@@ -1,0 +1,97 @@
+<script setup>
+import AppLayout from '@/Layouts/AppLayout.vue';
+import Welcome from '@/Components/Welcome.vue';
+import { Link } from '@inertiajs/vue3';
+
+const props = defineProps({
+    user: {
+        type: Object,
+        required: true,
+    },
+});
+
+// デバッグ用にpropsをログ出力
+console.log('Admin Dashboard props:', props);
+</script>
+
+<template>
+    <AppLayout title="Admin Dashboard">
+        <template #header>
+            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+                【管理者】{{ user?.name || 'ユーザー' }}さんのページ
+            </h2>
+        </template>
+
+        <div class="py-12">
+            <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+                <!-- ナビゲーションタブ -->
+                <div class="mb-6">
+                    <nav class="flex space-x-8" aria-label="Tabs">
+                        <a href="#" class="bg-red-100 text-red-700 px-3 py-2 font-medium text-sm rounded-md">
+                            管理者ダッシュボード
+                        </a>
+                        <Link :href="route('owner.dashboard')" class="text-orange-600 hover:text-orange-800 px-3 py-2 font-medium text-sm rounded-md border border-orange-200 hover:bg-orange-50">
+                            オーナーモードに切り替え
+                        </Link>
+                        <Link :href="route('user.dashboard')" class="text-blue-600 hover:text-blue-800 px-3 py-2 font-medium text-sm rounded-md border border-blue-200 hover:bg-blue-50">
+                            ユーザーモードに切り替え
+                        </Link>
+                        <Link :href="route('profile.show')" class="text-gray-600 hover:text-gray-800 px-3 py-2 font-medium text-sm rounded-md">
+                            プロフィール編集
+                        </Link>
+                    </nav>
+                </div>
+
+                <!-- プロフィール情報表示 -->
+                <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg p-6 mb-6">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">管理者プロフィール情報</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">名前</label>
+                            <p class="mt-1 text-sm text-gray-900">{{ user?.name || '未設定' }}</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">メールアドレス</label>
+                            <p class="mt-1 text-sm text-gray-900">{{ user?.email || '未設定' }}</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">所属</label>
+                            <p class="mt-1 text-sm text-gray-900">{{ user?.affiliation || '未設定' }}</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">担当</label>
+                            <p class="mt-1 text-sm text-gray-900">{{ user?.role || '未設定' }}</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">権限レベル</label>
+                            <p class="mt-1 text-sm text-red-600 font-semibold">{{ user?.user_role || '未設定' }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 管理者専用機能 -->
+                <div class="bg-red-50 overflow-hidden shadow-xl sm:rounded-lg p-6 mb-6">
+                    <h3 class="text-lg font-medium text-red-900 mb-4">管理者専用機能</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="bg-white p-4 rounded-lg border border-red-200">
+                            <h4 class="font-medium text-red-900">ユーザー管理</h4>
+                            <p class="text-sm text-red-700 mt-2">全ユーザーの管理、作成、編集、削除</p>
+                        </div>
+                        <div class="bg-white p-4 rounded-lg border border-red-200">
+                            <h4 class="font-medium text-red-900">システム設定</h4>
+                            <p class="text-sm text-red-700 mt-2">システム全体の設定管理</p>
+                        </div>
+                        <div class="bg-white p-4 rounded-lg border border-red-200">
+                            <h4 class="font-medium text-red-900">レポート</h4>
+                            <p class="text-sm text-red-700 mt-2">システム使用状況の確認</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg">
+                    <Welcome />
+                </div>
+            </div>
+        </div>
+    </AppLayout>
+</template>

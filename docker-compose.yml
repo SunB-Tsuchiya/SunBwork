@@ -1,0 +1,40 @@
+services:
+    laravel:
+        build:
+            context: './vendor/laravel/sail/runtimes/8.4'
+            dockerfile: Dockerfile
+            args:
+                WWWGROUP: '${WWWGROUP}'
+        image: 'sail-8.4/app'
+        container_name: sunbwork-laravel
+        platform: linux/arm64
+        extra_hosts:
+            - 'host.docker.internal:host-gateway'
+        ports:
+            - '${APP_PORT:-80}:80'
+            - '${VITE_PORT:-5173}:${VITE_PORT:-5173}'
+        environment:
+            WWWUSER: '${WWWUSER}'
+            LARAVEL_SAIL: 1
+            XDEBUG_MODE: '${SAIL_XDEBUG_MODE:-off}'
+            XDEBUG_CONFIG: '${SAIL_XDEBUG_CONFIG:-client_host=host.docker.internal}'
+            IGNITION_LOCAL_SITES_PATH: '${PWD}'
+        volumes:
+            - '.:/var/www/html'
+        networks:
+            - sail
+    adminer:
+        image: 'adminer:4.8.1'
+        container_name: sunbwork-adminer
+        platform: linux/arm64
+        ports:
+            - '${FORWARD_ADMINER_PORT:-8080}:8080'
+        volumes:
+            - '/home/tchirosb/SunBWork/database:/var/www/html/database'
+        environment:
+            ADMINER_PLUGINS: sqlite
+        networks:
+            - sail
+networks:
+    sail:
+        driver: bridge
