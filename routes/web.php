@@ -22,14 +22,14 @@ Route::middleware([
 ])->group(function () {
     Route::get('/dashboard', function () {
         $user = Auth::user();
-        
+
         // 最初のログイン時は最高権限のダッシュボードにリダイレクト
         if ($user->isAdmin()) {
             return redirect()->route('admin.dashboard');
         } elseif ($user->isOwner()) {
             return redirect()->route('owner.dashboard');
         }
-        
+
         // Regular user dashboard
         return Inertia::render('Dashboard', [
             'user' => $user,
@@ -42,6 +42,9 @@ Route::middleware([
             'user' => Auth::user(),
         ]);
     })->name('user.dashboard');
+
+    // チーム切り替え
+    Route::put('/current-team', [App\Http\Controllers\CurrentTeamController::class, 'update'])->name('current-team.update');
 });
 
 // Owner Routes (OwnerとAdminがアクセス可能)
@@ -58,4 +61,12 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     ->name('admin.')
     ->group(function () {
         Route::get('/dashboard', [App\Http\Controllers\Admin\DashboardController::class, 'index'])->name('dashboard');
+
+        // CSV一括登録（リソースルートより前に配置）
+        Route::get('users/csv/upload', [App\Http\Controllers\Admin\UserController::class, 'csvUpload'])->name('users.csv.upload');
+        Route::post('users/csv/preview', [App\Http\Controllers\Admin\UserController::class, 'csvPreview'])->name('users.csv.preview');
+        Route::post('users/csv/store', [App\Http\Controllers\Admin\UserController::class, 'csvStore'])->name('users.csv.store');
+
+        // ユーザー管理
+        Route::resource('users', App\Http\Controllers\Admin\UserController::class);
     });

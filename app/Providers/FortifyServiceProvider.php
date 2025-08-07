@@ -35,8 +35,16 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
         Fortify::redirectUserForTwoFactorAuthenticationUsing(RedirectIfTwoFactorAuthenticatable::class);
 
+        // 登録画面のビューカスタマイズ
+        Fortify::registerView(function () {
+            $companies = \App\Models\Company::with('departments')->where('active', 1)->get();
+            return \Inertia\Inertia::render('Auth/Register', [
+                'companies' => $companies
+            ]);
+        });
+
         RateLimiter::for('login', function (Request $request) {
-            $throttleKey = Str::transliterate(Str::lower($request->input(Fortify::username())).'|'.$request->ip());
+            $throttleKey = Str::transliterate(Str::lower($request->input(Fortify::username())) . '|' . $request->ip());
 
             return Limit::perMinute(5)->by($throttleKey);
         });

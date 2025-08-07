@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
@@ -31,9 +32,10 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'affiliation',
-        'role',
         'user_role',
+        'company_id',
+        'department_id',
+        'role_id',
     ];
 
     /**
@@ -92,5 +94,76 @@ class User extends Authenticatable
     public function isUser(): bool
     {
         return $this->user_role === 'user';
+    }
+
+    /**
+     * Get the company that the user belongs to
+     */
+    public function company()
+    {
+        return $this->belongsTo(\App\Models\Company::class);
+    }
+
+    /**
+     * Get the department that the user belongs to
+     */
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Department::class);
+    }
+
+    /**
+     * Get the current team with company and department information
+     */
+    public function currentTeamWithDetails()
+    {
+        if (!$this->current_team_id) {
+            return null;
+        }
+
+        return Team::with(['company', 'department'])
+            ->find($this->current_team_id);
+    }
+
+    /**
+     * Get all available teams for this user, organized by type
+     */
+    public function availableTeams()
+    {
+        $teams = $this->teams()->with(['company', 'department'])->get();
+
+        return [
+            'department' => $teams->where('team_type', 'department')->values(),
+            'personal' => $teams->where('team_type', 'personal')->values(),
+            'project' => $teams->where('team_type', 'project')->values(),
+        ];
+    }
+
+    /**
+     * ユーザーの役職
+     */
+    public function role(): BelongsTo
+    {
+        return $this->belongsTo(Role::class);
+    }
+
+    /**
+     * Get the current team details for team switcher
+     */
+    public function getCurrentTeamDetails()
+    {
+        $currentTeam = $this->currentTeamWithDetails();
+
+        if (!$currentTeam) {
+            return null;
+        }
+
+        return [
+            'id' => $currentTeam->id,
+            'name' => $currentTeam->name,
+            'team_type' => $currentTeam->team_type,
+            'company_name' => $currentTeam->company ? $currentTeam->company->name : null,
+            'department_name' => $currentTeam->department ? $currentTeam->department->name : null,
+        ];
     }
 }

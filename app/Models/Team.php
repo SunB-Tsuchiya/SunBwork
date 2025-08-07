@@ -21,6 +21,11 @@ class Team extends JetstreamTeam
     protected $fillable = [
         'name',
         'personal_team',
+        'user_id',
+        'company_id',
+        'department_id',
+        'team_type',
+        'description',
     ];
 
     /**
@@ -44,5 +49,37 @@ class Team extends JetstreamTeam
         return [
             'personal_team' => 'boolean',
         ];
+    }
+
+    /**
+     * チームの会社
+     */
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
+
+    /**
+     * チームの部署
+     */
+    public function department()
+    {
+        return $this->belongsTo(Department::class);
+    }
+
+    /**
+     * 部署チーム（個人チーム以外）のスコープ
+     */
+    public function scopeDepartmentTeams($query)
+    {
+        return $query->where('team_type', 'department');
+    }
+
+    /**
+     * 個人チームのスコープ
+     */
+    public function scopePersonalTeams($query)
+    {
+        return $query->where('personal_team', true);
     }
 }

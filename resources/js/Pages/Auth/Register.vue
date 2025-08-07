@@ -1,5 +1,6 @@
 <script setup>
 import { Head, Link, useForm } from '@inertiajs/vue3';
+import { ref, computed } from 'vue';
 import AuthenticationCard from '@/Components/AuthenticationCard.vue';
 import AuthenticationCardLogo from '@/Components/AuthenticationCardLogo.vue';
 import Checkbox from '@/Components/Checkbox.vue';
@@ -8,15 +9,66 @@ import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 
+const props = defineProps({
+    companies: Array,
+});
+
 const form = useForm({
     name: '',
     email: '',
     password: '',
     password_confirmation: '',
-    affiliation: '',
+    company_id: '',
+    department_id: '',
     role: '',
     terms: false,
 });
+
+// 選択した会社の部署一覧を取得
+const selectedCompanyDepartments = computed(() => {
+    if (!form.company_id) return [];
+    const company = props.companies.find(c => c.id == form.company_id);
+    return company ? company.departments : [];
+});
+
+// 選択した部署に応じた役職一覧を取得
+const availableRoles = computed(() => {
+    if (!form.department_id) return [];
+    
+    const department = selectedCompanyDepartments.value.find(d => d.id == form.department_id);
+    if (!department) return [];
+    
+    // 情報出版の場合
+    if (department.name === '情報出版') {
+        return [
+            '管理者',
+            '進行管理', 
+            'オペレーター',
+            '校正',
+            '営業',
+            'そのほか'
+        ];
+    } else {
+        // 情報出版以外（出力、オンデマンド）
+        return [
+            '管理者',
+            '進行管理',
+            'オペレーター', 
+            'そのほか'
+        ];
+    }
+});
+
+// 会社が変更された時に部署をリセット
+const onCompanyChange = () => {
+    form.department_id = '';
+    form.role = '';
+};
+
+// 部署が変更された時に役職をリセット
+const onDepartmentChange = () => {
+    form.role = '';
+};
 
 const submit = () => {
     form.post(route('register'), {
@@ -88,28 +140,54 @@ const submit = () => {
             </div>
 
             <div class="mt-4">
-                <InputLabel for="affiliation" value="所属" />
-                <TextInput
-                    id="affiliation"
-                    v-model="form.affiliation"
-                    type="text"
-                    class="mt-1 block w-full"
+                <InputLabel for="company" value="会社" />
+                <select
+                    id="company"
+                    v-model="form.company_id"
+                    @change="onCompanyChange"
+                    class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
                     required
-                    autocomplete="organization"
-                />
-                <InputError class="mt-2" :message="form.errors.affiliation" />
+                >
+                    <option value="">-- 会社を選択してください --</option>
+                    <option v-for="company in companies" :key="company.id" :value="company.id">
+                        {{ company.name }}
+                    </option>
+                </select>
+                <InputError class="mt-2" :message="form.errors.company_id" />
             </div>
 
             <div class="mt-4">
-                <InputLabel for="role" value="担当" />
-                <TextInput
+                <InputLabel for="department" value="部署" />
+                <select
+                    id="department"
+                    v-model="form.department_id"
+                    @change="onDepartmentChange"
+                    :disabled="!form.company_id"
+                    class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
+                    required
+                >
+                    <option value="">-- 部署を選択してください --</option>
+                    <option v-for="department in selectedCompanyDepartments" :key="department.id" :value="department.id">
+                        {{ department.name }}
+                    </option>
+                </select>
+                <InputError class="mt-2" :message="form.errors.department_id" />
+            </div>
+
+            <div class="mt-4">
+                <InputLabel for="role" value="役職・担当" />
+                <select
                     id="role"
                     v-model="form.role"
-                    type="text"
-                    class="mt-1 block w-full"
+                    :disabled="!form.department_id"
+                    class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
                     required
-                    autocomplete="organization-title"
-                />
+                >
+                    <option value="">-- 役職・担当を選択してください --</option>
+                    <option v-for="role in availableRoles" :key="role" :value="role">
+                        {{ role }}
+                    </option>
+                </select>
                 <InputError class="mt-2" :message="form.errors.role" />
             </div>
 

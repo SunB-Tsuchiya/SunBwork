@@ -30,6 +30,9 @@ console.log('Admin Dashboard props:', props);
                         <a href="#" class="bg-red-100 text-red-700 px-3 py-2 font-medium text-sm rounded-md">
                             管理者ダッシュボード
                         </a>
+                        <Link :href="route('admin.users.index')" class="text-red-600 hover:text-red-800 px-3 py-2 font-medium text-sm rounded-md border border-red-200 hover:bg-red-50">
+                            ユーザー管理
+                        </Link>
                         <Link :href="route('owner.dashboard')" class="text-orange-600 hover:text-orange-800 px-3 py-2 font-medium text-sm rounded-md border border-orange-200 hover:bg-orange-50">
                             オーナーモードに切り替え
                         </Link>
@@ -55,8 +58,11 @@ console.log('Admin Dashboard props:', props);
                             <p class="mt-1 text-sm text-gray-900">{{ user?.email || '未設定' }}</p>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">所属</label>
-                            <p class="mt-1 text-sm text-gray-900">{{ user?.affiliation || '未設定' }}</p>
+                            <label class="block text-sm font-medium text-gray-700">会社・部署</label>
+                            <p class="mt-1 text-sm text-gray-900">
+                                {{ user?.current_team?.company_name || '未設定' }}
+                                <span v-if="user?.current_team?.department_name"> - {{ user.current_team.department_name }}</span>
+                            </p>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700">担当</label>
