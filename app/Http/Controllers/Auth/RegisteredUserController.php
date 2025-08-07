@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Company;
 use App\Models\Department;
+use App\Models\Role;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,10 +24,19 @@ class RegisteredUserController extends Controller
      */
     public function create(): Response
     {
-        $companies = Company::with('departments')->where('active', 1)->get();
+        // 会社データを部署・役職とともに取得
+        $companies = Company::with([
+            'departments' => function ($query) {
+                $query->where('active', 1)
+                    ->with(['roles' => function ($roleQuery) {
+                        $roleQuery->where('active', 1)->orderBy('sort_order');
+                    }])
+                    ->orderBy('sort_order');
+            }
+        ])->where('active', 1)->get();
 
         return Inertia::render('Auth/Register', [
-            'companies' => $companies
+            'companies' => $companies->toArray()
         ]);
     }
 
@@ -43,15 +53,18 @@ class RegisteredUserController extends Controller
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'company_id' => 'required|exists:companies,id',
             'department_id' => 'required|exists:departments,id',
-            'role' => 'required|string|max:255',
+            'role_id' => 'required|exists:roles,id', // role_idを直接受け取る
+            'user_role' => 'required|in:admin,owner,user', // 権限レベルのバリデーション
         ]);
 
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'role' => $request->role,
-            'user_role' => 'user', // デフォルトは一般ユーザー
+            'company_id' => $request->company_id,     // 会社IDを保存
+            'department_id' => $request->department_id, // 部署IDを保存
+            'role_id' => $request->role_id,           // 役職IDを直接保存
+            'user_role' => $request->user_role,       // 権限レベルを保存
         ]);
 
         // 適切なチームを見つけて参加させる

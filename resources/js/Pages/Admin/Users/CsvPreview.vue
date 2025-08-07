@@ -148,7 +148,7 @@ const getRoleLabel = (role) => {
                                             メールアドレス
                                         </th>
                                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            役職
+                                            担当
                                         </th>
                                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                             システム権限

@@ -35,11 +35,23 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
         Fortify::redirectUserForTwoFactorAuthenticationUsing(RedirectIfTwoFactorAuthenticatable::class);
 
-        // 登録画面のビューカスタマイズ
+        // 【重要】登録画面のビューカスタマイズ
+        // Fortifyの登録機能を使用しているため、カスタムRegisterControllerは使用していません
+        // 登録画面のデータ提供はここで行います
         Fortify::registerView(function () {
-            $companies = \App\Models\Company::with('departments')->where('active', 1)->get();
+            // 会社・部署・役職の関連データを取得（Eager Loading使用）
+            $companies = \App\Models\Company::with([
+                'departments' => function ($query) {
+                    $query->where('active', 1)
+                        ->with(['roles' => function ($roleQuery) {
+                            $roleQuery->where('active', 1)->orderBy('sort_order');
+                        }])
+                        ->orderBy('sort_order');
+                }
+            ])->where('active', 1)->get();
+
             return \Inertia\Inertia::render('Auth/Register', [
-                'companies' => $companies
+                'companies' => $companies->toArray()
             ]);
         });
 

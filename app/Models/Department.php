@@ -41,6 +41,14 @@ class Department extends Model
     }
 
     /**
+     * 部署の役職
+     */
+    public function roles(): HasMany
+    {
+        return $this->hasMany(Role::class);
+    }
+
+    /**
      * アクティブな部署のみ取得
      */
     public function scopeActive($query)

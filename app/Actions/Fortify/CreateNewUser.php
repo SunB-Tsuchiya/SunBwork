@@ -4,6 +4,8 @@ namespace App\Actions\Fortify;
 
 use App\Models\Team;
 use App\Models\User;
+use App\Models\Department;
+use App\Models\Company;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -16,16 +18,23 @@ class CreateNewUser implements CreatesNewUsers
 
     /**
      * Create a newly registered user.
+     * 
+     * 【重要】Fortifyによる新規ユーザー登録処理
+     * カスタムフィールド: company_id, department_id, role_id, user_role
      *
      * @param  array<string, string>  $input
      */
     public function create(array $input): User
     {
+        // フォーム入力値のバリデーション
         Validator::make($input, [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'password' => $this->passwordRules(),
-            'role' => ['required', 'string', 'max:255'],
+            'company_id' => ['required', 'exists:companies,id'],
+            'department_id' => ['required', 'exists:departments,id'],
+            'role_id' => ['required', 'exists:roles,id'],
+            'user_role' => ['required', 'in:admin,owner,user'], // 権限レベル
             'terms' => Jetstream::hasTermsAndPrivacyPolicyFeature() ? ['accepted', 'required'] : '',
         ])->validate();
 
@@ -34,22 +43,40 @@ class CreateNewUser implements CreatesNewUsers
                 'name' => $input['name'],
                 'email' => $input['email'],
                 'password' => Hash::make($input['password']),
-                'role' => $input['role'],
-            ]), function (User $user) {
-                $this->createTeam($user);
+                'company_id' => $input['company_id'],
+                'department_id' => $input['department_id'],
+                'role_id' => $input['role_id'],
+                'user_role' => $input['user_role'],
+            ]), function (User $user) use ($input) {
+                $this->createTeam($user, $input);
             });
         });
     }
 
     /**
      * Create a personal team for the user.
+     * 
+     * 【重要】ユーザーを適切な部署チームに所属させる処理
+     * Jetstreamのチーム機能を使用
      */
-    protected function createTeam(User $user): void
+    protected function createTeam(User $user, array $input): void
     {
-        $user->ownedTeams()->save(Team::forceCreate([
+        // 適切なチームを見つけて参加させる
+        $department = \App\Models\Department::find($input['department_id']);
+        $team = Team::firstOrCreate([
+            'company_id' => $input['company_id'],
+            'department_id' => $input['department_id'],
+            'team_type' => 'department',
+        ], [
             'user_id' => $user->id,
-            'name' => explode(' ', $user->name, 2)[0] . "'s Team",
-            'personal_team' => true,
-        ]));
+            'name' => $department->company->name . ' - ' . $department->name,
+            'personal_team' => false,
+        ]);
+
+        if ($team) {
+            $user->teams()->attach($team, ['role' => 'editor']);
+            $user->current_team_id = $team->id;
+            $user->save();
+        }
     }
 }

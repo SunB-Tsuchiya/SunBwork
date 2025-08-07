@@ -1,6 +1,15 @@
 <script setup>
+// 【重要】Laravel Fortify + Inertia.js + Vue.js による登録画面
+// データ提供: app/Providers/FortifyServiceProvider.php
+// 登録処理: app/Actions/Fortify/CreateNewUser.php
+// 
+// 機能:
+// - 会社・部署・役職の連動ドロップダウン
+// - 権限レベル選択 (admin, owner, user)
+// - リアクティブフォーム処理
+
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import AuthenticationCard from '@/Components/AuthenticationCard.vue';
 import AuthenticationCardLogo from '@/Components/AuthenticationCardLogo.vue';
 import Checkbox from '@/Components/Checkbox.vue';
@@ -13,6 +22,16 @@ const props = defineProps({
     companies: Array,
 });
 
+// デバッグ用：取得したデータを確認
+console.log('Companies data:', props.companies);
+console.log('First company departments:', props.companies[0] ? props.companies[0].departments : 'No companies');
+if (props.companies[0] && props.companies[0].departments[0]) {
+    const firstDept = props.companies[0].departments[0];
+    console.log('First department:', firstDept);
+    console.log('First department keys:', Object.keys(firstDept));
+    console.log('First department roles property:', firstDept.roles);
+}
+
 const form = useForm({
     name: '',
     email: '',
@@ -20,7 +39,8 @@ const form = useForm({
     password_confirmation: '',
     company_id: '',
     department_id: '',
-    role: '',
+    role_id: '', // role_idに変更
+    user_role: 'user', // デフォルトは一般ユーザー
     terms: false,
 });
 
@@ -28,47 +48,65 @@ const form = useForm({
 const selectedCompanyDepartments = computed(() => {
     if (!form.company_id) return [];
     const company = props.companies.find(c => c.id == form.company_id);
+    console.log('Selected company:', company); // デバッグ用
+    console.log('Company departments:', company ? company.departments : 'No company'); // デバッグ用
     return company ? company.departments : [];
 });
 
-// 選択した部署に応じた役職一覧を取得
+// 選択した部署に応じた役職一覧を取得（rolesテーブルから）
 const availableRoles = computed(() => {
     if (!form.department_id) return [];
     
+    // 数値として比較（==で型変換も含める）
     const department = selectedCompanyDepartments.value.find(d => d.id == form.department_id);
-    if (!department) return [];
+    console.log('Selected department ID:', form.department_id); // デバッグ用
+    console.log('Available departments:', selectedCompanyDepartments.value); // デバッグ用
+    console.log('Found department:', department); // デバッグ用
+    console.log('Department keys:', department ? Object.keys(department) : 'No department'); // デバッグ用
+    console.log('Department roles property:', department ? department.roles : 'No department'); // デバッグ用
     
-    // 情報出版の場合
-    if (department.name === '情報出版') {
-        return [
-            '管理者',
-            '進行管理', 
-            'オペレーター',
-            '校正',
-            '営業',
-            'そのほか'
-        ];
-    } else {
-        // 情報出版以外（出力、オンデマンド）
-        return [
-            '管理者',
-            '進行管理',
-            'オペレーター', 
-            'そのほか'
-        ];
+    if (!department) {
+        console.log('Department not found'); // デバッグ用
+        return [];
     }
+    
+    if (!department.roles) {
+        console.log('No roles property found for department'); // デバッグ用
+        return [];
+    }
+    
+    // rolesテーブルのデータを使用
+    const roles = department.roles.filter(role => role.active);
+    console.log('Available roles:', roles); // デバッグ用
+    return roles;
 });
 
-// 会社が変更された時に部署をリセット
+// 権限レベルの選択肢
+const userRoleOptions = [
+    { value: 'admin', label: '管理者', description: '全ての機能にアクセス可能' },
+    { value: 'owner', label: 'オーナー', description: 'コンテンツ管理とユーザー機能にアクセス可能' },
+    { value: 'user', label: 'ユーザー', description: '基本機能のみアクセス可能' }
+];
+
+// 会社が変更された時に部署と役職をリセット
 const onCompanyChange = () => {
     form.department_id = '';
-    form.role = '';
+    form.role_id = '';
 };
 
 // 部署が変更された時に役職をリセット
 const onDepartmentChange = () => {
-    form.role = '';
+    form.role_id = '';
 };
+
+// フォームの値が変更されたときの監視
+watch(() => form.department_id, (newDepartmentId) => {
+    console.log('Department changed to:', newDepartmentId, typeof newDepartmentId);
+    if (newDepartmentId) {
+        // 文字列の場合は数値に変換
+        form.department_id = parseInt(newDepartmentId);
+    }
+}, { immediate: true });
 
 const submit = () => {
     form.post(route('register'), {
@@ -175,20 +213,56 @@ const submit = () => {
             </div>
 
             <div class="mt-4">
-                <InputLabel for="role" value="役職・担当" />
+                <InputLabel for="role_id" value="担当" />
                 <select
-                    id="role"
-                    v-model="form.role"
+                    id="role_id"
+                    v-model="form.role_id"
                     :disabled="!form.department_id"
                     class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
                     required
                 >
-                    <option value="">-- 役職・担当を選択してください --</option>
-                    <option v-for="role in availableRoles" :key="role" :value="role">
-                        {{ role }}
+                    <option value="">-- 担当を選択してください --</option>
+                    <option v-for="role in availableRoles" :key="role.id" :value="role.id">
+                        {{ role.name }}
                     </option>
                 </select>
-                <InputError class="mt-2" :message="form.errors.role" />
+                <InputError class="mt-2" :message="form.errors.role_id" />
+            </div>
+
+            <div class="mt-4">
+                <InputLabel for="user_role" value="権限レベル" />
+                <select
+                    id="user_role"
+                    v-model="form.user_role"
+                    class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
+                    required
+                >
+                    <option value="" disabled>権限レベルを選択してください</option>
+                    <option
+                        v-for="option in userRoleOptions"
+                        :key="option.value"
+                        :value="option.value"
+                    >
+                        {{ option.label }} - {{ option.description }}
+                    </option>
+                </select>
+                <InputError class="mt-2" :message="form.errors.user_role" />
+                
+                <!-- 権限レベルの説明 -->
+                <div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div class="bg-red-50 p-3 rounded-lg border border-red-200">
+                        <h4 class="font-medium text-red-900">管理者</h4>
+                        <p class="text-sm text-red-700 mt-1">全ての機能にアクセス可能。ユーザー管理、システム設定など。</p>
+                    </div>
+                    <div class="bg-orange-50 p-3 rounded-lg border border-orange-200">
+                        <h4 class="font-medium text-orange-900">オーナー</h4>
+                        <p class="text-sm text-orange-700 mt-1">コンテンツ管理とユーザー機能にアクセス可能。</p>
+                    </div>
+                    <div class="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                        <h4 class="font-medium text-blue-900">ユーザー</h4>
+                        <p class="text-sm text-blue-700 mt-1">基本機能のみアクセス可能。</p>
+                    </div>
+                </div>
             </div>
 
             <div v-if="$page.props.jetstream.hasTermsAndPrivacyPolicyFeature" class="mt-4">

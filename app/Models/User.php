@@ -36,6 +36,7 @@ class User extends Authenticatable
         'company_id',
         'department_id',
         'role_id',
+        'role',  // 担当（文字列）フィールドを追加
     ];
 
     /**
@@ -130,7 +131,10 @@ class User extends Authenticatable
      */
     public function availableTeams()
     {
-        $teams = $this->teams()->with(['company', 'department'])->get();
+        $teams = $this->teams()
+            ->withPivot('role')  // pivotテーブルのroleカラムを含める
+            ->with(['company', 'department'])
+            ->get();
 
         return [
             'department' => $teams->where('team_type', 'department')->values(),
@@ -145,6 +149,19 @@ class User extends Authenticatable
     public function role(): BelongsTo
     {
         return $this->belongsTo(Role::class);
+    }
+
+    /**
+     * Get all teams that the user owns or belongs to
+     */
+    public function allTeams()
+    {
+        $ownedTeams = $this->ownedTeams;
+        $memberTeams = $this->teams()
+            ->withPivot('role')  // pivotテーブルのroleカラムを含める
+            ->get();
+
+        return $ownedTeams->merge($memberTeams)->sortBy('name');
     }
 
     /**

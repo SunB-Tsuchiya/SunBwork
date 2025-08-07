@@ -26,7 +26,7 @@ class Company extends Model
      */
     public function departments(): HasMany
     {
-        return $this->hasMany(Department::class)->where('active', 1)->orderBy('sort_order');
+        return $this->hasMany(Department::class);
     }
 
     /**
