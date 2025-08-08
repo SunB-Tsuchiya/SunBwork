@@ -91,7 +91,7 @@ const submit = () => {
                                     <div class="font-semibold">name,email,password,role,user_role</div>
                                     <div class="text-gray-500 mt-2 mb-1"># データ行の例</div>
                                     <div>山田太郎,yamada@example.com,password123,管理者,user</div>
-                                    <div>佐藤花子,sato@example.com,password456,進行管理,owner</div>
+                                    <div>佐藤花子,sato@example.com,password456,進行管理,leader</div>
                                 </div>
                                 <div class="mt-4 text-sm text-gray-600">
                                     <h4 class="font-semibold mb-2">各列の説明：</h4>
@@ -100,7 +100,7 @@ const submit = () => {
                                         <li><strong>email:</strong> メールアドレス（重複不可）</li>
                                         <li><strong>password:</strong> パスワード</li>
                                         <li><strong>role:</strong> 担当（部署により異なる）</li>
-                                        <li><strong>user_role:</strong> システム権限（admin/owner/user のいずれか）</li>
+                                        <li><strong>user_role:</strong> システム権限（admin/leader/user のいずれか）</li>
                                     </ul>
                                 </div>
 
@@ -117,7 +117,7 @@ const submit = () => {
                                         </div>
                                         <div>
                                             <strong>システム権限:</strong> 
-                                            「管理者」→「admin」、「オーナー」→「owner」、「ユーザー」→「user」など
+                                            「管理者」→「admin」、「リーダー」→「leader」、「ユーザー」→「user」など
                                         </div>
                                     </div>
                                     <p class="text-xs text-blue-600 mt-2">

@@ -26,7 +26,7 @@ const submit = () => {
 
 const userRoleOptions = [
     { value: 'admin', label: '管理者', description: '全ての機能にアクセス可能' },
-    { value: 'owner', label: 'オーナー', description: 'コンテンツ管理とユーザー機能にアクセス可能' },
+    { value: 'leader', label: 'オーナー', description: 'コンテンツ管理とユーザー機能にアクセス可能' },
     { value: 'user', label: 'ユーザー', description: '基本機能のみアクセス可能' }
 ];
 </script>

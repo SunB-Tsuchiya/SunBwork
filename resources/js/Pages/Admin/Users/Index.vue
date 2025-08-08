@@ -13,7 +13,7 @@ const getRoleBadgeClass = (role) => {
     switch (role) {
         case 'admin':
             return 'bg-red-100 text-red-800';
-        case 'owner':
+        case 'leader':
             return 'bg-orange-100 text-orange-800';
         case 'user':
             return 'bg-blue-100 text-blue-800';
@@ -26,8 +26,8 @@ const getRoleText = (role) => {
     switch (role) {
         case 'admin':
             return '管理者';
-        case 'owner':
-            return 'オーナー';
+        case 'leader':
+            return 'リーダー';
         case 'user':
             return 'ユーザー';
         default:
@@ -60,8 +60,8 @@ const getRoleText = (role) => {
                         <a href="#" class="bg-red-100 text-red-700 px-3 py-2 font-medium text-sm rounded-md">
                             ユーザー管理
                         </a>
-                        <Link :href="route('owner.dashboard')" class="text-orange-600 hover:text-orange-800 px-3 py-2 font-medium text-sm rounded-md border border-orange-200 hover:bg-orange-50">
-                            オーナーモードに切り替え
+                        <Link :href="route('leader.dashboard')" class="text-orange-600 hover:text-orange-800 px-3 py-2 font-medium text-sm rounded-md border border-orange-200 hover:bg-orange-50">
+                            リーダーモードに切り替え
                         </Link>
                         <Link :href="route('user.dashboard')" class="text-blue-600 hover:text-blue-800 px-3 py-2 font-medium text-sm rounded-md border border-blue-200 hover:bg-blue-50">
                             ユーザーモードに切り替え

@@ -1,6 +1,6 @@
 <script setup>
 import AppLayout from '@/Layouts/AppLayout.vue';
-import Welcome from '@/Components/Welcome.vue';
+import Calendar from '@/Components/Calendar.vue'; // ←追加
 import { Link } from '@inertiajs/vue3';
 
 const props = defineProps({
@@ -21,8 +21,8 @@ console.log('Dashboard props:', props);
                 <template v-if="user?.user_role === 'admin'">
                     【管理者→ユーザーモード】{{ user?.name || 'ユーザー' }}さんのページ
                 </template>
-                <template v-else-if="user?.user_role === 'owner'">
-                    【オーナー→ユーザーモード】{{ user?.name || 'ユーザー' }}さんのページ
+                <template v-else-if="user?.user_role === 'leader'">
+                    【リーダー→ユーザーモード】{{ user?.name || 'ユーザー' }}さんのページ
                 </template>
                 <template v-else>
                     {{ user?.name || 'ユーザー' }}さんのページ
@@ -39,9 +39,9 @@ console.log('Dashboard props:', props);
                         <Link v-if="user?.user_role === 'admin'" :href="route('admin.dashboard')" class="text-red-600 hover:text-red-800 px-3 py-2 font-medium text-sm rounded-md border border-red-200 hover:bg-red-50">
                             管理者モードに戻る
                         </Link>
-                        <!-- オーナーまたは管理者の場合 -->
-                        <Link v-if="user?.user_role === 'owner' || user?.user_role === 'admin'" :href="route('owner.dashboard')" class="text-orange-600 hover:text-orange-800 px-3 py-2 font-medium text-sm rounded-md border border-orange-200 hover:bg-orange-50">
-                            オーナーモードに戻る
+                        <!-- リーダーまたは管理者の場合 -->
+                        <Link v-if="user?.user_role === 'leader' || user?.user_role === 'admin'" :href="route('leader.dashboard')" class="text-orange-600 hover:text-orange-800 px-3 py-2 font-medium text-sm rounded-md border border-orange-200 hover:bg-orange-50">
+                            リーダーモードに戻る
                         </Link>
                         <a href="#" class="bg-blue-100 text-blue-700 px-3 py-2 font-medium text-sm rounded-md">
                             ユーザーダッシュボード
@@ -79,7 +79,7 @@ console.log('Dashboard props:', props);
                 </div>
 
                 <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg">
-                    <Welcome />
+                    <Calendar /> <!-- ←Welcomeの代わりにCalendarを表示 -->
                 </div>
             </div>
         </div>

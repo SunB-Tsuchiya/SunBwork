@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Owner;
+namespace App\Http\Controllers\Leader;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -11,7 +11,7 @@ class DashboardController extends Controller
 {
     public function index()
     {
-        return Inertia::render('Owner/Dashboard', [
+        return Inertia::render('Leader/Dashboard', [
             'user' => Auth::user(),
         ]);
     }

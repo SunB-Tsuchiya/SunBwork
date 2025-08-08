@@ -43,9 +43,9 @@ class CurrentTeamController extends Controller
             return redirect()->route('admin.dashboard');
         }
 
-        // オーナー権限を持つ場合はオーナーダッシュボードへ
-        if ($user->isOwner()) {
-            return redirect()->route('owner.dashboard');
+        // リーダー権限を持つ場合はリーダーダッシュボードへ
+        if ($user->isLeader()) {
+            return redirect()->route('leader.dashboard');
         }
 
         // 一般ユーザーはユーザーダッシュボードへ

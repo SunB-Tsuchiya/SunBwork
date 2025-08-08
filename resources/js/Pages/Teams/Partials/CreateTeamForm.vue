@@ -30,7 +30,7 @@ const createTeam = () => {
 
         <template #form>
             <div class="col-span-6">
-                <InputLabel value="Team Owner" />
+                <InputLabel value="Team Leader" />
 
                 <div class="flex items-center mt-2">
                     <img class="object-cover size-12 rounded-full" :src="$page.props.auth.user.profile_photo_url" :alt="$page.props.auth.user.name">

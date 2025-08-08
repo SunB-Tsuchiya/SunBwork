@@ -3,9 +3,9 @@
 // データ提供: app/Providers/FortifyServiceProvider.php
 // 登録処理: app/Actions/Fortify/CreateNewUser.php
 // 
-// 機能:
+// 機能:    
 // - 会社・部署・役職の連動ドロップダウン
-// - 権限レベル選択 (admin, owner, user)
+// - 権限レベル選択 (admin, leader, user)
 // - リアクティブフォーム処理
 
 import { Head, Link, useForm } from '@inertiajs/vue3';
@@ -84,7 +84,7 @@ const availableRoles = computed(() => {
 // 権限レベルの選択肢
 const userRoleOptions = [
     { value: 'admin', label: '管理者', description: '全ての機能にアクセス可能' },
-    { value: 'owner', label: 'オーナー', description: 'コンテンツ管理とユーザー機能にアクセス可能' },
+    { value: 'leader', label: 'リーダー', description: 'コンテンツ管理とユーザー機能にアクセス可能' },
     { value: 'user', label: 'ユーザー', description: '基本機能のみアクセス可能' }
 ];
 
@@ -255,7 +255,7 @@ const submit = () => {
                         <p class="text-sm text-red-700 mt-1">全ての機能にアクセス可能。ユーザー管理、システム設定など。</p>
                     </div>
                     <div class="bg-orange-50 p-3 rounded-lg border border-orange-200">
-                        <h4 class="font-medium text-orange-900">オーナー</h4>
+                        <h4 class="font-medium text-orange-900">リーダー</h4>
                         <p class="text-sm text-orange-700 mt-1">コンテンツ管理とユーザー機能にアクセス可能。</p>
                     </div>
                     <div class="bg-blue-50 p-3 rounded-lg border border-blue-200">

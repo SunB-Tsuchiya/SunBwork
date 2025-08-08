@@ -29,8 +29,8 @@ Route::middleware([
         // 最初のログイン時は最高権限のダッシュボードにリダイレクト
         if ($user->isAdmin()) {
             return redirect()->route('admin.dashboard');
-        } elseif ($user->isOwner()) {
-            return redirect()->route('owner.dashboard');
+        } elseif ($user->isLeader()) {
+            return redirect()->route('leader.dashboard');
         }
 
         // Regular user dashboard
@@ -39,7 +39,7 @@ Route::middleware([
         ]);
     })->name('dashboard');
 
-    // User Dashboard (一般ユーザー機能 - Admin, Ownerもアクセス可能)
+    // User Dashboard (一般ユーザー機能 - Admin, Leaderもアクセス可能)
     Route::get('/user/dashboard', function () {
         return Inertia::render('Dashboard', [
             'user' => Auth::user(),
@@ -48,14 +48,18 @@ Route::middleware([
 
     // チーム切り替え
     Route::put('/current-team', [App\Http\Controllers\CurrentTeamController::class, 'update'])->name('current-team.update');
+
+    // 日報機能（作成、保存、表示、編集、更新、削除）
+    Route::resource('diaries', App\Http\Controllers\DiaryController::class)
+        ->only(['create', 'store', 'show', 'edit', 'update', 'destroy']);
 });
 
-// Owner Routes (OwnerとAdminがアクセス可能)
-Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'owner'])
-    ->prefix('owner')
-    ->name('owner.')
+// Leader Routes (LeaderとAdminがアクセス可能)
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'leader'])
+    ->prefix('leader')
+    ->name('leader.')
     ->group(function () {
-        Route::get('/dashboard', [App\Http\Controllers\Owner\DashboardController::class, 'index'])->name('dashboard');
+        Route::get('/dashboard', [App\Http\Controllers\Leader\DashboardController::class, 'index'])->name('dashboard');
     });
 
 // Admin Routes (Adminのみアクセス可能)

@@ -64,7 +64,9 @@
                                     <div>
                                         <div class="font-medium">{{ team.name }}</div>
                                         <div class="text-xs text-gray-500">{{ team.company_name }} - {{ team.department_name }}</div>
-                                        <div class="text-xs text-blue-600">役割: {{ team.pivot.role }}</div>
+                                        <div class="text-xs text-blue-600">
+                                            役割2: {{ team.pivot && team.pivot.role || 'メンバー' }}
+                                        </div>
                                     </div>
                                 </div>
                             </button>
@@ -89,7 +91,9 @@
                                     <div>
                                         <div class="font-medium">{{ team.name }}</div>
                                         <div class="text-xs text-gray-500">個人ワークスペース</div>
-                                        <div class="text-xs text-green-600">役割: {{ team.pivot.role }}</div>
+                                        <div class="text-xs text-green-600">
+                                             役割: {{ team.pivot && team.pivot.role || 'オーナー' }} 
+                                        </div>
                                     </div>
                                 </div>
                             </button>

@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
-class OwnerMiddleware
+class LeaderMiddleware
 {
     /**
      * Handle an incoming request.
@@ -16,7 +16,7 @@ class OwnerMiddleware
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (!Auth::check() || (!Auth::user()->isOwner() && !Auth::user()->isAdmin())) {
+        if (!Auth::check() || (!Auth::user()->isLeader() && !Auth::user()->isAdmin())) {
             abort(403, 'Leader or Admin access required.');
         }
 

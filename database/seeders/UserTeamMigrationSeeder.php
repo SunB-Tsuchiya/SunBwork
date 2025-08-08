@@ -22,8 +22,8 @@ class UserTeamMigrationSeeder extends Seeder
             $role = 'member';
             if ($user->user_role === 'admin') {
                 $role = 'admin';
-            } elseif ($user->user_role === 'owner') {
-                $role = 'owner';
+            } elseif ($user->user_role === 'leader') {
+                $role = 'leader';
             }
 
             // team_userテーブルにメンバーシップを追加（重複チェック）

@@ -34,7 +34,7 @@ class CreateNewUser implements CreatesNewUsers
             'company_id' => ['required', 'exists:companies,id'],
             'department_id' => ['required', 'exists:departments,id'],
             'role_id' => ['required', 'exists:roles,id'],
-            'user_role' => ['required', 'in:admin,owner,user'], // 権限レベル
+            'user_role' => ['required', 'in:admin,leader,user'], // 権限レベル (owner→leaderに変更)
             'terms' => Jetstream::hasTermsAndPrivacyPolicyFeature() ? ['accepted', 'required'] : '',
         ])->validate();
 

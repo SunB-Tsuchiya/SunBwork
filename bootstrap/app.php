@@ -30,7 +30,8 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
-            'owner' => \App\Http\Middleware\OwnerMiddleware::class,
+            'leader' => \App\Http\Middleware\LeaderMiddleware::class,
+            'owner' => \App\Http\Middleware\OwnerMiddleware::class, // 後方互換性のため残す
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

@@ -45,7 +45,7 @@ Fortify::registerView(function () {
 - `company_id`: 会社ID
 - `department_id`: 部署ID  
 - `role_id`: 役職ID
-- `user_role`: 権限レベル (admin, owner, user)
+- `user_role`: 権限レベル (admin, leader, user)
 
 ### 3. フロントエンド登録画面
 **ファイル**: `resources/js/Pages/Auth/Register.vue`

@@ -82,11 +82,19 @@ class User extends Authenticatable
     }
 
     /**
-     * Check if user is owner
+     * Check if user is leader
+     */
+    public function isLeader(): bool
+    {
+        return $this->user_role === 'leader';
+    }
+
+    /**
+     * Check if user is owner (deprecated - use isLeader())
      */
     public function isOwner(): bool
     {
-        return $this->user_role === 'owner';
+        return $this->isLeader();
     }
 
     /**
@@ -131,15 +139,19 @@ class User extends Authenticatable
      */
     public function availableTeams()
     {
-        $teams = $this->teams()
-            ->withPivot('role')  // pivotテーブルのroleカラムを含める
+        $personalTeams = $this->ownedTeams()
             ->with(['company', 'department'])
             ->get();
 
+        $memberTeams = $this->teams()
+            ->withPivot('role')
+            ->with(['company', 'department'])
+            ->get();
+
+        // TeamSwitcher.vueが期待する構造で返す
         return [
-            'department' => $teams->where('team_type', 'department')->values(),
-            'personal' => $teams->where('team_type', 'personal')->values(),
-            'project' => $teams->where('team_type', 'project')->values(),
+            'personal' => $personalTeams,
+            'department' => $memberTeams
         ];
     }
 
@@ -156,12 +168,23 @@ class User extends Authenticatable
      */
     public function allTeams()
     {
-        $ownedTeams = $this->ownedTeams;
-        $memberTeams = $this->teams()
-            ->withPivot('role')  // pivotテーブルのroleカラムを含める
+        $personalTeams = $this->ownedTeams()
+            ->with(['company', 'department'])
             ->get();
 
-        return $ownedTeams->merge($memberTeams)->sortBy('name');
+        $memberTeams = $this->teams()
+            ->withPivot('role')  // この行を追加/確認
+            ->get();
+
+        return $personalTeams->merge($memberTeams);
+    }
+
+    /**
+     * ユーザーの日報
+     */
+    public function diaries()
+    {
+        return $this->hasMany(Diary::class);
     }
 
     /**

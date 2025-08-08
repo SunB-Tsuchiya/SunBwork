@@ -48,7 +48,7 @@ class UserController extends Controller
             'email' => 'required|string|lowercase|email|max:255|unique:users',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'role' => 'required|string|max:255',
-            'user_role' => 'required|in:admin,owner,user',
+            'user_role' => 'required|in:admin,leader,user',
         ]);
 
         $user = User::create([
@@ -103,7 +103,7 @@ class UserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|lowercase|email|max:255|unique:users,email,' . $user->id,
             'role' => 'required|string|max:255',
-            'user_role' => 'required|in:admin,owner,user',
+            'user_role' => 'required|in:admin,leader,user',
         ]);
 
         $user->update([
@@ -309,7 +309,7 @@ class UserController extends Controller
                 'users.*.email' => 'required|string|lowercase|email|max:255|unique:users',
                 'users.*.password' => 'required|string',
                 'users.*.role' => 'required|string|max:255',
-                'users.*.user_role' => 'required|in:admin,owner,user',
+                'users.*.user_role' => 'required|in:admin,leader,user',
                 'company_id' => 'required|exists:companies,id',
                 'department_id' => 'required|exists:departments,id',
             ]);
@@ -526,15 +526,15 @@ class UserController extends Controller
      */
     private function validateAndFixUserRole($userRole)
     {
-        $validUserRoles = ['admin', 'owner', 'user'];
+        $validUserRoles = ['admin', 'leader', 'user'];
 
         // タイポ修正マップ
         $typoFixes = [
             'administrator' => 'admin',
             'アドミン' => 'admin',
             '管理者' => 'admin',
-            'オーナー' => 'owner',
-            'manager' => 'owner',
+            'リーダー' => 'leader',
+            'manager' => 'leader',
             'ユーザー' => 'user',
             'member' => 'user',
         ];

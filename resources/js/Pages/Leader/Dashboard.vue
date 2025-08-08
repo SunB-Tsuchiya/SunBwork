@@ -11,14 +11,14 @@ const props = defineProps({
 });
 
 // デバッグ用にpropsをログ出力
-console.log('Owner Dashboard props:', props);
+console.log('Leader Dashboard props:', props);
 </script>
 
 <template>
-    <AppLayout title="Owner Dashboard">
+    <AppLayout title="Leader Dashboard">
         <template #header>
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                【オーナー】{{ user?.name || 'ユーザー' }}さんのページ
+                【リーダー】{{ user?.name || 'ユーザー' }}さんのページ
             </h2>
         </template>
 
@@ -32,7 +32,7 @@ console.log('Owner Dashboard props:', props);
                             管理者モードに戻る
                         </Link>
                         <a href="#" class="bg-orange-100 text-orange-700 px-3 py-2 font-medium text-sm rounded-md">
-                            オーナーダッシュボード
+                            リーダーダッシュボード
                         </a>
                         <Link :href="route('user.dashboard')" class="text-blue-600 hover:text-blue-800 px-3 py-2 font-medium text-sm rounded-md border border-blue-200 hover:bg-blue-50">
                             ユーザーモードに切り替え

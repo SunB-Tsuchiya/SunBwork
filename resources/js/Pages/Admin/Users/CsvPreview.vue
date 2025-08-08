@@ -30,7 +30,7 @@ const getRoleBadgeClass = (role) => {
     switch (role) {
         case 'admin':
             return 'bg-red-100 text-red-800';
-        case 'owner':
+        case 'leader':
             return 'bg-orange-100 text-orange-800';
         case 'user':
             return 'bg-blue-100 text-blue-800';
@@ -43,8 +43,8 @@ const getRoleLabel = (role) => {
     switch (role) {
         case 'admin':
             return '管理者';
-        case 'owner':
-            return 'オーナー';
+        case 'leader':
+            return 'リーダー';
         case 'user':
             return 'ユーザー';
         default:

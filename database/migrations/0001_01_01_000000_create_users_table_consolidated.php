@@ -30,7 +30,7 @@ return new class extends Migration
             $table->string('profile_photo_path', 2048)->nullable();
 
             // User Role System
-            $table->enum('user_role', ['admin', 'owner', 'user'])->default('user');
+            $table->enum('user_role', ['admin', 'leader', 'user'])->default('user');
 
             // Organization Structure
             $table->foreignId('company_id')->nullable()->constrained()->onDelete('set null');
