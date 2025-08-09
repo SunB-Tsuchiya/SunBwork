@@ -9,6 +9,16 @@ use Inertia\Inertia;
 
 class DiaryController extends Controller
 {
+    public function index()
+    {
+        $diaries = Diary::where('user_id', Auth::id())
+            ->orderByDesc('date')
+            ->get();
+        return Inertia::render('Diaries/Index', [
+            'diaries' => $diaries,
+        ]);
+    }
+
     public function create(Request $request)
     {
         // date param optional
@@ -26,7 +36,7 @@ class DiaryController extends Controller
         ]);
         $data['user_id'] = Auth::id();
         $diary = Diary::create($data);
-        return redirect()->route('diaries.show', $diary->id);
+        return redirect()->route('diaries.index', $diary->id);
     }
 
     public function show(Diary $diary)

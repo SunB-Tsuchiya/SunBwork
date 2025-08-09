@@ -51,7 +51,7 @@ Route::middleware([
 
     // 日報機能（作成、保存、表示、編集、更新、削除）
     Route::resource('diaries', App\Http\Controllers\DiaryController::class)
-        ->only(['create', 'store', 'show', 'edit', 'update', 'destroy']);
+        ->only(['create', 'store', 'show', 'edit', 'update', 'destroy', 'index']);
 });
 
 // Leader Routes (LeaderとAdminがアクセス可能)

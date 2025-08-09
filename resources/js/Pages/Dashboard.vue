@@ -49,6 +49,10 @@ console.log('Dashboard props:', props);
                         <Link :href="route('profile.show')" class="text-gray-600 hover:text-gray-800 px-3 py-2 font-medium text-sm rounded-md">
                             プロフィール編集
                         </Link>
+                        <Link :href="route('diaries.index')" class="text-gray-600 hover:text-gray-800 px-3 py-2 font-medium text-sm rounded-md">
+                            日報一覧
+                        </Link>
+
                     </nav>
                 </div>
 
