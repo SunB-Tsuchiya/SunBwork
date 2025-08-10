@@ -89,7 +89,7 @@ class DiaryController extends Controller
             }
         }
 
-        return redirect()->route('diaries.index', $diary->id);
+    return redirect()->route('dashboard');
     }
 
     public function show(Diary $diary)

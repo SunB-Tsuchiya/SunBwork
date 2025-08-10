@@ -12,10 +12,13 @@ class DashboardController extends Controller
     public function index()
     {
         $user = Auth::user();
-        $diaries = Diary::where('user_id', $user->id)
-            ->where('date', '>=', now()->startOfMonth())
-            ->where('date', '<=', now()->endOfMonth())
-            ->get();
+        $diaries = [];
+        if ($user) {
+            $diaries = Diary::where('user_id', $user->id)
+                ->where('date', '>=', now()->startOfMonth())
+                ->where('date', '<=', now()->endOfMonth())
+                ->get();
+        }
 
         // 予定一覧（当月分、日付・タイトルのみ）
         $events = \App\Models\Event::where('user_id', $user->id)

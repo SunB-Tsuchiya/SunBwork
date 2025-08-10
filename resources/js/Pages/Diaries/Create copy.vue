@@ -5,12 +5,15 @@ import { useForm, Link } from '@inertiajs/vue3'
 import { route } from 'ziggy-js'
 import 'quill/dist/quill.snow.css';
 
+import { quillEditor } from 'vue3-quill';
 import { QuillEditor } from '@vueup/vue-quill';
-import { defaultToolbar } from '@/config/quillToolbar';
+
+console.log('quill-editor: running');
 
 const props = defineProps({
   date: String
 })
+
 
 const content = ref('');
 const form = useForm({
@@ -19,6 +22,19 @@ const form = useForm({
   files: []
 });
 
+const defaultToolbar = [
+  'bold', 'italic', 'underline',
+  'blockquote', 'code-block', 'link', 
+  'image', 'video', 'formula',
+  { 'header': 1 }, { 'header': 2 },
+  { 'list': 'ordered'}, { 'list': 'bullet' }, { 'list': 'check' },
+  { 'script': 'sub'}, { 'script': 'super' },
+  { 'indent': '-1'}, { 'indent': '+1' },
+  { 'direction': 'rtl' },
+  { 'size': ['small', false, 'large', 'huge'] },
+  { 'header': [1, 2, 3, 4, 5, 6, false] },
+  { 'color': [] }, { 'background': [] },{ 'font': [] },{ 'align': [] },
+'clean'];
 
 const submit = () => {
   const html = form.content?.trim() || '';
@@ -69,10 +85,10 @@ function stripHtml(html) {
 
             /></div>
         </div>
-        <!-- <div class="mb-4">
+        <div class="mb-4">
           <label class="block text-sm font-medium text-gray-700 mb-1">入力内容がここに出ます（HTML）</label>
             <div class="p-2 bg-gray-100 border rounded min-h-[40px]">{{ stripHtml(form.content) }}</div>
-        </div> -->
+        </div>
         <div class="mb-4">
           <label class="block text-sm font-medium text-gray-700 mb-1">添付ファイル</label>
           <input type="file" multiple @change="e => form.files = Array.from(e.target.files)" class="w-full border rounded p-2" />

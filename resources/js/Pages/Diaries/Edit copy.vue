@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, watch, onMounted } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import { Link } from '@inertiajs/vue3';
 import { route } from 'ziggy-js';
@@ -9,28 +9,43 @@ import { defaultToolbar } from '@/config/quillToolbar';
 import AppLayout from '@/layouts/AppLayout.vue';
 
 const props = defineProps({ diary: Object });
+
 const content = ref('');
-let editorInstance = null;
+const quillInstance = ref(null); // Quill のインスタンス
 
 onMounted(() => {
-  console.log('[onMounted] props.diary.content:', props.diary?.content);
+  content.value = props.diary.content || '<p>初期値がありません</p>';
+  console.log('onMounted で content を再設定:', content.value);
 });
 
-function handleEditorReady(editor) {
-  editorInstance = editor;
-  // HTML→Delta変換して初期表示
-  const delta = editor.clipboard.convert(props.diary.content || '<p>初期値がありません</p>');
-  editor.setContents(delta);
-  console.log('[handleEditorReady] setContents:', delta);
-}
+const onEditorReady = (quill) => {
+  quillInstance.value = quill;
+  console.log('QuillEditor が ready:', quill);
+
+  // 初期値を直接設定
+  quill.root.innerHTML = content.value;
+  console.log('QuillEditor に innerHTML を設定:', quill.root.innerHTML);
+};
 
 const form = useForm({
   content: content.value,
   files: [],
 });
 
+watch(content, (val) => {
+  console.log('watch: QuillEditor content changed:', val);
+});
+
 const submit = () => {
   form.content = content.value;
+  const html = form.content?.trim() || '';
+  console.log('submit 実行時の content:', html);
+
+  if (html === '' || html === '<p><br></p>' || html === '<p></p>') {
+    form.content = '';
+    console.log('空のコンテンツとして処理されました');
+  }
+
   form.put(route('diaries.update', props.diary.id), { forceFormData: true });
 };
 </script>
@@ -47,7 +62,7 @@ const submit = () => {
             :toolbar="defaultToolbar"
             style="min-height:180px;height:180px;background:#fff"
             v-model="content"
-            @ready="handleEditorReady"
+            @ready="onEditorReady"
           />
         </div>
         <div class="flex space-x-4">
