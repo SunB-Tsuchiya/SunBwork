@@ -1,5 +1,5 @@
 <script setup>
-import AppLayout from '@/Layouts/AppLayout.vue';
+import AppLayout from '@/layouts/AppLayout.vue';
 import Calendar from '@/Components/Calendar.vue'; // ←追加
 import { Link } from '@inertiajs/vue3';
 
@@ -8,10 +8,14 @@ const props = defineProps({
         type: Object,
         required: true,
     },
+    diaries: {
+        type: Array,
+        required: true,
+    },
 });
 
 // デバッグ用にpropsをログ出力
-console.log('Dashboard props:', props);
+console.log('Dashboard props:', props, 'Dashboard diaries:', props.diaries);
 </script>
 
 <template>
@@ -83,7 +87,7 @@ console.log('Dashboard props:', props);
                 </div>
 
                 <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg">
-                    <Calendar /> <!-- ←Welcomeの代わりにCalendarを表示 -->
+                    <Calendar :diaries="diaries" /> <!-- ←diariesを渡す -->
                 </div>
             </div>
         </div>

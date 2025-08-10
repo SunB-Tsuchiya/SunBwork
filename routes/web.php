@@ -18,26 +18,14 @@ Route::get('/', function () {
 });
 
 // User Dashboard (default authenticated users)
-Route::middleware([
-    'auth:sanctum',
-    config('jetstream.auth_session'),
-    'verified',
-])->group(function () {
-    Route::get('/dashboard', function () {
-        $user = Auth::user();
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified'])->group(function () {
+    // 予定（イベント）API
+    Route::get('/events', [App\Http\Controllers\EventController::class, 'index'])->name('events.index');
+    Route::post('/events', [App\Http\Controllers\EventController::class, 'store'])->name('events.store');
+    Route::put('/events/{event}', [App\Http\Controllers\EventController::class, 'update'])->name('events.update');
+    Route::delete('/events/{event}', [App\Http\Controllers\EventController::class, 'destroy'])->name('events.destroy');
 
-        // 最初のログイン時は最高権限のダッシュボードにリダイレクト
-        if ($user->isAdmin()) {
-            return redirect()->route('admin.dashboard');
-        } elseif ($user->isLeader()) {
-            return redirect()->route('leader.dashboard');
-        }
-
-        // Regular user dashboard
-        return Inertia::render('Dashboard', [
-            'user' => $user,
-        ]);
-    })->name('dashboard');
+    Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
 
     // User Dashboard (一般ユーザー機能 - Admin, Leaderもアクセス可能)
     Route::get('/user/dashboard', function () {
@@ -77,3 +65,13 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         // ユーザー管理
         Route::resource('users', App\Http\Controllers\Admin\UserController::class);
     });
+
+// デバッグ・テスト用ページのルート例
+// 今後も任意のVueページをテスト表示したい場合は、下記のようにInertia::renderでページ名を指定してください。
+// 例: /debug/create → resources/js/Pages/Diaries/CreateDebug.vue
+// 例: /debug/other  → resources/js/Pages/OtherDebug.vue
+
+
+Route::get('/debug/create', function() {
+    return Inertia::render('Diaries/CreateDebug');
+})->name('debug.create');
