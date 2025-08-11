@@ -203,7 +203,8 @@ const events = ref([
       end: event.end ?? undefined,
       allDay: false,
       color: `rgba(37,99,235,${alpha})`,
-      event_id: event.id
+      event_id: event.id,
+      description: event.description ?? ''
     };
   })
 ]);
@@ -227,6 +228,57 @@ const calendarOptions = computed(() => ({
   weekText: '週',
   dayHeaderFormat: { weekday: 'short' },
   slotDuration: '00:15:00',
+  editable: true, // イベントのドラッグ・リサイズを有効化
+  eventDurationEditable: true,
+  eventResizableFromStart: true,
+  eventResize: async function(info) {
+    const newStart = info.event.start;
+    const newEnd = info.event.end;
+    // date, startHour, startMinute, endHour, endMinuteを抽出
+    const startDateObj = new Date(newStart);
+    const endDateObj = new Date(newEnd);
+    const date = startDateObj.toISOString().slice(0,10);
+    const startHour = String(startDateObj.getHours()).padStart(2, '0');
+    const startMinute = String(startDateObj.getMinutes()).padStart(2, '0');
+    const endHour = String(endDateObj.getHours()).padStart(2, '0');
+    const endMinute = String(endDateObj.getMinutes()).padStart(2, '0');
+    if (confirm(`予定の時間を変更しますか？\n開始: ${date} ${startHour}:${startMinute}\n終了: ${date} ${endHour}:${endMinute}`)) {
+      try {
+        // バリデーション用: タイトル・説明が空やタグのみの場合はダミー値をセット
+        function stripTags(str) { return str ? str.replace(/<[^>]*>?/gm, '') : ''; }
+        const safeTitle = info.event.title && stripTags(info.event.title).trim() !== '' ? info.event.title : 'タイトル未設定';
+        const safeDescription = info.event.extendedProps.description && stripTags(info.event.extendedProps.description).trim() !== '' ? info.event.extendedProps.description : '内容未設定';
+        console.log('eventResize送信データ', {
+          date,
+          startHour,
+          startMinute,
+          endHour,
+          endMinute,
+          title: safeTitle,
+          description: safeDescription
+        });
+        await axios.put(`/events/${info.event.extendedProps.event_id}/calendar`, {
+          date,
+          startHour,
+          startMinute,
+          endHour,
+          endMinute
+        });
+        alert('予定を更新しました');
+      } catch (e) {
+        console.log('eventResize error:', e);
+        if (e.response && e.response.data) {
+          alert('予定の更新に失敗しました');
+          console.log('API error detail:', e.response.data);
+        } else {
+          alert('予定の更新に失敗しました');
+        }
+        info.revert(); // 失敗時は元に戻す
+      }
+    } else {
+      info.revert(); // キャンセル時は元に戻す
+    }
+  },
   eventClick: function(info) {
     // 日報ラベルクリック時のみ遷移
     if (info.event.extendedProps.diary_id) {

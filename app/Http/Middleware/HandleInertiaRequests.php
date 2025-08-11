@@ -37,14 +37,7 @@ class HandleInertiaRequests extends Middleware
     {
         return [
             ...parent::share($request),
-            'auth' => [
-                'user' => $request->user() ? [
-                    ...$request->user()->toArray(),
-                    'all_teams' => $request->user()->allTeams(),
-                    'current_team' => $request->user()->getCurrentTeamDetails(),
-                    'available_teams' => $request->user()->availableTeams(),
-                ] : null,
-            ],
+            //
         ];
     }
 }

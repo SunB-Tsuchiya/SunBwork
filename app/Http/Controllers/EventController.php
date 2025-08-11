@@ -12,6 +12,32 @@ use Inertia\Inertia;
 
 class EventController extends Controller
 {
+    /**
+     * カレンダーからのリサイズ用: 時間のみバリデート・更新
+     */
+    public function update_from_calendar(Request $request, $id)
+    {
+        $event = Event::findOrFail($id);
+        $validated = $request->validate([
+            'date' => ['required', 'date'],
+            'startHour' => ['required', 'regex:/^\\d{2}$/'],
+            'startMinute' => ['required', 'regex:/^\\d{2}$/'],
+            'endHour' => ['required', 'regex:/^\\d{2}$/'],
+            'endMinute' => ['required', 'regex:/^\\d{2}$/'],
+        ]);
+
+        // 日付と時刻を結合
+        $start = $validated['date'] . ' ' . $validated['startHour'] . ':' . $validated['startMinute'] . ':00';
+        $end = $validated['date'] . ' ' . $validated['endHour'] . ':' . $validated['endMinute'] . ':00';
+
+        $event->start = $start;
+        $event->end = $end;
+        $event->save();
+
+        return response()->json(['message' => 'Event time updated successfully.']);
+    }
+
+
     // ユーザーの予定一覧取得（カレンダー表示用）
     public function index()
     {
@@ -47,14 +73,14 @@ class EventController extends Controller
         // 開始・終了時刻を結合
         $data['start'] = $data['date'] . ' ' . $data['startHour'] . ':' . $data['startMinute'] . ':00';
         $data['end'] = $data['date'] . ' ' . $data['endHour'] . ':' . $data['endMinute'] . ':00';
-    $event = new Event();
-    $event->user_id = Auth::id();
-    $event->title = $data['title'];
-    $event->description = $data['description'];
-    $event->start = $data['start'];
-    $event->end = $data['end'];
-    $event->date = $data['date'];
-    $event->save();
+        $event = new Event();
+        $event->user_id = Auth::id();
+        $event->title = $data['title'];
+        $event->description = $data['description'];
+        $event->start = $data['start'];
+        $event->end = $data['end'];
+        $event->date = $data['date'];
+        $event->save();
 
         // 添付ファイル保存
         if ($request->hasFile('files')) {
@@ -94,12 +120,11 @@ class EventController extends Controller
     // 予定の更新
     public function update(Request $request, Event $event)
     {
-        
-    \Log::debug('Event update request', $request->all());
-    $this->authorize('update', $event);
-    \Log::debug('Request all: ' . json_encode($request->all(), JSON_UNESCAPED_UNICODE));
-    \Log::debug('Request input: ' . json_encode($request->input(), JSON_UNESCAPED_UNICODE));
-    // $request->get()は引数必須のため削除
+        \Log::debug('Event update request', $request->all());
+        $this->authorize('update', $event);
+        \Log::debug('Request all: ' . json_encode($request->all(), JSON_UNESCAPED_UNICODE));
+        \Log::debug('Request input: ' . json_encode($request->input(), JSON_UNESCAPED_UNICODE));
+        // $request->get()は引数必須のため削除
         $data = $request->validate([
             'date' => 'required|date',
             'title' => 'required|string|max:255',

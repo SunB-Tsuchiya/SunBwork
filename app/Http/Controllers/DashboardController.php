@@ -36,10 +36,12 @@ class DashboardController extends Controller
             Log::info('DashboardController@index events count', ['count' => $events->count(), 'data' => $events]);
         }
 
+        $roles = \App\Models\Role::all();
         return Inertia::render('Dashboard', [
             'user' => $user,
             'diaries' => $diaries,
             'events' => $events,
+            'roles' => $roles,
         ]);
     }
 }

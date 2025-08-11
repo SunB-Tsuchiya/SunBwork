@@ -24,9 +24,11 @@ class UserController extends Controller
     public function index()
     {
         $users = User::orderBy('created_at', 'desc')->get();
+        $roles = \App\Models\Role::all();
 
         return Inertia::render('Admin/Users/Index', [
             'users' => $users,
+            'roles' => $roles,
         ]);
     }
 
@@ -35,7 +37,14 @@ class UserController extends Controller
      */
     public function create()
     {
-        return Inertia::render('Admin/Users/Create');
+        // 会社ごとに部署・役職をネストして取得
+        $companies = Company::with(['departments.roles' => function($q){
+            $q->where('active', true);
+        }])->where('active', true)->get();
+
+        return Inertia::render('Admin/Users/Create', [
+            'companies' => $companies,
+        ]);
     }
 
     /**
@@ -43,35 +52,48 @@ class UserController extends Controller
      */
     public function store(Request $request)
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|lowercase|email|max:255|unique:users',
-            'password' => ['required', 'confirmed', Rules\Password::defaults()],
-            'role' => 'required|string|max:255',
-            'user_role' => 'required|in:admin,leader,user',
-        ]);
+        // リクエスト値をログ出力
+        Log::info('storeリクエスト値:', $request->all());
 
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'role' => $request->role,
-            'user_role' => $request->user_role,
-            'email_verified_at' => now(), // Admin作成のユーザーは即座に認証済み
-        ]);
+        try {
+            $request->validate([
+                'name' => 'required|string|max:255',
+                'email' => 'required|string|lowercase|email|max:255|unique:users|email',
+                'password' => ['required', 'confirmed', Rules\Password::defaults()],
+                'role_id' => 'required|exists:roles,id',
+                'user_role' => 'required|in:admin,leader,user',
+            ]);
 
-        // Jetstreamのチーム作成
-        $team = Team::create([
-            'user_id' => $user->id,
-            'name' => $user->name . "'s Team",
-            'personal_team' => true,
-        ]);
+            $user = User::create([
+                'name' => $request->name,
+                'email' => $request->email,
+                'password' => Hash::make($request->password),
+                'role_id' => $request->role_id,
+                'user_role' => $request->user_role,
+                'email_verified_at' => now(), // Admin作成のユーザーは即座に認証済み
+            ]);
 
-        $user->current_team_id = $team->id;
-        $user->save();
+            // Jetstreamのチーム作成
+            try {
+                $team = Team::create([
+                    'user_id' => $user->id,
+                    'name' => $user->name . "'s Team",
+                    'personal_team' => true,
+                ]);
+                $user->current_team_id = $team->id;
+                $user->save();
+            } catch (\Exception $e) {
+                Log::error('Team作成エラー: ' . $e->getMessage());
+                Log::error('Exception trace: ' . $e->getTraceAsString());
+            }
 
-        return redirect()->route('admin.users.index')
-            ->with('success', 'ユーザーが正常に作成されました。');
+            return redirect()->route('admin.users.index')
+                ->with('success', 'ユーザーが正常に作成されました。');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            // バリデーションエラー時は登録処理を行わず、ログ出力
+            Log::error('登録バリデーションエラー:', $e->errors());
+            throw $e;
+        }
     }
 
     /**
@@ -338,11 +360,17 @@ class UserController extends Controller
         try {
             foreach ($request->users as $userData) {
                 Log::info('Creating user: ' . $userData['email']);
+                // role名からrole_idを取得
+                $role = \App\Models\Role::where('name', $userData['role'])
+                    ->where('department_id', $department->id)
+                    ->first();
+                $role_id = $role ? $role->id : null;
+
                 $user = User::create([
                     'name' => $userData['name'],
                     'email' => $userData['email'],
                     'password' => Hash::make($userData['password']),
-                    'role' => $userData['role'],
+                    'role_id' => $role_id,
                     'user_role' => $userData['user_role'],
                 ]);
                 Log::info('User created with ID: ' . $user->id);

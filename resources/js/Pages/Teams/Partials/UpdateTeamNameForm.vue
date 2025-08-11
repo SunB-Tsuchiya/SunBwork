@@ -31,21 +31,21 @@ const updateTeamName = () => {
         </template>
 
         <template #description>
-            The team's name and leader information.
+            The team's name and owner information.
         </template>
 
         <template #form>
-            <!-- Team Leader Information -->
+            <!-- Team Owner Information -->
             <div class="col-span-6">
-                <InputLabel value="Team Leader" />
+                <InputLabel value="Team Owner" />
 
                 <div class="flex items-center mt-2">
-                    <img class="size-12 rounded-full object-cover" :src="team.leader.profile_photo_url" :alt="team.leader.name">
+                    <img class="size-12 rounded-full object-cover" :src="team.owner.profile_photo_url" :alt="team.owner.name">
 
                     <div class="ms-4 leading-tight">
-                        <div class="text-gray-900">{{ team.leader.name }}</div>
+                        <div class="text-gray-900">{{ team.owner.name }}</div>
                         <div class="text-gray-700 text-sm">
-                            {{ team.leader.email }}
+                            {{ team.owner.email }}
                         </div>
                     </div>
                 </div>

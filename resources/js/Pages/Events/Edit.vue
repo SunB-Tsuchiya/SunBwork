@@ -26,6 +26,17 @@ onMounted(() => {
   content.value = props.event.content || '';
   form.date = props.event.date || '';
   console.log('[Edit.vue] onMounted date:', form.date);
+  // 開始・終了時刻をprops.event.start/endから分解してセット
+  if (props.event.start) {
+    const startDate = new Date(props.event.start);
+    form.startHour = String(startDate.getHours()).padStart(2, '0');
+    form.startMinute = String(startDate.getMinutes()).padStart(2, '0');
+  }
+  if (props.event.end) {
+    const endDate = new Date(props.event.end);
+    form.endHour = String(endDate.getHours()).padStart(2, '0');
+    form.endMinute = String(endDate.getMinutes()).padStart(2, '0');
+  }
 });
 
 // ファイル送信が不要な場合（JSON送信）
@@ -64,9 +75,15 @@ const submit = () => {
       const hasFiles = form.files && form.files.length > 0;
       console.log(form.data()); // 送信前にデータ確認
       if (hasFiles) {
-        form.post(route('events.update', props.event.id), { forceFormData: true, _method: 'PUT' });
+        form.post(route('events.update', props.event.id), {
+          forceFormData: true,
+          _method: 'PUT',
+          onSuccess: () => router.get(route('calendar.index'))
+        });
       } else {
-        form.put(route('events.update', props.event.id));
+        form.put(route('events.update', props.event.id), {
+          onSuccess: () => router.get(route('calendar.index'))
+        });
       }
     });
 };
@@ -143,7 +160,7 @@ function handleEditorReady(editor) {
         </div>
         <div class="flex space-x-4">
           <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">更新</button>
-          <Link :href="route('dashboard')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded">キャンセル</Link>
+          <Link :href="route('calendar.index')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded">キャンセル</Link>
         </div>
       </form>
     </div>

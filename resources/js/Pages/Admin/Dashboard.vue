@@ -33,6 +33,9 @@ console.log('Admin Dashboard props:', props);
                         <Link :href="route('admin.users.index')" class="text-red-600 hover:text-red-800 px-3 py-2 font-medium text-sm rounded-md border border-red-200 hover:bg-red-50">
                             ユーザー管理
                         </Link>
+                            <Link :href="route('admin.companies.index')" class="text-green-600 hover:text-green-800 px-3 py-2 font-medium text-sm rounded-md border border-green-200 hover:bg-green-50">
+                                会社管理
+                            </Link>
                         <Link :href="route('leader.dashboard')" class="text-orange-600 hover:text-orange-800 px-3 py-2 font-medium text-sm rounded-md border border-orange-200 hover:bg-orange-50">
                             リーダーモードに切り替え
                         </Link>

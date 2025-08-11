@@ -7,7 +7,17 @@ const props = defineProps({
         type: Array,
         required: true,
     },
+    roles: {
+        type: Array,
+        default: () => [],
+    },
 });
+
+// role_idから役職名を取得
+const getRoleName = (role_id) => {
+    const role = props.roles.find(r => r.id === role_id);
+    return role ? role.name : '';
+};
 
 const getRoleBadgeClass = (role) => {
     switch (role) {
@@ -111,7 +121,7 @@ const getRoleText = (role) => {
                                             {{ user.email }}
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {{ user.role }}
+                                            {{ getRoleName(user.role_id) }}
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap">
                                             <span :class="getRoleBadgeClass(user.user_role)" class="inline-flex px-2 py-1 text-xs font-semibold rounded-full">
