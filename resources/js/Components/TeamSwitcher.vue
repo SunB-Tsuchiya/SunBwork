@@ -47,7 +47,7 @@
                     </div>
 
                     <!-- 部署チーム -->
-                    <div v-if="availableTeams.department.length > 0">
+                    <div v-if="availableTeams && availableTeams.department && availableTeams.department.length > 0">
                         <div class="block px-4 py-2 text-xs font-semibold text-gray-700 bg-gray-50">
                             部署チーム
                         </div>
@@ -72,7 +72,7 @@
                     </div>
 
                     <!-- 個人チーム -->
-                    <div v-if="availableTeams.personal.length > 0">
+                    <div v-if="availableTeams && availableTeams.personal && availableTeams.personal.length > 0">
                         <div class="block px-4 py-2 text-xs font-semibold text-gray-700 bg-gray-50 border-t border-gray-100">
                             個人チーム
                         </div>
@@ -118,6 +118,7 @@ const props = defineProps({
     availableTeams: {
         type: Object,
         required: true,
+        default: () => ({ department: [], personal: [] }),
     },
 })
 

@@ -85,10 +85,10 @@ const logout = () => {
                             <!-- TeamSwitcher -->
                             <div class="ms-3 relative">
                                 <TeamSwitcher 
-                                    v-if="$page.props.auth.user"
+                                    v-if="$page.props.auth.user && $page.props.auth.user.available_teams"
                                     :user="$page.props.auth.user" 
                                     :current-team="$page.props.auth.user.current_team"
-                                    :available-teams="$page.props.auth.user.available_teams" 
+                                    :available-teams="$page.props.auth.user.available_teams || { department: [], personal: [] }" 
                                 />
                             </div>
 
