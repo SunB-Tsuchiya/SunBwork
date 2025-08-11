@@ -16,4 +16,9 @@ class Event extends Model
         'start',
         'end'
     ];
+
+    public function attachments()
+    {
+        return $this->hasMany(Attachment::class, 'event_id');
+    }
 }

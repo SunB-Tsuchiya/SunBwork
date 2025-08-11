@@ -22,11 +22,15 @@
             <textarea v-model="form.description" class="border rounded w-full p-2" rows="2"></textarea>
           </div>
           <div class="mb-2">
+            <label class="block text-sm font-medium">日付</label>
+            <div class="border rounded w-full p-2 bg-gray-100">{{ form.date }}</div>
+          </div>
+          <div class="mb-2">
             <div class="flex gap-6 items-center">
               <div>
                 <label class="block text-sm font-medium mb-1">開始時刻</label>
                 <div class="flex gap-2">
-                  <select v-model="form.startHour" class="border rounded p-1 w-20">
+                  <select v-model="form.startHour" class="border rounded p-1 w-20" ref="startHourSelectRef">
                     <option v-for="h in 24" :key="h" :value="String(h-1).padStart(2, '0')">{{ String(h-1).padStart(2, '0') }}</option>
                   </select>
                   <select v-model="form.startMinute" class="border rounded p-1 w-20">
@@ -37,7 +41,7 @@
               <div>
                 <label class="block text-sm font-medium mb-1">終了時刻</label>
                 <div class="flex gap-2">
-                  <select v-model="form.endHour" class="border rounded p-1 w-20">
+                  <select v-model="form.endHour" class="border rounded p-1 w-20" ref="endHourSelectRef">
                     <option v-for="h in 24" :key="h" :value="String(h-1).padStart(2, '0')">{{ String(h-1).padStart(2, '0') }}</option>
                   </select>
                   <select v-model="form.endMinute" class="border rounded p-1 w-20">
@@ -75,16 +79,19 @@ import interactionPlugin from '@fullcalendar/interaction'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import { router } from '@inertiajs/vue3'
 import { route } from 'ziggy-js';
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted, nextTick } from 'vue'
 import axios from 'axios'
 
 const props = defineProps({
   diaries: {
     type: Array,
     default: () => []
+  },
+  events: {
+    type: Array,
+    default: () => []
   }
 })
-
 
 const showModal = ref(false)
 const showSelectModal = ref(false)
@@ -105,17 +112,30 @@ const mm = String(today.getMonth() + 1).padStart(2, '0');
 const dd = String(today.getDate()).padStart(2, '0');
 const selectedDate = ref(`${yyyy}-${mm}-${dd}`);
 
+const startHourSelectRef = ref(null);
+const endHourSelectRef = ref(null);
+
+onMounted(() => {
+  nextTick(() => {
+    const now = new Date();
+    const currentHour = String(now.getHours()).padStart(2, '0');
+    // 開始時刻のselect
+    if (startHourSelectRef.value) {
+      const idx = Array.from(startHourSelectRef.value.options).findIndex(opt => opt.value === currentHour);
+      if (idx >= 0) startHourSelectRef.value.selectedIndex = idx;
+    }
+    // 終了時刻のselect（今回はデフォルト10時のまま）
+  });
+});
 
 
 function openEventModal() {
-  // 選択中の日付をセット
-  form.value.date = selectedDate.value;
-  showModal.value = true;
+  // 選択中の日付をセットしてEvents/Create.vueへ遷移
+  router.get(route('events.create', { date: selectedDate.value }));
 }
 
 function openEventModalFromSelect() {
-  form.value.date = selectedDate.value;
-  showModal.value = true;
+  router.get(route('events.create', { date: selectedDate.value }));
   showSelectModal.value = false;
 }
 
@@ -161,18 +181,34 @@ const events = ref([
     };
   }),
   // 予定（青）
-  ...(props.events ?? []).map(event => {
-    // startが「YYYY-MM-DD HH:mm:ss」形式の場合
-    // day/weekビュー用にallDay: false, color:青
+  ...(props.events ?? []).map((event, idx, arr) => {
+    // 重複数をカウント
+    let overlapCount = 0;
+    if (event.start && event.end) {
+      const evStart = new Date(event.start).getTime();
+      const evEnd = new Date(event.end).getTime();
+      overlapCount = arr.filter((ev, i) => {
+        if (i === idx) return false;
+        if (!ev.start || !ev.end) return false;
+        const s = new Date(ev.start).getTime();
+        const e = new Date(ev.end).getTime();
+        return (evStart < e && evEnd > s);
+      }).length;
+    }
+    // 透明度計算（最大0.2まで薄くする）
+    const alpha = Math.max(1 - overlapCount * 0.2, 0.2);
     return {
       title: event.title,
       start: event.start,
-      end: event.end ?? undefined, // endがあれば
+      end: event.end ?? undefined,
       allDay: false,
-      color: '#2563eb',
+      color: `rgba(37,99,235,${alpha})`,
+      event_id: event.id
     };
   })
 ]);
+
+console.log('Calendar.vue events for FullCalendar:', events.value);
 
 const calendarOptions = computed(() => ({
   plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],
@@ -195,6 +231,10 @@ const calendarOptions = computed(() => ({
     // 日報ラベルクリック時のみ遷移
     if (info.event.extendedProps.diary_id) {
       router.get(route('diaries.show', { diary: info.event.extendedProps.diary_id }));
+    }
+    // 予定ラベルクリック時はShow.vueへ遷移
+    if (info.event.extendedProps.event_id) {
+      router.get(route('events.show', { event: info.event.extendedProps.event_id }));
     }
   },
   select: handleDateSelect,

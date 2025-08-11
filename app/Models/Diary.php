@@ -23,4 +23,12 @@ class Diary extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    /**
+     * 添付ファイル
+     */
+    public function attachments()
+    {
+        return $this->hasMany(Attachment::class, 'diary_id');
+    }
 }

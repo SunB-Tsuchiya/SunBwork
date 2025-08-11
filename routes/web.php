@@ -40,6 +40,11 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     // 日報機能（作成、保存、表示、編集、更新、削除）
     Route::resource('diaries', App\Http\Controllers\DiaryController::class)
         ->only(['create', 'store', 'show', 'edit', 'update', 'destroy', 'index']);
+
+    // イベント機能（作成、保存、表示、編集、更新）
+    Route::resource('events', App\Http\Controllers\EventController::class)->only([
+        'create', 'store', 'show', 'edit', 'update'
+    ]);
 });
 
 // Leader Routes (LeaderとAdminがアクセス可能)

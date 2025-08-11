@@ -10,7 +10,11 @@ const props = defineProps({
     },
     diaries: {
         type: Array,
-        required: true,
+        default: () => [],
+    },
+    events: {
+        type: Array,
+        default: () => [],
     },
 });
 
@@ -87,7 +91,7 @@ console.log('Dashboard props:', props, 'Dashboard diaries:', props.diaries);
                 </div>
 
                 <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg">
-                    <Calendar :diaries="diaries" /> <!-- ←diariesを渡す -->
+                    <Calendar :diaries="diaries" :events="events" />
                 </div>
             </div>
         </div>
