@@ -45,8 +45,8 @@ const confirmDelete = (companyId) => {
                     </div>
                     <div class="ml-8 text-blue-700">
                         <span>担当名：</span>
-                        <span v-for="(role, idx) in department.roles" :key="role.id">
-                            <span>{{ role.name }}</span><span v-if="idx < department.roles.length - 1">，</span>
+                        <span v-for="(assignment, idx) in department.assignments" :key="assignment.id">
+                            <span>{{ assignment.name }}</span><span v-if="idx < department.assignments.length - 1">，</span>
                         </span>
                     </div>
                 </div>

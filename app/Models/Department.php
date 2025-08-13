@@ -43,9 +43,9 @@ class Department extends Model
     /**
      * 部署の役職
      */
-    public function roles(): HasMany
+    public function assignments(): HasMany
     {
-        return $this->hasMany(Role::class);
+        return $this->hasMany(Assignment::class);
     }
 
     /**

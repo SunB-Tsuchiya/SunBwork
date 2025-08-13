@@ -30,9 +30,9 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::put('/events/{event}', [App\Http\Controllers\EventController::class, 'update'])->name('events.update');
     Route::delete('/events/{event}', [App\Http\Controllers\EventController::class, 'destroy'])->name('events.destroy');
 
-    Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
 
-    // User Dashboard (一般ユーザー機能 - Admin, Leaderもアクセス可能)
+    // Ziggy用: 明示的にuser.dashboardルートを追加
+    Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
     Route::get('/user/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('user.dashboard');
 
     // チーム切り替え
@@ -48,33 +48,41 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     ]);
 });
 
-// Leader Routes (LeaderとAdminがアクセス可能)
-Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'leader'])
-    ->prefix('leader')
-    ->name('leader.')
-    ->group(function () {
-        Route::get('/dashboard', [App\Http\Controllers\Leader\DashboardController::class, 'index'])->name('dashboard');
-    });
-
 // Admin Routes (Adminのみアクセス可能)
 Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
-        Route::get('/dashboard', [App\Http\Controllers\Admin\DashboardController::class, 'index'])->name('dashboard');
+        // Ziggy用: 明示的にadmin.dashboardルートを追加
+        Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
 
         // CSV一括登録（リソースルートより前に配置）
         Route::get('users/csv/upload', [App\Http\Controllers\Admin\UserController::class, 'csvUpload'])->name('users.csv.upload');
         Route::post('users/csv/preview', [App\Http\Controllers\Admin\UserController::class, 'csvPreview'])->name('users.csv.preview');
         Route::post('users/csv/store', [App\Http\Controllers\Admin\UserController::class, 'csvStore'])->name('users.csv.store');
 
-        // ユーザー管理
-        Route::resource('users', App\Http\Controllers\Admin\UserController::class);
+    // ユーザー管理
+    Route::resource('users', App\Http\Controllers\Admin\UserController::class);
 
-        // 会社管理
-        Route::resource('companies', App\Http\Controllers\Admin\CompanyController::class);
+    // 会社管理
+    Route::resource('companies', App\Http\Controllers\Admin\CompanyController::class);
+
+    // チーム管理
+    Route::resource('teams', App\Http\Controllers\Admin\TeamController::class);
     });
 
+
+
+// Ziggy用: 明示的にleader.dashboardルートを追加
+// Leader Routes (AdminとLeaderのみアクセス可能)
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'leader'])
+    ->prefix('leader')
+    ->name('leader.')
+    ->group(function () {
+        Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
+    });
+    
+    
 // デバッグ・テスト用ページのルート例
 // 今後も任意のVueページをテスト表示したい場合は、下記のようにInertia::renderでページ名を指定してください。
 // 例: /debug/create → resources/js/Pages/Diaries/CreateDebug.vue

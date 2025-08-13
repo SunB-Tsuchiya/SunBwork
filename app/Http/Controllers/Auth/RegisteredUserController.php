@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Company;
 use App\Models\Department;
-use App\Models\Role;
+use App\Models\Assignment;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -28,8 +28,8 @@ class RegisteredUserController extends Controller
         $companies = Company::with([
             'departments' => function ($query) {
                 $query->where('active', 1)
-                    ->with(['roles' => function ($roleQuery) {
-                        $roleQuery->where('active', 1)->orderBy('sort_order');
+                    ->with(['assignments' => function ($assignmentQuery) {
+                        $assignmentQuery->where('active', 1)->orderBy('sort_order');
                     }])
                     ->orderBy('sort_order');
             }
@@ -53,7 +53,7 @@ class RegisteredUserController extends Controller
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'company_id' => 'required|exists:companies,id',
             'department_id' => 'required|exists:departments,id',
-            'role_id' => 'required|exists:roles,id', // role_idを直接受け取る
+            'assignment_id' => 'required|exists:assignments,id', // assignment_idを直接受け取る
             'user_role' => 'required|in:admin,leader,user', // 権限レベルのバリデーション (owner→leaderに変更)
         ]);
 
@@ -63,7 +63,7 @@ class RegisteredUserController extends Controller
             'password' => Hash::make($request->password),
             'company_id' => $request->company_id,     // 会社IDを保存
             'department_id' => $request->department_id, // 部署IDを保存
-            'role_id' => $request->role_id,           // 役職IDを直接保存
+            'assignment_id' => $request->assignment_id,           // 役職IDを直接保存
             'user_role' => $request->user_role,       // 権限レベルを保存
         ]);
 

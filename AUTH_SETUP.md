@@ -22,7 +22,7 @@ Fortify::registerView(function () {
     $companies = \App\Models\Company::with([
         'departments' => function ($query) {
             $query->where('active', 1)
-                ->with(['roles' => function ($roleQuery) {
+                ->with(['assignments' => function ($roleQuery) {
                     $roleQuery->where('active', 1)->orderBy('sort_order');
                 }])
                 ->orderBy('sort_order');
@@ -57,13 +57,13 @@ Fortify::registerView(function () {
 
 ### モデル関係
 - `Company` → `Department` (hasMany)
-- `Department` → `Role` (hasMany)
+- `Department` → `Assignment` (hasMany)
 - `User` → `Company`, `Department`, `Role` (belongsTo)
 
 ### 主要テーブル
 - `companies`: 会社マスター
 - `departments`: 部署マスター
-- `roles`: 役職マスター  
+- `assignments`: 役職マスター  
 - `users`: ユーザー情報
 
 ## ルーティング

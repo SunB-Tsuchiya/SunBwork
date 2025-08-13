@@ -11,10 +11,10 @@ import TeamSwitcher from '@/Components/TeamSwitcher.vue';
 
 defineProps({
     title: String,
-    user: {
-        type: Object,
-        required: true,
-    },
+    // user: {
+    //     type: Object,
+    //     required: true,
+    // },
 });
 
 const showingNavigationDropdown = ref(false);
@@ -33,9 +33,12 @@ const logout = () => {
 
 import { usePage } from '@inertiajs/vue3';
 
-const page = usePage();
 
-console.log('AppLayout user:', page.props.auth.user);
+const page = usePage();
+const user = page.props.user; // これを追加
+console.log('AppLayout $page.props:', page.props);
+console.log('AppLayout user:', page.props.user);
+console.log('AppLayout auth:', page.props.auth);
 
 </script>
 

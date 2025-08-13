@@ -12,7 +12,7 @@ class CompanyController extends Controller
     // 一覧
     public function index()
     {
-        $companies = Company::with(['departments.roles'])->get();
+        $companies = Company::with(['departments.assignments'])->get();
         return Inertia::render('Admin/Companies/Index', [
             'companies' => $companies,
         ]);
@@ -37,7 +37,7 @@ class CompanyController extends Controller
     // 編集フォーム
     public function edit(Company $company)
     {
-        $company->load('departments.roles');
+        $company->load('departments.assignments');
         return Inertia::render('Admin/Companies/Edit', [
             'company' => $company,
         ]);
@@ -50,8 +50,8 @@ class CompanyController extends Controller
             'name' => 'required|string|max:255',
             'departments' => 'array',
             'departments.*.name' => 'required|string|max:255',
-            'departments.*.roles' => 'array',
-            'departments.*.roles.*.name' => 'required|string|max:255',
+            'departments.*.assignments' => 'array',
+            'departments.*.assignments.*.name' => 'required|string|max:255',
         ]);
 
         // 会社名更新
@@ -67,12 +67,12 @@ class CompanyController extends Controller
             }
 
             // 担当（役割）の更新・追加
-            foreach ($depData['roles'] as $roleData) {
-                $role = isset($roleData['id']) ? $department->roles()->find($roleData['id']) : null;
-                if ($role) {
-                    $role->update(['name' => $roleData['name']]);
+            foreach ($depData['assignments'] as $assignmentsData) {
+                $assignments = isset($assignmentsData['id']) ? $department->assignments()->find($assignmentsData['id']) : null;
+                if ($assignments) {
+                    $assignments->update(['name' => $assignmentsData['name']]);
                 } else {
-                    $department->roles()->create(['name' => $roleData['name']]);
+                    $department->assignments()->create(['name' => $assignmentsData['name']]);
                 }
             }
         }

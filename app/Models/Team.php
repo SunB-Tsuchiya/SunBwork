@@ -63,14 +63,7 @@ class Team extends JetstreamTeam
         return $this->belongsTo(Department::class);
     }
 
-    /**
-     * チームの役割
-     */
-    public function role()
-    {
-        return $this->belongsTo(\App\Models\Role::class);
-    }
-    
+ 
     /**
      * 部署チーム（個人チーム以外）のスコープ
      */

@@ -11,7 +11,7 @@ const form = useForm({
         {
             id: null,
             name: '',
-            roles: [
+            assignments: [
                 { id: null, name: '' }
             ]
         }
@@ -19,7 +19,7 @@ const form = useForm({
 });
 
 const addDepartment = () => {
-    form.departments.push({ id: null, name: '', roles: [{ id: null, name: '' }] });
+    form.departments.push({ id: null, name: '', assignments: [{ id: null, name: '' }] });
 };
 
 const removeDepartment = (depIdx) => {
@@ -28,13 +28,13 @@ const removeDepartment = (depIdx) => {
     }
 };
 
-const addRole = (depIdx) => {
-    form.departments[depIdx].roles.push({ id: null, name: '' });
+const addassignment = (depIdx) => {
+    form.departments[depIdx].assignments.push({ id: null, name: '' });
 };
 
-const removeRole = (depIdx, roleIdx) => {
+const removeAssignment = (depIdx, assignmentIdx) => {
     if (confirm('担当を削除します。よろしいですか？')) {
-        form.departments[depIdx].roles.splice(roleIdx, 1);
+        form.departments[depIdx].assignments.splice(assignmentIdx, 1);
     }
 };
 
@@ -45,8 +45,8 @@ const submit = () => {
             alert('部署名を入力してください');
             return;
         }
-        for (const role of dep.roles) {
-            if (!role.name.trim()) {
+        for (const assignment of dep.assignments) {
+            if (!assignment.name.trim()) {
                 alert('担当名を入力してください');
                 return;
             }
@@ -76,11 +76,11 @@ const submit = () => {
                     <div class="ml-4">
                         <div class="flex items-center mb-1">
                             <span class="block font-semibold">担当名</span>
-                            <button type="button" @click="addRole(depIdx)" class="ml-4 px-2 py-1 bg-blue-200 text-blue-800 rounded hover:bg-blue-300 transition">＋追加</button>
+                            <button type="button" @click="addAssignment(depIdx)" class="ml-4 px-2 py-1 bg-blue-200 text-blue-800 rounded hover:bg-blue-300 transition">＋追加</button>
                         </div>
-                        <div v-for="(role, roleIdx) in department.roles" :key="roleIdx" class="mb-2 flex items-center">
-                            <TextInput :id="`role-name-${depIdx}-${roleIdx}`" v-model="role.name" type="text" class="mt-1 block w-full" required />
-                            <button type="button" @click="removeRole(depIdx, roleIdx)" class="ml-2 px-2 py-1 bg-red-200 text-red-800 rounded hover:bg-red-300 transition">削除</button>
+                        <div v-for="(assignment, assignmentIdx) in department.assignments" :key="assignmentIdx" class="mb-2 flex items-center">
+                            <TextInput :id="`assignment-name-${depIdx}-${assignmentIdx}`" v-model="assignment.name" type="text" class="mt-1 block w-full" required />
+                            <button type="button" @click="removeAssignment(depIdx, assignmentIdx)" class="ml-2 px-2 py-1 bg-red-200 text-red-800 rounded hover:bg-red-300 transition">削除</button>
                         </div>
                     </div>
                 </div>

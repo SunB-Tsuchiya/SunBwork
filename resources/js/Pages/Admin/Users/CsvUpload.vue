@@ -88,7 +88,7 @@ const submit = () => {
                                 <p class="text-sm text-gray-700 mb-3">CSVファイルは以下の形式で作成してください：</p>
                                 <div class="bg-white p-3 rounded border font-mono text-sm">
                                     <div class="text-gray-500 mb-1"># ヘッダー行（必須）</div>
-                                    <div class="font-semibold">name,email,password,role,user_role</div>
+                                    <div class="font-semibold">name,email,password,assignment,user_role</div>
                                     <div class="text-gray-500 mt-2 mb-1"># データ行の例</div>
                                     <div>山田太郎,yamada@example.com,password123,管理者,user</div>
                                     <div>佐藤花子,sato@example.com,password456,進行管理,leader</div>
@@ -99,7 +99,7 @@ const submit = () => {
                                         <li><strong>name:</strong> ユーザー名</li>
                                         <li><strong>email:</strong> メールアドレス（重複不可）</li>
                                         <li><strong>password:</strong> パスワード</li>
-                                        <li><strong>role:</strong> 担当（部署により異なる）</li>
+                                        <li><strong>assignment:</strong> 担当（部署により異なる）</li>
                                         <li><strong>user_role:</strong> システム権限（admin/leader/user のいずれか）</li>
                                     </ul>
                                 </div>

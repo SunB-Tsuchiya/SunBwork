@@ -7,20 +7,20 @@ const props = defineProps({
         type: Array,
         required: true,
     },
-    roles: {
+    assignments: {
         type: Array,
         default: () => [],
     },
 });
 
-// role_idから役職名を取得
-const getRoleName = (role_id) => {
-    const role = props.roles.find(r => r.id === role_id);
-    return role ? role.name : '';
+// assignment_idから役職名を取得
+const getAssignmentName = (assignment_id) => {
+    const assignment = props.assignments.find(r => r.id === assignment_id);
+    return assignment ? assignment.name : '';
 };
 
-const getRoleBadgeClass = (role) => {
-    switch (role) {
+const getAssignmentBadgeClass = (assignment) => {
+    switch (assignment) {
         case 'admin':
             return 'bg-red-100 text-red-800';
         case 'leader':
@@ -32,8 +32,8 @@ const getRoleBadgeClass = (role) => {
     }
 };
 
-const getRoleText = (role) => {
-    switch (role) {
+const getAssignmentText = (assignment) => {
+    switch (assignment) {
         case 'admin':
             return '管理者';
         case 'leader':
@@ -41,7 +41,7 @@ const getRoleText = (role) => {
         case 'user':
             return 'ユーザー';
         default:
-            return role;
+            return assignment;
     }
 };
 </script>
@@ -121,11 +121,11 @@ const getRoleText = (role) => {
                                             {{ user.email }}
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {{ getRoleName(user.role_id) }}
+                                            {{ getAssignmentName(user.assignment_id) }}
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap">
-                                            <span :class="getRoleBadgeClass(user.user_role)" class="inline-flex px-2 py-1 text-xs font-semibold rounded-full">
-                                                {{ getRoleText(user.user_role) }}
+                                            <span :class="getAssignmentBadgeClass(user.user_role)" class="inline-flex px-2 py-1 text-xs font-semibold rounded-full">
+                                                {{ getAssignmentText(user.user_role) }}
                                             </span>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

@@ -88,7 +88,7 @@ console.log('useArray:', props.user);
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700">担当</label>
-                            <p class="mt-1 text-sm text-gray-900">{{ user?.part?.name || '未設定' }}</p>
+                            <p class="mt-1 text-sm text-gray-900">{{ user?.assignment?.name || '未設定' }}</p>
                         </div>
                          <div>
                             <label class="block text-sm font-medium text-gray-700">チーム</label>

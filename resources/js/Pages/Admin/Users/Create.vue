@@ -24,7 +24,7 @@ const form = useForm({
     password_confirmation: '',
     company_id: '',
     department_id: '',
-    role_id: '', // role_idで統一
+    assignment_id: '', // assignment_idで統一
     user_role: 'user',
     terms: false,
 });
@@ -54,7 +54,7 @@ const validationMessages = {
     department_id: {
         required: '部署を選択してください。',
     },
-    role_id: {
+    assignment_id: {
         required: '担当を選択してください。',
     },
     user_role: {
@@ -95,9 +95,9 @@ function validateField(field) {
             if (!form.department_id) errors.value.department_id = validationMessages.department_id.required;
             else delete errors.value.department_id;
             break;
-        case 'role_id':
-            if (!form.role_id) errors.value.role_id = validationMessages.role_id.required;
-            else delete errors.value.role_id;
+        case 'assignment_id':
+            if (!form.assignment_id) errors.value.assignment_id = validationMessages.assignment_id.required;
+            else delete errors.value.assignment_id;
             break;
         case 'user_role':
             if (!form.user_role) errors.value.user_role = validationMessages.user_role.required;
@@ -113,12 +113,12 @@ watch(() => form.password, () => validateField('password'));
 watch(() => form.password_confirmation, () => validateField('password_confirmation'));
 watch(() => form.company_id, () => validateField('company_id'));
 watch(() => form.department_id, () => validateField('department_id'));
-watch(() => form.role_id, () => validateField('role_id'));
+watch(() => form.assignment_id, () => validateField('assignment_id'));
 watch(() => form.user_role, () => validateField('user_role'));
 
 // 送信前に全項目バリデーション
 function validateAll() {
-    ['name','email','password','password_confirmation','company_id','department_id','role_id','user_role'].forEach(validateField);
+    ['name','email','password','password_confirmation','company_id','department_id','assignment_id','user_role'].forEach(validateField);
     return Object.keys(errors.value).length === 0;
 }
 
@@ -129,14 +129,14 @@ const selectedCompanyDepartments = computed(() => {
     return company ? company.departments : [];
 });
 
-const availableRoles = computed(() => {
+const availableAssignments = computed(() => {
     if (!form.department_id) return [];
     const department = selectedCompanyDepartments.value.find(d => d.id == form.department_id);
-    if (!department || !department.roles) return [];
-    return department.roles.filter(role => role.active);
+    if (!department || !department.assignments) return [];
+    return department.assignments.filter(assignment => assignment.active);
 });
 
-const userRoleOptions = [
+const userAssignmentOptions = [
     { value: 'admin', label: '管理者', description: '全ての機能にアクセス可能' },
     { value: 'leader', label: 'リーダー', description: 'コンテンツ管理とユーザー機能にアクセス可能' },
     { value: 'user', label: 'ユーザー', description: '基本機能のみアクセス可能' }
@@ -144,10 +144,10 @@ const userRoleOptions = [
 
 const onCompanyChange = () => {
     form.department_id = '';
-    form.role_id = '';
+    form.assignment_id = '';
 };
 const onDepartmentChange = () => {
-    form.role_id = '';
+    form.assignment_id = '';
 };
 
 watch(() => form.department_id, (newDepartmentId) => {
@@ -310,20 +310,20 @@ const submit = () => {
                     </div>
 
                     <div class="mt-4">
-                        <InputLabel for="role_id" value="担当" />
+                        <InputLabel for="assignment_id" value="担当" />
                         <select
-                            id="role_id"
-                            v-model="form.role_id"
+                            id="assignment_id"
+                            v-model="form.assignment_id"
                             :disabled="!form.department_id"
                             class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
                             required
                         >
                             <option value="">-- 担当を選択してください --</option>
-                            <option v-for="role in availableRoles" :key="role.id" :value="role.id">
-                                {{ role.name }}
+                            <option v-for="assignment in availableAssignments" :key="assignment.id" :value="assignment.id">
+                                {{ assignment.name }}
                             </option>
                         </select>
-                        <InputError class="mt-2" :message="errors.role_id || form.errors.role_id" />
+                        <InputError class="mt-2" :message="errors.assignment_id || form.errors.assignment_id" />
                     </div>
 
                     <div class="mt-4">
@@ -336,7 +336,7 @@ const submit = () => {
                         >
                             <option value="" disabled>権限レベルを選択してください</option>
                             <option
-                                v-for="option in userRoleOptions"
+                                v-for="option in userAssignmentOptions"
                                 :key="option.value"
                                 :value="option.value"
                             >

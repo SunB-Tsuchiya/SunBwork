@@ -24,11 +24,11 @@ class UserController extends Controller
     public function index()
     {
         $users = User::orderBy('created_at', 'desc')->get();
-        $roles = \App\Models\Role::all();
+        $assignments = \App\Models\Assignment::all();
 
         return Inertia::render('Admin/Users/Index', [
             'users' => $users,
-            'roles' => $roles,
+            'assignments' => $assignments,
         ]);
     }
 
@@ -38,7 +38,7 @@ class UserController extends Controller
     public function create()
     {
         // 会社ごとに部署・役職をネストして取得
-        $companies = Company::with(['departments.roles' => function($q){
+        $companies = Company::with(['departments.assignments' => function($q){
             $q->where('active', true);
         }])->where('active', true)->get();
 
@@ -60,15 +60,15 @@ class UserController extends Controller
                 'name' => 'required|string|max:255',
                 'email' => 'required|string|lowercase|email|max:255|unique:users|email',
                 'password' => ['required', 'confirmed', Rules\Password::defaults()],
-                'role_id' => 'required|exists:roles,id',
-                'user_role' => 'required|in:admin,leader,user',
+                'assignment_id' => 'required|exists:assignments,id',
+                'user_assignment' => 'required|in:admin,leader,user',
             ]);
 
             $user = User::create([
                 'name' => $request->name,
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
-                'role_id' => $request->role_id,
+                'assignment_id' => $request->assignment_id,
                 'user_role' => $request->user_role,
                 'email_verified_at' => now(), // Admin作成のユーザーは即座に認証済み
             ]);
@@ -124,14 +124,14 @@ class UserController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|lowercase|email|max:255|unique:users,email,' . $user->id,
-            'role' => 'required|string|max:255',
+            'assignment' => 'required|string|max:255',
             'user_role' => 'required|in:admin,leader,user',
         ]);
 
         $user->update([
             'name' => $request->name,
             'email' => $request->email,
-            'role' => $request->role,
+            'assignment' => $request->assignment,
             'user_role' => $request->user_role,
         ]);
 
@@ -224,7 +224,7 @@ class UserController extends Controller
                 while (($data = fgetcsv($handle, 1000, ',')) !== FALSE) {
                     $line++;
 
-                    // CSV形式: name,email,password,role,user_role
+                    // CSV形式: name,email,password,assignment,user_role
                     if (count($data) < 5) {
                         $errors[] = "行 {$line}: データが不足しています（5列必要です）";
                         continue;
@@ -235,7 +235,7 @@ class UserController extends Controller
                         'name' => trim($data[0]),
                         'email' => trim($data[1]),
                         'password' => trim($data[2]),
-                        'role' => trim($data[3]),
+                        'assignment' => trim($data[3]),
                         'user_role' => trim($data[4]),
                     ];
 
@@ -251,12 +251,12 @@ class UserController extends Controller
                     }
 
                     // 役職のバリデーションと自動修正
-                    $roleResult = $this->validateAndFixRole($userData['role'], $department->name);
-                    if (isset($roleResult['error'])) {
-                        $errors[] = "行 {$line}: {$roleResult['error']}";
-                    } elseif (isset($roleResult['fixed'])) {
-                        $userData['role'] = $roleResult['fixed'];
-                        $warnings[] = "行 {$line}: 役職「{$roleResult['original']}」を「{$roleResult['fixed']}」に自動修正しました";
+                    $assignmentResult = $this->validateAndFixAssignment($userData['assignment'], $department->name);
+                    if (isset($assignmentResult['error'])) {
+                        $errors[] = "行 {$line}: {$assignmentResult['error']}";
+                    } elseif (isset($assignmentResult['fixed'])) {
+                        $userData['assignment'] = $assignmentResult['fixed'];
+                        $warnings[] = "行 {$line}: 役職「{$assignmentResult['original']}」を「{$assignmentResult['fixed']}」に自動修正しました";
                     }
 
                     // ユーザー権限のバリデーションと自動修正
@@ -330,7 +330,7 @@ class UserController extends Controller
                 'users.*.name' => 'required|string|max:255',
                 'users.*.email' => 'required|string|lowercase|email|max:255|unique:users',
                 'users.*.password' => 'required|string',
-                'users.*.role' => 'required|string|max:255',
+                'users.*.assignment' => 'required|string|max:255',
                 'users.*.user_role' => 'required|in:admin,leader,user',
                 'company_id' => 'required|exists:companies,id',
                 'department_id' => 'required|exists:departments,id',
@@ -360,24 +360,24 @@ class UserController extends Controller
         try {
             foreach ($request->users as $userData) {
                 Log::info('Creating user: ' . $userData['email']);
-                // role名からrole_idを取得
-                $role = \App\Models\Role::where('name', $userData['role'])
+                // assignment名からassignment_idを取得
+                $assignment = \App\Models\Assignment::where('name', $userData['assignment'])
                     ->where('department_id', $department->id)
                     ->first();
-                $role_id = $role ? $role->id : null;
+                $assignment_id = $assignment ? $assignment->id : null;
 
                 $user = User::create([
                     'name' => $userData['name'],
                     'email' => $userData['email'],
                     'password' => Hash::make($userData['password']),
-                    'role_id' => $role_id,
+                    'assignment_id' => $assignment_id,
                     'user_role' => $userData['user_role'],
                 ]);
                 Log::info('User created with ID: ' . $user->id);
 
                 // 部署チームにユーザーを追加
                 Log::info('Adding user to department team: ' . $departmentTeam->id);
-                $user->teams()->attach($departmentTeam->id, ['role' => 'editor']);
+                $user->teams()->attach($departmentTeam->id, ['assignment' => 'editor']);
 
                 // 個人チームも作成
                 $personalTeam = Team::create([
@@ -390,7 +390,7 @@ class UserController extends Controller
                 ]);
 
                 // 個人チームにも追加
-                $user->teams()->attach($personalTeam->id, ['role' => 'admin']);
+                $user->teams()->attach($personalTeam->id, ['assignment' => 'admin']);
 
                 // 現在のチームを部署チームに設定
                 $user->current_team_id = $departmentTeam->id;
@@ -495,10 +495,10 @@ class UserController extends Controller
     /**
      * 役職名の自動修正とバリデーション
      */
-    private function validateAndFixRole($role, $departmentName)
+    private function validateAndFixAssignment($assignment, $departmentName)
     {
         // 部署別許可役職
-        $validRoles = [
+        $validAssignments = [
             '情報出版' => ['管理者', '進行管理', 'オペレーター', '校正', '営業', 'そのほか'],
             '出力' => ['管理者', '進行管理', 'オペレーター', 'そのほか'],
             'オンデマンド' => ['管理者', '進行管理', 'オペレーター', 'そのほか'],
@@ -526,27 +526,27 @@ class UserController extends Controller
             'others' => 'そのほか',
         ];
 
-        $trimmedRole = trim($role);
+        $trimmedAssignment = trim($assignment);
 
         // 自動修正を試行
-        if (isset($typoFixes[$trimmedRole])) {
-            $fixedRole = $typoFixes[$trimmedRole];
+        if (isset($typoFixes[$trimmedAssignment])) {
+            $fixedAssignment = $typoFixes[$trimmedAssignment];
 
             // 修正後の役職が部署で許可されているかチェック
-            if (isset($validRoles[$departmentName]) && in_array($fixedRole, $validRoles[$departmentName])) {
-                return ['fixed' => $fixedRole, 'original' => $role];
+            if (isset($validAssignments[$departmentName]) && in_array($fixedAssignment, $validAssignments[$departmentName])) {
+                return ['fixed' => $fixedAssignment, 'original' => $assignment];
             } else {
-                return ['error' => "部署「{$departmentName}」では役職「{$fixedRole}」は使用できません"];
+                return ['error' => "部署「{$departmentName}」では役職「{$fixedAssignment}」は使用できません"];
             }
         }
 
         // 完全一致チェック
-        if (isset($validRoles[$departmentName]) && in_array($trimmedRole, $validRoles[$departmentName])) {
-            return ['valid' => $trimmedRole];
+        if (isset($validAssignments[$departmentName]) && in_array($trimmedAssignment, $validAssignments[$departmentName])) {
+            return ['valid' => $trimmedAssignment];
         }
 
         // 無効な役職
-        return ['error' => "部署「{$departmentName}」では無効な役職: {$role}"];
+        return ['error' => "部署「{$departmentName}」では無効な役職: {$assignment}"];
     }
 
     /**
