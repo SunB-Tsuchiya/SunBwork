@@ -15,7 +15,7 @@ console.log('Leader Dashboard props:', props);
 </script>
 
 <template>
-    <AppLayout title="Leader Dashboard">
+    <AppLayout title="Leader Dashboard" :user="user">
         <template #header>
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">
                 【リーダー】{{ user?.name || 'ユーザー' }}さんのページ

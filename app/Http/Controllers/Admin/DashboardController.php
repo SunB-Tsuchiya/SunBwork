@@ -11,8 +11,12 @@ class DashboardController extends Controller
 {
     public function index()
     {
+        
+        $user = Auth::user();
+        $user->current_team = $user->currentTeam; // JetstreamのcurrentTeamリレーション
+        $user->available_teams = $user->teams; // Eloquentリレーション
         return Inertia::render('Admin/Dashboard', [
-            'user' => Auth::user(),
+            'user' => $user,
         ]);
     }
 }

@@ -11,6 +11,10 @@ import TeamSwitcher from '@/Components/TeamSwitcher.vue';
 
 defineProps({
     title: String,
+    user: {
+        type: Object,
+        required: true,
+    },
 });
 
 const showingNavigationDropdown = ref(false);
@@ -26,6 +30,13 @@ const switchToTeam = (team) => {
 const logout = () => {
     router.post(route('logout'));
 };
+
+import { usePage } from '@inertiajs/vue3';
+
+const page = usePage();
+
+console.log('AppLayout user:', page.props.auth.user);
+
 </script>
 
 <template>
@@ -85,10 +96,10 @@ const logout = () => {
                             <!-- TeamSwitcher -->
                             <div class="ms-3 relative">
                                 <TeamSwitcher 
-                                    v-if="$page.props.auth.user && $page.props.auth.user.available_teams"
-                                    :user="$page.props.auth.user" 
-                                    :current-team="$page.props.auth.user.current_team"
-                                    :available-teams="$page.props.auth.user.available_teams || { department: [], personal: [] }" 
+                                    v-if="user && user.available_teams"
+                                    :user="user" 
+                                    :current-team="user.current_team"
+                                    :available-teams="user.available_teams || { department: [], personal: [] }" 
                                 />
                             </div>
 

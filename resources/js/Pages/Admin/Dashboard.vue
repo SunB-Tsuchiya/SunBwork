@@ -8,6 +8,10 @@ const props = defineProps({
         type: Object,
         required: true,
     },
+    available_teams: {
+        type: Array,
+        default: () => [],
+    },
 });
 
 // デバッグ用にpropsをログ出力
@@ -15,7 +19,7 @@ console.log('Admin Dashboard props:', props);
 </script>
 
 <template>
-    <AppLayout title="Admin Dashboard">
+    <AppLayout title="Admin Dashboard" :user="user">
         <template #header>
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">
                 【管理者】{{ user?.name || 'ユーザー' }}さんのページ

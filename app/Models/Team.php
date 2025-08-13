@@ -64,6 +64,14 @@ class Team extends JetstreamTeam
     }
 
     /**
+     * チームの役割
+     */
+    public function role()
+    {
+        return $this->belongsTo(\App\Models\Role::class);
+    }
+    
+    /**
      * 部署チーム（個人チーム以外）のスコープ
      */
     public function scopeDepartmentTeams($query)

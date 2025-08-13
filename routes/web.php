@@ -33,11 +33,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
 
     // User Dashboard (一般ユーザー機能 - Admin, Leaderもアクセス可能)
-    Route::get('/user/dashboard', function () {
-        return Inertia::render('Dashboard', [
-            'user' => Auth::user(),
-        ]);
-    })->name('user.dashboard');
+    Route::get('/user/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('user.dashboard');
 
     // チーム切り替え
     Route::put('/current-team', [App\Http\Controllers\CurrentTeamController::class, 'update'])->name('current-team.update');
