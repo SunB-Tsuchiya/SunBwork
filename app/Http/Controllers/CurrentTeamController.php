@@ -48,6 +48,11 @@ class CurrentTeamController extends Controller
             return redirect()->route('leader.dashboard');
         }
 
+        // コーディネーター権限を持つ場合はコーディネーターダッシュボードへ
+        if ($user->isCoordinator()) {
+            return redirect()->route('coordinator.dashboard');
+        }
+
         // 一般ユーザーはユーザーダッシュボードへ
         return redirect()->route('user.dashboard');
     }

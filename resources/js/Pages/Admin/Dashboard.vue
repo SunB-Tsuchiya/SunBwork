@@ -4,15 +4,16 @@ import Welcome from '@/Components/Welcome.vue';
 import { Link } from '@inertiajs/vue3';
 
 const props = defineProps({
-    user: {
-        type: Object,
-        required: true,
-    },
     available_teams: {
         type: Array,
         default: () => [],
     },
 });
+
+// ユーザー情報はinertiaのpropsから取得する
+import { usePage } from '@inertiajs/vue3';
+const page = usePage();
+const user = page.props.user;
 
 // デバッグ用にpropsをログ出力
 console.log('Admin Dashboard props:', props);
@@ -31,9 +32,9 @@ console.log('Admin Dashboard props:', props);
                 <!-- ナビゲーションタブ -->
                 <div class="mb-6">
                     <nav class="flex space-x-8" aria-label="Tabs">
-                        <a href="#" class="bg-red-100 text-red-700 px-3 py-2 font-medium text-sm rounded-md">
+                        <!-- <a href="#" class="bg-red-100 text-red-700 px-3 py-2 font-medium text-sm rounded-md">
                             管理者ダッシュボード
-                        </a>
+                        </a> -->
                         <Link :href="route('admin.users.index')" class="text-red-600 hover:text-red-800 px-3 py-2 font-medium text-sm rounded-md border border-red-200 hover:bg-red-50">
                             ユーザー管理
                         </Link>
@@ -41,14 +42,20 @@ console.log('Admin Dashboard props:', props);
                             会社管理
                         </Link>
                         <Link :href="route('admin.teams.index')" class="text-green-600 hover:text-green-800 px-3 py-2 font-medium text-sm rounded-md border border-green-200 hover:bg-green-50">
-                                                    チーム管理
-                                                </Link>
-                        <Link :href="route('leader.dashboard')" class="text-orange-600 hover:text-orange-800 px-3 py-2 font-medium text-sm rounded-md border border-orange-200 hover:bg-orange-50">
+                            チーム管理
+                        </Link>
+                        <Link :href="route('admin.clients.index')" class="text-green-600 hover:text-green-800 px-3 py-2 font-medium text-sm rounded-md border border-green-200 hover:bg-green-50">
+                            クライアント管理
+                        </Link>
+                        <!-- <Link :href="route('leader.dashboard')" class="text-orange-600 hover:text-orange-800 px-3 py-2 font-medium text-sm rounded-md border border-orange-200 hover:bg-orange-50">
                             リーダーモードに切り替え
+                        </Link>
+                        <Link :href="route('coordinator.dashboard')" class="text-green-600 hover:text-green-800 px-3 py-2 font-medium text-sm rounded-md border border-green-200 hover:bg-green-50">
+                            進行管理モードに切り替え
                         </Link>
                         <Link :href="route('user.dashboard')" class="text-blue-600 hover:text-blue-800 px-3 py-2 font-medium text-sm rounded-md border border-blue-200 hover:bg-blue-50">
                             ユーザーモードに切り替え
-                        </Link>
+                        </Link> -->
                         <Link :href="route('profile.show')" class="text-gray-600 hover:text-gray-800 px-3 py-2 font-medium text-sm rounded-md">
                             プロフィール編集
                         </Link>

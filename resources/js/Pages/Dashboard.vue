@@ -4,10 +4,6 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { Link } from '@inertiajs/vue3';
 
 const props = defineProps({
-    user: {
-        type: Object,
-        required: true,
-    },
     diaries: {
         type: Array,
         default: () => [],
@@ -17,6 +13,11 @@ const props = defineProps({
         default: () => [],
     },
 });
+
+// ユーザー情報はinertiaのpropsから取得する
+import { usePage } from '@inertiajs/vue3';
+const page = usePage();
+const user = page.props.user;
 
 // デバッグ用にpropsをログ出力
 console.log('useArray:', props.user);
@@ -32,6 +33,9 @@ console.log('useArray:', props.user);
                 <template v-else-if="user?.user_role === 'leader'">
                     【リーダー→ユーザーモード】{{ user?.name || 'ユーザー' }}さんのページ
                 </template>
+                <template v-else-if="user?.user_role === 'coordinator'">
+                    【進行管理→ユーザーモード】{{ user?.name || 'ユーザー' }}さんのページ
+                </template>
                 <template v-else>
                     {{ user?.name || 'ユーザー' }}さんのページ
                 </template>
@@ -44,16 +48,19 @@ console.log('useArray:', props.user);
                 <div class="mb-6">
                     <nav class="flex space-x-8" aria-label="Tabs">
                         <!-- 管理者の場合 -->
-                        <Link v-if="user?.user_role === 'admin'" :href="route('admin.dashboard')" class="text-red-600 hover:text-red-800 px-3 py-2 font-medium text-sm rounded-md border border-red-200 hover:bg-red-50">
+                        <!-- <Link v-if="user?.user_role === 'admin'" :href="route('admin.dashboard')" class="text-red-600 hover:text-red-800 px-3 py-2 font-medium text-sm rounded-md border border-red-200 hover:bg-red-50">
                             管理者モードに戻る
-                        </Link>
+                        </Link> -->
                         <!-- リーダーまたは管理者の場合 -->
-                        <Link v-if="user?.user_role === 'leader' || user?.user_role === 'admin'" :href="route('leader.dashboard')" class="text-orange-600 hover:text-orange-800 px-3 py-2 font-medium text-sm rounded-md border border-orange-200 hover:bg-orange-50">
-                            リーダーモードに戻る
+                        <!-- <Link v-if="user?.user_role === 'leader' || user?.user_role === 'admin'" :href="route('leader.dashboard')" class="text-orange-600 hover:text-orange-800 px-3 py-2 font-medium text-sm rounded-md border border-orange-200 hover:bg-orange-50">
+                            リーダーモードに切り替え
+                        </Link>
+                        <Link :href="route('coordinator.dashboard')" class="text-green-600 hover:text-green-800 px-3 py-2 font-medium text-sm rounded-md border border-green-200 hover:bg-green-50">
+                            進行管理モードに切り替え
                         </Link>
                         <a href="#" class="bg-blue-100 text-blue-700 px-3 py-2 font-medium text-sm rounded-md">
                             ユーザーダッシュボード
-                        </a>
+                        </a> -->
                         <Link :href="route('profile.show')" class="text-gray-600 hover:text-gray-800 px-3 py-2 font-medium text-sm rounded-md">
                             プロフィール編集
                         </Link>

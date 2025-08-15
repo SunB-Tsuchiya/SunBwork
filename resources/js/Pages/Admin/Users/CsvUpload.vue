@@ -100,7 +100,7 @@ const submit = () => {
                                         <li><strong>email:</strong> メールアドレス（重複不可）</li>
                                         <li><strong>password:</strong> パスワード</li>
                                         <li><strong>assignment:</strong> 担当（部署により異なる）</li>
-                                        <li><strong>user_role:</strong> システム権限（admin/leader/user のいずれか）</li>
+                                        <li><strong>user_role:</strong> システム権限（admin/leader/coordinator/user のいずれか）</li>
                                     </ul>
                                 </div>
 

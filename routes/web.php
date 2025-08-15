@@ -80,8 +80,26 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     ->name('leader.')
     ->group(function () {
         Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
+        // クライアント管理（Leader用）
+        Route::resource('clients', App\Http\Controllers\ClientController::class)->only(['index', 'create', 'store', 'edit', 'update']);
+    });
+
+// クライアント管理（Admin用）
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'admin'])
+    ->prefix('admin')
+    ->name('admin.')
+    ->group(function () {
+        Route::resource('clients', App\Http\Controllers\ClientController::class)->only(['index', 'create', 'store', 'edit', 'update']);
+    });
+// Coordinator Routes (AdminとCoordinatorのみアクセス可能)
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'coordinator'])
+    ->prefix('coordinator')
+    ->name('coordinator.')
+    ->group(function () {
+        Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
     });
     
+
     
 // デバッグ・テスト用ページのルート例
 // 今後も任意のVueページをテスト表示したい場合は、下記のようにInertia::renderでページ名を指定してください。

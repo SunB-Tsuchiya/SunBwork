@@ -31,6 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
             'leader' => \App\Http\Middleware\LeaderMiddleware::class,
+            'coordinator' => \App\Http\Middleware\CoordinatorMiddleware::class,
             'owner' => \App\Http\Middleware\OwnerMiddleware::class, // 後方互換性のため残す
         ]);
     })

@@ -61,8 +61,20 @@ class UserController extends Controller
                 'email' => 'required|string|lowercase|email|max:255|unique:users|email',
                 'password' => ['required', 'confirmed', Rules\Password::defaults()],
                 'assignment_id' => 'required|exists:assignments,id',
-                'user_assignment' => 'required|in:admin,leader,user',
+                'user_role' => 'required|in:admin,viewer',
             ]);
+
+
+            // 会社チーム（department_id=null, team_type=company）
+            $companyTeam = Team::where('company_id', $request->company_id)
+                ->whereNull('department_id')
+                ->where('team_type', 'company')
+                ->first();
+            // 部署チーム（company_id, department_id一致, team_type=department）
+            $departmentTeam = Team::where('company_id', $request->company_id)
+                ->where('department_id', $request->department_id)
+                ->where('team_type', 'department')
+                ->first();
 
             $user = User::create([
                 'name' => $request->name,
@@ -70,18 +82,27 @@ class UserController extends Controller
                 'password' => Hash::make($request->password),
                 'assignment_id' => $request->assignment_id,
                 'user_role' => $request->user_role,
-                'email_verified_at' => now(), // Admin作成のユーザーは即座に認証済み
+                'email_verified_at' => now(),
+                'current_team_id' => $departmentTeam ? $departmentTeam->id : null,
             ]);
 
-            // Jetstreamのチーム作成
+            $role = ($request->user_role === 'admin') ? 'admin' : 'viewer';
+            // 会社チームに登録
+            if ($companyTeam) {
+                $user->teams()->attach($companyTeam->id, ['assignment' => 'editor', 'role' => $role]);
+            }
+            // 部署チームに登録
+            if ($departmentTeam) {
+                $user->teams()->attach($departmentTeam->id, ['assignment' => 'editor', 'role' => $role]);
+            }
+            // Jetstreamの個人チームも必要なら作成
             try {
-                $team = Team::create([
+                $personalTeam = Team::create([
                     'user_id' => $user->id,
                     'name' => $user->name . "'s Team",
                     'personal_team' => true,
                 ]);
-                $user->current_team_id = $team->id;
-                $user->save();
+                $user->teams()->attach($personalTeam->id, ['assignment' => 'admin', 'role' => $role]);
             } catch (\Exception $e) {
                 Log::error('Team作成エラー: ' . $e->getMessage());
                 Log::error('Exception trace: ' . $e->getTraceAsString());
@@ -125,7 +146,7 @@ class UserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|lowercase|email|max:255|unique:users,email,' . $user->id,
             'assignment' => 'required|string|max:255',
-            'user_role' => 'required|in:admin,leader,user',
+            'user_role' => 'required|in:admin,leader,coordinator, user',
         ]);
 
         $user->update([
@@ -331,7 +352,7 @@ class UserController extends Controller
                 'users.*.email' => 'required|string|lowercase|email|max:255|unique:users',
                 'users.*.password' => 'required|string',
                 'users.*.assignment' => 'required|string|max:255',
-                'users.*.user_role' => 'required|in:admin,leader,user',
+                'users.*.user_role' => 'required|in:admin,viewer',
                 'company_id' => 'required|exists:companies,id',
                 'department_id' => 'required|exists:departments,id',
             ]);
@@ -344,9 +365,15 @@ class UserController extends Controller
         $successCount = 0;
         $errors = [];
 
-        // 部署のチームを取得
         $department = Department::findOrFail($request->department_id);
-        $departmentTeam = Team::where('department_id', $department->id)
+        // 会社チーム（department_id=null, team_type=company）
+        $companyTeam = Team::where('company_id', $request->company_id)
+            ->whereNull('department_id')
+            ->where('team_type', 'company')
+            ->first();
+        // 部署チーム（company_id, department_id一致, team_type=department）
+        $departmentTeam = Team::where('company_id', $request->company_id)
+            ->where('department_id', $request->department_id)
             ->where('team_type', 'department')
             ->first();
 
@@ -366,35 +393,31 @@ class UserController extends Controller
                     ->first();
                 $assignment_id = $assignment ? $assignment->id : null;
 
+
                 $user = User::create([
                     'name' => $userData['name'],
                     'email' => $userData['email'],
                     'password' => Hash::make($userData['password']),
                     'assignment_id' => $assignment_id,
                     'user_role' => $userData['user_role'],
+                    'current_team_id' => $departmentTeam ? $departmentTeam->id : null,
                 ]);
-                Log::info('User created with ID: ' . $user->id);
-
-                // 部署チームにユーザーを追加
-                Log::info('Adding user to department team: ' . $departmentTeam->id);
-                $user->teams()->attach($departmentTeam->id, ['assignment' => 'editor']);
-
+                $role = ($userData['user_role'] === 'admin') ? 'admin' : 'viewer';
+                // 会社チームに登録
+                if ($companyTeam) {
+                    $user->teams()->attach($companyTeam->id, ['assignment' => 'editor', 'role' => $role]);
+                }
+                // 部署チームに登録
+                if ($departmentTeam) {
+                    $user->teams()->attach($departmentTeam->id, ['assignment' => 'editor', 'role' => $role]);
+                }
                 // 個人チームも作成
                 $personalTeam = Team::create([
                     'name' => $user->name . '\'s Team',
                     'user_id' => $user->id,
                     'personal_team' => true,
-                    'company_id' => $request->company_id,
-                    'department_id' => $request->department_id,
-                    'team_type' => 'personal',
                 ]);
-
-                // 個人チームにも追加
-                $user->teams()->attach($personalTeam->id, ['assignment' => 'admin']);
-
-                // 現在のチームを部署チームに設定
-                $user->current_team_id = $departmentTeam->id;
-                $user->save();
+                $user->teams()->attach($personalTeam->id, ['assignment' => 'admin', 'role' => $role]);
 
                 Log::info('User processing completed');
                 $successCount++;

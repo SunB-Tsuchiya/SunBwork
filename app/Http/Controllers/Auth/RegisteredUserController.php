@@ -54,7 +54,7 @@ class RegisteredUserController extends Controller
             'company_id' => 'required|exists:companies,id',
             'department_id' => 'required|exists:departments,id',
             'assignment_id' => 'required|exists:assignments,id', // assignment_idを直接受け取る
-            'user_role' => 'required|in:admin,leader,user', // 権限レベルのバリデーション (owner→leaderに変更)
+            'user_role' => 'required|in:admin,leader,coordinator,user', // 権限レベルのバリデーション
         ]);
 
         $user = User::create([

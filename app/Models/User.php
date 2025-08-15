@@ -90,6 +90,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Check if user is coordinator
+     */
+    public function isCoordinator(): bool
+    {
+        return $this->user_role === 'coordinator';
+    }
+
+    /**
      * Check if user is owner (deprecated - use isLeader())
      */
     public function isOwner(): bool

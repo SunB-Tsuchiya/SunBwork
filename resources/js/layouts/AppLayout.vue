@@ -71,6 +71,9 @@ console.log('AppLayout auth:', page.props.auth);
                                     <NavLink :href="route('leader.dashboard')" :active="route().current('leader.dashboard')">
                                         <span class="text-orange-600">Leader</span>
                                     </NavLink>
+                                    <NavLink :href="route('coordinator.dashboard')" :active="route().current('coordinator.dashboard')">
+                                        <span class="text-green-600">Coordinator</span>
+                                    </NavLink>
                                     <NavLink :href="route('user.dashboard')" :active="route().current('user.dashboard')">
                                         <span class="text-blue-600">User</span>
                                     </NavLink>
@@ -80,6 +83,19 @@ console.log('AppLayout auth:', page.props.auth);
                                 <template v-else-if="$page.props.auth.user.user_role === 'leader'">
                                     <NavLink :href="route('leader.dashboard')" :active="route().current('leader.dashboard')">
                                         <span class="text-orange-600">Leader</span>
+                                    </NavLink>
+                                    <NavLink :href="route('coordinator.dashboard')" :active="route().current('coordinator.dashboard')">
+                                        <span class="text-green-600">Coordinator</span>
+                                    </NavLink>
+                                    <NavLink :href="route('user.dashboard')" :active="route().current('user.dashboard')">
+                                        <span class="text-blue-600">User</span>
+                                    </NavLink>
+                                </template>
+
+                                <!-- Coordinator用ナビゲーション -->
+                                <template v-else-if="$page.props.auth.user.user_role === 'coordinator'">
+                                    <NavLink :href="route('coordinator.dashboard')" :active="route().current('coordinator.dashboard')">
+                                        <span class="text-green-600">Coordinator</span>
                                     </NavLink>
                                     <NavLink :href="route('user.dashboard')" :active="route().current('user.dashboard')">
                                         <span class="text-blue-600">User</span>
@@ -192,6 +208,9 @@ console.log('AppLayout auth:', page.props.auth);
                             <ResponsiveNavLink :href="route('leader.dashboard')" :active="route().current('leader.dashboard')">
                                 <span class="text-orange-600">Leader Dashboard</span>
                             </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('coordinator.dashboard')" :active="route().current('coordinator.dashboard')">
+                                <span class="text-green-600">Coordinator Dashboard</span>
+                            </ResponsiveNavLink>
                             <ResponsiveNavLink :href="route('user.dashboard')" :active="route().current('user.dashboard')">
                                 <span class="text-blue-600">User Dashboard</span>
                             </ResponsiveNavLink>
@@ -201,6 +220,19 @@ console.log('AppLayout auth:', page.props.auth);
                         <template v-else-if="$page.props.auth.user.user_role === 'leader'">
                             <ResponsiveNavLink :href="route('leader.dashboard')" :active="route().current('leader.dashboard')">
                                 <span class="text-orange-600">Leader Dashboard</span>
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('coordinator.dashboard')" :active="route().current('coordinator.dashboard')">
+                                <span class="text-green-600">Coordinator Dashboard</span>
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('user.dashboard')" :active="route().current('user.dashboard')">
+                                <span class="text-blue-600">User Dashboard</span>
+                            </ResponsiveNavLink>
+                        </template>
+
+                        <!-- Coordinator用レスポンシブナビゲーション -->
+                        <template v-else-if="$page.props.auth.user.user_role === 'coordinator'">
+                            <ResponsiveNavLink :href="route('coordinator.dashboard')" :active="route().current('coordinator.dashboard')">
+                                <span class="text-green-600">Coordinator Dashboard</span>
                             </ResponsiveNavLink>
                             <ResponsiveNavLink :href="route('user.dashboard')" :active="route().current('user.dashboard')">
                                 <span class="text-blue-600">User Dashboard</span>

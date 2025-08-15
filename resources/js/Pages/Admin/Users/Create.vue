@@ -137,9 +137,8 @@ const availableAssignments = computed(() => {
 });
 
 const userAssignmentOptions = [
-    { value: 'admin', label: '管理者', description: '全ての機能にアクセス可能' },
-    { value: 'leader', label: 'リーダー', description: 'コンテンツ管理とユーザー機能にアクセス可能' },
-    { value: 'user', label: 'ユーザー', description: '基本機能のみアクセス可能' }
+    { value: 'admin', label: '管理者', description: '全ての機能にアクセス可能（編集可）' },
+    { value: 'viewer', label: '閲覧者', description: '閲覧のみ可能（編集不可）' }
 ];
 
 const onCompanyChange = () => {
@@ -349,13 +348,9 @@ const submit = () => {
                                 <h4 class="font-medium text-red-900">管理者</h4>
                                 <p class="text-sm text-red-700 mt-1">全ての機能にアクセス可能。ユーザー管理、システム設定など。</p>
                             </div>
-                            <div class="bg-orange-50 p-3 rounded-lg border border-orange-200">
-                                <h4 class="font-medium text-orange-900">リーダー</h4>
-                                <p class="text-sm text-orange-700 mt-1">コンテンツ管理とユーザー機能にアクセス可能。</p>
-                            </div>
                             <div class="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                                <h4 class="font-medium text-blue-900">ユーザー</h4>
-                                <p class="text-sm text-blue-700 mt-1">基本機能のみアクセス可能。</p>
+                                <h4 class="font-medium text-blue-900">閲覧者</h4>
+                                <p class="text-sm text-blue-700 mt-1">閲覧のみ可能。編集はできません。</p>
                             </div>
                         </div>
                     </div>
