@@ -1,6 +1,18 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link } from '@inertiajs/vue3';
+import AdminNavigationTabs from '@/Components/AdminNavigationTabs.vue';
+import { router } from '@inertiajs/vue3';
+// ユーザー削除処理
+function deleteUser(id) {
+    if (confirm('本当にこのユーザーを削除しますか？')) {
+        router.delete(route('admin.users.destroy', id), {
+            onSuccess: () => {
+                router.visit(route('admin.users.index'));
+            }
+        });
+    }
+}
 
 const props = defineProps({
     users: {
@@ -26,6 +38,8 @@ const getAssignmentBadgeClass = (assignment) => {
         case 'leader':
             return 'bg-orange-100 text-orange-800';
         case 'user':
+            return 'bg-green-100 text-blue-800';
+        case 'user':
             return 'bg-blue-100 text-blue-800';
         default:
             return 'bg-gray-100 text-gray-800';
@@ -38,6 +52,8 @@ const getAssignmentText = (assignment) => {
             return '管理者';
         case 'leader':
             return 'リーダー';
+        case 'coordinator':
+            return '進行管理';
         case 'user':
             return 'ユーザー';
         default:
@@ -62,22 +78,7 @@ const getAssignmentText = (assignment) => {
         <div class="py-12">
             <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
                 <!-- ナビゲーションタブ -->
-                <div class="mb-6">
-                    <nav class="flex space-x-8" aria-label="Tabs">
-                        <Link :href="route('admin.dashboard')" class="text-red-600 hover:text-red-800 px-3 py-2 font-medium text-sm rounded-md border border-red-200 hover:bg-red-50">
-                            管理者ダッシュボード
-                        </Link>
-                        <a href="#" class="bg-red-100 text-red-700 px-3 py-2 font-medium text-sm rounded-md">
-                            ユーザー管理
-                        </a>
-                        <Link :href="route('leader.dashboard')" class="text-orange-600 hover:text-orange-800 px-3 py-2 font-medium text-sm rounded-md border border-orange-200 hover:bg-orange-50">
-                            リーダーモードに切り替え
-                        </Link>
-                        <Link :href="route('user.dashboard')" class="text-blue-600 hover:text-blue-800 px-3 py-2 font-medium text-sm rounded-md border border-blue-200 hover:bg-blue-50">
-                            ユーザーモードに切り替え
-                        </Link>
-                    </nav>
-                </div>
+                <AdminNavigationTabs active="users" />
 
                 <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg">
                     <div class="p-6">
@@ -139,7 +140,7 @@ const getAssignmentText = (assignment) => {
                                                 <Link :href="route('admin.users.edit', user.id)" class="text-yellow-600 hover:text-yellow-900">
                                                     編集
                                                 </Link>
-                                                <button @click="deleteUser(user)" class="text-red-600 hover:text-red-900">
+                                                    <button @click="deleteUser(user.id)" class="text-red-600 hover:text-red-900">
                                                     削除
                                                 </button>
                                             </div>

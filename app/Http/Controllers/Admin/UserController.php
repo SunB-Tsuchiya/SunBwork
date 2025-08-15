@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\Team;
 use App\Models\Company;
 use App\Models\Department;
+use App\Models\Assignment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
@@ -15,6 +16,7 @@ use Illuminate\Validation\Rules;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
+use PhpParser\Node\Expr\Assign;
 
 class UserController extends Controller
 {
@@ -53,7 +55,6 @@ class UserController extends Controller
     public function store(Request $request)
     {
         // リクエスト値をログ出力
-        Log::info('storeリクエスト値:', $request->all());
 
         try {
             $request->validate([
@@ -61,52 +62,62 @@ class UserController extends Controller
                 'email' => 'required|string|lowercase|email|max:255|unique:users|email',
                 'password' => ['required', 'confirmed', Rules\Password::defaults()],
                 'assignment_id' => 'required|exists:assignments,id',
-                'user_role' => 'required|in:admin,viewer',
+                'user_role' => [
+                    'required',
+                    function($attribute, $value, $fail) {
+                        $allowed = ['admin', 'leader', 'coordinator', 'user'];
+                        if (!in_array($value, $allowed)) {
+                            $fail("{$attribute} の値 '{$value}' は許可されていません（許可値: " . implode(',', $allowed) . ")");
+                        }
+                    }
+                ],
             ]);
 
 
             // 会社チーム（department_id=null, team_type=company）
             $companyTeam = Team::where('company_id', $request->company_id)
-                ->whereNull('department_id')
                 ->where('team_type', 'company')
                 ->first();
             // 部署チーム（company_id, department_id一致, team_type=department）
-            $departmentTeam = Team::where('company_id', $request->company_id)
-                ->where('department_id', $request->department_id)
-                ->where('team_type', 'department')
+            $departmentTeam = Team::where('department_id', $request->department_id)
                 ->first();
 
             $user = User::create([
                 'name' => $request->name,
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
+                'company_id' => $request->company_id,
+                'department_id' => $request->department_id,
                 'assignment_id' => $request->assignment_id,
+                'current_team_id' => $request->company_id,
                 'user_role' => $request->user_role,
                 'email_verified_at' => now(),
-                'current_team_id' => $departmentTeam ? $departmentTeam->id : null,
             ]);
 
             $role = ($request->user_role === 'admin') ? 'admin' : 'viewer';
+
             // 会社チームに登録
+            // team_userはピボットテーブルだから、attachメソッドで登録
             if ($companyTeam) {
-                $user->teams()->attach($companyTeam->id, ['assignment' => 'editor', 'role' => $role]);
+                $user->teams()->attach($companyTeam->id, ['role' => $role]);
             }
             // 部署チームに登録
+            // team_userはピボットテーブルだから、attachメソッドで登録
             if ($departmentTeam) {
-                $user->teams()->attach($departmentTeam->id, ['assignment' => 'editor', 'role' => $role]);
+                $user->teams()->attach($departmentTeam->id, ['role' => $role]);
             }
             // Jetstreamの個人チームも必要なら作成
-            try {
-                $personalTeam = Team::create([
-                    'user_id' => $user->id,
-                    'name' => $user->name . "'s Team",
-                    'personal_team' => true,
-                ]);
-                $user->teams()->attach($personalTeam->id, ['assignment' => 'admin', 'role' => $role]);
-            } catch (\Exception $e) {
-                Log::error('Team作成エラー: ' . $e->getMessage());
-                Log::error('Exception trace: ' . $e->getTraceAsString());
-            }
+            // try {
+            //     $personalTeam = Team::create([
+            //         'user_id' => $user->id,
+            //         'name' => $user->name . "'s Team",
+            //         'personal_team' => false,
+            //     ]);
+            //     $user->teams()->attach($personalTeam->id, ['assignment' => 'admin', 'role' => $role]);
+            // } catch (\Exception $e) {
+            //     Log::error('Team作成エラー: ' . $e->getMessage());
+            //     Log::error('Exception trace: ' . $e->getTraceAsString());
+            // }
 
             return redirect()->route('admin.users.index')
                 ->with('success', 'ユーザーが正常に作成されました。');
@@ -202,14 +213,6 @@ class UserController extends Controller
 
         $file = $request->file('csv_file');
 
-        // デバッグ: アップロードされたファイルの情報を確認
-        Log::info('Uploaded file info:', [
-            'original_name' => $file->getClientOriginalName(),
-            'size' => $file->getSize(),
-            'temp_path' => $file->path(),
-            'is_valid' => $file->isValid()
-        ]);
-
         // ディレクトリが存在することを確認
         $tempDir = storage_path('app/private/temp_csv');
         if (!is_dir($tempDir)) {
@@ -251,12 +254,17 @@ class UserController extends Controller
                         continue;
                     }
 
+                    $assignmentName = trim($data[3]);
+                    $assignment_id = \App\Models\Assignment::where('name', $assignmentName)
+                        ->where('department_id', $department->id)
+                        ->value('id');
                     $userData = [
                         'line' => $line,
                         'name' => trim($data[0]),
                         'email' => trim($data[1]),
                         'password' => trim($data[2]),
-                        'assignment' => trim($data[3]),
+                        'assignment' => $assignmentName,
+                        'assignment_id' => $assignment_id,
                         'user_role' => trim($data[4]),
                     ];
 
@@ -320,6 +328,9 @@ class UserController extends Controller
             // 選択された会社・部署情報を取得
             $company = Company::findOrFail($request->company_id);
             $department = Department::findOrFail($request->department_id);
+            $assignment_id = Assignment::where('name', $request->input('assignment'))
+                ->where('department_id', $department->id)
+                ->value('id');
 
             return Inertia::render('Admin/Users/CsvPreview', [
                 'csvData' => $csvData,
@@ -329,6 +340,7 @@ class UserController extends Controller
                 'department' => $department,
                 'company_id' => $request->company_id,
                 'department_id' => $request->department_id,
+                'assignment_id' => $assignment_id,
             ]);
         } catch (\Exception $e) {
             Storage::disk('local')->delete($path);
@@ -351,15 +363,23 @@ class UserController extends Controller
                 'users.*.name' => 'required|string|max:255',
                 'users.*.email' => 'required|string|lowercase|email|max:255|unique:users',
                 'users.*.password' => 'required|string',
-                'users.*.assignment' => 'required|string|max:255',
-                'users.*.user_role' => 'required|in:admin,viewer',
+                'users.*.assignment_id' => 'required|exists:assignments,id',
+                'users.*.user_role' => 'required|in:admin,leader,coordinator,user',
                 'company_id' => 'required|exists:companies,id',
                 'department_id' => 'required|exists:departments,id',
             ]);
             Log::info('Validation passed');
         } catch (\Illuminate\Validation\ValidationException $e) {
             Log::error('Validation failed: ', $e->errors());
-            throw $e;
+            // バリデーションエラー時は元の画面に戻し、エラー内容をInertiaで返す
+            return redirect()->back()
+                ->withErrors($e->errors())
+                ->withInput();
+        } catch (\Exception $e) {
+            Log::error('csvStore unexpected error: ' . $e->getMessage());
+            return redirect()->back()
+                ->withErrors(['batch' => '予期せぬエラーが発生しました: ' . $e->getMessage()])
+                ->withInput();
         }
 
         $successCount = 0;
@@ -378,22 +398,23 @@ class UserController extends Controller
             ->first();
 
         if (!$departmentTeam) {
-            return redirect()->route('admin.users.csv.upload')
-                ->withErrors(['department' => '選択された部署のチームが見つかりません。']);
+            return redirect()->back()
+                ->withErrors(['department' => '選択された部署のチームが見つかりません。'])
+                ->withInput();
         }
 
         DB::beginTransaction();
-
         try {
             foreach ($request->users as $userData) {
                 Log::info('Creating user: ' . $userData['email']);
                 // assignment名からassignment_idを取得
-                $assignment = \App\Models\Assignment::where('name', $userData['assignment'])
-                    ->where('department_id', $department->id)
-                    ->first();
-                $assignment_id = $assignment ? $assignment->id : null;
-
-
+                $assignment_id = isset($userData['assignment_id']) ? $userData['assignment_id'] : null;
+                // 念のためassignment_idがなければnameから再取得
+                if (!$assignment_id && isset($userData['assignment'])) {
+                    $assignment_id = \App\Models\Assignment::where('name', $userData['assignment'])
+                        ->where('department_id', $department->id)
+                        ->value('id');
+                }
                 $user = User::create([
                     'name' => $userData['name'],
                     'email' => $userData['email'],
@@ -405,34 +426,32 @@ class UserController extends Controller
                 $role = ($userData['user_role'] === 'admin') ? 'admin' : 'viewer';
                 // 会社チームに登録
                 if ($companyTeam) {
-                    $user->teams()->attach($companyTeam->id, ['assignment' => 'editor', 'role' => $role]);
+                    $user->teams()->attach($companyTeam->id, ['role' => $role]);
                 }
                 // 部署チームに登録
                 if ($departmentTeam) {
-                    $user->teams()->attach($departmentTeam->id, ['assignment' => 'editor', 'role' => $role]);
+                    $user->teams()->attach($departmentTeam->id, ['role' => $role]);
                 }
-                // 個人チームも作成
-                $personalTeam = Team::create([
-                    'name' => $user->name . '\'s Team',
-                    'user_id' => $user->id,
-                    'personal_team' => true,
-                ]);
-                $user->teams()->attach($personalTeam->id, ['assignment' => 'admin', 'role' => $role]);
-
                 Log::info('User processing completed');
                 $successCount++;
             }
-
             DB::commit();
             Log::info('Transaction committed successfully');
-
             return redirect()->route('admin.users.index')
                 ->with('success', "{$successCount}件のユーザーが一括登録されました。");
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            DB::rollBack();
+            Log::error('csvStore validation error: ', $e->errors());
+            return redirect()->back()
+                ->withErrors($e->errors())
+                ->withInput();
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('csvStore failed: ' . $e->getMessage());
             Log::error('Exception trace: ' . $e->getTraceAsString());
-            return redirect()->route('admin.users.csv.upload')->withErrors(['batch' => 'ユーザー登録中にエラーが発生しました: ' . $e->getMessage()]);
+            return redirect()->back()
+                ->withErrors(['batch' => 'ユーザー登録中にエラーが発生しました: ' . $e->getMessage()])
+                ->withInput();
         }
     }
 
@@ -577,7 +596,7 @@ class UserController extends Controller
      */
     private function validateAndFixUserRole($userRole)
     {
-        $validUserRoles = ['admin', 'leader', 'user'];
+        $validUserRoles = ['admin', 'leader', 'coordinator', 'user'];
 
         // タイポ修正マップ
         $typoFixes = [
@@ -588,6 +607,9 @@ class UserController extends Controller
             'manager' => 'leader',
             'ユーザー' => 'user',
             'member' => 'user',
+            'cordinator' => 'coordinator',
+            'coodinator' => 'coordinator',
+            'coordnator' => 'coordinator',
         ];
 
         $trimmedRole = trim(strtolower($userRole));

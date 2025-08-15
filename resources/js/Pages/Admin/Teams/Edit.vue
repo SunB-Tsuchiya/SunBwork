@@ -76,16 +76,6 @@ const updateTeam = () => {
                         />
                         <InputError :message="form.errors.department_id" class="mt-2" />
                     </div>
-                    <div class="col-span-6 sm:col-span-4">
-                        <InputLabel for="role_id" value="役職" />
-                        <SelectInput
-                            id="role_id"
-                            v-model="form.role_id"
-                            :options="roles.map(r => ({ value: r.id, label: r.name }))"
-                            class="block w-full mt-1"
-                        />
-                        <InputError :message="form.errors.role_id" class="mt-2" />
-                    </div>
                     <!-- 必要に応じて他のリレーションや属性もここに追加 -->
                 </template>
                 <template #actions>

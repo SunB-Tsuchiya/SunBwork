@@ -3,6 +3,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
+import AdminNavigationTabs from '@/Components/AdminNavigationTabs.vue';
 
 const props = defineProps({
     csvData: Array,
@@ -23,6 +24,9 @@ const form = useForm({
 });
 
 const submit = () => {
+    console.log('submit called');
+    console.log('form data:', form);
+    console.log('post url:', route('admin.users.csv.store'));
     form.post(route('admin.users.csv.store'));
 };
 
@@ -34,6 +38,8 @@ const getRoleBadgeClass = (role) => {
             return 'bg-orange-100 text-orange-800';
         case 'user':
             return 'bg-blue-100 text-blue-800';
+        case 'coordinator':
+            return 'bg-green-100 text-green-800';
         default:
             return 'bg-gray-100 text-gray-800';
     }
@@ -47,6 +53,8 @@ const getRoleLabel = (role) => {
             return 'リーダー';
         case 'user':
             return 'ユーザー';
+        case 'coordinator':
+            return '進行管理';
         default:
             return role;
     }
@@ -69,19 +77,7 @@ const getRoleLabel = (role) => {
         <div class="py-12">
             <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
                 <!-- ナビゲーションタブ -->
-                <div class="mb-6">
-                    <nav class="flex space-x-8" aria-label="Tabs">
-                        <Link :href="route('admin.dashboard')" class="text-red-600 hover:text-red-800 px-3 py-2 font-medium text-sm rounded-md border border-red-200 hover:bg-red-50">
-                            管理者ダッシュボード
-                        </Link>
-                        <Link :href="route('admin.users.index')" class="text-red-600 hover:text-red-800 px-3 py-2 font-medium text-sm rounded-md border border-red-200 hover:bg-red-50">
-                            ユーザー管理
-                        </Link>
-                        <a href="#" class="bg-red-100 text-red-700 px-3 py-2 font-medium text-sm rounded-md">
-                            CSV登録確認
-                        </a>
-                    </nav>
-                </div>
+                    <AdminNavigationTabs active="users" />
 
                 <!-- 登録先情報 -->
                 <div class="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -230,12 +226,13 @@ const getRoleLabel = (role) => {
                         <p class="text-gray-600 mb-4">
                             すべてのデータにエラーがあるため、登録できるユーザーがありません。
                         </p>
-                        <Link 
-                            :href="route('admin.users.csv.upload')" 
-                            class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 active:bg-blue-900 focus:outline-none focus:border-blue-900 focus:ring ring-blue-300 disabled:opacity-25 transition ease-in-out duration-150"
-                        >
-                            CSVファイルを修正してアップロード
-                        </Link>
+                        <form :action="route('admin.users.csv.upload')" method="get" class="inline">
+                            <button type="submit"
+                                class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 active:bg-blue-900 focus:outline-none focus:border-blue-900 focus:ring ring-blue-300 disabled:opacity-25 transition ease-in-out duration-150"
+                            >
+                                CSVファイルを修正してアップロード
+                            </button>
+                        </form>
                     </div>
                 </div>
             </div>

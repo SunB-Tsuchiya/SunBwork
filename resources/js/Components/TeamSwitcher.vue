@@ -131,5 +131,4 @@ const switchTeam = (teamId) => {
         preserveState: false,
     })
 }
-console.log('TeamSwitcher props:', props);
 </script>

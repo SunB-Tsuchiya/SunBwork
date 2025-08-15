@@ -42,6 +42,9 @@ console.log('Coordinator Dashboard props:', props);
                         <Link :href="route('user.dashboard')" class="text-blue-600 hover:text-blue-800 px-3 py-2 font-medium text-sm rounded-md border border-blue-200 hover:bg-blue-50">
                             ユーザーモードに切り替え
                         </Link> -->
+                        <Link :href="route('coordinator.project_jobs.index')" class="text-gray-600 hover:text-gray-800 px-3 py-2 font-medium text-sm rounded-md">
+                            案件一覧
+                        </Link>
                         <Link :href="route('profile.show')" class="text-gray-600 hover:text-gray-800 px-3 py-2 font-medium text-sm rounded-md">
                             プロフィール編集
                         </Link>

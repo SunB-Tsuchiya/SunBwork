@@ -53,7 +53,7 @@ const handleDelete = async (teamId) => {
                         class="px-4 py-2 rounded border text-sm font-medium"
                         :class="showType === 'personal' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-blue-600 border-blue-600'"
                         @click="showType = 'personal'"
-                    >個人チーム</button>
+                    >タスクチーム</button>
                 </div>
                 <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg p-6 mb-6">
                     <table class="min-w-full divide-y divide-gray-200">
@@ -63,7 +63,6 @@ const handleDelete = async (teamId) => {
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">チーム名</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">会社</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">部署</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">種別</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
@@ -71,8 +70,7 @@ const handleDelete = async (teamId) => {
                                 <td class="px-6 py-4 whitespace-nowrap">{{ team.id }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap">{{ team.name }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap">{{ team.company?.name || '未設定' }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap">{{ team.department?.name || '未設定' }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap">{{ team.team_type === 'personal' ? '個人チーム' : '部署チーム' }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">{{ team.department?.name || '' }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap flex flex-col sm:flex-row gap-2 sm:justify-end">
                                     <button @click="() => $inertia.visit(route('admin.teams.edit', { team: team.id }))" class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-xs">編集</button>
                                     <button

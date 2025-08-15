@@ -9,10 +9,13 @@ use Inertia\Inertia;
 
 class ProjectJobController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $jobs = ProjectJob::all();
-        return Inertia::render('Coordinator/ProjectJobs/Index', ['jobs' => $jobs]);
+        $user = $request->user();
+        $jobs = ProjectJob::with('client')
+            ->where('user_id', $user->id)
+            ->get();
+    return Inertia::render('Coordinator/ProjectJobs/Index', ['jobs' => $jobs]);
     }
 
     public function create()

@@ -5,6 +5,7 @@ import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
+import AdminNavigationTabs from '@/Components/AdminNavigationTabs.vue';
 import { ref, computed } from 'vue';
 
 const props = defineProps({
@@ -63,20 +64,9 @@ const submit = () => {
         </template>
 
         <div class="py-12">
-            <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
+            <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
                 <!-- ナビゲーションタブ -->
-                <div class="mb-6">
-                    <nav class="flex space-x-8" aria-label="Tabs">
-                        <Link :href="route('admin.dashboard')" class="text-red-600 hover:text-red-800 px-3 py-2 font-medium text-sm rounded-md border border-red-200 hover:bg-red-50">
-                            管理者ダッシュボード
-                        </Link>
-                        <Link :href="route('admin.users.index')" class="text-red-600 hover:text-red-800 px-3 py-2 font-medium text-sm rounded-md border border-red-200 hover:bg-red-50">
-                            ユーザー管理
-                        </Link>
-                        <a href="#" class="bg-red-100 text-red-700 px-3 py-2 font-medium text-sm rounded-md">
-                            CSV一括登録
-                        </a>
-                    </nav>
+                <AdminNavigationTabs active="users" />
                 </div>
 
                 <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg">
@@ -117,7 +107,7 @@ const submit = () => {
                                         </div>
                                         <div>
                                             <strong>システム権限:</strong> 
-                                            「管理者」→「admin」、「リーダー」→「leader」、「ユーザー」→「user」など
+                                            「管理者」→「admin」、「リーダー」→「leader」、「コーディネーター」→「coordinator」、「ユーザー」→「user」など
                                         </div>
                                     </div>
                                     <p class="text-xs text-blue-600 mt-2">
@@ -225,6 +215,5 @@ const submit = () => {
                     </div>
                 </div>
             </div>
-        </div>
     </AppLayout>
 </template>

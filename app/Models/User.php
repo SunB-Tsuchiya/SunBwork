@@ -22,7 +22,6 @@ class User extends Authenticatable
     use HasTeams;
     use Notifiable;
     use TwoFactorAuthenticatable;
-
     /**
      * The attributes that are mass assignable.
      *
@@ -35,8 +34,7 @@ class User extends Authenticatable
         'user_role',
         'company_id',
         'department_id',
-        'role_id',
-        'role',  // 担当（文字列）フィールドを追加
+        'assignment_id',
     ];
 
     /**

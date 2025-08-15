@@ -27,7 +27,7 @@ class ClientController extends Controller
             'fromSA' => 'boolean',
         ]);
         Client::create($data);
-        return redirect()->route('clients.index');
+        return redirect()->route('leader.clients.index');
     }
 
     public function edit(Client $client)
@@ -43,6 +43,6 @@ class ClientController extends Controller
             'fromSA' => 'boolean',
         ]);
         $client->update($data);
-        return redirect()->route('clients.index');
+        return redirect()->route('leader.clients.index');
     }
 }

@@ -7,6 +7,7 @@ import SecondaryButton from '@/Components/SecondaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import Checkbox from '@/Components/Checkbox.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
+import AdminNavigationTabs from '@/Components/AdminNavigationTabs.vue';
 import { ref, computed, watch } from 'vue';
 
 // props: companies（親から渡す）
@@ -137,8 +138,10 @@ const availableAssignments = computed(() => {
 });
 
 const userAssignmentOptions = [
-    { value: 'admin', label: '管理者', description: '全ての機能にアクセス可能（編集可）' },
-    { value: 'viewer', label: '閲覧者', description: '閲覧のみ可能（編集不可）' }
+    { value: 'admin', label: '管理者', description: '全ての機能にアクセス可能' },
+    { value: 'leader', label: 'リーダー', description: 'コンテンツ管理とユーザー機能にアクセス可能' },
+    { value: 'coordinator', label: '進行管理', description: 'タスク管理とユーザー機能にアクセス可能' },
+    { value: 'user', label: 'ユーザー', description: '基本機能のみアクセス可能' }
 ];
 
 const onCompanyChange = () => {
@@ -166,15 +169,12 @@ const submit = () => {
     form.post(route('admin.users.store'), {
         onFinish: () => form.reset('password', 'password_confirmation'),
         onError: (errors) => {
-            // サーバー側エラーも日本語で表示（英語の場合は日本語変換）
-            let messages = Object.values(errors).map(msg => {
-                if (msg.includes('required')) return '必須項目が入力されていません。';
-                if (msg.includes('confirmed')) return 'パスワードが一致しません。';
-                if (msg.includes('email')) return 'メールアドレスの形式が正しくありません。';
-                return msg;
+            // サーバー側エラー詳細をすべて表示
+            let messages = Object.entries(errors).map(([field, msg]) => {
+                return `[${field}] ${msg}`;
             }).join('\n');
             alert('登録できませんでした:\n' + messages);
-            console.error('登録バリデーションエラー:', messages);
+            console.error('登録バリデーションエラー:', errors);
         },
     });
 };
@@ -194,9 +194,12 @@ const submit = () => {
         </template>
 
         <div class="py-12">
-            <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
-                <!-- CSV一括登録セクション・区切り線はそのまま -->
-                <div class="mb-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+
+                <!-- ナビゲーションタブ -->
+                <AdminNavigationTabs active="users" />
+
+                <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg p-6 mb-8">
                     <h3 class="text-lg font-medium text-blue-900 mb-2">CSV一括登録</h3>
                     <p class="text-sm text-blue-700 mb-4">
                         CSVファイルを使用して複数のユーザーを一度に登録できます。
@@ -207,7 +210,7 @@ const submit = () => {
                     >
                         📄 CSVファイルをアップロード
                     </Link>
-                </div>
+                    
                 <div class="relative mb-8">
                     <div class="absolute inset-0 flex items-center">
                         <div class="w-full border-t border-gray-300"></div>
@@ -343,16 +346,6 @@ const submit = () => {
                             </option>
                         </select>
                         <InputError class="mt-2" :message="errors.user_role || form.errors.user_role" />
-                        <div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
-                            <div class="bg-red-50 p-3 rounded-lg border border-red-200">
-                                <h4 class="font-medium text-red-900">管理者</h4>
-                                <p class="text-sm text-red-700 mt-1">全ての機能にアクセス可能。ユーザー管理、システム設定など。</p>
-                            </div>
-                            <div class="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                                <h4 class="font-medium text-blue-900">閲覧者</h4>
-                                <p class="text-sm text-blue-700 mt-1">閲覧のみ可能。編集はできません。</p>
-                            </div>
-                        </div>
                     </div>
 
                     <!-- 利用規約チェックは管理画面では不要なら省略 -->
@@ -368,6 +361,8 @@ const submit = () => {
                         </PrimaryButton>
                     </div>
                 </form>
+                </div>
+
             </div>
         </div>
     </AppLayout>
