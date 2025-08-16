@@ -27,10 +27,14 @@ class UserController extends Controller
     {
         $users = User::orderBy('created_at', 'desc')->get();
         $assignments = \App\Models\Assignment::all();
+        $departments = Department::all();
+        $user = Auth::user();
 
         return Inertia::render('Admin/Users/Index', [
             'users' => $users,
             'assignments' => $assignments,
+            'departments' => $departments,
+            'user' => $user,
         ]);
     }
 
@@ -210,6 +214,8 @@ class UserController extends Controller
             'company_id' => 'required|exists:companies,id',
             'department_id' => 'required|exists:departments,id',
         ]);
+        Log::info('[csvPreview] company_id: ' . $request->company_id);
+        Log::info('[csvPreview] department_id: ' . $request->department_id);
 
         $file = $request->file('csv_file');
 
@@ -266,6 +272,8 @@ class UserController extends Controller
                         'assignment' => $assignmentName,
                         'assignment_id' => $assignment_id,
                         'user_role' => trim($data[4]),
+                        'company_id' => $request->company_id,
+                        'department_id' => $request->department_id,
                     ];
 
                     // 基本的なバリデーション
@@ -313,6 +321,8 @@ class UserController extends Controller
             // 選択された会社・部署情報を取得
             $company = Company::findOrFail($request->company_id);
 
+            Log::info('[csvPreview] company: ' . ($company ? $company->name : 'null'));
+            Log::info('[csvPreview] department: ' . ($department ? $department->name : 'null'));
             return Inertia::render('Admin/Users/CsvPreview', [
                 'csvData' => $csvData,
                 'errors' => $errors,
@@ -419,6 +429,8 @@ class UserController extends Controller
                     'name' => $userData['name'],
                     'email' => $userData['email'],
                     'password' => Hash::make($userData['password']),
+                    'company_id' => $userData['company_id'],
+                    'department_id' => $userData['department_id'],
                     'assignment_id' => $assignment_id,
                     'user_role' => $userData['user_role'],
                     'current_team_id' => $departmentTeam ? $departmentTeam->id : null,

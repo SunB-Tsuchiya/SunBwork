@@ -13,7 +13,6 @@ const page = usePage();
 const user = page.props.user;
 
 // デバッグ用にpropsをログ出力
-console.log('Coordinator Dashboard props:', props);
 </script>
 
 <template>

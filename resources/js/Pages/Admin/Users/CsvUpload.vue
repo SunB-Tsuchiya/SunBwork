@@ -67,8 +67,6 @@ const submit = () => {
             <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
                 <!-- ナビゲーションタブ -->
                 <AdminNavigationTabs active="users" />
-                </div>
-
                 <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg">
                     <div class="p-6">
                         <!-- 説明セクション -->
@@ -215,5 +213,6 @@ const submit = () => {
                     </div>
                 </div>
             </div>
+        </div>
     </AppLayout>
 </template>

@@ -13,19 +13,23 @@ class ProjectJob extends Model
         'jobcode',
         'name',
         'user_id',
+        'client_id',
         'detail',
-        'teammember',
         'schedule',
     ];
 
     protected $casts = [
         'detail' => 'array',
-        'teammember' => 'array',
         'schedule' => 'array',
     ];
 
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function client()
+    {
+        return $this->belongsTo(Client::class);
     }
 }

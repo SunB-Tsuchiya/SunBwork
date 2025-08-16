@@ -1,3 +1,42 @@
+## テーブル・表の装飾ガイドライン
+
+- 表（テーブル）のセル内で役職や権限などを表示する場合は、`resources/js/Pages/Admin/Users/Index.vue` のテーブル実装を参考にし、spanタグ＋クラス指定（例: `bg-green-100 text-blue-800 inline-flex px-2 py-1 text-xs font-semibold rounded-full` など）でバッジ風に装飾すること。
+- 色分けや丸み、フォントサイズなども同様に統一する。
+- 役職や権限ごとに色分けする場合は、同ファイルの `getAssignmentBadgeClass` 関数のようなロジックを使う。
+# 【重要】レイアウトdivの閉じ忘れ・入れ子崩れ防止について
+
+以下のようなレイアウト構造のdivは、ページ全体を包む役割を持つため、途中で閉じたり、入れ子を崩したりしないこと。
+
+```
+<div class="py-12">
+	<div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+		<!-- ナビゲーションタブ -->
+		<AdminNavigationTabs active="users" />
+		...
+	</div>
+</div>
+```
+
+この2重divは、必ずページのメインテンプレート全体を包むようにし、
+途中で閉じたり、部分的に再度開いたりしないこと。
+
+**閉じタグ（</div>）は必ず</AppLayout>の直前で閉じること。**
+
+これを守らないと、レイアウト崩れや余白・背景色の不整合が発生する。
+
+---
+## Inertiaのユーザー情報（user props）について
+
+本プロジェクトでは、Inertia.jsのpropsとして`user`（ログインユーザー情報）が全ページに渡されます。これにより、Vueコンポーネント側で`usePage().props.user`としてユーザー情報（id, name, company_id, 役割など）を取得できます。
+
+## AppLayout.vueの役割
+
+`resources/js/layouts/AppLayout.vue`は、全ページ共通のレイアウト・ヘッダー・ナビゲーション・チーム切替・ユーザープロフィール情報の管理を担っています。
+
+- ヘッダー部では、ユーザー名やチーム情報（Jetstream Team）を表示・切替可能です。
+- AppLayout.vueはInertiaのuser propsを受け取り、各種UIや権限制御、プロフィールメニュー等に活用しています。
+
+この仕様により、どのページでも「現在のユーザー情報」「チーム情報」を一元的に参照・管理できます。
 # サイトレイアウト統一仕様書（AIエージェント用）
 
 ## 目的

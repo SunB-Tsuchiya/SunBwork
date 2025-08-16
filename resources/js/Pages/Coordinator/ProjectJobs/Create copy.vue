@@ -26,42 +26,32 @@
             pattern="^[0-9\-]+$"
             inputmode="text"
             title="数字とハイフンのみ入力できます"
-            @input="validateJobcode"
           />
-          <div v-if="jobcodeError" class="text-red-600 text-sm mt-1">{{ jobcodeError }}</div>
-          <div v-if="form.errors.jobcode" class="text-red-600 text-sm mt-1">{{ form.errors.jobcode }}</div>
         </div>
         <div class="mb-4">
           <label class="block mb-1 font-semibold">案件タイトル</label>
           <input v-model="form.name" type="text" class="w-full border rounded px-3 py-2" required />
-          <div v-if="form.errors.name" class="text-red-600 text-sm mt-1">{{ form.errors.name }}</div>
         </div>
         <div class="mb-4">
-          <label class="block mb-1 font-semibold">担当ユーザー</label>
-          <input v-model="form.user_name" type="text" class="w-full border rounded px-3 py-2 bg-gray-100" readonly />
-          <div v-if="form.errors.user_id || form.errors.coordinator_id" class="text-red-600 text-sm mt-1">
-            {{ form.errors.user_id || form.errors.coordinator_id }}
-          </div>
+          <label class="block mb-1 font-semibold">担当ユーザーID</label>
+          <input v-model="form.user_id" type="number" class="w-full border rounded px-3 py-2 bg-gray-100" readonly />
         </div>
         <div class="mb-4">
-          <label class="block mb-1 font-semibold">クライアント</label>
+          <label class="block mb-1 font-semibold">クライアントID</label>
           <div class="flex gap-2 items-center">
-            ID:<input v-model="form.client_id" type="number" class="w-16 border rounded px-3 py-2 bg-gray-100" readonly />
-            <input v-model="form.client_name" type="text" class="w-60 border rounded px-3 py-2 bg-gray-100" readonly />
+            <input v-model="form.client_id" type="number" class="w-32 border rounded px-3 py-2 bg-gray-100" readonly />
             <button type="button" class="bg-blue-100 text-blue-700 px-3 py-2 rounded" @click="openClientModal">検索</button>
           </div>
-          <div v-if="form.errors.client_id" class="text-red-600 text-sm mt-1">{{ form.errors.client_id }}</div>
         </div>
         <div class="mb-4">
           <label class="block mb-1 font-semibold">詳細</label>
           <textarea v-model="form.detail" class="w-full border rounded px-3 py-2" rows="3"></textarea>
-          <div v-if="form.errors.detail" class="text-red-600 text-sm mt-1">{{ form.errors.detail }}</div>
         </div>
 
-      <!-- メンバー・スケジュール登録は後続ステップで実装 -->
+  <!-- メンバー・スケジュール登録は後続ステップで実装 -->
         <div class="mt-6 flex gap-4">
           <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700">作成</button>
-          <!-- <button type="button" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600" @click="clearFormAndRoute">情報をクリアする</button> -->
+          <button type="button" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600" @click="clearFormAndRoute">情報をクリアする</button>
         </div>
       </form>
 
@@ -82,7 +72,9 @@
             <input v-model="clientSearch.name" type="text" placeholder="名前を入力" class="border rounded px-2 py-1" />
             <button class="ml-2 bg-blue-500 text-white px-2 py-1 rounded" @click="searchClientByName">検索</button>
           </div>
-          <!-- clientSearchModeが'list'のときはボタンを表示せず、一覧を自動で出す -->
+          <div v-if="clientSearchMode === 'list'">
+            <button class="mb-2 bg-gray-200 px-2 py-1 rounded" @click="openClientListModal">一覧を表示</button>
+          </div>
           <div v-if="clientSearchResult">
             <div class="mt-2">検索結果: <span class="font-bold">{{ clientSearchResult.id }} {{ clientSearchResult.name }}</span>
               <button class="ml-2 bg-green-500 text-white px-2 py-1 rounded" @click="selectClient(clientSearchResult)">選択</button>
@@ -120,33 +112,18 @@
 </template>
 
 <script setup>
-import AppLayout from '@/layouts/AppLayout.vue';
-import { useForm, router, usePage } from '@inertiajs/vue3';
-import { ref, watch } from 'vue';
-import DialogModal from '@/Components/DialogModal.vue';
+
 
 const page = usePage();
 const form = useForm({
   jobcode: '',
   name: '',
   user_id: page.props.auth.user.id,
-  user_name: page.props.auth.user.name,
   client_id: '',
-  client_name: '',
   detail: '',
   teammember: null,
   schedule: null,
 });
-
-const jobcodeError = ref('');
-function validateJobcode(e) {
-  const val = e.target.value;
-  if (/^[0-9\-]*$/.test(val)) {
-    jobcodeError.value = '';
-  } else {
-    jobcodeError.value = '数字とハイフンのみ入力できます';
-  }
-}
 
 // クライアント検索用
 const showClientModal = ref(false);
@@ -155,13 +132,6 @@ const clientSearchMode = ref('id');
 const clientSearch = ref({ id: '', name: '' });
 const clientSearchResult = ref(null);
 const clientList = ref([]);
-
-// clientSearchModeが'list'になったら自動で一覧モーダルを開く
-watch(clientSearchMode, (val) => {
-  if (val === 'list') {
-    openClientListModal();
-  }
-});
 
 function openClientModal() {
   // クライアント一覧を即取得して空ならアラート
@@ -205,48 +175,22 @@ function searchClientByName() {
 }
 function selectClient(client) {
   form.client_id = client.id;
-  form.client_name = client.name;
   closeClientModal();
   closeClientListModal();
 }
-
-// エラー項目の日本語ラベル
-const errorLabels = {
-  jobcode: '伝票番号',
-  name: '案件タイトル',
-  user_id: '担当ユーザーID',
-  user_name: '担当ユーザー',
-  coordinator_id: '担当ユーザー',
-  client_id: 'クライアントID',
-  client_name: 'クライアント名',
-  detail: '詳細',
-};
 
 function submit() {
   // teammember/scheduleはnullで送信
   form.teammember = null;
   form.schedule = null;
   form.post(route('coordinator.project_jobs.store'), {
-    preserveState: true,
-    preserveScroll: true,
-    onError: (errors) => {
-      // 重大なバリデーションエラー時はalertも出す
-      if (errors && Object.keys(errors).length > 0) {
-        let msg = '入力内容に誤りがあります。\n';
-        for (const key in errors) {
-          const label = errorLabels[key] || key;
-          msg += `・${label}: ${errors[key]}\n`;
-        }
-        alert(msg);
-      }
-    },
     onSuccess: () => {
       // 登録後にshow画面へ遷移し、確認・案内を出す
       router.visit(route('coordinator.project_jobs.show', form.id), {
         onFinish: () => {
           // メンバー登録案内ダイアログ
           if (window.confirm('プロジェクトを登録しました。続いてメンバーを登録しますか？')) {
-            router.visit(route('coordinator.project_team_members.create'));
+            router.visit(route('coordinator.project_team_members.index'));
           }
         }
       });
@@ -256,7 +200,14 @@ function submit() {
 
 // スケジュール・メンバー登録は後続ステップで実装
 
-
+// 情報をクリアするボタンのクリック処理
+function clearFormAndRoute() {
+  // フォームを初期化
+  Object.keys(form).forEach(key => {
+    form[key] = (key === 'user_id') ? page.props.auth.user.id : '';
+  });
+  form.teammember = null;
+}
 </script>
 
 <style scoped>

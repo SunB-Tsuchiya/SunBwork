@@ -24,8 +24,8 @@
             <td class="px-4 py-2 border">{{ job.name }}</td>
             <td class="px-4 py-2 border">{{ job.client?.name || '-' }}</td>
             <td class="px-4 py-2 border flex gap-2">
-              <Link :href="route('coordinator.project_jobs.show', job.id)" class="bg-gray-200 px-2 py-1 rounded">詳細</Link>
-              <Link :href="route('coordinator.project_jobs.edit', job.id)" class="bg-yellow-200 px-2 py-1 rounded">編集</Link>
+              <Link :href="route('coordinator.project_jobs.show', { projectJob: job.id })" class="bg-gray-200 px-2 py-1 rounded">詳細</Link>
+              <Link :href="route('coordinator.project_jobs.edit', { projectJob: job.id })" class="bg-yellow-200 px-2 py-1 rounded">編集</Link>
               <button @click="destroy(job.id)" class="bg-red-200 px-2 py-1 rounded">削除</button>
               <button class="bg-green-200 px-2 py-1 rounded">完了</button>
             </td>
@@ -38,13 +38,35 @@
 
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Link, router } from '@inertiajs/vue3';
-import { ref } from 'vue';
-const props = defineProps({ jobs: Array });
+import { Link, router, usePage } from '@inertiajs/vue3';
+import { ref, onMounted } from 'vue';
+const props = defineProps({ jobs: Array, registerFlags: Array, jobid: [Number, String] });
 const jobs = props.jobs || [];
+const registerFlags = props.registerFlags || [];
+// jobid（直前登録ID）があればそれを優先、なければ最新ID
+const latestJobId = props.jobid || (jobs.length ? jobs[jobs.length - 1].id : null);
+const page = usePage();
+onMounted(() => {
+  if (page.props.reload) {
+    location.reload();
+    return;
+  }
+  // 新規登録直後、teammember/schedule未設定なら案内
+  if (registerFlags.length && latestJobId) {
+    if (registerFlags.includes('teammember') && registerFlags.includes('schedule')) {
+      if (confirm('プロジェクト登録が完了しました。続いてメンバーを登録しますか？')) {
+  router.visit(route('coordinator.project_team_members.create', { projectJob: latestJobId }));
+      }
+    } else if (registerFlags.includes('schedule')) {
+      if (confirm('メンバー登録が完了しました。続いてスケジュールを登録しますか？')) {
+        router.visit(route('coordinator.project_schedules.index', { projectJob: latestJobId }));
+      }
+    }
+  }
+});
 function destroy(id) {
   if (confirm('本当に削除しますか？')) {
-    router.delete(route('coordinator.project_jobs.destroy', id));
+    router.delete(route('coordinator.project_jobs.destroy', { projectJob: id }));
   }
 }
 </script>

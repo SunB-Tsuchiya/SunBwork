@@ -107,6 +107,16 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('project_jobs/{projectJob}/edit', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'edit'])->name('project_jobs.edit');
         Route::put('project_jobs/{projectJob}', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'update'])->name('project_jobs.update');
         Route::delete('project_jobs/{projectJob}', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'destroy'])->name('project_jobs.destroy');
+
+        // Project_team_members リソースルート
+        Route::resource('project_team_members', App\Http\Controllers\Coordinator\ProjectTeamMembersController::class)->names([
+            'create' => 'project_team_members.create',
+            'store' => 'project_team_members.store',
+            'show' => 'project_team_members.show',
+            'edit' => 'project_team_members.edit',
+            'update' => 'project_team_members.update',
+            'destroy' => 'project_team_members.destroy',
+        ]);
     });
     
 

@@ -73,7 +73,7 @@ const submit = () => {
         }
       }
       const hasFiles = form.files && form.files.length > 0;
-      console.log(form.data()); // 送信前にデータ確認
+            // 送信前のデータ確認consoleは削除
       if (hasFiles) {
         form.post(route('events.update', props.event.id), {
           forceFormData: true,

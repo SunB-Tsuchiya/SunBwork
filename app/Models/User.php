@@ -111,20 +111,29 @@ class User extends Authenticatable
         return $this->user_role === 'user';
     }
 
+
     /**
-     * Get the company that the user belongs to
+     * ユーザーの担当（アサインメント）
      */
-    public function company()
+    public function assignment(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\Company::class);
+        return $this->belongsTo(\App\Models\Assignment::class);
     }
 
     /**
-     * Get the department that the user belongs to
+     * ユーザーの部署
      */
     public function department(): BelongsTo
     {
         return $this->belongsTo(\App\Models\Department::class);
+    }
+
+    /**
+     * ユーザーの会社
+     */
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Company::class);
     }
 
     /**
@@ -159,14 +168,6 @@ class User extends Authenticatable
             'personal' => $personalTeams,
             'department' => $memberTeams
         ];
-    }
-
-    /**
-     * ユーザーの役職
-     */
-    public function role(): BelongsTo
-    {
-        return $this->belongsTo(Role::class);
     }
 
     /**
