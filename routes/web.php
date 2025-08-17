@@ -7,6 +7,8 @@ use Inertia\Inertia;
 
 // デバッグ用ルート
 require __DIR__ . '/debug.php';
+// チャット用ルート
+require __DIR__ . '/chat.php';
 
 Route::get('/', function () {
     return Inertia::render('Welcome', [
@@ -30,6 +32,14 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::put('/events/{event}', [App\Http\Controllers\EventController::class, 'update'])->name('events.update');
     Route::delete('/events/{event}', [App\Http\Controllers\EventController::class, 'destroy'])->name('events.destroy');
 
+    // ユーザー割り当てジョブ一覧・詳細
+    Route::prefix('user/assigned-projects')->name('user.assigned-projects.')->group(function () {
+        Route::get('/', [App\Http\Controllers\User\AssignedProjectController::class, 'index'])->name('index');
+        Route::get('/{id}', [App\Http\Controllers\User\AssignedProjectController::class, 'show'])->name('show');
+    });
+
+    // チャット画面
+    Route::get('/chat', [App\Http\Controllers\Chat\ChatController::class, 'index'])->name('chat.index');
 
     // Ziggy用: 明示的にuser.dashboardルートを追加
     Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
