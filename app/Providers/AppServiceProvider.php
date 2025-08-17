@@ -32,5 +32,10 @@ class AppServiceProvider extends ServiceProvider
             $user->assignment = $assignment;
             return $user;
         });
+
+        // 全ページ共通でcsrf_tokenをpropsに追加
+        \Inertia\Inertia::share('csrf_token', function () {
+            return csrf_token();
+        });
     }
 }

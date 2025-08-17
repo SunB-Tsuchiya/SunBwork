@@ -45,7 +45,9 @@ const user = page.props.user; // これを追加
 <template>
     <div>
         <Head :title="title" />
-
+        <Head>
+        <meta name="csrf-token" :content="$page.props.csrf_token" />
+        </Head>
         <Banner />
 
         <div class="min-h-screen bg-gray-100">

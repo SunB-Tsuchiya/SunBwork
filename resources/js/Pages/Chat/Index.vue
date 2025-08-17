@@ -2,6 +2,13 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import { ref, watch } from 'vue';
 import axios from 'axios';
+import { onMounted, onUnmounted } from 'vue';
+import { usePage } from '@inertiajs/vue3';
+
+
+const page = usePage();
+const user = page.props.user; // これを追加
+let echoChannel = null;
 const props = defineProps({
   users: Array
 });
@@ -11,10 +18,37 @@ const newMessage = ref('');
 const loading = ref(false);
 const errorMsg = ref('');
 
+const userId = user.id;
+
 function selectUser(user) {
   selectedUser.value = user;
   errorMsg.value = '';
+
+  // チャンネル購読の再設定
+  if (echoChannel) {
+    echoChannel.stopListening('ChatMessageSent');
+    echoChannel = null;
+  }
+  if (user && user.id !== 'ai' && userId) {
+      echoChannel = window.Echo.private('chat.' + userId)
+        .listen('ChatMessageSent', (e) => {
+          // console.log('受信イベント:', e); // ★ここを追加
+          if (
+            (e.from_user_id === user.id && e.to_user_id === Number(userId)) ||
+            (e.from_user_id === Number(userId) && e.to_user_id === user.id)
+          ) {
+            messages.value.push(e);
+          }
+        });
+  }
 }
+// ページ離脱時にチャンネル購読解除
+onUnmounted(() => {
+  if (echoChannel) {
+    echoChannel.stopListening('ChatMessageSent');
+    echoChannel = null;
+  }
+});
 
 // 相手選択時に履歴取得 or AI履歴初期化
 watch(selectedUser, async (user) => {
@@ -53,7 +87,8 @@ async function sendMessage() {
     if (res.data.error) {
       errorMsg.value = res.data.error;
     } else {
-      messages.value.push(res.data);
+      // ここを削除：重複防止
+      // messages.value.push(res.data);
       newMessage.value = '';
     }
   } catch (e) {
