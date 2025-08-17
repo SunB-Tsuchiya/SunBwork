@@ -35,6 +35,7 @@ class ChatController extends Controller
         } catch (\Exception $e) {
             return response()->json(['error' => '履歴取得エラー: ' . $e->getMessage()], 500);
         }
+        
     }
 
     // チャット送信API
