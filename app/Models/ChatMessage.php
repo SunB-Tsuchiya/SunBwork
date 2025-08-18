@@ -10,8 +10,8 @@ class ChatMessage extends Model
     use HasFactory;
 
     protected $fillable = [
-        'from_user_id',
-        'to_user_id',
+        'chat_room_id',
+        'user_id',
         'body',
         'type', // text, image, system, etc.
         'read_at',
@@ -21,10 +21,28 @@ class ChatMessage extends Model
         'read_at' => 'datetime',
     ];
 
-    public function fromUser() {
-        return $this->belongsTo(User::class, 'from_user_id');
+    public function room()
+    {
+        return $this->belongsTo(ChatRoom::class, 'chat_room_id');
     }
-    public function toUser() {
-        return $this->belongsTo(User::class, 'to_user_id');
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+    
+    // bodyを暗号化して保存、復号して取得
+    public function setBodyAttribute($value)
+    {
+        $this->attributes['body'] = encrypt($value);
+    }
+
+    public function getBodyAttribute($value)
+    {
+        try {
+            return decrypt($value);
+        } catch (\Exception $e) {
+            return $value; // 復号失敗時はそのまま返す
+        }
     }
 }

@@ -31,6 +31,16 @@ class ChatController extends Controller
             })->orWhere(function($q) use ($authId, $userId) {
                 $q->where('from_user_id', $userId)->where('to_user_id', $authId);
             })->orderBy('created_at')->get();
+            // bodyはモデルで自動復号
+            $messages = $messages->map(function($msg) {
+                return [
+                    'id' => $msg->id,
+                    'user_id' => $msg->from_user_id,
+                    'user_name' => $msg->user ? $msg->user->name : '',
+                    'message' => $msg->body,
+                    'created_at' => $msg->created_at,
+                ];
+            });
             return response()->json($messages);
         } catch (\Exception $e) {
             return response()->json(['error' => '履歴取得エラー: ' . $e->getMessage()], 500);

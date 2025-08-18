@@ -1,3 +1,4 @@
+    Route::post('/chat/rooms/{id}/messages', [App\Http\Controllers\Chat\ChatRoomController::class, 'sendMessage'])->name('chat.rooms.messages.send');
 <?php
 
 use Illuminate\Foundation\Application;
@@ -39,7 +40,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     });
 
     // チャット画面
-    Route::get('/chat', [App\Http\Controllers\Chat\ChatController::class, 'index'])->name('chat.index');
+    Route::get('/chat', [App\Http\Controllers\Chat\ChatController::class, 'index'])->name('chat.users.index');
 
     // Ziggy用: 明示的にuser.dashboardルートを追加
     Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
@@ -56,6 +57,12 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::resource('events', App\Http\Controllers\EventController::class)->only([
         'create', 'store', 'show', 'edit', 'update'
     ]);
+
+    // チャットルーム作成
+    Route::get('/chat/rooms', [App\Http\Controllers\Chat\ChatRoomController::class, 'index'])->name('chat.rooms.index');
+    Route::get('/chat/rooms/create', [App\Http\Controllers\Chat\ChatRoomController::class, 'create'])->name('chat.rooms.create');
+    Route::post('/chat/rooms', [App\Http\Controllers\Chat\ChatRoomController::class, 'store'])->name('chat.rooms.store');
+    Route::get('/chat/rooms/{id}', [App\Http\Controllers\Chat\ChatRoomController::class, 'show'])->name('chat.rooms.show');
 });
 
 // Admin Routes (Adminのみアクセス可能)

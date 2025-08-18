@@ -71,7 +71,7 @@ const user = page.props.user;
                         <Link :href="route('calendar.index')" class="text-green-600 hover:text-green-800 px-3 py-2 font-medium text-sm rounded-md">
                             予定表
                         </Link>
-                        <Link :href="route('chat.index')" class="text-purple-600 hover:text-purple-800 px-3 py-2 font-medium text-sm rounded-md">
+                        <Link :href="route('chat.rooms.index')" class="text-purple-600 hover:text-purple-800 px-3 py-2 font-medium text-sm rounded-md">
                             チャット
                         </Link>
 
