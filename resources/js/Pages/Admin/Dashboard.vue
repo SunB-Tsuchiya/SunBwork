@@ -39,6 +39,10 @@ const user = page.props.user;
                         <Link :href="route('admin.companies.index')" class="text-green-600 hover:text-green-800 px-3 py-2 font-medium text-sm rounded-md border border-green-200 hover:bg-green-50">
                             会社管理
                         </Link>
+                        <!-- デバッグページへのリンク -->
+                        <Link :href="route('debug.api')" class="text-blue-600 hover:text-blue-800 px-3 py-2 font-medium text-sm rounded-md border border-blue-200 hover:bg-blue-50">
+                            APIデバッグページ
+                        </Link>
                         <Link :href="route('admin.teams.index')" class="text-green-600 hover:text-green-800 px-3 py-2 font-medium text-sm rounded-md border border-green-200 hover:bg-green-50">
                             チーム管理
                         </Link>

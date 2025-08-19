@@ -14,7 +14,7 @@ console.log('ルーム情報：',props.rooms);
 const userId = props.auth?.user?.id;
 
 function createRoom() {
-  router.visit('/chat/rooms/create');
+  router.visit('/chat/rooms/create'); // ルートはそのまま（コントローラのみ変更）
 }
 
 function getRoomName(room) {
@@ -53,7 +53,8 @@ function getMemberNames(room) {
         <table class="min-w-full divide-y divide-gray-200 mb-4">
           <thead class="bg-gray-50">
             <tr>
-              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">相手名・ルーム名</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">未読</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">ルーム名</th>
               <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">メンバー</th>
               <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">種別</th>
               <th class="px-4 py-2"></th>
@@ -61,6 +62,12 @@ function getMemberNames(room) {
           </thead>
           <tbody>
             <tr v-for="room in rooms" :key="room.id" class="hover:bg-gray-50">
+              <td class="px-4 py-2 text-center">
+                <span v-if="room.unread_count > 0" class="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-bold">
+                  未読{{ room.unread_count }}件
+                </span>
+                <span v-else class="text-gray-400 text-xs">-</span>
+              </td>
               <td class="px-4 py-2">{{ getRoomName(room) }}</td>
               <td class="px-4 py-2">{{ getMemberNames(room) }}</td>
               <td class="px-4 py-2">{{ room.type === 'group' ? 'グループ' : 'パーソナル' }}</td>

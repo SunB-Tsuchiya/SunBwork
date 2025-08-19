@@ -2,16 +2,17 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import axios from 'axios';
+import { usePage } from '@inertiajs/vue3';
 
-// Inertiaからpropsでroom, auth, messagesを受け取る
+// Inertiaからpropsでroom, messagesを受け取る
 const props = defineProps({
-  room: Object,
-  auth: Object,
-  messages: Array,
+  room: { type: Object, default: () => ({ users: [] }) },
+  messages: { type: Array, default: () => [] },
 });
 
-const user = props.auth.user;
-const messages = ref([]);
+const page = usePage();
+const user = page.props.user;
+const messages = ref(Array.isArray(props.messages) ? [...props.messages] : []);
 const newMessage = ref('');
 
 // スクロール用ref
@@ -48,29 +49,87 @@ watch(messages, () => {
 });
 
 // モーダル表示状態
+
+
+// フラッシュメッセージ用
+const flashMessage = ref('');
+const flashTimeout = ref(null);
+
+import { onUnmounted } from 'vue';
+const echoChannel = ref(null);
+
+onMounted(() => {
+  // 初期履歴をセット
+  messages.value = props.messages ? [...props.messages] : [];
+  fetchMessages();
+  scrollToLatest();
+  if (props.room && props.room.id) {
+    console.log('[Echo] サブスクライブ: chatroom.' + props.room.id);
+    echoChannel.value = window.Echo.private('chatroom.' + props.room.id)
+      .listen('ChatMessageSent', (e) => {
+        console.log('[Echo] ChatMessageSent受信:', e);
+        console.log('[Echo] props.room.id:', props.room.id, 'e.chat_room_id:', e.chat_room_id);
+        if (e.chat_room_id === props.room.id) {
+          // すでに同じIDのメッセージが存在する場合は追加しない
+          if (!messages.value.some(m => m.id === e.id)) {
+            console.log('[Echo] ルームID一致: メッセージ追加前 messages.length=', messages.value.length);
+            messages.value.push({
+              id: e.id,
+              user_id: e.user_id ?? e.from_user_id,
+              user_name: e.user_name || (e.user ? e.user.name : ''),
+              message: e.body || e.message,
+              created_at: e.created_at,
+            });
+            // 新着メッセージ通知（自分以外の投稿のみ）
+            if ((e.user_id ?? e.from_user_id) !== user.id) {
+              const sender = e.user_name || (e.user ? e.user.name : '誰か');
+              flashMessage.value = `${sender} さんから新着メッセージです`;
+              if (flashTimeout.value) clearTimeout(flashTimeout.value);
+              flashTimeout.value = setTimeout(() => {
+                flashMessage.value = '';
+              }, 5000);
+            }
+            console.log('[Echo] メッセージ追加後 messages.length=', messages.value.length);
+            scrollToLatest();
+          } else {
+            console.log('[Echo] すでに同じIDのメッセージが存在するため追加しない');
+          }
+        } else {
+          console.log('[Echo] ルームID不一致: 受信したが無視');
+        }
+      });
+  }
+});
+
+onUnmounted(() => {
+  if (echoChannel.value) {
+    echoChannel.value.stopListening('ChatMessageSent');
+    echoChannel.value = null;
+  }
+});
+
 const showMembers = ref(false);
 
 // メンバーリスト（自分が一番上、他はID順）
 const sortedMembers = computed(() => {
-  if (!props.room.users) return [];
+  if (!props.room || !Array.isArray(props.room.users)) return [];
   const self = props.room.users.find(u => u.id === user.id);
   const others = props.room.users.filter(u => u.id !== user.id).sort((a, b) => a.id - b.id);
   return self ? [self, ...others] : others;
 });
 
 function getAssignmentName(assignment_id) {
-  // assignment_idがnameの場合もあるので両対応
   if (!assignment_id) return '';
   if (typeof assignment_id === 'string') return assignment_id;
-  // assignment_idが数値の場合はroom.usersから取得
+  if (!props.room || !Array.isArray(props.room.users)) return assignment_id;
   const member = props.room.users.find(u => u.assignment_id === assignment_id);
   return member && member.assignment ? member.assignment : assignment_id;
 }
 
 function getRoomDisplayName() {
+  if (!props.room) return '';
   if (props.room.type === 'private') {
-    // nameがnullなら自分以外のユーザー名
-    if (!props.room.name) {
+    if (!props.room.name && Array.isArray(props.room.users)) {
       const other = props.room.users.find(u => u.id !== user.id);
       return other ? other.name : '(相手なし)';
     }
@@ -79,44 +138,59 @@ function getRoomDisplayName() {
   return props.room.name;
 }
 
-// 1対1チャットの相手IDを取得
-const otherUserId = computed(() => {
-  if (!props.room.users) return null;
-  const other = props.room.users.find(u => u.id !== user.id);
-  return other ? other.id : null;
-});
-
-// メッセージ履歴取得
+// メッセージ履歴取得（ルームベース）
 async function fetchMessages() {
-  if (!otherUserId.value) return;
+  if (!props.room.id) return;
   try {
-    const res = await axios.get(`/chat/messages/${otherUserId.value}`);
+    const res = await axios.get(`/chat/rooms/${props.room.id}/messages`);
     if (Array.isArray(res.data)) {
       messages.value = res.data;
+      // 未読メッセージを既読に
+      markAllAsRead(res.data);
     }
   } catch (e) {
+    console.log('line152error');
     messages.value = [];
+  }
+}
+
+// 未読メッセージを既読にする
+async function markAllAsRead(msgs) {
+  if (!Array.isArray(msgs)) return;
+  for (const msg of msgs) {
+    // 自分以外のメッセージのみ既読APIを呼ぶ
+    if (!msg.is_read && msg.user_id !== user.id) {
+      await markAsRead(msg.id);
+    }
+  }
+}
+
+// 既読API呼び出し
+async function markAsRead(messageId) {
+  try {
+    await axios.post(`/api/chat/messages/${messageId}/read`);
+    // 成功時はローカルのis_readもtrueに
+    const target = messages.value.find(m => m.id === messageId);
+    if (target) target.is_read = true;
+  } catch (e) {
+    const target = messages.value.find(m => m.id === messageId);
+    const userName = target ? target.user_name : '不明';
+    const messageBody = target ? target.message : '';
+    console.error(`markAsRead失敗: ユーザー=${userName}, メッセージ="${messageBody}", エラー=`, e);
   }
 }
 
 // 送信処理
 async function sendMessage() {
-  if (!newMessage.value.trim() || !otherUserId.value) return;
+  if (!newMessage.value.trim() || !props.room.id) return;
   try {
-    const res = await axios.post('/chat/messages', {
-      to_user_id: otherUserId.value,
+    const res = await axios.post(`/chat/rooms/${props.room.id}/messages`, {
       body: newMessage.value,
     });
+    // 送信成功時は入力欄のみクリアし、messagesへのpushはEchoイベントに任せる
     if (res.data && res.data.id) {
-      messages.value.push({
-        id: res.data.id,
-        user_id: user.id,
-        user_name: user.name,
-        message: newMessage.value,
-        created_at: res.data.created_at,
-      });
       newMessage.value = '';
-      scrollToLatest();
+      // scrollToLatest()はEchoイベントで呼ばれるため不要
     }
   } catch (e) {
     alert('送信に失敗しました');
@@ -134,6 +208,12 @@ onMounted(() => {
     <template #header>
       <h2 class="font-semibold text-xl text-gray-800 leading-tight">チャットルーム</h2>
     </template>
+    <!-- フラッシュメッセージ -->
+    <transition name="fade">
+      <div v-if="flashMessage" class="fixed top-6 left-1/2 transform -translate-x-1/2 z-50 px-6 py-3 rounded shadow-lg text-lg border-2 border-purple-500 bg-white text-purple-800 font-semibold min-w-[280px] text-center">
+        {{ flashMessage }}
+      </div>
+    </transition>
     <div class="py-6">
       <div class="max-w-4xl mx-auto bg-white shadow rounded p-6">
         <div class="mb-4">
@@ -184,12 +264,16 @@ onMounted(() => {
             <div class="text-gray-400 text-center my-20">メッセージを入力して会話を開始してください</div>
           </template>
           <template v-else>
-            <div v-for="(msg, idx) in messages" :key="msg.id" :ref="idx === messages.length - 1 ? lastMessageRef : null" class="mb-2">
-              <span class="font-bold" :class="{ 'text-blue-600': msg.user_id === user.id }">
-                {{ msg.user_name }}
-              </span>
-              <span class="ml-2">{{ msg.message }}</span>
-              <span class="ml-2 text-xs text-gray-400">{{ msg.created_at }}</span>
+            <div v-for="(msg, idx) in messages" :key="msg.id" :ref="idx === messages.length - 1 ? lastMessageRef : null"
+              class="mb-2 flex" :class="msg.user_id === user.id ? 'justify-start' : 'justify-end'">
+              <div :class="msg.user_id === user.id ? 'bg-white' : 'bg-blue-50'" class="rounded px-3 py-2 max-w-[70%] flex flex-col relative">
+                <span class="font-bold text-xs" :class="{ 'text-blue-600': msg.user_id === user.id }">
+                  {{ msg.user_name }}
+                  <span v-if="!msg.is_read && msg.user_id !== user.id" class="ml-2 px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xxs align-middle">未読</span>
+                </span>
+                <span class="break-words">{{ msg.message }}</span>
+                <span class="text-xs text-gray-400 self-end">{{ msg.created_at }}</span>
+              </div>
             </div>
           </template>
         </div>
@@ -201,3 +285,11 @@ onMounted(() => {
     </div>
   </AppLayout>
 </template>
+<style scoped>
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.5s;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+}
+</style>

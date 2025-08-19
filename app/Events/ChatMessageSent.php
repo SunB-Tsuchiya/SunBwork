@@ -29,6 +29,7 @@ class ChatMessageSent implements ShouldBroadcastNow
         return [
             new PrivateChannel('chat.' . $this->message->from_user_id),
             new PrivateChannel('chat.' . $this->message->to_user_id),
+            new PrivateChannel('chatroom.' . $this->message->chat_room_id),
         ];
     }
 
@@ -36,11 +37,12 @@ class ChatMessageSent implements ShouldBroadcastNow
     {
         return [
             'id' => $this->message->id,
-            'from_user_id' => $this->message->from_user_id,
-            'to_user_id' => $this->message->to_user_id,
+            'chat_room_id' => $this->message->chat_room_id,
+            'user_id' => $this->message->user_id,
+            'user_name' => $this->message->user ? $this->message->user->name : '',
             'body' => $this->message->body,
             'type' => $this->message->type,
-            'created_at' => $this->message->created_at->toDateTimeString(),
+            'created_at' => $this->message->created_at->setTimezone('Asia/Tokyo')->format('Y-m-d H:i:s'),
         ];
     }
 }

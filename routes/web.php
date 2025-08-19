@@ -1,4 +1,3 @@
-    Route::post('/chat/rooms/{id}/messages', [App\Http\Controllers\Chat\ChatRoomController::class, 'sendMessage'])->name('chat.rooms.messages.send');
 <?php
 
 use Illuminate\Foundation\Application;
@@ -22,6 +21,9 @@ Route::get('/', function () {
 
 // User Dashboard (default authenticated users)
 Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified'])->group(function () {
+    // ...既存コード...
+    // チャットルームメッセージ送信
+    Route::post('/chat/rooms/{id}/messages', [App\Http\Controllers\Chat\ChatController::class, 'sendRoomMessage'])->name('chat.rooms.messages.send');
     // カレンダー画面
     Route::get('/calendar', [App\Http\Controllers\CalendarController::class, 'index'])->name('calendar.index');
     // カレンダーからのイベント時間変更用
@@ -59,10 +61,10 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     ]);
 
     // チャットルーム作成
-    Route::get('/chat/rooms', [App\Http\Controllers\Chat\ChatRoomController::class, 'index'])->name('chat.rooms.index');
-    Route::get('/chat/rooms/create', [App\Http\Controllers\Chat\ChatRoomController::class, 'create'])->name('chat.rooms.create');
-    Route::post('/chat/rooms', [App\Http\Controllers\Chat\ChatRoomController::class, 'store'])->name('chat.rooms.store');
-    Route::get('/chat/rooms/{id}', [App\Http\Controllers\Chat\ChatRoomController::class, 'show'])->name('chat.rooms.show');
+    Route::get('/chat/rooms', [App\Http\Controllers\Chat\ChatController::class, 'indexRooms'])->name('chat.rooms.index');
+    Route::get('/chat/rooms/create', [App\Http\Controllers\Chat\ChatController::class, 'createRoom'])->name('chat.rooms.create');
+    Route::post('/chat/rooms', [App\Http\Controllers\Chat\ChatController::class, 'storeRoom'])->name('chat.rooms.store');
+    Route::get('/chat/rooms/{id}', [App\Http\Controllers\Chat\ChatController::class, 'showRoom'])->name('chat.rooms.show');
 });
 
 // Admin Routes (Adminのみアクセス可能)
@@ -147,3 +149,11 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 Route::get('/debug/create', function() {
     return Inertia::render('Diaries/CreateDebug');
 })->name('debug.create');
+
+// --- デバッグ用API/認証チェックページ ---
+// /debug/api でAPI/認証の動作確認ができるVueページ（resources/js/Debug/ApiDebug.vue）
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/debug/api', function() {
+        return Inertia::render('Debug/ApiDebug');
+    })->name('debug.api');
+});

@@ -1,7 +1,14 @@
 import axios from 'axios';
-window.axios = axios;
 
+axios.defaults.baseURL = 'http://localhost';
+axios.defaults.withCredentials = true; // これも必須
+
+window.axios = axios;
 window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
+window.axios.defaults.withCredentials = true;
+
+// SPAでAPI認証が必要な場合、初回にCSRFクッキーを取得
+window.axios.get('/sanctum/csrf-cookie');
 
 import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';

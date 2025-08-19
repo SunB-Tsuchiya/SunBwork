@@ -31,11 +31,6 @@ class ChatMessage extends Model
         return $this->belongsTo(User::class);
     }
     
-    // bodyを暗号化して保存、復号して取得
-    public function setBodyAttribute($value)
-    {
-        $this->attributes['body'] = encrypt($value);
-    }
 
     public function getBodyAttribute($value)
     {
@@ -44,5 +39,10 @@ class ChatMessage extends Model
         } catch (\Exception $e) {
             return $value; // 復号失敗時はそのまま返す
         }
+    }
+    
+    public function reads()
+    {
+        return $this->hasMany(ChatMessageRead::class);
     }
 }

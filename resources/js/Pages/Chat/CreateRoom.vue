@@ -111,7 +111,7 @@ function createRoom() {
     type: roomType.value,
     user_ids: selectedMemberIds.value,
   }, {
-    onSuccess: () => router.visit('/chat/rooms'),
+  onSuccess: () => router.visit('/chat/rooms'),
     onError: (e) => { errors.value = e; },
   });
 }
