@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
-use Intervention\Image\Facades\Image;
+use Intervention\Image\ImageManager;
 use Inertia\Inertia;
 
 class EventController extends Controller
@@ -93,17 +93,38 @@ class EventController extends Controller
                 $path = 'event_attachments/' . $uniqueName;
 
                 if ($isImage) {
-                    $img = \Intervention\Image\Facades\Image::make($file);
+                        // @phpstan-ignore-next-line
+                        /** @var \Intervention\Image\Image $img */
+                        if (extension_loaded('imagick') && class_exists(\Intervention\Image\Drivers\Imagick\Driver::class)) {
+                            $manager = ImageManager::imagick();
+                        } else {
+                            $manager = ImageManager::gd();
+                        }
+                        $img = $manager->read($file);
                     if ($img->width() > 1200) {
                         $img->resize(1200, null, function ($constraint) {
                             $constraint->aspectRatio();
                             $constraint->upsize();
                         });
                     }
-                    $img->encode($ext, 80);
-                    \Storage::disk('public')->put($path, $img);
+                    if (strtolower($ext) === 'png') {
+                        $enc = new \Intervention\Image\Encoders\PngEncoder();
+                    } else {
+                        $enc = new \Intervention\Image\Encoders\JpegEncoder(80);
+                    }
+                    $encoded = $img->encode($enc);
+                    Storage::disk('public')->put($path, (string) $encoded->toDataUri() ? base64_decode(preg_replace('#^data:.*?;base64,#', '', $encoded->toDataUri())) : (string) $encoded);
+                    try {
+                        Storage::disk('public')->setVisibility($path, 'public');
+                        $real = Storage::disk('public')->path($path) ?? null;
+                        if ($real && file_exists($real)) {
+                            @chmod($real, 0644);
+                        }
+                    } catch (\Throwable $_exPerm) {
+                        logger()->warning('EventController: could not set permissions for image', ['path' => $path, 'error' => $_exPerm->getMessage()]);
+                    }
                 } else {
-                    \Storage::disk('public')->putFileAs('event_attachments', $file, $uniqueName);
+                    Storage::disk('public')->putFileAs('event_attachments', $file, $uniqueName);
                 }
                 \App\Models\Attachment::create([
                     'event_id' => $event->id,
@@ -120,10 +141,10 @@ class EventController extends Controller
     // 予定の更新
     public function update(Request $request, Event $event)
     {
-        \Log::debug('Event update request', $request->all());
+    Log::debug('Event update request', $request->all());
         $this->authorize('update', $event);
-        \Log::debug('Request all: ' . json_encode($request->all(), JSON_UNESCAPED_UNICODE));
-        \Log::debug('Request input: ' . json_encode($request->input(), JSON_UNESCAPED_UNICODE));
+    Log::debug('Request all: ' . json_encode($request->all(), JSON_UNESCAPED_UNICODE));
+    Log::debug('Request input: ' . json_encode($request->input(), JSON_UNESCAPED_UNICODE));
         // $request->get()は引数必須のため削除
         $data = $request->validate([
             'date' => 'required|date',
@@ -141,15 +162,15 @@ class EventController extends Controller
             'endHour' => 'required',
             'endMinute' => 'required',
         ]);
-        \Log::debug('Validated data', $data);
+    Log::debug('Validated data', $data);
         $data['description'] = $request->input('description', '');
         $data['user_id'] = Auth::id();
         $data['start'] = date('Y-m-d H:i:00', strtotime($data['date'] . ' ' . $data['startHour'] . ':' . $data['startMinute']));
         $data['end'] = date('Y-m-d H:i:00', strtotime($data['date'] . ' ' . $data['endHour'] . ':' . $data['endMinute']));
-        \Log::debug('Start/End generated', ['start' => $data['start'], 'end' => $data['end']]);
-        \Log::debug('Event before update', $event->toArray());
+    Log::debug('Start/End generated', ['start' => $data['start'], 'end' => $data['end']]);
+    Log::debug('Event before update', $event->toArray());
         $event->update($data);
-        \Log::debug('Event after update', $event->fresh()->toArray());
+    Log::debug('Event after update', $event->fresh()->toArray());
 
         // 添付ファイル保存（追加分のみ）
         if ($request->hasFile('files')) {
@@ -162,17 +183,38 @@ class EventController extends Controller
                 $path = 'event_attachments/' . $uniqueName;
 
                 if ($isImage) {
-                    $img = \Intervention\Image\Facades\Image::make($file);
+                        // @phpstan-ignore-next-line
+                        /** @var \Intervention\Image\Image $img */
+                        if (extension_loaded('imagick') && class_exists(\Intervention\Image\Drivers\Imagick\Driver::class)) {
+                            $manager = ImageManager::imagick();
+                        } else {
+                            $manager = ImageManager::gd();
+                        }
+                        $img = $manager->read($file);
                     if ($img->width() > 1200) {
                         $img->resize(1200, null, function ($constraint) {
                             $constraint->aspectRatio();
                             $constraint->upsize();
                         });
                     }
-                    $img->encode($ext, 80);
-                    \Storage::disk('public')->put($path, $img);
+                    if (strtolower($ext) === 'png') {
+                        $enc = new \Intervention\Image\Encoders\PngEncoder();
+                    } else {
+                        $enc = new \Intervention\Image\Encoders\JpegEncoder(80);
+                    }
+                    $encoded = $img->encode($enc);
+                    Storage::disk('public')->put($path, (string) $encoded->toDataUri() ? base64_decode(preg_replace('#^data:.*?;base64,#', '', $encoded->toDataUri())) : (string) $encoded);
+                    try {
+                        Storage::disk('public')->setVisibility($path, 'public');
+                        $real = Storage::disk('public')->path($path) ?? null;
+                        if ($real && file_exists($real)) {
+                            @chmod($real, 0644);
+                        }
+                    } catch (\Throwable $_exPerm) {
+                        logger()->warning('EventController: could not set permissions for image', ['path' => $path, 'error' => $_exPerm->getMessage()]);
+                    }
                 } else {
-                    \Storage::disk('public')->putFileAs('event_attachments', $file, $uniqueName);
+                    Storage::disk('public')->putFileAs('event_attachments', $file, $uniqueName);
                 }
                 \App\Models\Attachment::create([
                     'event_id' => $event->id,
@@ -182,7 +224,7 @@ class EventController extends Controller
                 ]);
             }
         }
-        \Log::debug('Event update finished');
+    Log::debug('Event update finished');
         return redirect()->route('dashboard');
     }
 
@@ -192,8 +234,8 @@ class EventController extends Controller
         $this->authorize('delete', $event);
         // 添付ファイルも削除
         foreach ($event->attachments as $attachment) {
-            if ($attachment->path && \Storage::disk('public')->exists($attachment->path)) {
-                \Storage::disk('public')->delete($attachment->path);
+            if ($attachment->path && Storage::disk('public')->exists($attachment->path)) {
+                Storage::disk('public')->delete($attachment->path);
             }
             $attachment->delete();
         }
@@ -224,7 +266,7 @@ class EventController extends Controller
     public function edit(Event $event)
     {
         $event->date = \Carbon\Carbon::parse($event->start)->toDateString();
-        \Log::debug('EditController event', $event->toArray());
+    Log::debug('EditController event', $event->toArray());
         return Inertia::render('Events/Edit', [
             'event' => $event,
         ]);

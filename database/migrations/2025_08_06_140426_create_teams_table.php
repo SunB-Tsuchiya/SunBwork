@@ -17,9 +17,9 @@ return new class extends Migration
             $table->string('name');
             $table->boolean('personal_team');
 
-            // optional relations
-            $table->foreignId('company_id')->nullable()->constrained()->onDelete('cascade');
-            $table->foreignId('department_id')->nullable()->constrained()->onDelete('cascade');
+            // optional relations (foreign keys added in a separate migration)
+            $table->unsignedBigInteger('company_id')->nullable();
+            $table->unsignedBigInteger('department_id')->nullable();
             $table->string('team_type')->default('personal'); // 'personal', 'department', 'company', 'admin', 'project'
             $table->text('description')->nullable();
 

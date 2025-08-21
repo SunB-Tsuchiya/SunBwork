@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\User;
 use Illuminate\Support\Facades\Storage;
-use Intervention\Image\ImageManagerStatic as Image;
+use Intervention\Image\ImageManager;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\URL;
@@ -208,21 +208,47 @@ class ChatController extends Controller
             ];
             // 画像ならサムネイルを作成（Intervention Image が無ければスキップ）
             if (str_starts_with($file->getClientMimeType(), 'image/')) {
-                if (class_exists(\Intervention\Image\ImageManagerStatic::class)) {
-                    try {
-                        $img = \Intervention\Image\ImageManagerStatic::make($file->getRealPath());
-                        $img->orientate();
-                        $img->fit(400, 400, function ($constraint) {
-                            $constraint->upsize();
-                        });
-                        $thumbPath = 'chat/thumbs/' . basename($path);
-                        Storage::disk('public')->put($thumbPath, (string) $img->encode());
-                        $meta['thumb_url'] = Storage::url($thumbPath);
-                        $meta['thumb_path'] = $thumbPath;
-                    } catch (\Exception $ex) {
-                        // サムネ作成失敗しても本体は保存済みなので処理を続行
-                        Log::warning('thumb create failed: ' . $ex->getMessage());
-                    }
+                if (class_exists(\Intervention\Image\ImageManager::class)) {
+                        try {
+                            if (extension_loaded('imagick') && class_exists(\Intervention\Image\Drivers\Imagick\Driver::class)) {
+                                $manager = ImageManager::imagick();
+                            } else {
+                                $manager = ImageManager::gd();
+                            }
+                            $img = $manager->read($file->getRealPath());
+                            $img->orientate();
+                            $img->fit(400, 400, function ($constraint) {
+                                $constraint->upsize();
+                            });
+                            $thumbPath = 'chat/thumbs/' . basename($path);
+                            // Choose encoder
+                            $thumbEncoder = new \Intervention\Image\Encoders\JpegEncoder(80);
+                            $thumbEncoded = $img->encode($thumbEncoder);
+                            $thumbBin = (string) $thumbEncoded->toDataUri() ? base64_decode(preg_replace('#^data:.*?;base64,#', '', $thumbEncoded->toDataUri())) : (string) $thumbEncoded;
+                            Storage::disk('public')->put($thumbPath, $thumbBin);
+                            try {
+                                Storage::disk('public')->setVisibility($thumbPath, 'public');
+                                $realThumb = Storage::disk('public')->path($thumbPath) ?? null;
+                                if ($realThumb && file_exists($realThumb)) {
+                                    @chmod($realThumb, 0644);
+                                }
+                            } catch (\Throwable $_exPerm) {
+                                Log::warning('thumb permission set failed', ['path' => $thumbPath, 'error' => $_exPerm->getMessage()]);
+                            }
+                            $meta['thumb_url'] = Storage::url($thumbPath);
+                            $meta['thumb_path'] = $thumbPath;
+                            $meta['thumb_url'] = Storage::url($thumbPath);
+                            $meta['thumb_path'] = $thumbPath;
+                        } catch (\Exception $ex) {
+                            // サムネ作成失敗しても本体は保存済みなので処理を続行
+                            Log::error('thumb create failed', [
+                                'path' => $path,
+                                'thumb_dest' => isset($thumbPath) ? $thumbPath : null,
+                                'error' => $ex->getMessage(),
+                                'exception_class' => get_class($ex),
+                                'trace' => $ex->getTraceAsString(),
+                            ]);
+                        }
                 } else {
                     Log::warning('Intervention Image not available; skipping thumbnail creation');
                 }

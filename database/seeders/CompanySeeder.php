@@ -4,18 +4,16 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use App\Models\Company;
 
 class CompanySeeder extends Seeder
 {
     public function run(): void
     {
-        DB::table('companies')->insert([
-            'name' => '株式会社サン・ブレーン',
-            'code' => 'SUNBRAIN',
-            'description' => 'サン・ブレーン本社',
-            'active' => 1,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        // id を固定しないで常に company を取得/作成する
+        Company::firstOrCreate(
+            ['code' => 'SUNBRAIN'],
+            ['name' => '株式会社サン・ブレーン', 'description' => 'サン・ブレーン本社', 'active' => 1]
+        );
     }
 }

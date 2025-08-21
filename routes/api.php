@@ -40,6 +40,9 @@ Route::middleware(['web', 'auth:sanctum'])->group(function () {
     Route::get('/chat-rooms/{id}', [\App\Http\Controllers\Chat\ChatController::class, 'showRoom']);
     Route::put('/chat-rooms/{id}', [\App\Http\Controllers\Chat\ChatController::class, 'updateRoom']);
     Route::delete('/chat-rooms/{id}', [\App\Http\Controllers\Chat\ChatController::class, 'destroyRoom']);
+    // Unified upload endpoint for diary/chat attachments
+    Route::post('/uploads', [\App\Http\Controllers\Api\UploadController::class, 'upload']);
+    Route::get('/uploads/status/{id}', [\App\Http\Controllers\Api\UploadStatusController::class, 'status']);
 });
 
 Route::middleware(['web', 'auth:sanctum'])->post('/chat/messages/{message}/read', [\App\Http\Controllers\Chat\ChatController::class, 'markAsRead']);

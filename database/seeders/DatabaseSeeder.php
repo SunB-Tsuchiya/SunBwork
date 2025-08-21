@@ -15,10 +15,13 @@ class DatabaseSeeder extends Seeder
             // ensure superadmin and its team are created before other dependent seeders
             CreateSuperadminSeeder::class,
             CreateSuperadminTeamSeeder::class,
-
+            // core data
             CompanySeeder::class,
             DepartmentSeeder::class,
             AssignmentSeeder::class,
+            // teams depend on companies/departments
+            \Database\Seeders\TeamSeeder::class,
+            // users depend on companies/departments/assignments/teams
             UserSeeder::class,
             AiPresetsSeeder::class,
         ]);

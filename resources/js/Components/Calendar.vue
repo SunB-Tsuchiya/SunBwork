@@ -229,8 +229,13 @@ const calendarOptions = computed(() => ({
   firstDay: 1,
   weekText: '\u9031',
   dayHeaderFormat: { weekday: 'short' },
-  slotDuration: '00:30:00',
+  // keep internal grid at 15-minute increments but show labels every 30 minutes
+  slotDuration: '00:15:00',
   slotLabelInterval: '00:30:00',
+  // force two-digit hour/minute labels (e.g. 09:00, 09:30)
+  slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
+  // ensure the calendar has enough height so time slots aren't cramped
+  height: 720,
   editable: true, // イベントのドラッグ・リサイズを有効化
   eventDurationEditable: true,
   eventResizableFromStart: true,
@@ -353,5 +358,28 @@ const submitEvent = async () => {
 
 .fc-daygrid-day:hover {
   background-color: #f3f4f6;
+}
+
+/* emphasize hour boundaries (every 4 slots when slotDuration is 15min => 60min) */
+.fc .fc-timegrid .fc-scrollgrid .fc-timegrid-slot-lane tr:nth-child(4n) td {
+  border-top: 4px solid rgba(15,23,42,0.22) !important;
+  /* add slight shadow so the separator stands out against white */
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+}
+
+/* emphasize labels at hour marks and make them two-digit bold (e.g. 09:00) */
+.fc .fc-timegrid .fc-timegrid-slot-labels tr:nth-child(4n) td {
+  border-top: 4px solid rgba(15,23,42,0.28) !important;
+  font-weight: 800;
+  color: rgba(15,23,42,0.98);
+  background-color: rgba(15,23,42,0.03);
+  /* keep label visually aligned by adding small padding */
+  padding-top: 4px !important;
+}
+
+/* give each slot a bit more vertical padding to avoid cramped appearance */
+.fc .fc-timegrid .fc-scrollgrid .fc-timegrid-slot-lane td {
+  padding-top: 6px;
+  padding-bottom: 6px;
 }
 </style>

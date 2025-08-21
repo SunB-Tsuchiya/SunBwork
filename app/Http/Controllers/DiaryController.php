@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
-use Intervention\Image\Facades\Image;
+use Intervention\Image\ImageManager;
 use App\Models\Diary;
 use App\Models\Attachment;
 use Inertia\Inertia;
@@ -50,9 +50,17 @@ class DiaryController extends Controller
                 }
             ],
         ]);
-        
-        $data['user_id'] = Auth::id();
-        $diary = Diary::create($data);
+    $diary = Diary::create($data);
+
+        // 本文内の [[attachment:{id}:filename]] プレースホルダを検出し、該当する attachments レコードを日報に紐付ける
+        $contentForScan = $data['content'] ?? $request->input('content', '');
+        if ($contentForScan) {
+            preg_match_all('/\[\[attachment:(\d+):[^\]]+\]\]/', $contentForScan, $matches);
+            if (!empty($matches[1])) {
+                $ids = array_map('intval', $matches[1]);
+                Attachment::whereIn('id', $ids)->update(['diary_id' => $diary->id]);
+            }
+        }
 
         // 添付ファイル保存
         if ($request->hasFile('files')) {
@@ -69,15 +77,35 @@ class DiaryController extends Controller
 
                 if ($isImage) {
                     // Intervention Imageでリサイズ（横幅1200px以内）
-                    $img = Image::make($file);
+                    /** @var \Intervention\Image\Image $img */
+                    if (extension_loaded('imagick') && class_exists(\Intervention\Image\Drivers\Imagick\Driver::class)) {
+                        $manager = ImageManager::imagick();
+                    } else {
+                        $manager = ImageManager::gd();
+                    }
+                    $img = $manager->read($file);
                     if ($img->width() > 1200) {
                         $img->resize(1200, null, function ($constraint) {
                             $constraint->aspectRatio();
                             $constraint->upsize();
                         });
                     }
-                    $img->encode($ext, 80); // 80%品質
-                    Storage::disk('public')->put($path, $img);
+                    if (strtolower($ext) === 'png') {
+                        $enc = new \Intervention\Image\Encoders\PngEncoder();
+                    } else {
+                        $enc = new \Intervention\Image\Encoders\JpegEncoder(80);
+                    }
+                    $encoded = $img->encode($enc);
+                    Storage::disk('public')->put($path, (string) $encoded->toDataUri() ? base64_decode(preg_replace('#^data:.*?;base64,#', '', $encoded->toDataUri())) : (string) $encoded);
+                    try {
+                        Storage::disk('public')->setVisibility($path, 'public');
+                        $real = Storage::disk('public')->path($path) ?? null;
+                        if ($real && file_exists($real)) {
+                            @chmod($real, 0644);
+                        }
+                    } catch (\Throwable $_exPerm) {
+                        logger()->warning('DiaryController: could not set permissions for image', ['path' => $path, 'error' => $_exPerm->getMessage()]);
+                    }
                 } else {
                     Storage::disk('public')->putFileAs('attachments', $file, $uniqueName);
                 }
@@ -145,17 +173,37 @@ class DiaryController extends Controller
                 $path = 'attachments/' . $uniqueName;
 
                 if ($isImage) {
-                    $img = \Intervention\Image\Facades\Image::make($file);
+                        /** @var \Intervention\Image\Image $img */
+                        if (extension_loaded('imagick') && class_exists(\Intervention\Image\Drivers\Imagick\Driver::class)) {
+                            $manager = ImageManager::imagick();
+                        } else {
+                            $manager = ImageManager::gd();
+                        }
+                        $img = $manager->read($file);
                     if ($img->width() > 1200) {
                         $img->resize(1200, null, function ($constraint) {
                             $constraint->aspectRatio();
                             $constraint->upsize();
                         });
                     }
-                    $img->encode($ext, 80);
-                    \Storage::disk('public')->put($path, $img);
+                    if (strtolower($ext) === 'png') {
+                        $enc = new \Intervention\Image\Encoders\PngEncoder();
+                    } else {
+                        $enc = new \Intervention\Image\Encoders\JpegEncoder(80);
+                    }
+                    $encoded = $img->encode($enc);
+                    Storage::disk('public')->put($path, (string) $encoded->toDataUri() ? base64_decode(preg_replace('#^data:.*?;base64,#', '', $encoded->toDataUri())) : (string) $encoded);
+                    try {
+                        Storage::disk('public')->setVisibility($path, 'public');
+                        $real = Storage::disk('public')->path($path) ?? null;
+                        if ($real && file_exists($real)) {
+                            @chmod($real, 0644);
+                        }
+                    } catch (\Throwable $_exPerm) {
+                        logger()->warning('DiaryController: could not set permissions for image', ['path' => $path, 'error' => $_exPerm->getMessage()]);
+                    }
                 } else {
-                    \Storage::disk('public')->putFileAs('attachments', $file, $uniqueName);
+                    Storage::disk('public')->putFileAs('attachments', $file, $uniqueName);
                 }
                 \App\Models\Attachment::create([
                     'diary_id' => $diary->id,
@@ -174,8 +222,8 @@ class DiaryController extends Controller
         $this->authorize('delete', $diary);
         // 添付ファイルも削除
         foreach ($diary->attachments as $attachment) {
-            if ($attachment->path && \Storage::disk('public')->exists($attachment->path)) {
-                \Storage::disk('public')->delete($attachment->path);
+            if ($attachment->path && Storage::disk('public')->exists($attachment->path)) {
+                Storage::disk('public')->delete($attachment->path);
             }
             $attachment->delete();
         }

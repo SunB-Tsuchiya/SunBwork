@@ -31,8 +31,14 @@ return new class extends Migration
         Schema::create('ai_presets', function (Blueprint $table) {
             $table->id();
             $table->string('name');
+            // preset type: 'model' | 'instruction' | 'system'
+            $table->string('type')->nullable();
+            // optional system prompt preserved for backwards compat
             $table->text('system_prompt')->nullable();
-            $table->json('settings')->nullable();
+            // seeder expects 'data' JSON for model/instruction/system payloads
+            $table->json('data')->nullable();
+            $table->text('description')->nullable();
+            $table->string('icon')->nullable();
             $table->timestamps();
         });
 

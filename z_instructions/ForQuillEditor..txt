@@ -1,0 +1,70 @@
+いかが、microsoft copilotと確立した解決方法です。これを参考にして、edit.vueを修正してください。
+
+GitHub Copilot に渡すための要点を、**技術的に明確かつ簡潔に**まとめました：
+
+---
+
+## 🧩 問題の概要
+
+**QuillEditor に HTML を渡しても初期表示されなかった。**
+
+---
+
+## 🔍 原因
+
+1. `QuillEditor` の `v-model` は **Delta形式**（Quill独自の構造）を期待している。
+2. HTML を直接渡しても、QuillEditor は自動的に変換して表示しない。
+3. `contentType="html"` を指定しても、バージョンや初期化タイミングによっては機能しないことがある。
+
+---
+
+## ✅ 解決策
+
+### ステップ：
+
+1. `@ready` イベントで QuillEditor のインスタンスを取得。
+2. `editor.clipboard.convert(html)` を使って HTML → Delta に変換。
+3. `editor.setContents(delta)` を使って Delta を直接エディターに挿入。
+
+---
+
+## 💡 なぜこれが有効か？
+
+- `clipboard.convert()` は Quill が公式に提供する HTML → Delta 変換手段。
+- `setContents()` は Delta を直接挿入するため、`v-model` の制約を回避できる。
+- `@ready` イベントは QuillEditor の初期化完了後に安全に処理できる。
+
+---
+
+## 🛠️ 実装例（Vue 3 + @vueup/vue-quill）
+
+```vue
+<script setup>
+import { ref, onMounted } from 'vue';
+import { QuillEditor } from '@vueup/vue-quill';
+import '@vueup/vue-quill/dist/vue-quill.snow.css';
+
+const props = defineProps({ diary: Object });
+const content = ref('');
+let editorInstance = null;
+
+onMounted(() => {
+  console.log('[onMounted] props.diary.content:', props.diary?.content);
+});
+
+function handleEditorReady(editor) {
+  editorInstance = editor;
+  const delta = editor.clipboard.convert(props.diary.content);
+  editor.setContents(delta);
+}
+</script>
+
+<template>
+  <QuillEditor
+    theme="snow"
+    style="min-height:200px;background:#fff"
+    v-model="content"
+    @ready="handleEditorReady"
+  />
+</template>
+```
