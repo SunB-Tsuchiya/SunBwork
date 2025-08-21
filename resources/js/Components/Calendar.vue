@@ -223,12 +223,14 @@ const calendarOptions = computed(() => ({
     right: 'dayGridMonth,timeGridWeek,timeGridDay'
   },
   selectable: true,
-  slotMinTime: '06:00:00',
+  // show time slots starting at 07:00 and use 30-minute intervals for consistent labels
+  slotMinTime: '07:00:00',
   slotMaxTime: '24:00:00',
   firstDay: 1,
-  weekText: '週',
+  weekText: '\u9031',
   dayHeaderFormat: { weekday: 'short' },
-  slotDuration: '00:15:00',
+  slotDuration: '00:30:00',
+  slotLabelInterval: '00:30:00',
   editable: true, // イベントのドラッグ・リサイズを有効化
   eventDurationEditable: true,
   eventResizableFromStart: true,
