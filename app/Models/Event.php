@@ -21,4 +21,15 @@ class Event extends Model
     {
         return $this->hasMany(Attachment::class, 'event_id');
     }
+
+    // Provide a virtual date attribute derived from start datetime
+    public function getDateAttribute()
+    {
+        if (empty($this->start)) return null;
+        try {
+            return \Carbon\Carbon::parse($this->start)->toDateString();
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
 }

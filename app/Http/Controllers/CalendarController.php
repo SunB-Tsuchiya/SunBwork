@@ -24,10 +24,12 @@ class CalendarController extends Controller
                 ->where('date', '>=', $diary_from)
                 ->where('date', '<=', $diary_to)
                 ->get();
+            // Do not select a physical `date` column because some DBs may not have it.
+            // Compute date from `start` via model accessor if needed.
             $events = Event::where('user_id', $user->id)
                 ->where('start', '>=', $event_from)
                 ->where('start', '<=', $event_to)
-                ->get(['id', 'title', 'start', 'end', 'date', 'description']);
+                ->get(['id', 'title', 'start', 'end', 'description']);
         }
         return Inertia::render('Calendar', [
             'user' => $user,
