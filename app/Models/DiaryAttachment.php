@@ -1,14 +1,20 @@
 <?php
+
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
-class DiaryAttachment extends Model
+/**
+ * Compatibility model for older DiaryAttachment references.
+ * Uses the unified 'attachments' table so existing code can continue
+ * to call App\Models\DiaryAttachment::create([...]) without error.
+ */
+class DiaryAttachment extends Attachment
 {
-    protected $fillable = [
-        'diary_id',
-        'path',
-        'original_name',
-        'mime_type'
-    ];
+    use HasFactory;
+
+    // Inherit $fillable and behavior from App\Models\Attachment.
+    // Keep explicit table mapping to be explicit about legacy name.
+    protected $table = 'attachments';
 }
+

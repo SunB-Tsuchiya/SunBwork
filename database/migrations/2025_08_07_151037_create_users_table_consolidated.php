@@ -32,6 +32,9 @@ return new class extends Migration
             // User Role System
             $table->enum('user_role', ['admin','leader','coordinator','user'])->default('user');
 
+            // Superadmin flag
+            $table->boolean('is_superadmin')->default(false)->after('user_role');
+
             // Organization Structure
             $table->foreignId('company_id')->nullable()->constrained()->onDelete('set null');
             $table->foreignId('department_id')->nullable()->constrained()->onDelete('set null');

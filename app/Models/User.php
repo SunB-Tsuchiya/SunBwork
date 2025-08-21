@@ -35,6 +35,7 @@ class User extends Authenticatable
         'company_id',
         'department_id',
         'assignment_id',
+    'is_superadmin',
     ];
 
     /**
@@ -68,6 +69,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_superadmin' => 'boolean',
         ];
     }
 
@@ -101,6 +103,14 @@ class User extends Authenticatable
     public function isOwner(): bool
     {
         return $this->isLeader();
+    }
+
+    /**
+     * Check if user is superadmin
+     */
+    public function isSuperAdmin(): bool
+    {
+        return $this->is_superadmin === true;
     }
 
     /**

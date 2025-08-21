@@ -35,15 +35,8 @@ return new class extends Migration
             $table->unique(['company_id', 'code']);
         });
 
-        // 既存のteamsテーブルを拡張
-        Schema::table('teams', function (Blueprint $table) {
-            $table->foreignId('company_id')->nullable()->constrained()->onDelete('cascade');
-            $table->foreignId('department_id')->nullable()->constrained()->onDelete('cascade');
-            $table->string('team_type')->default('personal'); // 'personal', 'department', 'project'
-            $table->text('description')->nullable();
-
-            $table->index(['company_id', 'department_id']);
-        });
+    // teams table schema moved to its own consolidated migration
+    // original extension removed to avoid duplicate definitions
     }
 
     /**

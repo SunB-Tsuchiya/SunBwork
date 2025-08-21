@@ -8,6 +8,14 @@ return new class extends Migration
 {
     public function up(): void
     {
+        Schema::create('clients', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->text('detail')->nullable();
+            $table->boolean('fromSB')->default(false);
+            $table->timestamps();
+        });
+
         Schema::create('project_jobs', function (Blueprint $table) {
             $table->id();
             $table->string('jobcode');
@@ -15,7 +23,6 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
             $table->foreignId('client_id')->constrained('clients')->onDelete('cascade');
             $table->json('detail')->nullable();
-            $table->json('teammember')->nullable();
             $table->json('schedule')->nullable();
             $table->timestamps();
         });
@@ -24,5 +31,6 @@ return new class extends Migration
     public function down(): void
     {
         Schema::dropIfExists('project_jobs');
+        Schema::dropIfExists('clients');
     }
 };

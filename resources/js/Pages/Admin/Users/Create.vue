@@ -159,6 +159,13 @@ watch(() => form.department_id, (newDepartmentId) => {
 }, { immediate: true });
 
 const submit = () => {
+    // client-side guard: inform non-superadmin users that only superadmin may create admin accounts
+    const page = usePage();
+    const currentUser = page.props.user || null;
+    if (form.user_role === 'admin' && !(currentUser && currentUser.is_superadmin)) {
+        alert('管理者アカウントの作成は superadmin のみ許可されています。');
+        return;
+    }
     if (!validateAll()) {
         // 日本語エラーをalertとconsoleに表示
         const messages = Object.values(errors.value).join('\n');

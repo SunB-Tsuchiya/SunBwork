@@ -143,9 +143,11 @@ const getAssignmentText = (assignment) => {
                 <h2 class="font-semibold text-xl text-gray-800 leading-tight">
                     ユーザー管理
                 </h2>
-                <Link :href="route('admin.users.create')" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
-                    新規ユーザー登録
-                </Link>
+                <template v-if="myuser?.is_superadmin">
+                    <Link :href="route('admin.users.create')" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+                        新規ユーザー登録
+                    </Link>
+                </template>
             </div>
         </template>
 

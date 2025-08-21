@@ -16,7 +16,16 @@ return new class extends Migration
             $table->foreignId('user_id')->index();
             $table->string('name');
             $table->boolean('personal_team');
+
+            // optional relations
+            $table->foreignId('company_id')->nullable()->constrained()->onDelete('cascade');
+            $table->foreignId('department_id')->nullable()->constrained()->onDelete('cascade');
+            $table->string('team_type')->default('personal'); // 'personal', 'department', 'company', 'admin', 'project'
+            $table->text('description')->nullable();
+
             $table->timestamps();
+
+            $table->index(['company_id', 'department_id']);
         });
     }
 

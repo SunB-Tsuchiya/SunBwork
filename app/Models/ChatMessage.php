@@ -45,4 +45,15 @@ class ChatMessage extends Model
     {
         return $this->hasMany(ChatMessageRead::class);
     }
+
+    // Compatibility accessors for older code that referenced from_user_id / to_user_id
+    public function getFromUserIdAttribute()
+    {
+        return $this->attributes['from_user_id'] ?? $this->attributes['user_id'] ?? null;
+    }
+
+    public function getToUserIdAttribute()
+    {
+        return $this->attributes['to_user_id'] ?? $this->attributes['user_id'] ?? null;
+    }
 }

@@ -58,7 +58,12 @@ class UserController extends Controller
      */
     public function store(Request $request)
     {
-        // リクエスト値をログ出力
+        // 管理者作成は superadmin のみ許可 (server-side guard)
+        $current = Auth::user();
+        if ($request->input('user_role') === 'admin' && (! $current || ! ($current->is_superadmin ?? false))) {
+            return redirect()->route('admin.users.index')
+                ->with('error', '管理者の作成は許可されていません。');
+        }
 
         try {
             $request->validate([

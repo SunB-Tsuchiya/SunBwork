@@ -26,11 +26,18 @@ class ChatMessageSent implements ShouldBroadcastNow
     public function broadcastOn()
     {
         // 送信者・受信者両方にプライベートチャンネル
-        return [
-            new PrivateChannel('chat.' . $this->message->from_user_id),
-            new PrivateChannel('chat.' . $this->message->to_user_id),
-            new PrivateChannel('chatroom.' . $this->message->chat_room_id),
-        ];
+        $channels = [];
+        if (! empty($this->message->from_user_id)) {
+            $channels[] = new PrivateChannel('chat.' . $this->message->from_user_id);
+        }
+        if (! empty($this->message->to_user_id)) {
+            $channels[] = new PrivateChannel('chat.' . $this->message->to_user_id);
+        }
+        if (! empty($this->message->chat_room_id)) {
+            $channels[] = new PrivateChannel('chatroom.' . $this->message->chat_room_id);
+        }
+
+        return $channels;
     }
 
     public function broadcastWith()

@@ -43,6 +43,26 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
 
     // チャット画面
     Route::get('/chat', [App\Http\Controllers\Chat\ChatController::class, 'index'])->name('chat.users.index');
+    // AIチャット（Bot）ページ
+    Route::get('/bot/chat', function () {
+        return Inertia::render('Bot/ChatBot');
+    })->name('bot.chat');
+    // Bot API proxy to OpenAI
+    Route::post('/bot/chat', [App\Http\Controllers\Bot\BotController::class, 'chat'])->name('bot.chat.api');
+    // Bot file upload & stream
+    Route::post('/bot/files', [App\Http\Controllers\Bot\BotFileController::class, 'upload'])->name('bot.files.upload');
+    Route::get('/bot/attachments', [App\Http\Controllers\Bot\BotFileController::class, 'stream'])->name('bot.files.stream');
+
+    // Bot export (conversation -> file)
+    Route::post('/bot/export', [App\Http\Controllers\BotExportController::class, 'export'])->name('bot.export');
+    Route::get('/bot/export/download/{filename}', [App\Http\Controllers\BotExportController::class, 'download'])->name('bot.export.download');
+
+    // AI conversation history
+    Route::get('/bot/history', [App\Http\Controllers\Bot\AiHistoryController::class, 'index'])->name('bot.history.index');
+    Route::get('/bot/history/{id}', [App\Http\Controllers\Bot\AiHistoryController::class, 'show'])->name('bot.history.show');
+    Route::get('/bot/history/{id}/json', [App\Http\Controllers\Bot\AiHistoryController::class, 'showJson'])->name('bot.history.show.json');
+    Route::post('/bot/history', [App\Http\Controllers\Bot\AiHistoryController::class, 'store'])->name('bot.history.store');
+    Route::put('/bot/history/{id}', [App\Http\Controllers\Bot\AiHistoryController::class, 'update'])->name('bot.history.update');
 
     // Ziggy用: 明示的にuser.dashboardルートを追加
     Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
@@ -89,6 +109,17 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 
     // チーム管理
     Route::resource('teams', App\Http\Controllers\Admin\TeamController::class);
+    // AI settings admin
+    Route::get('/ai', [\App\Http\Controllers\Admin\AiSettingController::class, 'index'])->name('ai.index');
+    Route::get('/ai/create', [\App\Http\Controllers\Admin\AiSettingController::class, 'create'])->name('ai.create');
+    Route::post('/ai', [\App\Http\Controllers\Admin\AiSettingController::class, 'store'])->name('ai.store');
+    Route::get('/ai/{id}/edit', [\App\Http\Controllers\Admin\AiSettingController::class, 'edit'])->name('ai.edit');
+    Route::put('/ai/{id}', [\App\Http\Controllers\Admin\AiSettingController::class, 'update'])->name('ai.update');
+    // AI presets management
+    Route::get('/ai-presets', [\App\Http\Controllers\Admin\AiPresetsController::class, 'index'])->name('ai.presets.index');
+    Route::post('/ai-presets', [\App\Http\Controllers\Admin\AiPresetsController::class, 'store'])->name('ai.presets.store');
+    Route::put('/ai-presets/{ai_preset}', [\App\Http\Controllers\Admin\AiPresetsController::class, 'update'])->name('ai.presets.update');
+    Route::delete('/ai-presets/{ai_preset}', [\App\Http\Controllers\Admin\AiPresetsController::class, 'destroy'])->name('ai.presets.destroy');
     });
 
 

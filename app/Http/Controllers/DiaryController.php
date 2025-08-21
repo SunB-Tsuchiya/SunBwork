@@ -65,7 +65,7 @@ class DiaryController extends Controller
                 $ext = $file->getClientOriginalExtension();
                 $dateStr = date('Ymd', strtotime($diary->date));
                 $uniqueName = $original . '_' . $dateStr . $diary->id . '.' . $ext;
-                $path = 'diary_attachments/' . $uniqueName;
+                $path = 'attachments/' . $uniqueName;
 
                 if ($isImage) {
                     // Intervention Imageでリサイズ（横幅1200px以内）
@@ -79,7 +79,7 @@ class DiaryController extends Controller
                     $img->encode($ext, 80); // 80%品質
                     Storage::disk('public')->put($path, $img);
                 } else {
-                    Storage::disk('public')->putFileAs('diary_attachments', $file, $uniqueName);
+                    Storage::disk('public')->putFileAs('attachments', $file, $uniqueName);
                 }
                 \App\Models\DiaryAttachment::create([
                     'diary_id' => $diary->id,
@@ -142,7 +142,7 @@ class DiaryController extends Controller
                 $ext = $file->getClientOriginalExtension();
                 $dateStr = date('Ymd', strtotime($diary->start));
                 $uniqueName = $original . '_' . $dateStr . $diary->id . '.' . $ext;
-                $path = 'diary_attachments/' . $uniqueName;
+                $path = 'attachments/' . $uniqueName;
 
                 if ($isImage) {
                     $img = \Intervention\Image\Facades\Image::make($file);
@@ -155,7 +155,7 @@ class DiaryController extends Controller
                     $img->encode($ext, 80);
                     \Storage::disk('public')->put($path, $img);
                 } else {
-                    \Storage::disk('public')->putFileAs('diary_attachments', $file, $uniqueName);
+                    \Storage::disk('public')->putFileAs('attachments', $file, $uniqueName);
                 }
                 \App\Models\Attachment::create([
                     'diary_id' => $diary->id,
