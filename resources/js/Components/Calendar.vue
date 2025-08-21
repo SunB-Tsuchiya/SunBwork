@@ -213,7 +213,8 @@ console.log('Calendar.vue events for FullCalendar:', events.value);
 
 const calendarOptions = computed(() => ({
   plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],
-  initialView: 'dayGridMonth',
+  // default to weekly time grid view
+  initialView: 'timeGridWeek',
   events: events.value,
   locale: 'ja',
   headerToolbar: {
