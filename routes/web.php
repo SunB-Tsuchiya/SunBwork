@@ -123,6 +123,25 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     });
 
 
+// SuperAdmin Routes (SuperAdminのみアクセス可能)
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'superadmin'])
+    ->prefix('superadmin')
+    ->name('superadmin.')
+    ->group(function () {
+        // Ziggy用: 明示的にsuperadmin.dashboardルートを追加
+        Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
+
+        // ユーザー管理
+        Route::resource('users', App\Http\Controllers\SuperAdmin\UserController::class);
+
+        // 会社管理
+        Route::resource('companies', App\Http\Controllers\SuperAdmin\CompanyController::class);
+
+        // チーム管理
+        Route::resource('teams', App\Http\Controllers\SuperAdmin\TeamController::class);
+    });
+
+
 
 // Ziggy用: 明示的にleader.dashboardルートを追加
 // Leader Routes (AdminとLeaderのみアクセス可能)

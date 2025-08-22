@@ -29,43 +29,54 @@ class TeamSeeder extends Seeder
             // 必要な参照データが無ければ何もしない（手動で環境を整えてから再実行してください）
             return;
         }
+        $companyName = $company->name ?? '会社';
 
-    $companyName = $company->name ?? '会社';
-    $departmentName = $department->name ?? null;
-
-        $teams = [
-            [
-                'user_id' => $user->id,
-                'name' => $companyName . ' 全社チーム',
-                'personal_team' => false,
-                'company_id' => $company->id,
-                'department_id' => null,
-                'team_type' => 'company',
-                'description' => '会社全体のチーム',
-            ],
-            [
-                'user_id' => $user->id,
-                'name' => $departmentName ? ($departmentName . ' チーム') : ($companyName . ' 部署チーム'),
-                'personal_team' => false,
-                'company_id' => $company->id,
-                'department_id' => $department ? $department->id : null,
-                'team_type' => 'department',
-                'description' => '部署ごとのチーム',
-            ],
-            // 個人チームは自動で作成しない
+        // 1) 会社全体チームを作成/更新
+        $companyTeamAttrs = [
+            'user_id' => $user->id,
+            'name' => $companyName . ' 全社チーム',
+            'personal_team' => false,
+            'company_id' => $company->id,
+            'department_id' => null,
+            'team_type' => 'company',
+            'description' => '会社全体のチーム',
+            'updated_at' => now(),
+            'created_at' => now(),
         ];
 
-        foreach ($teams as $t) {
+        Team::updateOrCreate(
+            [
+                'company_id' => $company->id,
+                'team_type' => 'company',
+            ],
+            $companyTeamAttrs
+        );
+
+        // 2) 会社に属する全ての部署ごとにチームを作成/更新
+        $departments = Department::where('company_id', $company->id)->get();
+
+        foreach ($departments as $dept) {
+            $deptName = $dept->name ?? ($companyName . ' 部署');
+
+            $deptTeamAttrs = [
+                'user_id' => $user->id,
+                'name' => $deptName . ' チーム',
+                'personal_team' => false,
+                'company_id' => $company->id,
+                'department_id' => $dept->id,
+                'team_type' => 'department',
+                'description' => '部署ごとのチーム',
+                'updated_at' => now(),
+                'created_at' => now(),
+            ];
+
             Team::updateOrCreate(
                 [
-                    'name' => $t['name'],
-                    'company_id' => $t['company_id'],
-                    'team_type' => $t['team_type'],
+                    'company_id' => $company->id,
+                    'department_id' => $dept->id,
+                    'team_type' => 'department',
                 ],
-                array_merge($t, [
-                    'updated_at' => now(),
-                    'created_at' => now(),
-                ])
+                $deptTeamAttrs
             );
         }
     }
