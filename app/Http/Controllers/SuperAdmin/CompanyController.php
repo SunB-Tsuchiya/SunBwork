@@ -5,6 +5,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Company;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 class CompanyController extends Controller
@@ -24,10 +25,23 @@ class CompanyController extends Controller
 
     public function store(Request $request)
     {
-        $request->validate([
+        $validated = $request->validate([
             'name' => 'required|string|max:255',
         ]);
-        Company::create($request->only('name'));
+
+        // Generate a slug-like unique code from the name (used as unique identifier)
+        $base = Str::slug($validated['name']);
+        $code = $base;
+        $i = 1;
+        while (Company::where('code', $code)->exists()) {
+            $code = $base . '-' . $i++;
+        }
+
+        Company::create([
+            'name' => $validated['name'],
+            'code' => $code,
+        ]);
+
         return redirect()->route('superadmin.companies.index');
     }
 

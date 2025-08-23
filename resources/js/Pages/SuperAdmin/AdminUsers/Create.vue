@@ -6,7 +6,7 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import Checkbox from '@/Components/Checkbox.vue';
-import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
+import { Head, Link, useForm } from '@inertiajs/vue3';
 import AdminNavigationTabs from '@/Components/AdminNavigationTabs.vue';
 import { ref, computed, watch } from 'vue';
 
@@ -144,14 +144,6 @@ const userAssignmentOptions = [
     { value: 'user', label: 'ユーザー', description: '基本機能のみアクセス可能' }
 ];
 
-// 現在のユーザー情報を取得し、superadmin でなければ 'admin' オプションを非表示にする
-const page = usePage();
-const currentUser = computed(() => page.props.user || null);
-const userAssignmentOptionsFiltered = computed(() => {
-    if (currentUser.value && currentUser.value.is_superadmin) return userAssignmentOptions;
-    return userAssignmentOptions.filter(o => o.value !== 'admin');
-});
-
 const onCompanyChange = () => {
     form.department_id = '';
     form.assignment_id = '';
@@ -181,7 +173,7 @@ const submit = () => {
         console.error('登録バリデーションエラー:', messages);
         return;
     }
-    form.post(route('admin.users.store'), {
+    form.post(route('superadmin.adminusers.store'), {
         onFinish: () => form.reset('password', 'password_confirmation'),
         onError: (errors) => {
             // サーバー側エラー詳細をすべて表示
@@ -202,7 +194,7 @@ const submit = () => {
                 <h2 class="font-semibold text-xl text-gray-800 leading-tight">
                     新規ユーザー登録
                 </h2>
-                <Link :href="route('admin.users.index')" class="text-gray-600 hover:text-gray-900">
+                <Link :href="route('superadmin.adminusers.index')" class="text-gray-600 hover:text-gray-900">
                     ← ユーザー一覧に戻る
                 </Link>
             </div>
@@ -220,7 +212,7 @@ const submit = () => {
                         CSVファイルを使用して複数のユーザーを一度に登録できます。
                     </p>
                     <Link 
-                        :href="route('admin.users.csv.upload')" 
+                        :href="route('superadmin.adminusers.csv.upload')" 
                         class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 active:bg-blue-900 focus:outline-none focus:border-blue-900 focus:ring ring-blue-300 disabled:opacity-25 transition ease-in-out duration-150"
                     >
                         📄 CSVファイルをアップロード
@@ -353,7 +345,7 @@ const submit = () => {
                         >
                             <option value="" disabled>権限レベルを選択してください</option>
                             <option
-                                v-for="option in userAssignmentOptionsFiltered"
+                                v-for="option in userAssignmentOptions"
                                 :key="option.value"
                                 :value="option.value"
                             >
@@ -366,7 +358,7 @@ const submit = () => {
                     <!-- 利用規約チェックは管理画面では不要なら省略 -->
 
                     <div class="flex items-center justify-end mt-6 space-x-3">
-                        <Link :href="route('admin.users.index')">
+                        <Link :href="route('superadmin.adminusers.index')">
                             <SecondaryButton type="button">
                                 キャンセル
                             </SecondaryButton>

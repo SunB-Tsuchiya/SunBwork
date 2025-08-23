@@ -1,165 +1,121 @@
 <?php
 
-namespace App\Http\Controllers\Admin;
+namespace App\Http\Controllers\SuperAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Team;
 use App\Models\Company;
 use App\Models\Department;
-use App\Models\Assignment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Validation\Rules;
-use Inertia\Inertia;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
-use PhpParser\Node\Expr\Assign;
+use Illuminate\Validation\Rules;
+use Inertia\Inertia;
 
-class UserController extends Controller
+class AdminUserController extends Controller
 {
-    /**
-     * Display a listing of users
-     */
     public function index()
     {
         $users = User::orderBy('created_at', 'desc')->get();
         $assignments = \App\Models\Assignment::all();
         $departments = Department::all();
+        $companies = Company::all();
+        
         $user = Auth::user();
 
-        return Inertia::render('Admin/Users/Index', [
+        return Inertia::render('SuperAdmin/AdminUsers/Index', [
             'users' => $users,
             'assignments' => $assignments,
             'departments' => $departments,
+            'companies' => $companies,
             'user' => $user,
         ]);
     }
 
-    /**
-     * Show the form for creating a new user
-     */
     public function create()
     {
-        // 会社ごとに部署・役職をネストして取得
         $companies = Company::with(['departments.assignments' => function($q){
             $q->where('active', true);
         }])->where('active', true)->get();
 
-        return Inertia::render('Admin/Users/Create', [
+        return Inertia::render('SuperAdmin/AdminUsers/Create', [
             'companies' => $companies,
         ]);
     }
 
-    /**
-     * Store a newly created user
-     */
     public function store(Request $request)
     {
-        // 管理者作成は superadmin のみ許可 (server-side guard)
         $current = Auth::user();
         if ($request->input('user_role') === 'admin' && (! $current || ! ($current->is_superadmin ?? false))) {
-            return redirect()->route('admin.users.index')
+            return redirect()->route('superadmin.adminusers.index')
                 ->with('error', '管理者の作成は許可されていません。');
         }
 
-        try {
-            $request->validate([
-                'name' => 'required|string|max:255',
-                'email' => 'required|string|lowercase|email|max:255|unique:users|email',
-                'password' => ['required', 'confirmed', Rules\Password::defaults()],
-                'assignment_id' => 'required|exists:assignments,id',
-                'user_role' => [
-                    'required',
-                    function($attribute, $value, $fail) {
-                        $allowed = ['admin', 'leader', 'coordinator', 'user'];
-                        if (!in_array($value, $allowed)) {
-                            $fail("{$attribute} の値 '{$value}' は許可されていません（許可値: " . implode(',', $allowed) . ")");
-                        }
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|lowercase|email|max:255|unique:users|email',
+            'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'assignment_id' => 'required|exists:assignments,id',
+            'user_role' => [
+                'required',
+                function($attribute, $value, $fail) {
+                    $allowed = ['admin', 'leader', 'coordinator', 'user'];
+                    if (!in_array($value, $allowed)) {
+                        $fail("{$attribute} の値 '{$value}' は許可されていません（許可値: " . implode(',', $allowed) . ")");
                     }
-                ],
-            ]);
+                }
+            ],
+        ]);
 
+        $companyTeam = Team::where('company_id', $request->company_id)
+            ->where('team_type', 'company')
+            ->first();
+        $departmentTeam = Team::where('department_id', $request->department_id)
+            ->first();
 
-            // 会社チーム（department_id=null, team_type=company）
-            $companyTeam = Team::where('company_id', $request->company_id)
-                ->where('team_type', 'company')
-                ->first();
-            // 部署チーム（company_id, department_id一致, team_type=department）
-            $departmentTeam = Team::where('department_id', $request->department_id)
-                ->first();
+        $user = User::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+            'company_id' => $request->company_id,
+            'department_id' => $request->department_id,
+            'assignment_id' => $request->assignment_id,
+            'current_team_id' => $request->company_id,
+            'user_role' => $request->user_role,
+            'email_verified_at' => now(),
+        ]);
 
-            $user = User::create([
-                'name' => $request->name,
-                'email' => $request->email,
-                'password' => Hash::make($request->password),
-                'company_id' => $request->company_id,
-                'department_id' => $request->department_id,
-                'assignment_id' => $request->assignment_id,
-                'current_team_id' => $request->company_id,
-                'user_role' => $request->user_role,
-                'email_verified_at' => now(),
-            ]);
+        $role = ($request->user_role === 'admin') ? 'admin' : 'viewer';
 
-            $role = ($request->user_role === 'admin') ? 'admin' : 'viewer';
-
-            // 会社チームに登録
-            // team_userはピボットテーブルだから、attachメソッドで登録
-            if ($companyTeam) {
-                $user->teams()->attach($companyTeam->id, ['role' => $role]);
-            }
-            // 部署チームに登録
-            // team_userはピボットテーブルだから、attachメソッドで登録
-            if ($departmentTeam) {
-                $user->teams()->attach($departmentTeam->id, ['role' => $role]);
-            }
-            // Jetstreamの個人チームも必要なら作成
-            // try {
-            //     $personalTeam = Team::create([
-            //         'user_id' => $user->id,
-            //         'name' => $user->name . "'s Team",
-            //         'personal_team' => false,
-            //     ]);
-            //     $user->teams()->attach($personalTeam->id, ['assignment' => 'admin', 'role' => $role]);
-            // } catch (\Exception $e) {
-            //     Log::error('Team作成エラー: ' . $e->getMessage());
-            //     Log::error('Exception trace: ' . $e->getTraceAsString());
-            // }
-
-            return redirect()->route('admin.users.index')
-                ->with('success', 'ユーザーが正常に作成されました。');
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            // バリデーションエラー時は登録処理を行わず、ログ出力
-            Log::error('登録バリデーションエラー:', $e->errors());
-            throw $e;
+        if ($companyTeam) {
+            $user->teams()->attach($companyTeam->id, ['role' => $role]);
         }
+        if ($departmentTeam) {
+            $user->teams()->attach($departmentTeam->id, ['role' => $role]);
+        }
+
+        return redirect()->route('superadmin.adminusers.index')
+            ->with('success', 'ユーザーが正常に作成されました。');
     }
 
-    /**
-     * Display the specified user
-     */
     public function show(User $user)
     {
-        return Inertia::render('Admin/Users/Show', [
+        return Inertia::render('SuperAdmin/AdminUsers/Show', [
             'user' => $user,
         ]);
     }
 
-    /**
-     * Show the form for editing the specified user
-     */
     public function edit(User $user)
     {
-        return Inertia::render('Admin/Users/Edit', [
+        return Inertia::render('SuperAdmin/AdminUsers/Edit', [
             'user' => $user,
         ]);
     }
 
-    /**
-     * Update the specified user
-     */
     public function update(Request $request, User $user)
     {
         $request->validate([
@@ -176,24 +132,20 @@ class UserController extends Controller
             'user_role' => $request->user_role,
         ]);
 
-        return redirect()->route('admin.users.index')
+        return redirect()->route('superadmin.adminusers.index')
             ->with('success', 'ユーザー情報が更新されました。');
     }
 
-    /**
-     * Remove the specified user
-     */
     public function destroy(User $user)
     {
-        // 現在ログイン中のAdminユーザーは削除できない
         if ($user->id === Auth::id()) {
-            return redirect()->route('admin.users.index')
+            return redirect()->route('superadmin.adminusers.index')
                 ->with('error', '自分自身のアカウントは削除できません。');
         }
 
         $user->delete();
 
-        return redirect()->route('admin.users.index')
+        return redirect()->route('superadmin.adminusers.index')
             ->with('success', 'ユーザーが削除されました。');
     }
 
@@ -204,13 +156,13 @@ class UserController extends Controller
     {
         $companies = Company::with('departments')->where('active', 1)->get();
 
-        return Inertia::render('Admin/Users/CsvUpload', [
+        return Inertia::render('SuperAdmin/AdminUsers/CsvUpload', [
             'companies' => $companies
         ]);
     }
 
     /**
-     * Preview CSV data
+     * Preview CSV data (robust implementation copied from Admin controller)
      */
     public function csvPreview(Request $request)
     {
@@ -219,6 +171,7 @@ class UserController extends Controller
             'company_id' => 'required|exists:companies,id',
             'department_id' => 'required|exists:departments,id',
         ]);
+
         Log::info('[csvPreview] company_id: ' . $request->company_id);
         Log::info('[csvPreview] department_id: ' . $request->department_id);
 
@@ -310,11 +263,6 @@ class UserController extends Controller
                         $warnings[] = "行 {$line}: ユーザー権限「{$userRoleResult['original']}」を「{$userRoleResult['fixed']}」に自動修正しました";
                     }
 
-                    // superadmin以外のadmin登録を禁止: CSVに'user_role'が'admin'を含む場合はエラー
-                    if (strtolower(trim($userData['user_role'])) === 'admin') {
-                        $errors[] = "行 {$line}: CSVからの管理者(admin)登録は許可されていません。superadmin ユーザーのみ手動で作成してください。";
-                    }
-
                     // 重複チェック
                     if (User::where('email', $userData['email'])->exists()) {
                         $errors[] = "行 {$line}: メールアドレス '{$userData['email']}' は既に使用されています";
@@ -333,7 +281,7 @@ class UserController extends Controller
 
             Log::info('[csvPreview] company: ' . ($company ? $company->name : 'null'));
             Log::info('[csvPreview] department: ' . ($department ? $department->name : 'null'));
-            return Inertia::render('Admin/Users/CsvPreview', [
+            return Inertia::render('SuperAdmin/AdminUsers/CsvPreview', [
                 'csvData' => $csvData,
                 'errors' => $errors,
                 'warnings' => $warnings,
@@ -345,23 +293,6 @@ class UserController extends Controller
                 'department_id' => $request->department_id,
             ]);
 
-            // 選択された会社・部署情報を取得
-            $company = Company::findOrFail($request->company_id);
-            $department = Department::findOrFail($request->department_id);
-            $assignment_id = Assignment::where('name', $request->input('assignment'))
-                ->where('department_id', $department->id)
-                ->value('id');
-
-            return Inertia::render('Admin/Users/CsvPreview', [
-                'csvData' => $csvData,
-                'errors' => $errors,
-                'hasErrors' => !empty($errors),
-                'company' => $company,
-                'department' => $department,
-                'company_id' => $request->company_id,
-                'department_id' => $request->department_id,
-                'assignment_id' => $assignment_id,
-            ]);
         } catch (\Exception $e) {
             Storage::disk('local')->delete($path);
             return redirect()->back()->withErrors(['csv_file' => 'CSVファイルの処理中にエラーが発生しました: ' . $e->getMessage()]);
@@ -369,7 +300,7 @@ class UserController extends Controller
     }
 
     /**
-     * Store users from CSV data
+     * Store users from CSV data (robust implementation)
      */
     public function csvStore(Request $request)
     {
@@ -384,8 +315,7 @@ class UserController extends Controller
                 'users.*.email' => 'required|string|lowercase|email|max:255|unique:users',
                 'users.*.password' => 'required|string',
                 'users.*.assignment_id' => 'required|exists:assignments,id',
-                // CSV経由での 'admin' 登録は不可にするため、'admin' を除外
-                'users.*.user_role' => 'required|in:leader,coordinator,user',
+                'users.*.user_role' => 'required|in:admin,leader,coordinator,user',
                 'company_id' => 'required|exists:companies,id',
                 'department_id' => 'required|exists:departments,id',
             ]);
@@ -409,7 +339,6 @@ class UserController extends Controller
         $department = Department::findOrFail($request->department_id);
         // 会社チーム（department_id=null, team_type=company）
         $companyTeam = Team::where('company_id', $request->company_id)
-            ->whereNull('department_id')
             ->where('team_type', 'company')
             ->first();
         // 部署チーム（company_id, department_id一致, team_type=department）
@@ -460,7 +389,7 @@ class UserController extends Controller
             }
             DB::commit();
             Log::info('Transaction committed successfully');
-            return redirect()->route('admin.users.index')
+            return redirect()->route('superadmin.adminusers.index')
                 ->with('success', "{$successCount}件のユーザーが一括登録されました。");
         } catch (\Illuminate\Validation\ValidationException $e) {
             DB::rollBack();

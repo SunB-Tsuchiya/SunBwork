@@ -23,7 +23,7 @@ const confirmDelete = (companyId) => {
         <template #header>
             <div class="flex items-center justify-between">
                 <h2 class="font-semibold text-xl text-gray-800 leading-tight">会社管理</h2>
-                <Link :href="route('admin.companies.create')" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">新規会社登録</Link>
+                <!-- <Link :href="route('admin.companies.create')" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">新規会社登録</Link> -->
             </div>
         </template>
         <div class="py-6 max-w-4xl mx-auto">

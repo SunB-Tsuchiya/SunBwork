@@ -53,13 +53,13 @@ const submit = () => {
         }
     }
     const routeName = 'superadmin.companies.store';
-    console.log('[Create.vue][Admin] submitting, intended route:', routeName, 'form:', JSON.parse(JSON.stringify(form)));
+    console.log('[Create.vue][SuperAdmin] submitting, intended route:', routeName, 'form:', JSON.parse(JSON.stringify(form))); // shallow snapshot
     try {
         const url = route(routeName);
-        console.log('[Create.vue][Admin] route resolved to:', url);
+        console.log('[Create.vue][SuperAdmin] route resolved to:', url);
         form.post(url);
     } catch (e) {
-        console.error('[Create.vue][Admin] Ziggy route resolution failed for', routeName, e);
+        console.error('[Create.vue][SuperAdmin] Ziggy route resolution failed for', routeName, e);
         throw e;
     }
 };

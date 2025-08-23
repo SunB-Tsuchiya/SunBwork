@@ -7,18 +7,15 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
-class AdminMiddleware
+class SuperadminMiddleware
 {
     /**
      * Handle an incoming request.
-     *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
      */
     public function handle(Request $request, Closure $next): Response
     {
-        // Allow users with admin role or superadmin flag to pass
-        if (!Auth::check() || (!Auth::user()->isAdmin() && !Auth::user()->isSuperAdmin())) {
-            abort(403, 'Admin access required.');
+        if (!Auth::check() || ! (Auth::user()->user_role === 'admin' && (Auth::user()->is_superadmin ?? false))) {
+            abort(403, 'Superadmin access required.');
         }
 
         return $next($request);

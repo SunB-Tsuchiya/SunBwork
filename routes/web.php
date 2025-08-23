@@ -31,8 +31,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
 
     // 予定（イベント）API
     Route::get('/events', [App\Http\Controllers\EventController::class, 'index'])->name('events.index');
-    Route::post('/events', [App\Http\Controllers\EventController::class, 'store'])->name('events.store');
-    Route::put('/events/{event}', [App\Http\Controllers\EventController::class, 'update'])->name('events.update');
+    // store/update are handled by the resource route declared below to avoid duplicate route names
     Route::delete('/events/{event}', [App\Http\Controllers\EventController::class, 'destroy'])->name('events.destroy');
 
     // ユーザー割り当てジョブ一覧・詳細
@@ -88,6 +87,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
 });
 
 // Admin Routes (Adminのみアクセス可能)
+// More specific admin routes that must enforce company ownership (clients, etc.) are protected separately.
 Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'admin'])
     ->prefix('admin')
     ->name('admin.')
@@ -104,8 +104,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     // ユーザー管理
     Route::resource('users', App\Http\Controllers\Admin\UserController::class);
 
-    // 会社管理
-    Route::resource('companies', App\Http\Controllers\Admin\CompanyController::class);
+    // 会社管理 (会社作成/管理は SuperAdmin 側に一本化しました)
+    // Route::resource('companies', App\Http\Controllers\Admin\CompanyController::class);
 
     // チーム管理
     Route::resource('teams', App\Http\Controllers\Admin\TeamController::class);
@@ -124,15 +124,26 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 
 
 // SuperAdmin Routes (SuperAdminのみアクセス可能)
-Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'superadmin'])
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', \App\Http\Middleware\SuperadminMiddleware::class])
     ->prefix('superadmin')
     ->name('superadmin.')
     ->group(function () {
         // Ziggy用: 明示的にsuperadmin.dashboardルートを追加
         Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
 
-        // ユーザー管理
-        Route::resource('users', App\Http\Controllers\SuperAdmin\UserController::class);
+    // ユーザー管理
+    // existing users resource (general)
+    Route::resource('users', App\Http\Controllers\SuperAdmin\UserController::class);
+    // adminusers: superadmin が管理する "admin" ユーザー用 CRUD
+    Route::resource('adminusers', App\Http\Controllers\SuperAdmin\AdminUserController::class);
+
+    // スーパ管理者向け: 管理者ユーザー (adminusers)
+    Route::resource('adminusers', App\Http\Controllers\SuperAdmin\AdminUserController::class);
+
+    // CSV routes for adminusers
+    Route::get('adminusers/csv/upload', [App\Http\Controllers\SuperAdmin\AdminUserController::class, 'csvUpload'])->name('adminusers.csv.upload');
+    Route::post('adminusers/csv/preview', [App\Http\Controllers\SuperAdmin\AdminUserController::class, 'csvPreview'])->name('adminusers.csv.preview');
+    Route::post('adminusers/csv/store', [App\Http\Controllers\SuperAdmin\AdminUserController::class, 'csvStore'])->name('adminusers.csv.store');
 
         // 会社管理
         Route::resource('companies', App\Http\Controllers\SuperAdmin\CompanyController::class);

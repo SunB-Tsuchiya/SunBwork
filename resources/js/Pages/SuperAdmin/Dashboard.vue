@@ -30,20 +30,11 @@ const user = page.props.user;
                 <!-- ナビゲーションタブ -->
                 <div class="mb-6">
                     <nav class="flex space-x-8" aria-label="Tabs">
-                        <Link :href="route('superadmin.users.index')" class="text-red-600 hover:text-red-800 px-3 py-2 font-medium text-sm rounded-md border border-red-200 hover:bg-red-50">
+                        <Link :href="route('superadmin.adminusers.index')" class="text-red-600 hover:text-red-800 px-3 py-2 font-medium text-sm rounded-md border border-red-200 hover:bg-red-50">
                             ユーザー管理
                         </Link>
                         <Link :href="route('superadmin.companies.index')" class="text-green-600 hover:text-green-800 px-3 py-2 font-medium text-sm rounded-md border border-green-200 hover:bg-green-50">
-                            会社管理
-                        </Link>
-                        <Link :href="route('debug.api')" class="text-blue-600 hover:text-blue-800 px-3 py-2 font-medium text-sm rounded-md border border-blue-200 hover:bg-blue-50">
-                            APIデバッグページ
-                        </Link>
-                        <Link :href="route('superadmin.teams.index')" class="text-green-600 hover:text-green-800 px-3 py-2 font-medium text-sm rounded-md border border-green-200 hover:bg-green-50">
-                            チーム管理
-                        </Link>
-                        <Link :href="route('superadmin.clients.index')" class="text-green-600 hover:text-green-800 px-3 py-2 font-medium text-sm rounded-md border border-green-200 hover:bg-green-50">
-                            クライアント管理
+                            会社の追加と管理
                         </Link>
                         <Link :href="route('profile.show')" class="text-gray-600 hover:text-gray-800 px-3 py-2 font-medium text-sm rounded-md">
                             プロフィール編集

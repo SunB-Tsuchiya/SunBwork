@@ -8,6 +8,7 @@ import DropdownLink from '@/Components/DropdownLink.vue';
 import NavLink from '@/Components/NavLink.vue';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
 import TeamSwitcher from '@/Components/TeamSwitcher.vue';
+import Toast from '@/Components/Toast.vue';
 
 defineProps({
     title: String,
@@ -65,8 +66,28 @@ const user = page.props.user; // これを追加
 
                             <!-- Navigation Links -->
                             <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
+                                <!-- SuperAdmin用ナビゲーション -->
+                                <template v-if="$page.props.auth.user.is_superadmin && (typeof route === 'function' ? route().has('superadmin.dashboard') : false)">
+                                    <NavLink :href="route('superadmin.dashboard')" :active="route().current('superadmin.dashboard')">
+                                        <span class="text-yellow-600">SuperAdmin</span>
+                                    </NavLink>
+                                    <NavLink :href="(user && user.is_superadmin) ? route('superadmin.dashboard') : route('admin.dashboard')"
+                                             :active="route().current('admin.dashboard') || route().current('superadmin.dashboard')">
+                                        <span class="text-red-600">Admin</span>
+                                    </NavLink>
+                                    <NavLink :href="route('leader.dashboard')" :active="route().current('leader.dashboard')">
+                                        <span class="text-orange-600">Leader</span>
+                                    </NavLink>
+                                    <NavLink :href="route('coordinator.dashboard')" :active="route().current('coordinator.dashboard')">
+                                        <span class="text-green-600">Coordinator</span>
+                                    </NavLink>
+                                    <NavLink :href="route('user.dashboard')" :active="route().current('user.dashboard')">
+                                        <span class="text-blue-600">User</span>
+                                    </NavLink>
+                                </template>
+
                                 <!-- Admin用ナビゲーション -->
-                                <template v-if="$page.props.auth.user.user_role === 'admin'">
+                                <template v-else-if="$page.props.auth.user.user_role === 'admin'">
                                     <NavLink :href="route('admin.dashboard')" :active="route().current('admin.dashboard')">
                                         <span class="text-red-600">Admin</span>
                                     </NavLink>
@@ -202,8 +223,27 @@ const user = page.props.user; // これを追加
                 <!-- Responsive Navigation Menu -->
                 <div :class="{'block': showingNavigationDropdown, 'hidden': ! showingNavigationDropdown}" class="sm:hidden">
                     <div class="pt-2 pb-3 space-y-1">
+                        <!-- SuperAdmin用レスポンシブナビゲーション -->
+                        <template v-if="$page.props.auth.user.is_superadmin && (typeof route === 'function' ? route().has('superadmin.dashboard') : false)">
+                            <ResponsiveNavLink :href="route('superadmin.dashboard')" :active="route().current('superadmin.dashboard')">
+                                <span class="text-yellow-600">SuperAdmin Dashboard</span>
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="(user && user.is_superadmin) ? route('superadmin.dashboard') : route('admin.dashboard')" :active="route().current('admin.dashboard') || route().current('superadmin.dashboard')">
+                                <span class="text-red-600">Admin Dashboard</span>
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('leader.dashboard')" :active="route().current('leader.dashboard')">
+                                <span class="text-orange-600">Leader Dashboard</span>
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('coordinator.dashboard')" :active="route().current('coordinator.dashboard')">
+                                <span class="text-green-600">Coordinator Dashboard</span>
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('user.dashboard')" :active="route().current('user.dashboard')">
+                                <span class="text-blue-600">User Dashboard</span>
+                            </ResponsiveNavLink>
+                        </template>
+
                         <!-- Admin用レスポンシブナビゲーション -->
-                        <template v-if="$page.props.auth.user.user_role === 'admin'">
+                        <template v-else-if="$page.props.auth.user.user_role === 'admin'">
                             <ResponsiveNavLink :href="route('admin.dashboard')" :active="route().current('admin.dashboard')">
                                 <span class="text-red-600">Admin Dashboard</span>
                             </ResponsiveNavLink>
@@ -334,6 +374,9 @@ const user = page.props.user; // これを追加
             </header>
 
             <!-- Page Content -->
+            <!-- Toasts -->
+            <Toast />
+
             <main>
                 <slot />
             </main>

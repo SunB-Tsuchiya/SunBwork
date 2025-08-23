@@ -19,13 +19,17 @@ return [
         'api/*',
         'sanctum/csrf-cookie',
         'broadcasting/auth',
+        // Allow Inertia/XHR calls from dev frontends to application routes
+        'superadmin/*',
+        'admin/*',
     ],
 
     // HTTP methods allowed for CORS requests
     'allowed_methods' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 
     // Allowed origins (comma-separated in env). Defaults target local dev hosts.
-    'allowed_origins' => array_filter(array_map('trim', explode(',', env('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://localhost:5174')))),
+    // Include 127.0.0.1 for Vite dev servers that use the numeric localhost
+    'allowed_origins' => array_filter(array_map('trim', explode(',', env('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173')))),
 
     // Patterns for allowed origins (unused by default)
     'allowed_origins_patterns' => [],

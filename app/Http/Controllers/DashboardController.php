@@ -24,7 +24,9 @@ class DashboardController extends Controller
 
         // URLパスでVueコンポーネントを振り分け
         $path = $request->path();
-        if (str_starts_with($path, 'admin/')) {
+        if (str_starts_with($path, 'superadmin/')) {
+            $component = 'SuperAdmin/Dashboard';
+        } elseif (str_starts_with($path, 'admin/')) {
             $component = 'Admin/Dashboard';
         } elseif (str_starts_with($path, 'leader/')) {
             $component = 'Leader/Dashboard';
@@ -34,12 +36,14 @@ class DashboardController extends Controller
             $component = 'Dashboard';
         } else {
             // ログイン直後など: user_roleで自動リダイレクト
-            if ($user->user_role === 'admin') {
+            if (!empty($user->is_superadmin) && $user->is_superadmin) {
+                return redirect()->route('superadmin.dashboard');
+            } elseif ($user->user_role === 'admin') {
                 return redirect()->route('admin.dashboard');
             } elseif ($user->user_role === 'leader') {
                 return redirect()->route('leader.dashboard');
-            } elseif ($user->user_role === 'coodinator') {
-                return redirect()->route('coodinator.dashboard');
+            } elseif ($user->user_role === 'coordinator') {
+                return redirect()->route('coordinator.dashboard');
             } else {
                 $component = 'Dashboard';
             }

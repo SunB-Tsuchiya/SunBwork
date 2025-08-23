@@ -35,6 +35,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->alias([
+            'superadmin' => \App\Http\Middleware\SuperadminMiddleware::class,
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
             'leader' => \App\Http\Middleware\LeaderMiddleware::class,
             'coordinator' => \App\Http\Middleware\CoordinatorMiddleware::class,

@@ -6,13 +6,27 @@ use App\Models\Company;
 
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Auth;
 
 class CompanyController extends Controller
 {
     // 一覧
     public function index()
     {
-        $companies = Company::with(['departments.assignments'])->get();
+        $user = Auth::user();
+        // superadmin は全会社を閲覧可能、それ以外は所属会社のみ
+        if ($user && ($user->is_superadmin ?? false)) {
+            $companies = Company::with(['departments.assignments'])->get();
+        } else {
+            if ($user && $user->company_id) {
+                $companies = Company::with(['departments.assignments'])
+                    ->where('id', $user->company_id)
+                    ->get();
+            } else {
+                $companies = collect([]);
+            }
+        }
+
         return Inertia::render('Admin/Companies/Index', [
             'companies' => $companies,
         ]);
@@ -37,6 +51,11 @@ class CompanyController extends Controller
     // 編集フォーム
     public function edit(Company $company)
     {
+        $user = Auth::user();
+        if (!($user && ($user->is_superadmin ?? false)) && $user->company_id !== $company->id) {
+            abort(403);
+        }
+
         $company->load('departments.assignments');
         return Inertia::render('Admin/Companies/Edit', [
             'company' => $company,
@@ -53,6 +72,12 @@ class CompanyController extends Controller
             'departments.*.assignments' => 'array',
             'departments.*.assignments.*.name' => 'required|string|max:255',
         ]);
+
+        // 権限チェック: superadmin でない場合は所属会社以外の更新を禁止
+        $user = Auth::user();
+        if (!($user && ($user->is_superadmin ?? false)) && $user->company_id !== $company->id) {
+            abort(403);
+        }
 
         // 会社名更新
         $company->update(['name' => $request->name]);
@@ -83,6 +108,11 @@ class CompanyController extends Controller
     // 削除
     public function destroy(Company $company)
     {
+        $user = Auth::user();
+        if (!($user && ($user->is_superadmin ?? false)) && $user->company_id !== $company->id) {
+            abort(403);
+        }
+
         $company->delete();
         return redirect()->route('admin.companies.index');
     }
