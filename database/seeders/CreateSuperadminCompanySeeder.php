@@ -16,6 +16,9 @@ class CreateSuperadminCompanySeeder extends Seeder
             'name' => 'Superadmin Company',
         ], [
             'name' => 'Superadmin Company',
+            'code' => 'SUPERADMIN',
+            'description' => 'Auto-created company for superadmin user',
+            'active' => true,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
