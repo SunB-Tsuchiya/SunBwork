@@ -25,12 +25,12 @@ class AuthServiceProvider extends ServiceProvider
 
         // Only a superadmin may create new admin users
         Gate::define('create-admin', function ($user) {
-            return isset($user->is_superadmin) && $user->is_superadmin === true;
+            return $user->user_role === 'superadmin';
         });
 
         // Convenience gate: promote to admin
         Gate::define('promote-to-admin', function ($user) {
-            return isset($user->is_superadmin) && $user->is_superadmin === true;
+            return $user->user_role === 'superadmin';
         });
     }
 }

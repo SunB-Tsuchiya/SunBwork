@@ -148,7 +148,7 @@ const userAssignmentOptions = [
 const page = usePage();
 const currentUser = computed(() => page.props.user || null);
 const userAssignmentOptionsFiltered = computed(() => {
-    if (currentUser.value && currentUser.value.is_superadmin) return userAssignmentOptions;
+    if (currentUser.value && currentUser.value.user_role === 'superadmin') return userAssignmentOptions;
     return userAssignmentOptions.filter(o => o.value !== 'admin');
 });
 
@@ -170,7 +170,7 @@ const submit = () => {
     // client-side guard: inform non-superadmin users that only superadmin may create admin accounts
     const page = usePage();
     const currentUser = page.props.user || null;
-    if (form.user_role === 'admin' && !(currentUser && currentUser.is_superadmin)) {
+    if (form.user_role === 'admin' && !(currentUser && currentUser.user_role === 'superadmin')) {
         alert('管理者アカウントの作成は superadmin のみ許可されています。');
         return;
     }

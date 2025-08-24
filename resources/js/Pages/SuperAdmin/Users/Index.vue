@@ -101,7 +101,7 @@ const getAssignmentName = (assignment_id) => {
 		<template #header>
 			<div class="flex items-center justify-between">
 				<h2 class="font-semibold text-xl text-gray-800 leading-tight">ユーザー管理</h2>
-				<template v-if="myuser?.is_superadmin">
+				<template v-if="myuser?.user_role === 'superadmin'">
 					<Link :href="route('superadmin.users.create')" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">新規ユーザー登録</Link>
 				</template>
 			</div>

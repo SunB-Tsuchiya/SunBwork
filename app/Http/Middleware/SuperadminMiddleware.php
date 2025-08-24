@@ -14,7 +14,7 @@ class SuperadminMiddleware
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (!Auth::check() || ! (Auth::user()->user_role === 'admin' && (Auth::user()->is_superadmin ?? false))) {
+        if (!Auth::check() || Auth::user()->user_role !== 'superadmin') {
             abort(403, 'Superadmin access required.');
         }
 

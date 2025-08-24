@@ -29,11 +29,8 @@ return new class extends Migration
             $table->foreignId('current_team_id')->nullable();
             $table->string('profile_photo_path', 2048)->nullable();
 
-            // User Role System
-            $table->enum('user_role', ['admin','leader','coordinator','user'])->default('user');
-
-            // Superadmin flag
-            $table->boolean('is_superadmin')->default(false);
+            // User Role System (add 'superadmin')
+            $table->enum('user_role', ['superadmin','admin','leader','coordinator','user'])->default('user');
 
             // Organization Structure
             $table->foreignId('company_id')->nullable()->constrained()->onDelete('set null');

@@ -31,7 +31,7 @@ class AppServiceProvider extends ServiceProvider
             $availableTeams = $user->teams;
 
             // If this is the specially provisioned superadmin account, allow login even without company/team
-            if (isset($user->is_superadmin) && $user->is_superadmin) {
+            if ($user->user_role === 'superadmin') {
                 // if no current team exists, provide a minimal placeholder so frontend components don't break
                 if (! $currentTeam) {
                     $currentTeam = (object) [
@@ -43,7 +43,7 @@ class AppServiceProvider extends ServiceProvider
                     ];
                 }
                 // ensure availableTeams has expected structure without calling model methods
-                if (! $availableTeams) {
+                    if (! $availableTeams) {
                     $availableTeams = (object) ['personal' => [], 'department' => []];
                 } else {
                     // if it's an Eloquent Collection or array, group by team_type

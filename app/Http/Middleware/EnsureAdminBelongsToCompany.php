@@ -33,17 +33,9 @@ class EnsureAdminBelongsToCompany
             }
         }
 
-        if (! $isSuperAdmin && ($user->is_superadmin ?? false)) {
-            $isSuperAdmin = true;
-        }
+    // direct property check removed; rely on isSuperAdmin() or hasRole('superadmin')
 
-        if (! $isSuperAdmin && method_exists($user, 'hasRole')) {
-            try {
-                $isSuperAdmin = (bool) $user->hasRole('superadmin');
-            } catch (\Throwable $e) {
-                $isSuperAdmin = false;
-            }
-        }
+    // no hasRole fallback - rely on isSuperAdmin() or user_role property
 
         if ($isSuperAdmin) {
             return $next($request);

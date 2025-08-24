@@ -67,12 +67,12 @@ const user = page.props.user; // これを追加
                             <!-- Navigation Links -->
                             <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
                                 <!-- SuperAdmin用ナビゲーション -->
-                                <template v-if="$page.props.auth.user.is_superadmin && (typeof route === 'function' ? route().has('superadmin.dashboard') : false)">
+                                <template v-if="$page.props.auth.user.user_role === 'superadmin' && (typeof route === 'function' ? route().has('superadmin.dashboard') : false)">
                                     <NavLink :href="route('superadmin.dashboard')" :active="route().current('superadmin.dashboard')">
                                         <span class="text-yellow-600">SuperAdmin</span>
                                     </NavLink>
-                                    <NavLink :href="(user && user.is_superadmin) ? route('superadmin.dashboard') : route('admin.dashboard')"
-                                             :active="route().current('admin.dashboard') || route().current('superadmin.dashboard')">
+                                    <NavLink :href="route('admin.dashboard')"
+                                             :active="route().current('admin.dashboard')">
                                         <span class="text-red-600">Admin</span>
                                     </NavLink>
                                     <NavLink :href="route('leader.dashboard')" :active="route().current('leader.dashboard')">
@@ -224,11 +224,11 @@ const user = page.props.user; // これを追加
                 <div :class="{'block': showingNavigationDropdown, 'hidden': ! showingNavigationDropdown}" class="sm:hidden">
                     <div class="pt-2 pb-3 space-y-1">
                         <!-- SuperAdmin用レスポンシブナビゲーション -->
-                        <template v-if="$page.props.auth.user.is_superadmin && (typeof route === 'function' ? route().has('superadmin.dashboard') : false)">
+                        <template v-if="$page.props.auth.user.user_role === 'superadmin' && (typeof route === 'function' ? route().has('superadmin.dashboard') : false)">
                             <ResponsiveNavLink :href="route('superadmin.dashboard')" :active="route().current('superadmin.dashboard')">
                                 <span class="text-yellow-600">SuperAdmin Dashboard</span>
                             </ResponsiveNavLink>
-                            <ResponsiveNavLink :href="(user && user.is_superadmin) ? route('superadmin.dashboard') : route('admin.dashboard')" :active="route().current('admin.dashboard') || route().current('superadmin.dashboard')">
+                            <ResponsiveNavLink :href="(user && user.user_role === 'superadmin') ? route('superadmin.dashboard') : route('admin.dashboard')" :active="route().current('admin.dashboard') || route().current('superadmin.dashboard')">
                                 <span class="text-red-600">Admin Dashboard</span>
                             </ResponsiveNavLink>
                             <ResponsiveNavLink :href="route('leader.dashboard')" :active="route().current('leader.dashboard')">

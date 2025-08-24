@@ -36,7 +36,7 @@ class DashboardController extends Controller
             $component = 'Dashboard';
         } else {
             // ログイン直後など: user_roleで自動リダイレクト
-            if (!empty($user->is_superadmin) && $user->is_superadmin) {
+            if ($user->user_role === 'superadmin') {
                 return redirect()->route('superadmin.dashboard');
             } elseif ($user->user_role === 'admin') {
                 return redirect()->route('admin.dashboard');

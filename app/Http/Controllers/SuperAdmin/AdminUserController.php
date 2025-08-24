@@ -49,8 +49,8 @@ class AdminUserController extends Controller
 
     public function store(Request $request)
     {
-        $current = Auth::user();
-        if ($request->input('user_role') === 'admin' && (! $current || ! ($current->is_superadmin ?? false))) {
+    $current = Auth::user();
+    if ($request->input('user_role') === 'admin' && (! $current || $current->user_role !== 'superadmin')) {
             return redirect()->route('superadmin.adminusers.index')
                 ->with('error', '管理者の作成は許可されていません。');
         }

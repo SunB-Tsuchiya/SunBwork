@@ -15,7 +15,7 @@ class CompanyController extends Controller
     {
         $user = Auth::user();
         // superadmin は全会社を閲覧可能、それ以外は所属会社のみ
-        if ($user && ($user->is_superadmin ?? false)) {
+        if ($user && $user->user_role === 'superadmin') {
             $companies = Company::with(['departments.assignments'])->get();
         } else {
             if ($user && $user->company_id) {
@@ -52,7 +52,7 @@ class CompanyController extends Controller
     public function edit(Company $company)
     {
         $user = Auth::user();
-        if (!($user && ($user->is_superadmin ?? false)) && $user->company_id !== $company->id) {
+    if (!($user && $user->user_role === 'superadmin') && $user->company_id !== $company->id) {
             abort(403);
         }
 
@@ -74,8 +74,8 @@ class CompanyController extends Controller
         ]);
 
         // 権限チェック: superadmin でない場合は所属会社以外の更新を禁止
-        $user = Auth::user();
-        if (!($user && ($user->is_superadmin ?? false)) && $user->company_id !== $company->id) {
+    $user = Auth::user();
+    if (!($user && $user->user_role === 'superadmin') && $user->company_id !== $company->id) {
             abort(403);
         }
 
@@ -108,8 +108,8 @@ class CompanyController extends Controller
     // 削除
     public function destroy(Company $company)
     {
-        $user = Auth::user();
-        if (!($user && ($user->is_superadmin ?? false)) && $user->company_id !== $company->id) {
+    $user = Auth::user();
+    if (!($user && $user->user_role === 'superadmin') && $user->company_id !== $company->id) {
             abort(403);
         }
 

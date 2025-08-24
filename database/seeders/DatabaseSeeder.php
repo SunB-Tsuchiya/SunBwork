@@ -12,7 +12,8 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            // ensure superadmin and its team are created before other dependent seeders
+            // ensure superadmin company, superadmin and its team are created before other dependent seeders
+            CreateSuperadminCompanySeeder::class,
             CreateSuperadminSeeder::class,
             CreateSuperadminTeamSeeder::class,
             // core data

@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use App\Models\User;
+use App\Models\Company;
 
 class CreateSuperadminSeeder extends Seeder
 {
@@ -25,12 +26,16 @@ class CreateSuperadminSeeder extends Seeder
             return;
         }
 
+        // try to find or create a superadmin company
+        $company = Company::firstWhere('name', 'Superadmin Company');
+        $companyId = $company ? $company->id : null;
+
         User::create([
             'name' => 'Super Admin',
             'email' => $email,
             'password' => Hash::make($password),
-            'user_role' => 'admin',
-            'is_superadmin' => true,
+            'user_role' => 'superadmin',
+            'company_id' => $companyId,
         ]);
     }
 }
