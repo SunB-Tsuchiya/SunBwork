@@ -14,7 +14,7 @@ class CoordinatorMiddleware
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (!Auth::check() || (!Auth::user()->isCoordinator() && !Auth::user()->isLeader() &&!Auth::user()->isAdmin())) {
+        if (!Auth::check() || (!Auth::user()->isCoordinator() && !Auth::user()->isLeader() && !Auth::user()->isAdmin() && !Auth::user()->isSuperAdmin())) {
             abort(403, 'Coordinator or Admin access required.');
         }
         return $next($request);

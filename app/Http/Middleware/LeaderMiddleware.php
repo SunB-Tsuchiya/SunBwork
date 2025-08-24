@@ -16,7 +16,7 @@ class LeaderMiddleware
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (!Auth::check() || (!Auth::user()->isLeader() && !Auth::user()->isAdmin())) {
+        if (!Auth::check() || (!Auth::user()->isLeader() && !Auth::user()->isAdmin() && !Auth::user()->isSuperAdmin())) {
             abort(403, 'Leader or Admin access required.');
         }
 
