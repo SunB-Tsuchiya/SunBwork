@@ -87,7 +87,7 @@ const removeRole = (depIdx, assignmentIdx) => {
                     <PrimaryButton type="submit" :disabled="form.processing">
                         更新
                     </PrimaryButton>
-                    <Link :href="route('admin.companies.index')" class="ml-4 text-gray-600 hover:underline">戻る</Link>
+                    <Link v-if="typeof route === 'function' && route().has('admin.companies.index')" :href="route('admin.companies.index')" class="ml-4 text-gray-600 hover:underline">戻る</Link>
                 </div>
             </form>
         </div>

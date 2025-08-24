@@ -35,12 +35,24 @@ class CompanyController extends Controller
     // 新規作成フォーム
     public function create()
     {
+        $user = Auth::user();
+        // 管理者側コントローラに残る作成フォームは superadmin のみ許可
+        if (!($user && $user->user_role === 'superadmin')) {
+            abort(403);
+        }
+
         return Inertia::render('Admin/Companies/Create');
     }
 
     // 登録
     public function store(Request $request)
     {
+        $user = Auth::user();
+        // Admin 側経由での会社作成は許可しない（superadmin のみ）
+        if (!($user && $user->user_role === 'superadmin')) {
+            abort(403);
+        }
+
         $request->validate([
             'name' => 'required|string|max:255',
         ]);
@@ -109,9 +121,10 @@ class CompanyController extends Controller
     public function destroy(Company $company)
     {
     $user = Auth::user();
-    if (!($user && $user->user_role === 'superadmin') && $user->company_id !== $company->id) {
+    // 会社の削除は superadmin のみ許可（admin は自社の削除も不可）
+    if (!($user && $user->user_role === 'superadmin')) {
             abort(403);
-        }
+    }
 
         $company->delete();
         return redirect()->route('admin.companies.index');

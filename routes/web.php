@@ -104,8 +104,13 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     // ユーザー管理
     Route::resource('users', App\Http\Controllers\Admin\UserController::class);
 
+    // クライアント管理（Admin用）: 管理者はクライアントの CRUD を扱える（作成/編集等）
+    Route::resource('clients', App\Http\Controllers\ClientController::class)->only(['index', 'create', 'store', 'edit', 'update']);
+
     // 会社管理 (会社作成/管理は SuperAdmin 側に一本化しました)
-    // Route::resource('companies', App\Http\Controllers\Admin\CompanyController::class);
+        // 会社管理: 管理者は自社の閲覧・編集のみ許可 (作成/削除はできない)
+        Route::resource('companies', App\Http\Controllers\Admin\CompanyController::class)
+            ->only(['index', 'show', 'edit', 'update']);
 
     // チーム管理
     Route::resource('teams', App\Http\Controllers\Admin\TeamController::class);
@@ -124,7 +129,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 
 
 // SuperAdmin Routes (SuperAdminのみアクセス可能)
-Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', \App\Http\Middleware\SuperadminMiddleware::class])
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'superadmin'])
     ->prefix('superadmin')
     ->name('superadmin.')
     ->group(function () {
@@ -134,10 +139,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     // ユーザー管理
     // existing users resource (general)
     Route::resource('users', App\Http\Controllers\SuperAdmin\UserController::class);
-    // adminusers: superadmin が管理する "admin" ユーザー用 CRUD
-    Route::resource('adminusers', App\Http\Controllers\SuperAdmin\AdminUserController::class);
-
-    // スーパ管理者向け: 管理者ユーザー (adminusers)
+    // adminusers: superadmin が管理する "admin" ユーザー用 CRUD (単一定義)
     Route::resource('adminusers', App\Http\Controllers\SuperAdmin\AdminUserController::class);
 
     // CSV routes for adminusers
@@ -165,13 +167,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::resource('clients', App\Http\Controllers\ClientController::class)->only(['index', 'create', 'store', 'edit', 'update']);
     });
 
-// クライアント管理（Admin用）
-Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'admin'])
-    ->prefix('admin')
-    ->name('admin.')
-    ->group(function () {
-        Route::resource('clients', App\Http\Controllers\ClientController::class)->only(['index', 'create', 'store', 'edit', 'update']);
-    });
+    // クライアント管理（Admin用）は上の admin グループに統合済み（重複削除）
 // Coordinator Routes (AdminとCoordinatorのみアクセス可能)
 Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'coordinator'])
     ->prefix('coordinator')

@@ -166,8 +166,15 @@ class UserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|lowercase|email|max:255|unique:users,email,' . $user->id,
             'assignment' => 'required|string|max:255',
-            'user_role' => 'required|in:admin,leader,coordinator, user',
+            'user_role' => 'required|string',
         ]);
+
+        // 非 superadmin が user_role を 'admin' に変更できないようサーバー側でガード
+        $current = Auth::user();
+        if ($request->input('user_role') === 'admin' && (! $current || $current->user_role !== 'superadmin')) {
+            return redirect()->route('admin.users.index')
+                ->with('error', '管理者への昇格は許可されていません。');
+        }
 
         $user->update([
             'name' => $request->name,
@@ -189,6 +196,12 @@ class UserController extends Controller
         if ($user->id === Auth::id()) {
             return redirect()->route('admin.users.index')
                 ->with('error', '自分自身のアカウントは削除できません。');
+        }
+        // admin ユーザーの削除は superadmin のみ許可
+        $current = Auth::user();
+        if ($user->user_role === 'admin' && (! $current || $current->user_role !== 'superadmin')) {
+            return redirect()->route('admin.users.index')
+                ->with('error', '管理者ユーザーの削除は許可されていません。');
         }
 
         $user->delete();
