@@ -42,17 +42,11 @@ class ProjectJobController extends Controller
                 'client_id' => 'required|exists:clients,id',
                 'detail' => 'nullable|string',
             ]);
-            // detailはJSON形式で保存
-            if (isset($data['detail']) && is_string($data['detail'])) {
-                $data['detail'] = json_encode(['text' => $data['detail']]);
-            }
+            // detailはプレーンテキストで保存
             $job = ProjectJob::create($data);
-            // schedule未設定フラグのみ
-            $registerFlags = [];
-            if (is_null($job->schedule)) {
-                $registerFlags[] = 'schedule';
-            }
-            return redirect()->route('coordinator.project_jobs.index')
+            // 新規作成時はメンバー/スケジュール未設定のため案内を出す
+            $registerFlags = ['teammember', 'schedule'];
+            return redirect()->route('coordinator.project_jobs.show', $job->id)
                 ->with('jobid', $job->id)
                 ->with('register_flags', $registerFlags);
         } catch (\Illuminate\Validation\ValidationException $e) {
@@ -64,7 +58,29 @@ class ProjectJobController extends Controller
 
     public function show(ProjectJob $projectJob)
     {
-        return Inertia::render('Coordinator/ProjectJobs/Show', ['job' => $projectJob]);
+        $jobid = session('jobid');
+        $registerFlags = session('register_flags', []);
+        // reload projectJob with team members and their user relation
+        $projectJob->load(['teamMembers.user']);
+        $members = $projectJob->teamMembers->map(function ($m) {
+            return [
+                'id' => $m->id,
+                'user_id' => $m->user_id,
+                'user' => $m->user ? [
+                    'id' => $m->user->id,
+                    'name' => $m->user->name,
+                    'department_id' => $m->user->department_id,
+                    'assignment_id' => $m->user->assignment_id,
+                ] : null,
+            ];
+        });
+
+        return Inertia::render('Coordinator/ProjectJobs/Show', [
+            'job' => $projectJob,
+            'members' => $members,
+            'jobid' => $jobid,
+            'registerFlags' => $registerFlags,
+        ]);
     }
 
     public function edit(ProjectJob $projectJob)
@@ -83,10 +99,7 @@ class ProjectJobController extends Controller
                 'detail' => 'nullable|string',
                 'schedule' => 'nullable|array',
             ]);
-            // detailはJSON形式で保存
-            if (isset($data['detail']) && is_string($data['detail'])) {
-                $data['detail'] = json_encode(['text' => $data['detail']]);
-            }
+            // detailはプレーンテキストで保存
             $projectJob->update($data);
             return redirect()->route('coordinator.project_jobs.index');
         } catch (\Illuminate\Validation\ValidationException $e) {
@@ -98,8 +111,8 @@ class ProjectJobController extends Controller
 
     public function destroy(ProjectJob $projectJob)
     {
-    $projectJob->delete();
-    // Inertiaリダイレクト時にフロントでリロードを促すため、フラッシュメッセージを渡す
-    return redirect()->route('coordinator.project_jobs.index')->with('reload', true);
+        $projectJob->delete();
+        // Inertiaリダイレクト時にフロントでリロードを促すため、フラッシュメッセージを渡す
+        return redirect()->route('coordinator.project_jobs.index')->with('reload', true);
     }
 }

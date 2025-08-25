@@ -7,252 +7,191 @@
 -->
 
 <template>
-  <AppLayout title="プロジェクトジョブ作成">
-    <template #header>
-      <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-        【進行管理】{{ $page.props.auth.user.name || 'ユーザー' }}さんのページ
-      </h2>
-    </template>
-    <div class="max-w-2xl mx-auto p-6 bg-white rounded shadow">
-      <h1 class="text-2xl font-bold mb-6">プロジェクトジョブ作成</h1>
-      <form @submit.prevent="submit">
-        <div class="mb-4">
-          <label class="block mb-1 font-semibold">伝票番号</label>
-          <input v-model="form.jobcode" type="text" class="w-full border rounded px-3 py-2" required />
-        </div>
-        <div class="mb-4">
-          <label class="block mb-1 font-semibold">案件タイトル</label>
-          <input v-model="form.name" type="text" class="w-full border rounded px-3 py-2" required />
-        </div>
-        <div class="mb-4">
-          <label class="block mb-1 font-semibold">担当ユーザーID</label>
-          <input v-model="form.user_id" type="number" class="w-full border rounded px-3 py-2 bg-gray-100" readonly />
-        </div>
-        <div class="mb-4">
-          <label class="block mb-1 font-semibold">クライアントID</label>
-          <div class="flex gap-2 items-center">
-            <input v-model="form.client_id" type="number" class="w-32 border rounded px-3 py-2 bg-gray-100" readonly />
-            <button type="button" class="bg-blue-100 text-blue-700 px-3 py-2 rounded" @click="openClientModal">検索</button>
-          </div>
-        </div>
-        <div class="mb-4">
-          <label class="block mb-1 font-semibold">詳細</label>
-          <textarea v-model="form.detail" class="w-full border rounded px-3 py-2" rows="3"></textarea>
-        </div>
+    <AppLayout title="プロジェクトジョブ作成">
+        <template #header>
+            <h2 class="text-xl font-semibold leading-tight text-gray-800">【進行管理】{{ $page.props.auth.user.name || 'ユーザー' }}さんのページ</h2>
+        </template>
+        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
+            <h1 class="mb-6 text-2xl font-bold">プロジェクトジョブ作成</h1>
+            <div class="mb-4">
+                <table class="min-w-full table-auto border">
+                    <tbody>
+                        <tr class="border-b">
+                            <th class="w-40 px-4 py-2 text-left">伝票番号</th>
+                            <td class="px-4 py-2">{{ job.jobcode || '-' }}</td>
+                        </tr>
+                        <tr class="border-b">
+                            <th class="px-4 py-2 text-left">案件タイトル</th>
+                            <td class="px-4 py-2">{{ job.name || '-' }}</td>
+                        </tr>
+                        <tr class="border-b">
+                            <th class="px-4 py-2 text-left">担当ユーザー</th>
+                            <td class="px-4 py-2">{{ job.user?.name || job.user_id || '-' }}</td>
+                        </tr>
+                        <tr class="border-b">
+                            <th class="px-4 py-2 text-left">クライアント</th>
+                            <td class="px-4 py-2">{{ job.client?.name || job.client_id || '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th class="px-4 py-2 text-left align-top">詳細</th>
+                            <td class="whitespace-pre-wrap px-4 py-2">
+                                {{ job.detail ? (typeof job.detail === 'string' ? job.detail : JSON.stringify(job.detail)) : '-' }}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
 
-        <!-- スケジュール設定 -->
-        <div class="mb-4">
-          <h3 class="font-semibold mb-1">スケジュール設定</h3>
-          <div class="flex items-center gap-4">
-            <div
-              :class="[
-                'status-box px-4 py-2 rounded w-32',
-                form.schedule ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-500'
-              ]"
-            >
-              {{ form.schedule ? '決定済み' : '未設定' }}
+                <div class="mt-6">
+                    <div class="mb-4">
+                        <h3 class="mb-1 font-semibold">スケジュール設定</h3>
+                        <div class="flex items-center gap-4">
+                            <div
+                                :class="[
+                                    'status-box w-32 rounded px-4 py-2',
+                                    job.schedule ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-500',
+                                ]"
+                            >
+                                {{ job.schedule ? '決定済み' : '未設定' }}
+                            </div>
+                            <button
+                                type="button"
+                                :class="['rounded px-4 py-2', job.schedule ? 'bg-gray-200 text-gray-800' : 'bg-blue-100 text-blue-700']"
+                                @click="goSchedule"
+                            >
+                                {{ job.schedule ? 'スケジュール詳細' : 'スケジュール登録' }}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <h3 class="mb-1 font-semibold">メンバー選定</h3>
+                        <div class="flex items-center gap-4">
+                            <div
+                                :class="[
+                                    'status-box w-32 rounded px-4 py-2',
+                                    hasMembers ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-500',
+                                ]"
+                            >
+                                {{ hasMembers ? '決定済み' : '未設定' }}
+                            </div>
+                            <button
+                                type="button"
+                                :class="['rounded px-4 py-2', hasMembers ? 'bg-gray-200 text-gray-800' : 'bg-green-100 text-green-700']"
+                                @click="hasMembers ? openMembersModal() : goProjectTeammember()"
+                            >
+                                {{ hasMembers ? 'メンバー詳細' : 'メンバー登録' }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex gap-4">
+                    <button type="button" class="rounded bg-yellow-600 px-6 py-2 text-white hover:bg-yellow-700" @click="goEdit">編集</button>
+                    <button type="button" class="rounded bg-gray-300 px-4 py-2 text-gray-800 hover:bg-gray-400" @click="backToIndex">
+                        一覧に戻る
+                    </button>
+                </div>
             </div>
-            <button type="button" class="bg-blue-100 text-blue-700 px-4 py-2 rounded" @click="goSchedule">スケジュール設定</button>
-          </div>
-        <!-- メンバー選定 -->
-          </div> 
-        <div class="mb-4">
-          <h3 class="font-semibold mb-1">メンバー選定</h3>
-          <div class="flex items-center gap-4">
-            <div
-              class="status-box px-4 py-2 rounded w-32"
-              :class="form.teammember ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-500'"
-            >
-              {{ form.teammember ? '決定済み' : '未設定' }}
+
+            <!-- (表示専用) クライアント検索モーダルは非表示 -->
+
+            <!-- Members modal -->
+            <div v-if="showMembersModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+                <div class="w-3/4 max-w-3xl rounded bg-white p-6">
+                    <h3 class="mb-4 text-lg font-semibold">メンバー一覧</h3>
+                    <div class="max-h-72 overflow-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-2 text-left text-xs font-medium text-gray-500">ID</th>
+                                    <th class="px-6 py-2 text-left text-xs font-medium text-gray-500">名前</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200 bg-white">
+                                <tr v-for="m in members" :key="m.id">
+                                    <td class="px-6 py-2 text-sm text-gray-700">{{ m.user ? m.user.id : m.user_id }}</td>
+                                    <td class="px-6 py-2 text-sm font-medium text-gray-900">{{ m.user ? m.user.name : '（ユーザー情報なし）' }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="mt-4 flex justify-end space-x-2">
+                        <button class="rounded bg-gray-200 px-4 py-2" @click="closeMembersModal">閉じる</button>
+                        <button class="rounded bg-blue-600 px-4 py-2 text-white" @click="editMembers">編集</button>
+                    </div>
+                </div>
             </div>
-            <button type="button" class="bg-green-100 text-green-700 px-4 py-2 rounded" @click="goProjectTeammember">チームメンバー設定</button>
-          </div>
-        </div>  
-        <div class="mt-6 flex gap-4">
-          <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700">作成</button>
-          <button type="button" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600" @click="clearFormAndRoute">情報をクリアする</button>
         </div>
-      </form>
-
-      <!-- クライアント検索モーダル -->
-      <DialogModal :show="showClientModal" @close="closeClientModal">
-        <template #title>クライアント検索</template>
-        <template #content>
-          <div class="mb-2 flex gap-4">
-            <label><input type="radio" value="id" v-model="clientSearchMode" /> IDで検索</label>
-            <label><input type="radio" value="name" v-model="clientSearchMode" /> 名前で検索</label>
-            <label><input type="radio" value="list" v-model="clientSearchMode" /> 一覧から検索</label>
-          </div>
-          <div v-if="clientSearchMode === 'id'" class="mb-2">
-            <input v-model="clientSearch.id" type="number" placeholder="IDを入力" class="border rounded px-2 py-1" />
-            <button class="ml-2 bg-blue-500 text-white px-2 py-1 rounded" @click="searchClientById">検索</button>
-          </div>
-          <div v-if="clientSearchMode === 'name'" class="mb-2">
-            <input v-model="clientSearch.name" type="text" placeholder="名前を入力" class="border rounded px-2 py-1" />
-            <button class="ml-2 bg-blue-500 text-white px-2 py-1 rounded" @click="searchClientByName">検索</button>
-          </div>
-          <div v-if="clientSearchMode === 'list'">
-            <button class="mb-2 bg-gray-200 px-2 py-1 rounded" @click="openClientListModal">一覧を表示</button>
-          </div>
-          <div v-if="clientSearchResult">
-            <div class="mt-2">検索結果: <span class="font-bold">{{ clientSearchResult.id }} {{ clientSearchResult.name }}</span>
-              <button class="ml-2 bg-green-500 text-white px-2 py-1 rounded" @click="selectClient(clientSearchResult)">選択</button>
-            </div>
-          </div>
-        </template>
-        <template #footer>
-          <button class="bg-gray-300 px-4 py-2 rounded" @click="closeClientModal">閉じる</button>
-        </template>
-      </DialogModal>
-
-      <!-- クライアント一覧モーダル -->
-      <DialogModal :show="showClientListModal" @close="closeClientListModal">
-        <template #title>クライアント一覧</template>
-        <template #content>
-          <table class="min-w-full">
-            <thead>
-              <tr><th>ID</th><th>会社名</th></tr>
-            </thead>
-            <tbody>
-              <tr v-for="client in clientList" :key="client.id" @click="selectClient(client)" class="hover:bg-blue-100 cursor-pointer">
-                <td>{{ client.id }}</td>
-                <td>{{ client.name }}</td>
-              </tr>
-            </tbody>
-          </table>
-          <div v-if="clientList.length === 0" class="text-gray-500 py-4">クライアントがありません</div>
-        </template>
-        <template #footer>
-          <button class="bg-gray-300 px-4 py-2 rounded" @click="closeClientListModal">閉じる</button>
-        </template>
-      </DialogModal>
-    </div>
-  </AppLayout>
+    </AppLayout>
 </template>
 
 <script setup>
-
 import AppLayout from '@/layouts/AppLayout.vue';
-import { ref, onMounted, watch } from 'vue';
-import { useForm, router, usePage } from '@inertiajs/vue3';
-import DialogModal from '@/Components/DialogModal.vue';
+import { router, usePage } from '@inertiajs/vue3';
+import { computed, onMounted, ref } from 'vue';
 
 const page = usePage();
-const form = useForm({
-  jobcode: '',
-  name: '',
-  user_id: page.props.auth.user.id,
-  client_id: '',
-  detail: '',
-  teammember: null,
-  schedule: null,
-});
+const job = page.props.job || {};
+const members = page.props.members || [];
+const showMembersModal = ref(false);
+const hasMembers = computed(() => Array.isArray(members) && members.length > 0);
 
-// 受け取ったselected_membersがあればform.teammemberにセット
+function openMembersModal() {
+    showMembersModal.value = true;
+}
+
+function closeMembersModal() {
+    showMembersModal.value = false;
+}
+
 onMounted(() => {
-  console.log('[DEBUG] route().params:', route().params);
-  console.log('[DEBUG] form 初期値:', JSON.parse(JSON.stringify(form)));
-  console.log('[DEBUG] page.props:', page.props);
-  // params から form へ値をセット
-  if (route().params) {
-    Object.keys(form).forEach(key => {
-      if (route().params[key] !== undefined && route().params[key] !== null) {
-        form[key] = route().params[key];
-      } else if (typeof form[key] === 'string') {
-        form[key] = '';
-      }
-    });
-  }
-  if (route().params.selected_members) {
-    form.teammember = route().params.selected_members;
-  }
-  // ハードリロード時は一時情報のみクリア（router.replaceはしない）
-  if (performance && performance.getEntriesByType('navigation')[0]?.type === 'reload') {
-    Object.keys(form).forEach(key => {
-      form[key] = (key === 'user_id') ? page.props.auth.user.id : '';
-    });
-    form.teammember = null;
-  }
+    const flags = page.props.registerFlags || [];
+    const createdJobId = page.props.jobid || null;
+    if (flags.length && createdJobId) {
+        if (flags.includes('teammember')) {
+            if (confirm('プロジェクトを登録しました。続いてメンバーを登録しますか？')) {
+                const url = route('coordinator.project_team_members.create') + '?project_job_id=' + createdJobId;
+                router.visit(url);
+                return;
+            }
+        }
+    }
 });
-
-// クライアント検索用
-const showClientModal = ref(false);
-const showClientListModal = ref(false);
-const clientSearchMode = ref('id');
-const clientSearch = ref({ id: '', name: '' });
-const clientSearchResult = ref(null);
-const clientList = ref([]);
-
-function openClientModal() {
-  // クライアント一覧を即取得して空ならアラート
-  fetch('/api/clients')
-    .then(res => res.json())
-    .then(data => {
-      if (data.length === 0) {
-        alert('クライアントが登録されていません。\n進行管理の権限ではクライアント作成はできません。\nチームリーダーに作成を依頼してください。');
-      } else {
-        showClientModal.value = true;
-        clientSearchResult.value = null;
-      }
-    });
-}
-function closeClientModal() {
-  showClientModal.value = false;
-}
-function openClientListModal() {
-  // クライアント一覧取得APIを呼ぶ想定
-  fetch('/api/clients')
-    .then(res => res.json())
-    .then(data => {
-      clientList.value = data;
-      showClientListModal.value = true;
-    });
-}
-function closeClientListModal() {
-  showClientListModal.value = false;
-}
-function searchClientById() {
-  if (!clientSearch.value.id) return;
-  fetch(`/api/clients/${clientSearch.value.id}`)
-    .then(res => res.ok ? res.json() : null)
-    .then(data => { clientSearchResult.value = data; });
-}
-function searchClientByName() {
-  if (!clientSearch.value.name) return;
-  fetch(`/api/clients?name=${encodeURIComponent(clientSearch.value.name)}`)
-    .then(res => res.ok ? res.json() : null)
-    .then(data => { clientSearchResult.value = data && data.length ? data[0] : null; });
-}
-function selectClient(client) {
-  form.client_id = client.id;
-  closeClientModal();
-  closeClientListModal();
-}
-
-function submit() {
-  form.post(route('coordinator.project_jobs.store'));
-}
 
 function goSchedule() {
-  router.visit(route('coordinator.project_jobs.schedule'));
-}
-function goProjectTeammember() {
-  router.visit(route('coordinator.project_team_members.create'), {
-    data: { ...form },
-    preserveState: true,
-    preserveScroll: true,
-  });
+    const id = job.id || null;
+    if (id) router.visit(route('coordinator.project_jobs.edit', { projectJob: id }));
 }
 
-// 情報をクリアするボタンのクリック処理
-function clearFormAndRoute() {
-  // ルートパラメータをクリアして再遷移
-  router.replace(route('coordinator.project_jobs.create'));
-  // フォームも初期化
-  Object.keys(form).forEach(key => {
-    form[key] = (key === 'user_id') ? page.props.auth.user.id : '';
-  });
-  form.teammember = null;
+function goProjectTeammember() {
+    const id = job.id || null;
+    if (id) {
+        const url = route('coordinator.project_team_members.create') + '?project_job_id=' + id;
+        router.visit(url);
+    } else {
+        router.visit(route('coordinator.project_team_members.create'));
+    }
+}
+
+function goEdit() {
+    const id = job.id || null;
+    if (id) router.visit(route('coordinator.project_jobs.edit', { projectJob: id }));
+}
+
+function backToIndex() {
+    router.visit(route('coordinator.project_jobs.index'));
+}
+
+function editMembers() {
+    // Gather selected user ids from members prop
+    const selectedIds = members.filter((m) => m.user).map((m) => m.user.id);
+    const id = job.id || null;
+    let url = route('coordinator.project_team_members.create');
+    const params = [];
+    if (id) params.push('project_job_id=' + encodeURIComponent(id));
+    if (selectedIds.length) params.push('selected_user_ids=' + encodeURIComponent(selectedIds.join(',')));
+    if (params.length) url += '?' + params.join('&');
+    router.visit(url);
 }
 </script>
 

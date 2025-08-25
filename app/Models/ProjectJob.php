@@ -19,7 +19,6 @@ class ProjectJob extends Model
     ];
 
     protected $casts = [
-        'detail' => 'array',
         'schedule' => 'array',
     ];
 
@@ -31,5 +30,12 @@ class ProjectJob extends Model
     public function client()
     {
         return $this->belongsTo(Client::class);
+    }
+
+    // ProjectTeamMembers relation
+    public function teamMembers()
+    {
+        // eager-load the user relation for display convenience
+        return $this->hasMany(ProjectTeamMember::class, 'project_job_id');
     }
 }

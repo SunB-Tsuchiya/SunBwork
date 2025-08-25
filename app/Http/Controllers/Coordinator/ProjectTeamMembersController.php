@@ -18,7 +18,7 @@ class ProjectTeamMembersController extends Controller
 {
     public function store(StoreProjectTeamMembersRequest $request)
     {
-        
+
         $projectJobId = $request->input('project_job_id');
         $userIds = $request->input('user_ids', []);
         try {
@@ -54,7 +54,7 @@ class ProjectTeamMembersController extends Controller
         $members = User::orderBy('created_at', 'desc')->with(['department', 'assignment'])->get();
         $departments = Department::all();
         $assignments = Assignment::all();
-    $user = Auth::user();
+        $user = Auth::user();
 
         return Inertia::render('Coordinator/ProjectTeamMembers/Index', [
             'members' => $members,
@@ -68,13 +68,24 @@ class ProjectTeamMembersController extends Controller
         $members = User::orderBy('created_at', 'desc')->with(['department', 'assignment'])->get();
         $departments = Department::all();
         $assignments = Assignment::all();
-    $user = Auth::user();
+        $user = Auth::user();
+
+        // Allow optional project_job_id to be passed via querystring from previous step
+        $projectJobId = request()->query('project_job_id');
+
+        // If project job id provided, load existing team member user_ids for pre-selection
+        $selectedMemberIds = [];
+        if ($projectJobId) {
+            $selectedMemberIds = ProjectTeamMember::where('project_job_id', $projectJobId)->pluck('user_id')->map(fn($v) => (int)$v)->all();
+        }
 
         return Inertia::render('Coordinator/ProjectTeamMembers/Create', [
             'members' => $members,
             'departments' => $departments,
             'assignments' => $assignments,
             'user' => $user,
+            'project_job_id' => $projectJobId,
+            'selected_member_ids' => $selectedMemberIds,
         ]);
     }
 }
