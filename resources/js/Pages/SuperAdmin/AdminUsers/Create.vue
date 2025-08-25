@@ -7,7 +7,7 @@ import SecondaryButton from '@/Components/SecondaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import Checkbox from '@/Components/Checkbox.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import AdminNavigationTabs from '@/Components/AdminNavigationTabs.vue';
+import SuperAdminNavigationTabs from '@/Components/Tabs/SuperAdminNavigationTabs.vue';
 import { ref, computed, watch } from 'vue';
 
 // props: companies（親から渡す）
@@ -26,7 +26,7 @@ const form = useForm({
     company_id: '',
     department_id: '',
     assignment_id: '', // assignment_idで統一
-    user_role: 'user',
+    user_role: 'admin',
     terms: false,
 });
 
@@ -137,11 +137,9 @@ const availableAssignments = computed(() => {
     return department.assignments.filter(assignment => assignment.active);
 });
 
+// この画面は superadmin が admin を作るための画面なので選べる権限は admin のみ
 const userAssignmentOptions = [
     { value: 'admin', label: '管理者', description: '全ての機能にアクセス可能' },
-    { value: 'leader', label: 'リーダー', description: 'コンテンツ管理とユーザー機能にアクセス可能' },
-    { value: 'coordinator', label: '進行管理', description: 'タスク管理とユーザー機能にアクセス可能' },
-    { value: 'user', label: 'ユーザー', description: '基本機能のみアクセス可能' }
 ];
 
 const onCompanyChange = () => {
@@ -188,14 +186,14 @@ const submit = () => {
 </script>
 
 <template>
-    <AppLayout title="新規ユーザー登録">
+    <AppLayout title="新規Adminユーザー登録">
         <template #header>
             <div class="flex items-center justify-between">
                 <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                    新規ユーザー登録
+                    新規Adminユーザー登録
                 </h2>
                 <Link :href="route('superadmin.adminusers.index')" class="text-gray-600 hover:text-gray-900">
-                    ← ユーザー一覧に戻る
+                    ← Adminユーザー一覧に戻る
                 </Link>
             </div>
         </template>
@@ -204,10 +202,10 @@ const submit = () => {
             <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
 
                 <!-- ナビゲーションタブ -->
-                <AdminNavigationTabs active="users" />
+                <SuperAdminNavigationTabs active="users" />
 
                 <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg p-6 mb-8">
-                    <h3 class="text-lg font-medium text-blue-900 mb-2">CSV一括登録</h3>
+                    <!-- <h3 class="text-lg font-medium text-blue-900 mb-2">CSV一括登録</h3>
                     <p class="text-sm text-blue-700 mb-4">
                         CSVファイルを使用して複数のユーザーを一度に登録できます。
                     </p>
@@ -216,16 +214,16 @@ const submit = () => {
                         class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 active:bg-blue-900 focus:outline-none focus:border-blue-900 focus:ring ring-blue-300 disabled:opacity-25 transition ease-in-out duration-150"
                     >
                         📄 CSVファイルをアップロード
-                    </Link>
+                    </Link> -->
                     
-                <div class="relative mb-8">
+                <!-- <div class="relative mb-8">
                     <div class="absolute inset-0 flex items-center">
                         <div class="w-full border-t border-gray-300"></div>
                     </div>
                     <div class="relative flex justify-center text-sm">
                         <span class="px-2 bg-white text-gray-500">または個別に登録</span>
                     </div>
-                </div>
+                </div> -->
 
                 <!-- Register.vueと同じフォーム構成 -->
                 <form @submit.prevent="submit">
@@ -308,9 +306,9 @@ const submit = () => {
                             @change="onDepartmentChange"
                             :disabled="!form.company_id"
                             class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
-                            required
                         >
-                            <option value="">-- 部署を選択してください --</option>
+                            <option value="">-- なし（未設定） --</option>
+                            <option value="--">-- 部署を選択してください --</option>
                             <option v-for="department in selectedCompanyDepartments" :key="department.id" :value="department.id">
                                 {{ department.name }}
                             </option>
@@ -325,9 +323,9 @@ const submit = () => {
                             v-model="form.assignment_id"
                             :disabled="!form.department_id"
                             class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
-                            required
                         >
-                            <option value="">-- 担当を選択してください --</option>
+                            <option value="">-- なし（未設定） --</option>
+                            <option value="--">-- 担当を選択してください --</option>
                             <option v-for="assignment in availableAssignments" :key="assignment.id" :value="assignment.id">
                                 {{ assignment.name }}
                             </option>

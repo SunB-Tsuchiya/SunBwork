@@ -59,7 +59,8 @@ class AdminUserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|lowercase|email|max:255|unique:users|email',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
-            'assignment_id' => 'required|exists:assignments,id',
+            // 部署・担当は "なし" を許容するため nullable にする
+            'assignment_id' => 'nullable|exists:assignments,id',
             'user_role' => [
                 'required',
                 function($attribute, $value, $fail) {
@@ -71,7 +72,13 @@ class AdminUserController extends Controller
             ],
         ]);
 
-        $companyTeam = Team::where('company_id', $request->company_id)
+    // 空文字が送られてきた場合は null に正規化
+    $departmentId = $request->input('department_id');
+    $assignmentId = $request->input('assignment_id');
+    if ($departmentId === '') $departmentId = null;
+    if ($assignmentId === '') $assignmentId = null;
+
+    $companyTeam = Team::where('company_id', $request->company_id)
             ->where('team_type', 'company')
             ->first();
         $departmentTeam = Team::where('department_id', $request->department_id)
@@ -82,8 +89,8 @@ class AdminUserController extends Controller
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'company_id' => $request->company_id,
-            'department_id' => $request->department_id,
-            'assignment_id' => $request->assignment_id,
+            'department_id' => $departmentId,
+            'assignment_id' => $assignmentId,
             'current_team_id' => $request->company_id,
             'user_role' => $request->user_role,
             'email_verified_at' => now(),

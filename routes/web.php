@@ -76,7 +76,11 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
 
     // イベント機能（作成、保存、表示、編集、更新）
     Route::resource('events', App\Http\Controllers\EventController::class)->only([
-        'create', 'store', 'show', 'edit', 'update'
+        'create',
+        'store',
+        'show',
+        'edit',
+        'update'
     ]);
 
     // チャットルーム作成
@@ -101,30 +105,30 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 
         Route::post('users/csv/store', [App\Http\Controllers\Admin\UserController::class, 'csvStore'])->name('users.csv.store');
 
-    // ユーザー管理
-    Route::resource('users', App\Http\Controllers\Admin\UserController::class);
+        // ユーザー管理
+        Route::resource('users', App\Http\Controllers\Admin\UserController::class);
 
-    // クライアント管理（Admin用）: 管理者はクライアントの CRUD を扱える（作成/編集等）
-    Route::resource('clients', App\Http\Controllers\ClientController::class)->only(['index', 'create', 'store', 'edit', 'update']);
+        // クライアント管理（Admin用）: 管理者はクライアントの CRUD を扱える（作成/編集等）
+        Route::resource('clients', App\Http\Controllers\ClientController::class)->only(['index', 'create', 'store', 'edit', 'update']);
 
-    // 会社管理 (会社作成/管理は SuperAdmin 側に一本化しました)
+        // 会社管理 (会社作成/管理は SuperAdmin 側に一本化しました)
         // 会社管理: 管理者は自社の閲覧・編集のみ許可 (作成/削除はできない)
         Route::resource('companies', App\Http\Controllers\Admin\CompanyController::class)
             ->only(['index', 'show', 'edit', 'update']);
 
-    // チーム管理
-    Route::resource('teams', App\Http\Controllers\Admin\TeamController::class);
-    // AI settings admin
-    Route::get('/ai', [\App\Http\Controllers\Admin\AiSettingController::class, 'index'])->name('ai.index');
-    Route::get('/ai/create', [\App\Http\Controllers\Admin\AiSettingController::class, 'create'])->name('ai.create');
-    Route::post('/ai', [\App\Http\Controllers\Admin\AiSettingController::class, 'store'])->name('ai.store');
-    Route::get('/ai/{id}/edit', [\App\Http\Controllers\Admin\AiSettingController::class, 'edit'])->name('ai.edit');
-    Route::put('/ai/{id}', [\App\Http\Controllers\Admin\AiSettingController::class, 'update'])->name('ai.update');
-    // AI presets management
-    Route::get('/ai-presets', [\App\Http\Controllers\Admin\AiPresetsController::class, 'index'])->name('ai.presets.index');
-    Route::post('/ai-presets', [\App\Http\Controllers\Admin\AiPresetsController::class, 'store'])->name('ai.presets.store');
-    Route::put('/ai-presets/{ai_preset}', [\App\Http\Controllers\Admin\AiPresetsController::class, 'update'])->name('ai.presets.update');
-    Route::delete('/ai-presets/{ai_preset}', [\App\Http\Controllers\Admin\AiPresetsController::class, 'destroy'])->name('ai.presets.destroy');
+        // チーム管理
+        Route::resource('teams', App\Http\Controllers\Admin\TeamController::class);
+        // AI settings admin
+        Route::get('/ai', [\App\Http\Controllers\Admin\AiSettingController::class, 'index'])->name('ai.index');
+        Route::get('/ai/create', [\App\Http\Controllers\Admin\AiSettingController::class, 'create'])->name('ai.create');
+        Route::post('/ai', [\App\Http\Controllers\Admin\AiSettingController::class, 'store'])->name('ai.store');
+        Route::get('/ai/{id}/edit', [\App\Http\Controllers\Admin\AiSettingController::class, 'edit'])->name('ai.edit');
+        Route::put('/ai/{id}', [\App\Http\Controllers\Admin\AiSettingController::class, 'update'])->name('ai.update');
+        // AI presets management
+        Route::get('/ai-presets', [\App\Http\Controllers\Admin\AiPresetsController::class, 'index'])->name('ai.presets.index');
+        Route::post('/ai-presets', [\App\Http\Controllers\Admin\AiPresetsController::class, 'store'])->name('ai.presets.store');
+        Route::put('/ai-presets/{ai_preset}', [\App\Http\Controllers\Admin\AiPresetsController::class, 'update'])->name('ai.presets.update');
+        Route::delete('/ai-presets/{ai_preset}', [\App\Http\Controllers\Admin\AiPresetsController::class, 'destroy'])->name('ai.presets.destroy');
     });
 
 
@@ -136,22 +140,34 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         // Ziggy用: 明示的にsuperadmin.dashboardルートを追加
         Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
 
-    // ユーザー管理
-    // existing users resource (general)
-    Route::resource('users', App\Http\Controllers\SuperAdmin\UserController::class);
-    // adminusers: superadmin が管理する "admin" ユーザー用 CRUD (単一定義)
-    Route::resource('adminusers', App\Http\Controllers\SuperAdmin\AdminUserController::class);
+        // ユーザー管理
+        // existing users resource (general)
+        Route::resource('users', App\Http\Controllers\SuperAdmin\UserController::class);
+        // adminusers: superadmin が管理する "admin" ユーザー用 CRUD (単一定義)
+        Route::resource('adminusers', App\Http\Controllers\SuperAdmin\AdminUserController::class);
 
-    // CSV routes for adminusers
-    Route::get('adminusers/csv/upload', [App\Http\Controllers\SuperAdmin\AdminUserController::class, 'csvUpload'])->name('adminusers.csv.upload');
-    Route::post('adminusers/csv/preview', [App\Http\Controllers\SuperAdmin\AdminUserController::class, 'csvPreview'])->name('adminusers.csv.preview');
-    Route::post('adminusers/csv/store', [App\Http\Controllers\SuperAdmin\AdminUserController::class, 'csvStore'])->name('adminusers.csv.store');
+        // CSV routes for adminusers
+        Route::get('adminusers/csv/upload', [App\Http\Controllers\SuperAdmin\AdminUserController::class, 'csvUpload'])->name('adminusers.csv.upload');
+        Route::post('adminusers/csv/preview', [App\Http\Controllers\SuperAdmin\AdminUserController::class, 'csvPreview'])->name('adminusers.csv.preview');
+        Route::post('adminusers/csv/store', [App\Http\Controllers\SuperAdmin\AdminUserController::class, 'csvStore'])->name('adminusers.csv.store');
 
         // 会社管理
         Route::resource('companies', App\Http\Controllers\SuperAdmin\CompanyController::class);
 
         // チーム管理
         Route::resource('teams', App\Http\Controllers\SuperAdmin\TeamController::class);
+
+        // AI settings for SuperAdmin
+        Route::get('/ai', [\App\Http\Controllers\SuperAdmin\AiSettingController::class, 'index'])->name('ai.index');
+        Route::get('/ai/create', [\App\Http\Controllers\SuperAdmin\AiSettingController::class, 'create'])->name('ai.create');
+        Route::post('/ai', [\App\Http\Controllers\SuperAdmin\AiSettingController::class, 'store'])->name('ai.store');
+        Route::get('/ai/{id}/edit', [\App\Http\Controllers\SuperAdmin\AiSettingController::class, 'edit'])->name('ai.edit');
+        Route::put('/ai/{id}', [\App\Http\Controllers\SuperAdmin\AiSettingController::class, 'update'])->name('ai.update');
+        // AI presets management (SuperAdmin)
+        Route::get('/ai-presets', [\App\Http\Controllers\SuperAdmin\AiPresetsController::class, 'index'])->name('ai.presets.index');
+        Route::post('/ai-presets', [\App\Http\Controllers\SuperAdmin\AiPresetsController::class, 'store'])->name('ai.presets.store');
+        Route::put('/ai-presets/{ai_preset}', [\App\Http\Controllers\SuperAdmin\AiPresetsController::class, 'update'])->name('ai.presets.update');
+        Route::delete('/ai-presets/{ai_preset}', [\App\Http\Controllers\SuperAdmin\AiPresetsController::class, 'destroy'])->name('ai.presets.destroy');
     });
 
 
@@ -167,7 +183,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::resource('clients', App\Http\Controllers\ClientController::class)->only(['index', 'create', 'store', 'edit', 'update']);
     });
 
-    // クライアント管理（Admin用）は上の admin グループに統合済み（重複削除）
+// クライアント管理（Admin用）は上の admin グループに統合済み（重複削除）
 // Coordinator Routes (AdminとCoordinatorのみアクセス可能)
 Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'coordinator'])
     ->prefix('coordinator')
@@ -194,23 +210,23 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
             'destroy' => 'project_team_members.destroy',
         ]);
     });
-    
 
-    
+
+
 // デバッグ・テスト用ページのルート例
 // 今後も任意のVueページをテスト表示したい場合は、下記のようにInertia::renderでページ名を指定してください。
 // 例: /debug/create → resources/js/Pages/Diaries/CreateDebug.vue
 // 例: /debug/other  → resources/js/Pages/OtherDebug.vue
 
 
-Route::get('/debug/create', function() {
+Route::get('/debug/create', function () {
     return Inertia::render('Diaries/CreateDebug');
 })->name('debug.create');
 
 // --- デバッグ用API/認証チェックページ ---
 // /debug/api でAPI/認証の動作確認ができるVueページ（resources/js/Debug/ApiDebug.vue）
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::get('/debug/api', function() {
+    Route::get('/debug/api', function () {
         return Inertia::render('Debug/ApiDebug');
     })->name('debug.api');
 });

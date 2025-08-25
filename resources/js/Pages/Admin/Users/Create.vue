@@ -7,7 +7,7 @@ import SecondaryButton from '@/Components/SecondaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import Checkbox from '@/Components/Checkbox.vue';
 import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
-import AdminNavigationTabs from '@/Components/AdminNavigationTabs.vue';
+import AdminNavigationTabs from '@/Components/Tabs/AdminNavigationTabs.vue';
 import { ref, computed, watch } from 'vue';
 
 // props: companies（親から渡す）

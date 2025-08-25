@@ -3,7 +3,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import AdminNavigationTabs from '@/Components/AdminNavigationTabs.vue';
+import AdminNavigationTabs from '@/Components/Tabs/AdminNavigationTabs.vue';
 
 const props = defineProps({
     csvData: Array,

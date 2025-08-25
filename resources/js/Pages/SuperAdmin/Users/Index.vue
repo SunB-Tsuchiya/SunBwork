@@ -1,7 +1,7 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link } from '@inertiajs/vue3';
-import AdminNavigationTabs from '@/Components/AdminNavigationTabs.vue';
+import AdminNavigationTabs from '@/Components/Tabs/AdminNavigationTabs.vue';
 import { router } from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
 import { usePage } from '@inertiajs/vue3';

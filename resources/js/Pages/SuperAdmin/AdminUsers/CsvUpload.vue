@@ -5,7 +5,7 @@ import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import AdminNavigationTabs from '@/Components/AdminNavigationTabs.vue';
+import AdminNavigationTabs from '@/Components/Tabs/AdminNavigationTabs.vue';
 import { ref, computed } from 'vue';
 
 const props = defineProps({
