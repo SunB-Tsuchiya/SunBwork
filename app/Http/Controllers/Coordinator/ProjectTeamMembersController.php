@@ -73,19 +73,12 @@ class ProjectTeamMembersController extends Controller
         // Allow optional project_job_id to be passed via querystring from previous step
         $projectJobId = request()->query('project_job_id');
 
-        // If project job id provided, load existing team member user_ids for pre-selection
-        $selectedMemberIds = [];
-        if ($projectJobId) {
-            $selectedMemberIds = ProjectTeamMember::where('project_job_id', $projectJobId)->pluck('user_id')->map(fn($v) => (int)$v)->all();
-        }
-
         return Inertia::render('Coordinator/ProjectTeamMembers/Create', [
             'members' => $members,
             'departments' => $departments,
             'assignments' => $assignments,
             'user' => $user,
             'project_job_id' => $projectJobId,
-            'selected_member_ids' => $selectedMemberIds,
         ]);
     }
 }

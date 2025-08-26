@@ -200,6 +200,17 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::put('project_jobs/{projectJob}', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'update'])->name('project_jobs.update');
         Route::delete('project_jobs/{projectJob}', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'destroy'])->name('project_jobs.destroy');
 
+        // PoC: ProjectSchedules (Gantt)
+        Route::get('project_schedules', [App\Http\Controllers\Coordinator\ProjectSchedulesController::class, 'index'])->name('project_schedules.index');
+        Route::get('project_schedules/create', [App\Http\Controllers\Coordinator\ProjectSchedulesController::class, 'create'])->name('project_schedules.create');
+        Route::post('project_schedules', [App\Http\Controllers\Coordinator\ProjectSchedulesController::class, 'store'])->name('project_schedules.store');
+    Route::patch('project_schedules/{project_schedule}', [App\Http\Controllers\Coordinator\ProjectSchedulesController::class, 'update'])->name('project_schedules.update');
+        Route::post('project_schedules/bulk_update', [App\Http\Controllers\Coordinator\ProjectSchedulesController::class, 'bulkUpdate'])->name('project_schedules.bulk_update');
+
+        // Calendar PoC for ProjectSchedules
+        Route::get('project_schedules/calendar', [App\Http\Controllers\Coordinator\ProjectSchedulesCalendarController::class, 'index'])->name('project_schedules.calendar');
+        Route::patch('project_schedules/{project_schedule}/calendar', [App\Http\Controllers\Coordinator\ProjectSchedulesCalendarController::class, 'update'])->name('project_schedules.calendar.update');
+
         // Project_team_members リソースルート
         Route::resource('project_team_members', App\Http\Controllers\Coordinator\ProjectTeamMembersController::class)->names([
             'create' => 'project_team_members.create',
