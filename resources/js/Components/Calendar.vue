@@ -2,7 +2,7 @@
     <div class="calendar-container">
         <div class="mb-4 flex gap-4">
             <button @click="openEventModal" class="rounded bg-blue-600 px-4 py-2 text-white">予定作成</button>
-            <button @click="goToDiaryCreate" class="rounded bg-orange-500 px-4 py-2 text-white">日報作成</button>
+            <button @click="goToDiaryCreate" class="rounded bg-orange-500 px-4 py-2 text-white">{{ props.diaryLabel }}作成</button>
         </div>
         <FullCalendar :options="calendarOptions" :events="events" />
         <!-- 予定作成モーダル -->
@@ -70,11 +70,18 @@
                 <h2 class="mb-4 text-lg font-bold">{{ selectedDate }} の操作</h2>
                 <div class="flex flex-col gap-4">
                     <button @click="openEventModalFromSelect" class="rounded bg-blue-600 px-4 py-2 text-white">予定作成</button>
-                    <button @click="goToDiaryCreateFromSelect" class="rounded bg-orange-500 px-4 py-2 text-white">日報作成</button>
+                    <button v-if="selectedScheduleId === null" @click="goToDiaryCreateFromSelect" class="rounded bg-orange-500 px-4 py-2 text-white">
+                        日報作成
+                    </button>
+                    <button v-else @click="goToScheduleMemoCreate(selectedScheduleId)" class="rounded bg-green-600 px-4 py-2 text-white">
+                        メモ作成
+                    </button>
                     <button @click="showSelectModal = false" class="rounded bg-gray-300 px-4 py-2">キャンセル</button>
                 </div>
             </div>
         </div>
+
+        <!-- schedule-specific UI removed — this Calendar is personal-only -->
     </div>
 </template>
 
@@ -97,6 +104,10 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    diaryLabel: {
+        type: String,
+        default: '日報',
+    },
 });
 
 const showModal = ref(false);
@@ -117,6 +128,8 @@ const yyyy = today.getFullYear();
 const mm = String(today.getMonth() + 1).padStart(2, '0');
 const dd = String(today.getDate()).padStart(2, '0');
 const selectedDate = ref(`${yyyy}-${mm}-${dd}`);
+// personal-only calendar: no schedule scoping
+const selectedScheduleId = ref(null);
 
 const startHourSelectRef = ref(null);
 const endHourSelectRef = ref(null);
@@ -160,9 +173,13 @@ function handleDateSelect(selectionInfo) {
     // カレンダーで日付選択時に選択日を保持
     const dateStr = selectionInfo.startStr.split('T')[0];
     selectedDate.value = dateStr;
+    // reset schedule id when selecting a bare date - calendar can receive schedule context via props/events
+    selectedScheduleId.value = null;
     // 予定・日報作成選択モーダルを表示
     showSelectModal.value = true;
 }
+
+// project schedule flows removed from personal calendar
 
 // 日報がある日をイベントとして表示（タイトルは●アイコン）
 const events = ref([
@@ -175,7 +192,7 @@ const events = ref([
         const mm = String(d.getMonth() + 1).padStart(2, '0');
         const dd = String(d.getDate()).padStart(2, '0');
         return {
-            title: '● 日報',
+            title: `● ${props.diaryLabel}`,
             start: `${yyyy}-${mm}-${dd}`,
             allDay: true,
             color: '#f59e42',
@@ -318,41 +335,14 @@ const calendarOptions = computed(() => ({
                     };
                 }
                 console.log('eventResize送信データ', logPayload);
-                // If this is a ProjectSchedule (schedule_id), call coordinator endpoint
-                if (info.event.extendedProps.schedule_id || info.event.schedule_id) {
-                    const sid = info.event.extendedProps.schedule_id ?? info.event.schedule_id;
-                    // send date-only start/end if allDay, otherwise include times
-                    const payload = {};
-                    if (info.event.allDay) {
-                        // FullCalendar endStr is exclusive for allDay events; convert to inclusive
-                        const startDateOnly = (info.event.startStr || newStart.toISOString()).split('T')[0];
-                        let endDateOnly = info.event.endStr || (newEnd ? newEnd.toISOString() : null);
-                        if (endDateOnly) endDateOnly = endDateOnly.split('T')[0];
-                        let endInclusive = endDateOnly;
-                        if (endDateOnly) {
-                            const d = new Date(endDateOnly);
-                            d.setDate(d.getDate() - 1);
-                            endInclusive = d.toISOString().split('T')[0];
-                        } else {
-                            endInclusive = startDateOnly;
-                        }
-                        payload.start_date = startDateOnly;
-                        payload.end_date = endInclusive;
-                    } else {
-                        payload.start = newStart.toISOString();
-                        payload.end = newEnd ? newEnd.toISOString() : undefined;
-                    }
-                    // Use Ziggy route helper instead of hardcoded path
-                    await axios.patch(route('coordinator.project_schedules.calendar.update', { project_schedule: sid }), payload);
-                } else {
-                    await axios.put(`/events/${info.event.extendedProps.event_id}/calendar`, {
-                        date,
-                        startHour,
-                        startMinute,
-                        endHour,
-                        endMinute,
-                    });
-                }
+                // update personal event via events endpoint
+                await axios.put(`/events/${info.event.extendedProps.event_id}/calendar`, {
+                    date: displayStart,
+                    startHour: newStart ? String(newStart.getHours()).padStart(2, '0') : undefined,
+                    startMinute: newStart ? String(newStart.getMinutes()).padStart(2, '0') : undefined,
+                    endHour: newEnd ? String(newEnd.getHours()).padStart(2, '0') : undefined,
+                    endMinute: newEnd ? String(newEnd.getMinutes()).padStart(2, '0') : undefined,
+                });
                 alert('予定を更新しました');
             } catch (e) {
                 console.log('eventResize error:', e);
@@ -377,14 +367,46 @@ const calendarOptions = computed(() => ({
         if (info.event.extendedProps.event_id) {
             router.get(route('events.show', { event: info.event.extendedProps.event_id }));
         }
-        // ProjectSchedule click -> coordinator show
-        if (info.event.extendedProps.schedule_id || info.event.schedule_id) {
-            const sid = info.event.extendedProps.schedule_id ?? info.event.schedule_id;
-            router.get(route('coordinator.project_schedules.show', { project_schedule: sid }));
-        }
+        // project schedule clicks not handled by personal calendar
     },
     select: handleDateSelect,
 }));
+
+function goToScheduleShowFromAction() {
+    if (!selectedScheduleForAction.value) return;
+    showScheduleActionModal.value = false;
+    router.get(route('coordinator.project_schedules.show', { project_schedule: selectedScheduleForAction.value }));
+}
+
+function openMemoModalFromAction() {
+    if (!selectedScheduleForAction.value) return;
+    selectedScheduleIdForMemo.value = selectedScheduleForAction.value;
+    showScheduleActionModal.value = false;
+    showMemoModal.value = true;
+}
+
+async function submitScheduleMemo() {
+    if (!selectedScheduleIdForMemo.value) {
+        alert('スケジュールが選択されていません');
+        return;
+    }
+    if (!memoBody.value || memoBody.value.trim() === '') {
+        alert('メモの内容を入力してください');
+        return;
+    }
+    try {
+        await axios.post(route('coordinator.project_schedule_comments.store', { project_schedule: selectedScheduleIdForMemo.value }), {
+            body: memoBody.value,
+        });
+        showMemoModal.value = false;
+        memoBody.value = '';
+        // Optional: navigate back to schedule show to reflect new comment
+        router.get(route('coordinator.project_schedules.show', { project_schedule: selectedScheduleIdForMemo.value }));
+    } catch (e) {
+        console.error('submitScheduleMemo error', e);
+        alert('メモの保存に失敗しました');
+    }
+}
 
 const submitEvent = async () => {
     const start = `${form.value.date} ${form.value.startHour}:${form.value.startMinute}:00`;

@@ -230,7 +230,6 @@ composer require beyondcode/laravel-websockets
     - 理由: FullCalendar はカレンダー表示とドラッグ操作、リソースビュー・タイムグリッドなどの柔軟なビューを持ち、既存のカレンダー UI と親和性が高い。
     - 移行メモ: 既存 PoC 実装（`resources/js/Components/Calendar.vue`）は FullCalendar ベースの実装に合わせている。必要に応じて Gantt 表示が必須なら、FullCalendar と Gantt 表示の併用（または Syncfusion/dhtmlx の Gantt 導入）を検討する。
 
-
 ---
 
 必要なら次のアクションとして、PoC 用の Inertia ページテンプレートと最小マイグレーション（ProjectSchedules テーブルのみ）を自動で作成します。どちらを先に進めますか？

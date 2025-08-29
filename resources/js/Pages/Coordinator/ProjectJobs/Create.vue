@@ -59,6 +59,10 @@
                 <!-- メンバー・スケジュール登録は後続ステップで実装 -->
                 <div class="mt-6 flex gap-4">
                     <button type="submit" class="rounded bg-blue-600 px-6 py-2 text-white hover:bg-blue-700">作成</button>
+                    <!-- Optional: if this page was opened with ?project_job_id=..., allow direct open of schedule -->
+                    <button v-if="projectJobId" type="button" class="rounded bg-blue-100 px-4 py-2 text-blue-700" @click="goSchedule">
+                        スケジュール設定
+                    </button>
                     <!-- <button type="button" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600" @click="clearFormAndRoute">情報をクリアする</button> -->
                 </div>
             </form>
@@ -124,7 +128,7 @@
 <script setup>
 import DialogModal from '@/Components/DialogModal.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { useForm, usePage } from '@inertiajs/vue3';
+import { router, useForm, usePage } from '@inertiajs/vue3';
 import { ref, watch } from 'vue';
 
 const page = usePage();
@@ -250,6 +254,21 @@ function submit() {
             }
         },
     });
+}
+
+// If this page was opened with ?project_job_id=123, show a quick link to the calendar PoC
+const projectJobId = (() => {
+    try {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('project_job_id');
+    } catch (e) {
+        return null;
+    }
+})();
+
+function goSchedule() {
+    if (!projectJobId) return;
+    router.visit(route('coordinator.project_jobs.schedule', { projectJob: projectJobId }));
 }
 
 // スケジュール・メンバー登録は後続ステップで実装

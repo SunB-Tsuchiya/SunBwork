@@ -19,8 +19,8 @@ class ProjectScheduleCalendarIntegrationTest extends TestCase
     public function test_assigned_member_can_update_schedule()
     {
         // Arrange: create user, project_job (implicit id), schedule and assign user
-    // set as coordinator to ensure role-based allowance (debugging)
-    $user = User::factory()->create(['user_role' => 'coordinator']);
+        // set as coordinator to ensure role-based allowance (debugging)
+        $user = User::factory()->create(['user_role' => 'coordinator']);
 
         // create a project job and a schedule under it
         // create a minimal client, then project job

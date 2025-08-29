@@ -35,11 +35,74 @@ class ProjectSchedulesCalendarController extends Controller
                 });
             }
             */
-            $schedules = $query->get(['id', 'name', 'start_date', 'end_date', 'progress', 'project_job_id']);
+            $schedules = $query->with('comments')->get(['id', 'name', 'start_date', 'end_date', 'progress', 'project_job_id']);
+        }
+
+        // If a project_job_id was provided, also resolve the ProjectJob and its client
+        $project = null;
+        $client = null;
+        if ($request->filled('project_job_id')) {
+            $pj = \App\Models\ProjectJob::with('client')->find($request->input('project_job_id'));
+            if ($pj) {
+                $project = [
+                    'id' => $pj->id,
+                    'name' => $pj->name,
+                    'jobcode' => $pj->jobcode ?? null,
+                ];
+                if ($pj->client) {
+                    $client = [
+                        'id' => $pj->client->id,
+                        'name' => $pj->client->name,
+                    ];
+                }
+            }
+        }
+
+        // Collect schedule comments separately for quicker JSON serialization in the frontend
+        $comments = [];
+        foreach ($schedules as $s) {
+            foreach ($s->comments ?? [] as $c) {
+                $comments[] = [
+                    'id' => $c->id,
+                    'project_schedule_id' => $c->project_schedule_id,
+                    'body' => $c->body,
+                    'date' => $c->date ? $c->date->toDateString() : null,
+                    'user_id' => $c->user_id,
+                ];
+            }
+        }
+
+        // Load project-level memos (project_memos).
+        // Always include global memos (project_id NULL). If a project_job_id is provided,
+        // also include memos for that project.
+        $projectMemos = [];
+        $projectId = $request->input('project_job_id', null);
+        $memosQuery = \App\Models\ProjectMemo::query();
+        if ($projectId) {
+            $memosQuery->where(function ($q) use ($projectId) {
+                $q->where('project_id', $projectId)->orWhereNull('project_id');
+            });
+        } else {
+            // no project specified: only global memos
+            $memosQuery->whereNull('project_id');
+        }
+        $memos = $memosQuery->get();
+        foreach ($memos as $m) {
+            $projectMemos[] = [
+                'id' => $m->id,
+                'project_id' => $m->project_id,
+                'body' => $m->body,
+                'date' => $m->date ? $m->date->toDateString() : null,
+                'user_id' => $m->user_id,
+            ];
         }
 
         return Inertia::render('Coordinator/ProjectSchedules/Calendar', [
             'schedules' => $schedules,
+            'project' => $project,
+            'client' => $client,
+            'comments' => $comments,
+            'memos' => $projectMemos,
         ]);
     }
 

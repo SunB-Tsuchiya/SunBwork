@@ -104,7 +104,7 @@ function validateModelOptionsObject(obj) {
 }
 
 const submit = async () => {
-  let payload = { ...form };
+  const payload = { ...form };
   let parsed = {};
   try {
     console.debug('Payload before submit:', payload);

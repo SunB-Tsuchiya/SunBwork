@@ -175,7 +175,7 @@ const submit = () => {
         onFinish: () => form.reset('password', 'password_confirmation'),
         onError: (errors) => {
             // サーバー側エラー詳細をすべて表示
-            let messages = Object.entries(errors).map(([field, msg]) => {
+            const messages = Object.entries(errors).map(([field, msg]) => {
                 return `[${field}] ${msg}`;
             }).join('\n');
             alert('登録できませんでした:\n' + messages);

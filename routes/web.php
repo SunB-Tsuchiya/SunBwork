@@ -83,6 +83,9 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
         'update'
     ]);
 
+    // Allow authenticated users (owners) to delete their project memos via a non-coordinator route
+    Route::delete('project_memos/{memo}', [App\Http\Controllers\Coordinator\ProjectMemosController::class, 'destroy'])->name('project_memos.destroy');
+
     // チャットルーム作成
     Route::get('/chat/rooms', [App\Http\Controllers\Chat\ChatController::class, 'indexRooms'])->name('chat.rooms.index');
     Route::get('/chat/rooms/create', [App\Http\Controllers\Chat\ChatController::class, 'createRoom'])->name('chat.rooms.create');
@@ -200,16 +203,38 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::put('project_jobs/{projectJob}', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'update'])->name('project_jobs.update');
         Route::delete('project_jobs/{projectJob}', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'destroy'])->name('project_jobs.destroy');
 
+        // Shortcut route used by the ProjectJobs edit/create pages to open the
+        // ProjectSchedules calendar for a specific project (passes project_job_id
+        // as a query parameter). This keeps front-end route calls like
+        // route('coordinator.project_jobs.schedule', { projectJob: id }) working
+        // without changing existing calendar controller signatures.
+        Route::get('project_jobs/{projectJob}/schedule', function ($projectJob) {
+            return redirect()->route('coordinator.project_schedules.calendar', ['project_job_id' => $projectJob]);
+        })->name('project_jobs.schedule');
+
         // PoC: ProjectSchedules (Gantt)
         Route::get('project_schedules', [App\Http\Controllers\Coordinator\ProjectSchedulesController::class, 'index'])->name('project_schedules.index');
         Route::get('project_schedules/create', [App\Http\Controllers\Coordinator\ProjectSchedulesController::class, 'create'])->name('project_schedules.create');
         Route::post('project_schedules', [App\Http\Controllers\Coordinator\ProjectSchedulesController::class, 'store'])->name('project_schedules.store');
-    Route::patch('project_schedules/{project_schedule}', [App\Http\Controllers\Coordinator\ProjectSchedulesController::class, 'update'])->name('project_schedules.update');
+        Route::patch('project_schedules/{project_schedule}', [App\Http\Controllers\Coordinator\ProjectSchedulesController::class, 'update'])->name('project_schedules.update');
         Route::post('project_schedules/bulk_update', [App\Http\Controllers\Coordinator\ProjectSchedulesController::class, 'bulkUpdate'])->name('project_schedules.bulk_update');
 
         // Calendar PoC for ProjectSchedules
         Route::get('project_schedules/calendar', [App\Http\Controllers\Coordinator\ProjectSchedulesCalendarController::class, 'index'])->name('project_schedules.calendar');
         Route::patch('project_schedules/{project_schedule}/calendar', [App\Http\Controllers\Coordinator\ProjectSchedulesCalendarController::class, 'update'])->name('project_schedules.calendar.update');
+
+        // ProjectSchedule comments (memos) - minimal PoC routes
+        Route::get('project_schedules/{project_schedule}/comments/create', [App\Http\Controllers\Coordinator\ProjectScheduleCommentsController::class, 'create'])->name('project_schedule_comments.create');
+        Route::post('project_schedules/{project_schedule}/comments', [App\Http\Controllers\Coordinator\ProjectScheduleCommentsController::class, 'store'])->name('project_schedule_comments.store');
+        Route::match(['put', 'patch'], 'project_schedules/comments/{comment}', [App\Http\Controllers\Coordinator\ProjectScheduleCommentsController::class, 'update'])->name('project_schedule_comments.update');
+        Route::get('project_schedules/comments/{comment}', [App\Http\Controllers\Coordinator\ProjectScheduleCommentsController::class, 'show'])->name('project_schedule_comments.show');
+
+        // Project-level memos (date-based notes) - new resource
+        Route::get('project_memos', [App\Http\Controllers\Coordinator\ProjectMemosController::class, 'index'])->name('project_memos.index');
+        Route::post('project_memos', [App\Http\Controllers\Coordinator\ProjectMemosController::class, 'store'])->name('project_memos.store');
+        Route::match(['put', 'patch'], 'project_memos/{memo}', [App\Http\Controllers\Coordinator\ProjectMemosController::class, 'update'])->name('project_memos.update');
+        Route::get('project_memos/{memo}', [App\Http\Controllers\Coordinator\ProjectMemosController::class, 'show'])->name('project_memos.show');
+        Route::delete('project_memos/{memo}', [App\Http\Controllers\Coordinator\ProjectMemosController::class, 'destroy'])->name('project_memos.destroy');
 
         // Project_team_members リソースルート
         Route::resource('project_team_members', App\Http\Controllers\Coordinator\ProjectTeamMembersController::class)->names([

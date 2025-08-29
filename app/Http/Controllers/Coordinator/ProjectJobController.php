@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\ProjectJob;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Log;
 
 class ProjectJobController extends Controller
 {
@@ -75,11 +76,17 @@ class ProjectJobController extends Controller
             ];
         });
 
+        // Determine if this project has any schedules defined (project_schedules)
+        $hasSchedule = \App\Models\ProjectSchedule::where('project_job_id', $projectJob->id)->exists();
+
+        // hasSchedule computed and returned to Inertia props
+
         return Inertia::render('Coordinator/ProjectJobs/Show', [
             'job' => $projectJob,
             'members' => $members,
             'jobid' => $jobid,
             'registerFlags' => $registerFlags,
+            'hasSchedule' => $hasSchedule,
         ]);
     }
 

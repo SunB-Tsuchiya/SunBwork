@@ -1,9 +1,15 @@
 <script setup>
-import Calendar from '@/Components/Calendar.vue';
+import ProjectCalendar from '@/Components/ProjectCalendar.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { ref } from 'vue';
 
-const props = defineProps({ schedules: { type: Array, default: () => [] } });
+const props = defineProps({
+    schedules: { type: Array, default: () => [] },
+    project: { type: Object, default: null },
+    client: { type: Object, default: null },
+    comments: { type: Array, default: () => [] },
+    memos: { type: Array, default: () => [] },
+});
 
 // Convert schedules to FullCalendar events
 const events = ref(
@@ -19,7 +25,7 @@ const events = ref(
         };
         // FullCalendar treats allDay end as exclusive, so add 1 day to end when passing as allDay
         const startDateOnly = fmt(s.start_date);
-        let endDateOnly = fmt(s.end_date);
+        const endDateOnly = fmt(s.end_date);
         let endForCalendar = endDateOnly;
         if (endDateOnly) {
             try {
@@ -55,7 +61,15 @@ console.log('Coordinator ProjectSchedules computed events', events.value);
         </template>
         <div class="py-12">
             <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                <Calendar :diaries="diaries" :events="events" />
+                <!-- Project header: show project name and client when available -->
+                <div class="mb-4 flex items-baseline justify-between">
+                    <div>
+                        <h1 class="text-2xl font-semibold text-gray-900">{{ project ? project.name : 'プロジェクト' }}</h1>
+                        <div class="text-sm text-gray-600">{{ client ? client.name : '' }}</div>
+                    </div>
+                </div>
+
+                <ProjectCalendar :diaries="diaries" :events="events" :comments="props.comments" :memos="props.memos" :project="props.project" />
             </div>
         </div>
     </AppLayout>

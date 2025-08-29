@@ -48,17 +48,17 @@
                             <div
                                 :class="[
                                     'status-box w-32 rounded px-4 py-2',
-                                    job.schedule ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-500',
+                                    hasScheduleFlag ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-500',
                                 ]"
                             >
-                                {{ job.schedule ? '決定済み' : '未設定' }}
+                                {{ hasScheduleFlag ? '決定済み' : '未設定' }}
                             </div>
                             <button
                                 type="button"
-                                :class="['rounded px-4 py-2', job.schedule ? 'bg-gray-200 text-gray-800' : 'bg-blue-100 text-blue-700']"
+                                :class="['rounded px-4 py-2', hasScheduleFlag ? 'bg-gray-200 text-gray-800' : 'bg-blue-100 text-blue-700']"
                                 @click="goSchedule"
                             >
-                                {{ job.schedule ? 'スケジュール詳細' : 'スケジュール登録' }}
+                                {{ hasScheduleFlag ? 'スケジュール詳細' : 'スケジュール登録' }}
                             </button>
                         </div>
                     </div>
@@ -132,6 +132,23 @@ import { computed, onMounted, ref } from 'vue';
 
 const page = usePage();
 const job = page.props.job || {};
+
+// allow server to pass an explicit hasSchedule flag (more reliable)
+const serverHasSchedule = page.props.hasSchedule;
+// job.schedule in DB may be stored as JSON/array or boolean; normalize check as fallback
+const computedHasSchedule = computed(() => {
+    const s = job.schedule;
+    if (!s) return false;
+    if (typeof s === 'boolean') return s === true;
+    if (Array.isArray(s)) return s.length > 0;
+    if (typeof s === 'object') return Object.keys(s).length > 0;
+    return Boolean(s);
+});
+
+const hasScheduleFlag = computed(() => {
+    if (typeof serverHasSchedule !== 'undefined') return Boolean(serverHasSchedule);
+    return computedHasSchedule.value;
+});
 const members = page.props.members || [];
 const showMembersModal = ref(false);
 const hasMembers = computed(() => Array.isArray(members) && members.length > 0);
@@ -160,7 +177,7 @@ onMounted(() => {
 
 function goSchedule() {
     const id = job.id || null;
-    if (id) router.visit(route('coordinator.project_jobs.edit', { projectJob: id }));
+    if (id) router.visit(route('coordinator.project_jobs.schedule', { projectJob: id }));
 }
 
 function goProjectTeammember() {

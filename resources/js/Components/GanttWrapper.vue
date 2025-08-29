@@ -113,7 +113,7 @@ onMounted(async () => {
             const scrollLeft =
                 chart && chart.$container && typeof chart.$container.scrollLeft === 'number'
                     ? chart.$container.scrollLeft
-                    : ganttEl && ganttEl.value
+                    : ganttEl.value && ganttEl.value
                       ? ganttEl.value.scrollLeft || 0
                       : 0;
             return e.clientX - rect.left + scrollLeft;
@@ -125,7 +125,7 @@ onMounted(async () => {
             if (maybeBarOrHandle) {
                 try {
                     // hide native scrollbar movement while dragging to avoid auto-scroll to far future
-                    if (ganttEl && ganttEl.value) {
+                    if (ganttEl.value && ganttEl.value) {
                         ganttEl.value.dataset._scrollOverflow = ganttEl.value.style.overflow;
                         ganttEl.value.style.overflow = 'hidden';
                     }
@@ -264,7 +264,7 @@ onMounted(async () => {
             }
             // restore outer container scrolling
             try {
-                if (ganttEl && ganttEl.value && ganttEl.value.dataset && ganttEl.value.dataset._scrollOverflow !== undefined) {
+                if (ganttEl.value && ganttEl.value && ganttEl.value.dataset && ganttEl.value.dataset._scrollOverflow !== undefined) {
                     ganttEl.value.style.overflow = ganttEl.value.dataset._scrollOverflow || '';
                     delete ganttEl.value.dataset._scrollOverflow;
                 }
@@ -280,7 +280,7 @@ onMounted(async () => {
         // ensure cleanup also restores overflow if mouseup happens outside svg
         const onDocMouseUpFallback = () => {
             try {
-                if (ganttEl && ganttEl.value && ganttEl.value.dataset && ganttEl.value.dataset._scrollOverflow !== undefined) {
+                if (ganttEl.value && ganttEl.value && ganttEl.value.dataset && ganttEl.value.dataset._scrollOverflow !== undefined) {
                     ganttEl.value.style.overflow = ganttEl.value.dataset._scrollOverflow || '';
                     delete ganttEl.value.dataset._scrollOverflow;
                 }
@@ -381,7 +381,7 @@ onMounted(async () => {
 
         // If the library inserts the today highlight slightly later, watch for it and center once observed.
         try {
-            const containerToObserve = gantt && gantt.$container ? gantt.$container : ganttEl && ganttEl.value ? ganttEl.value : null;
+            const containerToObserve = gantt && gantt.$container ? gantt.$container : ganttEl.value && ganttEl.value ? ganttEl.value : null;
             if (containerToObserve && typeof MutationObserver !== 'undefined') {
                 const mo = new MutationObserver((mutations) => {
                     for (const m of mutations) {
@@ -470,7 +470,7 @@ onMounted(async () => {
                     // fallback: find the vertical highlight inside the container and center it
                     try {
                         const highlight =
-                            (ganttEl && ganttEl.value && ganttEl.value.querySelector('.current-highlight')) ||
+                            (ganttEl.value && ganttEl.value && ganttEl.value.querySelector('.current-highlight')) ||
                             document.querySelector('.current-highlight');
                         if (highlight && ganttEl && ganttEl.value) {
                             // prefer numeric left from style, otherwise use offsetLeft

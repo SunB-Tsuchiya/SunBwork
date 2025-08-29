@@ -221,7 +221,7 @@ function scrollToLatest() {
   nextTick(() => {
     const area = messageArea.value;
     if (!area) return;
-    const lastEl = (lastMessageRef && lastMessageRef.value) || area.querySelector('[data-last="true"]') || area.lastElementChild;
+    const lastEl = (lastMessageRef.value && lastMessageRef.value) || area.querySelector('[data-last="true"]') || area.lastElementChild;
     if (!lastEl) {
       area.scrollTop = area.scrollHeight;
       return;

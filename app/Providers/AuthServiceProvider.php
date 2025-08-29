@@ -5,7 +5,9 @@ namespace App\Providers;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Gate;
 use App\Models\ProjectSchedule;
+use App\Models\ProjectMemo;
 use App\Policies\ProjectSchedulePolicy;
+use App\Policies\ProjectMemoPolicy;
 
 class AuthServiceProvider extends ServiceProvider
 {
@@ -17,6 +19,7 @@ class AuthServiceProvider extends ServiceProvider
     protected $policies = [
         // Model => Policy mappings
         ProjectSchedule::class => ProjectSchedulePolicy::class,
+        ProjectMemo::class => ProjectMemoPolicy::class,
     ];
 
     /**

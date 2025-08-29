@@ -9,9 +9,9 @@ class ProjectScheduleComment extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['project_schedule_id', 'user_id', 'body', 'metadata'];
+    protected $fillable = ['project_schedule_id', 'user_id', 'body', 'metadata', 'date'];
 
-    protected $casts = ['metadata' => 'array'];
+    protected $casts = ['metadata' => 'array', 'date' => 'date'];
 
     public function schedule()
     {
