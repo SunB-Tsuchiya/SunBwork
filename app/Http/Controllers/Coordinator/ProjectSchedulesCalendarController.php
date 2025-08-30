@@ -22,20 +22,7 @@ class ProjectSchedulesCalendarController extends Controller
             if ($request->filled('project_job_id')) {
                 $query->where('project_job_id', $request->input('project_job_id'));
             }
-            // For PoC/testing: return all schedules so developer can verify UI.
-            // In production enforce assignment/coordinator restrictions via Policy.
-            // Note: role hierarchy exists — SuperAdmin / Admin / Leader are treated as
-            // higher-role equivalents of Coordinator and should be allowed. If you
-            // want assignment filtering enabled, uncomment and use the check below
-            // which keeps role compatibility in mind.
-            /*
-            if (!($user->is_coordinator ?? false)) {
-                $query->whereHas('assignments', function ($q) use ($user) {
-                    $q->where('user_id', $user->id);
-                });
-            }
-            */
-            $schedules = $query->with('comments')->get(['id', 'name', 'start_date', 'end_date', 'progress', 'project_job_id']);
+            $schedules = $query->with('comments')->get(['id', 'name', 'description', 'start_date', 'end_date', 'progress', 'project_job_id', 'color']);
         }
 
         // If a project_job_id was provided, also resolve the ProjectJob and its client
@@ -118,16 +105,25 @@ class ProjectSchedulesCalendarController extends Controller
         $this->authorize('update', $project_schedule);
 
         $data = $request->validate([
+            'name' => 'nullable|string|max:255',
+            'description' => 'nullable|string',
+            'color' => 'nullable|string|max:50',
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date',
             'progress' => 'nullable|integer|min:0|max:100',
         ]);
 
+        if (array_key_exists('name', $data) && $data['name'] !== null) $project_schedule->name = $data['name'];
+        if (array_key_exists('description', $data)) $project_schedule->description = $data['description'];
+        if (array_key_exists('color', $data)) $project_schedule->color = $data['color'];
         if (array_key_exists('start_date', $data) && $data['start_date'] !== null) $project_schedule->start_date = $data['start_date'];
         if (array_key_exists('end_date', $data) && $data['end_date'] !== null) $project_schedule->end_date = $data['end_date'];
         if (array_key_exists('progress', $data)) $project_schedule->progress = $data['progress'];
 
         $project_schedule->save();
+        // Ensure we return the latest state (including casts / defaults) after save
+        $project_schedule->refresh();
+
         return response()->json(['ok' => true, 'schedule' => $project_schedule]);
     }
 }

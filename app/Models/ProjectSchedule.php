@@ -12,6 +12,7 @@ class ProjectSchedule extends Model
     protected $fillable = [
         'project_job_id',
         'parent_id',
+        'color',
         'name',
         'description',
         'start_date',

@@ -36,8 +36,12 @@ class ProjectSchedulesController extends Controller
             'name' => 'required|string|max:255',
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date',
+            'color' => 'nullable|string|max:32',
         ]);
         $schedule = ProjectSchedule::create($data + ['created_by' => $request->user()->id]);
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json(['status' => 'ok', 'schedule' => $schedule]);
+        }
         return redirect()->route('coordinator.project_schedules.index', ['project_job_id' => $data['project_job_id']]);
     }
 
@@ -48,16 +52,34 @@ class ProjectSchedulesController extends Controller
         $data = $request->validate([
             'start' => 'nullable|date',
             'end' => 'nullable|date',
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date',
+            'name' => 'nullable|string|max:255',
+            'description' => 'nullable|string',
+            'color' => 'nullable|string|max:32',
             'progress' => 'nullable|numeric|min:0|max:100',
         ]);
+
         $projectSchedule->fill([
-            'start_date' => $data['start'] ?? $projectSchedule->start_date,
-            'end_date' => $data['end'] ?? $projectSchedule->end_date,
+            'start_date' => $data['start_date'] ?? $data['start'] ?? $projectSchedule->start_date,
+            'end_date' => $data['end_date'] ?? $data['end'] ?? $projectSchedule->end_date,
+            'name' => $data['name'] ?? $projectSchedule->name,
+            'description' => array_key_exists('description', $data) ? $data['description'] : $projectSchedule->description,
+            'color' => $data['color'] ?? $projectSchedule->color,
             'progress' => $data['progress'] ?? $projectSchedule->progress,
             'updated_by' => $request->user()->id,
         ]);
         $projectSchedule->save();
+        // return fresh model to ensure casts/defaults and recently updated fields are present
+        $projectSchedule->refresh();
         return response()->json(['status' => 'ok', 'schedule' => $projectSchedule]);
+    }
+
+    public function destroy(Request $request, ProjectSchedule $projectSchedule)
+    {
+        $this->authorize('delete', $projectSchedule);
+        $projectSchedule->delete();
+        return response()->json(['status' => 'ok']);
     }
 
     // Bulk update schedules (e.g., multiple drag changes)

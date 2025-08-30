@@ -36,22 +36,38 @@ const events = ref(
                 endForCalendar = endDateOnly;
             }
         }
+        const chosen = s.color ?? (s.progress >= 100 ? '#9ca3af' : '#2563eb');
+        // compute readable text color
+        let textColor = '#ffffff';
+        try {
+            if (chosen && chosen.startsWith('#') && chosen.length === 7) {
+                const r = parseInt(chosen.slice(1, 3), 16);
+                const g = parseInt(chosen.slice(3, 5), 16);
+                const b = parseInt(chosen.slice(5, 7), 16);
+                const lum = 0.2126 * (r / 255) + 0.7152 * (g / 255) + 0.0722 * (b / 255);
+                textColor = lum < 0.6 ? '#ffffff' : '#111827';
+            }
+        } catch (e) {}
         return {
             title: s.name,
             start: startDateOnly,
             end: endForCalendar,
             allDay: true,
-            color: s.progress >= 100 ? '#9ca3af' : '#2563eb',
-            extendedProps: { schedule_id: s.id, progress: s.progress },
+            // prefer explicit schedule color when present (label picker)
+            color: chosen,
+            backgroundColor: chosen,
+            borderColor: chosen,
+            textColor: textColor,
+            description: s.description ?? '',
+            extendedProps: { schedule_id: s.id, progress: s.progress, description: s.description ?? '' },
         };
     }),
 );
 
 // Debug: log incoming props and computed events
-console.log('Coordinator ProjectSchedules props.schedules', props.schedules);
+// debug logging removed
 // Provide the converted events to the Calendar component
 const diaries = ref([]);
-console.log('Coordinator ProjectSchedules computed events', events.value);
 </script>
 
 <template>

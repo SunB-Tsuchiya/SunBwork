@@ -37,7 +37,21 @@ class HandleInertiaRequests extends Middleware
     {
         return [
             ...parent::share($request),
-            //
+            // Share authenticated user basic info and helper role flags for frontend permission checks
+            'auth' => [
+                'user' => $request->user()
+                    ? array_merge(
+                        $request->user()->only(['id', 'name', 'email', 'user_role']),
+                        [
+                            'isAdmin' => $request->user()->isAdmin(),
+                            'isLeader' => $request->user()->isLeader(),
+                            'isCoordinator' => $request->user()->isCoordinator(),
+                            'isSuperAdmin' => $request->user()->isSuperAdmin(),
+                            'isUser' => $request->user()->isUser(),
+                        ]
+                    )
+                    : null,
+            ],
         ];
     }
 }
