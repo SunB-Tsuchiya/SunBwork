@@ -38,4 +38,10 @@ class ProjectJob extends Model
         // eager-load the user relation for display convenience
         return $this->hasMany(ProjectTeamMember::class, 'project_job_id');
     }
+
+    // Schedules for this project job
+    public function schedules()
+    {
+        return $this->hasMany(\App\Models\ProjectSchedule::class, 'project_job_id');
+    }
 }

@@ -1,6 +1,16 @@
 <template>
     <div class="calendar-container">
-        <div class="mb-4 flex gap-4">
+        <div class="mb-4 flex items-center gap-4">
+            <!-- Link back to project details when project prop is present -->
+            <button
+                v-if="props.project"
+                @click="goToProjectShow"
+                class="rounded border bg-gray-100 px-4 py-2 text-gray-800"
+                title="プロジェクト詳細に戻る"
+            >
+                ← プロジェクト詳細に戻る
+            </button>
+
             <button @click="openEventModal" class="rounded bg-blue-600 px-4 py-2 text-white">予定作成</button>
             <button @click="goToDiaryCreate" class="rounded bg-orange-500 px-4 py-2 text-white">メモ作成</button>
         </div>
@@ -51,6 +61,9 @@
             <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
                 <h2 class="mb-4 text-lg font-bold">メモ編集</h2>
                 <div class="mb-2 text-sm text-gray-600">コメントID: {{ editingCommentId }}</div>
+                <div v-if="editingCommentAuthor" class="mb-2 text-sm text-gray-600">
+                    作成者: {{ editingCommentAuthor.id }} - {{ editingCommentAuthor.name }}
+                </div>
                 <div class="mb-2">
                     <label class="block text-sm font-medium">日付</label>
                     <input type="date" v-model="editingCommentDate" class="rounded border p-2" />
@@ -61,10 +74,17 @@
                 </div>
                 <div class="mt-4 flex justify-end gap-2">
                     <button type="button" @click="showEditModal = false" class="rounded bg-gray-300 px-4 py-2">キャンセル</button>
-                    <button type="button" @click="submitEditComment" class="rounded bg-blue-600 px-4 py-2 text-white">更新</button>
-                    <!-- Show delete only when the editing id corresponds to a project memo (server or local) -->
                     <button
-                        v-if="(props.memos || []).some((m) => m.id === editingCommentId) || (localMemos || []).some((m) => m.id === editingCommentId)"
+                        v-if="commentCanEdit({ id: editingCommentId })"
+                        type="button"
+                        @click="submitEditComment"
+                        class="rounded bg-blue-600 px-4 py-2 text-white"
+                    >
+                        更新
+                    </button>
+                    <!-- Show delete only when the editing id corresponds to a project memo (server or local) and user has permission -->
+                    <button
+                        v-if="commentCanEdit({ id: editingCommentId })"
                         type="button"
                         @click="deleteEditingMemo"
                         class="rounded bg-red-600 px-4 py-2 text-white"
@@ -277,6 +297,7 @@ const showEditModal = ref(false);
 const editingCommentId = ref(null);
 const editingCommentBody = ref('');
 const editingCommentDate = ref('');
+const editingCommentAuthor = ref(null);
 
 const startHourSelectRef = ref(null);
 const endHourSelectRef = ref(null);
@@ -371,6 +392,22 @@ const scheduleCanEdit = (id) => {
     return false;
 };
 
+// Determine whether the current user can edit/delete a project memo
+const commentCanEdit = (memo) => {
+    const u = userProps.value || {};
+    try {
+        if (!memo) return false;
+        if (typeof u.isSuperAdmin === 'function' && u.isSuperAdmin()) return true;
+        if (typeof u.isAdmin === 'function' && u.isAdmin()) return true;
+        if (typeof u.isLeader === 'function' && u.isLeader()) return true;
+        if (typeof u.isCoordinator === 'function' && u.isCoordinator()) return true;
+        if (u.id && memo && (memo.user_id === u.id || memo.id === editingCommentId.value)) return true;
+        if (u.isSuperAdmin === true || u.isAdmin === true || u.isLeader === true || u.isCoordinator === true) return true;
+        if (u.user_role && ['superadmin', 'admin', 'leader', 'coordinator'].includes(String(u.user_role).toLowerCase())) return true;
+    } catch (e) {}
+    return false;
+};
+
 // simple event modal state
 const showSimpleEventModal = ref(false);
 const simpleEventTitle = ref('');
@@ -398,12 +435,10 @@ onMounted(() => {
         }
         // TEMP DEBUG: log resolved user props to help diagnose permission issue
         try {
-            // eslint-disable-next-line no-console
             console.info('[ProjectCalendar] userProps for permission debug', userProps.value);
         } catch (e) {}
         // TEMP DEBUG: log incoming props and computed events length to diagnose missing schedules
         try {
-            // eslint-disable-next-line no-console
             console.info('[ProjectCalendar] incoming props', {
                 schedules: props.schedules,
                 events: props.events && props.events.value ? props.events.value : props.events,
@@ -416,20 +451,18 @@ onMounted(() => {
             setTimeout(() => {
                 try {
                     const apiNow = calendarRef.value && calendarRef.value.getApi ? calendarRef.value.getApi() : null;
-                    // eslint-disable-next-line no-console
+
                     if (apiNow && Array.isArray(plainCalendarEvents.value) && plainCalendarEvents.value.length > 0) {
                         try {
                             apiNow.getEventSources().forEach((s) => s.remove());
                             apiNow.addEventSource(JSON.parse(JSON.stringify(plainCalendarEvents.value)));
-                            // eslint-disable-next-line no-console
+
                             didForceAddEvents.value = true;
                         } catch (e) {
-                            // eslint-disable-next-line no-console
                             console.debug('[ProjectCalendar] onMounted inject error', e);
                         }
                     }
                 } catch (e) {
-                    // eslint-disable-next-line no-console
                     console.debug('[ProjectCalendar] onMounted immediate inject error', e);
                 }
             }, 300);
@@ -607,10 +640,17 @@ const calendarEvents = computed(() => {
     (props.memos ?? []).forEach((m) => {
         if (!m.date) return;
         const memoColor = m.color ?? m.label_color ?? '#60a5fa';
+        // prefer passing a local Date object at midnight to avoid FullCalendar interpreting UTC strings and shifting
+        let startDate = m.date;
+        try {
+            const dateOnly = String(m.date).split('T')[0];
+            const parts = dateOnly.split('-').map((x) => parseInt(x, 10));
+            if (parts.length === 3 && parts.every((n) => !Number.isNaN(n))) startDate = new Date(parts[0], parts[1] - 1, parts[2]);
+        } catch (e) {}
         list.push({
             id: `memo-${m.id}`,
             title: '📝',
-            start: m.date,
+            start: startDate,
             allDay: true,
             color: memoColor,
             backgroundColor: memoColor,
@@ -626,10 +666,18 @@ const calendarEvents = computed(() => {
         const exists = list.some((ev) => ev.extendedProps && ev.extendedProps.memo_id === m.id);
         if (!exists) {
             const memoColor = m.color ?? '#60a5fa';
+            // build local Date for start
+            let startDate = m.date;
+            try {
+                const parts = String(m.date)
+                    .split('-')
+                    .map((x) => parseInt(x, 10));
+                if (parts.length === 3 && parts.every((n) => !Number.isNaN(n))) startDate = new Date(parts[0], parts[1] - 1, parts[2]);
+            } catch (e) {}
             list.push({
                 id: `memo-local-${m.id}`,
                 title: '📝',
-                start: m.date,
+                start: startDate,
                 allDay: true,
                 color: memoColor,
                 backgroundColor: memoColor,
@@ -678,8 +726,16 @@ watch(
                 plainCalendarEvents.value = [];
                 return;
             }
-            // deep clone to strip reactivity/proxy wrappers
-            plainCalendarEvents.value = val.map((e) => JSON.parse(JSON.stringify(e)));
+            // prefer structuredClone to preserve Date objects; fallback to JSON cycle if not available
+            try {
+                if (typeof structuredClone === 'function') {
+                    plainCalendarEvents.value = val.map((e) => structuredClone(e));
+                } else {
+                    plainCalendarEvents.value = val.map((e) => JSON.parse(JSON.stringify(e)));
+                }
+            } catch (e) {
+                plainCalendarEvents.value = Array.isArray(val) ? val.slice() : [];
+            }
         } catch (e) {
             plainCalendarEvents.value = Array.isArray(val) ? val.slice() : [];
         }
@@ -711,7 +767,7 @@ watch(
                             apiNow.getEventSources().forEach((s) => s.remove());
                             apiNow.addEventSource(events);
                             // debug
-                            // eslint-disable-next-line no-console
+
                             console.info('[ProjectCalendar] injected events into FullCalendar via retry', events.length);
                             return;
                         } catch (e) {
@@ -767,7 +823,7 @@ const calendarOptions = computed(() => ({
     slotDuration: '00:15:00',
     slotLabelInterval: '00:30:00',
     slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
-    height: 720,
+    height: 'auto',
     editable: true,
     eventDurationEditable: true,
     eventResizableFromStart: true,
@@ -936,7 +992,7 @@ const calendarOptions = computed(() => ({
                     body: info.event.extendedProps.body || '',
                     date: info.event.startStr ? info.event.startStr.split('T')[0] : info.event.start,
                 };
-            openEditModalForComment({ id: memo.id, body: memo.body, date: memo.date });
+            openEditModalForComment({ id: memo.id, body: memo.body, date: memo.date, author: memo.author || null });
             return;
         }
         // For other events (schedules/personal events) open a modal showing details
@@ -953,6 +1009,21 @@ function goToScheduleShowFromAction() {
     router.get(route('coordinator.project_schedules.show', { project_schedule: selectedScheduleForAction.value }));
 }
 
+function goToProjectShow() {
+    try {
+        const pid = props.project && (props.project.id || props.project.project_job_id || props.project.project_job?.id);
+        if (!pid) return;
+        // prefer named Ziggy route; fallback to explicit path
+        try {
+            router.get(route('coordinator.project_jobs.show', { projectJob: pid }));
+        } catch (e) {
+            router.get(`/coordinator/project_jobs/${pid}`);
+        }
+    } catch (e) {
+        // ignore navigation errors
+    }
+}
+
 function openMemoModalFromAction() {
     if (!selectedScheduleForAction.value) return;
     selectedScheduleIdForMemo.value = selectedScheduleForAction.value;
@@ -964,6 +1035,12 @@ function openEditModalForComment(comment) {
     editingCommentId.value = comment.id;
     editingCommentBody.value = comment.body || '';
     editingCommentDate.value = comment.date || memoDate.value;
+    // set author if provided by server; if not, try to find in props.memos
+    editingCommentAuthor.value = comment.author || null;
+    if (!editingCommentAuthor.value && comment.id) {
+        const found = (props.memos || []).find((m) => m.id === comment.id);
+        if (found && found.author) editingCommentAuthor.value = found.author;
+    }
     showEditModal.value = true;
 }
 
@@ -1028,7 +1105,6 @@ function openScheduleShowModal(event) {
 
                 // debug
                 try {
-                    // eslint-disable-next-line no-console
                     console.debug(
                         '[ProjectCalendar] findInList searching',
                         listName,
@@ -1093,17 +1169,16 @@ function openScheduleShowModal(event) {
             else {
                 // debug: emit small samples so developer can inspect why lookup failed
                 try {
-                    // eslint-disable-next-line no-console
                     console.debug(
                         '[ProjectCalendar] openScheduleShowModal lookup failed; sample calendarEvents[0..4]:',
                         (calendarEvents.value || []).slice(0, 5),
                     );
-                    // eslint-disable-next-line no-console
+
                     console.debug(
                         '[ProjectCalendar] openScheduleShowModal lookup failed; sample plainCalendarEvents[0..4]:',
                         (plainCalendarEvents.value || []).slice(0, 5),
                     );
-                    // eslint-disable-next-line no-console
+
                     console.debug(
                         '[ProjectCalendar] openScheduleShowModal lookup failed; sample localCalendarEntries[0..4]:',
                         (localCalendarEntries.value || []).slice(0, 5),
@@ -1123,14 +1198,12 @@ function openScheduleShowModal(event) {
     isEditingSchedule.value = false;
     showScheduleShowModal.value = true;
     try {
-        // eslint-disable-next-line no-console
         console.info('[ProjectCalendar] openScheduleShowModal', { schedule: scheduleShowData.value, isEditingSchedule: isEditingSchedule.value });
     } catch (e) {}
 }
 
 function toggleEdit(enable) {
     try {
-        // eslint-disable-next-line no-console
         console.info('[ProjectCalendar] toggleEdit requested', { enable, before: isEditingSchedule.value });
     } catch (e) {}
     isEditingSchedule.value = !!enable;
@@ -1140,7 +1213,6 @@ function toggleEdit(enable) {
         scheduleEditEnd.value = scheduleShowData.value.end;
         scheduleEditColor.value = scheduleShowData.value.color;
         try {
-            // eslint-disable-next-line no-console
             console.info('[ProjectCalendar] toggleEdit entered edit mode', {
                 title: scheduleEditTitle.value,
                 start: scheduleEditStart.value,
@@ -1149,7 +1221,6 @@ function toggleEdit(enable) {
         } catch (e) {}
     } else {
         try {
-            // eslint-disable-next-line no-console
             console.info('[ProjectCalendar] toggleEdit exited edit mode', { isEditingSchedule: isEditingSchedule.value });
         } catch (e) {}
     }
@@ -1199,7 +1270,6 @@ async function submitScheduleUpdate() {
         // If no id found yet, try to locate by matching title/start/end against known event lists
         if (!id) {
             try {
-                // eslint-disable-next-line no-console
                 console.warn('[ProjectCalendar] submitScheduleUpdate no id in scheduleShowData, attempting lookup', scheduleShowData.value);
                 const normalizeDate = (d) => {
                     if (!d) return null;
@@ -1276,14 +1346,11 @@ async function submitScheduleUpdate() {
                     }
                 }
                 if (id) {
-                    // eslint-disable-next-line no-console
                     console.info('[ProjectCalendar] submitScheduleUpdate resolved id by lookup', id);
                 } else {
-                    // eslint-disable-next-line no-console
                     console.error('[ProjectCalendar] submitScheduleUpdate failed to resolve id after lookup', scheduleShowData.value);
                 }
             } catch (e) {
-                // eslint-disable-next-line no-console
                 console.error('[ProjectCalendar] submitScheduleUpdate lookup error', e);
             }
         }
@@ -1294,13 +1361,11 @@ async function submitScheduleUpdate() {
         const url = route('coordinator.project_schedules.update', { project_schedule: id });
         // debug: log resolved id, URL and payload to help diagnose 404 from server
         try {
-            // eslint-disable-next-line no-console
             console.info('[ProjectCalendar] submitScheduleUpdate resolved id', id, 'url', url, 'payload', payload);
         } catch (e) {}
         // defensive: do not attempt request if url would contain 'undefined'
         if (String(url).includes('undefined')) {
             try {
-                // eslint-disable-next-line no-console
                 console.error('[ProjectCalendar] submitScheduleUpdate aborting: url contains undefined', { id, url });
             } catch (e) {}
             throw new Error('Invalid update URL, aborting');
@@ -1312,18 +1377,16 @@ async function submitScheduleUpdate() {
             // If Ziggy-produced URL yields 404, try explicit coordinator path fallback
             try {
                 const status = err && err.response && err.response.status ? err.response.status : null;
-                // eslint-disable-next-line no-console
+
                 console.warn('[ProjectCalendar] submitScheduleUpdate first attempt failed', { url, status, err });
             } catch (ee) {}
             if (err && err.response && err.response.status === 404) {
                 const explicit = `/coordinator/project_schedules/${id}`;
                 try {
-                    // eslint-disable-next-line no-console
                     console.info('[ProjectCalendar] submitScheduleUpdate trying explicit URL', explicit);
                     resp = await axios.patch(explicit, payload);
                 } catch (err2) {
                     try {
-                        // eslint-disable-next-line no-console
                         console.error('[ProjectCalendar] submitScheduleUpdate explicit attempt failed', { explicit, err2 });
                     } catch (eee) {}
                     throw err2;
@@ -1335,7 +1398,6 @@ async function submitScheduleUpdate() {
         if (resp && resp.data && resp.data.schedule) {
             // debug: log server response to verify description and returned schedule
             try {
-                // eslint-disable-next-line no-console
                 console.info('[ProjectCalendar] submitScheduleUpdate response', resp.data);
             } catch (e) {}
             const s = resp.data.schedule;
@@ -1384,7 +1446,6 @@ async function submitScheduleUpdate() {
                     }
                 }
             } catch (e) {
-                // eslint-disable-next-line no-console
                 console.error('[ProjectCalendar] fullcalendar update error', e);
             }
 
@@ -1394,12 +1455,10 @@ async function submitScheduleUpdate() {
                     const api = calendarRef.value && calendarRef.value.getApi ? calendarRef.value.getApi() : null;
                     const found = api && api.getEventById ? api.getEventById(String(s.id)) : null;
                     if (!found) {
-                        // eslint-disable-next-line no-console
                         console.warn('[ProjectCalendar] schedule update not reflected in FullCalendar; performing full reload');
                         router.reload();
                     }
                 } catch (e) {
-                    // eslint-disable-next-line no-console
                     console.error('[ProjectCalendar] post-update check error', e);
                     router.reload();
                 }
@@ -1500,9 +1559,22 @@ async function submitScheduleMemo() {
     }
     // No schedule id: create a project-level memo (date-based note)
     try {
+        // send a timezone-safe datetime (set to 13:00 local) to avoid date shifting when server treats as UTC
+        const safeDateTime = (dStr) => {
+            try {
+                if (!dStr) return dStr;
+                const dateOnly = String(dStr).split('T')[0];
+                const dt = new Date(dateOnly + 'T13:00:00');
+                return dt.toISOString();
+            } catch (e) {
+                return dStr;
+            }
+        };
+
         const payload = {
             project_id: props.project ? props.project.id : null,
-            date: memoDate.value,
+            // send a datetime at 13:00 to avoid shifting to previous day in UTC
+            date: safeDateTime(memoDate.value),
             body: memoBody.value,
         };
         const resp = await axios.post(route('coordinator.project_memos.store'), payload);

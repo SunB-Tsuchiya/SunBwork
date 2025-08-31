@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use App\Models\ProjectMemo;
 
 class ProjectMemosController extends Controller
@@ -19,12 +20,18 @@ class ProjectMemosController extends Controller
                 $q->where('project_id', $request->input('project_id'))->orWhereNull('project_id');
             });
         }
-        $memos = $query->get();
+        $memos = $query->with('user:id,name')->get();
+        // attach author info for each memo
+        $memos->transform(function ($m) {
+            $m->author = $m->user ? ['id' => $m->user->id, 'name' => $m->user->name] : null;
+            return $m;
+        });
         return response()->json(['memos' => $memos]);
     }
 
     public function store(Request $request)
     {
+        Log::info('ProjectMemosController@store payload', $request->all());
         $data = $request->validate([
             'project_id' => ['nullable', 'integer', 'exists:project_jobs,id'],
             'date' => ['nullable', 'date'],
@@ -38,18 +45,39 @@ class ProjectMemosController extends Controller
             'body' => $data['body'],
         ]);
 
+        // reload with user relation
+        $memo->load('user:id,name');
+        $memo->author = $memo->user ? ['id' => $memo->user->id, 'name' => $memo->user->name] : null;
+
         return response()->json(['status' => 'ok', 'memo' => $memo]);
     }
 
     public function show($id)
     {
-        $memo = ProjectMemo::findOrFail($id);
+        $memo = ProjectMemo::with('user:id,name')->findOrFail($id);
+        // attach author info
+        $memo->author = $memo->user ? ['id' => $memo->user->id, 'name' => $memo->user->name] : null;
         return Inertia::render('Coordinator/ProjectSchedules/Memos/Show', ['memo' => $memo]);
     }
 
     public function update(Request $request, $id)
     {
         $memo = ProjectMemo::findOrFail($id);
+        $user = Auth::user();
+        if (!$user) {
+            return response()->json(['error' => 'Unauthenticated'], 401);
+        }
+
+        // Allow owner or coordinator/admin/leader/superadmin
+        $canUpdate = ($user->id === $memo->user_id)
+            || (method_exists($user, 'isCoordinator') && $user->isCoordinator())
+            || (method_exists($user, 'isAdmin') && $user->isAdmin())
+            || (method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin())
+            || (method_exists($user, 'isLeader') && $user->isLeader());
+
+        if (!$canUpdate) {
+            return response()->json(['error' => 'Forbidden'], 403);
+        }
         $data = $request->validate([
             'date' => ['nullable', 'date'],
             'body' => ['required', 'string'],
@@ -57,6 +85,8 @@ class ProjectMemosController extends Controller
         $memo->date = $data['date'] ?? $memo->date;
         $memo->body = $data['body'];
         $memo->save();
+        $memo->load('user:id,name');
+        $memo->author = $memo->user ? ['id' => $memo->user->id, 'name' => $memo->user->name] : null;
         return response()->json(['status' => 'ok', 'memo' => $memo]);
     }
 
