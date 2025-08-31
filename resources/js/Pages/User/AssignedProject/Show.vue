@@ -90,6 +90,15 @@ const sortedMembers = computed(() => {
     });
     return creator ? [creator, ...others] : others;
 });
+
+// UI: which section modal is open: null | 'details' | 'members'
+const selectedSection = ref(null);
+function openSection(name) {
+    selectedSection.value = name;
+}
+function closeSection() {
+    selectedSection.value = null;
+}
 </script>
 <template>
     <AppLayout title="ジョブ詳細">
@@ -97,85 +106,146 @@ const sortedMembers = computed(() => {
             <h2 class="text-xl font-semibold leading-tight text-gray-800">ジョブ詳細</h2>
         </template>
         <div class="space-y-8 py-6">
-            <!-- 1. ジョブ基本情報ブロック -->
-            <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
-                <!-- 1行目: ジョブID・伝票No.・クライアント名 横並び（モバイルは縦） -->
-                <div class="mb-4 flex flex-col md:flex-row md:items-center md:space-x-8">
-                    <div class="mb-2 md:mb-0">
-                        <label class="block text-sm font-medium text-gray-700">ジョブID</label>
-                        <div class="mt-1 text-lg text-gray-900">{{ job.id }}</div>
-                    </div>
-                    <div class="mb-2 md:mb-0">
-                        <label class="block text-sm font-medium text-gray-700">伝票No.</label>
-                        <div class="mt-1 text-gray-900">{{ job.jobcode }}</div>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">クライアント名</label>
-                        <div class="mt-1 text-gray-900">{{ job.client?.name || '-' }}</div>
-                    </div>
-                </div>
-                <!-- 2行目: 名前 -->
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700">名前</label>
-                    <div class="mt-1 text-gray-900">{{ job.name }}</div>
-                </div>
-                <!-- 3行目: 詳細 -->
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700">詳細</label>
-                    <div class="mt-1 whitespace-pre-wrap text-gray-900">
-                        <span v-if="job.detail && typeof job.detail === 'object' && job.detail.text">
-                            {{ job.detail.text }}
-                        </span>
-                        <span v-else-if="job.detail && typeof job.detail === 'object'">
-                            {{ JSON.stringify(job.detail, null, 2) }}
-                        </span>
-                        <span v-else>{{ job.detail || '-' }}</span>
-                    </div>
-                </div>
-            </div>
-            <!-- 2. チームメンバーブロック -->
-            <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
-                <div class="mb-4 border-b pb-1 text-lg font-bold">チームメンバー</div>
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead>
-                        <tr>
-                            <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">ID</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">名前</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">部署</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">担当</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr
-                            v-for="member in sortedMembers"
-                            :key="member.id"
-                            :class="[member.id === job.user_id ? 'bg-blue-50' : '', 'hover:bg-gray-50']"
-                        >
-                            <td class="px-4 py-2">{{ member.id }}</td>
-                            <td class="px-4 py-2">{{ member.name }}</td>
-                            <td class="px-4 py-2">{{ member.department }}</td>
-                            <td class="px-4 py-2">
-                                <span
-                                    :class="getAssignmentBadgeClass(member.assignment)"
-                                    class="inline-flex rounded-full px-2 py-1 text-xs font-semibold"
-                                >
-                                    {{ member.assignment }}
-                                </span>
-                                <span v-if="member.id === job.user_id" class="ml-2 text-xs font-bold text-blue-700">リーダー</span>
-                            </td>
-                        </tr>
-                        <tr v-if="!sortedMembers || sortedMembers.length === 0">
-                            <td colspan="4" class="py-4 text-center text-gray-400">メンバーがいません</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
             <!-- 3. スケジュールチャートブロック (ProjectCalendar を埋め込む) -->
             <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
+                <h3 class="mb-4 text-lg font-semibold text-gray-800">
+                    {{ job.name }} <span class="text-sm text-gray-500">- {{ job.client?.name || '-' }}</span>
+                </h3>
                 <div class="rounded bg-white p-4 shadow">
+                    <!-- controls above calendar -->
+                    <div class="mb-4 flex gap-2">
+                        <button @click="openSection('details')" class="rounded bg-blue-600 px-3 py-1 text-white">詳細</button>
+                        <button @click="openSection('members')" class="rounded bg-green-600 px-3 py-1 text-white">メンバー</button>
+                    </div>
                     <div class="mb-4 border-b pb-1 text-lg font-bold">スケジュールチャート</div>
                     <!-- AssignedProjectCalendar: 読み取り専用カレンダー -->
                     <AssignedProjectCalendar :schedules="schedules" :project="{ id: job.id, name: job.name }" :comments="[]" :memos="memosList" />
+
+                    <!-- memo list table (aligned with calendar width) -->
+                    <div class="mt-6">
+                        <h3 class="mb-4 text-lg font-semibold text-gray-800">メモ一覧</h3>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead>
+                                    <tr>
+                                        <th class="w-1/5 px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">日付</th>
+                                        <th class="w-1/5 px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">作成者</th>
+                                        <th class="w-3/5 px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">メモ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr
+                                        v-for="(m, idx) in memosList"
+                                        :key="m.id"
+                                        :class="[idx % 2 === 0 ? 'bg-black bg-opacity-10' : '', 'hover:bg-gray-50']"
+                                    >
+                                        <td class="w-1/5 px-4 py-2 align-top">
+                                            {{ m.date ? (m.date.split && m.date.split('T') ? m.date.split('T')[0] : m.date) : '-' }}
+                                        </td>
+                                        <td class="w-1/5 px-4 py-2 align-top">{{ (m.author && m.author.name) || (m.user && m.user.name) || '-' }}</td>
+                                        <td class="w-3/5 whitespace-pre-wrap px-4 py-2 align-top">{{ m.body }}</td>
+                                    </tr>
+                                    <tr v-if="!memosList || memosList.length === 0">
+                                        <td colspan="3" class="py-4 text-center text-gray-400">メモがありません</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Details modal -->
+            <div
+                v-if="selectedSection === 'details'"
+                class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+                @click="closeSection"
+            >
+                <div class="w-full max-w-2xl rounded bg-white p-6 shadow-lg" @click.stop>
+                    <div class="mb-4 flex items-center justify-between">
+                        <h4 class="text-lg font-semibold">ジョブ詳細</h4>
+                        <button class="text-gray-600" @click="closeSection">閉じる</button>
+                    </div>
+                    <!-- job basic info (moved from inline) -->
+                    <div class="mb-4">
+                        <div class="mb-2">
+                            <label class="block text-sm font-medium text-gray-700">ジョブID</label>
+                            <div class="mt-1 text-lg text-gray-900">{{ job.id }}</div>
+                        </div>
+                        <div class="mb-2">
+                            <label class="block text-sm font-medium text-gray-700">伝票No.</label>
+                            <div class="mt-1 text-gray-900">{{ job.jobcode }}</div>
+                        </div>
+                        <div class="mb-2">
+                            <label class="block text-sm font-medium text-gray-700">クライアント名</label>
+                            <div class="mt-1 text-gray-900">{{ job.client?.name || '-' }}</div>
+                        </div>
+                        <div class="mb-2">
+                            <label class="block text-sm font-medium text-gray-700">名前</label>
+                            <div class="mt-1 text-gray-900">{{ job.name }}</div>
+                        </div>
+                        <div class="mb-2">
+                            <label class="block text-sm font-medium text-gray-700">詳細</label>
+                            <div class="mt-1 whitespace-pre-wrap text-gray-900">
+                                <span v-if="job.detail && typeof job.detail === 'object' && job.detail.text">
+                                    {{ job.detail.text }}
+                                </span>
+                                <span v-else-if="job.detail && typeof job.detail === 'object'">
+                                    {{ JSON.stringify(job.detail, null, 2) }}
+                                </span>
+                                <span v-else>{{ job.detail || '-' }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Members modal -->
+            <div
+                v-if="selectedSection === 'members'"
+                class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+                @click="closeSection"
+            >
+                <div class="w-full max-w-2xl rounded bg-white p-6 shadow-lg" @click.stop>
+                    <div class="mb-4 flex items-center justify-between">
+                        <h4 class="text-lg font-semibold">チームメンバー</h4>
+                        <button class="text-gray-600" @click="closeSection">閉じる</button>
+                    </div>
+                    <div>
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead>
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">ID</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">名前</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">部署</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">担当</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr
+                                    v-for="member in sortedMembers"
+                                    :key="member.id"
+                                    :class="[member.id === job.user_id ? 'bg-blue-50' : '', 'hover:bg-gray-50']"
+                                >
+                                    <td class="px-4 py-2">{{ member.id }}</td>
+                                    <td class="px-4 py-2">{{ member.name }}</td>
+                                    <td class="px-4 py-2">{{ member.department }}</td>
+                                    <td class="px-4 py-2">
+                                        <span
+                                            :class="getAssignmentBadgeClass(member.assignment)"
+                                            class="inline-flex rounded-full px-2 py-1 text-xs font-semibold"
+                                        >
+                                            {{ member.assignment }}
+                                        </span>
+                                        <span v-if="member.id === job.user_id" class="ml-2 text-xs font-bold text-blue-700">リーダー</span>
+                                    </td>
+                                </tr>
+                                <tr v-if="!sortedMembers || sortedMembers.length === 0">
+                                    <td colspan="4" class="py-4 text-center text-gray-400">メンバーがいません</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
