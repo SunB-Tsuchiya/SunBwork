@@ -44,4 +44,9 @@ class ProjectJob extends Model
     {
         return $this->hasMany(\App\Models\ProjectSchedule::class, 'project_job_id');
     }
+
+    public function projectJobAssignments()
+    {
+        return $this->hasMany(\App\Models\ProjectJobAssignment::class, 'project_job_id');
+    }
 }

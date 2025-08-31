@@ -87,6 +87,9 @@
 
                 <div class="mt-6 flex gap-4">
                     <button type="button" class="rounded bg-yellow-600 px-6 py-2 text-white hover:bg-yellow-700" @click="goEdit">編集</button>
+                    <button type="button" class="rounded bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700" @click="goJobAssign">
+                        ジョブ割り当て
+                    </button>
                     <button type="button" class="rounded bg-gray-300 px-4 py-2 text-gray-800 hover:bg-gray-400" @click="backToIndex">
                         一覧に戻る
                     </button>
@@ -209,6 +212,10 @@ function editMembers() {
     if (selectedIds.length) params.push('selected_user_ids=' + encodeURIComponent(selectedIds.join(',')));
     if (params.length) url += '?' + params.join('&');
     router.visit(url);
+}
+function goJobAssign() {
+    const id = job.id || null;
+    if (id) router.visit(route('coordinator.project_jobs.assignments.index', { projectJob: id }));
 }
 </script>
 

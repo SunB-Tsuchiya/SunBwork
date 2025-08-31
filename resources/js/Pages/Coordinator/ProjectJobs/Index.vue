@@ -14,6 +14,7 @@
             <table v-else class="min-w-full border">
                 <thead>
                     <tr class="bg-gray-100">
+                        <th class="border px-4 py-2">ID</th>
                         <th class="border px-4 py-2">案件名</th>
                         <th class="border px-4 py-2">クライアント名</th>
                         <th class="border px-4 py-2">操作</th>
@@ -21,6 +22,7 @@
                 </thead>
                 <tbody>
                     <tr v-for="job in jobs" :key="job.id" class="hover:bg-gray-50">
+                        <td class="border px-4 py-2">{{ job.id }}</td>
                         <td class="border px-4 py-2">{{ job.name }}</td>
                         <td class="border px-4 py-2">{{ job.client?.name || '-' }}</td>
                         <td class="flex gap-2 border px-4 py-2">

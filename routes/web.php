@@ -202,6 +202,12 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('project_jobs/{projectJob}/edit', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'edit'])->name('project_jobs.edit');
         Route::put('project_jobs/{projectJob}', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'update'])->name('project_jobs.update');
         Route::delete('project_jobs/{projectJob}', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'destroy'])->name('project_jobs.destroy');
+        // Project job assignment (JobAssign)
+        Route::get('project_jobs/{projectJob}/assignments', [App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'index'])->name('project_jobs.assignments.index');
+        Route::get('project_jobs/{projectJob}/assignments/create', [App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'create'])->name('project_jobs.assignments.create');
+        Route::get('project_jobs/{projectJob}/assignments/{assignment}/edit', [App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'edit'])->name('project_jobs.assignments.edit');
+        Route::post('project_jobs/{projectJob}/assignments', [App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'store'])->name('project_jobs.assignments.store');
+        Route::put('project_jobs/{projectJob}/assignments/{assignment}', [App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'update'])->name('project_jobs.assignments.update');
 
         // Shortcut route used by the ProjectJobs edit/create pages to open the
         // ProjectSchedules calendar for a specific project (passes project_job_id
