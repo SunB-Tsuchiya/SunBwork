@@ -91,6 +91,20 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::get('/chat/rooms/create', [App\Http\Controllers\Chat\ChatController::class, 'createRoom'])->name('chat.rooms.create');
     Route::post('/chat/rooms', [App\Http\Controllers\Chat\ChatController::class, 'storeRoom'])->name('chat.rooms.store');
     Route::get('/chat/rooms/{id}', [App\Http\Controllers\Chat\ChatController::class, 'showRoom'])->name('chat.rooms.show');
+
+    // Job Requests (Inbox) - minimal CRUD + accept
+    Route::get('/job_requests', [App\Http\Controllers\JobRequestsController::class, 'index'])->name('job_requests.index');
+    Route::get('/job_requests/{jobRequest}', [App\Http\Controllers\JobRequestsController::class, 'show'])->name('job_requests.show');
+    Route::post('/job_requests', [App\Http\Controllers\JobRequestsController::class, 'store'])->name('job_requests.store');
+    Route::post('/job_requests/{jobRequest}/accept', [App\Http\Controllers\JobRequestsController::class, 'accept'])->name('job_requests.accept');
+    // Messages (mailbox)
+    Route::get('/messages', [App\Http\Controllers\MessageController::class, 'index'])->name('messages.index');
+    Route::get('/messages/create', [App\Http\Controllers\MessageController::class, 'create'])->name('messages.create');
+    Route::get('/messages/{message}', [App\Http\Controllers\MessageController::class, 'show'])->name('messages.show');
+    Route::post('/messages', [App\Http\Controllers\MessageController::class, 'store'])->name('messages.store');
+    Route::post('/messages/{message}/read', [App\Http\Controllers\MessageController::class, 'markRead'])->name('messages.read');
+    // lightweight user search for message compose autocomplete
+    Route::get('/users/search', [App\Http\Controllers\UserController::class, 'search'])->name('users.search');
 });
 
 // Admin Routes (Adminのみアクセス可能)

@@ -15,12 +15,12 @@ class ProjectJobAssignment extends Model
         'title',
         'detail',
         'difficulty',
-    'desired_at',
-    'desired_start_date',
-    'desired_end_date',
-    'desired_time',
-    'assigned',
-    'accepted',
+        'desired_at',
+        'desired_start_date',
+        'desired_end_date',
+        'desired_time',
+        'assigned',
+        'accepted',
     ];
 
     protected $casts = [
@@ -29,8 +29,8 @@ class ProjectJobAssignment extends Model
         'desired_start_date' => 'date:Y-m-d',
         'desired_end_date' => 'date:Y-m-d',
         'desired_time' => 'string',
-    'assigned' => 'boolean',
-    'accepted' => 'boolean',
+        'assigned' => 'boolean',
+        'accepted' => 'boolean',
     ];
 
     protected $dates = [

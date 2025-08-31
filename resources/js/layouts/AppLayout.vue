@@ -42,10 +42,54 @@ const logout = () => {
 };
 
 import { usePage } from '@inertiajs/vue3';
-import { useSlots } from 'vue';
+import { onBeforeUnmount, onMounted, useSlots, ref as vueRef } from 'vue';
 
 const page = usePage();
 const user = page.props.user; // これを追加
+const inboxCount = vueRef(page.props.user?.unread_job_requests_count || 0);
+const inboxToast = vueRef('');
+const unreadMessages = vueRef(page.props.user?.unread_messages_count || 0);
+let echoChannel = null;
+
+onMounted(() => {
+    try {
+        if (window.Echo && user && user.id) {
+            // jobrequests channel
+            echoChannel = window.Echo.private('jobrequests.' + user.id).listen('JobRequestCreated', (e) => {
+                inboxCount.value = (inboxCount.value || 0) + 1;
+                inboxToast.value = (e.from_user_name ? e.from_user_name + 'さんから依頼が届きました: ' : '新しい依頼: ') + (e.message || '');
+                window.dispatchEvent(new CustomEvent('jobrequest:received', { detail: { message: inboxToast.value } }));
+            });
+
+            // messages channel
+            window.Echo.private('messages.' + user.id).listen('MessageCreated', (e) => {
+                unreadMessages.value = (unreadMessages.value || 0) + 1;
+                const msg = (e.from_user_name ? e.from_user_name + 'さんからメールが届きました: ' : '新しいメール: ') + (e.subject || '(件名なし)');
+                window.dispatchEvent(new CustomEvent('message:received', { detail: { message: msg } }));
+            });
+            // listen for reads to decrement unread count
+            window.Echo.private('messages.' + user.id).listen('MessageRead', (e) => {
+                // decrement but never below 0
+                try {
+                    unreadMessages.value = Math.max(0, (unreadMessages.value || 0) - 1);
+                    window.dispatchEvent(new CustomEvent('message:read', { detail: { message_id: e.message_id } }));
+                } catch (err) {}
+            });
+        }
+    } catch (err) {
+        console.warn('Echo subscribe failed', err);
+    }
+});
+
+onBeforeUnmount(() => {
+    try {
+        if (echoChannel && window.Echo) {
+            window.Echo.leavePrivate('jobrequests.' + user.id);
+            window.Echo.leavePrivate('messages.' + user.id);
+            echoChannel = null;
+        }
+    } catch (err) {}
+});
 const slots = useSlots();
 const hasTabsSlot = !!slots.tabs;
 // console.log('AppLayout $page.props:', page.props);
@@ -164,6 +208,28 @@ const getTopTabActive = () => {
                         </div>
 
                         <div class="hidden sm:ms-6 sm:flex sm:items-center">
+                            <!-- Inbox link -->
+                            <div class="relative ms-3 flex items-center">
+                                <Link :href="route('job_requests.index')" class="flex items-center text-sm text-gray-600 hover:text-gray-800">
+                                    <span>依頼箱</span>
+                                    <span
+                                        v-if="inboxCount && inboxCount > 0"
+                                        class="ms-2 inline-flex items-center justify-center rounded-full bg-red-500 px-2 py-0.5 text-xs text-white"
+                                        >{{ inboxCount }}</span
+                                    >
+                                </Link>
+                            </div>
+                            <!-- Messages link -->
+                            <div class="relative ms-3 flex items-center">
+                                <Link :href="route('messages.index')" class="flex items-center text-sm text-gray-600 hover:text-gray-800">
+                                    <span>メール</span>
+                                    <span
+                                        v-if="unreadMessages && unreadMessages > 0"
+                                        class="ms-2 inline-flex items-center justify-center rounded-full bg-blue-500 px-2 py-0.5 text-xs text-white"
+                                        >{{ unreadMessages }}</span
+                                    >
+                                </Link>
+                            </div>
                             <!-- TeamSwitcher -->
                             <div class="relative ms-3">
                                 <TeamSwitcher

@@ -6,8 +6,10 @@ use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvid
 use Illuminate\Support\Facades\Gate;
 use App\Models\ProjectSchedule;
 use App\Models\ProjectMemo;
+use App\Models\JobRequest;
 use App\Policies\ProjectSchedulePolicy;
 use App\Policies\ProjectMemoPolicy;
+use App\Policies\JobRequestPolicy;
 
 class AuthServiceProvider extends ServiceProvider
 {
@@ -20,6 +22,7 @@ class AuthServiceProvider extends ServiceProvider
         // Model => Policy mappings
         ProjectSchedule::class => ProjectSchedulePolicy::class,
         ProjectMemo::class => ProjectMemoPolicy::class,
+        JobRequest::class => JobRequestPolicy::class,
     ];
 
     /**

@@ -133,4 +133,33 @@ npm run dev
 
 ---
 
+## 追記: サーバ側 HTML サニタイズの中央化 (2025-08-31)
+
+対応済み事項:
+- `config/htmlpurifier.php` を追加し、HTMLPurifier のホワイトリスト設定を集中管理するようにしました。
+- `App\Services\HtmlSanitizer` サービスを導入し、コントローラや他のサービスから容易に再利用できるようにしました。
+
+実装方針（今回の変更でのルール）:
+- コントローラやサービス内で直接 HTMLPurifier の設定を作らず、常に `App\Services\HtmlSanitizer` を経由して HTML を浄化してください。
+- 許可タグ/属性の変更は `config/htmlpurifier.php` の `settings` キーを編集して行い、アプリ再デプロイ時に環境ごとの調整を行ってください。
+
+既存コードの改修手順（開発者向け）:
+1. 既に HTML を受け取り保存している箇所を検索してください（例: `MessageController`, `Bot/AiHistoryController` など）。
+2. 直接 `HTMLPurifier` を使用している場合は、`App\Services\HtmlSanitizer` へ差し替えます。
+  - 例: `$body = (new \HTMLPurifier($config))->purify($input);` -> `$body = app(\App\Services\HtmlSanitizer::class)->purify($input);`
+3. 必要に応じて `config/htmlpurifier.php` の `HTML.Allowed` を調整し、ユニットテストを追加して期待動作を防ぐ回帰テストを作成してください。
+
+新規ユニットテスト案:
+- `tests/Unit/HtmlSanitizerTest.php` を作成し、XSS ベクトルとなる幾つかの入力（`<script>`, `onerror` 属性, `javascript:` スキームを含むリンクなど）がフィルタリングされることを検証してください。
+
+運用上の注記:
+- `Cache.SerializerPath` に指定したディレクトリ（デフォルト: `storage/framework/htmlpurifier`）に PHP プロセスが書き込み可能であることを確認してください。CI 環境ではこのディレクトリをキャッシュしないでください（ビルドで再生成して問題ありません）。
+
+次の推奨作業:
+1. `App\Services\FileMetaSanitizer` を作成し、既存のファイルメタサニタイズロジックを移行してください（`config/ai_files.php` を参照する）。
+2. 既存のコントローラを走査し、サニタイズパターンが統一されているか確認する自動コードオーディットスクリプト（簡易 grep ベース）を作成してください。
+
+
+---
+
 必要であれば私がこのファイルを PR の説明に流用して PR 作成まで代行します。どの追加作業を優先しますか？

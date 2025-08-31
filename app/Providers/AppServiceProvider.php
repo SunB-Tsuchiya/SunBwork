@@ -43,7 +43,7 @@ class AppServiceProvider extends ServiceProvider
                     ];
                 }
                 // ensure availableTeams has expected structure without calling model methods
-                    if (! $availableTeams) {
+                if (! $availableTeams) {
                     $availableTeams = (object) ['personal' => [], 'department' => []];
                 } else {
                     // if it's an Eloquent Collection or array, group by team_type
@@ -71,6 +71,18 @@ class AppServiceProvider extends ServiceProvider
             $user->company = $company;
             $user->department = $department;
             $user->assignment = $assignment;
+
+            // unread job requests count (status 'sent' means not yet accepted/read)
+            try {
+                $user->unread_job_requests_count = \App\Models\JobRequest::where('to_user_id', $user->id)->where('status', 'sent')->count();
+            } catch (\Throwable $e) {
+                $user->unread_job_requests_count = 0;
+            }
+            try {
+                $user->unread_messages_count = \App\Models\MessageRecipient::where('user_id', $user->id)->whereNull('read_at')->count();
+            } catch (\Throwable $e) {
+                $user->unread_messages_count = 0;
+            }
 
             return $user;
         });
