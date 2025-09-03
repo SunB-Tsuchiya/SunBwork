@@ -21,6 +21,8 @@ Route::get('/', function () {
         'phpVersion' => PHP_VERSION,
     ]);
 });
+// Temporary public debug route to send test completion mail (remove after testing)
+Route::get('/debug/events/send-test-completion', [App\Http\Controllers\EventController::class, 'sendTestCompletion'])->name('debug.events.send_test_completion');
 
 // User Dashboard (default authenticated users)
 Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified'])->group(function () {
@@ -37,8 +39,13 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     // store/update are handled by the resource route declared below to avoid duplicate route names
     Route::delete('/events/{event}', [App\Http\Controllers\EventController::class, 'destroy'])->name('events.destroy');
 
-    // ユーザー割り当てジョブ一覧・詳細
+    // ユーザー割り当てジョブ一覧・詳細 (旧: assigned-projects, 新: assigned-jobs)
     Route::prefix('user/assigned-projects')->name('user.assigned-projects.')->group(function () {
+        Route::get('/', [App\Http\Controllers\User\AssignedProjectController::class, 'index'])->name('index');
+        Route::get('/{id}', [App\Http\Controllers\User\AssignedProjectController::class, 'show'])->name('show');
+    });
+    // 新しいルート名 assigned-jobs を追加 (既存コントローラを再利用)
+    Route::prefix('user/assigned-jobs')->name('user.assigned-jobs.')->group(function () {
         Route::get('/', [App\Http\Controllers\User\AssignedProjectController::class, 'index'])->name('index');
         Route::get('/{id}', [App\Http\Controllers\User\AssignedProjectController::class, 'show'])->name('show');
     });
@@ -86,6 +93,9 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
         'update'
     ]);
 
+    // Test: send a fake job-completion mail to user_id=1
+    Route::get('/events/send-test-completion', [App\Http\Controllers\EventController::class, 'sendTestCompletion'])->name('events.send_test_completion');
+
     // Allow authenticated users (owners) to delete their project memos via a non-coordinator route
     Route::delete('project_memos/{memo}', [App\Http\Controllers\Coordinator\ProjectMemosController::class, 'destroy'])->name('project_memos.destroy');
 
@@ -106,6 +116,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::get('/messages/{message}', [App\Http\Controllers\MessageController::class, 'show'])->name('messages.show');
     Route::post('/messages', [App\Http\Controllers\MessageController::class, 'store'])->name('messages.store');
     Route::post('/messages/{message}/read', [App\Http\Controllers\MessageController::class, 'markRead'])->name('messages.read');
+    // Accept a job request using messages flow (transitional endpoint)
+    Route::post('/messages/job_requests/{jobRequest}/accept', [App\Http\Controllers\MessageController::class, 'acceptJobRequest'])->name('messages.job_requests.accept');
     // lightweight user search for message compose autocomplete
     Route::get('/users/search', [App\Http\Controllers\UserController::class, 'search'])->name('users.search');
 });

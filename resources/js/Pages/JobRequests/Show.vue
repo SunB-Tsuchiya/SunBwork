@@ -5,7 +5,8 @@ const page = usePage();
 const req = page.props.request;
 
 const accept = () => {
-    router.post(route('job_requests.accept', req.id));
+    // Use messages-based accept endpoint which updates JobRequest and linked assignment.
+    router.post(route('messages.job_requests.accept', req.id));
 };
 </script>
 

@@ -203,4 +203,46 @@ class MessageController extends Controller
 
         return redirect()->route('messages.index', ['folder' => $isDraft ? 'drafts' : 'sent']);
     }
+
+    /**
+     * Accept a job request using the messages-based flow.
+     * This updates the JobRequest status and linked assignment (if present).
+     */
+    public function acceptJobRequest(Request $request, \App\Models\JobRequest $jobRequest)
+    {
+        $this->authorize('update', $jobRequest);
+
+        if ($jobRequest->status === 'accepted') {
+            return back();
+        }
+
+        $jobRequest->status = 'accepted';
+        $jobRequest->accepted_at = now();
+        $jobRequest->save();
+
+        if ($jobRequest->project_job_assignment_id) {
+            $assignment = \App\Models\ProjectJobAssignment::find($jobRequest->project_job_assignment_id);
+            if ($assignment) {
+                $assignment->accepted = true;
+                $assignment->save();
+            }
+        }
+
+        // Optionally, mark any MessageRecipient rows that reference this job request as read.
+        try {
+            // If a message was created for this job request and linked via attachments or metadata,
+            // this code is a no-op unless application logic populates such links.
+        } catch (\Throwable $__e) {
+            // ignore
+        }
+
+        try {
+            event(new \App\Events\JobRequestAccepted($jobRequest));
+        } catch (\Throwable $e) {
+            logger()->warning('JobRequestAccepted broadcast failed: ' . $e->getMessage());
+        }
+
+        // Redirect user to messages index to reflect messages-based flow
+        return redirect()->route('messages.index');
+    }
 }

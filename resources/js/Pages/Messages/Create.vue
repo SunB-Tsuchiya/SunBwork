@@ -173,23 +173,23 @@
                                     <Link :href="route('messages.index')" class="text-sm text-gray-600 hover:text-gray-900">← 一覧へ戻る</Link>
                                 </div>
                                 <div class="space-x-2 text-right">
-                                <button
-                                    type="button"
-                                    @click="saveDraft"
-                                    class="inline-flex items-center gap-2 rounded-md bg-gray-200 px-4 py-2 text-gray-800"
-                                >
-                                    保存（下書き）
-                                </button>
-                                <button
-                                    type="button"
-                                    @click="confirmDiscard"
-                                    class="inline-flex items-center gap-2 rounded-md border bg-white px-4 py-2 text-red-600"
-                                >
-                                    破棄
-                                </button>
-                                <button type="submit" class="inline-flex items-center gap-2 rounded-md bg-blue-600 px-5 py-2 text-white shadow">
-                                    送信
-                                </button>
+                                    <button
+                                        type="button"
+                                        @click="saveDraft"
+                                        class="inline-flex items-center gap-2 rounded-md bg-gray-200 px-4 py-2 text-gray-800"
+                                    >
+                                        保存
+                                    </button>
+                                    <button
+                                        type="button"
+                                        @click="confirmDiscard"
+                                        class="inline-flex items-center gap-2 rounded-md border bg-white px-4 py-2 text-red-600"
+                                    >
+                                        破棄
+                                    </button>
+                                    <button type="submit" class="inline-flex items-center gap-2 rounded-md bg-blue-600 px-5 py-2 text-white shadow">
+                                        送信
+                                    </button>
                                 </div>
                             </div>
                         </form>
@@ -570,8 +570,10 @@ function saveDraft() {
         attachments: attachments.value.map((a) => a.id),
         save_as: 'draft',
     };
-    // use post to reuse same endpoint; server will handle save_as=draft and redirect to drafts
-    router.post(route('messages.store'), payload);
+    // use post to reuse same endpoint; server will handle save_as=draft
+    router.post(route('messages.store'), payload, {
+        onSuccess: () => showToast('下書きとして保存しました', 'success', 3000),
+    });
 }
 
 function confirmDiscard() {

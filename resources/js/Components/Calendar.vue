@@ -3,6 +3,7 @@
         <div class="mb-4 flex gap-4">
             <button @click="openEventModal" class="rounded bg-blue-600 px-4 py-2 text-white">予定作成</button>
             <button @click="goToDiaryCreate" class="rounded bg-orange-500 px-4 py-2 text-white">{{ props.diaryLabel }}作成</button>
+            <button @click="goToAssignedJobs" class="rounded bg-green-600 px-4 py-2 text-white">依頼一覧</button>
         </div>
         <FullCalendar :options="calendarOptions" :events="events" />
         <!-- 予定作成モーダル -->
@@ -108,6 +109,10 @@ const props = defineProps({
         type: String,
         default: '日報',
     },
+    jobs: {
+        type: Array,
+        default: () => [],
+    },
 });
 
 const showModal = ref(false);
@@ -133,6 +138,10 @@ const selectedScheduleId = ref(null);
 
 const startHourSelectRef = ref(null);
 const endHourSelectRef = ref(null);
+
+function goToAssignedJobs() {
+    router.get(route('user.assigned-jobs.index'));
+}
 
 onMounted(() => {
     nextTick(() => {
@@ -182,6 +191,7 @@ function handleDateSelect(selectionInfo) {
 // project schedule flows removed from personal calendar
 
 // 日報がある日をイベントとして表示（タイトルは●アイコン）
+// Merge diaries, events, and assigned jobs into FullCalendar events
 const events = ref([
     // 日報（オレンジ）
     ...props.diaries.map((diary) => {
@@ -229,9 +239,27 @@ const events = ref([
             description: event.description ?? event.extendedProps?.description ?? '',
         };
     }),
+    // Assigned jobs (Coordinator が割り当てたジョブ). 表示は allDay、色は淡い青
+    ...(props.jobs ?? [])
+        .map((job) => {
+            // job may contain preferred_date / scheduled_date / assigned_date
+            const date = job.preferred_date || job.scheduled_date || job.assigned_at || job.date || null;
+            if (!date) return null;
+            return {
+                title: `依頼: ${job.title}`,
+                start: String(date).split('T')[0],
+                allDay: true,
+                color: '#60a5fa',
+                job_id: job.id,
+                event_type: 'assigned_job',
+                description: job.details || job.description || '',
+                scheduled: job.scheduled_at || job.scheduled || false,
+            };
+        })
+        .filter(Boolean),
 ]);
 
-console.log('Calendar.vue events for FullCalendar:', events.value);
+// debug console.log removed after investigation
 
 const calendarOptions = computed(() => ({
     plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],

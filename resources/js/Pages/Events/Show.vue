@@ -17,8 +17,14 @@ function formatJstDateTime(dateStr) {
   return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
 }
 
-console.log('[Show.vue] event:', props.event);
-console.log('[Show.vue] event.description:', props.event.description);
+// remove debug logs
+
+function confirmDelete() {
+  if (!confirm('この予定を削除しますか？')) return;
+  // call delete endpoint and redirect to calendar on success
+  // Let the server return an Inertia redirect; no client-side onSuccess navigation needed
+  router.delete(route('events.destroy', { event: props.event.id }));
+}
 </script>
 
 <template>
@@ -49,7 +55,8 @@ console.log('[Show.vue] event.description:', props.event.description);
       </div>
       <div class="flex space-x-4">
         <Link :href="route('events.edit', props.event.id)" class="px-4 py-2 bg-blue-600 text-white rounded">編集</Link>
-  <Link :href="route('calendar.index')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded">戻る</Link>
+        <button @click="confirmDelete" class="px-4 py-2 bg-red-600 text-white rounded">削除</button>
+        <Link :href="route('calendar.index')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded">戻る</Link>
       </div>
     </div>
   </AppLayout>

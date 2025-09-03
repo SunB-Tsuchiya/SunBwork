@@ -1,0 +1,1915 @@
+diff --git a/app/Console/Kernel.php b/app/Console/Kernel.php
+index 0008eff..c7eb363 100644
+--- a/app/Console/Kernel.php
++++ b/app/Console/Kernel.php
+@@ -8,6 +8,7 @@ class Kernel extends ConsoleKernel
+ {
+     protected $commands = [
+         \App\Console\Commands\ConsolidateAiHistory::class,
++        \App\Console\Commands\MigrateJobRequestsToMessages::class,
+     ];
+ 
+     protected function schedule(\Illuminate\Console\Scheduling\Schedule $schedule)
+@@ -17,6 +18,6 @@ protected function schedule(\Illuminate\Console\Scheduling\Schedule $schedule)
+ 
+     protected function commands()
+     {
+-        $this->load(__DIR__.'/Commands');
++        $this->load(__DIR__ . '/Commands');
+     }
+ }
+diff --git a/app/Http/Controllers/CalendarController.php b/app/Http/Controllers/CalendarController.php
+index 210510c..103152b 100644
+--- a/app/Http/Controllers/CalendarController.php
++++ b/app/Http/Controllers/CalendarController.php
+@@ -5,8 +5,10 @@
+ use Illuminate\Http\Request;
+ use Inertia\Inertia;
+ use Illuminate\Support\Facades\Auth;
++// Log used for debugging during investigation (removed when cleanup)
+ use App\Models\Diary;
+ use App\Models\Event;
++use App\Models\ProjectJobAssignment;
+ 
+ class CalendarController extends Controller
+ {
+@@ -30,11 +32,31 @@ public function index()
+                 ->where('start', '>=', $event_from)
+                 ->where('start', '<=', $event_to)
+                 ->get(['id', 'title', 'start', 'end', 'description']);
++
++            // load assigned jobs that the user accepted or that are marked assigned
++            $jobs = ProjectJobAssignment::where('user_id', $user->id)
++                ->where(function ($q) {
++                    $q->where('accepted', true)->orWhere('assigned', true);
++                })
++                ->with('projectJob')
++                ->get()
++                ->map(function ($a) {
++                    return [
++                        'id' => $a->id,
++                        'title' => $a->title ?: ($a->projectJob ? $a->projectJob->name : '無題'),
++                        'details' => $a->detail ?? ($a->projectJob ? $a->projectJob->detail : null),
++                        'preferred_date' => $a->desired_start_date ? $a->desired_start_date->format('Y-m-d') : null,
++                        'scheduled_at' => null,
++                        'assigned_at' => $a->created_at,
++                    ];
++                });
+         }
+-        return Inertia::render('Calendar', [
++    // Debug logging removed after investigation
++    return Inertia::render('Calendar', [
+             'user' => $user,
+             'diaries' => $diaries,
+             'events' => $events,
++            'jobs' => $jobs ?? [],
+         ]);
+     }
+ }
+diff --git a/app/Http/Controllers/EventController.php b/app/Http/Controllers/EventController.php
+index d820236..4ab3b2d 100644
+--- a/app/Http/Controllers/EventController.php
++++ b/app/Http/Controllers/EventController.php
+@@ -5,10 +5,19 @@
+ use App\Models\Event;
+ use Illuminate\Http\Request;
+ use Illuminate\Support\Facades\Auth;
++use Illuminate\Support\Facades\Mail;
++use App\Models\User;
+ use Illuminate\Support\Facades\Storage;
+ use Illuminate\Support\Facades\Log;
++use Illuminate\Support\Facades\DB;
++use Illuminate\Support\Facades\Schema;
+ use Intervention\Image\ImageManager;
+ use Inertia\Inertia;
++use App\Models\ProjectJobAssignment;
++use App\Models\Message;
++use App\Models\MessageRecipient;
++use App\Events\MessageCreated;
++use App\Services\HtmlSanitizer;
+ 
+ class EventController extends Controller
+ {
+@@ -70,6 +79,28 @@ function ($attribute, $value, $fail) {
+             'endMinute' => 'required',
+         ]);
+         $data['user_id'] = Auth::id();
++        // Debug: log that store was invoked and incoming data to help trace why assignments are not marked
++        try {
++            Log::info('EventController::store invoked', ['input' => $request->all(), 'job_id' => $request->input('job_id')]);
++        } catch (\Throwable $__logE) {
++            // ignore logging errors
++        }
++        // If this request is for a job assignment, and that assignment is already marked scheduled,
++        // prevent creating a duplicate Event.
++        $jobId = $request->input('job_id');
++        if ($jobId) {
++            try {
++                $existingAssignment = ProjectJobAssignment::find($jobId);
++                if ($existingAssignment) {
++                    if (Schema::hasColumn('project_job_assignments', 'scheduled') && $existingAssignment->scheduled) {
++                        // Redirect back to assigned-jobs with a flash message indicating it's already set
++                        return redirect()->route('user.assigned-jobs.index')->with('error', 'このジョブは既にセット済です。');
++                    }
++                }
++            } catch (\Throwable $__e) {
++                // ignore and proceed
++            }
++        }
+         // 開始・終了時刻を結合
+         $data['start'] = $data['date'] . ' ' . $data['startHour'] . ':' . $data['startMinute'] . ':00';
+         $data['end'] = $data['date'] . ' ' . $data['endHour'] . ':' . $data['endMinute'] . ':00';
+@@ -82,6 +113,105 @@ function ($attribute, $value, $fail) {
+         $event->date = $data['date'];
+         $event->save();
+ 
++        // If this event was created for a job assignment, mark that assignment as scheduled.
++        $jobId = $request->input('job_id');
++        if ($jobId) {
++            try {
++                $assignment = ProjectJobAssignment::find($jobId);
++                if ($assignment) {
++                    // Log current assignment scheduled state before updating for debugging
++                    try {
++                        Log::info('EventController: about to mark ProjectJobAssignment scheduled', [
++                            'assignment_id' => $assignment->id ?? null,
++                            'scheduled' => $assignment->scheduled ?? null,
++                            'scheduled_at' => isset($assignment->scheduled_at) ? (string)$assignment->scheduled_at : null,
++                        ]);
++                    } catch (\Throwable $__logEx) {
++                        // ignore logging errors
++                    }
++
++                    // Use a transaction to ensure consistency
++                    DB::transaction(function () use ($assignment, $event) {
++                        // If the assignments table has scheduled_at column, set it to event start
++                        if (Schema::hasColumn('project_job_assignments', 'scheduled_at')) {
++                            $assignment->scheduled_at = $event->start;
++                        }
++                        // If there's a boolean scheduled flag, set it true
++                        if (Schema::hasColumn('project_job_assignments', 'scheduled')) {
++                            $assignment->scheduled = true;
++                        }
++                        $assignment->save();
++                    });
++
++                    // After marking scheduled, send a notification message to the assigner (if identifiable)
++                    try {
++                        // ensure projectJob relation is loaded
++                        $assignment->load('projectJob');
++                        $assignerId = null;
++                        // prefer explicit creator column if exists
++                        if (Schema::hasColumn('project_job_assignments', 'created_by') && isset($assignment->created_by)) {
++                            $assignerId = $assignment->created_by;
++                        }
++                        // fallback to project job owner
++                        if (!$assignerId && $assignment->projectJob && isset($assignment->projectJob->user_id)) {
++                            $assignerId = $assignment->projectJob->user_id;
++                        }
++
++                        if ($assignerId) {
++                            $sanitizer = app(HtmlSanitizer::class);
++                            // Build message using the same labels as sendTestCompletion so frontend formatting applies
++                            $bodyLines = [];
++                            $bodyLines[] = "ジョブ割り当て終了のご連絡";
++                            $bodyLines[] = "プロジェクトジョブID: " . ($assignment->project_job_id ?? '-');
++                            $bodyLines[] = "予定をセットしたユーザーID: " . (Auth::id() ?? '-');
++                            $bodyLines[] = "イベント名: " . ($event->title ?? ($assignment->title ?: ($assignment->projectJob->name ?? '-')));
++                            $bodyLines[] = "開始: " . ($event->start ?? '-');
++                            $bodyLines[] = "終了: " . ($event->end ?? '-');
++                            // prefer assignment detail then project job detail
++                            $detailText = $assignment->detail ?? ($assignment->projectJob->detail ?? '');
++                            $bodyLines[] = "詳細: " . ($detailText ?: '');
++
++                            $body = implode("\n", $bodyLines);
++                            $clean = $sanitizer->purify($body);
++
++                            try {
++                                Log::info('EventController: creating Message payload', ['from_user_id' => Auth::id(), 'subject' => 'ジョブ割り当て終了', 'assignerId' => $assignerId]);
++                                $message = Message::create([
++                                    'from_user_id' => Auth::id(),
++                                    'subject' => 'ジョブ割り当て終了',
++                                    'body' => $clean,
++                                    'status' => 'sent',
++                                    'sent_at' => now(),
++                                ]);
++                                Log::info('EventController: Message created', ['message_id' => $message->id]);
++
++                                $recipient = MessageRecipient::create([
++                                    'message_id' => $message->id,
++                                    'user_id' => $assignerId,
++                                    'type' => 'to',
++                                ]);
++                                Log::info('EventController: MessageRecipient created', ['recipient_id' => $recipient->id ?? null, 'message_id' => $message->id, 'assignerId' => $assignerId]);
++
++                                try {
++                                    $message->load('recipients');
++                                    event(new MessageCreated($message));
++                                    Log::info('EventController: MessageCreated event fired', ['message_id' => $message->id]);
++                                } catch (\Throwable $__e) {
++                                    Log::warning('EventController: broadcast MessageCreated failed', ['error' => $__e->getMessage()]);
++                                }
++                            } catch (\Throwable $__e) {
++                                Log::error('EventController: failed to create Message/Recipient', ['error' => $__e->getMessage()]);
++                            }
++                        }
++                    } catch (\Throwable $e) {
++                        Log::warning('Failed to send set-complete message', ['error' => $e->getMessage()]);
++                    }
++                }
++            } catch (\Throwable $e) {
++                Log::warning('Failed to mark ProjectJobAssignment as scheduled', ['job_id' => $jobId, 'error' => $e->getMessage()]);
++            }
++        }
++
+         // 添付ファイル保存
+         if ($request->hasFile('files')) {
+             foreach ($request->file('files') as $file) {
+@@ -93,14 +223,14 @@ function ($attribute, $value, $fail) {
+                 $path = 'event_attachments/' . $uniqueName;
+ 
+                 if ($isImage) {
+-                        // @phpstan-ignore-next-line
+-                        /** @var \Intervention\Image\Image $img */
+-                        if (extension_loaded('imagick') && class_exists(\Intervention\Image\Drivers\Imagick\Driver::class)) {
+-                            $manager = ImageManager::imagick();
+-                        } else {
+-                            $manager = ImageManager::gd();
+-                        }
+-                        $img = $manager->read($file);
++                    // @phpstan-ignore-next-line
++                    /** @var \Intervention\Image\Image $img */
++                    if (extension_loaded('imagick') && class_exists(\Intervention\Image\Drivers\Imagick\Driver::class)) {
++                        $manager = ImageManager::imagick();
++                    } else {
++                        $manager = ImageManager::gd();
++                    }
++                    $img = $manager->read($file);
+                     if ($img->width() > 1200) {
+                         $img->resize(1200, null, function ($constraint) {
+                             $constraint->aspectRatio();
+@@ -135,16 +265,16 @@ function ($attribute, $value, $fail) {
+             }
+         }
+ 
+-        return redirect()->route('dashboard');
++        return redirect()->route('calendar.index');
+     }
+ 
+     // 予定の更新
+     public function update(Request $request, Event $event)
+     {
+-    Log::debug('Event update request', $request->all());
++        Log::debug('Event update request', $request->all());
+         $this->authorize('update', $event);
+-    Log::debug('Request all: ' . json_encode($request->all(), JSON_UNESCAPED_UNICODE));
+-    Log::debug('Request input: ' . json_encode($request->input(), JSON_UNESCAPED_UNICODE));
++        Log::debug('Request all: ' . json_encode($request->all(), JSON_UNESCAPED_UNICODE));
++        Log::debug('Request input: ' . json_encode($request->input(), JSON_UNESCAPED_UNICODE));
+         // $request->get()は引数必須のため削除
+         $data = $request->validate([
+             'date' => 'required|date',
+@@ -162,15 +292,15 @@ function ($attribute, $value, $fail) {
+             'endHour' => 'required',
+             'endMinute' => 'required',
+         ]);
+-    Log::debug('Validated data', $data);
++        Log::debug('Validated data', $data);
+         $data['description'] = $request->input('description', '');
+         $data['user_id'] = Auth::id();
+         $data['start'] = date('Y-m-d H:i:00', strtotime($data['date'] . ' ' . $data['startHour'] . ':' . $data['startMinute']));
+         $data['end'] = date('Y-m-d H:i:00', strtotime($data['date'] . ' ' . $data['endHour'] . ':' . $data['endMinute']));
+-    Log::debug('Start/End generated', ['start' => $data['start'], 'end' => $data['end']]);
+-    Log::debug('Event before update', $event->toArray());
++        Log::debug('Start/End generated', ['start' => $data['start'], 'end' => $data['end']]);
++        Log::debug('Event before update', $event->toArray());
+         $event->update($data);
+-    Log::debug('Event after update', $event->fresh()->toArray());
++        Log::debug('Event after update', $event->fresh()->toArray());
+ 
+         // 添付ファイル保存（追加分のみ）
+         if ($request->hasFile('files')) {
+@@ -183,14 +313,14 @@ function ($attribute, $value, $fail) {
+                 $path = 'event_attachments/' . $uniqueName;
+ 
+                 if ($isImage) {
+-                        // @phpstan-ignore-next-line
+-                        /** @var \Intervention\Image\Image $img */
+-                        if (extension_loaded('imagick') && class_exists(\Intervention\Image\Drivers\Imagick\Driver::class)) {
+-                            $manager = ImageManager::imagick();
+-                        } else {
+-                            $manager = ImageManager::gd();
+-                        }
+-                        $img = $manager->read($file);
++                    // @phpstan-ignore-next-line
++                    /** @var \Intervention\Image\Image $img */
++                    if (extension_loaded('imagick') && class_exists(\Intervention\Image\Drivers\Imagick\Driver::class)) {
++                        $manager = ImageManager::imagick();
++                    } else {
++                        $manager = ImageManager::gd();
++                    }
++                    $img = $manager->read($file);
+                     if ($img->width() > 1200) {
+                         $img->resize(1200, null, function ($constraint) {
+                             $constraint->aspectRatio();
+@@ -224,8 +354,8 @@ function ($attribute, $value, $fail) {
+                 ]);
+             }
+         }
+-    Log::debug('Event update finished');
+-        return redirect()->route('dashboard');
++        Log::debug('Event update finished');
++        return redirect()->route('calendar.index');
+     }
+ 
+     // 予定の削除
+@@ -240,6 +370,10 @@ public function destroy(Event $event)
+             $attachment->delete();
+         }
+         $event->delete();
++        // If this request came from Inertia, return a redirect (Inertia expects a redirect/Inertia response).
++        if (request()->header('X-Inertia')) {
++            return redirect()->route('calendar.index');
++        }
+         return response()->json(['message' => 'deleted']);
+     }
+ 
+@@ -257,16 +391,121 @@ public function show(Event $event)
+     public function create(Request $request)
+     {
+         $date = $request->query('date', now()->toDateString());
++        $jobId = $request->query('job');
++        $jobData = null;
++        if ($jobId) {
++            $assignment = \App\Models\ProjectJobAssignment::with(['projectJob', 'user'])->find($jobId);
++            if ($assignment) {
++                $jobData = [
++                    'id' => $assignment->id,
++                    'project_job_id' => $assignment->project_job_id,
++                    'title' => $assignment->title ?: ($assignment->projectJob ? $assignment->projectJob->name : null),
++                    // details from assignment first, fallback to projectJob detail
++                    'details' => $assignment->detail ?? ($assignment->projectJob ? $assignment->projectJob->detail : null),
++                    // include assigned user name if available
++                    'assigned_user_name' => $assignment->user ? $assignment->user->name : null,
++                    // difficulty
++                    'difficulty' => $assignment->difficulty ?? ($assignment->projectJob ? $assignment->projectJob->difficulty : null),
++                    // desired/ preferred dates and time
++                    'desired_start_date' => $assignment->desired_start_date ? (method_exists($assignment->desired_start_date, 'format') ? $assignment->desired_start_date->format('Y-m-d') : (string) $assignment->desired_start_date) : null,
++                    'desired_end_date' => $assignment->desired_end_date ? (method_exists($assignment->desired_end_date, 'format') ? $assignment->desired_end_date->format('Y-m-d') : (string) $assignment->desired_end_date) : null,
++                    'desired_time' => $assignment->desired_time ?? null,
++                    // keep backward-compatible preferred_date
++                    'preferred_date' => $assignment->desired_start_date ? (method_exists($assignment->desired_start_date, 'format') ? $assignment->desired_start_date->format('Y-m-d') : (string) $assignment->desired_start_date) : null,
++                ];
++            }
++        }
++        // Debug logging to ensure jobData is created and query params are received
++        try {
++            Log::debug('EventController::create query', ['query' => $request->query()]);
++            Log::debug('EventController::create jobId', ['jobId' => $jobId]);
++            if (!empty($jobData)) {
++                Log::debug('EventController::create jobData', ['jobData' => $jobData]);
++            } else {
++                Log::debug('EventController::create jobData: null');
++            }
++        } catch (\Throwable $_e) {
++            // ignore logging errors
++        }
+         return Inertia::render('Events/Create', [
+             'date' => $date,
++            'job' => $jobData,
+         ]);
+     }
+ 
++    /**
++     * Send a test "job completion" email to user_id=1 with dummy data.
++     * Useful for verifying mail delivery during development.
++     */
++    public function sendTestCompletion(Request $request)
++    {
++        // prepare dummy payload
++        $data = [
++            'project_job_id' => $request->input('project_job_id', 12345),
++            'set_by_user_id' => $request->input('set_by_user_id', Auth::id() ?? 2),
++            'event_title' => $request->input('event_title', 'テストイベント'),
++            'start' => $request->input('start', now()->addDay()->format('Y-m-d H:i:00')),
++            'end' => $request->input('end', now()->addDay()->addHour()->format('Y-m-d H:i:00')),
++            'details' => $request->input('details', "これはテスト用のジョブ割り当て完了通知です。詳細はここに記載されます。"),
++        ];
++
++        $recipient = User::find(1);
++        if (!$recipient || !$recipient->email) {
++            return response()->json(['error' => 'Recipient user_id=1 not found or has no email'], 500);
++        }
++
++        $bodyLines = [];
++        $bodyLines[] = "ジョブ割り当て終了のご連絡";
++        $bodyLines[] = "プロジェクトジョブID: " . $data['project_job_id'];
++        $bodyLines[] = "予定をセットしたユーザーID: " . $data['set_by_user_id'];
++        $bodyLines[] = "イベント名: " . $data['event_title'];
++        $bodyLines[] = "開始: " . $data['start'];
++        $bodyLines[] = "終了: " . $data['end'];
++        $bodyLines[] = "詳細:\n" . $data['details'];
++
++        $body = implode("\n", $bodyLines);
++
++        try {
++            // Create as an application Message (internal messages flow)
++            $message = Message::create([
++                'from_user_id' => $data['set_by_user_id'],
++                'subject' => 'ジョブ割り当て終了',
++                'body' => $body,
++                'status' => 'sent',
++                'sent_at' => now(),
++            ]);
++
++            MessageRecipient::create([
++                'message_id' => $message->id,
++                'user_id' => $recipient->id,
++                'type' => 'to',
++            ]);
++
++            // Log for environments where DB access from CLI is not available
++            try {
++                Log::info('sendTestCompletion created Message', ['message_id' => $message->id, 'recipient' => $recipient->id]);
++            } catch (\Throwable $__e) {
++            }
++
++            // Broadcast to Reverb via MessageCreated event for real-time notification
++            try {
++                $message->load('recipients');
++                event(new MessageCreated($message));
++            } catch (\Throwable $__e) {
++                Log::warning('Broadcast MessageCreated failed', ['error' => $__e->getMessage()]);
++            }
++        } catch (\Throwable $e) {
++            Log::error('Failed to create test Message', ['error' => $e->getMessage()]);
++            return response()->json(['error' => 'Message create failed', 'message' => $e->getMessage()], 500);
++        }
++
++        return response()->json(['message' => 'Test Message created and broadcast (recipient user_id=1: ' . $recipient->email . ')', 'payload' => $data]);
++    }
+     // イベント編集画面表示
+     public function edit(Event $event)
+     {
+         $event->date = \Carbon\Carbon::parse($event->start)->toDateString();
+-    Log::debug('EditController event', $event->toArray());
++        Log::debug('EditController event', $event->toArray());
+         return Inertia::render('Events/Edit', [
+             'event' => $event,
+         ]);
+diff --git a/app/Http/Controllers/MessageController.php b/app/Http/Controllers/MessageController.php
+index 2234eb4..6dae455 100644
+--- a/app/Http/Controllers/MessageController.php
++++ b/app/Http/Controllers/MessageController.php
+@@ -203,4 +203,46 @@ public function store(Request $request)
+ 
+         return redirect()->route('messages.index', ['folder' => $isDraft ? 'drafts' : 'sent']);
+     }
++
++    /**
++     * Accept a job request using the messages-based flow.
++     * This updates the JobRequest status and linked assignment (if present).
++     */
++    public function acceptJobRequest(Request $request, \App\Models\JobRequest $jobRequest)
++    {
++        $this->authorize('update', $jobRequest);
++
++        if ($jobRequest->status === 'accepted') {
++            return back();
++        }
++
++        $jobRequest->status = 'accepted';
++        $jobRequest->accepted_at = now();
++        $jobRequest->save();
++
++        if ($jobRequest->project_job_assignment_id) {
++            $assignment = \App\Models\ProjectJobAssignment::find($jobRequest->project_job_assignment_id);
++            if ($assignment) {
++                $assignment->accepted = true;
++                $assignment->save();
++            }
++        }
++
++        // Optionally, mark any MessageRecipient rows that reference this job request as read.
++        try {
++            // If a message was created for this job request and linked via attachments or metadata,
++            // this code is a no-op unless application logic populates such links.
++        } catch (\Throwable $__e) {
++            // ignore
++        }
++
++        try {
++            event(new \App\Events\JobRequestAccepted($jobRequest));
++        } catch (\Throwable $e) {
++            logger()->warning('JobRequestAccepted broadcast failed: ' . $e->getMessage());
++        }
++
++        // Redirect user to messages index to reflect messages-based flow
++        return redirect()->route('messages.index');
++    }
+ }
+diff --git a/app/Http/Controllers/User/AssignedProjectController.php b/app/Http/Controllers/User/AssignedProjectController.php
+index c18489d..2228b6b 100644
+--- a/app/Http/Controllers/User/AssignedProjectController.php
++++ b/app/Http/Controllers/User/AssignedProjectController.php
+@@ -17,15 +17,63 @@ public function index(Request $request)
+         $jobs = \App\Models\ProjectTeamMember::with(['projectJob.client'])
+             ->where('user_id', $user->id)
+             ->get()
+-            ->map(function ($ptm) {
++            ->map(function ($ptm) use ($user) {
+                 $job = $ptm->projectJob;
++                // find any assignment for this user on this job (if project_job_assignments exists)
++                $assignment = null;
++                try {
++                    $assignment = \App\Models\ProjectJobAssignment::where('project_job_id', $job->id)
++                        ->where('user_id', $user->id)
++                        ->first();
++                } catch (\Throwable $e) {
++                    // ignore if table doesn't exist or other issues
++                }
+                 return [
+                     'id' => $job->id,
+                     'jobcode' => $job->jobcode,
+                     'name' => $job->name,
+                     'client_name' => $job->client ? $job->client->name : '-',
++                    'assignment' => $assignment ? [
++                        'id' => $assignment->id,
++                        'scheduled' => isset($assignment->scheduled) ? (bool)$assignment->scheduled : null,
++                        'scheduled_at' => $assignment->scheduled_at ?? null,
++                    ] : null,
+                 ];
+             });
++        // Use project_job_assignments for the user's assigned jobs
++        $assignments = [];
++        try {
++            $assignments = \App\Models\ProjectJobAssignment::with(['projectJob.client'])
++                ->where('user_id', $user->id)
++                ->get()
++                ->map(function ($a) {
++                    $pj = $a->projectJob;
++                    return [
++                        // id here is the assignment id (used when creating an event)
++                        'id' => $a->id,
++                        'project_job_id' => $a->project_job_id,
++                        'jobcode' => $pj ? $pj->jobcode : null,
++                        'name' => $a->title ?: ($pj ? $pj->name : null),
++                        'client_name' => $pj && $pj->client ? $pj->client->name : '-',
++                        // details: prefer assignment.detail, fallback to project job detail
++                        'details' => isset($a->detail) ? (is_string($a->detail) ? $a->detail : json_encode($a->detail)) : (isset($pj->detail) ? (is_string($pj->detail) ? $pj->detail : json_encode($pj->detail)) : null),
++                        // difficulty: prefer assignment difficulty, then project job
++                        'difficulty' => $a->difficulty ?? $pj->difficulty ?? null,
++                        // desired start/end/time: format Carbon to Y-m-d where possible
++                        'desired_start_date' => isset($a->desired_start_date) ? (method_exists($a->desired_start_date, 'format') ? $a->desired_start_date->format('Y-m-d') : (string) $a->desired_start_date) : null,
++                        'desired_end_date' => isset($a->desired_end_date) ? (method_exists($a->desired_end_date, 'format') ? $a->desired_end_date->format('Y-m-d') : (string) $a->desired_end_date) : null,
++                        'desired_time' => $a->desired_time ?? null,
++                        'scheduled' => isset($a->scheduled) ? (bool)$a->scheduled : false,
++                        'scheduled_at' => $a->scheduled_at ?? null,
++                        'preferred_date' => $a->desired_start_date ?? null,
++                    ];
++                })->toArray();
++        } catch (\Throwable $e) {
++            // fallback: if assignments table missing or error, keep empty
++            $assignments = [];
++        }
++
++        $jobs = collect($assignments);
+         return Inertia::render('User/AssignedProject/Index', [
+             'jobs' => $jobs,
+         ]);
+@@ -33,10 +81,19 @@ public function index(Request $request)
+ 
+     public function show($id)
+     {
+-        // project_jobs, client, メンバーを取得
+-        // eager-load client and schedules so frontend can render calendar without extra requests
++        // First try to find as a ProjectJobAssignment (assignment id)
++        $assignment = \App\Models\ProjectJobAssignment::with(['projectJob.client', 'user'])->find($id);
++        if ($assignment) {
++            $pj = $assignment->projectJob;
++            $pj->detail = is_string($pj->detail) ? json_decode($pj->detail, true) : $pj->detail;
++            return Inertia::render('User/AssignedProject/ShowAssignment', [
++                'assignment' => $assignment,
++                'projectJob' => $pj,
++            ]);
++        }
++
++        // Fallback: treat id as project_job id and render project show
+         $job = \App\Models\ProjectJob::with(['client', 'schedules'])->findOrFail($id);
+-        // detailsはJSONデコード
+         $job->detail = is_string($job->detail) ? json_decode($job->detail, true) : $job->detail;
+ 
+         // チームメンバー取得
+@@ -53,14 +110,12 @@ public function show($id)
+                 ];
+             });
+ 
+-        // load project memos (with author info) so assigned users can see them on calendar
+         $memos = \App\Models\ProjectMemo::where('project_id', $id)->with('user:id,name')->get();
+         $memos->transform(function ($m) {
+             $m->author = $m->user ? ['id' => $m->user->id, 'name' => $m->user->name] : null;
+             return $m;
+         });
+ 
+-        // debug: log memos count for this view
+         try {
+             Log::info('AssignedProjectController@show memos', ['project_id' => $id, 'count' => $memos->count()]);
+         } catch (\Throwable $e) {
+diff --git a/app/Providers/AppServiceProvider.php b/app/Providers/AppServiceProvider.php
+index 8291e63..c81c6a7 100644
+--- a/app/Providers/AppServiceProvider.php
++++ b/app/Providers/AppServiceProvider.php
+@@ -72,13 +72,11 @@ public function boot(): void
+             $user->department = $department;
+             $user->assignment = $assignment;
+ 
+-            // unread job requests count (status 'sent' means not yet accepted/read)
+-            try {
+-                $user->unread_job_requests_count = \App\Models\JobRequest::where('to_user_id', $user->id)->where('status', 'sent')->count();
+-            } catch (\Throwable $e) {
+-                $user->unread_job_requests_count = 0;
+-            }
++            // legacy: job_requests is being migrated into Messages. Keep the legacy
++            // property for a transitional period but set to 0 to avoid duplicate counts.
++            $user->unread_job_requests_count = 0;
+             try {
++                // authoritative unread messages count
+                 $user->unread_messages_count = \App\Models\MessageRecipient::where('user_id', $user->id)->whereNull('read_at')->count();
+             } catch (\Throwable $e) {
+                 $user->unread_messages_count = 0;
+diff --git a/resources/js/Components/AddressBookModal.vue b/resources/js/Components/AddressBookModal.vue
+index e69de29..006af83 100644
+--- a/resources/js/Components/AddressBookModal.vue
++++ b/resources/js/Components/AddressBookModal.vue
+@@ -0,0 +1,55 @@
++<template>
++    <div v-if="show" class="fixed inset-0 z-50 flex items-center justify-center">
++        <div class="fixed inset-0 bg-black/40" @click="close"></div>
++        <div class="z-10 w-3/4 max-w-2xl overflow-auto rounded-lg bg-white shadow-lg">
++            <div class="flex items-center justify-between border-b p-4">
++                <h3 class="font-semibold">アドレス帳</h3>
++                <button @click="close" class="text-gray-500">閉じる</button>
++            </div>
++            <div class="space-y-2 p-4">
++                <input v-model="query" @input="search" placeholder="検索（名前/会社/部署/役割/割当）" class="w-full rounded border px-3 py-2" />
++                <ul>
++                    <li v-for="u in users" :key="u.id" class="flex items-center justify-between p-2 hover:bg-gray-50">
++                        <div>
++                            <div class="font-medium">{{ u.name }}</div>
++                            <div class="text-xs text-gray-500">
++                                {{ u.company_name }} / {{ u.department_name }} / {{ u.role_name }} / {{ u.assignment_name }}
++                            </div>
++                        </div>
++                        <div>
++                            <button @click="$emit('select', u)" class="text-blue-600">選択</button>
++                        </div>
++                    </li>
++                </ul>
++            </div>
++        </div>
++    </div>
++</template>
++
++<script setup>
++import axios from 'axios';
++import { ref, watch } from 'vue';
++const props = defineProps({ show: Boolean, companyId: [Number, null] });
++const emit = defineEmits(['close', 'select']);
++const query = ref('');
++const users = ref([]);
++
++async function search() {
++    try {
++        const res = await axios.get(route('users.search'), { params: { q: query.value, company_id: props.companyId } });
++        users.value = res.data;
++    } catch (e) {
++        console.error(e);
++    }
++}
++
++watch(
++    () => props.show,
++    (v) => {
++        if (v) {
++            query.value = '';
++            users.value = [];
++        }
++    },
++);
++</script>
+diff --git a/resources/js/Components/Calendar.vue b/resources/js/Components/Calendar.vue
+index 8c58120..0ef00f7 100644
+--- a/resources/js/Components/Calendar.vue
++++ b/resources/js/Components/Calendar.vue
+@@ -3,6 +3,7 @@
+         <div class="mb-4 flex gap-4">
+             <button @click="openEventModal" class="rounded bg-blue-600 px-4 py-2 text-white">予定作成</button>
+             <button @click="goToDiaryCreate" class="rounded bg-orange-500 px-4 py-2 text-white">{{ props.diaryLabel }}作成</button>
++            <button @click="goToAssignedJobs" class="rounded bg-green-600 px-4 py-2 text-white">依頼一覧</button>
+         </div>
+         <FullCalendar :options="calendarOptions" :events="events" />
+         <!-- 予定作成モーダル -->
+@@ -108,6 +109,10 @@ const props = defineProps({
+         type: String,
+         default: '日報',
+     },
++    jobs: {
++        type: Array,
++        default: () => [],
++    },
+ });
+ 
+ const showModal = ref(false);
+@@ -134,6 +139,10 @@ const selectedScheduleId = ref(null);
+ const startHourSelectRef = ref(null);
+ const endHourSelectRef = ref(null);
+ 
++function goToAssignedJobs() {
++    router.get(route('user.assigned-jobs.index'));
++}
++
+ onMounted(() => {
+     nextTick(() => {
+         const now = new Date();
+@@ -182,6 +191,7 @@ function handleDateSelect(selectionInfo) {
+ // project schedule flows removed from personal calendar
+ 
+ // 日報がある日をイベントとして表示（タイトルは●アイコン）
++// Merge diaries, events, and assigned jobs into FullCalendar events
+ const events = ref([
+     // 日報（オレンジ）
+     ...props.diaries.map((diary) => {
+@@ -229,9 +239,27 @@ const events = ref([
+             description: event.description ?? event.extendedProps?.description ?? '',
+         };
+     }),
++    // Assigned jobs (Coordinator が割り当てたジョブ). 表示は allDay、色は淡い青
++    ...(props.jobs ?? [])
++        .map((job) => {
++            // job may contain preferred_date / scheduled_date / assigned_date
++            const date = job.preferred_date || job.scheduled_date || job.assigned_at || job.date || null;
++            if (!date) return null;
++            return {
++                title: `依頼: ${job.title}`,
++                start: String(date).split('T')[0],
++                allDay: true,
++                color: '#60a5fa',
++                job_id: job.id,
++                event_type: 'assigned_job',
++                description: job.details || job.description || '',
++                scheduled: job.scheduled_at || job.scheduled || false,
++            };
++        })
++        .filter(Boolean),
+ ]);
+ 
+-console.log('Calendar.vue events for FullCalendar:', events.value);
++// debug console.log removed after investigation
+ 
+ const calendarOptions = computed(() => ({
+     plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],
+diff --git a/resources/js/Components/Tabs/UserNavigationTabs.vue b/resources/js/Components/Tabs/UserNavigationTabs.vue
+index 5f0e184..29adda9 100644
+--- a/resources/js/Components/Tabs/UserNavigationTabs.vue
++++ b/resources/js/Components/Tabs/UserNavigationTabs.vue
+@@ -1,28 +1,24 @@
+ <script setup>
+ import { Link } from '@inertiajs/vue3';
+ const props = defineProps({
+-  active: { type: String, default: '' }
++    active: { type: String, default: '' },
+ });
+ </script>
+ 
+ <template>
+-  <div class="mb-6">
+-    <nav class="flex space-x-8" aria-label="Tabs">
+-      <Link :href="route('profile.show')" class="text-gray-600 hover:text-gray-800 px-3 py-2 font-medium text-sm rounded-md">
+-        プロフィール編集
+-      </Link>
+-      <Link :href="route('user.assigned-projects.index')" class="text-gray-600 hover:text-gray-800 px-3 py-2 font-medium text-sm rounded-md">
+-        ジョブ一覧
+-      </Link>
+-      <Link :href="route('diaries.index')" class="text-gray-600 hover:text-gray-800 px-3 py-2 font-medium text-sm rounded-md">
+-        日報一覧
+-      </Link>
+-      <Link :href="route('calendar.index')" class="text-green-600 hover:text-green-800 px-3 py-2 font-medium text-sm rounded-md">
+-        予定表
+-      </Link>
+-      <Link :href="route('chat.rooms.index')" class="text-purple-600 hover:text-purple-800 px-3 py-2 font-medium text-sm rounded-md">
+-        チャット
+-      </Link>
+-    </nav>
+-  </div>
++    <div class="mb-6">
++        <nav class="flex space-x-8" aria-label="Tabs">
++            <Link :href="route('profile.show')" class="rounded-md px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800">
++                プロフィール編集
++            </Link>
++            <Link :href="route('user.assigned-jobs.index')" class="rounded-md px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800">
++                ジョブ一覧
++            </Link>
++            <Link :href="route('diaries.index')" class="rounded-md px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800"> 日報一覧 </Link>
++            <Link :href="route('calendar.index')" class="rounded-md px-3 py-2 text-sm font-medium text-green-600 hover:text-green-800"> 予定表 </Link>
++            <Link :href="route('chat.rooms.index')" class="rounded-md px-3 py-2 text-sm font-medium text-purple-600 hover:text-purple-800">
++                チャット
++            </Link>
++        </nav>
++    </div>
+ </template>
+diff --git a/resources/js/Pages/Calendar.vue b/resources/js/Pages/Calendar.vue
+index 13e2b03..7307f45 100644
+--- a/resources/js/Pages/Calendar.vue
++++ b/resources/js/Pages/Calendar.vue
+@@ -1,32 +1,36 @@
+ <script setup>
+-import AppLayout from '@/layouts/AppLayout.vue';
+ import Calendar from '@/Components/Calendar.vue';
++import AppLayout from '@/layouts/AppLayout.vue';
+ 
+ const props = defineProps({
+-  user: {
+-    type: Object,
+-    required: false,
+-  },
+-  diaries: {
+-    type: Array,
+-    default: () => [],
+-  },
+-  events: {
+-    type: Array,
+-    default: () => [],
+-  },
++    user: {
++        type: Object,
++        required: false,
++    },
++    diaries: {
++        type: Array,
++        default: () => [],
++    },
++    events: {
++        type: Array,
++        default: () => [],
++    },
++    jobs: {
++        type: Array,
++        default: () => [],
++    },
+ });
+ </script>
+ 
+ <template>
+-  <AppLayout title="予定表">
+-    <template #header>
+-      <h2 class="font-semibold text-xl text-gray-800 leading-tight">予定表</h2>
+-    </template>
+-    <div class="py-12">
+-      <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+-        <Calendar :diaries="diaries" :events="events" />
+-      </div>
+-    </div>
+-  </AppLayout>
++    <AppLayout title="予定表">
++        <template #header>
++            <h2 class="text-xl font-semibold leading-tight text-gray-800">予定表</h2>
++        </template>
++        <div class="py-12">
++            <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
++                <Calendar :diaries="diaries" :events="events" :jobs="jobs" />
++            </div>
++        </div>
++    </AppLayout>
+ </template>
+diff --git a/resources/js/Pages/Coordinator/ProjectJobs/JobAssign/Index.vue b/resources/js/Pages/Coordinator/ProjectJobs/JobAssign/Index.vue
+index c4dc597..d3ed50b 100644
+--- a/resources/js/Pages/Coordinator/ProjectJobs/JobAssign/Index.vue
++++ b/resources/js/Pages/Coordinator/ProjectJobs/JobAssign/Index.vue
+@@ -85,18 +85,26 @@ function statusText(a) {
+ function sendRequest(a) {
+     if (!confirm('このジョブを発信しますか？')) return;
+ 
++    // Build payload compatible with MessagesController@store
++    // Messages API expects: { to: [userId,...], subject: string|null, body: string|null, attachments: [] }
++    const toUserId = a.user_id || a.user?.id;
++    // Build a readable details block for the email body
++    const assignedName = a.user?.name || a.assigned_user_name || '（未割当）';
++    const detailsText = a.details || a.detail || a.description || a.body || '';
++    const start = a.desired_start_date || a.preferred_date || a.start_date || '-';
++    const end = a.desired_end_date || a.end_date || '-';
++
+     const payload = {
+-        project_job_id: projectJob.id,
+-        project_job_assignment_id: a.id,
+-        to_user_id: a.user_id || a.user?.id,
+-        message: `割り当ての依頼: ${a.title}`,
++        to: toUserId ? [toUserId] : [],
++        subject: `ジョブ割り当ての依頼: ${a.title}`,
++        body: `割り当て依頼\nジョブ: ${projectJob.name}\n割り当て: ${a.title}\n\n担当ユーザー: ${assignedName}\n詳細:\n${detailsText || '（詳細なし）'}\n\n希望開始日: ${start}\n希望終了日: ${end}\n\nアプリで詳しい情報を確認できます。`,
+     };
+ 
+-    router.post(route('job_requests.store'), payload, {
++    router.post(route('messages.store'), payload, {
+         onSuccess: () => {
+-            // optimistic UI update
++            // optimistic UI update: mark assigned so UI reflects sent state
+             a.assigned = true;
+-            alert('発信しました。受信者に通知されます。');
++            alert('発信しました（Messages 経由）。受信者に通知されます。');
+         },
+         onError: (errors) => {
+             console.error('sendRequest error', errors);
+diff --git a/resources/js/Pages/Events/Create.vue b/resources/js/Pages/Events/Create.vue
+index 66ebfb3..a78db8a 100644
+--- a/resources/js/Pages/Events/Create.vue
++++ b/resources/js/Pages/Events/Create.vue
+@@ -1,140 +1,303 @@
+ <script setup>
+-import { ref, watch } from 'vue';
+ import AppLayout from '@/layouts/AppLayout.vue';
+-import { useForm, Link } from '@inertiajs/vue3';
++import { Link, useForm } from '@inertiajs/vue3';
++// No Quill: use simple textarea for details
++import { getCurrentInstance, nextTick, onMounted, ref, watch } from 'vue';
+ import { route } from 'ziggy-js';
+-import { QuillEditor } from '@vueup/vue-quill';
+-import '@vueup/vue-quill/dist/vue-quill.snow.css';
+-import { defaultToolbar } from '@/config/quillToolbar';
+ 
+-const props = defineProps({ date: String });
++const props = defineProps({ date: String, job: { type: Object, default: null } });
+ 
+-const content = ref('');
++// Build initial content by including job assignment metadata if available
++function buildJobDetails(job) {
++    if (!job) return '';
++    const assignedName = job.user?.name || job.assigned_user_name || '（未割当）';
++    const detailsText = job.details || job.detail || job.description || job.body || '';
++    const start = job.desired_start_date || job.preferred_date || job.start_date || '';
++    const end = job.desired_end_date || job.end_date || '';
++    const pjId = job.project_job_id || job.project_job || '';
++    const difficulty = job.difficulty || job.level || '';
++
++    let lines = [];
++    const jobName = job.title || job.name || (pjId ? `ID:${pjId}` : '');
++    if (jobName) lines.push(`ジョブ名: ${jobName}`);
++    if (difficulty) lines.push(`難易度: ${difficulty}`);
++    lines.push(`担当ユーザー: ${assignedName}`);
++    if (start || end) lines.push(`希望期間: ${start || '-'} 〜 ${end || '-'}`);
++    lines.push('詳細:');
++    if (detailsText) lines.push(detailsText);
++    return lines.join('\n') + '\n';
++}
++
++const _jobText = buildJobDetails(props.job) + (props.job && props.job.details ? '\n' + props.job.details : '');
++const content = ref(_jobText);
++// derive default start/end hour/minute from job.desired_time if available (expected formats: 'HH:MM', 'HH:MM:SS' or ISO time)
++function parseDesiredTime(t) {
++    if (!t) return null;
++    const core = String(t).split('T').pop().split('.')[0];
++    const parts = core.split(':');
++    if (parts.length >= 2) return { h: parts[0].padStart(2, '0'), m: parts[1].padStart(2, '0') };
++    return null;
++}
++const _desired = props.job && props.job.desired_time ? parseDesiredTime(props.job.desired_time) : null;
++const defaultStartHour = _desired ? _desired.h : '09';
++const defaultStartMinute = _desired ? _desired.m : '00';
++const defaultEndHour = _desired ? String(parseInt(_desired.h, 10) + 1).padStart(2, '0') : '10';
++const defaultEndMinute = '00';
+ const form = useForm({
+-  date: props.date || '',
+-  title: '',
+-  description: '',
+-  startHour: '09',
+-  startMinute: '00',
+-  endHour: '10',
+-  endMinute: '00',
+-  content,
+-  files: []
++    date: props.job && props.job.preferred_date ? props.job.preferred_date : props.date || '',
++    // do NOT inject project_job_id into title; keep title as-is
++    title: props.job && props.job.title ? props.job.title : '',
++    // include job details in description (plain text with newlines)
++    description: _jobText,
++    startHour: defaultStartHour,
++    startMinute: defaultStartMinute,
++    endHour: defaultEndHour,
++    endMinute: defaultEndMinute,
++    content,
++    job_id: props.job && props.job.id ? props.job.id : null,
++    files: [],
+ });
+ 
++const errorMessage = ref('');
++
+ console.log('[Create.vue] 初期 content:', content.value);
+ console.log('[Create.vue] 初期 description:', form.description);
++console.log('[Create.vue] props:', props);
++console.log('[Create.vue] derived defaults:', { defaultStartHour, defaultStartMinute, defaultEndHour, defaultEndMinute });
++console.log('[Create.vue] initial form:', {
++    date: form.date,
++    title: form.title,
++    startHour: form.startHour,
++    startMinute: form.startMinute,
++    endHour: form.endHour,
++    endMinute: form.endMinute,
++});
++
++onMounted(async () => {
++    try {
++        console.log('[Create.vue] onMounted props.job:', props.job);
++        await nextTick();
++        const editor = document.querySelector('.ql-editor');
++        console.log('[Create.vue] ql-editor innerHTML:', editor ? editor.innerHTML : null);
++        console.log('[Create.vue] ql-editor textContent:', editor ? editor.textContent : null);
++        // If editor appears empty, force a brief update to content to trigger Quill refresh
++        if (editor && (!editor.textContent || editor.textContent.trim() === '')) {
++            console.log('[Create.vue] ql-editor empty — forcing content update');
++            // append a space then remove it to trigger update
++            content.value = (content.value || '') + ' ';
++            await nextTick();
++            content.value = (content.value || '').trim();
++            await nextTick();
++            console.log('[Create.vue] after force ql-editor textContent:', editor.textContent);
++        }
++    } catch (e) {
++        console.error('[Create.vue] onMounted debug error', e);
++    }
++});
+ 
+ function onContentFocus() {
+-  console.log('[Create.vue] content onFocus:', content.value);
++    console.log('[Create.vue] content onFocus:', content.value);
+ }
+ function onContentBlur() {
+-  console.log('[Create.vue] content onBlur:', content.value);
++    console.log('[Create.vue] content onBlur:', content.value);
+ }
+ function onDescriptionFocus() {
+-  console.log('[Create.vue] description onFocus:', form.description);
++    console.log('[Create.vue] description onFocus:', form.description);
+ }
+ function onDescriptionBlur() {
+-  console.log('[Create.vue] description onBlur:', form.description);
++    console.log('[Create.vue] description onBlur:', form.description);
++}
++
++// helper: return ISO-like timestamp string for comparison
++function timestampForCompare(dateStr, hh, mm) {
++    return `${dateStr} ${hh}:${mm}`;
+ }
+ 
+ const submit = () => {
+-  form.description = content.value;
+-  // 時刻チェック
+-  const start = `${form.date} ${form.startHour}:${form.startMinute}`;
+-  const end = `${form.date} ${form.endHour}:${form.endMinute}`;
+-  if (end <= start) {
+-    alert('終了時刻は開始時刻より後にしてください。');
+-    return;
+-  }
+-  // 重複チェック
+-  fetch(`/events?date=${form.date}`)
+-    .then(res => res.json())
+-    .then(events => {
+-      const newStart = new Date(`${form.date}T${form.startHour}:${form.startMinute}:00`);
+-      const newEnd = new Date(`${form.date}T${form.endHour}:${form.endMinute}:00`);
+-      const overlap = events.some(ev => {
+-        const evStart = new Date(ev.start);
+-        const evEnd = new Date(ev.end);
+-        return (newStart < evEnd && newEnd > evStart);
+-      });
+-      if (overlap) {
+-        if (!confirm('同じ時間に予定があります。登録しますか？')) {
+-          return;
+-        }
+-      }
+-      form.post(route('events.store'), { forceFormData: true });
+-    });
++    // clear previous error
++    errorMessage.value = '';
++    form.description = content.value;
++    // 時刻チェック: Date オブジェクトで比較
++    const newStart = new Date(`${form.date}T${form.startHour}:${form.startMinute}:00`);
++    const newEnd = new Date(`${form.date}T${form.endHour}:${form.endMinute}:00`);
++    if (isNaN(newStart.getTime()) || isNaN(newEnd.getTime())) {
++        errorMessage.value = '開始/終了時刻が無効です。';
++        return;
++    }
++    if (newEnd <= newStart) {
++        errorMessage.value = '終了時刻は開始時刻より後にしてください。';
++        return;
++    }
++    // 最小長チェック（15分）
++    const minMs = 15 * 60 * 1000;
++    if (newEnd - newStart < minMs) {
++        errorMessage.value = '予定の最小長は15分です。';
++        return;
++    }
++
++    // 重複チェック
++    fetch(`/events?date=${form.date}`)
++        .then((res) => res.json())
++        .then((events) => {
++            // newStart/newEnd already computed above, but recompute here for scope
++            const newStart = new Date(`${form.date}T${form.startHour}:${form.startMinute}:00`);
++            const newEnd = new Date(`${form.date}T${form.endHour}:${form.endMinute}:00`);
++            const overlap = events.some((ev) => {
++                const evStart = new Date(ev.start);
++                const evEnd = new Date(ev.end);
++                return newStart < evEnd && newEnd > evStart;
++            });
++            if (overlap) {
++                if (!confirm('同じ時間に予定があります。登録しますか？')) {
++                    return;
++                }
++            }
++            // attach job_id if present so backend can optionally link the event
++            if (props.job && props.job.id) {
++                form.job_id = props.job.id;
++            }
++
++            try {
++                console.debug('[Create.vue] submitting event', {
++                    job_id: form.job_id,
++                    title: form.title,
++                    date: form.date,
++                    start: form.startHour + ':' + form.startMinute,
++                    end: form.endHour + ':' + form.endMinute,
++                });
++                form.post(route('events.store'), {
++                    forceFormData: true,
++                    onSuccess: () => {
++                        errorMessage.value = '';
++                        const target = props.job ? route('user.assigned-jobs.index') : route('calendar.index');
++                        if (props.job) {
++                            // force a full navigation to refresh server-side data
++                            window.location.href = target;
++                            return;
++                        }
++                        const vm = getCurrentInstance();
++                        try {
++                            vm?.proxy?.$inertia?.visit(target);
++                        } catch (e) {
++                            window.location.href = target;
++                        }
++                    },
++                    onError: (errors) => {
++                        console.error('events.store failed', errors);
++                        errorMessage.value = '予定の保存に失敗しました。後でもう一度お試しください。';
++                    },
++                });
++            } catch (e) {
++                console.error('[Create.vue] form.post threw', e);
++                errorMessage.value = '予定の保存に失敗しました（クライアントエラー）。';
++            }
++        });
+ };
+ 
+ function onInput(val) {
+-  if (typeof val === 'string') {
+-    content.value = val;
+-  } else if (val?.target?.innerHTML) {
+-    content.value = val.target.innerHTML;
+-  }
++    if (typeof val === 'string') {
++        content.value = val;
++    } else if (val?.target?.innerHTML) {
++        content.value = val.target.innerHTML;
++    }
+ }
+-watch(() => form.content, (val) => {
+-  content.value = val;
+-});
++watch(
++    () => form.content,
++    (val) => {
++        content.value = val;
++    },
++);
++
++// When start (hour/minute) changes, always set end to the same time.
++watch(
++    () => [form.startHour, form.startMinute],
++    ([h, m]) => {
++        form.endHour = h;
++        form.endMinute = m;
++    },
++);
+ </script>
+ 
+ <template>
+-  <AppLayout title="イベント作成">
+-    <div class="max-w-2xl mx-auto p-6 bg-white shadow rounded">
+-      <h1 class="text-2xl font-bold mb-4">イベント作成 ({{ form.date }})</h1>
+-      <form @submit.prevent="submit">
+-        <div class="mb-4">
+-          <label class="block text-sm font-medium text-gray-700 mb-1">タイトル</label>
+-          <input v-model="form.title" type="text" class="w-full border rounded p-2" required />
+-        </div>
+-        <div class="mb-4">
+-          <label class="block text-sm font-medium text-gray-700 mb-1">詳細</label>
+-          <QuillEditor
+-            theme="snow"
+-            :toolbar="defaultToolbar"
+-            style="min-height:180px;height:180px;background:#fff"
+-            v-model="content"
+-            @input="onInput"
+-            @focus="onContentFocus"
+-            @blur="onContentBlur"
+-          />
+-        </div>
+-        <div class="mb-4">
+-          <div class="flex gap-8 items-center">
+-            <div>
+-              <label class="block text-sm font-medium text-gray-700 mb-1">開始時刻</label>
+-              <div class="flex gap-2">
+-                <select v-model="form.startHour" class="border rounded p-1 w-20">
+-                  <option v-for="h in 24" :key="h" :value="String(h-1).padStart(2, '0')">{{ String(h-1).padStart(2, '0') }}</option>
+-                </select>
+-                <select v-model="form.startMinute" class="border rounded p-1 w-20">
+-                  <option v-for="m in [0,15,30,45]" :key="m" :value="String(m).padStart(2, '0')">{{ String(m).padStart(2, '0') }}</option>
+-                </select>
+-              </div>
+-            </div>
+-            <div>
+-              <label class="block text-sm font-medium text-gray-700 mb-1">終了時刻</label>
+-              <div class="flex gap-2">
+-                <select v-model="form.endHour" class="border rounded p-1 w-20">
+-                  <option v-for="h in 24" :key="h" :value="String(h-1).padStart(2, '0')">{{ String(h-1).padStart(2, '0') }}</option>
+-                </select>
+-                <select v-model="form.endMinute" class="border rounded p-1 w-20">
+-                  <option v-for="m in [0,15,30,45]" :key="m" :value="String(m).padStart(2, '0')">{{ String(m).padStart(2, '0') }}</option>
+-                </select>
+-              </div>
+-            </div>
+-          </div>
+-        </div>
+-        <div class="mb-4">
+-          <label class="block text-sm font-medium text-gray-700 mb-1">添付ファイル</label>
+-          <input type="file" multiple @change="e => form.files = Array.from(e.target.files)" class="w-full border rounded p-2" />
+-        </div>
+-        <div class="flex space-x-4">
+-          <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">保存</button>
+-          <Link :href="route('dashboard')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded">キャンセル</Link>
++    <AppLayout title="イベント作成">
++        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
++            <h1 class="mb-4 text-2xl font-bold">イベント作成 ({{ form.date }})</h1>
++            <form @submit.prevent="submit">
++                <div v-if="errorMessage" class="mb-4 rounded border-l-4 border-red-500 bg-red-50 p-3 text-red-700">
++                    {{ errorMessage }}
++                </div>
++                <div class="mb-4">
++                    <label class="mb-1 block text-sm font-medium text-gray-700">タイトル</label>
++                    <input v-model="form.title" type="text" class="w-full rounded border p-2" required />
++                </div>
++                <div class="mb-4">
++                    <label class="mb-1 block text-sm font-medium text-gray-700">詳細</label>
++                    <textarea
++                        v-model="content"
++                        @focus="onContentFocus"
++                        @blur="onContentBlur"
++                        rows="8"
++                        class="w-full rounded border bg-white p-2"
++                    ></textarea>
++                </div>
++                <div class="mb-4">
++                    <div class="flex items-center gap-8">
++                        <div>
++                            <label class="mb-1 block text-sm font-medium text-gray-700">開始時刻</label>
++                            <div class="flex gap-2">
++                                <select v-model="form.startHour" class="w-20 rounded border p-1">
++                                    <option v-for="h in 24" :key="h" :value="String(h - 1).padStart(2, '0')">
++                                        {{ String(h - 1).padStart(2, '0') }}
++                                    </option>
++                                </select>
++                                <select v-model="form.startMinute" class="w-20 rounded border p-1">
++                                    <option v-for="m in [0, 15, 30, 45]" :key="m" :value="String(m).padStart(2, '0')">
++                                        {{ String(m).padStart(2, '0') }}
++                                    </option>
++                                </select>
++                            </div>
++                        </div>
++                        <div>
++                            <label class="mb-1 block text-sm font-medium text-gray-700">終了時刻</label>
++                            <div class="flex gap-2">
++                                <select v-model="form.endHour" class="w-20 rounded border p-1">
++                                    <option v-for="h in 24" :key="h" :value="String(h - 1).padStart(2, '0')">
++                                        {{ String(h - 1).padStart(2, '0') }}
++                                    </option>
++                                </select>
++                                <select v-model="form.endMinute" class="w-20 rounded border p-1">
++                                    <option v-for="m in [0, 15, 30, 45]" :key="m" :value="String(m).padStart(2, '0')">
++                                        {{ String(m).padStart(2, '0') }}
++                                    </option>
++                                </select>
++                            </div>
++                        </div>
++                    </div>
++                </div>
++                <!-- attachments removed: not needed -->
++                <div class="flex space-x-4">
++                    <button
++                        type="submit"
++                        :disabled="form.processing"
++                        :aria-busy="form.processing"
++                        class="flex items-center gap-2 rounded bg-blue-600 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
++                    >
++                        <template v-if="form.processing">
++                            <svg class="h-5 w-5 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
++                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
++                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
++                            </svg>
++                            保存中…
++                        </template>
++                        <template v-else>保存</template>
++                    </button>
++                    <Link
++                        :href="props.job ? route('user.assigned-jobs.index') : route('calendar.index')"
++                        class="rounded bg-gray-200 px-4 py-2 text-gray-700"
++                        >キャンセル</Link
++                    >
++                </div>
++            </form>
+         </div>
+-      </form>
+-    </div>
+-  </AppLayout>
++    </AppLayout>
+ </template>
+diff --git a/resources/js/Pages/Events/Edit.vue b/resources/js/Pages/Events/Edit.vue
+index 90114f8..d7a9027 100644
+--- a/resources/js/Pages/Events/Edit.vue
++++ b/resources/js/Pages/Events/Edit.vue
+@@ -1,29 +1,25 @@
+ <script setup>
+-import { ref, watch, onMounted } from 'vue';
++import { ref, onMounted } from 'vue';
+ import AppLayout from '@/layouts/AppLayout.vue';
+-import { useForm, Link } from '@inertiajs/vue3';
++import { useForm, Link, router } from '@inertiajs/vue3';
+ import { route } from 'ziggy-js';
+-import { QuillEditor } from '@vueup/vue-quill';
+-import '@vueup/vue-quill/dist/vue-quill.snow.css';
+-import { defaultToolbar } from '@/config/quillToolbar';
+ 
+ const props = defineProps({ event: Object });
+ 
+ 
+-const content = ref(props.event.content || '');
++const content = ref(props.event.description || '');
+ const form = useForm({
+   title: props.event.title || '',
+-  description: '',
++  description: props.event.description || '',
+   date: props.event.date || '',
+   startHour: props.event.startHour || '09',
+   startMinute: props.event.startMinute || '00',
+   endHour: props.event.endHour || '10',
+   endMinute: props.event.endMinute || '00',
+-  files: []
+ });
+ 
+ onMounted(() => {
+-  content.value = props.event.content || '';
++  content.value = props.event.description || '';
+   form.date = props.event.date || '';
+   console.log('[Edit.vue] onMounted date:', form.date);
+   // 開始・終了時刻をprops.event.start/endから分解してセット
+@@ -39,13 +35,6 @@ onMounted(() => {
+   }
+ });
+ 
+-// ファイル送信が不要な場合（JSON送信）
+-// const submit = () => {
+-//   form.description = content.value;
+-//   form.put(route('events.update', props.event.id));
+-// };
+-
+-// ファイル送信が必要な場合（FormData送信）
+ const submit = () => {
+   form.description = content.value;
+   // 時刻チェック
+@@ -72,40 +61,12 @@ const submit = () => {
+           return;
+         }
+       }
+-      const hasFiles = form.files && form.files.length > 0;
+-            // 送信前のデータ確認consoleは削除
+-      if (hasFiles) {
+-        form.post(route('events.update', props.event.id), {
+-          forceFormData: true,
+-          _method: 'PUT',
+-          onSuccess: () => router.get(route('calendar.index'))
+-        });
+-      } else {
+-        form.put(route('events.update', props.event.id), {
+-          onSuccess: () => router.get(route('calendar.index'))
+-        });
+-      }
++      // always send JSON PUT (no files)
++      form.put(route('events.update', props.event.id), {
++        onSuccess: () => router.get(route('calendar.index'))
++      });
+     });
+ };
+-
+-function onInput(val) {
+-  if (typeof val === 'string') {
+-    content.value = val;
+-  } else if (val?.target?.innerHTML) {
+-    content.value = val.target.innerHTML;
+-  }
+-}
+-watch(() => form.content, (val) => {
+-  content.value = val;
+-});
+-
+-let editorInstance = null;
+-
+-function handleEditorReady(editor) {
+-  editorInstance = editor;
+-  const delta = editor.clipboard.convert(props.event.description || '');
+-  editor.setContents(delta);
+-}
+ </script>
+ 
+ <template>
+@@ -119,14 +80,7 @@ function handleEditorReady(editor) {
+         </div>
+         <div class="mb-4">
+           <label class="block text-sm font-medium text-gray-700 mb-1">内容</label>
+-          <QuillEditor
+-            theme="snow"
+-            :toolbar="defaultToolbar"
+-            style="min-height:180px;height:180px;background:#fff"
+-            v-model="content"
+-            @input="onInput"
+-            @ready="handleEditorReady"
+-          />
++          <textarea v-model="content" rows="6" class="w-full border rounded p-2" />
+         </div>
+         <div class="mb-4">
+           <div class="flex gap-8 items-center">
+@@ -154,10 +108,6 @@ function handleEditorReady(editor) {
+             </div>
+           </div>
+         </div>
+-        <div class="mb-4">
+-          <label class="block text-sm font-medium text-gray-700 mb-1">添付ファイル</label>
+-          <input type="file" multiple @change="e => form.files = Array.from(e.target.files)" class="w-full border rounded p-2" />
+-        </div>
+         <div class="flex space-x-4">
+           <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">更新</button>
+           <Link :href="route('calendar.index')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded">キャンセル</Link>
+diff --git a/resources/js/Pages/Events/Show.vue b/resources/js/Pages/Events/Show.vue
+index 2e3731c..e6e080e 100644
+--- a/resources/js/Pages/Events/Show.vue
++++ b/resources/js/Pages/Events/Show.vue
+@@ -17,8 +17,14 @@ function formatJstDateTime(dateStr) {
+   return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+ }
+ 
+-console.log('[Show.vue] event:', props.event);
+-console.log('[Show.vue] event.description:', props.event.description);
++// remove debug logs
++
++function confirmDelete() {
++  if (!confirm('この予定を削除しますか？')) return;
++  // call delete endpoint and redirect to calendar on success
++  // Let the server return an Inertia redirect; no client-side onSuccess navigation needed
++  router.delete(route('events.destroy', { event: props.event.id }));
++}
+ </script>
+ 
+ <template>
+@@ -49,7 +55,8 @@ console.log('[Show.vue] event.description:', props.event.description);
+       </div>
+       <div class="flex space-x-4">
+         <Link :href="route('events.edit', props.event.id)" class="px-4 py-2 bg-blue-600 text-white rounded">編集</Link>
+-  <Link :href="route('calendar.index')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded">戻る</Link>
++        <button @click="confirmDelete" class="px-4 py-2 bg-red-600 text-white rounded">削除</button>
++        <Link :href="route('calendar.index')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded">戻る</Link>
+       </div>
+     </div>
+   </AppLayout>
+diff --git a/resources/js/Pages/JobRequests/Index.vue b/resources/js/Pages/JobRequests/Index.vue
+index d331643..28015ce 100644
+--- a/resources/js/Pages/JobRequests/Index.vue
++++ b/resources/js/Pages/JobRequests/Index.vue
+@@ -1,5 +1,5 @@
+ <script setup>
+-import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
++import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
+ 
+ const page = usePage();
+ const props = page.props;
+@@ -8,7 +8,25 @@ const requests = props.requests || {};
+ const form = useForm({ to_user_id: '', project_job_assignment_id: '', project_job_id: '', message: '' });
+ 
+ const submit = () => {
+-    form.post(route('job_requests.store'));
++    // Build MessagesController compatible payload
++    const toId = form.to_user_id || '';
++    const payload = {
++        to: toId ? [toId] : [],
++        subject: `依頼: ${form.project_job_id || ''}`,
++        body: form.message || '',
++        attachments: [],
++    };
++
++    router.post(route('messages.store'), payload, {
++        onSuccess: () => {
++            form.reset('to_user_id', 'project_job_assignment_id', 'project_job_id', 'message');
++            alert('送信しました（Messages 経由）。受信者に通知されます。');
++        },
++        onError: (errors) => {
++            console.error('send message error', errors);
++            alert('送信に失敗しました。詳細はコンソールを確認してください。');
++        },
++    });
+ };
+ </script>
+ 
+diff --git a/resources/js/Pages/JobRequests/Show.vue b/resources/js/Pages/JobRequests/Show.vue
+index 6bdbab2..8ba50a7 100644
+--- a/resources/js/Pages/JobRequests/Show.vue
++++ b/resources/js/Pages/JobRequests/Show.vue
+@@ -5,7 +5,8 @@ const page = usePage();
+ const req = page.props.request;
+ 
+ const accept = () => {
+-    router.post(route('job_requests.accept', req.id));
++    // Use messages-based accept endpoint which updates JobRequest and linked assignment.
++    router.post(route('messages.job_requests.accept', req.id));
+ };
+ </script>
+ 
+diff --git a/resources/js/Pages/Messages/Create.vue b/resources/js/Pages/Messages/Create.vue
+index 59e9f7b..721b8b6 100644
+--- a/resources/js/Pages/Messages/Create.vue
++++ b/resources/js/Pages/Messages/Create.vue
+@@ -173,23 +173,23 @@
+                                     <Link :href="route('messages.index')" class="text-sm text-gray-600 hover:text-gray-900">← 一覧へ戻る</Link>
+                                 </div>
+                                 <div class="space-x-2 text-right">
+-                                <button
+-                                    type="button"
+-                                    @click="saveDraft"
+-                                    class="inline-flex items-center gap-2 rounded-md bg-gray-200 px-4 py-2 text-gray-800"
+-                                >
+-                                    保存（下書き）
+-                                </button>
+-                                <button
+-                                    type="button"
+-                                    @click="confirmDiscard"
+-                                    class="inline-flex items-center gap-2 rounded-md border bg-white px-4 py-2 text-red-600"
+-                                >
+-                                    破棄
+-                                </button>
+-                                <button type="submit" class="inline-flex items-center gap-2 rounded-md bg-blue-600 px-5 py-2 text-white shadow">
+-                                    送信
+-                                </button>
++                                    <button
++                                        type="button"
++                                        @click="saveDraft"
++                                        class="inline-flex items-center gap-2 rounded-md bg-gray-200 px-4 py-2 text-gray-800"
++                                    >
++                                        保存
++                                    </button>
++                                    <button
++                                        type="button"
++                                        @click="confirmDiscard"
++                                        class="inline-flex items-center gap-2 rounded-md border bg-white px-4 py-2 text-red-600"
++                                    >
++                                        破棄
++                                    </button>
++                                    <button type="submit" class="inline-flex items-center gap-2 rounded-md bg-blue-600 px-5 py-2 text-white shadow">
++                                        送信
++                                    </button>
+                                 </div>
+                             </div>
+                         </form>
+@@ -570,8 +570,10 @@ function saveDraft() {
+         attachments: attachments.value.map((a) => a.id),
+         save_as: 'draft',
+     };
+-    // use post to reuse same endpoint; server will handle save_as=draft and redirect to drafts
+-    router.post(route('messages.store'), payload);
++    // use post to reuse same endpoint; server will handle save_as=draft
++    router.post(route('messages.store'), payload, {
++        onSuccess: () => showToast('下書きとして保存しました', 'success', 3000),
++    });
+ }
+ 
+ function confirmDiscard() {
+diff --git a/resources/js/Pages/Messages/Show.vue b/resources/js/Pages/Messages/Show.vue
+index 239fa25..e66cfa1 100644
+--- a/resources/js/Pages/Messages/Show.vue
++++ b/resources/js/Pages/Messages/Show.vue
+@@ -215,7 +215,30 @@ function isAttachmentUrl(url) {
+     }
+ }
+ 
+-const sanitizedBody = computed(() => sanitize(localMessage.value?.body));
++function formatMessageBody(body) {
++    // If there's no body or it already contains obvious markup/newlines, leave it alone
++    if (!body || typeof body !== 'string') return body || '';
++    if (/\n|<br\s*\/?>|<p/i.test(body)) return body;
++
++    // Known labels in the job-completion notification we want on their own lines
++    const labels = ['プロジェクトジョブID:', '予定をセットしたユーザーID:', 'イベント名:', '開始:', '終了:', '詳細:'];
++
++    // If none of the labels are present, don't modify the body
++    const hasLabel = labels.some((l) => body.indexOf(l) >= 0);
++    if (!hasLabel) return body;
++
++    let out = String(body);
++    // Insert HTML <br> before each label occurrence (but not at the very start)
++    labels.forEach((label) => {
++        const esc = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
++        out = out.replace(new RegExp('\\s*' + esc, 'g'), '<br>' + label);
++    });
++    // Remove a leading <br> if inserted
++    out = out.replace(/^<br>/, '');
++    return out;
++}
++
++const sanitizedBody = computed(() => sanitize(formatMessageBody(localMessage.value?.body)));
+ 
+ function extractAttachmentsFromBody(body) {
+     if (!body || typeof body !== 'string') return [];
+diff --git a/resources/js/Pages/User/AssignedProject/Index.vue b/resources/js/Pages/User/AssignedProject/Index.vue
+index 703f967..40ae561 100644
+--- a/resources/js/Pages/User/AssignedProject/Index.vue
++++ b/resources/js/Pages/User/AssignedProject/Index.vue
+@@ -1,43 +1,78 @@
+ <script setup>
+ import AppLayout from '@/layouts/AppLayout.vue';
+ import { Link } from '@inertiajs/vue3';
++
+ const props = defineProps({
+-  jobs: Array
++    jobs: Array,
+ });
++
++function formatTime(t) {
++    if (!t) return '';
++    const core = String(t).split('.')[0];
++    const parts = core.split(':');
++    if (parts.length >= 2) return parts[0].padStart(2, '0') + ':' + parts[1].padStart(2, '0');
++    return t;
++}
+ </script>
++
+ <template>
+-  <AppLayout title="ジョブ一覧">
+-    <template #header>
+-      <h2 class="font-semibold text-xl text-gray-800 leading-tight">ジョブ一覧</h2>
+-    </template>
+-    <div class="py-6">
+-      <div class="max-w-4xl mx-auto bg-white shadow rounded p-6">
+-        <table class="min-w-full divide-y divide-gray-200">
+-          <thead>
+-            <tr>
+-              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">ジョブID</th>
+-              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">伝票No.</th>
+-              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">名前</th>
+-              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">クライアント名</th>
+-              <th class="px-4 py-2"></th>
+-            </tr>
+-          </thead>
+-          <tbody>
+-            <tr v-for="job in jobs" :key="job.id">
+-              <td class="px-4 py-2">{{ job.id }}</td>
+-              <td class="px-4 py-2">{{ job.jobcode }}</td>
+-              <td class="px-4 py-2">{{ job.name }}</td>
+-              <td class="px-4 py-2">{{ job.client_name }}</td>
+-              <td class="px-4 py-2 text-right">
+-                <Link :href="route('user.assigned-projects.show', job.id)" class="text-blue-600 hover:underline">詳細</Link>
+-              </td>
+-            </tr>
+-            <tr v-if="!jobs || jobs.length === 0">
+-              <td colspan="5" class="text-center text-gray-400 py-4">割り当てられたジョブはありません</td>
+-            </tr>
+-          </tbody>
+-        </table>
+-      </div>
+-    </div>
+-  </AppLayout>
++    <AppLayout title="ジョブ一覧">
++        <template #header>
++            <div class="flex items-center justify-between">
++                <h2 class="text-xl font-semibold leading-tight text-gray-800">ジョブ一覧</h2>
++                <div>
++                    <Link :href="route('calendar.index')" class="rounded bg-gray-200 px-3 py-1 text-gray-700">カレンダーに戻る</Link>
++                </div>
++            </div>
++        </template>
++        <div class="py-6">
++            <div class="mx-auto max-w-5xl rounded bg-white p-6 shadow">
++                <table class="min-w-full table-auto">
++                    <thead>
++                        <tr class="bg-gray-100 text-left">
++                            <th class="px-4 py-2 text-sm font-medium">プロジェクトジョブID</th>
++                            <th class="px-4 py-2 text-sm font-medium">タイトル</th>
++                            <th class="px-4 py-2 text-sm font-medium">詳細</th>
++                            <th class="px-4 py-2 text-sm font-medium">難易度</th>
++                            <th class="px-4 py-2 text-sm font-medium">希望開始日</th>
++                            <th class="px-4 py-2 text-sm font-medium">希望終了日</th>
++                            <th class="px-4 py-2 text-sm font-medium">希望時刻</th>
++                            <th class="px-4 py-2 text-sm font-medium">操作</th>
++                        </tr>
++                    </thead>
++                    <tbody>
++                        <tr v-for="job in props.jobs" :key="job.id" class="border-b hover:bg-gray-50">
++                            <td class="px-4 py-3 align-top text-sm">{{ job.project_job_id || job.id || '-' }}</td>
++                            <td class="px-4 py-3 align-top text-sm">{{ job.title || job.name || '-' }}</td>
++                            <td class="whitespace-pre-wrap px-4 py-3 align-top text-sm">{{ job.details || job.detail || job.description || '-' }}</td>
++                            <td class="px-4 py-3 align-top text-sm">{{ job.difficulty || job.level || '-' }}</td>
++                            <td class="px-4 py-3 align-top text-sm">{{ job.desired_start_date || job.preferred_date || '-' }}</td>
++                            <td class="px-4 py-3 align-top text-sm">{{ job.desired_end_date || '-' }}</td>
++                            <td class="px-4 py-3 align-top text-sm">
++                                {{ formatTime(job.desired_time) || (job.desired_time ? job.desired_time : '-') }}
++                            </td>
++                            <td class="px-4 py-3 align-top text-sm">
++                                <div class="flex items-center gap-2">
++                                    <Link :href="route('user.assigned-jobs.show', job.id)" class="text-blue-600 hover:underline">詳細</Link>
++                                    <div v-if="job.scheduled || job.scheduled_at">
++                                        <span class="text-sm font-semibold text-green-600">セット済</span>
++                                    </div>
++                                    <div v-else>
++                                        <Link
++                                            :href="route('events.create', { job: job.id })"
++                                            class="rounded bg-blue-500 px-2 py-1 text-sm text-white hover:bg-blue-600"
++                                            >予定をセット</Link
++                                        >
++                                    </div>
++                                </div>
++                            </td>
++                        </tr>
++                        <tr v-if="!props.jobs || props.jobs.length === 0">
++                            <td colspan="8" class="py-4 text-center text-gray-400">割り当てられたジョブはありません</td>
++                        </tr>
++                    </tbody>
++                </table>
++            </div>
++        </div>
++    </AppLayout>
+ </template>
+diff --git a/resources/js/layouts/AppLayout.vue b/resources/js/layouts/AppLayout.vue
+index f88b353..a0c2166 100644
+--- a/resources/js/layouts/AppLayout.vue
++++ b/resources/js/layouts/AppLayout.vue
+@@ -46,7 +46,9 @@ import { onBeforeUnmount, onMounted, useSlots, ref as vueRef } from 'vue';
+ 
+ const page = usePage();
+ const user = page.props.user; // これを追加
+-const inboxCount = vueRef(page.props.user?.unread_job_requests_count || 0);
++// Use unread_messages_count as the single notification source; job_requests are being
++// migrated to Messages so we stop subscribing to jobrequests channel here.
++const inboxCount = vueRef(0); // legacy placeholder
+ const inboxToast = vueRef('');
+ const unreadMessages = vueRef(page.props.user?.unread_messages_count || 0);
+ let echoChannel = null;
+@@ -54,14 +56,7 @@ let echoChannel = null;
+ onMounted(() => {
+     try {
+         if (window.Echo && user && user.id) {
+-            // jobrequests channel
+-            echoChannel = window.Echo.private('jobrequests.' + user.id).listen('JobRequestCreated', (e) => {
+-                inboxCount.value = (inboxCount.value || 0) + 1;
+-                inboxToast.value = (e.from_user_name ? e.from_user_name + 'さんから依頼が届きました: ' : '新しい依頼: ') + (e.message || '');
+-                window.dispatchEvent(new CustomEvent('jobrequest:received', { detail: { message: inboxToast.value } }));
+-            });
+-
+-            // messages channel
++            // messages channel (primary notification source)
+             window.Echo.private('messages.' + user.id).listen('MessageCreated', (e) => {
+                 unreadMessages.value = (unreadMessages.value || 0) + 1;
+                 const msg = (e.from_user_name ? e.from_user_name + 'さんからメールが届きました: ' : '新しいメール: ') + (e.subject || '(件名なし)');
+diff --git a/routes/web.php b/routes/web.php
+index 287803c..65b0289 100644
+--- a/routes/web.php
++++ b/routes/web.php
+@@ -21,6 +21,8 @@
+         'phpVersion' => PHP_VERSION,
+     ]);
+ });
++// Temporary public debug route to send test completion mail (remove after testing)
++Route::get('/debug/events/send-test-completion', [App\Http\Controllers\EventController::class, 'sendTestCompletion'])->name('debug.events.send_test_completion');
+ 
+ // User Dashboard (default authenticated users)
+ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified'])->group(function () {
+@@ -37,11 +39,16 @@
+     // store/update are handled by the resource route declared below to avoid duplicate route names
+     Route::delete('/events/{event}', [App\Http\Controllers\EventController::class, 'destroy'])->name('events.destroy');
+ 
+-    // ユーザー割り当てジョブ一覧・詳細
++    // ユーザー割り当てジョブ一覧・詳細 (旧: assigned-projects, 新: assigned-jobs)
+     Route::prefix('user/assigned-projects')->name('user.assigned-projects.')->group(function () {
+         Route::get('/', [App\Http\Controllers\User\AssignedProjectController::class, 'index'])->name('index');
+         Route::get('/{id}', [App\Http\Controllers\User\AssignedProjectController::class, 'show'])->name('show');
+     });
++    // 新しいルート名 assigned-jobs を追加 (既存コントローラを再利用)
++    Route::prefix('user/assigned-jobs')->name('user.assigned-jobs.')->group(function () {
++        Route::get('/', [App\Http\Controllers\User\AssignedProjectController::class, 'index'])->name('index');
++        Route::get('/{id}', [App\Http\Controllers\User\AssignedProjectController::class, 'show'])->name('show');
++    });
+ 
+     // チャット画面
+     Route::get('/chat', [App\Http\Controllers\Chat\ChatController::class, 'index'])->name('chat.users.index');
+@@ -86,6 +93,9 @@
+         'update'
+     ]);
+ 
++    // Test: send a fake job-completion mail to user_id=1
++    Route::get('/events/send-test-completion', [App\Http\Controllers\EventController::class, 'sendTestCompletion'])->name('events.send_test_completion');
++
+     // Allow authenticated users (owners) to delete their project memos via a non-coordinator route
+     Route::delete('project_memos/{memo}', [App\Http\Controllers\Coordinator\ProjectMemosController::class, 'destroy'])->name('project_memos.destroy');
+ 
+@@ -106,6 +116,8 @@
+     Route::get('/messages/{message}', [App\Http\Controllers\MessageController::class, 'show'])->name('messages.show');
+     Route::post('/messages', [App\Http\Controllers\MessageController::class, 'store'])->name('messages.store');
+     Route::post('/messages/{message}/read', [App\Http\Controllers\MessageController::class, 'markRead'])->name('messages.read');
++    // Accept a job request using messages flow (transitional endpoint)
++    Route::post('/messages/job_requests/{jobRequest}/accept', [App\Http\Controllers\MessageController::class, 'acceptJobRequest'])->name('messages.job_requests.accept');
+     // lightweight user search for message compose autocomplete
+     Route::get('/users/search', [App\Http\Controllers\UserController::class, 'search'])->name('users.search');
+ });
+diff --git a/z_instructions/messages_spec_history.md b/z_instructions/messages_spec_history.md
+index e12bf04..bf3686b 100644
+--- a/z_instructions/messages_spec_history.md
++++ b/z_instructions/messages_spec_history.md
+@@ -1,9 +1,11 @@
+ # Messages 機能：仕様と履歴（要約）
+ 
+ ## 概要
++
+ このドキュメントは、プロジェクト内で行ってきた `messages` 周辺の設計決定、実装変更、運用上の注意点を簡潔にまとめたものです。開発者が現状を素早く把握し、今後の作業に役立てることを目的とします。
+ 
+ ## 主要目的
++
+ - 添付ファイルを安全かつユーザーフレンドリーに配信（プレビューはモーダル、強制ダウンロード回避）
+ - メッセージ本文や一覧で添付ファイルの表示を誤って行わない（本文へファイル名やリンクを自動挿入しない）
+ - 添付のアップロードを安定して追跡・表示（Create UI でテーブル管理、ポーリングで状態更新）
+@@ -12,41 +14,45 @@ ## 主要目的
+ - サーバ側ソート（ページネーションと連携）
+ 
+ ## 変更履歴（高レベル）
++
+ - フロント（Vue3/Inertia）
+-  - `resources/js/Pages/Messages/Show.vue`
+-    - Inertia プロップの防御的コピー、必要に応じた詳細フェッチ、添付の blob 取得とモーダルプレビュー、本文のサニタイズ。添付リンクやファイル名を本文に残さない。
+-  - `resources/js/Pages/Messages/Create.vue`
+-    - ファイルは本文に挿入せずテーブルで管理。アップロードは `/api/uploads` を利用、ポーリングで状態更新、`保存（下書き）` と `破棄` ボタンを追加。フォーム下に「一覧へ戻る」リンクを追加。
+-  - `resources/js/Pages/Messages/Index.vue`
+-    - `listData`（ローカル複製）を用いて権威ある詳細ペイロードをマージすることでリロード時にも添付/差出人を表示。
+-    - 日付を `YYYY年M月D日 HH時MM分SS秒` 形式に整形。
+-    - ヘッダのホバー/フォーカス改善、ARIA 指定、クリックでサーバ側ソートを要求するように変更。
+-    - 行のダブルクリックで詳細ページへ遷移（`openShow`）。
++    - `resources/js/Pages/Messages/Show.vue`
++        - Inertia プロップの防御的コピー、必要に応じた詳細フェッチ、添付の blob 取得とモーダルプレビュー、本文のサニタイズ。添付リンクやファイル名を本文に残さない。
++    - `resources/js/Pages/Messages/Create.vue`
++        - ファイルは本文に挿入せずテーブルで管理。アップロードは `/api/uploads` を利用、ポーリングで状態更新、`保存（下書き）` と `破棄` ボタンを追加。フォーム下に「一覧へ戻る」リンクを追加。
++    - `resources/js/Pages/Messages/Index.vue`
++        - `listData`（ローカル複製）を用いて権威ある詳細ペイロードをマージすることでリロード時にも添付/差出人を表示。
++        - 日付を `YYYY年M月D日 HH時MM分SS秒` 形式に整形。
++        - ヘッダのホバー/フォーカス改善、ARIA 指定、クリックでサーバ側ソートを要求するように変更。
++        - 行のダブルクリックで詳細ページへ遷移（`openShow`）。
+ 
+ - サーバ（Laravel コントローラ）
+-  - `app/Http/Controllers/MessageController.php`
+-    - `index()` に `sort_by` / `sort_dir` を追加。`subject|from|attachments|time` を安全にソート。`withCount('attachments')` を利用。
+-    - `store()` に `save_as=draft` を受け、下書き保存（`status='draft'`, `sent_at=null`）に対応。
++    - `app/Http/Controllers/MessageController.php`
++        - `index()` に `sort_by` / `sort_dir` を追加。`subject|from|attachments|time` を安全にソート。`withCount('attachments')` を利用。
++        - `store()` に `save_as=draft` を受け、下書き保存（`status='draft'`, `sent_at=null`）に対応。
+ 
+ ## 実装上の要点
++
+ - 添付プレビューはサーバ発行の URL を blob として取得し、object URL を生成して `<img>`/`<iframe>` で表示（ダウンロードヘッダを回避）。
+ - 本文表示には DOMPurify などを利用してサニタイズ。添付リンクは本文レンダリングパスで除外あるいは無視する。
+ - 一覧は初回マウントで上位 N 件の詳細を順次フェッチして `listData` にマージすることで、リロード直後に添付アイコンや差出人が表示されるようにした。
+ - サーバソートはクエリ文字列で行い、`paginate(...)->appends($request->query())` でページネーションとソートを保持。
+ 
+ ## 既知の注意点 / TODO
++
+ - 下書きの「編集（既存 draft 更新）」は未実装（現在は保存は新規作成）。PATCH/PUT による更新を追加することを推奨。
+ - 添付のサーバ側削除 API は partial（存在するが運用確認が必要）。Create.vue の破棄は現在クライアント側の初期化で実装済み。サーバ削除に変更する場合は API 実装・確認が必要。
+ - `AddressBookModal` の import 大文字小文字の不一致（解決済みだが、他のファイルで同様の不一致が無いか要確認）。
+ - ブラウザの CORS／コンテンツヘッダによりプレビュー動作が環境依存になる可能性あり。動作確認を推奨。
+ 
+ ## 今後の提案（短期）
++
+ 1. 下書き編集フローの追加（draft の更新 API + Create.vue で編集可能に）。
+ 2. サーバ側で軽量なメタ（attachments_count 等）を一覧 API に含めることで、詳細フェッチを減らす。
+ 3. 添付削除をサーバ側で安定させ、Create の "破棄" をサーバ削除に切替。
+ 4. E2E テスト（添付アップロード→ポーリング→プレビュー）を追加。
+ 
+ ---
++
+ 作成日: 2025-09-03
+ 作成者: 自動生成（開発支援エージェント）
+-

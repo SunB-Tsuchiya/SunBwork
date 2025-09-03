@@ -215,7 +215,30 @@ function isAttachmentUrl(url) {
     }
 }
 
-const sanitizedBody = computed(() => sanitize(localMessage.value?.body));
+function formatMessageBody(body) {
+    // If there's no body or it already contains obvious markup/newlines, leave it alone
+    if (!body || typeof body !== 'string') return body || '';
+    if (/\n|<br\s*\/?>|<p/i.test(body)) return body;
+
+    // Known labels in the job-completion notification we want on their own lines
+    const labels = ['プロジェクトジョブID:', '予定をセットしたユーザーID:', 'イベント名:', '開始:', '終了:', '詳細:'];
+
+    // If none of the labels are present, don't modify the body
+    const hasLabel = labels.some((l) => body.indexOf(l) >= 0);
+    if (!hasLabel) return body;
+
+    let out = String(body);
+    // Insert HTML <br> before each label occurrence (but not at the very start)
+    labels.forEach((label) => {
+        const esc = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        out = out.replace(new RegExp('\\s*' + esc, 'g'), '<br>' + label);
+    });
+    // Remove a leading <br> if inserted
+    out = out.replace(/^<br>/, '');
+    return out;
+}
+
+const sanitizedBody = computed(() => sanitize(formatMessageBody(localMessage.value?.body)));
 
 function extractAttachmentsFromBody(body) {
     if (!body || typeof body !== 'string') return [];

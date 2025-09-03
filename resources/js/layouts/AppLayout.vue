@@ -46,7 +46,9 @@ import { onBeforeUnmount, onMounted, useSlots, ref as vueRef } from 'vue';
 
 const page = usePage();
 const user = page.props.user; // これを追加
-const inboxCount = vueRef(page.props.user?.unread_job_requests_count || 0);
+// Use unread_messages_count as the single notification source; job_requests are being
+// migrated to Messages so we stop subscribing to jobrequests channel here.
+const inboxCount = vueRef(0); // legacy placeholder
 const inboxToast = vueRef('');
 const unreadMessages = vueRef(page.props.user?.unread_messages_count || 0);
 let echoChannel = null;
@@ -54,14 +56,7 @@ let echoChannel = null;
 onMounted(() => {
     try {
         if (window.Echo && user && user.id) {
-            // jobrequests channel
-            echoChannel = window.Echo.private('jobrequests.' + user.id).listen('JobRequestCreated', (e) => {
-                inboxCount.value = (inboxCount.value || 0) + 1;
-                inboxToast.value = (e.from_user_name ? e.from_user_name + 'さんから依頼が届きました: ' : '新しい依頼: ') + (e.message || '');
-                window.dispatchEvent(new CustomEvent('jobrequest:received', { detail: { message: inboxToast.value } }));
-            });
-
-            // messages channel
+            // messages channel (primary notification source)
             window.Echo.private('messages.' + user.id).listen('MessageCreated', (e) => {
                 unreadMessages.value = (unreadMessages.value || 0) + 1;
                 const msg = (e.from_user_name ? e.from_user_name + 'さんからメールが届きました: ' : '新しいメール: ') + (e.subject || '(件名なし)');

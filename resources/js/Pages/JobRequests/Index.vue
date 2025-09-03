@@ -1,5 +1,5 @@
 <script setup>
-import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 
 const page = usePage();
 const props = page.props;
@@ -8,7 +8,25 @@ const requests = props.requests || {};
 const form = useForm({ to_user_id: '', project_job_assignment_id: '', project_job_id: '', message: '' });
 
 const submit = () => {
-    form.post(route('job_requests.store'));
+    // Build MessagesController compatible payload
+    const toId = form.to_user_id || '';
+    const payload = {
+        to: toId ? [toId] : [],
+        subject: `依頼: ${form.project_job_id || ''}`,
+        body: form.message || '',
+        attachments: [],
+    };
+
+    router.post(route('messages.store'), payload, {
+        onSuccess: () => {
+            form.reset('to_user_id', 'project_job_assignment_id', 'project_job_id', 'message');
+            alert('送信しました（Messages 経由）。受信者に通知されます。');
+        },
+        onError: (errors) => {
+            console.error('send message error', errors);
+            alert('送信に失敗しました。詳細はコンソールを確認してください。');
+        },
+    });
 };
 </script>
 

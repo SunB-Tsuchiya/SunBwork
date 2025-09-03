@@ -85,18 +85,26 @@ function statusText(a) {
 function sendRequest(a) {
     if (!confirm('このジョブを発信しますか？')) return;
 
+    // Build payload compatible with MessagesController@store
+    // Messages API expects: { to: [userId,...], subject: string|null, body: string|null, attachments: [] }
+    const toUserId = a.user_id || a.user?.id;
+    // Build a readable details block for the email body
+    const assignedName = a.user?.name || a.assigned_user_name || '（未割当）';
+    const detailsText = a.details || a.detail || a.description || a.body || '';
+    const start = a.desired_start_date || a.preferred_date || a.start_date || '-';
+    const end = a.desired_end_date || a.end_date || '-';
+
     const payload = {
-        project_job_id: projectJob.id,
-        project_job_assignment_id: a.id,
-        to_user_id: a.user_id || a.user?.id,
-        message: `割り当ての依頼: ${a.title}`,
+        to: toUserId ? [toUserId] : [],
+        subject: `ジョブ割り当ての依頼: ${a.title}`,
+        body: `割り当て依頼\nジョブ: ${projectJob.name}\n割り当て: ${a.title}\n\n担当ユーザー: ${assignedName}\n詳細:\n${detailsText || '（詳細なし）'}\n\n希望開始日: ${start}\n希望終了日: ${end}\n\nアプリで詳しい情報を確認できます。`,
     };
 
-    router.post(route('job_requests.store'), payload, {
+    router.post(route('messages.store'), payload, {
         onSuccess: () => {
-            // optimistic UI update
+            // optimistic UI update: mark assigned so UI reflects sent state
             a.assigned = true;
-            alert('発信しました。受信者に通知されます。');
+            alert('発信しました（Messages 経由）。受信者に通知されます。');
         },
         onError: (errors) => {
             console.error('sendRequest error', errors);

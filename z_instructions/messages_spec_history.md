@@ -1,9 +1,11 @@
 # Messages 機能：仕様と履歴（要約）
 
 ## 概要
+
 このドキュメントは、プロジェクト内で行ってきた `messages` 周辺の設計決定、実装変更、運用上の注意点を簡潔にまとめたものです。開発者が現状を素早く把握し、今後の作業に役立てることを目的とします。
 
 ## 主要目的
+
 - 添付ファイルを安全かつユーザーフレンドリーに配信（プレビューはモーダル、強制ダウンロード回避）
 - メッセージ本文や一覧で添付ファイルの表示を誤って行わない（本文へファイル名やリンクを自動挿入しない）
 - 添付のアップロードを安定して追跡・表示（Create UI でテーブル管理、ポーリングで状態更新）
@@ -12,41 +14,45 @@
 - サーバ側ソート（ページネーションと連携）
 
 ## 変更履歴（高レベル）
+
 - フロント（Vue3/Inertia）
-  - `resources/js/Pages/Messages/Show.vue`
-    - Inertia プロップの防御的コピー、必要に応じた詳細フェッチ、添付の blob 取得とモーダルプレビュー、本文のサニタイズ。添付リンクやファイル名を本文に残さない。
-  - `resources/js/Pages/Messages/Create.vue`
-    - ファイルは本文に挿入せずテーブルで管理。アップロードは `/api/uploads` を利用、ポーリングで状態更新、`保存（下書き）` と `破棄` ボタンを追加。フォーム下に「一覧へ戻る」リンクを追加。
-  - `resources/js/Pages/Messages/Index.vue`
-    - `listData`（ローカル複製）を用いて権威ある詳細ペイロードをマージすることでリロード時にも添付/差出人を表示。
-    - 日付を `YYYY年M月D日 HH時MM分SS秒` 形式に整形。
-    - ヘッダのホバー/フォーカス改善、ARIA 指定、クリックでサーバ側ソートを要求するように変更。
-    - 行のダブルクリックで詳細ページへ遷移（`openShow`）。
+    - `resources/js/Pages/Messages/Show.vue`
+        - Inertia プロップの防御的コピー、必要に応じた詳細フェッチ、添付の blob 取得とモーダルプレビュー、本文のサニタイズ。添付リンクやファイル名を本文に残さない。
+    - `resources/js/Pages/Messages/Create.vue`
+        - ファイルは本文に挿入せずテーブルで管理。アップロードは `/api/uploads` を利用、ポーリングで状態更新、`保存（下書き）` と `破棄` ボタンを追加。フォーム下に「一覧へ戻る」リンクを追加。
+    - `resources/js/Pages/Messages/Index.vue`
+        - `listData`（ローカル複製）を用いて権威ある詳細ペイロードをマージすることでリロード時にも添付/差出人を表示。
+        - 日付を `YYYY年M月D日 HH時MM分SS秒` 形式に整形。
+        - ヘッダのホバー/フォーカス改善、ARIA 指定、クリックでサーバ側ソートを要求するように変更。
+        - 行のダブルクリックで詳細ページへ遷移（`openShow`）。
 
 - サーバ（Laravel コントローラ）
-  - `app/Http/Controllers/MessageController.php`
-    - `index()` に `sort_by` / `sort_dir` を追加。`subject|from|attachments|time` を安全にソート。`withCount('attachments')` を利用。
-    - `store()` に `save_as=draft` を受け、下書き保存（`status='draft'`, `sent_at=null`）に対応。
+    - `app/Http/Controllers/MessageController.php`
+        - `index()` に `sort_by` / `sort_dir` を追加。`subject|from|attachments|time` を安全にソート。`withCount('attachments')` を利用。
+        - `store()` に `save_as=draft` を受け、下書き保存（`status='draft'`, `sent_at=null`）に対応。
 
 ## 実装上の要点
+
 - 添付プレビューはサーバ発行の URL を blob として取得し、object URL を生成して `<img>`/`<iframe>` で表示（ダウンロードヘッダを回避）。
 - 本文表示には DOMPurify などを利用してサニタイズ。添付リンクは本文レンダリングパスで除外あるいは無視する。
 - 一覧は初回マウントで上位 N 件の詳細を順次フェッチして `listData` にマージすることで、リロード直後に添付アイコンや差出人が表示されるようにした。
 - サーバソートはクエリ文字列で行い、`paginate(...)->appends($request->query())` でページネーションとソートを保持。
 
 ## 既知の注意点 / TODO
+
 - 下書きの「編集（既存 draft 更新）」は未実装（現在は保存は新規作成）。PATCH/PUT による更新を追加することを推奨。
 - 添付のサーバ側削除 API は partial（存在するが運用確認が必要）。Create.vue の破棄は現在クライアント側の初期化で実装済み。サーバ削除に変更する場合は API 実装・確認が必要。
 - `AddressBookModal` の import 大文字小文字の不一致（解決済みだが、他のファイルで同様の不一致が無いか要確認）。
 - ブラウザの CORS／コンテンツヘッダによりプレビュー動作が環境依存になる可能性あり。動作確認を推奨。
 
 ## 今後の提案（短期）
+
 1. 下書き編集フローの追加（draft の更新 API + Create.vue で編集可能に）。
 2. サーバ側で軽量なメタ（attachments_count 等）を一覧 API に含めることで、詳細フェッチを減らす。
 3. 添付削除をサーバ側で安定させ、Create の "破棄" をサーバ削除に切替。
 4. E2E テスト（添付アップロード→ポーリング→プレビュー）を追加。
 
 ---
+
 作成日: 2025-09-03
 作成者: 自動生成（開発支援エージェント）
-

@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Auth;
+// Log used for debugging during investigation (removed when cleanup)
 use App\Models\Diary;
 use App\Models\Event;
+use App\Models\ProjectJobAssignment;
 
 class CalendarController extends Controller
 {
@@ -30,11 +32,31 @@ class CalendarController extends Controller
                 ->where('start', '>=', $event_from)
                 ->where('start', '<=', $event_to)
                 ->get(['id', 'title', 'start', 'end', 'description']);
+
+            // load assigned jobs that the user accepted or that are marked assigned
+            $jobs = ProjectJobAssignment::where('user_id', $user->id)
+                ->where(function ($q) {
+                    $q->where('accepted', true)->orWhere('assigned', true);
+                })
+                ->with('projectJob')
+                ->get()
+                ->map(function ($a) {
+                    return [
+                        'id' => $a->id,
+                        'title' => $a->title ?: ($a->projectJob ? $a->projectJob->name : '無題'),
+                        'details' => $a->detail ?? ($a->projectJob ? $a->projectJob->detail : null),
+                        'preferred_date' => $a->desired_start_date ? $a->desired_start_date->format('Y-m-d') : null,
+                        'scheduled_at' => null,
+                        'assigned_at' => $a->created_at,
+                    ];
+                });
         }
-        return Inertia::render('Calendar', [
+    // Debug logging removed after investigation
+    return Inertia::render('Calendar', [
             'user' => $user,
             'diaries' => $diaries,
             'events' => $events,
+            'jobs' => $jobs ?? [],
         ]);
     }
 }

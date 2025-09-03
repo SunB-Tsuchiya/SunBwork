@@ -72,13 +72,11 @@ class AppServiceProvider extends ServiceProvider
             $user->department = $department;
             $user->assignment = $assignment;
 
-            // unread job requests count (status 'sent' means not yet accepted/read)
+            // legacy: job_requests is being migrated into Messages. Keep the legacy
+            // property for a transitional period but set to 0 to avoid duplicate counts.
+            $user->unread_job_requests_count = 0;
             try {
-                $user->unread_job_requests_count = \App\Models\JobRequest::where('to_user_id', $user->id)->where('status', 'sent')->count();
-            } catch (\Throwable $e) {
-                $user->unread_job_requests_count = 0;
-            }
-            try {
+                // authoritative unread messages count
                 $user->unread_messages_count = \App\Models\MessageRecipient::where('user_id', $user->id)->whereNull('read_at')->count();
             } catch (\Throwable $e) {
                 $user->unread_messages_count = 0;
