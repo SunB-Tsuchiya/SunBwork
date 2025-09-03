@@ -23,11 +23,34 @@ class TeamController extends Controller
         $team = Team::with(['company', 'department'])->findOrFail($id);
         $companies = \App\Models\Company::active()->get(['id', 'name']);
         $departments = \App\Models\Department::active()->get(['id', 'name', 'company_id']);
-        return Inertia::render('Admin/Teams/Edit', [
+        $props = [
             'team' => $team,
             'companies' => $companies,
             'departments' => $departments,
-        ]);
+        ];
+
+        // If this is a unit team, include the Unit model and users/leaders for the edit form
+        if ($team->team_type === 'unit') {
+            $unit = \App\Models\Unit::where('company_id', $team->company_id)
+                ->where('department_id', $team->department_id)
+                ->where('name', $team->name)
+                ->first();
+
+            $companyId = $team->company_id;
+            $users = \App\Models\User::select(['id', 'name', 'user_role', 'department_id', 'company_id'])
+                ->where('company_id', $companyId)
+                ->get();
+
+            $leaders = \App\Models\User::select(['id', 'name', 'user_role'])
+                ->whereIn('user_role', ['superadmin', 'admin'])
+                ->get();
+
+            $props['unit'] = $unit;
+            $props['users'] = $users;
+            $props['leaders'] = $leaders;
+        }
+
+        return Inertia::render('Admin/Teams/Edit', $props);
     }
 
     public function update(Request $request, $id)

@@ -37,6 +37,12 @@ const props = defineProps({
                 チーム管理
             </Link>
             <Link
+                :href="route('admin.diaries.index')"
+                class="rounded-md border border-green-200 px-3 py-2 text-sm font-medium text-green-600 hover:bg-green-50 hover:text-green-800"
+            >
+                日報管理
+            </Link>
+            <Link
                 :href="route('admin.clients.index')"
                 class="rounded-md border border-green-200 px-3 py-2 text-sm font-medium text-green-600 hover:bg-green-50 hover:text-green-800"
             >

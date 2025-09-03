@@ -20,7 +20,12 @@ class Team extends JetstreamTeam
      */
     protected $fillable = [
         'name',
+        'description',
         'personal_team',
+        'company_id',
+        'department_id',
+        'team_type',
+        'user_id',
     ];
 
     /**
@@ -44,9 +49,8 @@ class Team extends JetstreamTeam
         return [
             'personal_team' => 'boolean',
         ];
-        
     }
-    
+
     /**
      * チームの会社
      */
@@ -63,7 +67,7 @@ class Team extends JetstreamTeam
         return $this->belongsTo(Department::class);
     }
 
- 
+
     /**
      * 部署チーム（個人チーム以外）のスコープ
      */

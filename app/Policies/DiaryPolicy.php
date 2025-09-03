@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Policies;
 
 use App\Models\Diary;
@@ -12,7 +13,8 @@ class DiaryPolicy
      */
     public function viewAny(User $user): bool
     {
-        return false;
+        // allow admins to view listings for their company
+        return $user->isAdmin() || $user->isLeader() || $user->isCoordinator();
     }
 
     /**
@@ -20,7 +22,15 @@ class DiaryPolicy
      */
     public function view(\App\Models\User $user, \App\Models\Diary $diary)
     {
-        return $user->id === $diary->user_id;
+        // owner can view
+        if ($user->id === $diary->user_id) return true;
+
+        // admins/leaders/coordinators can view diaries of users in same company
+        if (($user->isAdmin() || $user->isLeader() || $user->isCoordinator()) && $user->company_id && $diary->user && $diary->user->company_id === $user->company_id) {
+            return true;
+        }
+
+        return false;
     }
 
     /**

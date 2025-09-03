@@ -50,7 +50,10 @@ class DiaryController extends Controller
                 }
             ],
         ]);
-    $diary = Diary::create($data);
+        // ensure diary is associated with the authenticated user
+        $data['user_id'] = Auth::id();
+
+        $diary = Diary::create($data);
 
         // 本文内の [[attachment:{id}:filename]] プレースホルダを検出し、該当する attachments レコードを日報に紐付ける
         $contentForScan = $data['content'] ?? $request->input('content', '');
@@ -64,7 +67,7 @@ class DiaryController extends Controller
 
         // 添付ファイル保存
         if ($request->hasFile('files')) {
-                    
+
 
             foreach ($request->file('files') as $file) {
                 $isImage = strpos($file->getMimeType(), 'image') === 0;
@@ -118,7 +121,7 @@ class DiaryController extends Controller
             }
         }
 
-    return redirect()->route('dashboard');
+        return redirect()->route('diaries.index');
     }
 
     public function show(Diary $diary)
@@ -140,6 +143,90 @@ class DiaryController extends Controller
     public function update(Request $request, Diary $diary)
     {
         $this->authorize('update', $diary);
+        // Quick path: if the request contains `content`, treat this as the Quill-based edit
+        if ($request->input('content') !== null) {
+            // ensure date exists for validation: use existing diary date if absent
+            $request->merge(['date' => $request->input('date', $diary->date)]);
+            $data = $request->validate([
+                'date' => 'required|date',
+                'content' => [
+                    'required',
+                    function ($attribute, $value, $fail) {
+                        if (trim(strip_tags($value)) === '') {
+                            $fail('内容を入力してください。');
+                        }
+                    }
+                ],
+            ]);
+            $data['user_id'] = Auth::id();
+            $diary->update($data);
+
+            // 本文内の [[attachment:{id}:filename]] プレースホルダを検出し、該当する attachments レコードを日報に紐付ける
+            $contentForScan = $data['content'] ?? $request->input('content', '');
+            if ($contentForScan) {
+                preg_match_all('/\[\[attachment:(\d+):[^\]]+\]\]/', $contentForScan, $matches);
+                if (!empty($matches[1])) {
+                    $ids = array_map('intval', $matches[1]);
+                    Attachment::whereIn('id', $ids)->update(['diary_id' => $diary->id]);
+                }
+            }
+
+            // 添付ファイル保存（追加分のみ）
+            if ($request->hasFile('files')) {
+                foreach ($request->file('files') as $file) {
+                    $isImage = strpos($file->getMimeType(), 'image') === 0;
+                    $original = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+                    $ext = $file->getClientOriginalExtension();
+                    $dateStr = date('Ymd', strtotime($diary->date));
+                    $uniqueName = $original . '_' . $dateStr . $diary->id . '.' . $ext;
+                    $path = 'attachments/' . $uniqueName;
+
+                    if ($isImage) {
+                        /** @var \Intervention\Image\Image $img */
+                        if (extension_loaded('imagick') && class_exists(\Intervention\Image\Drivers\Imagick\Driver::class)) {
+                            $manager = ImageManager::imagick();
+                        } else {
+                            $manager = ImageManager::gd();
+                        }
+                        $img = $manager->read($file);
+                        if ($img->width() > 1200) {
+                            $img->resize(1200, null, function ($constraint) {
+                                $constraint->aspectRatio();
+                                $constraint->upsize();
+                            });
+                        }
+                        if (strtolower($ext) === 'png') {
+                            $enc = new \Intervention\Image\Encoders\PngEncoder();
+                        } else {
+                            $enc = new \Intervention\Image\Encoders\JpegEncoder(80);
+                        }
+                        $encoded = $img->encode($enc);
+                        Storage::disk('public')->put($path, (string) $encoded->toDataUri() ? base64_decode(preg_replace('#^data:.*?;base64,#', '', $encoded->toDataUri())) : (string) $encoded);
+                        try {
+                            Storage::disk('public')->setVisibility($path, 'public');
+                            $real = Storage::disk('public')->path($path) ?? null;
+                            if ($real && file_exists($real)) {
+                                @chmod($real, 0644);
+                            }
+                        } catch (\Throwable $_exPerm) {
+                            logger()->warning('DiaryController: could not set permissions for image', ['path' => $path, 'error' => $_exPerm->getMessage()]);
+                        }
+                    } else {
+                        Storage::disk('public')->putFileAs('attachments', $file, $uniqueName);
+                    }
+                    \App\Models\Attachment::create([
+                        'diary_id' => $diary->id,
+                        'path' => $path,
+                        'original_name' => $file->getClientOriginalName(),
+                        'mime_type' => $file->getMimeType(),
+                    ]);
+                }
+            }
+
+            return redirect()->route('diaries.index');
+        }
+
+        // fallback: existing complex update flow (kept unchanged)
         $data = $request->validate([
             'date' => 'required|date',
             'title' => 'required|string|max:255',
@@ -173,13 +260,13 @@ class DiaryController extends Controller
                 $path = 'attachments/' . $uniqueName;
 
                 if ($isImage) {
-                        /** @var \Intervention\Image\Image $img */
-                        if (extension_loaded('imagick') && class_exists(\Intervention\Image\Drivers\Imagick\Driver::class)) {
-                            $manager = ImageManager::imagick();
-                        } else {
-                            $manager = ImageManager::gd();
-                        }
-                        $img = $manager->read($file);
+                    /** @var \Intervention\Image\Image $img */
+                    if (extension_loaded('imagick') && class_exists(\Intervention\Image\Drivers\Imagick\Driver::class)) {
+                        $manager = ImageManager::imagick();
+                    } else {
+                        $manager = ImageManager::gd();
+                    }
+                    $img = $manager->read($file);
                     if ($img->width() > 1200) {
                         $img->resize(1200, null, function ($constraint) {
                             $constraint->aspectRatio();
@@ -214,7 +301,7 @@ class DiaryController extends Controller
             }
         }
 
-        return redirect()->route('dashboard');
+        return redirect()->route('diaries.index');
     }
 
     public function destroy(Diary $diary)

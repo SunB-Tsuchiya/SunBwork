@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -14,6 +15,8 @@ class Diary extends Model
 
     protected $casts = [
         'date' => 'date',
+        'read_by' => 'array',
+        'admin_comments' => 'array',
     ];
 
     /**

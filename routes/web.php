@@ -150,6 +150,13 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 
         // チーム管理
         Route::resource('teams', App\Http\Controllers\Admin\TeamController::class);
+        // ユニットチーム作成 (画面と保存)
+        Route::get('teams/units/create', [App\Http\Controllers\Admin\UnitController::class, 'create'])->name('teams.units.create');
+        Route::post('units', [App\Http\Controllers\Admin\UnitController::class, 'store'])->name('units.store');
+        // 管理者向け 日報一覧・閲覧
+        Route::get('diaries', [App\Http\Controllers\Admin\DiaryAdminController::class, 'index'])->name('diaries.index');
+        Route::get('diaries/{diary}', [App\Http\Controllers\Admin\DiaryAdminController::class, 'show'])->name('diaries.show');
+        Route::post('diaries/{diary}/mark-read', [App\Http\Controllers\Admin\DiaryAdminController::class, 'markRead'])->name('diaries.mark_read');
         // AI settings admin
         Route::get('/ai', [\App\Http\Controllers\Admin\AiSettingController::class, 'index'])->name('ai.index');
         Route::get('/ai/create', [\App\Http\Controllers\Admin\AiSettingController::class, 'create'])->name('ai.create');

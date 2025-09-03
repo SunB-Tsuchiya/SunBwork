@@ -51,8 +51,8 @@ class CalendarController extends Controller
                     ];
                 });
         }
-    // Debug logging removed after investigation
-    return Inertia::render('Calendar', [
+        // Debug logging removed after investigation
+        return Inertia::render('Calendar', [
             'user' => $user,
             'diaries' => $diaries,
             'events' => $events,
