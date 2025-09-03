@@ -23,7 +23,16 @@ class UploadStatusController extends Controller
         ];
 
         if ($att->status === 'ready') {
-            $data['url'] = $att->path ? asset('storage/' . ltrim($att->path, '/')) : null;
+            // prefer a temporary signed URL (good for sharing/use in emails) that expires in 15 minutes
+            try {
+                $signed = \Illuminate\Support\Facades\URL::temporarySignedRoute('attachments.signed', now()->addMinutes(15), ['path' => $att->path]);
+                $data['url'] = $signed;
+            } catch (\Exception $__e) {
+                // fallback to authenticated stream route
+                $data['url'] = $att->path ? route('api.attachments.stream', ['path' => $att->path]) : null;
+            }
+            // public fallback
+            $data['public_url'] = $att->path ? asset('storage/' . ltrim($att->path, '/')) : null;
         }
 
         return response()->json($data);

@@ -7,9 +7,11 @@ use Illuminate\Support\Facades\Gate;
 use App\Models\ProjectSchedule;
 use App\Models\ProjectMemo;
 use App\Models\JobRequest;
+use App\Models\Message;
 use App\Policies\ProjectSchedulePolicy;
 use App\Policies\ProjectMemoPolicy;
 use App\Policies\JobRequestPolicy;
+use App\Policies\MessagePolicy;
 
 class AuthServiceProvider extends ServiceProvider
 {
@@ -23,6 +25,7 @@ class AuthServiceProvider extends ServiceProvider
         ProjectSchedule::class => ProjectSchedulePolicy::class,
         ProjectMemo::class => ProjectMemoPolicy::class,
         JobRequest::class => JobRequestPolicy::class,
+        Message::class => MessagePolicy::class,
     ];
 
     /**

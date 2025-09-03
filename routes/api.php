@@ -20,6 +20,8 @@
 // チャットメッセージ既読登録
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Gate;
+use App\Models\Message;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -43,7 +45,81 @@ Route::middleware(['web', 'auth:sanctum'])->group(function () {
     // Unified upload endpoint for diary/chat attachments
     Route::post('/uploads', [\App\Http\Controllers\Api\UploadController::class, 'upload']);
     Route::get('/uploads/status/{id}', [\App\Http\Controllers\Api\UploadStatusController::class, 'status']);
+    // Stream attachment with authorization
+    Route::get('/attachments/stream', [\App\Http\Controllers\AttachmentController::class, 'stream'])->name('api.attachments.stream');
+
+    // Debug: return the same mapping MessageController::show would produce for a message
+    // Access while logged-in at /api/debug/messages/{id}/payload
+    Route::get('/debug/messages/{message}/payload', function (Request $request, Message $message) {
+        Gate::authorize('view', $message);
+        $message->load('fromUser', 'recipients.user', 'attachments');
+
+        $mapped = $message->toArray();
+        $mapped['attachments'] = $message->attachments->map(function ($att) {
+            $url = null;
+            $public = null;
+            if ($att->status === 'ready' && $att->path) {
+                try {
+                    $url = route('api.attachments.stream', ['path' => $att->path]);
+                    $public = asset('storage/' . ltrim($att->path, '/'));
+                } catch (\Throwable $__e) {
+                    $url = null;
+                    $public = null;
+                }
+            }
+            return [
+                'id' => $att->id,
+                'original_name' => $att->original_name,
+                'mime_type' => $att->mime_type,
+                'size' => $att->size,
+                'status' => $att->status,
+                'url' => $url,
+                'public_url' => $public,
+                'path' => $att->path,
+            ];
+        })->values();
+
+        return response()->json($mapped);
+    })->name('debug.messages.payload');
+
+    // ...existing code in this group...
 });
+
+// Local-only public debug payload (no auth) for developer browser fetches on local machine.
+// Accessible only when running in local environment or from loopback to avoid exposure.
+Route::get('/debug/public/messages/{message}/payload', function (Request $request, Message $message) {
+    if (!app()->environment('local') && $request->ip() !== '127.0.0.1' && $request->ip() !== '::1') {
+        abort(404);
+    }
+    $message->load('fromUser', 'recipients.user', 'attachments');
+
+    $mapped = $message->toArray();
+    $mapped['attachments'] = $message->attachments->map(function ($att) {
+        $url = null;
+        $public = null;
+        if ($att->status === 'ready' && $att->path) {
+            try {
+                $url = route('api.attachments.stream', ['path' => $att->path]);
+                $public = asset('storage/' . ltrim($att->path, '/'));
+            } catch (\Throwable $__e) {
+                $url = null;
+                $public = null;
+            }
+        }
+        return [
+            'id' => $att->id,
+            'original_name' => $att->original_name,
+            'mime_type' => $att->mime_type,
+            'size' => $att->size,
+            'status' => $att->status,
+            'url' => $url,
+            'public_url' => $public,
+            'path' => $att->path,
+        ];
+    })->values();
+
+    return response()->json($mapped);
+})->name('debug.messages.public.payload');
 
 Route::middleware(['web', 'auth:sanctum'])->post('/chat/messages/{message}/read', [\App\Http\Controllers\Chat\ChatController::class, 'markAsRead']);
 

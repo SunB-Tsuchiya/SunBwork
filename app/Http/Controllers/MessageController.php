@@ -8,6 +8,7 @@ use App\Models\Message;
 use App\Models\MessageRecipient;
 use App\Events\MessageCreated;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use App\Services\HtmlSanitizer;
 
 class MessageController extends Controller
@@ -16,18 +17,51 @@ class MessageController extends Controller
     {
         $user = $request->user();
         $folder = $request->query('folder', 'inbox');
+        // Server-side sorting: accept sort_by (subject|from|attachments|time) and sort_dir (asc|desc)
+        $sortBy = $request->query('sort_by');
+        $sortDir = strtolower($request->query('sort_dir', 'desc')) === 'asc' ? 'asc' : 'desc';
 
+        // build base query and ensure attachments count is available for ordering
         if ($folder === 'sent') {
-            $messages = Message::where('from_user_id', $user->id)->with('recipients.user')->orderByDesc('created_at')->paginate(20);
+            $query = Message::where('from_user_id', $user->id)->with('recipients.user')->withCount('attachments');
         } else {
-            $messages = Message::whereHas('recipients', function ($q) use ($user) {
+            $query = Message::whereHas('recipients', function ($q) use ($user) {
                 $q->where('user_id', $user->id);
-            })->with('fromUser')->orderByDesc('created_at')->paginate(20);
+            })->with('fromUser')->withCount('attachments');
         }
+
+        // apply safe ordering based on allowed fields
+        if ($sortBy) {
+            switch ($sortBy) {
+                case 'subject':
+                    $query->orderBy('subject', $sortDir);
+                    break;
+                case 'attachments':
+                    $query->orderBy('attachments_count', $sortDir);
+                    break;
+                case 'time':
+                    // order by sent_at then created_at as fallback
+                    $query->orderBy('sent_at', $sortDir)->orderBy('created_at', $sortDir);
+                    break;
+                case 'from':
+                    // join users table to sort by sender name (safe: select messages.* to keep models)
+                    $query = $query->leftJoin('users', 'users.id', '=', 'messages.from_user_id')->select('messages.*')->orderBy('users.name', $sortDir);
+                    break;
+                default:
+                    $query->orderByDesc('created_at');
+            }
+        } else {
+            $query->orderByDesc('created_at');
+        }
+
+        // paginate and keep query string so pagination links preserve sort params
+        $messages = $query->paginate(20)->appends($request->query());
 
         return Inertia::render('Messages/Index', [
             'messages' => $messages,
             'folder' => $folder,
+            'sort_by' => $sortBy,
+            'sort_dir' => $sortDir,
         ]);
     }
 
@@ -43,6 +77,27 @@ class MessageController extends Controller
         $this->authorize('view', $message);
         $message->load('fromUser', 'recipients.user');
 
+        // load attachments for this message (if any) and expose public URLs when ready
+        $message->load('attachments');
+        $message->attachments = $message->attachments->map(function ($att) {
+            $url = null;
+            $public = null;
+            if ($att->status === 'ready' && $att->path) {
+                $url = route('api.attachments.stream', ['path' => $att->path]);
+                $public = asset('storage/' . ltrim($att->path, '/'));
+            }
+            return [
+                'id' => $att->id,
+                'original_name' => $att->original_name,
+                'mime_type' => $att->mime_type,
+                'size' => $att->size,
+                'status' => $att->status,
+                'url' => $url,
+                'public_url' => $public,
+                'path' => $att->path,
+            ];
+        })->values();
+
         // mark as read for current user
         $user = $request->user();
         if ($user) {
@@ -53,6 +108,17 @@ class MessageController extends Controller
                 } catch (\Throwable $__e) {
                 }
             }
+        }
+
+        // Debug log: record that show() was invoked and include minimal message payload
+        try {
+            Log::info('MessageController@show invoked', [
+                'id' => $message->id,
+                'subject' => $message->subject,
+                'attachments_count' => $message->attachments->count(),
+            ]);
+        } catch (\Throwable $__e) {
+            // ignore logging failures
         }
 
         return Inertia::render('Messages/Show', [
@@ -86,18 +152,20 @@ class MessageController extends Controller
             'bcc' => 'nullable|array',
             'bcc.*' => 'integer|exists:users,id',
             'attachments' => 'nullable|array',
+            'save_as' => 'nullable|string',
         ]);
 
-    // server-side sanitize body using centralized HtmlSanitizer service
-    $sanitizer = app(HtmlSanitizer::class);
-    $body = $sanitizer->purify($data['body'] ?? null);
+        // server-side sanitize body using centralized HtmlSanitizer service
+        $sanitizer = app(HtmlSanitizer::class);
+        $body = $sanitizer->purify($data['body'] ?? null);
 
+        $isDraft = isset($data['save_as']) && $data['save_as'] === 'draft';
         $message = Message::create([
             'from_user_id' => $request->user()->id,
             'subject' => $data['subject'] ?? null,
             'body' => $body,
-            'status' => 'sent',
-            'sent_at' => now(),
+            'status' => $isDraft ? 'draft' : 'sent',
+            'sent_at' => $isDraft ? null : now(),
         ]);
 
         $createRecipient = function ($userId, $type) use ($message) {
@@ -133,6 +201,6 @@ class MessageController extends Controller
             // non-fatal
         }
 
-        return redirect()->route('messages.index', ['folder' => 'sent']);
+        return redirect()->route('messages.index', ['folder' => $isDraft ? 'drafts' : 'sent']);
     }
 }

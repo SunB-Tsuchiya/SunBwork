@@ -10,6 +10,9 @@ require __DIR__ . '/debug.php';
 // チャット用ルート
 require __DIR__ . '/chat.php';
 
+// Signed attachment route (temporary signed URLs may access this without authentication)
+Route::get('/attachments/signed', [App\Http\Controllers\AttachmentController::class, 'stream'])->name('attachments.signed')->middleware('signed');
+
 Route::get('/', function () {
     return Inertia::render('Welcome', [
         'canLogin' => Route::has('login'),
