@@ -34,8 +34,55 @@ const handleEdit = (teamId) => {
 const handleDelete = async (teamId) => {
     if (!confirm('チームを削除します。よろしいですか？')) return;
     if (!confirm('本当に削除してよいですか？')) return;
-    // InertiaでDELETEリクエスト
-    await window.Inertia.delete(route('admin.teams.destroy', { team: teamId }));
+    // Use fetch DELETE with CSRF token to avoid performing a GET to the destroy route.
+    try {
+        // Resolve CSRF token robustly: prefer meta tag, then cookie XSRF-TOKEN, then window.Laravel
+        const getCookie = (name) => {
+            if (!document.cookie) return null;
+            const match = document.cookie.match(new RegExp('(^|; )' + name.replace(/([.$?*|{}()\[\]\\/+^])/g, '\\$1') + '=([^;]*)'));
+            return match ? match[2] : null;
+        };
+
+        const tokenMeta = document.querySelector('meta[name="csrf-token"]');
+        let csrf = tokenMeta ? tokenMeta.getAttribute('content') : window?.Laravel?.csrfToken || null;
+        if (!csrf) {
+            const raw = getCookie('XSRF-TOKEN');
+            if (raw) {
+                try {
+                    csrf = decodeURIComponent(raw);
+                } catch (e) {
+                    csrf = raw;
+                }
+            }
+        }
+        // Use explicit URL to ensure the ID is included (avoid Ziggy/route helper edge-cases)
+        const destroyUrl = `/admin/teams/${teamId}`;
+        console.debug('Deleting team via', destroyUrl);
+
+        const res = await fetch(destroyUrl, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': csrf || '',
+                Accept: 'application/json',
+            },
+            credentials: 'same-origin',
+        });
+
+        if (res.ok) {
+            // redirect to index (server redirect may be returned as JSON for XHR; just navigate)
+            window.location.href = route('admin.teams.index');
+            return;
+        }
+
+        const data = await res.json().catch(() => ({}));
+        const msg = data.message || `削除に失敗しました (HTTP ${res.status})`;
+        alert(msg);
+    } catch (err) {
+        console.error('Delete failed', err);
+        alert('削除に失敗しました。コンソールを確認してください。');
+    }
 };
 </script>
 

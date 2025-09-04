@@ -137,12 +137,37 @@ class z_SampleUsers22Seeder extends Seeder
                             }
 
                             // write resolved company_id/department_id back to users table if columns exist
+                            // resolve assignment (CSV 'role' -> assignments table) and prepare update data
+                            $assignmentId = null;
+                            if ($schema->hasTable('assignments')) {
+                                $csvRoleName = trim($data['role'] ?? '');
+                                if ($csvRoleName !== '') {
+                                    $existingAssignment = DB::table('assignments')->where('name', $csvRoleName)->first();
+                                    if ($existingAssignment) {
+                                        $assignmentId = $existingAssignment->id;
+                                    } else {
+                                        try {
+                                            $assignmentId = DB::table('assignments')->insertGetId([
+                                                'name' => $csvRoleName,
+                                                'created_at' => $now,
+                                                'updated_at' => $now,
+                                            ]);
+                                        } catch (\Throwable $_exA) {
+                                            logger()->warning('z_SampleUsers22Seeder: failed to create assignment', ['email' => $email, 'assignment' => $csvRoleName, 'error' => $_exA->getMessage()]);
+                                        }
+                                    }
+                                }
+                            }
+
                             $updateData = [];
                             if (!empty($companyId) && Schema::hasColumn('users', 'company_id')) {
                                 $updateData['company_id'] = $companyId;
                             }
                             if (!empty($departmentId) && Schema::hasColumn('users', 'department_id')) {
                                 $updateData['department_id'] = $departmentId;
+                            }
+                            if (!empty($assignmentId) && Schema::hasColumn('users', 'assignment_id')) {
+                                $updateData['assignment_id'] = $assignmentId;
                             }
                             if (!empty($updateData)) {
                                 try {

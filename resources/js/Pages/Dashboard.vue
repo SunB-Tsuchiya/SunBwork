@@ -55,8 +55,10 @@ const user = page.props.user;
                 <div>
                     <label class="block text-sm font-medium text-gray-700">会社・部署</label>
                     <p class="mt-1 text-sm text-gray-900">
-                        {{ user?.company?.name || '未設定' }}
-                        <span v-if="user?.department?.name"> - {{ user.department?.name }}</span>
+                        {{ user?.current_team?.company_name || user?.company?.name || '未設定' }}
+                        <span v-if="user?.current_team?.department_name || user?.department?.name">
+                            - {{ user?.current_team?.department_name || user?.department?.name }}
+                        </span>
                     </p>
                 </div>
                 <div>

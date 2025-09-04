@@ -9,6 +9,13 @@ const props = defineProps({
     <div class="mb-6">
         <nav class="flex space-x-8" aria-label="Tabs">
             <Link
+                v-if="typeof route === 'function' && route().has('admin.companies.index')"
+                :href="route('admin.companies.index')"
+                class="rounded-md border border-green-200 px-3 py-2 text-sm font-medium text-green-600 hover:bg-green-50 hover:text-green-800"
+            >
+                会社管理
+            </Link>
+            <Link
                 :href="route('admin.users.index')"
                 :class="[
                     'rounded-md px-3 py-2 text-sm font-medium',
@@ -17,13 +24,7 @@ const props = defineProps({
             >
                 ユーザー管理
             </Link>
-            <Link
-                v-if="typeof route === 'function' && route().has('admin.companies.index')"
-                :href="route('admin.companies.index')"
-                class="rounded-md border border-green-200 px-3 py-2 text-sm font-medium text-green-600 hover:bg-green-50 hover:text-green-800"
-            >
-                会社管理
-            </Link>
+
             <Link
                 :href="route('debug.api')"
                 class="rounded-md border border-blue-200 px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 hover:text-blue-800"

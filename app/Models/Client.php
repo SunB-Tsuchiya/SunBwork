@@ -13,6 +13,7 @@ class Client extends Model
         'name',
         'detail',
         'fromSB',
+        'company_id',
     ];
 
     protected $casts = [
@@ -22,5 +23,19 @@ class Client extends Model
     public function projectJobs()
     {
         return $this->hasMany(ProjectJob::class);
+    }
+
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
+
+    /**
+     * Scope a query to only include clients belonging to a given company id.
+     */
+    public function scopeForCompany($query, $companyId)
+    {
+        if (empty($companyId)) return $query->whereNull('company_id');
+        return $query->where('company_id', $companyId);
     }
 }

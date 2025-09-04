@@ -18,9 +18,22 @@ class z_ClientSeeder extends Seeder
         ];
 
         foreach ($clients as $c) {
+            // ensure the default company exists and get its id
+            $company = DB::table('companies')->where('name', '株式会社サン・ブレーン')->first();
+            if (!$company) {
+                $companyId = DB::table('companies')->insertGetId([
+                    'name' => '株式会社サン・ブレーン',
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+            } else {
+                $companyId = $company->id;
+            }
+
             DB::table('clients')->updateOrInsert([
                 'name' => $c['name']
             ], [
+                'company_id' => $companyId,
                 'notes' => $c['notes'] ?? null,
                 'updated_at' => $now,
                 'created_at' => $now,

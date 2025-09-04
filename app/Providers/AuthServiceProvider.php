@@ -12,6 +12,7 @@ use App\Policies\ProjectSchedulePolicy;
 use App\Policies\ProjectMemoPolicy;
 use App\Policies\JobRequestPolicy;
 use App\Policies\MessagePolicy;
+use App\Policies\ClientPolicy;
 
 class AuthServiceProvider extends ServiceProvider
 {
@@ -26,6 +27,7 @@ class AuthServiceProvider extends ServiceProvider
         ProjectMemo::class => ProjectMemoPolicy::class,
         JobRequest::class => JobRequestPolicy::class,
         Message::class => MessagePolicy::class,
+        \App\Models\Client::class => ClientPolicy::class,
     ];
 
     /**

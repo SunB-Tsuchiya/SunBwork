@@ -17,7 +17,7 @@ function buildJobDetails(job) {
     const pjId = job.project_job_id || job.project_job || '';
     const difficulty = job.difficulty || job.level || '';
 
-    let lines = [];
+    const lines = [];
     const jobName = job.title || job.name || (pjId ? `ID:${pjId}` : '');
     if (jobName) lines.push(`ジョブ名: ${jobName}`);
     if (difficulty) lines.push(`難易度: ${difficulty}`);

@@ -203,14 +203,14 @@ const getTopTabActive = () => {
                         </div>
 
                         <div class="hidden sm:ms-6 sm:flex sm:items-center">
-                            <!-- Inbox link -->
+                            <!-- Chat link (replaces previous Inbox) -->
                             <div class="relative ms-3 flex items-center">
-                                <Link :href="route('job_requests.index')" class="flex items-center text-sm text-gray-600 hover:text-gray-800">
-                                    <span>依頼箱</span>
+                                <Link :href="route('chat.rooms.index')" class="flex items-center text-sm text-gray-600 hover:text-gray-800">
+                                    <span>チャット</span>
                                     <span
-                                        v-if="inboxCount && inboxCount > 0"
-                                        class="ms-2 inline-flex items-center justify-center rounded-full bg-red-500 px-2 py-0.5 text-xs text-white"
-                                        >{{ inboxCount }}</span
+                                        v-if="unreadMessages && unreadMessages > 0"
+                                        class="ms-2 inline-flex items-center justify-center rounded-full bg-blue-500 px-2 py-0.5 text-xs text-white"
+                                        >{{ unreadMessages }}</span
                                     >
                                 </Link>
                             </div>

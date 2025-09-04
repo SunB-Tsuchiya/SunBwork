@@ -8,9 +8,9 @@ const props = defineProps({
 <template>
     <div class="mb-6">
         <nav class="flex space-x-8" aria-label="Tabs">
-            <Link :href="route('profile.show')" class="rounded-md px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800">
+            <!-- <Link :href="route('profile.show')" class="rounded-md px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800">
                 プロフィール編集
-            </Link>
+            </Link> -->
             <Link :href="route('user.assigned-jobs.index')" class="rounded-md px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800">
                 ジョブ一覧
             </Link>

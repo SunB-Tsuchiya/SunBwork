@@ -64,4 +64,26 @@ class TeamController extends Controller
         $team->update($validated);
         return redirect()->route('admin.teams.index')->with('success', 'チーム情報を更新しました');
     }
+
+    // Show a single team (resource route expects this)
+    public function show($id)
+    {
+        $team = Team::with(['company', 'department'])->findOrFail($id);
+        return Inertia::render('Admin/Teams/Show', [
+            'team' => $team,
+        ]);
+    }
+
+    // Destroy a team
+    public function destroy($id)
+    {
+        $team = Team::findOrFail($id);
+        $team->delete();
+        // If request is AJAX/XHR, return 204 No Content for client-side handling
+        if (request()->ajax() || request()->wantsJson() || request()->header('X-Requested-With') === 'XMLHttpRequest') {
+            return response()->json(['message' => 'deleted'], 204);
+        }
+
+        return redirect()->route('admin.teams.index')->with('success', 'チームを削除しました');
+    }
 }

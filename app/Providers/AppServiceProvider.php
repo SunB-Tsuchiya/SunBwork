@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Collection;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -27,8 +29,18 @@ class AppServiceProvider extends ServiceProvider
             $assignment = $user->assignment_id ? \App\Models\Assignment::find($user->assignment_id) : null;
 
             // populate current_team and available_teams safely
-            $currentTeam = $user->currentTeam;
-            $availableTeams = $user->teams;
+            $currentTeam = null;
+            $availableTeams = collect();
+            try {
+                // limit DB access to only what's needed and catch issues from the pivot/table schema
+                $currentTeam = $user->currentTeam;
+                $availableTeams = $user->teams;
+            } catch (\Throwable $e) {
+                // Log at debug level to avoid noisy ERROR logs; we still fallback to safe defaults.
+                Log::debug('Inertia share: failed to resolve user teams, falling back: ' . $e->getMessage());
+                $currentTeam = null;
+                $availableTeams = collect();
+            }
 
             // If this is the specially provisioned superadmin account, allow login even without company/team
             if ($user->user_role === 'superadmin') {

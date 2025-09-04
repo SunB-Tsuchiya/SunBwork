@@ -20,11 +20,12 @@ class AdminUserController extends Controller
 {
     public function index()
     {
-        $users = User::orderBy('created_at', 'desc')->get();
+        // 表示対象は管理者アカウント（user_role = 'admin') のみ
+        $users = User::where('user_role', 'admin')->orderBy('created_at', 'desc')->get();
         $assignments = \App\Models\Assignment::all();
         $departments = Department::all();
         $companies = Company::all();
-        
+
         $user = Auth::user();
 
         return Inertia::render('SuperAdmin/AdminUsers/Index', [
@@ -38,7 +39,14 @@ class AdminUserController extends Controller
 
     public function create()
     {
-        $companies = Company::with(['departments.assignments' => function($q){
+        $current = Auth::user();
+        // 管理者（admin）を新規作成できるのは superadmin のみ
+        if (! $current || $current->user_role !== 'superadmin') {
+            return redirect()->route('superadmin.adminusers.index')
+                ->with('error', '管理者の作成は許可されていません。');
+        }
+
+        $companies = Company::with(['departments.assignments' => function ($q) {
             $q->where('active', true);
         }])->where('active', true)->get();
 
@@ -49,8 +57,8 @@ class AdminUserController extends Controller
 
     public function store(Request $request)
     {
-    $current = Auth::user();
-    if ($request->input('user_role') === 'admin' && (! $current || $current->user_role !== 'superadmin')) {
+        $current = Auth::user();
+        if ($request->input('user_role') === 'admin' && (! $current || $current->user_role !== 'superadmin')) {
             return redirect()->route('superadmin.adminusers.index')
                 ->with('error', '管理者の作成は許可されていません。');
         }
@@ -63,7 +71,7 @@ class AdminUserController extends Controller
             'assignment_id' => 'nullable|exists:assignments,id',
             'user_role' => [
                 'required',
-                function($attribute, $value, $fail) {
+                function ($attribute, $value, $fail) {
                     $allowed = ['admin', 'leader', 'coordinator', 'user'];
                     if (!in_array($value, $allowed)) {
                         $fail("{$attribute} の値 '{$value}' は許可されていません（許可値: " . implode(',', $allowed) . ")");
@@ -72,13 +80,13 @@ class AdminUserController extends Controller
             ],
         ]);
 
-    // 空文字が送られてきた場合は null に正規化
-    $departmentId = $request->input('department_id');
-    $assignmentId = $request->input('assignment_id');
-    if ($departmentId === '') $departmentId = null;
-    if ($assignmentId === '') $assignmentId = null;
+        // 空文字が送られてきた場合は null に正規化
+        $departmentId = $request->input('department_id');
+        $assignmentId = $request->input('assignment_id');
+        if ($departmentId === '') $departmentId = null;
+        if ($assignmentId === '') $assignmentId = null;
 
-    $companyTeam = Team::where('company_id', $request->company_id)
+        $companyTeam = Team::where('company_id', $request->company_id)
             ->where('team_type', 'company')
             ->first();
         $departmentTeam = Team::where('department_id', $request->department_id)
@@ -173,6 +181,11 @@ class AdminUserController extends Controller
      */
     public function csvPreview(Request $request)
     {
+        $current = Auth::user();
+        if (! $current || $current->user_role !== 'superadmin') {
+            return redirect()->route('superadmin.adminusers.index')
+                ->with('error', 'CSVによる管理者作成は許可されていません。');
+        }
         $request->validate([
             'csv_file' => 'required|file|mimes:csv,txt|max:2048',
             'company_id' => 'required|exists:companies,id',
@@ -299,7 +312,6 @@ class AdminUserController extends Controller
                 'company_id' => $request->company_id,
                 'department_id' => $request->department_id,
             ]);
-
         } catch (\Exception $e) {
             Storage::disk('local')->delete($path);
             return redirect()->back()->withErrors(['csv_file' => 'CSVファイルの処理中にエラーが発生しました: ' . $e->getMessage()]);
@@ -311,6 +323,11 @@ class AdminUserController extends Controller
      */
     public function csvStore(Request $request)
     {
+        $current = Auth::user();
+        if (! $current || $current->user_role !== 'superadmin') {
+            return redirect()->route('superadmin.adminusers.index')
+                ->with('error', 'CSVによる管理者作成は許可されていません。');
+        }
         Log::info('csvStore method called');
         Log::info('Request method: ' . $request->method());
         Log::info('Request data: ', $request->all());

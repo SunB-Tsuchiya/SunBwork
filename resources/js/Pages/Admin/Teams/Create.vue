@@ -1,7 +1,7 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
 import { useForm, usePage } from '@inertiajs/vue3';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 
 const page = usePage();
 const props = page.props;
@@ -9,7 +9,17 @@ const props = page.props;
 const companies = ref(props.companies || []);
 const departments = ref(props.departments || []);
 const users = ref(props.users || []); // all users for company (used to derive department members)
-const leaders = ref(props.leaders || []); // limited set for leader select
+// props.leaders may be provided, but compute leader options from users to ensure roles are correct
+const leaders = ref(props.leaders || []); // optional precomputed leaders
+
+// Leader options: superadmin, admin, leader (optionally scoped by selected company)
+const leaderOptions = computed(() => {
+    const roles = ['superadmin', 'admin', 'leader'];
+    if (form.company_id) {
+        return users.value.filter((u) => roles.includes((u.user_role || '').toString()) && Number(u.company_id) === Number(form.company_id));
+    }
+    return users.value.filter((u) => roles.includes((u.user_role || '').toString()));
+});
 
 const form = useForm({ company_id: '', department_id: '', name: '', description: '', leader_id: '', member_ids: [] });
 
@@ -19,12 +29,28 @@ const availableDepartments = computed(() => {
 });
 
 const departmentMembers = computed(() => {
-    // show only users who belong to the selected department and exclude superadmin/admin/leader
+    // show only users who belong to the selected department and allow leader/coordinator/user
+    // exclude the currently selected leader so leader cannot be chosen as member
     if (!form.department_id) return [];
+    const allowed = ['leader', 'coordinator', 'user'];
     return users.value.filter((u) => {
-        return Number(u.department_id) === Number(form.department_id) && !['superadmin', 'admin', 'leader'].includes((u.user_role || '').toString());
+        return (
+            Number(u.department_id) === Number(form.department_id) &&
+            allowed.includes((u.user_role || '').toString()) &&
+            String(u.id) !== String(form.leader_id)
+        );
     });
 });
+
+// When leader selection changes, remove that user from member_ids if present
+watch(
+    () => form.leader_id,
+    (newLeader) => {
+        if (!newLeader) return;
+        if (!Array.isArray(form.member_ids)) return;
+        form.member_ids = form.member_ids.filter((id) => String(id) !== String(newLeader));
+    },
+);
 
 onMounted(() => {
     // preselect company if only one available
@@ -76,7 +102,7 @@ const submit = () => {
                             <label class="block text-sm font-medium text-gray-700">リーダー</label>
                             <select v-model="form.leader_id" class="input mt-1 w-full">
                                 <option value="">-- 選択 --</option>
-                                <option v-for="u in leaders" :key="u.id" :value="u.id">{{ u.name }} ({{ u.user_role }})</option>
+                                <option v-for="u in leaderOptions" :key="u.id" :value="u.id">{{ u.name }} ({{ u.user_role }})</option>
                             </select>
                         </div>
 
