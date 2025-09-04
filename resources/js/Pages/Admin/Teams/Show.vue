@@ -9,17 +9,6 @@ const props = defineProps({
     },
 });
 
-<script setup>
-import AppLayout from '@/layouts/AppLayout.vue';
-import { ref } from 'vue';
-
-const props = defineProps({
-    team: {
-        type: Object,
-        required: true,
-    },
-});
-
 const currentTeam = ref(props.team || {});
 
 const goBack = () => {
@@ -69,9 +58,9 @@ const goEdit = () => {
 
                     <div class="mt-6">
                         <h3 class="text-sm font-medium text-gray-700">メンバー</h3>
-                        <ul class="mt-2 list-disc list-inside text-sm text-gray-800">
+                        <ul class="mt-2 list-inside list-disc text-sm text-gray-800">
                             <li v-if="!currentTeam.users || currentTeam.users.length === 0">メンバーが登録されていません</li>
-                            <li v-for="u in (currentTeam.users || [])" :key="u.id">{{ u.name }} ({{ u.email }})</li>
+                            <li v-for="u in currentTeam.users || []" :key="u.id">{{ u.name }}</li>
                         </ul>
                     </div>
 
@@ -84,4 +73,3 @@ const goEdit = () => {
         </div>
     </AppLayout>
 </template>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">チーム詳細</h2>

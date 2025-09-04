@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Team;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\DB;
 
 class TeamController extends Controller
 {
@@ -69,6 +70,16 @@ class TeamController extends Controller
     public function show($id)
     {
         $team = Team::with(['company', 'department'])->findOrFail($id);
+
+        // load members (from pivot team_user) and provide minimal user info (id, name)
+        $members = DB::table('team_user')
+            ->join('users', 'team_user.user_id', '=', 'users.id')
+            ->where('team_user.team_id', $team->id)
+            ->select('users.id', 'users.name')
+            ->get();
+
+        $team->users = $members;
+
         return Inertia::render('Admin/Teams/Show', [
             'team' => $team,
         ]);

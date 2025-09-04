@@ -18,6 +18,12 @@ class AssignmentSeeder extends Seeder
             return;
         }
 
+        // 会社全体の役割: 管理者 (department_id = null)
+        Assignment::updateOrCreate(
+            ['department_id' => null, 'code' => 'admin'],
+            ['name' => '管理者', 'description' => '会社管理者', 'sort_order' => 0, 'active' => 1]
+        );
+
         $mapping = [
             'INFO' => [
                 ['name' => '進行管理', 'code' => 'shinko', 'sort_order' => 0],

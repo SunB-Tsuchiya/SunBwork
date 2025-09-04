@@ -26,6 +26,7 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,
             AiPresetsSeeder::class,
             // この下はサンプル用のファイルです。必要ないときは消します。
+            z_SampleAdminUserSeeder::class,
             z_SampleUsers22Seeder::class,
             z_SampleDiariesSeeder::class,
             z_ClientSeeder::class,

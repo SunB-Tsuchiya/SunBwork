@@ -44,6 +44,7 @@ class z_SampleUsers22Seeder extends Seeder
                 $data['company_name'] = '株式会社サン・ブレーン';
             }
             if (empty($data['department_name'])) {
+                // default department when CSV doesn't include it
                 $data['department_name'] = '情報出版';
             }
 
@@ -87,6 +88,9 @@ class z_SampleUsers22Seeder extends Seeder
                     if ($userRecord) {
                         $schema = DB::getSchemaBuilder();
                         $teamId = null;
+                        // ensure ids exist even if resolution fails
+                        $companyId = null;
+                        $departmentId = null;
                         // If company_id / department_id missing in CSV, try to resolve by name (find or create)
                         try {
                             // resolve company by name
@@ -97,15 +101,11 @@ class z_SampleUsers22Seeder extends Seeder
                                     if ($existingCompany) {
                                         $companyId = $existingCompany->id;
                                     } else {
-                                        try {
-                                            $companyId = DB::table('companies')->insertGetId([
-                                                'name' => $csvCompanyName,
-                                                'created_at' => $now,
-                                                'updated_at' => $now,
-                                            ]);
-                                        } catch (\Throwable $_exC) {
-                                            logger()->warning('z_SampleUsers22Seeder: failed to create company', ['email' => $email, 'company' => $csvCompanyName, 'error' => $_exC->getMessage()]);
+                                        // Do NOT create company automatically; output error and skip this user assignment
+                                        if (isset($this->command) && method_exists($this->command, 'error')) {
+                                            $this->command->error("z_SampleUsers22Seeder: company not found ({$csvCompanyName}) - will NOT create. Skipping team assignment for user {$email}.");
                                         }
+                                        continue;
                                     }
                                 }
                             }
@@ -122,16 +122,11 @@ class z_SampleUsers22Seeder extends Seeder
                                     if ($existingDept) {
                                         $departmentId = $existingDept->id;
                                     } else {
-                                        try {
-                                            $departmentId = DB::table('departments')->insertGetId([
-                                                'company_id' => $companyId,
-                                                'name' => $csvDeptName,
-                                                'created_at' => $now,
-                                                'updated_at' => $now,
-                                            ]);
-                                        } catch (\Throwable $_exD) {
-                                            logger()->warning('z_SampleUsers22Seeder: failed to create department', ['email' => $email, 'department' => $csvDeptName, 'error' => $_exD->getMessage()]);
+                                        // Do NOT create department automatically; output error and skip this user assignment
+                                        if (isset($this->command) && method_exists($this->command, 'error')) {
+                                            $this->command->error("z_SampleUsers22Seeder: department not found ({$csvDeptName}) - will NOT create. Skipping team assignment for user {$email}.");
                                         }
+                                        continue;
                                     }
                                 }
                             }
@@ -146,14 +141,9 @@ class z_SampleUsers22Seeder extends Seeder
                                     if ($existingAssignment) {
                                         $assignmentId = $existingAssignment->id;
                                     } else {
-                                        try {
-                                            $assignmentId = DB::table('assignments')->insertGetId([
-                                                'name' => $csvRoleName,
-                                                'created_at' => $now,
-                                                'updated_at' => $now,
-                                            ]);
-                                        } catch (\Throwable $_exA) {
-                                            logger()->warning('z_SampleUsers22Seeder: failed to create assignment', ['email' => $email, 'assignment' => $csvRoleName, 'error' => $_exA->getMessage()]);
+                                        // Do NOT create assignment automatically; log and leave null
+                                        if (isset($this->command) && method_exists($this->command, 'error')) {
+                                            $this->command->error("z_SampleUsers22Seeder: assignment not found ({$csvRoleName}) - will NOT create. Skipping assignment creation for user {$email}.");
                                         }
                                     }
                                 }
@@ -210,26 +200,11 @@ class z_SampleUsers22Seeder extends Seeder
                                     $teamId = $team->id;
                                     $assignedTeamIds[] = $team->id;
                                 } else {
-                                    // create department team so user can be assigned
-                                    try {
-                                        $deptName = $data['department_name'] ?? null;
-                                        $teamName = $deptName ?: ("Department {$departmentId} (Company {$companyId})");
-                                        $deptTeamId = DB::table('teams')->insertGetId([
-                                            'user_id' => $userRecord->id,
-                                            'company_id' => $companyId,
-                                            'department_id' => $departmentId,
-                                            'name' => $teamName,
-                                            'personal_team' => false,
-                                            'team_type' => 'department',
-                                            'created_at' => $now,
-                                            'updated_at' => $now,
-                                        ]);
-                                        $teamId = $deptTeamId;
-                                        $assignedTeamIds[] = $deptTeamId;
-                                    } catch (\Throwable $_exCreateTeam) {
-                                        // failed to create department team - skip creating this team
-                                        // leave teamId as-is
+                                    // Do NOT create department teams automatically; output error and skip this user assignment
+                                    if (isset($this->command) && method_exists($this->command, 'error')) {
+                                        $this->command->error("z_SampleUsers22Seeder: department team not found for company_id={$companyId} department_id={$departmentId} - will NOT create. Skipping assignment for user {$email}.");
                                     }
+                                    continue;
                                 }
                             }
 
@@ -243,26 +218,11 @@ class z_SampleUsers22Seeder extends Seeder
                                     $teamId = $team->id;
                                     $assignedTeamIds[] = $team->id;
                                 } else {
-                                    // create company team so user can be assigned
-                                    try {
-                                        $companyName = $data['company_name'] ?? null;
-                                        $teamName = $companyName ?: ("Company {$companyId}");
-                                        $companyTeamId = DB::table('teams')->insertGetId([
-                                            'user_id' => $userRecord->id,
-                                            'company_id' => $companyId,
-                                            'department_id' => null,
-                                            'name' => $teamName,
-                                            'personal_team' => false,
-                                            'team_type' => 'company',
-                                            'created_at' => $now,
-                                            'updated_at' => $now,
-                                        ]);
-                                        $teamId = $companyTeamId;
-                                        $assignedTeamIds[] = $companyTeamId;
-                                    } catch (\Throwable $_exCreateTeam) {
-                                        // failed to create company team - skip creating this team
-                                        // leave teamId as-is
+                                    // Do NOT create company teams automatically; output error and skip this user assignment
+                                    if (isset($this->command) && method_exists($this->command, 'error')) {
+                                        $this->command->error("z_SampleUsers22Seeder: company team not found for company_id={$companyId} - will NOT create. Skipping assignment for user {$email}.");
                                     }
+                                    continue;
                                 }
                             }
 
@@ -294,23 +254,11 @@ class z_SampleUsers22Seeder extends Seeder
                                         $assignedTeamIds[] = $deptTeam->id;
                                     }
                                 } else {
-                                    // create department team (company_id if available from CSV or null)
-                                    $companyForDept = $companyId ?? null;
-                                    $newDeptId = DB::table('teams')->insertGetId([
-                                        'user_id' => $userRecord->id,
-                                        'company_id' => $companyForDept,
-                                        'department_id' => null,
-                                        'name' => $deptName,
-                                        'personal_team' => false,
-                                        'team_type' => 'department',
-                                        'created_at' => $now,
-                                        'updated_at' => $now,
-                                    ]);
-                                    if ($newDeptId) {
-                                        $assignedTeamIds[] = $newDeptId;
-                                        // if we haven't set preferred team yet, prefer this department
-                                        $teamId = $teamId ?: $newDeptId;
+                                    // Do NOT create department teams automatically; output error and skip this user assignment
+                                    if (isset($this->command) && method_exists($this->command, 'error')) {
+                                        $this->command->error("z_SampleUsers22Seeder: department team named '{$deptName}' not found - will NOT create. Skipping assignment for user {$email}.");
                                     }
+                                    continue;
                                 }
                             } catch (\Throwable $_exDept) {
                                 // failed to find/create department team by name

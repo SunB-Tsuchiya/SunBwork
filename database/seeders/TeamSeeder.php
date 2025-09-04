@@ -30,11 +30,13 @@ class TeamSeeder extends Seeder
             return;
         }
         $companyName = $company->name ?? '会社';
+        // 保守: department_name と一致させるため、末尾に付く「 チーム」や「 全社チーム」を取り除く
+        $companyName = preg_replace('/\s*全社チーム$|\s*チーム$/u', '', $companyName);
 
         // 1) 会社全体チームを作成/更新
         $companyTeamAttrs = [
             'user_id' => $user->id,
-            'name' => $companyName . ' 全社チーム',
+            'name' => $companyName,
             'personal_team' => false,
             'company_id' => $company->id,
             'department_id' => null,
@@ -57,10 +59,12 @@ class TeamSeeder extends Seeder
 
         foreach ($departments as $dept) {
             $deptName = $dept->name ?? ($companyName . ' 部署');
+            // 部署名が "〜 チーム" と付いてしまっている場合は除去しておく
+            $deptName = preg_replace('/\s*チーム$/u', '', $deptName);
 
             $deptTeamAttrs = [
                 'user_id' => $user->id,
-                'name' => $deptName . ' チーム',
+                'name' => $deptName,
                 'personal_team' => false,
                 'company_id' => $company->id,
                 'department_id' => $dept->id,

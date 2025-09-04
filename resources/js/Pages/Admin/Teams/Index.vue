@@ -138,6 +138,13 @@ const handleDelete = async (teamId) => {
                                 <td class="whitespace-nowrap px-6 py-4">{{ team.department?.name || '' }}</td>
                                 <td class="flex flex-col gap-2 whitespace-nowrap px-6 py-4 sm:flex-row sm:justify-end">
                                     <button
+                                        @click="() => $inertia.visit(route('admin.teams.show', { team: team.id }))"
+                                        class="rounded border px-3 py-1 text-xs text-gray-700 hover:bg-gray-100"
+                                    >
+                                        詳細
+                                    </button>
+
+                                    <button
                                         @click="() => $inertia.visit(route('admin.teams.edit', { team: team.id }))"
                                         class="rounded bg-blue-500 px-3 py-1 text-xs text-white hover:bg-blue-600"
                                     >
