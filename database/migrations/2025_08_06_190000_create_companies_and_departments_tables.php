@@ -6,9 +6,6 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         // 会社テーブル
@@ -35,13 +32,10 @@ return new class extends Migration
             $table->unique(['company_id', 'code']);
         });
 
-    // teams table schema moved to its own consolidated migration
-    // original extension removed to avoid duplicate definitions
+        // teams table schema moved to its own consolidated migration
+        // original extension removed to avoid duplicate definitions
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::table('teams', function (Blueprint $table) {

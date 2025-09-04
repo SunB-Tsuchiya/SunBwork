@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Carbon\Carbon;
 use Intervention\Image\ImageManager;
 use App\Models\Diary;
 use App\Models\Attachment;
@@ -15,7 +16,7 @@ class DiaryController extends Controller
     public function index()
     {
         $diaries = Diary::where('user_id', Auth::id())
-            ->orderByDesc('date')
+            ->orderByDesc('created_at')
             ->get();
         return Inertia::render('Diaries/Index', [
             'diaries' => $diaries,
@@ -26,7 +27,7 @@ class DiaryController extends Controller
     {
         $date = $request->query('date', now()->toDateString());
         $userId = Auth::id();
-        $diary = Diary::where('user_id', $userId)->where('date', $date)->first();
+        $diary = Diary::where('user_id', $userId)->whereDate('created_at', $date)->first();
         if ($diary) {
             // 既に日報がある場合は編集画面へ
             return redirect()->route('diaries.edit', $diary->id);
@@ -51,9 +52,14 @@ class DiaryController extends Controller
             ],
         ]);
         // ensure diary is associated with the authenticated user
-        $data['user_id'] = Auth::id();
-
-        $diary = Diary::create($data);
+        // The schema uses timestamps rather than a dedicated `date` column.
+        $createdAt = Carbon::parse($data['date'])->startOfDay();
+        $diary = new Diary();
+        $diary->user_id = Auth::id();
+        $diary->content = $data['content'];
+        $diary->created_at = $createdAt;
+        $diary->updated_at = $createdAt;
+        $diary->save();
 
         // 本文内の [[attachment:{id}:filename]] プレースホルダを検出し、該当する attachments レコードを日報に紐付ける
         $contentForScan = $data['content'] ?? $request->input('content', '');
@@ -74,7 +80,7 @@ class DiaryController extends Controller
                 // ファイル名生成: 元のファイル名_YYYYMMDD[diary_id].[拡張子]
                 $original = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
                 $ext = $file->getClientOriginalExtension();
-                $dateStr = date('Ymd', strtotime($diary->date));
+                $dateStr = date('Ymd', strtotime($diary->created_at));
                 $uniqueName = $original . '_' . $dateStr . $diary->id . '.' . $ext;
                 $path = 'attachments/' . $uniqueName;
 
@@ -177,7 +183,7 @@ class DiaryController extends Controller
                     $isImage = strpos($file->getMimeType(), 'image') === 0;
                     $original = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
                     $ext = $file->getClientOriginalExtension();
-                    $dateStr = date('Ymd', strtotime($diary->date));
+                    $dateStr = date('Ymd', strtotime($diary->created_at));
                     $uniqueName = $original . '_' . $dateStr . $diary->id . '.' . $ext;
                     $path = 'attachments/' . $uniqueName;
 

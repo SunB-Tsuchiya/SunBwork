@@ -4,20 +4,18 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
-    public function up()
+return new class extends Migration
+{
+    public function up(): void
     {
         Schema::table('project_job_assignments', function (Blueprint $table) {
-            $table->date('desired_start_date')->nullable()->after('difficulty');
-            $table->date('desired_end_date')->nullable()->after('desired_start_date');
-            $table->time('desired_time')->nullable()->after('desired_end_date');
+            $table->timestamp('desired_start')->nullable()->change();
+            $table->timestamp('desired_end')->nullable()->change();
         });
     }
 
-    public function down()
+    public function down(): void
     {
-        Schema::table('project_job_assignments', function (Blueprint $table) {
-            $table->dropColumn(['desired_start_date', 'desired_end_date', 'desired_time']);
-        });
+        // revert not implemented
     }
 };

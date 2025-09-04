@@ -6,21 +6,17 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    public function up()
+    public function up(): void
     {
         Schema::table('project_schedule_comments', function (Blueprint $table) {
-            if (!Schema::hasColumn('project_schedule_comments', 'date')) {
-                $table->date('date')->nullable()->after('body')->index();
-            }
+            $table->date('comment_date')->nullable();
         });
     }
 
-    public function down()
+    public function down(): void
     {
         Schema::table('project_schedule_comments', function (Blueprint $table) {
-            if (Schema::hasColumn('project_schedule_comments', 'date')) {
-                $table->dropColumn('date');
-            }
+            $table->dropColumn('comment_date');
         });
     }
 };

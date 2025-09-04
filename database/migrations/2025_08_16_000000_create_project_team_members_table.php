@@ -10,8 +10,8 @@ return new class extends Migration
     {
         Schema::create('project_team_members', function (Blueprint $table) {
             $table->id();
-            // foreign keys deferred until project_jobs and users tables exist
-            $table->unsignedBigInteger('project_job_id');
+            $table->unsignedBigInteger('project_id');
+            $table->unsignedBigInteger('team_id');
             $table->unsignedBigInteger('user_id');
             $table->timestamps();
         });

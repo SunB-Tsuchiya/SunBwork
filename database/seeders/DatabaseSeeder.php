@@ -25,6 +25,10 @@ class DatabaseSeeder extends Seeder
             // users depend on companies/departments/assignments/teams
             UserSeeder::class,
             AiPresetsSeeder::class,
+            // この下はサンプル用のファイルです。必要ないときは消します。
+            z_SampleUsers22Seeder::class,
+            z_SampleDiariesSeeder::class,
+            z_ClientSeeder::class,
         ]);
     }
 }

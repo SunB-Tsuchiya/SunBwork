@@ -6,9 +6,6 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('users', function (Blueprint $table) {
@@ -30,7 +27,7 @@ return new class extends Migration
             $table->string('profile_photo_path', 2048)->nullable();
 
             // User Role System (add 'superadmin')
-            $table->enum('user_role', ['superadmin','admin','leader','coordinator','user'])->default('user');
+            $table->enum('user_role', ['superadmin', 'admin', 'leader', 'coordinator', 'user'])->default('user');
 
             // Organization Structure
             $table->foreignId('company_id')->nullable()->constrained()->onDelete('set null');
@@ -41,9 +38,6 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('users');

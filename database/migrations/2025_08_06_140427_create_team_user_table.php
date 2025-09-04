@@ -6,25 +6,19 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('team_user', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('team_id');
-            $table->foreignId('user_id');
+            $table->unsignedBigInteger('team_id')->index();
+            $table->unsignedBigInteger('user_id')->index();
+            // role column expected by application pivot usage
             $table->string('role')->nullable();
             $table->timestamps();
-
-            $table->unique(['team_id', 'user_id']);
+            $table->unique(['team_id', 'user_id'], 'team_user_unique');
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('team_user');

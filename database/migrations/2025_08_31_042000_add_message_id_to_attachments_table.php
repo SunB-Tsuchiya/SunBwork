@@ -6,32 +6,22 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    public function up()
+    public function up(): void
     {
-        Schema::table('attachments', function (Blueprint $table) {
-            if (!Schema::hasColumn('attachments', 'message_id')) {
-                $table->unsignedBigInteger('message_id')->nullable()->after('diary_id');
-                $table->index('message_id');
-                // Add FK if messages table exists
-                if (Schema::hasTable('messages')) {
-                    $table->foreign('message_id')->references('id')->on('messages')->onDelete('cascade');
-                }
-            }
-        });
+        // Safe add: only add the column if it doesn't exist (handles duplicate/merged migrations)
+        if (!Schema::hasColumn('attachments', 'message_id')) {
+            Schema::table('attachments', function (Blueprint $table) {
+                $table->unsignedBigInteger('message_id')->nullable()->after('user_id');
+            });
+        }
     }
 
-    public function down()
+    public function down(): void
     {
-        Schema::table('attachments', function (Blueprint $table) {
-            if (Schema::hasColumn('attachments', 'message_id')) {
-                // drop foreign if exists
-                try {
-                    $table->dropForeign(['message_id']);
-                } catch (\Throwable $__e) {
-                }
-                $table->dropIndex(['message_id']);
+        if (Schema::hasColumn('attachments', 'message_id')) {
+            Schema::table('attachments', function (Blueprint $table) {
                 $table->dropColumn('message_id');
-            }
-        });
+            });
+        }
     }
 };

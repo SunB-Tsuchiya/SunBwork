@@ -11,19 +11,15 @@ return new class extends Migration
         Schema::create('clients', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->text('detail')->nullable();
-            $table->boolean('fromSB')->default(false);
+            $table->text('notes')->nullable();
             $table->timestamps();
         });
 
         Schema::create('project_jobs', function (Blueprint $table) {
             $table->id();
-            $table->string('jobcode');
-            $table->string('name');
-            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
-            $table->foreignId('client_id')->constrained('clients')->onDelete('cascade');
-            $table->json('detail')->nullable();
-            $table->json('schedule')->nullable();
+            $table->unsignedBigInteger('client_id')->nullable();
+            $table->string('title');
+            $table->text('detail')->nullable();
             $table->timestamps();
         });
     }
