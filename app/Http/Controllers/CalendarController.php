@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use App\Models\Diary;
 use App\Models\Event;
 use App\Models\ProjectJobAssignment;
+use Illuminate\Support\Facades\Schema;
 
 class CalendarController extends Controller
 {
@@ -22,16 +23,26 @@ class CalendarController extends Controller
             $diary_to = now()->endOfDay();
             $event_from = now()->startOfMonth();
             $event_to = now()->endOfMonth();
-            $diaries = Diary::where('user_id', $user->id)
-                ->where('date', '>=', $diary_from)
-                ->where('date', '<=', $diary_to)
-                ->get();
+            $diaryQuery = Diary::where('user_id', $user->id);
+            if (Schema::hasColumn('diaries', 'date')) {
+                $diaryQuery->where('date', '>=', $diary_from)->where('date', '<=', $diary_to);
+            }
+            $diaries = $diaryQuery->get();
             // Do not select a physical `date` column because some DBs may not have it.
             // Compute date from `start` via model accessor if needed.
-            $events = Event::where('user_id', $user->id)
-                ->where('start', '>=', $event_from)
-                ->where('start', '<=', $event_to)
-                ->get(['id', 'title', 'start', 'end', 'description']);
+            $eventQuery = Event::where('user_id', $user->id);
+            $select = ['id', 'title'];
+            if (Schema::hasColumn('events', 'start')) {
+                $eventQuery->where('start', '>=', $event_from)->where('start', '<=', $event_to);
+                $select[] = 'start';
+            }
+            if (Schema::hasColumn('events', 'end')) {
+                $select[] = 'end';
+            }
+            if (Schema::hasColumn('events', 'description')) {
+                $select[] = 'description';
+            }
+            $events = $eventQuery->get($select);
 
             // load assigned jobs that the user accepted or that are marked assigned
             $jobs = ProjectJobAssignment::where('user_id', $user->id)

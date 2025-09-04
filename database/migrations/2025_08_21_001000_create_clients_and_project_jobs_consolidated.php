@@ -18,6 +18,8 @@ return new class extends Migration
         Schema::create('project_jobs', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('client_id')->nullable();
+            // owner / creator of the project job (nullable)
+            $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
             $table->string('title');
             $table->text('detail')->nullable();
             $table->timestamps();
