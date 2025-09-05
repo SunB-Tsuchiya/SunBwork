@@ -3,6 +3,8 @@
 use Illuminate\Support\Facades\Route;
 use App\Models\Company;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Broadcast as BroadcastFacade;
 
 // デバッグ用：登録ページのデータ構造を確認
 Route::get('/debug/register-data', function () {

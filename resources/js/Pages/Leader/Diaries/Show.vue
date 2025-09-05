@@ -14,9 +14,8 @@ function toggleComment() {
 
 function submitRead() {
     form.comment = commentText.value;
-    form.post(route('admin.diaries.mark_read', props.diary.id), {
+    form.post(route('leader.diaries.mark_read', props.diary.id), {
         onSuccess: () => {
-            // go back to the previous page (close)
             history.back();
         },
     });

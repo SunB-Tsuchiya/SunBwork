@@ -31,8 +31,10 @@ class RemoveTeamMember implements RemovesTeamMembers
      */
     protected function authorize(User $user, Team $team, User $teamMember): void
     {
-        if (! Gate::forUser($user)->check('removeTeamMember', $team) &&
-            $user->id !== $teamMember->id) {
+        if (
+            ! Gate::forUser($user)->check('removeTeamMember', $team) &&
+            $user->id !== $teamMember->id
+        ) {
             throw new AuthorizationException;
         }
     }
@@ -42,7 +44,28 @@ class RemoveTeamMember implements RemovesTeamMembers
      */
     protected function ensureUserDoesNotOwnTeam(User $teamMember, Team $team): void
     {
-        if ($teamMember->id === $team->owner->id) {
+        // Prevent removing a user who has an 'owner' pivot role on this team.
+        $isOwner = false;
+        try {
+            if (method_exists($team, 'users')) {
+                $isOwner = $team->users()->wherePivot('role', 'owner')->where('users.id', $teamMember->id)->exists();
+            } else {
+                $isOwner = \Illuminate\Support\Facades\DB::table('team_user')
+                    ->where('team_id', $team->id)
+                    ->where('user_id', $teamMember->id)
+                    ->where('role', 'owner')
+                    ->exists();
+            }
+        } catch (\Throwable $_ex) {
+            // fallback to original behavior if pivot access fails
+            try {
+                $isOwner = $teamMember->id === $team->owner->id;
+            } catch (\Throwable $_e) {
+                $isOwner = false;
+            }
+        }
+
+        if ($isOwner) {
             throw ValidationException::withMessages([
                 'team' => [__('You may not leave a team that you created.')],
             ])->errorBag('removeTeamMember');

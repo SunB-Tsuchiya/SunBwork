@@ -157,6 +157,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('diaries', [App\Http\Controllers\Admin\DiaryAdminController::class, 'index'])->name('diaries.index');
         Route::get('diaries/{diary}', [App\Http\Controllers\Admin\DiaryAdminController::class, 'show'])->name('diaries.show');
         Route::post('diaries/{diary}/mark-read', [App\Http\Controllers\Admin\DiaryAdminController::class, 'markRead'])->name('diaries.mark_read');
+        // 日付単位で「全部既読にする」
+        Route::post('diaries/mark-read-all', [App\Http\Controllers\Admin\DiaryAdminController::class, 'markReadAll'])->name('diaries.mark_read_all');
         // AI settings admin
         Route::get('/ai', [\App\Http\Controllers\Admin\AiSettingController::class, 'index'])->name('ai.index');
         Route::get('/ai/create', [\App\Http\Controllers\Admin\AiSettingController::class, 'create'])->name('ai.create');
@@ -220,6 +222,12 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
         // クライアント管理（Leader用）
         Route::resource('clients', App\Http\Controllers\ClientController::class)->only(['index', 'create', 'store', 'edit', 'update']);
+        // Leader diaries (leader can view diaries for departments/units they lead)
+        Route::get('diaries', [App\Http\Controllers\Leader\DiaryController::class, 'index'])->name('diaries.index');
+        Route::get('diaries/{diary}', [App\Http\Controllers\Leader\DiaryController::class, 'show'])->name('diaries.show');
+        Route::post('diaries/{diary}/mark-read', [App\Http\Controllers\Leader\DiaryController::class, 'markRead'])->name('diaries.mark_read');
+        // 日付単位で「全部既読にする」(リーダー用)
+        Route::post('diaries/mark-read-all', [App\Http\Controllers\Leader\DiaryController::class, 'markReadAll'])->name('diaries.mark_read_all');
     });
 
 // クライアント管理（Admin用）は上の admin グループに統合済み（重複削除）

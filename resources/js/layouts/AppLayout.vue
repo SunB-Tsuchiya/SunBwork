@@ -45,7 +45,11 @@ import { usePage } from '@inertiajs/vue3';
 import { onBeforeUnmount, onMounted, useSlots, ref as vueRef } from 'vue';
 
 const page = usePage();
-const user = page.props.user; // これを追加
+// Keep `user` available for templates (many pages pass a `user` prop).
+// Use `authUser` for realtime subscriptions to avoid subscribing to the
+// resource being viewed when it's not the logged-in user.
+const user = page.props.user;
+const authUser = page.props.auth && page.props.auth.user ? page.props.auth.user : page.props.user;
 // Use unread_messages_count as the single notification source; job_requests are being
 // migrated to Messages so we stop subscribing to jobrequests channel here.
 const inboxCount = vueRef(0); // legacy placeholder
@@ -55,15 +59,15 @@ let echoChannel = null;
 
 onMounted(() => {
     try {
-        if (window.Echo && user && user.id) {
+        if (window.Echo && authUser && authUser.id) {
             // messages channel (primary notification source)
-            window.Echo.private('messages.' + user.id).listen('MessageCreated', (e) => {
+            window.Echo.private('messages.' + authUser.id).listen('MessageCreated', (e) => {
                 unreadMessages.value = (unreadMessages.value || 0) + 1;
                 const msg = (e.from_user_name ? e.from_user_name + 'さんからメールが届きました: ' : '新しいメール: ') + (e.subject || '(件名なし)');
                 window.dispatchEvent(new CustomEvent('message:received', { detail: { message: msg } }));
             });
             // listen for reads to decrement unread count
-            window.Echo.private('messages.' + user.id).listen('MessageRead', (e) => {
+            window.Echo.private('messages.' + authUser.id).listen('MessageRead', (e) => {
                 // decrement but never below 0
                 try {
                     unreadMessages.value = Math.max(0, (unreadMessages.value || 0) - 1);
@@ -79,8 +83,8 @@ onMounted(() => {
 onBeforeUnmount(() => {
     try {
         if (echoChannel && window.Echo) {
-            window.Echo.leavePrivate('jobrequests.' + user.id);
-            window.Echo.leavePrivate('messages.' + user.id);
+            window.Echo.leavePrivate('jobrequests.' + authUser.id);
+            window.Echo.leavePrivate('messages.' + authUser.id);
             echoChannel = null;
         }
     } catch (err) {}

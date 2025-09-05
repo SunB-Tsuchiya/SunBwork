@@ -101,7 +101,20 @@ class UnitController extends Controller
                 // units are not personal teams
                 'personal_team' => false,
                 'team_type' => 'unit',
+                // persist leader on team for later reference
+                'leader_id' => $validated['leader_id'] ?? null,
             ]);
+
+            // ensure leader is attached as owner in pivot (if provided)
+            if (!empty($validated['leader_id'])) {
+                DB::table('team_user')->insertOrIgnore([
+                    'team_id' => $team->id,
+                    'user_id' => $validated['leader_id'],
+                    'role' => 'owner',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
 
             // add team members
             $memberIds = $validated['member_ids'] ?? [];

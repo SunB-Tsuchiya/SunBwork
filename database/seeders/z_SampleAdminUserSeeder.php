@@ -41,6 +41,11 @@ class z_sampleAdminUserSeeder extends Seeder
             'updated_at' => $now,
         ];
 
+        // if users table has user_role column, set it to admin for this seeded user
+        if (Schema::hasColumn('users', 'user_role')) {
+            $insert['user_role'] = $roleCode;
+        }
+
         try {
             DB::table('users')->updateOrInsert(['email' => $email], $insert);
             if (isset($this->command) && method_exists($this->command, 'info')) {
@@ -98,6 +103,10 @@ class z_sampleAdminUserSeeder extends Seeder
 
         // prepare update for user (company_id, department_id=null, assignment_id)
         $update = ['updated_at' => $now];
+        // ensure user_role is set to admin on update if the column exists
+        if (Schema::hasColumn('users', 'user_role')) {
+            $update['user_role'] = $roleCode;
+        }
         if ($companyId && Schema::hasColumn('users', 'company_id')) {
             $update['company_id'] = $companyId;
         }

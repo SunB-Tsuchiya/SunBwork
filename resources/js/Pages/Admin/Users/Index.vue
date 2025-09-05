@@ -1,6 +1,7 @@
 <script setup>
 import DialogModal from '@/Components/DialogModal.vue';
 import AdminNavigationTabs from '@/Components/Tabs/AdminNavigationTabs.vue';
+import UserTable from '@/Components/UserTable.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
@@ -266,108 +267,7 @@ const getAssignmentText = (assignment) => {
                                     <button class="rounded bg-blue-600 px-4 py-2 text-white" @click="doSearch">絞り込み</button>
                                 </template>
                             </DialogModal>
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th
-                                            @click.prevent="changeSort('id')"
-                                            class="cursor-pointer px-2 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
-                                        >
-                                            ID
-                                            <span class="ml-1 inline-block w-4 text-center text-xs" aria-hidden="true">
-                                                <template v-if="sortKey === 'id'">
-                                                    <span v-if="!sortDesc">▲</span>
-                                                    <span v-else>▼</span>
-                                                </template>
-                                            </span>
-                                        </th>
-                                        <th
-                                            @click.prevent="changeSort('name')"
-                                            class="cursor-pointer px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
-                                        >
-                                            名前
-                                            <span class="ml-2 inline-block w-4 text-center text-xs" aria-hidden="true">
-                                                <template v-if="sortKey === 'name'">
-                                                    <span v-if="!sortDesc">▲</span>
-                                                    <span v-else>▼</span>
-                                                </template>
-                                            </span>
-                                        </th>
-                                        <th
-                                            @click.prevent="changeSort('department_id')"
-                                            class="cursor-pointer px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
-                                        >
-                                            部署
-                                            <span class="ml-2 inline-block w-4 text-center text-xs" aria-hidden="true">
-                                                <template v-if="sortKey === 'department_id'">
-                                                    <span v-if="!sortDesc">▲</span>
-                                                    <span v-else>▼</span>
-                                                </template>
-                                            </span>
-                                        </th>
-                                        <th
-                                            @click.prevent="changeSort('assignment_id')"
-                                            class="cursor-pointer px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
-                                        >
-                                            担当
-                                            <span class="ml-2 inline-block w-4 text-center text-xs" aria-hidden="true">
-                                                <template v-if="sortKey === 'assignment_id'">
-                                                    <span v-if="!sortDesc">▲</span>
-                                                    <span v-else>▼</span>
-                                                </template>
-                                            </span>
-                                        </th>
-                                        <th
-                                            @click.prevent="changeSort('user_role')"
-                                            class="cursor-pointer px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
-                                        >
-                                            権限レベル
-                                            <span class="ml-2 inline-block w-4 text-center text-xs" aria-hidden="true">
-                                                <template v-if="sortKey === 'user_role'">
-                                                    <span v-if="!sortDesc">▲</span>
-                                                    <span v-else>▼</span>
-                                                </template>
-                                            </span>
-                                        </th>
-                                        <th class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">操作</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-200 bg-white">
-                                    <tr v-for="user in sortedUsers" :key="user.id" class="hover:bg-gray-50">
-                                        <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
-                                            {{ user.id }}
-                                        </td>
-                                        <td class="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
-                                            {{ user.name }}
-                                        </td>
-                                        <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
-                                            {{ getDepartmentName(user.department_id) }}
-                                        </td>
-                                        <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
-                                            {{ getAssignmentName(user.assignment_id) }}
-                                        </td>
-                                        <td class="whitespace-nowrap px-6 py-4">
-                                            <span
-                                                :class="getAssignmentBadgeClass(user.user_role)"
-                                                class="inline-flex rounded-full px-2 py-1 text-xs font-semibold"
-                                            >
-                                                {{ getAssignmentText(user.user_role) }}
-                                            </span>
-                                        </td>
-                                        <td class="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
-                                            <div class="flex justify-end space-x-2">
-                                                <Link :href="route('admin.users.show', user.id)" class="text-blue-600 hover:text-blue-900">
-                                                    詳細
-                                                </Link>
-                                                <Link :href="route('admin.users.edit', user.id)" class="text-yellow-600 hover:text-yellow-900">
-                                                    編集
-                                                </Link>
-                                                <button @click="deleteUser(user.id)" class="text-red-600 hover:text-red-900">削除</button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                            <UserTable :users="sortedUsers" :departments="props.departments" :assignments="props.assignments" />
                         </div>
                     </div>
                 </div>

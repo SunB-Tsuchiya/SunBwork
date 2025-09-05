@@ -46,5 +46,8 @@ class AuthServiceProvider extends ServiceProvider
         Gate::define('promote-to-admin', function ($user) {
             return $user->user_role === 'superadmin';
         });
+
+        // Ensure users have a valid current_team on login to avoid null-related view errors
+        \Illuminate\Support\Facades\Event::listen(\Illuminate\Auth\Events\Login::class, \App\Listeners\EnsureUserHasCurrentTeam::class);
     }
 }

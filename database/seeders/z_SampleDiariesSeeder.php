@@ -57,7 +57,6 @@ class z_SampleDiariesSeeder extends Seeder
                     'date' => $date,
                 ], [
                     'content' => $sampleText,
-                    'admin_read' => false,
                     'created_at' => $diaryDate,
                     'updated_at' => $now,
                 ]);

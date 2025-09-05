@@ -26,6 +26,7 @@ class Team extends JetstreamTeam
         'department_id',
         'team_type',
         'user_id',
+        'leader_id',
     ];
 
     /**
@@ -65,6 +66,43 @@ class Team extends JetstreamTeam
     public function department()
     {
         return $this->belongsTo(Department::class);
+    }
+
+    /**
+     * Ensure pivot rows are removed when a team is deleted.
+     */
+    protected static function booted()
+    {
+        static::deleting(function ($team) {
+            // detach any users from the team to clean up the pivot table
+            if (method_exists($team, 'users')) {
+                try {
+                    $team->users()->detach();
+                } catch (\Throwable $_ex) {
+                    logger()->warning('Team::deleting failed to detach users', ['team_id' => $team->id, 'error' => $_ex->getMessage()]);
+                }
+            } else {
+                // fallback: delete rows directly if pivot table exists
+                try {
+                    if (\Illuminate\Support\Facades\Schema::hasTable('team_user')) {
+                        \Illuminate\Support\Facades\DB::table('team_user')->where('team_id', $team->id)->delete();
+                    }
+                } catch (\Throwable $_ex) {
+                    logger()->warning('Team::deleting fallback failed to delete team_user rows', ['team_id' => $team->id, 'error' => $_ex->getMessage()]);
+                }
+            }
+
+            // If any users had this team as their current_team_id, null it so views don't error
+            try {
+                if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'current_team_id')) {
+                    \Illuminate\Support\Facades\DB::table('users')
+                        ->where('current_team_id', $team->id)
+                        ->update(['current_team_id' => null, 'updated_at' => now()]);
+                }
+            } catch (\Throwable $_ex) {
+                logger()->warning('Team::deleting failed to null current_team_id for users', ['team_id' => $team->id, 'error' => $_ex->getMessage()]);
+            }
+        });
     }
 
 

@@ -51,6 +51,7 @@ class CreateSuperadminTeamSeeder extends Seeder
             DB::table('team_user')->insert([
                 'team_id' => $teamId,
                 'user_id' => $super->id,
+                'role' => 'owner',
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);

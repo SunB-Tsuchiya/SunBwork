@@ -1,5 +1,6 @@
 <script setup>
 // AppLayout removed to avoid double-wrapping when used inside Admin/Teams/Edit.vue
+import UserTable from '@/Components/UserTable.vue';
 import { useForm, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, ref } from 'vue';
 
@@ -18,8 +19,10 @@ const form = useForm({
     company_id: unit?.company_id ?? team.company_id ?? '',
     department_id: unit?.department_id ?? team.department_id ?? '',
     description: unit?.description ?? team.description ?? '',
-    leader_id: unit?.leader_id ?? null,
-    member_ids: unit?.members?.map((m) => m.user_id) || [],
+    // normalize leader_id to string to match option values
+    leader_id: unit?.leader_id ? String(unit.leader_id) : null,
+    // unit.members is an array of User models (eager-loaded); normalize to strings to match checkbox values
+    member_ids: unit?.members?.map((m) => String(m.id)) || [],
 });
 
 const availableDepartments = computed(() => {
@@ -46,7 +49,7 @@ const submit = () => {
 <template>
     <!-- Render only the inner form content; layout is provided by the parent Edit.vue to avoid duplication -->
     <div class="py-6">
-        <div class="mx-auto max-w-3xl sm:px-6 lg:px-8">
+        <div class="mx-auto max-w-4xl sm:px-6 lg:px-8">
             <div class="bg-white p-6 shadow sm:rounded-lg">
                 <form @submit.prevent="submit" class="space-y-4">
                     <div>
@@ -79,18 +82,26 @@ const submit = () => {
                         <label class="block text-sm font-medium text-gray-700">リーダー</label>
                         <select v-model="form.leader_id" class="input mt-1 w-full">
                             <option value="">-- 選択 --</option>
-                            <option v-for="u in leaders" :key="u.id" :value="u.id">{{ u.name }} ({{ u.user_role }})</option>
+                            <option v-for="u in leaders" :key="u.id" :value="String(u.id)">{{ u.name }} ({{ u.user_role }})</option>
                         </select>
                     </div>
 
                     <div>
                         <label class="block text-sm font-medium text-gray-700">メンバー（複数選択可）</label>
-                        <div class="mt-2 grid gap-2">
+                        <div class="mt-2">
                             <div v-if="!form.department_id" class="text-sm text-gray-500">部署を選択してください</div>
-                            <label v-for="u in departmentMembers" :key="u.id" class="inline-flex items-center space-x-2">
-                                <input type="checkbox" :value="u.id" v-model="form.member_ids" class="form-checkbox" />
-                                <span class="text-sm">{{ u.name }} ({{ u.user_role }})</span>
-                            </label>
+
+                            <UserTable
+                                v-else
+                                :users="departmentMembers"
+                                :departments="departments"
+                                :assignments="[]"
+                                :show-actions="false"
+                                :selectable="true"
+                                :selected="form.member_ids"
+                                @update:selected="(val) => (form.member_ids = val)"
+                            />
+
                             <div v-if="departmentMembers.length === 0 && form.department_id" class="text-sm text-gray-500">
                                 選択された部署に該当するメンバーはありません
                             </div>

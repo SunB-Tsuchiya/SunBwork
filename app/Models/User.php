@@ -108,7 +108,7 @@ class User extends Authenticatable
      */
     public function isSuperAdmin(): bool
     {
-    return $this->user_role === 'superadmin';
+        return $this->user_role === 'superadmin';
     }
 
     /**
@@ -192,6 +192,40 @@ class User extends Authenticatable
             ->get();
 
         return $personalTeams->merge($memberTeams);
+    }
+
+    /**
+     * Determine if the user owns the given team.
+     *
+     * This overrides the HasTeams::ownsTeam behaviour to support multiple owners
+     * by checking the team_user pivot for role = 'owner' in addition to the
+     * original foreign key ownership.
+     */
+    public function ownsTeam($team)
+    {
+        if (is_null($team)) {
+            return false;
+        }
+
+        // If the conventional foreign-key matches, preserve behaviour
+        if ($this->id == $team->{$this->getForeignKey()}) {
+            return true;
+        }
+
+        // Otherwise check pivot for owner role
+        try {
+            if (method_exists($team, 'users')) {
+                return $team->users()->wherePivot('role', 'owner')->where('users.id', $this->id)->exists();
+            }
+
+            return \Illuminate\Support\Facades\DB::table('team_user')
+                ->where('team_id', $team->id)
+                ->where('user_id', $this->id)
+                ->where('role', 'owner')
+                ->exists();
+        } catch (\Throwable $_ex) {
+            return false;
+        }
     }
 
     /**

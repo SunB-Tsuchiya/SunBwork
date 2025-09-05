@@ -128,6 +128,39 @@ function goSchedule() {
     router.visit(route('coordinator.project_jobs.schedule', { projectJob: props.job.id }));
 }
 function goProjectTeammember() {
+    // If this job already has teammember info, pass selected_user_ids so the Create page
+    // pre-selects existing members. Support several shapes for form.teammember.
+    try {
+        const selected = form.teammember;
+        const pid = props.job.id;
+        const base = route('coordinator.project_team_members.create');
+        let ids = [];
+        if (Array.isArray(selected)) {
+            ids = selected
+                .map((s) => {
+                    if (!s) return null;
+                    if (typeof s === 'object') return s.user ? s.user.id || s.id || null : s.id || null;
+                    return s;
+                })
+                .filter(Boolean);
+        } else if (selected && typeof selected === 'object') {
+            // common shapes: { users: [{ user: { id } }, ... ] } or { user: { id } }
+            if (Array.isArray(selected.users)) {
+                ids = selected.users.map((u) => (u && u.user ? u.user.id || u.id || null : u.id || null)).filter(Boolean);
+            } else if (selected.user && selected.user.id) {
+                ids = [selected.user.id];
+            }
+        }
+
+        if (ids.length) {
+            const url = `${base}?project_job_id=${encodeURIComponent(pid)}&selected_user_ids=${encodeURIComponent(ids.join(','))}`;
+            router.visit(url);
+            return;
+        }
+    } catch (e) {
+        // fall through to default navigation
+    }
+
     router.visit(route('coordinator.project_team_members.create', { projectJob: props.job.id }));
 }
 </script>

@@ -19,6 +19,17 @@ const props = defineProps({
             >
                 クライアント管理
             </Link>
+            <Link
+                :href="route('leader.diaries.index')"
+                :class="[
+                    'rounded-md px-3 py-2 text-sm font-medium',
+                    active === 'diaries'
+                        ? 'bg-orange-100 text-orange-700'
+                        : 'border border-green-200 text-green-600 hover:bg-green-50 hover:text-green-800',
+                ]"
+            >
+                日報管理
+            </Link>
             <!-- <Link :href="route('profile.show')"
         :class="[
           'px-3 py-2 font-medium text-sm rounded-md',

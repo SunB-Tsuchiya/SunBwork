@@ -267,7 +267,9 @@ class z_SampleUsers22Seeder extends Seeder
 
                         // ensure we register the user into all assigned teams (department first, then company)
                         if ($schema->hasTable('team_user') && !empty($assignedTeamIds)) {
-                            $pivotRole = $data['team_role'] ?? ($data['role'] ?? 'member');
+                            // Use Jetstream-compatible default role 'user' for team pivot entries.
+                            // Allow explicit override via CSV 'team_role' only.
+                            $pivotRole = $data['team_role'] ?? 'user';
                             foreach ($assignedTeamIds as $tId) {
                                 try {
                                     $exists = DB::table('team_user')->where('team_id', $tId)->where('user_id', $userRecord->id)->first();

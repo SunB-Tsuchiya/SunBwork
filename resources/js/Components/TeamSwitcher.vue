@@ -74,7 +74,7 @@
                             <button
                                 @click="switchTeam(team.id)"
                                 class="block w-full px-4 py-2 text-left text-sm text-gray-700 transition duration-150 ease-in-out hover:bg-gray-100"
-                                :class="{ 'bg-gray-100 font-medium': team.id === currentTeam.id }"
+                                :class="{ 'bg-gray-100 font-medium': team.id === (currentTeam ? currentTeam.id : null) }"
                             >
                                 <div class="flex items-center">
                                     <div class="mr-3 flex h-6 w-6 items-center justify-center rounded-full bg-blue-100">
@@ -104,7 +104,7 @@
                             <button
                                 @click="switchTeam(team.id)"
                                 class="block w-full px-4 py-2 text-left text-sm text-gray-700 transition duration-150 ease-in-out hover:bg-gray-100"
-                                :class="{ 'bg-gray-100 font-medium': team.id === currentTeam.id }"
+                                :class="{ 'bg-gray-100 font-medium': team.id === (currentTeam ? currentTeam.id : null) }"
                             >
                                 <div class="flex items-center">
                                     <div class="mr-3 flex h-6 w-6 items-center justify-center rounded-full bg-green-100">

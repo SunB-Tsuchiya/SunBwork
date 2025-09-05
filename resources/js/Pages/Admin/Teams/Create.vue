@@ -58,6 +58,7 @@ onMounted(() => {
 });
 
 const submit = () => {
+    // route name is defined under the admin. group in routes/web.php, so use admin.units.store
     form.post(route('admin.units.store'));
 };
 </script>
