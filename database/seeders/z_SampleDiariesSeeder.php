@@ -22,6 +22,27 @@ class z_SampleDiariesSeeder extends Seeder
             'ito@test.com',
             'suzuki@test.com',
             'yayama@test.com',
+            "sato_k@test.com",
+            "takahashi_m@test.com",
+            "tanaka_y@test.com",
+            "watanabe_a@test.com",
+            "ito_k@test.com",
+            "nakamura_y@test.com",
+            "kobayashi_r@test.com",
+            "kato_n@test.com",
+            "yoshida_m@test.com",
+            "yamaguchi_n@test.com",
+            "noguchi_r@test.com",
+            "taniguchi_m@test.com",
+            "matsumoto_y@test.com",
+            "sasaki_n@test.com",
+            "ishikawa_a@test.com",
+            "ueda_m@test.com",
+            "ochiai_r@test.com",
+            "nakajima_a@test.com",
+            "inoue_k@test.com",
+            "hashimoto_t@test.com",
+            "okamoto_r@test.com",
         ];
 
         $users = DB::table('users')->whereIn('email', $emails)->pluck('id', 'email')->toArray();
@@ -33,7 +54,7 @@ class z_SampleDiariesSeeder extends Seeder
         // Generate dates for July and August (current year) for weekdays only
         $year = Carbon::now()->year;
         $dates = [];
-        for ($month = 7; $month <= 8; $month++) {
+        for ($month = 7; $month <= 9; $month++) {
             $daysInMonth = Carbon::create($year, $month, 1)->daysInMonth;
             for ($d = 1; $d <= $daysInMonth; $d++) {
                 $dt = Carbon::create($year, $month, $d);

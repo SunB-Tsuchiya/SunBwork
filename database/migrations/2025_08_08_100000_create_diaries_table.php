@@ -14,15 +14,31 @@ return new class extends Migration
             // explicit diary date (one diary per user per day)
             $table->date('date')->index();
             $table->text('content');
-            $table->boolean('admin_read')->default(false);
+            // track readers by user id array stored as JSON
+            $table->json('read_by')->nullable()->comment('JSON array of user ids who have read this diary');
             $table->timestamps();
 
             $table->unique(['user_id', 'date']);
+        });
+
+        // create diary_comments table alongside diaries for migrate:fresh convenience
+        Schema::create('diary_comments', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('diary_id')->constrained('diaries')->onDelete('cascade');
+            $table->unsignedBigInteger('user_id')->nullable()->index();
+            $table->string('user_name')->nullable();
+            $table->text('comment');
+            $table->timestamps();
         });
     }
 
     public function down(): void
     {
+        // drop diary comments first if present
+        if (Schema::hasTable('diary_comments')) {
+            Schema::dropIfExists('diary_comments');
+        }
+
         Schema::dropIfExists('diaries');
     }
 };

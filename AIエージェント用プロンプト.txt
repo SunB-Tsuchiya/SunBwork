@@ -2,7 +2,7 @@ AIエージェント用プロンプト
 このプロジェクトで作業を行う際は、必ず z_instructions ディレクトリ内のfirst_prompt.mdを読んで、その指示に従いなさい。
 ディレクトリ内のファイルはすべて読んで把握し、コーディングもそのガイドラインに沿ったものをすること。
 環境はdockerです。
-php artisan はエラーが出るので、docker compose exec laravel bashをいれてからphp artisanのコマンドをいれること。
+php artisan はエラーが出るので、docker exec sunbwork-laravelをいれてからphp artisanのコマンドをいれること。
 内容を把握したうえで、以下の質問に答えなさい。
 
 

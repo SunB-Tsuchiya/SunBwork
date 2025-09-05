@@ -11,14 +11,12 @@ class Diary extends Model
         'user_id',
         'date',
         'content',
-    'read_by',
-    'comments',
+        'read_by',
     ];
 
     protected $casts = [
         'date' => 'date',
         'read_by' => 'array',
-    'comments' => 'array',
     ];
 
     /**
@@ -35,6 +33,14 @@ class Diary extends Model
     public function attachments()
     {
         return $this->hasMany(Attachment::class, 'diary_id');
+    }
+
+    /**
+     * Comments relation stored in separate table diary_comments
+     */
+    public function comments()
+    {
+        return $this->hasMany(DiaryComment::class, 'diary_id')->orderBy('created_at', 'asc');
     }
 
     /**
@@ -75,17 +81,11 @@ class Diary extends Model
      */
     public function addComment(int $userId, string $userName, string $comment): void
     {
-        $comments = $this->comments ?? [];
-        if (!is_array($comments)) $comments = [];
-
-        $comments[] = [
+        DiaryComment::create([
+            'diary_id' => $this->id,
             'user_id' => intval($userId),
             'user_name' => $userName,
             'comment' => mb_substr($comment, 0, 1000),
-            'created_at' => now()->toDateTimeString(),
-        ];
-
-        $this->comments = $comments;
-        $this->save();
+        ]);
     }
 }

@@ -84,6 +84,13 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::resource('diaries', App\Http\Controllers\DiaryController::class)
         ->only(['create', 'store', 'show', 'edit', 'update', 'destroy', 'index']);
 
+    // Unified diaries interactions (管理者/リーダーの既読・コメント操作を統合するためのエンドポイント)
+    Route::prefix('diaries')->name('diaries.')->group(function () {
+        Route::get('/entries', [App\Http\Controllers\Diaries\DiaryController::class, 'index'])->name('entries.index');
+        Route::get('/interactions', [App\Http\Controllers\Diaries\DiaryController::class, 'index'])->name('interactions.index');
+        Route::post('/mark-read-all', [App\Http\Controllers\Diaries\DiaryController::class, 'markReadAll'])->name('mark_read_all');
+    });
+
     // イベント機能（作成、保存、表示、編集、更新）
     Route::resource('events', App\Http\Controllers\EventController::class)->only([
         'create',

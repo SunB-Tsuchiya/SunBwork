@@ -104,11 +104,14 @@ class DiaryAdminController extends Controller
                 'unread' => $unread,
             ];
 
-            return Inertia::render('Admin/Diaries/Index', [
+            return Inertia::render('Diaries/Interactions/Index', [
                 'departments' => $departments,
                 'date' => null,
                 'meta' => $meta,
                 'filters' => $filters,
+                'routePrefix' => 'admin',
+                'pageTitle' => '管理者 日報一覧',
+                'headerTitle' => '管理者用 日報一覧',
             ]);
         }
 
@@ -167,11 +170,14 @@ class DiaryAdminController extends Controller
 
             $filters = ['date' => $onlyDate, 'fullContent' => true, 'unread' => $unread];
 
-            return Inertia::render('Admin/Diaries/Index', [
+            return Inertia::render('Diaries/Interactions/Index', [
                 'departments' => $departments,
                 'date' => $onlyDate,
                 'meta' => $meta,
                 'filters' => $filters,
+                'routePrefix' => 'admin',
+                'pageTitle' => '管理者 日報一覧',
+                'headerTitle' => '管理者用 日報一覧',
             ]);
         }
 
@@ -256,11 +262,14 @@ class DiaryAdminController extends Controller
 
         $filters = ['q' => '', 'days' => $days, 'perPage' => $perPage, 'unread' => $unread];
 
-        return Inertia::render('Admin/Diaries/Index', [
+        return Inertia::render('Diaries/Interactions/Index', [
             'departments' => $departments,
             'date' => null,
             'meta' => $meta,
             'filters' => $filters,
+            'routePrefix' => 'admin',
+            'pageTitle' => '管理者 日報一覧',
+            'headerTitle' => '管理者用 日報一覧',
         ]);
     }
 
@@ -270,7 +279,7 @@ class DiaryAdminController extends Controller
     public function show(Diary $diary)
     {
         $this->authorize('view', $diary);
-        $diary->load('user');
+        $diary->load('user', 'comments');
 
         $readBy = $diary->read_by ?? [];
         $readByNames = [];
@@ -283,6 +292,15 @@ class DiaryAdminController extends Controller
 
         $diaryArray = $diary->toArray();
         $diaryArray['read_by_names'] = $readByNames;
+        $diaryArray['comments'] = array_map(function ($c) {
+            return [
+                'id' => $c['id'] ?? null,
+                'user_id' => $c['user_id'] ?? null,
+                'user_name' => $c['user_name'] ?? null,
+                'comment' => $c['comment'] ?? '',
+                'created_at' => $c['created_at'] ?? null,
+            ];
+        }, $diaryArray['comments'] ?? []);
 
         return Inertia::render('Admin/Diaries/Show', [
             'diary' => $diaryArray,
@@ -322,13 +340,13 @@ class DiaryAdminController extends Controller
         $date = $request->input('date');
         if (!$date) return redirect()->back()->with('error', '日付が指定されていません');
 
-            $diaries = Diary::where('date', $date)->get();
-            foreach ($diaries as $d) {
-                // use model helper to normalize and persist safely
-                if (!$d->hasBeenReadBy($admin->id)) {
-                    $d->addReadBy($admin->id);
-                }
+        $diaries = Diary::where('date', $date)->get();
+        foreach ($diaries as $d) {
+            // use model helper to normalize and persist safely
+            if (!$d->hasBeenReadBy($admin->id)) {
+                $d->addReadBy($admin->id);
             }
+        }
 
         return redirect()->back()->with('success', '日付の全ての日報を既読にしました');
     }
