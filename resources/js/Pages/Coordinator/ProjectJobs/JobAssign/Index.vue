@@ -10,11 +10,11 @@
                 <table class="min-w-full border">
                     <thead>
                         <tr class="bg-gray-100">
-                            <th class="border px-4 py-2">日付</th>
-                            <th class="border px-4 py-2">担当</th>
-                            <th class="border px-4 py-2">タイトル</th>
                             <th class="border px-4 py-2">希望日</th>
+                            <th class="border px-4 py-2">タイトル</th>
+                            <th class="border px-4 py-2">担当</th>
                             <th class="border px-4 py-2">終了希望日 / 時刻</th>
+                            <th class="border px-4 py-2">見積時間</th>
                             <th class="border px-4 py-2">依頼</th>
                             <th class="border px-4 py-2">Status</th>
                             <th class="border px-4 py-2">操作</th>
@@ -22,16 +22,16 @@
                     </thead>
                     <tbody>
                         <tr v-for="a in assignments" :key="a.id" class="hover:bg-gray-50">
-                            <td class="border px-4 py-2">{{ a.created_at ? a.created_at.split('T')[0] : '-' }}</td>
-                            <td class="border px-4 py-2">{{ a.user?.name || '-' }}</td>
-                            <td class="border px-4 py-2">{{ a.title }}</td>
                             <td class="border px-4 py-2">{{ a.desired_start_date || '-' }}</td>
+                            <td class="border px-4 py-2">{{ a.title }}</td>
+                            <td class="border px-4 py-2">{{ a.user?.name || '-' }}</td>
                             <td class="border px-4 py-2">
                                 {{ a.desired_end_date || '-' }}
                                 <span v-if="a.desired_time">
                                     {{ formatTime(a.desired_time) }}
                                 </span>
                             </td>
+                            <td class="border px-4 py-2">{{ formatEstimatedHours(a.estimated_hours) }}</td>
                             <td class="border px-4 py-2">
                                 <button class="rounded bg-blue-500 px-3 py-1 text-white" @click.prevent="sendRequest(a)">発信</button>
                             </td>
@@ -73,6 +73,14 @@ function formatTime(t) {
     const parts = core.split(':');
     if (parts.length >= 2) return parts[0].padStart(2, '0') + ':' + parts[1].padStart(2, '0');
     return t;
+}
+
+function formatEstimatedHours(h) {
+    if (h === null || h === undefined || h === '') return '-';
+    const n = Number(h);
+    if (Number.isNaN(n)) return '-';
+    // show 1.5 as "1.5h" or integer as "1h"
+    return Number.isInteger(n) ? `${n}h` : `${n}h`;
 }
 
 function statusText(a) {

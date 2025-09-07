@@ -31,8 +31,8 @@
                 </div>
                 <div class="mb-4">
                     <label class="mb-1 block font-semibold">案件タイトル</label>
-                    <input v-model="form.name" type="text" class="w-full rounded border px-3 py-2" required />
-                    <div v-if="form.errors.name" class="mt-1 text-sm text-red-600">{{ form.errors.name }}</div>
+                    <input v-model="form.title" type="text" class="w-full rounded border px-3 py-2" required />
+                    <div v-if="form.errors.title" class="mt-1 text-sm text-red-600">{{ form.errors.title }}</div>
                 </div>
                 <div class="mb-4">
                     <label class="mb-1 block font-semibold">担当ユーザー</label>
@@ -134,7 +134,7 @@ import { ref, watch } from 'vue';
 const page = usePage();
 const form = useForm({
     jobcode: '',
-    name: '',
+    title: '',
     user_id: page.props.auth.user.id,
     user_name: page.props.auth.user.name,
     client_id: '',
@@ -225,7 +225,7 @@ function selectClient(client) {
 // エラー項目の日本語ラベル
 const errorLabels = {
     jobcode: '伝票番号',
-    name: '案件タイトル',
+    title: '案件タイトル',
     user_id: '担当ユーザーID',
     user_name: '担当ユーザー',
     coordinator_id: '担当ユーザー',

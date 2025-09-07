@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Coordinator;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Schema;
 use App\Models\ProjectJob;
 use App\Models\ProjectJobAssignment;
 
@@ -12,7 +13,29 @@ class ProjectJobAssignmentsController extends Controller
 {
     public function index(ProjectJob $projectJob)
     {
-        $assignments = $projectJob->projectJobAssignments()->with('user')->orderBy('desired_end_date', 'asc')->get();
+        // Guard ordering by desired_end_date in case the column does not exist in the current DB
+        $query = $projectJob->projectJobAssignments()->with('user');
+        if (Schema::hasColumn('project_job_assignments', 'desired_end_date')) {
+            $query = $query->orderBy('desired_end_date', 'asc');
+        }
+        $assignments = $query->get()->map(function ($a) {
+            return [
+                'id' => $a->id,
+                'project_job_id' => $a->project_job_id,
+                'user_id' => $a->user_id,
+                'title' => $a->title,
+                'detail' => $a->detail,
+                'difficulty' => $a->difficulty,
+                'desired_start_date' => $a->desired_start_date ? $a->desired_start_date->format('Y-m-d') : null,
+                'desired_end_date' => $a->desired_end_date ? $a->desired_end_date->format('Y-m-d') : null,
+                'desired_time' => $a->desired_time,
+                'estimated_hours' => isset($a->estimated_hours) ? (float) $a->estimated_hours : null,
+                'assigned' => (bool) $a->assigned,
+                'accepted' => (bool) $a->accepted,
+                'user' => $a->user ? ['id' => $a->user->id, 'name' => $a->user->name] : null,
+            ];
+        });
+
         return Inertia::render('Coordinator/ProjectJobs/JobAssign/Index', [
             'projectJob' => $projectJob,
             'assignments' => $assignments,
@@ -44,10 +67,26 @@ class ProjectJobAssignmentsController extends Controller
             return $item['id'] !== null;
         })->values();
 
+        $a = $assignment;
+        $assignmentPayload = [
+            'id' => $a->id,
+            'project_job_id' => $a->project_job_id,
+            'user_id' => $a->user_id,
+            'title' => $a->title,
+            'detail' => $a->detail,
+            'difficulty' => $a->difficulty,
+            'desired_start_date' => $a->desired_start_date ? $a->desired_start_date->format('Y-m-d') : null,
+            'desired_end_date' => $a->desired_end_date ? $a->desired_end_date->format('Y-m-d') : null,
+            'desired_time' => $a->desired_time,
+            'estimated_hours' => isset($a->estimated_hours) ? (float) $a->estimated_hours : null,
+            'assigned' => (bool) $a->assigned,
+            'accepted' => (bool) $a->accepted,
+        ];
+
         return Inertia::render('Coordinator/ProjectJobs/JobAssign/Edit', [
             'projectJob' => $projectJob,
             'members' => $members,
-            'assignments' => [$assignment],
+            'assignments' => [$assignmentPayload],
             'editMode' => true,
         ]);
     }
@@ -58,6 +97,7 @@ class ProjectJobAssignmentsController extends Controller
             'title' => 'required|string|max:255',
             'detail' => 'nullable|string',
             'difficulty' => 'required|in:light,normal,heavy',
+            'estimated_hours' => 'nullable|numeric|min:0',
             'desired_start_date' => 'nullable|date',
             'desired_end_date' => 'nullable|date',
             'desired_time' => 'nullable|date_format:H:i',
@@ -89,6 +129,7 @@ class ProjectJobAssignmentsController extends Controller
             'desired_start_date' => $data['desired_start_date'] ?? null,
             'desired_end_date' => $data['desired_end_date'] ?? null,
             'desired_time' => $data['desired_time'] ?? null,
+            'estimated_hours' => $data['estimated_hours'] ?? null,
         ]);
 
         return redirect()->route('coordinator.project_jobs.assignments.index', ['projectJob' => $projectJob->id]);
@@ -101,6 +142,7 @@ class ProjectJobAssignmentsController extends Controller
             'assignments.*.title' => 'required|string|max:255',
             'assignments.*.detail' => 'nullable|string',
             'assignments.*.difficulty' => 'required|in:light,normal,heavy',
+            'assignments.*.estimated_hours' => 'nullable|numeric|min:0',
             'assignments.*.desired_start_date' => 'nullable|date',
             'assignments.*.desired_end_date' => 'nullable|date',
             'assignments.*.desired_time' => 'nullable|date_format:H:i',
@@ -133,9 +175,10 @@ class ProjectJobAssignmentsController extends Controller
                 'desired_start_date' => $a['desired_start_date'] ?? null,
                 'desired_end_date' => $a['desired_end_date'] ?? null,
                 'desired_time' => $a['desired_time'] ?? null,
+                'estimated_hours' => $a['estimated_hours'] ?? null,
             ]);
         }
 
-        return redirect()->route('coordinator.project_jobs.show', ['projectJob' => $projectJob->id]);
+        return redirect()->route('coordinator.project_jobs.assignments.index', ['projectJob' => $projectJob->id]);
     }
 }

@@ -23,7 +23,7 @@
                 <tbody>
                     <tr v-for="job in jobs" :key="job.id" class="hover:bg-gray-50">
                         <td class="border px-4 py-2">{{ job.id }}</td>
-                        <td class="border px-4 py-2">{{ job.name }}</td>
+                        <td class="border px-4 py-2">{{ job.title || job.name }}</td>
                         <td class="border px-4 py-2">{{ job.client?.name || '-' }}</td>
                         <td class="flex gap-2 border px-4 py-2">
                             <Link :href="route('coordinator.project_jobs.show', { projectJob: job.id })" class="rounded bg-gray-200 px-2 py-1"

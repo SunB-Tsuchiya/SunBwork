@@ -12,7 +12,7 @@
                 </div>
                 <div class="mb-4">
                     <label class="mb-1 block font-semibold">案件タイトル</label>
-                    <input v-model="form.name" type="text" class="w-full rounded border px-3 py-2" required />
+                    <input v-model="form.title" type="text" class="w-full rounded border px-3 py-2" required />
                 </div>
                 <div class="mb-4">
                     <label class="mb-1 block font-semibold">担当ユーザー</label>
@@ -106,7 +106,7 @@ const decodedTeammember = decodeField(props.job.teammember, null);
 const decodedSchedule = decodeField(props.job.schedule, null);
 const form = useForm({
     jobcode: props.job.jobcode || '',
-    name: props.job.name || '',
+    title: props.job.title || props.job.name || '',
     user_id: props.job.user_id || '',
     user_name: userName.value,
     client_id: props.job.client_id || '',

@@ -10,9 +10,13 @@ return new class extends Migration
     {
         Schema::create('project_memos', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('project_job_id');
+            // align with app code which expects `project_id` (nullable for global memos)
+            $table->unsignedBigInteger('project_id')->nullable();
             $table->unsignedBigInteger('user_id');
-            $table->text('memo');
+            // application expects `body` and optional `date`/`metadata`
+            $table->text('body');
+            $table->date('date')->nullable();
+            $table->json('metadata')->nullable();
             $table->timestamps();
         });
     }

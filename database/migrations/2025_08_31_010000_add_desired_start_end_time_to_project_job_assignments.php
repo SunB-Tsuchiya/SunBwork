@@ -8,10 +8,25 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('project_job_assignments', function (Blueprint $table) {
-            $table->timestamp('desired_start')->nullable()->change();
-            $table->timestamp('desired_end')->nullable()->change();
-        });
+        if (!Schema::hasTable('project_job_assignments')) {
+            return;
+        }
+
+        // Only attempt change if legacy timestamp columns still exist
+        if (Schema::hasColumn('project_job_assignments', 'desired_start') || Schema::hasColumn('project_job_assignments', 'desired_end')) {
+            try {
+                Schema::table('project_job_assignments', function (Blueprint $table) {
+                    if (Schema::hasColumn('project_job_assignments', 'desired_start')) {
+                        $table->timestamp('desired_start')->nullable()->change();
+                    }
+                    if (Schema::hasColumn('project_job_assignments', 'desired_end')) {
+                        $table->timestamp('desired_end')->nullable()->change();
+                    }
+                });
+            } catch (\Exception $e) {
+                // ignore change failures (safe for fresh installs)
+            }
+        }
     }
 
     public function down(): void

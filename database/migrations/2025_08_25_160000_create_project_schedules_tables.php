@@ -11,7 +11,19 @@ return new class extends Migration
         Schema::create('project_schedules', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('project_job_id');
-            $table->date('scheduled_date');
+            $table->unsignedBigInteger('parent_id')->nullable();
+            $table->string('name')->nullable();
+            $table->text('description')->nullable();
+            $table->dateTime('start_date')->nullable();
+            $table->dateTime('end_date')->nullable();
+            $table->integer('progress')->default(0);
+            $table->string('color')->nullable();
+            $table->string('status')->nullable();
+            $table->integer('order')->default(0);
+            $table->json('metadata')->nullable();
+            $table->date('scheduled_date')->nullable();
+            $table->unsignedBigInteger('created_by')->nullable();
+            $table->unsignedBigInteger('updated_by')->nullable();
             $table->timestamps();
         });
 

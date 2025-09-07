@@ -22,7 +22,7 @@
                         </tr>
                         <tr class="border-b">
                             <th class="px-4 py-2 text-left">案件タイトル</th>
-                            <td class="px-4 py-2">{{ job.name || '-' }}</td>
+                            <td class="px-4 py-2">{{ job.title || job.name || '-' }}</td>
                         </tr>
                         <tr class="border-b">
                             <th class="px-4 py-2 text-left">担当ユーザー</th>

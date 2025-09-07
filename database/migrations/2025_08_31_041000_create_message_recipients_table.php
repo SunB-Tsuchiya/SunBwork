@@ -11,7 +11,10 @@ return new class extends Migration
         Schema::create('message_recipients', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('message_id')->index();
-            $table->unsignedBigInteger('recipient_id')->index();
+            // canonical column name used across codebase
+            $table->unsignedBigInteger('user_id')->index();
+            $table->enum('type', ['to', 'cc', 'bcc'])->default('to');
+            $table->timestamp('read_at')->nullable();
             $table->timestamps();
         });
     }

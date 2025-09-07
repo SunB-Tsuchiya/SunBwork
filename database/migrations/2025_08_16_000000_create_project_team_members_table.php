@@ -10,8 +10,7 @@ return new class extends Migration
     {
         Schema::create('project_team_members', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('project_id');
-            $table->unsignedBigInteger('team_id');
+            $table->unsignedBigInteger('project_job_id');
             $table->unsignedBigInteger('user_id');
             $table->timestamps();
         });

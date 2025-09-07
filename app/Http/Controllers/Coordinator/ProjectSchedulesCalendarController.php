@@ -17,12 +17,37 @@ class ProjectSchedulesCalendarController extends Controller
         $schedules = [];
         if ($user) {
             // For PoC return schedules where the user is assigned or all if coordinator
+            // Avoid selecting a fragile subset of columns (some environments may differ)
+            // and normalize the result to a plain array that always includes project_job_id.
             $query = ProjectSchedule::query()->with('assignments');
             // If a project_id filter is provided, apply it
             if ($request->filled('project_job_id')) {
                 $query->where('project_job_id', $request->input('project_job_id'));
             }
-            $schedules = $query->with('comments')->get(['id', 'name', 'description', 'start_date', 'end_date', 'progress', 'project_job_id', 'color']);
+            // Load full models and map to a stable plain-array shape so the frontend
+            // always receives project_job_id explicitly.
+            $schedules = $query->with('comments')->get()->map(function ($s) {
+                return [
+                    'id' => $s->id,
+                    'name' => $s->name ?? null,
+                    'description' => $s->description ?? null,
+                    'start_date' => $s->start_date ?? null,
+                    'end_date' => $s->end_date ?? null,
+                    'progress' => $s->progress ?? null,
+                    'project_job_id' => $s->project_job_id ?? null,
+                    'color' => $s->color ?? null,
+                    // include comments inline to keep the frontend shape similar to before
+                    'comments' => $s->comments ? $s->comments->map(function ($c) {
+                        return [
+                            'id' => $c->id,
+                            'project_schedule_id' => $c->project_schedule_id,
+                            'body' => $c->body,
+                            'date' => $c->date ? $c->date->toDateString() : null,
+                            'user_id' => $c->user_id,
+                        ];
+                    })->toArray() : [],
+                ];
+            })->values();
         }
 
         // If a project_job_id was provided, also resolve the ProjectJob and its client

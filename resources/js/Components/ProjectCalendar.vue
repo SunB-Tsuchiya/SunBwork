@@ -860,6 +860,16 @@ const calendarOptions = computed(() => ({
         }
         if (confirm(confirmMessage)) {
             try {
+                // Debug: log event core fields to help diagnose missing project_schedule_id/project_job_id
+                try {
+                    console.info('[ProjectCalendar] eventResize start — event core fields', {
+                        id: info.event.id,
+                        event_id: info.event.event_id,
+                        extendedProps: info.event.extendedProps,
+                        defExtendedProps: info.event._def && info.event._def.extendedProps ? info.event._def.extendedProps : null,
+                        publicId: info.event._def && info.event._def.publicId ? info.event._def.publicId : null,
+                    });
+                } catch (e) {}
                 function stripTags(str) {
                     return str ? str.replace(/<[^>]*>?/gm, '') : '';
                 }
@@ -894,15 +904,186 @@ const calendarOptions = computed(() => ({
                         description: safeDescription,
                     };
                 }
-                // Only update generic events for personal calendar
-                await axios.put(`/events/${info.event.extendedProps.event_id}/calendar`, {
-                    date: displayStart,
-                    startHour: newStart ? String(newStart.getHours()).padStart(2, '0') : undefined,
-                    startMinute: newStart ? String(newStart.getMinutes()).padStart(2, '0') : undefined,
-                    endHour: newEnd ? String(newEnd.getHours()).padStart(2, '0') : undefined,
-                    endMinute: newEnd ? String(newEnd.getMinutes()).padStart(2, '0') : undefined,
-                });
-                alert('予定を更新しました');
+                // Prefer project schedule update when this event is part of a project
+                const ev = info.event;
+                const defExt = ev._def && ev._def.extendedProps ? ev._def.extendedProps : null;
+                const extended = ev.extendedProps || {};
+                const projectJobId =
+                    extended.project_job_id ||
+                    extended.project_job ||
+                    (defExt && (defExt.project_job_id || defExt.project_job)) ||
+                    (props.project &&
+                        (props.project.id || props.project.project_job_id || (props.project.project_job && props.project.project_job.id))) ||
+                    null;
+                // Try common fields for project schedule id
+                const inferredScheduleId =
+                    extended.project_schedule_id ||
+                    extended.project_schedule ||
+                    (defExt && (defExt.project_schedule_id || defExt.project_schedule)) ||
+                    extended.schedule_id ||
+                    ev.id ||
+                    ev.event_id ||
+                    (ev._def && ev._def.publicId) ||
+                    null;
+
+                if (projectJobId) {
+                    console.log('tchiro[ProjectCalendar] eventResize detected project event update', {
+                        project_job_id: projectJobId,
+                        project_schedule_id: inferredScheduleId,
+                        payload: logPayload,
+                    });
+                    // If we have a schedule id, call coordinator.project_schedules.update
+                    if (inferredScheduleId) {
+                        try {
+                            const url = route('coordinator.project_schedules.update', { project_schedule: inferredScheduleId });
+                            const payload = ev.allDay
+                                ? {
+                                      name: ev.title || undefined,
+                                      start_date: displayStart,
+                                      end_date: displayEndInclusive || displayStart,
+                                      color: ev.backgroundColor || ev.color,
+                                  }
+                                : {
+                                      name: ev.title || undefined,
+                                      start_date: displayStart,
+                                      end_date: newEnd ? newEnd.toISOString() : undefined,
+                                      color: ev.backgroundColor || ev.color,
+                                  };
+                            await axios.patch(url, payload);
+                            alert('予定を更新しました');
+                        } catch (err) {
+                            console.error('project schedule update failed', err);
+                            alert('予定の更新に失敗しました');
+                            info.revert();
+                        }
+                    } else {
+                        // Try to resolve schedule id by lookup (title / start / end) similar to submitScheduleUpdate
+                        try {
+                            const normalizeDate = (d) => {
+                                if (!d) return null;
+                                try {
+                                    return String(d).split('T')[0];
+                                } catch (e) {
+                                    return String(d);
+                                }
+                            };
+                            const wantTitle = (ev.title || '').trim();
+                            const wantStart = ev.start || null;
+                            const wantEnd = ev.end || null;
+
+                            const tryMatch = (list) => {
+                                if (!Array.isArray(list)) return null;
+                                const wantTitleLower = (wantTitle || '').toLowerCase().trim();
+                                for (const item of list) {
+                                    try {
+                                        const itemTitleRaw = item.title || item.name || '';
+                                        const itemTitle = itemTitleRaw ? String(itemTitleRaw).trim() : '';
+                                        const itemTitleLower = itemTitle.toLowerCase();
+                                        const itemStart = normalizeDate(item.start ?? item.start_date ?? item.date);
+                                        const itemEndRaw = item.end ?? item.end_date ?? undefined;
+                                        const itemEnd = itemEndRaw ? normalizeDate(itemEndRaw) : null;
+
+                                        const candidateId =
+                                            (item.extendedProps &&
+                                                (item.extendedProps.project_schedule_id ||
+                                                    item.extendedProps.event_id ||
+                                                    item.extendedProps.schedule_id)) ||
+                                            item.schedule_id ||
+                                            item.event_id ||
+                                            item.id ||
+                                            null;
+
+                                        if (wantTitleLower && itemTitleLower && wantTitleLower === itemTitleLower) {
+                                            if (wantStart && itemStart && normalizeDate(wantStart) === itemStart) return candidateId;
+                                            if (!wantStart) return candidateId;
+                                        }
+                                        if (wantStart && itemStart && normalizeDate(wantStart) === itemStart) {
+                                            if (wantEnd && itemEnd && normalizeDate(wantEnd) === itemEnd) return candidateId;
+                                            if (!wantEnd) return candidateId;
+                                        }
+                                        if (
+                                            wantTitleLower &&
+                                            itemTitleLower &&
+                                            (itemTitleLower.includes(wantTitleLower) || wantTitleLower.includes(itemTitleLower))
+                                        ) {
+                                            return candidateId;
+                                        }
+                                    } catch (e) {}
+                                }
+                                return null;
+                            };
+
+                            let resolved = null;
+                            resolved =
+                                tryMatch(calendarEvents.value) ||
+                                tryMatch(plainCalendarEvents.value) ||
+                                tryMatch(props.events && props.events.value ? props.events.value : props.events);
+                            if (!resolved && Array.isArray(props.schedules)) {
+                                for (const s of props.schedules) {
+                                    try {
+                                        const sTitle = (s.name || s.title || '').trim();
+                                        const sStart = normalizeDate(s.start_date || s.date || s.start);
+                                        if (
+                                            wantTitle &&
+                                            sTitle &&
+                                            wantTitle === sTitle &&
+                                            wantStart &&
+                                            sStart &&
+                                            normalizeDate(wantStart) === sStart
+                                        ) {
+                                            resolved = s.id;
+                                            break;
+                                        }
+                                    } catch (e) {}
+                                }
+                            }
+
+                            if (resolved) {
+                                console.info('[ProjectCalendar] eventResize resolved schedule id by lookup', resolved);
+                                try {
+                                    const url = route('coordinator.project_schedules.update', { project_schedule: resolved });
+                                    const payload = ev.allDay
+                                        ? {
+                                              name: ev.title || undefined,
+                                              start_date: displayStart,
+                                              end_date: displayEndInclusive || displayStart,
+                                              color: ev.backgroundColor || ev.color,
+                                          }
+                                        : {
+                                              name: ev.title || undefined,
+                                              start_date: displayStart,
+                                              end_date: newEnd ? newEnd.toISOString() : undefined,
+                                              color: ev.backgroundColor || ev.color,
+                                          };
+                                    await axios.patch(url, payload);
+                                    alert('予定を更新しました');
+                                } catch (err2) {
+                                    console.error('project schedule update failed (resolved)', err2);
+                                    alert('予定の更新に失敗しました');
+                                    info.revert();
+                                }
+                            } else {
+                                console.warn('[ProjectCalendar] cannot infer schedule id for project event; event shape:', ev);
+                                alert('プロジェクトに紐づくスケジュールIDが見つからないため更新できませんでした');
+                                info.revert();
+                            }
+                        } catch (e) {
+                            console.error('[ProjectCalendar] eventResize lookup error', e);
+                            alert('プロジェクトに紐づくスケジュールIDが見つからないため更新できませんでした');
+                            info.revert();
+                        }
+                    }
+                } else {
+                    // Only update generic events for personal calendar
+                    await axios.put(`/events/${extended.event_id}/calendar`, {
+                        date: displayStart,
+                        startHour: newStart ? String(newStart.getHours()).padStart(2, '0') : undefined,
+                        startMinute: newStart ? String(newStart.getMinutes()).padStart(2, '0') : undefined,
+                        endHour: newEnd ? String(newEnd.getHours()).padStart(2, '0') : undefined,
+                        endMinute: newEnd ? String(newEnd.getMinutes()).padStart(2, '0') : undefined,
+                    });
+                    alert('予定を更新しました');
+                }
             } catch (e) {
                 console.log('eventResize error:', e);
                 if (e.response && e.response.data) {
@@ -997,6 +1178,14 @@ const calendarOptions = computed(() => ({
         }
         // For other events (schedules/personal events) open a modal showing details
         if (!info.event.extendedProps.comment_id && !info.event.extendedProps.memo_id) {
+            try {
+                console.info('[ProjectCalendar] eventClick — clicked event core fields', {
+                    id: info.event.id,
+                    event_id: info.event.event_id,
+                    extendedProps: info.event.extendedProps,
+                    defExtendedProps: info.event._def && info.event._def.extendedProps ? info.event._def.extendedProps : null,
+                });
+            } catch (e) {}
             openScheduleShowModal(info.event);
         }
     },
@@ -1045,6 +1234,15 @@ function openEditModalForComment(comment) {
 }
 
 function openScheduleShowModal(event) {
+    try {
+        console.info('[ProjectCalendar] openScheduleShowModal — event core fields', {
+            id: event.id,
+            event_id: event.event_id,
+            extendedProps: event.extendedProps,
+            defExtendedProps: event._def && event._def.extendedProps ? event._def.extendedProps : null,
+            publicId: event._def && event._def.publicId ? event._def.publicId : null,
+        });
+    } catch (e) {}
     scheduleShowData.value.id = event.extendedProps.project_schedule_id || event.extendedProps.event_id || event.id || null;
     scheduleShowData.value.title = event.title || '';
     scheduleShowData.value.start = event.startStr
@@ -1544,12 +1742,66 @@ async function submitScheduleMemo() {
             return;
         }
         try {
-            await axios.post(route('coordinator.project_schedule_comments.store', { project_schedule: selectedScheduleIdForMemo.value }), {
-                body: memoBody.value,
-                metadata: { date: memoDate.value },
-            });
+            const resp = await axios.post(
+                route('coordinator.project_schedule_comments.store', { project_schedule: selectedScheduleIdForMemo.value }),
+                {
+                    body: memoBody.value,
+                    metadata: { date: memoDate.value },
+                },
+            );
+            // Attempt to immediately reflect the created comment on the calendar.
+            try {
+                const c = resp && resp.data && resp.data.comment ? resp.data.comment : null;
+                const commentObj = c
+                    ? {
+                          id: `comment-${c.id}`,
+                          title: '🗒️',
+                          start: c.date || memoDate.value,
+                          allDay: true,
+                          color: '#f59e42',
+                          backgroundColor: '#f59e42',
+                          borderColor: '#f59e42',
+                          extendedProps: { comment_id: c.id, project_schedule_id: c.project_schedule_id, body: c.body },
+                      }
+                    : {
+                          id: `comment-temp-${Date.now()}`,
+                          title: '🗒️',
+                          start: memoDate.value,
+                          allDay: true,
+                          color: '#f59e42',
+                          backgroundColor: '#f59e42',
+                          borderColor: '#f59e42',
+                          extendedProps: { comment_id: null, project_schedule_id: selectedScheduleIdForMemo.value, body: memoBody.value },
+                      };
+
+                // push into localCalendarEntries so our computed calendarEvents picks it up
+                localCalendarEntries.value.push({
+                    id: commentObj.id,
+                    title: commentObj.title,
+                    start: commentObj.start,
+                    allDay: true,
+                    color: commentObj.color,
+                    backgroundColor: commentObj.backgroundColor,
+                    borderColor: commentObj.borderColor,
+                    event_id: commentObj.id,
+                    description: commentObj.extendedProps.body || '',
+                    extendedProps: commentObj.extendedProps,
+                });
+
+                // Try to add to FullCalendar immediately
+                try {
+                    const api = calendarRef.value && calendarRef.value.getApi ? calendarRef.value.getApi() : null;
+                    if (api) api.addEvent(commentObj);
+                } catch (e) {
+                    console.debug('[ProjectCalendar] submitScheduleMemo addEvent failed', e);
+                }
+            } catch (e) {
+                console.debug('[ProjectCalendar] submitScheduleMemo post-processing failed', e);
+            }
+
             showMemoModal.value = false;
             memoBody.value = '';
+            // Navigate to schedule show to keep existing UX path
             router.get(route('coordinator.project_schedules.show', { project_schedule: selectedScheduleIdForMemo.value }));
         } catch (e) {
             console.error('submitScheduleMemo error', e);
@@ -1578,10 +1830,46 @@ async function submitScheduleMemo() {
             body: memoBody.value,
         };
         const resp = await axios.post(route('coordinator.project_memos.store'), payload);
-        // update local events with returned memo
-        if (resp && resp.data && resp.data.memo) {
-            const m = resp.data.memo;
-            localMemos.value.push({ id: m.id, project_id: m.project_id, date: m.date, body: m.body });
+        // update local events with returned memo and inject into calendar
+        try {
+            if (resp && resp.data && resp.data.memo) {
+                const m = resp.data.memo;
+                localMemos.value.push({ id: m.id, project_id: m.project_id, date: m.date, body: m.body });
+
+                const memoEvent = {
+                    id: `memo-${m.id}`,
+                    title: '📝',
+                    start: m.date,
+                    allDay: true,
+                    color: m.color ?? '#60a5fa',
+                    backgroundColor: m.color ?? '#60a5fa',
+                    borderColor: m.color ?? '#60a5fa',
+                    extendedProps: { memo_id: m.id, project_id: m.project_id, body: m.body },
+                };
+
+                // Add to localCalendarEntries for consistency
+                localCalendarEntries.value.push({
+                    id: memoEvent.id,
+                    title: memoEvent.title,
+                    start: memoEvent.start,
+                    allDay: true,
+                    color: memoEvent.color,
+                    backgroundColor: memoEvent.backgroundColor,
+                    borderColor: memoEvent.borderColor,
+                    event_id: memoEvent.id,
+                    description: memoEvent.extendedProps.body || '',
+                    extendedProps: memoEvent.extendedProps,
+                });
+
+                try {
+                    const api = calendarRef.value && calendarRef.value.getApi ? calendarRef.value.getApi() : null;
+                    if (api) api.addEvent(memoEvent);
+                } catch (e) {
+                    console.debug('[ProjectCalendar] submitScheduleMemo addEvent (project memo) failed', e);
+                }
+            }
+        } catch (e) {
+            console.debug('[ProjectCalendar] submitScheduleMemo post-processing failed', e);
         }
         showMemoModal.value = false;
         memoBody.value = '';
@@ -1627,7 +1915,44 @@ async function submitSimpleEvent() {
         showSimpleEventModal.value = false;
         if (resp && resp.data && resp.data.schedule) {
             // push the returned schedule into localCalendarEntries so calendar shows it immediately
-            localCalendarEntries.value.push(resp.data.schedule);
+            const sched = resp.data.schedule;
+            localCalendarEntries.value.push(sched);
+
+            // Also attempt to inject the new event directly into FullCalendar so the
+            // created schedule is visible immediately even if the automatic re-injection
+            // guard has already run.
+            try {
+                const api = calendarRef.value && calendarRef.value.getApi ? calendarRef.value.getApi() : null;
+                const eventObj = {
+                    id: sched.id,
+                    title: sched.name ?? sched.title ?? '',
+                    start: sched.start_date ? String(sched.start_date).split('T')[0] : (sched.date ?? null),
+                    end: sched.end_date ? String(sched.end_date).split('T')[0] : undefined,
+                    allDay: true,
+                    color: sched.color ?? undefined,
+                    backgroundColor: sched.color ?? undefined,
+                    borderColor: sched.color ?? undefined,
+                    event_id: sched.id,
+                    description: sched.description ?? '',
+                    extendedProps: { project_schedule_id: sched.id, project_job_id: sched.project_job_id ?? null },
+                };
+                if (api) {
+                    // If end date exists, FullCalendar expects exclusive end for allDay;
+                    // keep the same behavior as mapping from props.schedules earlier.
+                    if (eventObj.end) {
+                        try {
+                            const d = new Date(eventObj.end);
+                            d.setDate(d.getDate() + 1);
+                            eventObj.end = d.toISOString().split('T')[0];
+                        } catch (e) {}
+                    }
+                    api.addEvent(eventObj);
+                }
+            } catch (e) {
+                console.debug('[ProjectCalendar] submitSimpleEvent inject failed, falling back to reload', e);
+                // fallback: reload if injection fails
+                setTimeout(() => window.location.reload(), 200);
+            }
         } else {
             // fallback: reload if no schedule returned
             setTimeout(() => window.location.reload(), 200);

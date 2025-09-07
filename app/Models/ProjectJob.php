@@ -11,7 +11,7 @@ class ProjectJob extends Model
 
     protected $fillable = [
         'jobcode',
-        'name',
+        'title',
         'user_id',
         'client_id',
         'detail',

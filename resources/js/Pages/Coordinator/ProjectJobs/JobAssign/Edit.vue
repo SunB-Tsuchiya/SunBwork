@@ -47,6 +47,15 @@
                         </div>
                     </div>
 
+                    <label class="mb-1 mt-2 block font-semibold">見積時間</label>
+                    <div class="flex items-center gap-2">
+                        <select v-model="block.estimated_hours" class="w-40 rounded border px-3 py-2">
+                            <option value="">未指定</option>
+                            <option v-for="opt in estimatedOptions" :key="opt" :value="opt">{{ String(opt).replace('.0', '') }}h</option>
+                        </select>
+                        <span class="text-sm text-gray-500">(0.25刻み、例: 1.5 = 1時間30分)</span>
+                    </div>
+
                     <label class="mb-1 mt-2 block font-semibold">割当ユーザー</label>
                     <select v-model="block.user_id" class="w-full rounded border px-3 py-2">
                         <option value="">未指定</option>
@@ -63,7 +72,9 @@
                         ジョブブロックを追加
                     </button>
                     <button type="submit" class="rounded bg-green-600 px-4 py-2 text-white">保存して割り当て</button>
-                    <Link :href="route('coordinator.project_jobs.show', { projectJob: projectJob.id })" class="rounded bg-gray-200 px-4 py-2"
+                    <Link
+                        :href="route('coordinator.project_jobs.assignments.index', { projectJob: projectJob.id })"
+                        class="rounded bg-gray-200 px-4 py-2"
                         >戻る</Link
                     >
                 </div>
@@ -82,6 +93,8 @@ const page = usePage();
 
 const hours = Array.from({ length: 17 }, (_, i) => String(6 + i).padStart(2, '0'));
 const mins = ['00', '15', '30', '45'];
+// estimated hours options: 0.25 to 8.0 in 0.25 steps
+const estimatedOptions = Array.from({ length: 32 }, (_, i) => Number(((i + 1) * 0.25).toFixed(2)));
 
 function normalizeAssignment(a) {
     return {
@@ -93,6 +106,7 @@ function normalizeAssignment(a) {
         desired_end_date: a.desired_end_date || '',
         desired_time_hour: a.desired_time ? a.desired_time.split(':')[0] || '09' : a.desired_time_hour || '09',
         desired_time_min: a.desired_time ? a.desired_time.split(':')[1] || '00' : a.desired_time_min || '00',
+        estimated_hours: a.estimated_hours !== undefined && a.estimated_hours !== null ? a.estimated_hours : '',
         user_id: a.user_id || (a.user ? a.user.id : '') || '',
     };
 }
@@ -107,6 +121,7 @@ function addBlock() {
         desired_date: '',
         desired_time_hour: '09',
         desired_time_min: '00',
+        estimated_hours: '',
         user_id: '',
     });
 }
@@ -174,6 +189,7 @@ function submit() {
             title: a.title,
             detail: a.detail,
             difficulty: a.difficulty,
+            estimated_hours: a.estimated_hours || null,
             desired_start_date: a.desired_start_date || null,
             desired_end_date: a.desired_end_date || null,
             desired_time: String(a.desired_time_hour).padStart(2, '0') + ':' + String(a.desired_time_min).padStart(2, '0'),
@@ -188,6 +204,7 @@ function submit() {
             title: a.title,
             detail: a.detail,
             difficulty: a.difficulty,
+            estimated_hours: a.estimated_hours || null,
             desired_start_date: a.desired_start_date || null,
             desired_end_date: a.desired_end_date || null,
             desired_time: String(a.desired_time_hour).padStart(2, '0') + ':' + String(a.desired_time_min).padStart(2, '0'),
