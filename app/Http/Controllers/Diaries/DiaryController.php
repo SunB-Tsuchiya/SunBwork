@@ -95,7 +95,7 @@ class DiaryController extends Controller
                 });
 
             if ($unread) {
-                $query->whereRaw("JSON_SEARCH(read_by, 'one', ?) IS NULL", [$currentUserId]);
+                $query->whereRaw("JSON_CONTAINS(read_by, JSON_ARRAY(?)) = 0", [$currentUserId]);
             }
 
             $paginator = $query->orderBy('date', 'desc')->paginate(intval($request->input('perPage', 20)))->withQueryString();
@@ -123,7 +123,7 @@ class DiaryController extends Controller
                     'id' => $d->id,
                     'user_id' => $d->user_id,
                     'name' => $d->user->name ?? '',
-                    'description' => mb_substr(strip_tags($d->content ?? ''), 0, 20),
+                    'description' => strip_tags($d->content ?? ''),
                     'date' => $d->date->toDateString(),
                     'read_by' => $readBy,
                     'read_by_names' => $readByNames,
@@ -165,7 +165,7 @@ class DiaryController extends Controller
                 ->orderBy('date', 'desc');
 
             if ($unread) {
-                $diariesQuery->whereRaw("JSON_SEARCH(read_by, 'one', ?) IS NULL", [$currentUserId]);
+                $diariesQuery->whereRaw("JSON_CONTAINS(read_by, JSON_ARRAY(?)) = 0", [$currentUserId]);
             }
 
             $diaries = $diariesQuery->get();
@@ -196,7 +196,7 @@ class DiaryController extends Controller
                             'user_id' => $d->user_id,
                             'name' => $d->user->name ?? '',
                             'content' => $d->content ?? '',
-                            'description' => mb_substr(strip_tags($d->content ?? ''), 0, 20),
+                            'description' => strip_tags($d->content ?? ''),
                             'date' => $d->date->toDateString(),
                             'read_by' => $readBy,
                             'read_by_names' => $readByNames,
@@ -208,7 +208,7 @@ class DiaryController extends Controller
 
             $meta = null;
 
-            return Inertia::render('Diaries/Interactions/Index', [
+            return Inertia::render('Diaries/Interactions/ByDate', [
                 'departments' => $departments,
                 'date' => $onlyDate,
                 'meta' => $meta,
@@ -222,7 +222,7 @@ class DiaryController extends Controller
             ->where('date', '>=', now()->subDays($days));
 
         if ($unread) {
-            $datesQuery->whereRaw("JSON_SEARCH(read_by, 'one', ?) IS NULL", [$currentUserId]);
+            $datesQuery->whereRaw("JSON_CONTAINS(read_by, JSON_ARRAY(?)) = 0", [$currentUserId]);
         }
 
         $dates = $datesQuery->orderBy('date', 'desc')
@@ -240,7 +240,7 @@ class DiaryController extends Controller
             ->orderBy('date', 'desc');
 
         if ($unread) {
-            $diariesQuery->whereRaw("JSON_SEARCH(read_by, 'one', ?) IS NULL", [$currentUserId]);
+            $diariesQuery->whereRaw("JSON_CONTAINS(read_by, JSON_ARRAY(?)) = 0", [$currentUserId]);
         }
 
         $diaries = $diariesQuery->get();
@@ -277,7 +277,7 @@ class DiaryController extends Controller
                         'id' => $d->id,
                         'user_id' => $d->user_id,
                         'name' => $d->user->name ?? '',
-                        'description' => mb_substr(strip_tags($d->content ?? ''), 0, 20),
+                        'description' => strip_tags($d->content ?? ''),
                         'date' => $d->date->toDateString(),
                         'read_by' => $readBy,
                         'read_by_names' => $readByNames,

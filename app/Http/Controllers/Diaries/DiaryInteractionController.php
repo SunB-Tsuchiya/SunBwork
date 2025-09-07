@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Leader;
+namespace App\Http\Controllers\Diaries;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -11,68 +11,97 @@ use App\Models\Team;
 use App\Models\Unit;
 use Illuminate\Support\Facades\Auth;
 
-class DiaryController extends Controller
+class DiaryInteractionController extends Controller
 {
     /**
-     * Show diaries for leader: only users who belong to departments or unit teams
-     * where the current user is the configured leader.
+     * Build the list of permitted user IDs visible to the current actor
+     * (admin -> company users, leader -> department/unit members).
      */
-    public function index(Request $request)
+    protected function buildPermittedUserIds($currentUser)
     {
-        $leader = Auth::user();
-        $teams = Team::where('leader_id', $leader->id)
-            ->whereIn('team_type', ['department', 'unit'])
-            ->get();
+        // If user is superadmin, they can see all users' diaries
+        if (method_exists($currentUser, 'isSuperAdmin') && $currentUser->isSuperAdmin()) {
+            return User::pluck('id')->toArray();
+        }
 
+        $isAdmin = ($currentUser->user_role ?? '') === 'admin';
         $userIds = [];
-        foreach ($teams as $team) {
-            if ($team->team_type === 'department' && $team->department_id) {
-                $deptUsers = User::where('company_id', $team->company_id)
-                    ->where('department_id', $team->department_id)
-                    ->pluck('id')
-                    ->toArray();
-                $userIds = array_merge($userIds, $deptUsers);
-            }
 
-            if ($team->team_type === 'unit') {
-                $unit = Unit::where('company_id', $team->company_id)
-                    ->where('department_id', $team->department_id)
-                    ->where('name', $team->name)
-                    ->first();
-                if ($unit) {
-                    $members = $unit->members()->pluck('users.id')->toArray();
-                    $userIds = array_merge($userIds, $members);
+        if ($isAdmin) {
+            $companyId = $currentUser->company_id;
+            $users = User::where('company_id', $companyId)->get();
+            $userIds = $users->pluck('id')->toArray();
+            return array_values(array_unique(array_filter($userIds)));
+        }
+
+        // leader check and gather users from teams
+        $isLeader = Team::where('leader_id', $currentUser->id)->whereIn('team_type', ['department', 'unit'])->exists();
+        if ($isLeader) {
+            $teams = Team::where('leader_id', $currentUser->id)
+                ->whereIn('team_type', ['department', 'unit'])
+                ->get();
+
+            foreach ($teams as $team) {
+                if ($team->team_type === 'department' && $team->department_id) {
+                    $deptUsers = User::where('company_id', $team->company_id)
+                        ->where('department_id', $team->department_id)
+                        ->pluck('id')
+                        ->toArray();
+                    $userIds = array_merge($userIds, $deptUsers);
+                }
+
+                if ($team->team_type === 'unit') {
+                    $unit = Unit::where('company_id', $team->company_id)
+                        ->where('department_id', $team->department_id)
+                        ->where('name', $team->name)
+                        ->first();
+                    if ($unit) {
+                        $members = $unit->members()->pluck('users.id')->toArray();
+                        $userIds = array_merge($userIds, $members);
+                    }
                 }
             }
         }
 
-        $userIds = array_values(array_unique(array_filter($userIds)));
+        return array_values(array_unique(array_filter($userIds)));
+    }
+
+    public function index(Request $request)
+    {
+        $currentUser = Auth::user();
+        $isAdmin = ($currentUser->user_role ?? '') === 'admin';
+
+        $userIds = $this->buildPermittedUserIds($currentUser);
 
         if (empty($userIds)) {
+            // no permitted users -> render empty index
             $departments = [];
             $meta = null;
             $filters = ['q' => '', 'days' => 30, 'perPage' => 20];
+            $routePrefix = $isAdmin ? 'admin' : 'leader';
+
             return Inertia::render('Diaries/Interactions/Index', [
                 'departments' => $departments,
                 'date' => null,
                 'meta' => $meta,
                 'filters' => $filters,
-                'routePrefix' => 'leader',
-                'pageTitle' => 'リーダー 日報一覧',
-                'headerTitle' => 'リーダー用 日報一覧',
+                'routePrefix' => $routePrefix,
+                'pageTitle' => ($isAdmin ? '管理者 日報一覧' : 'リーダー 日報一覧'),
+                'headerTitle' => ($isAdmin ? '管理者用 日報一覧' : 'リーダー用 日報一覧'),
             ]);
         }
 
         // server-side filters and pagination
         $days = intval($request->input('days', 30));
-        $perPage = intval($request->input('perPage', 30)); // number of dates per page
+        $perPage = intval($request->input('perPage', 30));
         $currentUserId = Auth::id();
         $q = trim((string) $request->input('q', ''));
         $page = max(1, intval($request->input('page', 1)));
         $unread = intval($request->input('unread', 0));
+        $hasUnreadParam = $request->has('unread');
         $onlyDate = $request->input('date', null);
 
-        // if a free-text query is present, fall back to diary-level pagination
+        // free-text query -> diary-level pagination
         if ($q !== '') {
             $query = Diary::with('user.department')
                 ->whereIn('user_id', $userIds)
@@ -88,8 +117,13 @@ class DiaryController extends Controller
                         });
                 });
 
-            if ($unread) {
-                $query->whereRaw("JSON_SEARCH(read_by, 'one', ?) IS NULL", [$currentUserId]);
+            if ($hasUnreadParam && $unread === 1) {
+                // unread=1 -> only diaries NOT read by current user
+                // treat NULL read_by as empty array
+                $query->whereRaw("JSON_CONTAINS(COALESCE(read_by, JSON_ARRAY()), JSON_ARRAY(?)) = 0", [$currentUserId]);
+            } elseif ($hasUnreadParam && $unread === 0) {
+                // unread=0 -> only diaries read by current user
+                $query->whereRaw("JSON_CONTAINS(COALESCE(read_by, JSON_ARRAY()), JSON_ARRAY(?)) = 1", [$currentUserId]);
             }
 
             $paginator = $query->orderBy('date', 'desc')->paginate(intval($request->input('perPage', 20)))->withQueryString();
@@ -117,7 +151,7 @@ class DiaryController extends Controller
                     'id' => $d->id,
                     'user_id' => $d->user_id,
                     'name' => $d->user->name ?? '',
-                    'description' => mb_substr(strip_tags($d->content ?? ''), 0, 20),
+                    'description' => strip_tags($d->content ?? ''),
                     'date' => $d->date->toDateString(),
                     'read_by' => $readBy,
                     'read_by_names' => $readByNames,
@@ -137,25 +171,25 @@ class DiaryController extends Controller
                 'q' => $q,
                 'days' => $days,
                 'perPage' => intval($request->input('perPage', 20)),
-                'unread' => $unread,
+                'unread' => $hasUnreadParam ? $unread : null,
             ];
+
+            $routePrefix = $isAdmin ? 'admin' : 'leader';
 
             return Inertia::render('Diaries/Interactions/Index', [
                 'departments' => $departments,
                 'date' => null,
                 'meta' => $meta,
                 'filters' => $filters,
-                'routePrefix' => 'leader',
-                'pageTitle' => 'リーダー 日報一覧',
-                'headerTitle' => 'リーダー用 日報一覧',
+                'routePrefix' => $routePrefix,
+                'pageTitle' => ($isAdmin ? '管理者 日報一覧' : 'リーダー 日報一覧'),
+                'headerTitle' => ($isAdmin ? '管理者用 日報一覧' : 'リーダー用 日報一覧'),
             ]);
         }
 
         // if a specific date is requested, return only that date (full content page)
         if ($onlyDate) {
-            $sliced = [$onlyDate];
-            // when viewing a single date we want full content
-            $filters = ['date' => $onlyDate, 'fullContent' => true, 'unread' => $unread];
+            $filters = ['date' => $onlyDate, 'fullContent' => true, 'unread' => $hasUnreadParam ? $unread : null];
 
             $diariesQuery = Diary::with('user.department')
                 ->whereIn('user_id', $userIds)
@@ -163,8 +197,10 @@ class DiaryController extends Controller
                 ->where('date', $onlyDate)
                 ->orderBy('date', 'desc');
 
-            if ($unread) {
-                $diariesQuery->whereRaw("JSON_SEARCH(read_by, 'one', ?) IS NULL", [$currentUserId]);
+            if ($hasUnreadParam && $unread === 1) {
+                $diariesQuery->whereRaw("JSON_CONTAINS(COALESCE(read_by, JSON_ARRAY()), JSON_ARRAY(?)) = 0", [$currentUserId]);
+            } elseif ($hasUnreadParam && $unread === 0) {
+                $diariesQuery->whereRaw("JSON_CONTAINS(COALESCE(read_by, JSON_ARRAY()), JSON_ARRAY(?)) = 1", [$currentUserId]);
             }
 
             $diaries = $diariesQuery->get();
@@ -195,7 +231,7 @@ class DiaryController extends Controller
                             'user_id' => $d->user_id,
                             'name' => $d->user->name ?? '',
                             'content' => $d->content ?? '',
-                            'description' => mb_substr(strip_tags($d->content ?? ''), 0, 20),
+                            'description' => strip_tags($d->content ?? ''),
                             'date' => $d->date->toDateString(),
                             'read_by' => $readBy,
                             'read_by_names' => $readByNames,
@@ -206,15 +242,16 @@ class DiaryController extends Controller
             ];
 
             $meta = null;
+            $routePrefix = $isAdmin ? 'admin' : 'leader';
 
-            return Inertia::render('Diaries/Interactions/Index', [
+            return Inertia::render('Diaries/Interactions/ByDate', [
                 'departments' => $departments,
                 'date' => $onlyDate,
                 'meta' => $meta,
                 'filters' => $filters,
-                'routePrefix' => 'leader',
-                'pageTitle' => 'リーダー 日報一覧',
-                'headerTitle' => 'リーダー用 日報一覧',
+                'routePrefix' => $routePrefix,
+                'pageTitle' => ($isAdmin ? '管理者 日報一覧' : 'リーダー 日報一覧'),
+                'headerTitle' => ($isAdmin ? '管理者用 日報一覧' : 'リーダー用 日報一覧'),
             ]);
         }
 
@@ -223,8 +260,10 @@ class DiaryController extends Controller
             ->where('user_id', '!=', $currentUserId)
             ->where('date', '>=', now()->subDays($days));
 
-        if ($unread) {
-            $datesQuery->whereRaw("JSON_SEARCH(read_by, 'one', ?) IS NULL", [$currentUserId]);
+        if ($hasUnreadParam && $unread === 1) {
+            $datesQuery->whereRaw("JSON_CONTAINS(COALESCE(read_by, JSON_ARRAY()), JSON_ARRAY(?)) = 0", [$currentUserId]);
+        } elseif ($hasUnreadParam && $unread === 0) {
+            $datesQuery->whereRaw("JSON_CONTAINS(COALESCE(read_by, JSON_ARRAY()), JSON_ARRAY(?)) = 1", [$currentUserId]);
         }
 
         $dates = $datesQuery->orderBy('date', 'desc')
@@ -241,8 +280,10 @@ class DiaryController extends Controller
             ->whereIn('date', $sliced)
             ->orderBy('date', 'desc');
 
-        if ($unread) {
-            $diariesQuery->whereRaw("JSON_SEARCH(read_by, 'one', ?) IS NULL", [$currentUserId]);
+        if ($hasUnreadParam && $unread === 1) {
+            $diariesQuery->whereRaw("JSON_CONTAINS(COALESCE(read_by, JSON_ARRAY()), JSON_ARRAY(?)) = 0", [$currentUserId]);
+        } elseif ($hasUnreadParam && $unread === 0) {
+            $diariesQuery->whereRaw("JSON_CONTAINS(COALESCE(read_by, JSON_ARRAY()), JSON_ARRAY(?)) = 1", [$currentUserId]);
         }
 
         $diaries = $diariesQuery->get();
@@ -279,7 +320,7 @@ class DiaryController extends Controller
                         'id' => $d->id,
                         'user_id' => $d->user_id,
                         'name' => $d->user->name ?? '',
-                        'description' => mb_substr(strip_tags($d->content ?? ''), 0, 20),
+                        'description' => strip_tags($d->content ?? ''),
                         'date' => $d->date->toDateString(),
                         'read_by' => $readBy,
                         'read_by_names' => $readByNames,
@@ -297,38 +338,27 @@ class DiaryController extends Controller
             'total' => $totalDates,
         ];
 
-        $filters = ['q' => '', 'days' => $days, 'perPage' => $perPage, 'unread' => $unread];
+        $filters = ['q' => '', 'days' => $days, 'perPage' => $perPage, 'unread' => $hasUnreadParam ? $unread : null];
+        $routePrefix = $isAdmin ? 'admin' : 'leader';
 
         return Inertia::render('Diaries/Interactions/Index', [
             'departments' => $departments,
             'date' => null,
             'meta' => $meta,
             'filters' => $filters,
-            'routePrefix' => 'leader',
-            'pageTitle' => 'リーダー 日報一覧',
-            'headerTitle' => 'リーダー用 日報一覧',
+            'routePrefix' => $routePrefix,
+            'pageTitle' => ($isAdmin ? '管理者 日報一覧' : 'リーダー 日報一覧'),
+            'headerTitle' => ($isAdmin ? '管理者用 日報一覧' : 'リーダー用 日報一覧'),
         ]);
     }
 
     public function show(Diary $diary)
     {
-        $leader = Auth::user();
+        $currentUser = Auth::user();
+        $isAdmin = ($currentUser->user_role ?? '') === 'admin';
+        $permitted = $this->buildPermittedUserIds($currentUser);
 
-        // Build permitted user ids similarly to index
-        $teams = Team::where('leader_id', $leader->id)->whereIn('team_type', ['department', 'unit'])->get();
-        $permitted = [];
-        foreach ($teams as $team) {
-            if ($team->team_type === 'department' && $team->department_id) {
-                $permitted = array_merge($permitted, User::where('company_id', $team->company_id)->where('department_id', $team->department_id)->pluck('id')->toArray());
-            }
-            if ($team->team_type === 'unit') {
-                $unit = Unit::where('company_id', $team->company_id)->where('department_id', $team->department_id)->where('name', $team->name)->first();
-                if ($unit) $permitted = array_merge($permitted, $unit->members()->pluck('users.id')->toArray());
-            }
-        }
-        $permitted = array_values(array_unique($permitted));
-
-        if (!in_array($diary->user_id, $permitted) && ($leader->user_role ?? '') !== 'admin') {
+        if (!in_array($diary->user_id, $permitted) && !$isAdmin) {
             abort(403, 'この日報を表示する権限がありません');
         }
 
@@ -336,17 +366,24 @@ class DiaryController extends Controller
 
         $readBy = $diary->read_by ?? [];
         $readByNames = [];
+        $readByStructured = [];
         if (!empty($readBy) && is_array($readBy)) {
             $names = User::whereIn('id', $readBy)->pluck('name', 'id')->toArray();
             $readByNames = array_map(function ($id) use ($names) {
                 return $names[$id] ?? ('ID:' . $id);
             }, $readBy);
+
+            $readByStructured = array_map(function ($id) use ($names) {
+                return [
+                    'id' => $id,
+                    'name' => $names[$id] ?? ('ID:' . $id),
+                ];
+            }, $readBy);
         }
 
         $diaryArray = $diary->toArray();
         $diaryArray['read_by_names'] = $readByNames;
-
-        // ensure comments shape contains expected keys (user_id,user_name,comment,created_at)
+        $diaryArray['read_by'] = $readByStructured;
         $diaryArray['comments'] = array_map(function ($c) {
             return [
                 'id' => $c['id'] ?? null,
@@ -357,43 +394,31 @@ class DiaryController extends Controller
             ];
         }, $diaryArray['comments'] ?? []);
 
-        return Inertia::render('Leader/Diaries/Show', [
+        $routePrefix = $isAdmin ? 'admin' : 'leader';
+
+        return Inertia::render('Diaries/Interactions/Show', [
             'diary' => $diaryArray,
+            'routePrefix' => $routePrefix,
         ]);
     }
 
-    /**
-     * Mark a single diary as read by the current leader and optionally add a comment.
-     */
     public function markRead(Request $request, Diary $diary)
     {
-        $leader = Auth::user();
+        $currentUser = Auth::user();
+        $isAdmin = ($currentUser->user_role ?? '') === 'admin';
+        $permitted = $this->buildPermittedUserIds($currentUser);
 
-        // permission: leader must be able to view this diary (reuse same permitted logic as show)
-        $teams = Team::where('leader_id', $leader->id)->whereIn('team_type', ['department', 'unit'])->get();
-        $permitted = [];
-        foreach ($teams as $team) {
-            if ($team->team_type === 'department' && $team->department_id) {
-                $permitted = array_merge($permitted, User::where('company_id', $team->company_id)->where('department_id', $team->department_id)->pluck('id')->toArray());
-            }
-            if ($team->team_type === 'unit') {
-                $unit = Unit::where('company_id', $team->company_id)->where('department_id', $team->department_id)->where('name', $team->name)->first();
-                if ($unit) $permitted = array_merge($permitted, $unit->members()->pluck('users.id')->toArray());
-            }
-        }
-        $permitted = array_values(array_unique($permitted));
-
-        if (!in_array($diary->user_id, $permitted) && ($leader->user_role ?? '') !== 'admin') {
-            abort(403, 'この日報を表示する権限がありません');
+        if (!in_array($diary->user_id, $permitted) && !$isAdmin) {
+            abort(403, 'この日報を操作する権限がありません');
         }
 
         $readBy = $diary->read_by ?? [];
-        if (!in_array($leader->id, $readBy)) {
-            $readBy[] = $leader->id;
+        if (!in_array($currentUser->id, $readBy)) {
+            $readBy[] = $currentUser->id;
         }
 
         if ($request->filled('comment')) {
-            $diary->addComment($leader->id, $leader->name, $request->input('comment'));
+            $diary->addComment($currentUser->id, $currentUser->name, $request->input('comment'));
         }
 
         $diary->read_by = array_values($readBy);
@@ -402,34 +427,19 @@ class DiaryController extends Controller
         return redirect()->back()->with('success', '既読/コメントを保存しました');
     }
 
-    /**
-     * Mark all diaries on a given date as read by current leader (if permitted).
-     */
     public function markReadAll(Request $request)
     {
-        $leader = Auth::user();
+        $currentUser = Auth::user();
         $date = $request->input('date');
         if (!$date) return redirect()->back()->with('error', '日付が指定されていません');
 
-        // find diaries for users this leader can view
-        $teams = Team::where('leader_id', $leader->id)->whereIn('team_type', ['department', 'unit'])->get();
-        $userIds = [];
-        foreach ($teams as $team) {
-            if ($team->team_type === 'department' && $team->department_id) {
-                $userIds = array_merge($userIds, User::where('company_id', $team->company_id)->where('department_id', $team->department_id)->pluck('id')->toArray());
-            }
-            if ($team->team_type === 'unit') {
-                $unit = Unit::where('company_id', $team->company_id)->where('department_id', $team->department_id)->where('name', $team->name)->first();
-                if ($unit) $userIds = array_merge($userIds, $unit->members()->pluck('users.id')->toArray());
-            }
-        }
-        $userIds = array_values(array_unique($userIds));
+        $userIds = $this->buildPermittedUserIds($currentUser);
+        if (empty($userIds)) return redirect()->back()->with('error', '権限がありません');
 
         $diaries = Diary::whereIn('user_id', $userIds)->where('date', $date)->get();
         foreach ($diaries as $d) {
-            // use model helper to normalize and persist safely
-            if (!$d->hasBeenReadBy($leader->id)) {
-                $d->addReadBy($leader->id);
+            if (!$d->hasBeenReadBy($currentUser->id)) {
+                $d->addReadBy($currentUser->id);
             }
         }
 

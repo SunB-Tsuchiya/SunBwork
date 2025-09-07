@@ -22,7 +22,7 @@ return new class extends Migration
             $table->string('name');
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
             $table->foreignId('client_id')->constrained('clients')->onDelete('cascade');
-            $table->json('detail')->nullable();
+            $table->text('detail')->nullable();
             $table->json('schedule')->nullable();
             $table->timestamps();
         });

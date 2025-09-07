@@ -22,7 +22,7 @@ return new class extends Migration
             // owner / creator of the project job (nullable)
             $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
             $table->string('title');
-            $table->text('detail')->nullable();
+            $table->text('detail')->nullable(); // Updated to use text instead of json
             $table->timestamps();
         });
     }

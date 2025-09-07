@@ -3,6 +3,7 @@ AIエージェント用プロンプト
 ディレクトリ内のファイルはすべて読んで把握し、コーディングもそのガイドラインに沿ったものをすること。
 環境はdockerです。
 php artisan はエラーが出るので、docker exec sunbwork-laravelをいれてからphp artisanのコマンドをいれること。
+tinkerもdocker compose につづくコマンドをしないとエラーが出ます。
 内容を把握したうえで、以下の質問に答えなさい。
 
 

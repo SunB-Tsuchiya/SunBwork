@@ -84,11 +84,19 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::resource('diaries', App\Http\Controllers\DiaryController::class)
         ->only(['create', 'store', 'show', 'edit', 'update', 'destroy', 'index']);
 
-    // Unified diaries interactions (管理者/リーダーの既読・コメント操作を統合するためのエンドポイント)
-    Route::prefix('diaries')->name('diaries.')->group(function () {
-        Route::get('/entries', [App\Http\Controllers\Diaries\DiaryController::class, 'index'])->name('entries.index');
-        Route::get('/interactions', [App\Http\Controllers\Diaries\DiaryController::class, 'index'])->name('interactions.index');
-        Route::post('/mark-read-all', [App\Http\Controllers\Diaries\DiaryController::class, 'markReadAll'])->name('mark_read_all');
+    // Diary comment delete (authenticated users can delete their own comment)
+    Route::delete('diary-comments/{comment}', [App\Http\Controllers\DiaryCommentController::class, 'destroy'])->name('diary_comments.destroy');
+
+    // Unified diary interactions (管理者/リーダーの既読・コメント操作を統合するためのエンドポイント)
+    // Keep /interactions as the canonical user-facing index. Provide /entries as a
+    // backward-compatible redirect to avoid breaking older links.
+    Route::prefix('diaryinteractions')->name('diaryinteractions.')->group(function () {
+        Route::get('/interactions', [App\Http\Controllers\Diaries\DiaryInteractionController::class, 'index'])->name('interactions.index');
+        // backward-compatible redirect from /entries -> /interactions
+        Route::get('/entries', function () {
+            return redirect()->route('diaryinteractions.interactions.index');
+        })->name('entries.index');
+        Route::post('/mark-read-all', [App\Http\Controllers\Diaries\DiaryInteractionController::class, 'markReadAll'])->name('mark_read_all');
     });
 
     // イベント機能（作成、保存、表示、編集、更新）
@@ -160,12 +168,15 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         // ユニットチーム作成 (画面と保存)
         Route::get('teams/units/create', [App\Http\Controllers\Admin\UnitController::class, 'create'])->name('teams.units.create');
         Route::post('units', [App\Http\Controllers\Admin\UnitController::class, 'store'])->name('units.store');
-        // 管理者向け 日報一覧・閲覧
-        Route::get('diaries', [App\Http\Controllers\Admin\DiaryAdminController::class, 'index'])->name('diaries.index');
-        Route::get('diaries/{diary}', [App\Http\Controllers\Admin\DiaryAdminController::class, 'show'])->name('diaries.show');
-        Route::post('diaries/{diary}/mark-read', [App\Http\Controllers\Admin\DiaryAdminController::class, 'markRead'])->name('diaries.mark_read');
+        // 管理者向け 日報一覧・閲覧 (centralized diary interactions)
+        // Provide an admin-scoped diaries index route so admin links using
+        // route('admin.diaries.index') resolve correctly in Ziggy.
+        Route::get('diaries', [App\Http\Controllers\DiaryController::class, 'index'])->name('diaries.index');
+        Route::get('diaryinteractions', [App\Http\Controllers\Diaries\DiaryInteractionController::class, 'index'])->name('diaryinteractions.index');
+        Route::get('diaryinteractions/{diary}', [App\Http\Controllers\Diaries\DiaryInteractionController::class, 'show'])->name('diaryinteractions.show');
+        Route::post('diaryinteractions/{diary}/mark-read', [App\Http\Controllers\Diaries\DiaryInteractionController::class, 'markRead'])->name('diaryinteractions.mark_read');
         // 日付単位で「全部既読にする」
-        Route::post('diaries/mark-read-all', [App\Http\Controllers\Admin\DiaryAdminController::class, 'markReadAll'])->name('diaries.mark_read_all');
+        Route::post('diaryinteractions/mark-read-all', [App\Http\Controllers\Diaries\DiaryInteractionController::class, 'markReadAll'])->name('diaryinteractions.mark_read_all');
         // AI settings admin
         Route::get('/ai', [\App\Http\Controllers\Admin\AiSettingController::class, 'index'])->name('ai.index');
         Route::get('/ai/create', [\App\Http\Controllers\Admin\AiSettingController::class, 'create'])->name('ai.create');
@@ -229,12 +240,12 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
         // クライアント管理（Leader用）
         Route::resource('clients', App\Http\Controllers\ClientController::class)->only(['index', 'create', 'store', 'edit', 'update']);
-        // Leader diaries (leader can view diaries for departments/units they lead)
-        Route::get('diaries', [App\Http\Controllers\Leader\DiaryController::class, 'index'])->name('diaries.index');
-        Route::get('diaries/{diary}', [App\Http\Controllers\Leader\DiaryController::class, 'show'])->name('diaries.show');
-        Route::post('diaries/{diary}/mark-read', [App\Http\Controllers\Leader\DiaryController::class, 'markRead'])->name('diaries.mark_read');
+        // Leader diary interactions (leader can view diaries for departments/units they lead)
+        Route::get('diaryinteractions', [App\Http\Controllers\Diaries\DiaryInteractionController::class, 'index'])->name('diaryinteractions.index');
+        Route::get('diaryinteractions/{diary}', [App\Http\Controllers\Diaries\DiaryInteractionController::class, 'show'])->name('diaryinteractions.show');
+        Route::post('diaryinteractions/{diary}/mark-read', [App\Http\Controllers\Diaries\DiaryInteractionController::class, 'markRead'])->name('diaryinteractions.mark_read');
         // 日付単位で「全部既読にする」(リーダー用)
-        Route::post('diaries/mark-read-all', [App\Http\Controllers\Leader\DiaryController::class, 'markReadAll'])->name('diaries.mark_read_all');
+        Route::post('diaryinteractions/mark-read-all', [App\Http\Controllers\Diaries\DiaryInteractionController::class, 'markReadAll'])->name('diaryinteractions.mark_read_all');
     });
 
 // クライアント管理（Admin用）は上の admin グループに統合済み（重複削除）
