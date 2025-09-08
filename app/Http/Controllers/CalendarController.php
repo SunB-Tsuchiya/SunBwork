@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 // Log used for debugging during investigation (removed when cleanup)
 use App\Models\Diary;
 use App\Models\Event;
@@ -28,21 +29,40 @@ class CalendarController extends Controller
                 $diaryQuery->where('date', '>=', $diary_from)->where('date', '<=', $diary_to);
             }
             $diaries = $diaryQuery->get();
-            // Do not select a physical `date` column because some DBs may not have it.
-            // Compute date from `start` via model accessor if needed.
+            // Ensure we retrieve timestamp and body columns that the frontend expects.
+            // Some schemas use `starts_at`/`ends_at`/`body` while older code used `start`/`end`/`description`.
             $eventQuery = Event::where('user_id', $user->id);
             $select = ['id', 'title'];
-            if (Schema::hasColumn('events', 'start')) {
+            if (Schema::hasColumn('events', 'starts_at')) {
+                $eventQuery->where('starts_at', '>=', $event_from)->where('starts_at', '<=', $event_to);
+                $select[] = 'starts_at';
+            } elseif (Schema::hasColumn('events', 'start')) {
                 $eventQuery->where('start', '>=', $event_from)->where('start', '<=', $event_to);
                 $select[] = 'start';
             }
-            if (Schema::hasColumn('events', 'end')) {
+
+            if (Schema::hasColumn('events', 'ends_at')) {
+                $select[] = 'ends_at';
+            } elseif (Schema::hasColumn('events', 'end')) {
                 $select[] = 'end';
             }
-            if (Schema::hasColumn('events', 'description')) {
+
+            if (Schema::hasColumn('events', 'body')) {
+                $select[] = 'body';
+            } elseif (Schema::hasColumn('events', 'description')) {
                 $select[] = 'description';
             }
+
             $events = $eventQuery->get($select);
+
+            // Temporary debug: log first event to ensure start/end are present for Inertia props
+            if ($events->count() > 0) {
+                try {
+                    Log::debug('CalendarController::events sample', ['first' => $events->first()]);
+                } catch (\Exception $e) {
+                    // ignore logging errors
+                }
+            }
 
             // load assigned jobs that the user accepted or that are marked assigned
             $jobs = ProjectJobAssignment::where('user_id', $user->id)

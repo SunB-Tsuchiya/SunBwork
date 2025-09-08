@@ -10,6 +10,7 @@ use Intervention\Image\ImageManager;
 use App\Models\Diary;
 use App\Models\Attachment;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Log;
 
 class DiaryController extends Controller
 {
@@ -56,9 +57,16 @@ class DiaryController extends Controller
         $createdAt = Carbon::parse($data['date'])->startOfDay();
         $diary = new Diary();
         $diary->user_id = Auth::id();
+        // Persist explicit diary date (migration requires non-null date column)
+        $diary->date = $createdAt->toDateString();
         $diary->content = $data['content'];
         $diary->created_at = $createdAt;
         $diary->updated_at = $createdAt;
+        try {
+            Log::debug('DiaryController::store - pre-save diary', ['attrs' => $diary->toArray()]);
+        } catch (\Exception $_e) {
+            // ignore logging errors
+        }
         $diary->save();
 
         // 本文内の [[attachment:{id}:filename]] プレースホルダを検出し、該当する attachments レコードを日報に紐付ける

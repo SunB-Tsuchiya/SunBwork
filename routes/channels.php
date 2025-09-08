@@ -17,5 +17,11 @@ Broadcast::channel('messages.{userId}', function ($user, $userId) {
 });
 Broadcast::channel('chatroom.{roomId}', function ($user, $roomId) {
     // ルーム参加者ならtrue
-    return \App\Models\ChatRoom::find($roomId)?->users->contains($user->id);
+    try {
+        $room = \App\Models\ChatRoom::find($roomId);
+    } catch (\Throwable $e) {
+        // テーブルが存在しない等のDBエラーはここで吸収して false を返す
+        return false;
+    }
+    return $room?->users?->contains($user->id) ?? false;
 });

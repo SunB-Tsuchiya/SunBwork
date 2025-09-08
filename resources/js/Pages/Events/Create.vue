@@ -75,11 +75,8 @@ console.log('[Create.vue] initial form:', {
 
 onMounted(async () => {
     try {
-        console.log('[Create.vue] onMounted props.job:', props.job);
         await nextTick();
         const editor = document.querySelector('.ql-editor');
-        console.log('[Create.vue] ql-editor innerHTML:', editor ? editor.innerHTML : null);
-        console.log('[Create.vue] ql-editor textContent:', editor ? editor.textContent : null);
         // If editor appears empty, force a brief update to content to trigger Quill refresh
         if (editor && (!editor.textContent || editor.textContent.trim() === '')) {
             console.log('[Create.vue] ql-editor empty — forcing content update');

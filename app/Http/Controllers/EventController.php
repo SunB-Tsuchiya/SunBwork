@@ -53,7 +53,13 @@ class EventController extends Controller
         $date = request('date');
         $query = Event::where('user_id', Auth::id());
         if ($date) {
-            $query->whereDate('start', $date);
+            // Some environments use `starts_at`/`ends_at` in the DB while older code
+            // references `start`/`end`. Prefer the canonical DB column when present.
+            if (Schema::hasColumn('events', 'starts_at')) {
+                $query->whereDate('starts_at', $date);
+            } else {
+                $query->whereDate('start', $date);
+            }
         }
         $events = $query->get();
         return response()->json($events);
@@ -104,13 +110,24 @@ class EventController extends Controller
         // 開始・終了時刻を結合
         $data['start'] = $data['date'] . ' ' . $data['startHour'] . ':' . $data['startMinute'] . ':00';
         $data['end'] = $data['date'] . ' ' . $data['endHour'] . ':' . $data['endMinute'] . ':00';
+
+        // If the `events` table has a `date` column, ensure it's present; otherwise avoid
+        // persisting `date` to prevent SQL errors on schemas that don't include it.
+        if (Schema::hasColumn('events', 'date')) {
+            $data['date'] = $data['date'] ?? date('Y-m-d', strtotime($data['start']));
+        } else {
+            unset($data['date']);
+        }
+
         $event = new Event();
         $event->user_id = Auth::id();
         $event->title = $data['title'];
         $event->description = $data['description'];
         $event->start = $data['start'];
         $event->end = $data['end'];
-        $event->date = $data['date'];
+        if (isset($data['date'])) {
+            $event->date = $data['date'];
+        }
         $event->save();
 
         // If this event was created for a job assignment, mark that assignment as scheduled.
@@ -139,6 +156,11 @@ class EventController extends Controller
                         // If there's a boolean scheduled flag, set it true
                         if (Schema::hasColumn('project_job_assignments', 'scheduled')) {
                             $assignment->scheduled = true;
+                        }
+                        // If the assignments table keeps a separate `date` column, and it's empty,
+                        // populate it with the event's date portion so calendar-based flows have a date.
+                        if (Schema::hasColumn('project_job_assignments', 'date') && empty($assignment->date)) {
+                            $assignment->date = date('Y-m-d', strtotime($event->start));
                         }
                         $assignment->save();
                     });
@@ -297,6 +319,14 @@ class EventController extends Controller
         $data['user_id'] = Auth::id();
         $data['start'] = date('Y-m-d H:i:00', strtotime($data['date'] . ' ' . $data['startHour'] . ':' . $data['startMinute']));
         $data['end'] = date('Y-m-d H:i:00', strtotime($data['date'] . ' ' . $data['endHour'] . ':' . $data['endMinute']));
+        // Ensure we only include `date` if the column exists; otherwise remove it to avoid SQL errors.
+        if (Schema::hasColumn('events', 'date')) {
+            $data['date'] = $data['date'] ?? date('Y-m-d', strtotime($data['start']));
+        } else {
+            if (array_key_exists('date', $data)) {
+                unset($data['date']);
+            }
+        }
         Log::debug('Start/End generated', ['start' => $data['start'], 'end' => $data['end']]);
         Log::debug('Event before update', $event->toArray());
         $event->update($data);
