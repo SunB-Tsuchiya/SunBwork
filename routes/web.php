@@ -314,6 +314,15 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
             'update' => 'project_team_members.update',
             'destroy' => 'project_team_members.destroy',
         ]);
+
+        // Coordinator Work Items (Workflows / tasks)
+        Route::get('work-items', [App\Http\Controllers\Coordinator\WorkItemController::class, 'index'])->name('work_items.index');
+        Route::get('work-items/create', [App\Http\Controllers\Coordinator\WorkItemController::class, 'create'])->name('work_items.create');
+        Route::post('work-items/{work_item}/apply-preset', [App\Http\Controllers\Coordinator\WorkItemController::class, 'applyPreset'])->name('work_items.apply_preset');
+        // API endpoint to save sort order for lookup tables (types, sizes, stages)
+        Route::post('work-items/lookups/save-order', [App\Http\Controllers\Coordinator\WorkItemController::class, 'saveLookupOrder'])->name('work_items.lookups.save_order');
+        Route::post('work-items/lookups', [App\Http\Controllers\Coordinator\WorkItemController::class, 'storeLookup'])->name('work_items.lookups.store');
+        Route::match(['put', 'patch'], 'work-items/lookups/{table}/{id}', [App\Http\Controllers\Coordinator\WorkItemController::class, 'updateLookup'])->name('work_items.lookups.update');
     });
 
 
