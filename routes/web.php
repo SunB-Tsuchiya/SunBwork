@@ -270,6 +270,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('project_jobs/{projectJob}/assignments/{assignment}/edit', [App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'edit'])->name('project_jobs.assignments.edit');
         Route::post('project_jobs/{projectJob}/assignments', [App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'store'])->name('project_jobs.assignments.store');
         Route::put('project_jobs/{projectJob}/assignments/{assignment}', [App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'update'])->name('project_jobs.assignments.update');
+        Route::delete('project_jobs/{projectJob}/assignments/{assignment}', [App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'destroy'])->name('project_jobs.assignments.destroy');
 
         // Shortcut route used by the ProjectJobs edit/create pages to open the
         // ProjectSchedules calendar for a specific project (passes project_job_id
@@ -316,13 +317,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         ]);
 
         // Coordinator Work Items (Workflows / tasks)
-        Route::get('work-items', [App\Http\Controllers\Coordinator\WorkItemController::class, 'index'])->name('work_items.index');
-        Route::get('work-items/create', [App\Http\Controllers\Coordinator\WorkItemController::class, 'create'])->name('work_items.create');
-        Route::post('work-items/{work_item}/apply-preset', [App\Http\Controllers\Coordinator\WorkItemController::class, 'applyPreset'])->name('work_items.apply_preset');
-        // API endpoint to save sort order for lookup tables (types, sizes, stages)
-        Route::post('work-items/lookups/save-order', [App\Http\Controllers\Coordinator\WorkItemController::class, 'saveLookupOrder'])->name('work_items.lookups.save_order');
-        Route::post('work-items/lookups', [App\Http\Controllers\Coordinator\WorkItemController::class, 'storeLookup'])->name('work_items.lookups.store');
-        Route::match(['put', 'patch'], 'work-items/lookups/{table}/{id}', [App\Http\Controllers\Coordinator\WorkItemController::class, 'updateLookup'])->name('work_items.lookups.update');
+        // (work-items routes removed - lookups are provided by assignment controllers)
     });
 
 

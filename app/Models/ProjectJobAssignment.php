@@ -22,6 +22,13 @@ class ProjectJobAssignment extends Model
         'desired_time',
         'assigned',
         'accepted',
+        // lookup fields migrated from WorkItem
+        'size_id',
+        'work_item_type_id',
+        'stage_id',
+        'status_id',
+        'company_id',
+        'department_id',
     ];
 
     protected $casts = [
@@ -50,5 +57,36 @@ class ProjectJobAssignment extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    // Relations to lookup models (optional)
+    public function workItemType()
+    {
+        return $this->belongsTo(WorkItemType::class, 'work_item_type_id');
+    }
+
+    public function size()
+    {
+        return $this->belongsTo(Size::class, 'size_id');
+    }
+
+    public function stage()
+    {
+        return $this->belongsTo(Stage::class, 'stage_id');
+    }
+
+    public function statusModel()
+    {
+        return $this->belongsTo(Status::class, 'status_id');
+    }
+
+    public function company()
+    {
+        return $this->belongsTo(Company::class, 'company_id');
+    }
+
+    public function department()
+    {
+        return $this->belongsTo(Department::class, 'department_id');
     }
 }

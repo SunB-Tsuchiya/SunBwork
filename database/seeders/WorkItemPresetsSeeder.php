@@ -59,9 +59,19 @@ class WorkItemPresetsSeeder extends Seeder
                 continue;
             }
 
-            DB::table('work_items')->updateOrInsert([
+            DB::table('work_item_presets')->updateOrInsert([
                 'title' => $p['title']
-            ], $p + ['created_at' => now(), 'updated_at' => now()]);
+            ], [
+                'description' => $p['description'] ?? null,
+                'work_item_type_id' => $p['work_item_type_id'] ?? null,
+                'size_id' => $p['size_id'] ?? null,
+                'pages' => $p['pages'] ?? null,
+                'quantity' => $p['quantity'] ?? null,
+                'estimated_minutes' => $p['estimated_minutes'] ?? null,
+                'status' => $p['status'] ?? 'preset',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
         }
     }
 }

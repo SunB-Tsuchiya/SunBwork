@@ -6,19 +6,64 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 use App\Models\ProjectJob;
 use App\Models\ProjectJobAssignment;
 
 class ProjectJobAssignmentsController extends Controller
 {
-    public function index(ProjectJob $projectJob)
+    public function index(Request $request, ProjectJob $projectJob)
     {
-        // Guard ordering by desired_end_date in case the column does not exist in the current DB
-        $query = $projectJob->projectJobAssignments()->with('user');
-        if (Schema::hasColumn('project_job_assignments', 'desired_end_date')) {
-            $query = $query->orderBy('desired_end_date', 'asc');
+        // pagination and sorting
+        $perPage = 15;
+        $allowedSorts = [
+            'desired_start_date',
+            'title',
+            'user', // special-case: users.name
+            'desired_end_date',
+            'estimated_hours',
+            'assigned',
+        ];
+
+        $sortBy = $request->query('sort_by', 'desired_start_date');
+        $sortDir = strtolower($request->query('sort_dir', 'desc')) === 'asc' ? 'asc' : 'desc';
+        if (!in_array($sortBy, $allowedSorts)) {
+            $sortBy = 'desired_start_date';
         }
-        $assignments = $query->get()->map(function ($a) {
+
+        // base query
+        $query = $projectJob->projectJobAssignments()->with('user');
+
+        // search
+        $q = $request->query('q', null);
+        if ($q) {
+            $query = $query->where(function ($sub) use ($q) {
+                $sub->where('title', 'like', '%' . $q . '%')
+                    ->orWhere('detail', 'like', '%' . $q . '%');
+            })->orWhereHas('user', function ($uq) use ($q) {
+                $uq->where('name', 'like', '%' . $q . '%');
+            });
+        }
+
+        // apply sorting
+        if ($sortBy === 'user') {
+            // sort by user name
+            $query = $query->leftJoin('users', 'project_job_assignments.user_id', '=', 'users.id')
+                ->select('project_job_assignments.*')
+                ->orderBy('users.name', $sortDir);
+        } else {
+            if (Schema::hasColumn('project_job_assignments', $sortBy)) {
+                $query = $query->orderBy($sortBy, $sortDir);
+            } else {
+                // fallback
+                $query = $query->orderBy('desired_start_date', 'desc');
+            }
+        }
+
+        $paginator = $query->paginate($perPage)->withQueryString();
+
+        // transform items
+        $paginator->getCollection()->transform(function ($a) {
             return [
                 'id' => $a->id,
                 'project_job_id' => $a->project_job_id,
@@ -38,7 +83,10 @@ class ProjectJobAssignmentsController extends Controller
 
         return Inertia::render('Coordinator/ProjectJobs/JobAssign/Index', [
             'projectJob' => $projectJob,
-            'assignments' => $assignments,
+            'assignments' => $paginator,
+            'sort_by' => $sortBy,
+            'sort_dir' => $sortDir,
+            'q' => $q,
         ]);
     }
 
@@ -51,11 +99,52 @@ class ProjectJobAssignmentsController extends Controller
             return $item['id'] !== null;
         })->values();
 
+        // prepare companies list based on user role (superadmin/admin can select companies/departments)
+        $companies = collect();
+        $userRole = null;
+        $userCompanyId = null;
+        $userDepartmentId = null;
+        $user = request()->user();
+        if ($user) {
+            $userRole = $user->user_role ?? null;
+            $userCompanyId = $user->company_id ?? null;
+            $userDepartmentId = $user->department_id ?? null;
+        }
+
+        if ($userRole === 'superadmin') {
+            $companies = \App\Models\Company::with(['departments' => function ($q) {
+                $q->orderBy('sort_order');
+            }])->orderBy('name')->get();
+        } elseif ($userRole === 'admin') {
+            if ($userCompanyId) {
+                $companies = \App\Models\Company::where('id', $userCompanyId)->with(['departments' => function ($q) {
+                    $q->orderBy('sort_order');
+                }])->get();
+            }
+        } else {
+            // leader/coordinator: no companies list (they only see their department)
+            $companies = collect();
+        }
+
+        // lookup lists for modal (types, sizes, stages, statuses)
+        $types = \App\Models\WorkItemType::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'company_id', 'department_id']);
+        $sizes = \App\Models\Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'width', 'height', 'unit', 'company_id', 'department_id']);
+        $stages = \App\Models\Stage::orderBy('sort_order')->orderBy('order_index')->get(['id', 'name', 'company_id', 'department_id']);
+        $statuses = \App\Models\Status::orderBy('sort_order')->get(['id', 'name', 'slug', 'company_id', 'department_id']);
+
         return Inertia::render('Coordinator/ProjectJobs/JobAssign/Edit', [
             'projectJob' => $projectJob,
             'members' => $members,
             'assignments' => [],
             'editMode' => false,
+            'companies' => $companies,
+            'types' => $types,
+            'sizes' => $sizes,
+            'stages' => $stages,
+            'statuses' => $statuses,
+            'user_role' => $userRole,
+            'user_company_id' => $userCompanyId,
+            'user_department_id' => $userDepartmentId,
         ]);
     }
 
@@ -83,11 +172,51 @@ class ProjectJobAssignmentsController extends Controller
             'accepted' => (bool) $a->accepted,
         ];
 
+        // prepare companies list based on user role (same rules as WorkItemController)
+        $companies = collect();
+        $userRole = null;
+        $userCompanyId = null;
+        $userDepartmentId = null;
+        $user = request()->user();
+        if ($user) {
+            $userRole = $user->user_role ?? null;
+            $userCompanyId = $user->company_id ?? null;
+            $userDepartmentId = $user->department_id ?? null;
+        }
+
+        if ($userRole === 'superadmin') {
+            $companies = \App\Models\Company::with(['departments' => function ($q) {
+                $q->orderBy('sort_order');
+            }])->orderBy('name')->get();
+        } elseif ($userRole === 'admin') {
+            if ($userCompanyId) {
+                $companies = \App\Models\Company::where('id', $userCompanyId)->with(['departments' => function ($q) {
+                    $q->orderBy('sort_order');
+                }])->get();
+            }
+        } else {
+            $companies = collect();
+        }
+
+        // lookup lists for modal (types, sizes, stages, statuses)
+        $types = \App\Models\WorkItemType::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'company_id', 'department_id']);
+        $sizes = \App\Models\Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'width', 'height', 'unit', 'company_id', 'department_id']);
+        $stages = \App\Models\Stage::orderBy('sort_order')->orderBy('order_index')->get(['id', 'name', 'company_id', 'department_id']);
+        $statuses = \App\Models\Status::orderBy('sort_order')->get(['id', 'name', 'slug', 'company_id', 'department_id']);
+
         return Inertia::render('Coordinator/ProjectJobs/JobAssign/Edit', [
             'projectJob' => $projectJob,
             'members' => $members,
             'assignments' => [$assignmentPayload],
             'editMode' => true,
+            'companies' => $companies,
+            'types' => $types,
+            'sizes' => $sizes,
+            'stages' => $stages,
+            'statuses' => $statuses,
+            'user_role' => $userRole,
+            'user_company_id' => $userCompanyId,
+            'user_department_id' => $userDepartmentId,
         ]);
     }
 
@@ -147,6 +276,15 @@ class ProjectJobAssignmentsController extends Controller
             'assignments.*.desired_end_date' => 'nullable|date',
             'assignments.*.desired_time' => 'nullable|date_format:H:i',
             'assignments.*.user_id' => 'nullable|exists:users,id',
+            // lookup fields moved from WorkItem: clients should send these lookup ids directly on the assignment payload
+            'assignments.*.work_item_type_id' => 'nullable|exists:work_item_types,id',
+            'assignments.*.size_id' => 'nullable|exists:sizes,id',
+            'assignments.*.status_id' => 'nullable|exists:statuses,id',
+            'assignments.*.company_id' => 'nullable|exists:companies,id',
+            'assignments.*.department_id' => 'nullable|exists:departments,id',
+            'assignments.*.stage_id' => 'nullable|exists:stages,id',
+            'assignments.*.title' => 'nullable|string|max:255',
+            'assignments.*.description' => 'nullable|string',
         ]);
 
         foreach ($data['assignments'] as $a) {
@@ -166,18 +304,39 @@ class ProjectJobAssignmentsController extends Controller
                 }
             }
 
-            ProjectJobAssignment::create([
-                'project_job_id' => $projectJob->id,
-                'user_id' => $a['user_id'] ?? null,
-                'title' => $a['title'],
-                'detail' => $a['detail'] ?? null,
-                'difficulty' => $a['difficulty'],
-                'desired_start_date' => $a['desired_start_date'] ?? null,
-                'desired_end_date' => $a['desired_end_date'] ?? null,
-                'desired_time' => $a['desired_time'] ?? null,
-                'estimated_hours' => $a['estimated_hours'] ?? null,
-            ]);
+            // Create assignment and associated WorkItem in a transaction
+            DB::transaction(function () use ($projectJob, $a) {
+                $assignment = ProjectJobAssignment::create([
+                    'project_job_id' => $projectJob->id,
+                    'user_id' => $a['user_id'] ?? null,
+                    'title' => $a['title'],
+                    'detail' => $a['detail'] ?? null,
+                    'difficulty' => $a['difficulty'],
+                    'desired_start_date' => $a['desired_start_date'] ?? null,
+                    'desired_end_date' => $a['desired_end_date'] ?? null,
+                    'desired_time' => $a['desired_time'] ?? null,
+                    'estimated_hours' => $a['estimated_hours'] ?? null,
+                ]);
+
+                // previously we created a separate WorkItem here; now assignment stores type/size/stage/status/company/department directly
+                // No-op for WorkItem creation - clients should send lookup ids on assignment payload instead.
+            });
         }
+
+        return redirect()->route('coordinator.project_jobs.assignments.index', ['projectJob' => $projectJob->id]);
+    }
+
+    public function destroy(ProjectJob $projectJob, ProjectJobAssignment $assignment)
+    {
+        // ensure assignment belongs to the provided project
+        if ((int) $assignment->project_job_id !== (int) $projectJob->id) {
+            abort(404);
+        }
+
+        DB::transaction(function () use ($assignment) {
+            // simply delete the assignment. any historical WorkItem rows were dropped by migration.
+            $assignment->delete();
+        });
 
         return redirect()->route('coordinator.project_jobs.assignments.index', ['projectJob' => $projectJob->id]);
     }

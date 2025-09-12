@@ -11,7 +11,7 @@ import LeaderNavigationTabs from '@/Components/Tabs/LeaderNavigationTabs.vue';
 import SuperAdminNavigationTabs from '@/Components/Tabs/SuperAdminNavigationTabs.vue';
 import UserNavigationTabs from '@/Components/Tabs/UserNavigationTabs.vue';
 import TeamSwitcher from '@/Components/TeamSwitcher.vue';
-import Toast from '@/Components/Toast.vue';
+import ToastContainer from '@/Components/ToastContainer.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ref } from 'vue';
 
@@ -503,7 +503,7 @@ const getTopTabActive = () => {
             </header>
             <!-- Page Content -->
             <!-- Toasts -->
-            <Toast />
+            <ToastContainer />
             <div class="py-12">
                 <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
                     <!-- Role-specific tabs (centralized for Admin/SuperAdmin to avoid duplicates) -->

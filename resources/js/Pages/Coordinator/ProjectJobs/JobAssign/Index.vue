@@ -6,22 +6,27 @@
 
         <div class="mx-auto max-w-6xl rounded bg-white p-6 shadow">
             <h1 class="mb-4 text-2xl font-bold">ジョブ割り当て一覧：{{ projectJob.name }}</h1>
+                <div class="mb-4 flex items-center gap-2">
+                    <input v-model="page.props.q_model" @keyup.enter="search" placeholder="タイトル/詳細/担当で検索" class="w-72 rounded border px-3 py-2 text-sm" />
+                    <button class="rounded bg-blue-600 px-3 py-2 text-white" @click.prevent="search">検索</button>
+                    <button class="ml-2 rounded border px-3 py-2" @click.prevent="clearSearch">クリア</button>
+                </div>
             <div class="overflow-x-auto">
                 <table class="min-w-full border">
                     <thead>
                         <tr class="bg-gray-100">
-                            <th class="border px-4 py-2">希望日</th>
-                            <th class="border px-4 py-2">タイトル</th>
-                            <th class="border px-4 py-2">担当</th>
-                            <th class="border px-4 py-2">終了希望日 / 時刻</th>
-                            <th class="border px-4 py-2">見積時間</th>
+                            <th class="border px-4 py-2 cursor-pointer" @click.prevent="changeSort('desired_start_date')">希望日 <SortIcon :active="sortBy === 'desired_start_date'" :dir="sortDir" /></th>
+                            <th class="border px-4 py-2 cursor-pointer" @click.prevent="changeSort('title')">タイトル <SortIcon :active="sortBy === 'title'" :dir="sortDir" /></th>
+                            <th class="border px-4 py-2 cursor-pointer" @click.prevent="changeSort('user')">担当 <SortIcon :active="sortBy === 'user'" :dir="sortDir" /></th>
+                            <th class="border px-4 py-2 cursor-pointer" @click.prevent="changeSort('desired_end_date')">終了希望日 / 時刻 <SortIcon :active="sortBy === 'desired_end_date'" :dir="sortDir" /></th>
+                            <th class="border px-4 py-2 cursor-pointer" @click.prevent="changeSort('estimated_hours')">見積時間 <SortIcon :active="sortBy === 'estimated_hours'" :dir="sortDir" /></th>
                             <th class="border px-4 py-2">依頼</th>
-                            <th class="border px-4 py-2">Status</th>
+                            <th class="border px-4 py-2 cursor-pointer" @click.prevent="changeSort('assigned')">Status <SortIcon :active="sortBy === 'assigned'" :dir="sortDir" /></th>
                             <th class="border px-4 py-2">操作</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="a in assignments" :key="a.id" class="hover:bg-gray-50">
+                        <tr v-for="a in assignments.data" :key="a.id" class="hover:bg-gray-50">
                             <td class="border px-4 py-2">{{ a.desired_start_date || '-' }}</td>
                             <td class="border px-4 py-2">{{ a.title }}</td>
                             <td class="border px-4 py-2">{{ a.user?.name || '-' }}</td>
@@ -35,19 +40,30 @@
                             <td class="border px-4 py-2">
                                 <button class="rounded bg-blue-500 px-3 py-1 text-white" @click.prevent="sendRequest(a)">発信</button>
                             </td>
-                            <td class="border px-4 py-2">
-                                {{ statusText(a) }}
-                            </td>
+                            <td class="border px-4 py-2">{{ statusText(a) }}</td>
                             <td class="border px-4 py-2">
                                 <Link
                                     :href="route('coordinator.project_jobs.assignments.edit', { projectJob: projectJob.id, assignment: a.id })"
                                     class="rounded bg-yellow-500 px-3 py-1 text-white"
                                     >編集</Link
                                 >
+                                <button type="button" class="ml-2 rounded bg-red-500 px-3 py-1 text-white" @click.prevent="deleteAssignment(a)">
+                                    削除
+                                </button>
                             </td>
                         </tr>
                     </tbody>
                 </table>
+            </div>
+
+            <!-- pagination -->
+            <div class="mt-4 flex items-center justify-between">
+                <div class="text-sm text-gray-600">全 {{ assignments.total }} 件</div>
+                <div class="flex items-center space-x-2">
+                    <button :disabled="!assignments.prev_page_url" @click.prevent="goto(assignments.prev_page_url)" class="rounded border px-3 py-1 disabled:opacity-50">前へ</button>
+                    <div class="text-sm">{{ assignments.current_page }} / {{ assignments.last_page }}</div>
+                    <button :disabled="!assignments.next_page_url" @click.prevent="goto(assignments.next_page_url)" class="rounded border px-3 py-1 disabled:opacity-50">次へ</button>
+                </div>
             </div>
             <div class="mt-4">
                 <Link
@@ -63,8 +79,58 @@
 
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Link, router } from '@inertiajs/vue3';
-const { projectJob, assignments } = defineProps({ projectJob: Object, assignments: Array });
+import { Link, router, usePage } from '@inertiajs/vue3';
+import { h } from 'vue';
+const { projectJob, assignments } = defineProps({ projectJob: Object, assignments: Object });
+const page = usePage();
+// local search model bound to server-provided q
+page.props.q_model = page.props.q || '';
+
+// reactive sort state from server-provided props
+const sortBy = page.props.sort_by || 'desired_start_date';
+const sortDir = page.props.sort_dir || 'desc';
+
+function SortIcon({ active, dir }) {
+    if (!active) return h('span', { class: 'opacity-30' }, '↕');
+    return dir === 'asc' ? h('span', { class: 'inline-block' }, '↑') : h('span', { class: 'inline-block' }, '↓');
+}
+
+function changeSort(column) {
+    let dir = 'desc';
+    if (sortBy === column) {
+        dir = sortDir === 'desc' ? 'asc' : 'desc';
+    }
+    // navigate with query params
+    router.get(route('coordinator.project_jobs.assignments.index', { projectJob: projectJob.id }), { sort_by: column, sort_dir: dir, q: page.props.q_model }, { preserveState: false, replace: true });
+}
+
+function goto(url) {
+    if (!url) return;
+    router.visit(url, { preserveState: false });
+}
+
+function search() {
+    router.get(route('coordinator.project_jobs.assignments.index', { projectJob: projectJob.id }), { q: page.props.q_model, sort_by: sortBy, sort_dir: sortDir }, { preserveState: false, replace: false });
+}
+
+function clearSearch() {
+    page.props.q_model = '';
+    search();
+}
+
+function deleteAssignment(a) {
+    if (!confirm('この割当を本当に削除しますか？この操作は取り消せません。')) return;
+    router.delete(route('coordinator.project_jobs.assignments.destroy', { projectJob: projectJob.id, assignment: a.id }), {
+        onSuccess: () => {
+            // refresh the page data
+            router.reload();
+        },
+        onError: (errors) => {
+            console.error('deleteAssignment error', errors);
+            alert('削除に失敗しました。詳細はコンソールを確認してください。');
+        },
+    });
+}
 
 function formatTime(t) {
     if (!t) return '';

@@ -1,0 +1,30 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('assignments', function (Blueprint $table) {
+            $table->id();
+            // department_id must reference departments table
+            $table->foreignId('department_id')->constrained()->onDelete('cascade');
+            $table->string('name');
+            $table->string('code'); // 'manager', 'leader', 'member'など
+            $table->text('description')->nullable();
+            $table->integer('sort_order')->default(0);
+            $table->boolean('active')->default(true);
+            $table->timestamps();
+
+            $table->unique(['department_id', 'code']);
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('assignments');
+    }
+};

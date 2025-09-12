@@ -120,7 +120,7 @@ async function submit() {
         let res;
         // if edit mode, call update endpoint
         if (props.mode === 'edit' && props.item && props.item.id) {
-            res = await fetch(route('coordinator.work_items.lookups.update', { table: table, id: props.item.id }), {
+            res = await fetch(route('coordinator.assignments.lookups.update', { table: table, id: props.item.id }), {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
@@ -130,7 +130,7 @@ async function submit() {
                 body: JSON.stringify(payload),
             });
         } else {
-            res = await fetch(route('coordinator.work_items.lookups.store'), {
+            res = await fetch(route('coordinator.assignments.lookups.store'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
