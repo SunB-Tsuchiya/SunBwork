@@ -28,6 +28,15 @@ return new class extends Migration
 
             $table->boolean('assigned')->default(false);
             $table->boolean('accepted')->default(false);
+            $table->boolean('scheduled')->default(false);
+
+            // Lookup columns (consolidated from multiple alter migrations)
+            $table->unsignedBigInteger('size_id')->nullable()->index();
+            $table->unsignedBigInteger('work_item_type_id')->nullable()->index();
+            $table->unsignedBigInteger('stage_id')->nullable()->index();
+            $table->unsignedBigInteger('status_id')->nullable()->index();
+            $table->unsignedBigInteger('company_id')->nullable()->index();
+            $table->unsignedBigInteger('department_id')->nullable()->index();
 
             $table->timestamps();
         });

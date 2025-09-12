@@ -10,7 +10,9 @@ return new class extends Migration
     {
         Schema::create('work_item_stage_entries', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('work_item_id')->constrained('work_items')->cascadeOnDelete();
+            // Instead of tightly coupling to a removed work_items table, store optional foreign ids
+            $table->unsignedBigInteger('work_item_id')->nullable()->index();
+            $table->unsignedBigInteger('project_job_assignment_id')->nullable()->index();
             $table->foreignId('stage_id')->constrained('stages')->cascadeOnDelete();
             $table->foreignId('performed_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('started_at')->nullable();
