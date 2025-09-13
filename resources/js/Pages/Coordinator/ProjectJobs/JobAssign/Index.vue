@@ -6,22 +6,39 @@
 
         <div class="mx-auto max-w-6xl rounded bg-white p-6 shadow">
             <h1 class="mb-4 text-2xl font-bold">ジョブ割り当て一覧：{{ projectJob.name }}</h1>
-                <div class="mb-4 flex items-center gap-2">
-                    <input v-model="page.props.q_model" @keyup.enter="search" placeholder="タイトル/詳細/担当で検索" class="w-72 rounded border px-3 py-2 text-sm" />
-                    <button class="rounded bg-blue-600 px-3 py-2 text-white" @click.prevent="search">検索</button>
-                    <button class="ml-2 rounded border px-3 py-2" @click.prevent="clearSearch">クリア</button>
-                </div>
+            <div class="mb-4 flex items-center gap-2">
+                <input
+                    v-model="page.props.q_model"
+                    @keyup.enter="search"
+                    placeholder="タイトル/詳細/担当で検索"
+                    class="w-72 rounded border px-3 py-2 text-sm"
+                />
+                <button class="rounded bg-blue-600 px-3 py-2 text-white" @click.prevent="search">検索</button>
+                <button class="ml-2 rounded border px-3 py-2" @click.prevent="clearSearch">クリア</button>
+            </div>
             <div class="overflow-x-auto">
                 <table class="min-w-full border">
                     <thead>
                         <tr class="bg-gray-100">
-                            <th class="border px-4 py-2 cursor-pointer" @click.prevent="changeSort('desired_start_date')">希望日 <SortIcon :active="sortBy === 'desired_start_date'" :dir="sortDir" /></th>
-                            <th class="border px-4 py-2 cursor-pointer" @click.prevent="changeSort('title')">タイトル <SortIcon :active="sortBy === 'title'" :dir="sortDir" /></th>
-                            <th class="border px-4 py-2 cursor-pointer" @click.prevent="changeSort('user')">担当 <SortIcon :active="sortBy === 'user'" :dir="sortDir" /></th>
-                            <th class="border px-4 py-2 cursor-pointer" @click.prevent="changeSort('desired_end_date')">終了希望日 / 時刻 <SortIcon :active="sortBy === 'desired_end_date'" :dir="sortDir" /></th>
-                            <th class="border px-4 py-2 cursor-pointer" @click.prevent="changeSort('estimated_hours')">見積時間 <SortIcon :active="sortBy === 'estimated_hours'" :dir="sortDir" /></th>
+                            <th class="cursor-pointer border px-4 py-2" @click.prevent="changeSort('desired_start_date')">
+                                希望日 <SortIcon :active="sortBy === 'desired_start_date'" :dir="sortDir" />
+                            </th>
+                            <th class="cursor-pointer border px-4 py-2" @click.prevent="changeSort('title')">
+                                タイトル <SortIcon :active="sortBy === 'title'" :dir="sortDir" />
+                            </th>
+                            <th class="cursor-pointer border px-4 py-2" @click.prevent="changeSort('user')">
+                                担当 <SortIcon :active="sortBy === 'user'" :dir="sortDir" />
+                            </th>
+                            <th class="cursor-pointer border px-4 py-2" @click.prevent="changeSort('desired_end_date')">
+                                終了希望日 / 時刻 <SortIcon :active="sortBy === 'desired_end_date'" :dir="sortDir" />
+                            </th>
+                            <th class="cursor-pointer border px-4 py-2" @click.prevent="changeSort('estimated_hours')">
+                                見積時間 <SortIcon :active="sortBy === 'estimated_hours'" :dir="sortDir" />
+                            </th>
                             <th class="border px-4 py-2">依頼</th>
-                            <th class="border px-4 py-2 cursor-pointer" @click.prevent="changeSort('assigned')">Status <SortIcon :active="sortBy === 'assigned'" :dir="sortDir" /></th>
+                            <th class="cursor-pointer border px-4 py-2" @click.prevent="changeSort('assigned')">
+                                Status <SortIcon :active="sortBy === 'assigned'" :dir="sortDir" />
+                            </th>
                             <th class="border px-4 py-2">操作</th>
                         </tr>
                     </thead>
@@ -38,7 +55,13 @@
                             </td>
                             <td class="border px-4 py-2">{{ formatEstimatedHours(a.estimated_hours) }}</td>
                             <td class="border px-4 py-2">
-                                <button class="rounded bg-blue-500 px-3 py-1 text-white" @click.prevent="sendRequest(a)">発信</button>
+                                <button
+                                    :disabled="a.assigned"
+                                    @click.prevent="sendRequest(a)"
+                                    :class="['rounded px-3 py-1 text-white', a.assigned ? 'cursor-not-allowed bg-gray-400' : 'bg-blue-500']"
+                                >
+                                    {{ a.assigned ? '発信済み' : '発信' }}
+                                </button>
                             </td>
                             <td class="border px-4 py-2">{{ statusText(a) }}</td>
                             <td class="border px-4 py-2">
@@ -60,9 +83,21 @@
             <div class="mt-4 flex items-center justify-between">
                 <div class="text-sm text-gray-600">全 {{ assignments.total }} 件</div>
                 <div class="flex items-center space-x-2">
-                    <button :disabled="!assignments.prev_page_url" @click.prevent="goto(assignments.prev_page_url)" class="rounded border px-3 py-1 disabled:opacity-50">前へ</button>
+                    <button
+                        :disabled="!assignments.prev_page_url"
+                        @click.prevent="goto(assignments.prev_page_url)"
+                        class="rounded border px-3 py-1 disabled:opacity-50"
+                    >
+                        前へ
+                    </button>
                     <div class="text-sm">{{ assignments.current_page }} / {{ assignments.last_page }}</div>
-                    <button :disabled="!assignments.next_page_url" @click.prevent="goto(assignments.next_page_url)" class="rounded border px-3 py-1 disabled:opacity-50">次へ</button>
+                    <button
+                        :disabled="!assignments.next_page_url"
+                        @click.prevent="goto(assignments.next_page_url)"
+                        class="rounded border px-3 py-1 disabled:opacity-50"
+                    >
+                        次へ
+                    </button>
                 </div>
             </div>
             <div class="mt-4">
@@ -101,7 +136,11 @@ function changeSort(column) {
         dir = sortDir === 'desc' ? 'asc' : 'desc';
     }
     // navigate with query params
-    router.get(route('coordinator.project_jobs.assignments.index', { projectJob: projectJob.id }), { sort_by: column, sort_dir: dir, q: page.props.q_model }, { preserveState: false, replace: true });
+    router.get(
+        route('coordinator.project_jobs.assignments.index', { projectJob: projectJob.id }),
+        { sort_by: column, sort_dir: dir, q: page.props.q_model },
+        { preserveState: false, replace: true },
+    );
 }
 
 function goto(url) {
@@ -110,7 +149,11 @@ function goto(url) {
 }
 
 function search() {
-    router.get(route('coordinator.project_jobs.assignments.index', { projectJob: projectJob.id }), { q: page.props.q_model, sort_by: sortBy, sort_dir: sortDir }, { preserveState: false, replace: false });
+    router.get(
+        route('coordinator.project_jobs.assignments.index', { projectJob: projectJob.id }),
+        { q: page.props.q_model, sort_by: sortBy, sort_dir: sortDir },
+        { preserveState: false, replace: false },
+    );
 }
 
 function clearSearch() {
@@ -151,7 +194,8 @@ function formatEstimatedHours(h) {
 
 function statusText(a) {
     if (!a.assigned) return '未発信';
-    if (a.assigned && !a.accepted) return '送信中';
+    // assigned にフラグが立っていて accepted が false の場合は「送信済み」と表示
+    if (a.assigned && !a.accepted) return '送信済み';
     if (a.accepted) return '受諾';
     return '-';
 }

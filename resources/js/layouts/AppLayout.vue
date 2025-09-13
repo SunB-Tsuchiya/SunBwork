@@ -13,7 +13,7 @@ import UserNavigationTabs from '@/Components/Tabs/UserNavigationTabs.vue';
 import TeamSwitcher from '@/Components/TeamSwitcher.vue';
 import ToastContainer from '@/Components/ToastContainer.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 
 defineProps({
     title: String,
@@ -42,7 +42,7 @@ const logout = () => {
 };
 
 import { usePage } from '@inertiajs/vue3';
-import { onBeforeUnmount, onMounted, useSlots, ref as vueRef } from 'vue';
+import { onBeforeUnmount, onMounted, useSlots, ref as vueRef, watch } from 'vue';
 
 const page = usePage();
 // Keep `user` available for templates (many pages pass a `user` prop).
@@ -55,23 +55,95 @@ const authUser = page.props.auth && page.props.auth.user ? page.props.auth.user 
 const inboxCount = vueRef(0); // legacy placeholder
 const inboxToast = vueRef('');
 const unreadMessages = vueRef(page.props.user?.unread_messages_count || 0);
+// job-specific unread count provided by server when available
+const unreadJobMessages = vueRef(page.props.user?.unread_job_messages_count || 0);
+
+// keep reactive when Inertia page props update
+watch(
+    () => page.props.user && page.props.user.unread_job_messages_count,
+    (v) => {
+        unreadJobMessages.value = v || 0;
+    },
+);
+// compute a safe href for the Job link to avoid complex inline ternaries in template
+const jobLink = computed(() => {
+    try {
+        // Prefer the named Ziggy route for the JobBox index if available
+        if (typeof route === 'function' && route().has && route().has('project_jobs.index')) {
+            try {
+                return route('project_jobs.index');
+            } catch (e) {
+                // ignore and fall back to literal path
+            }
+        }
+
+        // Fallback to a literal path that maps to Pages/JobBox/Index.vue in the SPA router
+        return '/jobbox';
+    } catch (e) {
+        // final fallback
+    }
+
+    try {
+        return route('dashboard');
+    } catch (e) {
+        return '#';
+    }
+});
+// handle job link clicks with error trapping so we can surface the actual exception
+const handleJobClick = (e) => {
+    try {
+        const domHref = e.currentTarget.getAttribute('href');
+        const computedHref = jobLink && jobLink.value ? jobLink.value : jobLink;
+        console.debug('handleJobClick domHref:', domHref, 'computedHref:', computedHref);
+        // Let the browser handle the actual navigation (do not prevent default)
+    } catch (err) {
+        console.error('Error in handleJobClick (non-fatal):', err);
+        // swallow errors to avoid unwinding Vue native handler
+    }
+};
 let echoChannel = null;
 
 onMounted(() => {
+    console.debug('AppLayout jobLink (computed) =', jobLink && jobLink.value ? jobLink.value : jobLink);
+    try {
+        console.debug('AppLayout page.props.projectJob =', page.props.projectJob);
+    } catch (e) {
+        console.debug('AppLayout page.props.projectJob read failed', e);
+    }
+    try {
+        console.debug('AppLayout auth user =', page.props.auth && page.props.auth.user ? page.props.auth.user : null);
+    } catch (e) {
+        console.debug('AppLayout auth.user read failed', e);
+    }
     try {
         if (window.Echo && authUser && authUser.id) {
             // messages channel (primary notification source)
             window.Echo.private('messages.' + authUser.id).listen('MessageCreated', (e) => {
-                unreadMessages.value = (unreadMessages.value || 0) + 1;
+                // Only increment general unread messages for non-job messages
+                if (!e.is_job) {
+                    unreadMessages.value = (unreadMessages.value || 0) + 1;
+                }
                 const msg = (e.from_user_name ? e.from_user_name + 'さんからメールが届きました: ' : '新しいメール: ') + (e.subject || '(件名なし)');
                 window.dispatchEvent(new CustomEvent('message:received', { detail: { message: msg } }));
             });
-            // listen for reads to decrement unread count
+            // listen for reads to decrement general unread count
             window.Echo.private('messages.' + authUser.id).listen('MessageRead', (e) => {
-                // decrement but never below 0
                 try {
-                    unreadMessages.value = Math.max(0, (unreadMessages.value || 0) - 1);
-                    window.dispatchEvent(new CustomEvent('message:read', { detail: { message_id: e.message_id } }));
+                    if (!e.is_job) {
+                        unreadMessages.value = Math.max(0, (unreadMessages.value || 0) - 1);
+                        window.dispatchEvent(new CustomEvent('message:read', { detail: { message_id: e.message_id } }));
+                    }
+                } catch (err) {}
+            });
+
+            // job-specific channel: separate unread counter and events
+            window.Echo.private('jobmessages.' + authUser.id).listen('JobMessageCreated', (e) => {
+                // increment only the job-specific badge
+                unreadJobMessages.value = (unreadJobMessages.value || 0) + 1;
+            });
+            window.Echo.private('jobmessages.' + authUser.id).listen('JobMessageRead', (e) => {
+                try {
+                    unreadJobMessages.value = Math.max(0, (unreadJobMessages.value || 0) - 1);
                 } catch (err) {}
             });
         }
@@ -226,6 +298,17 @@ const getTopTabActive = () => {
                                         v-if="unreadMessages && unreadMessages > 0"
                                         class="ms-2 inline-flex items-center justify-center rounded-full bg-blue-500 px-2 py-0.5 text-xs text-white"
                                         >{{ unreadMessages }}</span
+                                    >
+                                </Link>
+                            </div>
+                            <!-- JobBox link -->
+                            <div class="relative ms-3 flex items-center">
+                                <Link :href="jobLink" class="flex items-center text-sm text-gray-600 hover:text-gray-800" @click="handleJobClick">
+                                    <span>ジョブ</span>
+                                    <span
+                                        v-if="unreadJobMessages && unreadJobMessages > 0"
+                                        class="ms-2 inline-flex items-center justify-center rounded-full bg-blue-500 px-2 py-0.5 text-xs text-white"
+                                        >{{ unreadJobMessages }}</span
                                     >
                                 </Link>
                             </div>

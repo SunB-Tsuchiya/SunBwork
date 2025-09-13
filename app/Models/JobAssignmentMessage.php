@@ -16,6 +16,7 @@ class JobAssignmentMessage extends Model
         'sender_id',
         'subject',
         'body',
+        'message_id',
         'attachments',
         'read_at',
     ];

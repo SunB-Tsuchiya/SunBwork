@@ -157,20 +157,6 @@ class ProjectJobAssignmentsController extends Controller
         })->values();
 
         $a = $assignment;
-        $assignmentPayload = [
-            'id' => $a->id,
-            'project_job_id' => $a->project_job_id,
-            'user_id' => $a->user_id,
-            'title' => $a->title,
-            'detail' => $a->detail,
-            'difficulty' => $a->difficulty,
-            'desired_start_date' => $a->desired_start_date ? $a->desired_start_date->format('Y-m-d') : null,
-            'desired_end_date' => $a->desired_end_date ? $a->desired_end_date->format('Y-m-d') : null,
-            'desired_time' => $a->desired_time,
-            'estimated_hours' => isset($a->estimated_hours) ? (float) $a->estimated_hours : null,
-            'assigned' => (bool) $a->assigned,
-            'accepted' => (bool) $a->accepted,
-        ];
 
         // prepare companies list based on user role (same rules as WorkItemController)
         $companies = collect();
@@ -204,6 +190,60 @@ class ProjectJobAssignmentsController extends Controller
         $stages = \App\Models\Stage::orderBy('sort_order')->orderBy('order_index')->get(['id', 'name', 'company_id', 'department_id']);
         $statuses = \App\Models\Status::orderBy('sort_order')->get(['id', 'name', 'slug', 'company_id', 'department_id']);
 
+        // build labels from lookups so the edit form can display current selection
+        $typeLabel = null;
+        $sizeLabel = null;
+        $stageLabel = null;
+        $statusLabel = null;
+        if ($a->work_item_type_id) {
+            $t = $types->firstWhere('id', $a->work_item_type_id);
+            if ($t) $typeLabel = 'type: ' . $t->name;
+        }
+        if ($a->size_id) {
+            $s = $sizes->firstWhere('id', $a->size_id);
+            if ($s) {
+                $sizeLabel = $s->name;
+                if (isset($s->width) && isset($s->height)) {
+                    $sizeLabel .= sprintf(' (%s×%s%s)', $s->width, $s->height, $s->unit ?? '');
+                }
+            }
+        }
+        if ($a->stage_id) {
+            $st = $stages->firstWhere('id', $a->stage_id);
+            if ($st) $stageLabel = $st->name;
+        }
+        if ($a->status_id) {
+            $stt = $statuses->firstWhere('id', $a->status_id);
+            if ($stt) $statusLabel = $stt->name;
+        }
+
+        $assignmentPayload = [
+            'id' => $a->id,
+            'project_job_id' => $a->project_job_id,
+            'user_id' => $a->user_id,
+            'title' => $a->title,
+            'detail' => $a->detail,
+            'difficulty' => $a->difficulty,
+            'desired_start_date' => $a->desired_start_date ? $a->desired_start_date->format('Y-m-d') : null,
+            'desired_end_date' => $a->desired_end_date ? $a->desired_end_date->format('Y-m-d') : null,
+            'desired_time' => $a->desired_time,
+            'estimated_hours' => isset($a->estimated_hours) ? (float) $a->estimated_hours : null,
+            'assigned' => (bool) $a->assigned,
+            'accepted' => (bool) $a->accepted,
+            // lookup ids migrated from WorkItem
+            'work_item_type_id' => $a->work_item_type_id,
+            'size_id' => $a->size_id,
+            'stage_id' => $a->stage_id,
+            'status_id' => $a->status_id,
+            'company_id' => $a->company_id,
+            'department_id' => $a->department_id,
+            // UX labels for display in the edit modal
+            'type_label' => $typeLabel,
+            'size_label' => $sizeLabel,
+            'stage_label' => $stageLabel,
+            'status_label' => $statusLabel,
+        ];
+
         return Inertia::render('Coordinator/ProjectJobs/JobAssign/Edit', [
             'projectJob' => $projectJob,
             'members' => $members,
@@ -231,6 +271,13 @@ class ProjectJobAssignmentsController extends Controller
             'desired_end_date' => 'nullable|date',
             'desired_time' => 'nullable|date_format:H:i',
             'user_id' => 'nullable|exists:users,id',
+            // lookup fields
+            'work_item_type_id' => 'nullable|exists:work_item_types,id',
+            'size_id' => 'nullable|exists:sizes,id',
+            'status_id' => 'nullable|exists:statuses,id',
+            'company_id' => 'nullable|exists:companies,id',
+            'department_id' => 'nullable|exists:departments,id',
+            'stage_id' => 'nullable|exists:stages,id',
         ]);
 
         // server-side logical validations
@@ -259,6 +306,13 @@ class ProjectJobAssignmentsController extends Controller
             'desired_end_date' => $data['desired_end_date'] ?? null,
             'desired_time' => $data['desired_time'] ?? null,
             'estimated_hours' => $data['estimated_hours'] ?? null,
+            // preserve lookup fields when updating
+            'work_item_type_id' => $data['work_item_type_id'] ?? null,
+            'size_id' => $data['size_id'] ?? null,
+            'stage_id' => $data['stage_id'] ?? null,
+            'status_id' => $data['status_id'] ?? null,
+            'company_id' => $data['company_id'] ?? null,
+            'department_id' => $data['department_id'] ?? null,
         ]);
 
         return redirect()->route('coordinator.project_jobs.assignments.index', ['projectJob' => $projectJob->id]);
@@ -316,6 +370,13 @@ class ProjectJobAssignmentsController extends Controller
                     'desired_end_date' => $a['desired_end_date'] ?? null,
                     'desired_time' => $a['desired_time'] ?? null,
                     'estimated_hours' => $a['estimated_hours'] ?? null,
+                    // store lookup fields migrated from WorkItem
+                    'work_item_type_id' => $a['work_item_type_id'] ?? null,
+                    'size_id' => $a['size_id'] ?? null,
+                    'stage_id' => $a['stage_id'] ?? null,
+                    'status_id' => $a['status_id'] ?? null,
+                    'company_id' => $a['company_id'] ?? null,
+                    'department_id' => $a['department_id'] ?? null,
                 ]);
 
                 // previously we created a separate WorkItem here; now assignment stores type/size/stage/status/company/department directly

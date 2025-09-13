@@ -15,6 +15,24 @@ Broadcast::channel('jobrequests.{userId}', function ($user, $userId) {
 Broadcast::channel('messages.{userId}', function ($user, $userId) {
     return (int) $user->id === (int) $userId;
 });
+// job-specific private channel for job-related notifications
+Broadcast::channel('jobmessages.{userId}', function ($user, $userId) {
+    // Development debug: log auth status for broadcasting auth requests.
+    try {
+        if (app()->environment('local') || env('APP_ENV') === 'local') {
+            \Illuminate\Support\Facades\Log::debug('Broadcast auth attempt for jobmessages', [
+                'route_user_id' => $userId,
+                'auth_user_id' => isset($user) ? $user->id : null,
+                'request_ip' => request()->ip(),
+                'session_id' => session()->getId(),
+            ]);
+        }
+    } catch (\Exception $e) {
+        // ignore logging failures to avoid breaking auth flow
+    }
+
+    return (int) $user->id === (int) $userId;
+});
 Broadcast::channel('chatroom.{roomId}', function ($user, $roomId) {
     // ルーム参加者ならtrue
     try {

@@ -7,7 +7,7 @@
         <div class="mx-auto max-w-3xl rounded bg-white p-6 shadow">
             <h1 class="mb-4 text-2xl font-bold">ジョブ割り当て：{{ projectJob.name }}</h1>
 
-            <form @submit.prevent="submit">
+            <form @submit.prevent="save">
                 <div v-for="(block, idx) in assignments" :key="idx" class="mb-4 rounded border p-4">
                     <label class="mb-1 block font-semibold">ジョブ名</label>
                     <input v-model="block.title" type="text" class="w-full rounded border px-3 py-2" required />
@@ -92,7 +92,7 @@
                     <button v-if="!props.editMode" type="button" class="rounded bg-blue-600 px-4 py-2 text-white" @click="addBlock">
                         ジョブブロックを追加
                     </button>
-                    <button type="submit" class="rounded bg-green-600 px-4 py-2 text-white">保存して割り当て</button>
+                    <button type="submit" class="rounded bg-green-600 px-4 py-2 text-white">保存する</button>
                     <Link
                         :href="route('coordinator.project_jobs.assignments.index', { projectJob: projectJob.id })"
                         class="rounded bg-gray-200 px-4 py-2"
@@ -142,6 +142,14 @@ const mins = ['00', '15', '30', '45'];
 // estimated hours options: 0.25 to 8.0 in 0.25 steps
 const estimatedOptions = Array.from({ length: 32 }, (_, i) => Number(((i + 1) * 0.25).toFixed(2)));
 
+function makeLabel(kind, id) {
+    if (!id) return null;
+    const list = { types: page.props.types, sizes: page.props.sizes, statuses: page.props.statuses, stages: page.props.stages }[kind];
+    if (!Array.isArray(list)) return null;
+    const found = list.find((x) => String(x.id) === String(id));
+    return found ? `${kind.replace(/s$/, '')}: ${found.name}` : null;
+}
+
 function normalizeAssignment(a) {
     return {
         id: a.id || null,
@@ -154,6 +162,18 @@ function normalizeAssignment(a) {
         desired_time_min: a.desired_time ? a.desired_time.split(':')[1] || '00' : a.desired_time_min || '00',
         estimated_hours: a.estimated_hours !== undefined && a.estimated_hours !== null ? a.estimated_hours : '',
         user_id: a.user_id || (a.user ? a.user.id : '') || '',
+        // preserve work_item lookup ids if present (so save() includes them)
+        work_item_type_id: a.work_item_type_id || null,
+        size_id: a.size_id || null,
+        stage_id: a.stage_id || null,
+        status_id: a.status_id || null,
+        company_id: a.company_id || null,
+        department_id: a.department_id || null,
+        // UX labels for display
+        type_label: a.type_label || makeLabel('types', a.work_item_type_id),
+        size_label: a.size_label || makeLabel('sizes', a.size_id),
+        stage_label: a.stage_label || makeLabel('stages', a.stage_id),
+        status_label: a.status_label || makeLabel('statuses', a.status_id),
     };
 }
 
@@ -302,7 +322,7 @@ function onHourChange(idx) {
     }
 }
 
-function submit() {
+function save() {
     if (props.editMode && assignments.value.length === 1 && assignments.value[0].id) {
         const a = assignments.value[0];
         const payload = {
@@ -314,6 +334,13 @@ function submit() {
             desired_end_date: a.desired_end_date || null,
             desired_time: String(a.desired_time_hour).padStart(2, '0') + ':' + String(a.desired_time_min).padStart(2, '0'),
             user_id: a.user_id || null,
+            // include lookup ids when updating a single assignment
+            work_item_type_id: a.work_item_type_id || null,
+            size_id: a.size_id || null,
+            stage_id: a.stage_id || null,
+            status_id: a.status_id || null,
+            company_id: a.company_id || null,
+            department_id: a.department_id || null,
         };
         router.put(route('coordinator.project_jobs.assignments.update', { projectJob: props.projectJob.id, assignment: a.id }), payload);
         return;

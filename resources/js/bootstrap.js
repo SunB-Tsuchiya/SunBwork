@@ -33,6 +33,44 @@ const initEcho = () => {
             },
         },
     });
+
+    // Ensure Pusher uses axios for channel authorization so that cookies (session)
+    // and the configured axios headers (X-CSRF-TOKEN) are sent. Some environments
+    // (vite proxy, different origins) may cause the default pusher auth XHR to omit
+    // credentials which results in 403 from /broadcasting/auth.
+    try {
+        if (window.Echo && window.Echo.connector && window.Echo.connector.pusher) {
+            const pusher = window.Echo.connector.pusher;
+            pusher.config.auth = pusher.config.auth || {};
+            pusher.config.auth.headers = pusher.config.auth.headers || {};
+
+            // prefer axios POST which respects axios.defaults.withCredentials
+            pusher.config.authorizer = function (channel, options) {
+                return {
+                    authorize: function (socketId, callback) {
+                        const payload = {
+                            socket_id: socketId,
+                            channel_name: channel.name,
+                        };
+                        // axios is configured with withCredentials=true above
+                        window.axios
+                            .post(pusher.config.authEndpoint || '/broadcasting/auth', payload, {
+                                headers: pusher.config.auth.headers || {},
+                            })
+                            .then(function (response) {
+                                callback(false, response.data);
+                            })
+                            .catch(function (error) {
+                                // Mirror pusher authorizer callback signature for errors
+                                callback(true, error);
+                            });
+                    },
+                };
+            };
+        }
+    } catch (e) {
+        console.warn('Failed to attach axios-based pusher authorizer', e);
+    }
 };
 
 // CSRF cookie を取得してから Echo を初期化する（race を防ぐ）

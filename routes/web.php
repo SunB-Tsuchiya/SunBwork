@@ -77,6 +77,11 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
     Route::get('/user/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('user.dashboard');
 
+    // Shortcut route: global JobBox - show a user's job messages across assignments
+    // When no specific project is provided the controller will return messages
+    // relevant to the authenticated user.
+    Route::get('/jobbox', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'global'])->name('project_jobs.index');
+
     // チーム切り替え
     Route::put('/current-team', [App\Http\Controllers\CurrentTeamController::class, 'update'])->name('current-team.update');
 
@@ -118,6 +123,12 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::get('/chat/rooms', [App\Http\Controllers\Chat\ChatController::class, 'indexRooms'])->name('chat.rooms.index');
     Route::get('/chat/rooms/create', [App\Http\Controllers\Chat\ChatController::class, 'createRoom'])->name('chat.rooms.create');
     Route::post('/chat/rooms', [App\Http\Controllers\Chat\ChatController::class, 'storeRoom'])->name('chat.rooms.store');
+
+    // Allow assigned users to view jobbox (read-only). These routes mirror coordinator jobbox but are under authenticated user middleware.
+    Route::get('project_jobs/{projectJob}/jobbox', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'index'])->name('project_jobs.jobbox.index');
+    Route::get('project_jobs/{projectJob}/jobbox/{message}', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'show'])->name('project_jobs.jobbox.show');
+    // Allow assigned users to send a completion reply back to coordinators
+    Route::post('project_jobs/{projectJob}/jobbox/reply', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'reply'])->name('project_jobs.jobbox.reply');
     Route::get('/chat/rooms/{id}', [App\Http\Controllers\Chat\ChatController::class, 'showRoom'])->name('chat.rooms.show');
 
     // Job Requests (Inbox) - minimal CRUD + accept
@@ -318,10 +329,11 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 
         // Coordinator Work Items (Workflows / tasks)
         // (work-items routes removed - lookups are provided by assignment controllers)
-    // JobBox (job-assignment related messages)
-    Route::get('project_jobs/{projectJob}/jobbox', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'index'])->name('project_jobs.jobbox.index');
-    Route::get('project_jobs/{projectJob}/jobbox/{message}', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'show'])->name('project_jobs.jobbox.show');
-    Route::post('project_jobs/{projectJob}/jobbox', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'store'])->name('project_jobs.jobbox.store');
+        // JobBox (job-assignment related messages)
+        Route::get('project_jobs/{projectJob}/jobbox', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'index'])->name('project_jobs.jobbox.index');
+        Route::get('project_jobs/{projectJob}/jobbox/{message}', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'show'])->name('project_jobs.jobbox.show');
+        Route::post('project_jobs/{projectJob}/jobbox', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'store'])->name('project_jobs.jobbox.store');
+        Route::delete('project_jobs/{projectJob}/jobbox/{message}', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'destroy'])->name('project_jobs.jobbox.destroy');
     });
 
 

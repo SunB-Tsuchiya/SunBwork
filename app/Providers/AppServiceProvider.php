@@ -5,6 +5,7 @@ namespace App\Providers;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -87,6 +88,26 @@ class AppServiceProvider extends ServiceProvider
             // legacy: job_requests is being migrated into Messages. Keep the legacy
             // property for a transitional period but set to 0 to avoid duplicate counts.
             $user->unread_job_requests_count = 0;
+            // jobbox unread count: attempt to derive unread job-assignment messages.
+            // Note: JobAssignmentMessage currently is not linked to Message by id
+            // (optional future improvement: add message_id to job_assignment_messages).
+            try {
+                // If job_assignment_messages were linked via message_id, we could
+                // count MessageRecipient rows for those messages. Fall back to 0
+                // to avoid errors in environments where linkage isn't present.
+                $hasColumn = Schema::hasColumn('job_assignment_messages', 'message_id');
+                if ($hasColumn) {
+                    $user->unread_job_messages_count = \App\Models\MessageRecipient::where('user_id', $user->id)
+                        ->whereNull('read_at')
+                        ->whereIn('message_id', function ($q) {
+                            $q->select('message_id')->from('job_assignment_messages');
+                        })->count();
+                } else {
+                    $user->unread_job_messages_count = 0;
+                }
+            } catch (\Throwable $e) {
+                $user->unread_job_messages_count = 0;
+            }
             try {
                 // authoritative unread messages count
                 $user->unread_messages_count = \App\Models\MessageRecipient::where('user_id', $user->id)->whereNull('read_at')->count();
