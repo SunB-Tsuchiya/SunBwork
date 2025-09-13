@@ -174,11 +174,19 @@ function sendRequest(a) {
         body: `割り当て依頼\nジョブ: ${projectJob.name}\n割り当て: ${a.title}\n\n担当ユーザー: ${assignedName}\n詳細:\n${detailsText || '（詳細なし）'}\n\n希望開始日: ${start}\n希望終了日: ${end}\n\nアプリで詳しい情報を確認できます。`,
     };
 
-    router.post(route('messages.store'), payload, {
+    // Use JobBox store route so job-related messages are stored separately and notifications are sent
+    const jbPayload = {
+        project_job_assignment_id: a.id,
+        to: toUserId ? [toUserId] : [],
+        subject: payload.subject || payload.subject === '' ? payload.subject : `ジョブ割り当ての依頼: ${a.title}`,
+        body: payload.body || payload.body === '' ? payload.body : payload.body,
+        attachments: [],
+    };
+
+    router.post(route('coordinator.project_jobs.jobbox.store', { projectJob: projectJob.id }), jbPayload, {
         onSuccess: () => {
-            // optimistic UI update: mark assigned so UI reflects sent state
             a.assigned = true;
-            alert('発信しました（Messages 経由）。受信者に通知されます。');
+            alert('発信しました（JobBox 経由）。受信者に通知されます。');
         },
         onError: (errors) => {
             console.error('sendRequest error', errors);

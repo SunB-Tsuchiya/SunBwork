@@ -52,19 +52,56 @@ class JobBoxController extends Controller
     {
         $data = $request->validate([
             'project_job_assignment_id' => 'required|integer|exists:project_job_assignments,id',
+            'to' => 'required|array',
+            'to.*' => 'integer|exists:users,id',
             'subject' => 'nullable|string|max:255',
             'body' => 'nullable|string',
+            'attachments' => 'nullable|array',
         ]);
 
-        $msg = JobAssignmentMessage::create([
+        // Create JobAssignmentMessage record
+        $jam = JobAssignmentMessage::create([
             'project_job_assignment_id' => $data['project_job_assignment_id'],
             'sender_id' => $request->user()->id,
             'subject' => $data['subject'] ?? null,
             'body' => $data['body'] ?? null,
         ]);
 
-        // TODO: reuse Messages notification/email sending here if needed.
+        // Also create a Message and recipients so existing notification flow can be reused
+        $sanitizer = app(\App\Services\HtmlSanitizer::class);
+        $body = $sanitizer->purify($data['body'] ?? null);
 
-        return back()->with('success', 'JobBox message sent');
+        $message = \App\Models\Message::create([
+            'from_user_id' => $request->user()->id,
+            'subject' => $data['subject'] ?? null,
+            'body' => $body,
+            'status' => 'sent',
+            'sent_at' => now(),
+        ]);
+
+        foreach ($data['to'] as $uid) {
+            \App\Models\MessageRecipient::create([
+                'message_id' => $message->id,
+                'user_id' => $uid,
+                'type' => 'to',
+            ]);
+        }
+
+        // Attach attachments if provided (move existing attachments to this message)
+        if (!empty($data['attachments'])) {
+            foreach ($data['attachments'] as $attId) {
+                \App\Models\Attachment::where('id', $attId)->update(['message_id' => $message->id]);
+            }
+        }
+
+        // Broadcast event for real-time notifications
+        try {
+            $message->load('recipients');
+            event(new \App\Events\MessageCreated($message));
+        } catch (\Throwable $__e) {
+            // non-fatal
+        }
+
+        return redirect()->route('project_jobs.jobbox.index', ['projectJob' => $projectJob->id])->with('success', 'JobBox: メッセージを送信しました');
     }
 }
