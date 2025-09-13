@@ -318,6 +318,10 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 
         // Coordinator Work Items (Workflows / tasks)
         // (work-items routes removed - lookups are provided by assignment controllers)
+    // JobBox (job-assignment related messages)
+    Route::get('project_jobs/{projectJob}/jobbox', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'index'])->name('project_jobs.jobbox.index');
+    Route::get('project_jobs/{projectJob}/jobbox/{message}', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'show'])->name('project_jobs.jobbox.show');
+    Route::post('project_jobs/{projectJob}/jobbox', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'store'])->name('project_jobs.jobbox.store');
     });
 
 
