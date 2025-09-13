@@ -9,8 +9,8 @@ class WorkItemTypesSeeder extends Seeder
 {
     public function run(): void
     {
-        $companyId = \DB::table('companies')->where('code', 'SUNBRAIN')->value('id');
-        $departmentId = \DB::table('departments')->where('code', 'INFO')->value('id');
+        $companyId = DB::table('companies')->where('code', 'SUNBRAIN')->value('id');
+        $departmentId = DB::table('departments')->where('code', 'INFO')->value('id');
 
         $types = [
             ['name' => '作成', 'slug' => 'creation', 'description' => '原稿作成', 'company_id' => $companyId, 'department_id' => $departmentId],
