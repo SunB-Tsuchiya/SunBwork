@@ -123,4 +123,9 @@ Route::get('/debug/public/messages/{message}/payload', function (Request $reques
 
 Route::middleware(['web', 'auth:sanctum'])->post('/chat/messages/{message}/read', [\App\Http\Controllers\Chat\ChatController::class, 'markAsRead']);
 
+// JobBox lightweight fetch for event-driven previews
+Route::get('/jobbox/{id}', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'apiShow'])->name('api.jobbox.show');
+// Mark a JobAssignmentMessage as read (SPA-friendly JSON endpoint)
+Route::post('/jobbox/{id}/read', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'apiMarkRead'])->name('api.jobbox.read');
+
 // End of API route definitions

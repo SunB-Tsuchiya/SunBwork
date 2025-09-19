@@ -25,6 +25,11 @@ function confirmDelete() {
     // Let the server return an Inertia redirect; no client-side onSuccess navigation needed
     router.delete(route('events.destroy', { event: props.event.id }));
 }
+
+function submitComplete() {
+    if (!confirm('このジョブを完了としてマークしますか？')) return;
+    router.post(route('events.complete', { event: props.event.id }));
+}
 </script>
 
 <template>
@@ -40,24 +45,23 @@ function confirmDelete() {
             </div>
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700">詳細</label>
-                <div class="prose" v-html="props.event.description"></div>
+                <!-- 保持されている改行を反映するため、プレーンテキストで表示し CSS の whitespace-pre-wrap を適用 -->
+                <div class="whitespace-pre-wrap text-sm text-gray-900">{{ props.event.description || '-' }}</div>
             </div>
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700">添付ファイル</label>
-                <div v-if="props.event.attachments && props.event.attachments.length">
-                    <ul>
-                        <li v-for="file in props.event.attachments" :key="file.id">
-                            <a :href="file.url" target="_blank" class="text-blue-600 underline">{{ file.original_name }}</a>
-                        </li>
-                    </ul>
-                </div>
-                <div v-else class="text-gray-500">添付ファイルなし</div>
-            </div>
+            <!-- 添付ファイルはイベントに付与しないため関連 UI を削除しました -->
             <div class="flex space-x-4">
                 <Link :href="route('events.edit', props.event.id)" class="rounded bg-blue-600 px-4 py-2 text-white">編集</Link>
                 <button @click="confirmDelete" class="rounded bg-red-600 px-4 py-2 text-white">削除</button>
+                <!-- 完了ボタン: イベントがジョブ割り当てに紐づいている場合のみ表示 -->
+                <template v-if="props.event.project_job_assignment_id">
+                    <form @submit.prevent="submitComplete">
+                        <button type="submit" class="rounded bg-yellow-600 px-4 py-2 text-white">完了する</button>
+                    </form>
+                </template>
                 <Link :href="route('calendar.index')" class="rounded bg-gray-200 px-4 py-2 text-gray-700">戻る</Link>
             </div>
         </div>
     </AppLayout>
 </template>
+
+<!-- merged script above -->

@@ -1,5 +1,6 @@
 <script setup>
-import { Link, usePage } from '@inertiajs/vue3';
+import { Inertia } from '@inertiajs/inertia';
+import { usePage } from '@inertiajs/vue3';
 import { computed, onMounted, ref, watch } from 'vue';
 
 const props = defineProps({
@@ -12,8 +13,14 @@ const props = defineProps({
     meta: { type: Object, default: null },
     filters: { type: Object, default: () => ({ q: '', days: 30, perPage: 30 }) },
     showCheckboxes: { type: Boolean, default: false },
+    // when true, render compact view: only date + content (hide id/name/dept/read)
+    compact: { type: Boolean, default: false },
+    // when true, hide the built-in pagination controls (parent will render its own)
+    hidePagination: { type: Boolean, default: false },
     fullContent: { type: Boolean, default: false },
     showUnreadToggle: { type: Boolean, default: true },
+    // whether to render the 既読/未読 column
+    showReadColumn: { type: Boolean, default: true },
     // control how many lines to show for description when not fullContent
     // null = default behavior (1 line)
     maxDescriptionLines: { type: Number, default: null },
@@ -82,6 +89,16 @@ function formatMD(dateStr) {
     }
 }
 
+function getContentText(d) {
+    const raw = (d && (d.content ?? d.description)) || '';
+    // strip simple HTML tags for length/search calculations
+    try {
+        return raw.replace(/<[^>]*>/g, '').trim();
+    } catch (e) {
+        return String(raw || '');
+    }
+}
+
 const filtered = computed(() => {
     if (props.serverMode) {
         // In serverMode, the parent (ByDate.vue) is responsible for applying
@@ -93,11 +110,12 @@ const filtered = computed(() => {
     let list = props.diaries || [];
     if (q) {
         list = list.filter((d) => {
+            const content = (getContentText(d) || '').toLowerCase();
             return (
                 String(d.id).includes(q) ||
                 (d.name || '').toLowerCase().includes(q) ||
                 (getDept(d) || '').toLowerCase().includes(q) ||
-                (d.description || '').toLowerCase().includes(q)
+                content.includes(q)
             );
         });
     }
@@ -270,6 +288,34 @@ function isExpanded(id) {
     return expanded.value.includes(id);
 }
 
+function onRowClick(d, event) {
+    // ignore clicks that originated from interactive controls inside the row
+    const el = event && (event.target || event.currentTarget);
+    if (el) {
+        const tag = (el.tagName || '').toLowerCase();
+        if (tag === 'a' || tag === 'button' || (el.closest && el.closest('a,button,input,textarea,select'))) {
+            return;
+        }
+    }
+    try {
+        const name = showRouteName.value;
+        // prefer named route resolution via Ziggy; fallback to path
+        try {
+            Inertia.get(route(name, d.id));
+            return;
+        } catch (e) {
+            // fallback to direct path constructed from routePrefix
+        }
+    } catch (e) {
+        // ignore
+    }
+    // last resort: navigate to /diaryinteractions/:id or /diaries/:id depending on prefix
+    const p = props.routePrefix || 'diaries';
+    let path = `/diaryinteractions/${d.id}`;
+    if (p !== 'diaries') path = `/${p}/diaryinteractions/${d.id}`;
+    window.location.href = path;
+}
+
 // measure is no longer done in JS; rely on Tailwind's line-clamp utility for truncation.
 function cleanupOptimisticReads(diaries) {
     try {
@@ -335,7 +381,7 @@ watch(
                                 </span>
                             </button>
                         </th>
-                        <th class="w-12 px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                        <th v-if="!props.compact" class="w-12 px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                             <button class="inline-flex items-center text-xs font-medium" @click.prevent="setSort('id')">
                                 <span>ID</span>
                                 <span v-if="sortKey === 'id'" class="ml-1 text-xs" aria-hidden>
@@ -344,7 +390,10 @@ watch(
                             </button>
                         </th>
                         <!-- 名前/部署をさらに狭く (レスポンシブ: sm:w-24, md:w-32) -->
-                        <th class="w-24 px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:w-24 md:w-32">
+                        <th
+                            v-if="!props.compact"
+                            class="w-24 px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:w-24 md:w-32"
+                        >
                             <button class="inline-flex items-center text-xs font-medium" @click.prevent="setSort('name')">
                                 <span>名前</span>
                                 <span v-if="sortKey === 'name'" class="ml-1 text-xs" aria-hidden>
@@ -352,7 +401,10 @@ watch(
                                 </span>
                             </button>
                         </th>
-                        <th class="w-24 px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:w-24 md:w-32">
+                        <th
+                            v-if="!props.compact"
+                            class="w-24 px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:w-24 md:w-32"
+                        >
                             <button class="inline-flex items-center text-xs font-medium" @click.prevent="setSort('dept')">
                                 <span>部署</span>
                                 <span v-if="sortKey === 'dept'" class="ml-1 text-xs" aria-hidden>
@@ -362,7 +414,7 @@ watch(
                         </th>
                         <!-- 内容列は幅を固定しない（残りスペースを使用）して折り返す -->
                         <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">内容</th>
-                        <th class="w-20 px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                        <th v-if="props.showReadColumn" class="w-20 px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                             <button class="inline-flex items-center text-xs font-medium" @click.prevent="setSort('read')">
                                 <span>既読</span>
                                 <span v-if="sortKey === 'read'" class="ml-1 text-xs" aria-hidden>
@@ -370,18 +422,25 @@ watch(
                                 </span>
                             </button>
                         </th>
-                        <th class="w-20 px-6 py-3"></th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200 bg-white">
-                    <tr v-for="d in paginated" :key="d.id">
+                    <tr
+                        v-for="d in paginated"
+                        :key="d.id"
+                        class="cursor-pointer transition-colors hover:bg-green-50"
+                        role="link"
+                        tabindex="0"
+                        @click="onRowClick(d, $event)"
+                        @keydown.enter="onRowClick(d, $event)"
+                    >
                         <td v-if="props.showCheckboxes" class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                             <input type="checkbox" :value="d.id" v-model="selected" />
                         </td>
                         <td class="px-3 py-4 text-sm text-gray-500">{{ formatMD(d.date) }}</td>
-                        <td class="px-6 py-4 text-sm text-gray-500">{{ d.id }}</td>
-                        <td class="truncate px-6 py-4 text-sm font-medium text-gray-900">{{ d.name }}</td>
-                        <td class="truncate px-6 py-4 text-sm text-gray-500">{{ getDept(d) }}</td>
+                        <td v-if="!props.compact" class="px-6 py-4 text-sm text-gray-500">{{ d.id }}</td>
+                        <td v-if="!props.compact" class="truncate px-6 py-4 text-sm font-medium text-gray-900">{{ d.name }}</td>
+                        <td v-if="!props.compact" class="truncate px-6 py-4 text-sm text-gray-500">{{ getDept(d) }}</td>
                         <!-- Allow single-line truncation on index view; fullContent shows full text -->
                         <td
                             :class="
@@ -395,9 +454,9 @@ watch(
                             </div>
                             <div v-else>
                                 <!-- Use configured line-clamp for truncation; keep expand toggle for long content -->
-                                <div :class="isExpanded(d.id) ? '' : descriptionClassFor()">{{ d.description }}</div>
+                                <div :class="isExpanded(d.id) ? '' : descriptionClassFor()">{{ d.content ?? d.description }}</div>
                                 <button
-                                    v-if="(d.description || '').length > 200"
+                                    v-if="(getContentText(d) || '').length > 200"
                                     @click.prevent="toggleExpand(d.id)"
                                     class="mt-1 text-xs text-blue-600"
                                 >
@@ -405,22 +464,25 @@ watch(
                                 </button>
                             </div>
                         </td>
-                        <td class="px-4 py-4 text-sm text-gray-500">
+                        <td v-if="props.showReadColumn && !props.compact" class="px-4 py-4 text-sm text-gray-500">
                             <span v-if="isReadByCurrentUser(d)" class="font-semibold text-green-600">既読</span>
                             <span v-else class="font-semibold text-red-600">未読</span>
                         </td>
-                        <td class="px-4 py-4 text-right">
-                            <Link :href="route(showRouteName, d.id)" class="rounded bg-blue-500 px-3 py-1 text-xs text-white">詳細</Link>
-                        </td>
+                        <!-- removed 操作/詳細 buttons; entire row is clickable to show -->
                     </tr>
                     <tr v-if="filtered.length === 0">
-                        <td :colspan="props.showCheckboxes ? 8 : 7" class="px-6 py-4 text-sm text-gray-500">日報はありません</td>
+                        <td
+                            :colspan="props.compact ? 2 : props.showCheckboxes ? (props.showReadColumn ? 7 : 6) : props.showReadColumn ? 6 : 5"
+                            class="px-6 py-4 text-sm text-gray-500"
+                        >
+                            日報はありません
+                        </td>
                     </tr>
                 </tbody>
             </table>
         </div>
 
-        <div class="mt-3 flex items-center justify-between">
+        <div v-if="!props.hidePagination" class="mt-3 flex items-center justify-between">
             <div class="text-sm text-gray-600">合計: {{ filtered.length }} 件</div>
             <div class="flex items-center space-x-2">
                 <button @click="prevPage" class="rounded border px-3 py-1" :disabled="page <= 1">前</button>

@@ -37,6 +37,15 @@ class Event extends Model
         return $this->hasMany(Attachment::class, 'event_id');
     }
 
+    /**
+     * Optional relation to ProjectJobAssignment so events created from a job
+     * can be linked back to the assignment.
+     */
+    public function projectJobAssignment()
+    {
+        return $this->belongsTo(ProjectJobAssignment::class, 'project_job_assignment_id');
+    }
+
     // Provide a virtual date attribute derived from start datetime
     public function getDateAttribute()
     {

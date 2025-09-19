@@ -17,7 +17,21 @@ class JobBoxController extends Controller
         // ensure the user is assigned to this project_job before showing jobbox.
         $user = $request->user();
         $isPrivileged = $user && (method_exists($user, 'isCoordinator') && ($user->isCoordinator() || $user->isLeader() || $user->isAdmin() || $user->isSuperAdmin()));
-        if (! $isPrivileged) {
+
+        // Additionally allow the project owner or any user who has sent a job-assignment
+        // message for this project to view the project jobbox even if they are not
+        // explicitly assigned. This lets senders (coordinators or project owners)
+        // view the jobbox they created messages in.
+        $isOwner = $user && $projectJob->user_id && $user->id === $projectJob->user_id;
+        $isSender = false;
+        if ($user) {
+            $isSender = \App\Models\JobAssignmentMessage::join('project_job_assignments', 'job_assignment_messages.project_job_assignment_id', '=', 'project_job_assignments.id')
+                ->where('project_job_assignments.project_job_id', $projectJob->id)
+                ->where('job_assignment_messages.sender_id', $user->id)
+                ->exists();
+        }
+
+        if (! $isPrivileged && ! $isOwner && ! $isSender) {
             // check if the current user has any assignment for this project job
             $hasAssignment = \App\Models\ProjectJobAssignment::where('project_job_id', $projectJob->id)
                 ->where('user_id', $user ? $user->id : 0)
@@ -28,27 +42,52 @@ class JobBoxController extends Controller
         }
 
         $q = $request->input('q');
+        $sort = $request->input('sort');
+        $dir = strtolower($request->input('dir', 'desc')) === 'asc' ? 'asc' : 'desc';
 
-        $messages = JobAssignmentMessage::whereHas('projectJobAssignment', function ($qry) use ($projectJob, $user, $isPrivileged) {
-            $qry->where('project_job_id', $projectJob->id);
-            // If the current user is not privileged, restrict to assignments belonging to them
-            if (! $isPrivileged && $user) {
-                $qry->where('user_id', $user->id);
-            }
-        })
-            ->with(['sender', 'projectJobAssignment'])
-            ->when($q, function ($qry, $q) {
-                $qry->where(function ($sub) use ($q) {
-                    $sub->where('subject', 'like', "%{$q}%")->orWhere('body', 'like', "%{$q}%");
-                });
-            })
-            ->orderBy('created_at', 'desc')
-            ->paginate(20);
+        // Build a query with joins so we can sort by related columns (assignment desired_start_date, sender name)
+        $base = JobAssignmentMessage::select('job_assignment_messages.*')
+            ->join('project_job_assignments', 'job_assignment_messages.project_job_assignment_id', '=', 'project_job_assignments.id')
+            ->leftJoin('users as senders', 'job_assignment_messages.sender_id', '=', 'senders.id')
+            ->where('project_job_assignments.project_job_id', $projectJob->id);
+
+        // If the current user is not privileged, restrict to assignments belonging to them
+        if (! $isPrivileged && $user) {
+            $base->where('project_job_assignments.user_id', $user->id);
+        }
+
+        // Apply search
+        if ($q) {
+            $base->where(function ($sub) use ($q) {
+                $sub->where('job_assignment_messages.subject', 'like', "%{$q}%")->orWhere('job_assignment_messages.body', 'like', "%{$q}%");
+            });
+        }
+
+        // Sorting whitelist
+        switch ($sort) {
+            case 'desired_start_date':
+                $base->orderBy('project_job_assignments.desired_start_date', $dir);
+                break;
+            case 'sender':
+                $base->orderBy('senders.name', $dir);
+                break;
+            case 'subject':
+                $base->orderBy('job_assignment_messages.subject', $dir);
+                break;
+            default:
+                $base->orderBy('job_assignment_messages.created_at', 'desc');
+        }
+
+        $messages = $base->with(['sender', 'projectJobAssignment.projectJob.client', 'projectJobAssignment', 'message.recipients.user', 'message.fromUser', 'projectJobAssignment.user'])
+            ->paginate(20)
+            ->appends(array_filter(['q' => $q, 'sort' => $sort, 'dir' => $dir]));
 
         return inertia('JobBox/Index', [
             'projectJob' => $projectJob,
             'messages' => $messages,
             'q' => $q,
+            'sort' => $sort,
+            'dir' => $dir,
         ]);
     }
 
@@ -64,28 +103,46 @@ class JobBoxController extends Controller
         }
 
         $q = $request->input('q');
+        $sort = $request->input('sort');
+        $dir = strtolower($request->input('dir', 'desc')) === 'asc' ? 'asc' : 'desc';
 
-        // Load JobAssignmentMessage rows where either:
-        //  - the underlying assignment belongs to this user (they're the assignee), OR
-        //  - the current user is the sender of the job message (they sent it)
-        $messages = JobAssignmentMessage::where(function ($qry) use ($user) {
-            $qry->whereHas('projectJobAssignment', function ($q2) use ($user) {
-                $q2->where('user_id', $user->id);
-            })->orWhere('sender_id', $user->id);
-        })
-            ->with(['sender', 'projectJobAssignment.projectJob'])
-            ->when($q, function ($qry, $q) {
-                $qry->where(function ($sub) use ($q) {
-                    $sub->where('subject', 'like', "%{$q}%")->orWhere('body', 'like', "%{$q}%");
-                });
-            })
-            ->orderBy('created_at', 'desc')
-            ->paginate(20);
+        $base = JobAssignmentMessage::select('job_assignment_messages.*')
+            ->join('project_job_assignments', 'job_assignment_messages.project_job_assignment_id', '=', 'project_job_assignments.id')
+            ->leftJoin('users as senders', 'job_assignment_messages.sender_id', '=', 'senders.id')
+            ->where(function ($qry) use ($user) {
+                $qry->where('project_job_assignments.user_id', $user->id)->orWhere('job_assignment_messages.sender_id', $user->id);
+            });
+
+        if ($q) {
+            $base->where(function ($sub) use ($q) {
+                $sub->where('job_assignment_messages.subject', 'like', "%{$q}%")->orWhere('job_assignment_messages.body', 'like', "%{$q}%");
+            });
+        }
+
+        switch ($sort) {
+            case 'desired_start_date':
+                $base->orderBy('project_job_assignments.desired_start_date', $dir);
+                break;
+            case 'sender':
+                $base->orderBy('senders.name', $dir);
+                break;
+            case 'subject':
+                $base->orderBy('job_assignment_messages.subject', $dir);
+                break;
+            default:
+                $base->orderBy('job_assignment_messages.created_at', 'desc');
+        }
+
+        $messages = $base->with(['sender', 'message.recipients.user', 'message.fromUser', 'projectJobAssignment.projectJob.client', 'projectJobAssignment.user'])
+            ->paginate(20)
+            ->appends(array_filter(['q' => $q, 'sort' => $sort, 'dir' => $dir]));
 
         return inertia('JobBox/Index', [
             'projectJob' => null,
             'messages' => $messages,
             'q' => $q,
+            'sort' => $sort,
+            'dir' => $dir,
         ]);
     }
 
@@ -103,9 +160,31 @@ class JobBoxController extends Controller
             }
         }
 
-        // mark read
+        // mark read (and set accepted=true to link accepted to read)
         if (! $message->read_at) {
             $message->read_at = now();
+            // set accepted flag to true when message is read
+            try {
+                $message->accepted = true;
+            } catch (\Throwable $__e) {
+                // ignore if column missing
+            }
+            // reflect read on the related assignment as well
+            try {
+                if ($message->project_job_assignment_id) {
+                    $assignment = ProjectJobAssignment::find($message->project_job_assignment_id);
+                    if ($assignment) {
+                        $assignment->read_at = $message->read_at;
+                        try {
+                            $assignment->accepted = true;
+                        } catch (\Throwable $__e) {
+                        }
+                        $assignment->save();
+                    }
+                }
+            } catch (\Throwable $__e) {
+                // non-fatal
+            }
             $message->save();
 
             // If this job message is linked to a Message, mark MessageRecipient rows as read
@@ -115,21 +194,215 @@ class JobBoxController extends Controller
                         ->where('user_id', \Illuminate\Support\Facades\Auth::id())
                         ->whereNull('read_at')
                         ->update(['read_at' => now()]);
-
-                    // broadcast job-specific read event so frontend can decrement job unread counter
-                    event(new \App\Events\JobMessageRead($message->message_id, \Illuminate\Support\Facades\Auth::id()));
                 } catch (\Throwable $__e) {
                     // non-fatal
                 }
             }
+
+            // Broadcast job-specific read event so frontend can decrement job unread counter.
+            // We broadcast the JobAssignmentMessage id (not Message id) so listeners can
+            // treat this as a jobbox read. Payload uses key `message_id` for backward
+            // compatibility with existing frontend listeners.
+            try {
+                // also notify the original sender so they receive the read update in real-time
+                $senderId = $message->sender_id ?? null;
+                $readAt = $message->read_at ? $message->read_at->toDateTimeString() : now()->toDateTimeString();
+                $ev = new \App\Events\JobMessageRead($message->id, \Illuminate\Support\Facades\Auth::id(), $senderId ? [$senderId] : null);
+                $ev->read_at = $readAt;
+                event($ev);
+            } catch (\Throwable $__e) {
+                // non-fatal
+            }
         }
 
-        $message->load('sender');
+        // load sender and the related assignment with its user and lookup relations
+        // so the frontend Show view can access `message.project_job_assignment` and display
+        // assignment details such as sizes, stages and work item types.
+        $message->load([
+            'sender',
+            'projectJobAssignment.user',
+            'projectJobAssignment.projectJob.client',
+            'projectJobAssignment.size',
+            'projectJobAssignment.stage',
+            'projectJobAssignment.workItemType',
+            'projectJobAssignment.statusModel',
+        ]);
+
+        // Add human-friendly label attributes on the loaded relation so the Inertia
+        // page can read `assignment.size_label`, `assignment.stage_label`, etc.
+        try {
+            if ($message->projectJobAssignment) {
+                $a = $message->projectJobAssignment;
+                $a->type_label = isset($a->workItemType) && $a->workItemType ? ($a->workItemType->name ?? $a->workItemType->label ?? null) : null;
+                $a->size_label = isset($a->size) && $a->size ? ($a->size->name ?? $a->size->label ?? null) : null;
+                $a->stage_label = isset($a->stage) && $a->stage ? ($a->stage->name ?? $a->stage->label ?? null) : null;
+                $a->status_label = isset($a->statusModel) && $a->statusModel ? ($a->statusModel->name ?? $a->statusModel->label ?? null) : null;
+            }
+        } catch (\Throwable $__e) {
+            // non-fatal: if lookup relations or attributes are missing, continue without labels
+        }
 
         return inertia('JobBox/Show', [
             'projectJob' => $projectJob,
             'message' => $message,
         ]);
+    }
+
+    /**
+     * Lightweight JSON endpoint for fetching a single JobAssignmentMessage by id.
+     * Used by the frontend when an event contains only the jam id.
+     */
+    public function apiShow(Request $request, $id)
+    {
+        $user = $request->user();
+        $jam = JobAssignmentMessage::with([
+            'sender',
+            'projectJobAssignment.user',
+            'projectJobAssignment.size',
+            'projectJobAssignment.stage',
+            'projectJobAssignment.workItemType',
+            'projectJobAssignment.statusModel',
+            'message.fromUser',
+            'message.recipients.user',
+        ])->findOrFail($id);
+
+        // Authorization: allow if user is privileged, owner of the project, sender, or assigned
+        $isPrivileged = $user && (method_exists($user, 'isCoordinator') && ($user->isCoordinator() || $user->isLeader() || $user->isAdmin() || $user->isSuperAdmin()));
+        $isOwner = false;
+        try {
+            $pj = $jam->projectJobAssignment ? $jam->projectJobAssignment->projectJob : null;
+            if ($pj && $pj->user_id && $user && $user->id === $pj->user_id) $isOwner = true;
+        } catch (\Throwable $__e) {
+            // ignore
+        }
+
+        $isSender = $user && $jam->sender_id && $user->id === $jam->sender_id;
+        $isAssignee = $user && $jam->project_job_assignment && $jam->project_job_assignment->user_id && $user->id === $jam->project_job_assignment->user_id;
+
+        if (! $isPrivileged && ! $isOwner && ! $isSender && ! $isAssignee) {
+            abort(403, 'Access denied.');
+        }
+
+        // map to a JSON-friendly shape
+        $mapped = [
+            'id' => $jam->id,
+            'subject' => $jam->subject,
+            'body' => $jam->body,
+            'sender' => $jam->sender ? ['id' => $jam->sender->id, 'name' => $jam->sender->name] : null,
+            'project_job_assignment' => $jam->project_job_assignment ? [
+                'project_job' => $jam->project_job_assignment->projectJob ? [
+                    'id' => $jam->project_job_assignment->projectJob->id,
+                    'title' => $jam->project_job_assignment->projectJob->title ?? null,
+                    'client' => $jam->project_job_assignment->projectJob->client ? ['id' => $jam->project_job_assignment->projectJob->client->id, 'name' => $jam->project_job_assignment->projectJob->client->name] : null,
+                ] : null,
+                'id' => $jam->project_job_assignment->id,
+                'user' => $jam->project_job_assignment->user ? ['id' => $jam->project_job_assignment->user->id, 'name' => $jam->project_job_assignment->user->name] : null,
+                'title' => $jam->project_job_assignment->title ?? null,
+                'detail' => $jam->project_job_assignment->detail ?? null,
+                'difficulty' => $jam->project_job_assignment->difficulty ?? null,
+                'desired_start_date' => $jam->project_job_assignment->desired_start_date ?? null,
+                'desired_end_date' => $jam->project_job_assignment->desired_end_date ?? null,
+                'desired_time' => $jam->project_job_assignment->desired_time ?? null,
+                'estimated_hours' => $jam->project_job_assignment->estimated_hours ?? null,
+                'assigned' => (bool) ($jam->project_job_assignment->assigned ?? false),
+                'scheduled' => (bool) ($jam->project_job_assignment->scheduled ?? false),
+                'scheduled_at' => $jam->project_job_assignment->scheduled_at ?? null,
+                'completed' => (bool) ($jam->project_job_assignment->completed ?? false),
+                'accepted' => (bool) ($jam->project_job_assignment->accepted ?? false),
+                'read_at' => $jam->project_job_assignment->read_at ? $jam->project_job_assignment->read_at->toDateTimeString() : null,
+                'size_label' => $jam->project_job_assignment->size ? ($jam->project_job_assignment->size->name ?? $jam->project_job_assignment->size->label ?? null) : null,
+                'stage_label' => $jam->project_job_assignment->stage ? ($jam->project_job_assignment->stage->name ?? $jam->project_job_assignment->stage->label ?? null) : null,
+                'type_label' => $jam->project_job_assignment->workItemType ? ($jam->project_job_assignment->workItemType->name ?? $jam->project_job_assignment->workItemType->label ?? null) : null,
+                'status_label' => $jam->project_job_assignment->statusModel ? ($jam->project_job_assignment->statusModel->name ?? $jam->project_job_assignment->statusModel->label ?? null) : null,
+            ] : null,
+            'message' => $jam->message ? [
+                'id' => $jam->message->id,
+                'subject' => $jam->message->subject,
+                'fromUser' => $jam->message->fromUser ? ['id' => $jam->message->fromUser->id, 'name' => $jam->message->fromUser->name] : null,
+            ] : null,
+            'read_at' => $jam->read_at ? $jam->read_at->toDateTimeString() : null,
+        ];
+
+        return response()->json(['data' => $mapped]);
+    }
+
+    /**
+     * SPA-friendly endpoint to mark a JobAssignmentMessage as read.
+     * This is used by the frontend Show view when opened via Inertia or when
+     * the broadcast supplied only an id and the frontend fetched the jam.
+     */
+    public function apiMarkRead(Request $request, $id)
+    {
+        $user = $request->user();
+        $jam = JobAssignmentMessage::findOrFail($id);
+
+        // Authorization: only assignee or privileged roles or sender/owner can mark
+        $isPrivileged = $user && (method_exists($user, 'isCoordinator') && ($user->isCoordinator() || $user->isLeader() || $user->isAdmin() || $user->isSuperAdmin()));
+        $isOwner = false;
+        try {
+            $pj = $jam->projectJobAssignment ? $jam->projectJobAssignment->projectJob : null;
+            if ($pj && $pj->user_id && $user && $user->id === $pj->user_id) $isOwner = true;
+        } catch (\Throwable $__e) {
+            // ignore
+        }
+
+        $isSender = $user && $jam->sender_id && $user->id === $jam->sender_id;
+        $isAssignee = $user && $jam->project_job_assignment && $jam->project_job_assignment->user_id && $user->id === $jam->project_job_assignment->user_id;
+
+        if (! $isPrivileged && ! $isOwner && ! $isSender && ! $isAssignee) {
+            return response()->json(['error' => 'Access denied'], 403);
+        }
+
+        if (! $jam->read_at) {
+            $jam->read_at = now();
+            // set accepted flag when marking read
+            try {
+                $jam->accepted = true;
+            } catch (\Throwable $__e) {
+                // ignore if column missing
+            }
+            // reflect read on related assignment as well
+            try {
+                if ($jam->project_job_assignment_id) {
+                    $assignment = ProjectJobAssignment::find($jam->project_job_assignment_id);
+                    if ($assignment) {
+                        $assignment->read_at = $jam->read_at;
+                        try {
+                            $assignment->accepted = true;
+                        } catch (\Throwable $__e) {
+                        }
+                        $assignment->save();
+                    }
+                }
+            } catch (\Throwable $__e) {
+                // non-fatal
+            }
+            $jam->save();
+
+            // If linked to a Message, update corresponding recipient
+            if ($jam->message_id) {
+                try {
+                    \App\Models\MessageRecipient::where('message_id', $jam->message_id)
+                        ->where('user_id', $user ? $user->id : 0)
+                        ->whereNull('read_at')
+                        ->update(['read_at' => now()]);
+                } catch (\Throwable $__e) {
+                    // non-fatal
+                }
+            }
+
+            try {
+                $senderId = $jam->sender_id ?? null;
+                $readAt = $jam->read_at ? $jam->read_at->toDateTimeString() : now()->toDateTimeString();
+                $ev = new \App\Events\JobMessageRead($jam->id, $user ? $user->id : null, $senderId ? [$senderId] : null);
+                $ev->read_at = $readAt;
+                event($ev);
+            } catch (\Throwable $__e) {
+                // non-fatal
+            }
+        }
+
+        return response()->json(['data' => ['id' => $jam->id, 'read_at' => $jam->read_at ? $jam->read_at->toDateTimeString() : null]]);
     }
 
     /**
@@ -183,53 +456,60 @@ class JobBoxController extends Controller
                 'body' => $data['body'] ?? null,
             ]);
 
-            // Also create a Message and recipients so existing notification flow can be reused
+            // For job assignment requests, do NOT create a regular Message that lands in users' inboxes.
+            // Job assignment notifications live in JobBox only. We still broadcast a job-specific event
+            // so frontends subscribed to jobmessages.* receive the notification.
             $sanitizer = app(\App\Services\HtmlSanitizer::class);
             $body = $sanitizer->purify($data['body'] ?? null);
 
-            $message = \App\Models\Message::create([
-                'from_user_id' => $request->user()->id,
-                'subject' => $data['subject'] ?? null,
-                'body' => $body,
-                'status' => 'sent',
-                'sent_at' => now(),
-            ]);
-
-            foreach ($data['to'] as $uid) {
-                \App\Models\MessageRecipient::create([
-                    'message_id' => $message->id,
-                    'user_id' => $uid,
-                    'type' => 'to',
-                ]);
-            }
-
-            // Attach attachments if provided (move existing attachments to this message)
+            // Do not create \App\Models\Message here. Keep job_assignment_messages self-contained.
+            // Persist attachments in the job_assignment_messages.attachments JSON if provided
             if (!empty($data['attachments'])) {
-                foreach ($data['attachments'] as $attId) {
-                    \App\Models\Attachment::where('id', $attId)->update(['message_id' => $message->id]);
-                }
+                $jam->attachments = $data['attachments'];
+                $jam->save();
             }
-
-            // Persist linkage from job_assignment_messages -> messages
-            $jam->message_id = $message->id;
-            $jam->save();
 
             // mark the related assignment as assigned so UI/status reflects sent state
             try {
                 $assignment = ProjectJobAssignment::find($jam->project_job_assignment_id);
                 if ($assignment && (int)$assignment->project_job_id === (int)$projectJob->id) {
                     $assignment->assigned = true;
+                    // set accepted true on the assignment when JAM is created (recipient has received)
+                    try {
+                        $assignment->accepted = true;
+                    } catch (\Throwable $__e) {
+                        // ignore if column missing
+                    }
                     $assignment->save();
                 }
             } catch (\Throwable $__e) {
                 // non-fatal
             }
 
-            // Broadcast event for job-specific real-time notifications
+            // Broadcast event for job-specific real-time notifications. We construct a lightweight
+            // pseudo-message object so the event payload contains subject/from_user_name while
+            // avoiding creating a Message row that would appear in users' message inboxes.
             try {
-                $message->load('recipients');
-                $recipientIds = $message->recipients->pluck('user_id')->unique()->values()->all();
-                event(new \App\Events\JobMessageCreated($message, $recipientIds));
+                // Reload the created JAM with useful relations so the event can include a full jam payload
+                try {
+                    $jamLoaded = JobAssignmentMessage::with(['sender', 'projectJobAssignment.user', 'projectJobAssignment.projectJob.client', 'message.fromUser', 'message.recipients.user'])->find($jam->id);
+                    $recipientIds = is_array($data['to']) ? array_values(array_unique($data['to'])) : [];
+                    // pass the loaded jam model to the event so broadcastWith() can serialize relations
+                    event(new \App\Events\JobMessageCreated($jamLoaded, $recipientIds, $jam->id));
+                } catch (\Throwable $__e) {
+                    // fallback: attempt a simpler reload of the JAM with client relation before sending a minimal payload
+                    $recipientIds = is_array($data['to']) ? array_values(array_unique($data['to'])) : [];
+                    try {
+                        $jamLoadedFallback = JobAssignmentMessage::with(['sender', 'projectJobAssignment.user', 'projectJobAssignment.projectJob.client', 'message.fromUser', 'message.recipients.user'])->find($jam->id);
+                        if ($jamLoadedFallback) {
+                            event(new \App\Events\JobMessageCreated($jamLoadedFallback, $recipientIds, $jam->id));
+                        } else {
+                            event(new \App\Events\JobMessageCreated((object) ['id' => $jam->id, 'subject' => $data['subject'] ?? null, 'body' => $body, 'fromUser' => (object) ['name' => $request->user()->name ?? null]], $recipientIds, $jam->id));
+                        }
+                    } catch (\Throwable $__inner2) {
+                        event(new \App\Events\JobMessageCreated((object) ['id' => $jam->id, 'subject' => $data['subject'] ?? null, 'body' => $body, 'fromUser' => (object) ['name' => $request->user()->name ?? null]], $recipientIds, $jam->id));
+                    }
+                }
             } catch (\Throwable $__e) {
                 // non-fatal
             }
@@ -331,7 +611,24 @@ class JobBoxController extends Controller
 
             // Broadcast job-specific event to coordinators
             try {
-                event(new \App\Events\JobMessageCreated($message, $recipientIds));
+                // When replying we have both a Message and a linked JAM; load the JAM with relations
+                // so the event payload contains consistent jam/project_job_assignment/recipients info.
+                try {
+                    $jamLoaded = JobAssignmentMessage::with(['sender', 'projectJobAssignment.user', 'projectJobAssignment.projectJob.client', 'message.fromUser', 'message.recipients.user'])->find($jam->id);
+                    event(new \App\Events\JobMessageCreated($jamLoaded, $recipientIds, $jam->id));
+                } catch (\Throwable $__inner) {
+                    // fallback: try to load the JAM with client relation; if it exists prefer it, otherwise send the Message object
+                    try {
+                        $jamLoadedFallback = JobAssignmentMessage::with(['sender', 'projectJobAssignment.user', 'projectJobAssignment.projectJob.client', 'message.fromUser', 'message.recipients.user'])->find($jam->id);
+                        if ($jamLoadedFallback) {
+                            event(new \App\Events\JobMessageCreated($jamLoadedFallback, $recipientIds, $jam->id));
+                        } else {
+                            event(new \App\Events\JobMessageCreated($message, $recipientIds, $jam->id));
+                        }
+                    } catch (\Throwable $__inner2) {
+                        event(new \App\Events\JobMessageCreated($message, $recipientIds, $jam->id));
+                    }
+                }
             } catch (\Throwable $__e) {
                 // non-fatal
             }

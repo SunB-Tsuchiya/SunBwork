@@ -61,8 +61,8 @@ class ProjectJobController extends Controller
     {
         $jobid = session('jobid');
         $registerFlags = session('register_flags', []);
-        // reload projectJob with team members and their user relation
-        $projectJob->load(['teamMembers.user']);
+        // reload projectJob with team members and their user relation, and also ensure user and client relations are loaded
+        $projectJob->load(['teamMembers.user', 'user', 'client']);
         $members = $projectJob->teamMembers->map(function ($m) {
             return [
                 'id' => $m->id,

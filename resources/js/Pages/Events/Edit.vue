@@ -20,7 +20,7 @@ const form = useForm({
 onMounted(() => {
     content.value = props.event.description || '';
     form.date = props.event.date || '';
-    console.log('[Edit.vue] onMounted date:', form.date);
+    // onMounted date debug removed
     // 開始・終了時刻をprops.event.start/endから分解してセット
     if (props.event.start) {
         const startDate = new Date(props.event.start);

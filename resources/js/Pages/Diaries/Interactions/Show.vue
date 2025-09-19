@@ -61,7 +61,7 @@ function markRead() {
     const prefix = props.routePrefix || 'diaries';
     // when using default prefix 'diaries' the route is 'diaryinteractions.mark_read', otherwise 'admin.diaryinteractions.mark_read' etc.
     const markRouteName = prefix === 'diaries' ? 'diaryinteractions.mark_read' : `${prefix}.diaryinteractions.mark_read`;
-    console.log('markRead clicked', { markRouteName, diaryId: props.diary?.id, prefix });
+    // markRead click logged in development; suppressed for production
     let target;
     try {
         target = route(markRouteName, props.diary.id);
@@ -134,11 +134,22 @@ function markRead() {
 }
 
 function goIndex() {
-    // Navigate back to the prefix's diaries index (no date param)
+    // Navigate back to the diary interactions index for the given prefix
     const prefix = props.routePrefix || 'diaries';
-    if (prefix === 'admin') window.location.href = '/admin/diaries';
-    else if (prefix === 'leader') window.location.href = '/leader/diaries';
-    else window.location.href = '/diaries';
+    const routeName = prefix === 'diaries' ? 'diaryinteractions.index' : `${prefix}.diaryinteractions.index`;
+    try {
+        // prefer Ziggy route resolution when available on the page
+        const url = route(routeName);
+        window.location.href = url;
+        return;
+    } catch (e) {
+        // fallback to explicit prefix paths
+    }
+
+    let redirectUrl = `/diaryinteractions`;
+    if (prefix === 'admin') redirectUrl = `/admin/diaryinteractions`;
+    else if (prefix === 'leader') redirectUrl = `/leader/diaryinteractions`;
+    window.location.href = redirectUrl;
 }
 
 async function deleteComment(commentId, idx) {

@@ -88,22 +88,30 @@ class AppServiceProvider extends ServiceProvider
             // legacy: job_requests is being migrated into Messages. Keep the legacy
             // property for a transitional period but set to 0 to avoid duplicate counts.
             $user->unread_job_requests_count = 0;
-            // jobbox unread count: attempt to derive unread job-assignment messages.
-            // Note: JobAssignmentMessage currently is not linked to Message by id
-            // (optional future improvement: add message_id to job_assignment_messages).
+            // jobbox unread count: count job_assignment_messages where the assignee
+            // has not yet read the job message. We use the nullable read_at column
+            // on job_assignment_messages for this purpose. This keeps job unread
+            // counts independent from regular MessageRecipient rows.
             try {
-                // If job_assignment_messages were linked via message_id, we could
-                // count MessageRecipient rows for those messages. Fall back to 0
-                // to avoid errors in environments where linkage isn't present.
-                $hasColumn = Schema::hasColumn('job_assignment_messages', 'message_id');
-                if ($hasColumn) {
-                    $user->unread_job_messages_count = \App\Models\MessageRecipient::where('user_id', $user->id)
-                        ->whereNull('read_at')
-                        ->whereIn('message_id', function ($q) {
-                            $q->select('message_id')->from('job_assignment_messages');
-                        })->count();
+                $hasJam = Schema::hasTable('job_assignment_messages');
+                $hasReadAt = Schema::hasColumn('job_assignment_messages', 'read_at');
+                if ($hasJam && $hasReadAt) {
+                    $user->unread_job_messages_count = \App\Models\JobAssignmentMessage::whereHas('projectJobAssignment', function ($q) use ($user) {
+                        $q->where('user_id', $user->id);
+                    })->whereNull('read_at')->count();
                 } else {
-                    $user->unread_job_messages_count = 0;
+                    // Fallback: if schema doesn't have read_at, keep legacy behaviour
+                    // by attempting to infer from message recipients when linkage exists.
+                    $hasMessageId = Schema::hasColumn('job_assignment_messages', 'message_id');
+                    if ($hasMessageId) {
+                        $user->unread_job_messages_count = \App\Models\MessageRecipient::where('user_id', $user->id)
+                            ->whereNull('read_at')
+                            ->whereIn('message_id', function ($q) {
+                                $q->select('message_id')->from('job_assignment_messages');
+                            })->count();
+                    } else {
+                        $user->unread_job_messages_count = 0;
+                    }
                 }
             } catch (\Throwable $e) {
                 $user->unread_job_messages_count = 0;

@@ -1,20 +1,25 @@
 <template>
-    <AppLayout :title="`ジョブ割り当て一覧 - ${projectJob.name}`">
+    <AppLayout :title="`ジョブ割り当て一覧 - ${projectJob.title}`">
         <template #header>
             <h2 class="text-xl font-semibold leading-tight text-gray-800">【進行管理】{{ $page.props.auth.user.name || 'ユーザー' }}さんのページ</h2>
         </template>
 
         <div class="mx-auto max-w-6xl rounded bg-white p-6 shadow">
-            <h1 class="mb-4 text-2xl font-bold">ジョブ割り当て一覧：{{ projectJob.name }}</h1>
-            <div class="mb-4 flex items-center gap-2">
-                <input
-                    v-model="page.props.q_model"
-                    @keyup.enter="search"
-                    placeholder="タイトル/詳細/担当で検索"
-                    class="w-72 rounded border px-3 py-2 text-sm"
-                />
-                <button class="rounded bg-blue-600 px-3 py-2 text-white" @click.prevent="search">検索</button>
-                <button class="ml-2 rounded border px-3 py-2" @click.prevent="clearSearch">クリア</button>
+            <h1 class="mb-4 text-2xl font-bold">ジョブ割り当て一覧：{{ projectJob.title }}</h1>
+            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div class="mb-4 flex items-center gap-2">
+                    <input
+                        v-model="page.props.q_model"
+                        @keyup.enter="search"
+                        placeholder="タイトル/詳細/担当で検索"
+                        class="w-72 rounded border px-3 py-2 text-sm"
+                    />
+                    <button class="rounded bg-blue-600 px-3 py-2 text-white" @click.prevent="search">検索</button>
+                    <button class="ml-2 rounded border px-3 py-2" @click.prevent="clearSearch">クリア</button>
+                </div>
+                <div class="mb-4 md:ml-4 md:mt-0">
+                    <button @click.prevent="gotoCreate" class="rounded bg-blue-600 px-4 py-2 text-white">新規ジョブ割り当て</button>
+                </div>
             </div>
             <div class="overflow-x-auto">
                 <table class="min-w-full border">
@@ -39,13 +44,15 @@
                             <th class="cursor-pointer border px-4 py-2" @click.prevent="changeSort('assigned')">
                                 Status <SortIcon :active="sortBy === 'assigned'" :dir="sortDir" />
                             </th>
-                            <th class="border px-4 py-2">操作</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="a in assignments.data" :key="a.id" class="hover:bg-gray-50">
+                        <tr v-for="a in assignments.data" :key="a.id" class="cursor-pointer hover:bg-gray-50" @click.prevent="rowClick(a)">
                             <td class="border px-4 py-2">{{ a.desired_start_date || '-' }}</td>
-                            <td class="border px-4 py-2">{{ a.title }}</td>
+                            <td class="border px-4 py-2">
+                                <div class="font-semibold">{{ a.title }}</div>
+                                <div class="text-sm text-gray-600">{{ projectJob.client?.name || '-' }}</div>
+                            </td>
                             <td class="border px-4 py-2">{{ a.user?.name || '-' }}</td>
                             <td class="border px-4 py-2">
                                 {{ a.desired_end_date || '-' }}
@@ -57,23 +64,13 @@
                             <td class="border px-4 py-2">
                                 <button
                                     :disabled="a.assigned"
-                                    @click.prevent="sendRequest(a)"
+                                    @click.stop.prevent="sendRequest(a)"
                                     :class="['rounded px-3 py-1 text-white', a.assigned ? 'cursor-not-allowed bg-gray-400' : 'bg-blue-500']"
                                 >
                                     {{ a.assigned ? '発信済み' : '発信' }}
                                 </button>
                             </td>
                             <td class="border px-4 py-2">{{ statusText(a) }}</td>
-                            <td class="border px-4 py-2">
-                                <Link
-                                    :href="route('coordinator.project_jobs.assignments.edit', { projectJob: projectJob.id, assignment: a.id })"
-                                    class="rounded bg-yellow-500 px-3 py-1 text-white"
-                                    >編集</Link
-                                >
-                                <button type="button" class="ml-2 rounded bg-red-500 px-3 py-1 text-white" @click.prevent="deleteAssignment(a)">
-                                    削除
-                                </button>
-                            </td>
                         </tr>
                     </tbody>
                 </table>
@@ -100,26 +97,27 @@
                     </button>
                 </div>
             </div>
-            <div class="mt-4">
-                <Link
-                    :href="route('coordinator.project_jobs.assignments.create', { projectJob: projectJob.id })"
-                    class="rounded bg-blue-600 px-4 py-2 text-white"
-                    >新規ジョブ割り当て</Link
-                >
-                <Link :href="route('coordinator.project_jobs.show', { projectJob: projectJob.id })" class="rounded bg-gray-200 px-4 py-2">戻る</Link>
-            </div>
         </div>
     </AppLayout>
 </template>
 
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Link, router, usePage } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import { h } from 'vue';
 const { projectJob, assignments } = defineProps({ projectJob: Object, assignments: Object });
 const page = usePage();
 // local search model bound to server-provided q
 page.props.q_model = page.props.q || '';
+
+// compute safe create URL (Ziggy may not include the route in some builds)
+let createUrl = '';
+try {
+    createUrl = route('coordinator.project_jobs.assignments.create', { projectJob: projectJob.id });
+} catch (err) {
+    // fallback to manual path
+    createUrl = `/coordinator/project_jobs/${projectJob.id}/assignments/create`;
+}
 
 // reactive sort state from server-provided props
 const sortBy = page.props.sort_by || 'desired_start_date';
@@ -148,6 +146,22 @@ function goto(url) {
     router.visit(url, { preserveState: false });
 }
 
+function rowClick(a) {
+    try {
+        let url;
+        try {
+            url = route('coordinator.project_jobs.assignments.show', { projectJob: projectJob.id, assignment: a.id });
+        } catch (zigErr) {
+            // Ziggy route not available in the client manifest; build fallback path
+            // Ziggy route missing — fallback to manual path
+            url = `/coordinator/project_jobs/${projectJob.id}/assignments/${a.id}`;
+        }
+        router.visit(url, { preserveState: false });
+    } catch (err) {
+        // rowClick error suppressed in production
+    }
+}
+
 function search() {
     router.get(
         route('coordinator.project_jobs.assignments.index', { projectJob: projectJob.id }),
@@ -159,6 +173,11 @@ function search() {
 function clearSearch() {
     page.props.q_model = '';
     search();
+}
+
+function gotoCreate() {
+    if (!createUrl) return;
+    router.visit(createUrl, { preserveState: false });
 }
 
 function deleteAssignment(a) {
@@ -214,16 +233,18 @@ function sendRequest(a) {
 
     const payload = {
         to: toUserId ? [toUserId] : [],
-        subject: `ジョブ割り当ての依頼: ${a.title}`,
-        body: `割り当て依頼\nジョブ: ${projectJob.name}\n割り当て: ${a.title}\n\n担当ユーザー: ${assignedName}\n詳細:\n${detailsText || '（詳細なし）'}\n\n希望開始日: ${start}\n希望終了日: ${end}\n\nアプリで詳しい情報を確認できます。`,
+        // Use provided subject if given; otherwise default to the assignment title (no auto-prefix)
+        subject: a.title || null,
+        body: `割り当て依頼\nジョブ: ${projectJob.title}\n割り当て: ${a.title}\n\n担当ユーザー: ${assignedName}\n詳細:\n${detailsText || '（詳細なし）'}\n\n希望開始日: ${start}\n希望終了日: ${end}\n\nアプリで詳しい情報を確認できます。`,
     };
 
     // Use JobBox store route so job-related messages are stored separately and notifications are sent
     const jbPayload = {
         project_job_assignment_id: a.id,
         to: toUserId ? [toUserId] : [],
-        subject: payload.subject || payload.subject === '' ? payload.subject : `ジョブ割り当ての依頼: ${a.title}`,
-        body: payload.body || payload.body === '' ? payload.body : payload.body,
+        // Preserve explicit subject if provided; otherwise use assignment title without prefix
+        subject: payload.subject || a.title || null,
+        body: payload.body || null,
         attachments: [],
     };
 

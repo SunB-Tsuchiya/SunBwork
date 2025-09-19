@@ -142,7 +142,7 @@ const props = defineProps({
 });
 
 // department_idから部署名を取得
-console.log('[DEBUG] props.users:', props.users);
+// Debug logging removed
 const getDepartmentName = (department_id) => {
     if (!props.departments) return '';
     const department = props.departments.find((d) => d.id === department_id);

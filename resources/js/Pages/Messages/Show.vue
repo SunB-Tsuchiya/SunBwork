@@ -188,7 +188,7 @@ async function pollAttachmentStatus(id, attempt) {
                         localMessage.value.body = localMessage.value.body.replace(new RegExp(`\\[\\[attachment:${id}:[^\\]]*\\]`, 'g'), ``);
                     }
                 } else {
-                    console.debug('tchiro:debug: no placeholder found in body');
+                    // placeholder not found debug suppressed
                 }
                 return;
             }

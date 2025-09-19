@@ -15,9 +15,7 @@ const page = usePage();
 const currentTeam = ref(props.team || {});
 
 // Debug: log incoming props and resolved team/users to browser console
-console.log('[Admin/Teams/Show] page.props:', page.props);
-console.log('[Admin/Teams/Show] prop team:', props.team);
-console.log('[Admin/Teams/Show] currentTeam.users (initial):', currentTeam.value.users);
+// Debug logging removed
 
 const goBack = () => {
     router.visit(route('admin.teams.index'));

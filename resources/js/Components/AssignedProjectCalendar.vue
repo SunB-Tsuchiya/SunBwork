@@ -277,13 +277,15 @@ const calendarEvents = computed(() => {
 
     if (rawEvents && rawEvents.length > 0) {
         rawEvents.forEach((ev) => {
+            const title = ev.title ?? ev.name ?? '';
+            const isCompleted = typeof title === 'string' && title.indexOf('【完了】') === 0;
             list.push({
                 id: ev.id ?? ev.event_id ?? undefined,
-                title: ev.title ?? ev.name ?? '',
+                title: title,
                 start: ev.start ?? ev.start_date ?? undefined,
                 end: ev.end ?? ev.end_date ?? undefined,
                 allDay: ev.allDay ?? ev.all_day ?? false,
-                color: ev.backgroundColor ?? ev.color ?? '#3b82f6',
+                color: isCompleted ? '#b58900' : (ev.backgroundColor ?? ev.color ?? '#3b82f6'),
                 description: ev.description ?? ev.extendedProps?.description ?? '',
                 extendedProps: ev.extendedProps ?? {},
             });
@@ -476,7 +478,7 @@ const calendarOptions = computed(() => ({
                     (localMemos.value || []).find((m) => String(m.id) === String(mid));
                 // debug: log what we found for this click
                 try {
-                    console.log('eventClick memo mid', mid, 'ext', ext, 'found', found);
+                    // eventClick memo debug removed
                 } catch (e) {}
                 // populate memoShowData.value so Vue reactivity updates the modal
                 memoShowData.value = {
@@ -499,7 +501,7 @@ const calendarOptions = computed(() => ({
                         null,
                 };
                 try {
-                    console.log('memoShowData set', memoShowData.value);
+                    // memoShowData debug removed
                 } catch (e) {}
                 showMemoShowModal.value = true;
                 return;
@@ -524,7 +526,7 @@ onMounted(() => {
     nextTick(() => {
         // debug: log received memos prop on mount
         try {
-            console.log('AssignedProjectCalendar mounted props.memos', props.memos);
+            // AssignedProjectCalendar mounted debug removed
         } catch (e) {}
         // small initial injection attempt
         try {
@@ -581,14 +583,14 @@ async function submitScheduleMemo() {
         };
         // debug: log payload before send
         try {
-            console.log('submitScheduleMemo payload', payload);
+            // submitScheduleMemo payload debug removed
         } catch (e) {}
         const resp = await axios.post(route('coordinator.project_memos.store'), payload);
         if (resp && resp.data && resp.data.memo) {
             const m = resp.data.memo;
             // debug: log POST response
             try {
-                console.log('submitScheduleMemo resp', resp && resp.data ? resp.data : resp);
+                // submitScheduleMemo response debug removed
             } catch (e) {}
             // optimistic push
             localMemos.value.push({
@@ -609,7 +611,7 @@ async function submitScheduleMemo() {
                 });
                 // debug: log list GET response
                 try {
-                    console.log('submitScheduleMemo listResp', listResp && listResp.data ? listResp.data : listResp);
+                    // submitScheduleMemo list response debug removed
                 } catch (e) {}
                 if (listResp && listResp.data && Array.isArray(listResp.data.memos)) {
                     // map to localMemos shape (ensure author present)

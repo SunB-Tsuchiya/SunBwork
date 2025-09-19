@@ -128,6 +128,14 @@ class EventController extends Controller
         if (isset($data['date'])) {
             $event->date = $data['date'];
         }
+        // If job_id provided and events table has project_job_assignment_id, set it so the event links to assignment
+        try {
+            if ($jobId && Schema::hasColumn('events', 'project_job_assignment_id')) {
+                $event->project_job_assignment_id = $jobId;
+            }
+        } catch (\Throwable $__e) {
+            // ignore environment/schema checks
+        }
         $event->save();
 
         // If this event was created for a job assignment, mark that assignment as scheduled.
@@ -165,68 +173,99 @@ class EventController extends Controller
                         $assignment->save();
                     });
 
-                    // After marking scheduled, send a notification message to the assigner (if identifiable)
+                    // Update any related JobAssignmentMessage rows so JobBox entries
+                    // reflect that a schedule was set for this assignment.
                     try {
-                        // ensure projectJob relation is loaded
+                        \App\Models\JobAssignmentMessage::where('project_job_assignment_id', $assignment->id)
+                            ->where(function ($q) use ($event) {
+                                // only update those not already marked scheduled
+                                $q->whereNull('scheduled')->orWhere('scheduled', false);
+                            })
+                            ->update(['scheduled' => true, 'scheduled_at' => $event->start]);
+                    } catch (\Throwable $__e) {
+                        Log::warning('EventController: failed to update JobAssignmentMessage scheduled flag', ['error' => $__e->getMessage()]);
+                    }
+
+                    // After marking scheduled, decide whether to create an internal Message
+                    // or to emit a lightweight toast event. If the actor (Auth::id()) is
+                    // the assignee (the user responsible for doing the job), we DO NOT
+                    // create a Message for the jobbox; instead we broadcast an
+                    // AssignmentStatusToast event for client-side toast display.
+                    try {
                         $assignment->load('projectJob');
-                        $assignerId = null;
-                        // prefer explicit creator column if exists
-                        if (Schema::hasColumn('project_job_assignments', 'created_by') && isset($assignment->created_by)) {
-                            $assignerId = $assignment->created_by;
-                        }
-                        // fallback to project job owner
-                        if (!$assignerId && $assignment->projectJob && isset($assignment->projectJob->user_id)) {
-                            $assignerId = $assignment->projectJob->user_id;
-                        }
+                        $assigneeId = $assignment->user_id ?? null;
+                        $actorId = Auth::id();
 
-                        if ($assignerId) {
-                            $sanitizer = app(HtmlSanitizer::class);
-                            // Build message using the same labels as sendTestCompletion so frontend formatting applies
-                            $bodyLines = [];
-                            $bodyLines[] = "ジョブ割り当て終了のご連絡";
-                            $bodyLines[] = "プロジェクトジョブID: " . ($assignment->project_job_id ?? '-');
-                            $bodyLines[] = "予定をセットしたユーザーID: " . (Auth::id() ?? '-');
-                            $bodyLines[] = "イベント名: " . ($event->title ?? ($assignment->title ?: ($assignment->projectJob->name ?? '-')));
-                            $bodyLines[] = "開始: " . ($event->start ?? '-');
-                            $bodyLines[] = "終了: " . ($event->end ?? '-');
-                            // prefer assignment detail then project job detail
-                            $detailText = $assignment->detail ?? ($assignment->projectJob->detail ?? '');
-                            $bodyLines[] = "詳細: " . ($detailText ?: '');
+                        // Prepare toast payload common fields
+                        $toastPayload = [
+                            'assignment_id' => $assignment->id,
+                            'event_id' => $event->id ?? null,
+                            'action' => 'scheduled',
+                            'actor_id' => $actorId,
+                            'actor_name' => Auth::user() ? (Auth::user()->name ?? null) : null,
+                            'title' => $event->title ?? ($assignment->title ?? ($assignment->projectJob->name ?? null)),
+                        ];
 
-                            $body = implode("\n", $bodyLines);
-                            $clean = $sanitizer->purify($body);
-
+                        if ($assigneeId && $actorId && intval($assigneeId) === intval($actorId)) {
+                            // Actor is the assignee: broadcast lightweight toast instead of Message
                             try {
-                                Log::info('EventController: creating Message payload', ['from_user_id' => Auth::id(), 'subject' => 'ジョブ割り当て終了', 'assignerId' => $assignerId]);
-                                $message = Message::create([
-                                    'from_user_id' => Auth::id(),
-                                    'subject' => 'ジョブ割り当て終了',
-                                    'body' => $clean,
-                                    'status' => 'sent',
-                                    'sent_at' => now(),
-                                ]);
-                                Log::info('EventController: Message created', ['message_id' => $message->id]);
+                                event(new \App\Events\AssignmentStatusToast($toastPayload));
+                                Log::info('EventController: AssignmentStatusToast broadcast (scheduled)', ['assignment_id' => $assignment->id, 'event_id' => $event->id ?? null, 'actor_id' => $actorId]);
+                            } catch (\Throwable $__e) {
+                                Log::warning('EventController: failed to broadcast AssignmentStatusToast (scheduled)', ['error' => $__e->getMessage(), 'assignment_id' => $assignment->id, 'actor_id' => $actorId]);
+                            }
+                        } else {
+                            // Actor is not the assignee: create a persistent internal Message as before
+                            $assignerId = null;
+                            if (Schema::hasColumn('project_job_assignments', 'created_by') && isset($assignment->created_by)) {
+                                $assignerId = $assignment->created_by;
+                            }
+                            if (!$assignerId && $assignment->projectJob && isset($assignment->projectJob->user_id)) {
+                                $assignerId = $assignment->projectJob->user_id;
+                            }
 
-                                $recipient = MessageRecipient::create([
-                                    'message_id' => $message->id,
-                                    'user_id' => $assignerId,
-                                    'type' => 'to',
-                                ]);
-                                Log::info('EventController: MessageRecipient created', ['recipient_id' => $recipient->id ?? null, 'message_id' => $message->id, 'assignerId' => $assignerId]);
+                            if ($assignerId) {
+                                $sanitizer = app(HtmlSanitizer::class);
+                                $bodyLines = [];
+                                $bodyLines[] = "ジョブ割り当て終了のご連絡";
+                                $bodyLines[] = "プロジェクトジョブID: " . ($assignment->project_job_id ?? '-');
+                                $bodyLines[] = "予定をセットしたユーザーID: " . ($actorId ?? '-');
+                                $bodyLines[] = "イベント名: " . ($event->title ?? ($assignment->title ?: ($assignment->projectJob->name ?? '-')));
+                                $bodyLines[] = "開始: " . ($event->start ?? '-');
+                                $bodyLines[] = "終了: " . ($event->end ?? '-');
+                                $detailText = $assignment->detail ?? ($assignment->projectJob->detail ?? '');
+                                $bodyLines[] = "詳細: " . ($detailText ?: '');
+
+                                $body = implode("\n", $bodyLines);
+                                $clean = $sanitizer->purify($body);
 
                                 try {
-                                    $message->load('recipients');
-                                    event(new MessageCreated($message));
-                                    Log::info('EventController: MessageCreated event fired', ['message_id' => $message->id]);
+                                    $message = Message::create([
+                                        'from_user_id' => $actorId,
+                                        'subject' => 'ジョブ割り当て終了',
+                                        'body' => $clean,
+                                        'status' => 'sent',
+                                        'sent_at' => now(),
+                                    ]);
+                                    MessageRecipient::create([
+                                        'message_id' => $message->id,
+                                        'user_id' => $assignerId,
+                                        'type' => 'to',
+                                    ]);
+                                    try {
+                                        $message->load('recipients');
+                                        event(new MessageCreated($message));
+                                        Log::info('EventController: Message created and broadcast (scheduled)', ['message_id' => $message->id, 'assignment_id' => $assignment->id, 'actor_id' => $actorId]);
+                                    } catch (\Throwable $__e) {
+                                        Log::warning('EventController: broadcast MessageCreated failed', ['error' => $__e->getMessage(), 'message_id' => $message->id ?? null]);
+                                    }
                                 } catch (\Throwable $__e) {
-                                    Log::warning('EventController: broadcast MessageCreated failed', ['error' => $__e->getMessage()]);
+                                    Log::error('EventController: failed to create Message/Recipient', ['error' => $__e->getMessage()]);
                                 }
-                            } catch (\Throwable $__e) {
-                                Log::error('EventController: failed to create Message/Recipient', ['error' => $__e->getMessage()]);
                             }
                         }
                     } catch (\Throwable $e) {
-                        Log::warning('Failed to send set-complete message', ['error' => $e->getMessage()]);
+                        Log::warning('Failed to send set-complete message or toast', ['error' => $e->getMessage()]);
                     }
                 }
             } catch (\Throwable $e) {
@@ -412,9 +451,135 @@ class EventController extends Controller
     {
         // 添付ファイルも取得する場合はリレーションをロード
         $event->load('attachments');
+        // if this event is linked to a project job assignment, eager-load that assignment
+        if (Schema::hasColumn('events', 'project_job_assignment_id') && $event->project_job_assignment_id) {
+            $event->load('projectJobAssignment.projectJob.client');
+        }
         return Inertia::render('Events/Show', [
             'event' => $event,
         ]);
+    }
+
+    /**
+     * Mark an event (linked to a project_job_assignment) as completed.
+     * This will set project_job_assignments.completed = true, update related
+     * JobAssignmentMessage rows, optionally prefix the event title with the
+     * completion label, and broadcast a notification to relevant recipients.
+     */
+    public function complete(Request $request, Event $event)
+    {
+        $this->authorize('update', $event);
+
+        if (!Schema::hasColumn('events', 'project_job_assignment_id') || !$event->project_job_assignment_id) {
+            return redirect()->back()->with('error', 'このイベントはジョブに紐づいていません。');
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $assignment = ProjectJobAssignment::find($event->project_job_assignment_id);
+            if (!$assignment) {
+                DB::rollBack();
+                return redirect()->back()->with('error', '関連する割り当てが見つかりません。');
+            }
+
+            // mark assignment completed if column exists
+            if (Schema::hasColumn('project_job_assignments', 'completed')) {
+                $assignment->completed = true;
+            }
+            $assignment->save();
+
+            // update any JobAssignmentMessage rows to reflect completed state
+            try {
+                if (Schema::hasColumn('job_assignment_messages', 'completed')) {
+                    \App\Models\JobAssignmentMessage::where('project_job_assignment_id', $assignment->id)
+                        ->update(['completed' => true]);
+                }
+            } catch (\Throwable $__e) {
+                // non-fatal
+            }
+
+            // Prefix event title with completion marker for persistent visibility
+            $prefix = '【完了】';
+            if (strpos($event->title, $prefix) !== 0) {
+                $event->title = $prefix . $event->title;
+                $event->save();
+            }
+
+            // Create an internal Message to notify assigner/coordinators or emit a toast
+            try {
+                $actorId = Auth::id();
+                $assigneeId = $assignment->user_id ?? null;
+                $toastPayload = [
+                    'assignment_id' => $assignment->id,
+                    'event_id' => $event->id ?? null,
+                    'action' => 'completed',
+                    'actor_id' => $actorId,
+                    'actor_name' => Auth::user() ? (Auth::user()->name ?? null) : null,
+                    'title' => $event->title ?? ($assignment->title ?? ($assignment->projectJob->name ?? null)),
+                ];
+
+                if ($assigneeId && $actorId && intval($assigneeId) === intval($actorId)) {
+                    // Actor is assignee: broadcast a lightweight toast instead of creating a Message
+                    try {
+                        event(new \App\Events\AssignmentStatusToast($toastPayload));
+                        Log::info('EventController: AssignmentStatusToast broadcast (completed)', ['assignment_id' => $assignment->id, 'event_id' => $event->id ?? null, 'actor_id' => $actorId]);
+                    } catch (\Throwable $__e) {
+                        Log::warning('EventController: failed to broadcast AssignmentStatusToast (completed)', ['error' => $__e->getMessage(), 'assignment_id' => $assignment->id, 'actor_id' => $actorId]);
+                    }
+                } else {
+                    // Actor is not the assignee: create Message and notify recipients as before
+                    $sanitizer = app(HtmlSanitizer::class);
+                    $bodyLines = [];
+                    $bodyLines[] = "ジョブが完了しました";
+                    $bodyLines[] = "プロジェクトジョブID: " . ($assignment->project_job_id ?? '-');
+                    $bodyLines[] = "完了を操作したユーザーID: " . ($actorId ?? '-');
+                    $bodyLines[] = "イベント名: " . ($event->title ?? '-');
+                    $bodyLines[] = "開始: " . ($event->start ?? '-');
+                    $bodyLines[] = "終了: " . ($event->end ?? '-');
+                    $bodyLines[] = "詳細: " . ($event->description ?? '');
+                    $body = $sanitizer->purify(implode("\n", $bodyLines));
+
+                    $message = Message::create([
+                        'from_user_id' => $actorId,
+                        'subject' => 'ジョブ完了',
+                        'body' => $body,
+                        'status' => 'sent',
+                        'sent_at' => now(),
+                    ]);
+
+                    $recipientIds = [];
+                    $assignment->load('projectJob');
+                    if ($assignment->projectJob && $assignment->projectJob->user_id) $recipientIds[] = $assignment->projectJob->user_id;
+                    if (Schema::hasColumn('project_job_assignments', 'created_by') && $assignment->created_by && !in_array($assignment->created_by, $recipientIds)) {
+                        $recipientIds[] = $assignment->created_by;
+                    }
+                    $recipientIds = array_values(array_unique(array_filter($recipientIds)));
+
+                    foreach ($recipientIds as $uid) {
+                        MessageRecipient::create(['message_id' => $message->id, 'user_id' => $uid, 'type' => 'to']);
+                    }
+
+                    try {
+                        $message->load('recipients');
+                        event(new MessageCreated($message));
+                        Log::info('EventController: Message created and broadcast (completed)', ['message_id' => $message->id, 'assignment_id' => $assignment->id, 'actor_id' => $actorId]);
+                    } catch (\Throwable $__e) {
+                        Log::warning('EventController: broadcast MessageCreated failed', ['error' => $__e->getMessage(), 'message_id' => $message->id ?? null]);
+                    }
+                }
+            } catch (\Throwable $__e) {
+                // non-fatal: continue
+            }
+
+            DB::commit();
+
+            return redirect()->back()->with('success', '完了にしました。通知を送信しました。');
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            report($e);
+            return redirect()->back()->with('error', '完了処理中にエラーが発生しました。');
+        }
     }
 
     // イベント新規作成画面表示
@@ -424,25 +589,11 @@ class EventController extends Controller
         $jobId = $request->query('job');
         $jobData = null;
         if ($jobId) {
-            $assignment = \App\Models\ProjectJobAssignment::with(['projectJob', 'user'])->find($jobId);
+            // load lookup relations so Create page can prefill human-friendly labels
+            $assignment = \App\Models\ProjectJobAssignment::with(['projectJob.client', 'projectJob', 'user', 'size', 'stage', 'workItemType', 'statusModel'])->find($jobId);
             if ($assignment) {
-                $jobData = [
-                    'id' => $assignment->id,
-                    'project_job_id' => $assignment->project_job_id,
-                    'title' => $assignment->title ?: ($assignment->projectJob ? $assignment->projectJob->name : null),
-                    // details from assignment first, fallback to projectJob detail
-                    'details' => $assignment->detail ?? ($assignment->projectJob ? $assignment->projectJob->detail : null),
-                    // include assigned user name if available
-                    'assigned_user_name' => $assignment->user ? $assignment->user->name : null,
-                    // difficulty
-                    'difficulty' => $assignment->difficulty ?? ($assignment->projectJob ? $assignment->projectJob->difficulty : null),
-                    // desired/ preferred dates and time
-                    'desired_start_date' => $assignment->desired_start_date ? (method_exists($assignment->desired_start_date, 'format') ? $assignment->desired_start_date->format('Y-m-d') : (string) $assignment->desired_start_date) : null,
-                    'desired_end_date' => $assignment->desired_end_date ? (method_exists($assignment->desired_end_date, 'format') ? $assignment->desired_end_date->format('Y-m-d') : (string) $assignment->desired_end_date) : null,
-                    'desired_time' => $assignment->desired_time ?? null,
-                    // keep backward-compatible preferred_date
-                    'preferred_date' => $assignment->desired_start_date ? (method_exists($assignment->desired_start_date, 'format') ? $assignment->desired_start_date->format('Y-m-d') : (string) $assignment->desired_start_date) : null,
-                ];
+                // Use model helper to produce consistent prefill data
+                $jobData = $assignment->toEventPrefill();
             }
         }
         // Debug logging to ensure jobData is created and query params are received

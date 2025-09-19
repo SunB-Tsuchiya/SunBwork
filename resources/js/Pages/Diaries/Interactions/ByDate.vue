@@ -151,24 +151,14 @@ const groupedByDate = computed(() => {
         }
     }
 
-    // debug: print filters and current user so we can see why client filters run
-    console.log(
-        'ByDate debug: props.filters=',
-        props.filters,
-        'serverUnread=',
-        serverUnread.value,
-        'showOnlyRead=',
-        showOnlyRead,
-        'currentUserId=',
-        currentUserId,
-    );
+    // debug info removed in production
     // Note: apply read/unread filters here regardless of whether the server
     // populated read_by entries. Client-side determination relies on the
     // available read_by data and the current user id.
 
     (props.departments || []).forEach((group) => {
         (group.diaries || []).forEach((d, idx) => {
-            if (idx < 5) console.log('ByDate debug diary:', { id: d.id, read_by: d.read_by });
+            // debug diary logging removed
             // if server requested unread-only, skip diaries already read by current user
             if (displayedUnread.value && isReadByCurrentUser(d)) return;
             // if server requested read-only (unread === 0), skip diaries NOT read by current user

@@ -132,7 +132,7 @@ const props = defineProps({
 });
 
 // company_idから部署名を取得
-console.log('[DEBUG] props.users:', props.users, props.companies);
+// Debug logging removed
 const getCompanyName = (company_id) => {
     if (!props.companies || !Array.isArray(props.companies)) return '';
     const company = props.companies.find((c) => String(c.id) === String(company_id));

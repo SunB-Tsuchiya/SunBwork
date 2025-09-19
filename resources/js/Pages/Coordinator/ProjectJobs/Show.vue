@@ -26,11 +26,11 @@
                         </tr>
                         <tr class="border-b">
                             <th class="px-4 py-2 text-left">担当ユーザー</th>
-                            <td class="px-4 py-2">{{ job.user?.name || job.user_id || '-' }}</td>
+                            <td class="px-4 py-2">{{ job.user?.name || '-' }}</td>
                         </tr>
                         <tr class="border-b">
                             <th class="px-4 py-2 text-left">クライアント</th>
-                            <td class="px-4 py-2">{{ job.client?.name || job.client_id || '-' }}</td>
+                            <td class="px-4 py-2">{{ job.client?.name || '-' }}</td>
                         </tr>
                         <tr>
                             <th class="px-4 py-2 text-left align-top">詳細</th>

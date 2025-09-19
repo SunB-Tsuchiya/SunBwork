@@ -1,17 +1,26 @@
 <template>
-    <AppLayout :title="`ジョブ割り当て - ${projectJob.name}`">
+    <AppLayout :title="`ジョブ割り当て - ${projectJob.title}`">
         <template #header>
             <h2 class="text-xl font-semibold leading-tight text-gray-800">【進行管理】{{ $page.props.auth.user.name || 'ユーザー' }}さんのページ</h2>
         </template>
 
         <div class="mx-auto max-w-3xl rounded bg-white p-6 shadow">
-            <h1 class="mb-4 text-2xl font-bold">ジョブ割り当て：{{ projectJob.name }}</h1>
+            <h1 class="mb-4 text-2xl font-bold">ジョブ割り当て：{{ projectJob.title }}</h1>
 
             <form @submit.prevent="save">
                 <div v-for="(block, idx) in assignments" :key="idx" class="mb-4 rounded border p-4">
                     <label class="mb-1 block font-semibold">ジョブ名</label>
-                    <input v-model="block.title" type="text" class="w-full rounded border px-3 py-2" required />
+                    <div class="flex items-center gap-2">
+                        <span class="whitespace-nowrap rounded-l border bg-gray-100 px-3 py-2">{{ block.title_prefix }}</span>
+                        <input v-model="block.title_suffix" type="text" class="flex-1 rounded-r border px-3 py-2" />
+                    </div>
                     <div v-if="block.selection_label" class="mt-1 text-sm text-gray-600">{{ block.selection_label }}</div>
+
+                    <!-- show client name (read-only) between title and detail -->
+                    <label class="mb-1 block font-semibold">クライアント</label>
+                    <div class="w-full rounded border bg-gray-50 px-3 py-2">
+                        {{ block.project_job?.client?.name || projectJob.client?.name || '-' }}
+                    </div>
 
                     <label class="mb-1 mt-2 block font-semibold">概要</label>
                     <textarea v-model="block.detail" class="w-full rounded border px-3 py-2" rows="3"></textarea>
@@ -153,7 +162,15 @@ function makeLabel(kind, id) {
 function normalizeAssignment(a) {
     return {
         id: a.id || null,
-        title: a.title || '',
+        // split title into immutable prefix and editable suffix
+        title_prefix: `${props.projectJob?.title || ''}：`,
+        title_suffix: (() => {
+            const raw = a.title || '';
+            const prefix = `「${props.projectJob?.title || ''}：`;
+            if (!raw) return '';
+            if (raw.startsWith(prefix)) return raw.slice(prefix.length).trim();
+            return raw;
+        })(),
         detail: a.detail || '',
         difficulty: a.difficulty || 'normal',
         desired_start_date: a.desired_start_date || a.desired_date || '',
@@ -174,6 +191,10 @@ function normalizeAssignment(a) {
         size_label: a.size_label || makeLabel('sizes', a.size_id),
         stage_label: a.stage_label || makeLabel('stages', a.stage_id),
         status_label: a.status_label || makeLabel('statuses', a.status_id),
+        // include project_job info when available so templates can display client safely
+        project_job:
+            a.project_job ||
+            (props.projectJob ? { id: props.projectJob.id, title: props.projectJob.title, client: props.projectJob.client || null } : null),
     };
 }
 
@@ -182,6 +203,8 @@ const assignments = ref(props.assignments && props.assignments.length ? props.as
 assignments.value.forEach((a) => {
     if (a.saving === undefined) a.saving = false;
     if (a.linked_assignment_id === undefined) a.linked_assignment_id = null;
+    if (a.title_prefix === undefined) a.title_prefix = `「${props.projectJob?.title || ''}：`;
+    if (a.title_suffix === undefined) a.title_suffix = '';
 });
 const showSelector = ref(false);
 // which assignment block index the selector will populate
@@ -203,7 +226,8 @@ function onSelected(payload) {
 
     if (idx === null || idx === undefined) {
         assignments.value.push({
-            title: payload.size_id ? `サイズ: ${payload.size_id}` : '新規作業',
+            title_prefix: `「${props.projectJob?.title || ''}：`,
+            title_suffix: payload.size_id ? `サイズ: ${payload.size_id}` : '',
             detail: '',
             difficulty: 'normal',
             desired_date: '',
@@ -253,7 +277,8 @@ function openSelector(idx) {
 
 function addBlock() {
     assignments.value.push({
-        title: '',
+        title_prefix: `「${props.projectJob?.title || ''}：`,
+        title_suffix: '',
         detail: '',
         difficulty: 'normal',
         desired_date: '',
@@ -326,7 +351,7 @@ function save() {
     if (props.editMode && assignments.value.length === 1 && assignments.value[0].id) {
         const a = assignments.value[0];
         const payload = {
-            title: a.title,
+            title: `${a.title_prefix}${a.title_suffix ? ' ' + a.title_suffix : ''}`,
             detail: a.detail,
             difficulty: a.difficulty,
             estimated_hours: a.estimated_hours || null,
@@ -348,7 +373,7 @@ function save() {
 
     const payload = {
         assignments: assignments.value.map((a) => ({
-            title: a.title,
+            title: `${a.title_prefix}${a.title_suffix ? ' ' + a.title_suffix : ''}`,
             detail: a.detail,
             difficulty: a.difficulty,
             estimated_hours: a.estimated_hours || null,

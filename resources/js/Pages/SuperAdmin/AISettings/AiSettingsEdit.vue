@@ -40,10 +40,7 @@ const showToast = (msg) => {
 
 onMounted(() => {
     // debug: print props and presets so you can inspect in browser console
-    console.debug('AiSettingsEdit props:', props);
-    console.debug('model_presets (from server):', presets);
-    console.debug('instructions_presets:', instructionsPresets);
-    console.debug('system_prompts:', systemPrompts);
+    // Debug logs removed for AiSettingsEdit
 });
 
 // When user selects a model in the dropdown, auto-apply matching preset (if any)
@@ -137,7 +134,7 @@ const submit = async () => {
     const payload = { ...form };
     let parsed = {};
     try {
-        console.debug('Payload before submit:', payload);
+        // Payload before submit debug suppressed
         parsed = JSON.parse(modelOptionsText.value || '{}');
     } catch (e) {
         alert('model_options は有効なJSONである必要があります');
@@ -158,10 +155,10 @@ const submit = async () => {
     payload.model_options = parsed;
     try {
         const settingId = Number(props.setting?.id || 0);
-        console.debug('Submitting AI setting, computed id:', settingId);
+        // Submitting AI setting debug suppressed
         if (settingId && Number.isFinite(settingId) && settingId > 0) {
             const url = route('superadmin.ai.update', settingId);
-            console.debug('PUT to', url);
+            // PUT to URL debug suppressed
             try {
                 await axios.put(url, payload);
             } catch (err) {
@@ -176,7 +173,7 @@ const submit = async () => {
             }
         } else {
             const url = route('superadmin.ai.store');
-            console.debug('POST to', url);
+            // POST to URL debug suppressed
             await axios.post(url, payload);
         }
         window.location.href = route('superadmin.ai.index');

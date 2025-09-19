@@ -140,7 +140,21 @@ const startHourSelectRef = ref(null);
 const endHourSelectRef = ref(null);
 
 function goToAssignedJobs() {
-    router.get(route('user.assigned-jobs.index'));
+    try {
+        // Prefer named Ziggy route for JobBox index if available
+        if (typeof route === 'function' && route().has && route().has('project_jobs.index')) {
+            try {
+                router.get(route('project_jobs.index'));
+                return;
+            } catch (e) {
+                // fallthrough to fallback
+            }
+        }
+    } catch (err) {
+        // ignore
+    }
+    // fallback literal path
+    router.get('/jobbox');
 }
 
 onMounted(() => {
@@ -226,13 +240,15 @@ const events = ref([
         }
         // 透明度計算（最大0.2まで薄くする）
         const alpha = Math.max(1 - overlapCount * 0.2, 0.2);
+        // If title starts with completion prefix, use dark yellow color
+        const isCompleted = typeof event.title === 'string' && event.title.indexOf('【完了】') === 0;
         return {
             title: event.title,
             start: event.start,
             end: event.end ?? undefined,
             // respect incoming allDay flag if provided
             allDay: event.allDay ?? false,
-            color: event.color ?? `rgba(37,99,235,${alpha})`,
+            color: isCompleted ? '#b58900' : (event.color ?? `rgba(37,99,235,${alpha})`),
             event_id: event.id,
             // ProjectSchedule mapping: preserve schedule_id if provided
             schedule_id: event.extendedProps?.schedule_id ?? event.schedule_id ?? undefined,
@@ -259,7 +275,7 @@ const events = ref([
         .filter(Boolean),
 ]);
 
-// debug console.log removed after investigation
+// debug logs removed after investigation
 
 const calendarOptions = computed(() => ({
     plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],
@@ -362,7 +378,7 @@ const calendarOptions = computed(() => ({
                         description: safeDescription,
                     };
                 }
-                console.log('eventResize送信データ', logPayload);
+                // eventResize payload log removed
                 // update personal event via events endpoint
                 await axios.put(`/events/${info.event.extendedProps.event_id}/calendar`, {
                     date: displayStart,
@@ -373,10 +389,10 @@ const calendarOptions = computed(() => ({
                 });
                 alert('予定を更新しました');
             } catch (e) {
-                console.log('eventResize error:', e);
+                // eventResize error log suppressed (keep error thrown)
                 if (e.response && e.response.data) {
                     alert('予定の更新に失敗しました');
-                    console.log('API error detail:', e.response.data);
+                    // API error detail log suppressed
                 } else {
                     alert('予定の更新に失敗しました');
                 }
@@ -386,16 +402,140 @@ const calendarOptions = computed(() => ({
             info.revert(); // キャンセル時は元に戻す
         }
     },
-    eventClick: function (info) {
-        // 日報ラベルクリック時のみ遷移
-        if (info.event.extendedProps.diary_id) {
-            router.get(route('diaries.show', { diary: info.event.extendedProps.diary_id }));
+    eventClick: async function (info) {
+        try {
+            // If the clicked event is an all-day event, prefer navigating to the corresponding show page
+            if (info.event.allDay) {
+                if (info.event.extendedProps.diary_id) {
+                    try {
+                        router.get(route('diaries.show', { diary: info.event.extendedProps.diary_id }));
+                    } catch (e) {
+                        // Ziggy route may not be available in some contexts - fallback to a safe URL
+                        window.location.href = `/diaries/${info.event.extendedProps.diary_id}`;
+                    }
+                    return;
+                }
+
+                if (info.event.extendedProps.event_id || info.event.extendedProps.id || info.event.id) {
+                    // derive a best-effort event id from multiple possible locations
+                    const evId =
+                        info.event.extendedProps.event_id ||
+                        info.event.extendedProps.id ||
+                        info.event.id ||
+                        (info.event._def && info.event._def.publicId) ||
+                        null;
+                    if (evId) {
+                        // debug: print the derived id and fallback URL so developer can inspect in browser console
+                        console.debug('Calendar: navigating to event show', {
+                            evId,
+                            fallback: `/events/${evId}`,
+                            extendedProps: info.event.extendedProps,
+                        });
+                        try {
+                            router.get(route('events.show', { event: evId }));
+                        } catch (e) {
+                            window.location.href = `/events/${evId}`;
+                        }
+                        return;
+                    }
+                }
+
+                // Assigned job items: if the event has an explicit event id candidate, prefer navigating to that
+                // (this covers cases where an assigned-job entry actually points to an event). Otherwise,
+                // attempt existence probe on /events/:job_id and fall back to assigned-jobs.
+                if (info.event.extendedProps.job_id) {
+                    const jid = info.event.extendedProps.job_id;
+                    // Check for explicit event id fields that may be present on the event
+                    const explicitEvId =
+                        (info.event.extendedProps && (info.event.extendedProps.event_id || info.event.extendedProps.id)) ||
+                        info.event.id ||
+                        (info.event._def && info.event._def.publicId) ||
+                        null;
+                    if (explicitEvId) {
+                        try {
+                            // Prefer navigating to the explicit event id
+                            router.get(route('events.show', { event: explicitEvId }));
+                        } catch (e) {
+                            window.location.href = `/events/${explicitEvId}`;
+                        }
+                        return;
+                    }
+                    try {
+                        // Quick existence probe: try HEAD first, then GET as a fallback if HEAD isn't supported.
+                        let exists = false;
+                        try {
+                            const headResp = await fetch(`/events/${jid}`, { method: 'HEAD', credentials: 'same-origin' });
+                            exists = headResp.ok;
+                        } catch (headErr) {
+                            exists = false;
+                        }
+
+                        if (!exists) {
+                            try {
+                                const getResp = await fetch(`/events/${jid}`, { method: 'GET', credentials: 'same-origin' });
+                                exists = getResp.ok;
+                            } catch (getErr) {
+                                exists = false;
+                            }
+                        }
+
+                        if (exists) {
+                            try {
+                                router.get(route('events.show', { event: jid }));
+                            } catch (e) {
+                                window.location.href = `/events/${jid}`;
+                            }
+                        } else {
+                            try {
+                                router.get(route('user.assigned-jobs.show', { assigned_job: jid }));
+                            } catch (e) {
+                                try {
+                                    router.get(route('assigned-jobs.show', { id: jid }));
+                                } catch (e2) {
+                                    window.location.href = `/assigned-jobs/${jid}`;
+                                }
+                            }
+                        }
+                    } catch (outerErr) {
+                        // On any probe/navigation error, fallback to assigned-jobs
+                        try {
+                            router.get(route('assigned-jobs.show', { id: jid }));
+                        } catch (e) {
+                            window.location.href = `/assigned-jobs/${jid}`;
+                        }
+                    }
+                    return;
+                }
+            }
+
+            // 日報ラベルクリック時のみ遷移（既存の挙動を保持）
+            if (info.event.extendedProps.diary_id) {
+                router.get(route('diaries.show', { diary: info.event.extendedProps.diary_id }));
+            }
+            // 予定ラベルクリック時はShow.vueへ遷移
+            if ((info.event.extendedProps && (info.event.extendedProps.event_id || info.event.extendedProps.id)) || info.event.id) {
+                const evId =
+                    (info.event.extendedProps && (info.event.extendedProps.event_id || info.event.extendedProps.id)) ||
+                    info.event.id ||
+                    (info.event._def && info.event._def.publicId) ||
+                    null;
+                if (evId) {
+                    console.debug('Calendar: navigating to event show (non-allDay)', {
+                        evId,
+                        fallback: `/events/${evId}`,
+                        extendedProps: info.event.extendedProps,
+                    });
+                    try {
+                        router.get(route('events.show', { event: evId }));
+                    } catch (e) {
+                        window.location.href = `/events/${evId}`;
+                    }
+                }
+            }
+            // project schedule clicks not handled by personal calendar
+        } catch (err) {
+            // swallow errors to avoid breaking the calendar UI
         }
-        // 予定ラベルクリック時はShow.vueへ遷移
-        if (info.event.extendedProps.event_id) {
-            router.get(route('events.show', { event: info.event.extendedProps.event_id }));
-        }
-        // project schedule clicks not handled by personal calendar
     },
     select: handleDateSelect,
 }));
@@ -439,7 +579,7 @@ async function submitScheduleMemo() {
 const submitEvent = async () => {
     const start = `${form.value.date} ${form.value.startHour}:${form.value.startMinute}:00`;
     const end = `${form.value.date} ${form.value.endHour}:${form.value.endMinute}:00`;
-    console.log('送信start:', start, '送信end:', end);
+    // send start/end debug suppressed
     try {
         await axios.post('/events', {
             title: form.value.title,

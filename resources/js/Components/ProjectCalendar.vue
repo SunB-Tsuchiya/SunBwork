@@ -459,11 +459,11 @@ onMounted(() => {
 
                             didForceAddEvents.value = true;
                         } catch (e) {
-                            console.debug('[ProjectCalendar] onMounted inject error', e);
+                            // ProjectCalendar onMounted inject error debug suppressed
                         }
                     }
                 } catch (e) {
-                    console.debug('[ProjectCalendar] onMounted immediate inject error', e);
+                    // ProjectCalendar immediate inject error debug suppressed
                 }
             }, 300);
         } catch (e) {}
@@ -554,7 +554,7 @@ const calendarEvents = computed(() => {
         const alpha = Math.max(1 - overlapCount * 0.2, 0.2);
 
         // prefer explicit color fields; fall back to generated rgba
-        const color =
+        let color =
             event.backgroundColor ??
             event.background_color ??
             event.color ??
@@ -562,6 +562,10 @@ const calendarEvents = computed(() => {
             event.label_color ??
             event.metadata?.color ??
             `rgba(37,99,235,${alpha})`;
+
+        // If the title indicates completion (prefix), override with dark yellow
+        const isCompleted = typeof title === 'string' && title.indexOf('【完了】') === 0;
+        if (isCompleted) color = '#b58900';
 
         list.push({
             // include canonical `id` so FullCalendar and getEvents() return stable identifiers
@@ -771,7 +775,7 @@ watch(
                             console.info('[ProjectCalendar] injected events into FullCalendar via retry', events.length);
                             return;
                         } catch (e) {
-                            console.debug('[ProjectCalendar] plainCalendarEvents watcher addEventSource error', e);
+                            // ProjectCalendar plainCalendarEvents addEventSource error debug suppressed
                         }
                     }
                     // Not ready yet — schedule another attempt up to limit
@@ -780,12 +784,12 @@ watch(
                         setTimeout(() => tryInject(attempt + 1), 200);
                     }
                 } catch (e) {
-                    console.debug('[ProjectCalendar] plainCalendarEvents retry error', e);
+                    // ProjectCalendar plainCalendarEvents retry error debug suppressed
                 }
             };
             tryInject(0);
         } catch (e) {
-            console.debug('[ProjectCalendar] plainCalendarEvents watcher error', e);
+            // ProjectCalendar plainCalendarEvents watcher error debug suppressed
         }
     },
     { immediate: true },
@@ -800,7 +804,7 @@ watch(
             const api = calendarRef.value && calendarRef.value.getApi ? calendarRef.value.getApi() : null;
             // no-op: rely on FullCalendar's eventsSet and :events binding
         } catch (e) {
-            console.debug('[ProjectCalendar] calendarEvents watch error', e);
+            // ProjectCalendar calendarEvents watch error debug suppressed
         }
     },
     { immediate: true },
@@ -927,11 +931,7 @@ const calendarOptions = computed(() => ({
                     null;
 
                 if (projectJobId) {
-                    console.log('tchiro[ProjectCalendar] eventResize detected project event update', {
-                        project_job_id: projectJobId,
-                        project_schedule_id: inferredScheduleId,
-                        payload: logPayload,
-                    });
+                    // project event resize detected — debug suppressed
                     // If we have a schedule id, call coordinator.project_schedules.update
                     if (inferredScheduleId) {
                         try {
@@ -1085,10 +1085,10 @@ const calendarOptions = computed(() => ({
                     alert('予定を更新しました');
                 }
             } catch (e) {
-                console.log('eventResize error:', e);
+                // eventResize error suppressed; keep alert and revert
                 if (e.response && e.response.data) {
                     alert('予定の更新に失敗しました');
-                    console.log('API error detail:', e.response.data);
+                    // API error detail suppressed
                 } else {
                     alert('予定の更新に失敗しました');
                 }
@@ -1143,11 +1143,11 @@ const calendarOptions = computed(() => ({
                     api.getEventSources().forEach((s) => s.remove());
                     api.addEventSource(calendarEvents.value);
                 } catch (e) {
-                    console.debug('[ProjectCalendar] guarded eventsSet addEventSource error', e);
+                    // guarded eventsSet addEventSource error debug suppressed
                 }
             }
         } catch (e) {
-            console.debug('[ProjectCalendar] eventsSet error', e);
+            // eventsSet error debug suppressed
         }
     },
     eventClick: function (info) {
@@ -1301,19 +1301,7 @@ function openScheduleShowModal(event) {
                     }
                 };
 
-                // debug
-                try {
-                    console.debug(
-                        '[ProjectCalendar] findInList searching',
-                        listName,
-                        'wantId',
-                        wantId,
-                        'wantTitle',
-                        wantTitle,
-                        'wantStart',
-                        wantStart,
-                    );
-                } catch (e) {}
+                // debug suppressed for findInList searching
 
                 for (const ev of list) {
                     try {
@@ -1334,7 +1322,7 @@ function openScheduleShowModal(event) {
                         if (wantId && evId && wantId === evId) {
                             if (desc) {
                                 try {
-                                    console.debug('[ProjectCalendar] findInList matched by id in', listName, evId);
+                                    // findInList matched by id debug suppressed
                                 } catch (e) {}
                                 return desc;
                             }
@@ -1348,7 +1336,7 @@ function openScheduleShowModal(event) {
                         if (wantTitle && evTitle && wantTitle === evTitle && wantStartNorm && evStart && wantStartNorm === evStart) {
                             if (desc) {
                                 try {
-                                    console.debug('[ProjectCalendar] findInList matched by title+start in', listName, ev);
+                                    // findInList matched by title+start debug suppressed
                                 } catch (e) {}
                                 return desc;
                             }
@@ -1367,20 +1355,7 @@ function openScheduleShowModal(event) {
             else {
                 // debug: emit small samples so developer can inspect why lookup failed
                 try {
-                    console.debug(
-                        '[ProjectCalendar] openScheduleShowModal lookup failed; sample calendarEvents[0..4]:',
-                        (calendarEvents.value || []).slice(0, 5),
-                    );
-
-                    console.debug(
-                        '[ProjectCalendar] openScheduleShowModal lookup failed; sample plainCalendarEvents[0..4]:',
-                        (plainCalendarEvents.value || []).slice(0, 5),
-                    );
-
-                    console.debug(
-                        '[ProjectCalendar] openScheduleShowModal lookup failed; sample localCalendarEntries[0..4]:',
-                        (localCalendarEntries.value || []).slice(0, 5),
-                    );
+                    // debug suppressed: lookup failed samples removed
                 } catch (e) {}
             }
         } catch (e) {
@@ -1793,10 +1768,10 @@ async function submitScheduleMemo() {
                     const api = calendarRef.value && calendarRef.value.getApi ? calendarRef.value.getApi() : null;
                     if (api) api.addEvent(commentObj);
                 } catch (e) {
-                    console.debug('[ProjectCalendar] submitScheduleMemo addEvent failed', e);
+                    // submitScheduleMemo addEvent failed debug suppressed
                 }
             } catch (e) {
-                console.debug('[ProjectCalendar] submitScheduleMemo post-processing failed', e);
+                // submitScheduleMemo post-processing failed debug suppressed
             }
 
             showMemoModal.value = false;
@@ -1865,11 +1840,11 @@ async function submitScheduleMemo() {
                     const api = calendarRef.value && calendarRef.value.getApi ? calendarRef.value.getApi() : null;
                     if (api) api.addEvent(memoEvent);
                 } catch (e) {
-                    console.debug('[ProjectCalendar] submitScheduleMemo addEvent (project memo) failed', e);
+                    // submitScheduleMemo addEvent project memo failed debug suppressed
                 }
             }
         } catch (e) {
-            console.debug('[ProjectCalendar] submitScheduleMemo post-processing failed', e);
+            // submitScheduleMemo post-processing failed debug suppressed
         }
         showMemoModal.value = false;
         memoBody.value = '';
@@ -1949,7 +1924,7 @@ async function submitSimpleEvent() {
                     api.addEvent(eventObj);
                 }
             } catch (e) {
-                console.debug('[ProjectCalendar] submitSimpleEvent inject failed, falling back to reload', e);
+                // submitSimpleEvent inject failed debug suppressed
                 // fallback: reload if injection fails
                 setTimeout(() => window.location.reload(), 200);
             }

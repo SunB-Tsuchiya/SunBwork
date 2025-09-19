@@ -113,6 +113,9 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
         'update'
     ]);
 
+    // Mark an event (that is linked to a project_job_assignment) as completed
+    Route::post('/events/{event}/complete', [App\Http\Controllers\EventController::class, 'complete'])->name('events.complete');
+
     // Test: send a fake job-completion mail to user_id=1
     Route::get('/events/send-test-completion', [App\Http\Controllers\EventController::class, 'sendTestCompletion'])->name('events.send_test_completion');
 
@@ -279,6 +282,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('project_jobs/{projectJob}/assignments', [App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'index'])->name('project_jobs.assignments.index');
         Route::get('project_jobs/{projectJob}/assignments/create', [App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'create'])->name('project_jobs.assignments.create');
         Route::get('project_jobs/{projectJob}/assignments/{assignment}/edit', [App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'edit'])->name('project_jobs.assignments.edit');
+        // Show (read-only) view for a single assignment
+        Route::get('project_jobs/{projectJob}/assignments/{assignment}', [App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'show'])->name('project_jobs.assignments.show');
         Route::post('project_jobs/{projectJob}/assignments', [App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'store'])->name('project_jobs.assignments.store');
         Route::put('project_jobs/{projectJob}/assignments/{assignment}', [App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'update'])->name('project_jobs.assignments.update');
         Route::delete('project_jobs/{projectJob}/assignments/{assignment}', [App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'destroy'])->name('project_jobs.assignments.destroy');

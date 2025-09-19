@@ -14,13 +14,156 @@ use Illuminate\Support\Facades\Log;
 
 class DiaryController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $diaries = Diary::where('user_id', Auth::id())
-            ->orderByDesc('created_at')
-            ->get();
+        $userId = Auth::id();
+
+        // server-side filters and pagination for personal diaries
+        $days = intval($request->input('days', 7));
+        $perPage = intval($request->input('perPage', 30));
+        $page = max(1, intval($request->input('page', 1)));
+        $q = trim((string) $request->input('q', ''));
+        $unread = intval($request->input('unread', 0));
+        $onlyDate = $request->input('date', null);
+
+        // if a specific date is requested, return that date's entries (full content)
+        if ($onlyDate) {
+            $diaries = Diary::where('user_id', $userId)
+                ->where('date', $onlyDate)
+                ->orderBy('date', 'desc')
+                ->get();
+
+            $diariesArr = $diaries->map(function ($d) {
+                return [
+                    'id' => $d->id,
+                    'content' => $d->content ?? '',
+                    'description' => strip_tags($d->content ?? ''),
+                    'date' => $d->date->toDateString(),
+                ];
+            })->values();
+
+            $filters = ['date' => $onlyDate, 'fullContent' => true, 'unread' => $unread];
+
+            return Inertia::render('Diaries/Index', [
+                'diaries' => $diariesArr,
+                'meta' => null,
+                'filters' => $filters,
+            ]);
+        }
+
+        // free-text query -> diary-level pagination
+        if ($q !== '') {
+            $lower = now()->subDays($days)->toDateString();
+            $upper = now()->toDateString();
+
+            $query = Diary::where('user_id', $userId)
+                ->where('date', '>=', $lower)
+                ->where('date', '<=', $upper)
+                ->where(function ($qq) use ($q) {
+                    if (is_numeric($q)) {
+                        $qq->orWhere('id', intval($q));
+                    }
+                    $qq->orWhere('content', 'like', '%' . $q . '%');
+                });
+
+            if ($unread) {
+                $query->whereRaw("JSON_CONTAINS(read_by, JSON_ARRAY(?)) = 0", [$userId]);
+            }
+
+            $paginator = $query->orderBy('date', 'desc')->paginate($perPage)->withQueryString();
+            $collection = $paginator->getCollection();
+
+            $diariesArr = $collection->map(function ($d) {
+                return [
+                    'id' => $d->id,
+                    'content' => $d->content ?? '',
+                    'description' => strip_tags($d->content ?? ''),
+                    'date' => $d->date->toDateString(),
+                ];
+            })->values();
+
+            $meta = $paginator->toArray()['meta'] ?? null;
+            $filters = ['q' => $q, 'days' => $days, 'perPage' => $perPage, 'unread' => $unread];
+
+            return Inertia::render('Diaries/Index', [
+                'diaries' => $diariesArr,
+                'meta' => $meta,
+                'filters' => $filters,
+            ]);
+        }
+
+        // default: return one diary per distinct date within the days window, paginated by date
+        $lower = now()->subDays($days)->toDateString();
+        $upper = now()->toDateString();
+
+        $datesQuery = Diary::where('user_id', $userId)
+            ->where('date', '>=', $lower)
+            ->where('date', '<=', $upper);
+
+        if ($unread) {
+            $datesQuery->whereRaw("JSON_CONTAINS(read_by, JSON_ARRAY(?)) = 0", [$userId]);
+        }
+
+        $dates = $datesQuery->orderBy('date', 'desc')
+            ->distinct()
+            ->pluck('date')
+            ->map(function ($d) {
+                // ensure we have plain date strings, not Carbon objects
+                try {
+                    return is_object($d) && method_exists($d, 'toDateString') ? $d->toDateString() : (string) $d;
+                } catch (\Throwable $_) {
+                    return (string) $d;
+                }
+            })->toArray();
+
+        $totalDates = count($dates);
+        $sliced = array_slice($dates, ($page - 1) * $perPage, $perPage);
+
+        $diariesQuery = Diary::where('user_id', $userId)
+            ->whereIn('date', $sliced)
+            ->orderBy('date', 'desc');
+
+        if ($unread) {
+            $diariesQuery->whereRaw("JSON_CONTAINS(read_by, JSON_ARRAY(?)) = 0", [$userId]);
+        }
+
+        $diaries = $diariesQuery->get();
+
+        // pick the latest diary per date
+        $grouped = $diaries->groupBy(function ($d) {
+            return $d->date->toDateString();
+        });
+
+        $diariesArr = [];
+        foreach ($sliced as $dateKey) {
+            $list = $grouped->get($dateKey, collect());
+            if ($list->count() === 0) continue;
+            // choose the latest created_at record for that date
+            $latest = $list->sortByDesc('created_at')->first();
+            $diariesArr[] = [
+                'id' => $latest->id,
+                'content' => $latest->content ?? '',
+                'description' => strip_tags($latest->content ?? ''),
+                'date' => $latest->date->toDateString(),
+            ];
+        }
+
+        $lastPage = (int) ceil($totalDates / max(1, $perPage));
+        $meta = [
+            'current_page' => $page,
+            'last_page' => $lastPage,
+            'per_page' => $perPage,
+            'total' => $totalDates,
+        ];
+
+        $filters = ['q' => '', 'days' => $days, 'perPage' => $perPage, 'unread' => $unread];
+
+        // end debugging
+
         return Inertia::render('Diaries/Index', [
-            'diaries' => $diaries,
+            'diaries' => collect($diariesArr),
+            'meta' => $meta,
+            'filters' => $filters,
         ]);
     }
 

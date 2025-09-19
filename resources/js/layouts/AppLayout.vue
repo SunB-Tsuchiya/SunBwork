@@ -41,6 +41,7 @@ const logout = () => {
     router.post(route('logout'));
 };
 
+import useToasts from '@/Composables/useToasts';
 import { usePage } from '@inertiajs/vue3';
 import { onBeforeUnmount, onMounted, useSlots, ref as vueRef, watch } from 'vue';
 
@@ -92,29 +93,15 @@ const jobLink = computed(() => {
 // handle job link clicks with error trapping so we can surface the actual exception
 const handleJobClick = (e) => {
     try {
-        const domHref = e.currentTarget.getAttribute('href');
-        const computedHref = jobLink && jobLink.value ? jobLink.value : jobLink;
-        console.debug('handleJobClick domHref:', domHref, 'computedHref:', computedHref);
         // Let the browser handle the actual navigation (do not prevent default)
     } catch (err) {
-        console.error('Error in handleJobClick (non-fatal):', err);
         // swallow errors to avoid unwinding Vue native handler
     }
 };
 let echoChannel = null;
 
 onMounted(() => {
-    console.debug('AppLayout jobLink (computed) =', jobLink && jobLink.value ? jobLink.value : jobLink);
-    try {
-        console.debug('AppLayout page.props.projectJob =', page.props.projectJob);
-    } catch (e) {
-        console.debug('AppLayout page.props.projectJob read failed', e);
-    }
-    try {
-        console.debug('AppLayout auth user =', page.props.auth && page.props.auth.user ? page.props.auth.user : null);
-    } catch (e) {
-        console.debug('AppLayout auth.user read failed', e);
-    }
+    // AppLayout mounted
     try {
         if (window.Echo && authUser && authUser.id) {
             // messages channel (primary notification source)
@@ -146,9 +133,34 @@ onMounted(() => {
                     unreadJobMessages.value = Math.max(0, (unreadJobMessages.value || 0) - 1);
                 } catch (err) {}
             });
+            // Global lightweight toast events for assignment actions (scheduled/completed)
+            try {
+                const { showToast } = useToasts();
+                if (window.Echo && typeof window.Echo.channel === 'function') {
+                    window.Echo.channel('toasts').listen('AssignmentStatusToast', (e) => {
+                        try {
+                            const p = e.payload || (e.payloads ? e.payloads : {});
+                            const title = p.title ? String(p.title) : '';
+                            let message = '';
+                            if (p.action === 'scheduled') {
+                                message = `「${title}」の予定がセットされました`;
+                            } else if (p.action === 'completed') {
+                                message = `「${title}」の作業が完了しました`;
+                            } else {
+                                message = p.message || '操作が完了しました';
+                            }
+                            showToast(message, 'success', 5000);
+                        } catch (err) {
+                            // non-fatal
+                        }
+                    });
+                }
+            } catch (err) {
+                // non-fatal
+            }
         }
     } catch (err) {
-        console.warn('Echo subscribe failed', err);
+        // Echo subscribe failed (non-fatal)
     }
 });
 
@@ -163,9 +175,7 @@ onBeforeUnmount(() => {
 });
 const slots = useSlots();
 const hasTabsSlot = !!slots.tabs;
-// console.log('AppLayout $page.props:', page.props);
-// console.log('AppLayout user:', page.props.user);
-// console.log('AppLayout auth:', page.props.auth);
+// Debug logs removed for production
 
 // Determine an "active" key for top tabs based on current route name
 const getTopTabActive = () => {
@@ -181,6 +191,19 @@ const getTopTabActive = () => {
         return '';
     } catch (e) {
         return '';
+    }
+};
+// compute active key for coordinator tabs (projects vs jobs)
+const computeCoordinatorActive = () => {
+    try {
+        const r = route().current();
+        if (!r) return '';
+        // if route name includes 'assignments' treat as jobs list/assignments area
+        if (r.includes('assignments')) return 'jobs';
+        // otherwise default to projects
+        return 'projects';
+    } catch (e) {
+        return 'projects';
     }
 };
 </script>
@@ -609,7 +632,11 @@ const getTopTabActive = () => {
                                 <SuperAdminNavigationTabs v-if="route().current('superadmin.dashboard')" active="users" />
                                 <AdminNavigationTabs v-else-if="route().current('admin.dashboard')" active="users" />
                                 <LeaderNavigationTabs v-else-if="route().current('leader.dashboard')" active="clients" />
-                                <CoordinatorNavigationTabs v-else-if="route().current('coordinator.dashboard')" active="projects" />
+                                <CoordinatorNavigationTabs
+                                    v-else-if="route().current('coordinator.dashboard')"
+                                    :projectJob="page.props.projectJob"
+                                    :active="computeCoordinatorActive()"
+                                />
                                 <UserNavigationTabs v-else-if="route().current('dashboard') || route().current('user.dashboard')" active="profile" />
                             </div>
                         </slot>

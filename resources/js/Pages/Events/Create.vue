@@ -16,11 +16,28 @@ function buildJobDetails(job) {
     const end = job.desired_end_date || job.end_date || '';
     const pjId = job.project_job_id || job.project_job || '';
     const difficulty = job.difficulty || job.level || '';
+    const sizeLabel = job.size_label || job.size?.name || job.size?.label || null;
+    const stageLabel = job.stage_label || job.stage?.name || job.stage?.label || null;
+    const typeLabel = job.type_label || job.work_item_type?.name || job.work_item_type?.label || null;
+    const statusLabel = job.status_label || job.statusModel?.name || job.statusModel?.label || null;
 
     const lines = [];
     const jobName = job.title || job.name || (pjId ? `ID:${pjId}` : '');
     if (jobName) lines.push(`ジョブ名: ${jobName}`);
+    if (job.client_name) lines.push(`クライアント: ${job.client_name}`);
     if (difficulty) lines.push(`難易度: ${difficulty}`);
+    if (typeLabel) lines.push(`種別: ${typeLabel}`);
+    if (sizeLabel) lines.push(`サイズ: ${sizeLabel}`);
+    if (stageLabel) lines.push(`ステージ: ${stageLabel}`);
+    if (statusLabel) lines.push(`ステータス: ${statusLabel}`);
+    if (job.estimated_hours) lines.push(`見積時間: ${job.estimated_hours}`);
+    if (job.scheduled) lines.push(`セット済み: ${job.scheduled_at || 'はい'}`);
+    if (job.accepted) lines.push(`確認済み: ${job.accepted ? 'はい' : 'いいえ'}`);
+    if (job.completed) lines.push(`完了: ${job.completed ? 'はい' : 'いいえ'}`);
+    if (job.linked_assignment_id) lines.push(`リンク割当ID: ${job.linked_assignment_id}`);
+    if (job.project_job_name) lines.push(`プロジェクトジョブ: ${job.project_job_name}`);
+    if (job.project_job_detail) lines.push(`プロジェクトジョブ詳細: ${job.project_job_detail}`);
+    if (job.assigned_user_id) lines.push(`割当ユーザーID: ${job.assigned_user_id}`);
     lines.push(`担当ユーザー: ${assignedName}`);
     if (start || end) lines.push(`希望期間: ${start || '-'} 〜 ${end || '-'}`);
     lines.push('詳細:');
@@ -28,7 +45,8 @@ function buildJobDetails(job) {
     return lines.join('\n') + '\n';
 }
 
-const _jobText = buildJobDetails(props.job) + (props.job && props.job.details ? '\n' + props.job.details : '');
+// Build job text once; buildJobDetails already includes the assignment details if present.
+const _jobText = buildJobDetails(props.job);
 const content = ref(_jobText);
 // derive default start/end hour/minute from job.desired_time if available (expected formats: 'HH:MM', 'HH:MM:SS' or ISO time)
 function parseDesiredTime(t) {
@@ -60,18 +78,7 @@ const form = useForm({
 
 const errorMessage = ref('');
 
-console.log('[Create.vue] 初期 content:', content.value);
-console.log('[Create.vue] 初期 description:', form.description);
-console.log('[Create.vue] props:', props);
-console.log('[Create.vue] derived defaults:', { defaultStartHour, defaultStartMinute, defaultEndHour, defaultEndMinute });
-console.log('[Create.vue] initial form:', {
-    date: form.date,
-    title: form.title,
-    startHour: form.startHour,
-    startMinute: form.startMinute,
-    endHour: form.endHour,
-    endMinute: form.endMinute,
-});
+// Development logs removed
 
 onMounted(async () => {
     try {
@@ -79,13 +86,13 @@ onMounted(async () => {
         const editor = document.querySelector('.ql-editor');
         // If editor appears empty, force a brief update to content to trigger Quill refresh
         if (editor && (!editor.textContent || editor.textContent.trim() === '')) {
-            console.log('[Create.vue] ql-editor empty — forcing content update');
+            // ql-editor empty handling: debug removed
             // append a space then remove it to trigger update
             content.value = (content.value || '') + ' ';
             await nextTick();
             content.value = (content.value || '').trim();
             await nextTick();
-            console.log('[Create.vue] after force ql-editor textContent:', editor.textContent);
+            // post-force editor content debug suppressed
         }
     } catch (e) {
         console.error('[Create.vue] onMounted debug error', e);
@@ -93,16 +100,16 @@ onMounted(async () => {
 });
 
 function onContentFocus() {
-    console.log('[Create.vue] content onFocus:', content.value);
+    // content focus debug removed
 }
 function onContentBlur() {
-    console.log('[Create.vue] content onBlur:', content.value);
+    // content blur debug removed
 }
 function onDescriptionFocus() {
-    console.log('[Create.vue] description onFocus:', form.description);
+    // description focus debug removed
 }
 function onDescriptionBlur() {
-    console.log('[Create.vue] description onBlur:', form.description);
+    // description blur debug removed
 }
 
 // helper: return ISO-like timestamp string for comparison
@@ -155,13 +162,7 @@ const submit = () => {
             }
 
             try {
-                console.debug('[Create.vue] submitting event', {
-                    job_id: form.job_id,
-                    title: form.title,
-                    date: form.date,
-                    start: form.startHour + ':' + form.startMinute,
-                    end: form.endHour + ':' + form.endMinute,
-                });
+                // submitting event debug removed
                 form.post(route('events.store'), {
                     forceFormData: true,
                     onSuccess: () => {

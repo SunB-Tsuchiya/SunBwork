@@ -17,10 +17,21 @@ function formatJstDate(dateStr) {
 }
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router } from '@inertiajs/vue3';
+import { computed } from 'vue';
 import { route } from 'ziggy-js';
 
 const props = defineProps({
     diary: Object,
+});
+
+const editHref = computed(() => {
+    try {
+        // attach a return_to parameter so Edit.vue can navigate back correctly
+        const current = window.location.pathname + window.location.search + window.location.hash;
+        return route('diaries.edit', props.diary.id) + `?return_to=${encodeURIComponent(current)}`;
+    } catch (e) {
+        return route('diaries.edit', props.diary.id);
+    }
 });
 
 const deleteDiary = () => {
@@ -57,7 +68,7 @@ const back = () => {
             <div class="flex space-x-4">
                 <!-- 今日の日報表示時は新規作成ボタンを非表示 -->
                 <!-- <Link v-if="formatJstDate(props.diary.date) !== todayJst" :href="route('diaries.create')" class="px-4 py-2 bg-green-600 text-white rounded">新しく日報を書く</Link> -->
-                <Link :href="route('diaries.edit', props.diary.id)" class="rounded bg-blue-600 px-4 py-2 text-white">編集</Link>
+                <Link :href="editHref" class="rounded bg-blue-600 px-4 py-2 text-white">編集</Link>
                 <button @click="deleteDiary" class="rounded bg-red-600 px-4 py-2 text-white">削除</button>
                 <button @click="back" class="rounded bg-gray-200 px-4 py-2 text-gray-700">戻る</button>
             </div>

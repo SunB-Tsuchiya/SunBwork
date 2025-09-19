@@ -57,7 +57,7 @@ const handleDelete = async (teamId) => {
         }
         // Use explicit URL to ensure the ID is included (avoid Ziggy/route helper edge-cases)
         const destroyUrl = `/admin/teams/${teamId}`;
-        console.debug('Deleting team via', destroyUrl);
+        // Deleting team debug suppressed
 
         const res = await fetch(destroyUrl, {
             method: 'DELETE',
