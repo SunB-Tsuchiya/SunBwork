@@ -125,7 +125,6 @@ npm run dev
 
 - CI ジョブに `composer install`, `npm ci`, `npm run build` を含める。
 - `./vendor/bin/pest --coverage` を実行してカバレッジを取得（必要な場合）。
-- テスト環境は sqlite in-memory を利用するか、CI 用 DB を事前に用意して `DB_*` を指定してテストを通す。
 
 ---
 

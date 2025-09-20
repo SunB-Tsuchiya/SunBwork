@@ -36,7 +36,6 @@ function adminer_object()
                     <th>System</th>
                     <td>
                         <select name="auth[driver]">
-                            <option value="sqlite" selected>SQLite 3</option>
                         </select>
                     </td>
                 </tr>

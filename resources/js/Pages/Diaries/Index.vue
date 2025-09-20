@@ -14,8 +14,6 @@ const showCalendar = ref(false);
 
 // days selector: default to 7 days for "my diaries"
 const selectedDays = ref(props.filters && props.filters.days ? Number(props.filters.days) : 7);
-// per-page selector: default to filters.perPage or 30
-const selectedPerPage = ref(props.filters && props.filters.perPage ? Number(props.filters.perPage) : 30);
 
 const currentPage = computed(() => (props.meta && props.meta.current_page ? props.meta.current_page : 1));
 const lastPage = computed(() => (props.meta && props.meta.last_page ? props.meta.last_page : 1));
@@ -24,7 +22,6 @@ function applyFilters() {
     const params = Object.assign({}, props.filters || {});
     params.days = selectedDays.value;
     params.page = 1;
-    params.perPage = selectedPerPage.value;
     // Prefer Ziggy route helper to build the full URL with query params.
     try {
         Inertia.get(route('diaries.index', params));
@@ -40,7 +37,6 @@ function pageRoute(n) {
     const params = Object.assign({}, props.filters || {});
     params.days = selectedDays.value;
     params.page = n;
-    params.perPage = selectedPerPage.value;
     const qs = new URLSearchParams(params).toString();
     try {
         return route('diaries.index', params);
@@ -108,13 +104,6 @@ function goToPage(n) {
                         <option :value="7">7日分を表示</option>
                         <option :value="30">30日分を表示</option>
                         <option :value="90">90日分を表示</option>
-                    </select>
-                    <label class="ml-4 mr-2 text-sm">表示件数:</label>
-                    <select v-model.number="selectedPerPage" class="rounded border px-2 py-1 text-sm">
-                        <option :value="10">10 / page</option>
-                        <option :value="20">20 / page</option>
-                        <option :value="30">30 / page</option>
-                        <option :value="50">50 / page</option>
                     </select>
                     <button class="ml-2 rounded bg-blue-600 px-3 py-1 text-xs text-white" @click.prevent="applyFilters">適用</button>
                 </div>

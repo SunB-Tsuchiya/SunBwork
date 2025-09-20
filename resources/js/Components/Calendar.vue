@@ -127,6 +127,10 @@ const form = ref({
     date: '',
 });
 
+// clicked time when user clicks a time slot (used by select modal to prefill create)
+const clickedStartHour = ref(null);
+const clickedStartMinute = ref(null);
+
 // カレンダーで選択中の日付（初期値は今日）
 const today = new Date();
 const yyyy = today.getFullYear();
@@ -172,16 +176,63 @@ onMounted(() => {
 
 function openEventModal() {
     // 選択中の日付をセットしてEvents/Create.vueへ遷移
-    router.get(route('events.create', { date: selectedDate.value }));
+    try {
+        const current = window.location.pathname + window.location.search + window.location.hash;
+        router.get(route('events.create', { date: selectedDate.value, return_to: current }));
+        return;
+    } catch (e) {
+        router.get(route('events.create', { date: selectedDate.value }));
+    }
 }
 
 function openEventModalFromSelect() {
-    router.get(route('events.create', { date: selectedDate.value }));
+    // include clicked time if available (snap already applied on click)
+    try {
+        if (clickedStartHour.value !== null && clickedStartMinute.value !== null) {
+            const hh = String(clickedStartHour.value).padStart(2, '0');
+            const mm = String(clickedStartMinute.value).padStart(2, '0');
+            const endH = String((parseInt(hh, 10) + 1) % 24).padStart(2, '0');
+            const endM = mm;
+            try {
+                const current = window.location.pathname + window.location.search + window.location.hash;
+                router.get(
+                    route('events.create', {
+                        date: selectedDate.value,
+                        startHour: hh,
+                        startMinute: mm,
+                        endHour: endH,
+                        endMinute: endM,
+                        return_to: current,
+                    }),
+                );
+            } catch (e) {
+                router.get(route('events.create', { date: selectedDate.value, startHour: hh, startMinute: mm, endHour: endH, endMinute: endM }));
+            }
+            showSelectModal.value = false;
+            // reset clicked time
+            clickedStartHour.value = null;
+            clickedStartMinute.value = null;
+            return;
+        }
+    } catch (e) {
+        // fallthrough to simple navigation
+    }
+    try {
+        const current = window.location.pathname + window.location.search + window.location.hash;
+        router.get(route('events.create', { date: selectedDate.value, return_to: current }));
+    } catch (e) {
+        router.get(route('events.create', { date: selectedDate.value }));
+    }
     showSelectModal.value = false;
 }
 
 function goToDiaryCreateFromSelect() {
-    router.get(route('diaries.create', { date: selectedDate.value }));
+    try {
+        const current = window.location.pathname + window.location.search + window.location.hash;
+        router.get(route('diaries.create', { date: selectedDate.value, return_to: current }));
+    } catch (e) {
+        router.get(route('diaries.create', { date: selectedDate.value }));
+    }
     showSelectModal.value = false;
 }
 
@@ -189,7 +240,12 @@ function goToDiaryCreateFromSelect() {
 
 function goToDiaryCreate() {
     // 選択中の日付で作成画面へ遷移
-    router.get(route('diaries.create', { date: selectedDate.value }));
+    try {
+        const current = window.location.pathname + window.location.search + window.location.hash;
+        router.get(route('diaries.create', { date: selectedDate.value, return_to: current }));
+    } catch (e) {
+        router.get(route('diaries.create', { date: selectedDate.value }));
+    }
 }
 
 function handleDateSelect(selectionInfo) {
@@ -200,6 +256,32 @@ function handleDateSelect(selectionInfo) {
     selectedScheduleId.value = null;
     // 予定・日報作成選択モーダルを表示
     showSelectModal.value = true;
+}
+
+// Handle clicking a time slot or date cell. Snap minutes to 00 or 30 and open select modal.
+function handleTimeSlotClick(info) {
+    try {
+        // info may be a Date or an object depending on FullCalendar hook
+        let dateObj = null;
+        if (info && info.date)
+            dateObj = info.date; // dateClick provides { date, ... }
+        else if (info && info.start)
+            dateObj = info.start; // select provides start
+        else if (info instanceof Date) dateObj = info;
+        if (!dateObj) return;
+        // convert to YYYY-MM-DD and hours/minutes
+        const isoDate = dateObj.toISOString();
+        const dateOnly = isoDate.split('T')[0];
+        const h = dateObj.getHours();
+        const m = dateObj.getMinutes();
+        const snappedM = m < 30 ? 0 : 30;
+        selectedDate.value = dateOnly;
+        clickedStartHour.value = h;
+        clickedStartMinute.value = snappedM;
+        showSelectModal.value = true;
+    } catch (e) {
+        // ignore
+    }
 }
 
 // project schedule flows removed from personal calendar
@@ -289,6 +371,7 @@ const calendarOptions = computed(() => ({
         right: 'dayGridMonth,timeGridWeek,timeGridDay',
     },
     selectable: true,
+    dateClick: handleTimeSlotClick,
     // show time slots starting at 07:00 and use 30-minute intervals for consistent labels
     slotMinTime: '07:00:00',
     slotMaxTime: '24:00:00',

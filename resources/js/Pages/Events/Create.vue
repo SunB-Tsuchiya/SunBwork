@@ -7,6 +7,21 @@ import { route } from 'ziggy-js';
 
 const props = defineProps({ date: String, job: { type: Object, default: null } });
 
+function formatJstDate(dateStr) {
+    if (!dateStr) return '';
+    try {
+        const d = new Date(dateStr);
+        d.setHours(d.getHours() + 9);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+    } catch (e) {
+        // fallback: take date part before 'T' if present
+        return String(dateStr).split('T')[0];
+    }
+}
+
 // Build initial content by including job assignment metadata if available
 function buildJobDetails(job) {
     if (!job) return '';
@@ -75,6 +90,40 @@ const form = useForm({
     job_id: props.job && props.job.id ? props.job.id : null,
     files: [],
 });
+
+// If URL query contains startHour/startMinute/endHour/endMinute, use them to prefill the form.
+// This allows links like /events/create?date=2025-09-19&startHour=11&startMinute=00&endHour=12&endMinute=00
+// to populate the selectors correctly.
+try {
+    const params = new URLSearchParams(window.location.search);
+    const qStartH = params.get('startHour');
+    const qStartM = params.get('startMinute');
+    const qEndH = params.get('endHour');
+    const qEndM = params.get('endMinute');
+    if (qStartH) form.startHour = String(qStartH).padStart(2, '0');
+    if (qStartM) form.startMinute = String(qStartM).padStart(2, '0');
+    if (qEndH) form.endHour = String(qEndH).padStart(2, '0');
+    if (qEndM) form.endMinute = String(qEndM).padStart(2, '0');
+} catch (e) {
+    // ignore if window or URLSearchParams not available in test environments
+}
+
+// capture return_to query param so we can navigate back after save/cancel
+let returnTo = '';
+try {
+    const paramsRt = new URLSearchParams(window.location.search);
+    const rt = paramsRt.get('return_to');
+    if (rt && rt !== 'undefined' && rt !== 'null') {
+        // decode in case value was encoded
+        try {
+            returnTo = decodeURIComponent(String(rt));
+        } catch (e) {
+            returnTo = String(rt);
+        }
+    }
+} catch (e) {
+    returnTo = '';
+}
 
 const errorMessage = ref('');
 
@@ -167,6 +216,22 @@ const submit = () => {
                     forceFormData: true,
                     onSuccess: () => {
                         errorMessage.value = '';
+                        // prefer returning to origin if provided (use full navigation to ensure the diary page re-fetches events)
+                        if (returnTo && returnTo !== '') {
+                            try {
+                                // If it's a relative path like /diaries/123, force a full navigation to ensure mounted hooks run.
+                                window.location.href = returnTo;
+                            } catch (e) {
+                                try {
+                                    const vm = getCurrentInstance();
+                                    vm?.proxy?.$inertia?.visit(returnTo);
+                                } catch (e2) {
+                                    // last-resort fallback
+                                    window.location.href = returnTo;
+                                }
+                            }
+                            return;
+                        }
                         const target = props.job ? route('user.assigned-jobs.index') : route('calendar.index');
                         if (props.job) {
                             // force a full navigation to refresh server-side data
@@ -207,11 +272,15 @@ watch(
 );
 
 // When start (hour/minute) changes, always set end to the same time.
+// Only update end time automatically when it previously matched the old start time.
+// This prevents overriding an explicit endHour/endMinute provided via query params.
 watch(
     () => [form.startHour, form.startMinute],
-    ([h, m]) => {
-        form.endHour = h;
-        form.endMinute = m;
+    ([h, m], [oldH, oldM]) => {
+        if (form.endHour === oldH && form.endMinute === oldM) {
+            form.endHour = h;
+            form.endMinute = m;
+        }
     },
 );
 </script>
@@ -219,7 +288,7 @@ watch(
 <template>
     <AppLayout title="イベント作成">
         <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
-            <h1 class="mb-4 text-2xl font-bold">イベント作成 ({{ form.date }})</h1>
+            <h1 class="mb-4 text-2xl font-bold">イベント作成 ({{ formatJstDate(form.date) }})</h1>
             <form @submit.prevent="submit">
                 <div v-if="errorMessage" class="mb-4 rounded border-l-4 border-red-500 bg-red-50 p-3 text-red-700">
                     {{ errorMessage }}
@@ -290,7 +359,7 @@ watch(
                         <template v-else>保存</template>
                     </button>
                     <Link
-                        :href="props.job ? route('user.assigned-jobs.index') : route('calendar.index')"
+                        :href="returnTo && returnTo !== '' ? returnTo : props.job ? route('user.assigned-jobs.index') : route('calendar.index')"
                         class="rounded bg-gray-200 px-4 py-2 text-gray-700"
                         >キャンセル</Link
                     >

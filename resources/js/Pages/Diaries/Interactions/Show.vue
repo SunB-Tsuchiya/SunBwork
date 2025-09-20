@@ -1,6 +1,8 @@
 <script setup>
+import TimelineDiary from '@/Components/TimelineDiary.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { computed, ref } from 'vue';
+import axios from 'axios';
+import { computed, onMounted, ref } from 'vue';
 import { route } from 'ziggy-js';
 
 const props = defineProps({
@@ -59,25 +61,21 @@ function routeForIndex(date) {
 function markRead() {
     // Post mark-read (and optional comment) then navigate to the index page for the diary's date
     const prefix = props.routePrefix || 'diaries';
-    // when using default prefix 'diaries' the route is 'diaryinteractions.mark_read', otherwise 'admin.diaryinteractions.mark_read' etc.
     const markRouteName = prefix === 'diaries' ? 'diaryinteractions.mark_read' : `${prefix}.diaryinteractions.mark_read`;
-    // markRead click logged in development; suppressed for production
+
     let target;
     try {
         target = route(markRouteName, props.diary.id);
     } catch (e) {
         console.warn('Ziggy route resolution failed for', markRouteName, e);
-        // fallback to constructing a reasonable URL
         const id = props.diary?.id;
-        if (prefix === 'admin') target = `/admin/diaries/${id}/mark-read`;
-        else if (prefix === 'leader') target = `/leader/diaries/${id}/mark-read`;
-        else target = `/diaries/${id}/mark-read`;
+        if (prefix === 'admin') target = `/admin/diaryinteractions/${id}/mark-read`;
+        else if (prefix === 'leader') target = `/leader/diaryinteractions/${id}/mark-read`;
+        else target = `/diaryinteractions/${id}/mark-read`;
     }
 
-    // Use fetch to POST so we can deterministically redirect on success
     (async () => {
         try {
-            // read XSRF token from cookie
             const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
             const csrf = match ? decodeURIComponent(match[1]) : null;
 
@@ -96,36 +94,26 @@ function markRead() {
                 return;
             }
 
-            // After successful POST, do a full redirect to the index for the diary date
+            // optimistic store
             try {
-                // store optimistic read so index can reflect change immediately
-                try {
-                    const key = 'optimistic_reads';
-                    const cur = JSON.parse(sessionStorage.getItem(key) || '[]');
-                    if (!cur.includes(props.diary.id)) {
-                        cur.push(props.diary.id);
-                        sessionStorage.setItem(key, JSON.stringify(cur));
-                    }
-                } catch (e) {
-                    console.warn('optimistic read store failed', e);
-                }
-
-                // Avoid calling Ziggy.route here to prevent runtime errors when the route list
-                // isn't available in the current page payload. Build a safe explicit URL
-                // based on the prefix and redirect to the diary interactions index path.
-                try {
-                    // Return to the list root for the prefix (drop the ?date param)
-                    let redirectUrl = `/diaryinteractions`;
-                    if (prefix === 'admin') redirectUrl = `/admin/diaryinteractions`;
-                    else if (prefix === 'leader') redirectUrl = `/leader/diaryinteractions`;
-                    window.location.href = redirectUrl;
-                } catch (e) {
-                    // fallback to a very safe root path
-                    window.location.href = `/diaryinteractions`;
+                const key = 'optimistic_reads';
+                const cur = JSON.parse(sessionStorage.getItem(key) || '[]');
+                if (!cur.includes(props.diary.id)) {
+                    cur.push(props.diary.id);
+                    sessionStorage.setItem(key, JSON.stringify(cur));
                 }
             } catch (e) {
-                console.warn('routeForIndex failed', e);
-                window.location.href = `/diaries?date=${encodeURIComponent(props.diary.date)}`;
+                console.warn('optimistic read store failed', e);
+            }
+
+            // Redirect to the correct interactions index depending on prefix
+            try {
+                let redirectUrl = '/diaryinteractions/interactions';
+                if (prefix === 'admin') redirectUrl = '/admin/diaryinteractions';
+                else if (prefix === 'leader') redirectUrl = '/leader/diaryinteractions';
+                window.location.href = redirectUrl;
+            } catch (e) {
+                window.location.href = '/diaryinteractions/interactions';
             }
         } catch (e) {
             console.error('markRead fetch error', e);
@@ -146,10 +134,64 @@ function goIndex() {
         // fallback to explicit prefix paths
     }
 
-    let redirectUrl = `/diaryinteractions`;
+    let redirectUrl = `/diaryinteractions/interactions`;
     if (prefix === 'admin') redirectUrl = `/admin/diaryinteractions`;
     else if (prefix === 'leader') redirectUrl = `/leader/diaryinteractions`;
     window.location.href = redirectUrl;
+}
+
+// --- events timetable state for interactions show (read-only) ---
+const events = ref([]);
+
+// helper to format YYYY-MM-DD in app/JST timezone (keep consistent with Diaries/Show.vue)
+function formatJstDate(dateStr) {
+    try {
+        const d = new Date(dateStr);
+        d.setHours(d.getHours() + 9);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+    } catch (e) {
+        return String(dateStr).split('T')[0];
+    }
+}
+
+// fetch events for this diary's date (read-only display)
+onMounted(async () => {
+    try {
+        const date = formatJstDate(props.diary.date);
+        // include the diary owner's user_id so leaders/admins can fetch that user's events
+        const resp = await axios.get('/events', { params: { date, user_id: props.diary.user_id } });
+        events.value = (resp.data || []).map((e) => ({
+            id: e.id ?? e.event_id ?? e._id ?? null,
+            title: e.title || e.name || '(無題)',
+            start: e.start,
+            end: e.end || e.start,
+            allDay: !!e.allDay || !!e.all_day || false,
+            color: e.color || e.backgroundColor || '#2563eb',
+            description: e.description || e.extendedProps?.description || '',
+        }));
+    } catch (err) {
+        // ignore fetch errors for now
+        console.warn('Failed to load events for diary interaction show', err);
+    }
+});
+
+// when timeline emits open-edit in read-only view, navigate to events.show (no edit)
+function onTimelineOpenEdit(payload) {
+    if (!payload || !payload.id) return;
+    const id = payload.id;
+    try {
+        // include diary id so the event show page can render a back link
+        const url = route('diaryinteractions.events.show', { event: id }) + `?diary=${encodeURIComponent(props.diary.id)}`;
+        window.location.href = url;
+        return;
+    } catch (e) {
+        // fallback to prefixed path
+        window.location.href = `/diaryinteractions/events/${id}`;
+        return;
+    }
 }
 
 async function deleteComment(commentId, idx) {
@@ -204,43 +246,64 @@ async function deleteComment(commentId, idx) {
 
 <template>
     <AppLayout title="日報表示">
-        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
-            <h1 class="mb-4 text-xl font-bold">日報 {{ props.diary.user?.name }} — {{ formattedDate }}</h1>
+        <template #header>
+            <h2 class="text-xl font-semibold leading-tight text-gray-800">日報一覧</h2>
+        </template>
 
-            <div class="prose mb-6" v-html="props.diary.content"></div>
+        <div class="py-6">
+            <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
+                <div class="rounded bg-white p-6 shadow">
+                    <h1 class="mb-4 text-2xl font-bold">日報 {{ formatJstDate(props.diary.date) }}</h1>
 
-            <!-- 追加: 既読ユーザー名を表示 -->
-            <div v-if="readerNames.length" class="mb-4 text-sm text-gray-600">
-                <strong class="mr-2">既読:</strong>
-                <span>{{ readerNames.join(', ') }}</span>
-            </div>
-            <!-- 保存されたコメントをここに表示 -->
-            <div class="mb-4">
-                <h3 class="mb-2 font-semibold">保存されたコメント</h3>
-                <div v-if="!(props.diary.comments || []).length" class="mb-2 text-sm text-gray-600">コメントはありません</div>
-                <div
-                    v-for="(c, idx) in props.diary.comments || []"
-                    :key="c.id || idx"
-                    class="mb-2 flex items-start justify-between rounded border p-3"
-                >
-                    <div class="text-sm text-gray-700">
-                        <strong>{{ c.user_name || c.user_name }}</strong
-                        >： <span class="whitespace-pre-wrap">{{ c.comment }}</span>
+                    <div class="prose mb-6" v-html="props.diary.content"></div>
+
+                    <!-- 追加: 既読ユーザー名を表示 -->
+                    <div v-if="readerNames.length" class="mb-4 text-sm text-gray-600">
+                        <strong class="mr-2">既読:</strong>
+                        <span>{{ readerNames.join(', ') }}</span>
                     </div>
-                    <div v-if="c.user_id === $page.props.auth?.user?.id" class="ml-4">
-                        <button @click.prevent="deleteComment(c.id, idx)" class="text-sm text-red-600 hover:underline">削除</button>
+                    <!-- 保存されたコメントをここに表示 -->
+                    <div class="mb-4">
+                        <h3 class="mb-2 font-semibold">保存されたコメント</h3>
+                        <div v-if="!(props.diary.comments || []).length" class="mb-2 text-sm text-gray-600">コメントはありません</div>
+                        <div
+                            v-for="(c, idx) in props.diary.comments || []"
+                            :key="c.id || idx"
+                            class="mb-2 flex items-start justify-between rounded border p-3"
+                        >
+                            <div class="text-sm text-gray-700">
+                                <strong>{{ c.user_name || c.user_name }}</strong
+                                >： <span class="whitespace-pre-wrap">{{ c.comment }}</span>
+                            </div>
+                            <div v-if="c.user_id === $page.props.auth?.user?.id" class="ml-4">
+                                <button @click.prevent="deleteComment(c.id, idx)" class="text-sm text-red-600 hover:underline">削除</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700">コメント（任意）</label>
+                        <textarea v-model="comment" rows="3" class="mt-1 block w-full rounded border px-3 py-2"></textarea>
+                    </div>
+
+                    <!-- 当日の予定（読み取り専用） -->
+                    <div class="mb-6">
+                        <label class="mb-2 block text-sm font-medium text-gray-700">当日の予定</label>
+                        <TimelineDiary
+                            :date="formatJstDate(props.diary.date)"
+                            :events="events"
+                            :startHour="8"
+                            :endHour="20"
+                            :editable="false"
+                            @open-edit="onTimelineOpenEdit"
+                        />
+                    </div>
+
+                    <div class="flex justify-end space-x-2">
+                        <button @click="goIndex" class="rounded bg-gray-200 px-4 py-2 text-gray-700">一覧へ</button>
+                        <button @click="markRead" class="rounded bg-blue-600 px-4 py-2 text-white">既読にする</button>
                     </div>
                 </div>
-            </div>
-
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700">コメント（任意）</label>
-                <textarea v-model="comment" rows="3" class="mt-1 block w-full rounded border px-3 py-2"></textarea>
-            </div>
-
-            <div class="flex justify-end space-x-2">
-                <button @click="goIndex" class="rounded bg-gray-200 px-4 py-2 text-gray-700">一覧へ</button>
-                <button @click="markRead" class="rounded bg-blue-600 px-4 py-2 text-white">既読にする</button>
             </div>
         </div>
     </AppLayout>

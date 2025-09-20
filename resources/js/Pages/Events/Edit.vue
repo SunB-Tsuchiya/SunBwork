@@ -34,6 +34,16 @@ onMounted(() => {
     }
 });
 
+// capture optional return_to so we can navigate back to caller
+let returnTo = '';
+try {
+    const rtParams = new URLSearchParams(window.location.search);
+    const rt = rtParams.get('return_to');
+    if (rt) returnTo = String(rt);
+} catch (e) {
+    returnTo = '';
+}
+
 const submit = () => {
     form.description = content.value;
     // 時刻チェック
@@ -62,7 +72,17 @@ const submit = () => {
             }
             // always send JSON PUT (no files)
             form.put(route('events.update', props.event.id), {
-                onSuccess: () => router.get(route('calendar.index')),
+                onSuccess: () => {
+                    if (returnTo && returnTo !== '') {
+                        try {
+                            window.location.href = returnTo;
+                        } catch (e) {
+                            router.get(route('calendar.index'));
+                        }
+                        return;
+                    }
+                    router.get(route('calendar.index'));
+                },
             });
         });
 };
@@ -117,7 +137,9 @@ const submit = () => {
                 </div>
                 <div class="flex space-x-4">
                     <button type="submit" class="rounded bg-blue-600 px-4 py-2 text-white">更新</button>
-                    <Link :href="route('calendar.index')" class="rounded bg-gray-200 px-4 py-2 text-gray-700">キャンセル</Link>
+                    <Link :href="returnTo && returnTo !== '' ? returnTo : route('calendar.index')" class="rounded bg-gray-200 px-4 py-2 text-gray-700"
+                        >キャンセル</Link
+                    >
                 </div>
             </form>
         </div>

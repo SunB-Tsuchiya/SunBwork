@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Carbon\Carbon;
 use Intervention\Image\ImageManager;
 use Inertia\Inertia;
 use App\Models\ProjectJobAssignment;
@@ -18,9 +19,61 @@ use App\Models\Message;
 use App\Models\MessageRecipient;
 use App\Events\MessageCreated;
 use App\Services\HtmlSanitizer;
+use App\Models\Team;
+use App\Models\Unit;
 
 class EventController extends Controller
 {
+    // Reuse permission logic from DiaryInteractionController to determine which user ids
+    // the current actor may inspect. Kept local to avoid cross-controller dependency.
+    protected function buildPermittedUserIdsForActor($currentUser)
+    {
+        if (!$currentUser) return [];
+        if (method_exists($currentUser, 'isSuperAdmin') && $currentUser->isSuperAdmin()) {
+            return User::pluck('id')->toArray();
+        }
+
+        $isAdmin = ($currentUser->user_role ?? '') === 'admin';
+        $userIds = [];
+
+        if ($isAdmin) {
+            $companyId = $currentUser->company_id;
+            $users = User::where('company_id', $companyId)->get();
+            $userIds = $users->pluck('id')->toArray();
+            return array_values(array_unique(array_filter($userIds)));
+        }
+
+        // leader check and gather users from teams
+        $isLeader = Team::where('leader_id', $currentUser->id)->whereIn('team_type', ['department', 'unit'])->exists();
+        if ($isLeader) {
+            $teams = Team::where('leader_id', $currentUser->id)
+                ->whereIn('team_type', ['department', 'unit'])
+                ->get();
+
+            foreach ($teams as $team) {
+                if ($team->team_type === 'department' && $team->department_id) {
+                    $deptUsers = User::where('company_id', $team->company_id)
+                        ->where('department_id', $team->department_id)
+                        ->pluck('id')
+                        ->toArray();
+                    $userIds = array_merge($userIds, $deptUsers);
+                }
+
+                if ($team->team_type === 'unit') {
+                    $unit = Unit::where('company_id', $team->company_id)
+                        ->where('department_id', $team->department_id)
+                        ->where('name', $team->name)
+                        ->first();
+                    if ($unit) {
+                        $members = $unit->members()->pluck('users.id')->toArray();
+                        $userIds = array_merge($userIds, $members);
+                    }
+                }
+            }
+        }
+
+        return array_values(array_unique(array_filter($userIds)));
+    }
     /**
      * カレンダーからのリサイズ用: 時間のみバリデート・更新
      */
@@ -51,17 +104,86 @@ class EventController extends Controller
     public function index()
     {
         $date = request('date');
-        $query = Event::where('user_id', Auth::id());
-        if ($date) {
-            // Some environments use `starts_at`/`ends_at` in the DB while older code
-            // references `start`/`end`. Prefer the canonical DB column when present.
-            if (Schema::hasColumn('events', 'starts_at')) {
-                $query->whereDate('starts_at', $date);
+        $requestedUserId = request('user_id');
+
+        // Default: only current user's events
+        $baseUserId = Auth::id();
+
+        // If a user_id was requested, validate the caller has permission to view that user's events
+        if ($requestedUserId) {
+            // compute permitted user ids for current actor (reuse DiaryInteraction logic locally)
+            $permitted = $this->buildPermittedUserIdsForActor(Auth::user());
+            // allow if requesting own events or the requested user is in permitted list
+            if (intval($requestedUserId) === intval(Auth::id()) || in_array(intval($requestedUserId), $permitted) || (Auth::user()->user_role ?? '') === 'admin') {
+                $baseUserId = intval($requestedUserId);
             } else {
-                $query->whereDate('start', $date);
+                abort(403, 'このユーザーの予定を表示する権限がありません');
+            }
+        }
+
+        $query = Event::where('user_id', $baseUserId);
+        if ($date) {
+            // Interpret the incoming date (YYYY-MM-DD) in the application's timezone
+            // (config('app.timezone')) and convert to UTC range so we can robustly
+            // compare against timestamp columns stored in UTC in the DB.
+            try {
+                $tz = config('app.timezone') ?: 'UTC';
+                $startOfDay = Carbon::createFromFormat('Y-m-d', $date, $tz)->startOfDay();
+                $endOfDay = Carbon::createFromFormat('Y-m-d', $date, $tz)->endOfDay();
+                // convert to UTC for DB comparison
+                $startUtc = $startOfDay->copy()->setTimezone('UTC');
+                $endUtc = $endOfDay->copy()->setTimezone('UTC');
+            } catch (\Exception $e) {
+                // fallback to naive whereDate if parsing fails
+                if (Schema::hasColumn('events', 'starts_at')) {
+                    $query->whereDate('starts_at', $date);
+                } else {
+                    $query->whereDate('start', $date);
+                }
+                $startUtc = null;
+                $endUtc = null;
+            }
+
+            if (isset($startUtc) && isset($endUtc)) {
+                // Build both UTC-range and local app-tz range strings. Some rows may have been
+                // persisted in UTC while others in app timezone; include either via OR so we
+                // don't accidentally drop events.
+                $utcStartStr = $startUtc->toDateTimeString();
+                $utcEndStr = $endUtc->toDateTimeString();
+                $localStartStr = $startOfDay->toDateTimeString();
+                $localEndStr = $endOfDay->toDateTimeString();
+
+                if (Schema::hasColumn('events', 'starts_at')) {
+                    $query->where(function ($q) use ($utcStartStr, $utcEndStr, $localStartStr, $localEndStr) {
+                        $q->whereBetween('starts_at', [$utcStartStr, $utcEndStr])
+                            ->orWhereBetween('starts_at', [$localStartStr, $localEndStr]);
+                    });
+                } else {
+                    $query->where(function ($q) use ($utcStartStr, $utcEndStr, $localStartStr, $localEndStr) {
+                        $q->whereBetween('start', [$utcStartStr, $utcEndStr])
+                            ->orWhereBetween('start', [$localStartStr, $localEndStr]);
+                    });
+                }
+                try {
+                    Log::debug('EventController@index using range strings', ['date' => $date, 'utc' => [$utcStartStr, $utcEndStr], 'local' => [$localStartStr, $localEndStr]]);
+                } catch (\Throwable $__e) {
+                }
             }
         }
         $events = $query->get();
+        try {
+            // Debug: log which events were fetched for this request (id, start, end)
+            $summ = $events->map(function ($e) {
+                return [
+                    'id' => $e->id ?? null,
+                    'start' => $e->start ?? ($e->starts_at ?? null),
+                    'end' => $e->end ?? ($e->ends_at ?? null),
+                ];
+            })->toArray();
+            Log::debug('EventController@index fetched events', ['date' => $date, 'count' => $events->count(), 'events' => $summ]);
+        } catch (\Throwable $__logE) {
+            // ignore logging errors
+        }
         return response()->json($events);
     }
 
@@ -455,8 +577,29 @@ class EventController extends Controller
         if (Schema::hasColumn('events', 'project_job_assignment_id') && $event->project_job_assignment_id) {
             $event->load('projectJobAssignment.projectJob.client');
         }
+        $hideEdit = request()->query('hide_edit') ? true : false;
         return Inertia::render('Events/Show', [
             'event' => $event,
+            'hide_edit' => $hideEdit,
+        ]);
+    }
+
+    /**
+     * Show an event in the Diaries/Interactions context (read-only view).
+     * This route is intended for admin/leader diary interactions pages so the
+     * rendered page omits edit affordances and uses the diary interactions layout.
+     */
+    public function showForInteraction(Event $event)
+    {
+        $event->load('attachments');
+        if (Schema::hasColumn('events', 'project_job_assignment_id') && $event->project_job_assignment_id) {
+            $event->load('projectJobAssignment.projectJob.client');
+        }
+        // Always hide edit for interactions context
+        $diaryId = request()->query('diary');
+        return Inertia::render('Diaries/Interactions/EventShow', [
+            'event' => $event,
+            'diary_id' => $diaryId,
         ]);
     }
 

@@ -102,6 +102,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
             return redirect()->route('diaryinteractions.interactions.index');
         })->name('entries.index');
         Route::post('/mark-read-all', [App\Http\Controllers\Diaries\DiaryInteractionController::class, 'markReadAll'])->name('mark_read_all');
+        // Show a single event in the diary interactions context (read-only view)
+        Route::get('/events/{event}', [App\Http\Controllers\EventController::class, 'showForInteraction'])->name('diaryinteractions.events.show');
     });
 
     // イベント機能（作成、保存、表示、編集、更新）
