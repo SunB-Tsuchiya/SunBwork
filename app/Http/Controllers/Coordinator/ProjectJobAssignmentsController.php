@@ -104,6 +104,11 @@ class ProjectJobAssignmentsController extends Controller
             return $item['id'] !== null;
         })->values();
 
+        // ensure projectJob has client relation loaded so the create/edit pages can display client name
+        if (method_exists($projectJob, 'load')) {
+            $projectJob->load('client');
+        }
+
         // prepare companies list based on user role (superadmin/admin can select companies/departments)
         $companies = collect();
         $userRole = null;
@@ -252,6 +257,8 @@ class ProjectJobAssignmentsController extends Controller
             'size_label' => $sizeLabel,
             'stage_label' => $stageLabel,
             'status_label' => $statusLabel,
+            'amounts' => $a->amounts ?? null,
+            'amounts_unit' => $a->amounts_unit ?? null,
         ];
 
         return Inertia::render('Coordinator/ProjectJobs/JobAssign/Edit', [
@@ -274,12 +281,49 @@ class ProjectJobAssignmentsController extends Controller
     {
         // Build display payload similar to edit(), including resolved labels and user info
         $a = $assignment;
+        // prepare members and lookup lists (same as edit) so frontend can resolve names
+        $members = $projectJob->teamMembers()->with('user')->get()->map(function ($m) {
+            return ['id' => $m->user?->id, 'name' => $m->user?->name];
+        })->filter(function ($item) {
+            return $item['id'] !== null;
+        })->values();
 
-        // lookup lists for labels
-        $types = \App\Models\WorkItemType::orderBy('sort_order')->orderBy('name')->get(['id', 'name']);
-        $sizes = \App\Models\Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'width', 'height', 'unit']);
-        $stages = \App\Models\Stage::orderBy('sort_order')->orderBy('order_index')->get(['id', 'name']);
-        $statuses = \App\Models\Status::orderBy('sort_order')->get(['id', 'name']);
+        // ensure projectJob has client relation loaded for the show page
+        if (method_exists($projectJob, 'load')) {
+            $projectJob->load('client');
+        }
+
+        // prepare companies list based on user role
+        $companies = collect();
+        $userRole = null;
+        $userCompanyId = null;
+        $userDepartmentId = null;
+        $user = request()->user();
+        if ($user) {
+            $userRole = $user->user_role ?? null;
+            $userCompanyId = $user->company_id ?? null;
+            $userDepartmentId = $user->department_id ?? null;
+        }
+
+        if ($userRole === 'superadmin') {
+            $companies = \App\Models\Company::with(['departments' => function ($q) {
+                $q->orderBy('sort_order');
+            }])->orderBy('name')->get();
+        } elseif ($userRole === 'admin') {
+            if ($userCompanyId) {
+                $companies = \App\Models\Company::where('id', $userCompanyId)->with(['departments' => function ($q) {
+                    $q->orderBy('sort_order');
+                }])->get();
+            }
+        } else {
+            $companies = collect();
+        }
+
+        // lookup lists for modal (types, sizes, stages, statuses)
+        $types = \App\Models\WorkItemType::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'company_id', 'department_id']);
+        $sizes = \App\Models\Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'width', 'height', 'unit', 'company_id', 'department_id']);
+        $stages = \App\Models\Stage::orderBy('sort_order')->orderBy('order_index')->get(['id', 'name', 'company_id', 'department_id']);
+        $statuses = \App\Models\Status::orderBy('sort_order')->get(['id', 'name', 'slug', 'company_id', 'department_id']);
 
         $typeLabel = null;
         $sizeLabel = null;
@@ -334,12 +378,25 @@ class ProjectJobAssignmentsController extends Controller
             'size_label' => $sizeLabel,
             'stage_label' => $stageLabel,
             'status_label' => $statusLabel,
+            'amounts' => $a->amounts ?? null,
+            'amounts_unit' => $a->amounts_unit ?? null,
             'user' => $userInfo,
         ];
 
         return Inertia::render('Coordinator/ProjectJobs/JobAssign/Show', [
             'projectJob' => $projectJob,
             'assignment' => $assignmentPayload,
+            // provide lookup arrays so frontend can resolve names like in edit()
+            'members' => $members,
+            'companies' => $companies,
+            'types' => $types,
+            'sizes' => $sizes,
+            'stages' => $stages,
+            'statuses' => $statuses,
+            'user_role' => $userRole,
+            'user_company_id' => $userCompanyId,
+            'user_department_id' => $userDepartmentId,
+            'editMode' => false,
         ]);
     }
 
@@ -361,6 +418,9 @@ class ProjectJobAssignmentsController extends Controller
             'company_id' => 'nullable|exists:companies,id',
             'department_id' => 'nullable|exists:departments,id',
             'stage_id' => 'nullable|exists:stages,id',
+            // amounts and unit: amounts is integer >= 0, unit limited to page|file
+            'amounts' => 'nullable|integer|min:0',
+            'amounts_unit' => 'nullable|string|in:page,file',
         ]);
 
         // server-side logical validations
@@ -396,6 +456,8 @@ class ProjectJobAssignmentsController extends Controller
             'status_id' => $data['status_id'] ?? null,
             'company_id' => $data['company_id'] ?? null,
             'department_id' => $data['department_id'] ?? null,
+            'amounts' => $data['amounts'] ?? null,
+            'amounts_unit' => $data['amounts_unit'] ?? null,
         ]);
 
         return redirect()->route('coordinator.project_jobs.assignments.index', ['projectJob' => $projectJob->id]);
@@ -420,6 +482,8 @@ class ProjectJobAssignmentsController extends Controller
             'assignments.*.company_id' => 'nullable|exists:companies,id',
             'assignments.*.department_id' => 'nullable|exists:departments,id',
             'assignments.*.stage_id' => 'nullable|exists:stages,id',
+            'assignments.*.amounts' => 'nullable|integer|min:0',
+            'assignments.*.amounts_unit' => 'nullable|string|in:page,file',
             'assignments.*.title' => 'nullable|string|max:255',
             'assignments.*.description' => 'nullable|string',
         ]);
@@ -460,6 +524,9 @@ class ProjectJobAssignmentsController extends Controller
                     'status_id' => $a['status_id'] ?? null,
                     'company_id' => $a['company_id'] ?? null,
                     'department_id' => $a['department_id'] ?? null,
+                    // amounts fields
+                    'amounts' => $a['amounts'] ?? null,
+                    'amounts_unit' => $a['amounts_unit'] ?? null,
                 ]);
 
                 // previously we created a separate WorkItem here; now assignment stores type/size/stage/status/company/department directly
@@ -468,6 +535,82 @@ class ProjectJobAssignmentsController extends Controller
         }
 
         return redirect()->route('coordinator.project_jobs.assignments.index', ['projectJob' => $projectJob->id]);
+    }
+
+    /**
+     * Store an assignment created by a regular user (no coordinator side-effects).
+     * This saves a single assignment record and redirects back to the calendar view.
+     */
+    public function storeUser(Request $request, ProjectJob $projectJob)
+    {
+        $data = $request->validate([
+            'title' => 'required|string|max:255',
+            'detail' => 'nullable|string',
+            'difficulty' => 'required|in:light,normal,heavy',
+            'estimated_hours' => 'nullable|numeric|min:0',
+            'desired_start_date' => 'nullable|date',
+            'desired_end_date' => 'nullable|date',
+            'desired_time' => 'nullable|date_format:H:i',
+            // Note: user_id should be the current authenticated user; do not accept client-supplied user_id
+            'work_item_type_id' => 'nullable|exists:work_item_types,id',
+            'size_id' => 'nullable|exists:sizes,id',
+            'status_id' => 'nullable|exists:statuses,id',
+            'company_id' => 'nullable|exists:companies,id',
+            'department_id' => 'nullable|exists:departments,id',
+            'stage_id' => 'nullable|exists:stages,id',
+            'amounts' => 'nullable|integer|min:0',
+            'amounts_unit' => 'nullable|string|in:page,file',
+        ]);
+
+        // server-side logical validations (same as store)
+        if (!empty($data['desired_start_date']) && !empty($data['desired_end_date'])) {
+            if ($data['desired_end_date'] < $data['desired_start_date']) {
+                return back()->withErrors(['desired_end_date' => '終了希望日は割当希望日より前にできません。'])->withInput();
+            }
+        }
+        if (!empty($data['desired_end_date']) && !empty($data['desired_time'])) {
+            $today = date('Y-m-d');
+            if ($data['desired_end_date'] === $today) {
+                $now = date('H:i');
+                if ($data['desired_time'] < $now) {
+                    return back()->withErrors(['desired_time' => '当日の時間は現在時刻以降を指定してください。'])->withInput();
+                }
+            }
+        }
+
+        // create a single assignment for the authenticated user without side-effects
+        $user = $request->user();
+
+        DB::transaction(function () use ($projectJob, $data, $user) {
+            ProjectJobAssignment::create([
+                'project_job_id' => $projectJob->id,
+                'user_id' => $user ? $user->id : null,
+                'title' => $data['title'],
+                'detail' => $data['detail'] ?? null,
+                'difficulty' => $data['difficulty'],
+                'desired_start_date' => $data['desired_start_date'] ?? null,
+                'desired_end_date' => $data['desired_end_date'] ?? null,
+                'desired_time' => $data['desired_time'] ?? null,
+                'estimated_hours' => $data['estimated_hours'] ?? null,
+                'work_item_type_id' => $data['work_item_type_id'] ?? null,
+                'size_id' => $data['size_id'] ?? null,
+                'stage_id' => $data['stage_id'] ?? null,
+                'status_id' => $data['status_id'] ?? null,
+                'company_id' => $data['company_id'] ?? null,
+                'department_id' => $data['department_id'] ?? null,
+                'amounts' => $data['amounts'] ?? null,
+                'amounts_unit' => $data['amounts_unit'] ?? null,
+            ]);
+        });
+
+        // After user saves their own job, redirect back to calendar (assume route 'calendar.index' exists)
+        // If your app uses a different calendar route, please adjust the route name accordingly.
+        try {
+            return redirect()->route('calendar.index');
+        } catch (\Exception $e) {
+            // Fallback: go back to project assignments index if calendar route not available
+            return redirect()->route('coordinator.project_jobs.assignments.index', ['projectJob' => $projectJob->id]);
+        }
     }
 
     public function destroy(ProjectJob $projectJob, ProjectJobAssignment $assignment)

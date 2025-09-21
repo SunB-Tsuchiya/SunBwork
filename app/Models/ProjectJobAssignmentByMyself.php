@@ -6,9 +6,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Schema;
 
-class ProjectJobAssignment extends Model
+class ProjectJobAssignmentByMyself extends Model
 {
     use HasFactory;
+
+    protected $table = 'project_job_assignment_by_myself';
 
     protected $fillable = [
         'project_job_id',
@@ -34,15 +36,16 @@ class ProjectJobAssignment extends Model
         // quantity fields
         'amounts',
         'amounts_unit',
+        // start time separate from desired_time
+        'start_time',
     ];
 
     protected $casts = [
         'desired_at' => 'datetime',
-        // serialize dates as plain Y-m-d to avoid ISO timestamp with T and timezone
         'desired_start_date' => 'date:Y-m-d',
         'desired_end_date' => 'date:Y-m-d',
         'desired_time' => 'string',
-        // estimated_hours stores fractional hours, e.g. 1.5 == 1 hour 30 minutes
+        'start_time' => 'string',
         'estimated_hours' => 'float',
         'assigned' => 'boolean',
         'completed' => 'boolean',
@@ -67,7 +70,6 @@ class ProjectJobAssignment extends Model
         return $this->belongsTo(User::class);
     }
 
-    // Relations to lookup models (optional)
     public function workItemType()
     {
         return $this->belongsTo(WorkItemType::class, 'work_item_type_id');
@@ -98,15 +100,8 @@ class ProjectJobAssignment extends Model
         return $this->belongsTo(Department::class, 'department_id');
     }
 
-    /**
-     * Build a standardized array for pre-filling Event creation forms.
-     * Includes assignment fields, linked project job fields and client info when available.
-     *
-     * @return array
-     */
     public function toEventPrefill(): array
     {
-        // ensure relations are loaded to avoid extra queries in callers
         $this->loadMissing(['projectJob.client', 'user', 'size', 'stage', 'workItemType', 'statusModel']);
 
         $jobData = [
@@ -125,10 +120,10 @@ class ProjectJobAssignment extends Model
             'desired_time' => $this->desired_time ?? null,
             'estimated_hours' => $this->estimated_hours ?? null,
             'linked_assignment_id' => $this->linked_assignment_id ?? null,
-            'scheduled' => Schema::hasColumn('project_job_assignments', 'scheduled') ? (bool) ($this->scheduled ?? false) : false,
-            'scheduled_at' => Schema::hasColumn('project_job_assignments', 'scheduled_at') && $this->scheduled_at ? (method_exists($this->scheduled_at, 'format') ? $this->scheduled_at->format('Y-m-d H:i:s') : (string)$this->scheduled_at) : null,
-            'accepted' => Schema::hasColumn('project_job_assignments', 'accepted') ? (bool) ($this->accepted ?? false) : false,
-            'completed' => Schema::hasColumn('project_job_assignments', 'completed') ? (bool) ($this->completed ?? false) : false,
+            'scheduled' => Schema::hasColumn('project_job_assignment_by_myself', 'scheduled') ? (bool) ($this->scheduled ?? false) : false,
+            'scheduled_at' => Schema::hasColumn('project_job_assignment_by_myself', 'scheduled_at') && $this->scheduled_at ? (method_exists($this->scheduled_at, 'format') ? $this->scheduled_at->format('Y-m-d H:i:s') : (string)$this->scheduled_at) : null,
+            'accepted' => Schema::hasColumn('project_job_assignment_by_myself', 'accepted') ? (bool) ($this->accepted ?? false) : false,
+            'completed' => Schema::hasColumn('project_job_assignment_by_myself', 'completed') ? (bool) ($this->completed ?? false) : false,
             'preferred_date' => $this->desired_start_date ? (method_exists($this->desired_start_date, 'format') ? $this->desired_start_date->format('Y-m-d') : (string)$this->desired_start_date) : null,
             'size_label' => $this->size ? ($this->size->name ?? $this->size->label ?? null) : null,
             'stage_label' => $this->stage ? ($this->stage->name ?? $this->stage->label ?? null) : null,

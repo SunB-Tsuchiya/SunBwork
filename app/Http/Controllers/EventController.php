@@ -164,26 +164,11 @@ class EventController extends Controller
                             ->orWhereBetween('start', [$localStartStr, $localEndStr]);
                     });
                 }
-                try {
-                    Log::debug('EventController@index using range strings', ['date' => $date, 'utc' => [$utcStartStr, $utcEndStr], 'local' => [$localStartStr, $localEndStr]]);
-                } catch (\Throwable $__e) {
-                }
+                // debug logging removed
             }
         }
         $events = $query->get();
-        try {
-            // Debug: log which events were fetched for this request (id, start, end)
-            $summ = $events->map(function ($e) {
-                return [
-                    'id' => $e->id ?? null,
-                    'start' => $e->start ?? ($e->starts_at ?? null),
-                    'end' => $e->end ?? ($e->ends_at ?? null),
-                ];
-            })->toArray();
-            Log::debug('EventController@index fetched events', ['date' => $date, 'count' => $events->count(), 'events' => $summ]);
-        } catch (\Throwable $__logE) {
-            // ignore logging errors
-        }
+        // removed verbose debug logging for fetched events
         return response()->json($events);
     }
 
@@ -454,10 +439,9 @@ class EventController extends Controller
     // 予定の更新
     public function update(Request $request, Event $event)
     {
-        Log::debug('Event update request', $request->all());
+    // debug logging removed
         $this->authorize('update', $event);
-        Log::debug('Request all: ' . json_encode($request->all(), JSON_UNESCAPED_UNICODE));
-        Log::debug('Request input: ' . json_encode($request->input(), JSON_UNESCAPED_UNICODE));
+    // debug logging removed
         // $request->get()は引数必須のため削除
         $data = $request->validate([
             'date' => 'required|date',
@@ -475,7 +459,7 @@ class EventController extends Controller
             'endHour' => 'required',
             'endMinute' => 'required',
         ]);
-        Log::debug('Validated data', $data);
+    // debug logging removed
         $data['description'] = $request->input('description', '');
         $data['user_id'] = Auth::id();
         $data['start'] = date('Y-m-d H:i:00', strtotime($data['date'] . ' ' . $data['startHour'] . ':' . $data['startMinute']));
@@ -488,10 +472,9 @@ class EventController extends Controller
                 unset($data['date']);
             }
         }
-        Log::debug('Start/End generated', ['start' => $data['start'], 'end' => $data['end']]);
-        Log::debug('Event before update', $event->toArray());
+    // debug logging removed
         $event->update($data);
-        Log::debug('Event after update', $event->fresh()->toArray());
+    // debug logging removed
 
         // 添付ファイル保存（追加分のみ）
         if ($request->hasFile('files')) {
@@ -545,7 +528,6 @@ class EventController extends Controller
                 ]);
             }
         }
-        Log::debug('Event update finished');
         return redirect()->route('calendar.index');
     }
 
@@ -740,21 +722,228 @@ class EventController extends Controller
             }
         }
         // Debug logging to ensure jobData is created and query params are received
+                // create-time debug logging removed
+        // Gather user-scoped clients and projects (those where the current user is a project_team_member)
+        $user = $request->user();
+        $userClients = [];
+        $userProjects = [];
         try {
-            Log::debug('EventController::create query', ['query' => $request->query()]);
-            Log::debug('EventController::create jobId', ['jobId' => $jobId]);
-            if (!empty($jobData)) {
-                Log::debug('EventController::create jobData', ['jobData' => $jobData]);
-            } else {
-                Log::debug('EventController::create jobData: null');
-            }
-        } catch (\Throwable $_e) {
-            // ignore logging errors
+            $ptms = \App\Models\ProjectTeamMember::with(['projectJob.client'])
+                ->where('user_id', $user->id)
+                ->get();
+            $jobs = $ptms->map(function ($ptm) {
+                return $ptm->projectJob;
+            })->filter();
+
+            $userProjects = $jobs->map(function ($job) {
+                return [
+                    'id' => $job->id,
+                    'title' => $job->title ?? ($job->name ?? null),
+                    'client_id' => $job->client ? $job->client->id : null,
+                ];
+            })->values();
+
+            $clients = $jobs->map(function ($job) {
+                return $job->client;
+            })->filter()->unique('id')->values();
+
+            $userClients = $clients->map(function ($c) {
+                return ['id' => $c->id, 'name' => $c->name ?? ($c->client_name ?? null)];
+            })->values();
+        } catch (\Throwable $__e) {
+            // ignore if tables/relations unavailable
+            $userClients = [];
+            $userProjects = [];
         }
-        return Inertia::render('Events/Create', [
+
+        // Provide minimal members array containing current user so AssignmentForm can default assignment to self
+        $members = [];
+        try {
+            if ($user) {
+                $members = [['id' => $user->id, 'name' => $user->name]];
+            }
+        } catch (\Throwable $__e) {
+            $members = [];
+        }
+
+        // If the authenticated user belongs to a company/department, include them so
+        // front-end components (AssignmentForm_user.vue) can default company/department
+        // for users who cannot change them (non-superadmin).
+        $company = null;
+        $department = null;
+        try {
+            if ($user && isset($user->company_id) && $user->company_id) {
+                $company = \App\Models\Company::find($user->company_id);
+            }
+            if ($user && isset($user->department_id) && $user->department_id) {
+                $department = \App\Models\Department::find($user->department_id);
+            }
+        } catch (\Throwable $__e) {
+            // ignore lookup errors; front-end will fallback to auth.user values
+            $company = null;
+            $department = null;
+        }
+
+        // lookup lists so front-end components (AssignmentForm_user) can render selects
+        $types = [];
+        $sizes = [];
+        $stages = [];
+        $statuses = [];
+        try {
+            $types = \App\Models\WorkItemType::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'company_id', 'department_id']);
+            $sizes = \App\Models\Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'width', 'height', 'unit', 'company_id', 'department_id']);
+            $stages = \App\Models\Stage::orderBy('sort_order')->orderBy('order_index')->get(['id', 'name', 'company_id', 'department_id']);
+            $statuses = \App\Models\Status::orderBy('sort_order')->get(['id', 'name', 'slug', 'company_id', 'department_id']);
+        } catch (\Throwable $__e) {
+            // ignore lookup errors; frontend will handle empty lists
+            $types = [];
+            $sizes = [];
+            $stages = [];
+            $statuses = [];
+        }
+
+        $props = [
             'date' => $date,
             'job' => $jobData,
-        ]);
+            'userClients' => $userClients,
+            'userProjects' => $userProjects,
+            'members' => $members,
+            'company' => $company,
+            'department' => $department,
+            'types' => $types,
+            'sizes' => $sizes,
+            'stages' => $stages,
+            'statuses' => $statuses,
+        ];
+
+        // Prepare a simplified debug-friendly copy of props so logs are readable
+        $props_debug = $props;
+        try {
+            if ($company && is_object($company)) {
+                $props_debug['company'] = ['id' => $company->id ?? null, 'name' => $company->name ?? null];
+            }
+            if ($department && is_object($department)) {
+                $props_debug['department'] = ['id' => $department->id ?? null, 'name' => $department->name ?? null];
+            }
+        } catch (\Throwable $__e) {
+            // ignore
+        }
+
+        try {
+            \Illuminate\Support\Facades\Log::info('INERTIA_PROPS', ['props' => $props_debug]);
+        } catch (\Throwable $__e) {
+            // ignore logging errors
+        }
+
+        return Inertia::render('Events/Create', $props);
+    }
+
+    /**
+     * ジョブ作成専用ページ表示
+     */
+    public function createJob(Request $request)
+    {
+        // reuse much of create() logic but render a dedicated job creation page
+        $date = $request->query('date', now()->toDateString());
+        $jobId = $request->query('job');
+        $jobData = null;
+        if ($jobId) {
+            $assignment = \App\Models\ProjectJobAssignment::with(['projectJob.client', 'projectJob', 'user', 'size', 'stage', 'workItemType', 'statusModel'])->find($jobId);
+            if ($assignment) {
+                $jobData = $assignment->toEventPrefill();
+            }
+        }
+
+        $user = $request->user();
+        $userClients = [];
+        $userProjects = [];
+        try {
+            $ptms = \App\Models\ProjectTeamMember::with(['projectJob.client'])
+                ->where('user_id', $user->id)
+                ->get();
+            $jobs = $ptms->map(function ($ptm) {
+                return $ptm->projectJob;
+            })->filter();
+
+            $userProjects = $jobs->map(function ($job) {
+                return [
+                    'id' => $job->id,
+                    'title' => $job->title ?? ($job->name ?? null),
+                    'client_id' => $job->client ? $job->client->id : null,
+                ];
+            })->values();
+
+            $clients = $jobs->map(function ($job) {
+                return $job->client;
+            })->filter()->unique('id')->values();
+
+            $userClients = $clients->map(function ($c) {
+                return ['id' => $c->id, 'name' => $c->name ?? ($c->client_name ?? null)];
+            })->values();
+        } catch (\Throwable $__e) {
+            $userClients = [];
+            $userProjects = [];
+        }
+
+        $members = [];
+        try {
+            if ($user) {
+                $members = [['id' => $user->id, 'name' => $user->name]];
+            }
+        } catch (\Throwable $__e) {
+            $members = [];
+        }
+
+        $company = null;
+        $department = null;
+        try {
+            if ($user && isset($user->company_id) && $user->company_id) {
+                $company = \App\Models\Company::find($user->company_id);
+            }
+            if ($user && isset($user->department_id) && $user->department_id) {
+                $department = \App\Models\Department::find($user->department_id);
+            }
+        } catch (\Throwable $__e) {
+            $company = null;
+            $department = null;
+        }
+
+        $types = [];
+        $sizes = [];
+        $stages = [];
+        $statuses = [];
+        try {
+            $types = \App\Models\WorkItemType::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'company_id', 'department_id']);
+            $sizes = \App\Models\Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'width', 'height', 'unit', 'company_id', 'department_id']);
+            $stages = \App\Models\Stage::orderBy('sort_order')->orderBy('order_index')->get(['id', 'name', 'company_id', 'department_id']);
+            $statuses = \App\Models\Status::orderBy('sort_order')->get(['id', 'name', 'slug', 'company_id', 'department_id']);
+        } catch (\Throwable $__e) {
+            $types = [];
+            $sizes = [];
+            $stages = [];
+            $statuses = [];
+        }
+
+        $props = [
+            'date' => $date,
+            'job' => $jobData,
+            'userClients' => $userClients,
+            'userProjects' => $userProjects,
+            'members' => $members,
+            'company' => $company,
+            'department' => $department,
+            'types' => $types,
+            'sizes' => $sizes,
+            'stages' => $stages,
+            'statuses' => $statuses,
+        ];
+
+        try {
+            \Illuminate\Support\Facades\Log::info('INERTIA_PROPS createJob', ['props' => ['date' => $date, 'jobId' => $jobId]]);
+        } catch (\Throwable $__e) {
+        }
+
+        return Inertia::render('Events/Create_Job', $props);
     }
 
     /**
@@ -829,7 +1018,6 @@ class EventController extends Controller
     public function edit(Event $event)
     {
         $event->date = \Carbon\Carbon::parse($event->start)->toDateString();
-        Log::debug('EditController event', $event->toArray());
         return Inertia::render('Events/Edit', [
             'event' => $event,
         ]);

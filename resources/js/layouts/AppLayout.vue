@@ -13,7 +13,7 @@ import UserNavigationTabs from '@/Components/Tabs/UserNavigationTabs.vue';
 import TeamSwitcher from '@/Components/TeamSwitcher.vue';
 import ToastContainer from '@/Components/ToastContainer.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
+import { computed, provide, ref } from 'vue';
 
 defineProps({
     title: String,
@@ -51,6 +51,17 @@ const page = usePage();
 // resource being viewed when it's not the logged-in user.
 const user = page.props.user;
 const authUser = page.props.auth && page.props.auth.user ? page.props.auth.user : page.props.user;
+
+// Provide `authUser` and `user` to descendant components via Vue's provide/inject
+// so components like AssignmentForm_user.vue can access them even when
+// $page props aren't available due to different mounting contexts.
+try {
+    provide('authUser', authUser);
+    provide('user', user);
+    // Provide without verbose debug logging in production
+} catch (e) {
+    // provide may fail in some SSR or test contexts; non-fatal
+}
 // Use unread_messages_count as the single notification source; job_requests are being
 // migrated to Messages so we stop subscribing to jobrequests channel here.
 const inboxCount = vueRef(0); // legacy placeholder
@@ -103,6 +114,7 @@ let echoChannel = null;
 onMounted(() => {
     // AppLayout mounted
     try {
+        // minimal mount handling; avoid verbose console output
         if (window.Echo && authUser && authUser.id) {
             // messages channel (primary notification source)
             window.Echo.private('messages.' + authUser.id).listen('MessageCreated', (e) => {

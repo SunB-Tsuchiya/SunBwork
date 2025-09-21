@@ -2,6 +2,7 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, useForm } from '@inertiajs/vue3';
 // No Quill: use simple textarea for details
+import { usePage } from '@inertiajs/vue3';
 import { getCurrentInstance, nextTick, onMounted, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
 
@@ -63,6 +64,61 @@ function buildJobDetails(job) {
 // Build job text once; buildJobDetails already includes the assignment details if present.
 const _jobText = buildJobDetails(props.job);
 const content = ref(_jobText);
+// UI state for tabs: 'event' or 'job'
+const activeTab = ref('event');
+const nullProjectJob = null;
+
+// Pull optional props from Inertia page props so AssignmentForm can be prefilled
+const page = usePage();
+const projectJob = ref(page.props.projectJob || null);
+const members = page.props.members || [];
+const assignments = page.props.assignments || [];
+
+// user-scoped clients/projects passed from controller
+const userClients = page.props.userClients || [];
+const userProjects = page.props.userProjects || [];
+
+const selectedClientId = ref(userClients.length ? userClients[0].id : '');
+const selectedProjectId = ref('');
+
+// compute projects filtered by selected client
+function projectsForClient(clientId) {
+    if (!clientId) return userProjects;
+    return userProjects.filter((p) => String(p.client_id) === String(clientId));
+}
+
+// when client changes, reset project selection
+watch(selectedClientId, (val) => {
+    const list = projectsForClient(val || '');
+    selectedProjectId.value = list.length ? list[0].id : '';
+    // update projectJob binding
+    if (selectedProjectId.value) {
+        const pj = userProjects.find((p) => String(p.id) === String(selectedProjectId.value));
+        projectJob.value = pj ? { id: pj.id, title: pj.title, client: { id: val } } : null;
+    } else {
+        projectJob.value = null;
+    }
+});
+
+// when project selected directly
+watch(selectedProjectId, (val) => {
+    if (val) {
+        const pj = userProjects.find((p) => String(p.id) === String(val));
+        projectJob.value = pj ? { id: pj.id, title: pj.title, client: { id: selectedClientId.value || pj.client_id } } : null;
+    } else {
+        projectJob.value = null;
+    }
+});
+
+// Initialize selections
+if (userClients.length && !selectedClientId.value) selectedClientId.value = userClients[0].id;
+if (!selectedProjectId.value) {
+    const initList = projectsForClient(selectedClientId.value);
+    if (initList.length) selectedProjectId.value = initList[0].id;
+}
+
+// default assigned user id (current user)
+const defaultUserId = page.props.auth && page.props.auth.user ? page.props.auth.user.id : null;
 // derive default start/end hour/minute from job.desired_time if available (expected formats: 'HH:MM', 'HH:MM:SS' or ISO time)
 function parseDesiredTime(t) {
     if (!t) return null;
@@ -289,82 +345,89 @@ watch(
     <AppLayout title="イベント作成">
         <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
             <h1 class="mb-4 text-2xl font-bold">イベント作成 ({{ formatJstDate(form.date) }})</h1>
-            <form @submit.prevent="submit">
-                <div v-if="errorMessage" class="mb-4 rounded border-l-4 border-red-500 bg-red-50 p-3 text-red-700">
-                    {{ errorMessage }}
-                </div>
-                <div class="mb-4">
-                    <label class="mb-1 block text-sm font-medium text-gray-700">タイトル</label>
-                    <input v-model="form.title" type="text" class="w-full rounded border p-2" required />
-                </div>
-                <div class="mb-4">
-                    <label class="mb-1 block text-sm font-medium text-gray-700">詳細</label>
-                    <textarea
-                        v-model="content"
-                        @focus="onContentFocus"
-                        @blur="onContentBlur"
-                        rows="8"
-                        class="w-full rounded border bg-white p-2"
-                    ></textarea>
-                </div>
-                <div class="mb-4">
-                    <div class="flex items-center gap-8">
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-gray-700">開始時刻</label>
-                            <div class="flex gap-2">
-                                <select v-model="form.startHour" class="w-20 rounded border p-1">
-                                    <option v-for="h in 24" :key="h" :value="String(h - 1).padStart(2, '0')">
-                                        {{ String(h - 1).padStart(2, '0') }}
-                                    </option>
-                                </select>
-                                <select v-model="form.startMinute" class="w-20 rounded border p-1">
-                                    <option v-for="m in [0, 15, 30, 45]" :key="m" :value="String(m).padStart(2, '0')">
-                                        {{ String(m).padStart(2, '0') }}
-                                    </option>
-                                </select>
+
+            <!-- tabs removed: job creation moved to a dedicated page -->
+
+            <div v-if="activeTab === 'event'">
+                <form @submit.prevent="submit">
+                    <div v-if="errorMessage" class="mb-4 rounded border-l-4 border-red-500 bg-red-50 p-3 text-red-700">
+                        {{ errorMessage }}
+                    </div>
+                    <div class="mb-4">
+                        <label class="mb-1 block text-sm font-medium text-gray-700">タイトル</label>
+                        <input v-model="form.title" type="text" class="w-full rounded border p-2" required />
+                    </div>
+                    <div class="mb-4">
+                        <label class="mb-1 block text-sm font-medium text-gray-700">詳細</label>
+                        <textarea
+                            v-model="content"
+                            @focus="onContentFocus"
+                            @blur="onContentBlur"
+                            rows="8"
+                            class="w-full rounded border bg-white p-2"
+                        ></textarea>
+                    </div>
+                    <div class="mb-4">
+                        <div class="flex items-center gap-8">
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-gray-700">開始時刻</label>
+                                <div class="flex gap-2">
+                                    <select v-model="form.startHour" class="w-20 rounded border p-1">
+                                        <option v-for="h in 24" :key="h" :value="String(h - 1).padStart(2, '0')">
+                                            {{ String(h - 1).padStart(2, '0') }}
+                                        </option>
+                                    </select>
+                                    <select v-model="form.startMinute" class="w-20 rounded border p-1">
+                                        <option v-for="m in [0, 15, 30, 45]" :key="m" :value="String(m).padStart(2, '0')">
+                                            {{ String(m).padStart(2, '0') }}
+                                        </option>
+                                    </select>
+                                </div>
                             </div>
-                        </div>
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-gray-700">終了時刻</label>
-                            <div class="flex gap-2">
-                                <select v-model="form.endHour" class="w-20 rounded border p-1">
-                                    <option v-for="h in 24" :key="h" :value="String(h - 1).padStart(2, '0')">
-                                        {{ String(h - 1).padStart(2, '0') }}
-                                    </option>
-                                </select>
-                                <select v-model="form.endMinute" class="w-20 rounded border p-1">
-                                    <option v-for="m in [0, 15, 30, 45]" :key="m" :value="String(m).padStart(2, '0')">
-                                        {{ String(m).padStart(2, '0') }}
-                                    </option>
-                                </select>
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-gray-700">終了時刻</label>
+                                <div class="flex gap-2">
+                                    <select v-model="form.endHour" class="w-20 rounded border p-1">
+                                        <option v-for="h in 24" :key="h" :value="String(h - 1).padStart(2, '0')">
+                                            {{ String(h - 1).padStart(2, '0') }}
+                                        </option>
+                                    </select>
+                                    <select v-model="form.endMinute" class="w-20 rounded border p-1">
+                                        <option v-for="m in [0, 15, 30, 45]" :key="m" :value="String(m).padStart(2, '0')">
+                                            {{ String(m).padStart(2, '0') }}
+                                        </option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-                <!-- attachments removed: not needed -->
-                <div class="flex space-x-4">
-                    <button
-                        type="submit"
-                        :disabled="form.processing"
-                        :aria-busy="form.processing"
-                        class="flex items-center gap-2 rounded bg-blue-600 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                        <template v-if="form.processing">
-                            <svg class="h-5 w-5 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                            </svg>
-                            保存中…
-                        </template>
-                        <template v-else>保存</template>
-                    </button>
-                    <Link
-                        :href="returnTo && returnTo !== '' ? returnTo : props.job ? route('user.assigned-jobs.index') : route('calendar.index')"
-                        class="rounded bg-gray-200 px-4 py-2 text-gray-700"
-                        >キャンセル</Link
-                    >
-                </div>
-            </form>
+                    <!-- attachments removed: not needed -->
+                    <div class="flex space-x-4">
+                        <button
+                            type="submit"
+                            :disabled="form.processing"
+                            :aria-busy="form.processing"
+                            class="flex items-center gap-2 rounded bg-blue-600 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            <template v-if="form.processing">
+                                <svg class="h-5 w-5 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                </svg>
+                                保存中…
+                            </template>
+                            <template v-else>保存</template>
+                        </button>
+                        <Link
+                            :href="returnTo && returnTo !== '' ? returnTo : props.job ? route('user.assigned-jobs.index') : route('calendar.index')"
+                            class="rounded bg-gray-200 px-4 py-2 text-gray-700"
+                            >キャンセル</Link
+                        >
+                    </div>
+                </form>
+            </div>
+
+            <!-- job tab removed; use dedicated job creation page instead -->
         </div>
     </AppLayout>
 </template>

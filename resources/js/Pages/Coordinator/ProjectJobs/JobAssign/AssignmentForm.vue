@@ -1,0 +1,825 @@
+<template>
+    <form @submit.prevent="save">
+        <div v-for="(block, idx) in assignments" :key="idx" class="mb-4 rounded border p-4">
+            <!-- show client name (read-only) above title -->
+            <label class="mb-1 block font-semibold">クライアント</label>
+            <div class="w-full rounded border bg-gray-50 px-3 py-2">
+                {{ clientName(block) }}
+            </div>
+
+            <!-- プロジェクト名を上に表示 -->
+            <label class="mb-1 block font-semibold">プロジェクト名</label>
+            <div class="w-full rounded border bg-gray-50 px-3 py-2">
+                {{ projectName(block) }}
+            </div>
+
+            <label class="mb-1 block font-semibold">ジョブ名</label>
+            <div>
+                <input v-model="block.title_suffix" :disabled="!editMode" type="text" class="w-full rounded border px-3 py-2" />
+            </div>
+            <!-- selection_label is legacy; we prefer showing individual fields in the form -->
+            <!-- (kept for backward compat but hidden when we render individual fields) -->
+
+            <label class="mb-1 mt-2 block font-semibold">概要</label>
+            <textarea v-model="block.detail" :disabled="!editMode" class="w-full rounded border px-3 py-2" rows="3"></textarea>
+
+            <label class="mb-1 mt-2 block font-semibold">作業詳細</label>
+            <!-- Company / Department (always visible) -->
+            <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                    <label class="block text-sm font-medium">会社</label>
+                    <div v-if="!editMode" class="mt-1 w-full rounded border bg-gray-50 px-3 py-2 text-sm">{{ companyName(block.company_id) }}</div>
+                    <select
+                        v-else
+                        v-model="block.company_id"
+                        :disabled="companyDisabled() || !editMode"
+                        @change="onCompanyChange(idx)"
+                        class="mt-1 w-full rounded border px-2 py-1 text-sm"
+                    >
+                        <option value="">-- グローバル / 未設定 --</option>
+                        <option v-for="c in page.props.companies" :key="c.id" :value="String(c.id)">{{ c.name }}</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium">部署</label>
+                    <div v-if="!editMode" class="mt-1 w-full rounded border bg-gray-50 px-3 py-2 text-sm">
+                        {{ departmentName(block.department_id) }}
+                    </div>
+                    <select
+                        v-else
+                        v-model="block.department_id"
+                        :disabled="departmentDisabled() || !editMode"
+                        @change="onDepartmentChange(idx)"
+                        class="mt-1 w-full rounded border px-2 py-1 text-sm"
+                    >
+                        <option value="">-- 指定なし --</option>
+                        <option v-for="d in departmentsForCompany(block.company_id)" :key="d.id" :value="String(d.id)">{{ d.name }}</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Inline 2x2 dropdowns: always visible under 作業詳細. Selecting updates the block immediately. -->
+            <div class="mt-4 grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium">Type</label>
+                    <div v-if="!editMode" class="mt-1 w-full rounded border bg-gray-50 px-3 py-2 text-sm">
+                        {{ itemName('types', block.work_item_type_id) }}
+                    </div>
+                    <select
+                        v-else
+                        v-model="block.work_item_type_id"
+                        :disabled="!hasDepartment(block) || !editMode"
+                        @change="onInlineSelectionChange(idx)"
+                        class="mt-1 w-full rounded border px-2 py-1 text-sm"
+                    >
+                        <option value="">-- 選択 --</option>
+                        <option v-for="t in typesForSelect(block.company_id, block.department_id)" :key="t.id" :value="String(t.id)">
+                            {{ t.name }}
+                        </option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium">Size</label>
+                    <div v-if="!editMode" class="mt-1 w-full rounded border bg-gray-50 px-3 py-2 text-sm">{{ itemName('sizes', block.size_id) }}</div>
+                    <select
+                        v-else
+                        v-model="block.size_id"
+                        :disabled="!hasDepartment(block) || !editMode"
+                        @change="onInlineSelectionChange(idx)"
+                        class="mt-1 w-full rounded border px-2 py-1 text-sm"
+                    >
+                        <option value="">-- 選択 --</option>
+                        <option v-for="s in sizesForSelect(block.company_id, block.department_id)" :key="s.id" :value="String(s.id)">
+                            {{ s.name }}
+                        </option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium">Stage</label>
+                    <div v-if="!editMode" class="mt-1 w-full rounded border bg-gray-50 px-3 py-2 text-sm">
+                        {{ itemName('stages', block.stage_id) }}
+                    </div>
+                    <select
+                        v-else
+                        v-model="block.stage_id"
+                        :disabled="!hasDepartment(block) || !editMode"
+                        @change="onInlineSelectionChange(idx)"
+                        class="mt-1 w-full rounded border px-2 py-1 text-sm"
+                    >
+                        <option value="">-- 選択 --</option>
+                        <option v-for="st in stagesForSelect(block.company_id, block.department_id)" :key="st.id" :value="String(st.id)">
+                            {{ st.name }}
+                        </option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium">Status</label>
+                    <div v-if="!editMode" class="mt-1 w-full rounded border bg-gray-50 px-3 py-2 text-sm">
+                        {{ itemName('statuses', block.status_id) }}
+                    </div>
+                    <select
+                        v-else
+                        v-model="block.status_id"
+                        :disabled="!editMode"
+                        @change="onInlineSelectionChange(idx)"
+                        class="mt-1 w-full rounded border px-2 py-1 text-sm"
+                    >
+                        <option value="">-- 選択 --</option>
+                        <option v-for="st in page.props.statuses" :key="st.id" :value="String(st.id)">{{ st.name }}</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Quantity (数量) : four digit selects 0-9 and a unit select (ページ / ファイル) -->
+            <label class="mb-1 mt-4 block font-semibold">数量</label>
+            <div class="mt-1 flex items-center gap-2">
+                <div class="flex gap-1">
+                    <select
+                        v-for="n in 4"
+                        :key="n"
+                        :aria-label="`amount-digit-${n}`"
+                        v-model="block[`amount_digit_${n - 1}`]"
+                        @change="onAmountDigitsChange(idx)"
+                        :disabled="!editMode"
+                        class="w-14 rounded border px-2 py-1 text-sm"
+                    >
+                        <option v-for="d in Array.from({ length: 10 }, (_, i) => i)" :key="d" :value="String(d)">{{ d }}</option>
+                    </select>
+                </div>
+                <div>
+                    <select v-model="block.amounts_unit" :disabled="!editMode" class="mt-1 w-32 rounded border px-2 py-1 text-sm">
+                        <option value="page">ページ</option>
+                        <option value="file">ファイル</option>
+                    </select>
+                </div>
+                <div class="ml-2 text-sm text-gray-600">
+                    <span v-if="block.amounts !== undefined">
+                        {{ block.amounts }}
+                        {{ block.amounts_unit === 'page' ? 'ページ' : block.amounts_unit === 'file' ? 'ファイル' : '' }}</span
+                    >
+                </div>
+            </div>
+
+            <label class="mb-1 mt-4 block font-semibold">難易度</label>
+            <select v-model="block.difficulty" :disabled="!editMode" class="w-full rounded border px-3 py-2">
+                <option value="light">軽い</option>
+                <option value="normal">普通</option>
+                <option value="heavy">重い</option>
+            </select>
+
+            <div class="mt-2">
+                <label class="mb-1 block font-semibold">割当希望日</label>
+                <input v-model="block.desired_start_date" :disabled="!editMode" type="date" class="w-full rounded border px-3 py-2" />
+
+                <div class="mt-2">
+                    <label class="mb-1 block font-semibold">終了希望日, 希望時間</label>
+                    <div class="flex items-center gap-3">
+                        <input
+                            v-model="block.desired_end_date"
+                            :min="minEndDate(idx)"
+                            type="date"
+                            class="rounded border px-3 py-2"
+                            @change="onEndDateChange(idx)"
+                            :disabled="!editMode"
+                        />
+
+                        <select
+                            v-model="block.desired_time_hour"
+                            :disabled="!editMode"
+                            class="w-20 rounded border px-3 py-2"
+                            @change="onHourChange(idx)"
+                        >
+                            <option v-for="h in availableHours(idx)" :key="h" :value="h">{{ h }}</option>
+                        </select>
+                        <select v-model="block.desired_time_min" :disabled="!editMode" class="w-20 rounded border px-3 py-2">
+                            <option v-for="m in availableMins(idx, block.desired_time_hour)" :key="m" :value="m">{{ m }}</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <label class="mb-1 mt-2 block font-semibold">見積時間</label>
+            <div class="flex items-center gap-2">
+                <select v-model="block.estimated_hours" :disabled="!editMode" class="w-40 rounded border px-3 py-2">
+                    <option value="">未指定</option>
+                    <option v-for="opt in estimatedOptions" :key="opt" :value="opt">{{ String(opt).replace('.0', '') }}h</option>
+                </select>
+                <span class="text-sm text-gray-500">(0.25刻み、例: 1.5 = 1時間30分)</span>
+            </div>
+
+            <label class="mb-1 mt-2 block font-semibold">割当ユーザー</label>
+            <div v-if="!editMode" class="mt-1 w-full rounded border bg-gray-50 px-3 py-2 text-sm">{{ memberName(block.user_id) }}</div>
+            <select v-else v-model="block.user_id" :disabled="!editMode" class="w-full rounded border px-3 py-2">
+                <option value="">未指定</option>
+                <option v-for="m in members" :key="m.id" :value="m.id">{{ m.id }}：{{ m.name }}</option>
+            </select>
+
+            <div class="mt-2 text-right">
+                <template v-if="block.linked_assignment_id">
+                    <a
+                        :href="
+                            route('coordinator.project_jobs.assignments.show', {
+                                projectJob: block.project_job && block.project_job.id ? block.project_job.id : projectJob ? projectJob.id : '',
+                                assignment: block.linked_assignment_id,
+                            })
+                        "
+                        class="ml-3 text-sm text-blue-600"
+                        >割当を見る (#{{ block.linked_assignment_id }})</a
+                    >
+                </template>
+            </div>
+        </div>
+
+        <div class="flex gap-2" v-if="editMode">
+            <button type="button" class="rounded bg-blue-600 px-4 py-2 text-white" @click="addBlock">ジョブブロックを追加</button>
+            <button type="submit" class="rounded bg-green-600 px-4 py-2 text-white">保存する</button>
+            <Link
+                :href="route('coordinator.project_jobs.assignments.index', { projectJob: projectJob ? projectJob.id : '' })"
+                class="rounded bg-gray-200 px-4 py-2"
+                >戻る</Link
+            >
+        </div>
+    </form>
+
+    <SelectionModal
+        v-if="showSelector"
+        :show="showSelector"
+        :companies="$page.props.companies || []"
+        :types="$page.props.types || []"
+        :sizes="$page.props.sizes || []"
+        :stages="$page.props.stages || []"
+        :statuses="$page.props.statuses || []"
+        :user-role="$page.props.auth.user.user_role || null"
+        :current-company-id="$page.props.company ? $page.props.company.id : $page.props.auth.user.company_id || ''"
+        :current-department-id="$page.props.department ? $page.props.department.id : $page.props.auth.user.department_id || ''"
+        @close="showSelector = false"
+        @selected="onSelected"
+    />
+
+    <!-- Toast container -->
+    <div class="fixed bottom-4 right-4 z-50 space-y-2">
+        <div v-for="t in toasts" :key="t.id" :class="toastClass(t.type)" class="max-w-sm">
+            <div class="flex items-center justify-between">
+                <div>{{ t.message }}</div>
+                <button @click="dismissToast(t.id)" class="ml-3 text-xs text-white">✕</button>
+            </div>
+        </div>
+    </div>
+</template>
+
+<script setup>
+import SelectionModal from '@/Components/SelectionModal.vue';
+import useToasts from '@/Composables/useToasts';
+import { Link, router, usePage } from '@inertiajs/vue3';
+import { ref } from 'vue';
+
+const props = defineProps({
+    projectJob: Object,
+    members: Array,
+    assignments: Array,
+    editMode: { type: Boolean, default: false },
+    defaultUserId: { type: [Number, String], default: null },
+});
+const page = usePage();
+
+const hours = Array.from({ length: 17 }, (_, i) => String(6 + i).padStart(2, '0'));
+const mins = ['00', '15', '30', '45'];
+const estimatedOptions = Array.from({ length: 32 }, (_, i) => Number(((i + 1) * 0.25).toFixed(2)));
+
+function makeLabel(kind, id) {
+    if (!id) return null;
+    const list = { types: page.props.types, sizes: page.props.sizes, statuses: page.props.statuses, stages: page.props.stages }[kind];
+    if (!Array.isArray(list)) return null;
+    const found = list.find((x) => String(x.id) === String(id));
+    return found ? `${kind.replace(/s$/, '')}: ${found.name}` : null;
+}
+
+function normalizeAssignment(a) {
+    return {
+        id: a.id || null,
+        title_prefix: `${props.projectJob?.title || ''}：`,
+        title_suffix: (() => {
+            const raw = a.title || '';
+            const prefix = `「${props.projectJob?.title || ''}：`;
+            if (!raw) return '';
+            if (raw.startsWith(prefix)) return raw.slice(prefix.length).trim();
+            return raw;
+        })(),
+        detail: a.detail || '',
+        difficulty: a.difficulty || 'normal',
+        desired_start_date: a.desired_start_date || a.desired_date || '',
+        desired_end_date: a.desired_end_date || '',
+        desired_time_hour: a.desired_time ? a.desired_time.split(':')[0] || '09' : a.desired_time_hour || '09',
+        desired_time_min: a.desired_time ? a.desired_time.split(':')[1] || '00' : a.desired_time_min || '00',
+        estimated_hours: a.estimated_hours !== undefined && a.estimated_hours !== null ? a.estimated_hours : '',
+        user_id: a.user_id || (a.user ? a.user.id : '') || '',
+        work_item_type_id: a.work_item_type_id || null,
+        size_id: a.size_id || null,
+        stage_id: a.stage_id || null,
+        status_id: a.status_id || null,
+        company_id: a.company_id || null,
+        department_id: a.department_id || null,
+        type_label: a.type_label || makeLabel('types', a.work_item_type_id),
+        size_label: a.size_label || makeLabel('sizes', a.size_id),
+        stage_label: a.stage_label || makeLabel('stages', a.stage_id),
+        status_label: a.status_label || makeLabel('statuses', a.status_id),
+        project_job:
+            a.project_job ||
+            (props.projectJob ? { id: props.projectJob.id, title: props.projectJob.title, client: props.projectJob.client || null } : null),
+    };
+}
+
+const assignments = ref(props.assignments && props.assignments.length ? props.assignments.map(normalizeAssignment) : [normalizeAssignment({})]);
+assignments.value.forEach((a) => {
+    if (a.saving === undefined) a.saving = false;
+    if (a.linked_assignment_id === undefined) a.linked_assignment_id = null;
+    if (a.title_prefix === undefined) a.title_prefix = `「${props.projectJob?.title || ''}：`;
+    if (a.title_suffix === undefined) a.title_suffix = '';
+    if (a.showInlineSelector === undefined) a.showInlineSelector = false;
+    const defaultCompany = page.props.company
+        ? page.props.company.id
+        : page.props.auth.user && page.props.auth.user.company_id
+          ? page.props.auth.user.company_id
+          : null;
+    const defaultDepartment = page.props.department
+        ? page.props.department.id
+        : page.props.auth.user && page.props.auth.user.department_id
+          ? page.props.auth.user.department_id
+          : null;
+    if (a.company_id === undefined || a.company_id === null || a.company_id === '') a.company_id = defaultCompany;
+    if (a.department_id === undefined || a.department_id === null || a.department_id === '') a.department_id = defaultDepartment;
+    if (a.work_item_type_id === undefined) a.work_item_type_id = a.work_item_type_id || null;
+    if (a.size_id === undefined) a.size_id = a.size_id || null;
+    if (a.stage_id === undefined) a.stage_id = a.stage_id || null;
+    if (a.status_id === undefined) a.status_id = a.status_id || null;
+    if (a.amount_digit_0 === undefined) a.amount_digit_0 = a.amounts ? String(Math.floor(a.amounts / 1000) % 10) : '0';
+    if (a.amount_digit_1 === undefined) a.amount_digit_1 = a.amounts ? String(Math.floor(a.amounts / 100) % 10) : '0';
+    if (a.amount_digit_2 === undefined) a.amount_digit_2 = a.amounts ? String(Math.floor(a.amounts / 10) % 10) : '0';
+    if (a.amount_digit_3 === undefined) a.amount_digit_3 = a.amounts ? String(a.amounts % 10) : '0';
+    if (a.amounts === undefined) a.amounts = a.amounts || 0;
+    if (a.amounts_unit === undefined) a.amounts_unit = a.amounts_unit || 'page';
+});
+
+// Ensure project_job.title/name is populated for display
+assignments.value.forEach((a) => {
+    try {
+        if (a.project_job) {
+            if (!a.project_job.title && !a.project_job.name) {
+                // try props.projectJob
+                if (props.projectJob && (props.projectJob.title || props.projectJob.name)) {
+                    a.project_job.title = props.projectJob.title || props.projectJob.name || '';
+                } else if (Array.isArray(page.props.userProjects)) {
+                    const pid = a.project_job.id || a.project_job.project_job_id || null;
+                    if (pid) {
+                        const found = page.props.userProjects.find((p) => String(p.id) === String(pid));
+                        if (found) a.project_job.title = found.title || found.name || found.project_name || '';
+                    }
+                }
+            }
+        }
+    } catch (e) {}
+});
+
+// If we're in read-only (show) mode, convert id fields into their display names
+// so the form shows the same values that the edit UI uses (names rather than numeric ids).
+if (!props.editMode) {
+    const memberName = (userId) => {
+        if (!userId) return '';
+        const m = (props.members || []).find((mm) => String(mm.id) === String(userId));
+        if (m && (m.name || m.full_name)) return m.name || m.full_name;
+        if (typeof userId === 'object' && userId !== null) return userId.name || userId.id || '';
+        return String(userId || '');
+    };
+
+    assignments.value = assignments.value.map((b) => {
+        const copy = { ...b };
+        try {
+            // replace id fields with human-readable names
+            copy.company_id = companyName(b.company_id) || copy.company_id;
+            copy.department_id = departmentName(b.department_id) || copy.department_id;
+            copy.work_item_type_id = itemName('types', b.work_item_type_id) || copy.work_item_type_id;
+            copy.size_id = itemName('sizes', b.size_id) || copy.size_id;
+            copy.stage_id = itemName('stages', b.stage_id) || copy.stage_id;
+            copy.status_id = itemName('statuses', b.status_id) || copy.status_id;
+            // user -> display name
+            copy.user_id = memberName(b.user_id) || (b.user && (b.user.name || b.user.id)) || copy.user_id;
+        } catch (e) {}
+        return copy;
+    });
+}
+
+const showSelector = ref(false);
+const selectorTargetIndex = ref(null);
+const { toasts, showToast, dismissToast, toastClass } = useToasts();
+
+function clientName(block) {
+    try {
+        if (block && block.project_job && block.project_job.client) {
+            const c = block.project_job.client;
+            if (c.name) return c.name;
+            if (c.client_name) return c.client_name;
+            if (c.name_en) return c.name_en;
+        }
+        if (block && block.project_job && block.project_job.client_name) return block.project_job.client_name;
+        if (props.projectJob && props.projectJob.client) {
+            const pc = props.projectJob.client;
+            if (pc.name) return pc.name;
+            if (pc.client_name) return pc.client_name;
+        }
+        if (props.projectJob && props.projectJob.client_name) return props.projectJob.client_name;
+        const clientId =
+            (block && block.project_job && (block.project_job.client?.id || block.project_job.client_id)) ||
+            (props.projectJob && (props.projectJob.client?.id || props.projectJob.client_id));
+        if (clientId && Array.isArray(page.props.clients)) {
+            const found = page.props.clients.find((x) => String(x.id) === String(clientId));
+            if (found && found.name) return found.name;
+        }
+    } catch (e) {}
+    return '-';
+}
+
+function projectName(block) {
+    try {
+        if (block && block.project_job) {
+            const pj = block.project_job;
+            if (pj.title) return pj.title;
+            if (pj.name) return pj.name;
+            if (pj.project_name) return pj.project_name;
+        }
+        // fallback: props.projectJob
+        if (props.projectJob && (props.projectJob.title || props.projectJob.name)) return props.projectJob.title || props.projectJob.name;
+        // fallback: try to find in page.props.userProjects by id
+        const pid = block && block.project_job && (block.project_job.id || block.project_job.project_job_id);
+        if (pid && Array.isArray(page.props.userProjects)) {
+            const found = page.props.userProjects.find((p) => String(p.id) === String(pid));
+            if (found) return found.name || found.title || found.project_name || '';
+        }
+    } catch (e) {}
+    return '-';
+}
+
+function onSelected(payload) {
+    const idx = selectorTargetIndex.value;
+    const makeLabel = (kind, id) => {
+        if (!id) return null;
+        const list = { types: page.props.types, sizes: page.props.sizes, statuses: page.props.statuses, stages: page.props.stages }[kind];
+        if (!Array.isArray(list)) return null;
+        const found = list.find((x) => String(x.id) === String(id));
+        return found ? `${kind.replace(/s$/, '')}: ${found.name}` : null;
+    };
+
+    if (idx === null || idx === undefined) {
+        assignments.value.push({
+            title_prefix: `「${props.projectJob?.title || ''}：`,
+            title_suffix: payload.size_id ? `サイズ: ${payload.size_id}` : '',
+            detail: '',
+            difficulty: 'normal',
+            desired_date: '',
+            desired_time_hour: '09',
+            desired_time_min: '00',
+            estimated_hours: '',
+            user_id: '',
+            work_item_type_id: payload.work_item_type_id,
+            size_id: payload.size_id,
+            stage_id: payload.stage_id || null,
+            status_id: payload.status_id,
+            company_id: payload.company_id,
+            department_id: payload.department_id,
+            saving: false,
+            linked_assignment_id: null,
+            type_label: makeLabel('types', payload.work_item_type_id),
+            size_label: makeLabel('sizes', payload.size_id),
+            stage_label: makeLabel('stages', payload.stage_id),
+            status_label: makeLabel('statuses', payload.status_id),
+        });
+    } else {
+        const b = assignments.value[idx];
+        b.work_item_type_id = payload.work_item_type_id;
+        b.size_id = payload.size_id;
+        b.stage_id = payload.stage_id || null;
+        b.status_id = payload.status_id;
+        b.company_id = payload.company_id;
+        b.department_id = payload.department_id;
+        b.type_label = makeLabel('types', payload.work_item_type_id);
+        b.size_label = makeLabel('sizes', payload.size_id);
+        b.stage_label = makeLabel('stages', payload.stage_id);
+        b.status_label = makeLabel('statuses', payload.status_id);
+    }
+    selectorTargetIndex.value = null;
+}
+
+const companyDisabled = () => {
+    return page.props.auth.user.user_role !== 'superadmin';
+};
+const departmentDisabled = () => {
+    return page.props.auth.user.user_role === 'leader' || page.props.auth.user.user_role === 'coordinator';
+};
+
+function departmentsFlattened() {
+    const out = [];
+    (page.props.companies || []).forEach((c) => {
+        const deps = c && c.departments ? c.departments : [];
+        Array.from(deps || []).forEach((d) => {
+            const id = d && (d.id ?? d['id']) ? (d.id ?? d['id']) : null;
+            const name = d && (d.name ?? d['name']) ? (d.name ?? d['name']) : null;
+            out.push({ id: id, name: name, company_id: c && (c.id ?? c['id']) ? (c.id ?? c['id']) : null });
+        });
+    });
+    return out;
+}
+
+function departmentsForCompany(companyId) {
+    if (!companyId) return departmentsFlattened();
+    return departmentsFlattened().filter((d) => String(d.company_id) === String(companyId));
+}
+
+function companyName(companyId) {
+    if (!companyId) return 'グローバル/未設定';
+    const found = (page.props.companies || []).find((c) => String(c.id) === String(companyId));
+    return found ? found.name : String(companyId);
+}
+
+function departmentName(departmentId) {
+    if (!departmentId) return '指定なし';
+    const all = departmentsFlattened();
+    const found = all.find((d) => String(d.id) === String(departmentId));
+    return found ? found.name : String(departmentId);
+}
+
+function itemName(kind, id) {
+    if (!id) return '';
+    const list = { types: page.props.types, sizes: page.props.sizes, statuses: page.props.statuses, stages: page.props.stages }[kind];
+    if (!Array.isArray(list)) return String(id);
+    const found = list.find((x) => String(x.id) === String(id));
+    return found ? found.name : String(id);
+}
+
+function memberName(userId) {
+    if (!userId) return '未指定';
+    // if userId already a string name (from normalization), return it
+    if (typeof userId === 'string' && isNaN(Number(userId))) return userId;
+    const m = (props.members || []).find((mm) => String(mm.id) === String(userId));
+    if (m) return m.name || m.full_name || String(m.id);
+    // fallback: look in page props users if available
+    const pageUsers = page.props.users || page.props.members || [];
+    const found = (Array.isArray(pageUsers) ? pageUsers : []).find((u) => String(u.id) === String(userId));
+    if (found) return found.name || found.full_name || String(found.id);
+    // if user object exists on block
+    try {
+        if (userId && typeof userId === 'object') return userId.name || userId.full_name || String(userId.id || '');
+    } catch (e) {}
+    return String(userId);
+}
+
+function typesForSelect(companyId, departmentId) {
+    const list = page.props.types || [];
+    const comp = companyId || (page.props.company ? page.props.company.id : page.props.auth.user.company_id) || '';
+    const dept = departmentId || (page.props.department ? page.props.department.id : page.props.auth.user.department_id) || '';
+    return list.filter((t) => {
+        const compMatch = !t.company_id || String(t.company_id) === String(comp);
+        const deptMatch = !t.department_id || String(t.department_id) === String(dept);
+        return compMatch && deptMatch;
+    });
+}
+
+function sizesForSelect(companyId, departmentId) {
+    const list = page.props.sizes || [];
+    const comp = companyId || (page.props.company ? page.props.company.id : page.props.auth.user.company_id) || '';
+    const dept = departmentId || (page.props.department ? page.props.department.id : page.props.auth.user.department_id) || '';
+    return list.filter((s) => {
+        const compMatch = !s.company_id || String(s.company_id) === String(comp);
+        const deptMatch = !s.department_id || String(s.department_id) === String(dept);
+        return compMatch && deptMatch;
+    });
+}
+
+function stagesForSelect(companyId, departmentId) {
+    const list = page.props.stages || [];
+    const comp = companyId || (page.props.company ? page.props.company.id : page.props.auth.user.company_id) || '';
+    const dept = departmentId || (page.props.department ? page.props.department.id : page.props.auth.user.department_id) || '';
+    return list.filter((st) => {
+        const compMatch = !st.company_id || String(st.company_id) === String(comp);
+        const deptMatch = !st.department_id || String(st.department_id) === String(dept);
+        return compMatch && deptMatch;
+    });
+}
+
+function openInlineSelector(idx) {
+    const b = assignments.value[idx];
+    b.showInlineSelector = true;
+    if (!b.selectionForm) {
+        b.selectionForm = {
+            company_id: b.company_id || page.props.company ? page.props.company.id : page.props.auth.user.company_id || '',
+            department_id: b.department_id || page.props.department ? page.props.department.id : page.props.auth.user.department_id || '',
+            type_id: b.work_item_type_id || '',
+            size_id: b.size_id || '',
+            stage_id: b.stage_id || '',
+            status_id: b.status_id || '',
+        };
+    }
+}
+
+function cancelInlineSelector(idx) {
+    const b = assignments.value[idx];
+    if (b) b.showInlineSelector = false;
+}
+
+function applyInlineSelected(idx) {
+    const b = assignments.value[idx];
+    if (!b) return;
+    const f = b.selectionForm || {};
+    b.work_item_type_id = f.type_id || null;
+    b.size_id = f.size_id || null;
+    b.stage_id = f.stage_id || null;
+    b.status_id = f.status_id || null;
+    b.company_id = f.company_id || null;
+    b.department_id = f.department_id || null;
+    b.type_label = b.work_item_type_id ? makeLabel('types', b.work_item_type_id) : null;
+    b.size_label = b.size_id ? makeLabel('sizes', b.size_id) : null;
+    b.stage_label = b.stage_id ? makeLabel('stages', b.stage_id) : null;
+    b.status_label = b.status_id ? makeLabel('statuses', b.status_id) : null;
+    b.showInlineSelector = false;
+}
+
+function onInlineSelectionChange(idx) {
+    const b = assignments.value[idx];
+    if (!b) return;
+    b.type_label = b.work_item_type_id ? makeLabel('types', b.work_item_type_id) : null;
+    b.size_label = b.size_id ? makeLabel('sizes', b.size_id) : null;
+    b.stage_label = b.stage_id ? makeLabel('stages', b.stage_id) : null;
+    b.status_label = b.status_id ? makeLabel('statuses', b.status_id) : null;
+}
+
+function hasDepartment(block) {
+    return block && block.department_id !== undefined && block.department_id !== null && String(block.department_id) !== '';
+}
+
+function onCompanyChange(idx) {
+    const b = assignments.value[idx];
+    if (!b) return;
+    b.department_id = '';
+    b.work_item_type_id = null;
+    b.size_id = null;
+    b.stage_id = null;
+    onInlineSelectionChange(idx);
+}
+
+function onDepartmentChange(idx) {
+    const b = assignments.value[idx];
+    if (!b) return;
+    b.work_item_type_id = null;
+    b.size_id = null;
+    b.stage_id = null;
+    onInlineSelectionChange(idx);
+}
+
+function onAmountDigitsChange(idx) {
+    const b = assignments.value[idx];
+    if (!b) return;
+    const d0 = Number(b.amount_digit_0 || '0');
+    const d1 = Number(b.amount_digit_1 || '0');
+    const d2 = Number(b.amount_digit_2 || '0');
+    const d3 = Number(b.amount_digit_3 || '0');
+    const value = d0 * 1000 + d1 * 100 + d2 * 10 + d3;
+    b.amounts = value;
+}
+
+function openSelector(idx) {
+    selectorTargetIndex.value = idx;
+    showSelector.value = true;
+}
+
+function addBlock() {
+    assignments.value.push({
+        title_prefix: `「${props.projectJob?.title || ''}：`,
+        title_suffix: '',
+        detail: '',
+        difficulty: 'normal',
+        desired_date: '',
+        desired_time_hour: '09',
+        desired_time_min: '00',
+        estimated_hours: '',
+        user_id: props.defaultUserId || '',
+        saving: false,
+        linked_assignment_id: null,
+        amount_digit_0: '0',
+        amount_digit_1: '0',
+        amount_digit_2: '0',
+        amount_digit_3: '0',
+        amounts: 0,
+        amounts_unit: 'page',
+        project_job: props.projectJob ? { id: props.projectJob.id, title: props.projectJob.title } : null,
+    });
+}
+
+function removeBlock(i) {
+    assignments.value.splice(i, 1);
+}
+
+function todayDateStr() {
+    const d = new Date();
+    return d.toISOString().split('T')[0];
+}
+
+function minEndDate(idx) {
+    const a = assignments.value[idx];
+    return a.desired_start_date || todayDateStr();
+}
+
+function availableHours(idx) {
+    const a = assignments.value[idx];
+    if (!a.desired_end_date) return hours;
+    const today = todayDateStr();
+    if (a.desired_end_date !== today) return hours;
+    const now = new Date();
+    const currentHour = String(now.getHours()).padStart(2, '0');
+    return hours.filter((h) => h >= currentHour);
+}
+
+function availableMins(idx, hour) {
+    const a = assignments.value[idx];
+    if (!a.desired_end_date) return mins;
+    const today = todayDateStr();
+    if (a.desired_end_date !== today) return mins;
+    const now = new Date();
+    const currentHour = String(now.getHours()).padStart(2, '0');
+    if (hour > currentHour) return mins;
+    const curMin = now.getMinutes();
+    const nextQuarter = Math.ceil(curMin / 15) * 15;
+    return mins.filter((m) => Number(m) >= nextQuarter);
+}
+
+function onEndDateChange(idx) {
+    const a = assignments.value[idx];
+    if (a.desired_start_date && a.desired_end_date && a.desired_end_date < a.desired_start_date) {
+        a.desired_end_date = a.desired_start_date;
+    }
+}
+
+function onHourChange(idx) {
+    const a = assignments.value[idx];
+    const avail = availableMins(idx, a.desired_time_hour);
+    if (!avail.includes(a.desired_time_min)) {
+        a.desired_time_min = avail.length ? avail[0] : '00';
+    }
+}
+
+function save() {
+    if (!props.editMode && assignments.value.length === 1) return; // read-only mode, no save
+
+    if (props.editMode && assignments.value.length === 1 && assignments.value[0].id) {
+        const a = assignments.value[0];
+        const payload = {
+            title: `${a.title_prefix}${a.title_suffix ? ' ' + a.title_suffix : ''}`,
+            detail: a.detail,
+            difficulty: a.difficulty,
+            estimated_hours: a.estimated_hours || null,
+            desired_start_date: a.desired_start_date || null,
+            desired_end_date: a.desired_end_date || null,
+            desired_time: String(a.desired_time_hour).padStart(2, '0') + ':' + String(a.desired_time_min).padStart(2, '0'),
+            user_id: a.user_id || null,
+            work_item_type_id: a.work_item_type_id || null,
+            size_id: a.size_id || null,
+            stage_id: a.stage_id || null,
+            status_id: a.status_id || null,
+            company_id: a.company_id || null,
+            department_id: a.department_id || null,
+            amounts: a.amounts || null,
+            amounts_unit: a.amounts_unit || null,
+        };
+        router.put(route('coordinator.project_jobs.assignments.update', { projectJob: props.projectJob.id, assignment: a.id }), payload);
+        router.put(
+            route('coordinator.project_jobs.assignments.update', { projectJob: props.projectJob ? props.projectJob.id : '', assignment: a.id }),
+            payload,
+        );
+        return;
+    }
+
+    const payload = {
+        assignments: assignments.value.map((a) => ({
+            title: `${a.title_prefix}${a.title_suffix ? ' ' + a.title_suffix : ''}`,
+            detail: a.detail,
+            difficulty: a.difficulty,
+            estimated_hours: a.estimated_hours || null,
+            desired_start_date: a.desired_start_date || null,
+            desired_end_date: a.desired_end_date || null,
+            desired_time: String(a.desired_time_hour).padStart(2, '0') + ':' + String(a.desired_time_min).padStart(2, '0'),
+            user_id: a.user_id || null,
+            work_item_type_id: a.work_item_type_id || null,
+            size_id: a.size_id || null,
+            status_id: a.status_id || null,
+            company_id: a.company_id || null,
+            department_id: a.department_id || null,
+            stage_id: a.stage_id || null,
+            amounts: a.amounts || null,
+            amounts_unit: a.amounts_unit || null,
+        })),
+    };
+    router.post(route('coordinator.project_jobs.assignments.store', { projectJob: props.projectJob.id }), payload);
+    router.post(route('coordinator.project_jobs.assignments.store', { projectJob: props.projectJob ? props.projectJob.id : '' }), payload);
+}
+</script>
+
+<style scoped>
+/* small styles (none) */
+</style>

@@ -27,17 +27,17 @@ const markAsReadResult = ref(null);
 // --- 基本チェック関数 ---
 function runAllChecks() {
   // 1. axios baseURL チェック
-  console.log('【axios baseURLのテスト】：', axios.defaults.baseURL);
+    // debug logging removed
   // 2. withCredentials チェック
-  console.log('【withCredentialsのテスト】：', axios.defaults.withCredentials);
+    // debug logging removed
   // 3. Cookie チェック
-  console.log('【Cookieのテスト】：', document.cookie);
+    // debug logging removed
   // 4. XSRF-TOKEN チェック
   const xsrf = document.cookie.split('; ').find(row => row.startsWith('XSRF-TOKEN='));
-  console.log('【XSRF-TOKENのテスト】：', xsrf);
+    // debug logging removed
   // 5. laravel_session チェック
   const session = document.cookie.split('; ').find(row => row.startsWith('laravel_session='));
-  console.log('【laravel_sessionのテスト】：', session);
+    // debug logging removed
   // 6. /api/user テスト
   checkApiUser();
   // 7. /api/chat/messages/1/read テスト
@@ -46,29 +46,29 @@ function runAllChecks() {
 
 // /api/user のテスト
 async function checkApiUser() {
-  console.log('【/api/userのテスト】：リクエスト開始');
+  // request started (debug logging removed)
   userResult.value = 'Loading...';
   try {
     const res = await axios.get('/api/user');
     userResult.value = JSON.stringify(res.data, null, 2);
-    console.log('【/api/userのテスト】：レスポンス', res.data);
+    // response received
   } catch (e) {
     userResult.value = e.response ? JSON.stringify(e.response.data, null, 2) : e.message;
-    console.log('【/api/userのテスト】：エラー', e);
+    // error received
   }
 }
 
 // /api/chat/messages/1/read のテスト
 async function checkMarkAsRead() {
-  console.log('【/api/chat/messages/1/readのテスト】：リクエスト開始');
+  // request started (debug logging removed)
   markAsReadResult.value = 'Loading...';
   try {
     const res = await axios.post('/api/chat/messages/1/read');
     markAsReadResult.value = JSON.stringify(res.data, null, 2);
-    console.log('【/api/chat/messages/1/readのテスト】：レスポンス', res.data);
+    // response received
   } catch (e) {
     markAsReadResult.value = e.response ? JSON.stringify(e.response.data, null, 2) : e.message;
-    console.log('【/api/chat/messages/1/readのテスト】：エラー', e);
+    // error received
   }
 }
 </script>

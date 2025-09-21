@@ -107,6 +107,9 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     });
 
     // イベント機能（作成、保存、表示、編集、更新）
+    // New route for job-specific create page (frontend navigates here for job creation)
+    Route::get('/events/create-job', [App\Http\Controllers\EventController::class, 'createJob'])->name('events.create_job');
+
     Route::resource('events', App\Http\Controllers\EventController::class)->only([
         'create',
         'store',
@@ -134,6 +137,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::get('project_jobs/{projectJob}/jobbox/{message}', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'show'])->name('project_jobs.jobbox.show');
     // Allow assigned users to send a completion reply back to coordinators
     Route::post('project_jobs/{projectJob}/jobbox/reply', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'reply'])->name('project_jobs.jobbox.reply');
+    // Allow authenticated users to create a single assignment (their own) without coordinator side-effects
+    Route::post('project_jobs/{projectJob}/assignments/user', [App\Http\Controllers\User\ProjectJobAssignmentController::class, 'store'])->name('project_jobs.assignments.store_user');
     Route::get('/chat/rooms/{id}', [App\Http\Controllers\Chat\ChatController::class, 'showRoom'])->name('chat.rooms.show');
 
     // Job Requests (Inbox) - minimal CRUD + accept

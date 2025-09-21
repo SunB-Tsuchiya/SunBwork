@@ -2,6 +2,7 @@
     <div class="calendar-container">
         <div class="mb-4 flex gap-4">
             <button @click="openEventModal" class="rounded bg-blue-600 px-4 py-2 text-white">予定作成</button>
+            <button @click="goToJobCreate" class="rounded bg-indigo-600 px-4 py-2 text-white">ジョブ作成</button>
             <button @click="goToDiaryCreate" class="rounded bg-orange-500 px-4 py-2 text-white">{{ props.diaryLabel }}作成</button>
             <button @click="goToAssignedJobs" class="rounded bg-green-600 px-4 py-2 text-white">依頼一覧</button>
         </div>
@@ -248,6 +249,29 @@ function goToDiaryCreate() {
     }
 }
 
+function goToJobCreate() {
+    try {
+        const params = { date: selectedDate.value };
+        // include clicked time if present
+        if (clickedStartHour.value !== null && clickedStartMinute.value !== null) {
+            params.startHour = String(clickedStartHour.value).padStart(2, '0');
+            params.startMinute = String(clickedStartMinute.value).padStart(2, '0');
+        }
+        const current = window.location.pathname + window.location.search + window.location.hash;
+        try {
+            router.get(route('events.create_job', params));
+            return;
+        } catch (e) {
+            // fallback: open the generic event create page
+            openEventModal();
+            return;
+        }
+    } catch (e) {
+        // fallback to existing events.create
+        openEventModal();
+    }
+}
+
 function handleDateSelect(selectionInfo) {
     // カレンダーで日付選択時に選択日を保持
     const dateStr = selectionInfo.startStr.split('T')[0];
@@ -324,15 +348,51 @@ const events = ref([
         const alpha = Math.max(1 - overlapCount * 0.2, 0.2);
         // If title starts with completion prefix, use dark yellow color
         const isCompleted = typeof event.title === 'string' && event.title.indexOf('【完了】') === 0;
+
+        // Determine special colors based on linkage columns coming from server
+        // We expect incoming event to possibly include extendedProps.project_job_assignment_by_myself_id
+        const pjByMyselfId = event.extendedProps?.project_job_assignment_by_myself_id ?? event.project_job_assignment_by_myself_id ?? null;
+        const pjAssignmentId = event.extendedProps?.project_job_assignment_id ?? event.project_job_assignment_id ?? null;
+
+        // If event is linked to a project_job_assignment_by_myself, render it in gray (k20% ~ very light)
+        if (pjByMyselfId) {
+            return {
+                title: event.title,
+                start: event.start,
+                end: event.end ?? undefined,
+                allDay: event.allDay ?? false,
+                // force k20 regardless of server-provided color
+                color: '#00000033',
+                event_id: event.id,
+                schedule_id: event.extendedProps?.schedule_id ?? event.schedule_id ?? undefined,
+                description: event.description ?? event.extendedProps?.description ?? '',
+            };
+        }
+
+        // If both linkage ids are null, treat as a 'personal unlinked' event — use a distinctive color
+        if (!pjByMyselfId && !pjAssignmentId) {
+            return {
+                title: event.title,
+                start: event.start,
+                end: event.end ?? undefined,
+                allDay: event.allDay ?? false,
+                // distinct color for user's own unlinked events. Default to a teal color that's different
+                // from assignment-status colors (which are likely red/orange/blue). Use a muted teal: #1fb6b3
+                color: event.color ?? '#1fb6b3',
+                event_id: event.id,
+                schedule_id: event.extendedProps?.schedule_id ?? event.schedule_id ?? undefined,
+                description: event.description ?? event.extendedProps?.description ?? '',
+            };
+        }
+
+        // default coloring path
         return {
             title: event.title,
             start: event.start,
             end: event.end ?? undefined,
-            // respect incoming allDay flag if provided
             allDay: event.allDay ?? false,
             color: isCompleted ? '#b58900' : (event.color ?? `rgba(37,99,235,${alpha})`),
             event_id: event.id,
-            // ProjectSchedule mapping: preserve schedule_id if provided
             schedule_id: event.extendedProps?.schedule_id ?? event.schedule_id ?? undefined,
             description: event.description ?? event.extendedProps?.description ?? '',
         };

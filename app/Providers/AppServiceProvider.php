@@ -37,8 +37,8 @@ class AppServiceProvider extends ServiceProvider
                 $currentTeam = $user->currentTeam;
                 $availableTeams = $user->teams;
             } catch (\Throwable $e) {
-                // Log at debug level to avoid noisy ERROR logs; we still fallback to safe defaults.
-                Log::debug('Inertia share: failed to resolve user teams, falling back: ' . $e->getMessage());
+                // Log as a warning; this is non-fatal but noteworthy in logs
+                Log::warning('Inertia share: failed to resolve user teams, falling back: ' . $e->getMessage());
                 $currentTeam = null;
                 $availableTeams = collect();
             }

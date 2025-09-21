@@ -473,8 +473,7 @@ function handleTimelineClick(e) {
     const minsPastHour = Math.floor(rawMin % 60);
     const snappedMins = minsPastHour < 30 ? 0 : 30; // 00 or 30
     const minuteOffset = hourPart * 60 + snappedMins;
-    console.log('handleTimelineClick fired', { clickX, rawMin, minuteOffset, startHour: startHour.value, endHour: endHour.value });
-    console.log('handleTimelineClick debug', { contentLeft, rectLeft: rect.left, scrollLeft, pxPerMin });
+        // debug logging removed
     openSelectModalAt(minuteOffset);
 }
 

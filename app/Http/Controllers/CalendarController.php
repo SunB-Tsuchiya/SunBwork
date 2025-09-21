@@ -53,16 +53,43 @@ class CalendarController extends Controller
                 $select[] = 'description';
             }
 
+            // Include linkage columns if present so the frontend can detect linked assignments
+            if (Schema::hasColumn('events', 'project_job_assignment_by_myself_id')) {
+                $select[] = 'project_job_assignment_by_myself_id';
+            }
+            if (Schema::hasColumn('events', 'project_job_assignment_id')) {
+                $select[] = 'project_job_assignment_id';
+            }
+
             $events = $eventQuery->get($select);
 
-            // Temporary debug: log first event to ensure start/end are present for Inertia props
-            if ($events->count() > 0) {
-                try {
-                    Log::debug('CalendarController::events sample', ['first' => $events->first()]);
-                } catch (\Exception $e) {
-                    // ignore logging errors
-                }
-            }
+            // Map events to plain arrays and ensure linkage ids are present both top-level and in extendedProps
+            $events = $events->map(function ($e) {
+                // Convert to array first to capture appended attributes like start/end/description
+                $arr = $e->toArray();
+                return [
+                    'id' => $e->id,
+                    'title' => $e->title,
+                    'start' => $e->start ?? ($arr['start'] ?? null),
+                    'end' => $e->end ?? ($arr['end'] ?? null),
+                    'allDay' => $arr['allDay'] ?? false,
+                    'description' => $e->description ?? ($arr['description'] ?? null),
+                    // keep server-provided color if present, but client may override for linked assignments
+                    'color' => $arr['color'] ?? ($e->color ?? null),
+                    // top-level linkage fields (some clients check top-level)
+                    'project_job_assignment_by_myself_id' => $arr['project_job_assignment_by_myself_id'] ?? ($e->project_job_assignment_by_myself_id ?? null),
+                    'project_job_assignment_id' => $arr['project_job_assignment_id'] ?? ($e->project_job_assignment_id ?? null),
+                    // Extended props for FullCalendar compatibility
+                    'extendedProps' => array_merge($arr['extendedProps'] ?? [], [
+                        'project_job_assignment_by_myself_id' => $arr['project_job_assignment_by_myself_id'] ?? ($e->project_job_assignment_by_myself_id ?? null),
+                        'project_job_assignment_id' => $arr['project_job_assignment_id'] ?? ($e->project_job_assignment_id ?? null),
+                        'description' => $e->description ?? ($arr['description'] ?? null),
+                    ]),
+                ];
+            })->values();
+
+            // Temporary debug: log first event to ensure linkage keys are present for Inertia props
+                // sample logging removed
 
             // load assigned jobs that the user accepted or that are marked assigned
             $jobs = ProjectJobAssignment::where('user_id', $user->id)
