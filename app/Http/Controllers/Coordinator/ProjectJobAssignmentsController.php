@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 use App\Models\ProjectJob;
 use App\Models\ProjectJobAssignment;
+use Illuminate\Support\Facades\Log;
 
 class ProjectJobAssignmentsController extends Controller
 {
@@ -143,6 +144,18 @@ class ProjectJobAssignmentsController extends Controller
         $sizes = \App\Models\Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'width', 'height', 'unit', 'company_id', 'department_id']);
         $stages = \App\Models\Stage::orderBy('sort_order')->orderBy('order_index')->get(['id', 'name', 'company_id', 'department_id']);
         $statuses = \App\Models\Status::orderBy('sort_order')->get(['id', 'name', 'slug', 'company_id', 'department_id']);
+        // build difficulties list with either (id,name,slug) when slug exists, or (id,name) otherwise
+        $difficultySelect = ['id', 'name'];
+        try {
+            if (Schema::hasColumn('difficulties', 'slug')) $difficultySelect[] = 'slug';
+        } catch (\Throwable $__e) {
+            // if introspection fails, default to id,name
+        }
+        try {
+            $difficulties = \App\Models\Difficulty::orderBy('sort_order')->get($difficultySelect);
+        } catch (\Throwable $__e) {
+            $difficulties = collect();
+        }
 
         return Inertia::render('Coordinator/ProjectJobs/JobAssign/Edit', [
             'projectJob' => $projectJob,
@@ -154,6 +167,7 @@ class ProjectJobAssignmentsController extends Controller
             'sizes' => $sizes,
             'stages' => $stages,
             'statuses' => $statuses,
+            'difficulties' => $difficulties,
             'user_role' => $userRole,
             'user_company_id' => $userCompanyId,
             'user_department_id' => $userDepartmentId,
@@ -265,6 +279,18 @@ class ProjectJobAssignmentsController extends Controller
             'amounts_unit' => $a->amounts_unit ?? null,
         ];
 
+        // build difficulties list
+        $difficultySelect = ['id', 'name'];
+        try {
+            if (Schema::hasColumn('difficulties', 'slug')) $difficultySelect[] = 'slug';
+        } catch (\Throwable $__e) {
+        }
+        try {
+            $difficulties = \App\Models\Difficulty::orderBy('sort_order')->get($difficultySelect);
+        } catch (\Throwable $__e) {
+            $difficulties = collect();
+        }
+
         return Inertia::render('Coordinator/ProjectJobs/JobAssign/Edit', [
             'projectJob' => $projectJob,
             'members' => $members,
@@ -275,6 +301,7 @@ class ProjectJobAssignmentsController extends Controller
             'sizes' => $sizes,
             'stages' => $stages,
             'statuses' => $statuses,
+            'difficulties' => $difficulties,
             'user_role' => $userRole,
             'user_company_id' => $userCompanyId,
             'user_department_id' => $userDepartmentId,
@@ -389,6 +416,18 @@ class ProjectJobAssignmentsController extends Controller
             'user' => $userInfo,
         ];
 
+        // build difficulties list
+        $difficultySelect = ['id', 'name'];
+        try {
+            if (Schema::hasColumn('difficulties', 'slug')) $difficultySelect[] = 'slug';
+        } catch (\Throwable $__e) {
+        }
+        try {
+            $difficulties = \App\Models\Difficulty::orderBy('sort_order')->get($difficultySelect);
+        } catch (\Throwable $__e) {
+            $difficulties = collect();
+        }
+
         return Inertia::render('Coordinator/ProjectJobs/JobAssign/Show', [
             'projectJob' => $projectJob,
             'assignment' => $assignmentPayload,
@@ -399,6 +438,7 @@ class ProjectJobAssignmentsController extends Controller
             'sizes' => $sizes,
             'stages' => $stages,
             'statuses' => $statuses,
+            'difficulties' => $difficulties,
             'user_role' => $userRole,
             'user_company_id' => $userCompanyId,
             'user_department_id' => $userDepartmentId,
@@ -411,8 +451,9 @@ class ProjectJobAssignmentsController extends Controller
         $data = $request->validate([
             'title' => 'required|string|max:255',
             'detail' => 'nullable|string',
-            // accept either difficulty id (numeric) or known name/slug
-            'difficulty' => 'required',
+            // accept either difficulty_id (preferred) or difficulty name/slug
+            'difficulty_id' => 'nullable|exists:difficulties,id',
+            'difficulty' => 'required_without:difficulty_id',
             'estimated_hours' => 'nullable|numeric|min:0',
             'desired_start_date' => 'nullable|date',
             'desired_end_date' => 'nullable|date',
@@ -447,19 +488,28 @@ class ProjectJobAssignmentsController extends Controller
             }
         }
 
-        // resolve difficulty to id if necessary
+        // resolve difficulty to id if necessary - prefer explicit difficulty_id sent by client
         $difficultyId = null;
         $difficultyLabel = null;
-        if (!empty($data['difficulty'])) {
-            // numeric id
+        if (!empty($data['difficulty_id'])) {
+            $difficultyId = (int) $data['difficulty_id'];
+        } elseif (!empty($data['difficulty'])) {
+            // numeric id passed in difficulty field
             if (is_numeric($data['difficulty'])) {
                 $difficultyId = (int) $data['difficulty'];
             } else {
-                // try to find by slug (if column exists) or name
+                // try to find by slug (if column exists) or name — be defensive if schema introspection fails
                 $query = \App\Models\Difficulty::query();
-                if (Schema::hasColumn('difficulties', 'slug')) {
-                    $query->where('slug', $data['difficulty'])->orWhere('name', $data['difficulty']);
-                } else {
+                try {
+                    if (Schema::hasColumn('difficulties', 'slug')) {
+                        $query->where(function ($q) use ($data) {
+                            $q->where('slug', $data['difficulty'])->orWhere('name', $data['difficulty']);
+                        });
+                    } else {
+                        $query->where('name', $data['difficulty']);
+                    }
+                } catch (\Throwable $__e) {
+                    // fallback to matching name only
                     $query->where('name', $data['difficulty']);
                 }
                 $d = $query->first();
@@ -491,12 +541,16 @@ class ProjectJobAssignmentsController extends Controller
             'amounts_unit' => $data['amounts_unit'] ?? null,
         ];
 
+        // (debug logs removed)
+
         // Only include legacy 'difficulty' string if the column exists in the table
         if (Schema::hasColumn('project_job_assignments', 'difficulty')) {
             $updateData['difficulty'] = $data['difficulty'] ?? null;
         }
 
         $assignment->update($updateData);
+
+        // (debug logs removed)
 
         return redirect()->route('coordinator.project_jobs.assignments.index', ['projectJob' => $projectJob->id]);
     }
@@ -507,7 +561,9 @@ class ProjectJobAssignmentsController extends Controller
             'assignments' => 'required|array',
             'assignments.*.title' => 'required|string|max:255',
             'assignments.*.detail' => 'nullable|string',
-            'assignments.*.difficulty' => 'required|in:light,normal,heavy',
+            // allow assignments to provide difficulty_id (preferred) or difficulty string
+            'assignments.*.difficulty_id' => 'nullable|exists:difficulties,id',
+            'assignments.*.difficulty' => 'required_without:assignments.*.difficulty_id|in:light,normal,heavy',
             'assignments.*.estimated_hours' => 'nullable|numeric|min:0',
             'assignments.*.desired_start_date' => 'nullable|date',
             'assignments.*.desired_end_date' => 'nullable|date',
@@ -545,16 +601,24 @@ class ProjectJobAssignmentsController extends Controller
 
             // Create assignment and associated WorkItem in a transaction
             DB::transaction(function () use ($projectJob, $a) {
-                // resolve difficulty for each incoming assignment payload
+                // resolve difficulty for each incoming assignment payload - prefer difficulty_id
                 $difficultyId = null;
-                if (!empty($a['difficulty'])) {
+                if (!empty($a['difficulty_id'])) {
+                    $difficultyId = (int) $a['difficulty_id'];
+                } elseif (!empty($a['difficulty'])) {
                     if (is_numeric($a['difficulty'])) {
                         $difficultyId = (int) $a['difficulty'];
                     } else {
                         $q = \App\Models\Difficulty::query();
-                        if (Schema::hasColumn('difficulties', 'slug')) {
-                            $q->where('slug', $a['difficulty'])->orWhere('name', $a['difficulty']);
-                        } else {
+                        try {
+                            if (Schema::hasColumn('difficulties', 'slug')) {
+                                $q->where(function ($q2) use ($a) {
+                                    $q2->where('slug', $a['difficulty'])->orWhere('name', $a['difficulty']);
+                                });
+                            } else {
+                                $q->where('name', $a['difficulty']);
+                            }
+                        } catch (\Throwable $__e) {
                             $q->where('name', $a['difficulty']);
                         }
                         $d = $q->first();
@@ -588,8 +652,11 @@ class ProjectJobAssignmentsController extends Controller
                     $createData['difficulty'] = $a['difficulty'] ?? null;
                 }
 
+                // (debug logs removed)
+
                 $assignment = ProjectJobAssignment::create($createData);
 
+                // (debug logs removed)
                 // previously we created a separate WorkItem here; now assignment stores type/size/stage/status/company/department directly
                 // No-op for WorkItem creation - clients should send lookup ids on assignment payload instead.
             });
@@ -607,8 +674,9 @@ class ProjectJobAssignmentsController extends Controller
         $data = $request->validate([
             'title' => 'required|string|max:255',
             'detail' => 'nullable|string',
-            // accept either difficulty id or name/slug
-            'difficulty' => 'required',
+            // accept either difficulty_id (preferred) or difficulty name/slug
+            'difficulty_id' => 'nullable|exists:difficulties,id',
+            'difficulty' => 'required_without:difficulty_id',
             'estimated_hours' => 'nullable|numeric|min:0',
             'desired_start_date' => 'nullable|date',
             'desired_end_date' => 'nullable|date',
@@ -644,16 +712,24 @@ class ProjectJobAssignmentsController extends Controller
         $user = $request->user();
 
         DB::transaction(function () use ($projectJob, $data, $user) {
-            // resolve difficulty id
+            // resolve difficulty id - prefer explicit difficulty_id from request
             $difficultyId = null;
-            if (!empty($data['difficulty'])) {
+            if (!empty($data['difficulty_id'])) {
+                $difficultyId = (int) $data['difficulty_id'];
+            } elseif (!empty($data['difficulty'])) {
                 if (is_numeric($data['difficulty'])) {
                     $difficultyId = (int) $data['difficulty'];
                 } else {
                     $q = \App\Models\Difficulty::query();
-                    if (Schema::hasColumn('difficulties', 'slug')) {
-                        $q->where('slug', $data['difficulty'])->orWhere('name', $data['difficulty']);
-                    } else {
+                    try {
+                        if (Schema::hasColumn('difficulties', 'slug')) {
+                            $q->where(function ($q2) use ($data) {
+                                $q2->where('slug', $data['difficulty'])->orWhere('name', $data['difficulty']);
+                            });
+                        } else {
+                            $q->where('name', $data['difficulty']);
+                        }
+                    } catch (\Throwable $__e) {
                         $q->where('name', $data['difficulty']);
                     }
                     $d = $q->first();
@@ -685,7 +761,7 @@ class ProjectJobAssignmentsController extends Controller
                 $createData['difficulty'] = $data['difficulty'] ?? null;
             }
 
-            ProjectJobAssignment::create($createData);
+            $assignment = ProjectJobAssignment::create($createData);
         });
 
         // After user saves their own job, redirect back to calendar (assume route 'calendar.index' exists)

@@ -722,11 +722,21 @@ function onHourChange(idx) {
 
 function save() {
     if (!props.editMode) return;
+    function assembleTitle(a) {
+        // If user provided a title_suffix (job name), prefer it
+        if (a.title_suffix && String(a.title_suffix).trim() !== '') return String(a.title_suffix).trim();
+        // Otherwise, if we have project_job.title or name, return only the job name part (strip any project prefix)
+        const maybe = a.project_job && (a.project_job.title || a.project_job.name) ? a.project_job.title || a.project_job.name : null;
+        if (!maybe) return '';
+        // If the project_job title contains Japanese full-width colon '：', assume prefix format 'Project：Job' and strip
+        if (maybe.includes('：')) return maybe.replace(/^.*：/, '').trim();
+        // Otherwise return the whole value
+        return String(maybe).trim();
+    }
+
     const payload = {
         assignments: assignments.value.map((a) => ({
-            title:
-                (a.project_job && (a.project_job.title || a.project_job.name) ? `${a.project_job.title || a.project_job.name}：` : '') +
-                (a.title_suffix || ''),
+            title: assembleTitle(a),
             detail: a.detail || '',
             user_id: a.user_id || (effectiveAuthUser() ? effectiveAuthUser().id : null),
             project_job_id: a.project_job_id || null,
@@ -737,7 +747,6 @@ function save() {
                 (window?.page?.props?.difficulties
                     ? (window.page.props.difficulties.find((d) => d.name === a.difficulty || d.slug === a.difficulty)?.id ?? null)
                     : null),
-            difficulty: a.difficulty || null,
             desired_start_date: a.desired_start_date || null,
             desired_end_date: a.desired_end_date || null,
             // send start_time (from upper selectors) and desired_time (end time) separately

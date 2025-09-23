@@ -11,7 +11,7 @@ import LeaderNavigationTabs from '@/Components/Tabs/LeaderNavigationTabs.vue';
 import SuperAdminNavigationTabs from '@/Components/Tabs/SuperAdminNavigationTabs.vue';
 import UserNavigationTabs from '@/Components/Tabs/UserNavigationTabs.vue';
 import TeamSwitcher from '@/Components/TeamSwitcher.vue';
-import ToastContainer from '@/Components/ToastContainer.vue';
+import ToastUnified from '@/Components/ToastUnified.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { computed, provide, ref } from 'vue';
 
@@ -46,6 +46,8 @@ import { usePage } from '@inertiajs/vue3';
 import { onBeforeUnmount, onMounted, useSlots, ref as vueRef, watch } from 'vue';
 
 const page = usePage();
+// shared toast API (shared composable)
+const { showToast } = useToasts();
 // Keep `user` available for templates (many pages pass a `user` prop).
 // Use `authUser` for realtime subscriptions to avoid subscribing to the
 // resource being viewed when it's not the logged-in user.
@@ -139,6 +141,15 @@ onMounted(() => {
             window.Echo.private('jobmessages.' + authUser.id).listen('JobMessageCreated', (e) => {
                 // increment only the job-specific badge
                 unreadJobMessages.value = (unreadJobMessages.value || 0) + 1;
+                try {
+                    const from = e.from_user_name ? `${e.from_user_name}さん` : '誰か';
+                    const subj = e.subject || '(件名なし)';
+                    const msg = `${from} からジョブ関連のメッセージが届きました: ${subj}`;
+                    // dispatch a generic message:received event so Toast.vue (and other listeners) show a toast
+                    window.dispatchEvent(new CustomEvent('message:received', { detail: { message: msg } }));
+                } catch (err) {
+                    // non-fatal
+                }
             });
             window.Echo.private('jobmessages.' + authUser.id).listen('JobMessageRead', (e) => {
                 try {
@@ -626,7 +637,7 @@ const computeCoordinatorActive = () => {
             </header>
             <!-- Page Content -->
             <!-- Toasts -->
-            <ToastContainer />
+            <ToastUnified />
             <div class="py-12">
                 <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
                     <!-- Role-specific tabs (centralized for Admin/SuperAdmin to avoid duplicates) -->

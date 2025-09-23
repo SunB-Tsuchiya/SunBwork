@@ -22,7 +22,9 @@ class ProjectJobAssignmentController extends Controller
             'assignments' => 'required|array',
             'assignments.*.title' => 'required|string|max:255',
             'assignments.*.detail' => 'nullable|string',
-            'assignments.*.difficulty' => 'required|in:light,normal,heavy',
+            // allow either difficulty_id (preferred) or difficulty string
+            'assignments.*.difficulty_id' => 'nullable|exists:difficulties,id',
+            'assignments.*.difficulty' => 'required_without:assignments.*.difficulty_id|in:light,normal,heavy',
             'assignments.*.estimated_hours' => 'nullable|numeric|min:0',
             'assignments.*.desired_start_date' => 'nullable|date',
             'assignments.*.desired_end_date' => 'nullable|date',
@@ -51,12 +53,38 @@ class ProjectJobAssignmentController extends Controller
             }
 
             DB::transaction(function () use ($projectJob, $a, $user) {
-                $assignment = ProjectJobAssignmentByMyself::create([
+                // resolve difficulty id - prefer explicit difficulty_id
+                $difficultyId = null;
+                if (!empty($a['difficulty_id'])) {
+                    $difficultyId = (int) $a['difficulty_id'];
+                } elseif (!empty($a['difficulty'])) {
+                    // if difficulty is numeric, treat as id; otherwise try to find by slug/name
+                    if (is_numeric($a['difficulty'])) {
+                        $difficultyId = (int) $a['difficulty'];
+                    } else {
+                        $q = \App\Models\Difficulty::query();
+                        try {
+                            if (Schema::hasColumn('difficulties', 'slug')) {
+                                $q->where(function ($q2) use ($a) {
+                                    $q2->where('slug', $a['difficulty'])->orWhere('name', $a['difficulty']);
+                                });
+                            } else {
+                                $q->where('name', $a['difficulty']);
+                            }
+                        } catch (\Throwable $__e) {
+                            $q->where('name', $a['difficulty']);
+                        }
+                        $d = $q->first();
+                        if ($d) $difficultyId = $d->id;
+                    }
+                }
+
+                $createPayload = [
                     'project_job_id' => $projectJob->id,
                     'user_id' => $user ? $user->id : null,
                     'title' => $a['title'],
                     'detail' => $a['detail'] ?? null,
-                    'difficulty' => $a['difficulty'],
+                    'difficulty_id' => $difficultyId,
                     'desired_start_date' => $a['desired_start_date'] ?? null,
                     'desired_end_date' => $a['desired_end_date'] ?? null,
                     'desired_time' => $a['desired_time'] ?? null,
@@ -70,7 +98,14 @@ class ProjectJobAssignmentController extends Controller
                     'department_id' => $a['department_id'] ?? null,
                     'amounts' => $a['amounts'] ?? null,
                     'amounts_unit' => $a['amounts_unit'] ?? null,
-                ]);
+                ];
+
+                // include legacy string column only if table has it
+                if (Schema::hasColumn('project_job_assignment_by_myself', 'difficulty')) {
+                    $createPayload['difficulty'] = $a['difficulty'] ?? null;
+                }
+
+                $assignment = ProjectJobAssignmentByMyself::create($createPayload);
 
                 // Create corresponding Event if events table supports linking
                 try {

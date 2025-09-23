@@ -23,15 +23,17 @@ function dismissToast(id) {
 }
 
 function toastClass(type) {
+    // Make toasts more prominent and use an orange theme by default
+    const base = 'text-white p-4 rounded shadow-lg text-base';
     switch (type) {
         case 'success':
-            return 'bg-green-600 text-white p-3 rounded shadow';
+            return base + ' bg-orange-600';
         case 'error':
-            return 'bg-red-600 text-white p-3 rounded shadow';
+            return base + ' bg-red-600';
         case 'warning':
-            return 'bg-yellow-500 text-white p-3 rounded shadow';
+            return base + ' bg-orange-500';
         default:
-            return 'bg-gray-800 text-white p-3 rounded shadow';
+            return base + ' bg-orange-600';
     }
 }
 

@@ -4,6 +4,7 @@ AIエージェント用プロンプト
 環境はdockerです。
 php artisan はエラーが出るので、docker exec sunbwork-laravelをいれてからphp artisanのコマンドをいれること。
 tinkerもdocker compose につづくコマンドをしないとエラーが出ます。
+sqliteを使おうとするエラーが多発していますが、私の環境はmysqlです。間違えないでください。
 内容を把握したうえで、以下の質問に答えなさい。
 
 

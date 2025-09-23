@@ -509,16 +509,8 @@ onMounted(() => {
         const channel = window.Echo.private('jobmessages.' + authUser.id);
         channel.listen('JobMessageCreated', async (e) => {
             // event payload received (silently handled)
-            // Show a shared toast so user notices immediately
-            try {
-                showToast(
-                    (e.from_user_name ? `${e.from_user_name} さんからジョブが届きました: ` : '新しいジョブ: ') + (e.subject || '(件名なし)'),
-                    'info',
-                    5000,
-                );
-            } catch (err) {
-                // toast failed (non-fatal)
-            }
+            // DO NOT show a page-local toast here; toasts are centralized in AppLayout
+            // to avoid duplicate toasts across the app.
 
             // If the event includes a full jam payload, use it. Otherwise, if only an id is provided,
             // attempt to fetch the jam via a lightweight endpoint.

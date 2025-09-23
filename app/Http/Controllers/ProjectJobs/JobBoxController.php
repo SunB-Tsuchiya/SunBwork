@@ -270,11 +270,16 @@ class JobBoxController extends Controller
         } catch (\Throwable $__e) {
             // if schema introspection fails for any reason, default to id,name
         }
+        try {
+            $difficulties = \App\Models\Difficulty::orderBy('sort_order')->get($difficultySelect);
+        } catch (\Throwable $__e) {
+            $difficulties = collect();
+        }
 
         return inertia('JobBox/Show', [
             'projectJob' => $projectJob,
             'message' => $message,
-            'difficulties' => \App\Models\Difficulty::orderBy('sort_order')->get($difficultySelect),
+            'difficulties' => $difficulties,
         ]);
     }
 

@@ -271,7 +271,7 @@
 import SelectionModal from '@/Components/SelectionModal.vue';
 import useToasts from '@/Composables/useToasts';
 import { Link, router, usePage } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { onMounted, ref } from 'vue';
 
 const props = defineProps({
     projectJob: Object,
@@ -300,13 +300,33 @@ function normalizeAssignment(a) {
         title_prefix: `${props.projectJob?.title || ''}：`,
         title_suffix: (() => {
             const raw = a.title || '';
-            const prefix = `「${props.projectJob?.title || ''}：`;
             if (!raw) return '';
-            if (raw.startsWith(prefix)) return raw.slice(prefix.length).trim();
+            const pj = props.projectJob?.title || '';
+            // common formats to strip:
+            // 1) Leading Japanese quote + project + full-width colon: 「Project：Job
+            // 2) Project + full-width colon: Project：Job
+            // 3) Project + ascii colon: Project:Job
+            // 4) If none match, but raw contains a colon, assume prefix up to the last colon
+            // Trim surrounding whitespace and quotes after stripping
+            const candidates = [];
+            if (pj) {
+                candidates.push(`「${pj}：`);
+                candidates.push(`${pj}：`);
+                candidates.push(`${pj}:`);
+            }
+            // Try exact prefix matches first
+            for (const pref of candidates) {
+                if (raw.startsWith(pref)) return raw.slice(pref.length).trim();
+            }
+            // If raw contains a full-width colon or ascii colon, strip leading prefix up to the first colon
+            if (raw.includes('：')) return raw.replace(/^.*？：/, '').replace(/^.*：/, '').trim();
+            if (raw.includes(':')) return raw.replace(/^.*?:/, '').trim();
+            // fallback: return raw as-is
             return raw;
         })(),
         detail: a.detail || '',
         difficulty: a.difficulty || 'normal',
+        difficulty_id: a.difficulty_id ?? null,
         desired_start_date: a.desired_start_date || a.desired_date || '',
         desired_end_date: a.desired_end_date || '',
         desired_time_hour: a.desired_time ? a.desired_time.split(':')[0] || '09' : a.desired_time_hour || '09',
@@ -323,6 +343,9 @@ function normalizeAssignment(a) {
         size_label: a.size_label || makeLabel('sizes', a.size_id),
         stage_label: a.stage_label || makeLabel('stages', a.stage_id),
         status_label: a.status_label || makeLabel('statuses', a.status_id),
+        // preserve amounts so later initialization can split digits for the 4-select UI
+        amounts: a.amounts !== undefined && a.amounts !== null ? a.amounts : a.amounts || 0,
+        amounts_unit: a.amounts_unit || 'page',
         project_job:
             a.project_job ||
             (props.projectJob ? { id: props.projectJob.id, title: props.projectJob.title, client: props.projectJob.client || null } : null),
@@ -352,10 +375,31 @@ assignments.value.forEach((a) => {
     if (a.size_id === undefined) a.size_id = a.size_id || null;
     if (a.stage_id === undefined) a.stage_id = a.stage_id || null;
     if (a.status_id === undefined) a.status_id = a.status_id || null;
-    if (a.amount_digit_0 === undefined) a.amount_digit_0 = a.amounts ? String(Math.floor(a.amounts / 1000) % 10) : '0';
-    if (a.amount_digit_1 === undefined) a.amount_digit_1 = a.amounts ? String(Math.floor(a.amounts / 100) % 10) : '0';
-    if (a.amount_digit_2 === undefined) a.amount_digit_2 = a.amounts ? String(Math.floor(a.amounts / 10) % 10) : '0';
-    if (a.amount_digit_3 === undefined) a.amount_digit_3 = a.amounts ? String(a.amounts % 10) : '0';
+    // ensure difficulty_id is populated when only difficulty name/string is present
+    if ((a.difficulty_id === undefined || a.difficulty_id === null) && a.difficulty) {
+        try {
+            const resolved = resolveDifficultyId(a.difficulty);
+            if (resolved !== null) a.difficulty_id = resolved;
+        } catch (e) {}
+    }
+    // ensure amounts is numeric
+    const amt = a.amounts !== undefined && a.amounts !== null && a.amounts !== '' ? Number(a.amounts) : null;
+    if (amt !== null && !Number.isNaN(amt)) {
+        const abs = Math.max(0, Math.floor(Math.abs(amt)) % 10000); // 0-9999
+        const d0 = Math.floor(abs / 1000) % 10;
+        const d1 = Math.floor(abs / 100) % 10;
+        const d2 = Math.floor(abs / 10) % 10;
+        const d3 = Math.floor(abs % 10);
+        if (a.amount_digit_0 === undefined) a.amount_digit_0 = String(d0);
+        if (a.amount_digit_1 === undefined) a.amount_digit_1 = String(d1);
+        if (a.amount_digit_2 === undefined) a.amount_digit_2 = String(d2);
+        if (a.amount_digit_3 === undefined) a.amount_digit_3 = String(d3);
+    } else {
+        if (a.amount_digit_0 === undefined) a.amount_digit_0 = '0';
+        if (a.amount_digit_1 === undefined) a.amount_digit_1 = '0';
+        if (a.amount_digit_2 === undefined) a.amount_digit_2 = '0';
+        if (a.amount_digit_3 === undefined) a.amount_digit_3 = '0';
+    }
     if (a.amounts === undefined) a.amounts = a.amounts || 0;
     if (a.amounts_unit === undefined) a.amounts_unit = a.amounts_unit || 'page';
 });
@@ -411,6 +455,23 @@ if (!props.editMode) {
 const showSelector = ref(false);
 const selectorTargetIndex = ref(null);
 const { toasts, showToast, dismissToast, toastClass } = useToasts();
+
+onMounted(() => {
+    try {
+        const list = window?.page?.props?.difficulties || page.props.difficulties || null;
+        console.log('[AssignmentForm] mounted - page.props.difficulties (raw):', list);
+        if (Array.isArray(list)) {
+            console.log(
+                '[AssignmentForm] difficulties id/name list:',
+                list.map((d) => ({ id: d?.id ?? null, name: d?.name ?? null, slug: d?.slug ?? null })),
+            );
+        } else {
+            console.log('[AssignmentForm] difficulties is not an array:', list);
+        }
+    } catch (e) {
+        console.error('[AssignmentForm] error logging difficulties on mount', e);
+    }
+});
 
 function clientName(block) {
     try {
@@ -749,6 +810,85 @@ function availableMins(idx, hour) {
     return mins.filter((m) => Number(m) >= nextQuarter);
 }
 
+// Resolve difficulty to numeric id.
+// Accepts: numeric id (number or numeric string), name, slug, key (case-insensitive)
+function resolveDifficultyId(val) {
+    if (val === undefined || val === null || val === '') return null;
+    // number-like
+    const num = Number(val);
+    if (!Number.isNaN(num) && String(val).trim() !== '') return num;
+    const list = window?.page?.props?.difficulties || page.props.difficulties || null;
+    if (Array.isArray(list)) {
+        const lower = String(val).toLowerCase();
+        const found = list.find((d) => {
+            if (!d) return false;
+            if (String(d.id) === String(val)) return true;
+            if (d.name && String(d.name).toLowerCase() === lower) return true;
+            if (d.slug && String(d.slug).toLowerCase() === lower) return true;
+            if (d.key && String(d.key).toLowerCase() === lower) return true;
+            if (d.value && String(d.value).toLowerCase() === lower) return true;
+            return false;
+        });
+        if (found) return found.id;
+    }
+    // Fallback: support known english keys mapping to localized names
+    try {
+        const list = window?.page?.props?.difficulties || page.props.difficulties || null;
+        if (Array.isArray(list)) {
+            const key = String(val).toLowerCase();
+            const synonyms = {
+                light: ['軽い', 'かるい', 'light'],
+                normal: ['普通', 'ふつう', 'normal'],
+                heavy: ['重い', 'おもい', '重度', '重大', 'heavy'],
+            };
+            if (Object.prototype.hasOwnProperty.call(synonyms, key)) {
+                const candidates = synonyms[key];
+                const found2 = list.find((d) => {
+                    if (!d || !d.name) return false;
+                    return candidates.some((s) => String(d.name).toLowerCase() === String(s).toLowerCase());
+                });
+                if (found2) return found2.id;
+            }
+
+            // Also try a contains-match: if val is an english key, find a difficulty whose name contains expected kanji
+            const containsMap = {
+                light: ['軽'],
+                normal: ['普'],
+                heavy: ['重', '大'],
+            };
+            const k2 = String(val).toLowerCase();
+            if (Object.prototype.hasOwnProperty.call(containsMap, k2)) {
+                const chars = containsMap[k2];
+                const found3 = list.find((d) => {
+                    if (!d || !d.name) return false;
+                    return chars.some((ch) => String(d.name).indexOf(ch) !== -1);
+                });
+                if (found3) return found3.id;
+            }
+        }
+    } catch (e) {
+        // ignore and return null
+    }
+    return null;
+}
+
+// Build the title to send to the server: prefer title_suffix (job name) only.
+function assembleTitle(a) {
+    try {
+        if (a?.title_suffix && String(a.title_suffix).trim() !== '') return String(a.title_suffix).trim();
+        // Fallback: strip any leading project name and punctuation from title_prefix
+        let t = a?.title_prefix ?? '';
+        t = String(t || '').replace(/^\s+|\s+$/g, '');
+        // remove leading Japanese quote and anything up to a full-width or ascii colon
+        t = t.replace(/^.*?[：:]/, '');
+        // remove surrounding quotes if any
+        t = t.replace(/^\u300c|\u300d|"|'/g, '').replace(/\u300c|\u300d|"|'$/g, '');
+        return t.trim();
+    } catch (e) {
+        return '';
+    }
+}
+
 function onEndDateChange(idx) {
     const a = assignments.value[idx];
     if (a.desired_start_date && a.desired_end_date && a.desired_end_date < a.desired_start_date) {
@@ -771,13 +911,9 @@ function save() {
         const a = assignments.value[0];
         // prefer sending difficulty_id when available, otherwise keep string for backward compat
         const payload = {
-            title: `${a.title_prefix}${a.title_suffix ? ' ' + a.title_suffix : ''}`,
+            title: assembleTitle(a),
             detail: a.detail,
-            difficulty_id:
-                a.difficulty_id ??
-                (window?.page?.props?.difficulties
-                    ? (window.page.props.difficulties.find((d) => d.name === a.difficulty || d.slug === a.difficulty)?.id ?? null)
-                    : null),
+            difficulty_id: a.difficulty_id ?? resolveDifficultyId(a.difficulty),
             difficulty: a.difficulty,
             estimated_hours: a.estimated_hours || null,
             desired_start_date: a.desired_start_date || null,
@@ -803,13 +939,9 @@ function save() {
 
     const payload = {
         assignments: assignments.value.map((a) => ({
-            title: `${a.title_prefix}${a.title_suffix ? ' ' + a.title_suffix : ''}`,
+            title: assembleTitle(a),
             detail: a.detail,
-            difficulty_id:
-                a.difficulty_id ??
-                (window?.page?.props?.difficulties
-                    ? (window.page.props.difficulties.find((d) => d.name === a.difficulty || d.slug === a.difficulty)?.id ?? null)
-                    : null),
+            difficulty_id: a.difficulty_id ?? resolveDifficultyId(a.difficulty),
             difficulty: a.difficulty,
             estimated_hours: a.estimated_hours || null,
             desired_start_date: a.desired_start_date || null,
