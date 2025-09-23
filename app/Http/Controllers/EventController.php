@@ -439,9 +439,9 @@ class EventController extends Controller
     // 予定の更新
     public function update(Request $request, Event $event)
     {
-    // debug logging removed
+        // debug logging removed
         $this->authorize('update', $event);
-    // debug logging removed
+        // debug logging removed
         // $request->get()は引数必須のため削除
         $data = $request->validate([
             'date' => 'required|date',
@@ -459,7 +459,7 @@ class EventController extends Controller
             'endHour' => 'required',
             'endMinute' => 'required',
         ]);
-    // debug logging removed
+        // debug logging removed
         $data['description'] = $request->input('description', '');
         $data['user_id'] = Auth::id();
         $data['start'] = date('Y-m-d H:i:00', strtotime($data['date'] . ' ' . $data['startHour'] . ':' . $data['startMinute']));
@@ -472,9 +472,9 @@ class EventController extends Controller
                 unset($data['date']);
             }
         }
-    // debug logging removed
+        // debug logging removed
         $event->update($data);
-    // debug logging removed
+        // debug logging removed
 
         // 添付ファイル保存（追加分のみ）
         if ($request->hasFile('files')) {
@@ -722,7 +722,7 @@ class EventController extends Controller
             }
         }
         // Debug logging to ensure jobData is created and query params are received
-                // create-time debug logging removed
+        // create-time debug logging removed
         // Gather user-scoped clients and projects (those where the current user is a project_team_member)
         $user = $request->user();
         $userClients = [];

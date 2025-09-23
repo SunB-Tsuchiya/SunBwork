@@ -209,6 +209,12 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('/ai-presets', [\App\Http\Controllers\Admin\AiPresetsController::class, 'store'])->name('ai.presets.store');
         Route::put('/ai-presets/{ai_preset}', [\App\Http\Controllers\Admin\AiPresetsController::class, 'update'])->name('ai.presets.update');
         Route::delete('/ai-presets/{ai_preset}', [\App\Http\Controllers\Admin\AiPresetsController::class, 'destroy'])->name('ai.presets.destroy');
+        // Admin: Workload Analyzer (company-wide)
+        Route::get('workload-analyzer', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'index'])->name('workload_analyzer.index');
+        // Register settings routes before the parameterized {user} route so 'settings' is not captured as {user}
+        Route::get('workload-analyzer/settings', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'settings'])->name('workload_analyzer.settings');
+        Route::post('workload-analyzer/settings', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'saveSettings'])->name('workload_analyzer.settings.save');
+        Route::get('workload-analyzer/{user}', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'show'])->name('workload_analyzer.show');
     });
 
 
@@ -248,6 +254,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('/ai-presets', [\App\Http\Controllers\SuperAdmin\AiPresetsController::class, 'store'])->name('ai.presets.store');
         Route::put('/ai-presets/{ai_preset}', [\App\Http\Controllers\SuperAdmin\AiPresetsController::class, 'update'])->name('ai.presets.update');
         Route::delete('/ai-presets/{ai_preset}', [\App\Http\Controllers\SuperAdmin\AiPresetsController::class, 'destroy'])->name('ai.presets.destroy');
+        // SuperAdmin: Workload Analyzer (global)
+        Route::get('workload-analyzer', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'index'])->name('workload_analyzer.index');
     });
 
 
@@ -267,6 +275,12 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('diaryinteractions/{diary}/mark-read', [App\Http\Controllers\Diaries\DiaryInteractionController::class, 'markRead'])->name('diaryinteractions.mark_read');
         // 日付単位で「全部既読にする」(リーダー用)
         Route::post('diaryinteractions/mark-read-all', [App\Http\Controllers\Diaries\DiaryInteractionController::class, 'markReadAll'])->name('diaryinteractions.mark_read_all');
+        // Leader: Workload Analyzer (show company/department/team members and analysis placeholders)
+        Route::get('workload-analyzer', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'index'])->name('workload_analyzer.index');
+        // ensure static 'settings' route is registered before the parameterized {user} route
+        Route::get('workload-analyzer/settings', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'settings'])->name('workload_analyzer.settings');
+        Route::post('workload-analyzer/settings', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'saveSettings'])->name('workload_analyzer.settings.save');
+        Route::get('workload-analyzer/{user}', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'show'])->name('workload_analyzer.show');
     });
 
 // クライアント管理（Admin用）は上の admin グループに統合済み（重複削除）
@@ -359,6 +373,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 Route::get('/debug/create', function () {
     return Inertia::render('Diaries/CreateDebug');
 })->name('debug.create');
+
+// (temporary debug routes removed)
 
 // --- デバッグ用API/認証チェックページ ---
 // /debug/api でAPI/認証の動作確認ができるVueページ（resources/js/Debug/ApiDebug.vue）

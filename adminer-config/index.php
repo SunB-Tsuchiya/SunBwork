@@ -42,8 +42,7 @@ function adminer_object()
                 <tr>
                     <th>Server</th>
                     <td>
-                        <input name="auth[server]" value="/var/www/html/database/database.sqlite"
-                            title="SQLite database file path" readonly>
+                        <input name="auth[server]" value="" placeholder="e.g. mysql:host=127.0.0.1;port=3306" title="Database server or file path">
                     </td>
                 </tr>
                 <tr>

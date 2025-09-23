@@ -14,6 +14,7 @@ return new class extends Migration
             $table->string('label')->nullable();
             $table->integer('width_mm')->nullable();
             $table->integer('height_mm')->nullable();
+            $table->decimal('coefficient', 6, 3)->nullable();
             $table->timestamps();
         });
     }

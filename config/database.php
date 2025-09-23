@@ -16,7 +16,8 @@ return [
     |
     */
 
-    'default' => env('DB_CONNECTION', 'sqlite'),
+    // Use the environment DB_CONNECTION by default; prefer mysql when not set.
+    'default' => env('DB_CONNECTION', 'mysql'),
 
     /*
     |--------------------------------------------------------------------------
@@ -31,6 +32,12 @@ return [
 
     'connections' => [
 
+        // SQLite connection (kept for backward compatibility / local dev). The
+        // 'database' value here uses database_path('database.sqlite') as a
+        // sensible default, but the actual connection in use is controlled by
+        // the `DB_CONNECTION` environment variable (see top-level 'default').
+        // In production or when `.env` sets DB_CONNECTION=mysql this block
+        // is ignored.
         'sqlite' => [
             'driver' => 'sqlite',
             'url' => env('DB_URL'),
@@ -147,7 +154,7 @@ return [
 
         'options' => [
             'cluster' => env('REDIS_CLUSTER', 'redis'),
-            'prefix' => env('REDIS_PREFIX', Str::slug(env('APP_NAME', 'laravel'), '_').'_database_'),
+            'prefix' => env('REDIS_PREFIX', Str::slug(env('APP_NAME', 'laravel'), '_') . '_database_'),
             'persistent' => env('REDIS_PERSISTENT', false),
         ],
 

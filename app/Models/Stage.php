@@ -9,5 +9,5 @@ class Stage extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'order_index', 'description'];
+    protected $fillable = ['name', 'order_index', 'description', 'coefficient'];
 }

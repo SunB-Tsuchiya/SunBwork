@@ -615,8 +615,13 @@ const computeCoordinatorActive = () => {
 
             <!-- Page Heading -->
             <header v-if="$slots.header" class="bg-white shadow">
-                <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-                    <slot name="header" />
+                <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-6 sm:px-6 lg:px-8">
+                    <div class="flex-1">
+                        <slot name="header" />
+                    </div>
+                    <div class="ml-4 flex-shrink-0">
+                        <slot name="headerExtras" />
+                    </div>
                 </div>
             </header>
             <!-- Page Content -->

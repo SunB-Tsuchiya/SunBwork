@@ -36,6 +36,7 @@ class ProjectJobAssignmentByMyself extends Model
         // quantity fields
         'amounts',
         'amounts_unit',
+        'difficulty_id',
         // start time separate from desired_time
         'start_time',
     ];
@@ -63,6 +64,11 @@ class ProjectJobAssignmentByMyself extends Model
     public function projectJob()
     {
         return $this->belongsTo(ProjectJob::class, 'project_job_id');
+    }
+
+    public function difficultyModel()
+    {
+        return $this->belongsTo(\App\Models\Difficulty::class, 'difficulty_id');
     }
 
     public function user()

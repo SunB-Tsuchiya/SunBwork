@@ -89,7 +89,7 @@ class CalendarController extends Controller
             })->values();
 
             // Temporary debug: log first event to ensure linkage keys are present for Inertia props
-                // sample logging removed
+            // sample logging removed
 
             // load assigned jobs that the user accepted or that are marked assigned
             $jobs = ProjectJobAssignment::where('user_id', $user->id)

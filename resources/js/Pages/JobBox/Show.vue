@@ -39,7 +39,7 @@
                 </div>
 
                 <label class="mb-1 mt-2 block font-semibold">難易度</label>
-                <div class="w-full rounded border bg-gray-50 px-3 py-2">{{ assignment.difficulty }}</div>
+                <div class="w-full rounded border bg-gray-50 px-3 py-2">{{ difficultyLabel }}</div>
 
                 <div class="mt-2">
                     <label class="mb-1 block font-semibold">割当希望日</label>
@@ -97,12 +97,35 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, usePage } from '@inertiajs/vue3';
-import { onMounted } from 'vue';
+import { computed, onMounted } from 'vue';
 const { projectJob, message } = defineProps({ projectJob: Object, message: Object });
 const page = usePage();
 
 // Use assignment from the message payload (broadcast includes project_job_assignment)
 const assignment = message?.project_job_assignment || {};
+
+// Resolve difficulty label in a predictable order:
+// 1) assignment.difficulty_label (provided by backend)
+// 2) lookup by assignment.difficulty_id using page.props.difficulties
+// 3) attempt to match legacy assignment.difficulty to a difficulty by name/slug
+// 4) fallback to assignment.difficulty or '-'
+const difficultyLabel = computed(() => {
+    if (assignment?.difficulty_label) return assignment.difficulty_label;
+    const did = assignment?.difficulty_id ?? null;
+    const difficulties = page.props?.difficulties ?? null;
+    if (did && Array.isArray(difficulties)) {
+        const found = difficulties.find((d) => String(d.id) === String(did));
+        if (found) return found.name;
+    }
+    if (assignment?.difficulty) {
+        if (Array.isArray(difficulties)) {
+            const found = difficulties.find((d) => d.name === assignment.difficulty || d.slug === assignment.difficulty);
+            if (found) return found.name;
+        }
+        return assignment.difficulty;
+    }
+    return '-';
+});
 
 function formatTime(t) {
     if (!t) return '';

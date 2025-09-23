@@ -12,7 +12,7 @@ class Size extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'label', 'width', 'height', 'unit', 'sort_order', 'company_id', 'department_id'];
+    protected $fillable = ['name', 'label', 'width', 'height', 'unit', 'sort_order', 'company_id', 'department_id', 'coefficient'];
 
     /**
      * サイズの会社

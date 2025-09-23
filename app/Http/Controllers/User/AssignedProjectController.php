@@ -74,7 +74,7 @@ class AssignedProjectController extends Controller
         }
 
         $jobs = collect($assignments);
-        return Inertia::render('User/AssignedProject/Index', [
+        return Inertia::render('Calendar/Index', [
             'jobs' => $jobs,
         ]);
     }

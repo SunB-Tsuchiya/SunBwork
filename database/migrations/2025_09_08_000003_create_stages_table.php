@@ -12,6 +12,7 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->integer('order_index')->default(0);
+            $table->decimal('coefficient', 6, 3)->nullable();
             $table->text('description')->nullable();
             $table->timestamps();
         });

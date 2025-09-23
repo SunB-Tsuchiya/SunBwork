@@ -69,6 +69,14 @@ class Team extends JetstreamTeam
     }
 
     /**
+     * Team members (many-to-many with users via team_user pivot table)
+     */
+    public function members()
+    {
+        return $this->belongsToMany(\App\Models\User::class, 'team_user', 'team_id', 'user_id')->withPivot('role')->withTimestamps();
+    }
+
+    /**
      * Ensure pivot rows are removed when a team is deleted.
      */
     protected static function booted()

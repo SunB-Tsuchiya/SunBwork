@@ -8,6 +8,7 @@ use App\Models\JobAssignmentMessage;
 use App\Models\ProjectJobAssignment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class JobBoxController extends Controller
 {
@@ -237,14 +238,43 @@ class JobBoxController extends Controller
                 $a->size_label = isset($a->size) && $a->size ? ($a->size->name ?? $a->size->label ?? null) : null;
                 $a->stage_label = isset($a->stage) && $a->stage ? ($a->stage->name ?? $a->stage->label ?? null) : null;
                 $a->status_label = isset($a->statusModel) && $a->statusModel ? ($a->statusModel->name ?? $a->statusModel->label ?? null) : null;
+                // resolve difficulty_label for frontend display (prefer difficulty_id, fallback to legacy difficulty)
+                try {
+                    $a->difficulty_label = null;
+                    if (isset($a->difficulty_id) && $a->difficulty_id) {
+                        $d = \App\Models\Difficulty::find($a->difficulty_id);
+                        if ($d) $a->difficulty_label = $d->name;
+                    }
+                    if (empty($a->difficulty_label) && !empty($a->difficulty)) {
+                        $q = \App\Models\Difficulty::query();
+                        if (Schema::hasColumn('difficulties', 'slug')) {
+                            $q->where('slug', $a->difficulty)->orWhere('name', $a->difficulty);
+                        } else {
+                            $q->where('name', $a->difficulty);
+                        }
+                        $d2 = $q->first();
+                        if ($d2) $a->difficulty_label = $d2->name;
+                    }
+                } catch (\Throwable $__e) {
+                    // non-fatal
+                }
             }
         } catch (\Throwable $__e) {
             // non-fatal: if lookup relations or attributes are missing, continue without labels
         }
 
+        // build difficulties list with either (id,name,slug) when slug exists, or (id,name) otherwise
+        $difficultySelect = ['id', 'name'];
+        try {
+            if (Schema::hasColumn('difficulties', 'slug')) $difficultySelect[] = 'slug';
+        } catch (\Throwable $__e) {
+            // if schema introspection fails for any reason, default to id,name
+        }
+
         return inertia('JobBox/Show', [
             'projectJob' => $projectJob,
             'message' => $message,
+            'difficulties' => \App\Models\Difficulty::orderBy('sort_order')->get($difficultySelect),
         ]);
     }
 
@@ -300,6 +330,8 @@ class JobBoxController extends Controller
                 'title' => $jam->project_job_assignment->title ?? null,
                 'detail' => $jam->project_job_assignment->detail ?? null,
                 'difficulty' => $jam->project_job_assignment->difficulty ?? null,
+                'difficulty_id' => $jam->project_job_assignment->difficulty_id ?? null,
+                'difficulty_label' => null,
                 'desired_start_date' => $jam->project_job_assignment->desired_start_date ?? null,
                 'desired_end_date' => $jam->project_job_assignment->desired_end_date ?? null,
                 'desired_time' => $jam->project_job_assignment->desired_time ?? null,
@@ -314,6 +346,30 @@ class JobBoxController extends Controller
                 'stage_label' => $jam->project_job_assignment->stage ? ($jam->project_job_assignment->stage->name ?? $jam->project_job_assignment->stage->label ?? null) : null,
                 'type_label' => $jam->project_job_assignment->workItemType ? ($jam->project_job_assignment->workItemType->name ?? $jam->project_job_assignment->workItemType->label ?? null) : null,
                 'status_label' => $jam->project_job_assignment->statusModel ? ($jam->project_job_assignment->statusModel->name ?? $jam->project_job_assignment->statusModel->label ?? null) : null,
+                'difficulty_label' => (function () use ($jam) {
+                    try {
+                        $a = $jam->project_job_assignment;
+                        if (!$a) return null;
+                        if (isset($a->difficulty_id) && $a->difficulty_id) {
+                            $d = \App\Models\Difficulty::find($a->difficulty_id);
+                            if ($d) return $d->name;
+                        }
+                        if (!empty($a->difficulty)) {
+                            $q = \App\Models\Difficulty::query();
+                            if (Schema::hasColumn('difficulties', 'slug')) {
+                                $q->where('slug', $a->difficulty)->orWhere('name', $a->difficulty);
+                            } else {
+                                $q->where('name', $a->difficulty);
+                            }
+                            $d2 = $q->first();
+                            if ($d2) return $d2->name;
+                            return $a->difficulty;
+                        }
+                    } catch (\Throwable $__e) {
+                        return null;
+                    }
+                    return null;
+                })(),
             ] : null,
             'message' => $jam->message ? [
                 'id' => $jam->message->id,

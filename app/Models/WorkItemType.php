@@ -9,5 +9,5 @@ class WorkItemType extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'slug', 'description'];
+    protected $fillable = ['name', 'slug', 'description', 'coefficient'];
 }

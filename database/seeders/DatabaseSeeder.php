@@ -30,6 +30,7 @@ class DatabaseSeeder extends Seeder
             \Database\Seeders\SizesSeeder::class,
             \Database\Seeders\StatusesSeeder::class,
             \Database\Seeders\StagesSeeder::class,
+            \Database\Seeders\DifficultiesSeeder::class,
             \Database\Seeders\WorkItemPresetsSeeder::class,
             // この下はサンプル用のファイルです。必要ないときは消します。
             z_SampleAdminUserSeeder::class,

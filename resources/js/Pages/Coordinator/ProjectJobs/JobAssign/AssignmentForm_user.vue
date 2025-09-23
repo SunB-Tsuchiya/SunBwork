@@ -310,8 +310,8 @@ const debugStr = computed(() => {
         return String(e);
     }
 });
-    // mount hook (no debug logging)
-    onMounted(() => {});
+// mount hook (no debug logging)
+onMounted(() => {});
 
 // Watch injected/inferred user and page props for changes
 watch(
@@ -732,6 +732,11 @@ function save() {
             project_job_id: a.project_job_id || null,
             company_id: a.company_id || null,
             department_id: a.department_id || null,
+            difficulty_id:
+                a.difficulty_id ??
+                (window?.page?.props?.difficulties
+                    ? (window.page.props.difficulties.find((d) => d.name === a.difficulty || d.slug === a.difficulty)?.id ?? null)
+                    : null),
             difficulty: a.difficulty || null,
             desired_start_date: a.desired_start_date || null,
             desired_end_date: a.desired_end_date || null,

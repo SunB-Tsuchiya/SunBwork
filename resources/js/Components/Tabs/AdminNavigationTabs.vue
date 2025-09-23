@@ -49,6 +49,17 @@ const props = defineProps({
             >
                 クライアント管理
             </Link>
+            <Link
+                :href="route('admin.workload_analyzer.index')"
+                :class="[
+                    'rounded-md px-3 py-2 text-sm font-medium',
+                    active === 'workload'
+                        ? 'bg-orange-100 text-orange-700'
+                        : 'border border-green-200 text-green-600 hover:bg-green-50 hover:text-green-800',
+                ]"
+            >
+                作業量分析
+            </Link>
             <!-- <Link :href="route('leader.dashboard')"
         class="text-orange-600 hover:text-orange-800 px-3 py-2 font-medium text-sm rounded-md border border-orange-200 hover:bg-orange-50">
         リーダーモードに切り替え

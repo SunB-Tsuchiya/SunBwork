@@ -13,6 +13,7 @@ return new class extends Migration
             $table->string('name');
             $table->string('slug')->unique();
             $table->integer('sort_order')->default(0);
+            $table->decimal('coefficient', 6, 3)->nullable();
             $table->timestamps();
         });
     }
