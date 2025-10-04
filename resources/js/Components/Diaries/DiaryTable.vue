@@ -273,7 +273,7 @@ function prevPage() {
 
 function nextPage() {
     if (props.serverMode) return;
-    if (internalPage.value < totalPages.value) internalPage += 1;
+    if (internalPage.value < totalPages.value) internalPage.value += 1;
 }
 
 function toggleExpand(id) {

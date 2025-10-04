@@ -36,7 +36,7 @@
                     </thead>
                     <tbody>
                         <tr
-                            v-for="m in localMessages"
+                            v-for="m in displayMessages"
                             :key="m.id"
                             :class="['cursor-pointer hover:bg-gray-100', m.__is_new ? 'new-highlight' : '']"
                             @click.prevent="rowClick(m, $event)"
@@ -373,10 +373,33 @@ function getClientName(m) {
 // Determine assignment status: 完了, セット済み, 確認済み, 受信済み
 function getAssignmentStatus(m) {
     try {
-        // Determine flags from jam and linked assignment
+        // Prefer canonical status object when available (in assignment.status.key)
         const jam = m || {};
         const assignment = m.project_job_assignment || {};
 
+        const statusKey = (assignment.status && assignment.status.key) || (jam.status && jam.status.key) || null;
+        if (statusKey) {
+            switch (statusKey) {
+                case 'completed':
+                    return '完了';
+                case 'scheduled':
+                    return 'セット済み';
+                case 'confirmed':
+                    return '確認済み';
+                case 'received':
+                    return '受信済み';
+                // legacy slugs fallback
+                case 'order':
+                    return '受信済み';
+                case 'in_progress':
+                    return '受信済み';
+                default:
+                    // unknown key — fall back to flag logic below
+                    break;
+            }
+        }
+
+        // Fallback for older data shapes: use existing flag/timestamp heuristics
         const completed = Boolean(jam.completed) || Boolean(assignment.completed);
         if (completed) return '完了';
 
@@ -456,8 +479,31 @@ function statusIcon(status) {
 
 // Real-time: subscribe to jobmessages channel and prepend new job messages
 import useToasts from '@/Composables/useToasts';
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 const localMessages = ref(props.messages && props.messages.data ? [...props.messages.data] : []);
+
+// displayMessages deduplicates by project_job_assignment id and returns the latest message per assignment
+const displayMessages = computed(() => {
+    const arr = Array.isArray(localMessages.value) ? localMessages.value : [];
+    const byAssign = new Map();
+    for (const m of arr) {
+        const aid = m.project_job_assignment && m.project_job_assignment.id ? String(m.project_job_assignment.id) : `noassign-${m.id}`;
+        if (!byAssign.has(aid)) {
+            byAssign.set(aid, m);
+            continue;
+        }
+        // prefer the most recently created message
+        const existing = byAssign.get(aid);
+        const eCreated = existing && existing.created_at ? new Date(existing.created_at) : null;
+        const mCreated = m && m.created_at ? new Date(m.created_at) : null;
+        if (!eCreated && mCreated) {
+            byAssign.set(aid, m);
+        } else if (eCreated && mCreated && mCreated > eCreated) {
+            byAssign.set(aid, m);
+        }
+    }
+    return Array.from(byAssign.values());
+});
 const { showToast } = useToasts();
 
 // Determine if a JobAssignmentMessage should be considered unread for the current user

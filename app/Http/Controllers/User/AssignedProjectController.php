@@ -22,7 +22,9 @@ class AssignedProjectController extends Controller
                 // find any assignment for this user on this job (if project_job_assignments exists)
                 $assignment = null;
                 try {
-                    $assignment = \App\Models\ProjectJobAssignment::where('project_job_id', $job->id)
+                    // eager-load statusModel so we can include canonical status in the payload
+                    $assignment = \App\Models\ProjectJobAssignment::with(['statusModel'])
+                        ->where('project_job_id', $job->id)
                         ->where('user_id', $user->id)
                         ->first();
                 } catch (\Throwable $e) {
@@ -37,13 +39,18 @@ class AssignedProjectController extends Controller
                         'id' => $assignment->id,
                         'scheduled' => isset($assignment->scheduled) ? (bool)$assignment->scheduled : null,
                         'scheduled_at' => $assignment->scheduled_at ?? null,
+                        'status' => $assignment->statusModel ? [
+                            'id' => $assignment->statusModel->id,
+                            'key' => $assignment->statusModel->key ?? $assignment->statusModel->slug ?? null,
+                            'name' => $assignment->statusModel->name,
+                        ] : null,
                     ] : null,
                 ];
             });
         // Use project_job_assignments for the user's assigned jobs
         $assignments = [];
         try {
-            $assignments = \App\Models\ProjectJobAssignment::with(['projectJob.client'])
+            $assignments = \App\Models\ProjectJobAssignment::with(['projectJob.client', 'statusModel'])
                 ->where('user_id', $user->id)
                 ->get()
                 ->map(function ($a) {
@@ -65,6 +72,11 @@ class AssignedProjectController extends Controller
                         'desired_time' => $a->desired_time ?? null,
                         'scheduled' => isset($a->scheduled) ? (bool)$a->scheduled : false,
                         'scheduled_at' => $a->scheduled_at ?? null,
+                        'status' => $a->statusModel ? [
+                            'id' => $a->statusModel->id,
+                            'key' => $a->statusModel->key ?? $a->statusModel->slug ?? null,
+                            'name' => $a->statusModel->name,
+                        ] : null,
                         'preferred_date' => $a->desired_start_date ?? null,
                     ];
                 })->toArray();
@@ -82,10 +94,18 @@ class AssignedProjectController extends Controller
     public function show($id)
     {
         // First try to find as a ProjectJobAssignment (assignment id)
-        $assignment = \App\Models\ProjectJobAssignment::with(['projectJob.client', 'user'])->find($id);
+        $assignment = \App\Models\ProjectJobAssignment::with(['projectJob.client', 'user', 'statusModel'])->find($id);
         if ($assignment) {
             $pj = $assignment->projectJob;
             $pj->detail = is_string($pj->detail) ? json_decode($pj->detail, true) : $pj->detail;
+            // attach canonical status object for frontend convenience
+            if ($assignment->relationLoaded('statusModel') && $assignment->statusModel) {
+                $assignment->status = [
+                    'id' => $assignment->statusModel->id,
+                    'key' => $assignment->statusModel->key ?? $assignment->statusModel->slug ?? null,
+                    'name' => $assignment->statusModel->name,
+                ];
+            }
             return Inertia::render('User/AssignedProject/ShowAssignment', [
                 'assignment' => $assignment,
                 'projectJob' => $pj,

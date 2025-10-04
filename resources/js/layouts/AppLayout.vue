@@ -125,7 +125,9 @@ onMounted(() => {
                     unreadMessages.value = (unreadMessages.value || 0) + 1;
                 }
                 const msg = (e.from_user_name ? e.from_user_name + 'さんからメールが届きました: ' : '新しいメール: ') + (e.subject || '(件名なし)');
-                window.dispatchEvent(new CustomEvent('message:received', { detail: { message: msg } }));
+                // include the message id if provided so clients can dedupe identical events
+                const mid = e.id || e.message_id || null;
+                window.dispatchEvent(new CustomEvent('message:received', { detail: { message: msg, id: mid, origin: 'message' } }));
             });
             // listen for reads to decrement general unread count
             window.Echo.private('messages.' + authUser.id).listen('MessageRead', (e) => {
@@ -145,8 +147,9 @@ onMounted(() => {
                     const from = e.from_user_name ? `${e.from_user_name}さん` : '誰か';
                     const subj = e.subject || '(件名なし)';
                     const msg = `${from} からジョブ関連のメッセージが届きました: ${subj}`;
-                    // dispatch a generic message:received event so Toast.vue (and other listeners) show a toast
-                    window.dispatchEvent(new CustomEvent('message:received', { detail: { message: msg } }));
+                    // include jam id or job_assignment_message_id when present so clients can dedupe
+                    const jid = e.job_assignment_message_id || e.message_id || (e.jam && e.jam.id) || null;
+                    window.dispatchEvent(new CustomEvent('message:received', { detail: { message: msg, id: jid, origin: 'job' } }));
                 } catch (err) {
                     // non-fatal
                 }
@@ -156,31 +159,7 @@ onMounted(() => {
                     unreadJobMessages.value = Math.max(0, (unreadJobMessages.value || 0) - 1);
                 } catch (err) {}
             });
-            // Global lightweight toast events for assignment actions (scheduled/completed)
-            try {
-                const { showToast } = useToasts();
-                if (window.Echo && typeof window.Echo.channel === 'function') {
-                    window.Echo.channel('toasts').listen('AssignmentStatusToast', (e) => {
-                        try {
-                            const p = e.payload || (e.payloads ? e.payloads : {});
-                            const title = p.title ? String(p.title) : '';
-                            let message = '';
-                            if (p.action === 'scheduled') {
-                                message = `「${title}」の予定がセットされました`;
-                            } else if (p.action === 'completed') {
-                                message = `「${title}」の作業が完了しました`;
-                            } else {
-                                message = p.message || '操作が完了しました';
-                            }
-                            showToast(message, 'success', 5000);
-                        } catch (err) {
-                            // non-fatal
-                        }
-                    });
-                }
-            } catch (err) {
-                // non-fatal
-            }
+            // AssignmentStatusToast is handled centrally by ToastUnified.vue (subscribe to "toasts" channel)
         }
     } catch (err) {
         // Echo subscribe failed (non-fatal)

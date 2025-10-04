@@ -319,7 +319,11 @@ function normalizeAssignment(a) {
                 if (raw.startsWith(pref)) return raw.slice(pref.length).trim();
             }
             // If raw contains a full-width colon or ascii colon, strip leading prefix up to the first colon
-            if (raw.includes('：')) return raw.replace(/^.*？：/, '').replace(/^.*：/, '').trim();
+            if (raw.includes('：'))
+                return raw
+                    .replace(/^.*？：/, '')
+                    .replace(/^.*：/, '')
+                    .trim();
             if (raw.includes(':')) return raw.replace(/^.*?:/, '').trim();
             // fallback: return raw as-is
             return raw;

@@ -3,12 +3,28 @@ import { ref } from 'vue';
 // Shared (singleton) toast state so multiple imports share the same toasts
 const toasts = ref([]);
 const idCounter = ref(1);
+// recentMessages: map of "type|message" -> timestamp ms when last shown
+const recentMessages = ref({});
+const DEDUPE_WINDOW_MS = 1500; // ignore identical toasts within 1.5s
 
 /**
  * Show a toast message.
  * action: optional object { label: string, handler: function }
  */
 function showToast(message, type = 'info', duration = 3000, action = null) {
+    try {
+        const key = `${type}|${String(message)}`;
+        const now = Date.now();
+        const last = recentMessages.value[key] || 0;
+        if (now - last < DEDUPE_WINDOW_MS) {
+            // duplicate within short window; ignore
+            return null;
+        }
+        recentMessages.value[key] = now;
+    } catch (err) {
+        // fallback to showing toast on any error
+    }
+
     const id = idCounter.value++;
     toasts.value.push({ id, message, type, action });
     if (duration && duration > 0) {

@@ -179,7 +179,7 @@ async function addNew(kind) {
         return;
     }
 
-    let payload = { table, name };
+    const payload = { table, name };
 
     if (table === 'sizes') {
         const unit = window.prompt('単位を入力してください (mm, cm, px など) （デフォルト: mm）', 'mm') || 'mm';

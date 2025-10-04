@@ -780,7 +780,7 @@ function save() {
                 });
                 // Provide quick feedback to the user and abort the request
                 try {
-                    // eslint-disable-next-line no-undef
+                     
                     alert('プロジェクトが選択されていません。プロジェクトを選択してください。');
                 } catch (e) {}
                 return;
@@ -798,7 +798,7 @@ function save() {
     if (!coordinatorProjectJobId) {
         console.error('[AssignmentForm_user] missing projectJob id for coordinator-store', { sampleAssignment: payload.assignments[0] });
         try {
-            // eslint-disable-next-line no-undef
+             
             alert('プロジェクトが選択されていません。プロジェクトを選択してください。');
         } catch (e) {}
         return;

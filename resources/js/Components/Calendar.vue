@@ -6,7 +6,7 @@
             <button @click="goToDiaryCreate" class="rounded bg-orange-500 px-4 py-2 text-white">{{ props.diaryLabel }}作成</button>
             <button @click="goToAssignedJobs" class="rounded bg-green-600 px-4 py-2 text-white">依頼一覧</button>
         </div>
-        <FullCalendar :options="calendarOptions" :events="events" />
+        <FullCalendar ref="fullCalendarRef" :options="calendarOptions" :events="events" />
         <!-- 予定作成モーダル -->
         <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
             <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
@@ -94,7 +94,7 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import FullCalendar from '@fullcalendar/vue3';
 import { router } from '@inertiajs/vue3';
 import axios from 'axios';
-import { computed, nextTick, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
 
 const props = defineProps({
@@ -138,11 +138,24 @@ const yyyy = today.getFullYear();
 const mm = String(today.getMonth() + 1).padStart(2, '0');
 const dd = String(today.getDate()).padStart(2, '0');
 const selectedDate = ref(`${yyyy}-${mm}-${dd}`);
+// If the page was opened with a ?date=YYYY-MM-DD query (or Inertia supplied it in the URL),
+// prefer that as the initial selected date so links like "予定を編集" focus the correct day.
+try {
+    const params = new URLSearchParams(window.location.search);
+    const qd = params.get('date');
+    if (qd && typeof qd === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(qd)) {
+        selectedDate.value = qd;
+    }
+} catch (e) {
+    // ignore malformed URL or environments without window
+}
 // personal-only calendar: no schedule scoping
 const selectedScheduleId = ref(null);
 
 const startHourSelectRef = ref(null);
 const endHourSelectRef = ref(null);
+// Reference to FullCalendar component so we can programmatically navigate to dates
+const fullCalendarRef = ref(null);
 
 function goToAssignedJobs() {
     try {
@@ -397,24 +410,7 @@ const events = ref([
             description: event.description ?? event.extendedProps?.description ?? '',
         };
     }),
-    // Assigned jobs (Coordinator が割り当てたジョブ). 表示は allDay、色は淡い青
-    ...(props.jobs ?? [])
-        .map((job) => {
-            // job may contain preferred_date / scheduled_date / assigned_date
-            const date = job.preferred_date || job.scheduled_date || job.assigned_at || job.date || null;
-            if (!date) return null;
-            return {
-                title: `依頼: ${job.title}`,
-                start: String(date).split('T')[0],
-                allDay: true,
-                color: '#60a5fa',
-                job_id: job.id,
-                event_type: 'assigned_job',
-                description: job.details || job.description || '',
-                scheduled: job.scheduled_at || job.scheduled || false,
-            };
-        })
-        .filter(Boolean),
+    // Assigned jobs display removed per UX request: do not include props.jobs in calendar events
 ]);
 
 // debug logs removed after investigation
@@ -423,6 +419,8 @@ const calendarOptions = computed(() => ({
     plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],
     // choose initial view: if all events are all-day, use month grid so they are visible
     initialView: events.value && events.value.length > 0 && events.value.every((ev) => ev.allDay) ? 'dayGridMonth' : 'timeGridWeek',
+    // initialDate allows FullCalendar to open on a specific day (YYYY-MM-DD)
+    initialDate: selectedDate.value,
     events: events.value,
     locale: 'ja',
     headerToolbar: {
@@ -682,6 +680,28 @@ const calendarOptions = computed(() => ({
     },
     select: handleDateSelect,
 }));
+
+// When selectedDate changes (including initial value set from query param), navigate FullCalendar to it.
+watch(
+    selectedDate,
+    async (newDate) => {
+        try {
+            // Wait for calendar to mount
+            await nextTick();
+            const fc = fullCalendarRef.value && fullCalendarRef.value.getApi ? fullCalendarRef.value : null;
+            if (fc && typeof fc.getApi === 'function') {
+                const api = fc.getApi();
+                if (api && typeof api.gotoDate === 'function') {
+                    api.gotoDate(newDate);
+                }
+            }
+        } catch (e) {
+            // swallow errors to avoid breaking UI
+            console.debug('Calendar: gotoDate failed', e);
+        }
+    },
+    { immediate: true },
+);
 
 function goToScheduleShowFromAction() {
     if (!selectedScheduleForAction.value) return;

@@ -79,9 +79,38 @@ class JobBoxController extends Controller
                 $base->orderBy('job_assignment_messages.created_at', 'desc');
         }
 
-        $messages = $base->with(['sender', 'projectJobAssignment.projectJob.client', 'projectJobAssignment', 'message.recipients.user', 'message.fromUser', 'projectJobAssignment.user'])
+        // Ensure statusModel is loaded so we can attach a canonical `status` object
+        $messages = $base->with([
+            'sender',
+            'projectJobAssignment.projectJob.client',
+            'projectJobAssignment',
+            'projectJobAssignment.statusModel',
+            'message.recipients.user',
+            'message.fromUser',
+            'projectJobAssignment.user',
+        ])
             ->paginate(20)
             ->appends(array_filter(['q' => $q, 'sort' => $sort, 'dir' => $dir]));
+        // Attach canonical `status` object to each loaded assignment for frontend convenience
+        try {
+            $messages->getCollection()->transform(function ($msg) {
+                try {
+                    if (isset($msg->projectJobAssignment) && $msg->projectJobAssignment && isset($msg->projectJobAssignment->statusModel) && $msg->projectJobAssignment->statusModel) {
+                        $sm = $msg->projectJobAssignment->statusModel;
+                        $msg->projectJobAssignment->status = [
+                            'id' => $sm->id,
+                            'key' => $sm->key ?? $sm->slug ?? null,
+                            'name' => $sm->name,
+                        ];
+                    }
+                } catch (\Throwable $__e) {
+                    // non-fatal
+                }
+                return $msg;
+            });
+        } catch (\Throwable $__e) {
+            // non-fatal
+        }
 
         return inertia('JobBox/Index', [
             'projectJob' => $projectJob,
@@ -134,7 +163,8 @@ class JobBoxController extends Controller
                 $base->orderBy('job_assignment_messages.created_at', 'desc');
         }
 
-        $messages = $base->with(['sender', 'message.recipients.user', 'message.fromUser', 'projectJobAssignment.projectJob.client', 'projectJobAssignment.user'])
+        // Ensure statusModel is loaded for each linked assignment
+        $messages = $base->with(['sender', 'message.recipients.user', 'message.fromUser', 'projectJobAssignment.projectJob.client', 'projectJobAssignment.statusModel', 'projectJobAssignment.user'])
             ->paginate(20)
             ->appends(array_filter(['q' => $q, 'sort' => $sort, 'dir' => $dir]));
 
@@ -179,6 +209,20 @@ class JobBoxController extends Controller
                         try {
                             $assignment->accepted = true;
                         } catch (\Throwable $__e) {
+                        }
+                        // set status_id to 'confirmed' (accepted/read) if statuses table exists
+                        try {
+                            if (Schema::hasTable('statuses') && Schema::hasColumn('project_job_assignments', 'status_id')) {
+                                $status = DB::table('statuses')->where('key', 'confirmed')->first();
+                                if (!$status) {
+                                    $statusId = DB::table('statuses')->insertGetId(['key' => 'confirmed', 'name' => '確認済み', 'created_at' => now(), 'updated_at' => now()]);
+                                } else {
+                                    $statusId = $status->id;
+                                }
+                                $assignment->status_id = $statusId;
+                            }
+                        } catch (\Throwable $__e) {
+                            // non-fatal
                         }
                         $assignment->save();
                     }

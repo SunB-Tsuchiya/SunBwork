@@ -33,7 +33,8 @@ class ProjectJobAssignmentsController extends Controller
         }
 
         // base query
-        $query = $projectJob->projectJobAssignments()->with('user');
+        // include statusModel so we can return a canonical status object in the API payload
+        $query = $projectJob->projectJobAssignments()->with(['user', 'statusModel']);
 
         // search
         $q = $request->query('q', null);
@@ -65,6 +66,17 @@ class ProjectJobAssignmentsController extends Controller
 
         // transform items
         $paginator->getCollection()->transform(function ($a) {
+            // build canonical status object when relationship is available
+            $statusObj = null;
+            if (isset($a->statusModel) && $a->statusModel) {
+                $statusObj = [
+                    'id' => $a->statusModel->id,
+                    // 'key' column may not exist on very old installs; fall back to slug
+                    'key' => $a->statusModel->key ?? $a->statusModel->slug ?? null,
+                    'name' => $a->statusModel->name,
+                ];
+            }
+
             return [
                 'id' => $a->id,
                 'project_job_id' => $a->project_job_id,
@@ -80,6 +92,9 @@ class ProjectJobAssignmentsController extends Controller
                 'estimated_hours' => isset($a->estimated_hours) ? (float) $a->estimated_hours : null,
                 'assigned' => (bool) $a->assigned,
                 'accepted' => (bool) $a->accepted,
+                // keep status_id for backward compatibility
+                'status_id' => $a->status_id ?? null,
+                'status' => $statusObj,
                 'user' => $a->user ? ['id' => $a->user->id, 'name' => $a->user->name] : null,
             ];
         });
@@ -143,7 +158,14 @@ class ProjectJobAssignmentsController extends Controller
         $types = \App\Models\WorkItemType::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'company_id', 'department_id']);
         $sizes = \App\Models\Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'width', 'height', 'unit', 'company_id', 'department_id']);
         $stages = \App\Models\Stage::orderBy('sort_order')->orderBy('order_index')->get(['id', 'name', 'company_id', 'department_id']);
-        $statuses = \App\Models\Status::orderBy('sort_order')->get(['id', 'name', 'slug', 'company_id', 'department_id']);
+        // Request key column as well when available so we can include canonical status.key in payload
+        $statusCols = ['id', 'name', 'slug', 'company_id', 'department_id'];
+        try {
+            if (Schema::hasColumn('statuses', 'key')) $statusCols[] = 'key';
+        } catch (\Throwable $__e) {
+            // ignore introspection errors
+        }
+        $statuses = \App\Models\Status::orderBy('sort_order')->get($statusCols);
         // build difficulties list with either (id,name,slug) when slug exists, or (id,name) otherwise
         $difficultySelect = ['id', 'name'];
         try {
@@ -268,6 +290,17 @@ class ProjectJobAssignmentsController extends Controller
             'size_id' => $a->size_id,
             'stage_id' => $a->stage_id,
             'status_id' => $a->status_id,
+            'status' => $a->statusModel ? [
+                'id' => $a->statusModel->id,
+                'key' => $a->statusModel->key ?? $a->statusModel->slug ?? null,
+                'name' => $a->statusModel->name,
+            ] : null,
+            // canonical status object for frontend convenience
+            'status' => $a->statusModel ? [
+                'id' => $a->statusModel->id,
+                'key' => $a->statusModel->key ?? $a->statusModel->slug ?? null,
+                'name' => $a->statusModel->name,
+            ] : null,
             'company_id' => $a->company_id,
             'department_id' => $a->department_id,
             // UX labels for display in the edit modal

@@ -22,8 +22,10 @@ class CalendarController extends Controller
         if ($user) {
             $diary_from = now()->subDays(20)->startOfDay();
             $diary_to = now()->endOfDay();
-            $event_from = now()->startOfMonth();
-            $event_to = now()->endOfMonth();
+            // Include surrounding months to surface events near month boundaries
+            // (e.g. if today is early October, include September events so they appear).
+            $event_from = now()->subMonth(1)->startOfMonth();
+            $event_to = now()->addMonth(1)->endOfMonth();
             $diaryQuery = Diary::where('user_id', $user->id);
             if (Schema::hasColumn('diaries', 'date')) {
                 $diaryQuery->where('date', '>=', $diary_from)->where('date', '<=', $diary_to);
@@ -67,13 +69,26 @@ class CalendarController extends Controller
             $events = $events->map(function ($e) {
                 // Convert to array first to capture appended attributes like start/end/description
                 $arr = $e->toArray();
+                // normalize various possible DB column names to frontend-friendly keys
+                $startVal = $e->start ?? ($arr['start'] ?? null);
+                if (empty($startVal) && isset($arr['starts_at'])) $startVal = $arr['starts_at'];
+                if (empty($startVal) && isset($arr['startsAt'])) $startVal = $arr['startsAt'];
+
+                $endVal = $e->end ?? ($arr['end'] ?? null);
+                if (empty($endVal) && isset($arr['ends_at'])) $endVal = $arr['ends_at'];
+                if (empty($endVal) && isset($arr['endsAt'])) $endVal = $arr['endsAt'];
+
+                // description may be stored in `description` or legacy `body`
+                $descVal = $e->description ?? ($arr['description'] ?? null);
+                if (empty($descVal) && isset($arr['body'])) $descVal = $arr['body'];
+
                 return [
                     'id' => $e->id,
                     'title' => $e->title,
-                    'start' => $e->start ?? ($arr['start'] ?? null),
-                    'end' => $e->end ?? ($arr['end'] ?? null),
+                    'start' => $startVal,
+                    'end' => $endVal,
                     'allDay' => $arr['allDay'] ?? false,
-                    'description' => $e->description ?? ($arr['description'] ?? null),
+                    'description' => $descVal,
                     // keep server-provided color if present, but client may override for linked assignments
                     'color' => $arr['color'] ?? ($e->color ?? null),
                     // top-level linkage fields (some clients check top-level)
@@ -83,7 +98,7 @@ class CalendarController extends Controller
                     'extendedProps' => array_merge($arr['extendedProps'] ?? [], [
                         'project_job_assignment_by_myself_id' => $arr['project_job_assignment_by_myself_id'] ?? ($e->project_job_assignment_by_myself_id ?? null),
                         'project_job_assignment_id' => $arr['project_job_assignment_id'] ?? ($e->project_job_assignment_id ?? null),
-                        'description' => $e->description ?? ($arr['description'] ?? null),
+                        'description' => $descVal,
                     ]),
                 ];
             })->values();

@@ -5,6 +5,22 @@ import { route } from 'ziggy-js';
 
 const props = defineProps({ event: Object, hide_edit: { type: Boolean, default: false } });
 
+// Determine whether the event/linked assignment is already completed
+function isEventCompleted() {
+    try {
+        if (!props.event) return false;
+        if (props.event.title && String(props.event.title).indexOf('【完了】') === 0) return true;
+        if (props.event.project_job_assignment_id && props.event.project_job_assignment && props.event.project_job_assignment.completed) return true;
+        if (props.event.project_job_assignment && props.event.project_job_assignment.status) {
+            const s = props.event.project_job_assignment.status;
+            if (s.key === 'completed' || String(s.name || '').indexOf('完了') !== -1) return true;
+        }
+        return false;
+    } catch (e) {
+        return false;
+    }
+}
+
 function formatJstDateTime(dateStr) {
     if (!dateStr) return '';
     const d = new Date(dateStr);
@@ -30,6 +46,8 @@ function submitComplete() {
     if (!confirm('このジョブを完了としてマークしますか？')) return;
     router.post(route('events.complete', { event: props.event.id }));
 }
+
+// 完了詳細関連は表示しないため削除
 </script>
 
 <template>
@@ -57,7 +75,17 @@ function submitComplete() {
                 <!-- 完了ボタン: イベントがジョブ割り当てに紐づいている場合のみ表示 -->
                 <template v-if="props.event.project_job_assignment_id">
                     <form @submit.prevent="submitComplete">
-                        <button type="submit" class="rounded bg-yellow-600 px-4 py-2 text-white">完了する</button>
+                        <button
+                            type="submit"
+                            :class="
+                                isEventCompleted()
+                                    ? 'cursor-not-allowed rounded bg-yellow-800 px-4 py-2 text-white opacity-80'
+                                    : 'rounded bg-yellow-600 px-4 py-2 text-white'
+                            "
+                            :disabled="isEventCompleted()"
+                        >
+                            {{ isEventCompleted() ? '完了済み' : '完了する' }}
+                        </button>
                     </form>
                 </template>
                 <Link :href="route('calendar.index')" class="rounded bg-gray-200 px-4 py-2 text-gray-700">戻る</Link>

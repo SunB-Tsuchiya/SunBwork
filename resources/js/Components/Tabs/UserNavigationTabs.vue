@@ -11,9 +11,7 @@ const props = defineProps({
             <!-- <Link :href="route('profile.show')" class="rounded-md px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800">
                 プロフィール編集
             </Link> -->
-            <Link :href="route('user.assigned-jobs.index')" class="rounded-md px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800">
-                ジョブ一覧
-            </Link>
+            <Link href="/jobbox" class="rounded-md px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800"> ジョブ一覧 </Link>
             <Link :href="route('diaries.index')" class="rounded-md px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800"> 日報一覧 </Link>
             <Link :href="route('calendar.index')" class="rounded-md px-3 py-2 text-sm font-medium text-green-600 hover:text-green-800"> 予定表 </Link>
             <Link :href="route('chat.rooms.index')" class="rounded-md px-3 py-2 text-sm font-medium text-purple-600 hover:text-purple-800">

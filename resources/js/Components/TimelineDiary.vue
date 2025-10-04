@@ -132,7 +132,7 @@ const windowMinutes = computed(() => (endHourRef.value - startHourRef.value) * 6
 const usedPxPerMin = computed(() => {
     try {
         const measured =
-            timelineContentRef && timelineContentRef.value && windowMinutes.value > 0
+            timelineContentRef.value && timelineContentRef.value && windowMinutes.value > 0
                 ? timelineContentRef.value.clientWidth / windowMinutes.value
                 : null;
         return measured || pxPerMinuteRef.value;
@@ -168,7 +168,7 @@ function computeEventStyle(ev) {
     try {
         const baselineHour = startHourRef.value;
         const measuredPxPerMin =
-            timelineContentRef && timelineContentRef.value && windowMinutes.value > 0
+            timelineContentRef.value && timelineContentRef.value && windowMinutes.value > 0
                 ? timelineContentRef.value.clientWidth / windowMinutes.value
                 : null;
         const pxPerMinuteLocal = measuredPxPerMin || pxPerMinuteRef.value;
@@ -213,18 +213,18 @@ function computeEventStyle(ev) {
 const dragOverrides = ref({});
 const suppressClick = ref({});
 const suppressTimelineClick = ref(false);
-let dragging = ref(false);
-let draggingEventId = ref(null);
-let dragStartX = ref(0);
-let dragOrigLeftPx = ref(0);
-let dragOrigDurationMin = ref(0);
-let dragMoved = ref(false);
-let resizeMode = ref(null);
-let resizeEventId = ref(null);
-let resizeOrigLeftPx = ref(0);
-let resizeOrigWidthPx = ref(0);
-let resizeOrigStartMin = ref(0);
-let resizeOrigEndMin = ref(0);
+const dragging = ref(false);
+const draggingEventId = ref(null);
+const dragStartX = ref(0);
+const dragOrigLeftPx = ref(0);
+const dragOrigDurationMin = ref(0);
+const dragMoved = ref(false);
+const resizeMode = ref(null);
+const resizeEventId = ref(null);
+const resizeOrigLeftPx = ref(0);
+const resizeOrigWidthPx = ref(0);
+const resizeOrigStartMin = ref(0);
+const resizeOrigEndMin = ref(0);
 
 function getEventStyleWithOverrides(ev) {
     const base = computeEventStyle(ev) || {};
@@ -267,16 +267,16 @@ function onBackgroundClick(e) {
         return;
     }
     // compute snapped minute
-    const contentEl = timelineContentRef && timelineContentRef.value ? timelineContentRef.value : null;
-    const scrollWrap = scrollWrapperRef && scrollWrapperRef.value ? scrollWrapperRef.value : null;
+    const contentEl = timelineContentRef.value && timelineContentRef.value ? timelineContentRef.value : null;
+    const scrollWrap = scrollWrapperRef.value && scrollWrapperRef.value ? scrollWrapperRef.value : null;
     const container = contentEl || e.currentTarget || e.target;
     if (!container || !container.getBoundingClientRect) return;
     const rect = container.getBoundingClientRect();
-    const contentLeft = timelineContentRef && timelineContentRef.value ? timelineContentRef.value.getBoundingClientRect().left : rect.left;
+    const contentLeft = timelineContentRef.value && timelineContentRef.value ? timelineContentRef.value.getBoundingClientRect().left : rect.left;
     const scrollLeft = scrollWrap ? scrollWrap.scrollLeft || 0 : container.scrollLeft || 0;
     const clickX = e.clientX - contentLeft + scrollLeft;
     const measuredPxPerMin =
-        timelineContentRef && timelineContentRef.value && windowMinutes.value > 0 ? timelineContentRef.value.clientWidth / windowMinutes.value : null;
+        timelineContentRef.value && timelineContentRef.value && windowMinutes.value > 0 ? timelineContentRef.value.clientWidth / windowMinutes.value : null;
     const pxPerMin = measuredPxPerMin || pxPerMinuteRef.value;
     const rawMin = startHourRef.value * 60 + clickX / pxPerMin;
     const hourPart = Math.floor(rawMin / 60);
@@ -287,16 +287,16 @@ function onBackgroundClick(e) {
 }
 
 function computeSnappedMinuteFromClientX(clientX) {
-    const contentEl = timelineContentRef && timelineContentRef.value ? timelineContentRef.value : null;
-    const scrollWrap = scrollWrapperRef && scrollWrapperRef.value ? scrollWrapperRef.value : null;
+    const contentEl = timelineContentRef.value && timelineContentRef.value ? timelineContentRef.value : null;
+    const scrollWrap = scrollWrapperRef.value && scrollWrapperRef.value ? scrollWrapperRef.value : null;
     const container = contentEl;
     if (!container || !container.getBoundingClientRect) return null;
     const rect = container.getBoundingClientRect();
-    const contentLeft = timelineContentRef && timelineContentRef.value ? timelineContentRef.value.getBoundingClientRect().left : rect.left;
+    const contentLeft = timelineContentRef.value && timelineContentRef.value ? timelineContentRef.value.getBoundingClientRect().left : rect.left;
     const scrollLeft = scrollWrap ? scrollWrap.scrollLeft || 0 : container.scrollLeft || 0;
     const clickX = clientX - contentLeft + scrollLeft;
     const measuredPxPerMin =
-        timelineContentRef && timelineContentRef.value && windowMinutes.value > 0 ? timelineContentRef.value.clientWidth / windowMinutes.value : null;
+        timelineContentRef.value && timelineContentRef.value && windowMinutes.value > 0 ? timelineContentRef.value.clientWidth / windowMinutes.value : null;
     const pxPerMin = measuredPxPerMin || pxPerMinuteRef.value;
     const rawMin = startHourRef.value * 60 + clickX / pxPerMin;
     const hourPart = Math.floor(rawMin / 60);

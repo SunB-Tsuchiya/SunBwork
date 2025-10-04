@@ -101,10 +101,11 @@ class EventController extends Controller
 
 
     // ユーザーの予定一覧取得（カレンダー表示用）
-    public function index()
+    public function index(Request $request)
     {
-        $date = request('date');
-        $requestedUserId = request('user_id');
+        $date = $request->query('date');
+        $requestedUserId = $request->query('user_id');
+        $jobFilter = $request->query('job');
 
         // Default: only current user's events
         $baseUserId = Auth::id();
@@ -122,6 +123,10 @@ class EventController extends Controller
         }
 
         $query = Event::where('user_id', $baseUserId);
+        // If a specific job/assignment filter provided, restrict to events linked to that assignment
+        if ($jobFilter && Schema::hasColumn('events', 'project_job_assignment_id')) {
+            $query->where('project_job_assignment_id', intval($jobFilter));
+        }
         if ($date) {
             // Interpret the incoming date (YYYY-MM-DD) in the application's timezone
             // (config('app.timezone')) and convert to UTC range so we can robustly
@@ -169,7 +174,25 @@ class EventController extends Controller
         }
         $events = $query->get();
         // removed verbose debug logging for fetched events
-        return response()->json($events);
+
+        // If the caller expects JSON (API clients) keep returning JSON. However
+        // Inertia Link navigations and normal browser requests expect an Inertia
+        // response. Detect that and render the Inertia page so SPA navigation
+        // works correctly when users click links from the frontend.
+        if ($request->wantsJson()) {
+            return response()->json($events);
+        }
+
+        // Render the calendar index page (we don't have a dedicated Events/Index
+        // SPA page). The calendar page accepts events and will show the user's
+        // events. This keeps Link navigation working while API clients still
+        // receive JSON.
+        return Inertia::render('Calendar/Index', [
+            'events' => $events,
+            'date' => $date,
+            'user_id' => $baseUserId,
+            'jobs' => [],
+        ]);
     }
 
     // 予定の新規作成
@@ -276,6 +299,20 @@ class EventController extends Controller
                         // populate it with the event's date portion so calendar-based flows have a date.
                         if (Schema::hasColumn('project_job_assignments', 'date') && empty($assignment->date)) {
                             $assignment->date = date('Y-m-d', strtotime($event->start));
+                        }
+                        // If statuses table exists, set scheduled status
+                        try {
+                            if (Schema::hasTable('statuses') && Schema::hasColumn('project_job_assignments', 'status_id')) {
+                                $status = DB::table('statuses')->where('key', 'scheduled')->first();
+                                if (!$status) {
+                                    $statusId = DB::table('statuses')->insertGetId(['key' => 'scheduled', 'name' => 'セット済み', 'created_at' => now(), 'updated_at' => now()]);
+                                } else {
+                                    $statusId = $status->id;
+                                }
+                                $assignment->status_id = $statusId;
+                            }
+                        } catch (\Throwable $__e) {
+                            // non-fatal
                         }
                         $assignment->save();
                     });
@@ -612,6 +649,20 @@ class EventController extends Controller
             if (Schema::hasColumn('project_job_assignments', 'completed')) {
                 $assignment->completed = true;
             }
+            // set status_id to 'completed' if statuses table exists
+            try {
+                if (Schema::hasTable('statuses') && Schema::hasColumn('project_job_assignments', 'status_id')) {
+                    $status = DB::table('statuses')->where('key', 'completed')->first();
+                    if (!$status) {
+                        $statusId = DB::table('statuses')->insertGetId(['key' => 'completed', 'name' => '完了', 'created_at' => now(), 'updated_at' => now()]);
+                    } else {
+                        $statusId = $status->id;
+                    }
+                    $assignment->status_id = $statusId;
+                }
+            } catch (\Throwable $__e) {
+                // non-fatal
+            }
             $assignment->save();
 
             // update any JobAssignmentMessage rows to reflect completed state
@@ -632,6 +683,7 @@ class EventController extends Controller
             }
 
             // Create an internal Message to notify assigner/coordinators or emit a toast
+            $didBroadcastToast = false;
             try {
                 $actorId = Auth::id();
                 $assigneeId = $assignment->user_id ?? null;
@@ -648,6 +700,7 @@ class EventController extends Controller
                     // Actor is assignee: broadcast a lightweight toast instead of creating a Message
                     try {
                         event(new \App\Events\AssignmentStatusToast($toastPayload));
+                        $didBroadcastToast = true;
                         Log::info('EventController: AssignmentStatusToast broadcast (completed)', ['assignment_id' => $assignment->id, 'event_id' => $event->id ?? null, 'actor_id' => $actorId]);
                     } catch (\Throwable $__e) {
                         Log::warning('EventController: failed to broadcast AssignmentStatusToast (completed)', ['error' => $__e->getMessage(), 'assignment_id' => $assignment->id, 'actor_id' => $actorId]);
@@ -698,6 +751,12 @@ class EventController extends Controller
             }
 
             DB::commit();
+
+            // If we broadcast a lightweight toast (assignee actor case), avoid adding
+            // a flash success message which could trigger a second toast on the recipient.
+            if ($didBroadcastToast) {
+                return redirect()->back();
+            }
 
             return redirect()->back()->with('success', '完了にしました。通知を送信しました。');
         } catch (\Throwable $e) {

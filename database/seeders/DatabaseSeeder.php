@@ -29,6 +29,8 @@ class DatabaseSeeder extends Seeder
             \Database\Seeders\WorkItemTypesSeeder::class,
             \Database\Seeders\SizesSeeder::class,
             \Database\Seeders\StatusesSeeder::class,
+            // Canonical status keys used by status_id columns
+            \Database\Seeders\StatusesTableSeeder::class,
             \Database\Seeders\StagesSeeder::class,
             \Database\Seeders\DifficultiesSeeder::class,
             \Database\Seeders\WorkItemPresetsSeeder::class,

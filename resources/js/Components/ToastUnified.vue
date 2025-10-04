@@ -1,15 +1,20 @@
 <template>
-    <div class="fixed left-1/2 top-4 z-50 transform -translate-x-1/2 w-full max-w-xl">
+    <div class="fixed left-1/2 top-4 z-50 w-full max-w-xl -translate-x-1/2 transform">
         <!-- Shared composable toasts (calls to showToast) -->
-        <transition-group name="toast" tag="div" class="space-y-3 w-full">
-            <div v-for="t in composableToasts" :key="t.id" class="mx-auto toast-wrapper w-full">
+        <transition-group name="toast" tag="div" class="w-full space-y-3">
+            <div v-for="t in composableToasts" :key="t.id" class="toast-wrapper mx-auto w-full">
                 <div :class="toastClass(t.type)">
                     <div class="flex items-center justify-between">
                         <div class="flex-1 pr-4">{{ t.message }}</div>
                         <div class="flex items-center gap-3">
                             <button
                                 v-if="t.action && typeof t.action.handler === 'function'"
-                                @click="() => { t.action.handler(); dismiss(t.id); }"
+                                @click="
+                                    () => {
+                                        t.action.handler();
+                                        dismiss(t.id);
+                                    }
+                                "
                                 class="text-sm text-white underline"
                             >
                                 {{ t.action.label || 'Action' }}
@@ -31,7 +36,7 @@
                 :class="toast.type === 'error' ? 'bg-red-600 text-white' : 'bg-orange-600 text-white'"
             >
                 <div class="flex-1">
-                    <div class="font-semibold text-lg">{{ toast.type === 'error' ? 'エラー' : '通知' }}</div>
+                    <div class="text-lg font-semibold">{{ toast.type === 'error' ? 'エラー' : '通知' }}</div>
                     <div class="mt-1">{{ toast.message }}</div>
                 </div>
                 <button @click="dismissLocal(toast.id)" class="ms-4 text-white opacity-90 hover:opacity-100">✕</button>
@@ -41,17 +46,31 @@
 </template>
 
 <script setup>
-import { onMounted, reactive } from 'vue';
-import { usePage } from '@inertiajs/vue3';
 import useToasts from '@/Composables/useToasts';
+import { usePage } from '@inertiajs/vue3';
+import { onMounted, reactive } from 'vue';
 
 const { toasts: composableToasts, dismissToast, toastClass } = useToasts();
 
 // local event-driven toasts (mimics previous Toast.vue behavior)
 const page = usePage();
 const localToasts = reactive([]);
+const recentLocal = {};
+const LOCAL_DEDUPE_MS = 1500;
+// record of seen notification ids (from server broadcasts) to prevent double-show
+const seenNotificationIds = new Set();
 
 function pushLocal({ id, type = 'success', message = '' }) {
+    try {
+        const key = `${type}|${String(message)}`;
+        const now = Date.now();
+        const last = recentLocal[key] || 0;
+        if (now - last < LOCAL_DEDUPE_MS) {
+            return;
+        }
+        recentLocal[key] = now;
+    } catch (err) {}
+
     const toast = { id, type, message, visible: true };
     localToasts.push(toast);
     setTimeout(() => dismissLocal(id), 4000);
@@ -87,12 +106,46 @@ onMounted(() => {
     // Listen for events dispatched by AppLayout (jobrequest/message)
     window.addEventListener('jobrequest:received', (ev) => {
         const message = ev?.detail?.message || '新しい依頼があります';
-        pushLocal({ id: `jobreq-${Date.now()}`, type: 'success', message });
+        const nid = ev?.detail?.id || `jobreq-${Date.now()}`;
+        if (nid && seenNotificationIds.has(String(nid))) return;
+        if (nid) seenNotificationIds.add(String(nid));
+        pushLocal({ id: nid, type: 'success', message });
     });
     window.addEventListener('message:received', (ev) => {
         const message = ev?.detail?.message || '新しいメールがあります';
-        pushLocal({ id: `message-${Date.now()}`, type: 'success', message });
+        const nid = ev?.detail?.id || `message-${Date.now()}`;
+        if (nid && seenNotificationIds.has(String(nid))) return;
+        if (nid) seenNotificationIds.add(String(nid));
+        pushLocal({ id: nid, type: 'success', message });
     });
+
+    // Also subscribe to server-side lightweight toast broadcasts on the 'toasts' channel.
+    try {
+        if (window.Echo && typeof window.Echo.channel === 'function') {
+            window.Echo.channel('toasts').listen('AssignmentStatusToast', (e) => {
+                try {
+                    const p = e.payload || (e.payloads ? e.payloads : {});
+                    const title = p.title ? String(p.title) : '';
+                    let message = '';
+                    if (p.action === 'scheduled') {
+                        message = `「${title}」の予定がセットされました`;
+                    } else if (p.action === 'completed') {
+                        message = `「${title}」の作業が完了しました`;
+                    } else {
+                        message = p.message || '操作が完了しました';
+                    }
+                    const nid = p.assignment_id || p.event_id || `toast-${Date.now()}`;
+                    if (nid && seenNotificationIds.has(String(nid))) return;
+                    if (nid) seenNotificationIds.add(String(nid));
+                    pushLocal({ id: nid, type: 'success', message });
+                } catch (err) {
+                    // non-fatal
+                }
+            });
+        }
+    } catch (err) {
+        // non-fatal
+    }
 });
 </script>
 
@@ -104,7 +157,9 @@ onMounted(() => {
 }
 .toast-enter-active,
 .toast-leave-active {
-    transition: opacity 240ms ease, transform 240ms ease;
+    transition:
+        opacity 240ms ease,
+        transform 240ms ease;
 }
 
 .toast-enter-from,
