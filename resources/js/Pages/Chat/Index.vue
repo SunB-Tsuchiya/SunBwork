@@ -8,9 +8,9 @@ const props = defineProps({
     auth: Object,
     success: String,
 });
-// Debug logging removed
-
-const userId = props.auth?.user?.id;
+// obtain current user robustly: prefer shared auth.user, then page.props.user, then passed auth prop
+const user = page.props?.auth?.user ?? page.props?.user ?? props.auth?.user ?? null;
+const userId = user?.id;
 
 function createRoom() {
     router.visit('/chat/rooms/create'); // ルートはそのまま（コントローラのみ変更）

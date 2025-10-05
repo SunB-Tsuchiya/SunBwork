@@ -16,12 +16,9 @@ class ChatController extends Controller
 {
     public function index(Request $request)
     {
-        // 全ユーザー一覧（自分以外）を取得
-        $user = $request->user();
-        $users = User::where('id', '!=', $user->id)->get(['id', 'name', 'user_role', 'department_id', 'assignment_id']);
-        return Inertia::render('Chat/Index', [
-            'users' => $users,
-        ]);
+        // For compatibility, delegate to indexRooms so that /chat renders the rooms
+        // list expected by the frontend (Chat/Index.vue expects `rooms`).
+        return $this->indexRooms($request);
     }
 
     // ルーム内メッセージ履歴取得API
@@ -94,6 +91,7 @@ class ChatController extends Controller
         return inertia('Chat/Index', [
             'rooms' => $rooms,
             'auth' => ['user' => $user],
+            'current_user_id' => $user->id,
         ]);
     }
 

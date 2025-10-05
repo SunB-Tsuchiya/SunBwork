@@ -31,6 +31,14 @@ class ChatRoom extends Model
 
     public function messages()
     {
-        return $this->hasMany(ChatMessage::class);
+        // determine foreign key used in chat_messages: prefer chat_room_id, fallback to chat_id
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasColumn('chat_messages', 'chat_room_id')) {
+                return $this->hasMany(ChatMessage::class, 'chat_room_id');
+            }
+        } catch (\Throwable $e) {
+            // ignore and fallback
+        }
+        return $this->hasMany(ChatMessage::class, 'chat_id');
     }
 }

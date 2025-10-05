@@ -8,10 +8,13 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue';
 const props = defineProps({
     room: { type: Object, default: () => ({ users: [] }) },
     messages: { type: Array, default: () => [] },
+    // in some pages auth is passed as a prop; accept it optionally
+    auth: { type: Object, required: false },
 });
 
 const page = usePage();
-const user = page.props.user;
+// page.props may expose user directly or under auth.user depending on app setup
+const user = page.props?.auth?.user ?? page.props?.user ?? props.auth?.user ?? null;
 const messages = ref(Array.isArray(props.messages) ? [...props.messages] : []);
 const newMessage = ref('');
 const isDragging = ref(false);

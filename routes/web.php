@@ -50,8 +50,10 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
         Route::get('/{id}', [App\Http\Controllers\User\AssignedProjectController::class, 'show'])->name('show');
     });
 
-    // チャット画面
-    Route::get('/chat', [App\Http\Controllers\Chat\ChatController::class, 'index'])->name('chat.users.index');
+    // チャット画面: トップ-level /chat はチャットルーム一覧にリダイレクト
+    Route::get('/chat', function () {
+        return redirect()->route('chat.rooms.index');
+    })->name('chat.index');
     // AIチャット（Bot）ページ
     Route::get('/bot/chat', function () {
         return Inertia::render('Bot/ChatBot');
@@ -360,6 +362,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('project_jobs/{projectJob}/jobbox/{message}', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'show'])->name('project_jobs.jobbox.show');
         Route::post('project_jobs/{projectJob}/jobbox', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'store'])->name('project_jobs.jobbox.store');
         Route::delete('project_jobs/{projectJob}/jobbox/{message}', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'destroy'])->name('project_jobs.jobbox.destroy');
+        // Project job analysis (ジョブ分析)
+        Route::get('project_jobs/{projectJob}/analysis', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'analysis'])->name('project_jobs.analysis');
     });
 
 
