@@ -1,5 +1,6 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
+import MessageArea from '@/Pages/Chat/MessageArea.vue';
 import { usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
@@ -17,17 +18,112 @@ const page = usePage();
 const user = page.props?.auth?.user ?? page.props?.user ?? props.auth?.user ?? null;
 const messages = ref(Array.isArray(props.messages) ? [...props.messages] : []);
 const newMessage = ref('');
+const newMessageRef = ref(null);
+const isComposing = ref(false);
 const isDragging = ref(false);
+const isSending = ref(false);
+const sendCooldown = ref(false);
+const SEND_COOLDOWN_MS = 1000; // ms, prevent rapid repeated sends
 const uploadProgress = ref({});
 const fileModal = ref({ open: false, file: null });
+// rooms list (try page props first, fall back to props, otherwise fetch)
+const rooms = ref(page.props?.rooms ?? props.rooms ?? []);
+
+// local current room so we can switch client-side without full page navigation
+const currentRoom = ref(props.room ? JSON.parse(JSON.stringify(props.room)) : { users: [] });
+
+// manage echo subscription per-room
+function unsubscribeEcho() {
+    try {
+        if (echoChannel.value) {
+            echoChannel.value.stopListening && echoChannel.value.stopListening('ChatMessageSent');
+            echoChannel.value = null;
+        }
+    } catch (e) {
+        echoChannel.value = null;
+    }
+}
+
+function subscribeEchoFor(roomId) {
+    if (!window.Echo || !roomId) return;
+    unsubscribeEcho();
+    try {
+        echoChannel.value = window.Echo.private('chatroom.' + roomId).listen('ChatMessageSent', (e) => {
+            if (e.chat_room_id === currentRoom.value.id) {
+                if (!messages.value.some((m) => m.id === e.id)) {
+                    let pushed = {
+                        id: e.id,
+                        user_id: e.user_id ?? e.from_user_id,
+                        user_name: e.user_name || (e.user ? e.user.name : ''),
+                        message: e.body || e.message,
+                        created_at: e.created_at,
+                        is_read: false,
+                    };
+                    try {
+                        pushed = normalizeMessage(pushed) || pushed;
+                    } catch (err) {
+                        console.warn('normalizeMessage failed', err);
+                    }
+                    messages.value.push(pushed);
+                    if ((e.user_id ?? e.from_user_id) !== user.id) {
+                        scheduleMarkAsRead(e.id, 5000);
+                    }
+                    if ((e.user_id ?? e.from_user_id) !== user.id) {
+                        const sender = e.user_name || (e.user ? e.user.name : '誰か');
+                        flashMessage.value = `${sender} さんから新着メッセージです`;
+                        if (flashTimeout.value) clearTimeout(flashTimeout.value);
+                        flashTimeout.value = setTimeout(() => {
+                            flashMessage.value = '';
+                        }, 5000);
+                    }
+                    scrollToLatest();
+                }
+            }
+        });
+    } catch (err) {
+        // ignore echo subscribe errors
+    }
+}
+
+// select a room client-side: switch currentRoom, fetch messages, update URL and Echo
+function selectRoom(r) {
+    if (!r || !r.id) return;
+    // set current room (shallow clone)
+    currentRoom.value = r;
+    messages.value = [];
+    fetchMessages();
+    scrollToLatest();
+    subscribeEchoFor(r.id);
+    try {
+        window.history.pushState({}, '', `/chat/rooms/${r.id}`);
+    } catch (e) {}
+}
+
+async function fetchRoomsList() {
+    try {
+        const res = await axios.get('/chat/rooms', { headers: { Accept: 'application/json' } });
+        // expect array of rooms or { data: [...] }
+        const payload = res.data;
+        if (Array.isArray(payload)) {
+            rooms.value = payload;
+        } else if (payload && Array.isArray(payload.data)) {
+            rooms.value = payload.data;
+        } else {
+            console.debug('fetchRoomsList: unexpected payload', payload);
+        }
+    } catch (e) {
+        // ignore; leave rooms as-is
+        console.debug('fetchRoomsList failed', e && e.message ? e.message : e);
+    }
+}
 
 // ファイルアップロード処理
 async function uploadFile(file, tempId) {
-    if (!file || !props.room.id) return null;
+    if (!file || !currentRoom.value?.id) return null;
     const form = new FormData();
     form.append('file', file);
     try {
-        const res = await axios.post(`/chat/rooms/${props.room.id}/messages`, form, {
+        const res = await axios.post(`/chat/rooms/${currentRoom.value.id}/messages`, form, {
             headers: { 'Content-Type': 'multipart/form-data' },
             onUploadProgress: (progressEvent) => {
                 const p = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 1));
@@ -201,6 +297,10 @@ function sanitizeUrl(u) {
         if (proto === 'http:' || proto === 'https:' || proto === 'blob:') return parsed.toString();
         if (proto === 'data:') {
             if (/^data:image\//i.test(s)) return s;
+            // fetch rooms list if not provided by server
+            if (!rooms.value || rooms.value.length === 0) {
+                fetchRoomsList();
+            }
             return null;
         }
         return null;
@@ -383,51 +483,14 @@ onMounted(() => {
           })
         : [];
     fetchMessages();
+    // ensure rooms list is loaded for left column
+    if (!rooms.value || rooms.value.length === 0) {
+        fetchRoomsList();
+    }
     scrollToLatest();
-    if (props.room && props.room.id) {
-        // Echo subscribe log removed
-        echoChannel.value = window.Echo.private('chatroom.' + props.room.id).listen('ChatMessageSent', (e) => {
-            // ChatMessageSent reception debug removed
-            if (e.chat_room_id === props.room.id) {
-                // すでに同じIDのメッセージが存在する場合は追加しない
-                if (!messages.value.some((m) => m.id === e.id)) {
-                    // pre-add messages.length log removed
-                    let pushed = {
-                        id: e.id,
-                        user_id: e.user_id ?? e.from_user_id,
-                        user_name: e.user_name || (e.user ? e.user.name : ''),
-                        message: e.body || e.message,
-                        created_at: e.created_at,
-                        is_read: false,
-                    };
-                    try {
-                        pushed = normalizeMessage(pushed) || pushed;
-                    } catch (err) {
-                        console.warn('normalizeMessage failed', err);
-                    }
-                    messages.value.push(pushed);
-                    // 受信メッセージは5秒後に既読にする（自分のメッセージは除く）
-                    if ((e.user_id ?? e.from_user_id) !== user.id) {
-                        scheduleMarkAsRead(e.id, 5000);
-                    }
-                    // 新着メッセージ通知（自分以外の投稿のみ）
-                    if ((e.user_id ?? e.from_user_id) !== user.id) {
-                        const sender = e.user_name || (e.user ? e.user.name : '誰か');
-                        flashMessage.value = `${sender} さんから新着メッセージです`;
-                        if (flashTimeout.value) clearTimeout(flashTimeout.value);
-                        flashTimeout.value = setTimeout(() => {
-                            flashMessage.value = '';
-                        }, 5000);
-                    }
-                    // post-add messages.length log removed
-                    scrollToLatest();
-                } else {
-                    // duplicate message avoid log removed
-                }
-            } else {
-                // ignored room id reception log removed
-            }
-        });
+    // subscribe Echo for initial current room
+    if (currentRoom.value && currentRoom.value.id) {
+        subscribeEchoFor(currentRoom.value.id);
     }
 });
 
@@ -447,30 +510,30 @@ const showMembers = ref(false);
 
 // メンバーリスト（自分が一番上、他はID順）
 const sortedMembers = computed(() => {
-    if (!props.room || !Array.isArray(props.room.users)) return [];
-    const self = props.room.users.find((u) => u.id === user.id);
-    const others = props.room.users.filter((u) => u.id !== user.id).sort((a, b) => a.id - b.id);
+    if (!currentRoom.value || !Array.isArray(currentRoom.value.users)) return [];
+    const self = currentRoom.value.users.find((u) => u.id === user.id);
+    const others = currentRoom.value.users.filter((u) => u.id !== user.id).sort((a, b) => a.id - b.id);
     return self ? [self, ...others] : others;
 });
 
 function getAssignmentName(assignment_id) {
     if (!assignment_id) return '';
     if (typeof assignment_id === 'string') return assignment_id;
-    if (!props.room || !Array.isArray(props.room.users)) return assignment_id;
-    const member = props.room.users.find((u) => u.assignment_id === assignment_id);
+    if (!currentRoom.value || !Array.isArray(currentRoom.value.users)) return assignment_id;
+    const member = currentRoom.value.users.find((u) => u.assignment_id === assignment_id);
     return member && member.assignment ? member.assignment : assignment_id;
 }
 
 function getRoomDisplayName() {
-    if (!props.room) return '';
-    if (props.room.type === 'private') {
-        if (!props.room.name && Array.isArray(props.room.users)) {
-            const other = props.room.users.find((u) => u.id !== user.id);
+    if (!currentRoom.value) return '';
+    if (currentRoom.value.type === 'private') {
+        if (!currentRoom.value.name && Array.isArray(currentRoom.value.users)) {
+            const other = currentRoom.value.users.find((u) => u.id !== user.id);
             return other ? other.name : '(相手なし)';
         }
-        return props.room.name;
+        return currentRoom.value.name;
     }
-    return props.room.name;
+    return currentRoom.value.name;
 }
 
 // タイムスタンプ表示: 今日なら時刻のみ、今日以外は年月日を返す
@@ -489,9 +552,9 @@ function formatTimestamp(ts) {
 
 // メッセージ履歴取得（ルームベース）
 async function fetchMessages() {
-    if (!props.room.id) return;
+    if (!currentRoom.value?.id) return;
     try {
-        const res = await axios.get(`/chat/rooms/${props.room.id}/messages`);
+        const res = await axios.get(`/chat/rooms/${currentRoom.value.id}/messages`);
         if (Array.isArray(res.data)) {
             // ensure file.streamUrl exists for each file message
             const mapped = res.data.map((m) => {
@@ -561,11 +624,13 @@ function scheduleMarkAsRead(messageId, delay = 5000) {
     pendingReadTimeouts.value.set(messageId, timeoutId);
 }
 
-// 送信処理
+// 送信処理（アンチスパムと送信中フラグを含む）
 async function sendMessage() {
-    if (!newMessage.value.trim() || !props.room.id) return;
+    if (!newMessage.value.trim() || !currentRoom.value?.id) return;
+    if (isSending.value || sendCooldown.value) return;
+    isSending.value = true;
     try {
-        const res = await axios.post(`/chat/rooms/${props.room.id}/messages`, {
+        const res = await axios.post(`/chat/rooms/${currentRoom.value.id}/messages`, {
             body: newMessage.value,
         });
         // 送信成功時は入力欄のみクリアし、messagesへのpushはEchoイベントに任せる
@@ -573,8 +638,17 @@ async function sendMessage() {
             newMessage.value = '';
             // scrollToLatest()はEchoイベントで呼ばれるため不要
         }
+        // start cooldown to prevent spam
+        sendCooldown.value = true;
+        setTimeout(() => {
+            sendCooldown.value = false;
+        }, SEND_COOLDOWN_MS);
     } catch (e) {
         alert('送信に失敗しました');
+    } finally {
+        isSending.value = false;
+        // ensure textarea is resized after clearing
+        autosizeTextarea();
     }
 }
 
@@ -582,6 +656,63 @@ onMounted(() => {
     fetchMessages();
     scrollToLatest();
 });
+
+// autosize textarea for message input with max-height and overflow
+const MAX_TEXTAREA_HEIGHT = 200; // px
+function autosizeTextarea() {
+    nextTick(() => {
+        const ta = newMessageRef.value;
+        if (!ta) return;
+        try {
+            // reset height to measure scrollHeight
+            ta.style.height = 'auto';
+            ta.style.overflowY = 'hidden';
+            const newHeight = ta.scrollHeight + 2; // small buffer
+            if (newHeight > MAX_TEXTAREA_HEIGHT) {
+                ta.style.height = MAX_TEXTAREA_HEIGHT + 'px';
+                ta.style.overflowY = 'auto';
+            } else {
+                ta.style.height = newHeight + 'px';
+                ta.style.overflowY = 'hidden';
+            }
+        } catch (e) {
+            // ignore
+        }
+    });
+}
+
+watch(newMessage, () => {
+    autosizeTextarea();
+});
+
+onMounted(() => {
+    // ensure textarea has correct initial height
+    autosizeTextarea();
+});
+
+// handle Enter to send, Shift+Enter for newline, respect IME composition
+function onTextareaKeydown(e) {
+    if (isComposing.value) return;
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        // call sendMessage and ensure autosize will run after newMessage cleared
+        try {
+            sendMessage();
+        } catch (err) {
+            // ignore
+        }
+    }
+}
+
+function onCompositionStart() {
+    isComposing.value = true;
+}
+
+function onCompositionEnd() {
+    // small timeout to allow input event to update value
+    isComposing.value = false;
+    nextTick(() => autosizeTextarea());
+}
 </script>
 
 <template>
@@ -598,25 +729,38 @@ onMounted(() => {
                 {{ flashMessage }}
             </div>
         </transition>
-        <div class="py-6">
-            <div class="mx-auto flex max-w-4xl flex-col rounded bg-white p-6 shadow" style="height: calc(100vh - 160px)">
-                <div class="mb-4">
-                    <a href="/chat/rooms" class="text-blue-600 hover:underline">← ルーム一覧へ戻る</a>
-                </div>
-                <!-- ルーム名・相手名表示 -->
-                <div class="mb-4 flex items-center">
-                    <span class="text-lg font-bold">
-                        <template v-if="props.room.type === 'private'">
-                            {{ getRoomDisplayName() }}
-                        </template>
-                        <template v-else>
-                            {{ props.room.name }}
-                        </template>
-                    </span>
-                    <template v-if="props.room.type === 'group'">
-                        <button class="ml-4 rounded bg-gray-200 px-3 py-1 text-sm hover:bg-gray-300" @click="showMembers = true">メンバー</button>
-                    </template>
-                </div>
+        <div class="py-4">
+            <div class="mx-auto flex max-w-6xl gap-4 rounded bg-white p-4 shadow" style="height: calc(100vh - 140px)">
+                <!-- 左カラム: ルーム一覧のみ (モバイルは非表示) -->
+                <aside class="hidden w-64 flex-shrink-0 border-r border-gray-100 px-3 py-2 md:block">
+                    <div class="mb-2 flex items-center justify-between">
+                        <div class="text-sm font-medium">ルーム一覧</div>
+                        <a href="/chat/rooms" class="text-xs text-blue-600 hover:underline">一覧へ</a>
+                    </div>
+                    <ul class="room-index space-y-1 text-sm leading-tight">
+                        <li v-for="r in rooms" :key="r.id" class="rounded px-0 py-0">
+                            <a
+                                :href="`/chat/rooms/${r.id}`"
+                                @click="onRoomClick($event, r)"
+                                @keydown.enter.prevent="selectRoom(r)"
+                                :class="[
+                                    'flex w-full cursor-pointer items-center justify-between rounded px-2 py-2 transition-colors hover:bg-indigo-100 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300',
+                                    r.id === currentRoom.id ? 'bg-indigo-200 font-semibold text-gray-900' : '',
+                                ]"
+                                :aria-current="r.id === currentRoom.id ? 'true' : null"
+                            >
+                                <div class="truncate text-sm text-gray-800">
+                                    {{ r.name || (r.type === 'private' ? r.users && r.users.find((u) => u.id !== user.id)?.name : '(無名)') }}
+                                </div>
+                                <span
+                                    v-if="r.unread_count"
+                                    class="ml-2 inline-flex items-center rounded-full bg-red-500 px-2 py-0.5 text-xs font-semibold text-white"
+                                    >{{ r.unread_count }}</span
+                                >
+                            </a>
+                        </li>
+                    </ul>
+                </aside>
                 <!-- メンバーモーダル -->
                 <div v-if="showMembers" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
                     <div class="min-w-[300px] rounded bg-white p-6 shadow-lg">
@@ -643,163 +787,9 @@ onMounted(() => {
                         </div>
                     </div>
                 </div>
-                <div
-                    ref="messageArea"
-                    class="mb-4 flex-1 overflow-y-auto rounded border border-gray-200 bg-gradient-to-b from-white to-gray-50 p-4 shadow-inner"
-                    @drop.prevent="handleDrop"
-                    @dragover.prevent="handleDragOver"
-                    @dragleave.prevent="handleDragLeave"
-                >
-                    <template v-if="messages.length === 0">
-                        <div class="my-20 text-center text-gray-400">メッセージを入力して会話を開始してください</div>
-                    </template>
-                    <template v-else>
-                        <div
-                            v-for="(msg, idx) in messages"
-                            :key="msg.id"
-                            :ref="
-                                (el) => {
-                                    if (!lastMessageRef) return;
-                                    if (idx === messages.length - 1) {
-                                        lastMessageRef.value = el;
-                                    } else if (lastMessageRef.value === el) {
-                                        lastMessageRef.value = null;
-                                    }
-                                }
-                            "
-                            :data-last="idx === messages.length - 1"
-                            class="mb-3 flex"
-                            :class="msg.user_id === user.id ? 'justify-start' : 'justify-end'"
-                        >
-                            <div class="flex items-end" :class="msg.user_id === user.id ? 'flex-row' : 'flex-row-reverse'">
-                                <div v-if="msg.user_name" :class="['flex-shrink-0', msg.user_id === user.id ? 'mr-3' : 'ml-3']">
-                                    <div
-                                        class="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-800"
-                                    >
-                                        {{ (msg.user_name || '').charAt(0).toUpperCase() }}
-                                    </div>
-                                </div>
-                                <div :class="msg.user_id === user.id ? 'chat-bubble-own' : 'chat-bubble-other'" class="chat-bubble relative">
-                                    <div class="relative mb-1">
-                                        <span
-                                            v-if="!msg.is_read && msg.user_id !== user.id"
-                                            class="text-xxs absolute -right-2 -top-2 rounded bg-purple-100 px-2 py-0.5 text-purple-700"
-                                            >未読</span
-                                        >
-                                    </div>
-                                    <div class="break-words text-sm leading-relaxed">
-                                        <template v-if="msg.type === 'file' && msg.file">
-                                            <div class="flex items-center gap-3">
-                                                <div
-                                                    class="relative flex h-36 w-36 items-center justify-center overflow-hidden rounded border bg-gray-100"
-                                                >
-                                                    <template v-if="msg.uploading">
-                                                        <div class="flex h-full w-full flex-col items-center justify-center">
-                                                            <svg
-                                                                class="h-6 w-6 animate-spin text-gray-600"
-                                                                xmlns="http://www.w3.org/2000/svg"
-                                                                fill="none"
-                                                                viewBox="0 0 24 24"
-                                                            >
-                                                                <circle
-                                                                    class="opacity-25"
-                                                                    cx="12"
-                                                                    cy="12"
-                                                                    r="10"
-                                                                    stroke="currentColor"
-                                                                    stroke-width="4"
-                                                                ></circle>
-                                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
-                                                            </svg>
-                                                            <div class="mt-2 text-xs text-gray-600">ファイルをアップロードしています…</div>
-                                                            <div class="mt-2 w-20 overflow-hidden rounded-full bg-gray-200">
-                                                                <div class="h-1 bg-blue-600" :style="{ width: (msg._progress || 0) + '%' }"></div>
-                                                            </div>
-                                                        </div>
-                                                    </template>
-                                                    <template v-else>
-                                                        <template v-if="msg.file.mime && msg.file.mime.startsWith('image/')">
-                                                            <img
-                                                                :src="msg.file.streamUrl || msg.file.url"
-                                                                class="h-full w-full cursor-pointer object-cover"
-                                                                @click="openFileModal(msg.file)"
-                                                            />
-                                                        </template>
-                                                        <template v-else-if="msg.file.mime && msg.file.mime === 'application/pdf'">
-                                                            <div
-                                                                class="flex h-full w-full cursor-pointer items-center justify-center text-sm text-gray-700"
-                                                                @click="openFileModal(msg.file)"
-                                                            >
-                                                                PDF プレビュー
-                                                            </div>
-                                                        </template>
-                                                        <template v-else-if="msg.file.mime && msg.file.mime.startsWith('text/')">
-                                                            <div
-                                                                class="h-full w-full cursor-pointer p-2 text-sm text-gray-700"
-                                                                @click="openFileModal(msg.file)"
-                                                            >
-                                                                <pre class="max-h-24 overflow-auto whitespace-pre-wrap text-xs">{{
-                                                                    msg.file.original_name
-                                                                }}</pre>
-                                                            </div>
-                                                        </template>
-                                                        <template v-else>
-                                                            <div class="px-2 text-xs text-gray-600">{{ msg.file.original_name }}</div>
-                                                        </template>
-                                                    </template>
-                                                </div>
-                                                <div class="flex-1">
-                                                    <div class="font-medium">{{ msg.file.original_name }}</div>
-                                                    <div class="text-sm text-gray-500">{{ (msg.file.size / 1024).toFixed(1) }} KB</div>
-                                                    <div class="mt-2">
-                                                        <a
-                                                            :href="
-                                                                msg.file.streamUrl ||
-                                                                '/chat/attachments?path=' +
-                                                                    encodeURIComponent(
-                                                                        msg.file.path ||
-                                                                            msg.file.url ||
-                                                                            msg.file.thumb_path ||
-                                                                            msg.file.original_name,
-                                                                    )
-                                                            "
-                                                            target="_blank"
-                                                            class="mr-3 text-blue-600 underline"
-                                                            >開く</a
-                                                        >
-                                                        <a
-                                                            :href="
-                                                                msg.file.streamUrl ||
-                                                                '/chat/attachments?path=' +
-                                                                    encodeURIComponent(
-                                                                        msg.file.path ||
-                                                                            msg.file.url ||
-                                                                            msg.file.thumb_path ||
-                                                                            msg.file.original_name,
-                                                                    )
-                                                            "
-                                                            :download="msg.file.original_name"
-                                                            class="text-gray-600"
-                                                            >ダウンロード</a
-                                                        >
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </template>
-                                        <template v-else>
-                                            {{ msg.message }}
-                                        </template>
-                                    </div>
-                                    <div class="mt-2 self-end text-right text-xs text-gray-400">{{ formatTimestamp(msg.created_at) }}</div>
-                                </div>
-                            </div>
-                        </div>
-                    </template>
-                </div>
-                <form @submit.prevent="sendMessage" class="flex gap-2">
-                    <input v-model="newMessage" class="flex-1 rounded border px-3 py-2" placeholder="メッセージを入力..." />
-                    <button type="submit" class="rounded bg-blue-600 px-4 py-2 text-white">送信</button>
-                </form>
+                <main class="flex h-full min-h-0 min-w-0 flex-1 flex-col">
+                    <MessageArea :room="currentRoom" :initialMessages="messages" :user="user" />
+                </main>
             </div>
         </div>
         <!-- File preview modal -->
@@ -871,11 +861,12 @@ onMounted(() => {
 
 /* base bubble width: mobile 75% of container; on larger screens attempt to increase (2.5x) but cap to 95% to avoid overflow */
 .chat-bubble {
-    max-width: 75%;
+    /* mobile-like width: keep messages narrow for readability */
+    max-width: 420px;
 }
 @media (min-width: 768px) {
     .chat-bubble {
-        max-width: min(95%, calc(75% * 2.5));
+        max-width: 420px;
     }
 }
 
@@ -904,5 +895,16 @@ onMounted(() => {
 
 .h-96 {
     height: 24rem;
+}
+
+/* left index tweaks */
+.room-index {
+    font-size: 0.9rem; /* slightly smaller */
+    line-height: 1.1; /* tighter */
+}
+.room-index .active {
+    background: linear-gradient(90deg, rgba(99, 102, 241, 0.06), rgba(199, 210, 254, 0.03));
+    border-radius: 6px;
+    padding: 6px 8px;
 }
 </style>

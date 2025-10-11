@@ -16,6 +16,11 @@ class AiHistoryController extends Controller
     public function index(Request $request)
     {
         $convs = AiConversation::withCount('messages')->latest()->paginate(20);
+        // If this is an XHR / AJAX request (axios from the frontend), return JSON payload
+        if ($request->wantsJson() || $request->ajax() || $request->expectsJson()) {
+            // return paginated data as array; frontend will handle res.data or res.data.data
+            return response()->json($convs->toArray());
+        }
         return Inertia::render('Bot/AiHistoryIndex', ['conversations' => $convs]);
     }
 

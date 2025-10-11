@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use App\Models\AiConversation;
 use App\Models\AiMessage;
+use App\Models\AiSummary;
 use App\Models\AiSetting;
 
 class BotController extends Controller
@@ -35,7 +36,15 @@ class BotController extends Controller
             // system prompt precedence: provided prompt else admin-configured else default
             $setting = AiSetting::latest()->first();
             $defaultSystem = 'You are a helpful assistant. Reply concisely in Japanese when appropriate.';
-            $system = $data['system_prompt'] ?? ($setting->system_prompt ?? $defaultSystem);
+            // Guard against missing AiSetting record to avoid null property access
+            if (!empty($data['system_prompt'])) {
+                $system = $data['system_prompt'];
+            } else {
+                $system = $defaultSystem;
+                if ($setting && isset($setting->system_prompt) && $setting->system_prompt) {
+                    $system = $setting->system_prompt;
+                }
+            }
             $messages[] = ['role' => 'system', 'content' => $system];
             // if files are attached, include a summary and (when safe) the file contents or preview
             if (!empty($data['files']) && is_array($data['files'])) {
@@ -107,17 +116,113 @@ class BotController extends Controller
             }
             $messages[] = ['role' => 'user', 'content' => $data['message']];
 
+            // If a conversation_id was provided, include previous messages from that conversation
+            // to give the model conversational context. We first try to include a stored conversation
+            // summary (ai_summaries) if one exists, then fetch recent messages in reverse-order
+            // batches and stop when a conservative character budget is reached (approximate token budget).
+            if (!empty($data['conversation_id'])) {
+                try {
+                    $convId = $data['conversation_id'];
+                    // try to surface a saved summary attached to the conversation (fast path)
+                    $summaryContent = null;
+                    try {
+                        $convModel = AiConversation::find($convId);
+                        if ($convModel && !empty($convModel->summary_id)) {
+                            $summary = AiSummary::find($convModel->summary_id);
+                            if ($summary && !empty($summary->summary)) {
+                                $summaryContent = "Conversation summary (up to message #{$summary->summarized_until_message_id}):\n" . $summary->summary;
+                            }
+                        }
+                    } catch (\Throwable $_e) {
+                        // non-fatal: continue to history aggregation even if summary lookup fails
+                        \Illuminate\Support\Facades\Log::warning('BotController: summary lookup failed: ' . $_e->getMessage());
+                    }
+                    $historyCharBudget = 40000; // approx for ~10000 tokens
+                    $accum = 0;
+                    $toInclude = [];
+                    $batchSize = 50;
+                    $lastId = null;
+                    $done = false;
+
+                    while (!$done) {
+                        // prefer using precomputed char_count if available to avoid repeated mb_strlen calls
+                        $q = AiMessage::where('ai_conversation_id', $convId)->select(['id', 'role', 'content', 'char_count'])->orderBy('id', 'desc')->limit($batchSize);
+                        if ($lastId) $q->where('id', '<', $lastId);
+                        $batch = $q->get();
+                        if ($batch->isEmpty()) break;
+                        foreach ($batch as $m) {
+                            $content = $m->content ?? '';
+                            if ($content === null || trim($content) === '') continue;
+                            $len = 0;
+                            if (isset($m->char_count) && $m->char_count) {
+                                $len = (int) $m->char_count;
+                            } else {
+                                $len = mb_strlen($content);
+                            }
+                            if ($accum + $len > $historyCharBudget) {
+                                $done = true;
+                                break;
+                            }
+                            $toInclude[] = ['role' => ($m->role ?? 'user'), 'content' => $content];
+                            $accum += $len;
+                        }
+                        $lastId = $batch->last()->id;
+                        if ($batch->count() < $batchSize) break;
+                    }
+
+                    if (!empty($toInclude)) {
+                        // restore chronological order
+                        $toInclude = array_reverse($toInclude);
+                        // remove the current user message appended earlier (we'll re-add it at the end)
+                        array_pop($messages);
+                        // if we fetched a stored summary, insert it before the expanded history
+                        if (!empty($summaryContent)) {
+                            $messages[] = ['role' => 'system', 'content' => $summaryContent];
+                        }
+                        foreach ($toInclude as $h) {
+                            $messages[] = ['role' => $h['role'], 'content' => $h['content']];
+                        }
+                        // re-add current user message
+                        $messages[] = ['role' => 'user', 'content' => $data['message']];
+                    }
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::warning('BotController: failed to include conversation history: '.$e->getMessage());
+                }
+            }
+
             // prefer admin-configured model and max_tokens when available
-            $model = $setting->model ?? 'gpt-3.5-turbo';
-            $maxTokens = $setting->max_tokens ?? 800;
+            $model = 'gpt-3.5-turbo';
+            $maxTokens = 800;
+            if ($setting) {
+                if (isset($setting->model) && $setting->model) {
+                    $model = $setting->model;
+                }
+                if (isset($setting->max_tokens) && $setting->max_tokens) {
+                    $maxTokens = $setting->max_tokens;
+                }
+            }
             // enforce a safe hard cap to avoid runaway tokens (configurable via config/reverb.php)
             $hardMax = config('reverb.ai_max_tokens_hardcap', 2000);
             if ($maxTokens > $hardMax) {
                 $maxTokens = $hardMax;
             }
+            // temperature: allow numeric override from model_options stored as array or JSON
             $temperature = 0.6;
-            if ($setting && is_array($setting->model_options) && array_key_exists('temperature', $setting->model_options)) {
-                $temperature = $setting->model_options['temperature'];
+            if ($setting && isset($setting->model_options)) {
+                $modelOptions = null;
+                if (is_array($setting->model_options)) {
+                    $modelOptions = $setting->model_options;
+                } elseif (is_string($setting->model_options) && $setting->model_options !== '') {
+                    try {
+                        $decoded = json_decode($setting->model_options, true);
+                        if (is_array($decoded)) $modelOptions = $decoded;
+                    } catch (\Throwable $e) {
+                        // ignore
+                    }
+                }
+                if (is_array($modelOptions) && array_key_exists('temperature', $modelOptions)) {
+                    $temperature = $modelOptions['temperature'];
+                }
             }
 
             $payload = [
@@ -136,11 +241,44 @@ class BotController extends Controller
             ])->post('https://api.openai.com/v1/chat/completions', $payload);
 
             if (!$resp->successful()) {
-                return response()->json(['error' => 'OpenAI API request failed', 'detail' => $resp->body()], 500);
+                // Log detailed info for debugging
+                try {
+                    \Illuminate\Support\Facades\Log::error('OpenAI API non-success response', [
+                        'status' => $resp->status(),
+                        'body' => $resp->body(),
+                        'payload_summary' => substr(json_encode($payload), 0, 2000),
+                    ]);
+                } catch (\Throwable $_e) {
+                    // swallow logging errors
+                }
+
+                // Try to extract a friendly error message from the OpenAI response body
+                $detailBody = $resp->body();
+                $friendly = 'OpenAI API request failed';
+                try {
+                    $djson = json_decode($detailBody, true);
+                    if (is_array($djson) && isset($djson['error']['message'])) {
+                        $friendly = $djson['error']['message'];
+                    }
+                } catch (\Throwable $_e) {
+                    // ignore
+                }
+
+                $statusCode = $resp->status() ?: 500;
+                return response()->json(['error' => $friendly, 'status' => $statusCode, 'detail' => $detailBody], $statusCode);
             }
 
-            $json = $resp->json();
-            $reply = $json['choices'][0]['message']['content'] ?? '';
+            $json = [];
+            try {
+                $json = $resp->json() ?: [];
+            } catch (\Throwable $_e) {
+                // log parse issue but continue
+                \Illuminate\Support\Facades\Log::warning('Failed to parse OpenAI response JSON', ['body' => $resp->body()]);
+            }
+            $reply = '';
+            if (is_array($json) && isset($json['choices']) && is_array($json['choices']) && isset($json['choices'][0]['message']['content'])) {
+                $reply = $json['choices'][0]['message']['content'];
+            }
 
             // persist conversation + messages for history
             try {

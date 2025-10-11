@@ -9,7 +9,7 @@ class AiConversation extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['user_id', 'title', 'system_prompt'];
+    protected $fillable = ['user_id', 'title', 'system_prompt', 'summary_id'];
 
     public function messages()
     {

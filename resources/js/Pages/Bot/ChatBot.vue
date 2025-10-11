@@ -1,5 +1,6 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
+import MessageArea from '@/Pages/Chat/MessageArea.vue';
 import axios from 'axios';
 import MarkdownIt from 'markdown-it';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
@@ -27,6 +28,71 @@ const exporting = ref(false);
 const exportFormat = ref('md');
 // markdown renderer for AI messages (no raw HTML allowed)
 const md = new MarkdownIt({ html: false, linkify: true, typographer: true });
+
+// wrapper to upload a single file via /bot/files and return metadata similar to chat upload
+async function uploadSingleFile(file) {
+    if (!file) return null;
+    const form = new FormData();
+    form.append('file', file);
+    try {
+        const res = await axios.post('/bot/files', form, {
+            withCredentials: true,
+            headers: { 'Content-Type': 'multipart/form-data', 'X-XSRF-TOKEN': getXsrfToken() },
+        });
+        if (res && res.data && res.data.file) return res.data.file;
+        return null;
+    } catch (e) {
+        console.error('uploadSingleFile failed', e);
+        return null;
+    }
+}
+
+// wrapper so MessageArea can call the same send flow used by ChatBot
+async function sendViaMessageArea(text) {
+    if (!text || !text.trim()) return;
+    const t = text.trim();
+    const tempId = 'tmp-' + Date.now();
+    messages.value.push({ id: tempId, user: '自分', text: t, isTemp: true });
+    loading.value = true;
+    try {
+            console.info('[sendViaMessageArea] before send messages_count=', messages.value.length, 'conversationId=', conversationId.value);
+        const payload = { message: t };
+        if (systemPrompt.value && systemPrompt.value.trim()) payload.system_prompt = systemPrompt.value.trim();
+        if (uploadedFiles.value.length) payload.files = uploadedFiles.value;
+        if (conversationId.value) payload.conversation_id = conversationId.value;
+        const res = await axios.post('/bot/chat', payload, {
+            withCredentials: true,
+            headers: { 'X-XSRF-TOKEN': getXsrfToken() },
+        });
+        const reply = res.data.reply || '(応答なし)';
+        // replace temp message
+        const idx = messages.value.findIndex((m) => m.id === tempId);
+        if (idx >= 0) messages.value.splice(idx, 1, { id: Date.now(), user: '自分', text: t });
+        const aiMsg = { id: Date.now() + 1, user: 'AI', text: reply };
+        normalizeMessage(aiMsg);
+        messages.value.push(aiMsg);
+            console.info('[sendViaMessageArea] after send messages_count=', messages.value.length);
+        uploadedFiles.value = [];
+    } catch (e) {
+        // try to show a friendly error coming from the server (OpenAI error detail)
+        let errMsg = 'エラー: 応答を取得できませんでした';
+        try {
+            if (e && e.response && e.response.data) {
+                const d = e.response.data;
+                if (d.error) {
+                    errMsg = 'エラー: ' + (typeof d.error === 'string' ? d.error : (d.error.message || JSON.stringify(d.error)));
+                } else if (d.detail) {
+                    errMsg = 'エラー: ' + (typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail));
+                }
+            }
+        } catch (ee) {}
+        messages.value.push({ id: Date.now() + 2, user: 'AI', text: errMsg });
+    } finally {
+        loading.value = false;
+        await nextTick();
+        scrollToBottom();
+    }
+}
 
 function renderMarkdown(text) {
     try {
@@ -151,10 +217,37 @@ function normalizeMessage(msg) {
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
 const canUpload = computed(() => {
-    return !!(selectedFiles.value && selectedFiles.value.length) && !uploading.value;
+                            console.info('Uploading file:', f.name);
 });
 
 const fileInput = ref(null);
+
+// conversation histories shown in left column
+const histories = ref([]);
+
+async function fetchHistories() {
+    try {
+        const res = await axios.get('/bot/history', { withCredentials: true });
+        let list = res && res.data ? res.data : [];
+        // support Inertia-style payloads (data) or plain arrays
+        if (list && list.data && Array.isArray(list.data)) list = list.data;
+        if (!Array.isArray(list)) list = [];
+        histories.value = list;
+        return list;
+    } catch (e) {
+        histories.value = [];
+        return [];
+    }
+}
+
+function selectHistory(h) {
+    if (!h || !h.id) return;
+    // load via existing loader
+    loadConversation(h.id);
+    try {
+        window.history.pushState({}, '', `/bot/chat?load_conversation=${encodeURIComponent(h.id)}`);
+    } catch (e) {}
+}
 
 function onFileInputChange(e) {
     const files = e.target && e.target.files ? Array.from(e.target.files) : [];
@@ -288,7 +381,18 @@ async function sendMessage() {
         // after successful send, clear selected uploaded files
         uploadedFiles.value = [];
     } catch (e) {
-        messages.value.push({ id: Date.now() + 2, user: 'AI', text: 'エラー: 応答を取得できませんでした' });
+        let errMsg = 'エラー: 応答を取得できませんでした';
+        try {
+            if (e && e.response && e.response.data) {
+                const d = e.response.data;
+                if (d.error) {
+                    errMsg = 'エラー: ' + (typeof d.error === 'string' ? d.error : (d.error.message || JSON.stringify(d.error)));
+                } else if (d.detail) {
+                    errMsg = 'エラー: ' + (typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail));
+                }
+            }
+        } catch (ee) {}
+        messages.value.push({ id: Date.now() + 2, user: 'AI', text: errMsg });
     } finally {
         loading.value = false;
         await nextTick();
@@ -440,8 +544,13 @@ async function saveConversation() {
 }
 
 async function startNewConversation() {
-    // save current conversation then reset UI
-    await saveConversation();
+    // Ask user whether to save current conversation before starting a new one.
+    if ((messages.value && messages.value.length > 0) || (systemPrompt.value && systemPrompt.value.trim())) {
+        const shouldSave = confirm('現在の会話を保存しますか？ 保存しない場合は内容は破棄されます。');
+        if (shouldSave) {
+            await saveConversation();
+        }
+    }
     conversationId.value = null;
     messages.value = [];
     systemPrompt.value = '';
@@ -483,13 +592,25 @@ function handleBeforeUnload(e) {
     } catch (err) {}
 }
 
-onMounted(() => {
+onMounted(async () => {
     // check query param load_conversation
     try {
         const params = new URLSearchParams(window.location.search);
         const id = params.get('load_conversation');
         if (id) {
-            loadConversation(id);
+            await loadConversation(id);
+        } else {
+            // load conversation histories for left column and auto-continue the latest conversation
+            await fetchHistories();
+            try {
+                // if there are histories and we have no active messages, auto-load the most recent one
+                if ((!messages.value || messages.value.length === 0) && histories.value && histories.value.length > 0) {
+                    const latest = histories.value[0];
+                    if (latest && latest.id) {
+                        await loadConversation(latest.id);
+                    }
+                }
+            } catch (ee) {}
         }
     } catch (e) {}
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -506,7 +627,7 @@ onUnmounted(() => {
             <h2 class="text-xl font-semibold leading-tight text-gray-800">AIチャット</h2>
         </template>
         <div class="py-6">
-            <div class="mx-auto flex max-w-4xl flex-col rounded bg-white p-6 shadow" style="height: calc(100vh - 160px)">
+                <div class="mx-auto max-w-6xl rounded bg-white p-4 shadow flex flex-col gap-4" style="height: calc(100vh - 140px)">
                 <div class="mb-4 flex items-center justify-between">
                     <div class="flex items-center gap-3">
                         <!-- <a href="/chat" class="inline-flex items-center text-blue-600 hover:underline px-3 py-2">← チャットルーム一覧へ戻る</a> -->
@@ -552,36 +673,47 @@ onUnmounted(() => {
                         </div>
                     </div>
                 </div>
-                <div
-                    ref="messageArea"
-                    class="mb-4 flex-1 overflow-y-auto rounded border border-gray-200 bg-gradient-to-b from-white to-gray-50 p-4 shadow-inner"
-                >
-                    <div v-for="msg in messages" :key="msg.id" class="mb-3">
-                        <div
-                            :class="[
-                                'chat-bubble relative',
-                                msg.user === '自分' ? 'chat-bubble-own inline-block' : 'chat-bubble-other inline-block',
-                                msg.isFileUpload ? 'w-4/5 cursor-pointer bg-blue-600 text-white' : '',
-                            ]"
-                            @click="msg.isFileUpload && msg.file ? openAttachment(msg.file) : null"
-                        >
-                            <div :class="['break-words text-sm leading-relaxed', msg.isFileUpload ? 'rounded p-3' : '']">
-                                <span :class="['mr-2 font-semibold', msg.isFileUpload ? 'text-white' : '']">{{ msg.user }}</span>
-                                <div
-                                    :class="['whitespace-pre-line', msg.isFileUpload ? 'text-white' : '']"
-                                    v-if="!msg.isFileUpload && msg.user === 'AI'"
-                                    v-html="renderMarkdown(msg.text)"
-                                ></div>
-                                <div v-else :class="['whitespace-pre-line', msg.isFileUpload ? 'text-white' : '']">{{ msg.text }}</div>
-                                <div v-if="msg.isFileUpload && msg.file" class="mt-2 text-xs italic text-white/80">クリックでファイルを表示</div>
-                            </div>
+                <div class="flex w-full gap-4 flex-1 overflow-hidden">
+                    <aside class="hidden w-64 flex-shrink-0 border-r border-gray-100 px-3 py-2 md:block overflow-auto">
+                        <div class="mb-2 flex items-center justify-between">
+                            <div class="text-sm font-medium">会話履歴</div>
+                            <button @click="fetchHistories" class="text-xs text-blue-600 hover:underline">更新</button>
                         </div>
-                    </div>
+                        <ul class="space-y-2 text-sm leading-tight">
+                            <li v-for="h in histories.slice(0,5)" :key="h.id" class="rounded">
+                                <div
+                                    role="button"
+                                    tabindex="0"
+                                    @click.prevent="selectHistory(h)"
+                                    @keydown.enter.prevent="selectHistory(h)"
+                                    class="px-2 py-2 hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer"
+                                >
+                                    <div class="font-medium block w-full break-words">{{ h.title || h.name || (h.system_prompt ? (h.system_prompt.slice(0, 80) + '...') : (h.meta && h.meta.title) || '会話') }}</div>
+                                    <div class="text-xs text-gray-500 mt-1">{{ new Date(h.updated_at || h.created_at || Date.now()).toLocaleString() }}</div>
+                                </div>
+                            </li>
+                        </ul>
+                        <div class="mt-3 px-2">
+                            <a href="/bot/history" class="text-xs text-blue-600 hover:underline">全履歴を見る</a>
+                        </div>
+                        <div v-if="!histories || histories.length === 0" class="mt-4 text-sm text-gray-500">
+                            履歴がありません。<br />右上の「ファイルアップロード」または「新規会話を始める」で会話を作成してください。
+                        </div>
+                    </aside>
+                    <main class="flex-1 px-4 py-2 overflow-auto">
+                        <MessageArea
+                            :room="{ id: null, name: 'AIチャット' }"
+                            :initialMessages="messages"
+                            :user="{ id: null, name: '自分' }"
+                            :externalMessages="messages"
+                            :sendFn="sendViaMessageArea"
+                            :uploadFn="uploadSingleFile"
+                            :openAttachmentFn="openAttachment"
+                            :renderMarkdownFn="renderMarkdown"
+                            :aiWorking="loading"
+                        />
+                    </main>
                 </div>
-                <form @submit.prevent="sendMessage" class="flex gap-2">
-                    <input v-model="newMessage" class="flex-1 rounded border px-3 py-2" placeholder="メッセージを入力..." />
-                    <button type="submit" class="rounded bg-blue-600 px-4 py-2 text-white" :disabled="loading">送信</button>
-                </form>
 
                 <!-- Prompt Modal -->
                 <div v-if="showPromptModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">

@@ -88,6 +88,22 @@ class ChatController extends Controller
             $room->unread_count = $unreadCount;
             return $room;
         });
+        // If the request was initiated by Inertia (X-Inertia header present),
+        // return an Inertia response so client-side navigation works.
+        if ($request->header('X-Inertia')) {
+            return inertia('Chat/Index', [
+                'rooms' => $rooms,
+                'auth' => ['user' => $user],
+                'current_user_id' => $user->id,
+            ]);
+        }
+
+        // If the client expects JSON (AJAX/API call), return rooms as JSON
+        if ($request->wantsJson() || $request->ajax() || $request->isJson()) {
+            return response()->json($rooms->values());
+        }
+
+        // Default: render the Inertia page for normal browser requests
         return inertia('Chat/Index', [
             'rooms' => $rooms,
             'auth' => ['user' => $user],
@@ -247,11 +263,17 @@ class ChatController extends Controller
                         } else {
                             $manager = ImageManager::gd();
                         }
-                        $img = $manager->read($file->getRealPath());
-                        $img->orientate();
-                        $img->fit(400, 400, function ($constraint) {
-                            $constraint->upsize();
-                        });
+                        // create Intervention image instance from uploaded file
+                        $img = $manager->make($file->getRealPath());
+                        // auto-orient and fit to a thumbnail size
+                        if (method_exists($img, 'orientate')) {
+                            $img->orientate();
+                        }
+                        if (method_exists($img, 'fit')) {
+                            $img->fit(400, 400, function ($constraint) {
+                                $constraint->upsize();
+                            });
+                        }
                         $thumbPath = 'chat/thumbs/' . basename($path);
                         // Choose encoder
                         $thumbEncoder = new \Intervention\Image\Encoders\JpegEncoder(80);
