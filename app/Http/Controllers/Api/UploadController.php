@@ -98,4 +98,17 @@ class UploadController extends Controller
             'size' => $attachment->size,
         ]);
     }
+
+    // Return attachment metadata for client-side resolution
+    public function showAttachment($id)
+    {
+        try {
+            $a = Attachment::find($id);
+            if (!$a) return response()->json(['error' => 'not_found'], 404);
+            return response()->json($a);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('showAttachment failed: ' . $e->getMessage());
+            return response()->json(['error' => 'server_error'], 500);
+        }
+    }
 }

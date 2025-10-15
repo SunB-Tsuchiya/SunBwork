@@ -17,11 +17,27 @@ class BotFileController extends Controller
         ]);
 
         $file = $request->file('file');
-        $path = $file->store('bot', 'public');
+        // Preserve original filename when saving. If a file with the same name
+        // already exists in the 'bot' folder on the public disk, return 409 so
+        // the client can notify the user rather than silently renaming.
+        $originalName = basename($file->getClientOriginalName());
+        // sanitize filename to remove any directory separators
+        $originalName = str_replace(['..', '/', '\\'], '_', $originalName);
+        $path = 'bot/' . $originalName;
+        if (Storage::disk('public')->exists($path)) {
+            return response()->json([
+                'error' => 'file_exists',
+                'message' => '同名のファイルが既に存在します: ' . $originalName,
+                'path' => $path,
+            ], 409);
+        }
+
+        // store using original name
+        $stored = Storage::disk('public')->putFileAs('bot', $file, $originalName);
         $url = Storage::url($path);
         $meta = [
             'url' => $url,
-            'original_name' => $file->getClientOriginalName(),
+            'original_name' => $originalName,
             'mime' => $file->getClientMimeType(),
             'size' => $file->getSize(),
             'path' => $path,
@@ -33,7 +49,7 @@ class BotFileController extends Controller
                 $contents = file_get_contents($file->getRealPath());
                 $meta['preview'] = mb_substr($contents, 0, 2000);
             } catch (\Exception $e) {
-                Log::warning('bot file preview failed: '.$e->getMessage());
+                Log::warning('bot file preview failed: ' . $e->getMessage());
             }
         }
 
@@ -64,5 +80,31 @@ class BotFileController extends Controller
         if (!Storage::disk('public')->exists($path)) abort(404);
         $full = Storage::disk('public')->path($path);
         return response()->file($full);
+    }
+
+    // POST /bot/files/delete - delete an uploaded file (authenticated users)
+    public function delete(Request $request)
+    {
+        $request->validate([
+            'path' => 'required|string',
+        ]);
+        $path = $request->input('path');
+        $path = ltrim($path, '\\/');
+        if (!str_starts_with($path, 'bot/')) {
+            $path = 'bot/' . $path;
+        }
+        try {
+            if (!Storage::disk('public')->exists($path)) {
+                return response()->json(['error' => 'file not found'], 404);
+            }
+            $deleted = Storage::disk('public')->delete($path);
+            if ($deleted) {
+                return response()->json(['success' => true]);
+            }
+            return response()->json(['error' => 'delete failed'], 500);
+        } catch (\Exception $e) {
+            Log::error('bot file delete failed: ' . $e->getMessage());
+            return response()->json(['error' => 'delete error'], 500);
+        }
     }
 }

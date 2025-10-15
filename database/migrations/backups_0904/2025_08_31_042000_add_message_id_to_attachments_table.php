@@ -6,6 +6,12 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    // NOTE: This is a backup migration that adds the legacy `message_id` column
+    // to the `attachments` table. The project is migrating to the polymorphic
+    // `attachmentables` pivot table. Keep this file for history; do not rely on
+    // it as part of the new migration flow. After full pivot migration and
+    // verification, consider creating a safe migration to drop legacy columns.
+
     public function up()
     {
         Schema::table('attachments', function (Blueprint $table) {

@@ -245,11 +245,16 @@ class ChatController extends Controller
 
         if ($request->hasFile('file')) {
             $file = $request->file('file');
-            $path = $file->store('chat', 'public');
+            // Preserve original filename (including multibyte chars) while avoiding collisions
+            $orig = $file->getClientOriginalName();
+            $uuid = Str::uuid()->toString();
+            $storedName = $uuid . '_' . $orig;
+            // storeAs will preserve multibyte names correctly
+            $path = $file->storeAs('chat', $storedName, 'public');
             $url = Storage::url($path);
             $meta = [
                 'url' => $url,
-                'original_name' => $file->getClientOriginalName(),
+                'original_name' => $orig,
                 'mime' => $file->getClientMimeType(),
                 'size' => $file->getSize(),
                 'path' => $path,
@@ -264,12 +269,15 @@ class ChatController extends Controller
                             $manager = ImageManager::gd();
                         }
                         // create Intervention image instance from uploaded file
-                        $img = $manager->make($file->getRealPath());
+                        /** @var \Intervention\Image\Image $img */
+                        $img = $manager->read($file);
                         // auto-orient and fit to a thumbnail size
                         if (method_exists($img, 'orientate')) {
+                            // @phpstan-ignore-next-line
                             $img->orientate();
                         }
                         if (method_exists($img, 'fit')) {
+                            // @phpstan-ignore-next-line
                             $img->fit(400, 400, function ($constraint) {
                                 $constraint->upsize();
                             });
@@ -308,11 +316,38 @@ class ChatController extends Controller
                 }
             }
 
+            // Create Attachment DB record if attachments table/model exists
+            try {
+                if (class_exists(\App\Models\Attachment::class)) {
+                    $attach = \App\Models\Attachment::create([
+                        'path' => $meta['path'],
+                        'original_name' => $meta['original_name'],
+                        'mime_type' => $meta['mime'],
+                        'size' => $meta['size'],
+                        // existing schema expects integer status; use 1 as ready
+                        'status' => 1,
+                        'user_id' => $user->id,
+                    ]);
+                    // include attachment_id for future compatibility
+                    $meta['attachment_id'] = $attach->id;
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Attachment create failed: ' . $e->getMessage());
+            }
+
             $msg = $room->messages()->create([
                 'user_id' => $user->id,
                 'body' => json_encode($meta),
                 'type' => 'file',
             ]);
+            // If an Attachment row was created, link it to this ChatMessage via polymorphic pivot
+            try {
+                if (!empty($attach) && method_exists($attach, 'attachTo')) {
+                    $attach->attachTo($msg);
+                }
+            } catch (\Throwable $_e) {
+                Log::warning('ChatController: failed to attach Attachment to ChatMessage', ['attachment_id' => $attach->id ?? null, 'chat_message_id' => $msg->id, 'error' => $_e->getMessage()]);
+            }
         } else {
             $data = $request->validate([
                 'body' => 'required|string|max:2000',
@@ -369,7 +404,23 @@ class ChatController extends Controller
         }
 
         if (!Storage::disk('public')->exists($path)) {
-            abort(404);
+            // Fallback: the stored files may have UUID_ prefix (e.g. <uuid>_original_name)
+            // If the exact path doesn't exist, try to find a file under chat/ whose name ends with the requested basename
+            try {
+                $requestedBasename = basename($path);
+                $files = Storage::disk('public')->files('chat');
+                foreach ($files as $f) {
+                    if (str_ends_with($f, $requestedBasename)) {
+                        $path = $f;
+                        break;
+                    }
+                }
+                if (!Storage::disk('public')->exists($path)) {
+                    abort(404);
+                }
+            } catch (\Throwable $_ex) {
+                abort(404);
+            }
         }
 
         // 追加の認可チェック: ファイルを投稿したメッセージのルームにユーザが参加しているか

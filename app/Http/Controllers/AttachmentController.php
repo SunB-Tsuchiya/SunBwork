@@ -41,37 +41,71 @@ class AttachmentController extends Controller
             abort(404);
         }
 
-        // Authorization: if we have an Attachment model, prefer it
+        // Authorization: prefer checking polymorphic links (attachmentables) first,
+        // then fall back to legacy columns like message_id/user_id for compatibility.
         if (isset($att)) {
-            // If attachment is linked to a message, check that the current user is sender or a recipient
-            if ($att->message_id) {
-                try {
-                    $msg = $att->message()->with('recipients')->first();
-                    if ($msg) {
-                        $isAllowed = ($msg->from_user_id === $user->id) || $msg->recipients->pluck('user_id')->contains($user->id);
-                        if (!$isAllowed) {
-                            abort(403, 'このファイルにアクセスする権限がありません');
+            try {
+                // If the attachment is linked to one or more messages via attachmentables,
+                // check message sender/recipient permissions.
+                $linkedMessage = $att->messages()->with('recipients')->first();
+                if ($linkedMessage) {
+                    $isAllowed = ($linkedMessage->from_user_id === $user->id) || $linkedMessage->recipients->pluck('user_id')->contains($user->id);
+                    if (!$isAllowed) abort(403, 'このファイルにアクセスする権限がありません');
+                } else {
+                    // No message link via pivot; fall back to legacy message_id column if present
+                    if ($att->message_id) {
+                        $msg = $att->message()->with('recipients')->first();
+                        if ($msg) {
+                            $isAllowed = ($msg->from_user_id === $user->id) || $msg->recipients->pluck('user_id')->contains($user->id);
+                            if (!$isAllowed) abort(403, 'このファイルにアクセスする権限がありません');
+                        }
+                    } else {
+                        // No message relation: allow owner (owner_type/owner_id or user_id) or admins
+                        // If owner_type/owner_id present, allow when matches current user (owner may be a User model)
+                        if ($att->owner_type && $att->owner_id) {
+                            try {
+                                if ($att->owner_type === 'App\\Models\\User' && intval($att->owner_id) !== intval($user->id)) {
+                                    if (!($user->user_role ?? '') || $user->user_role !== 'admin') abort(403, 'このファイルにアクセスする権限がありません');
+                                }
+                            } catch (\Throwable $ex) {
+                                Log::warning('owner auth lookup failed: ' . $ex->getMessage());
+                            }
+                        } else {
+                            if ($att->user_id && $att->user_id !== $user->id) {
+                                if (!($user->user_role ?? '') || $user->user_role !== 'admin') {
+                                    abort(403, 'このファイルにアクセスする権限がありません');
+                                }
+                            }
                         }
                     }
-                } catch (\Exception $ex) {
-                    Log::warning('message auth lookup failed: ' . $ex->getMessage());
                 }
-            } else {
-                // allow owner or admins
-                if ($att->user_id && $att->user_id !== $user->id) {
-                    if (!($user->user_role ?? '') || $user->user_role !== 'admin') {
-                        abort(403, 'このファイルにアクセスする権限がありません');
-                    }
-                }
+            } catch (\Exception $ex) {
+                Log::warning('attachment auth lookup failed: ' . $ex->getMessage());
             }
         } else {
-            // best-effort: try to find Attachment by path
+            // best-effort: try to find Attachment by path and apply same logic
             try {
                 $maybe = Attachment::where('path', $path)->first();
                 if ($maybe) {
-                    if ($maybe->user_id && $maybe->user_id !== $user->id) {
-                        if (!($user->user_role ?? '') || $user->user_role !== 'admin') {
-                            abort(403, 'このファイルにアクセスする権限がありません');
+                    $linkedMessage = $maybe->messages()->with('recipients')->first();
+                    if ($linkedMessage) {
+                        $isAllowed = ($linkedMessage->from_user_id === $user->id) || $linkedMessage->recipients->pluck('user_id')->contains($user->id);
+                        if (!$isAllowed) abort(403, 'このファイルにアクセスする権限がありません');
+                    } else {
+                        if ($maybe->owner_type && $maybe->owner_id) {
+                            try {
+                                if ($maybe->owner_type === 'App\\Models\\User' && intval($maybe->owner_id) !== intval($user->id)) {
+                                    if (!($user->user_role ?? '') || $user->user_role !== 'admin') abort(403, 'このファイルにアクセスする権限がありません');
+                                }
+                            } catch (\Throwable $ex) {
+                                Log::warning('owner auth lookup failed: ' . $ex->getMessage());
+                            }
+                        } else {
+                            if ($maybe->user_id && $maybe->user_id !== $user->id) {
+                                if (!($user->user_role ?? '') || $user->user_role !== 'admin') {
+                                    abort(403, 'このファイルにアクセスする権限がありません');
+                                }
+                            }
                         }
                     }
                 }

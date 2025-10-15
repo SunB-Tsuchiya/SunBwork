@@ -59,6 +59,11 @@ class MessageCreateE2ETest extends TestCase
         $message = Message::where('subject', 'E2E Test')->first();
         $this->assertNotNull($message);
         $this->assertDatabaseHas('message_recipients', ['message_id' => $message->id, 'user_id' => $recipient->id, 'type' => 'to']);
-        $this->assertDatabaseHas('attachments', ['id' => $attId, 'message_id' => $message->id]);
+        // After migration to polymorphic pivot, attachment should be linked via attachmentables
+        $this->assertDatabaseHas('attachmentables', [
+            'attachment_id' => $attId,
+            'attachable_type' => \App\Models\Message::class,
+            'attachable_id' => $message->id,
+        ]);
     }
 }

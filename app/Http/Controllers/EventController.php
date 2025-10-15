@@ -461,12 +461,17 @@ class EventController extends Controller
                 } else {
                     Storage::disk('public')->putFileAs('event_attachments', $file, $uniqueName);
                 }
-                \App\Models\Attachment::create([
-                    'event_id' => $event->id,
+                // Create a generic Attachment and attach via polymorphic pivot to this Event
+                $attachment = \App\Models\Attachment::create([
                     'path' => $path,
                     'original_name' => $file->getClientOriginalName(),
                     'mime_type' => $file->getMimeType(),
                 ]);
+                try {
+                    $event->attachments()->attach($attachment->id, ['created_at' => now(), 'updated_at' => now()]);
+                } catch (\Throwable $_ex) {
+                    logger()->warning('EventController: could not attach attachment to event', ['attachment_id' => $attachment->id, 'event_id' => $event->id, 'error' => $_ex->getMessage()]);
+                }
             }
         }
 
@@ -557,12 +562,16 @@ class EventController extends Controller
                 } else {
                     Storage::disk('public')->putFileAs('event_attachments', $file, $uniqueName);
                 }
-                \App\Models\Attachment::create([
-                    'event_id' => $event->id,
+                $attachment = \App\Models\Attachment::create([
                     'path' => $path,
                     'original_name' => $file->getClientOriginalName(),
                     'mime_type' => $file->getMimeType(),
                 ]);
+                try {
+                    $event->attachments()->attach($attachment->id, ['created_at' => now(), 'updated_at' => now()]);
+                } catch (\Throwable $_ex) {
+                    logger()->warning('EventController: could not attach attachment to event', ['attachment_id' => $attachment->id, 'event_id' => $event->id, 'error' => $_ex->getMessage()]);
+                }
             }
         }
         return redirect()->route('calendar.index');

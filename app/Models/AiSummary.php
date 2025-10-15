@@ -14,6 +14,10 @@ class AiSummary extends Model
         'summarized_until_message_id',
         'char_count',
         'version',
+        'tokens_estimate',
+        'model',
+        'status',
+        'meta',
     ];
 
     public function conversation()

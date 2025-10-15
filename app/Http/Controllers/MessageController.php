@@ -189,7 +189,23 @@ class MessageController extends Controller
         // attach uploaded attachments (client uploads to /api/uploads and returns attachment ids)
         if (!empty($data['attachments'])) {
             foreach ($data['attachments'] as $attId) {
-                \App\Models\Attachment::where('id', $attId)->update(['message_id' => $message->id]);
+                try {
+                    $att = \App\Models\Attachment::find($attId);
+                    if ($att) {
+                        // Prefer polymorphic pivot attach; attachTo returns bool
+                        $ok = $att->attachTo($message);
+                        if (! $ok) {
+                            // Do NOT write the legacy attachments.message_id column here.
+                            // The system should rely on the attachmentables pivot and the migration
+                            // tooling to create any missing links. Log for later inspection.
+                            logger()->warning('MessageController: attachTo returned false; attachment not linked via pivot', ['att_id' => $attId, 'message_id' => $message->id]);
+                        }
+                    } else {
+                        logger()->warning('MessageController: attachment id not found', ['att_id' => $attId]);
+                    }
+                } catch (\Throwable $__e) {
+                    logger()->warning('MessageController: failed to attach attachment to message', ['att_id' => $attId, 'message_id' => $message->id, 'error' => $__e->getMessage()]);
+                }
             }
         }
 

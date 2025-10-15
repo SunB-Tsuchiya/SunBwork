@@ -30,8 +30,10 @@ class Message extends Model
         return $this->belongsTo(User::class, 'from_user_id');
     }
 
-    public function attachments(): HasMany
+    public function attachments()
     {
-        return $this->hasMany(Attachment::class, 'message_id');
+        return $this->morphToMany(Attachment::class, 'attachable', 'attachmentables')
+            ->withPivot(['role', 'order'])
+            ->withTimestamps();
     }
 }

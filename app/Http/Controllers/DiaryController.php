@@ -9,6 +9,7 @@ use Carbon\Carbon;
 use Intervention\Image\ImageManager;
 use App\Models\Diary;
 use App\Models\Attachment;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Log;
 
@@ -214,7 +215,23 @@ class DiaryController extends Controller
             preg_match_all('/\[\[attachment:(\d+):[^\]]+\]\]/', $contentForScan, $matches);
             if (!empty($matches[1])) {
                 $ids = array_map('intval', $matches[1]);
-                Attachment::whereIn('id', $ids)->update(['diary_id' => $diary->id]);
+                $attachments = Attachment::whereIn('id', $ids)->get();
+                $now = now();
+                $toInsert = [];
+                foreach ($attachments as $a) {
+                    $toInsert[] = [
+                        'attachment_id' => $a->id,
+                        'attachable_type' => \App\Models\Diary::class,
+                        'attachable_id' => $diary->id,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+                }
+                if (!empty($toInsert)) {
+                    foreach (array_chunk($toInsert, 200) as $chunk) {
+                        DB::table('attachmentables')->insertOrIgnore($chunk);
+                    }
+                }
             }
         }
 
@@ -265,12 +282,17 @@ class DiaryController extends Controller
                 } else {
                     Storage::disk('public')->putFileAs('attachments', $file, $uniqueName);
                 }
-                \App\Models\DiaryAttachment::create([
-                    'diary_id' => $diary->id,
+                // Create a generic Attachment and attach via polymorphic pivot to this Diary
+                $attachment = \App\Models\Attachment::create([
                     'path' => $path,
                     'original_name' => $file->getClientOriginalName(),
                     'mime_type' => $file->getMimeType(),
                 ]);
+                try {
+                    $diary->attachments()->attach($attachment->id, ['created_at' => now(), 'updated_at' => now()]);
+                } catch (\Throwable $_ex) {
+                    logger()->warning('DiaryController: could not attach attachment to diary', ['attachment_id' => $attachment->id, 'diary_id' => $diary->id, 'error' => $_ex->getMessage()]);
+                }
             }
         }
 
@@ -320,7 +342,23 @@ class DiaryController extends Controller
                 preg_match_all('/\[\[attachment:(\d+):[^\]]+\]\]/', $contentForScan, $matches);
                 if (!empty($matches[1])) {
                     $ids = array_map('intval', $matches[1]);
-                    Attachment::whereIn('id', $ids)->update(['diary_id' => $diary->id]);
+                    $attachments = Attachment::whereIn('id', $ids)->get();
+                    $now = now();
+                    $toInsert = [];
+                    foreach ($attachments as $a) {
+                        $toInsert[] = [
+                            'attachment_id' => $a->id,
+                            'attachable_type' => \App\Models\Diary::class,
+                            'attachable_id' => $diary->id,
+                            'created_at' => $now,
+                            'updated_at' => $now,
+                        ];
+                    }
+                    if (!empty($toInsert)) {
+                        foreach (array_chunk($toInsert, 200) as $chunk) {
+                            DB::table('attachmentables')->insertOrIgnore($chunk);
+                        }
+                    }
                 }
             }
 
@@ -367,12 +405,16 @@ class DiaryController extends Controller
                     } else {
                         Storage::disk('public')->putFileAs('attachments', $file, $uniqueName);
                     }
-                    \App\Models\Attachment::create([
-                        'diary_id' => $diary->id,
+                    $attachment = \App\Models\Attachment::create([
                         'path' => $path,
                         'original_name' => $file->getClientOriginalName(),
                         'mime_type' => $file->getMimeType(),
                     ]);
+                    try {
+                        $diary->attachments()->attach($attachment->id, ['created_at' => now(), 'updated_at' => now()]);
+                    } catch (\Throwable $_ex) {
+                        logger()->warning('DiaryController: could not attach uploaded attachment to diary', ['attachment_id' => $attachment->id, 'diary_id' => $diary->id, 'error' => $_ex->getMessage()]);
+                    }
                 }
             }
 
@@ -445,12 +487,16 @@ class DiaryController extends Controller
                 } else {
                     Storage::disk('public')->putFileAs('attachments', $file, $uniqueName);
                 }
-                \App\Models\Attachment::create([
-                    'diary_id' => $diary->id,
+                $attachment = \App\Models\Attachment::create([
                     'path' => $path,
                     'original_name' => $file->getClientOriginalName(),
                     'mime_type' => $file->getMimeType(),
                 ]);
+                try {
+                    $diary->attachments()->attach($attachment->id, ['created_at' => now(), 'updated_at' => now()]);
+                } catch (\Throwable $_ex) {
+                    logger()->warning('DiaryController: could not attach uploaded attachment to diary (fallback)', ['attachment_id' => $attachment->id ?? null, 'diary_id' => $diary->id, 'error' => $_ex->getMessage()]);
+                }
             }
         }
 

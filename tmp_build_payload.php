@@ -43,7 +43,7 @@ if (!empty($data['conversation_id'])) {
     $lastId = null;
     $done = false;
     while (!$done) {
-        $q = AiMessage::where('ai_conversation_id', $convId)->select(['id','role','content','char_count'])->orderBy('id','desc')->limit($batchSize);
+        $q = AiMessage::where('ai_conversation_id', $convId)->select(['id', 'role', 'content', 'char_count'])->orderBy('id', 'desc')->limit($batchSize);
         if ($lastId) $q->where('id', '<', $lastId);
         $batch = $q->get();
         if ($batch->isEmpty()) break;
@@ -51,8 +51,11 @@ if (!empty($data['conversation_id'])) {
             $content = $m->content ?? '';
             if ($content === null || trim($content) === '') continue;
             $len = (isset($m->char_count) && $m->char_count) ? (int)$m->char_count : mb_strlen($content);
-            if ($accum + $len > $historyCharBudget) { $done = true; break; }
-            $toInclude[] = ['role'=>($m->role ?? 'user'),'content'=>$content,'id'=>$m->id,'len'=>$len];
+            if ($accum + $len > $historyCharBudget) {
+                $done = true;
+                break;
+            }
+            $toInclude[] = ['role' => ($m->role ?? 'user'), 'content' => $content, 'id' => $m->id, 'len' => $len];
             $accum += $len;
         }
         $lastId = $batch->last()->id;
@@ -72,4 +75,4 @@ if (!empty($data['conversation_id'])) {
     }
 }
 
-echo json_encode($messages, JSON_UNESCAPED_UNICODE|JSON_PRETTY_PRINT) . "\n";
+echo json_encode($messages, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . "\n";

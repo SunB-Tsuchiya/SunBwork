@@ -45,6 +45,8 @@ Route::middleware(['web', 'auth:sanctum'])->group(function () {
     // Unified upload endpoint for diary/chat attachments
     Route::post('/uploads', [\App\Http\Controllers\Api\UploadController::class, 'upload']);
     Route::get('/uploads/status/{id}', [\App\Http\Controllers\Api\UploadStatusController::class, 'status']);
+    // Fetch attachment metadata by id (used by MessageArea to resolve attachment_id)
+    Route::get('/attachments/{id}', [\App\Http\Controllers\Api\UploadController::class, 'showAttachment']);
     // Stream attachment with authorization
     Route::get('/attachments/stream', [\App\Http\Controllers\AttachmentController::class, 'stream'])->name('api.attachments.stream');
 

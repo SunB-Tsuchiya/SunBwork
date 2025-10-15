@@ -62,6 +62,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::post('/bot/chat', [App\Http\Controllers\Bot\BotController::class, 'chat'])->name('bot.chat.api');
     // Bot file upload & stream
     Route::post('/bot/files', [App\Http\Controllers\Bot\BotFileController::class, 'upload'])->name('bot.files.upload');
+    Route::post('/bot/files/delete', [App\Http\Controllers\Bot\BotFileController::class, 'delete'])->name('bot.files.delete');
     Route::get('/bot/attachments', [App\Http\Controllers\Bot\BotFileController::class, 'stream'])->name('bot.files.stream');
 
     // Bot export (conversation -> file)
@@ -74,6 +75,9 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::get('/bot/history/{id}/json', [App\Http\Controllers\Bot\AiHistoryController::class, 'showJson'])->name('bot.history.show.json');
     Route::post('/bot/history', [App\Http\Controllers\Bot\AiHistoryController::class, 'store'])->name('bot.history.store');
     Route::put('/bot/history/{id}', [App\Http\Controllers\Bot\AiHistoryController::class, 'update'])->name('bot.history.update');
+
+    // Fetch latest summary for a conversation (used by frontend SummaryPanel)
+    Route::get('/bot/conversations/{id}/summary', [App\Http\Controllers\Bot\BotController::class, 'summary'])->name('bot.conversations.summary');
 
     // Ziggy用: 明示的にuser.dashboardルートを追加
     Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
@@ -142,6 +146,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     // Allow authenticated users to create a single assignment (their own) without coordinator side-effects
     Route::post('project_jobs/{projectJob}/assignments/user', [App\Http\Controllers\User\ProjectJobAssignmentController::class, 'store'])->name('project_jobs.assignments.store_user');
     Route::get('/chat/rooms/{id}', [App\Http\Controllers\Chat\ChatController::class, 'showRoom'])->name('chat.rooms.show');
+
+
 
     // Job Requests (Inbox) - minimal CRUD + accept
     Route::get('/job_requests', [App\Http\Controllers\JobRequestsController::class, 'index'])->name('job_requests.index');

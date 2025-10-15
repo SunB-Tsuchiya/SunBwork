@@ -14,13 +14,21 @@ const props = defineProps({
     sendFn: { type: Function, required: false },
     uploadFn: { type: Function, required: false },
     openAttachmentFn: { type: Function, required: false },
+    // optional: handler to request deletion of an uploaded file (meta object)
+    deleteAttachmentFn: { type: Function, required: false },
+    // optional: handler to request the AI reference a file (meta object)
+    referenceFn: { type: Function, required: false },
+    // optional: handler passed by parent to request summarization of a file (meta object)
+    summarizeFn: { type: Function, required: false },
     renderMarkdownFn: { type: Function, required: false },
 });
 
 // local state
 const messages = ref(Array.isArray(props.initialMessages) ? [...props.initialMessages] : []);
 // when externalMessages is provided, render that instead of internal messages
-const displayedMessagesRaw = computed(() => (props.externalMessages && Array.isArray(props.externalMessages) ? props.externalMessages : messages.value));
+const displayedMessagesRaw = computed(() =>
+    props.externalMessages && Array.isArray(props.externalMessages) ? props.externalMessages : messages.value,
+);
 // normalize a cloned copy for safe rendering (don't mutate parent props)
 const displayedMessages = computed(() => {
     return (displayedMessagesRaw.value || []).map((m) => {
@@ -78,14 +86,27 @@ function buildStreamUrl(file) {
     const candidate = file.path || file.thumb_path || file.url || file.original_name;
     if (!candidate) return null;
     if (typeof candidate === 'string') {
-        if (candidate.startsWith('/storage/')) return `/chat/attachments?path=${encodeURIComponent(candidate.replace(/^\/storage\//, ''))}`;
+        // If candidate references the public storage path, map to the appropriate stream endpoint
+        if (candidate.startsWith('/storage/')) {
+            const inner = candidate.replace(/^\/storage\//, '');
+            if (inner.startsWith('bot/')) return `/bot/attachments?path=${encodeURIComponent(inner)}`;
+            return `/chat/attachments?path=${encodeURIComponent(inner)}`;
+        }
         try {
             const url = new URL(candidate, window.location.origin);
-            if (url.pathname && url.pathname.startsWith('/storage/'))
-                return `/chat/attachments?path=${encodeURIComponent(url.pathname.replace(/^\/storage\//, ''))}`;
+            if (url.pathname && url.pathname.startsWith('/storage/')) {
+                const inner = url.pathname.replace(/^\/storage\//, '');
+                if (inner.startsWith('bot/')) return `/bot/attachments?path=${encodeURIComponent(inner)}`;
+                return `/chat/attachments?path=${encodeURIComponent(inner)}`;
+            }
         } catch (e) {}
+        // If candidate explicitly names a bot path, use the bot stream endpoint
+        if (candidate.startsWith('bot/')) return `/bot/attachments?path=${encodeURIComponent(candidate)}`;
         if (candidate.startsWith('chat/')) return `/chat/attachments?path=${encodeURIComponent(candidate)}`;
-        return candidate.startsWith('/') ? candidate : candidate;
+        // If candidate is an absolute local path, return as-is (it should already be prefixed)
+        if (candidate.startsWith('/')) return candidate;
+        // Otherwise return as-is (could be a full URL or relative string)
+        return candidate;
     }
     return null;
 }
@@ -106,6 +127,78 @@ function sanitizeUrl(u) {
     } catch (e) {
         return null;
     }
+}
+
+// Ensure a local path has a leading slash when used in hrefs
+function ensureLeadingSlashIfLocal(u) {
+    if (!u || typeof u !== 'string') return u;
+    const s = u.trim();
+    if (s.startsWith('http://') || s.startsWith('https://') || s.startsWith('blob:') || s.startsWith('data:')) return s;
+    // Ensure local paths are properly encoded for non-ASCII filenames
+    const local = s.startsWith('/') ? s : '/' + s;
+    try {
+        // encodeURI preserves existing % escapes and encodes non-ASCII characters
+        const parts = local
+            .split('/')
+            .map((p) => encodeURIComponent(decodeURIComponent(p)))
+            .join('/');
+        // preserve leading slash
+        return parts.startsWith('/') ? parts : '/' + parts;
+    } catch (e) {
+        return local;
+    }
+}
+
+// Build a safe href for attachments. preferStream=true will try streamUrl first.
+function attachmentHref(file, preferStream = true) {
+    if (!file) return null;
+    const tryStream = file.streamUrl || null;
+    const tryUrl = file.url || null;
+    // Prefer a public /storage URL when we have a storage path
+    try {
+        // If file.path exists, map it to the public storage URL and return an absolute, encoded path
+        if (file.path) {
+            // common case: file.path is like 'bot/xxx.txt'
+            const storagePath = '/storage/' + file.path.replace(/^\//, '');
+            return ensureLeadingSlashIfLocal(storagePath);
+        }
+
+        // If file.url is provided, normalize storage URLs to local /storage/ path
+        if (tryUrl) {
+            const s = sanitizeUrl(tryUrl) || tryUrl;
+            try {
+                const parsed = new URL(s, window.location.origin);
+                // If the URL's pathname contains /storage/, extract that portion and return a local storage path
+                if (parsed.pathname && parsed.pathname.includes('/storage/')) {
+                    const after = parsed.pathname.substring(parsed.pathname.indexOf('/storage/') + '/storage/'.length);
+                    const storagePath = '/storage/' + after.replace(/^\//, '');
+                    return ensureLeadingSlashIfLocal(storagePath);
+                }
+            } catch (e) {
+                // not an absolute URL, fall back
+            }
+            // Always normalize the candidate via ensureLeadingSlashIfLocal.
+            // This will add a leading slash for relative paths (so 'bot/..' -> '/bot/...')
+            // and will return external http(s) URLs unchanged.
+            return ensureLeadingSlashIfLocal(s);
+        }
+
+        // If streamer URL is present, use it as a fallback
+        if (preferStream && tryStream) {
+            const s = sanitizeUrl(tryStream) || tryStream;
+            return ensureLeadingSlashIfLocal(s);
+        }
+
+        // Last resort: try to build a stream query using original_name
+        if (file.original_name) return '/chat/attachments?path=' + encodeURIComponent(file.original_name);
+    } catch (e) {
+        // fallback to existing heuristics
+        if (preferStream && tryStream) return ensureLeadingSlashIfLocal(sanitizeUrl(tryStream) || tryStream);
+        if (tryUrl) return ensureLeadingSlashIfLocal(sanitizeUrl(tryUrl) || tryUrl);
+        if (file.path) return '/chat/attachments?path=' + encodeURIComponent(file.path);
+        if (file.original_name) return '/chat/attachments?path=' + encodeURIComponent(file.original_name);
+    }
+    return null;
 }
 
 function prefetchFilePreview(file) {
@@ -132,6 +225,29 @@ function prefetchFilePreview(file) {
 function normalizeMessage(msg) {
     if (!msg || typeof msg !== 'object') return msg;
     if (msg.type === 'file' && msg.file) {
+        // If attachment_id is present but file lacks path/url, fetch metadata
+        if (msg.file.attachment_id && !msg.file.path && !msg.file.url) {
+            // asynchronous fetch (best-effort, don't block rendering)
+            (async () => {
+                try {
+                    const res = await axios.get(`/attachments/${msg.file.attachment_id}`);
+                    if (res && res.data) {
+                        const a = res.data;
+                        // merge fields
+                        msg.file.path = msg.file.path || a.path || null;
+                        msg.file.url = msg.file.url || (a.path ? '/storage/' + a.path : null) || a.url || null;
+                        msg.file.mime = msg.file.mime || a.mime_type || a.mime || null;
+                        msg.file.size = msg.file.size || a.size || null;
+                        if (!msg.file.streamUrl) msg.file.streamUrl = buildStreamUrl(msg.file);
+                        try {
+                            prefetchFilePreview(msg.file);
+                        } catch (e) {}
+                    }
+                } catch (e) {
+                    // ignore fetch errors
+                }
+            })();
+        }
         if (!msg.file.streamUrl) msg.file.streamUrl = buildStreamUrl(msg.file);
         try {
             prefetchFilePreview(msg.file);
@@ -452,7 +568,8 @@ function handleDragLeave(e) {
 function openFileModal(file) {
     if (!file) return;
     if (props.openAttachmentFn) return props.openAttachmentFn(file);
-    const streamUrl = `/chat/attachments?path=${encodeURIComponent(file.path || file.url || file.thumb_path || file.original_name)}`;
+    const streamUrl =
+        attachmentHref(file, false) || `/chat/attachments?path=${encodeURIComponent(file.path || file.url || file.thumb_path || file.original_name)}`;
     fileModal.value.open = true;
     fileModal.value.file = { ...file, streamUrl };
     if (file.mime && typeof file.mime === 'string' && file.mime.startsWith('text/')) {
@@ -469,6 +586,33 @@ function openFileModal(file) {
 function closeFileModal() {
     fileModal.value.open = false;
     fileModal.value.file = null;
+}
+
+// Request deletion of an attachment shown in the modal or in-message
+async function requestDeleteAttachment(file) {
+    if (!file) return;
+    // If parent provided a handler, call it
+    if (props.deleteAttachmentFn) {
+        try {
+            await props.deleteAttachmentFn(file);
+        } catch (e) {
+            console.error('deleteAttachmentFn failed', e);
+        }
+        // close modal after parent handled deletion
+        closeFileModal();
+        return;
+    }
+
+    // Fallback: try to remove message referencing this file from internal messages
+    try {
+        const idx = messages.value.findIndex(
+            (m) => m.file && (m.file.path === file.path || m.file.url === file.url || m.file.original_name === file.original_name),
+        );
+        if (idx >= 0) messages.value.splice(idx, 1);
+    } catch (e) {
+        console.error('local delete fallback failed', e);
+    }
+    closeFileModal();
 }
 
 // send message
@@ -611,6 +755,7 @@ onUnmounted(() => {
                     }
                 "
                 :data-last="idx === displayedMessages.length - 1"
+                :data-file-path="msg.file ? msg.file.path || msg.file.url || msg.file.original_name : null"
                 class="mb-3 flex"
                 :class="isOwnMessage(msg) ? 'justify-start' : 'justify-end'"
             >
@@ -620,7 +765,7 @@ onUnmounted(() => {
                             {{ (msg.user_name || '').charAt(0).toUpperCase() }}
                         </div>
                     </div>
-                    <div :class="isOwnMessage(msg) ? 'chat-bubble-own' : 'chat-bubble-other'" class="chat-bubble relative">
+                    <div :class="['chat-bubble relative', isOwnMessage(msg) ? 'chat-bubble-own' : 'chat-bubble-other']">
                         <div class="relative mb-1">
                             <span
                                 v-if="!msg.is_read && msg.user_id !== props.user.id"
@@ -630,79 +775,95 @@ onUnmounted(() => {
                         </div>
                         <div class="break-words text-sm leading-relaxed">
                             <template v-if="msg.type === 'file' && msg.file">
-                                <div class="flex items-center gap-3">
-                                    <div class="relative flex h-36 w-36 items-center justify-center overflow-hidden rounded border bg-gray-100">
-                                        <template v-if="msg.uploading">
-                                            <div class="flex h-full w-full flex-col items-center justify-center">
-                                                <svg
-                                                    class="h-6 w-6 animate-spin text-gray-600"
-                                                    xmlns="http://www.w3.org/2000/svg"
-                                                    fill="none"
-                                                    viewBox="0 0 24 24"
-                                                >
-                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
-                                                </svg>
-                                                <div class="mt-2 text-xs text-gray-600">ファイルをアップロードしています…</div>
-                                                <div class="mt-2 w-20 overflow-hidden rounded-full bg-gray-200">
-                                                    <div class="h-1 bg-blue-600" :style="{ width: (msg._progress || 0) + '%' }"></div>
-                                                </div>
-                                            </div>
-                                        </template>
-                                        <template v-else>
-                                            <template v-if="msg.file.mime && msg.file.mime.startsWith('image/')">
-                                                <img
-                                                    :src="msg.file.streamUrl || msg.file.url"
-                                                    class="h-full w-full cursor-pointer object-cover"
-                                                    @click="openFileModal(msg.file)"
-                                                />
-                                            </template>
-                                            <template v-else-if="msg.file.mime && msg.file.mime === 'application/pdf'">
-                                                <div
-                                                    class="flex h-full w-full cursor-pointer items-center justify-center text-sm text-gray-700"
-                                                    @click="openFileModal(msg.file)"
-                                                >
-                                                    PDF プレビュー
-                                                </div>
-                                            </template>
-                                            <template v-else-if="msg.file.mime && msg.file.mime.startsWith('text/')">
-                                                <div class="h-full w-full cursor-pointer p-2 text-sm text-gray-700" @click="openFileModal(msg.file)">
-                                                    <pre class="max-h-24 overflow-auto whitespace-pre-wrap text-xs">{{ msg.file.original_name }}</pre>
+                                <div class="rounded border bg-gray-50 p-3">
+                                    <div class="flex items-center gap-3">
+                                        <div class="relative flex h-14 w-14 items-center justify-center overflow-hidden rounded border bg-gray-100">
+                                            <template v-if="msg.uploading">
+                                                <div class="flex h-full w-full flex-col items-center justify-center">
+                                                    <svg
+                                                        class="h-10 w-10 animate-spin text-gray-600"
+                                                        xmlns="http://www.w3.org/2000/svg"
+                                                        fill="none"
+                                                        viewBox="0 0 24 24"
+                                                    >
+                                                        <circle
+                                                            class="opacity-25"
+                                                            cx="12"
+                                                            cy="12"
+                                                            r="10"
+                                                            stroke="currentColor"
+                                                            stroke-width="4"
+                                                        ></circle>
+                                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                                                    </svg>
+                                                    <div class="mt-2 text-xs text-gray-600">ファイルをアップロードしています…</div>
+                                                    <div class="mt-2 w-20 overflow-hidden rounded-full bg-gray-200">
+                                                        <div class="h-1 bg-blue-600" :style="{ width: (msg._progress || 0) + '%' }"></div>
+                                                    </div>
                                                 </div>
                                             </template>
                                             <template v-else>
-                                                <div class="px-2 text-xs text-gray-600">{{ msg.file.original_name }}</div>
+                                                <!-- シンプルなアイコン表示に統一：内部に文字は入れず、クリックでプレビューを開く -->
+                                                <div
+                                                    class="flex h-full w-full cursor-pointer items-center justify-center text-gray-600"
+                                                    @click="openFileModal(msg.file)"
+                                                >
+                                                    <svg
+                                                        class="h-10 w-10 text-gray-400"
+                                                        xmlns="http://www.w3.org/2000/svg"
+                                                        viewBox="0 0 24 24"
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                        stroke-width="1.5"
+                                                        stroke-linecap="round"
+                                                        stroke-linejoin="round"
+                                                    >
+                                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                                        <path d="M14 2v6h6" />
+                                                    </svg>
+                                                </div>
                                             </template>
-                                        </template>
-                                    </div>
-                                    <div class="flex-1">
-                                        <div class="font-medium">{{ msg.file.original_name }}</div>
-                                        <div class="text-sm text-gray-500">{{ (msg.file.size / 1024).toFixed(1) }} KB</div>
-                                        <div class="mt-2">
-                                            <a
-                                                :href="
-                                                    msg.file.streamUrl ||
-                                                    '/chat/attachments?path=' +
-                                                        encodeURIComponent(
-                                                            msg.file.path || msg.file.url || msg.file.thumb_path || msg.file.original_name,
-                                                        )
-                                                "
-                                                target="_blank"
-                                                class="mr-3 text-blue-600 underline"
-                                                >開く</a
-                                            >
-                                            <a
-                                                :href="
-                                                    msg.file.streamUrl ||
-                                                    '/chat/attachments?path=' +
-                                                        encodeURIComponent(
-                                                            msg.file.path || msg.file.url || msg.file.thumb_path || msg.file.original_name,
-                                                        )
-                                                "
-                                                :download="msg.file.original_name"
-                                                class="text-gray-600"
-                                                >ダウンロード</a
-                                            >
+                                        </div>
+                                        <div class="flex-1">
+                                            <div class="font-medium">{{ msg.file.original_name }}</div>
+                                            <div class="text-sm text-gray-500">
+                                                <span class="mr-3">{{ (msg.file.size / 1024).toFixed(1) }} KB</span>
+                                                <span class="text-xs text-gray-400">{{ msg.file.mime || 'unknown' }}</span>
+                                            </div>
+                                            <div class="mt-2">
+                                                <button
+                                                    @click.prevent="
+                                                        (props.referenceFn
+                                                            ? props.referenceFn
+                                                            : props.openAttachmentFn
+                                                              ? props.openAttachmentFn
+                                                              : openFileModal)(msg.file)
+                                                    "
+                                                    class="mr-3 text-sm text-blue-600 underline"
+                                                >
+                                                    参照
+                                                </button>
+                                                <!-- '開く' は UI から削除 (ダウンロードは残す) -->
+                                                <!-- ダウンロード: 既存の '開く' 挙動（元の優先順）を使ってダウンロードさせる -->
+                                                <a
+                                                    :href="attachmentHref(msg.file, false)"
+                                                    :download="msg.file.original_name"
+                                                    class="mr-3 text-gray-600"
+                                                    >ダウンロード</a
+                                                >
+
+                                                <template v-if="props.summarizeFn">
+                                                    <button
+                                                        @click.prevent="props.summarizeFn(msg.file)"
+                                                        class="ml-1 rounded bg-indigo-600 px-2 py-1 text-xs text-white"
+                                                    >
+                                                        要約
+                                                    </button>
+                                                </template>
+                                                <button @click.prevent="requestDeleteAttachment(msg.file)" class="ml-2 text-sm text-red-600">
+                                                    削除
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -716,18 +877,18 @@ onUnmounted(() => {
         </template>
         <!-- AI working / typing indicator -->
         <div v-if="props.aiWorking" class="mb-3 flex justify-end" aria-live="polite">
-            <div class="flex items-end flex-row-reverse">
-                <div class="flex-shrink-0 ml-3">
+            <div class="flex flex-row-reverse items-end">
+                <div class="ml-3 flex-shrink-0">
                     <div class="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-sm font-semibold text-gray-700">AI</div>
                 </div>
                 <div class="chat-bubble-other chat-bubble relative">
                     <div class="break-words text-sm leading-relaxed">
                         <div class="flex items-center gap-2">
                             <div class="h-3 w-12 rounded-full bg-gray-100 px-2 py-1">
-                                <div class="typing-dots flex gap-1 items-center justify-center">
-                                    <span class="dot h-2 w-2 rounded-full bg-gray-500 animate-bounce" style="animation-delay:0s"></span>
-                                    <span class="dot h-2 w-2 rounded-full bg-gray-500 animate-bounce" style="animation-delay:0.12s"></span>
-                                    <span class="dot h-2 w-2 rounded-full bg-gray-500 animate-bounce" style="animation-delay:0.24s"></span>
+                                <div class="typing-dots flex items-center justify-center gap-1">
+                                    <span class="dot h-2 w-2 animate-bounce rounded-full bg-gray-500" style="animation-delay: 0s"></span>
+                                    <span class="dot h-2 w-2 animate-bounce rounded-full bg-gray-500" style="animation-delay: 0.12s"></span>
+                                    <span class="dot h-2 w-2 animate-bounce rounded-full bg-gray-500" style="animation-delay: 0.24s"></span>
                                 </div>
                             </div>
                             <div class="text-xs text-gray-500">AIが応答中…</div>
@@ -768,21 +929,20 @@ onUnmounted(() => {
             <div class="mb-4 flex items-center justify-between">
                 <div class="font-bold">{{ fileModal.file?.original_name || 'プレビュー' }}</div>
                 <div>
-                    <a
-                        :href="fileModal.file?.streamUrl || fileModal.file?.url"
-                        :download="fileModal.file?.original_name"
-                        class="mr-3 text-sm text-gray-700"
+                    <a :href="attachmentHref(fileModal.file, true)" :download="fileModal.file?.original_name" class="mr-3 text-sm text-gray-700"
                         >ダウンロード</a
-                    ><button @click="closeFileModal" class="rounded border px-3 py-1 text-gray-700">閉じる</button>
+                    >
+                    <button @click="requestDeleteAttachment(fileModal.file)" class="mr-3 rounded border px-3 py-1 text-red-700">削除</button>
+                    <button @click="closeFileModal" class="rounded border px-3 py-1 text-gray-700">閉じる</button>
                 </div>
             </div>
             <div class="max-h-[70vh] overflow-auto">
                 <template v-if="fileModal.file">
                     <template v-if="fileModal.file.mime && fileModal.file.mime.startsWith('image/')">
-                        <img :src="fileModal.file.streamUrl || fileModal.file.url" class="h-auto w-full object-contain" />
+                        <img :src="attachmentHref(fileModal.file, false)" class="h-auto w-full object-contain" />
                     </template>
                     <template v-else-if="fileModal.file.mime && fileModal.file.mime === 'application/pdf'">
-                        <iframe :src="fileModal.file.streamUrl" class="h-[70vh] w-full" frameborder="0"></iframe>
+                        <iframe :src="attachmentHref(fileModal.file, false)" class="h-[70vh] w-full" frameborder="0"></iframe>
                     </template>
                     <template v-else-if="fileModal.file.mime && fileModal.file.mime.startsWith('text/')">
                         <div class="max-h-[70vh] overflow-auto whitespace-pre-wrap p-4 font-mono text-sm text-gray-800">

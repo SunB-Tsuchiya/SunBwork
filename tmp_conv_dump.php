@@ -8,7 +8,10 @@ use App\Models\AiConversation;
 use App\Models\AiMessage;
 
 $conv = AiConversation::with('messages')->find(5);
-if (!$conv) { echo json_encode(['error'=>'not found']); exit(0); }
+if (!$conv) {
+    echo json_encode(['error' => 'not found']);
+    exit(0);
+}
 $arr = $conv->toArray();
 // sanitize meta similar to AiHistoryController::showJson
 if (!empty($arr['messages']) && is_array($arr['messages'])) {
@@ -30,4 +33,4 @@ if (!empty($arr['messages']) && is_array($arr['messages'])) {
         }
     }
 }
-echo json_encode($arr, JSON_UNESCAPED_UNICODE|JSON_PRETTY_PRINT);
+echo json_encode($arr, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);

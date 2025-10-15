@@ -35,7 +35,9 @@ class Event extends Model
 
     public function attachments()
     {
-        return $this->hasMany(Attachment::class, 'event_id');
+        return $this->morphToMany(Attachment::class, 'attachable', 'attachmentables')
+            ->withPivot(['role', 'order'])
+            ->withTimestamps();
     }
 
     /**

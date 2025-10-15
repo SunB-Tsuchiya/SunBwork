@@ -10,6 +10,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Support\Facades\Storage;
 use Intervention\Image\ImageManager;
 use App\Models\Attachment;
+use Illuminate\Support\Facades\DB;
 
 class ProcessUploadJob implements ShouldQueue
 {
@@ -24,6 +25,74 @@ class ProcessUploadJob implements ShouldQueue
         $this->tmpPath = $tmpPath;
         $this->attachmentId = $attachmentId;
         $this->type = $type;
+    }
+
+    /**
+     * Update the Attachment record and create polymorphic links in attachmentables
+     * based on existing diary_id/event_id/message_id or owner_type/owner_id.
+     */
+    protected function finalizeAttachment(array $attrs): void
+    {
+        // Update the attachment
+        Attachment::where('id', $this->attachmentId)->update($attrs);
+
+        // Retrieve current attachment row to inspect linkage columns
+        $a = Attachment::find($this->attachmentId);
+        if (!$a) return;
+
+        $now = now();
+        $toInsert = [];
+
+        if ($a->message_id) {
+            $toInsert[] = [
+                'attachment_id' => $a->id,
+                'attachable_type' => \App\Models\Message::class,
+                'attachable_id' => $a->message_id,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+        if ($a->diary_id) {
+            $toInsert[] = [
+                'attachment_id' => $a->id,
+                'attachable_type' => \App\Models\Diary::class,
+                'attachable_id' => $a->diary_id,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+        if ($a->event_id) {
+            $toInsert[] = [
+                'attachment_id' => $a->id,
+                'attachable_type' => \App\Models\Event::class,
+                'attachable_id' => $a->event_id,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        // If owner_type/owner_id point to a model, consider creating pivot as well when appropriate
+        if ($a->owner_type && $a->owner_id) {
+            // Only create pivot when owner_type is a recognized attachable model
+            $allowed = [\App\Models\Diary::class, \App\Models\Event::class, \App\Models\Message::class, \App\Models\User::class];
+            if (in_array($a->owner_type, $allowed, true)) {
+                $toInsert[] = [
+                    'attachment_id' => $a->id,
+                    'attachable_type' => $a->owner_type,
+                    'attachable_id' => $a->owner_id,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+            }
+        }
+
+        if (!empty($toInsert)) {
+            // Use insertOrIgnore to avoid duplicates on repeated job runs
+            $chunks = array_chunk($toInsert, 200);
+            foreach ($chunks as $chunk) {
+                DB::table('attachmentables')->insertOrIgnore($chunk);
+            }
+        }
     }
 
     public function handle()
@@ -117,7 +186,7 @@ class ProcessUploadJob implements ShouldQueue
         $originalName = basename($tmpPath);
         $ext = pathinfo($originalName, PATHINFO_EXTENSION) ?: '';
 
-        $denyExt = ['php','php3','php4','phtml','exe','sh','bat','cmd','scr'];
+        $denyExt = ['php', 'php3', 'php4', 'phtml', 'exe', 'sh', 'bat', 'cmd', 'scr'];
         if (in_array(strtolower($ext), $denyExt)) {
             Attachment::where('id', $this->attachmentId)->update(['status' => 'rejected']);
             @unlink($fullTmp);
@@ -156,24 +225,24 @@ class ProcessUploadJob implements ShouldQueue
                         $encoder = new \Intervention\Image\Encoders\JpegEncoder(80);
                     }
                     $encoded = $img->encode($encoder);
-                        Storage::disk('public')->put($finalPath, (string) $encoded->toDataUri() ? base64_decode(preg_replace('#^data:.*?;base64,#', '', $encoded->toDataUri())) : (string) $encoded);
-                        // ensure public visibility and file permissions when using local driver
-                        try {
-                            Storage::disk('public')->setVisibility($finalPath, 'public');
-                            $real = Storage::disk('public')->path($finalPath) ?? null;
-                            if ($real && file_exists($real)) {
-                                @chmod($real, 0644);
-                            }
-                        } catch (\Throwable $_permEx) {
-                            logger()->warning('ProcessUploadJob: could not set permissions', [
-                                'attachment_id' => $this->attachmentId,
-                                'path' => $finalPath,
-                                'error' => $_permEx->getMessage(),
-                            ]);
+                    Storage::disk('public')->put($finalPath, (string) $encoded->toDataUri() ? base64_decode(preg_replace('#^data:.*?;base64,#', '', $encoded->toDataUri())) : (string) $encoded);
+                    // ensure public visibility and file permissions when using local driver
+                    try {
+                        Storage::disk('public')->setVisibility($finalPath, 'public');
+                        $real = Storage::disk('public')->path($finalPath) ?? null;
+                        if ($real && file_exists($real)) {
+                            @chmod($real, 0644);
                         }
+                    } catch (\Throwable $_permEx) {
+                        logger()->warning('ProcessUploadJob: could not set permissions', [
+                            'attachment_id' => $this->attachmentId,
+                            'path' => $finalPath,
+                            'error' => $_permEx->getMessage(),
+                        ]);
+                    }
                     $size = Storage::disk('public')->size($finalPath);
                     @unlink($fullTmp);
-                    Attachment::where('id', $this->attachmentId)->update([
+                    $this->finalizeAttachment([
                         'path' => $finalPath,
                         'mime_type' => $mime,
                         'size' => $size,
@@ -228,7 +297,7 @@ class ProcessUploadJob implements ShouldQueue
                 Storage::disk('public')->put($finalPath, $out);
                 $size = Storage::disk('public')->size($finalPath);
                 @unlink($fullTmp);
-                Attachment::where('id', $this->attachmentId)->update([
+                $this->finalizeAttachment([
                     'path' => $finalPath,
                     'mime_type' => $mime,
                     'size' => $size,
@@ -251,7 +320,7 @@ class ProcessUploadJob implements ShouldQueue
         if ($moved) {
             $size = Storage::disk('public')->size($moved);
             @unlink($fullTmp);
-            Attachment::where('id', $this->attachmentId)->update([
+            $this->finalizeAttachment([
                 'path' => $moved,
                 'mime_type' => $mime,
                 'size' => $size,

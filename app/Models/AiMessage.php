@@ -9,7 +9,7 @@ class AiMessage extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['ai_conversation_id','user_id','role','content','meta','char_count'];
+    protected $fillable = ['ai_conversation_id', 'user_id', 'role', 'content', 'meta', 'char_count'];
 
     protected $casts = [
         'meta' => 'array'

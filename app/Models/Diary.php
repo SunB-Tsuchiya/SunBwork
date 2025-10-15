@@ -32,7 +32,9 @@ class Diary extends Model
      */
     public function attachments()
     {
-        return $this->hasMany(Attachment::class, 'diary_id');
+        return $this->morphToMany(Attachment::class, 'attachable', 'attachmentables')
+            ->withPivot(['role', 'order'])
+            ->withTimestamps();
     }
 
     /**
