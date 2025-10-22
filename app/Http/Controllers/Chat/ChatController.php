@@ -250,7 +250,8 @@ class ChatController extends Controller
             $uuid = Str::uuid()->toString();
             $storedName = $uuid . '_' . $orig;
             // storeAs will preserve multibyte names correctly
-            $path = $file->storeAs('chat', $storedName, 'public');
+            // Save chat uploads into the shared attachments/ directory so all attachments are centralized
+            $path = $file->storeAs('attachments', $storedName, 'public');
             $url = Storage::url($path);
             $meta = [
                 'url' => $url,
@@ -259,61 +260,16 @@ class ChatController extends Controller
                 'size' => $file->getSize(),
                 'path' => $path,
             ];
-            // 画像ならサムネイルを作成（Intervention Image が無ければスキップ）
-            if (str_starts_with($file->getClientMimeType(), 'image/')) {
-                if (class_exists(\Intervention\Image\ImageManager::class)) {
-                    try {
-                        if (extension_loaded('imagick') && class_exists(\Intervention\Image\Drivers\Imagick\Driver::class)) {
-                            $manager = ImageManager::imagick();
-                        } else {
-                            $manager = ImageManager::gd();
-                        }
-                        // create Intervention image instance from uploaded file
-                        /** @var \Intervention\Image\Image $img */
-                        $img = $manager->read($file);
-                        // auto-orient and fit to a thumbnail size
-                        if (method_exists($img, 'orientate')) {
-                            // @phpstan-ignore-next-line
-                            $img->orientate();
-                        }
-                        if (method_exists($img, 'fit')) {
-                            // @phpstan-ignore-next-line
-                            $img->fit(400, 400, function ($constraint) {
-                                $constraint->upsize();
-                            });
-                        }
-                        $thumbPath = 'chat/thumbs/' . basename($path);
-                        // Choose encoder
-                        $thumbEncoder = new \Intervention\Image\Encoders\JpegEncoder(80);
-                        $thumbEncoded = $img->encode($thumbEncoder);
-                        $thumbBin = (string) $thumbEncoded->toDataUri() ? base64_decode(preg_replace('#^data:.*?;base64,#', '', $thumbEncoded->toDataUri())) : (string) $thumbEncoded;
-                        Storage::disk('public')->put($thumbPath, $thumbBin);
-                        try {
-                            Storage::disk('public')->setVisibility($thumbPath, 'public');
-                            $realThumb = Storage::disk('public')->path($thumbPath) ?? null;
-                            if ($realThumb && file_exists($realThumb)) {
-                                @chmod($realThumb, 0644);
-                            }
-                        } catch (\Throwable $_exPerm) {
-                            Log::warning('thumb permission set failed', ['path' => $thumbPath, 'error' => $_exPerm->getMessage()]);
-                        }
-                        $meta['thumb_url'] = Storage::url($thumbPath);
-                        $meta['thumb_path'] = $thumbPath;
-                        $meta['thumb_url'] = Storage::url($thumbPath);
-                        $meta['thumb_path'] = $thumbPath;
-                    } catch (\Exception $ex) {
-                        // サムネ作成失敗しても本体は保存済みなので処理を続行
-                        Log::error('thumb create failed', [
-                            'path' => $path,
-                            'thumb_dest' => isset($thumbPath) ? $thumbPath : null,
-                            'error' => $ex->getMessage(),
-                            'exception_class' => get_class($ex),
-                            'trace' => $ex->getTraceAsString(),
-                        ]);
-                    }
-                } else {
-                    Log::warning('Intervention Image not available; skipping thumbnail creation');
+            // Delegate thumbnail creation to AttachmentService so chat and bot share the same logic
+            try {
+                $svc = new \App\Services\AttachmentService();
+                $thumb = $svc->createThumbnailFromDiskPath($path);
+                if (!empty($thumb)) {
+                    $meta['thumb_path'] = $thumb['thumb_path'];
+                    $meta['thumb_url'] = $thumb['thumb_url'];
                 }
+            } catch (\Throwable $__e) {
+                Log::warning('ChatController: thumbnail delegation failed: ' . $__e->getMessage());
             }
 
             // Create Attachment DB record if attachments table/model exists
@@ -340,10 +296,11 @@ class ChatController extends Controller
                 'body' => json_encode($meta),
                 'type' => 'file',
             ]);
-            // If an Attachment row was created, link it to this ChatMessage via polymorphic pivot
+            // If an Attachment row was created, link it to this ChatMessage via AttachmentService pivot helper
             try {
-                if (!empty($attach) && method_exists($attach, 'attachTo')) {
-                    $attach->attachTo($msg);
+                if (!empty($attach) && !empty($attach->id)) {
+                    $svc = new \App\Services\AttachmentService();
+                    $svc->attachPivot($attach->id, \App\Models\ChatMessage::class, $msg->id);
                 }
             } catch (\Throwable $_e) {
                 Log::warning('ChatController: failed to attach Attachment to ChatMessage', ['attachment_id' => $attach->id ?? null, 'chat_message_id' => $msg->id, 'error' => $_e->getMessage()]);
@@ -373,7 +330,16 @@ class ChatController extends Controller
         if ($msg->type === 'file') {
             $decoded = json_decode($msg->body, true);
             if (is_array($decoded)) {
-                $response['file'] = $this->sanitizeFileMeta($decoded) ?? null;
+                // Prefer a sanitized file meta but keep original decoded as fallback
+                $fileMeta = $this->sanitizeFileMeta($decoded) ?? $decoded;
+                // If an attachment DB id exists in the decoded payload, ensure it's exposed so frontend can call DELETE
+                if (isset($decoded['attachment_id'])) {
+                    $fileMeta['attachment_id'] = $decoded['attachment_id'];
+                } elseif (isset($attach) && !empty($attach->id)) {
+                    // fallback to the $attach created earlier in this request
+                    $fileMeta['attachment_id'] = $attach->id;
+                }
+                $response['file'] = $fileMeta;
                 // 表示用メッセージは元のファイル名を使う
                 $response['message'] = ($response['file']['original_name'] ?? $decoded['original_name'] ?? $response['message']);
             } else {
@@ -390,26 +356,29 @@ class ChatController extends Controller
     public function streamAttachment(Request $request)
     {
         $user = $request->user();
-        // クエリパラメータ ?path=chat/xxx を期待
+        // クエリパラメータ ?path=chat/xxx または ?path=attachments/xxx を期待
         $path = $request->query('path');
         if (!$path) {
             abort(400, 'path is required');
         }
         // 危険なパスを回避
         $path = ltrim($path, '\/');
-        // only allow files under chat/ inside public disk
-        if (!str_starts_with($path, 'chat/')) {
-            // 直書きの場合は chat/ を補う
-            $path = 'chat/' . $path;
+        // allow files under chat/ or attachments/
+        if (!str_starts_with($path, 'chat/') && !str_starts_with($path, 'attachments/')) {
+            // treat bare names as attachments/ by default
+            $path = 'attachments/' . $path;
         }
 
         if (!Storage::disk('public')->exists($path)) {
             // Fallback: the stored files may have UUID_ prefix (e.g. <uuid>_original_name)
-            // If the exact path doesn't exist, try to find a file under chat/ whose name ends with the requested basename
+            // If the exact path doesn't exist, try to find a file under attachments/ or chat/ whose name ends with the requested basename
             try {
                 $requestedBasename = basename($path);
-                $files = Storage::disk('public')->files('chat');
-                foreach ($files as $f) {
+                $candidates = array_merge(
+                    Storage::disk('public')->files('attachments'),
+                    Storage::disk('public')->files('chat')
+                );
+                foreach ($candidates as $f) {
                     if (str_ends_with($f, $requestedBasename)) {
                         $path = $f;
                         break;

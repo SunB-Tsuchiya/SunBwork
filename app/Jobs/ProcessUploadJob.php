@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Storage;
 use Intervention\Image\ImageManager;
 use App\Models\Attachment;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use App\Services\AttachmentService;
 
 class ProcessUploadJob implements ShouldQueue
 {
@@ -19,12 +21,14 @@ class ProcessUploadJob implements ShouldQueue
     protected $tmpPath;
     protected $attachmentId;
     protected $type;
+    protected $uploaderId;
 
-    public function __construct(string $tmpPath, int $attachmentId, ?string $type = null)
+    public function __construct(string $tmpPath, int $attachmentId, ?string $type = null, ?int $uploaderId = null)
     {
         $this->tmpPath = $tmpPath;
         $this->attachmentId = $attachmentId;
         $this->type = $type;
+        $this->uploaderId = $uploaderId;
     }
 
     /**
@@ -34,64 +38,21 @@ class ProcessUploadJob implements ShouldQueue
     protected function finalizeAttachment(array $attrs): void
     {
         // Update the attachment
+        // ensure user_id is set when available
+        if (!empty($this->uploaderId)) {
+            $attrs['user_id'] = $this->uploaderId;
+        }
         Attachment::where('id', $this->attachmentId)->update($attrs);
 
-        // Retrieve current attachment row to inspect linkage columns
+        // Retrieve current attachment row and delegate any legacy->pivot work to the service
         $a = Attachment::find($this->attachmentId);
         if (!$a) return;
-
-        $now = now();
-        $toInsert = [];
-
-        if ($a->message_id) {
-            $toInsert[] = [
-                'attachment_id' => $a->id,
-                'attachable_type' => \App\Models\Message::class,
-                'attachable_id' => $a->message_id,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ];
-        }
-        if ($a->diary_id) {
-            $toInsert[] = [
-                'attachment_id' => $a->id,
-                'attachable_type' => \App\Models\Diary::class,
-                'attachable_id' => $a->diary_id,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ];
-        }
-        if ($a->event_id) {
-            $toInsert[] = [
-                'attachment_id' => $a->id,
-                'attachable_type' => \App\Models\Event::class,
-                'attachable_id' => $a->event_id,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ];
-        }
-
-        // If owner_type/owner_id point to a model, consider creating pivot as well when appropriate
-        if ($a->owner_type && $a->owner_id) {
-            // Only create pivot when owner_type is a recognized attachable model
-            $allowed = [\App\Models\Diary::class, \App\Models\Event::class, \App\Models\Message::class, \App\Models\User::class];
-            if (in_array($a->owner_type, $allowed, true)) {
-                $toInsert[] = [
-                    'attachment_id' => $a->id,
-                    'attachable_type' => $a->owner_type,
-                    'attachable_id' => $a->owner_id,
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ];
-            }
-        }
-
-        if (!empty($toInsert)) {
-            // Use insertOrIgnore to avoid duplicates on repeated job runs
-            $chunks = array_chunk($toInsert, 200);
-            foreach ($chunks as $chunk) {
-                DB::table('attachmentables')->insertOrIgnore($chunk);
-            }
+        try {
+            $svc = new AttachmentService();
+            $svc->ensurePivotFromLegacy($a);
+        } catch (\Throwable $__e) {
+            // non-fatal: log and continue
+            logger()->warning('ProcessUploadJob: ensurePivotFromLegacy failed: ' . $__e->getMessage());
         }
     }
 
@@ -225,7 +186,13 @@ class ProcessUploadJob implements ShouldQueue
                         $encoder = new \Intervention\Image\Encoders\JpegEncoder(80);
                     }
                     $encoded = $img->encode($encoder);
-                    Storage::disk('public')->put($finalPath, (string) $encoded->toDataUri() ? base64_decode(preg_replace('#^data:.*?;base64,#', '', $encoded->toDataUri())) : (string) $encoded);
+                    // write encoded bytes directly
+                    try {
+                        Storage::disk('public')->put($finalPath, (string) $encoded);
+                    } catch (\Throwable $_putEx) {
+                        // fallback to original approach
+                        Storage::disk('public')->put($finalPath, (string) $encoded->toDataUri() ? base64_decode(preg_replace('#^data:.*?;base64,#', '', $encoded->toDataUri())) : (string) $encoded);
+                    }
                     // ensure public visibility and file permissions when using local driver
                     try {
                         Storage::disk('public')->setVisibility($finalPath, 'public');
@@ -316,9 +283,12 @@ class ProcessUploadJob implements ShouldQueue
             }
         }
 
-        $moved = Storage::disk('public')->putFileAs($folder, new \Illuminate\Http\File($fullTmp), $unique);
-        if ($moved) {
-            $size = Storage::disk('public')->size($moved);
+        // Use AttachmentService to move local file into public storage; this centralizes naming
+        try {
+            $svc = new AttachmentService();
+            $meta = $svc->storeLocalFile($fullTmp, $this->uploaderId ? (object) ['id' => $this->uploaderId] : null, $folder, $unique, false);
+            $moved = $meta['path'];
+            $size = $meta['size'] ?? Storage::disk('public')->size($moved);
             @unlink($fullTmp);
             $this->finalizeAttachment([
                 'path' => $moved,
@@ -327,6 +297,20 @@ class ProcessUploadJob implements ShouldQueue
                 'status' => 'ready',
             ]);
             return;
+        } catch (\Throwable $e) {
+            // fallback to previous approach
+            $moved = Storage::disk('public')->putFileAs($folder, new \Illuminate\Http\File($fullTmp), $unique);
+            if ($moved) {
+                $size = Storage::disk('public')->size($moved);
+                @unlink($fullTmp);
+                $this->finalizeAttachment([
+                    'path' => $moved,
+                    'mime_type' => $mime,
+                    'size' => $size,
+                    'status' => 'ready',
+                ]);
+                return;
+            }
         }
         // If we reached here, moving failed. Log and mark failed.
         logger()->error('ProcessUploadJob could not move file to storage', [

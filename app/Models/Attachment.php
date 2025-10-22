@@ -17,20 +17,13 @@ class Attachment extends Model
     protected $fillable = [
         'path',
         'original_name',
-        'filename',
         'mime_type',
         'status',
         'size',
         'user_id',
         'created_by',
-        'owner_type',
-        'owner_id',
     ];
 
-    public function message()
-    {
-        return $this->belongsTo(\App\Models\Message::class, 'message_id');
-    }
 
     public function user()
     {

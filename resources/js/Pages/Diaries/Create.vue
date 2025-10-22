@@ -1,13 +1,25 @@
 <script setup>
+import useToasts from '@/Composables/useToasts';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, useForm } from '@inertiajs/vue3';
+import { QuillEditor } from '@vueup/vue-quill';
+import axios from 'axios';
 import 'quill/dist/quill.snow.css';
 import { ref, watch } from 'vue';
 import { route } from 'ziggy-js';
 
-import { defaultToolbar } from '@/config/quillToolbar';
-import { QuillEditor } from '@vueup/vue-quill';
-import axios from 'axios';
+// original toolbar configuration (kept for later use):
+// import { defaultToolbar } from '@/config/quillToolbar';
+
+// default-like toolbar (image insertion intentionally removed)
+const simpleToolbar = [
+    [{ header: [1, 2, 3, false] }],
+    ['bold', 'italic', 'underline', 'strike'],
+    [{ list: 'ordered' }, { list: 'bullet' }, { indent: '-1' }, { indent: '+1' }],
+    ['blockquote', 'code-block'],
+    [{ align: [] }],
+    ['clean'],
+];
 
 const props = defineProps({
     date: String,
@@ -247,12 +259,37 @@ function handleEditorReady(editor) {
     }
 }
 
+const { showToast, showValidationErrors } = useToasts();
+
 const submit = () => {
     const html = form.content?.trim() || '';
     if (html === '' || html === '<p><br></p>' || html === '<p></p>') {
         form.content = '';
     }
-    form.post(route('diaries.store'), { forceFormData: true });
+    form.post(route('diaries.store'), {
+        forceFormData: true,
+        onStart: () => {
+            try {
+                showToast('送信中...', 'info', 1000);
+            } catch (e) {}
+        },
+        onFinish: () => {},
+        onSuccess: () => {
+            try {
+                showToast('保存しました', 'success', 1500);
+            } catch (e) {}
+        },
+        onError: (errors) => {
+            try {
+                // show single combined validation message
+                showValidationErrors(errors, 6000);
+            } catch (e) {
+                try {
+                    showToast('保存に失敗しました', 'error', 4000);
+                } catch (ee) {}
+            }
+        },
+    });
 };
 
 function onInput(val) {
@@ -299,7 +336,7 @@ function stripHtml(html) {
                         <div @drop.prevent="handleDrop" @dragover.prevent="handleDragOver" class="rounded border bg-white p-1">
                             <QuillEditor
                                 theme="snow"
-                                :toolbar="defaultToolbar"
+                                :toolbar="simpleToolbar"
                                 style="min-height: 220px; height: 220px; background: #fff"
                                 v-model="form.content"
                                 @input="onInput"

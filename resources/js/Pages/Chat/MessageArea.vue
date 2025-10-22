@@ -21,7 +21,12 @@ const props = defineProps({
     // optional: handler passed by parent to request summarization of a file (meta object)
     summarizeFn: { type: Function, required: false },
     renderMarkdownFn: { type: Function, required: false },
+    // optional: width class to control outer container (matches SummaryPanel's widthClass)
+    widthClass: { type: String, default: 'w-full' },
+    // optional: parent can provide a function to open an upload modal; if present, use it instead of native picker
+    openUploadModal: { type: Function, required: false },
 });
+const emit = defineEmits(['request-open-upload']);
 
 // local state
 const messages = ref(Array.isArray(props.initialMessages) ? [...props.initialMessages] : []);
@@ -74,6 +79,7 @@ const isSending = ref(false);
 const sendCooldown = ref(false);
 const SEND_COOLDOWN_MS = 1000;
 const uploadProgress = ref({});
+const fileInput = ref(null);
 const fileModal = ref({ open: false, file: null });
 const messageArea = ref(null);
 const lastMessageRef = ref(null);
@@ -92,38 +98,62 @@ function buildStreamUrl(file) {
             if (inner.startsWith('bot/')) return `/bot/attachments?path=${encodeURIComponent(inner)}`;
             return `/chat/attachments?path=${encodeURIComponent(inner)}`;
         }
-        try {
-            const url = new URL(candidate, window.location.origin);
-            if (url.pathname && url.pathname.startsWith('/storage/')) {
-                const inner = url.pathname.replace(/^\/storage\//, '');
-                if (inner.startsWith('bot/')) return `/bot/attachments?path=${encodeURIComponent(inner)}`;
-                return `/chat/attachments?path=${encodeURIComponent(inner)}`;
-            }
-        } catch (e) {}
-        // If candidate explicitly names a bot path, use the bot stream endpoint
-        if (candidate.startsWith('bot/')) return `/bot/attachments?path=${encodeURIComponent(candidate)}`;
-        if (candidate.startsWith('chat/')) return `/chat/attachments?path=${encodeURIComponent(candidate)}`;
-        // If candidate is an absolute local path, return as-is (it should already be prefixed)
-        if (candidate.startsWith('/')) return candidate;
-        // Otherwise return as-is (could be a full URL or relative string)
-        return candidate;
     }
-    return null;
+    try {
+        const url = new URL(candidate, window.location.origin);
+        if (url.pathname && url.pathname.startsWith('/storage/')) {
+            const inner = url.pathname.replace(/^\/storage\//, '');
+            if (inner.startsWith('bot/')) return `/bot/attachments?path=${encodeURIComponent(inner)}`;
+            return `/chat/attachments?path=${encodeURIComponent(inner)}`;
+        }
+    } catch (e) {}
+    // If candidate explicitly names a bot path, use the bot stream endpoint
+    if (candidate.startsWith('bot/')) return `/bot/attachments?path=${encodeURIComponent(candidate)}`;
+    // If candidate references central attachments/, map to chat stream endpoint
+    if (candidate.startsWith('attachments/')) return `/chat/attachments?path=${encodeURIComponent(candidate)}`;
+    if (candidate.startsWith('chat/')) return `/chat/attachments?path=${encodeURIComponent(candidate)}`;
+    // If candidate is an absolute local path, return as-is (it should already be prefixed)
+    if (candidate.startsWith('/')) return candidate;
+    // Ensure any remaining relative local candidate becomes a leading-slash local path
+    return ensureLeadingSlashIfLocal(candidate);
+}
+
+/* Prefer public storage URL (Storage::url) for thumbnails when available,
+   fallback to stream endpoint when necessary. */
+function thumbnailSrc(file) {
+    if (!file) return null;
+    // prefer explicit thumb_url or url
+    const thumbUrl = file.thumb_url || file.url || null;
+    if (thumbUrl) {
+        const safe = sanitizeUrl(thumbUrl);
+        if (safe) return safe;
+        // if it's a local path starting with /storage, accept it
+        if (thumbUrl.startsWith('/')) return thumbUrl;
+    }
+    // prefer storage-relative path if provided
+    const thumbPath = file.thumb_path || file.path || null;
+    if (thumbPath && typeof thumbPath === 'string') {
+        // use chat stream endpoint instead of public storage path
+        return ensureUrlSafe('/chat/attachments?path=' + encodeURIComponent(thumbPath.replace(/^\//, '')));
+    }
+    // fallback to the stream endpoint builder
+    return buildStreamUrl(file);
 }
 
 function sanitizeUrl(u) {
     if (!u || typeof u !== 'string') return null;
     const s = u.trim();
+    // absolute local path
     if (s.startsWith('/')) return s;
-    try {
-        const parsed = new URL(s, window.location.origin);
-        const proto = parsed.protocol.toLowerCase();
-        if (proto === 'http:' || proto === 'https:' || proto === 'blob:') return parsed.toString();
-        if (proto === 'data:') {
-            if (/^data:image\//i.test(s)) return s;
-            return null;
-        }
+    // absolute http(s)/blob/data URLs -> allow specific schemes
+    if (/^https?:\/\//i.test(s) || /^blob:/i.test(s)) return s;
+    if (/^data:/i.test(s)) {
+        if (/^data:image\//i.test(s)) return s;
         return null;
+    }
+    // relative local paths like 'attachments/xxx' should be normalized to '/attachments/xxx'
+    try {
+        return ensureLeadingSlashIfLocal(s);
     } catch (e) {
         return null;
     }
@@ -177,28 +207,41 @@ function attachmentHref(file, preferStream = true) {
             } catch (e) {
                 // not an absolute URL, fall back
             }
-            // Always normalize the candidate via ensureLeadingSlashIfLocal.
-            // This will add a leading slash for relative paths (so 'bot/..' -> '/bot/...')
-            // and will return external http(s) URLs unchanged.
-            return ensureLeadingSlashIfLocal(s);
+            // Normalize the candidate via ensureUrlSafe so attachments/... becomes stream endpoint
+            // and relative local paths get a leading slash.
+            return ensureUrlSafe(s);
         }
 
         // If streamer URL is present, use it as a fallback
         if (preferStream && tryStream) {
             const s = sanitizeUrl(tryStream) || tryStream;
-            return ensureLeadingSlashIfLocal(s);
+            return ensureUrlSafe(s);
         }
 
         // Last resort: try to build a stream query using original_name
-        if (file.original_name) return '/chat/attachments?path=' + encodeURIComponent(file.original_name);
+        if (file.original_name) return ensureUrlSafe('/chat/attachments?path=' + encodeURIComponent(file.original_name));
     } catch (e) {
         // fallback to existing heuristics
-        if (preferStream && tryStream) return ensureLeadingSlashIfLocal(sanitizeUrl(tryStream) || tryStream);
-        if (tryUrl) return ensureLeadingSlashIfLocal(sanitizeUrl(tryUrl) || tryUrl);
-        if (file.path) return '/chat/attachments?path=' + encodeURIComponent(file.path);
-        if (file.original_name) return '/chat/attachments?path=' + encodeURIComponent(file.original_name);
+        if (preferStream && tryStream) return ensureUrlSafe(sanitizeUrl(tryStream) || tryStream);
+        if (tryUrl) return ensureUrlSafe(sanitizeUrl(tryUrl) || tryUrl);
+        if (file.path) return ensureUrlSafe('/chat/attachments?path=' + encodeURIComponent(file.path));
+        if (file.original_name) return ensureUrlSafe('/chat/attachments?path=' + encodeURIComponent(file.original_name));
     }
     return null;
+}
+
+// Normalize candidate paths to safe URLs. Prefer streaming endpoints for
+// 'attachments/' and ensure local relative paths have a leading slash.
+function ensureUrlSafe(candidate) {
+    if (!candidate || typeof candidate !== 'string') return null;
+    const s = candidate.trim();
+    if (!s) return null;
+    if (s.startsWith('/')) return s;
+    if (s.startsWith('storage/')) return '/' + s;
+    if (s.startsWith('attachments/')) return `/chat/attachments?path=${encodeURIComponent(s)}`;
+    if (s.startsWith('chat/')) return `/chat/attachments?path=${encodeURIComponent(s)}`;
+    if (s.startsWith('bot/')) return `/bot/attachments?path=${encodeURIComponent(s)}`;
+    return '/' + s;
 }
 
 function prefetchFilePreview(file) {
@@ -230,7 +273,9 @@ function normalizeMessage(msg) {
             // asynchronous fetch (best-effort, don't block rendering)
             (async () => {
                 try {
-                    const res = await axios.get(`/attachments/${msg.file.attachment_id}`);
+                    // Fetch attachment metadata via the API prefix to avoid colliding
+                    // with web routes (GET /attachments/{id} is not the API endpoint).
+                    const res = await axios.get(`/api/attachments/${msg.file.attachment_id}`);
                     if (res && res.data) {
                         const a = res.data;
                         // merge fields
@@ -536,8 +581,17 @@ function handleDrop(e) {
                     real = normalizeMessage(real) || real;
                 } catch (e) {}
                 if (!props.externalMessages) {
-                    if (idx >= 0) {
-                        messages.value.splice(idx, 1, real);
+                    // Remove any message that was already added by server broadcast with the same id
+                    // (this can happen if the echo listener receives the broadcast before the upload response)
+                    try {
+                        messages.value = messages.value.filter((m) => m.id !== data.id);
+                    } catch (e) {
+                        // ignore filtering errors and continue
+                    }
+                    // find the optimistic temp message index again (it may have shifted)
+                    const tmpIdx = messages.value.findIndex((m) => m._tmpId === tempId);
+                    if (tmpIdx >= 0) {
+                        messages.value.splice(tmpIdx, 1, real);
                         if (real.type === 'file' && real.file) prefetchFilePreview(real.file);
                     } else {
                         if (!messages.value.some((m) => m.id === data.id)) messages.value.push(real);
@@ -565,13 +619,102 @@ function handleDragLeave(e) {
     e.preventDefault();
 }
 
-function openFileModal(file) {
+function triggerFilePicker() {
+    try {
+        if (props.openUploadModal) {
+            try {
+                props.openUploadModal();
+                return;
+            } catch (e) {}
+        }
+        // fallback: notify parent via emit so it can open a modal
+        try {
+            emit && emit('request-open-upload');
+        } catch (e) {}
+        if (fileInput.value) fileInput.value.click();
+    } catch (e) {}
+}
+
+async function onFileInputChange(e) {
+    const files = e.target && e.target.files ? Array.from(e.target.files) : [];
+    if (!files.length) return;
+    for (const f of files) {
+        const tempId = 'tmp-' + Date.now() + '-' + Math.floor(Math.random() * 10000);
+        const tempMsg = {
+            _tmpId: tempId,
+            id: tempId,
+            user_id: props.user.id,
+            user_name: props.user.name,
+            message: `ファイルをアップロードしています： ${f.name}`,
+            created_at: new Date().toISOString(),
+            type: 'file',
+            file: { original_name: f.name, mime: f.type || 'application/octet-stream', size: f.size, path: '' },
+            uploading: true,
+            _progress: 0,
+            is_read: false,
+        };
+        if (!props.externalMessages) messages.value.push(tempMsg);
+        scrollToLatest();
+        (async () => {
+            const data = await uploadFile(f, tempId);
+            const idx = messages.value.findIndex((m) => m._tmpId === tempId);
+            if (data && data.id) {
+                if (data.file && !data.file.streamUrl) {
+                    const p = data.file.path || data.file.thumb_path || data.file.url || data.file.original_name;
+                    data.file.streamUrl = `/chat/attachments?path=${encodeURIComponent(p)}`;
+                }
+                let real = {
+                    id: data.id,
+                    user_id: data.user_id,
+                    user_name: data.user_name,
+                    message: data.message,
+                    created_at: data.created_at,
+                    type: data.type || 'file',
+                    file: data.file || null,
+                    is_read: false,
+                };
+                try {
+                    real = normalizeMessage(real) || real;
+                } catch (e) {}
+                if (!props.externalMessages) {
+                    try {
+                        messages.value = messages.value.filter((m) => m.id !== data.id);
+                    } catch (e) {}
+                    const tmpIdx = messages.value.findIndex((m) => m._tmpId === tempId);
+                    if (tmpIdx >= 0) {
+                        messages.value.splice(tmpIdx, 1, real);
+                        if (real.type === 'file' && real.file) prefetchFilePreview(real.file);
+                    } else {
+                        if (!messages.value.some((m) => m.id === data.id)) messages.value.push(real);
+                    }
+                }
+                scheduleMarkAsRead(data.id, 5000);
+            } else {
+                if (idx >= 0) {
+                    const t = messages.value[idx];
+                    t.uploading = false;
+                    t._failed = true;
+                    t.message = `アップロードに失敗しました： ${f.name}`;
+                    t._progress = 0;
+                }
+            }
+            scrollToLatest();
+        })();
+    }
+    // reset input so same file can be selected again
+    try {
+        e.target.value = null;
+    } catch (er) {}
+}
+
+function openFileModal(file, messageId = null) {
     if (!file) return;
-    if (props.openAttachmentFn) return props.openAttachmentFn(file);
+    if (props.openAttachmentFn) return props.openAttachmentFn(file, messageId);
     const streamUrl =
         attachmentHref(file, false) || `/chat/attachments?path=${encodeURIComponent(file.path || file.url || file.thumb_path || file.original_name)}`;
     fileModal.value.open = true;
     fileModal.value.file = { ...file, streamUrl };
+    fileModal.value.messageId = messageId;
     if (file.mime && typeof file.mime === 'string' && file.mime.startsWith('text/')) {
         fetch(streamUrl, { credentials: 'same-origin' })
             .then((r) => (r.ok ? r.text() : Promise.reject('fetch-failed')))
@@ -589,8 +732,11 @@ function closeFileModal() {
 }
 
 // Request deletion of an attachment shown in the modal or in-message
-async function requestDeleteAttachment(file) {
+async function requestDeleteAttachment(file, messageId = null) {
     if (!file) return;
+    // Confirm with the user before deleting the file
+    const name = file.original_name || file.path || file.url || 'このファイル';
+    if (!confirm(`'${name}' を削除しますか？`)) return;
     // If parent provided a handler, call it
     if (props.deleteAttachmentFn) {
         try {
@@ -603,8 +749,67 @@ async function requestDeleteAttachment(file) {
         return;
     }
 
+    // Try server-side delete: prefer attachment_id, otherwise send path to DELETE /attachments
+    try {
+        if (file.attachment_id) {
+            // Use API route for deletion so it goes through the SPA/api middleware group
+            const res = await axios.delete(`/api/attachments/${file.attachment_id}`);
+            if (res && (res.status === 200 || res.status === 204)) {
+                // Prefer to remove by explicit messageId when provided
+                if (messageId) {
+                    const idxById = messages.value.findIndex((m) => String(m.id) === String(messageId));
+                    if (idxById >= 0) {
+                        messages.value.splice(idxById, 1);
+                        closeFileModal();
+                        return;
+                    }
+                }
+                const idx = messages.value.findIndex(
+                    (m) =>
+                        m.file &&
+                        (String(m.file.attachment_id) === String(file.attachment_id) || m.file.path === file.path || m.file.url === file.url),
+                );
+                if (idx >= 0) messages.value.splice(idx, 1);
+                closeFileModal();
+                return;
+            }
+        } else if (file.path || file.url) {
+            // attempt to send path-based delete; axios.delete can accept a config with data
+            const payload = { path: file.path || (file.url && file.url.replace(/^\/storage\//, '')) || file.original_name };
+            const res = await axios.delete('/api/attachments', { data: payload });
+            if (res && (res.status === 200 || res.status === 204)) {
+                if (messageId) {
+                    const idxById = messages.value.findIndex((m) => String(m.id) === String(messageId));
+                    if (idxById >= 0) {
+                        messages.value.splice(idxById, 1);
+                        closeFileModal();
+                        return;
+                    }
+                }
+                const idx = messages.value.findIndex(
+                    (m) => m.file && (m.file.path === file.path || m.file.url === file.url || m.file.original_name === file.original_name),
+                );
+                if (idx >= 0) messages.value.splice(idx, 1);
+                closeFileModal();
+                return;
+            }
+        }
+    } catch (e) {
+        console.warn('attachment delete API failed', e);
+        // fall through to optimistic/local removal
+    }
+
     // Fallback: try to remove message referencing this file from internal messages
     try {
+        // If messageId provided, remove that specific message first
+        if (messageId) {
+            const idxById = messages.value.findIndex((m) => String(m.id) === String(messageId));
+            if (idxById >= 0) {
+                messages.value.splice(idxById, 1);
+                closeFileModal();
+                return;
+            }
+        }
         const idx = messages.value.findIndex(
             (m) => m.file && (m.file.path === file.path || m.file.url === file.url || m.file.original_name === file.original_name),
         );
@@ -728,7 +933,7 @@ onUnmounted(() => {
 <template>
     <div
         ref="messageArea"
-        class="mb-2 ml-auto min-h-0 w-full max-w-[640px] flex-1 overflow-y-auto rounded border border-gray-100 bg-white p-3 shadow-inner md:p-4"
+        :class="[props.widthClass, 'mx-auto mb-2 min-h-0 overflow-y-auto rounded border border-gray-100 bg-white p-3 shadow-inner md:p-4']"
         @drop.prevent="handleDrop"
         @dragover.prevent="handleDragOver"
         @dragleave.prevent="handleDragLeave"
@@ -803,24 +1008,40 @@ onUnmounted(() => {
                                                 </div>
                                             </template>
                                             <template v-else>
-                                                <!-- シンプルなアイコン表示に統一：内部に文字は入れず、クリックでプレビューを開く -->
-                                                <div
-                                                    class="flex h-full w-full cursor-pointer items-center justify-center text-gray-600"
-                                                    @click="openFileModal(msg.file)"
-                                                >
-                                                    <svg
-                                                        class="h-10 w-10 text-gray-400"
-                                                        xmlns="http://www.w3.org/2000/svg"
-                                                        viewBox="0 0 24 24"
-                                                        fill="none"
-                                                        stroke="currentColor"
-                                                        stroke-width="1.5"
-                                                        stroke-linecap="round"
-                                                        stroke-linejoin="round"
+                                                <!-- If a thumbnail is available, show it; otherwise show icon -->
+                                                <div class="h-full w-full">
+                                                    <template
+                                                        v-if="
+                                                            msg.file && (msg.file.thumb_path || msg.file.thumb_url || msg.file.path || msg.file.url)
+                                                        "
                                                     >
-                                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                                        <path d="M14 2v6h6" />
-                                                    </svg>
+                                                        <img
+                                                            :src="thumbnailSrc(msg.file)"
+                                                            class="h-full w-full cursor-pointer object-cover"
+                                                            @click="openFileModal(msg.file)"
+                                                            alt="thumbnail"
+                                                        />
+                                                    </template>
+                                                    <template v-else>
+                                                        <div
+                                                            class="flex h-full w-full cursor-pointer items-center justify-center text-gray-600"
+                                                            @click="openFileModal(msg.file)"
+                                                        >
+                                                            <svg
+                                                                class="h-10 w-10 text-gray-400"
+                                                                xmlns="http://www.w3.org/2000/svg"
+                                                                viewBox="0 0 24 24"
+                                                                fill="none"
+                                                                stroke="currentColor"
+                                                                stroke-width="1.5"
+                                                                stroke-linecap="round"
+                                                                stroke-linejoin="round"
+                                                            >
+                                                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                                                <path d="M14 2v6h6" />
+                                                            </svg>
+                                                        </div>
+                                                    </template>
                                                 </div>
                                             </template>
                                         </div>
@@ -860,7 +1081,7 @@ onUnmounted(() => {
                                                         要約
                                                     </button>
                                                 </template>
-                                                <button @click.prevent="requestDeleteAttachment(msg.file)" class="ml-2 text-sm text-red-600">
+                                                <button @click.prevent="requestDeleteAttachment(msg.file, msg.id)" class="ml-2 text-sm text-red-600">
                                                     削除
                                                 </button>
                                             </div>
@@ -899,6 +1120,9 @@ onUnmounted(() => {
             </div>
         </div>
     </div>
+    <!-- hidden file input used by file button -->
+    <input ref="fileInput" type="file" style="display: none" @change="onFileInputChange" multiple />
+
     <form
         @submit.prevent="sendMessage"
         class="ml-auto mt-2 flex w-full max-w-[640px] flex-shrink-0 items-center gap-2 rounded border border-gray-200 bg-white p-2 shadow-sm"
@@ -915,6 +1139,22 @@ onUnmounted(() => {
             enterkeyhint="send"
             placeholder="メッセージを入力..."
         ></textarea>
+        <button type="button" @click.prevent="triggerFilePicker" class="rounded p-2 text-gray-600 hover:bg-gray-100" title="ファイルをアップロード">
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="h-5 w-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 5 17 10" />
+                <line x1="12" y1="5" x2="12" y2="19" />
+            </svg>
+        </button>
         <button
             type="submit"
             :disabled="isSending || sendCooldown"
@@ -932,7 +1172,9 @@ onUnmounted(() => {
                     <a :href="attachmentHref(fileModal.file, true)" :download="fileModal.file?.original_name" class="mr-3 text-sm text-gray-700"
                         >ダウンロード</a
                     >
-                    <button @click="requestDeleteAttachment(fileModal.file)" class="mr-3 rounded border px-3 py-1 text-red-700">削除</button>
+                    <button @click="requestDeleteAttachment(fileModal.file, fileModal.messageId)" class="mr-3 rounded border px-3 py-1 text-red-700">
+                        削除
+                    </button>
                     <button @click="closeFileModal" class="rounded border px-3 py-1 text-gray-700">閉じる</button>
                 </div>
             </div>

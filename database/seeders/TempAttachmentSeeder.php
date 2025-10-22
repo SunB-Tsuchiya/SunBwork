@@ -42,10 +42,10 @@ class TempAttachmentSeeder extends Seeder
         ]);
 
         $ids = [];
-        $ids[] = DB::table('attachments')->insertGetId(['path' => 'attachments/a1.txt', 'original_name' => 'a1.txt', 'filename' => 'a1.txt', 'mime_type' => 'text/plain', 'status' => 0, 'size' => 123, 'created_at' => $now, 'updated_at' => $now]);
-        $ids[] = DB::table('attachments')->insertGetId(['path' => 'attachments/a2.png', 'original_name' => 'a2.png', 'filename' => 'a2.png', 'mime_type' => 'image/png', 'status' => 0, 'size' => 456, 'created_at' => $now, 'updated_at' => $now]);
-        $ids[] = DB::table('attachments')->insertGetId(['path' => 'attachments/a3.pdf', 'original_name' => 'a3.pdf', 'filename' => 'a3.pdf', 'mime_type' => 'application/pdf', 'status' => 0, 'size' => 789, 'created_at' => $now, 'updated_at' => $now]);
-        $ids[] = DB::table('attachments')->insertGetId(['path' => 'attachments/a4.jpg', 'original_name' => 'a4.jpg', 'filename' => 'a4.jpg', 'mime_type' => 'image/jpeg', 'status' => 0, 'size' => 111, 'created_at' => $now, 'updated_at' => $now]);
+        $ids[] = DB::table('attachments')->insertGetId(['path' => 'attachments/a1.txt', 'original_name' => 'a1.txt', 'mime_type' => 'text/plain', 'status' => 0, 'size' => 123, 'created_at' => $now, 'updated_at' => $now]);
+        $ids[] = DB::table('attachments')->insertGetId(['path' => 'attachments/a2.png', 'original_name' => 'a2.png', 'mime_type' => 'image/png', 'status' => 0, 'size' => 456, 'created_at' => $now, 'updated_at' => $now]);
+        $ids[] = DB::table('attachments')->insertGetId(['path' => 'attachments/a3.pdf', 'original_name' => 'a3.pdf', 'mime_type' => 'application/pdf', 'status' => 0, 'size' => 789, 'created_at' => $now, 'updated_at' => $now]);
+        $ids[] = DB::table('attachments')->insertGetId(['path' => 'attachments/a4.jpg', 'original_name' => 'a4.jpg', 'mime_type' => 'image/jpeg', 'status' => 0, 'size' => 111, 'created_at' => $now, 'updated_at' => $now]);
 
         // Create attachmentables pivots for the seeded diary/event/message
         DB::table('attachmentables')->insertOrIgnore([

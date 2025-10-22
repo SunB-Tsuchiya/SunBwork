@@ -30,11 +30,20 @@ const exportFormat = ref('md');
 // markdown renderer for AI messages (no raw HTML allowed)
 const md = new MarkdownIt({ html: false, linkify: true, typographer: true });
 
+function openBotFileModal() {
+    showFileModal.value = true;
+}
+
 // wrapper to upload a single file via /bot/files and return metadata similar to chat upload
 async function uploadSingleFile(file) {
     if (!file) return null;
     const form = new FormData();
     form.append('file', file);
+    // If we have a conversationId, ask server to attach this file to the AiConversation
+    if (conversationId.value) {
+        form.append('attachable_type', '\\App\\Models\\AiConversation');
+        form.append('attachable_id', String(conversationId.value));
+    }
     try {
         const res = await axios.post('/bot/files', form, {
             withCredentials: true,
@@ -175,6 +184,19 @@ function isUrlString(s) {
     return typeof s === 'string' && /^https?:\/\//.test(s.trim());
 }
 
+// Local ensureUrlSafe helper (mirrors MessageArea.ensureUrlSafe)
+function ensureUrlSafe(candidate) {
+    if (!candidate || typeof candidate !== 'string') return null;
+    const s = candidate.trim();
+    if (!s) return null;
+    if (s.startsWith('/')) return s;
+    if (s.startsWith('storage/')) return '/' + s;
+    if (s.startsWith('attachments/')) return `/chat/attachments?path=${encodeURIComponent(s)}`;
+    if (s.startsWith('chat/')) return `/chat/attachments?path=${encodeURIComponent(s)}`;
+    if (s.startsWith('bot/')) return `/bot/attachments?path=${encodeURIComponent(s)}`;
+    return '/' + s;
+}
+
 function normalizeMessage(msg) {
     if (!msg) return msg;
     try {
@@ -293,17 +315,45 @@ function debugClick() {
 
 function getAttachmentUrl(meta) {
     if (!meta) return '';
-    // Prefer a public storage URL when available (Storage::url), this avoids hitting
-    // the auth-protected stream endpoint which can return 302 -> /login on reload.
-    if (meta.url) {
-        const safe = sanitizeUrl(meta.url);
+    // Prefer explicit thumbnail urls/paths when present
+    if (meta.thumb_url) {
+        const safe = sanitizeUrl(meta.thumb_url);
         if (safe) return safe;
-        // if meta.url exists but sanitizeUrl rejected it (rare), still return as-is
-        if (/^https?:\/\//.test(meta.url) || meta.url.startsWith('/')) return meta.url;
+        if (/^https?:\/\//.test(meta.thumb_url) || meta.thumb_url.startsWith('/')) return meta.thumb_url;
+    }
+    if (meta.thumb_path) {
+        // map to public storage URL so browsers can load it directly
+        return ensureUrlSafe('/storage/' + meta.thumb_path.replace(/^\//, ''));
     }
 
+    // Prefer a public storage URL when available (Storage::url), this avoids hitting
+    // the auth-protected stream endpoint which can return 302 -> /login on reload.
+
     // Fallback: if we have internal storage path, use the stream endpoint.
-    if (meta.path) return ensureLeadingSlashIfLocal('/bot/attachments?path=' + encodeURIComponent(meta.path));
+    // Prefer internal storage path (thumb_path or path) and stream it via the bot endpoint.
+    // This avoids returning direct /storage/... URLs which can be blocked by the webserver
+    // (causing 403). If we have an explicit thumb_path or path, build the proxied URL.
+    try {
+        if (meta && (meta.thumb_path || meta.path)) {
+            const p = meta.thumb_path || meta.path;
+            return ensureUrlSafe('/bot/attachments?path=' + encodeURIComponent(p));
+        }
+    } catch (e) {
+        // fall through to other fallbacks
+    }
+
+    // If a public URL is provided (remote or storage URL), validate and return it as last resort.
+    if (meta && meta.url) {
+        // if it's a /storage/... URL, prefer to convert to streaming path where possible
+        if (typeof meta.url === 'string' && meta.url.startsWith('/storage/')) {
+            // strip leading /storage/ and stream
+            return ensureUrlSafe('/bot/attachments?path=' + encodeURIComponent(meta.url.replace(/^\/storage\//, '')));
+        }
+        // otherwise sanitize and return the provided url
+        const s = sanitizeUrl(meta.url);
+        return s || '';
+    }
+
     return '';
 }
 
@@ -320,7 +370,7 @@ async function openAttachment(meta) {
             loadingAttachment.value = true;
             const url = getAttachmentUrl(meta);
             if (url) {
-                const res = await axios.get(url, { responseType: 'text' });
+                const res = await axios.get(url, { responseType: 'text', withCredentials: true });
                 attachmentContent.value = res.data;
             }
         } catch (e) {
@@ -466,6 +516,10 @@ async function uploadSelectedFiles() {
         const f = selectedFiles.value[i];
         const form = new FormData();
         form.append('file', f);
+        if (conversationId.value) {
+            form.append('attachable_type', '\\App\\Models\\AiConversation');
+            form.append('attachable_id', String(conversationId.value));
+        }
         try {
             const res = await axios.post('/bot/files', form, {
                 withCredentials: true,
@@ -874,6 +928,8 @@ onUnmounted(() => {
                             :initialMessages="messages"
                             :user="{ id: null, name: '自分' }"
                             :externalMessages="messages"
+                            widthClass="w-full"
+                            :openUploadModal="openBotFileModal"
                             :sendFn="sendViaMessageArea"
                             :summarizeFn="summarizeFile"
                             :uploadFn="uploadSingleFile"
@@ -946,10 +1002,26 @@ onUnmounted(() => {
                             <div v-if="uploading" class="text-sm text-gray-600">アップロード中...</div>
                             <div v-for="(meta, idx) in uploadedFiles" :key="meta.path" class="mt-2 rounded border p-2">
                                 <div class="flex items-center justify-between">
-                                    <div>
-                                        <div class="font-medium">{{ meta.original_name }}</div>
-                                        <div class="text-xs text-gray-500">{{ meta.mime }} • {{ Math.round(meta.size / 1024) }} KB</div>
-                                        <div v-if="meta.preview" class="mt-1 text-xs text-gray-700">{{ meta.preview }}</div>
+                                    <div class="flex items-center gap-3">
+                                        <template v-if="meta && (meta.thumb_path || meta.thumb_url || meta.path || meta.url)">
+                                            <img
+                                                :src="getAttachmentUrl({ path: meta.thumb_path || meta.path, url: meta.thumb_url || meta.url })"
+                                                class="h-12 w-12 object-cover"
+                                            />
+                                        </template>
+                                        <template v-else>
+                                            <div class="flex h-12 w-12 items-center justify-center rounded bg-gray-100 text-gray-600">
+                                                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                                    <path d="M14 2v6h6" />
+                                                </svg>
+                                            </div>
+                                        </template>
+                                        <div>
+                                            <div class="font-medium">{{ meta.original_name }}</div>
+                                            <div class="text-xs text-gray-500">{{ meta.mime }} • {{ Math.round(meta.size / 1024) }} KB</div>
+                                            <div v-if="meta.preview" class="mt-1 text-xs text-gray-700">{{ meta.preview }}</div>
+                                        </div>
                                     </div>
                                     <div class="ml-4 flex items-center gap-2">
                                         <button @click="removeUploaded(idx)" class="text-sm text-red-600">削除</button>
@@ -997,11 +1069,14 @@ onUnmounted(() => {
                         <div class="mt-3">
                             <template v-if="attachmentToShow">
                                 <!-- Image -->
-                                <img
-                                    v-if="attachmentToShow.mime && attachmentToShow.mime.startsWith('image/')"
-                                    :src="getAttachmentUrl(attachmentToShow)"
-                                    class="h-auto max-h-[70vh] w-full object-contain"
-                                />
+                                <div v-if="attachmentToShow.mime && attachmentToShow.mime.startsWith('image/')" class="flex w-full justify-center">
+                                    <img
+                                        :src="getAttachmentUrl(attachmentToShow)"
+                                        class="block h-auto max-h-[80vh] w-auto max-w-full"
+                                        style="object-fit: contain"
+                                        alt="attachment"
+                                    />
+                                </div>
 
                                 <!-- PDF -->
                                 <iframe

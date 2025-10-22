@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class MigrateAttachmentsToAttachmentables extends Command
 {
@@ -13,6 +14,12 @@ class MigrateAttachmentsToAttachmentables extends Command
     public function handle(): int
     {
         $commit = $this->option('commit');
+
+        // If legacy linkage columns are missing, nothing to migrate
+        if (! Schema::hasColumn('attachments', 'message_id') && ! Schema::hasColumn('attachments', 'diary_id') && ! Schema::hasColumn('attachments', 'event_id')) {
+            $this->info('No legacy attachment linkage columns (message_id/diary_id/event_id) present. Nothing to migrate.');
+            return 0;
+        }
 
         $this->info('Starting attachments -> attachmentables migration (' . ($commit ? 'COMMIT' : 'DRY-RUN') . ')');
 

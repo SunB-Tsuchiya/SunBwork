@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use Intervention\Image\ImageManager;
+use App\Services\AttachmentService;
 
 class BotFileController extends Controller
 {
@@ -21,27 +23,10 @@ class BotFileController extends Controller
         // already exists in the 'bot' folder on the public disk, return 409 so
         // the client can notify the user rather than silently renaming.
         $originalName = basename($file->getClientOriginalName());
-        // sanitize filename to remove any directory separators
-        $originalName = str_replace(['..', '/', '\\'], '_', $originalName);
-        $path = 'bot/' . $originalName;
-        if (Storage::disk('public')->exists($path)) {
-            return response()->json([
-                'error' => 'file_exists',
-                'message' => '同名のファイルが既に存在します: ' . $originalName,
-                'path' => $path,
-            ], 409);
-        }
-
-        // store using original name
-        $stored = Storage::disk('public')->putFileAs('bot', $file, $originalName);
-        $url = Storage::url($path);
-        $meta = [
-            'url' => $url,
-            'original_name' => $originalName,
-            'mime' => $file->getClientMimeType(),
-            'size' => $file->getSize(),
-            'path' => $path,
-        ];
+        $svc = new AttachmentService();
+        $attachableType = $request->input('attachable_type');
+        $attachableId = $request->input('attachable_id') ? intval($request->input('attachable_id')) : null;
+        $meta = $svc->storeUploadedFile($file, $request->user(), $attachableType, $attachableId);
 
         // try to create small text preview for text files
         if (str_starts_with($file->getClientMimeType(), 'text/')) {
@@ -53,6 +38,17 @@ class BotFileController extends Controller
             }
         }
 
+        // Delegate thumbnail creation to AttachmentService so bot and chat share the same logic
+        try {
+            $thumbResult = $svc->createThumbnailFromDiskPath($meta['path']);
+            if (!empty($thumbResult)) {
+                $meta['thumb_path'] = $thumbResult['thumb_path'];
+                $meta['thumb_url'] = $thumbResult['thumb_url'];
+            }
+        } catch (\Throwable $__e) {
+            Log::warning('bot thumbnail delegation failed: ' . $__e->getMessage());
+        }
+
         // sanitize response meta: only include allowed keys and safe url/path
         $safe = [
             'original_name' => substr($meta['original_name'] ?? '', 0, 255),
@@ -61,25 +57,34 @@ class BotFileController extends Controller
             'path' => $meta['path'],
             'url' => Storage::url($meta['path']),
         ];
-        if (!Storage::disk('public')->exists($safe['path'])) {
-            return response()->json(['error' => 'file not found after upload'], 500);
-        }
-        return response()->json(['file' => $safe]);
+
+        // Build response and include thumb metadata when present
+        $resp = [
+            'original_name' => substr($meta['original_name'] ?? '', 0, 255),
+            'mime' => substr($meta['mime'] ?? '', 0, 100),
+            'size' => intval($meta['size'] ?? 0),
+            'path' => $meta['path'],
+            'url' => $meta['url'] ?? Storage::url($meta['path']),
+        ];
+        if (!empty($meta['thumb_path'])) $resp['thumb_path'] = $meta['thumb_path'];
+        if (!empty($meta['thumb_url'])) $resp['thumb_url'] = $meta['thumb_url'];
+        if (!empty($meta['preview'])) $resp['preview'] = $meta['preview'];
+
+        return response()->json(['file' => $resp]);
     }
 
     // GET /bot/attachments?path=bot/xxx - stream file back
     public function stream(Request $request)
     {
-        $user = $request->user();
         $path = $request->query('path');
         if (!$path) abort(400, 'path is required');
-        $path = ltrim($path, '\\/');
-        if (!str_starts_with($path, 'bot/')) {
-            $path = 'bot/' . $path;
+        $svc = new AttachmentService();
+        try {
+            $full = $svc->diskPath($path);
+            return response()->file($full);
+        } catch (\RuntimeException $e) {
+            abort(404);
         }
-        if (!Storage::disk('public')->exists($path)) abort(404);
-        $full = Storage::disk('public')->path($path);
-        return response()->file($full);
     }
 
     // POST /bot/files/delete - delete an uploaded file (authenticated users)
@@ -89,19 +94,11 @@ class BotFileController extends Controller
             'path' => 'required|string',
         ]);
         $path = $request->input('path');
-        $path = ltrim($path, '\\/');
-        if (!str_starts_with($path, 'bot/')) {
-            $path = 'bot/' . $path;
-        }
+        $svc = new AttachmentService();
         try {
-            if (!Storage::disk('public')->exists($path)) {
-                return response()->json(['error' => 'file not found'], 404);
-            }
-            $deleted = Storage::disk('public')->delete($path);
-            if ($deleted) {
-                return response()->json(['success' => true]);
-            }
-            return response()->json(['error' => 'delete failed'], 500);
+            $deleted = $svc->deleteByPath($path);
+            if ($deleted) return response()->json(['success' => true]);
+            return response()->json(['error' => 'file not found'], 404);
         } catch (\Exception $e) {
             Log::error('bot file delete failed: ' . $e->getMessage());
             return response()->json(['error' => 'delete error'], 500);

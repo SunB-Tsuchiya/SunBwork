@@ -26,6 +26,13 @@ const sendCooldown = ref(false);
 const SEND_COOLDOWN_MS = 1000; // ms, prevent rapid repeated sends
 const uploadProgress = ref({});
 const fileModal = ref({ open: false, file: null });
+const uploadInput = ref(null);
+const uploadModalInput = ref(null);
+const showFileModal = ref(false);
+
+function openChatRoomFileModal() {
+    showFileModal.value = true;
+}
 // rooms list (try page props first, fall back to props, otherwise fetch)
 const rooms = ref(page.props?.rooms ?? props.rooms ?? []);
 
@@ -175,8 +182,13 @@ function handleDrop(e) {
             if (data && data.id) {
                 // ensure streamUrl exists on file meta
                 if (data.file && !data.file.streamUrl) {
-                    const p = data.file.path || data.file.thumb_path || data.file.url || data.file.original_name;
-                    data.file.streamUrl = `/chat/attachments?path=${encodeURIComponent(p)}`;
+                    // prefer the centralized builder which handles storage/ and attachments/ prefixes
+                    data.file.streamUrl =
+                        buildStreamUrl(data.file) ||
+                        ensureUrlSafe(
+                            '/chat/attachments?path=' +
+                                encodeURIComponent(data.file.path || data.file.thumb_path || data.file.url || data.file.original_name || ''),
+                        );
                 }
                 let real = {
                     id: data.id,
@@ -226,10 +238,97 @@ function handleDragLeave(e) {
     isDragging.value = false;
 }
 
+// Open native file picker for upload button
+function openUploadDialog() {
+    try {
+        if (uploadInput.value && typeof uploadInput.value.click === 'function') {
+            uploadInput.value.value = null; // reset
+            uploadInput.value.click();
+        }
+    } catch (e) {
+        console.warn('openUploadDialog failed', e);
+    }
+}
+
+// Handle files selected via the upload input
+async function onUploadInputChange(e) {
+    const files = e && e.target && e.target.files ? Array.from(e.target.files) : [];
+    if (!files.length) return;
+    for (const f of files) {
+        const tempId = 'tmp-' + Date.now() + '-' + Math.floor(Math.random() * 10000);
+        const tempMsg = {
+            _tmpId: tempId,
+            id: tempId,
+            user_id: user.id,
+            user_name: user.name,
+            message: `ファイルをアップロードしています： ${f.name}`,
+            created_at: new Date().toISOString(),
+            type: 'file',
+            file: { original_name: f.name, mime: f.type || 'application/octet-stream', size: f.size, path: '' },
+            uploading: true,
+            _progress: 0,
+            is_read: false,
+        };
+        messages.value.push(tempMsg);
+        scrollToLatest();
+        (async () => {
+            const data = await uploadFile(f, tempId);
+            const idx = messages.value.findIndex((m) => m._tmpId === tempId);
+            if (data && data.id) {
+                if (data.file && !data.file.streamUrl) {
+                    data.file.streamUrl =
+                        buildStreamUrl(data.file) ||
+                        ensureUrlSafe(
+                            '/chat/attachments?path=' +
+                                encodeURIComponent(data.file.path || data.file.thumb_path || data.file.url || data.file.original_name || ''),
+                        );
+                }
+                let real = {
+                    id: data.id,
+                    user_id: data.user_id,
+                    user_name: data.user_name,
+                    message: data.message,
+                    created_at: data.created_at,
+                    type: data.type || 'file',
+                    file: data.file || null,
+                    is_read: false,
+                };
+                try {
+                    real = normalizeMessage(real) || real;
+                } catch (e) {
+                    console.warn('normalizeMessage failed for upload', e);
+                }
+                if (idx >= 0) {
+                    messages.value.splice(idx, 1, real);
+                    if (real.type === 'file' && real.file) prefetchFilePreview(real.file);
+                } else {
+                    if (!messages.value.some((m) => m.id === data.id)) messages.value.push(real);
+                }
+                scheduleMarkAsRead(data.id, 5000);
+            } else {
+                if (idx >= 0) {
+                    const t = messages.value[idx];
+                    t.uploading = false;
+                    t._failed = true;
+                    t.message = `アップロードに失敗しました： ${f.name}`;
+                    t._progress = 0;
+                }
+            }
+            scrollToLatest();
+        })();
+    }
+    // reset input
+    try {
+        if (uploadInput.value) uploadInput.value.value = null;
+    } catch (e) {}
+}
+
 function openFileModal(file) {
     if (!file) return;
     // build proxy URL to stream through Laravel
-    const streamUrl = `/chat/attachments?path=${encodeURIComponent(file.path || file.url || file.thumb_path || file.original_name)}`;
+    const streamUrl =
+        buildStreamUrl(file) ||
+        ensureUrlSafe('/chat/attachments?path=' + encodeURIComponent(file.path || file.url || file.thumb_path || file.original_name || ''));
     fileModal.value.open = true;
     fileModal.value.file = { ...file, streamUrl };
     // for text files, prefetch content
@@ -276,6 +375,10 @@ function buildStreamUrl(file) {
         if (candidate.startsWith('chat/')) {
             return `/chat/attachments?path=${encodeURIComponent(candidate)}`;
         }
+        // support legacy/internal paths starting with attachments/
+        if (candidate.startsWith('attachments/')) {
+            return `/chat/attachments?path=${encodeURIComponent(candidate)}`;
+        }
         // fallback: validate candidate and return only if safe
         try {
             const safe = sanitizeUrl(candidate);
@@ -309,14 +412,37 @@ function sanitizeUrl(u) {
     }
 }
 
+// Ensure incoming candidate paths that look like 'attachments/...' are converted
+// to safe URLs (prefer streaming endpoint). Also ensure simple relative paths
+// are returned with a leading slash so the browser doesn't resolve them
+// relative to the current page path.
+function ensureUrlSafe(candidate) {
+    if (!candidate || typeof candidate !== 'string') return null;
+    const s = candidate.trim();
+    if (!s) return null;
+    // already absolute local path
+    if (s.startsWith('/')) return s;
+    // if it's a storage-relative path like 'storage/...', make it '/storage/...'
+    if (s.startsWith('storage/')) return '/' + s;
+    // attachments/ -> prefer chat stream endpoint
+    if (s.startsWith('attachments/')) return `/chat/attachments?path=${encodeURIComponent(s)}`;
+    // chat/ -> stream via chat
+    if (s.startsWith('chat/')) return `/chat/attachments?path=${encodeURIComponent(s)}`;
+    // bot/ -> stream via bot
+    if (s.startsWith('bot/')) return `/bot/attachments?path=${encodeURIComponent(s)}`;
+    // if it looks like a hostless URL (no scheme), avoid returning raw relative paths; prepend '/'
+    return '/' + s;
+}
+
 // lightweight preview fetch for text files (non-blocking)
 function prefetchFilePreview(file) {
     if (!file || !file.mime) return;
     try {
         const url = buildStreamUrl(file);
-        if (!url) return;
-        // text preview
+
+        // text preview (non-blocking)
         if (typeof file.mime === 'string' && file.mime.startsWith('text/')) {
+            if (!url) return;
             fetch(url, { credentials: 'same-origin' })
                 .then((r) => (r.ok ? r.text() : Promise.reject('nope')))
                 .then((txt) => {
@@ -326,10 +452,11 @@ function prefetchFilePreview(file) {
                 .catch(() => {
                     file.previewText = null;
                 });
+            return;
         }
-        // optionally for pdf we could set a flag to indicate preview is available
+
+        // mark pdf preview availability
         if (file.mime === 'application/pdf') {
-            // only use url if it's safe
             file.previewPdf = sanitizeUrl(url) || null;
         }
     } catch (e) {
@@ -717,6 +844,8 @@ function onCompositionEnd() {
 
 <template>
     <AppLayout title="チャットルーム">
+        <!-- hidden file input used by Upload button -->
+        <input ref="uploadInput" type="file" style="display: none" @change="onUploadInputChange" multiple />
         <template #header>
             <h2 class="text-xl font-semibold leading-tight text-gray-800">チャットルーム</h2>
         </template>
@@ -729,67 +858,103 @@ function onCompositionEnd() {
                 {{ flashMessage }}
             </div>
         </transition>
-        <div class="py-4">
-            <div class="mx-auto flex max-w-6xl gap-4 rounded bg-white p-4 shadow" style="height: calc(100vh - 140px)">
-                <!-- 左カラム: ルーム一覧のみ (モバイルは非表示) -->
-                <aside class="hidden w-64 flex-shrink-0 border-r border-gray-100 px-3 py-2 md:block">
-                    <div class="mb-2 flex items-center justify-between">
-                        <div class="text-sm font-medium">ルーム一覧</div>
-                        <a href="/chat/rooms" class="text-xs text-blue-600 hover:underline">一覧へ</a>
-                    </div>
-                    <ul class="room-index space-y-1 text-sm leading-tight">
-                        <li v-for="r in rooms" :key="r.id" class="rounded px-0 py-0">
-                            <a
-                                :href="`/chat/rooms/${r.id}`"
-                                @click="onRoomClick($event, r)"
-                                @keydown.enter.prevent="selectRoom(r)"
-                                :class="[
-                                    'flex w-full cursor-pointer items-center justify-between rounded px-2 py-2 transition-colors hover:bg-indigo-100 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300',
-                                    r.id === currentRoom.id ? 'bg-indigo-200 font-semibold text-gray-900' : '',
-                                ]"
-                                :aria-current="r.id === currentRoom.id ? 'true' : null"
-                            >
-                                <div class="truncate text-sm text-gray-800">
-                                    {{ r.name || (r.type === 'private' ? r.users && r.users.find((u) => u.id !== user.id)?.name : '(無名)') }}
-                                </div>
-                                <span
-                                    v-if="r.unread_count"
-                                    class="ml-2 inline-flex items-center rounded-full bg-red-500 px-2 py-0.5 text-xs font-semibold text-white"
-                                    >{{ r.unread_count }}</span
-                                >
-                            </a>
-                        </li>
-                    </ul>
-                </aside>
-                <!-- メンバーモーダル -->
-                <div v-if="showMembers" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-                    <div class="min-w-[300px] rounded bg-white p-6 shadow-lg">
-                        <div class="mb-4 flex items-center justify-between">
-                            <span class="text-lg font-bold">メンバー一覧</span>
-                            <button @click="showMembers = false" class="text-gray-500 hover:text-gray-800">×</button>
-                        </div>
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">担当</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">名前</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="member in sortedMembers" :key="member.id">
-                                    <td class="px-4 py-2">{{ getAssignmentName(member.assignment_id) }}</td>
-                                    <td class="px-4 py-2">{{ member.name }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                        <div class="mt-4 flex justify-end">
-                            <button @click="showMembers = false" class="rounded bg-blue-600 px-4 py-2 text-white">閉じる</button>
-                        </div>
+        <div class="py-6">
+            <div class="mx-auto flex max-w-6xl flex-col gap-4 rounded bg-white p-4 shadow" style="height: calc(100vh - 140px)">
+                <div class="mb-4 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <button
+                            type="button"
+                            @click="openChatRoomFileModal"
+                            class="inline-flex items-center rounded bg-green-600 px-3 py-2 text-white shadow-lg"
+                        >
+                            ファイルアップロード
+                        </button>
                     </div>
                 </div>
-                <main class="flex h-full min-h-0 min-w-0 flex-1 flex-col">
-                    <MessageArea :room="currentRoom" :initialMessages="messages" :user="user" />
-                </main>
+
+                <div class="flex w-full flex-1 gap-4 overflow-hidden">
+                    <!-- 左カラム: ルーム一覧のみ (モバイルは非表示) -->
+                    <aside class="hidden w-64 flex-shrink-0 border-r border-gray-100 px-3 py-2 md:block">
+                        <div class="mb-2 flex items-center justify-between">
+                            <div class="text-sm font-medium">ルーム一覧</div>
+                            <a href="/chat/rooms" class="text-xs text-blue-600 hover:underline">一覧へ</a>
+                        </div>
+                        <ul class="room-index space-y-1 text-sm leading-tight">
+                            <li v-for="r in rooms" :key="r.id" class="rounded px-0 py-0">
+                                <a
+                                    :href="`/chat/rooms/${r.id}`"
+                                    @click="onRoomClick($event, r)"
+                                    @keydown.enter.prevent="selectRoom(r)"
+                                    :class="[
+                                        'flex w-full cursor-pointer items-center justify-between rounded px-2 py-2 transition-colors hover:bg-indigo-100 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300',
+                                        r.id === currentRoom.id ? 'bg-indigo-200 font-semibold text-gray-900' : '',
+                                    ]"
+                                    :aria-current="r.id === currentRoom.id ? 'true' : null"
+                                >
+                                    <div class="truncate text-sm text-gray-800">
+                                        {{ r.name || (r.type === 'private' ? r.users && r.users.find((u) => u.id !== user.id)?.name : '(無名)') }}
+                                    </div>
+                                    <span
+                                        v-if="r.unread_count"
+                                        class="ml-2 inline-flex items-center rounded-full bg-red-500 px-2 py-0.5 text-xs font-semibold text-white"
+                                        >{{ r.unread_count }}</span
+                                    >
+                                </a>
+                            </li>
+                        </ul>
+                    </aside>
+
+                    <!-- メンバーモーダル -->
+                    <div v-if="showMembers" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+                        <div class="min-w-[300px] rounded bg-white p-6 shadow-lg">
+                            <div class="mb-4 flex items-center justify-between">
+                                <span class="text-lg font-bold">メンバー一覧</span>
+                                <button @click="showMembers = false" class="text-gray-500 hover:text-gray-800">×</button>
+                            </div>
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">担当</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">名前</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="member in sortedMembers" :key="member.id">
+                                        <td class="px-4 py-2">{{ getAssignmentName(member.assignment_id) }}</td>
+                                        <td class="px-4 py-2">{{ member.name }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <div class="mt-4 flex justify-end">
+                                <button @click="showMembers = false" class="rounded bg-blue-600 px-4 py-2 text-white">閉じる</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <main class="flex-1 overflow-auto px-4 py-2">
+                        <MessageArea
+                            :room="currentRoom"
+                            :initialMessages="messages"
+                            :user="user"
+                            widthClass="w-full"
+                            :openUploadModal="openChatRoomFileModal"
+                            @request-open-upload="openChatRoomFileModal"
+                        />
+                    </main>
+                </div>
+            </div>
+        </div>
+        <!-- File upload modal (ChatRoom) -->
+        <div v-if="showFileModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+            <div class="w-11/12 max-w-2xl rounded bg-white p-4 shadow-lg">
+                <h3 class="mb-2 font-semibold">ファイルをアップロード</h3>
+                <div>
+                    <input ref="uploadModalInput" type="file" multiple @change="onUploadInputChange" class="cursor-pointer" />
+                    <div class="mt-2 text-xs text-gray-600">ファイル選択後、アップロードは自動で開始されます。</div>
+                </div>
+                <div class="mt-3 flex justify-end gap-2">
+                    <button @click="showFileModal = false" class="rounded border px-3 py-1">閉じる</button>
+                </div>
             </div>
         </div>
         <!-- File preview modal -->

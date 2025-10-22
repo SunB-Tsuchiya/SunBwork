@@ -28,6 +28,7 @@ import TimelineDiary from '@/Components/TimelineDiary.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router } from '@inertiajs/vue3';
 import axios from 'axios';
+import DOMPurify from 'dompurify';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { route } from 'ziggy-js';
 
@@ -43,6 +44,31 @@ const editHref = computed(() => {
     } catch (e) {
         return route('diaries.edit', props.diary.id);
     }
+});
+
+// 追加: 既読ユーザー名を安全に取り出すヘルパー
+const readerNames = computed(() => {
+    const rb = props.diary?.read_by || [];
+    if (!Array.isArray(rb) || rb.length === 0) return [];
+
+    return rb
+        .map((item) => {
+            if (!item && item !== 0) return String(item);
+            // 期待される形: { id, name } や { user_id, user_name } など複数パターンに対応
+
+            if (typeof item === 'object') {
+                if (item.name) return item.name;
+                if (item.user_name) return item.user_name;
+                if (item.admin_name) return item.admin_name;
+                if (item.full_name) return item.full_name;
+                // フォールバック: id として表示
+                if (item.id) return `user#${item.id}`;
+                return JSON.stringify(item);
+            }
+            // 単純な文字列/数値の場合
+            return String(item);
+        })
+        .filter(Boolean);
 });
 
 // Handlers for TimelineDiary component emits
@@ -144,6 +170,55 @@ const deleteDiary = () => {
     }
 };
 
+async function deleteComment(commentId, idx) {
+    if (!confirm('コメントを削除してよいですか？')) return;
+
+    const prefix = props.routePrefix || 'diaries';
+    let target;
+    try {
+        target = route('diary_comments.destroy', commentId);
+    } catch (e) {
+        console.warn('Ziggy route failed for diary_comments.destroy', e);
+        target = `/diary-comments/${commentId}`;
+    }
+
+    try {
+        const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
+        const csrf = match ? decodeURIComponent(match[1]) : null;
+        const res = await fetch(target, {
+            method: 'DELETE',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(csrf ? { 'X-XSRF-TOKEN': csrf } : {}),
+            },
+        });
+
+        if (!res.ok) {
+            console.error('deleteComment failed', res.status, await res.text());
+            alert('コメントの削除に失敗しました');
+            return;
+        }
+
+        // remove from local diary comments array (if present)
+        try {
+            const arr = props.diary.comments || [];
+            if (arr[idx] && (arr[idx].id === commentId || arr[idx].id === Number(commentId))) {
+                arr.splice(idx, 1);
+            } else {
+                // fallback: find by id
+                const found = arr.findIndex((x) => x.id === commentId || x.id === Number(commentId));
+                if (found >= 0) arr.splice(found, 1);
+            }
+        } catch (e) {
+            console.warn('local comment array update failed', e);
+        }
+    } catch (e) {
+        console.error('deleteComment error', e);
+        alert('コメントの削除中にエラーが発生しました');
+    }
+}
+
 import {} from 'vue';
 
 const back = () => {
@@ -244,6 +319,312 @@ function extendTo24() {
 }
 
 // fetch events for the diary's date
+const cloneDeep = (obj) => {
+    try {
+        return structuredClone(obj);
+    } catch (e) {
+        try {
+            return JSON.parse(JSON.stringify(obj));
+        } catch (e2) {
+            return obj;
+        }
+    }
+};
+
+// local reactive copy of diary so we can replace placeholders and poll attachments
+const localDiary = ref(props.diary ? cloneDeep(props.diary) : null);
+
+function startAttachmentPolling() {
+    try {
+        if (!localDiary.value) return;
+        // If server provided attachments array, poll those
+        if (Array.isArray(localDiary.value.attachments) && localDiary.value.attachments.length) {
+            localDiary.value.attachments.forEach((f) => {
+                if (!f) return;
+                if ((f.status || '') !== 'ready' && f.id) pollAttachmentStatus(f.id, 0);
+            });
+        }
+
+        // Also scan content for any [[attachment:id:...]] placeholders and start polling for them
+        const body = localDiary.value.content || '';
+        const ids = extractPlaceholderIds(body);
+        ids.forEach((id) => {
+            // ensure attachments array exists and contains an entry for this id so UI can show it when ready
+            if (!Array.isArray(localDiary.value.attachments)) localDiary.value.attachments = [];
+            const existing = localDiary.value.attachments.find((a) => String(a.id) === String(id));
+            if (!existing) {
+                localDiary.value.attachments.push({ id: Number(id), status: 'pending' });
+            }
+            pollAttachmentStatus(id, 0);
+        });
+    } catch (e) {}
+}
+
+async function pollAttachmentStatus(id, attempt) {
+    const maxAttempts = 30;
+    const interval = 2000;
+    try {
+        const r = await axios.get(`/api/uploads/status/${id}`);
+        if (r && r.data) {
+            const st = r.data.status;
+            // upsert into attachments array so we have url/mime available
+            if (!Array.isArray(localDiary.value.attachments)) localDiary.value.attachments = [];
+            const idx = (localDiary.value.attachments || []).findIndex((f) => String(f.id) === String(id));
+            const updatedMeta = {
+                id: Number(id),
+                status: st || 'pending',
+                url: r.data.url || null,
+                mime_type: r.data.mime || r.data.mime_type || null,
+                original_name: r.data.original_name || null,
+                size: r.data.size || null,
+            };
+            if (idx >= 0) {
+                localDiary.value.attachments.splice(idx, 1, { ...localDiary.value.attachments[idx], ...updatedMeta });
+            } else {
+                localDiary.value.attachments.push(updatedMeta);
+            }
+
+            if (st === 'ready') {
+                const placeholder = `[[attachment:${id}:`;
+                if (localDiary.value.content && localDiary.value.content.indexOf(placeholder) >= 0) {
+                    const url = r.data.url;
+                    const original = r.data.original_name || '';
+                    if (r.data.mime && r.data.mime.startsWith('image/')) {
+                        localDiary.value.content = localDiary.value.content.replace(
+                            new RegExp(`\\[\\[attachment:${id}:[^\\]]*\\]\\]`, 'g'),
+                            `![](${url})`,
+                        );
+                    } else {
+                        // remove placeholder entirely for non-image attachments
+                        localDiary.value.content = localDiary.value.content.replace(new RegExp(`\\[\\[attachment:${id}:[^\\]]*\\]\\]`, 'g'), ``);
+                    }
+                }
+                return;
+            }
+        }
+    } catch (e) {}
+    if (attempt < maxAttempts) setTimeout(() => pollAttachmentStatus(id, attempt + 1), interval);
+}
+
+function extractPlaceholderIds(body) {
+    if (!body || typeof body !== 'string') return [];
+    const ids = [];
+    const re = /\[\[attachment:(\d+):[^\]]*\]\]/g;
+    let m;
+    while ((m = re.exec(body))) {
+        if (m && m[1]) ids.push(m[1]);
+    }
+    // dedupe
+    return Array.from(new Set(ids));
+}
+
+function isAttachmentUrl(url) {
+    try {
+        if (!localDiary.value || !Array.isArray(localDiary.value.attachments)) return false;
+        return localDiary.value.attachments.some((a) => {
+            if (!a || !a.url || !url) return false;
+            try {
+                const au = String(a.url);
+                return url === au || url.startsWith(au) || au.startsWith(url);
+            } catch (e) {
+                return false;
+            }
+        });
+    } catch (e) {
+        return false;
+    }
+}
+
+function extractAttachmentsFromBody(body) {
+    if (!body || typeof body !== 'string') return [];
+    const results = [];
+    try {
+        // If body contains HTML anchors, parse them first
+        if (/<a\s+/i.test(body)) {
+            const container = document.createElement('div');
+            container.innerHTML = body;
+            const links = container.querySelectorAll('a[href]');
+            links.forEach((a) => {
+                try {
+                    const href = a.getAttribute('href');
+                    if (href) results.push({ original_name: (a.textContent && a.textContent.trim()) || href.split('/').pop() || href, url: href });
+                } catch (e) {}
+            });
+        }
+    } catch (e) {}
+    const mdRe = /!\[([^\]]*)\]\((https?:[^)]+)\)/g; // images
+    let m;
+    while ((m = mdRe.exec(body))) {
+        results.push({ original_name: m[1] || m[2].split('/').pop(), url: m[2] });
+    }
+    // normal links and markdown links
+    const linkRe = /\[([^\]]+)\]\((https?:[^)]+)\)/g;
+    while ((m = linkRe.exec(body))) {
+        results.push({ original_name: m[1], url: m[2] });
+    }
+    const urlRe = /(^|\s)(https?:\/\/[^\s<>"]+)/g;
+    while ((m = urlRe.exec(body))) {
+        const url = m[2] || m[1];
+        if (!results.find((r) => r.url === url)) results.push({ original_name: url.split('/').pop() || url, url });
+    }
+    return results;
+}
+
+const attachmentsList = computed(() => {
+    const explicit = localDiary.value && Array.isArray(localDiary.value.attachments) ? localDiary.value.attachments || [] : [];
+    const extracted = extractAttachmentsFromBody(localDiary.value?.content || '');
+    // merge explicit and extracted, preferring explicit entries when URLs match
+    const out = [];
+    const seen = new Set();
+    explicit.forEach((e) => {
+        const key = e.url || (e.original_name ? `name:${e.original_name}` : `id:${e.id}`) || JSON.stringify(e);
+        seen.add(key);
+        out.push(e);
+    });
+    extracted.forEach((ex) => {
+        const key = ex.url || (ex.original_name ? `name:${ex.original_name}` : null);
+        if (key && seen.has(key)) return;
+        // normalize relative URLs to absolute when possible (leave as-is otherwise)
+        out.push({ original_name: ex.original_name, url: ex.url });
+        if (key) seen.add(key);
+    });
+    return out;
+});
+
+async function deleteAttachment(file) {
+    if (!file) return;
+    if (!confirm('添付ファイルを削除してよいですか？')) return;
+
+    // If the file has an attachment id on the server, try to delete via API
+    try {
+        if (file.id) {
+            // try server DELETE endpoint - adjust path if your backend mounts attachments elsewhere
+            // Use API endpoint for attachment deletion (SPA session-auth)
+            const res = await axios.delete(`/api/attachments/${file.id}`);
+            if (res && (res.status === 200 || res.status === 204)) {
+                // remove from local attachments
+                localDiary.value.attachments = (localDiary.value.attachments || []).filter((a) => String(a.id) !== String(file.id));
+                return;
+            }
+        }
+    } catch (e) {
+        // ignore and fallback to optimistic removal
+        console.warn('attachment delete API failed', e);
+    }
+
+    // Fallback: optimistic remove from local state (client-only)
+    try {
+        if (Array.isArray(localDiary.value.attachments)) {
+            localDiary.value.attachments = (localDiary.value.attachments || []).filter((a) => {
+                // try matching by url or original_name if id not present
+                if (file.id && a.id) return String(a.id) !== String(file.id);
+                if (file.url && a.url) return file.url !== a.url;
+                if (file.original_name && a.original_name) return file.original_name !== a.original_name;
+                return true;
+            });
+        }
+    } catch (e) {
+        console.warn('optimistic remove failed', e);
+    }
+}
+
+// sanitize and render body: convert ![]() to <img>, markdown links to anchors, but suppress attachment links already represented in attachmentsList
+function sanitize(html) {
+    const src = html || '';
+    try {
+        const container = document.createElement('div');
+        container.innerHTML = src;
+        const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+        const textNodes = [];
+        while (walker.nextNode()) textNodes.push(walker.currentNode);
+        textNodes.forEach((tn) => {
+            const text = tn.nodeValue || '';
+            let replaced = text;
+            replaced = replaced.replace(
+                /!\[([^\]]*)\]\(([^)]+)\)/g,
+                (m, alt, url) => `<img src="${String(url).trim()}" alt="${alt || ''}" class="max-w-full h-auto rounded" />`,
+            );
+            replaced = replaced.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, txt, url) => {
+                const u = String(url).trim();
+                if (isAttachmentUrl(u)) return ``;
+                return `<a href="${u}" target="_blank" rel="noopener noreferrer" class="text-blue-600 underline" download>${txt}</a>`;
+            });
+            replaced = replaced.replace(/(^|\s)(https?:\/\/[^\s<>]+)/g, (m, pre, url) => {
+                const u = String(url).trim();
+                if (isAttachmentUrl(u)) return `${pre}`;
+                return `${pre}<a href="${u}" target="_blank" rel="noopener noreferrer" class="text-blue-600 underline" download>${u}</a>`;
+            });
+            if (replaced !== text) {
+                const frag = document.createRange().createContextualFragment(replaced);
+                tn.parentNode.replaceChild(frag, tn);
+            }
+        });
+        return DOMPurify.sanitize(container.innerHTML);
+    } catch (e) {
+        return DOMPurify.sanitize(src);
+    }
+}
+
+const sanitizedContent = computed(() => sanitize(localDiary.value?.content || ''));
+
+// Preview modal state and helpers
+const previewModal = ref({ open: false, url: null, mime: null, filename: null, isBlob: false });
+let currentObjectUrl = null;
+function revokeCurrentObjectUrl() {
+    try {
+        if (currentObjectUrl) {
+            URL.revokeObjectURL(currentObjectUrl);
+            currentObjectUrl = null;
+        }
+    } catch (e) {}
+}
+async function fetchBlobAndShow(url, filename) {
+    try {
+        const res = await axios.get(url, { responseType: 'blob' });
+        const blob = res.data;
+        const mime = blob.type || res.headers['content-type'] || 'application/octet-stream';
+        revokeCurrentObjectUrl();
+        currentObjectUrl = URL.createObjectURL(blob);
+        previewModal.value = { open: true, url: currentObjectUrl, mime, filename: filename || url.split('/').pop() || 'file', isBlob: true };
+    } catch (e) {
+        try {
+            window.open(url, '_blank', 'noopener');
+        } catch (e2) {}
+    }
+}
+
+function openAttachmentInModal(file) {
+    if (!file || !file.url) return;
+    if (file.url.startsWith('blob:') || file.url.startsWith('data:')) {
+        previewModal.value = {
+            open: true,
+            url: file.url,
+            mime: file.mime_type || '',
+            filename: file.original_name || '',
+            isBlob: file.url.startsWith('blob:'),
+        };
+        return;
+    }
+    fetchBlobAndShow(file.url, file.original_name || 'file');
+}
+
+function onBodyClick(e) {
+    try {
+        const a = e.target.closest && e.target.closest('a');
+        if (a && a.href) {
+            e.preventDefault();
+            const url = a.href;
+            const filename = (a.textContent && a.textContent.trim()) || url.split('/').pop();
+            fetchBlobAndShow(url, filename);
+        }
+    } catch (e) {}
+}
+
+function closePreviewModal() {
+    previewModal.value.open = false;
+    revokeCurrentObjectUrl();
+}
+
 onMounted(async () => {
     try {
         // pass only YYYY-MM-DD to backend using the app/JST-aware formatter so the diary's displayed date
@@ -264,6 +645,8 @@ onMounted(async () => {
         // ignore fetch errors silently for now
         console.warn('Failed to load events for diary show', err);
     }
+    // start attachment polling for any in-progress uploads
+    startAttachmentPolling();
 });
 
 function computeSnappedMinuteFromClientX(clientX) {
@@ -276,7 +659,9 @@ function computeSnappedMinuteFromClientX(clientX) {
     const scrollLeft = scrollWrap ? scrollWrap.scrollLeft || 0 : container.scrollLeft || 0;
     const clickX = clientX - contentLeft + scrollLeft;
     const measuredPxPerMin =
-        timelineContentRef.value && timelineContentRef.value && windowMinutes.value > 0 ? timelineContentRef.value.clientWidth / windowMinutes.value : null;
+        timelineContentRef.value && timelineContentRef.value && windowMinutes.value > 0
+            ? timelineContentRef.value.clientWidth / windowMinutes.value
+            : null;
     const pxPerMin = measuredPxPerMin || pxPerMinute.value;
     const rawMin = startHour.value * 60 + clickX / pxPerMin;
     const hourPart = Math.floor(rawMin / 60);
@@ -465,7 +850,9 @@ function handleTimelineClick(e) {
     const clickX = e.clientX - contentLeft + scrollLeft;
     // derive pxPerMin from rendered content width if available to avoid mismatch
     const measuredPxPerMin =
-        timelineContentRef.value && timelineContentRef.value && windowMinutes.value > 0 ? timelineContentRef.value.clientWidth / windowMinutes.value : null;
+        timelineContentRef.value && timelineContentRef.value && windowMinutes.value > 0
+            ? timelineContentRef.value.clientWidth / windowMinutes.value
+            : null;
     const pxPerMin = measuredPxPerMin || pxPerMinute.value;
     // compute raw minute and then snap to either :00 or :30
     const rawMin = startHour.value * 60 + clickX / pxPerMin;
@@ -727,7 +1114,31 @@ onUnmounted(() => {
                 <div class="rounded bg-white p-6 shadow">
                     <h1 class="mb-4 text-2xl font-bold">日報 {{ formatJstDate(props.diary.date) }}</h1>
                     <div class="prose mb-6">
-                        <p v-html="props.diary.content"></p>
+                        <div v-html="sanitizedContent" @click="onBodyClick"></div>
+                    </div>
+                    <!-- 追加: 既読ユーザー名と保存されたコメントをユーザー日記にも表示 -->
+                    <!-- 既読者表示 -->
+                    <div v-if="readerNames.length" class="mb-4 text-sm text-gray-600">
+                        <strong class="mr-2">既読:</strong>
+                        <span>{{ readerNames.join(', ') }}</span>
+                    </div>
+                    <!-- 保存されたコメント表示 -->
+                    <div class="mb-4">
+                        <h3 class="mb-2 font-semibold">保存されたコメント</h3>
+                        <div v-if="!(props.diary.comments || []).length" class="mb-2 text-sm text-gray-600">コメントはありません</div>
+                        <div
+                            v-for="(c, idx) in props.diary.comments || []"
+                            :key="c.id || idx"
+                            class="mb-2 flex items-start justify-between rounded border p-3"
+                        >
+                            <div class="text-sm text-gray-700">
+                                <strong>{{ c.user_name || c.user_name }}</strong
+                                >： <span class="whitespace-pre-wrap">{{ c.comment }}</span>
+                            </div>
+                            <div v-if="c.user_id === $page.props.auth?.user?.id" class="ml-4">
+                                <button @click.prevent="deleteComment(c.id, idx)" class="text-sm text-red-600 hover:underline">削除</button>
+                            </div>
+                        </div>
                     </div>
                     <div class="mb-4 flex space-x-4">
                         <!-- 今日の日報表示時は新規作成ボタンを非表示 -->
@@ -749,6 +1160,39 @@ onUnmounted(() => {
                             @open-create="onTimelineOpenCreate"
                             @open-edit="onTimelineOpenEdit"
                         />
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700">添付ファイル</label>
+                        <div v-if="attachmentsList && attachmentsList.length">
+                            <ul class="mt-2 space-y-2">
+                                <li
+                                    v-for="file in attachmentsList"
+                                    :key="file.id || file.url || file.original_name"
+                                    class="flex items-center justify-between rounded bg-gray-50 p-2"
+                                >
+                                    <div>
+                                        <div class="text-sm font-medium text-gray-900">{{ file.original_name || file.name }}</div>
+                                        <div class="text-xs text-gray-500">
+                                            {{ file.size ? (file.size / 1024).toFixed(1) + ' KB' : '-' }} • {{ file.mime_type || file.mime || '-' }}
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-3">
+                                        <button
+                                            v-if="file.url"
+                                            type="button"
+                                            @click.prevent="openAttachmentInModal(file)"
+                                            class="text-blue-600 underline"
+                                        >
+                                            開く
+                                        </button>
+                                        <a v-if="file.url" :href="file.url" :download="file.original_name" class="text-gray-600">ダウンロード</a>
+                                        <span v-else class="text-sm text-gray-500">(利用不可)</span>
+                                        <button type="button" @click.prevent="deleteAttachment(file)" class="ml-3 text-sm text-red-600">削除</button>
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
+                        <div v-else class="mt-2 text-sm text-gray-500">添付ファイルなし</div>
                     </div>
                 </div>
                 <!-- Event modal -->
@@ -780,6 +1224,30 @@ onUnmounted(() => {
                         <div class="flex flex-col gap-4">
                             <button @click="createFromSelect" class="rounded bg-blue-600 px-4 py-2 text-white">予定作成</button>
                             <button @click="closeSelectModal" class="rounded bg-gray-300 px-4 py-2">キャンセル</button>
+                        </div>
+                    </div>
+                </div>
+                <!-- Preview Modal -->
+                <div v-if="previewModal.open" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                    <div class="max-h-[90vh] w-full max-w-4xl overflow-auto rounded bg-white p-4">
+                        <div class="mb-2 flex items-center justify-between">
+                            <div class="text-sm font-medium">プレビュー: {{ previewModal.filename }}</div>
+                            <button type="button" @click="closePreviewModal" class="text-gray-600">閉じる</button>
+                        </div>
+                        <div class="border p-2">
+                            <template v-if="previewModal.mime && previewModal.mime.startsWith('image/')">
+                                <img :src="previewModal.url" alt="preview" class="h-auto max-w-full" />
+                            </template>
+                            <template v-else-if="previewModal.mime && previewModal.mime === 'application/pdf'">
+                                <iframe :src="previewModal.url" class="w-full" style="height: 70vh" frameborder="0"></iframe>
+                            </template>
+                            <template v-else>
+                                <div class="text-sm">
+                                    プレビューできません。<a :href="previewModal.url" target="_blank" rel="noopener" class="text-blue-600 underline"
+                                        >新しいタブで開く</a
+                                    >
+                                </div>
+                            </template>
                         </div>
                     </div>
                 </div>

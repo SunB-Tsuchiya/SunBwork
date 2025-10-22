@@ -180,12 +180,12 @@ async function pollAttachmentStatus(id, attempt) {
                     const original = r.data.original_name || '';
                     if (r.data.mime && r.data.mime.startsWith('image/')) {
                         localMessage.value.body = localMessage.value.body.replace(
-                            new RegExp(`\\[\\[attachment:${id}:[^\\]]*\\]`, 'g'),
+                            new RegExp(`\\[\\[attachment:${id}:[^\\]]*\\]\\]`, 'g'),
                             `![](${url})`,
                         );
                     } else {
                         // For non-image attachments, remove placeholder entirely so filename does not appear in the body.
-                        localMessage.value.body = localMessage.value.body.replace(new RegExp(`\\[\\[attachment:${id}:[^\\]]*\\]`, 'g'), ``);
+                        localMessage.value.body = localMessage.value.body.replace(new RegExp(`\\[\\[attachment:${id}:[^\\]]*\\]\\]`, 'g'), ``);
                     }
                 } else {
                     // placeholder not found debug suppressed

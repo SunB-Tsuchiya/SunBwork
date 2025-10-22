@@ -10,12 +10,29 @@ use Inertia\Inertia;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Facades\DB;
 
 class AiHistoryController extends Controller
 {
     public function index(Request $request)
     {
-        $convs = AiConversation::withCount('messages')->latest()->paginate(20);
+        $user = $request->user();
+        $scope = $request->query('scope', 'mine'); // 'mine' or 'all'
+
+        $isAdmin = $user && (
+            (method_exists($user, 'isAdmin') && $user->isAdmin()) ||
+            (method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin()) ||
+            in_array(($user->user_role ?? ''), ['admin', 'superadmin'])
+        );
+
+        // include the user relation so frontend (admin) can display user info
+        $query = AiConversation::withCount('messages')->with('user')->latest();
+        if (!$isAdmin || $scope !== 'all') {
+            // non-admins always only see their own; admins see all only when scope=all
+            $query->where('user_id', $user ? $user->id : 0);
+        }
+
+        $convs = $query->paginate(20);
         // If this is an XHR / AJAX request (axios from the frontend), return JSON payload
         if ($request->wantsJson() || $request->ajax() || $request->expectsJson()) {
             // return paginated data as array; frontend will handle res.data or res.data.data
@@ -26,7 +43,19 @@ class AiHistoryController extends Controller
 
     public function show(Request $request, $id)
     {
+        $user = $request->user();
         $conv = AiConversation::with('messages')->findOrFail($id);
+
+        // authorize: owner or admin
+        $isAdmin = $user && (
+            (method_exists($user, 'isAdmin') && $user->isAdmin()) ||
+            (method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin()) ||
+            in_array(($user->user_role ?? ''), ['admin', 'superadmin'])
+        );
+        if ($conv->user_id && $user && $user->id !== $conv->user_id && !$isAdmin) {
+            return response()->json(['error' => 'forbidden'], 403);
+        }
+
         return Inertia::render('Bot/AiHistoryShow', ['conversation' => $conv]);
     }
 
@@ -104,6 +133,86 @@ class AiHistoryController extends Controller
         }
 
         return response()->json($conv->fresh());
+    }
+
+    /**
+     * Delete a conversation and its related messages and attachments.
+     */
+    public function destroy(Request $request, $id)
+    {
+        $conv = AiConversation::with('messages')->find($id);
+        if (!$conv) return response()->json(['error' => 'not found'], 404);
+
+        // Authorization: only owner or admin can delete (basic check)
+        $user = $request->user();
+        if ($user && $conv->user_id && $user->id !== $conv->user_id) {
+            // project uses user_role / isAdmin() / isSuperAdmin helper - allow superadmin as well
+            $isAdmin = (
+                (method_exists($user, 'isAdmin') && $user->isAdmin()) ||
+                (method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin()) ||
+                in_array(($user->user_role ?? ''), ['admin', 'superadmin'])
+            );
+            if (!$isAdmin) {
+                return response()->json(['error' => 'forbidden'], 403);
+            }
+        }
+
+        // Collect attachments referenced in messages (meta.file.path) and via attachmentables pivot
+        $attachmentService = new \App\Services\AttachmentService();
+        $attachmentIds = [];
+        try {
+            foreach ($conv->messages as $m) {
+                if (!empty($m->meta) && is_array($m->meta) && !empty($m->meta['file'])) {
+                    $file = $m->meta['file'];
+                    if (!empty($file['attachment_id'])) $attachmentIds[] = $file['attachment_id'];
+                }
+            }
+        } catch (\Throwable $_e) {
+            // ignore
+        }
+
+        // Also find attachments linked via attachmentables pivot to AiConversation
+        try {
+            $pivotRows = DB::table('attachmentables')
+                ->where('attachable_type', \App\Models\AiConversation::class)
+                ->where('attachable_id', $conv->id)
+                ->pluck('attachment_id')
+                ->toArray();
+            foreach ($pivotRows as $pid) $attachmentIds[] = $pid;
+        } catch (\Throwable $_e) {
+            // ignore
+        }
+
+        // Unique ids
+        $attachmentIds = array_values(array_filter(array_unique($attachmentIds)));
+
+        DB::beginTransaction();
+        try {
+            // delete messages
+            $conv->messages()->delete();
+            // delete pivot rows for this conversation
+            DB::table('attachmentables')->where('attachable_type', \App\Models\AiConversation::class)->where('attachable_id', $conv->id)->delete();
+            // delete conversation
+            $conv->delete();
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json(['error' => 'delete failed', 'message' => $e->getMessage()], 500);
+        }
+
+        // Cleanup attachments after transaction (use service which will remove storage and any remaining pivots)
+        foreach ($attachmentIds as $aid) {
+            try {
+                $att = \App\Models\Attachment::find($aid);
+                if ($att) $attachmentService->deleteAttachment($att);
+            } catch (\Throwable $_e) {
+                // log and continue
+                logger()->warning('AiHistoryController::destroy cleanup attach failed: ' . $_e->getMessage());
+            }
+        }
+
+        return response()->json(['success' => true]);
     }
 
     /**

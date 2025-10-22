@@ -5,13 +5,16 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Carbon\Carbon;
 use Intervention\Image\ImageManager;
 use App\Models\Diary;
 use App\Models\Attachment;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Log;
+use App\Services\AttachmentService;
 
 class DiaryController extends Controller
 {
@@ -235,63 +238,16 @@ class DiaryController extends Controller
             }
         }
 
-        // 添付ファイル保存
+        // 添付ファイル保存: AttachmentService に処理を委譲してサムネイル生成/DB登録/ピボットを集中管理
         if ($request->hasFile('files')) {
-
-
+            $svc = new AttachmentService();
             foreach ($request->file('files') as $file) {
-                $isImage = strpos($file->getMimeType(), 'image') === 0;
-                // ファイル名生成: 元のファイル名_YYYYMMDD[diary_id].[拡張子]
-                $original = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
-                $ext = $file->getClientOriginalExtension();
-                $dateStr = date('Ymd', strtotime($diary->created_at));
-                $uniqueName = $original . '_' . $dateStr . $diary->id . '.' . $ext;
-                $path = 'attachments/' . $uniqueName;
-
-                if ($isImage) {
-                    // Intervention Imageでリサイズ（横幅1200px以内）
-                    /** @var \Intervention\Image\Image $img */
-                    if (extension_loaded('imagick') && class_exists(\Intervention\Image\Drivers\Imagick\Driver::class)) {
-                        $manager = ImageManager::imagick();
-                    } else {
-                        $manager = ImageManager::gd();
-                    }
-                    $img = $manager->read($file);
-                    if ($img->width() > 1200) {
-                        $img->resize(1200, null, function ($constraint) {
-                            $constraint->aspectRatio();
-                            $constraint->upsize();
-                        });
-                    }
-                    if (strtolower($ext) === 'png') {
-                        $enc = new \Intervention\Image\Encoders\PngEncoder();
-                    } else {
-                        $enc = new \Intervention\Image\Encoders\JpegEncoder(80);
-                    }
-                    $encoded = $img->encode($enc);
-                    Storage::disk('public')->put($path, (string) $encoded->toDataUri() ? base64_decode(preg_replace('#^data:.*?;base64,#', '', $encoded->toDataUri())) : (string) $encoded);
-                    try {
-                        Storage::disk('public')->setVisibility($path, 'public');
-                        $real = Storage::disk('public')->path($path) ?? null;
-                        if ($real && file_exists($real)) {
-                            @chmod($real, 0644);
-                        }
-                    } catch (\Throwable $_exPerm) {
-                        logger()->warning('DiaryController: could not set permissions for image', ['path' => $path, 'error' => $_exPerm->getMessage()]);
-                    }
-                } else {
-                    Storage::disk('public')->putFileAs('attachments', $file, $uniqueName);
-                }
-                // Create a generic Attachment and attach via polymorphic pivot to this Diary
-                $attachment = \App\Models\Attachment::create([
-                    'path' => $path,
-                    'original_name' => $file->getClientOriginalName(),
-                    'mime_type' => $file->getMimeType(),
-                ]);
                 try {
-                    $diary->attachments()->attach($attachment->id, ['created_at' => now(), 'updated_at' => now()]);
-                } catch (\Throwable $_ex) {
-                    logger()->warning('DiaryController: could not attach attachment to diary', ['attachment_id' => $attachment->id, 'diary_id' => $diary->id, 'error' => $_ex->getMessage()]);
+                    // storeUploadedFile will save to public/attachments, create thumbnail when applicable,
+                    // create Attachment DB row and attach pivot to the Diary when attachable args are provided.
+                    $svc->storeUploadedFile($file, Auth::user(), \App\Models\Diary::class, $diary->id);
+                } catch (\Throwable $__e) {
+                    Log::warning('DiaryController: AttachmentService storeUploadedFile failed: ' . $__e->getMessage());
                 }
             }
         }
@@ -302,8 +258,90 @@ class DiaryController extends Controller
     public function show(Diary $diary)
     {
         $this->authorize('view', $diary);
+        // Load relations and normalize read_by / comments to match interactions view
+        $diary->load('user', 'comments', 'attachments');
+
+        $readBy = $diary->read_by ?? [];
+        $readByNames = [];
+        $readByStructured = [];
+        if (!empty($readBy) && is_array($readBy)) {
+            $names = User::whereIn('id', $readBy)->pluck('name', 'id')->toArray();
+            $readByNames = array_map(function ($id) use ($names) {
+                return $names[$id] ?? ('ID:' . $id);
+            }, $readBy);
+
+            $readByStructured = array_map(function ($id) use ($names) {
+                return [
+                    'id' => $id,
+                    'name' => $names[$id] ?? ('ID:' . $id),
+                ];
+            }, $readBy);
+        }
+
+        $diaryArray = $diary->toArray();
+        $diaryArray['read_by_names'] = $readByNames;
+        $diaryArray['read_by'] = $readByStructured;
+        $diaryArray['comments'] = array_map(function ($c) {
+            return [
+                'id' => $c['id'] ?? null,
+                'user_id' => $c['user_id'] ?? null,
+                'user_name' => $c['user_name'] ?? null,
+                'comment' => $c['comment'] ?? '',
+                'created_at' => $c['created_at'] ?? null,
+            ];
+        }, $diaryArray['comments'] ?? []);
+
+        // Map attachments to expose signed urls and thumbnail urls when available
+        $diaryArray['attachments'] = $diary->attachments->map(function ($att) {
+            $url = null;
+            $public = null;
+            $thumb = null;
+            if (($att->status === 'ready' || $att->status === 1) && $att->path) {
+                try {
+                    $url = URL::temporarySignedRoute('attachments.signed', now()->addMinutes(15), ['path' => $att->path]);
+                } catch (\Throwable $__e) {
+                    try {
+                        $url = route('api.attachments.stream', ['path' => $att->path]);
+                    } catch (\Throwable $_e) {
+                        $url = null;
+                    }
+                }
+                $public = $att->path ? asset('storage/' . ltrim($att->path, '/')) : null;
+
+                // thumbnail candidate(s)
+                $candidate = dirname($att->path) . '/thumbs/' . basename($att->path);
+                if (Storage::disk('public')->exists($candidate)) {
+                    try {
+                        $thumb = URL::temporarySignedRoute('attachments.signed', now()->addMinutes(15), ['path' => $candidate]);
+                    } catch (\Throwable $_e) {
+                        $thumb = asset('storage/' . ltrim($candidate, '/'));
+                    }
+                } else {
+                    $alt = 'attachments/thumbs/' . basename($att->path);
+                    if (Storage::disk('public')->exists($alt)) {
+                        try {
+                            $thumb = URL::temporarySignedRoute('attachments.signed', now()->addMinutes(15), ['path' => $alt]);
+                        } catch (\Throwable $_e) {
+                            $thumb = asset('storage/' . ltrim($alt, '/'));
+                        }
+                    }
+                }
+            }
+            return [
+                'id' => $att->id,
+                'original_name' => $att->original_name,
+                'mime_type' => $att->mime_type,
+                'size' => $att->size,
+                'status' => $att->status,
+                'url' => $url,
+                'public_url' => $public,
+                'path' => $att->path,
+                'thumb_url' => $thumb,
+            ];
+        })->values();
+
         return Inertia::render('Diaries/Show', [
-            'diary' => $diary,
+            'diary' => $diaryArray,
         ]);
     }
 
@@ -366,11 +404,11 @@ class DiaryController extends Controller
             if ($request->hasFile('files')) {
                 foreach ($request->file('files') as $file) {
                     $isImage = strpos($file->getMimeType(), 'image') === 0;
-                    $original = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
                     $ext = $file->getClientOriginalExtension();
-                    $dateStr = date('Ymd', strtotime($diary->created_at));
-                    $uniqueName = $original . '_' . $dateStr . $diary->id . '.' . $ext;
-                    $path = 'attachments/' . $uniqueName;
+                    $origName = basename($file->getClientOriginalName());
+                    $safeName = preg_replace('/[^A-Za-z0-9_.-]/', '_', $origName);
+                    $unique = uniqid() . '_' . $safeName;
+                    $path = 'attachments/' . $unique;
 
                     if ($isImage) {
                         /** @var \Intervention\Image\Image $img */
@@ -393,6 +431,44 @@ class DiaryController extends Controller
                         }
                         $encoded = $img->encode($enc);
                         Storage::disk('public')->put($path, (string) $encoded->toDataUri() ? base64_decode(preg_replace('#^data:.*?;base64,#', '', $encoded->toDataUri())) : (string) $encoded);
+                        // create thumbnail for diary images
+                        try {
+                            if (class_exists(\Intervention\Image\ImageManager::class)) {
+                                if (extension_loaded('imagick') && class_exists(\Intervention\Image\Drivers\Imagick\Driver::class)) {
+                                    $tManager = ImageManager::imagick();
+                                } else {
+                                    $tManager = ImageManager::gd();
+                                }
+                                $tImg = $tManager->read($file);
+                                // Ensure thumbnail fits within 400x400 while preserving aspect ratio
+                                try {
+                                    if ($tImg->width() > 400) {
+                                        $tImg->resize(400, null, function ($constraint) {
+                                            $constraint->aspectRatio();
+                                            $constraint->upsize();
+                                        });
+                                    }
+                                } catch (\Throwable $_resizeEx) {
+                                    // ignore resizing errors and continue
+                                }
+                                $thumbPath = 'attachments/thumbs/' . basename($path);
+                                $thumbEncoder = new \Intervention\Image\Encoders\JpegEncoder(80);
+                                $thumbEncoded = $tImg->encode($thumbEncoder);
+                                $thumbBin = (string) $thumbEncoded->toDataUri() ? base64_decode(preg_replace('#^data:.*?;base64,#', '', $thumbEncoded->toDataUri())) : (string) $thumbEncoded;
+                                Storage::disk('public')->put($thumbPath, $thumbBin);
+                                try {
+                                    Storage::disk('public')->setVisibility($thumbPath, 'public');
+                                    $realThumb = Storage::disk('public')->path($thumbPath) ?? null;
+                                    if ($realThumb && file_exists($realThumb)) {
+                                        @chmod($realThumb, 0644);
+                                    }
+                                } catch (\Throwable $_exPerm) {
+                                    logger()->warning('DiaryController: could not set permissions for thumb', ['thumb' => $thumbPath, 'error' => $_exPerm->getMessage()]);
+                                }
+                            }
+                        } catch (\Throwable $_t) {
+                            Log::warning('Diary thumbnail create failed: ' . $_t->getMessage());
+                        }
                         try {
                             Storage::disk('public')->setVisibility($path, 'public');
                             $real = Storage::disk('public')->path($path) ?? null;
@@ -403,7 +479,7 @@ class DiaryController extends Controller
                             logger()->warning('DiaryController: could not set permissions for image', ['path' => $path, 'error' => $_exPerm->getMessage()]);
                         }
                     } else {
-                        Storage::disk('public')->putFileAs('attachments', $file, $uniqueName);
+                        Storage::disk('public')->putFileAs('attachments', $file, $unique);
                     }
                     $attachment = \App\Models\Attachment::create([
                         'path' => $path,
@@ -444,58 +520,14 @@ class DiaryController extends Controller
         $data['end'] = $data['date'] . ' ' . $data['endHour'] . ':' . $data['endMinute'] . ':00';
         $diary->update($data);
 
-        // 添付ファイル保存（追加分のみ）
+        // 添付ファイル保存（追加分のみ）: AttachmentService に委譲
         if ($request->hasFile('files')) {
+            $svc = new AttachmentService();
             foreach ($request->file('files') as $file) {
-                $isImage = strpos($file->getMimeType(), 'image') === 0;
-                $original = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
-                $ext = $file->getClientOriginalExtension();
-                $dateStr = date('Ymd', strtotime($diary->start));
-                $uniqueName = $original . '_' . $dateStr . $diary->id . '.' . $ext;
-                $path = 'attachments/' . $uniqueName;
-
-                if ($isImage) {
-                    /** @var \Intervention\Image\Image $img */
-                    if (extension_loaded('imagick') && class_exists(\Intervention\Image\Drivers\Imagick\Driver::class)) {
-                        $manager = ImageManager::imagick();
-                    } else {
-                        $manager = ImageManager::gd();
-                    }
-                    $img = $manager->read($file);
-                    if ($img->width() > 1200) {
-                        $img->resize(1200, null, function ($constraint) {
-                            $constraint->aspectRatio();
-                            $constraint->upsize();
-                        });
-                    }
-                    if (strtolower($ext) === 'png') {
-                        $enc = new \Intervention\Image\Encoders\PngEncoder();
-                    } else {
-                        $enc = new \Intervention\Image\Encoders\JpegEncoder(80);
-                    }
-                    $encoded = $img->encode($enc);
-                    Storage::disk('public')->put($path, (string) $encoded->toDataUri() ? base64_decode(preg_replace('#^data:.*?;base64,#', '', $encoded->toDataUri())) : (string) $encoded);
-                    try {
-                        Storage::disk('public')->setVisibility($path, 'public');
-                        $real = Storage::disk('public')->path($path) ?? null;
-                        if ($real && file_exists($real)) {
-                            @chmod($real, 0644);
-                        }
-                    } catch (\Throwable $_exPerm) {
-                        logger()->warning('DiaryController: could not set permissions for image', ['path' => $path, 'error' => $_exPerm->getMessage()]);
-                    }
-                } else {
-                    Storage::disk('public')->putFileAs('attachments', $file, $uniqueName);
-                }
-                $attachment = \App\Models\Attachment::create([
-                    'path' => $path,
-                    'original_name' => $file->getClientOriginalName(),
-                    'mime_type' => $file->getMimeType(),
-                ]);
                 try {
-                    $diary->attachments()->attach($attachment->id, ['created_at' => now(), 'updated_at' => now()]);
-                } catch (\Throwable $_ex) {
-                    logger()->warning('DiaryController: could not attach uploaded attachment to diary (fallback)', ['attachment_id' => $attachment->id ?? null, 'diary_id' => $diary->id, 'error' => $_ex->getMessage()]);
+                    $svc->storeUploadedFile($file, Auth::user(), \App\Models\Diary::class, $diary->id);
+                } catch (\Throwable $__e) {
+                    Log::warning('DiaryController (update): AttachmentService storeUploadedFile failed: ' . $__e->getMessage());
                 }
             }
         }

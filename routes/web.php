@@ -74,6 +74,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::get('/bot/history/{id}', [App\Http\Controllers\Bot\AiHistoryController::class, 'show'])->name('bot.history.show');
     Route::get('/bot/history/{id}/json', [App\Http\Controllers\Bot\AiHistoryController::class, 'showJson'])->name('bot.history.show.json');
     Route::post('/bot/history', [App\Http\Controllers\Bot\AiHistoryController::class, 'store'])->name('bot.history.store');
+    Route::delete('/bot/history/{id}', [App\Http\Controllers\Bot\AiHistoryController::class, 'destroy'])->name('bot.history.destroy');
     Route::put('/bot/history/{id}', [App\Http\Controllers\Bot\AiHistoryController::class, 'update'])->name('bot.history.update');
 
     // Fetch latest summary for a conversation (used by frontend SummaryPanel)
@@ -97,6 +98,11 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
 
     // Diary comment delete (authenticated users can delete their own comment)
     Route::delete('diary-comments/{comment}', [App\Http\Controllers\DiaryCommentController::class, 'destroy'])->name('diary_comments.destroy');
+
+    // Attachment deletion (authenticated users) - allow frontend to call DELETE /attachments/{id}
+    Route::delete('attachments/{attachment}', [App\Http\Controllers\AttachmentController::class, 'destroy'])->name('attachments.destroy');
+    // Also allow deletion by POST/DELETE with path/attachment_id in body for clients that only have path
+    Route::delete('attachments', [App\Http\Controllers\AttachmentController::class, 'destroyByPath'])->name('attachments.destroy_by_path');
 
     // Unified diary interactions (管理者/リーダーの既読・コメント操作を統合するためのエンドポイント)
     // Keep /interactions as the canonical user-facing index. Provide /entries as a

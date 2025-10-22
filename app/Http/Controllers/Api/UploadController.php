@@ -89,7 +89,7 @@ class UploadController extends Controller
         ]);
 
         // dispatch async job to process and update attachment
-        ProcessUploadJob::dispatch($tmpPath, $attachment->id, $request->input('type'));
+        ProcessUploadJob::dispatch($tmpPath, $attachment->id, $request->input('type'), $request->user()?->id);
 
         return response()->json([
             'id' => $attachment->id,

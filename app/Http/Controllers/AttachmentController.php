@@ -6,6 +6,7 @@ use App\Models\Attachment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use App\Services\AttachmentService;
 
 class AttachmentController extends Controller
 {
@@ -40,9 +41,16 @@ class AttachmentController extends Controller
         if (!Storage::disk('public')->exists($path)) {
             abort(404);
         }
+        $svc = new AttachmentService();
+        try {
+            $fullPath = $svc->diskPath($path ?? $path);
+        } catch (\RuntimeException $e) {
+            // diskPath throws when not found; map to 404
+            abort(404);
+        }
 
         // Authorization: prefer checking polymorphic links (attachmentables) first,
-        // then fall back to legacy columns like message_id/user_id for compatibility.
+        return response()->file($fullPath);
         if (isset($att)) {
             try {
                 // If the attachment is linked to one or more messages via attachmentables,
@@ -52,30 +60,10 @@ class AttachmentController extends Controller
                     $isAllowed = ($linkedMessage->from_user_id === $user->id) || $linkedMessage->recipients->pluck('user_id')->contains($user->id);
                     if (!$isAllowed) abort(403, 'このファイルにアクセスする権限がありません');
                 } else {
-                    // No message link via pivot; fall back to legacy message_id column if present
-                    if ($att->message_id) {
-                        $msg = $att->message()->with('recipients')->first();
-                        if ($msg) {
-                            $isAllowed = ($msg->from_user_id === $user->id) || $msg->recipients->pluck('user_id')->contains($user->id);
-                            if (!$isAllowed) abort(403, 'このファイルにアクセスする権限がありません');
-                        }
-                    } else {
-                        // No message relation: allow owner (owner_type/owner_id or user_id) or admins
-                        // If owner_type/owner_id present, allow when matches current user (owner may be a User model)
-                        if ($att->owner_type && $att->owner_id) {
-                            try {
-                                if ($att->owner_type === 'App\\Models\\User' && intval($att->owner_id) !== intval($user->id)) {
-                                    if (!($user->user_role ?? '') || $user->user_role !== 'admin') abort(403, 'このファイルにアクセスする権限がありません');
-                                }
-                            } catch (\Throwable $ex) {
-                                Log::warning('owner auth lookup failed: ' . $ex->getMessage());
-                            }
-                        } else {
-                            if ($att->user_id && $att->user_id !== $user->id) {
-                                if (!($user->user_role ?? '') || $user->user_role !== 'admin') {
-                                    abort(403, 'このファイルにアクセスする権限がありません');
-                                }
-                            }
+                    // No message link via pivot: fallback to ownership by user_id or admin
+                    if ($att->user_id && $att->user_id !== $user->id) {
+                        if (!($user->user_role ?? '') || $user->user_role !== 'admin') {
+                            abort(403, 'このファイルにアクセスする権限がありません');
                         }
                     }
                 }
@@ -92,19 +80,9 @@ class AttachmentController extends Controller
                         $isAllowed = ($linkedMessage->from_user_id === $user->id) || $linkedMessage->recipients->pluck('user_id')->contains($user->id);
                         if (!$isAllowed) abort(403, 'このファイルにアクセスする権限がありません');
                     } else {
-                        if ($maybe->owner_type && $maybe->owner_id) {
-                            try {
-                                if ($maybe->owner_type === 'App\\Models\\User' && intval($maybe->owner_id) !== intval($user->id)) {
-                                    if (!($user->user_role ?? '') || $user->user_role !== 'admin') abort(403, 'このファイルにアクセスする権限がありません');
-                                }
-                            } catch (\Throwable $ex) {
-                                Log::warning('owner auth lookup failed: ' . $ex->getMessage());
-                            }
-                        } else {
-                            if ($maybe->user_id && $maybe->user_id !== $user->id) {
-                                if (!($user->user_role ?? '') || $user->user_role !== 'admin') {
-                                    abort(403, 'このファイルにアクセスする権限がありません');
-                                }
+                        if ($maybe->user_id && $maybe->user_id !== $user->id) {
+                            if (!($user->user_role ?? '') || $user->user_role !== 'admin') {
+                                abort(403, 'このファイルにアクセスする権限がありません');
                             }
                         }
                     }
@@ -116,5 +94,106 @@ class AttachmentController extends Controller
 
         $full = Storage::disk('public')->path($path);
         return response()->file($full);
+    }
+
+    /**
+     * Delete an attachment record and its storage files (authorized users only).
+     */
+    public function destroy(Request $request, Attachment $attachment)
+    {
+        $user = $request->user();
+
+        // Authorization: allow when the uploader or an admin deletes,
+        // or when the attachment is linked to a Diary owned by the current user.
+        $isOwner = ($attachment->user_id && intval($attachment->user_id) === intval($user->id));
+        $isAdmin = ($user->user_role ?? '') === 'admin';
+        $isDiaryOwnerLink = false;
+        try {
+            if ($attachment->diaries()->where('user_id', $user->id)->exists()) {
+                $isDiaryOwnerLink = true;
+            }
+        } catch (\Throwable $__e) {
+            // ignore and continue
+        }
+
+        if (!($isOwner || $isAdmin || $isDiaryOwnerLink)) {
+            abort(403, 'この操作を行う権限がありません');
+        }
+
+        // Delegate full deletion work to AttachmentService which will remove files, pivots and linked messages safely
+        $svc = new AttachmentService();
+        try {
+            $ok = $svc->deleteAttachment($attachment, $user);
+            if (!$ok) {
+                return response()->json(['error' => 'could_not_delete'], 500);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('AttachmentController::destroy: service deletion failed: ' . $e->getMessage(), ['attachment_id' => $attachment->id ?? null]);
+            return response()->json(['error' => 'could_not_delete'], 500);
+        }
+
+        return response()->json(['message' => 'deleted']);
+    }
+
+    /**
+     * Delete an attachment by lookup (path or attachment_id in request body).
+     * Useful for frontend clients that only have a storage path and not the DB id.
+     */
+    public function destroyByPath(Request $request)
+    {
+        $user = $request->user();
+        $path = $request->input('path');
+        $id = $request->input('attachment_id');
+
+        if (!$path && !$id) {
+            return response()->json(['error' => 'path_or_id_required'], 400);
+        }
+
+        $attachment = null;
+        if ($id) {
+            $attachment = Attachment::find($id);
+        }
+        if (!$attachment && $path) {
+            $p = ltrim((string)$path, '\\/');
+            $attachment = Attachment::where('path', $p)->first();
+            if (!$attachment) {
+                // try basename fallback
+                $basename = basename($p);
+                $attachment = Attachment::where('path', 'like', '%' . $basename)->first();
+            }
+        }
+
+        if (!$attachment) {
+            return response()->json(['error' => 'not_found'], 404);
+        }
+
+        // Perform same authorization checks as destroy()
+        $isOwner = ($attachment->user_id && intval($attachment->user_id) === intval($user->id));
+        $isAdmin = ($user->user_role ?? '') === 'admin';
+        $isDiaryOwnerLink = false;
+        try {
+            if ($attachment->diaries()->where('user_id', $user->id)->exists()) {
+                $isDiaryOwnerLink = true;
+            }
+        } catch (\Throwable $__e) {
+            // ignore and continue
+        }
+
+        if (!($isOwner || $isAdmin || $isDiaryOwnerLink)) {
+            return response()->json(['error' => 'forbidden'], 403);
+        }
+
+        $svc = new AttachmentService();
+        try {
+            $ok = $svc->deleteAttachment($attachment, $user);
+            if (!$ok) {
+                return response()->json(['error' => 'could_not_delete'], 500);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('AttachmentController::destroyByPath: service deletion failed: ' . $e->getMessage(), ['attachment_id' => $attachment->id ?? null]);
+            return response()->json(['error' => 'could_not_delete'], 500);
+        }
+
+        return response()->json(['message' => 'deleted']);
     }
 }

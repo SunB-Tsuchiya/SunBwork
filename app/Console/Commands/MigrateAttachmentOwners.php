@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use App\Models\Attachment;
+use Illuminate\Support\Facades\Schema;
 
 class MigrateAttachmentOwners extends Command
 {
@@ -12,6 +13,14 @@ class MigrateAttachmentOwners extends Command
 
     public function handle()
     {
+        // If the legacy owner columns have already been removed by migration,
+        // this command is obsolete and should exit cleanly instead of failing
+        // with SQL errors that reference missing columns.
+        if (! Schema::hasColumn('attachments', 'owner_type') || ! Schema::hasColumn('attachments', 'owner_id')) {
+            $this->info('Legacy owner columns (owner_type/owner_id) not present on attachments table. Nothing to migrate.');
+            return 0;
+        }
+
         $commit = $this->option('commit');
         $batch = (int) $this->option('batch');
 

@@ -373,7 +373,7 @@ watch(
                         <th v-if="props.showCheckboxes" class="w-12 px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                             <input type="checkbox" :checked="allSelected" @change.prevent="toggleSelectAll" />
                         </th>
-                        <th class="w-20 px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                        <th class="w-24 px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                             <button class="inline-flex items-center text-xs font-medium" @click.prevent="setSort('date')">
                                 <span>日付</span>
                                 <span v-if="sortKey === 'date'" class="ml-1 text-xs" aria-hidden>
@@ -454,7 +454,7 @@ watch(
                             </div>
                             <div v-else>
                                 <!-- Use configured line-clamp for truncation; keep expand toggle for long content -->
-                                <div :class="isExpanded(d.id) ? '' : descriptionClassFor()">{{ d.content ?? d.description }}</div>
+                                <div :class="isExpanded(d.id) ? '' : descriptionClassFor()">{{ d.description ?? d.content }}</div>
                                 <button
                                     v-if="(getContentText(d) || '').length > 200"
                                     @click.prevent="toggleExpand(d.id)"
