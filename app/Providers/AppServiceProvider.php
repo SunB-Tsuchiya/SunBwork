@@ -6,6 +6,7 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\URL;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -130,5 +131,21 @@ class AppServiceProvider extends ServiceProvider
         \Inertia\Inertia::share('csrf_token', function () {
             return csrf_token();
         });
+
+        // Ensure URL generator uses configured APP_URL as root so
+        // temporary signed URLs validate correctly when requests
+        // arrive via different network/proxy setups (common in Docker).
+        try {
+            $appUrl = config('app.url');
+            if (!empty($appUrl)) {
+                URL::forceRootUrl($appUrl);
+                // If APP_URL declares https, force scheme as well
+                if (str_starts_with($appUrl, 'https://')) {
+                    URL::forceScheme('https');
+                }
+            }
+        } catch (\Throwable $__e) {
+            Log::warning('AppServiceProvider: forceRootUrl failed: ' . $__e->getMessage());
+        }
     }
 }

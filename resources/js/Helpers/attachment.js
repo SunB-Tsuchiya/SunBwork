@@ -1,12 +1,11 @@
-const STREAM_BASE =
-    (function(){
-        if (typeof window === 'undefined' || !window.location) return '/api/attachments/stream';
-        const p = String(window.location.pathname || '').toLowerCase();
-        if (p.startsWith('/chat')) return '/chat/attachments';
-        if (p.startsWith('/bot')) return '/bot/attachments';
-        // diaries (diary pages) use the API stream endpoint by default
-        return '/api/attachments/stream';
-    })();
+const STREAM_BASE = (function () {
+    if (typeof window === 'undefined' || !window.location) return '/api/attachments/stream';
+    const p = String(window.location.pathname || '').toLowerCase();
+    if (p.startsWith('/chat')) return '/chat/attachments';
+    if (p.startsWith('/bot')) return '/bot/attachments';
+    // diaries (diary pages) use the API stream endpoint by default
+    return '/api/attachments/stream';
+})();
 
 export function ensureAttachmentUrl(candidate) {
     // candidate can be: full URL string, '/storage/...' path, 'attachments/...' relative path,

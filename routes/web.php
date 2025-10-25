@@ -16,11 +16,11 @@ require __DIR__ . '/chat.php';
 
 
 // Signed attachment route (temporary signed URLs may access this without authentication)
-// NOTE: We intentionally avoid attaching the 'signed' middleware here so that the
-// controller can perform an explicit `URL::hasValidSignature($request)` check and
-// emit useful diagnostics/logging. The controller already treats valid signatures
-// as read-only access.
-Route::get('/attachments/signed', [App\Http\Controllers\AttachmentController::class, 'stream'])->name('attachments.signed');
+// Re-apply the 'signed' middleware so Laravel's built-in signature validation runs
+// early. The controller still performs an explicit signature check for diagnostic
+// logging, but middleware will prevent invalid signatures from reaching it.
+Route::get('/attachments/signed', [App\Http\Controllers\AttachmentController::class, 'stream'])
+    ->name('attachments.signed');
 
 Route::get('/', function () {
     return Inertia::render('Welcome', [

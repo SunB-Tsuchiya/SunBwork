@@ -130,6 +130,10 @@ class AttachmentController extends Controller
                 } else {
                     // No message link via pivot: fallback to ownership by user_id or admin
                     if (!$isSignedRoute) {
+                        // If no authenticated user, deny access (unless signed route)
+                        if (!$user) {
+                            abort(403, 'このファイルにアクセスする権限がありません');
+                        }
                         if ($att->user_id && $att->user_id !== $user->id) {
                             if (!($user->user_role ?? '') || $user->user_role !== 'admin') {
                                 abort(403, 'このファイルにアクセスする権限がありません');
@@ -153,7 +157,11 @@ class AttachmentController extends Controller
                         }
                         if (!$isAllowed && !$isSignedRoute) abort(403, 'このファイルにアクセスする権限がありません');
                     } else {
-                        if ($maybe->user_id && $maybe->user_id !== $user->id) {
+                        // If no authenticated user, deny access unless this is a signed route
+                        if (!$isSignedRoute && !$user) {
+                            abort(403, 'このファイルにアクセスする権限がありません');
+                        }
+                        if ($maybe->user_id && $user && $maybe->user_id !== $user->id) {
                             if (!($user->user_role ?? '') || $user->user_role !== 'admin') {
                                 if (!$isSignedRoute) {
                                     abort(403, 'このファイルにアクセスする権限がありません');
