@@ -144,7 +144,9 @@ async function pollAttachmentAndReplace(id, placeholder) {
             const r = await axios.get(`/api/uploads/status/${id}`);
             if (r.data && r.data.status === 'ready') {
                 // replace placeholder in editor with actual url or image
-                const url = r.data.url;
+                const url = r.data.url || r.data.public_url || null;
+                const thumb = r.data.thumb_url || null;
+                const preview = r.data.preview || null;
                 // find placeholder text position
                 const contents = editorInstance.getContents();
                 const plain = editorInstance.getText();
@@ -152,16 +154,18 @@ async function pollAttachmentAndReplace(id, placeholder) {
                 if (idx >= 0) {
                     // delete placeholder length and insert link or image
                     editorInstance.deleteText(idx, placeholder.length);
-                    if (r.data.mime && r.data.mime.startsWith('image/')) {
+                    if (r.data.mime && r.data.mime.startsWith('image/') && url) {
                         editorInstance.insertEmbed(idx, 'image', url);
                         editorInstance.setSelection(idx + 1);
-                    } else {
-                        editorInstance.insertText(idx, r.data.original_name, { link: url });
-                        editorInstance.setSelection(idx + r.data.original_name.length);
+                    } else if (url) {
+                        editorInstance.insertText(idx, r.data.original_name || url, { link: url });
+                        editorInstance.setSelection(idx + (r.data.original_name ? r.data.original_name.length : url.length || 0));
                     }
                 }
-                // update form.files entry
-                form.files = (form.files || []).map((f) => (f.id === id ? { ...f, status: 'ready', url } : f));
+                // update form.files entry with URL/thumbnail/preview when available
+                form.files = (form.files || []).map((f) =>
+                    f.id === id ? { ...f, status: 'ready', url, public_url: r.data.public_url || null, thumb_url: thumb, preview } : f,
+                );
                 clearInterval(timer);
             } else if (r.data && (r.data.status === 'failed' || r.data.status === 'rejected')) {
                 alert(`アップロード処理に失敗しました: ${r.data.status}`);

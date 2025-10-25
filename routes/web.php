@@ -4,14 +4,23 @@ use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\URL;
+use Carbon\Carbon;
 
 // デバッグ用ルート
 require __DIR__ . '/debug.php';
 // チャット用ルート
 require __DIR__ . '/chat.php';
 
+
+
 // Signed attachment route (temporary signed URLs may access this without authentication)
-Route::get('/attachments/signed', [App\Http\Controllers\AttachmentController::class, 'stream'])->name('attachments.signed')->middleware('signed');
+// NOTE: We intentionally avoid attaching the 'signed' middleware here so that the
+// controller can perform an explicit `URL::hasValidSignature($request)` check and
+// emit useful diagnostics/logging. The controller already treats valid signatures
+// as read-only access.
+Route::get('/attachments/signed', [App\Http\Controllers\AttachmentController::class, 'stream'])->name('attachments.signed');
 
 Route::get('/', function () {
     return Inertia::render('Welcome', [

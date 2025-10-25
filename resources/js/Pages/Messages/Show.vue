@@ -350,7 +350,7 @@ function revokeCurrentObjectUrl() {
 async function fetchBlobAndShow(url, filename) {
     try {
         // fetch as blob to avoid browser download forced by server headers
-        const res = await axios.get(url, { responseType: 'blob' });
+        const res = await axios.get(url, { responseType: 'blob', withCredentials: true });
         const blob = res.data;
         const mime = blob.type || res.headers['content-type'] || 'application/octet-stream';
         revokeCurrentObjectUrl();

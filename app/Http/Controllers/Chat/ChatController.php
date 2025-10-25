@@ -330,20 +330,25 @@ class ChatController extends Controller
         if ($msg->type === 'file') {
             $decoded = json_decode($msg->body, true);
             if (is_array($decoded)) {
-                // Prefer a sanitized file meta but keep original decoded as fallback
-                $fileMeta = $this->sanitizeFileMeta($decoded) ?? $decoded;
-                // If an attachment DB id exists in the decoded payload, ensure it's exposed so frontend can call DELETE
+                // Use AttachmentService to produce consistent response meta
+                $svc = new \App\Services\AttachmentService();
+                $fileMeta = $svc->formatResponseMeta($decoded) + ($decoded ?? []);
+                // ensure attachment_id is present when available
                 if (isset($decoded['attachment_id'])) {
                     $fileMeta['attachment_id'] = $decoded['attachment_id'];
                 } elseif (isset($attach) && !empty($attach->id)) {
-                    // fallback to the $attach created earlier in this request
                     $fileMeta['attachment_id'] = $attach->id;
                 }
+                // for text files, try to generate preview
+                try {
+                    $preview = $svc->generatePreviewIfText($decoded);
+                    if ($preview) $fileMeta['preview'] = $preview;
+                } catch (\Throwable $_e) {
+                    Log::warning('ChatController: preview generation failed: ' . $_e->getMessage());
+                }
                 $response['file'] = $fileMeta;
-                // 表示用メッセージは元のファイル名を使う
                 $response['message'] = ($response['file']['original_name'] ?? $decoded['original_name'] ?? $response['message']);
             } else {
-                // もし body が生のテキストのままならそのまま表示
                 $response['message'] = $msg->body;
             }
         }
@@ -356,6 +361,19 @@ class ChatController extends Controller
     public function streamAttachment(Request $request)
     {
         $user = $request->user();
+        // Diagnostic log to help trace failing requests (temporary)
+        try {
+            $cookieHeader = $request->header('cookie');
+            $hasSession = !empty($cookieHeader) && is_string($cookieHeader) && stripos($cookieHeader, 'laravel_session') !== false;
+            \Illuminate\Support\Facades\Log::info('ChatController::streamAttachment called', [
+                'path_query' => $request->query('path'),
+                'user_id' => $user?->id ?? null,
+                'has_session_cookie' => $hasSession,
+                'ip' => $request->ip(),
+            ]);
+        } catch (\Throwable $__e) {
+            // ignore
+        }
         // クエリパラメータ ?path=chat/xxx または ?path=attachments/xxx を期待
         $path = $request->query('path');
         if (!$path) {
@@ -411,8 +429,25 @@ class ChatController extends Controller
         }
 
         // フルパスを取得してファイルを返す（ブラウザは Content-Type に応じて表示する）
-        $full = Storage::disk('public')->path($path);
-        return response()->file($full);
+        try {
+            $exists = Storage::disk('public')->exists($path);
+            \Illuminate\Support\Facades\Log::info('ChatController::streamAttachment final check', [
+                'final_path' => $path,
+                'exists' => $exists,
+            ]);
+            $full = Storage::disk('public')->path($path);
+            \Illuminate\Support\Facades\Log::info('ChatController::streamAttachment fullpath', ['full' => $full]);
+            // response()->file は内部で例外を投げる場合があるため安全にラップ
+            return response()->file($full);
+        } catch (\Throwable $e) {
+            // 例外情報を残して 500 にフォールバック
+            \Illuminate\Support\Facades\Log::error('ChatController::streamAttachment response error', [
+                'path' => $path,
+                'error' => $e->getMessage(),
+                'trace' => substr($e->getTraceAsString(), 0, 1000),
+            ]);
+            abort(500, 'ファイルの配信に失敗しました');
+        }
     }
 
     // メッセージ既読登録API

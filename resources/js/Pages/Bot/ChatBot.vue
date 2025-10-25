@@ -1,4 +1,5 @@
 <script setup>
+import { ensureAttachmentUrl, ensureThumbUrl } from '@/Helpers/attachment';
 import AppLayout from '@/layouts/AppLayout.vue';
 import SummaryPanel from '@/Pages/Bot/SummaryPanel.vue';
 import MessageArea from '@/Pages/Chat/MessageArea.vue';
@@ -190,10 +191,10 @@ function ensureUrlSafe(candidate) {
     const s = candidate.trim();
     if (!s) return null;
     if (s.startsWith('/')) return s;
-    if (s.startsWith('storage/')) return '/' + s;
-    if (s.startsWith('attachments/')) return `/chat/attachments?path=${encodeURIComponent(s)}`;
-    if (s.startsWith('chat/')) return `/chat/attachments?path=${encodeURIComponent(s)}`;
-    if (s.startsWith('bot/')) return `/bot/attachments?path=${encodeURIComponent(s)}`;
+    // delegate storage/attachments/chat/bot cases to centralized helper
+    if (s.startsWith('storage/') || s.startsWith('attachments/') || s.startsWith('chat/') || s.startsWith('bot/')) {
+        return ensureAttachmentUrl(s);
+    }
     return '/' + s;
 }
 
@@ -323,7 +324,7 @@ function getAttachmentUrl(meta) {
     }
     if (meta.thumb_path) {
         // map to public storage URL so browsers can load it directly
-        return ensureUrlSafe('/storage/' + meta.thumb_path.replace(/^\//, ''));
+        return ensureThumbUrl(meta);
     }
 
     // Prefer a public storage URL when available (Storage::url), this avoids hitting
@@ -346,8 +347,7 @@ function getAttachmentUrl(meta) {
     if (meta && meta.url) {
         // if it's a /storage/... URL, prefer to convert to streaming path where possible
         if (typeof meta.url === 'string' && meta.url.startsWith('/storage/')) {
-            // strip leading /storage/ and stream
-            return ensureUrlSafe('/bot/attachments?path=' + encodeURIComponent(meta.url.replace(/^\/storage\//, '')));
+            if (typeof meta.url === 'string') return ensureAttachmentUrl(meta.url);
         }
         // otherwise sanitize and return the provided url
         const s = sanitizeUrl(meta.url);

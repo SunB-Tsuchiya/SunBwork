@@ -247,6 +247,73 @@ class AttachmentService
     }
 
     /**
+     * If the meta represents a text file, attempt to generate a small preview string.
+     * Returns preview string or null.
+     */
+    public function generatePreviewIfText(array $meta, int $maxChars = 2000): ?string
+    {
+        try {
+            if (!empty($meta['preview'])) return (string) $meta['preview'];
+            $mime = $meta['mime'] ?? '';
+            if (empty($mime) || !str_starts_with($mime, 'text/')) return null;
+            $path = $meta['path'] ?? null;
+            if (!$path) return null;
+            $p = $this->normalizePath($path);
+            if (!Storage::disk('public')->exists($p)) return null;
+            $full = Storage::disk('public')->path($p);
+            if (!file_exists($full)) return null;
+            $contents = @file_get_contents($full);
+            if ($contents === false) return null;
+            return mb_substr($contents, 0, $maxChars);
+        } catch (\Throwable $e) {
+            Log::warning('AttachmentService: generatePreviewIfText failed: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Normalize and sanitize attachment meta for API responses.
+     * Returns an array with keys like original_name, mime, size, path, url, thumb_path, thumb_url, preview.
+     */
+    public function formatResponseMeta(array $meta): array
+    {
+        $out = [];
+        $out['original_name'] = isset($meta['original_name']) ? substr((string) $meta['original_name'], 0, 255) : '';
+        $out['mime'] = isset($meta['mime']) ? substr((string) $meta['mime'], 0, 100) : '';
+        $out['size'] = isset($meta['size']) ? intval($meta['size']) : 0;
+
+        // prefer normalized storage path when present
+        if (!empty($meta['path'])) {
+            $p = $this->normalizePath((string) $meta['path']);
+            if (Storage::disk('public')->exists($p)) {
+                $out['path'] = $p;
+                $out['url'] = Storage::url($p);
+            } else {
+                // If stored path doesn't exist, still expose the given path and url if present
+                $out['path'] = (string) $meta['path'];
+                $out['url'] = $meta['url'] ?? null;
+            }
+        } elseif (!empty($meta['url'])) {
+            $out['url'] = $meta['url'];
+        }
+
+        if (!empty($meta['thumb_path'])) {
+            $out['thumb_path'] = (string) $meta['thumb_path'];
+        }
+        if (!empty($meta['thumb_url'])) {
+            $out['thumb_url'] = (string) $meta['thumb_url'];
+        }
+        if (!empty($meta['preview'])) {
+            $out['preview'] = (string) $meta['preview'];
+        }
+        if (!empty($meta['attachment_id'])) {
+            $out['attachment_id'] = $meta['attachment_id'];
+        }
+
+        return $out;
+    }
+
+    /**
      * Stream file by path (returns full disk path)
      */
     public function diskPath(string $path): string

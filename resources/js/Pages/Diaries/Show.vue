@@ -25,6 +25,7 @@ function isoDateOnly(dateStr) {
     }
 }
 import TimelineDiary from '@/Components/TimelineDiary.vue';
+import { ensureAttachmentUrl, ensureThumbUrl } from '@/Helpers/attachment';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router } from '@inertiajs/vue3';
 import axios from 'axios';
@@ -580,7 +581,7 @@ function revokeCurrentObjectUrl() {
 }
 async function fetchBlobAndShow(url, filename) {
     try {
-        const res = await axios.get(url, { responseType: 'blob' });
+        const res = await axios.get(url, { responseType: 'blob', withCredentials: true });
         const blob = res.data;
         const mime = blob.type || res.headers['content-type'] || 'application/octet-stream';
         revokeCurrentObjectUrl();
@@ -1170,22 +1171,41 @@ onUnmounted(() => {
                                     :key="file.id || file.url || file.original_name"
                                     class="flex items-center justify-between rounded bg-gray-50 p-2"
                                 >
-                                    <div>
-                                        <div class="text-sm font-medium text-gray-900">{{ file.original_name || file.name }}</div>
-                                        <div class="text-xs text-gray-500">
-                                            {{ file.size ? (file.size / 1024).toFixed(1) + ' KB' : '-' }} • {{ file.mime_type || file.mime || '-' }}
+                                    <div class="flex items-center gap-3">
+                                        <div
+                                            v-if="ensureThumbUrl(file) || (file.url && (file.mime_type || file.mime || '').startsWith('image/'))"
+                                            class="h-12 w-16 flex-shrink-0"
+                                        >
+                                            <img
+                                                :src="ensureThumbUrl(file) || ensureAttachmentUrl(file) || file.url"
+                                                class="h-12 w-16 rounded object-cover"
+                                                alt="thumbnail"
+                                            />
+                                        </div>
+                                        <div>
+                                            <div class="text-sm font-medium text-gray-900">{{ file.original_name || file.name }}</div>
+                                            <div class="text-xs text-gray-500">
+                                                {{ file.size ? (file.size / 1024).toFixed(1) + ' KB' : '-' }} •
+                                                {{ file.mime_type || file.mime || '-' }}
+                                            </div>
                                         </div>
                                     </div>
                                     <div class="flex items-center gap-3">
                                         <button
-                                            v-if="file.url"
+                                            v-if="ensureAttachmentUrl(file) || file.url"
                                             type="button"
                                             @click.prevent="openAttachmentInModal(file)"
                                             class="text-blue-600 underline"
                                         >
                                             開く
                                         </button>
-                                        <a v-if="file.url" :href="file.url" :download="file.original_name" class="text-gray-600">ダウンロード</a>
+                                        <a
+                                            v-if="ensureAttachmentUrl(file) || file.url"
+                                            :href="ensureAttachmentUrl(file) || file.url"
+                                            :download="file.original_name"
+                                            class="text-gray-600"
+                                            >ダウンロード</a
+                                        >
                                         <span v-else class="text-sm text-gray-500">(利用不可)</span>
                                         <button type="button" @click.prevent="deleteAttachment(file)" class="ml-3 text-sm text-red-600">削除</button>
                                     </div>

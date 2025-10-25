@@ -1,4 +1,5 @@
 <script setup>
+import { ensureAttachmentUrl } from '@/Helpers/attachment';
 import AppLayout from '@/layouts/AppLayout.vue';
 import MessageArea from '@/Pages/Chat/MessageArea.vue';
 import { usePage } from '@inertiajs/vue3';
@@ -358,34 +359,8 @@ function buildStreamUrl(file) {
     if (!candidate) return null;
     // if url like /storage/chat/xxx, convert to 'chat/xxx'
     if (typeof candidate === 'string') {
-        // /storage/... URLs (local storage) -> strip and use internal stream
-        if (candidate.startsWith('/storage/')) {
-            return `/chat/attachments?path=${encodeURIComponent(candidate.replace(/^\/storage\//, ''))}`;
-        }
-        // full http(s) URL pointing to our host and /storage/ -> extract path
-        try {
-            const url = new URL(candidate, window.location.origin);
-            if (url.pathname && url.pathname.startsWith('/storage/')) {
-                return `/chat/attachments?path=${encodeURIComponent(url.pathname.replace(/^\/storage\//, ''))}`;
-            }
-        } catch (e) {
-            // not a full URL, ignore
-        }
-        // if it already looks like a storage-relative path (chat/...), use it
-        if (candidate.startsWith('chat/')) {
-            return `/chat/attachments?path=${encodeURIComponent(candidate)}`;
-        }
-        // support legacy/internal paths starting with attachments/
-        if (candidate.startsWith('attachments/')) {
-            return `/chat/attachments?path=${encodeURIComponent(candidate)}`;
-        }
-        // fallback: validate candidate and return only if safe
-        try {
-            const safe = sanitizeUrl(candidate);
-            return safe || null;
-        } catch (e) {
-            return null;
-        }
+        // delegate to centralized helper which yields streamable or safe URLs
+        return ensureAttachmentUrl(candidate);
     }
     return null;
 }
@@ -422,14 +397,10 @@ function ensureUrlSafe(candidate) {
     if (!s) return null;
     // already absolute local path
     if (s.startsWith('/')) return s;
-    // if it's a storage-relative path like 'storage/...', make it '/storage/...'
-    if (s.startsWith('storage/')) return '/' + s;
-    // attachments/ -> prefer chat stream endpoint
-    if (s.startsWith('attachments/')) return `/chat/attachments?path=${encodeURIComponent(s)}`;
-    // chat/ -> stream via chat
-    if (s.startsWith('chat/')) return `/chat/attachments?path=${encodeURIComponent(s)}`;
-    // bot/ -> stream via bot
-    if (s.startsWith('bot/')) return `/bot/attachments?path=${encodeURIComponent(s)}`;
+    // Delegate storage/attachments/chat/bot cases to the centralized helper
+    if (s.startsWith('storage/') || s.startsWith('attachments/') || s.startsWith('chat/') || s.startsWith('bot/')) {
+        return ensureAttachmentUrl(s);
+    }
     // if it looks like a hostless URL (no scheme), avoid returning raw relative paths; prepend '/'
     return '/' + s;
 }

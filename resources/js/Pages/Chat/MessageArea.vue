@@ -1,4 +1,5 @@
 <script setup>
+import { ensureAttachmentUrl } from '@/Helpers/attachment';
 import axios from 'axios';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 
@@ -91,31 +92,8 @@ function buildStreamUrl(file) {
     if (!file) return null;
     const candidate = file.path || file.thumb_path || file.url || file.original_name;
     if (!candidate) return null;
-    if (typeof candidate === 'string') {
-        // If candidate references the public storage path, map to the appropriate stream endpoint
-        if (candidate.startsWith('/storage/')) {
-            const inner = candidate.replace(/^\/storage\//, '');
-            if (inner.startsWith('bot/')) return `/bot/attachments?path=${encodeURIComponent(inner)}`;
-            return `/chat/attachments?path=${encodeURIComponent(inner)}`;
-        }
-    }
-    try {
-        const url = new URL(candidate, window.location.origin);
-        if (url.pathname && url.pathname.startsWith('/storage/')) {
-            const inner = url.pathname.replace(/^\/storage\//, '');
-            if (inner.startsWith('bot/')) return `/bot/attachments?path=${encodeURIComponent(inner)}`;
-            return `/chat/attachments?path=${encodeURIComponent(inner)}`;
-        }
-    } catch (e) {}
-    // If candidate explicitly names a bot path, use the bot stream endpoint
-    if (candidate.startsWith('bot/')) return `/bot/attachments?path=${encodeURIComponent(candidate)}`;
-    // If candidate references central attachments/, map to chat stream endpoint
-    if (candidate.startsWith('attachments/')) return `/chat/attachments?path=${encodeURIComponent(candidate)}`;
-    if (candidate.startsWith('chat/')) return `/chat/attachments?path=${encodeURIComponent(candidate)}`;
-    // If candidate is an absolute local path, return as-is (it should already be prefixed)
-    if (candidate.startsWith('/')) return candidate;
-    // Ensure any remaining relative local candidate becomes a leading-slash local path
-    return ensureLeadingSlashIfLocal(candidate);
+    // delegate all normalization to helper which returns a streamable or safe URL
+    return ensureAttachmentUrl(candidate);
 }
 
 /* Prefer public storage URL (Storage::url) for thumbnails when available,
@@ -165,15 +143,35 @@ function ensureLeadingSlashIfLocal(u) {
     const s = u.trim();
     if (s.startsWith('http://') || s.startsWith('https://') || s.startsWith('blob:') || s.startsWith('data:')) return s;
     // Ensure local paths are properly encoded for non-ASCII filenames
+    // but DO NOT encode the query string or hash portion — encode only path segments.
     const local = s.startsWith('/') ? s : '/' + s;
     try {
-        // encodeURI preserves existing % escapes and encodes non-ASCII characters
-        const parts = local
+        // Split off hash, then query so we only encode the pathname segments
+        const [pathAndQuery, hash] = local.split('#');
+        const [pathPart, queryPart] = pathAndQuery.split('?');
+
+        const encodedPath = pathPart
             .split('/')
             .map((p) => encodeURIComponent(decodeURIComponent(p)))
             .join('/');
-        // preserve leading slash
-        return parts.startsWith('/') ? parts : '/' + parts;
+
+        let result = encodedPath;
+        if (queryPart !== undefined && queryPart !== '') {
+            // encode each query key/value safely
+            const params = queryPart
+                .split('&')
+                .map((pair) => {
+                    const [k, v] = pair.split('=');
+                    const key = k ? encodeURIComponent(decodeURIComponent(k)) : '';
+                    const val = v !== undefined ? encodeURIComponent(decodeURIComponent(v)) : '';
+                    return key + (v !== undefined ? '=' + val : '');
+                })
+                .join('&');
+            result += '?' + params;
+        }
+        if (hash !== undefined) result += '#' + hash;
+
+        return result.startsWith('/') ? result : '/' + result;
     } catch (e) {
         return local;
     }
@@ -189,7 +187,7 @@ function attachmentHref(file, preferStream = true) {
         // If file.path exists, map it to the public storage URL and return an absolute, encoded path
         if (file.path) {
             // common case: file.path is like 'bot/xxx.txt'
-            const storagePath = '/storage/' + file.path.replace(/^\//, '');
+            const storagePath = ensureAttachmentUrl('/storage/' + file.path.replace(/^\//, ''));
             return ensureLeadingSlashIfLocal(storagePath);
         }
 
@@ -275,12 +273,12 @@ function normalizeMessage(msg) {
                 try {
                     // Fetch attachment metadata via the API prefix to avoid colliding
                     // with web routes (GET /attachments/{id} is not the API endpoint).
-                    const res = await axios.get(`/api/attachments/${msg.file.attachment_id}`);
+                    const res = await axios.get(`/api/attachments/${msg.file.attachment_id}`, { withCredentials: true });
                     if (res && res.data) {
                         const a = res.data;
                         // merge fields
                         msg.file.path = msg.file.path || a.path || null;
-                        msg.file.url = msg.file.url || (a.path ? '/storage/' + a.path : null) || a.url || null;
+                        msg.file.url = msg.file.url || a.url || (a.path ? ensureAttachmentUrl('/storage/' + a.path) : null) || null;
                         msg.file.mime = msg.file.mime || a.mime_type || a.mime || null;
                         msg.file.size = msg.file.size || a.size || null;
                         if (!msg.file.streamUrl) msg.file.streamUrl = buildStreamUrl(msg.file);

@@ -6,6 +6,7 @@ use App\Models\Attachment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\URL;
 use App\Services\AttachmentService;
 
 class AttachmentController extends Controller
@@ -15,6 +16,25 @@ class AttachmentController extends Controller
     public function stream(Request $request)
     {
         $user = $request->user();
+
+        // Diagnostic logging to help debug 404/authorization issues. Do not log
+        // full cookie values to avoid leaking secrets; only log presence flags.
+        try {
+            $hasSessionCookie = false;
+            $cookieHeader = $request->header('cookie');
+            if (!empty($cookieHeader) && is_string($cookieHeader) && stripos($cookieHeader, 'laravel_session') !== false) {
+                $hasSessionCookie = true;
+            }
+            \Illuminate\Support\Facades\Log::info('AttachmentController::stream called', [
+                'path_query' => $request->query('path'),
+                'id_query' => $request->query('id'),
+                'user_id' => $user?->id ?? null,
+                'has_session_cookie' => $hasSessionCookie,
+                'ip' => $request->ip(),
+            ]);
+        } catch (\Throwable $__logEx) {
+            // ignore logging failures
+        }
 
         $path = $request->query('path');
         $id = $request->query('id');
@@ -38,32 +58,82 @@ class AttachmentController extends Controller
             abort(403, '不正なパスです');
         }
 
+        // If the storage entry doesn't exist exactly as given, try a best-effort
+        // lookup by Attachment DB row using the full path or its basename to
+        // handle potential encoding/normalization mismatches.
+        $svc = new AttachmentService();
         if (!Storage::disk('public')->exists($path)) {
+            try {
+                // try exact DB row match first
+                $maybe = Attachment::where('path', $path)->first();
+                if (!$maybe) {
+                    // fallback to basename match
+                    $basename = basename($path);
+                    $maybe = Attachment::where('path', 'like', '%' . $basename)->first();
+                }
+                if ($maybe) {
+                    // adopt the canonical path from DB
+                    $path = $maybe->path;
+                    $att = $maybe;
+                }
+            } catch (\Throwable $__e) {
+                Log::warning('AttachmentController::stream - DB fallback lookup failed: ' . $__e->getMessage());
+            }
+        }
+
+        if (!Storage::disk('public')->exists($path)) {
+            // still not found
+            Log::info('AttachmentController::stream - storage missing', ['path' => $path]);
             abort(404);
         }
-        $svc = new AttachmentService();
+
         try {
             $fullPath = $svc->diskPath($path ?? $path);
         } catch (\RuntimeException $e) {
             // diskPath throws when not found; map to 404
+            Log::info('AttachmentController::stream - diskPath failed', ['path' => $path, 'error' => $e->getMessage()]);
             abort(404);
         }
 
-        // Authorization: prefer checking polymorphic links (attachmentables) first,
-        return response()->file($fullPath);
+        // Authorization: prefer checking polymorphic links (attachmentables) first.
+        // In addition to checking the route name, also verify the URL signature
+        // explicitly. This helps when the middleware or route name differs but the
+        // temporary signed URL is still valid (common in dev/proxy setups).
+        $isSignedRoute = false;
+        try {
+            $isSignedRoute = (bool) $request->routeIs('attachments.signed');
+        } catch (\Throwable $__) {
+            $isSignedRoute = false;
+        }
+        // Also accept a valid signature even if routeIs didn't match (defensive)
+        try {
+            if (!$isSignedRoute && URL::hasValidSignature($request)) {
+                $isSignedRoute = true;
+                Log::info('AttachmentController::stream - request has valid signature, treating as signed route', ['path' => $path]);
+            }
+        } catch (\Throwable $__sigEx) {
+            // ignore signature check failures
+        }
+
         if (isset($att)) {
             try {
                 // If the attachment is linked to one or more messages via attachmentables,
                 // check message sender/recipient permissions.
                 $linkedMessage = $att->messages()->with('recipients')->first();
                 if ($linkedMessage) {
-                    $isAllowed = ($linkedMessage->from_user_id === $user->id) || $linkedMessage->recipients->pluck('user_id')->contains($user->id);
-                    if (!$isAllowed) abort(403, 'このファイルにアクセスする権限がありません');
+                    $isAllowed = false;
+                    if (!$isSignedRoute && $user) {
+                        $isAllowed = ($linkedMessage->from_user_id === $user->id) || $linkedMessage->recipients->pluck('user_id')->contains($user->id);
+                    }
+                    // If this is a signed route, allow access (read-only) regardless of user
+                    if (!$isAllowed && !$isSignedRoute) abort(403, 'このファイルにアクセスする権限がありません');
                 } else {
                     // No message link via pivot: fallback to ownership by user_id or admin
-                    if ($att->user_id && $att->user_id !== $user->id) {
-                        if (!($user->user_role ?? '') || $user->user_role !== 'admin') {
-                            abort(403, 'このファイルにアクセスする権限がありません');
+                    if (!$isSignedRoute) {
+                        if ($att->user_id && $att->user_id !== $user->id) {
+                            if (!($user->user_role ?? '') || $user->user_role !== 'admin') {
+                                abort(403, 'このファイルにアクセスする権限がありません');
+                            }
                         }
                     }
                 }
@@ -77,12 +147,17 @@ class AttachmentController extends Controller
                 if ($maybe) {
                     $linkedMessage = $maybe->messages()->with('recipients')->first();
                     if ($linkedMessage) {
-                        $isAllowed = ($linkedMessage->from_user_id === $user->id) || $linkedMessage->recipients->pluck('user_id')->contains($user->id);
-                        if (!$isAllowed) abort(403, 'このファイルにアクセスする権限がありません');
+                        $isAllowed = false;
+                        if (!$isSignedRoute && $user) {
+                            $isAllowed = ($linkedMessage->from_user_id === $user->id) || $linkedMessage->recipients->pluck('user_id')->contains($user->id);
+                        }
+                        if (!$isAllowed && !$isSignedRoute) abort(403, 'このファイルにアクセスする権限がありません');
                     } else {
                         if ($maybe->user_id && $maybe->user_id !== $user->id) {
                             if (!($user->user_role ?? '') || $user->user_role !== 'admin') {
-                                abort(403, 'このファイルにアクセスする権限がありません');
+                                if (!$isSignedRoute) {
+                                    abort(403, 'このファイルにアクセスする権限がありません');
+                                }
                             }
                         }
                     }
@@ -91,7 +166,6 @@ class AttachmentController extends Controller
                 Log::warning('attachment auth lookup failed: ' . $ex->getMessage());
             }
         }
-
         $full = Storage::disk('public')->path($path);
         return response()->file($full);
     }

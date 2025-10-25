@@ -33,6 +33,8 @@ class Kernel extends HttpKernel
         ],
 
         'api' => [
+            // Temporary diagnostics middleware to log attachment-related requests early
+            \App\Http\Middleware\LogAttachmentRequests::class,
             'throttle:api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ],

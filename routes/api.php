@@ -123,6 +123,35 @@ Route::get('/debug/public/messages/{message}/payload', function (Request $reques
     return response()->json($mapped);
 })->name('debug.messages.public.payload');
 
+// Local-only debug: stream attachments without auth (useful for diagnosing
+// whether the streaming pipeline or auth/session is the cause of 404s).
+// Only available in local environment or from loopback to avoid exposure.
+Route::get('/debug/public/attachments/stream', function (Request $request) {
+    if (!app()->environment('local') && $request->ip() !== '127.0.0.1' && $request->ip() !== '::1') {
+        abort(404);
+    }
+
+    $path = $request->query('path');
+    $id = $request->query('id');
+    if (!$path && !$id) {
+        return response()->json(['error' => 'path_or_id_required'], 400);
+    }
+
+    if ($id) {
+        $att = \App\Models\Attachment::find($id);
+        if (!$att) return response()->json(['error' => 'not_found'], 404);
+        $path = $att->path;
+    }
+
+    $svc = new \App\Services\AttachmentService();
+    try {
+        $full = $svc->diskPath((string)$path);
+        return response()->file($full);
+    } catch (\Throwable $e) {
+        return response()->json(['error' => 'not_found'], 404);
+    }
+})->name('debug.attachments.public.stream');
+
 Route::middleware(['web', 'auth:sanctum'])->post('/chat/messages/{message}/read', [\App\Http\Controllers\Chat\ChatController::class, 'markAsRead']);
 
 // JobBox lightweight fetch for event-driven previews
