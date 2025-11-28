@@ -29,7 +29,8 @@ class UploadStatusController extends Controller
                 $data['url'] = $signed;
             } catch (\Exception $__e) {
                 // fallback to authenticated stream route
-                $data['url'] = $att->path ? route('api.attachments.stream', ['path' => $att->path]) : null;
+                // Use the web-stream route so SPA clients use session-based auth
+                $data['url'] = $att->path ? route('attachments.stream', ['path' => $att->path]) : null;
             }
             // public fallback
             $data['public_url'] = $att->path ? asset('storage/' . ltrim($att->path, '/')) : null;

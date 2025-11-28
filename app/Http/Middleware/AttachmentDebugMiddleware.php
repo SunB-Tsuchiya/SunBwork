@@ -16,7 +16,8 @@ class AttachmentDebugMiddleware
     public function handle(Request $request, Closure $next)
     {
         try {
-            if ($request->is('api/attachments/stream') || $request->is('api/attachments/stream*')) {
+            // Support both legacy API-prefixed stream path and new web /attachments/stream
+            if ($request->is('api/attachments/stream') || $request->is('api/attachments/stream*') || $request->is('attachments/stream') || $request->is('attachments/stream*')) {
                 $cookieHeader = $request->header('cookie');
                 Log::info('AttachmentDebugMiddleware: incoming request', [
                     'uri' => $request->getRequestUri(),

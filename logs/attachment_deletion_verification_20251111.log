@@ -1,0 +1,67 @@
+検証ログ: Attachment / Message 永久削除フロー検証
+日時: 2025-11-11
+
+目的:
+- MessageController::destroy の動作確認（per-recipient Trash -> 完全削除時の DB/pivot/ファイル挙動）
+- 共有添付や複数受信者がいるケースの安全性確認
+
+環境:
+- リポジトリ: SunBWork (branch: chatjob05)
+- 実行環境: Docker Compose (laravel コンテナ + mysql コンテナ sunbwork-mysql)
+
+作業手順（要約）:
+1) ホストの test_destroy.php を修正・配置 → コンテナ(/var/www/html/)へコピー
+2) コンテナ内で php -l による構文チェック → スクリプト実行
+3) 結果を確認
+4) 追加ケース用スクリプト test_destroy_extra.php を作成し実行
+5) DB ダンプを作成しホストへコピー (ファイル: ./db_backup_1762855429.sql)
+
+重要出力（抜粋）:
+- test_destroy.php 実行結果:
+  - php -l: No syntax errors detected
+  - Controller response: {"ok":true}
+  - Message exists after destroy: no
+  - Recipient rows for message: 0
+  - Attachment row exists: no
+  - Attachment file exists on disk: no
+  - attachmentables count for attachment: 0
+
+- test_destroy_extra.php 実行結果:
+  === Multi-recipient case ===
+  Controller response: {"ok":true}
+  Message exists: yes
+  Recipient rows: 1
+  Attachment row exists: yes
+  Attachment file exists: yes
+  attachmentables count: 1
+
+  === Shared-attachment case ===
+  Controller response (shared case): {"ok":true}
+  msgA exists: no
+  msgB exists: yes
+  attachment row exists (att2): yes
+  attachment file exists (att2): yes
+  attachmentables count (att2): 1
+
+解釈 / 結論:
+- メッセージを送信者自身が完全削除した場合（かつ他受信者がいない）、メッセージ・添付・pivot は削除される（今回のテストで確認済）。
+- 他受信者がいるメッセージについて、一人が完全削除してもメッセージは残り、添付は残る（pivotのみ削除される）。
+- 添付が複数のメッセージで共有されている場合、一方のみを削除しても添付のファイルと DB レコードは残る（他参照保護が働いている）。
+
+保存先:
+- このログファイル: logs/attachment_deletion_verification_20251111.log
+- DB ダンプ: ./db_backup_1762855429.sql (ホストへコピー済み、サイズ約680K)
+
+今後の提案:
+- 上記検証を PHPUnit の Feature テストに落とし込み、CI へ組み込む。
+- public/build のステージング配備とブラウザ統合テストで UI 側の挙動を確認する。
+
+実行したコマンドの一部（参考）:
+- docker compose exec laravel bash -lc "php -l /var/www/html/test_destroy.php"
+- docker compose exec laravel bash -lc "php /var/www/html/test_destroy.php"
+- docker compose exec laravel bash -lc "php -l /var/www/html/test_destroy_extra.php"
+- docker compose exec laravel bash -lc "php /var/www/html/test_destroy_extra.php"
+- docker cp sunbwork-mysql:/tmp/db_backup_1762855429.sql ./db_backup_1762855429.sql
+
+終了ステータス:
+- 検証完了。上記ログに示した通り、期待どおりの安全側の挙動が確認できました。

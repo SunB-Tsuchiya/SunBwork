@@ -81,7 +81,7 @@ const sendCooldown = ref(false);
 const SEND_COOLDOWN_MS = 1000;
 const uploadProgress = ref({});
 const fileInput = ref(null);
-const fileModal = ref({ open: false, file: null });
+const fileModal = ref({ open: false, file: null, messageId: null, isOwner: false });
 const messageArea = ref(null);
 const lastMessageRef = ref(null);
 const pendingReadTimeouts = ref(new Map());
@@ -713,6 +713,19 @@ function openFileModal(file, messageId = null) {
     fileModal.value.open = true;
     fileModal.value.file = { ...file, streamUrl };
     fileModal.value.messageId = messageId;
+    // determine whether current user owns this file so we can show/hide the delete button
+    try {
+        if (messageId) {
+            const m = messages.value.find((mm) => String(mm.id) === String(messageId));
+            fileModal.value.isOwner = !!(m && isOwnMessage(m));
+        } else if (file && typeof file.user_id !== 'undefined') {
+            fileModal.value.isOwner = !!(file.user_id === props.user?.id);
+        } else {
+            fileModal.value.isOwner = false;
+        }
+    } catch (e) {
+        fileModal.value.isOwner = false;
+    }
     if (file.mime && typeof file.mime === 'string' && file.mime.startsWith('text/')) {
         fetch(streamUrl, { credentials: 'same-origin' })
             .then((r) => (r.ok ? r.text() : Promise.reject('fetch-failed')))
@@ -727,6 +740,8 @@ function openFileModal(file, messageId = null) {
 function closeFileModal() {
     fileModal.value.open = false;
     fileModal.value.file = null;
+    fileModal.value.messageId = null;
+    fileModal.value.isOwner = false;
 }
 
 // Request deletion of an attachment shown in the modal or in-message
@@ -1079,7 +1094,11 @@ onUnmounted(() => {
                                                         要約
                                                     </button>
                                                 </template>
-                                                <button @click.prevent="requestDeleteAttachment(msg.file, msg.id)" class="ml-2 text-sm text-red-600">
+                                                <button
+                                                    v-if="isOwnMessage(msg)"
+                                                    @click.prevent="requestDeleteAttachment(msg.file, msg.id)"
+                                                    class="ml-2 text-sm text-red-600"
+                                                >
                                                     削除
                                                 </button>
                                             </div>
@@ -1170,7 +1189,11 @@ onUnmounted(() => {
                     <a :href="attachmentHref(fileModal.file, true)" :download="fileModal.file?.original_name" class="mr-3 text-sm text-gray-700"
                         >ダウンロード</a
                     >
-                    <button @click="requestDeleteAttachment(fileModal.file, fileModal.messageId)" class="mr-3 rounded border px-3 py-1 text-red-700">
+                    <button
+                        v-if="fileModal.isOwner"
+                        @click="requestDeleteAttachment(fileModal.file, fileModal.messageId)"
+                        class="mr-3 rounded border px-3 py-1 text-red-700"
+                    >
                         削除
                     </button>
                     <button @click="closeFileModal" class="rounded border px-3 py-1 text-gray-700">閉じる</button>

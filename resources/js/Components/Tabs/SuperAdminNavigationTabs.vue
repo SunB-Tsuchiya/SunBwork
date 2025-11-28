@@ -40,6 +40,12 @@ const props = defineProps({
             >
                 AI設定
             </Link>
+            <Link
+                :href="route('debug.api')"
+                class="rounded-md border border-blue-200 px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 hover:text-blue-800"
+            >
+                APIデバッグページ
+            </Link>
         </nav>
     </div>
 </template>

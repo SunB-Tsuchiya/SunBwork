@@ -309,7 +309,7 @@ class DiaryController extends Controller
                 }
             } catch (\Throwable $_e) {
                 try {
-                    if (!empty($formatted['path'])) $formatted['url'] = route('api.attachments.stream', ['path' => $formatted['path']]);
+                    if (!empty($formatted['path'])) $formatted['url'] = route('attachments.stream', ['path' => $formatted['path']]);
                 } catch (\Throwable $__e) {
                     // leave formatted['url'] as-is
                 }

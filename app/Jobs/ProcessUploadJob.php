@@ -13,6 +13,7 @@ use App\Models\Attachment;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use App\Services\AttachmentService;
+use Illuminate\Support\Str;
 
 class ProcessUploadJob implements ShouldQueue
 {
@@ -144,7 +145,18 @@ class ProcessUploadJob implements ShouldQueue
         $mime = finfo_file($finfo, $fullTmp);
         finfo_close($finfo);
 
+        // Prefer the original_name from the Attachment DB row when available
+        // (UploadController records the client's original filename). Falling
+        // back to the tmp basename only when the DB row is missing.
         $originalName = basename($tmpPath);
+        try {
+            $existing = Attachment::find($this->attachmentId);
+            if ($existing && !empty($existing->original_name)) {
+                $originalName = $existing->original_name;
+            }
+        } catch (\Throwable $_e) {
+            // ignore and keep basename
+        }
         $ext = pathinfo($originalName, PATHINFO_EXTENSION) ?: '';
 
         $denyExt = ['php', 'php3', 'php4', 'phtml', 'exe', 'sh', 'bat', 'cmd', 'scr'];
@@ -154,12 +166,18 @@ class ProcessUploadJob implements ShouldQueue
             return;
         }
 
+        // Always store uploads into the centralized `attachments/` folder so
+        // chat, bot, diary and messages share the same storage location.
+        // Previously a `type` could cause files to be stored under
+        // "chat/attachments" or "bot/attachments"; centralize to simplify
+        // streaming, thumbnails and deletion logic.
         $folder = 'attachments';
-        if ($this->type) {
-            $folder = trim($this->type, '/') . '/attachments';
-        }
 
-        $unique = uniqid() . '_' . preg_replace('/[^A-Za-z0-9_.-]/', '_', $originalName);
+        // Build stored filename as: <uuid>_<original_name>
+        // Preserve multibyte characters in the original name but sanitize path
+        // separators and dot-dot sequences to avoid directory traversal.
+        $safeOriginal = str_replace(['..', '/', '\\'], '_', $originalName);
+        $unique = (string) Str::uuid() . '_' . $safeOriginal;
         $finalPath = $folder . '/' . $unique;
 
         if (strpos($mime, 'image/') === 0) {

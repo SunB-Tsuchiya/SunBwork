@@ -169,6 +169,15 @@
                                                     <td class="px-4 py-2">{{ m.from_user_name || (m.from_user?.name ?? '') }}</td>
                                                     <td class="px-4 py-2">{{ hasAttachments(m) ? '📎' : '' }}</td>
                                                     <td class="px-4 py-2">{{ formatDate(m.sent_at || m.created_at) }}</td>
+                                                    <td class="px-4 py-2 text-right">
+                                                        <button
+                                                            @click.stop.prevent="onIndexDeleteClick(m)"
+                                                            class="rounded bg-red-50 px-2 py-1 text-sm text-red-700 hover:bg-red-100"
+                                                            :title="(folder === 'trash' || isTrashed(m)) ? '完全削除' : '削除（ゴミ箱へ移動）'"
+                                                        >
+                                                            {{ (folder === 'trash' || isTrashed(m)) ? '完全削除' : '削除' }}
+                                                        </button>
+                                                    </td>
                                                 </tr>
                                             </tbody>
                                         </table>
@@ -464,6 +473,69 @@ function openShow(m) {
     } catch (e) {
         // fallback
         window.location = route('messages.show', m.id);
+    }
+}
+
+async function trashMessage(m) {
+    if (!m || !m.id) return;
+    // confirm with the user
+    if (!confirm('このメッセージをゴミ箱に移動しますか？')) return;
+    try {
+        await axios.post(route('messages.trash', m.id));
+        // remove from local listData so UI updates immediately
+        const idx = listData.value.findIndex((x) => x.id === m.id);
+        if (idx >= 0) listData.value.splice(idx, 1);
+        // clear selection if it was the removed message
+        if (selected.value && selected.value.id === m.id) selected.value = null;
+    } catch (err) {
+        console.error('trashMessage error', err);
+        alert('メッセージの削除に失敗しました。');
+    }
+}
+
+/**
+ * Return true if the message is already trashed for the current user.
+ */
+function isTrashed(m) {
+    try {
+        const uid = currentUser?.id || (page.props?.auth?.user?.id ?? null);
+        if (!uid || !m) return false;
+        if (Array.isArray(m.recipients)) {
+            return m.recipients.some((r) => {
+                const rid = r.user_id ?? r.user?.id ?? null;
+                return rid === uid && r.deleted_at;
+            });
+        }
+        return false;
+    } catch (e) {
+        return false;
+    }
+}
+
+/**
+ * Handle delete button in index: if in trash (folder==='trash') or message already trashed,
+ * perform permanent delete; otherwise move to trash (reuse trashMessage).
+ */
+async function onIndexDeleteClick(m) {
+    if (!m || !m.id) return;
+    try {
+        if (folder === 'trash' || isTrashed(m)) {
+            if (!confirm('このメッセージを完全に削除します。元に戻せません。よろしいですか？')) return;
+            await axios.delete(route('messages.destroy', m.id));
+            const idx = listData.value.findIndex((x) => x.id === m.id);
+            if (idx >= 0) listData.value.splice(idx, 1);
+            if (selected.value && selected.value.id === m.id) selected.value = null;
+            return;
+        }
+
+        // fallback to move-to-trash
+        await (async () => {
+            // reuse existing trashMessage flow which already confirms and updates listData
+            await trashMessage(m);
+        })();
+    } catch (err) {
+        console.error('onIndexDeleteClick error', err);
+        alert('メッセージの削除に失敗しました。');
     }
 }
 </script>

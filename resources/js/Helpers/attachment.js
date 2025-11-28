@@ -3,8 +3,9 @@ const STREAM_BASE = (function () {
     const p = String(window.location.pathname || '').toLowerCase();
     if (p.startsWith('/chat')) return '/chat/attachments';
     if (p.startsWith('/bot')) return '/bot/attachments';
-    // diaries (diary pages) use the API stream endpoint by default
-    return '/api/attachments/stream';
+    // diaries (diary pages) and default pages use the web stream endpoint by default
+    // Use the web-based `/attachments/stream` (served under `web` middleware)
+    return '/attachments/stream';
 })();
 
 export function ensureAttachmentUrl(candidate) {
@@ -29,8 +30,9 @@ export function ensureAttachmentUrl(candidate) {
     if (typeof candidate === 'string') {
         // Full http(s) -> return as-is
         if (candidate.startsWith('http://') || candidate.startsWith('https://')) return candidate;
-        // Already a stream endpoint
-        if (candidate.startsWith('/api/attachments') || candidate.startsWith('/chat/attachments')) return candidate;
+        // Already a stream endpoint (accept both web and legacy api-prefixed forms)
+        if (candidate.startsWith('/api/attachments') || candidate.startsWith('/attachments') || candidate.startsWith('/chat/attachments'))
+            return candidate;
         // /storage/ local path -> convert to stream endpoint
         if (candidate.startsWith('/storage/')) {
             const path = candidate.replace(/^\/storage\//, '');

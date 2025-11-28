@@ -23,10 +23,24 @@ class MessageController extends Controller
 
         // build base query and ensure attachments count is available for ordering
         if ($folder === 'sent') {
-            $query = Message::where('from_user_id', $user->id)->with('recipients.user')->withCount('attachments');
-        } else {
+            // For sent folder, show messages authored by the user but exclude those
+            // the sender has already moved to trash (we represent per-sender trash
+            // using a MessageRecipient row with deleted_at set for the sender).
+            $query = Message::where('from_user_id', $user->id)
+                ->whereDoesntHave('recipients', function ($q) use ($user) {
+                    $q->where('user_id', $user->id)->whereNotNull('deleted_at');
+                })
+                ->with('recipients.user')
+                ->withCount('attachments');
+        } elseif ($folder === 'trash') {
+            // messages where current user's recipient row has deleted_at set
             $query = Message::whereHas('recipients', function ($q) use ($user) {
-                $q->where('user_id', $user->id);
+                $q->where('user_id', $user->id)->whereNotNull('deleted_at');
+            })->with('fromUser')->withCount('attachments');
+        } else {
+            // inbox: only recipient rows that are not deleted
+            $query = Message::whereHas('recipients', function ($q) use ($user) {
+                $q->where('user_id', $user->id)->whereNull('deleted_at');
             })->with('fromUser')->withCount('attachments');
         }
 
@@ -79,24 +93,54 @@ class MessageController extends Controller
 
         // load attachments for this message (if any) and expose public URLs when ready
         $message->load('attachments');
-        $message->attachments = $message->attachments->map(function ($att) {
-            $url = null;
-            $public = null;
-            if ($att->status === 'ready' && $att->path) {
-                $url = route('api.attachments.stream', ['path' => $att->path]);
-                $public = asset('storage/' . ltrim($att->path, '/'));
-            }
-            return [
-                'id' => $att->id,
-                'original_name' => $att->original_name,
-                'mime_type' => $att->mime_type,
-                'size' => $att->size,
-                'status' => $att->status,
-                'url' => $url,
-                'public_url' => $public,
-                'path' => $att->path,
-            ];
-        })->values();
+        // Use AttachmentService to normalize attachment meta so all UIs get consistent fields
+        try {
+            $svc = new \App\Services\AttachmentService();
+            $message->attachments = $message->attachments->map(function ($att) use ($svc) {
+                $meta = $svc->formatResponseMeta([
+                    'path' => $att->path,
+                    'url' => null,
+                    'original_name' => $att->original_name,
+                    'mime' => $att->mime_type,
+                    'size' => $att->size,
+                    'attachment_id' => $att->id,
+                ]);
+                // back-compat: expose public storage URL as public_url
+                $public = null;
+                if (!empty($meta['path'])) {
+                    $public = asset('storage/' . ltrim($meta['path'], '/'));
+                }
+                return array_merge([
+                    'id' => $att->id,
+                    'original_name' => $att->original_name,
+                    'mime_type' => $att->mime_type,
+                    'size' => $att->size,
+                    'status' => $att->status,
+                    'path' => $att->path,
+                ], $meta, ['public_url' => $public]);
+            })->values();
+        } catch (\Throwable $__e) {
+            // fallback to previous behavior on error
+            $message->attachments = $message->attachments->map(function ($att) {
+                $url = null;
+                $public = null;
+                if ($att->status === 'ready' && $att->path) {
+                    // prefer web-stream route so browser sessions authenticate correctly
+                    $url = route('attachments.stream', ['path' => $att->path]);
+                    $public = asset('storage/' . ltrim($att->path, '/'));
+                }
+                return [
+                    'id' => $att->id,
+                    'original_name' => $att->original_name,
+                    'mime_type' => $att->mime_type,
+                    'size' => $att->size,
+                    'status' => $att->status,
+                    'url' => $url,
+                    'public_url' => $public,
+                    'path' => $att->path,
+                ];
+            })->values();
+        }
 
         // mark as read for current user
         $user = $request->user();
@@ -218,6 +262,130 @@ class MessageController extends Controller
         }
 
         return redirect()->route('messages.index', ['folder' => $isDraft ? 'drafts' : 'sent']);
+    }
+
+    /**
+     * Move a message to the current user's Trash (per-recipient soft-delete).
+     */
+    public function trash(Request $request, Message $message)
+    {
+        $user = $request->user();
+        if (!$user) return response()->json(['error' => 'unauthenticated'], 401);
+
+        // Ensure the user is a recipient of the message. If the user is the
+        // sender, allow a per-sender trash by creating a MessageRecipient row
+        // for them (type 'to' is used for sender copy so it fits the enum) and
+        // marking it deleted. This keeps the per-recipient semantics without
+        // removing the message for other recipients.
+        $mr = MessageRecipient::where('message_id', $message->id)->where('user_id', $user->id)->first();
+
+        if (!$mr) {
+            // If the current user is the author/sender, create a recipient row
+            // to represent the sender's mailbox copy and mark it deleted.
+            if ($message->from_user_id === $user->id) {
+                try {
+                    $mr = MessageRecipient::create([
+                        'message_id' => $message->id,
+                        'user_id' => $user->id,
+                        'type' => 'to',
+                        'deleted_at' => now(),
+                    ]);
+                } catch (\Throwable $__e) {
+                    // creation failed for some reason
+                    return response()->json(['error' => 'not_found'], 404);
+                }
+                return response()->json(['ok' => true]);
+            }
+            return response()->json(['error' => 'not_found'], 404);
+        }
+
+        $mr->deleted_at = now();
+        $mr->save();
+
+        return response()->json(['ok' => true]);
+    }
+
+    /**
+     * Permanently remove the message for the current user.
+     * If there are no remaining recipients after removal, also remove the message
+     * and any attached files via AttachmentService.
+     */
+    public function destroy(Request $request, Message $message)
+    {
+        $user = $request->user();
+        if (!$user) return response()->json(['error' => 'unauthenticated'], 401);
+
+        $mr = MessageRecipient::where('message_id', $message->id)->where('user_id', $user->id)->first();
+        if (!$mr) {
+            // No recipient row found for user: nothing to permanently delete for them
+            return response()->json(['error' => 'not_found'], 404);
+        }
+
+        // Only allow permanent deletion when the message is already in the user's trash
+        if ($mr->deleted_at === null) {
+            return response()->json(['error' => 'not_in_trash'], 403);
+        }
+
+        // remove the recipient row permanently
+        try {
+            $mr->delete();
+        } catch (\Throwable $e) {
+            return response()->json(['error' => 'could_not_delete_recipient'], 500);
+        }
+
+        // If no recipients remain, delete the message and attachments to free storage
+        try {
+            $remaining = $message->recipients()->count();
+            if ($remaining === 0) {
+                // load attachments and delete via AttachmentService for safe cleanup
+                $message->load('attachments');
+                $svc = new \App\Services\AttachmentService();
+                foreach ($message->attachments ?? [] as $att) {
+                    try {
+                        // First, remove the pivot linking this attachment to the message.
+                        try {
+                            \Illuminate\Support\Facades\DB::table('attachmentables')
+                                ->where('attachment_id', $att->id)
+                                ->where('attachable_type', \App\Models\Message::class)
+                                ->where('attachable_id', $message->id)
+                                ->delete();
+                        } catch (\Throwable $_pivotEx) {
+                            \Illuminate\Support\Facades\Log::warning('Message destroy: failed to remove pivot for attachment', ['attachment_id' => $att->id ?? null, 'message_id' => $message->id, 'error' => $_pivotEx->getMessage()]);
+                        }
+
+                        // If the attachment is still referenced by other attachables, do not delete files/db row.
+                        $stillReferenced = false;
+                        try {
+                            $stillReferenced = (bool) \Illuminate\Support\Facades\DB::table('attachmentables')->where('attachment_id', $att->id)->exists();
+                        } catch (\Throwable $_existsEx) {
+                            // on error, err on the side of safety and assume it is still referenced
+                            $stillReferenced = true;
+                        }
+
+                        if ($stillReferenced) {
+                            \Illuminate\Support\Facades\Log::info('Message destroy: attachment left in place because it is referenced elsewhere', ['attachment_id' => $att->id ?? null, 'message_id' => $message->id]);
+                            continue;
+                        }
+
+                        // No other references — safe to delete fully
+                        $svc->deleteAttachment($att, $user);
+                    } catch (\Throwable $__e) {
+                        // continue deleting others
+                        \Illuminate\Support\Facades\Log::warning('Message destroy: failed to delete attachment', ['attachment_id' => $att->id ?? null, 'error' => $__e->getMessage()]);
+                    }
+                }
+                try {
+                    $message->delete();
+                } catch (\Throwable $__e) {
+                    \Illuminate\Support\Facades\Log::warning('Message destroy: failed to delete message', ['message_id' => $message->id, 'error' => $__e->getMessage()]);
+                }
+            }
+        } catch (\Throwable $e) {
+            // log and continue
+            \Illuminate\Support\Facades\Log::warning('Message destroy: cleanup failed', ['message_id' => $message->id, 'error' => $e->getMessage()]);
+        }
+
+        return response()->json(['ok' => true]);
     }
 
     /**

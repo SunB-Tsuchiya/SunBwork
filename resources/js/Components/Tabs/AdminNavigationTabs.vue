@@ -24,13 +24,6 @@ const props = defineProps({
             >
                 ユーザー管理
             </Link>
-
-            <Link
-                :href="route('debug.api')"
-                class="rounded-md border border-blue-200 px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 hover:text-blue-800"
-            >
-                APIデバッグページ
-            </Link>
             <Link
                 :href="route('admin.teams.index')"
                 class="rounded-md border border-green-200 px-3 py-2 text-sm font-medium text-green-600 hover:bg-green-50 hover:text-green-800"

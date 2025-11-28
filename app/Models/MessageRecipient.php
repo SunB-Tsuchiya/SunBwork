@@ -11,10 +11,12 @@ class MessageRecipient extends Model
         'user_id',
         'type',
         'read_at',
+        'deleted_at',
     ];
 
     protected $casts = [
         'read_at' => 'datetime',
+        'deleted_at' => 'datetime',
     ];
 
     public function message()

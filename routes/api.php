@@ -47,8 +47,14 @@ Route::middleware(['web', 'auth:sanctum'])->group(function () {
     Route::get('/uploads/status/{id}', [\App\Http\Controllers\Api\UploadStatusController::class, 'status']);
     // Fetch attachment metadata by id (used by MessageArea to resolve attachment_id)
     Route::get('/attachments/{id}', [\App\Http\Controllers\Api\UploadController::class, 'showAttachment']);
-    // Stream attachment with authorization
-    Route::get('/attachments/stream', [\App\Http\Controllers\AttachmentController::class, 'stream'])->name('api.attachments.stream');
+    // Allow frontend to delete attachments via the SPA API prefix.
+    // The frontend issues DELETE requests to /api/attachments/:id or DELETE /api/attachments with { path }
+    // Keep these routes on the web+auth:sanctum middleware so browser session cookies authenticate correctly.
+    Route::delete('/attachments/{attachment}', [\App\Http\Controllers\AttachmentController::class, 'destroy']);
+    Route::delete('/attachments', [\App\Http\Controllers\AttachmentController::class, 'destroyByPath']);
+    // NOTE: moved to web routes to ensure session-based authentication for SPA clients.
+    // Legacy API route removed to avoid session/auth mismatch. Use the web route
+    // named `attachments.stream` instead (defined in routes/web.php).
 
     // Debug: return the same mapping MessageController::show would produce for a message
     // Access while logged-in at /api/debug/messages/{id}/payload
@@ -62,7 +68,10 @@ Route::middleware(['web', 'auth:sanctum'])->group(function () {
             $public = null;
             if ($att->status === 'ready' && $att->path) {
                 try {
-                    $url = route('api.attachments.stream', ['path' => $att->path]);
+                    // For authenticated SPA clients we normally use the API stream route.
+                    // Keep behavior unchanged here.
+                    // Prefer web-stream route so SPA clients use session-based auth
+                    $url = route('attachments.stream', ['path' => $att->path]);
                     $public = asset('storage/' . ltrim($att->path, '/'));
                 } catch (\Throwable $__e) {
                     $url = null;
@@ -101,7 +110,9 @@ Route::get('/debug/public/messages/{message}/payload', function (Request $reques
         $public = null;
         if ($att->status === 'ready' && $att->path) {
             try {
-                $url = route('api.attachments.stream', ['path' => $att->path]);
+                // For the public debug payload, emit a temporary signed URL so
+                // unauthenticated developer browser requests can access attachments.
+                $url = \Illuminate\Support\Facades\URL::temporarySignedRoute('attachments.signed', now()->addMinutes(15), ['path' => $att->path]);
                 $public = asset('storage/' . ltrim($att->path, '/'));
             } catch (\Throwable $__e) {
                 $url = null;

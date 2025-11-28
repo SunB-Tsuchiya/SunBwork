@@ -8,8 +8,22 @@
             <div class="py-12">
                 <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
                     <div class="bg-white p-6 shadow sm:rounded-lg">
-                        <div class="mb-4">
+                        <div class="mb-4 flex items-center justify-between">
                             <a :href="route('messages.index')" class="text-sm text-blue-600 underline">← 一覧に戻る</a>
+                            <div>
+                                <button
+                                    v-if="
+                                        currentUserId &&
+                                        (currentUserId === (localMessage?.from_user_id ?? localMessage?.from_user?.id) ||
+                                            (Array.isArray(localMessage?.recipients) &&
+                                                localMessage.recipients.some((r) => (r.user_id ?? r.user?.id) === currentUserId)))
+                                    "
+                                    @click.prevent="onTrashClick"
+                                    class="rounded bg-red-50 px-2 py-1 text-sm text-red-700 hover:bg-red-100"
+                                >
+                                    {{ isTrashedByCurrentUser ? '完全削除' : '削除' }}
+                                </button>
+                            </div>
                         </div>
                         <h3 class="text-lg font-semibold">{{ subjectText }}</h3>
                         <div class="mt-1 text-sm text-gray-500">差出人: {{ senderName }}</div>
@@ -24,23 +38,42 @@
                                         :key="file.id || file.url"
                                         class="flex items-center justify-between rounded bg-gray-50 p-2"
                                     >
-                                        <div>
-                                            <div class="text-sm font-medium text-gray-900">{{ file.original_name }}</div>
-                                            <div class="text-xs text-gray-500">
-                                                {{ file.size || 0 ? (file.size / 1024).toFixed(1) + ' KB' : '-' }} • {{ file.mime_type || '-' }}
+                                        <div class="flex items-center gap-3">
+                                            <div v-if="ensureThumb(file)" class="flex-shrink-0">
+                                                <img :src="ensureThumb(file)" alt="thumb" class="h-12 w-12 rounded object-cover" />
+                                            </div>
+                                            <div>
+                                                <div class="text-sm font-medium text-gray-900">{{ file.original_name }}</div>
+                                                <div class="text-xs text-gray-500">
+                                                    {{ file.size || 0 ? (file.size / 1024).toFixed(1) + ' KB' : '-' }} • {{ file.mime_type || '-' }}
+                                                </div>
                                             </div>
                                         </div>
                                         <div class="flex items-center gap-3">
                                             <button
-                                                v-if="file.url"
+                                                v-if="file && (file.url || file.path || file.id)"
                                                 type="button"
                                                 @click.prevent="openAttachmentInModal(file)"
                                                 class="text-blue-600 underline"
                                             >
                                                 開く
                                             </button>
-                                            <a v-if="file.url" :href="file.url" :download="file.original_name" class="text-gray-600">ダウンロード</a>
-                                            <span v-else class="text-sm text-gray-500">(利用不可)</span>
+                                            <a
+                                                v-if="file.url || file.path || file.id"
+                                                :href="downloadHref(file)"
+                                                :download="file.original_name"
+                                                class="text-gray-600"
+                                                >ダウンロード</a
+                                            >
+                                            <button
+                                                v-if="$page.props.auth?.user?.id === file.user_id"
+                                                type="button"
+                                                @click.prevent="confirmDelete(file)"
+                                                class="text-red-600"
+                                            >
+                                                削除
+                                            </button>
+                                            <span v-else-if="!(file.url || file.path || file.id)" class="text-sm text-gray-500">(利用不可)</span>
                                         </div>
                                     </li>
                                 </ul>
@@ -81,12 +114,23 @@
 </template>
 
 <script setup>
+import { ensureAttachmentUrl, ensureThumbUrl } from '@/Helpers/attachment';
 import AppLayout from '@/layouts/AppLayout.vue';
+import { router, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import DOMPurify from 'dompurify';
 import { computed, onMounted, ref, watch } from 'vue';
 const props = defineProps({ message: Object });
 const { message } = props;
+
+const page = usePage();
+const currentUserId = computed(() => {
+    try {
+        return page.props?.user?.id || page.props?.auth?.user?.id || null;
+    } catch (e) {
+        return null;
+    }
+});
 
 function cloneDeep(obj) {
     try {
@@ -347,8 +391,12 @@ function revokeCurrentObjectUrl() {
     } catch (e) {}
 }
 
-async function fetchBlobAndShow(url, filename) {
+async function fetchBlobAndShow(urlCandidate, filename) {
     try {
+        // normalize candidate to streamable URL
+        const url =
+            typeof urlCandidate === 'string' ? ensureAttachmentUrl(urlCandidate) || urlCandidate : ensureAttachmentUrl(urlCandidate) || urlCandidate;
+        if (!url) return;
         // fetch as blob to avoid browser download forced by server headers
         const res = await axios.get(url, { responseType: 'blob', withCredentials: true });
         const blob = res.data;
@@ -359,26 +407,76 @@ async function fetchBlobAndShow(url, filename) {
     } catch (e) {
         // fallback: open in new tab if fetch fails
         try {
-            window.open(url, '_blank', 'noopener');
+            const url =
+                typeof urlCandidate === 'string'
+                    ? ensureAttachmentUrl(urlCandidate) || urlCandidate
+                    : ensureAttachmentUrl(urlCandidate) || urlCandidate;
+            if (url) window.open(url, '_blank', 'noopener');
         } catch (e2) {}
     }
 }
 
 function openAttachmentInModal(file) {
-    if (!file || !file.url) return;
-    // if file.url is a data URL or already blob URL, just open
-    if (file.url.startsWith('blob:') || file.url.startsWith('data:')) {
+    if (!file) return;
+    // normalize url from file meta if needed
+    const candidate = file.url || file.path || file.attachment_id || file;
+    const url = ensureAttachmentUrl(candidate) || file.url || null;
+    if (!url) return;
+    // if it's already a blob/data URL, open directly
+    if (typeof url === 'string' && (url.startsWith('blob:') || url.startsWith('data:'))) {
         previewModal.value = {
             open: true,
-            url: file.url,
-            mime: file.mime_type || '',
+            url: url,
+            mime: file.mime_type || file.mime || '',
             filename: file.original_name || '',
-            isBlob: file.url.startsWith('blob:'),
+            isBlob: url.startsWith('blob:'),
         };
         return;
     }
     // otherwise fetch as blob to avoid download headers
-    fetchBlobAndShow(file.url, file.original_name || 'file');
+    fetchBlobAndShow(url, file.original_name || 'file');
+}
+
+function ensureThumb(file) {
+    try {
+        return ensureThumbUrl(file) || null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function downloadHref(file) {
+    // prefer a streamable/download-safe url
+    try {
+        const candidate = file.url || file.path || file.attachment_id || file;
+        return ensureAttachmentUrl(candidate) || file.url || '#';
+    } catch (e) {
+        return file.url || '#';
+    }
+}
+
+async function confirmDelete(file) {
+    try {
+        if (!file) return;
+        if (!confirm('添付ファイルを削除しますか？ この操作は取り消せません。')) return;
+        // If we have an id, call id-based delete API, otherwise try path-based
+        if (file.id) {
+            await axios.delete(`/api/attachments/${file.id}`);
+        } else if (file.path) {
+            await axios.delete(`/api/attachments`, { data: { path: file.path } });
+        } else {
+            // fallback: try deleting by using url -> path
+            const u = ensureAttachmentUrl(file) || file.url;
+            await axios.delete(`/api/attachments`, { data: { url: u } });
+        }
+        // remove locally
+        if (Array.isArray(localMessage.value?.attachments)) {
+            localMessage.value.attachments = localMessage.value.attachments.filter((f) => f !== file && f.id !== file.id && f.path !== file.path);
+        }
+    } catch (e) {
+        console.error('削除失敗', e);
+        alert('削除に失敗しました');
+    }
 }
 
 function onBodyClick(e) {
@@ -398,5 +496,50 @@ function closePreviewModal() {
     previewModal.value.open = false;
     // revoke object URL to free memory
     revokeCurrentObjectUrl();
+}
+
+const isTrashedByCurrentUser = computed(() => {
+    try {
+        const uid = currentUserId.value;
+        if (!uid || !localMessage.value) return false;
+        if (Array.isArray(localMessage.value.recipients)) {
+            return localMessage.value.recipients.some((r) => {
+                const rid = r.user_id ?? r.user?.id ?? null;
+                return rid === uid && r.deleted_at;
+            });
+        }
+        return false;
+    } catch (e) {
+        return false;
+    }
+});
+
+async function onTrashClick() {
+    try {
+        if (!localMessage.value || !localMessage.value.id) return;
+        if (isTrashedByCurrentUser.value) {
+            // permanent delete flow
+            if (!confirm('このメッセージを完全に削除します。元に戻せません。よろしいですか？')) return;
+            await axios.delete(route('messages.destroy', localMessage.value.id));
+            try {
+                router.get(route('messages.index'));
+            } catch (e) {
+                window.location = route('messages.index');
+            }
+            return;
+        }
+
+        // move to trash
+        if (!confirm('このメッセージをゴミ箱に移動しますか？')) return;
+        await axios.post(route('messages.trash', localMessage.value.id));
+        try {
+            router.get(route('messages.index'));
+        } catch (e) {
+            window.location = route('messages.index');
+        }
+    } catch (e) {
+        console.error('trashMessage error', e);
+        alert('削除に失敗しました。');
+    }
 }
 </script>

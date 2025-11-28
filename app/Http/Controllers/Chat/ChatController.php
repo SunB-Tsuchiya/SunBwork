@@ -247,8 +247,11 @@ class ChatController extends Controller
             $file = $request->file('file');
             // Preserve original filename (including multibyte chars) while avoiding collisions
             $orig = $file->getClientOriginalName();
+            // sanitize original name to remove directory separators while preserving
+            // multibyte characters (e.g. Japanese filenames)
+            $safeOrig = str_replace(['..', '/', '\\'], '_', $orig);
             $uuid = Str::uuid()->toString();
-            $storedName = $uuid . '_' . $orig;
+            $storedName = $uuid . '_' . $safeOrig;
             // storeAs will preserve multibyte names correctly
             // Save chat uploads into the shared attachments/ directory so all attachments are centralized
             $path = $file->storeAs('attachments', $storedName, 'public');

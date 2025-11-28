@@ -112,6 +112,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::delete('attachments/{attachment}', [App\Http\Controllers\AttachmentController::class, 'destroy'])->name('attachments.destroy');
     // Also allow deletion by POST/DELETE with path/attachment_id in body for clients that only have path
     Route::delete('attachments', [App\Http\Controllers\AttachmentController::class, 'destroyByPath'])->name('attachments.destroy_by_path');
+    // SPA-friendly attachment stream (use web middleware so StartSession runs)
+    Route::get('/attachments/stream', [App\Http\Controllers\AttachmentController::class, 'stream'])->name('attachments.stream');
 
     // Unified diary interactions (管理者/リーダーの既読・コメント操作を統合するためのエンドポイント)
     // Keep /interactions as the canonical user-facing index. Provide /entries as a
@@ -177,6 +179,10 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::post('/messages/{message}/read', [App\Http\Controllers\MessageController::class, 'markRead'])->name('messages.read');
     // Accept a job request using messages flow (transitional endpoint)
     Route::post('/messages/job_requests/{jobRequest}/accept', [App\Http\Controllers\MessageController::class, 'acceptJobRequest'])->name('messages.job_requests.accept');
+    // Move message to trash for the current user
+    Route::post('/messages/{message}/trash', [App\Http\Controllers\MessageController::class, 'trash'])->name('messages.trash');
+    // Permanently remove a message for the current user (only if already in trash)
+    Route::delete('/messages/{message}', [App\Http\Controllers\MessageController::class, 'destroy'])->name('messages.destroy');
     // lightweight user search for message compose autocomplete
     Route::get('/users/search', [App\Http\Controllers\UserController::class, 'search'])->name('users.search');
 });
