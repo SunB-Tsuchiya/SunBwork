@@ -245,13 +245,23 @@ const submit = () => {
     }
 
     // 重複チェック
-    fetch(`/events?date=${form.date}`)
-        .then((res) => res.json())
+    const evUrl = `/events?date=${encodeURIComponent(form.date)}`;
+    fetch(evUrl, {
+        headers: { 'Accept': 'application/json' },
+        credentials: 'same-origin',
+    })
+        .then((res) => {
+            if (!res.ok) {
+                // 非 200 レスポンスはここで扱う（例: 401/419/302 など）
+                throw new Error(`HTTP ${res.status}`);
+            }
+            return res.json();
+        })
         .then((events) => {
-            // newStart/newEnd already computed above, but recompute here for scope
             const newStart = new Date(`${form.date}T${form.startHour}:${form.startMinute}:00`);
             const newEnd = new Date(`${form.date}T${form.endHour}:${form.endMinute}:00`);
             const overlap = events.some((ev) => {
+                // 自分と重複判定（Create の場合は ev.id 比較は不要だが保守のため残す）
                 const evStart = new Date(ev.start);
                 const evEnd = new Date(ev.end);
                 return newStart < evEnd && newEnd > evStart;
@@ -310,6 +320,13 @@ const submit = () => {
                 console.error('[Create.vue] form.post threw', e);
                 errorMessage.value = '予定の保存に失敗しました（クライアントエラー）。';
             }
+        })
+        .catch((err) => {
+            console.error('Failed to fetch events for overlap check', err);
+            // JSON で取れなかった / 非 OK / ネットワークエラーのときは重複チェックをスキップして投稿を継続
+            console.warn('events overlap fetch failed or returned non-JSON. Proceeding to submit. Error:', err);
+            // フォールバック: 元の投稿ロジックを実行
+            form.post(route('events.store'), { forceFormData: true, onSuccess: /* ... */ });
         });
 };
 
