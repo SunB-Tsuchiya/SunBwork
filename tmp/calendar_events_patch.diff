@@ -1,0 +1,99 @@
+*** Begin Patch
+*** Update File: resources/js/Components/Calendar.vue
+@@
+ onMounted(() => {
+     nextTick(() => {
+         const now = new Date();
+         const currentHour = String(now.getHours()).padStart(2, '0');
+         // 開始時刻のselect
+         if (startHourSelectRef.value) {
+             const idx = Array.from(startHourSelectRef.value.options).findIndex((opt) => opt.value === currentHour);
+             if (idx >= 0) startHourSelectRef.value.selectedIndex = idx;
+         }
+         // 終了時刻のselect（今回はデフォルト10時のまま）
+     });
+ 
+     
+ });
++
++// Load events from server only when props.events is missing or empty.
++// Use Accept: application/json and credentials to avoid receiving HTML (Inertia redirect/login).
++async function loadEventsIfMissing() {
++    try {
++        if (props.events && Array.isArray(props.events) && props.events.length > 0) return;
++
++        const resp = await fetch(`/events?date=${selectedDate.value}`, {
++            headers: { Accept: 'application/json' },
++            credentials: 'same-origin',
++        });
++        if (!resp.ok) {
++            console.debug('Calendar: events fetch not ok', resp.status);
++            return;
++        }
++        const json = await resp.json();
++        // Support APIs returning plain array or { events: [...] } or { data: [...] }
++        const payload = Array.isArray(json) ? json : (json.events ?? json.data ?? []);
++        if (!Array.isArray(payload) || payload.length === 0) return;
++
++        const transform = (event) => {
++            const isCompleted = typeof event.title === 'string' && event.title.indexOf('【完了】') === 0;
++            const pjByMyselfId = event.extendedProps?.project_job_assignment_by_myself_id ?? event.project_job_assignment_by_myself_id ?? null;
++            const pjAssignmentId = event.extendedProps?.project_job_assignment_id ?? event.project_job_assignment_id ?? null;
++
++            if (pjByMyselfId) {
++                return {
++                    title: event.title,
++                    start: event.start,
++                    end: event.end ?? undefined,
++                    allDay: event.allDay ?? false,
++                    color: '#00000033',
++                    event_id: event.id,
++                    schedule_id: event.extendedProps?.schedule_id ?? event.schedule_id ?? undefined,
++                    description: event.description ?? event.extendedProps?.description ?? '',
++                };
++            }
++            if (!pjByMyselfId && !pjAssignmentId) {
++                return {
++                    title: event.title,
++                    start: event.start,
++                    end: event.end ?? undefined,
++                    allDay: event.allDay ?? false,
++                    color: event.color ?? '#1fb6b3',
++                    event_id: event.id,
++                    schedule_id: event.extendedProps?.schedule_id ?? event.schedule_id ?? undefined,
++                    description: event.description ?? event.extendedProps?.description ?? '',
++                };
++            }
++            return {
++                title: event.title,
++                start: event.start,
++                end: event.end ?? undefined,
++                allDay: event.allDay ?? false,
++                color: isCompleted ? '#b58900' : (event.color ?? '#2563eb'),
++                event_id: event.id,
++                schedule_id: event.extendedProps?.schedule_id ?? event.schedule_id ?? undefined,
++                description: event.description ?? event.extendedProps?.description ?? '',
++            };
++        };
++
++        const mapped = payload.map(transform);
++        for (const ev of mapped) {
++            const exists = events.value.some((e) => {
++                if (e.event_id && ev.event_id) return e.event_id === ev.event_id && e.start === ev.start;
++                return e.start === ev.start && e.title === ev.title;
++            });
++            if (!exists) events.value.push(ev);
++        }
++        console.debug('Calendar: loaded events from API', mapped.length);
++    } catch (err) {
++        console.debug('Calendar: events fetch failed', err);
++    }
++}
++
++// ensure we try loading when component mounts (after the existing nextTick logic)
++onMounted(() => {
++    nextTick(() => {
++        try { loadEventsIfMissing(); } catch (e) { /* ignore */ }
++    });
++});
+*** End Patch

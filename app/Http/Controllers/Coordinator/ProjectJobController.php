@@ -235,7 +235,38 @@ class ProjectJobController extends Controller
 
     public function edit(ProjectJob $projectJob)
     {
-        return Inertia::render('Coordinator/ProjectJobs/Edit', ['job' => $projectJob]);
+        // Ensure team members (and their user relation) are loaded so the Edit page
+        // receives the same `teammember` shape as the Show page expects.
+        $projectJob->load(['teamMembers.user', 'user', 'client']);
+
+        $members = $projectJob->teamMembers->map(function ($m) {
+            return [
+                'id' => $m->id,
+                'user_id' => $m->user_id,
+                'user' => $m->user ? [
+                    'id' => $m->user->id,
+                    'name' => $m->user->name,
+                    'department_id' => $m->user->department_id,
+                    'assignment_id' => $m->user->assignment_id,
+                ] : null,
+            ];
+        });
+
+        // pass job as an array merged with teammember so client sees `job.teammember`
+        $jobArray = array_merge($projectJob->toArray(), ['teammember' => $members]);
+
+        return Inertia::render('Coordinator/ProjectJobs/Edit', ['job' => $jobArray]);
+    }
+
+    /**
+     * Shortcut: redirect to the ProjectSchedules calendar view for the given project.
+     *
+     * This keeps frontend route calls like route('coordinator.project_jobs.schedule', { projectJob: id })
+     * working while centralizing redirect logic in the controller (consistent with other routes).
+     */
+    public function schedule(ProjectJob $projectJob)
+    {
+        return redirect()->route('coordinator.project_schedules.calendar', ['project_job_id' => $projectJob->id]);
     }
 
     public function update(Request $request, ProjectJob $projectJob)

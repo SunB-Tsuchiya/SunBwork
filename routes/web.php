@@ -338,14 +338,11 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::put('project_jobs/{projectJob}/assignments/{assignment}', [App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'update'])->name('project_jobs.assignments.update');
         Route::delete('project_jobs/{projectJob}/assignments/{assignment}', [App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'destroy'])->name('project_jobs.assignments.destroy');
 
-        // Shortcut route used by the ProjectJobs edit/create pages to open the
-        // ProjectSchedules calendar for a specific project (passes project_job_id
-        // as a query parameter). This keeps front-end route calls like
-        // route('coordinator.project_jobs.schedule', { projectJob: id }) working
-        // without changing existing calendar controller signatures.
-        Route::get('project_jobs/{projectJob}/schedule', function ($projectJob) {
-            return redirect()->route('coordinator.project_schedules.calendar', ['project_job_id' => $projectJob]);
-        })->name('project_jobs.schedule');
+        Route::get(
+            'project_jobs/{projectJob}/schedule',
+            [App\Http\Controllers\Coordinator\ProjectJobController::class, 'schedule']
+        )
+            ->name('project_jobs.schedule');
 
         // PoC: ProjectSchedules (Gantt)
         Route::get('project_schedules', [App\Http\Controllers\Coordinator\ProjectSchedulesController::class, 'index'])->name('project_schedules.index');

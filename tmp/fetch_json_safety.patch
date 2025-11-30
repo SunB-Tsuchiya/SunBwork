@@ -1,0 +1,241 @@
+*** Begin Patch
+*** Update File: resources/js/Pages/Coordinator/ProjectJobs/Create.vue
+@@
+-    fetch('/api/clients')
+-        .then((res) => res.json())
+-        .then((data) => {
+-            if (data.length === 0) {
+-                alert(
+-                    'クライアントが登録されていません。\n進行管理の権限ではクライアント作成はできません。\nチームリーダーに作成を依頼してください。',
+-                );
+-            } else {
+-                showClientModal.value = true;
+-                clientSearchResult.value = null;
+-            }
+-        });
++    fetch('/api/clients', { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
++        .then((res) => {
++            if (!res.ok) throw new Error(`HTTP ${res.status}`);
++            return res.json();
++        })
++        .then((data) => {
++            if (data.length === 0) {
++                alert(
++                    'クライアントが登録されていません。\n進行管理の権限ではクライアント作成はできません。\nチームリーダーに作成を依頼してください。',
++                );
++            } else {
++                showClientModal.value = true;
++                clientSearchResult.value = null;
++            }
++        })
++        .catch((err) => {
++            console.error('Failed to load clients', err);
++            alert('クライアント取得に失敗しました。後ほど再試行してください。');
++        });
+@@
+-    fetch('/api/clients')
+-        .then((res) => res.json())
+-        .then((data) => {
+-            clientList.value = data;
+-            showClientListModal.value = true;
+-        });
++    fetch('/api/clients', { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
++        .then((res) => {
++            if (!res.ok) throw new Error(`HTTP ${res.status}`);
++            return res.json();
++        })
++        .then((data) => {
++            clientList.value = data;
++            showClientListModal.value = true;
++        })
++        .catch((err) => {
++            console.error('Failed to load client list', err);
++            alert('クライアント一覧の取得に失敗しました。');
++        });
+@@
+-    fetch(`/api/clients/${clientSearch.value.id}`)
+-        .then((res) => (res.ok ? res.json() : null))
+-        .then((data) => {
+-            clientSearchResult.value = data;
+-        });
++    fetch(`/api/clients/${clientSearch.value.id}`, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
++        .then((res) => {
++            if (!res.ok) return null;
++            return res.json();
++        })
++        .then((data) => {
++            clientSearchResult.value = data;
++        })
++        .catch((err) => {
++            console.error('searchClientById failed', err);
++            clientSearchResult.value = null;
++            alert('クライアント検索に失敗しました。');
++        });
+@@
+-    fetch(`/api/clients?name=${encodeURIComponent(clientSearch.value.name)}`)
+-        .then((res) => (res.ok ? res.json() : null))
+-        .then((data) => {
+-            clientSearchResult.value = data && data.length ? data[0] : null;
+-        });
++    fetch(`/api/clients?name=${encodeURIComponent(clientSearch.value.name)}`, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
++        .then((res) => {
++            if (!res.ok) return null;
++            return res.json();
++        })
++        .then((data) => {
++            clientSearchResult.value = data && data.length ? data[0] : null;
++        })
++        .catch((err) => {
++            console.error('searchClientByName failed', err);
++            clientSearchResult.value = null;
++            alert('クライアント検索に失敗しました。');
++        });
+*** End Patch
+
+*** Begin Patch
+*** Update File: resources/js/Pages/JobBox/Index.vue
+@@
+-                        const resp = await fetch(route('api.jobbox.show', { id: e.job_assignment_message_id }), { credentials: 'same-origin' });
+-                        if (resp.ok) {
+-                            const json = await resp.json();
+-                            jam = json.data || json;
+-                        }
++                        try {
++                            const resp = await fetch(route('api.jobbox.show', { id: e.job_assignment_message_id }), {
++                                credentials: 'same-origin',
++                                headers: { Accept: 'application/json' },
++                            });
++                            if (resp.ok) {
++                                const json = await resp.json().catch(() => null);
++                                jam = json && (json.data || json) ? (json.data || json) : jam;
++                            }
++                        } catch (fetchErr) {
++                            // fetch jam failed (non-fatal)
++                            console.warn('Echo jobbox fetch failed', fetchErr);
++                        }
+*** End Patch
+
+*** Begin Patch
+*** Update File: resources/js/Pages/Coordinator/ProjectSchedules/Index.vue
+@@
+-        const res = await fetch(route('coordinator.project_schedules.update', { projectSchedule: idNum }), {
+-            method: 'PATCH',
+-            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+-            body: JSON.stringify(body),
+-            credentials: 'same-origin',
+-        });
+-        if (!res.ok) throw new Error('network');
+-        const data = await res.json();
++        try {
++            const res = await fetch(route('coordinator.project_schedules.update', { projectSchedule: idNum }), {
++                method: 'PATCH',
++                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
++                body: JSON.stringify(body),
++                credentials: 'same-origin',
++            });
++            if (!res.ok) throw new Error('network');
++            const data = await res.json().catch(() => null);
++            // sync returned schedule if present
++            if (data && data.schedule) {
++                const s = data.schedule;
++                const i = tasks.findIndex((t) => Number(t.id) === Number(s.id));
++                if (i !== -1) {
++                    tasks[i].start = s.start_date || tasks[i].start;
++                    tasks[i].end = s.end_date || tasks[i].end;
++                    tasks[i].progress = s.progress ?? tasks[i].progress;
++                }
++            }
++        } catch (e) {
++            console.error('Failed to persist schedule update', e);
++            // optionally refetch or rollback optimistic update (omitted for brevity)
++        }
+-        // sync returned schedule if present
+-        if (data.schedule) {
+-            const s = data.schedule;
+-            const i = tasks.findIndex((t) => Number(t.id) === Number(s.id));
+-            if (i !== -1) {
+-                tasks[i].start = s.start_date || tasks[i].start;
+-                tasks[i].end = s.end_date || tasks[i].end;
+-                tasks[i].progress = s.progress ?? tasks[i].progress;
+-            }
+-        }
+-    } catch (e) {
+-        console.error('Failed to persist schedule update', e);
+-        // optionally refetch or rollback optimistic update (omitted for brevity)
+-    }
++    }
+*** End Patch
+
+*** Begin Patch
+*** Update File: resources/js/Components/LookupModal.vue
+@@
+-        if (props.mode === 'edit' && props.item && props.item.id) {
+-            res = await fetch(route('coordinator.assignments.lookups.update', { table: table, id: props.item.id }), {
+-                method: 'PATCH',
+-                headers: {
+-                    'Content-Type': 'application/json',
+-                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || '',
+-                    Accept: 'application/json',
+-                },
+-                body: JSON.stringify(payload),
+-            });
+-        } else {
+-            res = await fetch(route('coordinator.assignments.lookups.store'), {
+-                method: 'POST',
+-                headers: {
+-                    'Content-Type': 'application/json',
+-                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || '',
+-                    Accept: 'application/json',
+-                },
+-                body: JSON.stringify(payload),
+-            });
+-        }
+-
+-        const body = await res.json().catch(() => null);
+-        if (!res.ok) {
+-            formErrors.value.form =
+-                (body && (body.error || (body.errors && Object.values(body.errors).flat()[0]))) ||
+-                (props.mode === 'edit' ? '更新に失敗しました' : '追加に失敗しました');
+-            return;
+-        }
++        try {
++            let res;
++            const commonHeaders = {
++                'Content-Type': 'application/json',
++                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || '',
++                Accept: 'application/json',
++            };
++            if (props.mode === 'edit' && props.item && props.item.id) {
++                res = await fetch(route('coordinator.assignments.lookups.update', { table: table, id: props.item.id }), {
++                    method: 'PATCH',
++                    headers: commonHeaders,
++                    body: JSON.stringify(payload),
++                    credentials: 'same-origin',
++                });
++            } else {
++                res = await fetch(route('coordinator.assignments.lookups.store'), {
++                    method: 'POST',
++                    headers: commonHeaders,
++                    body: JSON.stringify(payload),
++                    credentials: 'same-origin',
++                });
++            }
++
++            const body = await res.json().catch(() => null);
++            if (!res.ok) {
++                formErrors.value.form =
++                    (body && (body.error || (body.errors && Object.values(body.errors).flat()[0]))) ||
++                    (props.mode === 'edit' ? '更新に失敗しました' : '追加に失敗しました');
++                return;
++            }
++            if (body && body.item) {
++                emits('created', body.item);
++                resetForm();
++            }
++            emits('close');
++            return;
++        } catch (err) {
++            formErrors.value.form = props.mode === 'edit' ? '更新中にエラーが発生しました' : '追加中にエラーが発生しました';
++            return;
++        }
+*** End Patch

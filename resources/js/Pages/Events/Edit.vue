@@ -53,9 +53,36 @@ const submit = () => {
         alert('終了時刻は開始時刻より後にしてください。');
         return;
     }
-    // 重複チェック
-    fetch(`/events?date=${form.date}`)
-        .then((res) => res.json())
+
+    // helper: 実際の送信処理を関数化
+    const doPut = () => {
+        form.put(route('events.update', props.event.id), {
+            onSuccess: () => {
+                if (returnTo && returnTo !== '') {
+                    try {
+                        window.location.href = returnTo;
+                    } catch (e) {
+                        router.get(route('calendar.index'));
+                    }
+                    return;
+                }
+                router.get(route('calendar.index'));
+            },
+        });
+    };
+
+    // 重複チェック（JSON 期待）。Accept ヘッダを付け、非 OK / parse error の場合は重複チェックをスキップして更新する。
+    const evUrl = `/events?date=${encodeURIComponent(form.date)}`;
+    fetch(evUrl, {
+        headers: { Accept: 'application/json' },
+        credentials: 'same-origin',
+    })
+        .then((res) => {
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}`);
+            }
+            return res.json();
+        })
         .then((events) => {
             const newStart = new Date(`${form.date}T${form.startHour}:${form.startMinute}:00`);
             const newEnd = new Date(`${form.date}T${form.endHour}:${form.endMinute}:00`);
@@ -70,20 +97,12 @@ const submit = () => {
                     return;
                 }
             }
-            // always send JSON PUT (no files)
-            form.put(route('events.update', props.event.id), {
-                onSuccess: () => {
-                    if (returnTo && returnTo !== '') {
-                        try {
-                            window.location.href = returnTo;
-                        } catch (e) {
-                            router.get(route('calendar.index'));
-                        }
-                        return;
-                    }
-                    router.get(route('calendar.index'));
-                },
-            });
+            doPut();
+        })
+        .catch((err) => {
+            // JSON で取れなかった / エラーが出た場合は重複チェックをスキップして更新を継続
+            console.warn('events overlap fetch failed or returned non-JSON. Proceeding to update. Error:', err);
+            doPut();
         });
 };
 </script>

@@ -247,7 +247,7 @@ const submit = () => {
     // 重複チェック
     const evUrl = `/events?date=${encodeURIComponent(form.date)}`;
     fetch(evUrl, {
-        headers: { 'Accept': 'application/json' },
+        headers: { Accept: 'application/json' },
         credentials: 'same-origin',
     })
         .then((res) => {
@@ -326,7 +326,44 @@ const submit = () => {
             // JSON で取れなかった / 非 OK / ネットワークエラーのときは重複チェックをスキップして投稿を継続
             console.warn('events overlap fetch failed or returned non-JSON. Proceeding to submit. Error:', err);
             // フォールバック: 元の投稿ロジックを実行
-            form.post(route('events.store'), { forceFormData: true, onSuccess: /* ... */ });
+            form.post(route('events.store'), {
+                forceFormData: true,
+                onSuccess: () => {
+                    errorMessage.value = '';
+                    // prefer returning to origin if provided (use full navigation to ensure the diary page re-fetches events)
+                    if (returnTo && returnTo !== '') {
+                        try {
+                            // If it's a relative path like /diaries/123, force a full navigation to ensure mounted hooks run.
+                            window.location.href = returnTo;
+                        } catch (e) {
+                            try {
+                                const vm = getCurrentInstance();
+                                vm?.proxy?.$inertia?.visit(returnTo);
+                            } catch (e2) {
+                                // last-resort fallback
+                                window.location.href = returnTo;
+                            }
+                        }
+                        return;
+                    }
+                    const target = props.job ? route('user.assigned-jobs.index') : route('calendar.index');
+                    if (props.job) {
+                        // force a full navigation to refresh server-side data
+                        window.location.href = target;
+                        return;
+                    }
+                    const vm = getCurrentInstance();
+                    try {
+                        vm?.proxy?.$inertia?.visit(target);
+                    } catch (e) {
+                        window.location.href = target;
+                    }
+                },
+                onError: (errors) => {
+                    console.error('events.store failed', errors);
+                    errorMessage.value = '予定の保存に失敗しました。後でもう一度お試しください。';
+                },
+            });
         });
 };
 
