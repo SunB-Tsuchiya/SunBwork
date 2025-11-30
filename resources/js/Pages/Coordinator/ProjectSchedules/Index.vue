@@ -75,7 +75,7 @@ async function onUpdateTask(payload) {
 
         const res = await fetch(route('coordinator.project_schedules.update', { projectSchedule: idNum }), {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
             body: JSON.stringify(body),
             credentials: 'same-origin',
         });

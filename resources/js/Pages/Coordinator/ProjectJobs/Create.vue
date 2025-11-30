@@ -171,7 +171,7 @@ watch(clientSearchMode, (val) => {
 
 function openClientModal() {
     // クライアント一覧を即取得して空ならアラート
-    fetch('/api/clients')
+    fetch('/api/clients', { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
         .then((res) => res.json())
         .then((data) => {
             if (data.length === 0) {
@@ -189,7 +189,7 @@ function closeClientModal() {
 }
 function openClientListModal() {
     // クライアント一覧取得APIを呼ぶ想定
-    fetch('/api/clients')
+    fetch('/api/clients', { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
         .then((res) => res.json())
         .then((data) => {
             clientList.value = data;
@@ -201,7 +201,7 @@ function closeClientListModal() {
 }
 function searchClientById() {
     if (!clientSearch.value.id) return;
-    fetch(`/api/clients/${clientSearch.value.id}`)
+    fetch(`/api/clients/${clientSearch.value.id}`, { headers: { Accept: "application/json" }, credentials: "same-origin" })
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
             clientSearchResult.value = data;
@@ -209,7 +209,7 @@ function searchClientById() {
 }
 function searchClientByName() {
     if (!clientSearch.value.name) return;
-    fetch(`/api/clients?name=${encodeURIComponent(clientSearch.value.name)}`)
+    fetch(`/api/clients?name=${encodeURIComponent(clientSearch.value.name)}`, { headers: { Accept: "application/json" }, credentials: "same-origin" })
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
             clientSearchResult.value = data && data.length ? data[0] : null;

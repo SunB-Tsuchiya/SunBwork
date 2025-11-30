@@ -127,7 +127,8 @@ async function submit() {
                     'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || '',
                     Accept: 'application/json',
                 },
-                body: JSON.stringify(payload),
+                    body: JSON.stringify(payload),
+                    credentials: 'same-origin',
             });
         } else {
             res = await fetch(route('coordinator.assignments.lookups.store'), {
@@ -137,7 +138,8 @@ async function submit() {
                     'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || '',
                     Accept: 'application/json',
                 },
-                body: JSON.stringify(payload),
+                    body: JSON.stringify(payload),
+                    credentials: 'same-origin',
             });
         }
 

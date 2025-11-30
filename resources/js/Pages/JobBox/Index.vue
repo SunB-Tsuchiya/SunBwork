@@ -567,7 +567,7 @@ onMounted(() => {
                 } else if (e.job_assignment_message_id) {
                     // Try to fetch the jam item from the server (lightweight show endpoint)
                     try {
-                        const resp = await fetch(route('api.jobbox.show', { id: e.job_assignment_message_id }), { credentials: 'same-origin' });
+                        const resp = await fetch(route('api.jobbox.show', { id: e.job_assignment_message_id }), { credentials: 'same-origin', headers: { Accept: 'application/json' } });
                         if (resp.ok) {
                             const json = await resp.json();
                             jam = json.data || json;
