@@ -270,7 +270,7 @@
 <script setup>
 import SelectionModal from '@/Components/SelectionModal.vue';
 import useToasts from '@/Composables/useToasts';
-import { Link, router, usePage } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
 import { onMounted, ref } from 'vue';
 
 const props = defineProps({
@@ -908,62 +908,160 @@ function onHourChange(idx) {
     }
 }
 
-function save() {
-    if (!props.editMode && assignments.value.length === 1) return; // read-only mode, no save
+const saving = ref(false);
 
-    if (props.editMode && assignments.value.length === 1 && assignments.value[0].id) {
-        const a = assignments.value[0];
-        // prefer sending difficulty_id when available, otherwise keep string for backward compat
-        const payload = {
-            title: assembleTitle(a),
-            detail: a.detail,
-            difficulty_id: a.difficulty_id ?? resolveDifficultyId(a.difficulty),
-            difficulty: a.difficulty,
-            estimated_hours: a.estimated_hours || null,
-            desired_start_date: a.desired_start_date || null,
-            desired_end_date: a.desired_end_date || null,
-            desired_time: String(a.desired_time_hour).padStart(2, '0') + ':' + String(a.desired_time_min).padStart(2, '0'),
-            user_id: a.user_id || null,
-            work_item_type_id: a.work_item_type_id || null,
-            size_id: a.size_id || null,
-            stage_id: a.stage_id || null,
-            status_id: a.status_id || null,
-            company_id: a.company_id || null,
-            department_id: a.department_id || null,
-            amounts: a.amounts || null,
-            amounts_unit: a.amounts_unit || null,
-        };
-        router.put(route('coordinator.project_jobs.assignments.update', { projectJob: props.projectJob.id, assignment: a.id }), payload);
-        router.put(
-            route('coordinator.project_jobs.assignments.update', { projectJob: props.projectJob ? props.projectJob.id : '', assignment: a.id }),
-            payload,
-        );
+async function save() {
+    console.log('[AssignmentForm_user] save invoked', {
+        editMode: props.editMode,
+        assignments_sample: assignments.value && assignments.value[0] ? assignments.value[0] : null,
+    });
+    if (!props.editMode) {
+        console.log('[AssignmentForm_user] editMode is false — aborting save');
         return;
+    }
+    saving.value = true;
+
+    function assembleTitle(a) {
+        if (a.title_suffix && String(a.title_suffix).trim() !== '') return String(a.title_suffix).trim();
+        const maybe = a.project_job && (a.project_job.title || a.project_job.name) ? a.project_job.title || a.project_job.name : null;
+        if (!maybe) return '';
+        if (maybe.includes('：')) return maybe.replace(/^.*：/, '').trim();
+        return String(maybe).trim();
     }
 
     const payload = {
         assignments: assignments.value.map((a) => ({
             title: assembleTitle(a),
-            detail: a.detail,
-            difficulty_id: a.difficulty_id ?? resolveDifficultyId(a.difficulty),
-            difficulty: a.difficulty,
-            estimated_hours: a.estimated_hours || null,
-            desired_start_date: a.desired_start_date || null,
-            desired_end_date: a.desired_end_date || null,
-            desired_time: String(a.desired_time_hour).padStart(2, '0') + ':' + String(a.desired_time_min).padStart(2, '0'),
-            user_id: a.user_id || null,
-            work_item_type_id: a.work_item_type_id || null,
-            size_id: a.size_id || null,
-            status_id: a.status_id || null,
+            detail: a.detail || '',
+            user_id: a.user_id || (effectiveAuthUser() ? effectiveAuthUser().id : null),
+            project_job_id: a.project_job_id || null,
             company_id: a.company_id || null,
             department_id: a.department_id || null,
+            difficulty_id:
+                a.difficulty_id ??
+                (window?.page?.props?.difficulties
+                    ? (window.page.props.difficulties.find((d) => d.name === a.difficulty || d.slug === a.difficulty)?.id ?? null)
+                    : null),
+            desired_start_date: a.desired_start_date || null,
+            desired_end_date: a.desired_end_date || null,
+            start_time: String(a.start_time_hour || '00').padStart(2, '0') + ':' + String(a.start_time_min || '00').padStart(2, '0'),
+            desired_time: String(a.desired_time_hour || '00').padStart(2, '0') + ':' + String(a.desired_time_min || '00').padStart(2, '0'),
+            estimated_hours: a.estimated_hours || null,
+            work_item_type_id: a.work_item_type_id || null,
+            size_id: a.size_id || null,
             stage_id: a.stage_id || null,
-            amounts: a.amounts || null,
-            amounts_unit: a.amounts_unit || null,
+            status_id: a.status_id || null,
+            amounts: typeof a.amounts === 'number' ? a.amounts : Number(a.amounts) || 0,
+            amounts_unit: a.amounts_unit || 'page',
         })),
     };
-    router.post(route('coordinator.project_jobs.assignments.store', { projectJob: props.projectJob.id }), payload);
-    router.post(route('coordinator.project_jobs.assignments.store', { projectJob: props.projectJob ? props.projectJob.id : '' }), payload);
+
+    try {
+        const auth = effectiveAuthUser();
+        const allForAuth = payload.assignments.every((x) => String(x.user_id) === String(auth ? auth.id : null));
+        const computedProjectJobId =
+            props.projectJob && props.projectJob.id ? props.projectJob.id : payload.assignments[0] ? payload.assignments[0].project_job_id : null;
+
+        console.log('[AssignmentForm_user] computedProjectJobId:', computedProjectJobId, 'allForAuth?', allForAuth);
+
+        if (allForAuth) {
+            if (!computedProjectJobId) {
+                console.error('[AssignmentForm_user] missing projectJob id when attempting user-store', {
+                    computedProjectJobId,
+                    sampleAssignment: payload.assignments[0],
+                });
+                try {
+                    alert('プロジェクトが選択されていません。プロジェクトを選択してください。');
+                } catch (e) {}
+                return;
+            }
+            const url = route('project_jobs.assignments.store_user', { projectJob: computedProjectJobId });
+            const rel =
+                typeof window !== 'undefined' && url && url.indexOf(window.location.origin) === 0 ? url.replace(window.location.origin, '') : url;
+            console.log('[AssignmentForm_user] posting (fetch) to (relative):', rel);
+
+            // CSRF token
+            const token = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+            try {
+                const res = await fetch(rel, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': token,
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-Inertia': 'true',
+                    },
+                    body: JSON.stringify(payload),
+                });
+                console.log('[AssignmentForm_user] fetch POST status:', res.status, 'ok?', res.ok);
+                if (res.ok) {
+                    // Successful — refresh to reflect changes (adjust to Inertia visit if you prefer)
+                    location.reload();
+                    return;
+                } else {
+                    const txt = await res.text().catch(() => '');
+                    console.error('[AssignmentForm_user] fetch POST failed:', res.status, txt);
+                    alert('保存に失敗しました（' + res.status + '）');
+                    return;
+                }
+            } catch (err) {
+                console.error('[AssignmentForm_user] fetch POST error:', err);
+                alert('保存に失敗しました（ネットワークエラー）');
+                return;
+            } finally {
+                saving.value = false;
+            }
+        }
+    } catch (e) {
+        console.warn('[AssignmentForm_user] allForAuth check failed, falling back to coordinator route', e);
+    }
+
+    // Coordinator route fallback (same fetch pattern)
+    const coordinatorProjectJobId =
+        props.projectJob && props.projectJob.id ? props.projectJob.id : payload.assignments[0] ? payload.assignments[0].project_job_id : null;
+    if (!coordinatorProjectJobId) {
+        console.error('[AssignmentForm_user] missing projectJob id for coordinator-store', { sampleAssignment: payload.assignments[0] });
+        try {
+            alert('プロジェクトが選択されていません。プロジェクトを選択してください。');
+        } catch (e) {}
+        saving.value = false;
+        return;
+    }
+
+    try {
+        const url2 = route('coordinator.project_jobs.assignments.store', { projectJob: coordinatorProjectJobId });
+        const rel2 =
+            typeof window !== 'undefined' && url2 && url2.indexOf(window.location.origin) === 0 ? url2.replace(window.location.origin, '') : url2;
+        console.log('[AssignmentForm_user] coordinator-store posting to:', rel2);
+        const token2 = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+        const res2 = await fetch(rel2, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': token2,
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-Inertia': 'true',
+            },
+            body: JSON.stringify(payload),
+        });
+        console.log('[AssignmentForm_user] coordinator fetch POST status:', res2.status, 'ok?', res2.ok);
+        if (res2.ok) {
+            location.reload();
+            return;
+        } else {
+            const txt2 = await res2.text().catch(() => '');
+            console.error('[AssignmentForm_user] coordinator fetch POST failed:', res2.status, txt2);
+            alert('保存に失敗しました（' + res2.status + '）');
+            return;
+        }
+    } catch (err2) {
+        console.error('[AssignmentForm_user] coordinator fetch error:', err2);
+        alert('保存に失敗しました（ネットワークエラー）');
+    } finally {
+        saving.value = false;
+    }
 }
 </script>
 

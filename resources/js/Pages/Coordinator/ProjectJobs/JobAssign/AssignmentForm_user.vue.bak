@@ -252,13 +252,13 @@
         <div class="flex gap-2" v-if="editMode">
             <!-- <button type="submit" class="rounded bg-green-600 px-4 py-2 text-white">保存する</button> -->
             <!-- テストです。 -->
-            <button type="submit" @click.prevent="save" :disabled="saving" class="rounded bg-green-600 px-4 py-2 text-white">保存する</button>
+            <button type="submit" @click.prevent="save" class="rounded bg-green-600 px-4 py-2 text-white">保存する</button>
         </div>
     </form>
 </template>
 
 <script setup>
-import { usePage } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import { computed, inject, onMounted, ref, watch } from 'vue';
 
 const props = defineProps({
@@ -721,9 +721,8 @@ function onHourChange(idx) {
         a.desired_time_min = avail.length ? avail[0] : '00';
     }
 }
-const saving = ref(false);
 
-async function save() {
+function save() {
     console.log('[AssignmentForm_user] save invoked', {
         editMode: props.editMode,
         assignments_sample: assignments.value && assignments.value[0] ? assignments.value[0] : null,
@@ -732,7 +731,6 @@ async function save() {
         console.log('[AssignmentForm_user] editMode is false — aborting save');
         return;
     }
-    saving.value = true;
 
     function assembleTitle(a) {
         if (a.title_suffix && String(a.title_suffix).trim() !== '') return String(a.title_suffix).trim();
@@ -750,7 +748,6 @@ async function save() {
             project_job_id: a.project_job_id || null,
             company_id: a.company_id || null,
             department_id: a.department_id || null,
-            difficulty: a.difficulty || null,
             difficulty_id:
                 a.difficulty_id ??
                 (window?.page?.props?.difficulties
@@ -773,6 +770,7 @@ async function save() {
     try {
         const auth = effectiveAuthUser();
         const allForAuth = payload.assignments.every((x) => String(x.user_id) === String(auth ? auth.id : null));
+        // Determine projectJob id robustly
         const computedProjectJobId =
             props.projectJob && props.projectJob.id ? props.projectJob.id : payload.assignments[0] ? payload.assignments[0].project_job_id : null;
 
@@ -789,87 +787,32 @@ async function save() {
                 } catch (e) {}
                 return;
             }
-            const url = route('project_jobs.assignments.store_user', { projectJob: computedProjectJobId });
-            const rel =
-                typeof window !== 'undefined' && url && url.indexOf(window.location.origin) === 0 ? url.replace(window.location.origin, '') : url;
-            console.log('[AssignmentForm_user] posting (fetch) to (relative):', rel);
-
-            // CSRF token
-            const token = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+            // Log resolved route URL before posting
             try {
-                const res = await fetch(rel, {
-                    method: 'POST',
-                    credentials: 'same-origin',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': token,
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'X-Inertia': 'true',
-                    },
-                    body: JSON.stringify(payload),
-                });
-
-                // Handle possible redirect/409/3xx cases robustly:
-                if (res.redirected && res.url) {
-                    // fetch followed redirect automatically — navigate to final location
-                    window.location.href = res.url;
-                    return;
+                const url = route('project_jobs.assignments.store_user', { projectJob: computedProjectJobId });
+                console.log('[AssignmentForm_user] user-store route resolved to:', url);
+                try {
+                    // make relative if Ziggy returned an absolute URL (avoid origin mismatch)
+                    const rel =
+                        typeof window !== 'undefined' && url && url.indexOf(window.location.origin) === 0
+                            ? url.replace(window.location.origin, '')
+                            : url;
+                    console.log('[AssignmentForm_user] posting to (relative):', rel);
+                    router.post(rel, payload);
+                    console.log('[AssignmentForm_user] router.post invoked for user-store');
+                } catch (postErr) {
+                    console.error('[AssignmentForm_user] router.post threw (user-store):', postErr);
                 }
-
-                if (res.ok) {
-                    // Successful — refresh to reflect changes (adjust to Inertia visit if you prefer)
-                    location.reload();
-                    return;
-                }
-
-                // Inertia full-page redirect: 409 with X-Inertia-Location (or Location)
-                if (res.status === 409) {
-                    const inertiaLocation = res.headers.get('x-inertia-location') || res.headers.get('X-Inertia-Location') || null;
-                    const locationHeader = res.headers.get('location') || null;
-                    const dest = inertiaLocation || locationHeader;
-                    if (dest) {
-                        if (/^https?:\/\//i.test(dest)) {
-                            window.location.href = dest;
-                        } else {
-                            window.location.href = window.location.origin + dest;
-                        }
-                        return;
-                    }
-                    // fallback: reload the page
-                    window.location.reload();
-                    return;
-                }
-
-                // Other 3xx returned without automatic follow (defensive)
-                if (res.status >= 300 && res.status < 400) {
-                    const locationHeader = res.headers.get('location') || null;
-                    if (locationHeader) {
-                        if (/^https?:\/\//i.test(locationHeader)) {
-                            window.location.href = locationHeader;
-                        } else {
-                            window.location.href = window.location.origin + locationHeader;
-                        }
-                        return;
-                    }
-                }
-
-                // Fallback: show server status / message
-                const txt = await res.text().catch(() => '');
-                console.error('[AssignmentForm_user] fetch POST failed:', res.status, txt);
-                alert('保存に失敗しました（' + res.status + '）');
-            } catch (err) {
-                console.error('[AssignmentForm_user] fetch POST error:', err);
-                alert('保存に失敗しました（ネットワークエラー）');
-                return;
-            } finally {
-                saving.value = false;
+            } catch (routeErr) {
+                console.error('[AssignmentForm_user] route(...) threw for user-store:', routeErr);
             }
+            return;
         }
     } catch (e) {
         console.warn('[AssignmentForm_user] allForAuth check failed, falling back to coordinator route', e);
     }
 
-    // Coordinator route fallback (same fetch pattern)
+    // Coordinator route
     const coordinatorProjectJobId =
         props.projectJob && props.projectJob.id ? props.projectJob.id : payload.assignments[0] ? payload.assignments[0].project_job_id : null;
     if (!coordinatorProjectJobId) {
@@ -877,7 +820,6 @@ async function save() {
         try {
             alert('プロジェクトが選択されていません。プロジェクトを選択してください。');
         } catch (e) {}
-        saving.value = false;
         return;
     }
 
@@ -886,62 +828,9 @@ async function save() {
         const rel2 =
             typeof window !== 'undefined' && url2 && url2.indexOf(window.location.origin) === 0 ? url2.replace(window.location.origin, '') : url2;
         console.log('[AssignmentForm_user] coordinator-store posting to:', rel2);
-        const token2 = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
-        const res2 = await fetch(rel2, {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': token2,
-                'X-Requested-With': 'XMLHttpRequest',
-                'X-Inertia': 'true',
-            },
-            body: JSON.stringify(payload),
-        });
-        console.log('[AssignmentForm_user] coordinator fetch POST status:', res2.status, 'ok?', res2.ok);
-
-        if (res2.redirected && res2.url) {
-            window.location.href = res2.url;
-            return;
-        }
-        if (res2.ok) {
-            location.reload();
-            return;
-        }
-        if (res2.status === 409) {
-            const inertiaLocation = res2.headers.get('x-inertia-location') || res2.headers.get('X-Inertia-Location') || null;
-            const locationHeader = res2.headers.get('location') || null;
-            const dest = inertiaLocation || locationHeader;
-            if (dest) {
-                if (/^https?:\/\//i.test(dest)) {
-                    window.location.href = dest;
-                } else {
-                    window.location.href = window.location.origin + dest;
-                }
-                return;
-            }
-            window.location.reload();
-            return;
-        }
-        if (res2.status >= 300 && res2.status < 400) {
-            const locationHeader = res2.headers.get('location') || null;
-            if (locationHeader) {
-                if (/^https?:\/\//i.test(locationHeader)) {
-                    window.location.href = locationHeader;
-                } else {
-                    window.location.href = window.location.origin + locationHeader;
-                }
-                return;
-            }
-        }
-        const txt2 = await res2.text().catch(() => '');
-        console.error('[AssignmentForm_user] coordinator fetch POST failed:', res2.status, txt2);
-        alert('保存に失敗しました（' + res2.status + '）');
-    } catch (err2) {
-        console.error('[AssignmentForm_user] coordinator fetch error:', err2);
-        alert('保存に失敗しました（ネットワークエラー）');
-    } finally {
-        saving.value = false;
+        router.post(rel2, payload);
+    } catch (routeErr2) {
+        console.error('[AssignmentForm_user] route(...) threw for coordinator-store:', routeErr2);
     }
 }
 </script>

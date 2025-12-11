@@ -436,6 +436,27 @@ const calendarOptions = computed(() => ({
     firstDay: 1,
     weekText: '\u9031',
     dayHeaderFormat: { weekday: 'short' },
+    // add just after dayHeaderFormat
+    // dayHeaderContent: 月/日を表示。月ビューでは日付は表示しない。
+    dayHeaderContent: function (arg) {
+        // arg.date は Date、arg.text はロケールに沿った曜ラベル（例: "月"）
+        const viewType = arg.view && arg.view.type ? String(arg.view.type) : '';
+        const d = arg.date;
+        const month = d ? d.getMonth() + 1 : '';
+        const day = d ? d.getDate() : '';
+        const md = month && day ? `${month}/${day}` : '';
+        const weekdayText = arg.text || '';
+
+        // 月表示（dayGridMonth）のときは日付 (md) を表示しない
+        if (viewType === 'dayGridMonth') {
+            return { html: `<div class="fc-day-header-bottom">${weekdayText}</div>` };
+        }
+
+        // それ以外のビューでは「12/1」(上段) + 曜日(下段) を二段表示
+        return {
+            html: `<div class="fc-day-header-top">${md}</div><div class="fc-day-header-bottom">${weekdayText}</div>`,
+        };
+    },
     // keep internal grid at 15-minute increments but show labels every 30 minutes
     slotDuration: '00:15:00',
     slotLabelInterval: '00:30:00',
@@ -820,5 +841,25 @@ const submitEvent = async () => {
 .fc .fc-timegrid .fc-scrollgrid .fc-timegrid-slot-lane td {
     padding-top: 6px;
     padding-bottom: 6px;
+}
+/* 月表示時に曜日のみを中央寄せ表示する場合の補正 */
+.fc .fc-col-header-cell .fc-day-header-bottom {
+    display: block;
+    text-align: center;
+    /* 既存のスタイルと衝突しないように調整 */
+}
+
+/* 通常（非月ビュー）で日付（上段）をやや強調 */
+.fc .fc-col-header-cell .fc-day-header-top {
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1;
+    padding-bottom: 0.06rem;
+    color: rgba(15, 23, 42, 0.95);
+}
+.fc .fc-col-header-cell .fc-day-header-bottom {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: rgba(15, 23, 42, 0.7);
 }
 </style>

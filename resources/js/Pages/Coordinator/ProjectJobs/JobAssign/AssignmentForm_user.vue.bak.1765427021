@@ -750,6 +750,7 @@ async function save() {
             project_job_id: a.project_job_id || null,
             company_id: a.company_id || null,
             department_id: a.department_id || null,
+            difficulty_id: a.difficulty_id || null,
             difficulty: a.difficulty || null,
             difficulty_id:
                 a.difficulty_id ??
@@ -808,26 +809,19 @@ async function save() {
                     },
                     body: JSON.stringify(payload),
                 });
-
-                // Handle possible redirect/409/3xx cases robustly:
-                if (res.redirected && res.url) {
-                    // fetch followed redirect automatically — navigate to final location
-                    window.location.href = res.url;
-                    return;
-                }
-
                 if (res.ok) {
                     // Successful — refresh to reflect changes (adjust to Inertia visit if you prefer)
                     location.reload();
                     return;
                 }
 
-                // Inertia full-page redirect: 409 with X-Inertia-Location (or Location)
+                // Handle Inertia's "full page redirect required" response (409 with X-Inertia-Location)
                 if (res.status === 409) {
                     const inertiaLocation = res.headers.get('x-inertia-location') || res.headers.get('X-Inertia-Location') || null;
                     const locationHeader = res.headers.get('location') || null;
                     const dest = inertiaLocation || locationHeader;
                     if (dest) {
+                        // dest may be absolute or relative; prefer absolute if provided
                         if (/^https?:\/\//i.test(dest)) {
                             window.location.href = dest;
                         } else {
@@ -838,19 +832,6 @@ async function save() {
                     // fallback: reload the page
                     window.location.reload();
                     return;
-                }
-
-                // Other 3xx returned without automatic follow (defensive)
-                if (res.status >= 300 && res.status < 400) {
-                    const locationHeader = res.headers.get('location') || null;
-                    if (locationHeader) {
-                        if (/^https?:\/\//i.test(locationHeader)) {
-                            window.location.href = locationHeader;
-                        } else {
-                            window.location.href = window.location.origin + locationHeader;
-                        }
-                        return;
-                    }
                 }
 
                 // Fallback: show server status / message
@@ -899,44 +880,15 @@ async function save() {
             body: JSON.stringify(payload),
         });
         console.log('[AssignmentForm_user] coordinator fetch POST status:', res2.status, 'ok?', res2.ok);
-
-        if (res2.redirected && res2.url) {
-            window.location.href = res2.url;
-            return;
-        }
         if (res2.ok) {
             location.reload();
             return;
-        }
-        if (res2.status === 409) {
-            const inertiaLocation = res2.headers.get('x-inertia-location') || res2.headers.get('X-Inertia-Location') || null;
-            const locationHeader = res2.headers.get('location') || null;
-            const dest = inertiaLocation || locationHeader;
-            if (dest) {
-                if (/^https?:\/\//i.test(dest)) {
-                    window.location.href = dest;
-                } else {
-                    window.location.href = window.location.origin + dest;
-                }
-                return;
-            }
-            window.location.reload();
+        } else {
+            const txt2 = await res2.text().catch(() => '');
+            console.error('[AssignmentForm_user] coordinator fetch POST failed:', res2.status, txt2);
+            alert('保存に失敗しました（' + res2.status + '）');
             return;
         }
-        if (res2.status >= 300 && res2.status < 400) {
-            const locationHeader = res2.headers.get('location') || null;
-            if (locationHeader) {
-                if (/^https?:\/\//i.test(locationHeader)) {
-                    window.location.href = locationHeader;
-                } else {
-                    window.location.href = window.location.origin + locationHeader;
-                }
-                return;
-            }
-        }
-        const txt2 = await res2.text().catch(() => '');
-        console.error('[AssignmentForm_user] coordinator fetch POST failed:', res2.status, txt2);
-        alert('保存に失敗しました（' + res2.status + '）');
     } catch (err2) {
         console.error('[AssignmentForm_user] coordinator fetch error:', err2);
         alert('保存に失敗しました（ネットワークエラー）');

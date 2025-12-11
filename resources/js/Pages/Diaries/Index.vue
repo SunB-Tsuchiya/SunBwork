@@ -64,6 +64,8 @@ function goToPage(n) {
     // Use Inertia.get with pageRoute so current selectedDays is included
     Inertia.get(pageRoute(n));
 }
+
+const selectedPerPage = computed(() => (props.meta && props.meta.per_page ? Number(props.meta.per_page) : 20));
 </script>
 
 <template>
