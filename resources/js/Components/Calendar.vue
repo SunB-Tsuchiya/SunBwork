@@ -2,7 +2,7 @@
     <div class="calendar-container">
         <div class="mb-4 flex gap-4">
             <button @click="openEventModal" class="rounded bg-blue-600 px-4 py-2 text-white">予定作成</button>
-            <button @click="goToJobCreate" class="rounded bg-indigo-600 px-4 py-2 text-white">ジョブ作成</button>
+            <!-- <button @click="goToJobCreate" class="rounded bg-indigo-600 px-4 py-2 text-white">ジョブ作成</button> -->
             <button @click="goToDiaryCreate" class="rounded bg-orange-500 px-4 py-2 text-white">{{ props.diaryLabel }}作成</button>
             <button @click="goToAssignedJobs" class="rounded bg-green-600 px-4 py-2 text-white">依頼一覧</button>
         </div>

@@ -10,7 +10,6 @@ import CoordinatorNavigationTabs from '@/Components/Tabs/CoordinatorNavigationTa
 import LeaderNavigationTabs from '@/Components/Tabs/LeaderNavigationTabs.vue';
 import SuperAdminNavigationTabs from '@/Components/Tabs/SuperAdminNavigationTabs.vue';
 import UserNavigationTabs from '@/Components/Tabs/UserNavigationTabs.vue';
-import TeamSwitcher from '@/Components/TeamSwitcher.vue';
 import ToastUnified from '@/Components/ToastUnified.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { computed, provide, ref } from 'vue';
@@ -338,14 +337,15 @@ const computeCoordinatorActive = () => {
                                 </Link>
                             </div>
                             <!-- TeamSwitcher -->
-                            <div class="relative ms-3">
+                            <!-- チームスイッチャーは機能してないので切ります。 -->
+                            <!-- <div class="relative ms-3">
                                 <TeamSwitcher
                                     v-if="user && user.available_teams"
                                     :user="user"
                                     :current-team="user.current_team"
                                     :available-teams="user.available_teams || { department: [], personal: [] }"
                                 />
-                            </div>
+                            </div> -->
 
                             <!-- Settings Dropdown -->
                             <div class="relative ms-3">

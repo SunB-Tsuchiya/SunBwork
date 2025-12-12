@@ -269,6 +269,7 @@
 
 <script setup>
 import SelectionModal from '@/Components/SelectionModal.vue';
+import { inertiaFetch } from '@/Composables/useInertiaFetch';
 import useToasts from '@/Composables/useToasts';
 import { Link, usePage } from '@inertiajs/vue3';
 import { onMounted, ref } from 'vue';
@@ -463,17 +464,16 @@ const { toasts, showToast, dismissToast, toastClass } = useToasts();
 onMounted(() => {
     try {
         const list = window?.page?.props?.difficulties || page.props.difficulties || null;
-        console.log('[AssignmentForm] mounted - page.props.difficulties (raw):', list);
         if (Array.isArray(list)) {
-            console.log(
-                '[AssignmentForm] difficulties id/name list:',
-                list.map((d) => ({ id: d?.id ?? null, name: d?.name ?? null, slug: d?.slug ?? null })),
-            );
+            // console.log(
+            //     '[AssignmentForm] difficulties id/name list:',
+            //     list.map((d) => ({ id: d?.id ?? null, name: d?.name ?? null, slug: d?.slug ?? null })),
+            // );
         } else {
-            console.log('[AssignmentForm] difficulties is not an array:', list);
+            // console.log('[AssignmentForm] difficulties is not an array:', list);
         }
     } catch (e) {
-        console.error('[AssignmentForm] error logging difficulties on mount', e);
+        // console.error('[AssignmentForm] error logging difficulties on mount', e);
     }
 });
 
@@ -911,12 +911,12 @@ function onHourChange(idx) {
 const saving = ref(false);
 
 async function save() {
-    console.log('[AssignmentForm_user] save invoked', {
-        editMode: props.editMode,
-        assignments_sample: assignments.value && assignments.value[0] ? assignments.value[0] : null,
-    });
+    // console.log('[AssignmentForm_user] save invoked', {
+    //     editMode: props.editMode,
+    //     assignments_sample: assignments.value && assignments.value[0] ? assignments.value[0] : null,
+    // });
     if (!props.editMode) {
-        console.log('[AssignmentForm_user] editMode is false — aborting save');
+        // console.log('[AssignmentForm_user] editMode is false — aborting save');
         return;
     }
     saving.value = true;
@@ -962,7 +962,7 @@ async function save() {
         const computedProjectJobId =
             props.projectJob && props.projectJob.id ? props.projectJob.id : payload.assignments[0] ? payload.assignments[0].project_job_id : null;
 
-        console.log('[AssignmentForm_user] computedProjectJobId:', computedProjectJobId, 'allForAuth?', allForAuth);
+        // console.log('[AssignmentForm_user] computedProjectJobId:', computedProjectJobId, 'allForAuth?', allForAuth);
 
         if (allForAuth) {
             if (!computedProjectJobId) {
@@ -978,12 +978,12 @@ async function save() {
             const url = route('project_jobs.assignments.store_user', { projectJob: computedProjectJobId });
             const rel =
                 typeof window !== 'undefined' && url && url.indexOf(window.location.origin) === 0 ? url.replace(window.location.origin, '') : url;
-            console.log('[AssignmentForm_user] posting (fetch) to (relative):', rel);
+            // console.log('[AssignmentForm_user] posting (fetch) to (relative):', rel);
 
             // CSRF token
             const token = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
             try {
-                const res = await fetch(rel, {
+                const res = await inertiaFetch(rel, {
                     method: 'POST',
                     credentials: 'same-origin',
                     headers: {
@@ -994,7 +994,7 @@ async function save() {
                     },
                     body: JSON.stringify(payload),
                 });
-                console.log('[AssignmentForm_user] fetch POST status:', res.status, 'ok?', res.ok);
+                // console.log('[AssignmentForm_user] fetch POST status:', res.status, 'ok?', res.ok);
                 if (res.ok) {
                     // Successful — refresh to reflect changes (adjust to Inertia visit if you prefer)
                     location.reload();
@@ -1033,7 +1033,7 @@ async function save() {
         const url2 = route('coordinator.project_jobs.assignments.store', { projectJob: coordinatorProjectJobId });
         const rel2 =
             typeof window !== 'undefined' && url2 && url2.indexOf(window.location.origin) === 0 ? url2.replace(window.location.origin, '') : url2;
-        console.log('[AssignmentForm_user] coordinator-store posting to:', rel2);
+        // console.log('[AssignmentForm_user] coordinator-store posting to:', rel2);
         const token2 = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
         const res2 = await fetch(rel2, {
             method: 'POST',
@@ -1046,7 +1046,7 @@ async function save() {
             },
             body: JSON.stringify(payload),
         });
-        console.log('[AssignmentForm_user] coordinator fetch POST status:', res2.status, 'ok?', res2.ok);
+        // console.log('[AssignmentForm_user] coordinator fetch POST status:', res2.status, 'ok?', res2.ok);
         if (res2.ok) {
             location.reload();
             return;
