@@ -258,6 +258,7 @@
 </template>
 
 <script setup>
+import { inertiaFetch } from '@/Composables/useInertiaFetch';
 import { usePage } from '@inertiajs/vue3';
 import { computed, inject, onMounted, ref, watch } from 'vue';
 
@@ -724,14 +725,6 @@ function onHourChange(idx) {
 const saving = ref(false);
 
 async function save() {
-    console.log('[AssignmentForm_user] save invoked', {
-        editMode: props.editMode,
-        assignments_sample: assignments.value && assignments.value[0] ? assignments.value[0] : null,
-    });
-    if (!props.editMode) {
-        console.log('[AssignmentForm_user] editMode is false — aborting save');
-        return;
-    }
     saving.value = true;
 
     function assembleTitle(a) {
@@ -776,8 +769,6 @@ async function save() {
         const computedProjectJobId =
             props.projectJob && props.projectJob.id ? props.projectJob.id : payload.assignments[0] ? payload.assignments[0].project_job_id : null;
 
-        console.log('[AssignmentForm_user] computedProjectJobId:', computedProjectJobId, 'allForAuth?', allForAuth);
-
         if (allForAuth) {
             if (!computedProjectJobId) {
                 console.error('[AssignmentForm_user] missing projectJob id when attempting user-store', {
@@ -792,12 +783,12 @@ async function save() {
             const url = route('project_jobs.assignments.store_user', { projectJob: computedProjectJobId });
             const rel =
                 typeof window !== 'undefined' && url && url.indexOf(window.location.origin) === 0 ? url.replace(window.location.origin, '') : url;
-            console.log('[AssignmentForm_user] posting (fetch) to (relative):', rel);
 
             // CSRF token
             const token = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+
             try {
-                const res = await fetch(rel, {
+                const res = await inertiaFetch(rel, {
                     method: 'POST',
                     credentials: 'same-origin',
                     headers: {
@@ -809,51 +800,14 @@ async function save() {
                     body: JSON.stringify(payload),
                 });
 
-                // Handle possible redirect/409/3xx cases robustly:
-                if (res.redirected && res.url) {
-                    // fetch followed redirect automatically — navigate to final location
-                    window.location.href = res.url;
-                    return;
-                }
+                // ヘルパがナビゲートした場合は戻る（さらに処理不要）
+                if (!res || res.navigated) return;
 
                 if (res.ok) {
-                    // Successful — refresh to reflect changes (adjust to Inertia visit if you prefer)
                     location.reload();
                     return;
                 }
 
-                // Inertia full-page redirect: 409 with X-Inertia-Location (or Location)
-                if (res.status === 409) {
-                    const inertiaLocation = res.headers.get('x-inertia-location') || res.headers.get('X-Inertia-Location') || null;
-                    const locationHeader = res.headers.get('location') || null;
-                    const dest = inertiaLocation || locationHeader;
-                    if (dest) {
-                        if (/^https?:\/\//i.test(dest)) {
-                            window.location.href = dest;
-                        } else {
-                            window.location.href = window.location.origin + dest;
-                        }
-                        return;
-                    }
-                    // fallback: reload the page
-                    window.location.reload();
-                    return;
-                }
-
-                // Other 3xx returned without automatic follow (defensive)
-                if (res.status >= 300 && res.status < 400) {
-                    const locationHeader = res.headers.get('location') || null;
-                    if (locationHeader) {
-                        if (/^https?:\/\//i.test(locationHeader)) {
-                            window.location.href = locationHeader;
-                        } else {
-                            window.location.href = window.location.origin + locationHeader;
-                        }
-                        return;
-                    }
-                }
-
-                // Fallback: show server status / message
                 const txt = await res.text().catch(() => '');
                 console.error('[AssignmentForm_user] fetch POST failed:', res.status, txt);
                 alert('保存に失敗しました（' + res.status + '）');
@@ -885,9 +839,8 @@ async function save() {
         const url2 = route('coordinator.project_jobs.assignments.store', { projectJob: coordinatorProjectJobId });
         const rel2 =
             typeof window !== 'undefined' && url2 && url2.indexOf(window.location.origin) === 0 ? url2.replace(window.location.origin, '') : url2;
-        console.log('[AssignmentForm_user] coordinator-store posting to:', rel2);
         const token2 = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
-        const res2 = await fetch(rel2, {
+        const res2 = await inertiaFetch(rel2, {
             method: 'POST',
             credentials: 'same-origin',
             headers: {
@@ -898,7 +851,8 @@ async function save() {
             },
             body: JSON.stringify(payload),
         });
-        console.log('[AssignmentForm_user] coordinator fetch POST status:', res2.status, 'ok?', res2.ok);
+
+        if (!res2 || res2.navigated) return;
 
         if (res2.redirected && res2.url) {
             window.location.href = res2.url;
