@@ -30,59 +30,10 @@
             <label class="mb-1 mt-2 block font-semibold">作業詳細</label>
             <!-- Company / Department (always visible) -->
             <!-- Inline 2x2 dropdowns: always visible under 作業詳細. Selecting updates the block immediately. -->
-            <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                    <label class="block text-sm font-medium">会社</label>
-                    <div v-if="!editMode" class="mt-1 w-full rounded border bg-gray-50 px-3 py-2 text-sm">{{ companyName(block.company_id) }}</div>
-                    <select
-                        v-else
-                        v-model="block.company_id"
-                        :disabled="companyDisabled() || !editMode"
-                        @change="onCompanyChange(idx)"
-                        class="mt-1 w-full rounded border px-2 py-1 text-sm"
-                    >
-                        <option value="">-- グローバル / 未設定 --</option>
-                        <!-- If the current user cannot change company, show only their company as the single option -->
-                        <template v-if="companyDisabled()">
-                            <option :value="String(effectiveAuthUser() && effectiveAuthUser().company_id ? effectiveAuthUser().company_id : '')">
-                                {{ companyNameFromId(effectiveAuthUser() && effectiveAuthUser().company_id ? effectiveAuthUser().company_id : null) }}
-                            </option>
-                        </template>
-                        <template v-else>
-                            <option v-for="c in page.props.companies" :key="c.id" :value="String(c.id)">{{ c.name }}</option>
-                        </template>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium">部署</label>
-                    <div v-if="!editMode" class="mt-1 w-full rounded border bg-gray-50 px-3 py-2 text-sm">
-                        {{ departmentName(block.department_id) }}
-                    </div>
-                    <select
-                        v-else
-                        v-model="block.department_id"
-                        :disabled="departmentDisabled() || !editMode"
-                        @change="onDepartmentChange(idx)"
-                        class="mt-1 w-full rounded border px-2 py-1 text-sm"
-                    >
-                        <option value="">-- 指定なし --</option>
-                        <!-- If department editing is disabled, show only user's department name -->
-                        <template v-if="departmentDisabled()">
-                            <option
-                                :value="String(effectiveAuthUser() && effectiveAuthUser().department_id ? effectiveAuthUser().department_id : '')"
-                            >
-                                {{
-                                    departmentNameFromId(
-                                        effectiveAuthUser() && effectiveAuthUser().department_id ? effectiveAuthUser().department_id : null,
-                                    )
-                                }}
-                            </option>
-                        </template>
-                        <template v-else>
-                            <option v-for="d in departmentsForCompany(block.company_id)" :key="d.id" :value="String(d.id)">{{ d.name }}</option>
-                        </template>
-                    </select>
-                </div>
+            <!-- Company/Department hidden: not displayed but IDs preserved for DB -->
+            <div>
+                <input type="hidden" v-model="block.company_id" />
+                <input type="hidden" v-model="block.department_id" />
             </div>
 
             <div class="mt-4 grid grid-cols-2 gap-4">
@@ -334,6 +285,43 @@ const hours = Array.from({ length: 17 }, (_, i) => String(6 + i).padStart(2, '0'
 const mins = ['00', '15', '30', '45'];
 const estimatedOptions = Array.from({ length: 32 }, (_, i) => Number(((i + 1) * 0.25).toFixed(2)));
 
+function resolveDifficultyId(val) {
+    if (val === undefined || val === null || val === '') return null;
+    const num = Number(val);
+    if (!Number.isNaN(num) && String(val).trim() !== '') return num;
+    const list = window?.page?.props?.difficulties || page.props.difficulties || null;
+    if (Array.isArray(list)) {
+        const lower = String(val).toLowerCase();
+        const found = list.find((d) => {
+            try {
+                if (!d) return false;
+                const parts = [d.name, d.slug, d.key, d.label].filter(Boolean);
+                return parts.some((p) => String(p).toLowerCase() === lower);
+            } catch (e) {
+                return false;
+            }
+        });
+        if (found) return found.id;
+    }
+    try {
+        const map = { light: 'light', normal: 'normal', heavy: 'heavy' };
+        const k = String(val).toLowerCase();
+        if (map[k]) {
+            if (Array.isArray(window?.page?.props?.difficulties)) {
+                const f = window.page.props.difficulties.find((d) => String(d.slug || d.key || d.name).toLowerCase() === k);
+                if (f) return f.id;
+            }
+        }
+    } catch (e) {}
+    // Final fallback: common english keys -> assumed canonical IDs
+    try {
+        const k2 = String(val).toLowerCase();
+        const fallbackIds = { light: 1, normal: 2, heavy: 3 };
+        if (Object.prototype.hasOwnProperty.call(fallbackIds, k2)) return fallbackIds[k2];
+    } catch (e) {}
+    return null;
+}
+
 function normalizeAssignment(a) {
     return {
         id: a.id || null,
@@ -344,6 +332,7 @@ function normalizeAssignment(a) {
         detail: a.detail || '',
         user_id: a.user_id || (effectiveAuthUser() ? effectiveAuthUser().id : null),
         difficulty: a.difficulty || 'normal',
+        difficulty_id: a.difficulty_id ?? null,
         desired_start_date: a.desired_start_date || a.desired_date || '',
         desired_end_date: a.desired_end_date || '',
         desired_time_hour: a.desired_time ? a.desired_time.split(':')[0] || '09' : a.desired_time_hour || '09',
@@ -385,6 +374,13 @@ assignments.value.forEach((a) => {
     if (a.stage_id === undefined) a.stage_id = a.stage_id || null;
     if (a.status_id === undefined) a.status_id = a.status_id || null;
     if (a.difficulty === undefined) a.difficulty = a.difficulty || 'normal';
+    if (a.difficulty_id === undefined || a.difficulty_id === null) {
+        try {
+            a.difficulty_id = resolveDifficultyId(a.difficulty);
+        } catch (e) {
+            a.difficulty_id = null;
+        }
+    }
     if (a.desired_start_date === undefined) a.desired_start_date = a.desired_start_date || '';
     if (a.desired_end_date === undefined) a.desired_end_date = a.desired_end_date || '';
     if (a.desired_time_hour === undefined) a.desired_time_hour = a.desired_time_hour || '09';
@@ -746,6 +742,7 @@ async function save() {
             difficulty: a.difficulty || null,
             difficulty_id:
                 a.difficulty_id ??
+                resolveDifficultyId(a.difficulty) ??
                 (window?.page?.props?.difficulties
                     ? (window.page.props.difficulties.find((d) => d.name === a.difficulty || d.slug === a.difficulty)?.id ?? null)
                     : null),

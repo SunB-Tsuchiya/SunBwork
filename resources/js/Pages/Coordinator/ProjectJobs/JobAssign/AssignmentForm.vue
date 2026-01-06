@@ -1,7 +1,7 @@
 <template>
     <form @submit.prevent="save">
         <div v-for="(block, idx) in assignments" :key="idx" class="mb-4 rounded border p-4">
-            <!-- show client name (read-only) above title -->
+            <!-- show assigned user's company / department (read-only) above title -->
             <label class="mb-1 block font-semibold">クライアント</label>
             <div class="w-full rounded border bg-gray-50 px-3 py-2">
                 {{ clientName(block) }}
@@ -24,38 +24,10 @@
             <textarea v-model="block.detail" :disabled="!editMode" class="w-full rounded border px-3 py-2" rows="3"></textarea>
 
             <label class="mb-1 mt-2 block font-semibold">作業詳細</label>
-            <!-- Company / Department (always visible) -->
-            <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                    <label class="block text-sm font-medium">会社</label>
-                    <div v-if="!editMode" class="mt-1 w-full rounded border bg-gray-50 px-3 py-2 text-sm">{{ companyName(block.company_id) }}</div>
-                    <select
-                        v-else
-                        v-model="block.company_id"
-                        :disabled="companyDisabled() || !editMode"
-                        @change="onCompanyChange(idx)"
-                        class="mt-1 w-full rounded border px-2 py-1 text-sm"
-                    >
-                        <option value="">-- グローバル / 未設定 --</option>
-                        <option v-for="c in page.props.companies" :key="c.id" :value="String(c.id)">{{ c.name }}</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium">部署</label>
-                    <div v-if="!editMode" class="mt-1 w-full rounded border bg-gray-50 px-3 py-2 text-sm">
-                        {{ departmentName(block.department_id) }}
-                    </div>
-                    <select
-                        v-else
-                        v-model="block.department_id"
-                        :disabled="departmentDisabled() || !editMode"
-                        @change="onDepartmentChange(idx)"
-                        class="mt-1 w-full rounded border px-2 py-1 text-sm"
-                    >
-                        <option value="">-- 指定なし --</option>
-                        <option v-for="d in departmentsForCompany(block.company_id)" :key="d.id" :value="String(d.id)">{{ d.name }}</option>
-                    </select>
-                </div>
+            <!-- Company/Department are not shown in this form, but keep hidden inputs so values are submitted -->
+            <div>
+                <input type="hidden" v-model="block.company_id" />
+                <input type="hidden" v-model="block.department_id" />
             </div>
 
             <!-- Inline 2x2 dropdowns: always visible under 作業詳細. Selecting updates the block immediately. -->
@@ -272,7 +244,7 @@ import SelectionModal from '@/Components/SelectionModal.vue';
 import { inertiaFetch } from '@/Composables/useInertiaFetch';
 import useToasts from '@/Composables/useToasts';
 import { Link, usePage } from '@inertiajs/vue3';
-import { onMounted, ref } from 'vue';
+import { inject, onMounted, ref } from 'vue';
 
 const props = defineProps({
     projectJob: Object,
@@ -282,6 +254,20 @@ const props = defineProps({
     defaultUserId: { type: [Number, String], default: null },
 });
 const page = usePage();
+
+// injected values may be provided by AppLayout (same pattern as AssignmentForm_user.vue)
+const injectedAuthUser = inject('authUser', null);
+const injectedUser = inject('user', null);
+
+// Helper to get the effective auth user (injected -> page.props.auth.user -> page.props.user)
+function effectiveAuthUser() {
+    return (
+        injectedAuthUser ||
+        (page.props && page.props.auth && page.props.auth.user ? page.props.auth.user : null) ||
+        (page.props && page.props.user ? page.props.user : null) ||
+        null
+    );
+}
 
 const hours = Array.from({ length: 17 }, (_, i) => String(6 + i).padStart(2, '0'));
 const mins = ['00', '15', '30', '45'];
@@ -364,16 +350,11 @@ assignments.value.forEach((a) => {
     if (a.title_prefix === undefined) a.title_prefix = `「${props.projectJob?.title || ''}：`;
     if (a.title_suffix === undefined) a.title_suffix = '';
     if (a.showInlineSelector === undefined) a.showInlineSelector = false;
-    const defaultCompany = page.props.company
-        ? page.props.company.id
-        : page.props.auth.user && page.props.auth.user.company_id
-          ? page.props.auth.user.company_id
-          : null;
-    const defaultDepartment = page.props.department
-        ? page.props.department.id
-        : page.props.auth.user && page.props.auth.user.department_id
-          ? page.props.auth.user.department_id
-          : null;
+    const authForDefaults = effectiveAuthUser();
+    const defaultCompany =
+        authForDefaults && authForDefaults.company_id ? authForDefaults.company_id : page.props.company ? page.props.company.id : null;
+    const defaultDepartment =
+        authForDefaults && authForDefaults.department_id ? authForDefaults.department_id : page.props.department ? page.props.department.id : null;
     if (a.company_id === undefined || a.company_id === null || a.company_id === '') a.company_id = defaultCompany;
     if (a.department_id === undefined || a.department_id === null || a.department_id === '') a.department_id = defaultDepartment;
     if (a.work_item_type_id === undefined) a.work_item_type_id = a.work_item_type_id || null;
@@ -573,12 +554,38 @@ function onSelected(payload) {
     selectorTargetIndex.value = null;
 }
 
-const companyDisabled = () => {
-    return page.props.auth.user.user_role !== 'superadmin';
-};
-const departmentDisabled = () => {
-    return page.props.auth.user.user_role === 'leader' || page.props.auth.user.user_role === 'coordinator';
-};
+// Robust helper to return a company name from an id. Tries multiple sources:
+// 1) page.props.companies list
+// 2) page.props.company single object
+// 3) fallback to companyName()
+function companyNameFromId(companyId) {
+    if (!companyId) return companyName(companyId);
+    // try list
+    const fromList = (page.props.companies || []).find((c) => String(c.id) === String(companyId));
+    if (fromList && fromList.name) return fromList.name;
+    // try single prop
+    if (page.props && page.props.company && String(page.props.company.id) === String(companyId) && page.props.company.name) {
+        return page.props.company.name;
+    }
+    // try userProjects/client info (some pages expose company via project -> client)
+    try {
+        const up = page.props.userProjects || page.props.user_projects || null;
+        if (Array.isArray(up)) {
+            const found = up.find((p) => {
+                if (!p) return false;
+                if (p.client && (String(p.client.id) === String(companyId) || String(p.client_id) === String(companyId))) return true;
+                if (p.company && (String(p.company.id) === String(companyId) || String(p.company_id) === String(companyId))) return true;
+                return false;
+            });
+            if (found) {
+                if (found.client && found.client.name) return found.client.name;
+                if (found.company && found.company.name) return found.company.name;
+            }
+        }
+    } catch (e) {}
+    // fallback: original companyName() which will at least return the id string
+    return companyName(companyId);
+}
 
 function departmentsFlattened() {
     const out = [];
@@ -592,10 +599,38 @@ function departmentsFlattened() {
     });
     return out;
 }
+// Robust helper to return a department name from an id. Tries:
+// 1) departmentsFlattened()
+// 2) page.props.department single object
+// 3) fallback to departmentName()
+function departmentNameFromId(departmentId) {
+    if (!departmentId) return departmentName(departmentId);
+    const fromList = departmentsFlattened().find((d) => String(d.id) === String(departmentId));
+    if (fromList && fromList.name) return fromList.name;
+    if (page.props && page.props.department && String(page.props.department.id) === String(departmentId) && page.props.department.name) {
+        return page.props.department.name;
+    }
+    return departmentName(departmentId);
+}
 
-function departmentsForCompany(companyId) {
-    if (!companyId) return departmentsFlattened();
-    return departmentsFlattened().filter((d) => String(d.company_id) === String(companyId));
+// block 内の情報から部署名を優先取得。見つからなければ departmentNameFromId にフォールバック。
+function departmentNameFromBlock(block) {
+    try {
+        if (!block) return departmentNameFromId(null);
+        if (block.department && (block.department.name || block.department.department_name)) {
+            return block.department.name || block.department.department_name;
+        }
+        if (block.department_name) return block.department_name;
+        // project_job にネストされている場合
+        if (block.project_job && block.project_job.department) {
+            const d = block.project_job.department;
+            if (d.name) return d.name;
+            if (d.department_name) return d.department_name;
+        }
+    } catch (e) {
+        // ignore
+    }
+    return departmentNameFromId(block && block.department_id ? block.department_id : null);
 }
 
 function companyName(companyId) {
@@ -765,6 +800,8 @@ function addBlock() {
         desired_time_min: '00',
         estimated_hours: '',
         user_id: props.defaultUserId || '',
+        company_id: effectiveAuthUser() ? effectiveAuthUser().company_id : null,
+        department_id: effectiveAuthUser() ? effectiveAuthUser().department_id : null,
         saving: false,
         linked_assignment_id: null,
         amount_digit_0: '0',
@@ -893,6 +930,68 @@ function assembleTitle(a) {
     }
 }
 
+// ユーザー情報オブジェクトを取得（props.members -> page.props.users の順に探索）
+function memberById(userId) {
+    if (!userId) return null;
+    try {
+        const m = (props.members || []).find((mm) => String(mm.id) === String(userId));
+        if (m) return m;
+        const pageUsers = page.props.users || page.props.members || [];
+        if (Array.isArray(pageUsers)) {
+            const p = pageUsers.find((u) => String(u.id) === String(userId));
+            if (p) return p;
+        }
+    } catch (e) {}
+    return null;
+}
+
+// 割当ユーザー（または block）の会社名を優先取得。見つからなければ既存の companyNameFromId にフォールバック。
+function memberCompanyName(userId, block) {
+    try {
+        const m = memberById(userId);
+        if (m) {
+            if (m.company && (m.company.name || m.company.company_name)) return m.company.name || m.company.company_name;
+            if (m.company_name) return m.company_name;
+            if (m.company_id) return companyNameFromId(m.company_id);
+        }
+    } catch (e) {}
+    // block に会社情報があれば優先
+    try {
+        if (block) {
+            if (block.company && (block.company.name || block.company.company_name)) return block.company.name || block.company.company_name;
+            if (block.company_name) return block.company_name;
+            // project_job.client があるケース（既存の client 表示を補助）
+            if (block.project_job && block.project_job.client && (block.project_job.client.name || block.project_job.client.client_name))
+                return block.project_job.client.name || block.project_job.client.client_name;
+            if (block.company_id) return companyNameFromId(block.company_id);
+        }
+    } catch (e) {}
+    // 最終フォールバック
+    return companyNameFromId(null);
+}
+
+// 割当ユーザー（または block）の部署名を優先取得。見つからなければ既存の departmentNameFromId にフォールバック。
+function memberDepartmentName(userId, block) {
+    try {
+        const m = memberById(userId);
+        if (m) {
+            if (m.department && (m.department.name || m.department.department_name)) return m.department.name || m.department.department_name;
+            if (m.department_name) return m.department_name;
+            if (m.department_id) return departmentNameFromId(m.department_id);
+        }
+    } catch (e) {}
+    try {
+        if (block) {
+            if (block.department && (block.department.name || block.department.department_name))
+                return block.department.name || block.department.department_name;
+            if (block.department_name) return block.department_name;
+            if (block.department_id) return departmentNameFromId(block.department_id);
+        }
+    } catch (e) {}
+    // 最終フォールバック
+    return departmentNameFromId(null);
+}
+
 function onEndDateChange(idx) {
     const a = assignments.value[idx];
     if (a.desired_start_date && a.desired_end_date && a.desired_end_date < a.desired_start_date) {
@@ -937,11 +1036,13 @@ async function save() {
             project_job_id: a.project_job_id || null,
             company_id: a.company_id || null,
             department_id: a.department_id || null,
+            difficulty: a.difficulty || 'normal',
             difficulty_id:
                 a.difficulty_id ??
                 (window?.page?.props?.difficulties
                     ? (window.page.props.difficulties.find((d) => d.name === a.difficulty || d.slug === a.difficulty)?.id ?? null)
                     : null),
+
             desired_start_date: a.desired_start_date || null,
             desired_end_date: a.desired_end_date || null,
             start_time: String(a.start_time_hour || '00').padStart(2, '0') + ':' + String(a.start_time_min || '00').padStart(2, '0'),
@@ -985,7 +1086,6 @@ async function save() {
             try {
                 const res = await inertiaFetch(rel, {
                     method: 'POST',
-                    credentials: 'same-origin',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': token,
@@ -1035,9 +1135,8 @@ async function save() {
             typeof window !== 'undefined' && url2 && url2.indexOf(window.location.origin) === 0 ? url2.replace(window.location.origin, '') : url2;
         // console.log('[AssignmentForm_user] coordinator-store posting to:', rel2);
         const token2 = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
-        const res2 = await fetch(rel2, {
+        const res2 = await inertiaFetch(rel2, {
             method: 'POST',
-            credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': token2,
@@ -1046,7 +1145,10 @@ async function save() {
             },
             body: JSON.stringify(payload),
         });
-        // console.log('[AssignmentForm_user] coordinator fetch POST status:', res2.status, 'ok?', res2.ok);
+
+        // inertiaFetch が遷移を実施した場合は処理終了
+        if (!res2 || res2.navigated) return;
+
         if (res2.ok) {
             location.reload();
             return;
@@ -1062,6 +1164,42 @@ async function save() {
     } finally {
         saving.value = false;
     }
+}
+
+// ログイン中ユーザー（auth）の会社名を優先して取得。なければ page.props.company / id ベースにフォールバック。
+function authCompanyName() {
+    try {
+        const auth = effectiveAuthUser();
+        // auth がユーザーオブジェクトで company 情報を持つ場合を優先
+        if (auth) {
+            if (auth.company && (auth.company.name || auth.company.company_name)) return auth.company.name || auth.company.company_name;
+            if (auth.company_name) return auth.company_name;
+            if (auth.company_id) return companyNameFromId(auth.company_id);
+        }
+    } catch (e) {}
+    // 次にページ単位で渡されている company prop をチェック
+    try {
+        if (page.props && page.props.company && page.props.company.name) return page.props.company.name;
+    } catch (e) {}
+    // 最終フォールバック
+    return companyNameFromId(null);
+}
+
+// ログイン中ユーザー（auth）の部署名を優先して取得。なければ page.props.department / id ベースにフォールバック。
+function authDepartmentName() {
+    try {
+        const auth = effectiveAuthUser();
+        if (auth) {
+            if (auth.department && (auth.department.name || auth.department.department_name))
+                return auth.department.name || auth.department.department_name;
+            if (auth.department_name) return auth.department_name;
+            if (auth.department_id) return departmentNameFromId(auth.department_id);
+        }
+    } catch (e) {}
+    try {
+        if (page.props && page.props.department && page.props.department.name) return page.props.department.name;
+    } catch (e) {}
+    return departmentNameFromId(null);
 }
 </script>
 
