@@ -192,11 +192,11 @@
                                 <button
                                     @click="submitComplete"
                                     :class="
-                                        isAssignmentCompleted
+                                        isAssignmentCompleted || isSubmittingComplete
                                             ? 'ml-2 cursor-not-allowed rounded bg-yellow-800 px-3 py-2 text-sm text-white opacity-80'
                                             : 'ml-2 rounded bg-yellow-600 px-3 py-2 text-sm text-white hover:bg-yellow-700'
                                     "
-                                    :disabled="isAssignmentCompleted"
+                                    :disabled="isAssignmentCompleted || isSubmittingComplete"
                                 >
                                     {{ isAssignmentCompleted ? '完了済み' : '完了にする' }}
                                 </button>
@@ -329,6 +329,8 @@ onMounted(async () => {
 
 const events = ref([]);
 
+// local UI state for submitting complete action
+const isSubmittingComplete = ref(false);
 // note: complete details modal and helpers were removed per UX decision
 
 function totalMinutes() {
@@ -430,7 +432,20 @@ function submitComplete() {
             alert('完了対象の予定IDが見つかりません。');
             return;
         }
-        router.post(route('events.complete', { event: evId }));
+        isSubmittingComplete.value = true;
+        router.post(
+            route('events.complete', { event: evId }),
+            {},
+            {
+                onSuccess: () => {
+                    // reload to reflect server-side state (assignment marked completed)
+                    window.location.reload();
+                },
+                onError: () => {
+                    isSubmittingComplete.value = false;
+                },
+            },
+        );
     } catch (e) {
         // swallow to avoid breaking the page
         console.debug('submitComplete error', e);

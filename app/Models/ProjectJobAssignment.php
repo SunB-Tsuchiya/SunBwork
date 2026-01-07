@@ -35,6 +35,8 @@ class ProjectJobAssignment extends Model
         'amounts',
         'amounts_unit',
         'difficulty_id',
+        'starts_at',
+        'ends_at',
     ];
 
     protected $casts = [
@@ -49,6 +51,8 @@ class ProjectJobAssignment extends Model
         'completed' => 'boolean',
         'accepted' => 'boolean',
         'read_at' => 'datetime',
+        'starts_at' => 'datetime',
+        'ends_at' => 'datetime',
     ];
 
     protected $dates = [
@@ -56,6 +60,8 @@ class ProjectJobAssignment extends Model
         'desired_end_date',
         'desired_at',
         'read_at',
+        'starts_at',
+        'ends_at',
     ];
 
     public function projectJob()
