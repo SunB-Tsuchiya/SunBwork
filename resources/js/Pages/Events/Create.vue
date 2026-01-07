@@ -1,8 +1,7 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Link, useForm } from '@inertiajs/vue3';
-import { usePage } from '@inertiajs/vue3';
 import AssignmentFormUser from '@/Pages/Coordinator/ProjectJobs/JobAssign/AssignmentForm_user.vue';
+import { Link, useForm, usePage } from '@inertiajs/vue3';
 import { getCurrentInstance, nextTick, onMounted, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
 
@@ -55,14 +54,17 @@ const _jobText = buildJobDetails(props.job);
 const content = ref(_jobText);
 const activeTab = ref('client'); // 'client' or 'job'
 
-const _desired = props.job && props.job.desired_time ? (function (t) {
-    try {
-        const core = String(t).split('T').pop().split('.')[0];
-        const parts = core.split(':');
-        if (parts.length >= 2) return { h: parts[0].padStart(2, '0'), m: parts[1].padStart(2, '0') };
-    } catch (e) {}
-    return null;
-})(props.job.desired_time) : null;
+const _desired =
+    props.job && props.job.desired_time
+        ? (function (t) {
+              try {
+                  const core = String(t).split('T').pop().split('.')[0];
+                  const parts = core.split(':');
+                  if (parts.length >= 2) return { h: parts[0].padStart(2, '0'), m: parts[1].padStart(2, '0') };
+              } catch (e) {}
+              return null;
+          })(props.job.desired_time)
+        : null;
 
 const defaultStartHour = _desired ? _desired.h : '09';
 const defaultStartMinute = _desired ? _desired.m : '00';
@@ -236,15 +238,21 @@ function onInput(val) {
         content.value = val.target.innerHTML;
     }
 }
-watch(() => form.content, (val) => {
-    content.value = val;
-});
-watch(() => [form.startHour, form.startMinute], ([h, m], [oldH, oldM]) => {
-    if (form.endHour === oldH && form.endMinute === oldM) {
-        form.endHour = h;
-        form.endMinute = m;
-    }
-});
+watch(
+    () => form.content,
+    (val) => {
+        content.value = val;
+    },
+);
+watch(
+    () => [form.startHour, form.startMinute],
+    ([h, m], [oldH, oldM]) => {
+        if (form.endHour === oldH && form.endMinute === oldM) {
+            form.endHour = h;
+            form.endMinute = m;
+        }
+    },
+);
 </script>
 
 <template>
@@ -253,14 +261,21 @@ watch(() => [form.startHour, form.startMinute], ([h, m], [oldH, oldM]) => {
             <div class="mb-4 flex items-center justify-between">
                 <h1 class="text-2xl font-bold">イベント作成</h1>
                 <div class="flex items-center space-x-2">
-                    <button :class="['px-3 py-1 rounded', activeTab === 'client' ? 'bg-blue-600 text-white' : 'border']" @click="activeTab = 'client'">クライアント</button>
-                    <button :class="['px-3 py-1 rounded', activeTab === 'job' ? 'bg-blue-600 text-white' : 'border']" @click="activeTab = 'job'">ジョブ</button>
+                    <button
+                        :class="['rounded px-3 py-1', activeTab === 'client' ? 'bg-blue-600 text-white' : 'border']"
+                        @click="activeTab = 'client'"
+                    >
+                        個人
+                    </button>
+                    <button :class="['rounded px-3 py-1', activeTab === 'job' ? 'bg-blue-600 text-white' : 'border']" @click="activeTab = 'job'">
+                        ジョブ
+                    </button>
                 </div>
             </div>
 
             <!-- Client tab: existing event form -->
             <div v-if="activeTab === 'client'">
-                <h2 class="mb-2 text-lg font-medium text-gray-700">（クライアント向け）イベント作成 ({{ formatJstDate(form.date) }})</h2>
+                <h2 class="mb-2 text-lg font-medium text-gray-700">（個人向け）イベント作成 ({{ formatJstDate(form.date) }})</h2>
                 <form @submit.prevent="submit">
                     <div v-if="errorMessage" class="mb-4 rounded border-l-4 border-red-500 bg-red-50 p-3 text-red-700">{{ errorMessage }}</div>
 
@@ -280,10 +295,14 @@ watch(() => [form.startHour, form.startMinute], ([h, m], [oldH, oldM]) => {
                                 <label class="mb-1 block text-sm font-medium text-gray-700">開始時刻</label>
                                 <div class="flex gap-2">
                                     <select v-model="form.startHour" class="w-20 rounded border p-1">
-                                        <option v-for="h in 24" :key="h" :value="String(h - 1).padStart(2, '0')">{{ String(h - 1).padStart(2, '0') }}</option>
+                                        <option v-for="h in 24" :key="h" :value="String(h - 1).padStart(2, '0')">
+                                            {{ String(h - 1).padStart(2, '0') }}
+                                        </option>
                                     </select>
                                     <select v-model="form.startMinute" class="w-20 rounded border p-1">
-                                        <option v-for="m in [0,15,30,45]" :key="m" :value="String(m).padStart(2, '0')">{{ String(m).padStart(2, '0') }}</option>
+                                        <option v-for="m in [0, 15, 30, 45]" :key="m" :value="String(m).padStart(2, '0')">
+                                            {{ String(m).padStart(2, '0') }}
+                                        </option>
                                     </select>
                                 </div>
                             </div>
@@ -291,10 +310,14 @@ watch(() => [form.startHour, form.startMinute], ([h, m], [oldH, oldM]) => {
                                 <label class="mb-1 block text-sm font-medium text-gray-700">終了時刻</label>
                                 <div class="flex gap-2">
                                     <select v-model="form.endHour" class="w-20 rounded border p-1">
-                                        <option v-for="h in 24" :key="h" :value="String(h - 1).padStart(2, '0')">{{ String(h - 1).padStart(2, '0') }}</option>
+                                        <option v-for="h in 24" :key="h" :value="String(h - 1).padStart(2, '0')">
+                                            {{ String(h - 1).padStart(2, '0') }}
+                                        </option>
                                     </select>
                                     <select v-model="form.endMinute" class="w-20 rounded border p-1">
-                                        <option v-for="m in [0,15,30,45]" :key="m" :value="String(m).padStart(2, '0')">{{ String(m).padStart(2, '0') }}</option>
+                                        <option v-for="m in [0, 15, 30, 45]" :key="m" :value="String(m).padStart(2, '0')">
+                                            {{ String(m).padStart(2, '0') }}
+                                        </option>
                                     </select>
                                 </div>
                             </div>
@@ -302,13 +325,19 @@ watch(() => [form.startHour, form.startMinute], ([h, m], [oldH, oldM]) => {
                     </div>
 
                     <div class="flex space-x-4">
-                        <button type="submit" :disabled="form.processing" class="flex items-center gap-2 rounded bg-blue-600 px-4 py-2 text-white disabled:opacity-50">
-                            <template v-if="form.processing">
-                                保存中…
-                            </template>
+                        <button
+                            type="submit"
+                            :disabled="form.processing"
+                            class="flex items-center gap-2 rounded bg-blue-600 px-4 py-2 text-white disabled:opacity-50"
+                        >
+                            <template v-if="form.processing"> 保存中… </template>
                             <template v-else>保存</template>
                         </button>
-                        <Link :href="returnTo && returnTo !== '' ? returnTo : props.job ? route('user.assigned-jobs.index') : route('calendar.index')" class="rounded bg-gray-200 px-4 py-2 text-gray-700">キャンセル</Link>
+                        <Link
+                            :href="returnTo && returnTo !== '' ? returnTo : props.job ? route('user.assigned-jobs.index') : route('calendar.index')"
+                            class="rounded bg-gray-200 px-4 py-2 text-gray-700"
+                            >キャンセル</Link
+                        >
                     </div>
                 </form>
             </div>

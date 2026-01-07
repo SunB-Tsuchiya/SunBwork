@@ -306,9 +306,11 @@ function handleTimeSlotClick(info) {
             dateObj = info.start; // select provides start
         else if (info instanceof Date) dateObj = info;
         if (!dateObj) return;
-        // convert to YYYY-MM-DD and hours/minutes
-        const isoDate = dateObj.toISOString();
-        const dateOnly = isoDate.split('T')[0];
+        // convert to local YYYY-MM-DD and hours/minutes (avoid toISOString which shifts to UTC)
+        const y = dateObj.getFullYear();
+        const mo = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const da = String(dateObj.getDate()).padStart(2, '0');
+        const dateOnly = `${y}-${mo}-${da}`;
         const h = dateObj.getHours();
         const m = dateObj.getMinutes();
         const snappedM = m < 30 ? 0 : 30;
@@ -682,11 +684,11 @@ const calendarOptions = computed(() => ({
                     (info.event._def && info.event._def.publicId) ||
                     null;
                 if (evId) {
-                    console.debug('Calendar: navigating to event show (non-allDay)', {
-                        evId,
-                        fallback: `/events/${evId}`,
-                        extendedProps: info.event.extendedProps,
-                    });
+                    // console.debug('Calendar: navigating to event show (non-allDay)', {
+                    //     evId,
+                    //     fallback: `/events/${evId}`,
+                    //     extendedProps: info.event.extendedProps,
+                    // });
                     try {
                         router.get(route('events.show', { event: evId }));
                     } catch (e) {

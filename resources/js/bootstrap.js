@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-axios.defaults.baseURL = 'http://localhost';
+axios.defaults.baseURL = window.location?.origin || '';
 axios.defaults.withCredentials = true; // これも必須
 
 window.axios = axios;
