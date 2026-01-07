@@ -611,6 +611,7 @@ class ProjectJobAssignmentsController extends Controller
             'assignments.*.stage_id' => 'nullable|exists:stages,id',
             'assignments.*.amounts' => 'nullable|integer|min:0',
             'assignments.*.amounts_unit' => 'nullable|string|in:page,file',
+            'assignments.*.sender_id' => 'nullable|exists:users,id',
             'assignments.*.title' => 'nullable|string|max:255',
             'assignments.*.description' => 'nullable|string',
         ]);
@@ -662,6 +663,7 @@ class ProjectJobAssignmentsController extends Controller
                 $createData = [
                     'project_job_id' => $projectJob->id,
                     'user_id' => $a['user_id'] ?? null,
+                    'sender_id' => $a['sender_id'] ?? null,
                     'title' => $a['title'],
                     'detail' => $a['detail'] ?? null,
                     'difficulty_id' => $difficultyId,

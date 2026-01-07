@@ -37,6 +37,7 @@ class ProjectJobAssignment extends Model
         'difficulty_id',
         'starts_at',
         'ends_at',
+        'sender_id',
     ];
 
     protected $casts = [
@@ -53,6 +54,7 @@ class ProjectJobAssignment extends Model
         'read_at' => 'datetime',
         'starts_at' => 'datetime',
         'ends_at' => 'datetime',
+        'sender_id' => 'integer',
     ];
 
     protected $dates = [
@@ -63,6 +65,11 @@ class ProjectJobAssignment extends Model
         'starts_at',
         'ends_at',
     ];
+
+    public function sender()
+    {
+        return $this->belongsTo(User::class, 'sender_id');
+    }
 
     public function projectJob()
     {

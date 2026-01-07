@@ -39,6 +39,7 @@ class ProjectJobAssignmentByMyself extends Model
         'difficulty_id',
         // start time separate from desired_time
         'start_time',
+        'sender_id',
     ];
 
     protected $casts = [
@@ -52,6 +53,7 @@ class ProjectJobAssignmentByMyself extends Model
         'completed' => 'boolean',
         'accepted' => 'boolean',
         'read_at' => 'datetime',
+        'sender_id' => 'integer',
     ];
 
     protected $dates = [
@@ -60,6 +62,11 @@ class ProjectJobAssignmentByMyself extends Model
         'desired_at',
         'read_at',
     ];
+
+    public function sender()
+    {
+        return $this->belongsTo(User::class, 'sender_id');
+    }
 
     public function projectJob()
     {
