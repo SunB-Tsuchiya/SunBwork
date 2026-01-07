@@ -736,6 +736,7 @@ async function save() {
             title: assembleTitle(a),
             detail: a.detail || '',
             user_id: a.user_id || (effectiveAuthUser() ? effectiveAuthUser().id : null),
+            sender_id: null,
             project_job_id: a.project_job_id || null,
             company_id: a.company_id || null,
             department_id: a.department_id || null,

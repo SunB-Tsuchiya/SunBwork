@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use App\Models\ProjectJob;
 use App\Models\ProjectJobAssignmentByMyself;
+use App\Models\ProjectJobAssignment;
 use App\Models\Event;
 use Illuminate\Support\Facades\Schema;
 
@@ -107,7 +108,17 @@ class ProjectJobAssignmentController extends Controller
                     $createPayload['difficulty'] = $a['difficulty'] ?? null;
                 }
 
-                $assignment = ProjectJobAssignmentByMyself::create($createPayload);
+                // Create assignment in the canonical project_job_assignments table
+                // Prefer ProjectJobAssignment when available so user-created assignments
+                // appear in the main assignments list. Keep fallback to the legacy
+                // "by_myself" table if needed.
+                if (class_exists(ProjectJobAssignment::class)) {
+                    // Ensure sender_id is null for user-created records as requested
+                    $createPayload['sender_id'] = $a['sender_id'] ?? null;
+                    $assignment = ProjectJobAssignment::create($createPayload);
+                } else {
+                    $assignment = ProjectJobAssignmentByMyself::create($createPayload);
+                }
 
                 // Create corresponding Event if events table supports linking
                 try {
@@ -153,7 +164,10 @@ class ProjectJobAssignmentController extends Controller
                         if ($start) $event->start = $start;
                         if ($end) $event->end = $end;
                         // link back to the created assignment if column exists
-                        if (Schema::hasColumn('events', 'project_job_assignment_by_myself_id')) {
+                        // Link event to whichever assignment table we created the record in
+                        if (Schema::hasColumn('events', 'project_job_assignment_id')) {
+                            $event->project_job_assignment_id = $assignment->id;
+                        } elseif (Schema::hasColumn('events', 'project_job_assignment_by_myself_id')) {
                             $event->project_job_assignment_by_myself_id = $assignment->id;
                         }
                         $event->save();
