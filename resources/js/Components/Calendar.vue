@@ -364,28 +364,11 @@ const events = ref([
         // If title starts with completion prefix, use dark yellow color
         const isCompleted = typeof event.title === 'string' && event.title.indexOf('【完了】') === 0;
 
-        // Determine special colors based on linkage columns coming from server
-        // We expect incoming event to possibly include extendedProps.project_job_assignment_by_myself_id
-        const pjByMyselfId = event.extendedProps?.project_job_assignment_by_myself_id ?? event.project_job_assignment_by_myself_id ?? null;
+        // Determine linkage id coming from server (canonical assignment id)
         const pjAssignmentId = event.extendedProps?.project_job_assignment_id ?? event.project_job_assignment_id ?? null;
 
-        // If event is linked to a project_job_assignment_by_myself, render it in gray (k20% ~ very light)
-        if (pjByMyselfId) {
-            return {
-                title: event.title,
-                start: event.start,
-                end: event.end ?? undefined,
-                allDay: event.allDay ?? false,
-                // force k20 regardless of server-provided color
-                color: '#00000033',
-                event_id: event.id,
-                schedule_id: event.extendedProps?.schedule_id ?? event.schedule_id ?? undefined,
-                description: event.description ?? event.extendedProps?.description ?? '',
-            };
-        }
-
-        // If both linkage ids are null, treat as a 'personal unlinked' event — use a distinctive color
-        if (!pjByMyselfId && !pjAssignmentId) {
+        // If linkage id is not present, treat as a 'personal unlinked' event — use a distinctive color
+        if (!pjAssignmentId) {
             return {
                 title: event.title,
                 start: event.start,

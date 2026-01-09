@@ -17,7 +17,7 @@ class Event extends Model
         // DB has 'starts_at'/'ends_at', controllers prefer 'start'/'end'
         'starts_at',
         'ends_at',
-        'project_job_assignment_by_myself_id',
+        // 'project_job_assignment_by_myself_id' removed via migration
         // aliases accepted for mass assignment
         'start',
         'end',
@@ -51,7 +51,8 @@ class Event extends Model
 
     public function projectJobAssignmentByMyself()
     {
-        return $this->belongsTo(\App\Models\ProjectJobAssignmentByMyself::class, 'project_job_assignment_by_myself_id');
+        // column removed: keep method stub removed to avoid accidental usage
+        return null;
     }
 
     // Provide a virtual date attribute derived from start datetime

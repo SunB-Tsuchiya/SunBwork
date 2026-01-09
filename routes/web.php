@@ -162,6 +162,13 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::post('project_jobs/{projectJob}/jobbox/reply', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'reply'])->name('project_jobs.jobbox.reply');
     // Allow authenticated users to create a single assignment (their own) without coordinator side-effects
     Route::post('project_jobs/{projectJob}/assignments/user', [App\Http\Controllers\User\ProjectJobAssignmentController::class, 'store'])->name('project_jobs.assignments.store_user');
+    // Standalone page for user assignment form — redirect to controller-backed job create
+    Route::get('project_jobs/assignments/create-user', function (
+        \Illuminate\Http\Request $request
+    ) {
+        // Redirect to EventController::createJob which provides userClients/userProjects/members and lookup lists
+        return redirect()->route('events.create_job');
+    })->name('project_jobs.assignments.create_user');
     Route::get('/chat/rooms/{id}', [App\Http\Controllers\Chat\ChatController::class, 'showRoom'])->name('chat.rooms.show');
 
 

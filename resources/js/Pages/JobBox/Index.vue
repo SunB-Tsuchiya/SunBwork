@@ -6,17 +6,25 @@
 
         <div class="mx-auto max-w-6xl rounded bg-white p-6 shadow">
             <h1 class="mb-4 text-2xl font-bold">JobBox：{{ props.projectJob?.name || '' }}</h1>
-            <div class="mb-4 flex items-center gap-2">
-                <input
-                    v-model="page.props.q_model"
-                    @keyup.enter="search"
-                    placeholder="タイトル/詳細/担当で検索"
-                    class="w-72 rounded border px-3 py-2 text-sm"
-                />
-                <button class="rounded bg-blue-600 px-3 py-2 text-white" @click.prevent="search">検索</button>
-                <button class="ml-2 rounded border px-3 py-2" @click.prevent="clearSearch">クリア</button>
+            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div class="mb-4 flex items-center gap-2">
+                    <input
+                        v-model="page.props.q_model"
+                        @keyup.enter="search"
+                        placeholder="タイトル/詳細/担当で検索"
+                        class="w-72 rounded border px-3 py-2 text-sm"
+                    />
+                    <button class="rounded bg-blue-600 px-3 py-2 text-white" @click.prevent="search">検索</button>
+                    <button class="ml-2 rounded border px-3 py-2" @click.prevent="clearSearch">クリア</button>
+                </div>
+                <div class="mb-4 md:ml-4 md:mt-0">
+                    <Link
+                        :href="typeof route === 'function' ? route('project_jobs.assignments.create_user') : '/project_jobs/assignments/create-user'"
+                        class="rounded bg-blue-600 px-4 py-2 text-white"
+                        >新規ジョブ作成</Link
+                    >
+                </div>
             </div>
-
             <div class="overflow-x-auto">
                 <table class="min-w-full border">
                     <thead>
@@ -207,6 +215,24 @@ function formatDate(d) {
 function goto(url) {
     if (!url) return;
     router.visit(url, { preserveState: false });
+}
+
+function gotoCreate() {
+    try {
+        // Prefer standalone assignment form route, then fall back to events.create
+        try {
+            return router.visit(route('project_jobs.assignments.create_user'));
+        } catch (err) {
+            try {
+                return router.visit(route('events.create'));
+            } catch (err2) {
+                return router.visit('/events/create');
+            }
+        }
+    } catch (err) {
+        // swallow navigation errors
+        console.error('gotoCreate error', err);
+    }
 }
 
 function rowClick(m, event) {

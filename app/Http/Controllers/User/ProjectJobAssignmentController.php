@@ -163,12 +163,9 @@ class ProjectJobAssignmentController extends Controller
                         $event->description = $description;
                         if ($start) $event->start = $start;
                         if ($end) $event->end = $end;
-                        // link back to the created assignment if column exists
-                        // Link event to whichever assignment table we created the record in
+                        // link back to the created assignment if canonical column exists
                         if (Schema::hasColumn('events', 'project_job_assignment_id')) {
                             $event->project_job_assignment_id = $assignment->id;
-                        } elseif (Schema::hasColumn('events', 'project_job_assignment_by_myself_id')) {
-                            $event->project_job_assignment_by_myself_id = $assignment->id;
                         }
                         $event->save();
                     }

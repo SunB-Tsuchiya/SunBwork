@@ -11,7 +11,7 @@
 
 - ユーザーがジョブを自身で登録（割当）できるようにする。
 - 割当時に「開始時間（start_time）」を選べるようにし、DB とカレンダーイベントに反映する。
-- 割当（ProjectJobAssignmentByMyself）を保存した際に `events` に対応する行を作成し、`project_job_assignment_by_myself_id` でリンクする。
+- 割当（ProjectJobAssignmentByMyself）を保存した際に `events` に対応する行を作成し、必要に応じて割当をリンクする（`project_job_assignment_id` を優先して使用）。
 - 割当フォームの送信ペイロードに lookup id（`work_item_type_id, size_id, stage_id, status_id`）と金量 (`amounts, amounts_unit`) を含める。
 - カレンダー上でユーザー作成割当ジョブに特定のカラー（k20）を適用する。
 - 開発用のログ（`console.log`, `Log::debug`）を削除して本番に適した状態にする。
@@ -31,18 +31,18 @@
     - `resources/js/Pages/Events/Create_Job.vue`
         - カレンダーの『ジョブ作成』から遷移する専用ジョブ作成ページ。`AssignmentForm_user` を埋め込む。
     - `resources/js/Components/Calendar.vue`
-        - FullCalendar コンポーネントラッパー。イベントの `project_job_assignment_by_myself_id` を検出して強制的に k20 カラーを適用するロジックを追加。
+        - FullCalendar コンポーネントラッパー。イベントの割当リンク（`project_job_assignment_id` 等）を検出してカラーを適用するロジックを追加。
     - その他関連ページの微修正（Events/Create.vue、Diaries/Create.vue など）。
 
 - Backend (Laravel):
     - `app/Http/Controllers/User/ProjectJobAssignmentController.php`
         - ユーザー自身が割当を作成する処理を実装。`start_time` を検証し `ProjectJobAssignmentByMyself` に保存。
         - 割当保存後、該当する `Event` を作成。`description` に割当の詳細（サイズ、種別、工程、数量等）を埋める。
-        - `events` に `project_job_assignment_by_myself_id` カラムがあればそれをセットする保護コードを含む。
+        - `events` に割当リンク用カラムがあればそれをセットする保護コードを含む（`project_job_assignment_id` を優先）。
     - `app/Models/ProjectJobAssignmentByMyself.php`
         - `$fillable` と `$casts` に `start_time` を追加。`toEventPrefill()` ヘルパを提供。
     - `app/Http/Controllers/CalendarController.php`
-        - Inertia に返すイベント配列に `project_job_assignment_by_myself_id` を top-level と `extendedProps` の両方に含めるように変更。
+        - Inertia に返すイベント配列に割当リンク（`project_job_assignment_id` 等）を top-level と `extendedProps` の両方に含めるように変更。
     - `app/Http/Controllers/EventController.php`
         - Event の作成・編集・完了処理に、割当リンクの処理を追加（既存）。
         - このコントローラのデバッグログ (Log::debug) を削除している。
@@ -51,7 +51,7 @@
     - create_project_job_assignment_by_myself_table.php
         - `desired_start_date`, `start_time`（後から追加する migration で対応）、lookup id カラムなどを含むテーブルを作成。
     - add_project_job_assignment_by_myself_to_events_table.php
-        - `events` テーブルに `project_job_assignment_by_myself_id` を追加する migration を用意（存在チェックを Controller 側で行うように実装）。
+        - `events` テーブルに割当リンク用のカラムを追加する migration を用意（存在チェックを Controller 側で行うように実装）。
     - add_start_time_to_project_job_assignment_by_myself_table.php
         - `start_time` カラムを `project_job_assignment_by_myself` テーブルに追加（適切な after の位置で作成）。
 
@@ -65,15 +65,15 @@
 - 入力と出力（割当作成フロー）
     - 入力: フロントエンドから送られる assignments 配列。各 assignment は少なくとも次を含む:
         - `work_item_type_id`, `size_id`, `stage_id`, `status_id`, `amounts`, `amounts_unit`, `start_time`, `desired_start_date`（または desired_time）など。
-    - 出力: データベースに `project_job_assignment_by_myself` 行が作成され、対応する `events` 行が作成される（schema が存在する場合は `project_job_assignment_by_myself_id` をセット）。
+    - 出力: データベースに割当行が作成され、対応する `events` 行が作成される（環境により `project_job_assignment_id` がセットされる）。
     - エラー: バリデーションエラーは 422 を返す。DB トランザクションで失敗した場合はロールバック。
 
 - イベント記述 (Event.description)
     - 保存時、`description` フィールドには割当の詳細（プロジェクトジョブ名、ユーザー名、サイズ、種類、工程、数量、単位、備考、割当 URL など）をテキストで連結して格納。
-    - `project_job_assignment_by_myself_id` が存在すれば、`events` レコードにその id を格納する。
+    - `project_job_assignment_id` が存在すれば、`events` レコードにその id を格納する。
 
 - カレンダー描画ルール
-    - イベントに `project_job_assignment_by_myself_id`（トップレベルか extendedProps のどちらかに）を含む場合、クライアント側で色を強制的に k20（グレー）に上書きする実装になっています。
+    - イベントに割当リンク（`project_job_assignment_id` 等）を含む場合、クライアント側で色を上書きする実装になっています。
 
 - ルート保護
     - Ziggy を用いた route() 呼び出しで、projectId 等が空のときに二重スラッシュが発生しないよう、フロントエンドで guard を実装しています。
@@ -91,7 +91,7 @@
 3. 動作確認
     - カレンダーから「ジョブ作成」→ フォームで割当を作成
     - DB を確認: `project_job_assignment_by_myself` テーブルに行ができ、`start_time` が保存されていること
-    - `events` テーブルに行ができ、`project_job_assignment_by_myself_id` が設定されていること（migration が適用されている場合）
+    - `events` テーブルに行ができ、割当リンク用カラム（例: `project_job_assignment_id`）が設定されていること（migration が適用されている場合）
     - カレンダー上で該当イベントが k20（グレー）で描画されること
 4. 追加テスト
     - `work_item_type_id` / `size_id` / `stage_id` / `status_id` / `amounts` / `amounts_unit` が payload に含まれていることをブラウザのネットワークタブで確認
@@ -102,7 +102,7 @@
 ## 注意点 / 既知の落とし穴
 
 - マイグレーションは環境差異（既にカラムがある or ない）によってエラーになる可能性があるため、実行前に DB のバックアップを推奨します。
-- `events` テーブルに `project_job_assignment_by_myself_id` カラムが無い場合、コントローラはその存在をチェックして安全に動作するように設計されています。ただし、機能の完全性（イベントのリンクや色の判定）を確保するにはカラム追加を推奨します。
+    - `events` テーブルに割当リンク用カラムが無い場合、コントローラはその存在をチェックして安全に動作するように設計されています。ただし、機能の完全性（イベントのリンクや色の判定）を確保するにはカラム追加を推奨します。
 - 既存の通知フロー（Message / MessageRecipient / JobAssignmentMessage）との整合性は継続的に検証する必要があります。特に完了処理やメッセージブロードキャスト部分は環境依存の挙動を示すことがあります。
 - ログを削除した部分は開発時のトラブルシュート時に役立つ情報だった箇所もあります。運用で問題が発生した場合は Log::info や Log::warning を適切に再導入してください。
 
@@ -113,7 +113,7 @@
 1. 本番/ステージングでマイグレーションを適用し、手動で一連のフロー（ジョブ作成→イベント生成→カレンダー描画）を検証する。
 2. 割当の自動テスト（Pest/PHPUnit）を追加：
     - 割当作成 API のユニットテスト（happy path + バリデーションエラー）
-    - Event 作成が正しく行われ、`project_job_assignment_by_myself_id` が設定される統合テスト
+    - Event 作成が正しく行われ、割当リンク用カラム（例: `project_job_assignment_id`）が設定される統合テスト
 3. フロントエンドの e2e テスト（Playwright/Cypress 等）でカレンダーの色とジョブ作成ワークフローを検証する。
 4. 追加改善案:
     - イベント詳細の HTML マークアップを構造化して、パースしやすい JSON 形式のメタデータ（例: `extendedProps.job_assignment_details`）を store しておくとフロント側で柔軟に表示できる。

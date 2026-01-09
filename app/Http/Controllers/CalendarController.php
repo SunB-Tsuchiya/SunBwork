@@ -55,10 +55,7 @@ class CalendarController extends Controller
                 $select[] = 'description';
             }
 
-            // Include linkage columns if present so the frontend can detect linked assignments
-            if (Schema::hasColumn('events', 'project_job_assignment_by_myself_id')) {
-                $select[] = 'project_job_assignment_by_myself_id';
-            }
+            // Include canonical linkage column if present so the frontend can detect linked assignments
             if (Schema::hasColumn('events', 'project_job_assignment_id')) {
                 $select[] = 'project_job_assignment_id';
             }
@@ -91,12 +88,10 @@ class CalendarController extends Controller
                     'description' => $descVal,
                     // keep server-provided color if present, but client may override for linked assignments
                     'color' => $arr['color'] ?? ($e->color ?? null),
-                    // top-level linkage fields (some clients check top-level)
-                    'project_job_assignment_by_myself_id' => $arr['project_job_assignment_by_myself_id'] ?? ($e->project_job_assignment_by_myself_id ?? null),
+                    // top-level linkage field (some clients check top-level)
                     'project_job_assignment_id' => $arr['project_job_assignment_id'] ?? ($e->project_job_assignment_id ?? null),
                     // Extended props for FullCalendar compatibility
                     'extendedProps' => array_merge($arr['extendedProps'] ?? [], [
-                        'project_job_assignment_by_myself_id' => $arr['project_job_assignment_by_myself_id'] ?? ($e->project_job_assignment_by_myself_id ?? null),
                         'project_job_assignment_id' => $arr['project_job_assignment_id'] ?? ($e->project_job_assignment_id ?? null),
                         'description' => $descVal,
                     ]),

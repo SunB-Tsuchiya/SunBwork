@@ -495,6 +495,20 @@ function itemName(kind, id) {
     return found ? found.name : String(id);
 }
 
+function memberName(userId) {
+    if (!userId) return '未指定';
+    if (typeof userId === 'string' && isNaN(Number(userId))) return userId;
+    const m = (props.members || []).find((mm) => String(mm.id) === String(userId));
+    if (m) return m.name || m.full_name || String(m.id);
+    const pageUsers = page.props.users || page.props.members || [];
+    const found = (Array.isArray(pageUsers) ? pageUsers : []).find((u) => String(u.id) === String(userId));
+    if (found) return found.name || found.full_name || String(found.id);
+    try {
+        if (userId && typeof userId === 'object') return userId.name || userId.full_name || String(userId.id || '');
+    } catch (e) {}
+    return String(userId);
+}
+
 function typesForSelect(companyId, departmentId) {
     const list = page.props.types || [];
     const auth = effectiveAuthUser();
