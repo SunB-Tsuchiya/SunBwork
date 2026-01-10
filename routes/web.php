@@ -162,6 +162,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::post('project_jobs/{projectJob}/jobbox/reply', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'reply'])->name('project_jobs.jobbox.reply');
     // Allow authenticated users to create a single assignment (their own) without coordinator side-effects
     Route::post('project_jobs/{projectJob}/assignments/user', [App\Http\Controllers\User\ProjectJobAssignmentController::class, 'store'])->name('project_jobs.assignments.store_user');
+    // Allow authenticated users to update their assignment (edit)
+    Route::patch('project_jobs/{projectJob}/assignments/{assignment}/user', [App\Http\Controllers\User\ProjectJobAssignmentController::class, 'update'])->name('project_jobs.assignments.update_user');
     // Standalone page for user assignment form — redirect to controller-backed job create
     Route::get('project_jobs/assignments/create-user', function (
         \Illuminate\Http\Request $request

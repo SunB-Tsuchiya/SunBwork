@@ -23,14 +23,12 @@ function isEventCompleted() {
 
 function formatJstDateTime(dateStr) {
     if (!dateStr) return '';
-    const d = new Date(dateStr);
-    d.setHours(d.getHours() + 9);
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    const hh = String(d.getHours()).padStart(2, '0');
-    const min = String(d.getMinutes()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+    const s = String(dateStr);
+    // If the value already contains YYYY-MM-DD and HH:MM, extract and return without timezone adjustments
+    const m = s.match(/(\d{4}-\d{2}-\d{2})[T ]?(\d{2}:\d{2})/);
+    if (m) return `${m[1]} ${m[2]}`;
+    // Fallback: trim to first 16 chars and replace T with space
+    return s.replace('T', ' ').substring(0, 16);
 }
 
 // remove debug logs

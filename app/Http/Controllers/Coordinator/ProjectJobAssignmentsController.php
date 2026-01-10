@@ -18,7 +18,6 @@ class ProjectJobAssignmentsController extends Controller
         // pagination and sorting
         $perPage = 15;
         $allowedSorts = [
-            'desired_start_date',
             'title',
             'user', // special-case: users.name
             'desired_end_date',
@@ -26,10 +25,10 @@ class ProjectJobAssignmentsController extends Controller
             'assigned',
         ];
 
-        $sortBy = $request->query('sort_by', 'desired_start_date');
+        $sortBy = $request->query('sort_by', 'title');
         $sortDir = strtolower($request->query('sort_dir', 'desc')) === 'asc' ? 'asc' : 'desc';
         if (!in_array($sortBy, $allowedSorts)) {
-            $sortBy = 'desired_start_date';
+            $sortBy = 'title';
         }
 
         // base query
@@ -83,7 +82,6 @@ class ProjectJobAssignmentsController extends Controller
                 'user_id' => $a->user_id,
                 'title' => $a->title,
                 'detail' => $a->detail,
-                'difficulty' => $a->difficulty,
                 'difficulty_id' => $a->difficulty_id ?? null,
                 'difficulty_label' => $a->difficultyModel?->name ?? null,
                 'desired_start_date' => $a->desired_start_date ? $a->desired_start_date->format('Y-m-d') : null,
@@ -276,10 +274,8 @@ class ProjectJobAssignmentsController extends Controller
             'user_id' => $a->user_id,
             'title' => $a->title,
             'detail' => $a->detail,
-            'difficulty' => $a->difficulty,
             'difficulty_id' => $a->difficulty_id ?? null,
             'difficulty_label' => $a->difficultyModel?->name ?? null,
-            'desired_start_date' => $a->desired_start_date ? $a->desired_start_date->format('Y-m-d') : null,
             'desired_end_date' => $a->desired_end_date ? $a->desired_end_date->format('Y-m-d') : null,
             'desired_time' => $a->desired_time,
             'estimated_hours' => isset($a->estimated_hours) ? (float) $a->estimated_hours : null,
@@ -423,10 +419,8 @@ class ProjectJobAssignmentsController extends Controller
             'user_id' => $a->user_id,
             'title' => $a->title,
             'detail' => $a->detail,
-            'difficulty' => $a->difficulty,
             'difficulty_id' => $a->difficulty_id ?? null,
             'difficulty_label' => $a->difficultyModel?->name ?? null,
-            'desired_start_date' => $a->desired_start_date ? $a->desired_start_date->format('Y-m-d') : null,
             'desired_end_date' => $a->desired_end_date ? $a->desired_end_date->format('Y-m-d') : null,
             'desired_time' => $a->desired_time,
             'estimated_hours' => isset($a->estimated_hours) ? (float) $a->estimated_hours : null,
@@ -484,11 +478,10 @@ class ProjectJobAssignmentsController extends Controller
         $data = $request->validate([
             'title' => 'required|string|max:255',
             'detail' => 'nullable|string',
-            // accept either difficulty_id (preferred) or difficulty name/slug
+            // accept difficulty by id only
             'difficulty_id' => 'nullable|exists:difficulties,id',
-            'difficulty' => 'required_without:difficulty_id',
             'estimated_hours' => 'nullable|numeric|min:0',
-            'desired_start_date' => 'nullable|date',
+            // scheduling: desired_start_date removed
             'desired_end_date' => 'nullable|date',
             'desired_time' => 'nullable|date_format:H:i',
             'user_id' => 'nullable|exists:users,id',
@@ -505,11 +498,6 @@ class ProjectJobAssignmentsController extends Controller
         ]);
 
         // server-side logical validations
-        if (!empty($data['desired_start_date']) && !empty($data['desired_end_date'])) {
-            if ($data['desired_end_date'] < $data['desired_start_date']) {
-                return back()->withErrors(['desired_end_date' => '終了希望日は割当希望日より前にできません。'])->withInput();
-            }
-        }
         // if end date is today, desired_time must be >= now
         if (!empty($data['desired_end_date']) && !empty($data['desired_time'])) {
             $today = date('Y-m-d');
@@ -521,37 +509,8 @@ class ProjectJobAssignmentsController extends Controller
             }
         }
 
-        // resolve difficulty to id if necessary - prefer explicit difficulty_id sent by client
-        $difficultyId = null;
-        $difficultyLabel = null;
-        if (!empty($data['difficulty_id'])) {
-            $difficultyId = (int) $data['difficulty_id'];
-        } elseif (!empty($data['difficulty'])) {
-            // numeric id passed in difficulty field
-            if (is_numeric($data['difficulty'])) {
-                $difficultyId = (int) $data['difficulty'];
-            } else {
-                // try to find by slug (if column exists) or name — be defensive if schema introspection fails
-                $query = \App\Models\Difficulty::query();
-                try {
-                    if (Schema::hasColumn('difficulties', 'slug')) {
-                        $query->where(function ($q) use ($data) {
-                            $q->where('slug', $data['difficulty'])->orWhere('name', $data['difficulty']);
-                        });
-                    } else {
-                        $query->where('name', $data['difficulty']);
-                    }
-                } catch (\Throwable $__e) {
-                    // fallback to matching name only
-                    $query->where('name', $data['difficulty']);
-                }
-                $d = $query->first();
-                if ($d) {
-                    $difficultyId = $d->id;
-                    $difficultyLabel = $d->name;
-                }
-            }
-        }
+        // prefer explicit difficulty_id only
+        $difficultyId = !empty($data['difficulty_id']) ? (int) $data['difficulty_id'] : null;
 
         $updateData = [
             'user_id' => $data['user_id'] ?? null,
@@ -559,7 +518,6 @@ class ProjectJobAssignmentsController extends Controller
             'detail' => $data['detail'] ?? null,
             // store difficulty_id; keep legacy string column untouched if present
             'difficulty_id' => $difficultyId,
-            'desired_start_date' => $data['desired_start_date'] ?? null,
             'desired_end_date' => $data['desired_end_date'] ?? null,
             'desired_time' => $data['desired_time'] ?? null,
             'estimated_hours' => $data['estimated_hours'] ?? null,
@@ -576,10 +534,7 @@ class ProjectJobAssignmentsController extends Controller
 
         // (debug logs removed)
 
-        // Only include legacy 'difficulty' string if the column exists in the table
-        if (Schema::hasColumn('project_job_assignments', 'difficulty')) {
-            $updateData['difficulty'] = $data['difficulty'] ?? null;
-        }
+        // legacy difficulty string column removed from update payload
 
         $assignment->update($updateData);
 
@@ -594,11 +549,10 @@ class ProjectJobAssignmentsController extends Controller
             'assignments' => 'required|array',
             'assignments.*.title' => 'required|string|max:255',
             'assignments.*.detail' => 'nullable|string',
-            // allow assignments to provide difficulty_id (preferred) or difficulty string
+            // accept difficulty by id only
             'assignments.*.difficulty_id' => 'nullable|exists:difficulties,id',
-            'assignments.*.difficulty' => 'required_without:assignments.*.difficulty_id|in:light,normal,heavy',
             'assignments.*.estimated_hours' => 'nullable|numeric|min:0',
-            'assignments.*.desired_start_date' => 'nullable|date',
+            // scheduling: desired_start_date removed
             'assignments.*.desired_end_date' => 'nullable|date',
             'assignments.*.desired_time' => 'nullable|date_format:H:i',
             'assignments.*.user_id' => 'nullable|exists:users,id',
@@ -618,11 +572,7 @@ class ProjectJobAssignmentsController extends Controller
 
         foreach ($data['assignments'] as $a) {
             // logical validations per assignment
-            if (!empty($a['desired_start_date']) && !empty($a['desired_end_date'])) {
-                if ($a['desired_end_date'] < $a['desired_start_date']) {
-                    return back()->withErrors(['assignments' => '終了希望日は割当希望日より前にできません。'])->withInput();
-                }
-            }
+            // scheduling: desired_start_date removed; only validate desired_time vs today below
             if (!empty($a['desired_end_date']) && !empty($a['desired_time'])) {
                 $today = date('Y-m-d');
                 if ($a['desired_end_date'] === $today) {
@@ -635,30 +585,8 @@ class ProjectJobAssignmentsController extends Controller
 
             // Create assignment and associated WorkItem in a transaction
             DB::transaction(function () use ($projectJob, $a) {
-                // resolve difficulty for each incoming assignment payload - prefer difficulty_id
-                $difficultyId = null;
-                if (!empty($a['difficulty_id'])) {
-                    $difficultyId = (int) $a['difficulty_id'];
-                } elseif (!empty($a['difficulty'])) {
-                    if (is_numeric($a['difficulty'])) {
-                        $difficultyId = (int) $a['difficulty'];
-                    } else {
-                        $q = \App\Models\Difficulty::query();
-                        try {
-                            if (Schema::hasColumn('difficulties', 'slug')) {
-                                $q->where(function ($q2) use ($a) {
-                                    $q2->where('slug', $a['difficulty'])->orWhere('name', $a['difficulty']);
-                                });
-                            } else {
-                                $q->where('name', $a['difficulty']);
-                            }
-                        } catch (\Throwable $__e) {
-                            $q->where('name', $a['difficulty']);
-                        }
-                        $d = $q->first();
-                        if ($d) $difficultyId = $d->id;
-                    }
-                }
+                // prefer explicit difficulty_id only
+                $difficultyId = !empty($a['difficulty_id']) ? (int) $a['difficulty_id'] : null;
 
                 $createData = [
                     'project_job_id' => $projectJob->id,
@@ -667,7 +595,7 @@ class ProjectJobAssignmentsController extends Controller
                     'title' => $a['title'],
                     'detail' => $a['detail'] ?? null,
                     'difficulty_id' => $difficultyId,
-                    'desired_start_date' => $a['desired_start_date'] ?? null,
+                    // scheduling: desired_start_date removed
                     'desired_end_date' => $a['desired_end_date'] ?? null,
                     'desired_time' => $a['desired_time'] ?? null,
                     'estimated_hours' => $a['estimated_hours'] ?? null,
@@ -683,9 +611,7 @@ class ProjectJobAssignmentsController extends Controller
                     'amounts_unit' => $a['amounts_unit'] ?? null,
                 ];
 
-                if (Schema::hasColumn('project_job_assignments', 'difficulty')) {
-                    $createData['difficulty'] = $a['difficulty'] ?? null;
-                }
+                // legacy difficulty string column removed from create payload
 
                 // (debug logs removed)
 
@@ -709,11 +635,10 @@ class ProjectJobAssignmentsController extends Controller
         $data = $request->validate([
             'title' => 'required|string|max:255',
             'detail' => 'nullable|string',
-            // accept either difficulty_id (preferred) or difficulty name/slug
+            // accept difficulty by id only
             'difficulty_id' => 'nullable|exists:difficulties,id',
-            'difficulty' => 'required_without:difficulty_id',
             'estimated_hours' => 'nullable|numeric|min:0',
-            'desired_start_date' => 'nullable|date',
+            // scheduling: desired_start_date removed
             'desired_end_date' => 'nullable|date',
             'desired_time' => 'nullable|date_format:H:i',
             // Note: user_id should be the current authenticated user; do not accept client-supplied user_id
@@ -728,11 +653,6 @@ class ProjectJobAssignmentsController extends Controller
         ]);
 
         // server-side logical validations (same as store)
-        if (!empty($data['desired_start_date']) && !empty($data['desired_end_date'])) {
-            if ($data['desired_end_date'] < $data['desired_start_date']) {
-                return back()->withErrors(['desired_end_date' => '終了希望日は割当希望日より前にできません。'])->withInput();
-            }
-        }
         if (!empty($data['desired_end_date']) && !empty($data['desired_time'])) {
             $today = date('Y-m-d');
             if ($data['desired_end_date'] === $today) {
@@ -747,30 +667,8 @@ class ProjectJobAssignmentsController extends Controller
         $user = $request->user();
 
         DB::transaction(function () use ($projectJob, $data, $user) {
-            // resolve difficulty id - prefer explicit difficulty_id from request
-            $difficultyId = null;
-            if (!empty($data['difficulty_id'])) {
-                $difficultyId = (int) $data['difficulty_id'];
-            } elseif (!empty($data['difficulty'])) {
-                if (is_numeric($data['difficulty'])) {
-                    $difficultyId = (int) $data['difficulty'];
-                } else {
-                    $q = \App\Models\Difficulty::query();
-                    try {
-                        if (Schema::hasColumn('difficulties', 'slug')) {
-                            $q->where(function ($q2) use ($data) {
-                                $q2->where('slug', $data['difficulty'])->orWhere('name', $data['difficulty']);
-                            });
-                        } else {
-                            $q->where('name', $data['difficulty']);
-                        }
-                    } catch (\Throwable $__e) {
-                        $q->where('name', $data['difficulty']);
-                    }
-                    $d = $q->first();
-                    if ($d) $difficultyId = $d->id;
-                }
-            }
+            // prefer explicit difficulty_id only
+            $difficultyId = !empty($data['difficulty_id']) ? (int) $data['difficulty_id'] : null;
 
             $createData = [
                 'project_job_id' => $projectJob->id,
@@ -778,7 +676,7 @@ class ProjectJobAssignmentsController extends Controller
                 'title' => $data['title'],
                 'detail' => $data['detail'] ?? null,
                 'difficulty_id' => $difficultyId,
-                'desired_start_date' => $data['desired_start_date'] ?? null,
+                // scheduling: desired_start_date removed
                 'desired_end_date' => $data['desired_end_date'] ?? null,
                 'desired_time' => $data['desired_time'] ?? null,
                 'estimated_hours' => $data['estimated_hours'] ?? null,
@@ -792,9 +690,7 @@ class ProjectJobAssignmentsController extends Controller
                 'amounts_unit' => $data['amounts_unit'] ?? null,
             ];
 
-            if (Schema::hasColumn('project_job_assignments', 'difficulty')) {
-                $createData['difficulty'] = $data['difficulty'] ?? null;
-            }
+            // legacy difficulty string column removed from create payload
 
             $assignment = ProjectJobAssignment::create($createData);
         });

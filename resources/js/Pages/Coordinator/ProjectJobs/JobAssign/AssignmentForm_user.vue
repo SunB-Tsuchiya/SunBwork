@@ -147,49 +147,29 @@
                 <option value="heavy">重い</option>
             </select>
 
-            <div class="mt-2">
-                <label class="mb-1 block font-semibold">割当希望日、開始時間</label>
-                <div class="flex items-center gap-3">
-                    <input v-model="block.desired_start_date" :disabled="!editMode" type="date" class="rounded border px-3 py-2" />
-                    <!-- Upper time selectors now represent the start time -->
-                    <select v-model="block.start_time_hour" :disabled="!editMode" class="w-20 rounded border px-3 py-2">
-                        <option v-for="h in hours" :key="h" :value="h">{{ h }}</option>
-                    </select>
-                    <select v-model="block.start_time_min" :disabled="!editMode" class="w-20 rounded border px-3 py-2">
-                        <option v-for="m in mins" :key="m" :value="m">{{ m }}</option>
-                    </select>
-                </div>
-
-                <div class="mt-2">
-                    <label class="mb-1 block font-semibold">終了希望日, 希望時間</label>
-                    <div class="flex items-center gap-3">
-                        <input
-                            v-model="block.desired_end_date"
-                            :min="minEndDate(idx)"
-                            type="date"
-                            class="rounded border px-3 py-2"
-                            @change="onEndDateChange(idx)"
-                            :disabled="!editMode"
-                        />
-
-                        <!-- End-time selects remain as desired_time (end) -->
-                        <select v-model="block.desired_time_hour" :disabled="!editMode" class="w-20 rounded border px-3 py-2">
-                            <option v-for="h in hours" :key="h" :value="h">{{ h }}</option>
-                        </select>
-                        <select v-model="block.desired_time_min" :disabled="!editMode" class="w-20 rounded border px-3 py-2">
-                            <option v-for="m in mins" :key="m" :value="m">{{ m }}</option>
-                        </select>
+            <div
+                v-if="block.id && (block.desired_start_date || block.desired_end_date || block.desired_time_hour || block.desired_time_min)"
+                class="mt-2 flex gap-4"
+            >
+                <!-- <div class="flex-1">
+                    <label class="mb-1 block font-semibold">割当希望日</label>
+                    <div v-if="block.desired_start_date" class="mt-1 w-full rounded border bg-gray-50 px-3 py-2 text-sm">
+                        {{ formatStart(block) }}
+                    </div>
+                </div> -->
+                <div class="flex-1">
+                    <label class="mb-1 block font-semibold">締め切り</label>
+                    <div v-if="block.desired_end_date || block.desired_time_hour" class="mt-1 w-full rounded border bg-gray-50 px-3 py-2 text-sm">
+                        {{ formatEnd(block) }}
                     </div>
                 </div>
             </div>
 
             <label class="mb-1 mt-2 block font-semibold">見積時間</label>
             <div class="flex items-center gap-2">
-                <select v-model="block.estimated_hours" :disabled="!editMode" class="w-40 rounded border px-3 py-2">
-                    <option value="">未指定</option>
-                    <option v-for="opt in estimatedOptions" :key="opt" :value="opt">{{ String(opt).replace('.0', '') }}h</option>
-                </select>
-                <span class="text-sm text-gray-500">(0.25刻み、例: 1.5 = 1時間30分)</span>
+                <div v-if="block.id && block.estimated_hours" class="mt-1 w-40 rounded border bg-gray-50 px-3 py-2 text-sm">
+                    {{ formatEstimated(block) }}
+                </div>
             </div>
 
             <label class="mb-1 mt-2 block font-semibold">割当ユーザー</label>
@@ -198,6 +178,41 @@
                 <option value="">未指定</option>
                 <option v-for="m in props.members || members" :key="m.id" :value="m.id">{{ m.id }}：{{ m.name }}</option>
             </select>
+        </div>
+
+        <!-- Inline event date/time editor (placed above the save button) -->
+        <div v-if="editMode" class="mb-4 rounded border p-4">
+            <label class="block text-sm font-medium text-gray-700">作業日</label>
+            <div class="mt-1 flex items-center gap-2">
+                <input type="date" v-model="workDate" class="rounded border px-3 py-2" />
+            </div>
+            <div class="mt-2">
+                <label class="block text-sm font-medium text-gray-700">時間</label>
+                <div class="mt-1 flex items-end gap-4">
+                    <div class="flex flex-col">
+                        <label class="text-xs text-gray-600">開始</label>
+                        <div class="flex gap-2">
+                            <select v-model="startTimeHour" :disabled="!editMode" class="w-20 rounded border px-3 py-2">
+                                <option v-for="h in hours" :key="h" :value="h">{{ h }}</option>
+                            </select>
+                            <select v-model="startTimeMin" :disabled="!editMode" class="w-20 rounded border px-3 py-2">
+                                <option v-for="m in mins" :key="m" :value="m">{{ m }}</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="flex flex-col">
+                        <label class="text-xs text-gray-600">終了</label>
+                        <div class="flex gap-2">
+                            <select v-model="endTimeHour" :disabled="!editMode" class="w-20 rounded border px-3 py-2">
+                                <option v-for="h in hours" :key="h" :value="h">{{ h }}</option>
+                            </select>
+                            <select v-model="endTimeMin" :disabled="!editMode" class="w-20 rounded border px-3 py-2">
+                                <option v-for="m in mins" :key="m" :value="m">{{ m }}</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="flex gap-2" v-if="editMode">
@@ -220,6 +235,7 @@ const props = defineProps({
     editMode: { type: Boolean, default: true },
     userClients: { type: Array, default: () => [] },
     userProjects: { type: Array, default: () => [] },
+    event: { type: Object, default: null },
 });
 const page = usePage();
 // Try to use injected auth/user from layout (provided via AppLayout.vue)
@@ -267,6 +283,49 @@ const debugStr = computed(() => {
 // mount hook (no debug logging)
 onMounted(() => {});
 
+// Inline event editor state (optional)
+import { onMounted as onMountedLocal } from 'vue';
+const workDate = ref('');
+const startTimeHour = ref('09');
+const startTimeMin = ref('00');
+const endTimeHour = ref('10');
+const endTimeMin = ref('00');
+
+function normalizeToDateTimePartsLocal(dt) {
+    if (!dt) return { date: '', time: '' };
+    const s = String(dt);
+    const m = s.match(/(\d{4}-\d{2}-\d{2})[T ]?(\d{2}:\d{2})/);
+    if (m) return { date: m[1], time: m[2] };
+    const parts = s.replace('T', ' ').split(' ');
+    return { date: parts[0] || '', time: (parts[1] || '').slice(0, 5) };
+}
+
+onMountedLocal(() => {
+    // prefer explicit event prop if provided, else derive from first assignment
+    const ev = props.event || (assignments.value && assignments.value[0] ? assignments.value[0] : null);
+    if (ev) {
+        const s = normalizeToDateTimePartsLocal(ev.start || ev.desired_start_date || ev.start_time || '');
+        const e = normalizeToDateTimePartsLocal(ev.end || ev.desired_end_date || ev.desired_time || '');
+        workDate.value = s.date || (assignments.value[0] ? assignments.value[0].desired_start_date || '' : '');
+        if (s.time) {
+            const [sh, sm] = String(s.time).split(':');
+            startTimeHour.value = sh || '09';
+            startTimeMin.value = sm || '00';
+        } else if (assignments.value[0]) {
+            startTimeHour.value = assignments.value[0].start_time_hour || '09';
+            startTimeMin.value = assignments.value[0].start_time_min || '00';
+        }
+        if (e.time) {
+            const [eh, em] = String(e.time).split(':');
+            endTimeHour.value = eh || startTimeHour.value || '10';
+            endTimeMin.value = em || startTimeMin.value || '00';
+        } else if (assignments.value[0]) {
+            endTimeHour.value = assignments.value[0].desired_time_hour || startTimeHour.value || '10';
+            endTimeMin.value = assignments.value[0].desired_time_min || startTimeMin.value || '00';
+        }
+    }
+});
+
 // Watch injected/inferred user and page props for changes
 watch(
     () => ({
@@ -281,7 +340,7 @@ watch(
     },
     { deep: true },
 );
-const hours = Array.from({ length: 17 }, (_, i) => String(6 + i).padStart(2, '0'));
+const hours = Array.from({ length: 17 }, (_, i) => String(7 + i).padStart(2, '0'));
 const mins = ['00', '15', '30', '45'];
 const estimatedOptions = Array.from({ length: 32 }, (_, i) => Number(((i + 1) * 0.25).toFixed(2)));
 
@@ -732,10 +791,51 @@ function onHourChange(idx) {
         a.desired_time_min = avail.length ? avail[0] : '00';
     }
 }
+
+function formatStart(block) {
+    if (!block) return '';
+    const date = block.desired_start_date || '';
+    return date ? String(date) : '';
+}
+
+function formatEnd(block) {
+    if (!block) return '';
+    const date = block.desired_end_date || '';
+    const hh = block.desired_time_hour;
+    const mm = block.desired_time_min || '00';
+    if (date && hh) return `${date} ${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+    if (date) return date;
+    if (hh) return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+    return '';
+}
+
+function formatEstimated(block) {
+    if (!block || block.estimated_hours === undefined || block.estimated_hours === null || block.estimated_hours === '') return '';
+    return String(block.estimated_hours).replace('.0', '') + 'h';
+}
 const saving = ref(false);
 
 async function save() {
     saving.value = true;
+
+    // If inline event editor present, copy values into first assignment so backend can sync event
+    try {
+        if (assignments.value && assignments.value.length) {
+            const a0 = assignments.value[0];
+            if (workDate.value) a0.desired_start_date = workDate.value;
+            // endDate removed; do not override desired_end_date from inline editor
+            if (startTimeHour.value) {
+                a0.start_time_hour = startTimeHour.value;
+                a0.start_time_min = startTimeMin.value || '00';
+                a0.start_time = String(a0.start_time_hour).padStart(2, '0') + ':' + String(a0.start_time_min).padStart(2, '0');
+            }
+            if (endTimeHour.value) {
+                a0.desired_time_hour = endTimeHour.value;
+                a0.desired_time_min = endTimeMin.value || '00';
+                a0.desired_time = String(a0.desired_time_hour).padStart(2, '0') + ':' + String(a0.desired_time_min).padStart(2, '0');
+            }
+        }
+    } catch (e) {}
 
     function assembleTitle(a) {
         if (a.title_suffix && String(a.title_suffix).trim() !== '') return String(a.title_suffix).trim();
@@ -747,6 +847,7 @@ async function save() {
 
     const payload = {
         assignments: assignments.value.map((a) => ({
+            id: a.id || null,
             title: assembleTitle(a),
             detail: a.detail || '',
             user_id: a.user_id || (effectiveAuthUser() ? effectiveAuthUser().id : null),
@@ -754,7 +855,6 @@ async function save() {
             project_job_id: a.project_job_id || null,
             company_id: a.company_id || null,
             department_id: a.department_id || null,
-            difficulty: a.difficulty || null,
             difficulty_id:
                 a.difficulty_id ??
                 resolveDifficultyId(a.difficulty) ??
@@ -763,8 +863,16 @@ async function save() {
                     : null),
             desired_start_date: a.desired_start_date || null,
             desired_end_date: a.desired_end_date || null,
-            start_time: String(a.start_time_hour || '00').padStart(2, '0') + ':' + String(a.start_time_min || '00').padStart(2, '0'),
-            desired_time: String(a.desired_time_hour || '00').padStart(2, '0') + ':' + String(a.desired_time_min || '00').padStart(2, '0'),
+            start_time: !a.id
+                ? null
+                : a.start_time_hour
+                  ? String(a.start_time_hour).padStart(2, '0') + ':' + String(a.start_time_min || '00').padStart(2, '0')
+                  : null,
+            desired_time: !a.id
+                ? null
+                : a.desired_time_hour
+                  ? String(a.desired_time_hour).padStart(2, '0') + ':' + String(a.desired_time_min || '00').padStart(2, '0')
+                  : null,
             estimated_hours: a.estimated_hours || null,
             work_item_type_id: a.work_item_type_id || null,
             size_id: a.size_id || null,
@@ -780,6 +888,81 @@ async function save() {
         const allForAuth = payload.assignments.every((x) => String(x.user_id) === String(auth ? auth.id : null));
         const computedProjectJobId =
             props.projectJob && props.projectJob.id ? props.projectJob.id : payload.assignments[0] ? payload.assignments[0].project_job_id : null;
+        // If editing existing assignment(s) (have id), call update endpoint instead of store
+        const firstAssignmentHasId = payload.assignments[0] && payload.assignments[0].id;
+        if (firstAssignmentHasId) {
+            // Send update. Use user-specific update when the assignment belongs to the current user,
+            // otherwise use coordinator update route (coordinator can update any assignment).
+            const assignmentId = payload.assignments[0].id;
+            const token = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+            const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
+            const xsrf = match ? decodeURIComponent(match[1]) : null;
+            if (allForAuth) {
+                const url = route('project_jobs.assignments.update_user', { projectJob: computedProjectJobId, assignment: assignmentId });
+                const rel =
+                    typeof window !== 'undefined' && url && url.indexOf(window.location.origin) === 0 ? url.replace(window.location.origin, '') : url;
+                try {
+                    const res = await inertiaFetch(rel, {
+                        method: 'PATCH',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': token,
+                            ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}),
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-Inertia': 'true',
+                        },
+                        body: JSON.stringify(payload.assignments[0]),
+                    });
+                    if (!res || res.navigated) return;
+                    if (res.ok || res.redirected) {
+                        location.reload();
+                        return;
+                    }
+                    const txt = await res.text().catch(() => '');
+                    console.error('[AssignmentForm_user] update PATCH failed:', res.status, txt);
+                    alert('保存に失敗しました（' + res.status + '）');
+                } catch (err) {
+                    console.error('[AssignmentForm_user] update PATCH error:', err);
+                    alert('保存に失敗しました（ネットワークエラー）');
+                } finally {
+                    saving.value = false;
+                }
+                return;
+            } else {
+                // Coordinator update (PUT)
+                const url = route('coordinator.project_jobs.assignments.update', { projectJob: computedProjectJobId, assignment: assignmentId });
+                const rel =
+                    typeof window !== 'undefined' && url && url.indexOf(window.location.origin) === 0 ? url.replace(window.location.origin, '') : url;
+                try {
+                    const res = await inertiaFetch(rel, {
+                        method: 'PUT',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': token,
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-Inertia': 'true',
+                        },
+                        body: JSON.stringify(payload.assignments[0]),
+                    });
+                    if (!res || res.navigated) return;
+                    if (res.ok || res.redirected) {
+                        location.reload();
+                        return;
+                    }
+                    const txt = await res.text().catch(() => '');
+                    console.error('[AssignmentForm_user] coordinator update PUT failed:', res.status, txt);
+                    alert('保存に失敗しました（' + res.status + '）');
+                } catch (err) {
+                    console.error('[AssignmentForm_user] coordinator update PUT error:', err);
+                    alert('保存に失敗しました（ネットワークエラー）');
+                } finally {
+                    saving.value = false;
+                }
+                return;
+            }
+        }
 
         if (allForAuth) {
             if (!computedProjectJobId) {
@@ -798,6 +981,8 @@ async function save() {
 
             // CSRF token
             const token = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+            const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
+            const xsrf = match ? decodeURIComponent(match[1]) : null;
 
             try {
                 const res = await inertiaFetch(rel, {
@@ -806,6 +991,7 @@ async function save() {
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': token,
+                        ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}),
                         'X-Requested-With': 'XMLHttpRequest',
                         'X-Inertia': 'true',
                     },
@@ -852,12 +1038,15 @@ async function save() {
         const rel2 =
             typeof window !== 'undefined' && url2 && url2.indexOf(window.location.origin) === 0 ? url2.replace(window.location.origin, '') : url2;
         const token2 = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+        const match2 = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
+        const xsrf2 = match2 ? decodeURIComponent(match2[1]) : null;
         const res2 = await inertiaFetch(rel2, {
             method: 'POST',
             credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': token2,
+                ...(xsrf2 ? { 'X-XSRF-TOKEN': xsrf2 } : {}),
                 'X-Requested-With': 'XMLHttpRequest',
                 'X-Inertia': 'true',
             },

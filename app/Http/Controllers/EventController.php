@@ -1086,6 +1086,94 @@ class EventController extends Controller
     public function edit(Event $event)
     {
         $event->date = \Carbon\Carbon::parse($event->start)->toDateString();
+
+        // If this event is linked to a project job assignment, render the
+        // JobBox edit page which allows editing the canonical assignment
+        // alongside the event. Otherwise fall back to the normal Events/Edit.
+        try {
+            if (Schema::hasColumn('events', 'project_job_assignment_id') && $event->project_job_assignment_id) {
+                $assignment = ProjectJobAssignment::with(['projectJob.client', 'projectJob'])->find($event->project_job_assignment_id);
+
+                // Gather same lookup lists as create/createJob so the form has selects
+                $user = request()->user();
+                $userClients = [];
+                $userProjects = [];
+                try {
+                    $ptms = \App\Models\ProjectTeamMember::with(['projectJob.client'])
+                        ->where('user_id', $user->id)
+                        ->get();
+                    $jobs = $ptms->map(function ($ptm) {
+                        return $ptm->projectJob;
+                    })->filter();
+                    $userProjects = $jobs->map(function ($job) {
+                        return [
+                            'id' => $job->id,
+                            'title' => $job->title ?? ($job->name ?? null),
+                            'client_id' => $job->client ? $job->client->id : null,
+                        ];
+                    })->values();
+                    $clients = $jobs->map(function ($job) {
+                        return $job->client;
+                    })->filter()->unique('id')->values();
+                    $userClients = $clients->map(function ($c) {
+                        return ['id' => $c->id, 'name' => $c->name ?? ($c->client_name ?? null)];
+                    })->values();
+                } catch (\Throwable $__e) {
+                    $userClients = [];
+                    $userProjects = [];
+                }
+
+                $members = [];
+                try {
+                    if ($user) $members = [['id' => $user->id, 'name' => $user->name]];
+                } catch (\Throwable $__e) {
+                    $members = [];
+                }
+
+                $company = null;
+                $department = null;
+                try {
+                    if ($user && isset($user->company_id) && $user->company_id) $company = \App\Models\Company::find($user->company_id);
+                    if ($user && isset($user->department_id) && $user->department_id) $department = \App\Models\Department::find($user->department_id);
+                } catch (\Throwable $__e) {
+                    $company = null;
+                    $department = null;
+                }
+
+                $types = [];
+                $sizes = [];
+                $stages = [];
+                $statuses = [];
+                try {
+                    $types = \App\Models\WorkItemType::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'company_id', 'department_id']);
+                    $sizes = \App\Models\Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'width', 'height', 'unit', 'company_id', 'department_id']);
+                    $stages = \App\Models\Stage::orderBy('sort_order')->orderBy('order_index')->get(['id', 'name', 'company_id', 'department_id']);
+                    $statuses = \App\Models\Status::orderBy('sort_order')->get(['id', 'name', 'slug', 'company_id', 'department_id']);
+                } catch (\Throwable $__e) {
+                    $types = [];
+                    $sizes = [];
+                    $stages = [];
+                    $statuses = [];
+                }
+
+                return Inertia::render('JobBox/Edit_User', [
+                    'event' => $event,
+                    'projectJobAssignment' => $assignment,
+                    'userClients' => $userClients,
+                    'userProjects' => $userProjects,
+                    'members' => $members,
+                    'company' => $company,
+                    'department' => $department,
+                    'types' => $types,
+                    'sizes' => $sizes,
+                    'stages' => $stages,
+                    'statuses' => $statuses,
+                ]);
+            }
+        } catch (\Throwable $__e) {
+            // ignore and fall back
+        }
+
         return Inertia::render('Events/Edit', [
             'event' => $event,
         ]);

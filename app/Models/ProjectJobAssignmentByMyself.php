@@ -18,15 +18,14 @@ class ProjectJobAssignmentByMyself extends Model
         'estimated_hours',
         'title',
         'detail',
-        'difficulty',
         'desired_at',
-        'desired_start_date',
         'desired_end_date',
         'desired_time',
+        // datetime/date fields related to explicit scheduling removed
         'assigned',
         'completed',
         'accepted',
-        // lookup fields migrated from WorkItem
+        // lookup fields
         'size_id',
         'work_item_type_id',
         'stage_id',
@@ -37,30 +36,29 @@ class ProjectJobAssignmentByMyself extends Model
         'amounts',
         'amounts_unit',
         'difficulty_id',
-        // start time separate from desired_time
-        'start_time',
         'sender_id',
+        'scheduled',
+        'scheduled_at',
     ];
 
     protected $casts = [
         'desired_at' => 'datetime',
-        'desired_start_date' => 'date:Y-m-d',
         'desired_end_date' => 'date:Y-m-d',
         'desired_time' => 'string',
-        'start_time' => 'string',
         'estimated_hours' => 'float',
         'assigned' => 'boolean',
         'completed' => 'boolean',
         'accepted' => 'boolean',
         'read_at' => 'datetime',
+        // starts_at/ends_at removed from casts
         'sender_id' => 'integer',
     ];
 
     protected $dates = [
-        'desired_start_date',
         'desired_end_date',
         'desired_at',
         'read_at',
+        // removed starts_at/ends_at/desired_start_date
     ];
 
     public function sender()
@@ -128,7 +126,6 @@ class ProjectJobAssignmentByMyself extends Model
             'project_job_name' => $this->projectJob ? ($this->projectJob->name ?? null) : null,
             'project_job_detail' => $this->projectJob ? ($this->projectJob->detail ?? null) : null,
             'difficulty' => $this->difficulty ?? ($this->projectJob ? ($this->projectJob->difficulty ?? null) : null),
-            'desired_start_date' => $this->desired_start_date ? (method_exists($this->desired_start_date, 'format') ? $this->desired_start_date->format('Y-m-d') : (string)$this->desired_start_date) : null,
             'desired_end_date' => $this->desired_end_date ? (method_exists($this->desired_end_date, 'format') ? $this->desired_end_date->format('Y-m-d') : (string)$this->desired_end_date) : null,
             'desired_time' => $this->desired_time ?? null,
             'estimated_hours' => $this->estimated_hours ?? null,
@@ -137,7 +134,7 @@ class ProjectJobAssignmentByMyself extends Model
             'scheduled_at' => Schema::hasColumn('project_job_assignment_by_myself', 'scheduled_at') && $this->scheduled_at ? (method_exists($this->scheduled_at, 'format') ? $this->scheduled_at->format('Y-m-d H:i:s') : (string)$this->scheduled_at) : null,
             'accepted' => Schema::hasColumn('project_job_assignment_by_myself', 'accepted') ? (bool) ($this->accepted ?? false) : false,
             'completed' => Schema::hasColumn('project_job_assignment_by_myself', 'completed') ? (bool) ($this->completed ?? false) : false,
-            'preferred_date' => $this->desired_start_date ? (method_exists($this->desired_start_date, 'format') ? $this->desired_start_date->format('Y-m-d') : (string)$this->desired_start_date) : null,
+            'preferred_date' => null,
             'size_label' => $this->size ? ($this->size->name ?? $this->size->label ?? null) : null,
             'stage_label' => $this->stage ? ($this->stage->name ?? $this->stage->label ?? null) : null,
             'type_label' => $this->workItemType ? ($this->workItemType->name ?? $this->workItemType->label ?? null) : null,

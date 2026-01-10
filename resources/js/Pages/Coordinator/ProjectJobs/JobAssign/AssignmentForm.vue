@@ -140,11 +140,11 @@
             </select>
 
             <div class="mt-2">
-                <label class="mb-1 block font-semibold">割当希望日</label>
-                <input v-model="block.desired_start_date" :disabled="!editMode" type="date" class="w-full rounded border px-3 py-2" />
+                <!-- <label class="mb-1 block font-semibold">割当希望日</label>
+                <input v-model="block.desired_start_date" :disabled="!editMode" type="date" class="w-full rounded border px-3 py-2" /> -->
 
                 <div class="mt-2">
-                    <label class="mb-1 block font-semibold">終了希望日, 希望時間</label>
+                    <label class="mb-1 block font-semibold">締め切り</label>
                     <div class="flex items-center gap-3">
                         <input
                             v-model="block.desired_end_date"
@@ -1037,7 +1037,6 @@ async function save() {
             project_job_id: a.project_job_id || null,
             company_id: a.company_id || null,
             department_id: a.department_id || null,
-            difficulty: a.difficulty || 'normal',
             difficulty_id:
                 a.difficulty_id ??
                 (window?.page?.props?.difficulties

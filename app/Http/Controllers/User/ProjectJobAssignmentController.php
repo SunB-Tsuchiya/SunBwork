@@ -23,14 +23,12 @@ class ProjectJobAssignmentController extends Controller
             'assignments' => 'required|array',
             'assignments.*.title' => 'required|string|max:255',
             'assignments.*.detail' => 'nullable|string',
-            // allow either difficulty_id (preferred) or difficulty string
+            // accept difficulty by id only (legacy string removed)
             'assignments.*.difficulty_id' => 'nullable|exists:difficulties,id',
-            'assignments.*.difficulty' => 'required_without:assignments.*.difficulty_id|in:light,normal,heavy',
             'assignments.*.estimated_hours' => 'nullable|numeric|min:0',
-            'assignments.*.desired_start_date' => 'nullable|date',
             'assignments.*.desired_end_date' => 'nullable|date',
             'assignments.*.desired_time' => 'nullable|date_format:H:i',
-            'assignments.*.start_time' => 'nullable|date_format:H:i',
+            // scheduling fields removed: desired_start_date/start_time
             // lookup fields
             'assignments.*.work_item_type_id' => 'nullable|exists:work_item_types,id',
             'assignments.*.size_id' => 'nullable|exists:sizes,id',
@@ -55,31 +53,8 @@ class ProjectJobAssignmentController extends Controller
             }
 
             DB::transaction(function () use ($projectJob, $a, $user) {
-                // resolve difficulty id - prefer explicit difficulty_id
-                $difficultyId = null;
-                if (!empty($a['difficulty_id'])) {
-                    $difficultyId = (int) $a['difficulty_id'];
-                } elseif (!empty($a['difficulty'])) {
-                    // if difficulty is numeric, treat as id; otherwise try to find by slug/name
-                    if (is_numeric($a['difficulty'])) {
-                        $difficultyId = (int) $a['difficulty'];
-                    } else {
-                        $q = \App\Models\Difficulty::query();
-                        try {
-                            if (Schema::hasColumn('difficulties', 'slug')) {
-                                $q->where(function ($q2) use ($a) {
-                                    $q2->where('slug', $a['difficulty'])->orWhere('name', $a['difficulty']);
-                                });
-                            } else {
-                                $q->where('name', $a['difficulty']);
-                            }
-                        } catch (\Throwable $__e) {
-                            $q->where('name', $a['difficulty']);
-                        }
-                        $d = $q->first();
-                        if ($d) $difficultyId = $d->id;
-                    }
-                }
+                // prefer explicit difficulty_id only
+                $difficultyId = !empty($a['difficulty_id']) ? (int) $a['difficulty_id'] : null;
 
                 $createPayload = [
                     'project_job_id' => $projectJob->id,
@@ -88,10 +63,9 @@ class ProjectJobAssignmentController extends Controller
                     'title' => $a['title'],
                     'detail' => $a['detail'] ?? null,
                     'difficulty_id' => $difficultyId,
-                    'desired_start_date' => $a['desired_start_date'] ?? null,
+                    // scheduling fields removed: desired_start_date/start_time
                     'desired_end_date' => $a['desired_end_date'] ?? null,
                     'desired_time' => $a['desired_time'] ?? null,
-                    'start_time' => $a['start_time'] ?? null,
                     'estimated_hours' => $a['estimated_hours'] ?? null,
                     'work_item_type_id' => $a['work_item_type_id'] ?? null,
                     'size_id' => $a['size_id'] ?? null,
@@ -103,45 +77,36 @@ class ProjectJobAssignmentController extends Controller
                     'amounts_unit' => $a['amounts_unit'] ?? null,
                 ];
 
-                // include legacy string column only if table has it
-                if (Schema::hasColumn('project_job_assignment_by_myself', 'difficulty')) {
-                    $createPayload['difficulty'] = $a['difficulty'] ?? null;
-                }
+                // legacy difficulty string column removed from payload
 
-                // Create assignment in the canonical project_job_assignments table
-                // Prefer ProjectJobAssignment when available so user-created assignments
-                // appear in the main assignments list. Keep fallback to the legacy
-                // "by_myself" table if needed.
-                if (class_exists(ProjectJobAssignment::class)) {
-                    // Ensure sender_id is null for user-created records as requested
+                // Create assignment: for user-created assignments prefer the
+                // `project_job_assignment_by_myself` table so users' own schedules
+                // are stored separately from coordinator-created canonical rows.
+                if (class_exists(ProjectJobAssignmentByMyself::class)) {
                     $createPayload['sender_id'] = $a['sender_id'] ?? null;
-                    $assignment = ProjectJobAssignment::create($createPayload);
-                } else {
                     $assignment = ProjectJobAssignmentByMyself::create($createPayload);
+                } else {
+                    // Fallback to canonical table if the by_myself model/table isn't present
+                    $assignment = ProjectJobAssignment::create($createPayload);
                 }
 
                 // Create corresponding Event if events table supports linking
                 try {
                     if (Schema::hasTable('events')) {
-                        $start = null;
-                        $end = null;
-                        $startDate = $a['desired_start_date'] ?? null;
-                        $endDate = $a['desired_end_date'] ?? $startDate;
-                        // Prefer explicit start_time (separate selector) for event start; fall back to desired_time
-                        $time = $a['start_time'] ?? $a['desired_time'] ?? null; // expected format HH:MM
-                        if ($startDate && $time) {
-                            $start = $startDate . ' ' . $time . ':00';
-                            // Use end date and desired_time (end selector) if provided, else mirror start time
-                            $endTime = $a['desired_time'] ?? $time;
-                            $end = $endDate . ' ' . $endTime . ':00';
-                        }
+                        // scheduling fields removed: do not set event start/end here
 
                         // Build description from assignment fields (similar to example provided)
                         $lines = [];
                         $lines[] = 'ジョブ名: ' . ($a['title'] ?? '');
                         // Try to include client/project if available
                         $lines[] = 'クライアント: ' . ($projectJob->client->name ?? ($a['client_name'] ?? '-'));
-                        $lines[] = '難易度: ' . ($a['difficulty'] ?? '-');
+                        // prefer difficulty name resolved from difficulty_id
+                        $dname = '-';
+                        if (!empty($difficultyId)) {
+                            $dObj = \App\Models\Difficulty::find($difficultyId);
+                            if ($dObj) $dname = $dObj->name;
+                        }
+                        $lines[] = '難易度: ' . $dname;
                         $lines[] = '種別: ' . ($a['work_item_type_id'] ? ('id:' . $a['work_item_type_id']) : '-');
                         $lines[] = 'サイズ: ' . ($a['size_id'] ? ('id:' . $a['size_id']) : '-');
                         $lines[] = 'ステージ: ' . ($a['stage_id'] ? ('id:' . $a['stage_id']) : '-');
@@ -161,8 +126,7 @@ class ProjectJobAssignmentController extends Controller
                         $event->user_id = $user ? $user->id : null;
                         $event->title = $a['title'] ?? '割当予定';
                         $event->description = $description;
-                        if ($start) $event->start = $start;
-                        if ($end) $event->end = $end;
+                        // start/end intentionally not set from assignment fields
                         // link back to the created assignment if canonical column exists
                         if (Schema::hasColumn('events', 'project_job_assignment_id')) {
                             $event->project_job_assignment_id = $assignment->id;
@@ -182,5 +146,95 @@ class ProjectJobAssignmentController extends Controller
         } catch (\Exception $e) {
             return redirect()->route('user.assigned-projects.index');
         }
+    }
+
+    /**
+     * Update an existing assignment created by the authenticated user.
+     * This will update the canonical project_job_assignments row and any
+     * linked event (events.project_job_assignment_id) to keep title/description/start/end in sync.
+     */
+    public function update(Request $request, ProjectJob $projectJob, ProjectJobAssignment $assignment)
+    {
+        // Debug: log authentication and assignment info to help diagnose 403
+        try {
+            \Illuminate\Support\Facades\Log::info('ProjectJobAssignment:update attempt', [
+                'auth_id' => $request->user() ? $request->user()->id : null,
+                'assignment_id' => $assignment->id,
+                'assignment_user_id' => $assignment->user_id,
+                'assignment_sender_id' => $assignment->sender_id,
+                'session_id' => session()->getId(),
+                'cookies' => array_keys($request->cookies->all()),
+            ]);
+        } catch (\Throwable $__e) {
+            // ignore logging errors
+        }
+
+        $this->authorize('update', $assignment);
+
+        $data = $request->validate([
+            'title' => 'required|string|max:255',
+            'detail' => 'nullable|string',
+            'difficulty_id' => 'nullable|exists:difficulties,id',
+            'estimated_hours' => 'nullable|numeric|min:0',
+            // scheduling fields removed: desired_start_date/start_time
+            'desired_end_date' => 'nullable|date',
+            'desired_time' => 'nullable|date_format:H:i',
+            'work_item_type_id' => 'nullable|exists:work_item_types,id',
+            'size_id' => 'nullable|exists:sizes,id',
+            'status_id' => 'nullable|exists:statuses,id',
+            'company_id' => 'nullable|exists:companies,id',
+            'department_id' => 'nullable|exists:departments,id',
+            'stage_id' => 'nullable|exists:stages,id',
+            'amounts' => 'nullable|integer|min:0',
+            'amounts_unit' => 'nullable|string|in:page,file',
+            'user_id' => 'nullable|exists:users,id',
+        ]);
+
+        DB::transaction(function () use ($assignment, $data) {
+            // map fields
+            $assignment->title = $data['title'];
+            $assignment->detail = $data['detail'] ?? $assignment->detail;
+            if (isset($data['difficulty_id'])) $assignment->difficulty_id = $data['difficulty_id'];
+            if (isset($data['desired_end_date'])) $assignment->desired_end_date = $data['desired_end_date'];
+            if (isset($data['desired_time'])) $assignment->desired_time = $data['desired_time'];
+            if (isset($data['estimated_hours'])) $assignment->estimated_hours = $data['estimated_hours'];
+            if (isset($data['work_item_type_id'])) $assignment->work_item_type_id = $data['work_item_type_id'];
+            if (isset($data['size_id'])) $assignment->size_id = $data['size_id'];
+            if (isset($data['stage_id'])) $assignment->stage_id = $data['stage_id'];
+            if (isset($data['status_id'])) $assignment->status_id = $data['status_id'];
+            if (isset($data['company_id'])) $assignment->company_id = $data['company_id'];
+            if (isset($data['department_id'])) $assignment->department_id = $data['department_id'];
+            if (isset($data['amounts'])) $assignment->amounts = $data['amounts'];
+            if (isset($data['amounts_unit'])) $assignment->amounts_unit = $data['amounts_unit'];
+            if (isset($data['user_id'])) $assignment->user_id = $data['user_id'];
+
+            $assignment->save();
+
+            // Update linked event if present
+            try {
+                if (Schema::hasTable('events') && Schema::hasColumn('events', 'project_job_assignment_id')) {
+                    $event = Event::where('project_job_assignment_id', $assignment->id)->first();
+                    if ($event) {
+                        // rebuild event title/description and start/end if desired dates provided
+                        $event->title = $assignment->title;
+                        $lines = [];
+                        $lines[] = 'ジョブ名: ' . ($assignment->title ?? '');
+                        $lines[] = 'クライアント: ' . ($assignment->projectJob && $assignment->projectJob->client ? ($assignment->projectJob->client->name ?? '-') : '-');
+                        $lines[] = '難易度: ' . ($assignment->difficultyModel?->name ?? '-');
+                        $lines[] = '見積時間: ' . ($assignment->estimated_hours ?? '-');
+                        $lines[] = '詳細:';
+                        $lines[] = $assignment->detail ?? '';
+                        $event->description = implode("\n", $lines);
+
+                        // scheduling fields removed: do not update event start/end here
+                        $event->save();
+                    }
+                }
+            } catch (\Throwable $__e) {
+                // non-fatal
+            }
+        });
+
+        return redirect()->route('calendar.index');
     }
 }
