@@ -863,16 +863,13 @@ async function save() {
                     : null),
             desired_start_date: a.desired_start_date || null,
             desired_end_date: a.desired_end_date || null,
-            start_time: !a.id
-                ? null
-                : a.start_time_hour
-                  ? String(a.start_time_hour).padStart(2, '0') + ':' + String(a.start_time_min || '00').padStart(2, '0')
-                  : null,
-            desired_time: !a.id
-                ? null
-                : a.desired_time_hour
-                  ? String(a.desired_time_hour).padStart(2, '0') + ':' + String(a.desired_time_min || '00').padStart(2, '0')
-                  : null,
+            // Always send time fields if available so server can create Event on new assignments
+            start_time: a.start_time_hour
+                ? String(a.start_time_hour).padStart(2, '0') + ':' + String(a.start_time_min || '00').padStart(2, '0')
+                : a.start_time ?? null,
+            desired_time: a.desired_time_hour
+                ? String(a.desired_time_hour).padStart(2, '0') + ':' + String(a.desired_time_min || '00').padStart(2, '0')
+                : a.desired_time ?? null,
             estimated_hours: a.estimated_hours || null,
             work_item_type_id: a.work_item_type_id || null,
             size_id: a.size_id || null,

@@ -21,6 +21,8 @@ class ProjectJobAssignmentController extends Controller
     {
         $data = $request->validate([
             'assignments' => 'required|array',
+            'assignments.*.desired_start_date' => 'nullable|date',
+            'assignments.*.start_time' => 'nullable|date_format:H:i',
             'assignments.*.title' => 'required|string|max:255',
             'assignments.*.detail' => 'nullable|string',
             // accept difficulty by id only (legacy string removed)
@@ -43,6 +45,8 @@ class ProjectJobAssignmentController extends Controller
 
         // validated payload received (debug logging removed)
         $user = $request->user();
+
+        // (removed temporary debug logging)
 
         foreach ($data['assignments'] as $a) {
             // basic logical validations
@@ -93,9 +97,7 @@ class ProjectJobAssignmentController extends Controller
                 // Create corresponding Event if events table supports linking
                 try {
                     if (Schema::hasTable('events')) {
-                        // scheduling fields removed: do not set event start/end here
-
-                        // Build description from assignment fields (similar to example provided)
+                        // Build description from assignment fields
                         $lines = [];
                         $lines[] = 'ジョブ名: ' . ($a['title'] ?? '');
                         // Try to include client/project if available
@@ -116,7 +118,42 @@ class ProjectJobAssignmentController extends Controller
                         $lines[] = 'プロジェクトジョブ詳細: ' . ($projectJob->detail ?? '-');
                         $lines[] = '割当ユーザーID: ' . ($a['user_id'] ?? '-');
                         $lines[] = '担当ユーザー: ' . ($user ? $user->name : '-');
-                        $lines[] = '希望期間: ' . ($startDate ? ($startDate . ' ' . ($time ?? '') . ' 〜 ' . ($endDate ?? $startDate) . ' ' . ($a['desired_time'] ?? $time ?? '')) : '-');
+
+                        // If inline event editor provided start/end parts, assemble start/end
+                        $eventStart = null;
+                        $eventEnd = null;
+                        try {
+                            if (!empty($a['desired_start_date'])) {
+                                $datePart = $a['desired_start_date'];
+
+                                // Prefer explicit combined time strings first
+                                $startTimePart = $a['start_time'] ?? null;
+                                $endTimePart = $a['desired_time'] ?? null;
+
+                                // Fallback to hour/min parts if combined strings are not provided
+                                if (empty($startTimePart) && (isset($a['start_time_hour']) || isset($a['start_time_min']))) {
+                                    $sh = isset($a['start_time_hour']) ? sprintf('%02d', $a['start_time_hour']) : '09';
+                                    $sm = isset($a['start_time_min']) ? sprintf('%02d', $a['start_time_min']) : '00';
+                                    $startTimePart = $sh . ':' . $sm;
+                                }
+                                if (empty($endTimePart) && (isset($a['desired_time_hour']) || isset($a['desired_time_min']))) {
+                                    $eh = isset($a['desired_time_hour']) ? sprintf('%02d', $a['desired_time_hour']) : '10';
+                                    $em = isset($a['desired_time_min']) ? sprintf('%02d', $a['desired_time_min']) : '00';
+                                    $endTimePart = $eh . ':' . $em;
+                                }
+
+                                if ($startTimePart) {
+                                    $eventStart = \Carbon\Carbon::parse($datePart . ' ' . $startTimePart);
+                                }
+                                if ($endTimePart) {
+                                    $eventEnd = \Carbon\Carbon::parse($datePart . ' ' . $endTimePart);
+                                }
+                            }
+                        } catch (\Throwable $__parseE) {
+                            // ignore parse errors and leave start/end null
+                        }
+
+                        $lines[] = '希望日時: ' . (!empty($a['desired_start_date']) ? ($a['desired_start_date'] . ' ' . ($a['start_time'] ?? '') . ' - ' . ($a['desired_time'] ?? '')) : '-');
                         $lines[] = '詳細:';
                         $lines[] = $a['detail'] ?? '';
 
@@ -126,11 +163,35 @@ class ProjectJobAssignmentController extends Controller
                         $event->user_id = $user ? $user->id : null;
                         $event->title = $a['title'] ?? '割当予定';
                         $event->description = $description;
-                        // start/end intentionally not set from assignment fields
+
+                        // (removed temporary parsed-time debug logging)
+
+                        if ($eventStart) {
+                            $event->start = $eventStart->toDateTimeString();
+                            if (Schema::hasColumn('events', 'starts_at')) {
+                                $event->starts_at = $eventStart->toDateTimeString();
+                            }
+                        }
+                        if ($eventEnd) {
+                            $event->end = $eventEnd->toDateTimeString();
+                            if (Schema::hasColumn('events', 'ends_at')) {
+                                $event->ends_at = $eventEnd->toDateTimeString();
+                            }
+                        }
+                        // If the events table has a date column, set it from start
+                        if ($eventStart && Schema::hasColumn('events', 'date')) {
+                            try {
+                                $event->date = $eventStart->toDateString();
+                            } catch (\Throwable $__eDate) {
+                                // ignore
+                            }
+                        }
+
                         // link back to the created assignment if canonical column exists
                         if (Schema::hasColumn('events', 'project_job_assignment_id')) {
                             $event->project_job_assignment_id = $assignment->id;
                         }
+
                         $event->save();
                     }
                 } catch (\Throwable $__e) {

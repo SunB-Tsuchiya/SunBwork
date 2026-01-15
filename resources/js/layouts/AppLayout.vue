@@ -326,7 +326,7 @@ const computeCoordinatorActive = () => {
                                 </Link>
                             </div>
                             <!-- JobBox link -->
-                            <div class="relative ms-3 flex items-center">
+                            <!-- <div class="relative ms-3 flex items-center">
                                 <Link :href="jobLink" class="flex items-center text-sm text-gray-600 hover:text-gray-800" @click="handleJobClick">
                                     <span>ジョブ</span>
                                     <span
@@ -335,7 +335,7 @@ const computeCoordinatorActive = () => {
                                         >{{ unreadJobMessages }}</span
                                     >
                                 </Link>
-                            </div>
+                            </div> -->
                             <!-- TeamSwitcher -->
                             <!-- チームスイッチャーは機能してないので切ります。 -->
                             <!-- <div class="relative ms-3">

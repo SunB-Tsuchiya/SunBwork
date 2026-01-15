@@ -98,6 +98,10 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     // relevant to the authenticated user.
     Route::get('/jobbox', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'global'])->name('project_jobs.index');
 
+    // MyJobBox: user-scoped JobBox page (personal messages/assignments)
+    Route::get('/myjobbox', [\App\Http\Controllers\User\MyProjectJobController::class, 'index'])->name('user.myjobbox.index');
+    Route::get('/myjobbox/{assignment}', [\App\Http\Controllers\User\MyProjectJobController::class, 'showAssignment'])->name('user.myjobbox.show');
+
     // チーム切り替え
     Route::put('/current-team', [App\Http\Controllers\CurrentTeamController::class, 'update'])->name('current-team.update');
 

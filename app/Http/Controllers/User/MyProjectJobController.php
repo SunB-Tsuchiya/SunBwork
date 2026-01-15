@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\ProjectJob;
 use Inertia\Inertia;
+use App\Models\ProjectJobAssignmentByMyself;
+
 use Illuminate\Support\Facades\Log;
 
 class MyProjectJobController extends Controller
@@ -16,13 +18,40 @@ class MyProjectJobController extends Controller
         $jobs = ProjectJob::with('client')
             ->where('user_id', $user->id)
             ->get();
+        // ユーザー自身が登録した「自分用割当」を取得（ページネーション）
+        $myAssignments = ProjectJobAssignmentByMyself::where('user_id', $user->id)
+            ->with(['projectJob.client', 'user', 'statusModel'])
+            ->orderBy('created_at', 'desc')
+            ->paginate(20);
         // フラッシュデータからjobid/register_flagsを取得
         $jobid = session('jobid');
         $registerFlags = session('register_flags', []);
-        return Inertia::render('Coordinator/ProjectJobs/Index', [
+        return Inertia::render('MyJobBox/Index', [
             'jobs' => $jobs,
+            'myAssignments' => $myAssignments,
             'jobid' => $jobid,
             'registerFlags' => $registerFlags,
+        ]);
+    }
+
+    /**
+     * Show a single ProjectJobAssignmentByMyself assignment for the current user.
+     */
+    public function showAssignment(\App\Models\ProjectJobAssignmentByMyself $assignment, Request $request)
+    {
+        $user = $request->user();
+        if (! $user || $assignment->user_id !== $user->id) {
+            abort(403, 'Access denied.');
+        }
+
+        // eager load relations used by the frontend
+        $assignment->load(['projectJob.client', 'user', 'size', 'stage', 'workItemType', 'statusModel']);
+
+        $projectJob = $assignment->projectJob ?? null;
+
+        return Inertia::render('MyJobBox/Show', [
+            'projectJob' => $projectJob,
+            'assignment' => $assignment,
         ]);
     }
 
