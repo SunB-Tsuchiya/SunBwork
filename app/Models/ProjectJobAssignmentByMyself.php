@@ -101,6 +101,14 @@ class ProjectJobAssignmentByMyself extends Model
         return $this->belongsTo(Status::class, 'status_id');
     }
 
+    /**
+     * Events linked to this assignment via events.project_job_assignment_id
+     */
+    public function events()
+    {
+        return $this->hasMany(\App\Models\Event::class, 'project_job_assignment_id');
+    }
+
     public function company()
     {
         return $this->belongsTo(Company::class, 'company_id');

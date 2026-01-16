@@ -68,7 +68,9 @@ class ProjectJobAssignmentController extends Controller
                     'detail' => $a['detail'] ?? null,
                     'difficulty_id' => $difficultyId,
                     // scheduling fields removed: desired_start_date/start_time
-                    'desired_end_date' => $a['desired_end_date'] ?? null,
+                    // Prefer the user-selected work date (desired_start_date from the form)
+                    // and store it into the `desired_end_date` column so UI's "作業日" is preserved.
+                    'desired_end_date' => $a['desired_start_date'] ?? $a['desired_end_date'] ?? null,
                     'desired_time' => $a['desired_time'] ?? null,
                     'estimated_hours' => $a['estimated_hours'] ?? null,
                     'work_item_type_id' => $a['work_item_type_id'] ?? null,
@@ -88,10 +90,47 @@ class ProjectJobAssignmentController extends Controller
                 // are stored separately from coordinator-created canonical rows.
                 if (class_exists(ProjectJobAssignmentByMyself::class)) {
                     $createPayload['sender_id'] = $a['sender_id'] ?? null;
+                    // Set assignment flags and timestamps when saving from user-side job creation
+                    try {
+                        if (Schema::hasColumn('project_job_assignment_by_myself', 'assigned')) {
+                            $createPayload['assigned'] = 1;
+                        }
+                        if (Schema::hasColumn('project_job_assignment_by_myself', 'accepted')) {
+                            $createPayload['accepted'] = 1;
+                        }
+                        if (Schema::hasColumn('project_job_assignment_by_myself', 'scheduled')) {
+                            $createPayload['scheduled'] = 1;
+                        }
+                        if (Schema::hasColumn('project_job_assignment_by_myself', 'read_at')) {
+                            $createPayload['read_at'] = now();
+                        }
+                        if (Schema::hasColumn('project_job_assignment_by_myself', 'scheduled_at')) {
+                            $createPayload['scheduled_at'] = now();
+                        }
+                    } catch (\Throwable $__ePayload) {
+                        // defensive: ignore schema inspection errors and continue without flags
+                    }
+
                     $assignment = ProjectJobAssignmentByMyself::create($createPayload);
+                    // If model/table doesn't allow mass-assigning read_at, set it explicitly after create
+                    try {
+                        if (Schema::hasColumn('project_job_assignment_by_myself', 'read_at') && empty($assignment->read_at)) {
+                            $assignment->read_at = now();
+                            $assignment->save();
+                        }
+                    } catch (\Throwable $__eSetRead) {
+                        // ignore
+                    }
                 } else {
                     // Fallback to canonical table if the by_myself model/table isn't present
                     $assignment = ProjectJobAssignment::create($createPayload);
+                    try {
+                        if (Schema::hasColumn('project_job_assignments', 'read_at') && empty($assignment->read_at)) {
+                            $assignment->read_at = now();
+                            $assignment->save();
+                        }
+                    } catch (\Throwable $__eSetRead2) {
+                    }
                 }
 
                 // Create corresponding Event if events table supports linking

@@ -89,7 +89,7 @@
                         </option>
                     </select>
                 </div>
-                <div>
+                <div v-if="!props.hideStatus">
                     <label class="block text-sm font-medium">Status</label>
                     <div v-if="!editMode" class="mt-1 w-full rounded border bg-gray-50 px-3 py-2 text-sm">
                         {{ itemName('statuses', block.status_id) }}
@@ -236,6 +236,8 @@ const props = defineProps({
     userClients: { type: Array, default: () => [] },
     userProjects: { type: Array, default: () => [] },
     event: { type: Object, default: null },
+    hideStatus: { type: Boolean, default: false },
+    defaultStatusId: { type: [Number, String], default: null },
 });
 const page = usePage();
 // Try to use injected auth/user from layout (provided via AppLayout.vue)
@@ -866,15 +868,19 @@ async function save() {
             // Always send time fields if available so server can create Event on new assignments
             start_time: a.start_time_hour
                 ? String(a.start_time_hour).padStart(2, '0') + ':' + String(a.start_time_min || '00').padStart(2, '0')
-                : a.start_time ?? null,
+                : (a.start_time ?? null),
             desired_time: a.desired_time_hour
                 ? String(a.desired_time_hour).padStart(2, '0') + ':' + String(a.desired_time_min || '00').padStart(2, '0')
-                : a.desired_time ?? null,
+                : (a.desired_time ?? null),
             estimated_hours: a.estimated_hours || null,
             work_item_type_id: a.work_item_type_id || null,
             size_id: a.size_id || null,
             stage_id: a.stage_id || null,
-            status_id: a.status_id || null,
+            status_id: props.hideStatus
+                ? props.defaultStatusId !== null && props.defaultStatusId !== undefined
+                    ? Number(props.defaultStatusId)
+                    : 2
+                : (a.status_id ?? null),
             amounts: typeof a.amounts === 'number' ? a.amounts : Number(a.amounts) || 0,
             amounts_unit: a.amounts_unit || 'page',
         })),

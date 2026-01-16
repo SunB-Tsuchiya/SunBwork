@@ -20,7 +20,9 @@ class MyProjectJobController extends Controller
             ->get();
         // ユーザー自身が登録した「自分用割当」を取得（ページネーション）
         $myAssignments = ProjectJobAssignmentByMyself::where('user_id', $user->id)
-            ->with(['projectJob.client', 'user', 'statusModel'])
+            ->with(['projectJob.client', 'user', 'statusModel', 'events' => function ($q) {
+                $q->orderBy('starts_at');
+            }])
             ->orderBy('created_at', 'desc')
             ->paginate(20);
         // フラッシュデータからjobid/register_flagsを取得

@@ -8,6 +8,8 @@
                     :members="members"
                     :assignments="assignments"
                     :editMode="true"
+                    :hide-status="true"
+                    :default-status-id="2"
                     :defaultUserId="defaultUserId"
                     :user-clients="userClients"
                     :user-projects="userProjects"

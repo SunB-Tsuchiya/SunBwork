@@ -17,9 +17,9 @@
                     <button class="rounded bg-blue-600 px-3 py-2 text-white" @click.prevent="search">検索</button>
                     <button class="ml-2 rounded border px-3 py-2" @click.prevent="clearSearch">クリア</button>
                 </div>
-                <div class="mb-4 md:ml-4 md:mt-0">
+                <!-- <div class="mb-4 md:ml-4 md:mt-0">
                     <button @click.prevent="gotoCreate" class="rounded bg-blue-600 px-4 py-2 text-white">新規ジョブ割り当て</button>
-                </div>
+                </div> -->
             </div>
             <div class="overflow-x-auto">
                 <table class="min-w-full border">
@@ -48,7 +48,13 @@
                     </thead>
                     <tbody>
                         <tr v-for="a in assignments.data" :key="a.id" class="cursor-pointer hover:bg-gray-50" @click.prevent="rowClick(a)">
-                            <td class="border px-4 py-2">{{ a.desired_start_date || '-' }}</td>
+                            <td class="border px-4 py-2">
+                                <div v-if="a.desired_start_date">
+                                    {{ formatDate(a.desired_start_date) }}
+                                    <span v-if="a.desired_time"> {{ formatTime(a.desired_time) }}</span>
+                                </div>
+                                <div v-else>-</div>
+                            </td>
                             <td class="border px-4 py-2">
                                 <div class="font-semibold">{{ a.title }}</div>
                                 <div class="text-sm text-gray-600">{{ projectJob.client?.name || '-' }}</div>
@@ -201,6 +207,15 @@ function formatTime(t) {
     const parts = core.split(':');
     if (parts.length >= 2) return parts[0].padStart(2, '0') + ':' + parts[1].padStart(2, '0');
     return t;
+}
+
+function formatDate(d) {
+    if (!d) return '-';
+    const s = String(d);
+    // Normalize ISO-ish or date-time strings to YYYY-MM-DD
+    if (s.includes('T')) return s.split('T')[0];
+    if (s.includes(' ')) return s.split(' ')[0];
+    return s;
 }
 
 function formatEstimatedHours(h) {

@@ -32,7 +32,7 @@
                             <th class="border px-4 py-2">送受信</th>
                             <th class="border px-4 py-2">相手</th>
                             <th class="cursor-pointer border px-4 py-2" @click.prevent="changeSort('desired_start_date')">
-                                希望日 <span v-if="isSorted('desired_start_date')">{{ sortIcon() }}</span>
+                                予定日・時刻 <span v-if="isSorted('desired_start_date')">{{ sortIcon() }}</span>
                             </th>
                             <th class="cursor-pointer border px-4 py-2" @click.prevent="changeSort('subject')">
                                 タイトル <span v-if="isSorted('subject')">{{ sortIcon() }}</span>
@@ -85,18 +85,44 @@
                                 </span>
                             </td>
                             <td class="border px-4 py-2 text-sm text-gray-700">
-                                {{ m.user?.name || (m.sender && m.sender.name) || m.project_job_assignment?.user?.name || '-' }}
+                                {{ m.user?.name || m.sender?.name || m.project_job_assignment?.user?.name || '-' }}
                             </td>
-                            <!-- m is JobAssignmentMessage; load related assignment via m.project_job_assignment? -->
                             <td class="border px-4 py-2">
-                                {{ m.desired_end_date || m.desired_at || m.project_job_assignment?.desired_start_date || '-' }}
+                                <div v-if="getFirstEvent(m)">
+                                    {{ formatDateTimeRange(
+                                        getFirstEvent(m).start || getFirstEvent(m).starts_at,
+                                        getFirstEvent(m).end || getFirstEvent(m).ends_at,
+                                    ) }}
+                                </div>
+                                <div
+                                    v-else-if="
+                                        m.desired_start_date ||
+                                        m.desired_at ||
+                                        (m.project_job_assignment &&
+                                            (m.project_job_assignment.desired_start_date || m.project_job_assignment.desired_at))
+                                    "
+                                >
+                                    {{ formatDateTimeRange(
+                                        m.desired_start_date ||
+                                            m.desired_at ||
+                                            (m.project_job_assignment &&
+                                                (m.project_job_assignment.desired_start_date || m.project_job_assignment.desired_at)),
+                                        m.desired_time || (m.project_job_assignment && m.project_job_assignment.desired_time),
+                                    ) }}
+                                </div>
+                                <div v-else>-</div>
                             </td>
                             <td class="border px-4 py-2">{{ m.title || m.subject || (m.body && m.body.slice(0, 80)) || '' }}</td>
                             <td class="border px-4 py-2">
-                                {{ m.projectJob?.client?.name || m.project_job_assignment?.projectJob?.client?.name || '-' }}
+                                {{
+                                    m.projectJob?.client?.name ||
+                                    m.project_job?.client?.name ||
+                                    m.project_job_assignment?.projectJob?.client?.name ||
+                                    '-'
+                                }}
                             </td>
                             <td class="border px-4 py-2">
-                                <template v-if="!(m.read_at || m.project_job_assignment?.read_at)">
+                                <template v-if="!(m.read_at || m.readAt || m.project_job_assignment?.read_at)">
                                     <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800"
                                         >未読</span
                                     >
@@ -107,7 +133,7 @@
                             </td>
                             <td class="border px-4 py-2">
                                 <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">{{
-                                    m.statusModel?.name || m.status_label || ''
+                                    m.statusModel?.name || m.status_label || m.status_name || ''
                                 }}</span>
                             </td>
                         </tr>
@@ -213,6 +239,121 @@ function navigateTo(url) {
     }
 }
 
+function formatDate(d) {
+    if (!d) return '-';
+    try {
+        const s = String(d).split('T')[0];
+        return s;
+    } catch (e) {
+        return String(d).split('T')[0] || '-';
+    }
+}
+
+function formatTime(t) {
+    if (!t) return '';
+    const core = String(t).split('.')[0];
+    const parts = core.split(':');
+    if (parts.length >= 2) return parts[0].padStart(2, '0') + ':' + parts[1].padStart(2, '0');
+    return t;
+}
+
+function formatDateTimeRange(start, end) {
+    if (!start && !end) return '-';
+
+    let s = start == null ? '' : String(start);
+    let e = end == null ? '' : String(end);
+
+    // If start contains a full range like "2026-01-12T09:00-2026-01-12T17:00" and end is empty,
+    // split it into start and end parts.
+    if ((!e || e === '') && s.includes('T') && s.includes('-')) {
+        const parts = s.split('-');
+        if (parts.length >= 2) {
+            const left = parts[0];
+            const right = parts.slice(1).join('-');
+            s = left;
+            e = right;
+        }
+    }
+
+    // If end contains a full range and start is a date-only string, pick times from end.
+    if (e && e.includes('T') && e.includes('-') && !(s.includes('T') || s.includes(':'))) {
+        const parts = e.split('-');
+        if (parts.length >= 2) {
+            const left = parts[0];
+            const right = parts.slice(1).join('-');
+            // left holds a datetime for the start time, right holds datetime for end time
+            const startDate = formatDate(s);
+            const startTime = formatTime(left);
+            const endTime = formatTime(right);
+            if (startTime && endTime) return `${startDate} ${startTime}-${endTime}`;
+            if (startTime) return `${startDate} ${startTime}`;
+            return startDate;
+        }
+    }
+
+    const startDate = s ? formatDate(s) : '';
+    const endDate = e ? formatDate(e) : '';
+
+    // extract time parts
+    function extractTimeFrom(str, preferLastSegment = false) {
+        if (!str) return '';
+        // if it's a combined range like "09:00-17:00"
+        if (str.includes('-') && !str.includes('T')) {
+            const p = str.split('-');
+            return preferLastSegment ? formatTime(p[p.length - 1]) : formatTime(p[0]);
+        }
+        // if contains 'T', take substring after 'T' up to end or before '-' if present
+        if (str.includes('T')) {
+            const afterT = str.split('T')[1] || '';
+            const beforeDash = afterT.split('-')[0];
+            return formatTime(beforeDash);
+        }
+        // if contains space-separated time
+        if (str.includes(' ')) {
+            const parts = str.split(' ');
+            return formatTime(parts[1] || parts[0]);
+        }
+        // otherwise treat as time
+        return formatTime(str);
+    }
+
+    const startTime = extractTimeFrom(s, false);
+    const endTime = extractTimeFrom(e, true);
+
+    if (startDate && endDate && startDate === endDate) {
+        if (startTime || endTime) return `${startDate} ${startTime || ''}${endTime ? '-' + endTime : ''}`.trim();
+        return `${startDate}`;
+    }
+
+    if (startDate && endDate) {
+        if (startTime && endTime) return `${startDate} ${startTime}-${endDate} ${endTime}`;
+        if (startTime) return `${startDate} ${startTime}-${endDate}`;
+        return `${startDate}-${endDate}`;
+    }
+
+    if (startDate) return startTime ? `${startDate} ${startTime}` : `${startDate}`;
+    if (endDate) return endTime ? `${endDate} ${endTime}` : `${endDate}`;
+    return '-';
+}
+
+function getFirstEvent(m) {
+    // m.events may be an array or a paginated object { data: [...] }
+    try {
+        if (m.events) {
+            if (Array.isArray(m.events) && m.events.length) return m.events[0];
+            if (m.events.data && Array.isArray(m.events.data) && m.events.data.length) return m.events.data[0];
+        }
+        if (m.project_job_assignment && m.project_job_assignment.events) {
+            const e = m.project_job_assignment.events;
+            if (Array.isArray(e) && e.length) return e[0];
+            if (e.data && Array.isArray(e.data) && e.data.length) return e.data[0];
+        }
+    } catch (e) {
+        // defensive: ignore and return null
+    }
+    return null;
+}
+
 function getBackLink() {
     try {
         if (props.projectJob && props.projectJob.id) {
@@ -270,7 +411,10 @@ async function rowClick(m, event) {
             }
 
             try {
-                const res = await fetch(eventsUrl, { credentials: 'same-origin', headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
+                const res = await fetch(eventsUrl, {
+                    credentials: 'same-origin',
+                    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                });
                 if (res.ok) {
                     const payload = await res.json();
                     if (Array.isArray(payload) && payload.length > 0) {

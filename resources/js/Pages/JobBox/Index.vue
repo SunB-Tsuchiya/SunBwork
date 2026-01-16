@@ -17,13 +17,13 @@
                     <button class="rounded bg-blue-600 px-3 py-2 text-white" @click.prevent="search">検索</button>
                     <button class="ml-2 rounded border px-3 py-2" @click.prevent="clearSearch">クリア</button>
                 </div>
-                <div class="mb-4 md:ml-4 md:mt-0">
+                <!-- <div class="mb-4 md:ml-4 md:mt-0">
                     <Link
                         :href="typeof route === 'function' ? route('project_jobs.assignments.create_user') : '/project_jobs/assignments/create-user'"
                         class="rounded bg-blue-600 px-4 py-2 text-white"
                         >新規ジョブ作成</Link
                     >
-                </div>
+                </div> -->
             </div>
             <div class="overflow-x-auto">
                 <table class="min-w-full border">
