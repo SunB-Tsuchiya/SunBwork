@@ -177,6 +177,60 @@ class JobBoxController extends Controller
         ]);
     }
 
+    /**
+     * User-scoped jobbox: show job messages where the assignment's user_id is the
+     * authenticated user. This returns only messages for which the current user
+     * is the assignee (project_job_assignments.user_id == auth id).
+     */
+    public function user(Request $request)
+    {
+        $user = $request->user();
+        if (! $user) {
+            return redirect()->route('login');
+        }
+
+        $q = $request->input('q');
+        $sort = $request->input('sort');
+        $dir = strtolower($request->input('dir', 'desc')) === 'asc' ? 'asc' : 'desc';
+
+        $base = JobAssignmentMessage::select('job_assignment_messages.*')
+            ->join('project_job_assignments', 'job_assignment_messages.project_job_assignment_id', '=', 'project_job_assignments.id')
+            ->leftJoin('users as senders', 'job_assignment_messages.sender_id', '=', 'senders.id')
+            ->where('project_job_assignments.user_id', $user->id);
+
+        if ($q) {
+            $base->where(function ($sub) use ($q) {
+                $sub->where('job_assignment_messages.subject', 'like', "%{$q}%")->orWhere('job_assignment_messages.body', 'like', "%{$q}%");
+            });
+        }
+
+        switch ($sort) {
+            case 'desired_start_date':
+                $base->orderBy('project_job_assignments.desired_start_date', $dir);
+                break;
+            case 'sender':
+                $base->orderBy('senders.name', $dir);
+                break;
+            case 'subject':
+                $base->orderBy('job_assignment_messages.subject', $dir);
+                break;
+            default:
+                $base->orderBy('job_assignment_messages.created_at', 'desc');
+        }
+
+        $messages = $base->with(['sender', 'message.recipients.user', 'message.fromUser', 'projectJobAssignment.projectJob.client', 'projectJobAssignment.statusModel', 'projectJobAssignment.user'])
+            ->paginate(20)
+            ->appends(array_filter(['q' => $q, 'sort' => $sort, 'dir' => $dir]));
+
+        return inertia('JobBox/Index', [
+            'projectJob' => null,
+            'messages' => $messages,
+            'q' => $q,
+            'sort' => $sort,
+            'dir' => $dir,
+        ]);
+    }
+
     public function show(ProjectJob $projectJob, JobAssignmentMessage $message)
     {
         // Authorization: allow privileged roles or assigned users only

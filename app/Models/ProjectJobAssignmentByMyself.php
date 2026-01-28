@@ -15,6 +15,7 @@ class ProjectJobAssignmentByMyself extends Model
     protected $fillable = [
         'project_job_id',
         'user_id',
+        'linked_assignment_id',
         'estimated_hours',
         'title',
         'detail',
@@ -45,6 +46,7 @@ class ProjectJobAssignmentByMyself extends Model
         'desired_at' => 'datetime',
         'desired_end_date' => 'date:Y-m-d',
         'desired_time' => 'string',
+        'linked_assignment_id' => 'integer',
         'estimated_hours' => 'float',
         'assigned' => 'boolean',
         'completed' => 'boolean',

@@ -41,6 +41,7 @@ class ProjectJobAssignmentController extends Controller
             'assignments.*.amounts' => 'nullable|integer|min:0',
             'assignments.*.amounts_unit' => 'nullable|string|in:page,file',
             'assignments.*.sender_id' => 'nullable|exists:users,id',
+            'assignments.*.linked_assignment_id' => 'nullable|exists:project_job_assignments,id',
         ]);
 
         // validated payload received (debug logging removed)
@@ -81,6 +82,7 @@ class ProjectJobAssignmentController extends Controller
                     'department_id' => $a['department_id'] ?? null,
                     'amounts' => $a['amounts'] ?? null,
                     'amounts_unit' => $a['amounts_unit'] ?? null,
+                    'linked_assignment_id' => $a['linked_assignment_id'] ?? null,
                 ];
 
                 // legacy difficulty string column removed from payload
@@ -255,28 +257,15 @@ class ProjectJobAssignmentController extends Controller
      */
     public function update(Request $request, ProjectJob $projectJob, ProjectJobAssignment $assignment)
     {
-        // Debug: log authentication and assignment info to help diagnose 403
-        try {
-            \Illuminate\Support\Facades\Log::info('ProjectJobAssignment:update attempt', [
-                'auth_id' => $request->user() ? $request->user()->id : null,
-                'assignment_id' => $assignment->id,
-                'assignment_user_id' => $assignment->user_id,
-                'assignment_sender_id' => $assignment->sender_id,
-                'session_id' => session()->getId(),
-                'cookies' => array_keys($request->cookies->all()),
-            ]);
-        } catch (\Throwable $__e) {
-            // ignore logging errors
-        }
-
-        $this->authorize('update', $assignment);
+        // For user-edit flow: do not modify the canonical `project_job_assignments` row.
+        // Instead, create or update a `ProjectJobAssignmentByMyself` record linked to the
+        // canonical assignment and optionally update/create the Event linked to that by-myself record.
 
         $data = $request->validate([
             'title' => 'required|string|max:255',
             'detail' => 'nullable|string',
             'difficulty_id' => 'nullable|exists:difficulties,id',
             'estimated_hours' => 'nullable|numeric|min:0',
-            // scheduling fields removed: desired_start_date/start_time
             'desired_end_date' => 'nullable|date',
             'desired_time' => 'nullable|date_format:H:i',
             'work_item_type_id' => 'nullable|exists:work_item_types,id',
@@ -290,48 +279,113 @@ class ProjectJobAssignmentController extends Controller
             'user_id' => 'nullable|exists:users,id',
         ]);
 
-        DB::transaction(function () use ($assignment, $data) {
-            // map fields
-            $assignment->title = $data['title'];
-            $assignment->detail = $data['detail'] ?? $assignment->detail;
-            if (isset($data['difficulty_id'])) $assignment->difficulty_id = $data['difficulty_id'];
-            if (isset($data['desired_end_date'])) $assignment->desired_end_date = $data['desired_end_date'];
-            if (isset($data['desired_time'])) $assignment->desired_time = $data['desired_time'];
-            if (isset($data['estimated_hours'])) $assignment->estimated_hours = $data['estimated_hours'];
-            if (isset($data['work_item_type_id'])) $assignment->work_item_type_id = $data['work_item_type_id'];
-            if (isset($data['size_id'])) $assignment->size_id = $data['size_id'];
-            if (isset($data['stage_id'])) $assignment->stage_id = $data['stage_id'];
-            if (isset($data['status_id'])) $assignment->status_id = $data['status_id'];
-            if (isset($data['company_id'])) $assignment->company_id = $data['company_id'];
-            if (isset($data['department_id'])) $assignment->department_id = $data['department_id'];
-            if (isset($data['amounts'])) $assignment->amounts = $data['amounts'];
-            if (isset($data['amounts_unit'])) $assignment->amounts_unit = $data['amounts_unit'];
-            if (isset($data['user_id'])) $assignment->user_id = $data['user_id'];
+        $user = $request->user();
 
-            $assignment->save();
+        DB::transaction(function () use ($assignment, $data, $user) {
+            // Find existing by-myself record for this canonical assignment and user
+            $by = ProjectJobAssignmentByMyself::where('linked_assignment_id', $assignment->id)
+                ->where('user_id', $user ? $user->id : null)
+                ->first();
 
-            // Update linked event if present
+            $payload = [
+                'project_job_id' => $assignment->project_job_id ?? null,
+                'linked_assignment_id' => $assignment->id,
+                'user_id' => $user ? $user->id : null,
+                'sender_id' => $user ? $user->id : null,
+                'title' => $data['title'],
+                'detail' => $data['detail'] ?? null,
+                'difficulty_id' => $data['difficulty_id'] ?? null,
+                'desired_end_date' => $data['desired_end_date'] ?? null,
+                'desired_time' => $data['desired_time'] ?? null,
+                'estimated_hours' => $data['estimated_hours'] ?? null,
+                'work_item_type_id' => $data['work_item_type_id'] ?? null,
+                'size_id' => $data['size_id'] ?? null,
+                'stage_id' => $data['stage_id'] ?? null,
+                'status_id' => $data['status_id'] ?? null,
+                'company_id' => $data['company_id'] ?? $assignment->company_id ?? null,
+                'department_id' => $data['department_id'] ?? $assignment->department_id ?? null,
+                'amounts' => $data['amounts'] ?? $assignment->amounts ?? null,
+                'amounts_unit' => $data['amounts_unit'] ?? $assignment->amounts_unit ?? null,
+            ];
+
+            if ($by) {
+                $by->fill($payload);
+                $by->save();
+            } else {
+                $by = ProjectJobAssignmentByMyself::create($payload);
+            }
+
+            // Update or create Event linked to the by-myself assignment id
             try {
                 if (Schema::hasTable('events') && Schema::hasColumn('events', 'project_job_assignment_id')) {
-                    $event = Event::where('project_job_assignment_id', $assignment->id)->first();
-                    if ($event) {
-                        // rebuild event title/description and start/end if desired dates provided
-                        $event->title = $assignment->title;
-                        $lines = [];
-                        $lines[] = 'ジョブ名: ' . ($assignment->title ?? '');
-                        $lines[] = 'クライアント: ' . ($assignment->projectJob && $assignment->projectJob->client ? ($assignment->projectJob->client->name ?? '-') : '-');
-                        $lines[] = '難易度: ' . ($assignment->difficultyModel?->name ?? '-');
-                        $lines[] = '見積時間: ' . ($assignment->estimated_hours ?? '-');
-                        $lines[] = '詳細:';
-                        $lines[] = $assignment->detail ?? '';
-                        $event->description = implode("\n", $lines);
+                    $event = Event::where('project_job_assignment_id', $by->id)->first();
+                    // Build description
+                    $lines = [];
+                    $lines[] = 'ジョブ名: ' . ($by->title ?? '');
+                    $lines[] = 'クライアント: ' . ($assignment->projectJob && $assignment->projectJob->client ? ($assignment->projectJob->client->name ?? '-') : '-');
+                    $lines[] = '難易度: ' . ($by->difficultyModel?->name ?? '-');
+                    $lines[] = '見積時間: ' . ($by->estimated_hours ?? '-');
+                    $lines[] = '詳細:';
+                    $lines[] = $by->detail ?? '';
 
-                        // scheduling fields removed: do not update event start/end here
+                    // assemble start/end if desired_end_date provided
+                    $eventStart = null;
+                    $eventEnd = null;
+                    try {
+                        if (!empty($by->desired_end_date)) {
+                            $datePart = $by->desired_end_date;
+                            $startTimePart = $by->start_time ?? null;
+                            $endTimePart = $by->desired_time ?? null;
+                            if (empty($startTimePart) && (isset($by->start_time_hour) || isset($by->start_time_min))) {
+                                $sh = isset($by->start_time_hour) ? sprintf('%02d', $by->start_time_hour) : '09';
+                                $sm = isset($by->start_time_min) ? sprintf('%02d', $by->start_time_min) : '00';
+                                $startTimePart = $sh . ':' . $sm;
+                            }
+                            if (empty($endTimePart) && (isset($by->desired_time_hour) || isset($by->desired_time_min))) {
+                                $eh = isset($by->desired_time_hour) ? sprintf('%02d', $by->desired_time_hour) : '10';
+                                $em = isset($by->desired_time_min) ? sprintf('%02d', $by->desired_time_min) : '00';
+                                $endTimePart = $eh . ':' . $em;
+                            }
+                            if ($startTimePart) $eventStart = \Carbon\Carbon::parse($datePart . ' ' . $startTimePart);
+                            if ($endTimePart) $eventEnd = \Carbon\Carbon::parse($datePart . ' ' . $endTimePart);
+                        }
+                    } catch (\Throwable $__pe) {
+                    }
+
+                    if ($event) {
+                        $event->title = $by->title ?? $event->title;
+                        $event->description = implode("\n", $lines);
+                        if ($eventStart) {
+                            $event->start = $eventStart->toDateTimeString();
+                            if (Schema::hasColumn('events', 'starts_at')) $event->starts_at = $eventStart->toDateTimeString();
+                        }
+                        if ($eventEnd) {
+                            $event->end = $eventEnd->toDateTimeString();
+                            if (Schema::hasColumn('events', 'ends_at')) $event->ends_at = $eventEnd->toDateTimeString();
+                        }
+                        $event->save();
+                    } else {
+                        // create new event and link it to the by-myself assignment
+                        $event = new Event();
+                        $event->user_id = $user ? $user->id : null;
+                        $event->title = $by->title ?? '割当予定';
+                        $event->description = implode("\n", $lines);
+                        if ($eventStart) {
+                            $event->start = $eventStart->toDateTimeString();
+                            if (Schema::hasColumn('events', 'starts_at')) $event->starts_at = $eventStart->toDateTimeString();
+                        }
+                        if ($eventEnd) {
+                            $event->end = $eventEnd->toDateTimeString();
+                            if (Schema::hasColumn('events', 'ends_at')) $event->ends_at = $eventEnd->toDateTimeString();
+                        }
+                        if (Schema::hasColumn('events', 'project_job_assignment_id')) {
+                            $event->project_job_assignment_id = $by->id;
+                        }
                         $event->save();
                     }
                 }
             } catch (\Throwable $__e) {
-                // non-fatal
+                \Illuminate\Support\Facades\Log::warning('Failed to update/create Event for ProjectJobAssignmentByMyself', ['error' => $__e->getMessage()]);
             }
         });
 

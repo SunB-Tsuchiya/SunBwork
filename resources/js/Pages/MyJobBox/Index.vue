@@ -29,8 +29,8 @@
                 <table class="min-w-full border">
                     <thead>
                         <tr class="bg-gray-100">
-                            <th class="border px-4 py-2">送受信</th>
-                            <th class="border px-4 py-2">相手</th>
+                            <!-- <th class="border px-4 py-2">送受信</th>
+                            <th class="border px-4 py-2">相手</th> -->
                             <th class="cursor-pointer border px-4 py-2" @click.prevent="changeSort('desired_start_date')">
                                 予定日・時刻 <span v-if="isSorted('desired_start_date')">{{ sortIcon() }}</span>
                             </th>
@@ -38,7 +38,7 @@
                                 タイトル <span v-if="isSorted('subject')">{{ sortIcon() }}</span>
                             </th>
                             <th class="border px-4 py-2">クライアント</th>
-                            <th class="border px-4 py-2">既読</th>
+                            <!-- <th class="border px-4 py-2">既読</th> -->
                             <th class="border px-4 py-2">ステータス</th>
                         </tr>
                     </thead>
@@ -50,7 +50,7 @@
                             @click.prevent="rowClick(m, $event)"
                             role="button"
                         >
-                            <td class="border px-4 py-2">
+                            <!-- <td class="border px-4 py-2">
                                 <span class="inline-flex items-center gap-2">
                                     <span
                                         :class="
@@ -86,13 +86,15 @@
                             </td>
                             <td class="border px-4 py-2 text-sm text-gray-700">
                                 {{ m.user?.name || m.sender?.name || m.project_job_assignment?.user?.name || '-' }}
-                            </td>
+                            </td> -->
                             <td class="border px-4 py-2">
                                 <div v-if="getFirstEvent(m)">
-                                    {{ formatDateTimeRange(
-                                        getFirstEvent(m).start || getFirstEvent(m).starts_at,
-                                        getFirstEvent(m).end || getFirstEvent(m).ends_at,
-                                    ) }}
+                                    {{
+                                        formatDateTimeRange(
+                                            getFirstEvent(m).start || getFirstEvent(m).starts_at,
+                                            getFirstEvent(m).end || getFirstEvent(m).ends_at,
+                                        )
+                                    }}
                                 </div>
                                 <div
                                     v-else-if="
@@ -102,13 +104,15 @@
                                             (m.project_job_assignment.desired_start_date || m.project_job_assignment.desired_at))
                                     "
                                 >
-                                    {{ formatDateTimeRange(
-                                        m.desired_start_date ||
-                                            m.desired_at ||
-                                            (m.project_job_assignment &&
-                                                (m.project_job_assignment.desired_start_date || m.project_job_assignment.desired_at)),
-                                        m.desired_time || (m.project_job_assignment && m.project_job_assignment.desired_time),
-                                    ) }}
+                                    {{
+                                        formatDateTimeRange(
+                                            m.desired_start_date ||
+                                                m.desired_at ||
+                                                (m.project_job_assignment &&
+                                                    (m.project_job_assignment.desired_start_date || m.project_job_assignment.desired_at)),
+                                            m.desired_time || (m.project_job_assignment && m.project_job_assignment.desired_time),
+                                        )
+                                    }}
                                 </div>
                                 <div v-else>-</div>
                             </td>
@@ -121,7 +125,7 @@
                                     '-'
                                 }}
                             </td>
-                            <td class="border px-4 py-2">
+                            <!-- <td class="border px-4 py-2">
                                 <template v-if="!(m.read_at || m.readAt || m.project_job_assignment?.read_at)">
                                     <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800"
                                         >未読</span
@@ -130,11 +134,22 @@
                                 <template v-else>
                                     <span class="text-sm text-gray-600">既読</span>
                                 </template>
-                            </td>
+                            </td> -->
                             <td class="border px-4 py-2">
-                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">{{
-                                    m.statusModel?.name || m.status_label || m.status_name || ''
-                                }}</span>
+                                <TooltipProvider :delay-duration="0">
+                                    <Tooltip>
+                                        <TooltipTrigger>
+                                            <span
+                                                :class="statusBadgeClass(getAssignmentStatus(m))"
+                                                class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+                                            >
+                                                <span v-html="statusIcon(getAssignmentStatus(m))" class="mr-1 inline-flex h-3 w-3"></span>
+                                                {{ getAssignmentStatus(m) }}
+                                            </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent class="jobbox-tooltip max-w-xs">{{ statusTooltip(getAssignmentStatus(m)) }}</TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
                             </td>
                         </tr>
                     </tbody>
@@ -173,9 +188,10 @@
 </template>
 
 <script setup>
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
-import { computed, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 const props = defineProps({ projectJob: Object, messages: Object, myAssignments: Object });
 const page = usePage();
 page.props.q_model = page.props.q || '';
@@ -186,7 +202,27 @@ const currentDir = page.props.dir || 'desc';
 const sortState = reactive({ sort: currentSort, dir: currentDir });
 
 const localMessages = ref(props.messages?.data || []);
-const displayMessages = computed(() => props.messages?.data || localMessages.value);
+const displayMessages = computed(() => {
+    const arr = Array.isArray(localMessages.value) ? localMessages.value : [];
+    const byAssign = new Map();
+    for (const m of arr) {
+        const aid = m.project_job_assignment && m.project_job_assignment.id ? String(m.project_job_assignment.id) : `noassign-${m.id}`;
+        if (!byAssign.has(aid)) {
+            byAssign.set(aid, m);
+            continue;
+        }
+        // prefer the most recently created message
+        const existing = byAssign.get(aid);
+        const eCreated = existing && existing.created_at ? new Date(existing.created_at) : null;
+        const mCreated = m && m.created_at ? new Date(m.created_at) : null;
+        if (!eCreated && mCreated) {
+            byAssign.set(aid, m);
+        } else if (eCreated && mCreated && mCreated > eCreated) {
+            byAssign.set(aid, m);
+        }
+    }
+    return Array.from(byAssign.values());
+});
 
 function isSorted(key) {
     return sortState.sort === key;
@@ -194,36 +230,6 @@ function isSorted(key) {
 
 function sortIcon() {
     return sortState.dir === 'asc' ? '▲' : '▼';
-}
-
-function deleteMessage(m) {
-    if (!confirm('このメッセージを本当に削除しますか？この操作は取り消せません。')) return;
-    router.delete(route('coordinator.project_jobs.jobbox.destroy', { projectJob: props.projectJob?.id, message: m.id }), {
-        onSuccess: () => {
-            router.reload();
-        },
-        onError: (errors) => {
-            console.error('deleteMessage error', errors);
-            alert('削除に失敗しました。');
-        },
-    });
-}
-
-function sendFromMessage(m) {
-    if (!confirm('このジョブ情報を発信しますか？')) return;
-    const to = m.project_job_assignment?.user_id ? [m.project_job_assignment.user_id] : [];
-    const payload = {
-        project_job_assignment_id: m.project_job_assignment?.id || null,
-        to: to,
-        subject: m.subject || m.project_job_assignment?.title || null,
-        body: m.body || null,
-        attachments: [],
-    };
-    router.post(route('coordinator.project_jobs.jobbox.store', { projectJob: props.projectJob?.id }), payload, {
-        onSuccess: () => {
-            alert('発信しました。');
-        },
-    });
 }
 
 function navigateTo(url) {
@@ -452,4 +458,255 @@ async function rowClick(m, event) {
         }
     }
 }
+
+function getAssignmentStatus(m) {
+    try {
+        // Prefer canonical status object when available (in assignment.status.key)
+        const jam = m || {};
+        const assignment = m || {};
+
+        const statusKey = (assignment.status && assignment.status.key) || (jam.status && jam.status.key) || null;
+        if (statusKey) {
+            switch (statusKey) {
+                case 'completed':
+                    return '完了';
+                case 'scheduled':
+                    return 'セット済み';
+                case 'confirmed':
+                    return '確認済み';
+                case 'received':
+                    return '受信済み';
+                // legacy slugs fallback
+                case 'order':
+                    return '受信済み';
+                case 'in_progress':
+                    return '受信済み';
+                default:
+                    // unknown key — fall back to flag logic below
+                    break;
+            }
+        }
+
+        // Fallback for older data shapes: use existing flag/timestamp heuristics
+        const completed = Boolean(jam.completed) || Boolean(assignment.completed);
+        if (completed) return '完了';
+
+        const scheduled = Boolean(jam.scheduled) || Boolean(assignment.scheduled) || Boolean(assignment.scheduled_at);
+        if (scheduled) return 'セット済み';
+
+        const accepted = Boolean(jam.accepted) || Boolean(assignment.accepted);
+        const readAt = jam.read_at || assignment.read_at || null;
+        // If message has been read but not necessarily accepted, show '既読済み'
+        if (readAt) {
+            if (accepted) return '確認済み';
+            return '既読済み';
+        }
+        if (accepted) return '受信済み';
+
+        return '-';
+    } catch (err) {
+        return '-';
+    }
+}
+
+function statusBadgeClass(status) {
+    const s = status || '';
+    switch (s) {
+        case '完了':
+            // Match calendar completed color (yellow)
+            return 'bg-yellow-100 text-yellow-800';
+        case 'セット済み':
+            // Scheduled matches calendar blue
+            return 'bg-blue-100 text-blue-800';
+        case '確認済み':
+            // Confirmed -> green to align with calendar/positive state
+            return 'bg-green-100 text-green-800';
+        case '受信済み':
+            return 'bg-indigo-100 text-indigo-800';
+        case '既読済み':
+            return 'bg-gray-100 text-gray-700';
+        default:
+            return 'bg-gray-100 text-gray-700';
+    }
+}
+
+function statusTooltip(status) {
+    switch (status) {
+        case '完了':
+            return '作業が完了しています。';
+        case 'セット済み':
+            return '作業の予定がカレンダーにセットされています。';
+        case '確認済み':
+            return '受信者が内容を確認しました（既読）。';
+        case '受信済み':
+            return '受信者にメッセージが届いています（未確認）。';
+        case '既読済み':
+            return '既に既読となっています。';
+        default:
+            return '';
+    }
+}
+
+function statusIcon(status) {
+    // return small SVG icons as strings
+    switch (status) {
+        case '完了':
+            return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3 text-yellow-800"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 00-1.414-1.414L7 12.172 4.707 9.879a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l9-9z" clip-rule="evenodd"/></svg>`;
+        case 'セット済み':
+            return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3 text-blue-800"><path d="M6 2a1 1 0 000 2h8a1 1 0 100-2H6zM3 6a1 1 0 011-1h12a1 1 0 011 1v9a2 2 0 01-2 2H5a2 2 0 01-2-2V6z"/></svg>`;
+        case '確認済み':
+            return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3 text-green-800"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zM9 7h2v5H9V7zm0 7h2v2H9v-2z"/></svg>`;
+        case '受信済み':
+            return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3 text-indigo-800"><path d="M2 5a2 2 0 012-2h12a2 2 0 012 2v1l-8 4.5L2 6V5z"/><path d="M18 8.118V15a2 2 0 01-2 2H4a2 2 0 01-2-2V8.118l8 4.5 8-4.5z"/></svg>`;
+        case '既読済み':
+            return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3 text-gray-800"><path d="M3 5a1 1 0 011-1h12a1 1 0 011 1v9a2 2 0 01-2 2H5a2 2 0 01-2-2V5z"/></svg>`;
+        default:
+            return '';
+    }
+}
+
+function changeSort(key) {
+    // toggle direction if same key
+    if (sortState.sort === key) {
+        sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+        sortState.sort = key;
+        sortState.dir = 'asc';
+    }
+
+    const pjId = props.projectJob?.id;
+    const params = { q: page.props.q_model, sort: sortState.sort, dir: sortState.dir };
+    try {
+        // if (pjId) {
+        //     const r =
+        //         page.props.auth.user && page.props.auth.user.isCoordinator ? 'coordinator.project_jobs.jobbox.index' : 'project_jobs.jobbox.index';
+        //     router.get(route(r, { projectJob: pjId }), params, { preserveState: false });
+        //     return;
+        // }
+        // global jobbox route: named 'project_jobs.index' or fallback route
+        router.get(route('project_jobs.index'), params, { preserveState: false });
+    } catch (err) {
+        // fallback: reload current url with query params
+        router.get(window.location.pathname, params, { preserveState: false });
+    }
+}
+
+onMounted(() => {
+    try {
+        // debugger;
+        // console.log('DEBUG page.props', page.props);
+        const authUser = page.props.auth.user;
+        if (!authUser || !window.Echo) return;
+        const channel = window.Echo.private('jobmessages.' + authUser.id);
+        channel.listen('JobMessageCreated', async (e) => {
+            // event payload received (silently handled)
+            // DO NOT show a page-local toast here; toasts are centralized in AppLayout
+            // to avoid duplicate toasts across the app.
+
+            // If the event includes a full jam payload, use it. Otherwise, if only an id is provided,
+            // attempt to fetch the jam via a lightweight endpoint.
+            try {
+                let jam = null;
+                if (e.jam) {
+                    jam = e.jam;
+                } else if (e.job_assignment_message_id) {
+                    // Try to fetch the jam item from the server (lightweight show endpoint)
+                    try {
+                        const resp = await fetch(route('api.jobbox.show', { id: e.job_assignment_message_id }), {
+                            credentials: 'same-origin',
+                            headers: { Accept: 'application/json' },
+                        });
+                        if (resp.ok) {
+                            const json = await resp.json();
+                            jam = json.data || json;
+                        }
+                    } catch (fetchErr) {
+                        // fetch jam failed (non-fatal)
+                    }
+                }
+
+                const newJamBase = jam
+                    ? { ...jam }
+                    : {
+                          id: e.job_assignment_message_id || e.message_id || `tmp-${Date.now()}`,
+                          subject: e.subject || null,
+                          body: e.jam && e.jam.body ? e.jam.body : null,
+                          sender: {
+                              name: e.from_user_name || null,
+                              id: e.from_user_id || (e.jam && e.jam.sender && e.jam.sender.id ? e.jam.sender.id : null),
+                          },
+                          project_job_assignment: null,
+                          read_at: e.jam && e.jam.read_at ? e.jam.read_at : null,
+                          from_user_id: e.from_user_id || (e.jam && e.jam.sender && e.jam.sender.id ? e.jam.sender.id : null),
+                      };
+
+                // If body contains an inline desired_start_date, try to extract YYYY-MM-DD and populate the preview
+                try {
+                    const bodyHtml = (newJamBase.body || '') + (e.jam && e.jam.body ? e.jam.body : '');
+                    const match =
+                        bodyHtml.match(/希望開始日[:：\s]*([0-9]{4}-[0-9]{2}-[0-9]{2})/i) ||
+                        bodyHtml.match(/希望日[:：\s]*([0-9]{4}-[0-9]{2}-[0-9]{2})/i);
+                    if (match && match[1]) {
+                        newJamBase.project_job_assignment = newJamBase.project_job_assignment || {};
+                        newJamBase.project_job_assignment.desired_start_date = match[1];
+                    } else if (e.jam && e.jam.project_job_assignment && e.jam.project_job_assignment.desired_start_date) {
+                        newJamBase.project_job_assignment = newJamBase.project_job_assignment || {};
+                        newJamBase.project_job_assignment.desired_start_date = e.jam.project_job_assignment.desired_start_date;
+                    }
+                    // Prefer jam-level read_at if provided
+                    if (e.jam && e.jam.read_at) {
+                        newJamBase.read_at = e.jam.read_at;
+                    }
+                } catch (err) {
+                    // ignore parsing errors
+                }
+
+                const newJam = { ...newJamBase, __is_new: true };
+
+                // Prepend and keep pagination length consistent
+                localMessages.value.unshift(newJam);
+                const perPage = props.messages?.per_page || 20;
+                if (localMessages.value.length > perPage) {
+                    localMessages.value.splice(perPage);
+                }
+
+                // If server provided total, increment it in a local shadow so UI shows updated total
+                try {
+                    if (!props.messages) props.messages = {};
+                    props.messages.total = (props.messages.total || localMessages.value.length) + 1;
+                } catch (err) {
+                    // non-fatal
+                }
+
+                // Clear the new highlight after 20 seconds
+                setTimeout(() => {
+                    const idx = localMessages.value.findIndex((x) => x.id === newJam.id);
+                    if (idx >= 0) {
+                        localMessages.value[idx].__is_new = false;
+                    }
+                }, 20000);
+            } catch (err) {
+                // JobMessageCreated handling failed (non-fatal)
+            }
+        });
+
+        // Listen for JobMessageRead so the UI can mark specific JAM rows as read in real-time.
+        channel.listen('JobMessageRead', (e) => {
+            try {
+                const mid = e && e.message_id ? e.message_id : null;
+                if (!mid) return;
+                const idx = localMessages.value.findIndex((x) => Number(x.id) === Number(mid));
+                if (idx >= 0) {
+                    // Prefer the read_at timestamp from the event payload when available
+                    const eventReadAt = e && e.read_at ? e.read_at : null;
+                    localMessages.value[idx].read_at = eventReadAt || new Date().toISOString();
+                }
+            } catch (err) {
+                // non-fatal
+            }
+        });
+    } catch (err) {
+        // JobBox Echo subscribe failed (non-fatal)
+    }
+});
 </script>

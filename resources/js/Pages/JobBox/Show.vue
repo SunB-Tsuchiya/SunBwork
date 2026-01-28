@@ -158,16 +158,16 @@
                         </div>
 
                         <div class="mt-2 text-right">
-                            <div v-if="assignment.linked_assignment_id">
+                            <div v-if="linkedAssignmentId">
                                 <Link
                                     :href="
                                         route('coordinator.project_jobs.assignments.show', {
                                             projectJob: projectJob.id,
-                                            assignment: assignment.linked_assignment_id,
+                                            assignment: linkedAssignmentId,
                                         })
                                     "
                                     class="ml-3 text-sm text-blue-600"
-                                    >割当を見る (#{{ assignment.linked_assignment_id }})</Link
+                                    >割当を見る (#{{ linkedAssignmentId }})</Link
                                 >
                             </div>
                         </div>
@@ -205,7 +205,11 @@
                             <!-- If assignee and not scheduled, show the regular '予定をセット' button -->
                             <Link
                                 v-else
-                                :href="route('events.create', { job: assignment.id })"
+                                :href="
+                                    linkedAssignmentId
+                                        ? route('project_jobs.assignments.edit_user') + '?job=' + encodeURIComponent(linkedAssignmentId)
+                                        : route('events.create', { job: assignment.id })
+                                "
                                 class="rounded bg-blue-500 px-3 py-2 text-sm text-white hover:bg-blue-600"
                             >
                                 予定をセット
@@ -372,6 +376,19 @@ const displayStatus = computed(() => {
     return assignment?.status?.name || assignment?.statusModel?.name || assignment?.statusModel?.label || assignment?.status_label || '-';
 });
 
+const linkedAssignmentId = computed(() => {
+    try {
+        return (
+            assignment?.linked_assignment_id ||
+            assignment?.project_job_assignment_id ||
+            (assignment?.project_job_assignment && assignment.project_job_assignment.id) ||
+            null
+        );
+    } catch (e) {
+        return null;
+    }
+});
+
 const isAssignee = computed(() => {
     try {
         return page.props.auth.user && assignment && assignment.user && page.props.auth.user.id === assignment.user.id;
@@ -414,7 +431,30 @@ const editDate = computed(() => {
 });
 
 const editHref = computed(() => {
-    // Navigate to calendar index with date and user_id so calendar focuses the day
+    // If there is an event linked to a project_job_assignment, prefer opening
+    // the user assignment create form so the user can create a "by myself" record.
+    const ev = Array.isArray(events.value) && events.value.length > 0 ? events.value[0] : null;
+    if (ev && ev.project_job_assignment_id) {
+        const params = new URLSearchParams();
+        params.set('job', String(ev.project_job_assignment_id));
+        // pass project context
+        try {
+            if (projectJob && projectJob.id) params.set('projectJob', String(projectJob.id));
+        } catch (e) {}
+        // Prefill fields from assignment when available
+        try {
+            if (assignment && assignment.sender_id) params.set('sender_id', String(assignment.sender_id));
+            if (assignment && assignment.desired_end_date) params.set('desired_end_date', String(assignment.desired_end_date));
+            if (assignment && assignment.desired_time) params.set('desired_time', String(assignment.desired_time));
+            if (assignment && assignment.estimated_hours !== undefined && assignment.estimated_hours !== null)
+                params.set('estimated_hours', String(assignment.estimated_hours));
+        } catch (e) {}
+
+        // route to the user assignment create page (which redirects to events.create_job)
+        return route('project_jobs.assignments.create_user') + '?' + params.toString();
+    }
+
+    // Fallback: Navigate to calendar index with date and user_id so calendar focuses the day
     return route('calendar.index') + '?date=' + encodeURIComponent(editDate.value) + '&user_id=' + encodeURIComponent(assignment.user?.id || '');
 });
 

@@ -32,7 +32,7 @@
                             <th class="border px-4 py-2">送受信</th>
                             <th class="border px-4 py-2">相手</th>
                             <th class="cursor-pointer border px-4 py-2" @click.prevent="changeSort('desired_start_date')">
-                                希望日 <span v-if="isSorted('desired_start_date')">{{ sortIcon() }}</span>
+                                締切日 <span v-if="isSorted('desired_start_date')">{{ sortIcon() }}</span>
                             </th>
                             <th class="cursor-pointer border px-4 py-2" @click.prevent="changeSort('subject')">
                                 タイトル <span v-if="isSorted('subject')">{{ sortIcon() }}</span>
@@ -86,7 +86,7 @@
                             </td>
                             <td class="border px-4 py-2 text-sm text-gray-700">{{ getCounterparty(m) }}</td>
                             <!-- m is JobAssignmentMessage; load related assignment via m.project_job_assignment? -->
-                            <td class="border px-4 py-2">{{ m.project_job_assignment?.desired_start_date || '-' }}</td>
+                            <td class="border px-4 py-2">{{ m.project_job_assignment?.desired_end_date || '-' }}</td>
                             <td class="border px-4 py-2">{{ m.subject || (m.body && m.body.slice(0, 80)) }}</td>
                             <td class="border px-4 py-2">{{ getClientName(m) }}</td>
                             <td class="border px-4 py-2">
@@ -235,12 +235,61 @@ function gotoCreate() {
     }
 }
 
-function rowClick(m, event) {
+async function rowClick(m, event) {
     // If click originated from a link or button, let that element handle it
     const tag = event.target && event.target.tagName ? event.target.tagName.toLowerCase() : '';
     if (tag === 'a' || tag === 'button' || (event.target.closest && event.target.closest('a,button'))) {
         return;
     }
+    // Try to locate a linked Event for this assignment first (match MyJobBox behaviour)
+    try {
+        const assId = m.project_job_assignment?.id || m.project_job_assignment_id || m.id || null;
+        const userId =
+            m.project_job_assignment?.user?.id || m.project_job_assignment?.user_id || (page.props.auth.user && page.props.auth.user.id) || '';
+        if (assId) {
+            // build events index URL with query params
+            let eventsUrl = null;
+            try {
+                eventsUrl = typeof route === 'function' ? route('events.index') : '/events';
+                const query = [];
+                if (userId) query.push('user_id=' + encodeURIComponent(userId));
+                if (assId) query.push('job=' + encodeURIComponent(assId));
+                if (query.length) eventsUrl = eventsUrl + '?' + query.join('&');
+            } catch (e) {
+                eventsUrl = '/events?job=' + encodeURIComponent(assId);
+            }
+
+            try {
+                const res = await fetch(eventsUrl, {
+                    credentials: 'same-origin',
+                    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                });
+                if (res.ok) {
+                    const payload = await res.json();
+                    if (Array.isArray(payload) && payload.length > 0) {
+                        const ev = payload[0];
+                        const evId = ev.id || ev.event_id || (ev.extendedProps && (ev.extendedProps.event_id || ev.extendedProps.id));
+                        if (evId) {
+                            try {
+                                router.get(typeof route === 'function' ? route('events.show', evId) : '/events/' + evId);
+                                return;
+                            } catch (err) {
+                                try {
+                                    window.location.href = typeof route === 'function' ? route('events.show', evId) : '/events/' + evId;
+                                    return;
+                                } catch (er) {}
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                // ignore fetch errors and fallback to assignment link
+            }
+        }
+    } catch (e) {
+        // ignore errors and fall back
+    }
+
     const url = getMessageLink(m);
     if (url && url !== '#') {
         router.visit(url, { preserveState: false });
@@ -578,6 +627,8 @@ function isUnread(m) {
 
 onMounted(() => {
     try {
+        // debugger;
+        // console.log('DEBUG page.props', page.props);
         const authUser = page.props.auth.user;
         if (!authUser || !window.Echo) return;
         const channel = window.Echo.private('jobmessages.' + authUser.id);

@@ -93,10 +93,15 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
     Route::get('/user/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('user.dashboard');
 
-    // Shortcut route: global JobBox - show a user's job messages across assignments
-    // When no specific project is provided the controller will return messages
-    // relevant to the authenticated user.
-    Route::get('/jobbox', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'global'])->name('project_jobs.index');
+    // Shortcut route: global JobBox - coordinator-only. User-specific jobbox is
+    // available at /user/jobbox.
+    Route::get('/jobbox', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'global'])
+        ->middleware('coordinator')
+        ->name('project_jobs.index');
+
+    // User-scoped jobbox: show messages where the assignment's user_id == auth id
+    Route::get('/user/jobbox', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'user'])
+        ->name('user.jobbox.index');
 
     // MyJobBox: user-scoped JobBox page (personal messages/assignments)
     Route::get('/myjobbox', [\App\Http\Controllers\User\MyProjectJobController::class, 'index'])->name('user.myjobbox.index');
@@ -169,12 +174,10 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     // Allow authenticated users to update their assignment (edit)
     Route::patch('project_jobs/{projectJob}/assignments/{assignment}/user', [App\Http\Controllers\User\ProjectJobAssignmentController::class, 'update'])->name('project_jobs.assignments.update_user');
     // Standalone page for user assignment form — redirect to controller-backed job create
-    Route::get('project_jobs/assignments/create-user', function (
-        \Illuminate\Http\Request $request
-    ) {
-        // Redirect to EventController::createJob which provides userClients/userProjects/members and lookup lists
-        return redirect()->route('events.create_job');
-    })->name('project_jobs.assignments.create_user');
+    Route::get('project_jobs/assignments/create-user', [\App\Http\Controllers\ProjectJobs\ProjectJobAssignmentUserController::class, 'create'])
+        ->name('project_jobs.assignments.create_user');
+    Route::get('/project_jobs/assignments/edit-user', [\App\Http\Controllers\ProjectJobs\ProjectJobAssignmentUserController::class, 'edit'])
+        ->name('project_jobs.assignments.edit_user');
     Route::get('/chat/rooms/{id}', [App\Http\Controllers\Chat\ChatController::class, 'showRoom'])->name('chat.rooms.show');
 
 

@@ -1,7 +1,7 @@
 <template>
-    <AppLayout title="ジョブ作成">
+    <AppLayout title="ジョブ編集">
         <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
-            <h1 class="mb-4 text-2xl font-bold">ジョブ作成２</h1>
+            <h1 class="mb-4 text-2xl font-bold">ジョブ編集（マイジョブ）</h1>
             <div>
                 <AssignmentFormUser
                     :projectJob="projectJob"
@@ -28,6 +28,7 @@ import { ref } from 'vue';
 const page = usePage();
 const projectJob = ref(page.props.projectJob || null);
 const members = page.props.members || [];
+// assignments expected to be prefilled by server (single prefill object)
 const assignments = page.props.assignments || [];
 const userClients = page.props.userClients || [];
 const userProjects = page.props.userProjects || [];

@@ -84,22 +84,7 @@
                         </option>
                     </select>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium">Status</label>
-                    <div v-if="!editMode" class="mt-1 w-full rounded border bg-gray-50 px-3 py-2 text-sm">
-                        {{ itemName('statuses', block.status_id) }}
-                    </div>
-                    <select
-                        v-else
-                        v-model="block.status_id"
-                        :disabled="!editMode"
-                        @change="onInlineSelectionChange(idx)"
-                        class="mt-1 w-full rounded border px-2 py-1 text-sm"
-                    >
-                        <option value="">-- 選択 --</option>
-                        <option v-for="st in page.props.statuses" :key="st.id" :value="String(st.id)">{{ st.name }}</option>
-                    </select>
-                </div>
+                <!-- Status はこのフォームでは表示しない（常に status_id = 1 を保存する） -->
             </div>
 
             <!-- Quantity (数量) : four digit selects 0-9 and a unit select (ページ / ファイル) -->
@@ -252,6 +237,8 @@ const props = defineProps({
     assignments: Array,
     editMode: { type: Boolean, default: false },
     defaultUserId: { type: [Number, String], default: null },
+    hideStatus: { type: Boolean, default: false },
+    defaultStatusId: { type: [Number, String], default: null },
 });
 const page = usePage();
 
@@ -327,7 +314,7 @@ function normalizeAssignment(a) {
         work_item_type_id: a.work_item_type_id || null,
         size_id: a.size_id || null,
         stage_id: a.stage_id || null,
-        status_id: a.status_id || null,
+        status_id: 1,
         company_id: a.company_id || null,
         department_id: a.department_id || null,
         type_label: a.type_label || makeLabel('types', a.work_item_type_id),
@@ -360,7 +347,7 @@ assignments.value.forEach((a) => {
     if (a.work_item_type_id === undefined) a.work_item_type_id = a.work_item_type_id || null;
     if (a.size_id === undefined) a.size_id = a.size_id || null;
     if (a.stage_id === undefined) a.stage_id = a.stage_id || null;
-    if (a.status_id === undefined) a.status_id = a.status_id || null;
+    if (a.status_id === undefined) a.status_id = 1;
     // ensure difficulty_id is populated when only difficulty name/string is present
     if ((a.difficulty_id === undefined || a.difficulty_id === null) && a.difficulty) {
         try {
@@ -528,7 +515,7 @@ function onSelected(payload) {
             work_item_type_id: payload.work_item_type_id,
             size_id: payload.size_id,
             stage_id: payload.stage_id || null,
-            status_id: payload.status_id,
+            status_id: 1,
             company_id: payload.company_id,
             department_id: payload.department_id,
             saving: false,
@@ -543,7 +530,7 @@ function onSelected(payload) {
         b.work_item_type_id = payload.work_item_type_id;
         b.size_id = payload.size_id;
         b.stage_id = payload.stage_id || null;
-        b.status_id = payload.status_id;
+        b.status_id = 1;
         b.company_id = payload.company_id;
         b.department_id = payload.department_id;
         b.type_label = makeLabel('types', payload.work_item_type_id);
@@ -802,6 +789,7 @@ function addBlock() {
         user_id: props.defaultUserId || '',
         company_id: effectiveAuthUser() ? effectiveAuthUser().company_id : null,
         department_id: effectiveAuthUser() ? effectiveAuthUser().department_id : null,
+        status_id: 1,
         saving: false,
         linked_assignment_id: null,
         amount_digit_0: '0',
@@ -1051,7 +1039,7 @@ async function save() {
             work_item_type_id: a.work_item_type_id || null,
             size_id: a.size_id || null,
             stage_id: a.stage_id || null,
-            status_id: a.status_id || null,
+            status_id: 1,
             amounts: typeof a.amounts === 'number' ? a.amounts : Number(a.amounts) || 0,
             amounts_unit: a.amounts_unit || 'page',
         })),

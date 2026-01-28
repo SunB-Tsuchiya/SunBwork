@@ -212,7 +212,7 @@ function editMembers() {
 }
 function goJobAssign() {
     const id = job.id || null;
-    if (id) router.visit(route('coordinator.project_jobs.assignments.index', { projectJob: id }));
+    if (id) router.visit(route('coordinator.project_jobs.assignments.create', { projectJob: id }));
 }
 
 function goAnalysis() {
