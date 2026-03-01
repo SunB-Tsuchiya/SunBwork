@@ -16,14 +16,31 @@ const currentMonth = (() => {
     const m = String(d.getMonth() + 1).padStart(2, '0');
     return `${y}-${m}`;
 })();
-// selectedYm defaults to server-provided selected_ym or current month
-const selectedYm = ref(page && page.props && page.props.value && page.props.value.selected_ym ? page.props.value.selected_ym : currentMonth);
+
+function getYmFromUrl() {
+    if (typeof window === 'undefined') return null;
+    try {
+        const params = new URL(window.location.href).searchParams;
+        const candidate = params.get('ym');
+        if (candidate && /^\d{4}-\d{2}$/.test(candidate)) {
+            return candidate;
+        }
+    } catch (e) {
+        // ignore invalid URL parsing
+    }
+    return null;
+}
+
+// selectedYm defaults to server-provided selected_ym, query string, or current month
+const selectedYm = ref(
+    page && page.props && page.props.value && page.props.value.selected_ym ? page.props.value.selected_ym : getYmFromUrl() || currentMonth,
+);
 
 // keep selectedYm in sync if server props change (Inertia navigation)
 watch(
     () => page.props && page.props.value && page.props.value.selected_ym,
     (v) => {
-        selectedYm.value = v || currentMonth;
+        selectedYm.value = v || getYmFromUrl() || currentMonth;
     },
 );
 
@@ -124,6 +141,12 @@ const rolePrefix = (() => {
     // leader, coordinator, default -> leader
     return '/leader';
 })();
+const routeNamePrefix = (() => {
+    const r = String(userRole || '').toLowerCase();
+    if (r.includes('super')) return 'superadmin';
+    if (r.includes('admin')) return 'admin';
+    return 'leader';
+})();
 
 // build a small list of months around current month (last 12 months)
 const months = [];
@@ -136,8 +159,14 @@ for (let i = 0; i < 12; i++) {
 }
 
 function changeYm() {
-    const ym = selectedYm.value;
-    // navigate by changing location so Inertia will request same page with ?ym=
+    const ym = selectedYm.value || currentMonth;
+    try {
+        const routeName = `${routeNamePrefix}.workload_analyzer.index`;
+        Inertia.get(route(routeName, { ym }));
+        return;
+    } catch (e) {
+        // fall back to a full reload if Ziggy route helper fails
+    }
     const url = new URL(window.location.href);
     url.searchParams.set('ym', ym);
     window.location.href = url.toString();
@@ -193,23 +222,23 @@ function flattenDepartmentRows(dept) {
 }
 
 function onMemberRowClick(row) {
-    // try named route using Ziggy (route helper). Route name pattern: `${prefix}.workload-analyzer.show` may not exist,
-    // so fallback to path-based navigation like `${rolePrefix}/workload-analyzer/${id}`
+    const ym = selectedYm.value || currentMonth;
+    const routeParams = { user: row.id, ym };
+    // try named route via Ziggy; ensures the clicked month is preserved in the query string
     try {
         const prefix = rolePrefix.replace(/^\//, '');
-        // attempt Inertia.get with named route
         try {
-            Inertia.get(route(`${prefix}.workload-analyzer.show`, row.id, { ym: selectedYm.value }));
+            Inertia.get(route(`${prefix}.workload_analyzer.show`, routeParams));
             return;
         } catch (e) {
-            // fallback
+            // fallback to classic navigation below
         }
     } catch (e) {
-        // ignore
+        // ignore and fall back
     }
-    // final fallback
     const base = rolePrefix || '/leader';
-    window.location.href = `${base}/workload-analyzer/${row.id}?ym=${selectedYm.value}`;
+    const encodedYm = encodeURIComponent(ym);
+    window.location.href = `${base}/workload-analyzer/${row.id}?ym=${encodedYm}`;
 }
 
 function formatHour(h) {
@@ -267,7 +296,7 @@ function diffMinutes(estimated, actual) {
 
         <Head title="作業量分析" />
 
-        <div class="py-12">
+        <div class="py-2">
             <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
                 <div class="mb-6 overflow-hidden bg-white p-6 shadow-xl sm:rounded-lg">
                     <p class="text-sm text-gray-500">自分の会社・部署・チームのメンバーごとの簡易分析ビュー（プレースホルダ）</p>

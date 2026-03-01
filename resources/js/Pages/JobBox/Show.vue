@@ -44,71 +44,36 @@
                         <label class="mb-1 mt-2 block font-semibold">作業詳細</label>
 
                         <div class="mb-2 text-sm text-gray-700">
-                            <!-- 作業種別、サイズ、ステージ、ステータスをthにするテーブルを作成 -->
-                            <table class="w-full">
-                                <thead>
-                                    <tr class="border-b">
-                                        <th class="py-2 text-left">作業種別</th>
-                                        <th class="py-2 text-left">サイズ</th>
-                                        <th class="py-2 text-left">ステージ</th>
-                                        <th class="py-2 text-left">ステータス</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <!-- single data row: each cell shows an optional small label above the main value -->
-                                    <tr>
-                                        <td class="py-2">
-                                            <div
-                                                v-if="
-                                                    assignment.type_label &&
-                                                    assignment.work_item_type &&
-                                                    assignment.work_item_type?.name !== assignment.type_label &&
-                                                    assignment.work_item_type?.label !== assignment.type_label
-                                                "
-                                                class="text-sm text-gray-500"
-                                            >
-                                                {{ assignment.type_label }}
-                                            </div>
-                                            <div class="text-sm text-gray-700">
-                                                {{
-                                                    assignment.work_item_type?.name ||
-                                                    assignment.work_item_type?.label ||
-                                                    assignment.type_label ||
-                                                    '-'
-                                                }}
-                                            </div>
-                                        </td>
-                                        <td class="py-2">
-                                            <div v-if="assignment.type_label && assignment.type_label !== displayType" class="text-sm text-gray-500">
-                                                {{ assignment.type_label }}
-                                            </div>
-                                            <div class="text-sm text-gray-700">{{ displayType }}</div>
-                                        </td>
-                                        <td class="py-2">
-                                            <div
-                                                v-if="
-                                                    assignment.size_label &&
-                                                    assignment.size &&
-                                                    assignment.size?.name !== assignment.size_label &&
-                                                    assignment.size?.label !== assignment.size_label
-                                                "
-                                                class="text-sm text-gray-500"
-                                            >
-                                                {{ assignment.size_label }}
-                                            </div>
-                                            <div class="text-sm text-gray-700">
-                                                {{ assignment.size?.name || assignment.size?.label || assignment.size_label || '-' }}
-                                            </div>
-                                        </td>
-                                        <td class="py-2">
-                                            <div v-if="assignment.size_label && assignment.size_label !== displaySize" class="text-sm text-gray-500">
-                                                {{ assignment.size_label }}
-                                            </div>
-                                            <div class="text-sm text-gray-700">{{ displaySize }}</div>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                            <!-- 作業種別、サイズ、ステージ、ステータス をグリッド表示に変更 -->
+                            <div class="grid grid-cols-1 gap-3 text-sm text-gray-700 sm:grid-cols-2">
+                                <div>
+                                    <div v-if="assignment.type_label && assignment.type_label !== displayType" class="text-sm text-gray-500">
+                                        {{ assignment.type_label }}
+                                    </div>
+                                    <div class="text-sm text-gray-700">{{ displayType }}</div>
+                                </div>
+
+                                <div>
+                                    <div v-if="assignment.size_label && assignment.size_label !== displaySize" class="text-sm text-gray-500">
+                                        {{ assignment.size_label }}
+                                    </div>
+                                    <div class="text-sm text-gray-700">{{ displaySize }}</div>
+                                </div>
+
+                                <div>
+                                    <div v-if="assignment.stage_label && assignment.stage_label !== displayStage" class="text-sm text-gray-500">
+                                        {{ assignment.stage_label }}
+                                    </div>
+                                    <div class="text-sm text-gray-700">{{ displayStage }}</div>
+                                </div>
+
+                                <div>
+                                    <div v-if="assignment.status_label && assignment.status_label !== displayStatus" class="text-sm text-gray-500">
+                                        {{ assignment.status_label }}
+                                    </div>
+                                    <div class="text-sm text-gray-700">{{ displayStatus }}</div>
+                                </div>
+                            </div>
                             <div class="flex items-center gap-2">
                                 <span class="font-semibold">難易度：</span>
                                 <span>{{ difficultyLabel }}</span>
@@ -159,14 +124,7 @@
 
                         <div class="mt-2 text-right">
                             <div v-if="linkedAssignmentId">
-                                <Link
-                                    :href="
-                                        route('coordinator.project_jobs.assignments.show', {
-                                            projectJob: projectJob.id,
-                                            assignment: linkedAssignmentId,
-                                        })
-                                    "
-                                    class="ml-3 text-sm text-blue-600"
+                                <Link :href="getAssignmentLink(linkedAssignmentId)" class="ml-3 text-sm text-blue-600"
                                     >割当を見る (#{{ linkedAssignmentId }})</Link
                                 >
                             </div>
@@ -203,15 +161,7 @@
                             </div>
 
                             <!-- If assignee and not scheduled, show the regular '予定をセット' button -->
-                            <Link
-                                v-else
-                                :href="
-                                    linkedAssignmentId
-                                        ? route('project_jobs.assignments.edit_user') + '?job=' + encodeURIComponent(linkedAssignmentId)
-                                        : route('events.create', { job: assignment.id })
-                                "
-                                class="rounded bg-blue-500 px-3 py-2 text-sm text-white hover:bg-blue-600"
-                            >
+                            <Link v-else :href="getSetHref()" class="rounded bg-blue-500 px-3 py-2 text-sm text-white hover:bg-blue-600">
                                 予定をセット
                             </Link>
                         </template>
@@ -236,6 +186,26 @@ import { computed, onMounted, ref } from 'vue';
 import { route } from 'ziggy-js';
 const { projectJob, message } = defineProps({ projectJob: Object, message: Object });
 const page = usePage();
+
+// Safe route helper: prefer Ziggy `route()` when available, else return fallback string.
+function safeRoute(name, params = {}, fallback = '#') {
+    try {
+        if (typeof route === 'function') return route(name, params || {});
+    } catch (e) {
+        // ignore
+    }
+    return fallback;
+}
+
+function getAssignmentLink(id) {
+    try {
+        if (!id) return '#';
+        const fallback = projectJob && projectJob.id ? `/project_jobs/${projectJob.id}/assignments/${id}` : `#/assignments/${id}`;
+        return safeRoute('coordinator.project_jobs.assignments.show', { projectJob: projectJob?.id, assignment: id }, fallback);
+    } catch (e) {
+        return '#';
+    }
+}
 
 // Use assignment from the message payload (broadcast includes project_job_assignment)
 const assignment = message?.project_job_assignment || {};
@@ -279,9 +249,18 @@ function formatEstimatedHours(h) {
 }
 
 function routeBack() {
-    return page.props.auth.user && page.props.auth.user.isCoordinator
-        ? route('coordinator.project_jobs.assignments.index', { projectJob: projectJob.id })
-        : route('project_jobs.jobbox.index', { projectJob: projectJob.id });
+    try {
+        if (page.props.auth.user && page.props.auth.user.isCoordinator) {
+            return safeRoute(
+                'coordinator.project_jobs.assignments.index',
+                { projectJob: projectJob?.id },
+                projectJob && projectJob.id ? `/project_jobs/${projectJob.id}/assignments` : '/jobbox',
+            );
+        }
+        return safeRoute('project_jobs.jobbox.index', { projectJob: projectJob?.id }, '/jobbox');
+    } catch (e) {
+        return '/jobbox';
+    }
 }
 
 // Mark JAM read when assignee opens this SPA view. Silent if API fails.
@@ -289,7 +268,8 @@ onMounted(async () => {
     try {
         const jamId = message && message.id;
         if (!jamId) return;
-        await fetch(route('api.jobbox.read', { id: jamId }), {
+        const apiReadUrl = safeRoute('api.jobbox.read', { id: jamId }, `/api/jobbox/read/${jamId}`);
+        await fetch(apiReadUrl, {
             method: 'POST',
             credentials: 'same-origin',
             headers: {
@@ -310,7 +290,8 @@ onMounted(async () => {
             // Request JSON explicitly so EventController returns JSON (we changed it
             // to render an Inertia page for normal browser requests). Also include
             // the job query so the server can pre-filter events linked to this job.
-            const url = route('events.index') + '?user_id=' + encodeURIComponent(assigneeId) + '&job=' + encodeURIComponent(assignment.id);
+            const baseEventsUrl = safeRoute('events.index', {}, '/events');
+            const url = baseEventsUrl + '?user_id=' + encodeURIComponent(assigneeId) + '&job=' + encodeURIComponent(assignment.id);
             const res = await fetch(url, {
                 method: 'GET',
                 credentials: 'same-origin',
@@ -451,11 +432,17 @@ const editHref = computed(() => {
         } catch (e) {}
 
         // route to the user assignment create page (which redirects to events.create_job)
-        return route('project_jobs.assignments.create_user') + '?' + params.toString();
+        return safeRoute('project_jobs.assignments.create_user', {}, '/project_jobs/assignments/create-user') + '?' + params.toString();
     }
 
     // Fallback: Navigate to calendar index with date and user_id so calendar focuses the day
-    return route('calendar.index') + '?date=' + encodeURIComponent(editDate.value) + '&user_id=' + encodeURIComponent(assignment.user?.id || '');
+    return (
+        safeRoute('calendar.index', {}, '/calendar') +
+        '?date=' +
+        encodeURIComponent(editDate.value) +
+        '&user_id=' +
+        encodeURIComponent(assignment.user?.id || '')
+    );
 });
 
 function submitComplete() {
@@ -473,8 +460,9 @@ function submitComplete() {
             return;
         }
         isSubmittingComplete.value = true;
+        const completeUrl = safeRoute('events.complete', { event: evId }, `/events/${evId}/complete`);
         router.post(
-            route('events.complete', { event: evId }),
+            completeUrl,
             {},
             {
                 onSuccess: () => {
@@ -489,6 +477,29 @@ function submitComplete() {
     } catch (e) {
         // swallow to avoid breaking the page
         console.debug('submitComplete error', e);
+    }
+}
+
+function getSetHref() {
+    try {
+        if (linkedAssignmentId && linkedAssignmentId.value) {
+            const jid = String(linkedAssignmentId.value);
+            const fallback = '/project_jobs/assignments/edit-user?job=' + encodeURIComponent(jid);
+            // route for edit_user may not be available client-side, so append query string if ziggy present
+            try {
+                if (typeof route === 'function') return route('project_jobs.assignments.edit_user') + '?job=' + encodeURIComponent(jid);
+            } catch (e) {
+                return fallback;
+            }
+            return fallback;
+        }
+        try {
+            return safeRoute('events.create', { job: assignment.id }, '/events/create?job=' + encodeURIComponent(assignment.id));
+        } catch (e) {
+            return '/events/create?job=' + encodeURIComponent(assignment.id);
+        }
+    } catch (e) {
+        return '#';
     }
 }
 

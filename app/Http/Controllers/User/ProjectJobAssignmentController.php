@@ -61,6 +61,7 @@ class ProjectJobAssignmentController extends Controller
                 // prefer explicit difficulty_id only
                 $difficultyId = !empty($a['difficulty_id']) ? (int) $a['difficulty_id'] : null;
 
+                $linkedAssignmentId = $a['linked_assignment_id'] ?? null;
                 $createPayload = [
                     'project_job_id' => $projectJob->id,
                     'user_id' => $user ? $user->id : null,
@@ -82,7 +83,6 @@ class ProjectJobAssignmentController extends Controller
                     'department_id' => $a['department_id'] ?? null,
                     'amounts' => $a['amounts'] ?? null,
                     'amounts_unit' => $a['amounts_unit'] ?? null,
-                    'linked_assignment_id' => $a['linked_assignment_id'] ?? null,
                 ];
 
                 // legacy difficulty string column removed from payload
@@ -113,6 +113,9 @@ class ProjectJobAssignmentController extends Controller
                         // defensive: ignore schema inspection errors and continue without flags
                     }
 
+                    if ($linkedAssignmentId && Schema::hasColumn('project_job_assignment_by_myself', 'linked_assignment_id')) {
+                        $createPayload['linked_assignment_id'] = $linkedAssignmentId;
+                    }
                     $assignment = ProjectJobAssignmentByMyself::create($createPayload);
                     // If model/table doesn't allow mass-assigning read_at, set it explicitly after create
                     try {
@@ -125,6 +128,9 @@ class ProjectJobAssignmentController extends Controller
                     }
                 } else {
                     // Fallback to canonical table if the by_myself model/table isn't present
+                    if ($linkedAssignmentId && Schema::hasColumn('project_job_assignments', 'linked_assignment_id')) {
+                        $createPayload['linked_assignment_id'] = $linkedAssignmentId;
+                    }
                     $assignment = ProjectJobAssignment::create($createPayload);
                     try {
                         if (Schema::hasColumn('project_job_assignments', 'read_at') && empty($assignment->read_at)) {

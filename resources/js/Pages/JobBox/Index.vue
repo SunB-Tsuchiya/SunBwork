@@ -249,6 +249,8 @@ async function rowClick(m, event) {
         if (assId) {
             // build events index URL with query params
             let eventsUrl = null;
+            // ziggy route() may not be available in all contexts; guard with try/catch
+            // route()が使えるか確認
             try {
                 eventsUrl = typeof route === 'function' ? route('events.index') : '/events';
                 const query = [];

@@ -2,7 +2,7 @@
     <div class="calendar-container">
         <div class="mb-4 flex gap-4">
             <button @click="openEventModal" class="rounded bg-blue-600 px-4 py-2 text-white">予定作成</button>
-            <!-- <button @click="goToJobCreate" class="rounded bg-indigo-600 px-4 py-2 text-white">ジョブ作成</button> -->
+            <button @click="goToJobCreate" class="rounded bg-indigo-600 px-4 py-2 text-white">ジョブ作成</button>
             <button @click="goToDiaryCreate" class="rounded bg-orange-500 px-4 py-2 text-white">{{ props.diaryLabel }}作成</button>
             <button @click="goToAssignedJobs" class="rounded bg-green-600 px-4 py-2 text-white">依頼一覧</button>
         </div>
@@ -72,6 +72,8 @@
                 <h2 class="mb-4 text-lg font-bold">{{ selectedDate }} の操作</h2>
                 <div class="flex flex-col gap-4">
                     <button @click="openEventModalFromSelect" class="rounded bg-blue-600 px-4 py-2 text-white">予定作成</button>
+                    <button @click="goToJobCreate" class="rounded bg-blue-600 px-4 py-2 text-white">ジョブ作成</button>
+
                     <button v-if="selectedScheduleId === null" @click="goToDiaryCreateFromSelect" class="rounded bg-orange-500 px-4 py-2 text-white">
                         日報作成
                     </button>
@@ -263,6 +265,7 @@ function goToDiaryCreate() {
 }
 
 function goToJobCreate() {
+    showSelectModal.value = false;
     try {
         const params = { date: selectedDate.value };
         // include clicked time if present
@@ -270,7 +273,6 @@ function goToJobCreate() {
             params.startHour = String(clickedStartHour.value).padStart(2, '0');
             params.startMinute = String(clickedStartMinute.value).padStart(2, '0');
         }
-        const current = window.location.pathname + window.location.search + window.location.hash;
         try {
             router.get(route('events.create_job', params));
             return;
