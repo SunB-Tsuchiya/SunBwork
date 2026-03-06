@@ -41,7 +41,6 @@ class ProjectJobAssignmentController extends Controller
             'assignments.*.amounts' => 'nullable|integer|min:0',
             'assignments.*.amounts_unit' => 'nullable|string|in:page,file',
             'assignments.*.sender_id' => 'nullable|exists:users,id',
-            'assignments.*.linked_assignment_id' => 'nullable|exists:project_job_assignments,id',
         ]);
 
         // validated payload received (debug logging removed)
@@ -61,7 +60,6 @@ class ProjectJobAssignmentController extends Controller
                 // prefer explicit difficulty_id only
                 $difficultyId = !empty($a['difficulty_id']) ? (int) $a['difficulty_id'] : null;
 
-                $linkedAssignmentId = $a['linked_assignment_id'] ?? null;
                 $createPayload = [
                     'project_job_id' => $projectJob->id,
                     'user_id' => $user ? $user->id : null,
@@ -113,9 +111,6 @@ class ProjectJobAssignmentController extends Controller
                         // defensive: ignore schema inspection errors and continue without flags
                     }
 
-                    if ($linkedAssignmentId && Schema::hasColumn('project_job_assignment_by_myself', 'linked_assignment_id')) {
-                        $createPayload['linked_assignment_id'] = $linkedAssignmentId;
-                    }
                     $assignment = ProjectJobAssignmentByMyself::create($createPayload);
                     // If model/table doesn't allow mass-assigning read_at, set it explicitly after create
                     try {
@@ -128,9 +123,6 @@ class ProjectJobAssignmentController extends Controller
                     }
                 } else {
                     // Fallback to canonical table if the by_myself model/table isn't present
-                    if ($linkedAssignmentId && Schema::hasColumn('project_job_assignments', 'linked_assignment_id')) {
-                        $createPayload['linked_assignment_id'] = $linkedAssignmentId;
-                    }
                     $assignment = ProjectJobAssignment::create($createPayload);
                     try {
                         if (Schema::hasColumn('project_job_assignments', 'read_at') && empty($assignment->read_at)) {
@@ -289,13 +281,13 @@ class ProjectJobAssignmentController extends Controller
 
         DB::transaction(function () use ($assignment, $data, $user) {
             // Find existing by-myself record for this canonical assignment and user
-            $by = ProjectJobAssignmentByMyself::where('linked_assignment_id', $assignment->id)
+            $by = ProjectJobAssignmentByMyself::where('project_job_id', $assignment->project_job_id)
                 ->where('user_id', $user ? $user->id : null)
+                ->orderByDesc('created_at')
                 ->first();
 
             $payload = [
                 'project_job_id' => $assignment->project_job_id ?? null,
-                'linked_assignment_id' => $assignment->id,
                 'user_id' => $user ? $user->id : null,
                 'sender_id' => $user ? $user->id : null,
                 'title' => $data['title'],

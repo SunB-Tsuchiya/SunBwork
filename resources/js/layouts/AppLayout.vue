@@ -304,7 +304,8 @@ const computeCoordinatorActive = () => {
 
                         <div class="hidden sm:ms-6 sm:flex sm:items-center">
                             <!-- Chat link (replaces previous Inbox) -->
-                            <div class="relative ms-3 flex items-center">
+                            <!-- チャットメール閉じる必要になったら再開 -->
+                            <!-- <div class="relative ms-3 flex items-center">
                                 <Link :href="route('chat.rooms.index')" class="flex items-center text-sm text-gray-600 hover:text-gray-800">
                                     <span>チャット</span>
                                     <span
@@ -313,9 +314,9 @@ const computeCoordinatorActive = () => {
                                         >{{ unreadMessages }}</span
                                     >
                                 </Link>
-                            </div>
+                            </div> -->
                             <!-- Messages link -->
-                            <div class="relative ms-3 flex items-center">
+                            <!-- <div class="relative ms-3 flex items-center">
                                 <Link :href="route('messages.index')" class="flex items-center text-sm text-gray-600 hover:text-gray-800">
                                     <span>メール</span>
                                     <span
@@ -324,7 +325,7 @@ const computeCoordinatorActive = () => {
                                         >{{ unreadMessages }}</span
                                     >
                                 </Link>
-                            </div>
+                            </div> -->
                             <!-- JobBox link -->
                             <!-- <div class="relative ms-3 flex items-center">
                                 <Link :href="jobLink" class="flex items-center text-sm text-gray-600 hover:text-gray-800" @click="handleJobClick">

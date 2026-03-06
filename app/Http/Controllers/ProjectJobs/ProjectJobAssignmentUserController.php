@@ -91,7 +91,6 @@ class ProjectJobAssignmentUserController extends Controller
         // Build a single prefill assignment object for the form using query params and optional job source
         $prefill = [
             'project_job_id' => $request->query('projectJob') ?: null,
-            'linked_assignment_id' => $jobId ?: null,
             'sender_id' => $request->query('sender_id') ?: ($user ? $user->id : null),
             'desired_end_date' => $request->query('desired_end_date') ?: null,
             'desired_time' => $request->query('desired_time') ?: null,

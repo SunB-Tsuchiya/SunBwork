@@ -1,5 +1,4 @@
 <script setup>
-import Welcome from '@/Components/Welcome.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 // tabs are rendered centrally in AppLayout.vue
 
@@ -71,10 +70,6 @@ const user = page.props.user;
                     <p class="mt-2 text-sm text-yellow-700">監査ログの確認とエクスポート</p>
                 </div>
             </div>
-        </div>
-
-        <div class="overflow-hidden bg-white shadow-xl sm:rounded-lg">
-            <Welcome />
         </div>
     </AppLayout>
 </template>

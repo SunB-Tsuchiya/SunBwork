@@ -1,5 +1,4 @@
 <script setup>
-import Welcome from '@/Components/Welcome.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 // Coordinator tabs remain per-page
 
@@ -66,10 +65,6 @@ const user = page.props.user;
                     <p class="mt-2 text-sm text-orange-700">アクセス統計とユーザー分析</p>
                 </div>
             </div>
-        </div>
-
-        <div class="overflow-hidden bg-white shadow-xl sm:rounded-lg">
-            <Welcome />
         </div>
     </AppLayout>
 </template>

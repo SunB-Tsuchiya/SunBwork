@@ -226,9 +226,7 @@ watch(
                         <template v-if="form.processing"> 保存中… </template>
                         <template v-else>保存</template>
                     </button>
-                    <Link
-                        :href="returnTo && returnTo !== '' ? returnTo : route('calendar.index')"
-                        class="rounded bg-gray-200 px-4 py-2 text-gray-700"
+                    <Link :href="returnTo && returnTo !== '' ? returnTo : route('calendar.index')" class="rounded bg-gray-200 px-4 py-2 text-gray-700"
                         >キャンセル</Link
                     >
                 </div>

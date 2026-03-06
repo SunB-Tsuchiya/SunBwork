@@ -190,56 +190,43 @@ onMounted(() => {
     });
 });
 
+function buildDateTimeParams() {
+    const params = { date: selectedDate.value };
+    if (clickedStartHour.value !== null && clickedStartMinute.value !== null) {
+        const hh = String(clickedStartHour.value).padStart(2, '0');
+        const mm = String(clickedStartMinute.value).padStart(2, '0');
+        const nextHour = String((Number(hh) + 1) % 24).padStart(2, '0');
+        params.startHour = hh;
+        params.startMinute = mm;
+        params.endHour = nextHour;
+        params.endMinute = mm;
+    }
+    return params;
+}
+
 function openEventModal() {
+    const params = buildDateTimeParams();
     // 選択中の日付をセットしてEvents/Create.vueへ遷移
     try {
         const current = window.location.pathname + window.location.search + window.location.hash;
-        router.get(route('events.create', { date: selectedDate.value, return_to: current }));
+        router.get(route('events.create', { ...params, return_to: current }));
         return;
     } catch (e) {
-        router.get(route('events.create', { date: selectedDate.value }));
+        router.get(route('events.create', params));
     }
 }
 
 function openEventModalFromSelect() {
-    // include clicked time if available (snap already applied on click)
-    try {
-        if (clickedStartHour.value !== null && clickedStartMinute.value !== null) {
-            const hh = String(clickedStartHour.value).padStart(2, '0');
-            const mm = String(clickedStartMinute.value).padStart(2, '0');
-            const endH = String((parseInt(hh, 10) + 1) % 24).padStart(2, '0');
-            const endM = mm;
-            try {
-                const current = window.location.pathname + window.location.search + window.location.hash;
-                router.get(
-                    route('events.create', {
-                        date: selectedDate.value,
-                        startHour: hh,
-                        startMinute: mm,
-                        endHour: endH,
-                        endMinute: endM,
-                        return_to: current,
-                    }),
-                );
-            } catch (e) {
-                router.get(route('events.create', { date: selectedDate.value, startHour: hh, startMinute: mm, endHour: endH, endMinute: endM }));
-            }
-            showSelectModal.value = false;
-            // reset clicked time
-            clickedStartHour.value = null;
-            clickedStartMinute.value = null;
-            return;
-        }
-    } catch (e) {
-        // fallthrough to simple navigation
-    }
+    const params = buildDateTimeParams();
     try {
         const current = window.location.pathname + window.location.search + window.location.hash;
-        router.get(route('events.create', { date: selectedDate.value, return_to: current }));
+        router.get(route('events.create', { ...params, return_to: current }));
     } catch (e) {
-        router.get(route('events.create', { date: selectedDate.value }));
+        router.get(route('events.create', params));
     }
     showSelectModal.value = false;
+    clickedStartHour.value = null;
+    clickedStartMinute.value = null;
 }
 
 function goToDiaryCreateFromSelect() {
@@ -267,12 +254,7 @@ function goToDiaryCreate() {
 function goToJobCreate() {
     showSelectModal.value = false;
     try {
-        const params = { date: selectedDate.value };
-        // include clicked time if present
-        if (clickedStartHour.value !== null && clickedStartMinute.value !== null) {
-            params.startHour = String(clickedStartHour.value).padStart(2, '0');
-            params.startMinute = String(clickedStartMinute.value).padStart(2, '0');
-        }
+        const params = buildDateTimeParams();
         try {
             router.get(route('events.create_job', params));
             return;

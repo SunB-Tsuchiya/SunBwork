@@ -1,8 +1,8 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
 import AssignmentFormUser from '@/Pages/Coordinator/ProjectJobs/JobAssign/AssignmentForm_user.vue';
-import { ref } from 'vue';
 import { usePage } from '@inertiajs/vue3';
+import { ref } from 'vue';
 
 const page = usePage();
 const projectJob = ref(page.props.projectJob || null);
@@ -11,6 +11,7 @@ const assignments = page.props.assignments || [];
 const userClients = page.props.userClients || [];
 const userProjects = page.props.userProjects || [];
 const defaultUserId = page.props.auth && page.props.auth.user ? page.props.auth.user.id : null;
+const prefillEvent = ref(page.props.prefillEvent || null);
 </script>
 
 <template>
@@ -24,6 +25,7 @@ const defaultUserId = page.props.auth && page.props.auth.user ? page.props.auth.
                     :projectJob="projectJob"
                     :members="members"
                     :assignments="assignments"
+                    :event="prefillEvent"
                     :editMode="true"
                     :defaultUserId="defaultUserId"
                     :user-clients="userClients"

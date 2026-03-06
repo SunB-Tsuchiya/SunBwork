@@ -914,6 +914,10 @@ class EventController extends Controller
         // reuse much of create() logic but render a dedicated job creation page
         $date = $request->query('date', now()->toDateString());
         $jobId = $request->query('job');
+        $startHour = $request->query('startHour');
+        $startMinute = $request->query('startMinute');
+        $endHour = $request->query('endHour');
+        $endMinute = $request->query('endMinute');
         $jobData = null;
         if ($jobId) {
             $assignment = \App\Models\ProjectJobAssignment::with(['projectJob.client', 'projectJob', 'user', 'size', 'stage', 'workItemType', 'statusModel'])->find($jobId);
@@ -992,6 +996,27 @@ class EventController extends Controller
             $statuses = [];
         }
 
+        $prefillEvent = null;
+        if ($date) {
+            $prefillEvent = [
+                'start' => $date,
+                'end' => $date,
+                'desired_start_date' => $date,
+            ];
+            if ($startHour !== null && $startHour !== '' && $startMinute !== null && $startMinute !== '') {
+                $sh = str_pad($startHour, 2, '0', STR_PAD_LEFT);
+                $sm = str_pad($startMinute, 2, '0', STR_PAD_LEFT);
+                $prefillEvent['start'] = "{$date} {$sh}:{$sm}:00";
+                $prefillEvent['start_time'] = "{$sh}:{$sm}";
+            }
+            if ($endHour !== null && $endHour !== '' && $endMinute !== null && $endMinute !== '') {
+                $eh = str_pad($endHour, 2, '0', STR_PAD_LEFT);
+                $em = str_pad($endMinute, 2, '0', STR_PAD_LEFT);
+                $prefillEvent['end'] = "{$date} {$eh}:{$em}:00";
+                $prefillEvent['desired_time'] = "{$eh}:{$em}";
+            }
+        }
+
         $props = [
             'date' => $date,
             'job' => $jobData,
@@ -1004,6 +1029,7 @@ class EventController extends Controller
             'sizes' => $sizes,
             'stages' => $stages,
             'statuses' => $statuses,
+            'prefillEvent' => $prefillEvent,
         ];
 
         try {

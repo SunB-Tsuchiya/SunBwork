@@ -135,7 +135,6 @@ class ProjectJobAssignment extends Model
             'desired_end_date' => $this->desired_end_date ? (method_exists($this->desired_end_date, 'format') ? $this->desired_end_date->format('Y-m-d') : (string)$this->desired_end_date) : null,
             'desired_time' => $this->desired_time ?? null,
             'estimated_hours' => $this->estimated_hours ?? null,
-            'linked_assignment_id' => $this->linked_assignment_id ?? null,
             'scheduled' => Schema::hasColumn('project_job_assignments', 'scheduled') ? (bool) ($this->scheduled ?? false) : false,
             'scheduled_at' => Schema::hasColumn('project_job_assignments', 'scheduled_at') && $this->scheduled_at ? (method_exists($this->scheduled_at, 'format') ? $this->scheduled_at->format('Y-m-d H:i:s') : (string)$this->scheduled_at) : null,
             'accepted' => Schema::hasColumn('project_job_assignments', 'accepted') ? (bool) ($this->accepted ?? false) : false,
