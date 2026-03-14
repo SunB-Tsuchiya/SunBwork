@@ -180,6 +180,16 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
         ->name('project_jobs.assignments.edit_user');
     Route::get('/chat/rooms/{id}', [App\Http\Controllers\Chat\ChatController::class, 'showRoom'])->name('chat.rooms.show');
 
+    // Workload setting: show lists (stages, sizes, statuses, difficulties) scoped by company
+    Route::get('workload-setting', [App\Http\Controllers\WorkloadSettingController::class, 'index'])
+        ->name('workload_setting.index');
+
+    // Workload setting edit and save (type = stages|work_item_types|sizes|statuses|difficulties)
+    Route::get('workload-setting/edit/{type}', [App\Http\Controllers\WorkloadSettingController::class, 'edit'])
+        ->name('workload_setting.edit');
+    Route::post('workload-setting/{type}', [App\Http\Controllers\WorkloadSettingController::class, 'store'])
+        ->name('workload_setting.store');
+
 
 
     // Job Requests (Inbox) - minimal CRUD + accept

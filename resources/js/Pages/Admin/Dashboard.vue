@@ -52,24 +52,5 @@ const user = page.props.user;
                 </div>
             </div>
         </div>
-
-        <!-- 管理者専用機能 -->
-        <div class="mb-6 overflow-hidden bg-red-50 p-6 shadow-xl sm:rounded-lg">
-            <h3 class="mb-4 text-lg font-medium text-red-900">管理者専用機能</h3>
-            <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <div class="rounded-lg border border-red-200 bg-white p-4">
-                    <h4 class="font-medium text-red-900">ユーザー管理</h4>
-                    <p class="mt-2 text-sm text-red-700">全ユーザーの管理、作成、編集、削除</p>
-                </div>
-                <div class="rounded-lg border border-red-200 bg-white p-4">
-                    <h4 class="font-medium text-red-900">システム設定</h4>
-                    <p class="mt-2 text-sm text-red-700">システム全体の設定管理</p>
-                </div>
-                <div class="rounded-lg border border-red-200 bg-white p-4">
-                    <h4 class="font-medium text-red-900">レポート</h4>
-                    <p class="mt-2 text-sm text-red-700">システム使用状況の確認</p>
-                </div>
-            </div>
-        </div>
     </AppLayout>
 </template>

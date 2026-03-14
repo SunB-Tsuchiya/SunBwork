@@ -52,24 +52,5 @@ const user = page.props.user;
                 </div>
             </div>
         </div>
-
-        <!-- スーパ管理者専用機能 -->
-        <div class="mb-6 overflow-hidden bg-yellow-50 p-6 shadow-xl sm:rounded-lg">
-            <h3 class="mb-4 text-lg font-medium text-yellow-900">スーパ管理者専用機能</h3>
-            <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <div class="rounded-lg border border-yellow-200 bg-white p-4">
-                    <h4 class="font-medium text-yellow-900">全社権限の管理</h4>
-                    <p class="mt-2 text-sm text-yellow-700">システム全体の最上位権限管理</p>
-                </div>
-                <div class="rounded-lg border border-yellow-200 bg-white p-4">
-                    <h4 class="font-medium text-yellow-900">システム設定</h4>
-                    <p class="mt-2 text-sm text-yellow-700">全体のシステム設定管理</p>
-                </div>
-                <div class="rounded-lg border border-yellow-200 bg-white p-4">
-                    <h4 class="font-medium text-yellow-900">監査・ログ</h4>
-                    <p class="mt-2 text-sm text-yellow-700">監査ログの確認とエクスポート</p>
-                </div>
-            </div>
-        </div>
     </AppLayout>
 </template>

@@ -47,24 +47,5 @@ const user = page.props.user;
                 </div>
             </div>
         </div>
-
-        <!-- オーナー専用機能 -->
-        <div class="mb-6 overflow-hidden bg-orange-50 p-6 shadow-xl sm:rounded-lg">
-            <h3 class="mb-4 text-lg font-medium text-orange-900">進行管理専用機能</h3>
-            <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <div class="rounded-lg border border-orange-200 bg-white p-4">
-                    <h4 class="font-medium text-orange-900">コンテンツ管理</h4>
-                    <p class="mt-2 text-sm text-orange-700">サイトコンテンツの作成、編集、公開</p>
-                </div>
-                <div class="rounded-lg border border-orange-200 bg-white p-4">
-                    <h4 class="font-medium text-orange-900">ユーザー確認</h4>
-                    <p class="mt-2 text-sm text-orange-700">一般ユーザーの活動確認</p>
-                </div>
-                <div class="rounded-lg border border-orange-200 bg-white p-4">
-                    <h4 class="font-medium text-orange-900">統計情報</h4>
-                    <p class="mt-2 text-sm text-orange-700">アクセス統計とユーザー分析</p>
-                </div>
-            </div>
-        </div>
     </AppLayout>
 </template>

@@ -41,6 +41,18 @@ const props = defineProps({
             >
                 作業量分析
             </Link>
+            <Link
+                :href="route('workload_setting.index')"
+                :class="[
+                    'rounded-md px-3 py-2 text-sm font-medium',
+                    active === 'workload_setting'
+                        ? 'bg-orange-100 text-orange-700'
+                        : 'border border-green-200 text-green-600 hover:bg-green-50 hover:text-green-800',
+                ]"
+            >
+                作業項目設定
+            </Link>
+
             <!-- <Link :href="route('profile.show')"
         :class="[
           'px-3 py-2 font-medium text-sm rounded-md',

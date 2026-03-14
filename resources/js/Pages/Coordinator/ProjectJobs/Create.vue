@@ -20,8 +20,6 @@
                         v-model="form.jobcode"
                         type="text"
                         class="w-full rounded border px-3 py-2"
-                        required
-                        pattern="^[0-9\-]+$"
                         inputmode="text"
                         title="数字とハイフンのみ入力できます"
                         @input="validateJobcode"
@@ -201,7 +199,7 @@ function closeClientListModal() {
 }
 function searchClientById() {
     if (!clientSearch.value.id) return;
-    fetch(`/api/clients/${clientSearch.value.id}`, { headers: { Accept: "application/json" }, credentials: "same-origin" })
+    fetch(`/api/clients/${clientSearch.value.id}`, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
             clientSearchResult.value = data;
@@ -209,7 +207,7 @@ function searchClientById() {
 }
 function searchClientByName() {
     if (!clientSearch.value.name) return;
-    fetch(`/api/clients?name=${encodeURIComponent(clientSearch.value.name)}`, { headers: { Accept: "application/json" }, credentials: "same-origin" })
+    fetch(`/api/clients?name=${encodeURIComponent(clientSearch.value.name)}`, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
             clientSearchResult.value = data && data.length ? data[0] : null;
@@ -235,6 +233,13 @@ const errorLabels = {
 };
 
 function submit() {
+    // jobcode は未入力を許可。入力がある場合は数字とハイフンのみ許可する。
+    if (form.jobcode && !/^[0-9\-]+$/.test(form.jobcode)) {
+        jobcodeError.value = '数字とハイフンのみ入力できます';
+        alert('伝票番号は数字とハイフンのみ入力できます');
+        return;
+    }
+
     // teammember/scheduleはnullで送信
     form.teammember = null;
     form.schedule = null;

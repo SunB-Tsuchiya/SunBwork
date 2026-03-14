@@ -37,7 +37,7 @@ class ProjectJobController extends Controller
 
         try {
             $data = $request->validate([
-                'jobcode' => ['required', 'string', 'max:255', 'regex:/^[0-9\-]+$/'],
+                'jobcode' => ['nullable', 'string', 'max:255', 'regex:/^[0-9\-]+$/'],
                 'title' => 'required|string|max:255',
                 'user_id' => 'required|exists:users,id',
                 'client_id' => 'required|exists:clients,id',
@@ -273,7 +273,7 @@ class ProjectJobController extends Controller
     {
         try {
             $data = $request->validate([
-                'jobcode' => ['required', 'string', 'max:255', 'regex:/^[0-9\-]+$/'],
+                'jobcode' => ['nullable', 'string', 'max:255', 'regex:/^[0-9\-]+$/'],
                 'title' => 'required|string|max:255',
                 'user_id' => 'required|exists:users,id',
                 'client_id' => 'required|exists:clients,id',
