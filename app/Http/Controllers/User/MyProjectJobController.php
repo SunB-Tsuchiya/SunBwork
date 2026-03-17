@@ -7,6 +7,8 @@ use Illuminate\Http\Request;
 use App\Models\ProjectJob;
 use Inertia\Inertia;
 use App\Models\ProjectJobAssignmentByMyself;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 use Illuminate\Support\Facades\Log;
 
@@ -15,22 +17,86 @@ class MyProjectJobController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
+        $q = $request->input('q');
+        $periodParam = $request->query('period');
+        $usePeriodFilter = true;
+        $periodModel = $periodParam;
+        if ($periodParam === null) {
+            $periodModel = now()->format('Y-m');
+        } elseif ($periodParam === '' || $periodParam === 'all') {
+            $usePeriodFilter = false;
+        }
+
+        $periodStart = null;
+        $periodEnd = null;
+        if ($usePeriodFilter) {
+            try {
+                $periodStart = Carbon::createFromFormat('Y-m', $periodModel)->startOfMonth();
+                $periodEnd = Carbon::createFromFormat('Y-m', $periodModel)->endOfMonth();
+            } catch (\Throwable $__e) {
+                $periodModel = now()->format('Y-m');
+                $periodStart = Carbon::createFromFormat('Y-m', $periodModel)->startOfMonth();
+                $periodEnd = Carbon::createFromFormat('Y-m', $periodModel)->endOfMonth();
+            }
+        }
+
         $jobs = ProjectJob::with('client')
             ->where('user_id', $user->id)
             ->get();
         // ユーザー自身が登録した「自分用割当」を取得（ページネーション）
-        $myAssignments = ProjectJobAssignmentByMyself::where('user_id', $user->id)
+        $baseAssignments = ProjectJobAssignmentByMyself::where('user_id', $user->id)
             ->with(['projectJob.client', 'user', 'statusModel', 'events' => function ($q) {
                 $q->orderBy('starts_at');
             }])
-            ->orderBy('created_at', 'desc')
-            ->paginate(20);
+            ->orderBy('created_at', 'desc');
+
+        if ($q) {
+            $baseAssignments->where(function ($sub) use ($q) {
+                $sub->where('title', 'like', "%{$q}%")
+                    ->orWhere('detail', 'like', "%{$q}%");
+            });
+        }
+
+        if ($usePeriodFilter && $periodStart && $periodEnd) {
+            $baseAssignments->whereBetween(
+                DB::raw('COALESCE(desired_end_date, created_at)'),
+                [$periodStart, $periodEnd]
+            );
+        }
+
+        $appendParams = ['period' => $periodModel];
+        if ($q !== null && $q !== '') {
+            $appendParams['q'] = $q;
+        }
+
+        $myAssignments = $baseAssignments->paginate(20)->appends($appendParams);
+
+        $monthValues = ProjectJobAssignmentByMyself::where('user_id', $user->id)
+            ->selectRaw("DATE_FORMAT(COALESCE(desired_end_date, created_at), '%Y-%m') as ym")
+            ->groupBy('ym')
+            ->orderBy('ym', 'desc')
+            ->pluck('ym');
+
+        $monthOptions = $monthValues
+            ->filter()
+            ->map(function ($ym) {
+                try {
+                    $label = Carbon::createFromFormat('Y-m', $ym)->format('Y年n月');
+                } catch (\Throwable $__e) {
+                    $label = $ym;
+                }
+                return ['value' => $ym, 'label' => $label];
+            })
+            ->values();
         // フラッシュデータからjobid/register_flagsを取得
         $jobid = session('jobid');
         $registerFlags = session('register_flags', []);
         return Inertia::render('MyJobBox/Index', [
             'jobs' => $jobs,
             'myAssignments' => $myAssignments,
+            'monthOptions' => $monthOptions,
+            'period' => $periodModel,
+            'q' => $q,
             'jobid' => $jobid,
             'registerFlags' => $registerFlags,
         ]);

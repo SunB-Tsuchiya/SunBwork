@@ -27,11 +27,13 @@ const props = defineProps({
         <template #header>
             <h2 class="text-xl font-semibold leading-tight text-gray-800">予定表</h2>
         </template>
-        <div class="py-12">
-            <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                <Calendar :diaries="diaries" :events="events" :jobs="jobs" />
+        <main>
+            <div class="py-2">
+                <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
+                    <Calendar :diaries="diaries" :events="events" :jobs="jobs" />
+                </div>
             </div>
-        </div>
+        </main>
     </AppLayout>
 </template>
 

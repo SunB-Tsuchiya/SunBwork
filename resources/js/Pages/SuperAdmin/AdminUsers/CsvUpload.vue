@@ -5,7 +5,6 @@ import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import AdminNavigationTabs from '@/Components/Tabs/AdminNavigationTabs.vue';
 import { ref, computed } from 'vue';
 
 const props = defineProps({
@@ -65,8 +64,6 @@ const submit = () => {
 
         <div class="py-12">
             <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-                <!-- ナビゲーションタブ -->
-                <AdminNavigationTabs active="users" />
                 <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg">
                     <div class="p-6">
                         <!-- 説明セクション -->

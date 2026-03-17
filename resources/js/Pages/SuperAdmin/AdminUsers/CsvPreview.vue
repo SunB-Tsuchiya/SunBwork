@@ -1,6 +1,5 @@
 <script setup>
 import PrimaryButton from '@/Components/PrimaryButton.vue';
-import AdminNavigationTabs from '@/Components/Tabs/AdminNavigationTabs.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, useForm } from '@inertiajs/vue3';
 
@@ -69,9 +68,6 @@ const getRoleLabel = (role) => {
 
         <div class="py-12">
             <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                <!-- ナビゲーションタブ -->
-                <AdminNavigationTabs active="users" />
-
                 <!-- 登録先情報 -->
                 <div class="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
                     <h3 class="mb-3 text-lg font-medium text-blue-800">📍 登録先情報</h3>

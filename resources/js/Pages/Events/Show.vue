@@ -86,7 +86,7 @@ function submitComplete() {
                         </button>
                     </form>
                 </template>
-                <Link :href="route('calendar.index')" class="rounded bg-gray-200 px-4 py-2 text-gray-700">戻る</Link>
+                <button @click="window.history.back()" class="rounded bg-gray-200 px-4 py-2 text-gray-700">戻る</button>
             </div>
         </div>
     </AppLayout>

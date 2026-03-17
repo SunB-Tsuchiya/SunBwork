@@ -7,6 +7,7 @@ use App\Models\ProjectJob;
 use App\Models\JobAssignmentMessage;
 use App\Models\ProjectJobAssignment;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -43,6 +44,27 @@ class JobBoxController extends Controller
         }
 
         $q = $request->input('q');
+        $periodParam = $request->query('period');
+        $usePeriodFilter = true;
+        $periodModel = $periodParam;
+        if ($periodParam === null) {
+            $periodModel = now()->format('Y-m');
+        } elseif ($periodParam === '' || $periodParam === 'all') {
+            $usePeriodFilter = false;
+        }
+
+        $periodStart = null;
+        $periodEnd = null;
+        if ($usePeriodFilter) {
+            try {
+                $periodStart = Carbon::createFromFormat('Y-m', $periodModel)->startOfMonth();
+                $periodEnd = Carbon::createFromFormat('Y-m', $periodModel)->endOfMonth();
+            } catch (\Throwable $__e) {
+                $periodModel = now()->format('Y-m');
+                $periodStart = Carbon::createFromFormat('Y-m', $periodModel)->startOfMonth();
+                $periodEnd = Carbon::createFromFormat('Y-m', $periodModel)->endOfMonth();
+            }
+        }
         $sort = $request->input('sort');
         $dir = strtolower($request->input('dir', 'desc')) === 'asc' ? 'asc' : 'desc';
 
@@ -62,6 +84,13 @@ class JobBoxController extends Controller
             $base->where(function ($sub) use ($q) {
                 $sub->where('job_assignment_messages.subject', 'like', "%{$q}%")->orWhere('job_assignment_messages.body', 'like', "%{$q}%");
             });
+        }
+
+        if ($usePeriodFilter && $periodStart && $periodEnd) {
+            $base->whereBetween(
+                DB::raw('COALESCE(project_job_assignments.desired_end_date, job_assignment_messages.created_at)'),
+                [$periodStart, $periodEnd]
+            );
         }
 
         // Sorting whitelist
@@ -90,7 +119,7 @@ class JobBoxController extends Controller
             'projectJobAssignment.user',
         ])
             ->paginate(20)
-            ->appends(array_filter(['q' => $q, 'sort' => $sort, 'dir' => $dir]));
+            ->appends(array_filter(['q' => $q, 'period' => $periodModel, 'sort' => $sort, 'dir' => $dir]));
         // Attach canonical `status` object to each loaded assignment for frontend convenience
         try {
             $messages->getCollection()->transform(function ($msg) {
@@ -112,10 +141,37 @@ class JobBoxController extends Controller
             // non-fatal
         }
 
+        $monthBase = JobAssignmentMessage::join('project_job_assignments', 'job_assignment_messages.project_job_assignment_id', '=', 'project_job_assignments.id')
+            ->where('project_job_assignments.project_job_id', $projectJob->id);
+
+        if (! $isPrivileged && $user) {
+            $monthBase->where('project_job_assignments.user_id', $user->id);
+        }
+
+        $monthValues = $monthBase
+            ->selectRaw("DATE_FORMAT(COALESCE(project_job_assignments.desired_end_date, job_assignment_messages.created_at), '%Y-%m') as ym")
+            ->groupBy('ym')
+            ->orderBy('ym', 'desc')
+            ->pluck('ym');
+
+        $monthOptions = $monthValues
+            ->filter()
+            ->map(function ($ym) {
+                try {
+                    $label = Carbon::createFromFormat('Y-m', $ym)->format('Y年n月');
+                } catch (\Throwable $__e) {
+                    $label = $ym;
+                }
+                return ['value' => $ym, 'label' => $label];
+            })
+            ->values();
+
         return inertia('JobBox/Index', [
             'projectJob' => $projectJob,
             'messages' => $messages,
             'q' => $q,
+            'period' => $periodModel,
+            'monthOptions' => $monthOptions,
             'sort' => $sort,
             'dir' => $dir,
         ]);
@@ -133,6 +189,27 @@ class JobBoxController extends Controller
         }
 
         $q = $request->input('q');
+        $periodParam = $request->query('period');
+        $usePeriodFilter = true;
+        $periodModel = $periodParam;
+        if ($periodParam === null) {
+            $periodModel = now()->format('Y-m');
+        } elseif ($periodParam === '' || $periodParam === 'all') {
+            $usePeriodFilter = false;
+        }
+
+        $periodStart = null;
+        $periodEnd = null;
+        if ($usePeriodFilter) {
+            try {
+                $periodStart = Carbon::createFromFormat('Y-m', $periodModel)->startOfMonth();
+                $periodEnd = Carbon::createFromFormat('Y-m', $periodModel)->endOfMonth();
+            } catch (\Throwable $__e) {
+                $periodModel = now()->format('Y-m');
+                $periodStart = Carbon::createFromFormat('Y-m', $periodModel)->startOfMonth();
+                $periodEnd = Carbon::createFromFormat('Y-m', $periodModel)->endOfMonth();
+            }
+        }
         $sort = $request->input('sort');
         $dir = strtolower($request->input('dir', 'desc')) === 'asc' ? 'asc' : 'desc';
 
@@ -147,6 +224,13 @@ class JobBoxController extends Controller
             $base->where(function ($sub) use ($q) {
                 $sub->where('job_assignment_messages.subject', 'like', "%{$q}%")->orWhere('job_assignment_messages.body', 'like', "%{$q}%");
             });
+        }
+
+        if ($usePeriodFilter && $periodStart && $periodEnd) {
+            $base->whereBetween(
+                DB::raw('COALESCE(project_job_assignments.desired_end_date, job_assignment_messages.created_at)'),
+                [$periodStart, $periodEnd]
+            );
         }
 
         switch ($sort) {
@@ -166,12 +250,35 @@ class JobBoxController extends Controller
         // Ensure statusModel is loaded for each linked assignment
         $messages = $base->with(['sender', 'message.recipients.user', 'message.fromUser', 'projectJobAssignment.projectJob.client', 'projectJobAssignment.statusModel', 'projectJobAssignment.user'])
             ->paginate(20)
-            ->appends(array_filter(['q' => $q, 'sort' => $sort, 'dir' => $dir]));
+            ->appends(array_filter(['q' => $q, 'period' => $periodModel, 'sort' => $sort, 'dir' => $dir]));
+
+        $monthValues = JobAssignmentMessage::join('project_job_assignments', 'job_assignment_messages.project_job_assignment_id', '=', 'project_job_assignments.id')
+            ->where(function ($qry) use ($user) {
+                $qry->where('project_job_assignments.user_id', $user->id)->orWhere('job_assignment_messages.sender_id', $user->id);
+            })
+            ->selectRaw("DATE_FORMAT(COALESCE(project_job_assignments.desired_end_date, job_assignment_messages.created_at), '%Y-%m') as ym")
+            ->groupBy('ym')
+            ->orderBy('ym', 'desc')
+            ->pluck('ym');
+
+        $monthOptions = $monthValues
+            ->filter()
+            ->map(function ($ym) {
+                try {
+                    $label = Carbon::createFromFormat('Y-m', $ym)->format('Y年n月');
+                } catch (\Throwable $__e) {
+                    $label = $ym;
+                }
+                return ['value' => $ym, 'label' => $label];
+            })
+            ->values();
 
         return inertia('JobBox/Index', [
             'projectJob' => null,
             'messages' => $messages,
             'q' => $q,
+            'period' => $periodModel,
+            'monthOptions' => $monthOptions,
             'sort' => $sort,
             'dir' => $dir,
         ]);
@@ -190,6 +297,27 @@ class JobBoxController extends Controller
         }
 
         $q = $request->input('q');
+        $periodParam = $request->query('period');
+        $usePeriodFilter = true;
+        $periodModel = $periodParam;
+        if ($periodParam === null) {
+            $periodModel = now()->format('Y-m');
+        } elseif ($periodParam === '' || $periodParam === 'all') {
+            $usePeriodFilter = false;
+        }
+
+        $periodStart = null;
+        $periodEnd = null;
+        if ($usePeriodFilter) {
+            try {
+                $periodStart = Carbon::createFromFormat('Y-m', $periodModel)->startOfMonth();
+                $periodEnd = Carbon::createFromFormat('Y-m', $periodModel)->endOfMonth();
+            } catch (\Throwable $__e) {
+                $periodModel = now()->format('Y-m');
+                $periodStart = Carbon::createFromFormat('Y-m', $periodModel)->startOfMonth();
+                $periodEnd = Carbon::createFromFormat('Y-m', $periodModel)->endOfMonth();
+            }
+        }
         $sort = $request->input('sort');
         $dir = strtolower($request->input('dir', 'desc')) === 'asc' ? 'asc' : 'desc';
 
@@ -202,6 +330,13 @@ class JobBoxController extends Controller
             $base->where(function ($sub) use ($q) {
                 $sub->where('job_assignment_messages.subject', 'like', "%{$q}%")->orWhere('job_assignment_messages.body', 'like', "%{$q}%");
             });
+        }
+
+        if ($usePeriodFilter && $periodStart && $periodEnd) {
+            $base->whereBetween(
+                DB::raw('COALESCE(project_job_assignments.desired_end_date, job_assignment_messages.created_at)'),
+                [$periodStart, $periodEnd]
+            );
         }
 
         switch ($sort) {
@@ -220,12 +355,33 @@ class JobBoxController extends Controller
 
         $messages = $base->with(['sender', 'message.recipients.user', 'message.fromUser', 'projectJobAssignment.projectJob.client', 'projectJobAssignment.statusModel', 'projectJobAssignment.user'])
             ->paginate(20)
-            ->appends(array_filter(['q' => $q, 'sort' => $sort, 'dir' => $dir]));
+            ->appends(array_filter(['q' => $q, 'period' => $periodModel, 'sort' => $sort, 'dir' => $dir]));
+
+        $monthValues = JobAssignmentMessage::join('project_job_assignments', 'job_assignment_messages.project_job_assignment_id', '=', 'project_job_assignments.id')
+            ->where('project_job_assignments.user_id', $user->id)
+            ->selectRaw("DATE_FORMAT(COALESCE(project_job_assignments.desired_end_date, job_assignment_messages.created_at), '%Y-%m') as ym")
+            ->groupBy('ym')
+            ->orderBy('ym', 'desc')
+            ->pluck('ym');
+
+        $monthOptions = $monthValues
+            ->filter()
+            ->map(function ($ym) {
+                try {
+                    $label = Carbon::createFromFormat('Y-m', $ym)->format('Y年n月');
+                } catch (\Throwable $__e) {
+                    $label = $ym;
+                }
+                return ['value' => $ym, 'label' => $label];
+            })
+            ->values();
 
         return inertia('JobBox/Index', [
             'projectJob' => null,
             'messages' => $messages,
             'q' => $q,
+            'period' => $periodModel,
+            'monthOptions' => $monthOptions,
             'sort' => $sort,
             'dir' => $dir,
         ]);

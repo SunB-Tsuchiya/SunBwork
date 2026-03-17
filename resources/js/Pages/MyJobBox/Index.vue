@@ -25,6 +25,23 @@
                     >
                 </div>
             </div>
+            <div>
+                <div class="mb-4 flex items-center" style="gap: 10px; justify-content: flex-start">
+                    <label for="periodSelect" class="text-sm text-gray-700">期間:</label>
+                    <select
+                        id="periodSelect"
+                        v-model="page.props.period_model"
+                        @change="search"
+                        class="rounded border px-3 py-2 text-sm"
+                        style="width: 9.5em; min-width: 9.5em"
+                    >
+                        <option value="all">全期間</option>
+                        <option v-for="m in monthOptions" :key="m.value" :value="m.value">
+                            {{ m.label }}
+                        </option>
+                    </select>
+                </div>
+            </div>
             <div class="overflow-x-auto">
                 <table class="min-w-full border">
                     <thead>
@@ -195,6 +212,8 @@ import { computed, onMounted, reactive, ref } from 'vue';
 const props = defineProps({ projectJob: Object, messages: Object, myAssignments: Object });
 const page = usePage();
 page.props.q_model = page.props.q || '';
+page.props.period_model = page.props.period ?? '';
+const monthOptions = computed(() => (Array.isArray(page.props.monthOptions) ? page.props.monthOptions : []));
 // propagate server sort state into the component for UI
 const currentSort = page.props.sort || null;
 const currentDir = page.props.dir || 'desc';
@@ -230,6 +249,18 @@ function isSorted(key) {
 
 function sortIcon() {
     return sortState.dir === 'asc' ? '▲' : '▼';
+}
+
+function search() {
+    try {
+        router.get(route('user.myjobbox.index'), { q: page.props.q_model, period: page.props.period_model }, { preserveState: false });
+    } catch (err) {
+        const params = new URLSearchParams();
+        params.set('q', page.props.q_model || '');
+        params.set('period', page.props.period_model === undefined ? '' : page.props.period_model);
+        const qs = params.toString();
+        window.location.href = `/myjobbox${qs ? `?${qs}` : ''}`;
+    }
 }
 
 function navigateTo(url) {
@@ -574,21 +605,18 @@ function changeSort(key) {
         sortState.dir = 'asc';
     }
 
-    const pjId = props.projectJob?.id;
-    const params = { q: page.props.q_model, sort: sortState.sort, dir: sortState.dir };
+    const params = { q: page.props.q_model, period: page.props.period_model, sort: sortState.sort, dir: sortState.dir };
     try {
-        // if (pjId) {
-        //     const r =
-        //         page.props.auth.user && page.props.auth.user.isCoordinator ? 'coordinator.project_jobs.jobbox.index' : 'project_jobs.jobbox.index';
-        //     router.get(route(r, { projectJob: pjId }), params, { preserveState: false });
-        //     return;
-        // }
-        // global jobbox route: named 'project_jobs.index' or fallback route
-        router.get(route('project_jobs.index'), params, { preserveState: false });
+        router.get(route('user.myjobbox.index'), params, { preserveState: false });
     } catch (err) {
         // fallback: reload current url with query params
         router.get(window.location.pathname, params, { preserveState: false });
     }
+}
+
+function clearSearch() {
+    page.props.q_model = '';
+    search();
 }
 
 onMounted(() => {

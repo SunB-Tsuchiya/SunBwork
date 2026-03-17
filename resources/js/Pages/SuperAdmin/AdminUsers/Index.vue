@@ -1,6 +1,5 @@
 <script setup>
 import DialogModal from '@/Components/DialogModal.vue';
-import SuperAdminNavigationTabs from '@/Components/Tabs/SuperAdminNavigationTabs.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
@@ -198,9 +197,6 @@ const getAssignmentText = (assignment) => {
 
         <div class="py-12">
             <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                <!-- ナビゲーションタブ -->
-                <SuperAdminNavigationTabs active="users" />
-
                 <div class="overflow-hidden bg-white shadow-xl sm:rounded-lg">
                     <div class="p-6">
                         <div class="mb-4 flex items-center justify-between">

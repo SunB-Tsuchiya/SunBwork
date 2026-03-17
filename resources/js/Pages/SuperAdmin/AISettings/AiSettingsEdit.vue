@@ -208,7 +208,7 @@ function onModelChange(e) {
         </template>
 
         <main>
-            <div class="py-12">
+            <div class="py-2">
                 <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
                     <div class="bg-white p-6 shadow-xl sm:rounded-lg">
                         <form @submit.prevent="submit" class="space-y-4">

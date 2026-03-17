@@ -183,12 +183,19 @@ const getTopTabActive = () => {
     try {
         const r = route().current();
         if (!r) return '';
-        // map some route name fragments to the tab keys used by components
-        if (r.includes('users') || r.includes('adminusers') || r.includes('superadmin.users')) return 'users';
+        if (r.includes('users') || r.includes('adminusers')) return 'users';
         if (r.includes('companies')) return 'companies';
         if (r.includes('debug') || r.includes('api')) return 'debug';
         if (r.includes('teams')) return 'teams';
         if (r.includes('clients')) return 'clients';
+        if (r.includes('workload_setting')) return 'workload_setting';
+        if (r.includes('workload_analyzer')) return 'workload';
+        if (r.includes('diaryinteractions') || r.includes('diaries')) return 'diaries';
+        if (r.includes('ai')) return 'ai';
+        if (r.includes('calendar')) return 'calendar';
+        if (r.includes('myjobbox') || r === 'dashboard') return 'myjob';
+        if (r.includes('user.jobbox')) return 'jobbox';
+        if (r.includes('profile')) return 'profile';
         return '';
     } catch (e) {
         return '';
@@ -207,6 +214,23 @@ const computeCoordinatorActive = () => {
         return 'projects';
     }
 };
+
+// Determine which role "area" the current route belongs to.
+// SuperAdmin/Admin can navigate to lower-role areas; use route prefix to detect.
+const currentRouteContext = computed(() => {
+    try {
+        const r = route().current();
+        if (!r) return page.props.auth?.user?.user_role || 'user';
+        if (r.startsWith('superadmin.')) return 'superadmin';
+        if (r.startsWith('admin.')) return 'admin';
+        if (r.startsWith('leader.') || r.startsWith('workload_setting.')) return 'leader';
+        if (r.startsWith('coordinator.')) return 'coordinator';
+        // fallback to actual user role
+        return page.props.auth?.user?.user_role || 'user';
+    } catch (e) {
+        return page.props.auth?.user?.user_role || 'user';
+    }
+});
 </script>
 
 <template>
@@ -507,6 +531,104 @@ const computeCoordinatorActive = () => {
                         </template>
                     </div>
 
+                    <!-- Responsive Role Sub-Tabs (route-context based) -->
+                    <div class="space-y-1 border-t border-gray-200 pb-3 pt-2">
+                        <!-- SuperAdmin sub-tabs -->
+                        <template v-if="currentRouteContext === 'superadmin'">
+                            <ResponsiveNavLink
+                                v-if="typeof route === 'function' && route().has('superadmin.companies.index')"
+                                :href="route('superadmin.companies.index')"
+                                :active="route().current('superadmin.companies.*')"
+                                ><span class="text-yellow-600">会社の追加と管理</span></ResponsiveNavLink
+                            >
+                            <ResponsiveNavLink :href="route('superadmin.adminusers.index')" :active="route().current('superadmin.adminusers.*')"
+                                ><span class="text-yellow-600">Adminユーザー管理</span></ResponsiveNavLink
+                            >
+                            <ResponsiveNavLink
+                                v-if="typeof route === 'function' && route().has('superadmin.ai.index')"
+                                :href="route('superadmin.ai.index')"
+                                :active="route().current('superadmin.ai.*')"
+                                ><span class="text-yellow-600">AI設定</span></ResponsiveNavLink
+                            >
+                            <ResponsiveNavLink :href="route('debug.api')" :active="route().current('debug.api')"
+                                ><span class="text-yellow-600">APIデバッグページ</span></ResponsiveNavLink
+                            >
+                        </template>
+
+                        <!-- Admin sub-tabs -->
+                        <template v-else-if="currentRouteContext === 'admin'">
+                            <ResponsiveNavLink
+                                v-if="typeof route === 'function' && route().has('admin.companies.index')"
+                                :href="route('admin.companies.index')"
+                                :active="route().current('admin.companies.*')"
+                                ><span class="text-red-600">会社管理</span></ResponsiveNavLink
+                            >
+                            <ResponsiveNavLink :href="route('admin.users.index')" :active="route().current('admin.users.*')">
+                                <span class="text-red-600">ユーザー管理</span>
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('admin.teams.index')" :active="route().current('admin.teams.*')">
+                                <span class="text-red-600">チーム管理</span>
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('admin.diaryinteractions.index')" :active="route().current('admin.diaryinteractions.*')">
+                                <span class="text-red-600">日報管理</span>
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('admin.clients.index')" :active="route().current('admin.clients.*')">
+                                <span class="text-red-600">クライアント管理</span>
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('admin.workload_analyzer.index')" :active="route().current('admin.workload_analyzer.*')">
+                                <span class="text-red-600">作業量分析</span>
+                            </ResponsiveNavLink>
+                        </template>
+
+                        <!-- Leader sub-tabs -->
+                        <template v-else-if="currentRouteContext === 'leader'">
+                            <ResponsiveNavLink :href="route('leader.clients.index')" :active="route().current('leader.clients.*')">
+                                <span class="text-orange-600">クライアント管理</span>
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink
+                                :href="route('leader.diaryinteractions.index')"
+                                :active="route().current('leader.diaryinteractions.*')"
+                            >
+                                <span class="text-orange-600">日報管理</span>
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink
+                                :href="route('leader.workload_analyzer.index')"
+                                :active="route().current('leader.workload_analyzer.*')"
+                            >
+                                <span class="text-orange-600">作業量分析</span>
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('workload_setting.index')" :active="route().current('workload_setting.*')">
+                                <span class="text-orange-600">作業項目設定</span>
+                            </ResponsiveNavLink>
+                        </template>
+
+                        <!-- Coordinator sub-tabs -->
+                        <template v-else-if="currentRouteContext === 'coordinator'">
+                            <ResponsiveNavLink
+                                :href="route('coordinator.project_jobs.index')"
+                                :active="route().current('coordinator.project_jobs.*')"
+                            >
+                                <span class="text-green-600">案件一覧</span>
+                            </ResponsiveNavLink>
+                        </template>
+
+                        <!-- User sub-tabs -->
+                        <template v-else>
+                            <ResponsiveNavLink href="/myjobbox" :active="route().current('myjobbox')">
+                                <span class="text-blue-600">マイジョブ</span>
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink href="/user/jobbox" :active="route().current('user.jobbox*')">
+                                <span class="text-blue-600">依頼されたジョブ</span>
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('diaries.index')" :active="route().current('diaries.*')">
+                                <span class="text-blue-600">日報一覧</span>
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('calendar.index')" :active="route().current('calendar.*')">
+                                <span class="text-blue-600">予定表</span>
+                            </ResponsiveNavLink>
+                        </template>
+                    </div>
+
                     <!-- Responsive Settings Options -->
                     <div class="border-t border-gray-200 pb-1 pt-4">
                         <div class="flex items-center px-4">
@@ -618,34 +740,24 @@ const computeCoordinatorActive = () => {
             <!-- Page Content -->
             <!-- Toasts -->
             <ToastUnified />
-            <div class="py-12">
+            <div class="py-6">
+                <!-- ここにページ固有のタブが入ります（必要なければ中央の役割ベースタブが表示されます） -->
                 <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
                     <!-- Role-specific tabs (centralized for Admin/SuperAdmin to avoid duplicates) -->
                     <div class="mx-auto mt-6 max-w-7xl sm:px-6 lg:px-8">
                         <!-- Allow pages to provide their own tabs via named slot 'tabs'. Falls back to centralized role tabs. -->
                         <slot name="tabs">
-                            <!-- Role-specific navigation tabs (centralized) -->
-                            <div
-                                v-if="
-                                    typeof route === 'function' &&
-                                    (route().current('superadmin.dashboard') ||
-                                        route().current('admin.dashboard') ||
-                                        route().current('leader.dashboard') ||
-                                        route().current('coordinator.dashboard') ||
-                                        route().current('dashboard') ||
-                                        route().current('user.dashboard'))
-                                "
-                                class=""
-                            >
-                                <SuperAdminNavigationTabs v-if="route().current('superadmin.dashboard')" active="users" />
-                                <AdminNavigationTabs v-else-if="route().current('admin.dashboard')" active="users" />
-                                <LeaderNavigationTabs v-else-if="route().current('leader.dashboard')" active="clients" />
+                            <!-- Role-specific navigation tabs (centralized, based on current route area) -->
+                            <div v-if="page.props.auth && page.props.auth.user" class="">
+                                <SuperAdminNavigationTabs v-if="currentRouteContext === 'superadmin'" :active="getTopTabActive()" />
+                                <AdminNavigationTabs v-else-if="currentRouteContext === 'admin'" :active="getTopTabActive()" />
+                                <LeaderNavigationTabs v-else-if="currentRouteContext === 'leader'" :active="getTopTabActive()" />
                                 <CoordinatorNavigationTabs
-                                    v-else-if="route().current('coordinator.dashboard')"
+                                    v-else-if="currentRouteContext === 'coordinator'"
                                     :projectJob="page.props.projectJob"
                                     :active="computeCoordinatorActive()"
                                 />
-                                <UserNavigationTabs v-else-if="route().current('dashboard') || route().current('user.dashboard')" active="profile" />
+                                <UserNavigationTabs v-else :active="getTopTabActive()" />
                             </div>
                         </slot>
                     </div>

@@ -5,7 +5,7 @@
         </template>
 
         <main>
-            <div class="py-6">
+            <div class="py-2">
                 <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
                     <!-- Top toolbar: compose, address book, search -->
                     <div class="mb-4 flex items-center gap-3">
@@ -173,9 +173,9 @@
                                                         <button
                                                             @click.stop.prevent="onIndexDeleteClick(m)"
                                                             class="rounded bg-red-50 px-2 py-1 text-sm text-red-700 hover:bg-red-100"
-                                                            :title="(folder === 'trash' || isTrashed(m)) ? '完全削除' : '削除（ゴミ箱へ移動）'"
+                                                            :title="folder === 'trash' || isTrashed(m) ? '完全削除' : '削除（ゴミ箱へ移動）'"
                                                         >
-                                                            {{ (folder === 'trash' || isTrashed(m)) ? '完全削除' : '削除' }}
+                                                            {{ folder === 'trash' || isTrashed(m) ? '完全削除' : '削除' }}
                                                         </button>
                                                     </td>
                                                 </tr>

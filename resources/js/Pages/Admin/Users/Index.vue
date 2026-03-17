@@ -1,6 +1,5 @@
 <script setup>
 import DialogModal from '@/Components/DialogModal.vue';
-import AdminNavigationTabs from '@/Components/Tabs/AdminNavigationTabs.vue';
 import UserTable from '@/Components/UserTable.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
@@ -198,33 +197,30 @@ const getAssignmentText = (assignment) => {
                 </template>
             </div>
         </template>
-
-        <div class="py-12">
-            <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                <!-- ナビゲーションタブ -->
-                <AdminNavigationTabs active="users" />
-
-                <div class="overflow-hidden bg-white shadow-xl sm:rounded-lg">
-                    <div class="p-6">
-                        <div class="mb-4 flex items-center justify-between">
-                            <h3 class="text-lg font-medium text-gray-900">登録ユーザー一覧</h3>
-                            <div class="text-sm text-gray-500">総数: {{ filteredUsers.length }}人</div>
-                            <div class="flex items-center space-x-2">
-                                <button @click="openSearchModal" class="rounded bg-blue-600 px-4 py-2 font-bold text-white hover:bg-blue-700">
-                                    絞り込み
-                                </button>
-                                <button @click="clearSearch" class="rounded bg-gray-300 px-4 py-2 font-bold text-gray-800 hover:bg-gray-400">
-                                    クリア
-                                </button>
+        <main>
+            <div class="py-2">
+                <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
+                    <div class="overflow-hidden bg-white shadow-xl sm:rounded-lg">
+                        <div class="p-6">
+                            <div class="mb-4 flex items-center justify-between">
+                                <h3 class="text-lg font-medium text-gray-900">登録ユーザー一覧</h3>
+                                <div class="text-sm text-gray-500">総数: {{ filteredUsers.length }}人</div>
+                                <div class="flex items-center space-x-2">
+                                    <button @click="openSearchModal" class="rounded bg-blue-600 px-4 py-2 font-bold text-white hover:bg-blue-700">
+                                        絞り込み
+                                    </button>
+                                    <button @click="clearSearch" class="rounded bg-gray-300 px-4 py-2 font-bold text-gray-800 hover:bg-gray-400">
+                                        クリア
+                                    </button>
+                                </div>
                             </div>
-                        </div>
 
-                        <div class="overflow-x-auto">
-                            <!-- 検索モーダル -->
-                            <DialogModal :show="showSearchModal" @close="closeSearchModal">
-                                <template #title>ユーザー検索</template>
-                                <template #content>
-                                    <!--
+                            <div class="overflow-x-auto">
+                                <!-- 検索モーダル -->
+                                <DialogModal :show="showSearchModal" @close="closeSearchModal">
+                                    <template #title>ユーザー検索</template>
+                                    <template #content>
+                                        <!--
                     <div class="mb-4">
                         <label class="block mb-1 font-semibold">会社</label>
                         <select class="w-full border rounded px-3 py-2" disabled>
@@ -234,44 +230,45 @@ const getAssignmentText = (assignment) => {
                         </select>
                     </div>
                     -->
-                                    <div class="mb-4">
-                                        <label class="mb-1 block font-semibold">部署</label>
-                                        <select
-                                            v-model="selectedDepartmentId"
-                                            @change="onDepartmentChange"
-                                            class="w-full rounded border px-3 py-2"
-                                            :disabled="!userCompanyId"
-                                        >
-                                            <option value="">-- 部署を選択してください --</option>
-                                            <option v-for="department in filteredDepartments" :key="department.id" :value="String(department.id)">
-                                                {{ department.name }}
-                                            </option>
-                                        </select>
-                                    </div>
-                                    <div class="mb-4">
-                                        <label class="mb-1 block font-semibold">担当</label>
-                                        <select
-                                            v-model="selectedAssignmentId"
-                                            class="w-full rounded border px-3 py-2"
-                                            :disabled="!selectedDepartmentId"
-                                        >
-                                            <option value="">-- 担当を選択してください --</option>
-                                            <option v-for="assignment in filteredAssignments" :key="assignment.id" :value="String(assignment.id)">
-                                                {{ assignment.name }}
-                                            </option>
-                                        </select>
-                                    </div>
-                                </template>
-                                <template #footer>
-                                    <button class="mr-2 rounded bg-gray-300 px-4 py-2" @click="closeSearchModal">閉じる</button>
-                                    <button class="rounded bg-blue-600 px-4 py-2 text-white" @click="doSearch">絞り込み</button>
-                                </template>
-                            </DialogModal>
-                            <UserTable :users="sortedUsers" :departments="props.departments" :assignments="props.assignments" />
+                                        <div class="mb-4">
+                                            <label class="mb-1 block font-semibold">部署</label>
+                                            <select
+                                                v-model="selectedDepartmentId"
+                                                @change="onDepartmentChange"
+                                                class="w-full rounded border px-3 py-2"
+                                                :disabled="!userCompanyId"
+                                            >
+                                                <option value="">-- 部署を選択してください --</option>
+                                                <option v-for="department in filteredDepartments" :key="department.id" :value="String(department.id)">
+                                                    {{ department.name }}
+                                                </option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-4">
+                                            <label class="mb-1 block font-semibold">担当</label>
+                                            <select
+                                                v-model="selectedAssignmentId"
+                                                class="w-full rounded border px-3 py-2"
+                                                :disabled="!selectedDepartmentId"
+                                            >
+                                                <option value="">-- 担当を選択してください --</option>
+                                                <option v-for="assignment in filteredAssignments" :key="assignment.id" :value="String(assignment.id)">
+                                                    {{ assignment.name }}
+                                                </option>
+                                            </select>
+                                        </div>
+                                    </template>
+                                    <template #footer>
+                                        <button class="mr-2 rounded bg-gray-300 px-4 py-2" @click="closeSearchModal">閉じる</button>
+                                        <button class="rounded bg-blue-600 px-4 py-2 text-white" @click="doSearch">絞り込み</button>
+                                    </template>
+                                </DialogModal>
+                                <UserTable :users="sortedUsers" :departments="props.departments" :assignments="props.assignments" />
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </main>
     </AppLayout>
 </template>

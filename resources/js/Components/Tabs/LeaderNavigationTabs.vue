@@ -3,6 +3,13 @@ import { Link } from '@inertiajs/vue3';
 const props = defineProps({
     active: { type: String, default: '' },
 });
+// Leader カラー: orange
+const tab = (key) => [
+    'rounded-md px-3 py-2 text-sm font-medium',
+    props.active === key
+        ? 'bg-orange-100 text-orange-700'
+        : 'border border-orange-200 text-orange-600 hover:bg-orange-50 hover:text-orange-800',
+];
 </script>
 
 <template>
@@ -10,56 +17,28 @@ const props = defineProps({
         <nav class="flex space-x-8" aria-label="Tabs">
             <Link
                 :href="route('leader.clients.index')"
-                :class="[
-                    'rounded-md px-3 py-2 text-sm font-medium',
-                    active === 'clients'
-                        ? 'bg-orange-100 text-orange-700'
-                        : 'border border-green-200 text-green-600 hover:bg-green-50 hover:text-green-800',
-                ]"
+                :class="tab('clients')"
             >
                 クライアント管理
             </Link>
             <Link
                 :href="route('leader.diaryinteractions.index')"
-                :class="[
-                    'rounded-md px-3 py-2 text-sm font-medium',
-                    active === 'diaries'
-                        ? 'bg-orange-100 text-orange-700'
-                        : 'border border-green-200 text-green-600 hover:bg-green-50 hover:text-green-800',
-                ]"
+                :class="tab('diaries')"
             >
                 日報管理
             </Link>
             <Link
                 :href="route('leader.workload_analyzer.index')"
-                :class="[
-                    'rounded-md px-3 py-2 text-sm font-medium',
-                    active === 'workload'
-                        ? 'bg-orange-100 text-orange-700'
-                        : 'border border-green-200 text-green-600 hover:bg-green-50 hover:text-green-800',
-                ]"
+                :class="tab('workload')"
             >
                 作業量分析
             </Link>
             <Link
                 :href="route('workload_setting.index')"
-                :class="[
-                    'rounded-md px-3 py-2 text-sm font-medium',
-                    active === 'workload_setting'
-                        ? 'bg-orange-100 text-orange-700'
-                        : 'border border-green-200 text-green-600 hover:bg-green-50 hover:text-green-800',
-                ]"
+                :class="tab('workload_setting')"
             >
                 作業項目設定
             </Link>
-
-            <!-- <Link :href="route('profile.show')"
-        :class="[
-          'px-3 py-2 font-medium text-sm rounded-md',
-          active === 'profile' ? 'bg-gray-100 text-gray-700' : 'text-gray-600 hover:text-gray-800'
-        ]">
-        プロフィール編集
-      </Link> -->
         </nav>
     </div>
 </template>

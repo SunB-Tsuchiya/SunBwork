@@ -1,7 +1,6 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link } from '@inertiajs/vue3';
-import AdminNavigationTabs from '@/Components/Tabs/AdminNavigationTabs.vue';
 import { router } from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
 import { usePage } from '@inertiajs/vue3';
@@ -109,8 +108,6 @@ const getAssignmentName = (assignment_id) => {
 
 		<div class="py-12">
 			<div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-				<AdminNavigationTabs active="users" />
-
 				<div class="bg-white overflow-hidden shadow-xl sm:rounded-lg">
 					<div class="p-6">
 						<div class="flex items-center justify-between mb-4">

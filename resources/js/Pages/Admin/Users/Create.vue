@@ -7,7 +7,6 @@ import SecondaryButton from '@/Components/SecondaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import Checkbox from '@/Components/Checkbox.vue';
 import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
-import AdminNavigationTabs from '@/Components/Tabs/AdminNavigationTabs.vue';
 import { ref, computed, watch } from 'vue';
 
 // props: companies（親から渡す）
@@ -210,9 +209,6 @@ const submit = () => {
 
         <div class="py-12">
             <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-
-                <!-- ナビゲーションタブ -->
-                <AdminNavigationTabs active="users" />
 
                 <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg p-6 mb-8">
                     <h3 class="text-lg font-medium text-blue-900 mb-2">CSV一括登録</h3>

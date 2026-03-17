@@ -5,133 +5,139 @@
                 <h2 class="text-xl font-semibold leading-tight text-gray-800">チームメンバー管理</h2>
             </div>
         </template>
-        <div class="py-12">
-            <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                <div class="overflow-hidden bg-white shadow-xl sm:rounded-lg">
-                    <div class="p-6">
-                        <div class="mb-4 flex items-center justify-between">
-                            <h3 class="text-lg font-medium text-gray-900">登録チームメンバー一覧</h3>
-                            <div class="flex items-center space-x-2">
-                                <button @click="openSearchModal" class="rounded bg-blue-600 px-4 py-2 font-bold text-white hover:bg-blue-700">
-                                    絞り込み
-                                </button>
-                                <button @click="clearSearch" class="rounded bg-gray-300 px-4 py-2 font-bold text-gray-800 hover:bg-gray-400">
-                                    クリア
-                                </button>
+        <main>
+            <div class="py-2">
+                <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
+                    <div class="overflow-hidden bg-white shadow-xl sm:rounded-lg">
+                        <div class="p-6">
+                            <div class="mb-4 flex items-center justify-between">
+                                <h3 class="text-lg font-medium text-gray-900">登録チームメンバー一覧</h3>
+                                <div class="flex items-center space-x-2">
+                                    <button @click="openSearchModal" class="rounded bg-blue-600 px-4 py-2 font-bold text-white hover:bg-blue-700">
+                                        絞り込み
+                                    </button>
+                                    <button @click="clearSearch" class="rounded bg-gray-300 px-4 py-2 font-bold text-gray-800 hover:bg-gray-400">
+                                        クリア
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                        <DialogModal :show="showSearchModal" @close="closeSearchModal">
-                            <template #title>メンバー検索</template>
-                            <template #content>
-                                <div class="mb-4">
-                                    <label class="mb-1 block font-semibold">部署</label>
-                                    <select v-model="selectedDepartmentId" class="w-full rounded border px-3 py-2">
-                                        <option value="">-- 部署を選択してください --</option>
-                                        <option v-for="department in departments" :key="department.id" :value="String(department.id)">
-                                            {{ department.name }}
-                                        </option>
-                                    </select>
+                            <DialogModal :show="showSearchModal" @close="closeSearchModal">
+                                <template #title>メンバー検索</template>
+                                <template #content>
+                                    <div class="mb-4">
+                                        <label class="mb-1 block font-semibold">部署</label>
+                                        <select v-model="selectedDepartmentId" class="w-full rounded border px-3 py-2">
+                                            <option value="">-- 部署を選択してください --</option>
+                                            <option v-for="department in departments" :key="department.id" :value="String(department.id)">
+                                                {{ department.name }}
+                                            </option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-4">
+                                        <label class="mb-1 block font-semibold">担当</label>
+                                        <select
+                                            v-model="selectedAssignmentId"
+                                            class="w-full rounded border px-3 py-2"
+                                            :disabled="!selectedDepartmentId"
+                                        >
+                                            <option value="">-- 担当を選択してください --</option>
+                                            <option v-for="assignment in filteredAssignments" :key="assignment.id" :value="String(assignment.id)">
+                                                {{ assignment.name }}
+                                            </option>
+                                        </select>
+                                    </div>
+                                </template>
+                                <template #footer>
+                                    <button class="mr-2 rounded bg-gray-300 px-4 py-2" @click="closeSearchModal">閉じる</button>
+                                    <button class="rounded bg-blue-600 px-4 py-2 text-white" @click="doSearch">絞り込み</button>
+                                </template>
+                            </DialogModal>
+                            <div class="overflow-x-auto">
+                                <div class="mb-2 border-b pb-1 text-lg font-bold">メンバー一覧</div>
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                                                <input type="checkbox" :checked="allChecked" @change="toggleAllMembers" />
+                                            </th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">ID</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">名前</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">部署</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">担当</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-200 bg-white">
+                                        <tr
+                                            v-for="member in filteredMembers"
+                                            :key="member.id"
+                                            class="hover:bg-gray-50"
+                                            @click="toggleMember(member.id)"
+                                            :class="{ 'bg-blue-50': selectedMemberIds.includes(member.id), 'cursor-pointer': true }"
+                                        >
+                                            <td class="whitespace-nowrap px-4 py-4 text-sm text-gray-500" @click.stop>
+                                                <input type="checkbox" :value="member.id" v-model="selectedMemberIds" />
+                                            </td>
+                                            <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ member.id }}</td>
+                                            <td class="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">{{ member.name }}</td>
+                                            <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+                                                {{ getDepartmentName(member.department_id) }}
+                                            </td>
+                                            <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+                                                <span
+                                                    :class="getAssignmentBadgeClass(getAssignmentName(member.assignment_id))"
+                                                    class="inline-flex rounded-full px-2 py-1 text-xs font-semibold"
+                                                >
+                                                    {{ getAssignmentName(member.assignment_id) }}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="mt-8 overflow-x-auto">
+                                <div class="mb-2 border-b pb-1 text-lg font-bold">選択中のチームメンバー</div>
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">ID</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">名前</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">部署</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">担当</th>
+                                            <th class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-200 bg-white">
+                                        <tr v-for="member in selectedMembers" :key="member.id" class="hover:bg-gray-50">
+                                            <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ member.id }}</td>
+                                            <td class="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">{{ member.name }}</td>
+                                            <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+                                                {{ getDepartmentName(member.department_id) }}
+                                            </td>
+                                            <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+                                                <span
+                                                    :class="getAssignmentBadgeClass(getAssignmentName(member.assignment_id))"
+                                                    class="inline-flex rounded-full px-2 py-1 text-xs font-semibold"
+                                                >
+                                                    {{ getAssignmentName(member.assignment_id) }}
+                                                </span>
+                                            </td>
+                                            <td class="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
+                                                <button @click="removeSelectedMember(member.id)" class="text-red-600 hover:text-red-900">削除</button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                <div class="mt-4 flex justify-end">
+                                    <button class="rounded bg-blue-600 px-6 py-2 font-bold text-white hover:bg-blue-700" @click="registerMembers">
+                                        メンバー登録
+                                    </button>
                                 </div>
-                                <div class="mb-4">
-                                    <label class="mb-1 block font-semibold">担当</label>
-                                    <select v-model="selectedAssignmentId" class="w-full rounded border px-3 py-2" :disabled="!selectedDepartmentId">
-                                        <option value="">-- 担当を選択してください --</option>
-                                        <option v-for="assignment in filteredAssignments" :key="assignment.id" :value="String(assignment.id)">
-                                            {{ assignment.name }}
-                                        </option>
-                                    </select>
-                                </div>
-                            </template>
-                            <template #footer>
-                                <button class="mr-2 rounded bg-gray-300 px-4 py-2" @click="closeSearchModal">閉じる</button>
-                                <button class="rounded bg-blue-600 px-4 py-2 text-white" @click="doSearch">絞り込み</button>
-                            </template>
-                        </DialogModal>
-                        <div class="overflow-x-auto">
-                            <div class="mb-2 border-b pb-1 text-lg font-bold">メンバー一覧</div>
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                                            <input type="checkbox" :checked="allChecked" @change="toggleAllMembers" />
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">ID</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">名前</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">部署</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">担当</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-200 bg-white">
-                                    <tr
-                                        v-for="member in filteredMembers"
-                                        :key="member.id"
-                                        class="hover:bg-gray-50"
-                                        @click="toggleMember(member.id)"
-                                        :class="{ 'bg-blue-50': selectedMemberIds.includes(member.id), 'cursor-pointer': true }"
-                                    >
-                                        <td class="whitespace-nowrap px-4 py-4 text-sm text-gray-500" @click.stop>
-                                            <input type="checkbox" :value="member.id" v-model="selectedMemberIds" />
-                                        </td>
-                                        <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ member.id }}</td>
-                                        <td class="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">{{ member.name }}</td>
-                                        <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
-                                            {{ getDepartmentName(member.department_id) }}
-                                        </td>
-                                        <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
-                                            <span
-                                                :class="getAssignmentBadgeClass(getAssignmentName(member.assignment_id))"
-                                                class="inline-flex rounded-full px-2 py-1 text-xs font-semibold"
-                                            >
-                                                {{ getAssignmentName(member.assignment_id) }}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                        <div class="mt-8 overflow-x-auto">
-                            <div class="mb-2 border-b pb-1 text-lg font-bold">選択中のチームメンバー</div>
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">ID</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">名前</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">部署</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">担当</th>
-                                        <th class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">操作</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-200 bg-white">
-                                    <tr v-for="member in selectedMembers" :key="member.id" class="hover:bg-gray-50">
-                                        <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ member.id }}</td>
-                                        <td class="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">{{ member.name }}</td>
-                                        <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
-                                            {{ getDepartmentName(member.department_id) }}
-                                        </td>
-                                        <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
-                                            <span
-                                                :class="getAssignmentBadgeClass(getAssignmentName(member.assignment_id))"
-                                                class="inline-flex rounded-full px-2 py-1 text-xs font-semibold"
-                                            >
-                                                {{ getAssignmentName(member.assignment_id) }}
-                                            </span>
-                                        </td>
-                                        <td class="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
-                                            <button @click="removeSelectedMember(member.id)" class="text-red-600 hover:text-red-900">削除</button>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                            <div class="mt-4 flex justify-end">
-                                <button class="rounded bg-blue-600 px-6 py-2 font-bold text-white hover:bg-blue-700" @click="registerMembers">
-                                    メンバー登録
-                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </main>
     </AppLayout>
 </template>
 <script setup>

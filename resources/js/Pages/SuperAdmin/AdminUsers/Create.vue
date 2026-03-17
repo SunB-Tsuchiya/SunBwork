@@ -3,7 +3,6 @@ import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
-import SuperAdminNavigationTabs from '@/Components/Tabs/SuperAdminNavigationTabs.vue';
 import TextInput from '@/Components/TextInput.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, useForm, usePage } from '@inertiajs/vue3';
@@ -224,9 +223,6 @@ const submit = () => {
 
         <div class="py-12">
             <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                <!-- ナビゲーションタブ -->
-                <SuperAdminNavigationTabs active="users" />
-
                 <div class="mb-8 overflow-hidden bg-white p-6 shadow-xl sm:rounded-lg">
                     <!-- <h3 class="text-lg font-medium text-blue-900 mb-2">CSV一括登録</h3>
                     <p class="text-sm text-blue-700 mb-4">

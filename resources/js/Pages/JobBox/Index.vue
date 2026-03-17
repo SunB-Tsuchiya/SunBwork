@@ -25,6 +25,23 @@
                     >
                 </div> -->
             </div>
+            <div>
+                <div class="mb-4 flex items-center" style="gap: 10px; justify-content: flex-start">
+                    <label for="periodSelect" class="text-sm text-gray-700">期間:</label>
+                    <select
+                        id="periodSelect"
+                        v-model="page.props.period_model"
+                        @change="search"
+                        class="rounded border px-3 py-2 text-sm"
+                        style="width: 9.5em; min-width: 9.5em"
+                    >
+                        <option value="all">全期間</option>
+                        <option v-for="m in monthOptions" :key="m.value" :value="m.value">
+                            {{ m.label }}
+                        </option>
+                    </select>
+                </div>
+            </div>
             <div class="overflow-x-auto">
                 <table class="min-w-full border">
                     <thead>
@@ -150,12 +167,15 @@
 
 <script setup>
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import useToasts from '@/Composables/useToasts';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
-import { reactive } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 const props = defineProps({ projectJob: Object, messages: Object });
 const page = usePage();
 page.props.q_model = page.props.q || '';
+page.props.period_model = page.props.period ?? '';
+const monthOptions = computed(() => (Array.isArray(page.props.monthOptions) ? page.props.monthOptions : []));
 // propagate server sort state into the component for UI
 const currentSort = page.props.sort || null;
 const currentDir = page.props.dir || 'desc';
@@ -301,11 +321,12 @@ async function rowClick(m, event) {
 function search() {
     const pjId = props.projectJob?.id;
     if (!pjId) {
-        // no project context yet; avoid calling Ziggy with missing params
+        const target = page.props.auth.user && page.props.auth.user.isCoordinator ? 'project_jobs.index' : 'user.jobbox.index';
+        router.get(route(target), { q: page.props.q_model, period: page.props.period_model }, { preserveState: false });
         return;
     }
     const r = page.props.auth.user && page.props.auth.user.isCoordinator ? 'coordinator.project_jobs.jobbox.index' : 'project_jobs.jobbox.index';
-    router.get(route(r, { projectJob: pjId }), { q: page.props.q_model }, { preserveState: false });
+    router.get(route(r, { projectJob: pjId }), { q: page.props.q_model, period: page.props.period_model }, { preserveState: false });
 }
 
 function changeSort(key) {
@@ -318,7 +339,7 @@ function changeSort(key) {
     }
 
     const pjId = props.projectJob?.id;
-    const params = { q: page.props.q_model, sort: sortState.sort, dir: sortState.dir };
+    const params = { q: page.props.q_model, period: page.props.period_model, sort: sortState.sort, dir: sortState.dir };
     try {
         if (pjId) {
             const r =
@@ -327,7 +348,8 @@ function changeSort(key) {
             return;
         }
         // global jobbox route: named 'project_jobs.index' or fallback route
-        router.get(route('project_jobs.index'), params, { preserveState: false });
+        const target = page.props.auth.user && page.props.auth.user.isCoordinator ? 'project_jobs.index' : 'user.jobbox.index';
+        router.get(route(target), params, { preserveState: false });
     } catch (err) {
         // fallback: reload current url with query params
         router.get(window.location.pathname, params, { preserveState: false });
@@ -557,8 +579,6 @@ function statusIcon(status) {
 }
 
 // Real-time: subscribe to jobmessages channel and prepend new job messages
-import useToasts from '@/Composables/useToasts';
-import { computed, onMounted, ref } from 'vue';
 const localMessages = ref(props.messages && props.messages.data ? [...props.messages.data] : []);
 
 // displayMessages deduplicates by project_job_assignment id and returns the latest message per assignment

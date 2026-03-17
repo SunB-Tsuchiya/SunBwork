@@ -75,18 +75,20 @@ const diaries = ref([]);
         <template #header>
             <h2 class="text-xl font-semibold leading-tight text-gray-800">プロジェクト スケジュール</h2>
         </template>
-        <div class="py-12">
-            <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                <!-- Project header: show project name and client when available -->
-                <div class="mb-4 flex items-baseline justify-between">
-                    <div>
-                        <h1 class="text-2xl font-semibold text-gray-900">{{ project ? project.name : 'プロジェクト' }}</h1>
-                        <div class="text-sm text-gray-600">{{ client ? client.name : '' }}</div>
+        <main>
+            <div class="py-2">
+                <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
+                    <!-- Project header: show project name and client when available -->
+                    <div class="mb-4 flex items-baseline justify-between">
+                        <div>
+                            <h1 class="text-2xl font-semibold text-gray-900">{{ project ? project.name : 'プロジェクト' }}</h1>
+                            <div class="text-sm text-gray-600">{{ client ? client.name : '' }}</div>
+                        </div>
                     </div>
-                </div>
 
-                <ProjectCalendar :diaries="diaries" :events="events" :comments="props.comments" :memos="props.memos" :project="props.project" />
+                    <ProjectCalendar :diaries="diaries" :events="events" :comments="props.comments" :memos="props.memos" :project="props.project" />
+                </div>
             </div>
-        </div>
+        </main>
     </AppLayout>
 </template>
