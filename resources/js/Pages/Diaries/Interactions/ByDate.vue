@@ -189,15 +189,11 @@ const groupedByDate = computed(() => {
         </template>
 
         <!-- 一覧に戻るリンクを見出し下に表示 -->
-        <div class="py-2">
-            <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                <a :href="route(routeForIndex())" class="text-sm text-blue-600 hover:underline">一覧に戻る</a>
-            </div>
+        <div class="mb-2">
+            <a :href="route(routeForIndex())" class="text-sm text-blue-600 hover:underline">一覧に戻る</a>
         </div>
 
-        <div class="py-6">
-            <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                <div v-for="(list, date) in groupedByDate" :key="date" class="mb-8">
+        <div v-for="(list, date) in groupedByDate" :key="date" class="mb-8">
                     <div class="mb-2">
                         <h3 class="flex items-center gap-2 text-lg font-bold">
                             <span>{{ formatDate(date) }}</span>
@@ -233,7 +229,5 @@ const groupedByDate = computed(() => {
                         :useInteractionRoutes="true"
                     />
                 </div>
-            </div>
-        </div>
     </AppLayout>
 </template>

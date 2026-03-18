@@ -75,9 +75,7 @@ const diaries = ref([]);
         <template #header>
             <h2 class="text-xl font-semibold leading-tight text-gray-800">プロジェクト スケジュール</h2>
         </template>
-        <main>
-            <div class="py-2">
-                <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
+        <div class="rounded bg-white p-6 shadow">
                     <!-- Project header: show project name and client when available -->
                     <div class="mb-4 flex items-baseline justify-between">
                         <div>
@@ -87,8 +85,6 @@ const diaries = ref([]);
                     </div>
 
                     <ProjectCalendar :diaries="diaries" :events="events" :comments="props.comments" :memos="props.memos" :project="props.project" />
-                </div>
-            </div>
-        </main>
+        </div>
     </AppLayout>
 </template>

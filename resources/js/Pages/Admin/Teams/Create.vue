@@ -69,9 +69,7 @@ const submit = () => {
             <h2 class="text-xl font-semibold leading-tight text-gray-800">新規ユニットチーム作成</h2>
         </template>
 
-        <div class="py-6">
-            <div class="mx-auto max-w-3xl sm:px-6 lg:px-8">
-                <div class="bg-white p-6 shadow sm:rounded-lg">
+        <div class="mx-auto max-w-3xl rounded bg-white p-6 shadow">
                     <form @submit.prevent="submit" class="space-y-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700">会社</label>
@@ -125,8 +123,6 @@ const submit = () => {
                             <button type="submit" class="rounded bg-blue-600 px-4 py-2 text-white">作成</button>
                         </div>
                     </form>
-                </div>
-            </div>
         </div>
     </AppLayout>
 </template>

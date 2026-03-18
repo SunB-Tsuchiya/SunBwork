@@ -74,9 +74,7 @@ const selectedPerPage = computed(() => (props.meta && props.meta.per_page ? Numb
             <h2 class="text-xl font-semibold leading-tight text-gray-800">日報一覧</h2>
         </template>
 
-        <div class="py-6">
-            <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                <div class="mb-4 flex items-center justify-between">
+        <div class="mb-4 flex items-center justify-between">
                     <div class="flex items-center">
                         <h1 class="text-2xl font-bold">日報一覧</h1>
                         <button @click="showCalendar = true" class="ml-4 text-gray-600 hover:text-blue-600" ref="calendarBtn">
@@ -167,8 +165,6 @@ const selectedPerPage = computed(() => (props.meta && props.meta.per_page ? Numb
                         </template>
                     </div>
                 </div>
-            </div>
-        </div>
     </AppLayout>
 </template>
 

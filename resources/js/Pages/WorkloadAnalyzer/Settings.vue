@@ -76,9 +76,7 @@ function saveTable(table) {
     <AppLayout title="作業量分析 設定">
         <Head title="作業量分析 設定" />
 
-        <div class="py-12">
-            <div class="mx-auto max-w-3xl sm:px-6 lg:px-8">
-                <div class="bg-white p-6 shadow sm:rounded-lg">
+        <div class="rounded bg-white p-6 shadow">
                     <h1 class="mb-4 text-xl font-semibold">作業量分析 - 設定</h1>
 
                     <div class="space-y-6">
@@ -190,8 +188,6 @@ function saveTable(table) {
                             <a href="/leader/workload-analyzer" class="text-sm text-gray-600">キャンセル</a>
                         </div>
                     </div>
-                </div>
-            </div>
         </div>
     </AppLayout>
 </template>

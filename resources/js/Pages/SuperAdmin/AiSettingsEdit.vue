@@ -169,10 +169,7 @@ const submit = async () => {
             <h2 class="text-xl font-semibold leading-tight text-gray-800">AI設定編集</h2>
         </template>
 
-        <main>
-            <div class="py-2">
-                <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                    <div class="bg-white p-6 shadow-xl sm:rounded-lg">
+        <div class="rounded bg-white p-6 shadow">
                         <form @submit.prevent="submit" class="space-y-4">
                             <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                                 <div>
@@ -291,10 +288,7 @@ const submit = async () => {
                                 <button type="submit" class="rounded bg-blue-600 px-4 py-2 text-white">保存</button>
                             </div>
                         </form>
-                    </div>
-                </div>
-            </div>
-        </main>
+        </div>
         <div v-if="toast" class="fixed bottom-6 right-6 rounded bg-black px-4 py-2 text-white shadow">{{ toast }}</div>
     </AppLayout>
 </template>

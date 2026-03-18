@@ -117,9 +117,7 @@ function onBack() {
 
 <template>
     <AppLayout title="スケジュール（閲覧）">
-        <div class="py-6">
-            <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white p-6 shadow">
                     <h1 class="mb-4 text-2xl font-bold">スケジュール（閲覧） {{ props.event.title }}</h1>
                     <div class="mb-4">
                         <label class="block text-sm font-medium text-gray-700">日時</label>
@@ -136,7 +134,5 @@ function onBack() {
                         <button type="button" class="rounded bg-gray-200 px-4 py-2 text-gray-700" @click.prevent="onBack">戻る</button>
                     </div>
                 </div>
-            </div>
-        </div>
     </AppLayout>
 </template>

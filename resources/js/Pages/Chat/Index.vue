@@ -41,8 +41,7 @@ function getMemberNames(room) {
         <template #header>
             <h2 class="text-xl font-semibold leading-tight text-gray-800">チャットルーム一覧</h2>
         </template>
-        <div class="py-6">
-            <div class="mx-auto max-w-4xl rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-4xl rounded bg-white p-6 shadow">
                 <div v-if="success" class="mb-4 rounded border border-green-300 bg-green-100 p-3 text-green-800">
                     {{ success }}
                 </div>
@@ -80,6 +79,5 @@ function getMemberNames(room) {
                     <a href="/bot/chat" class="text-purple-600 hover:underline"> AIチャットはこちら </a>
                 </div>
             </div>
-        </div>
     </AppLayout>
 </template>

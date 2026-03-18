@@ -24,7 +24,7 @@ const user = page.props.user;
         <!-- ナビゲーションタブ (中央化のため AppLayout.vue で表示) -->
 
         <!-- プロフィール情報表示 -->
-        <div class="mb-6 overflow-hidden bg-white p-6 shadow-xl sm:rounded-lg">
+        <div class="rounded bg-white p-6 shadow">
             <h3 class="mb-4 text-lg font-medium text-gray-900">スーパ管理者プロフィール情報</h3>
             <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div>

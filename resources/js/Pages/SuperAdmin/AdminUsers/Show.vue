@@ -19,9 +19,7 @@ const props = defineProps({
         </Link>
       </div>
     </template>
-    <div class="py-12">
-      <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
-        <div class="bg-white shadow overflow-hidden sm:rounded-lg p-6">
+    <div class="mx-auto max-w-3xl rounded bg-white p-6 shadow">
           <h3 class="text-lg font-medium text-gray-900 mb-4">ユーザー情報</h3>
           <dl class="divide-y divide-gray-200">
             <div class="py-4 flex justify-between">
@@ -41,8 +39,6 @@ const props = defineProps({
               <dd class="text-sm text-gray-900">{{ new Date(user.created_at).toLocaleDateString('ja-JP') }}</dd>
             </div>
           </dl>
-        </div>
-      </div>
     </div>
   </AppLayout>
 </template>

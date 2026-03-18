@@ -26,9 +26,7 @@
             </div>
         </template>
 
-        <div class="py-12">
-            <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white p-6 shadow">
                     <h3 class="mb-4 text-lg font-semibold">この案件に紐づく割り当てと実際の作業</h3>
 
                     <div v-if="!hasEvents" class="text-sm text-gray-600">割り当てに紐づく実作業の予定・記録はありません。</div>
@@ -157,8 +155,6 @@
                             </table>
                         </div>
                     </div>
-                </div>
-            </div>
         </div>
     </AppLayout>
 </template>

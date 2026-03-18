@@ -197,11 +197,7 @@ const getAssignmentText = (assignment) => {
                 </template>
             </div>
         </template>
-        <main>
-            <div class="py-2">
-                <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                    <div class="overflow-hidden bg-white shadow-xl sm:rounded-lg">
-                        <div class="p-6">
+        <div class="rounded bg-white p-6 shadow">
                             <div class="mb-4 flex items-center justify-between">
                                 <h3 class="text-lg font-medium text-gray-900">登録ユーザー一覧</h3>
                                 <div class="text-sm text-gray-500">総数: {{ filteredUsers.length }}人</div>
@@ -265,10 +261,6 @@ const getAssignmentText = (assignment) => {
                                 </DialogModal>
                                 <UserTable :users="sortedUsers" :departments="props.departments" :assignments="props.assignments" />
                             </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </main>
+        </div>
     </AppLayout>
 </template>

@@ -250,9 +250,7 @@ async function deleteComment(commentId, idx) {
             <h2 class="text-xl font-semibold leading-tight text-gray-800">日報一覧</h2>
         </template>
 
-        <div class="py-6">
-            <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white p-6 shadow">
                     <h1 class="mb-4 text-2xl font-bold">日報 {{ formatJstDate(props.diary.date) }}</h1>
 
                     <div class="prose mb-6" v-html="props.diary.content"></div>
@@ -304,7 +302,5 @@ async function deleteComment(commentId, idx) {
                         <button @click="markRead" class="rounded bg-blue-600 px-4 py-2 text-white">既読にする</button>
                     </div>
                 </div>
-            </div>
-        </div>
     </AppLayout>
 </template>

@@ -829,8 +829,7 @@ function onCompositionEnd() {
                 {{ flashMessage }}
             </div>
         </transition>
-        <div class="py-6">
-            <div class="mx-auto flex max-w-6xl flex-col gap-4 rounded bg-white p-4 shadow" style="height: calc(100vh - 140px)">
+        <div class="mx-auto flex max-w-6xl flex-col gap-4 rounded bg-white p-4 shadow" style="height: calc(100vh - 140px)">
                 <div class="mb-4 flex items-center justify-between">
                     <div class="flex items-center gap-3">
                         <button
@@ -962,7 +961,6 @@ function onCompositionEnd() {
                     </template>
                 </div>
             </div>
-        </div>
     </AppLayout>
 </template>
 <style scoped>

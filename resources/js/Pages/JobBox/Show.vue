@@ -4,9 +4,7 @@
             <h2 class="text-xl font-semibold leading-tight text-gray-800">ジョブ割り当て — メッセージ表示</h2>
         </template>
 
-        <div class="py-12">
-            <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                <div class="mx-auto max-w-3xl rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-3xl rounded bg-white p-6 shadow">
                     <h1 class="mb-4 flex items-center gap-2 text-2xl font-bold">
                         <span>ジョブ割り当て：{{ projectJob.title }}</span>
                         <svg
@@ -174,8 +172,6 @@
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
     </AppLayout>
 </template>
 

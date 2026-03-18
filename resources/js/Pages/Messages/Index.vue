@@ -4,9 +4,7 @@
             <h2 class="text-xl font-semibold leading-tight">メール</h2>
         </template>
 
-        <main>
-            <div class="py-2">
-                <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
+        <div class="rounded bg-white p-6 shadow">
                     <!-- Top toolbar: compose, address book, search -->
                     <div class="mb-4 flex items-center gap-3">
                         <Link :href="route('messages.create')" class="inline-flex items-center gap-2 rounded bg-blue-600 px-3 py-2 text-white">
@@ -225,9 +223,7 @@
                             ></button>
                         </template>
                     </div>
-                </div>
-            </div>
-        </main>
+        </div>
         <AddressBookModal :show="showAddress" :companyId="currentUser.company_id" @close="showAddress = false" @select="onAddressSelect" />
     </AppLayout>
 </template>

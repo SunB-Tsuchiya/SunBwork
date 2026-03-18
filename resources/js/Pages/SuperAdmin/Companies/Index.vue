@@ -29,7 +29,7 @@ const confirmDelete = (companyId) => {
                 >
             </div>
         </template>
-        <div class="mb-6 overflow-hidden bg-white p-6 shadow-xl sm:rounded-lg">
+        <div class="rounded bg-white p-6 shadow">
             <div v-for="company in companies" :key="company.id" class="mb-8 rounded-lg bg-blue-50 p-6 shadow">
                 <div class="mb-4 flex items-center text-2xl font-bold text-blue-800">
                     <span>会社名：{{ company.name }}</span>

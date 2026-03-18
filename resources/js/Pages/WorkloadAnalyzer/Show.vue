@@ -315,9 +315,7 @@ onMounted(() => {
 
         <h1 class="text-2xl font-semibold">作業量分析 - 詳細</h1>
 
-        <div class="py-12">
-            <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                <div class="mb-6 overflow-hidden bg-white p-6 shadow-xl sm:rounded-lg">
+        <div class="rounded bg-white p-6 shadow">
                     <div class="mb-4">
                         <div class="text-sm text-gray-500">ユーザー: {{ props.user_id }} / 月: {{ props.selected_ym }}</div>
                     </div>
@@ -430,8 +428,6 @@ onMounted(() => {
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
         </div>
     </AppLayout>
 </template>

@@ -10,10 +10,7 @@
             </div>
         </template>
 
-        <main>
-            <div class="py-2">
-                <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                    <div class="bg-white p-6 shadow-xl sm:rounded-lg">
+        <div class="rounded bg-white p-6 shadow">
                         <form @submit.prevent="submit" class="mx-auto grid max-w-3xl grid-cols-1 gap-6">
                             <div v-if="prefillLoading" class="rounded-md border border-yellow-100 bg-yellow-50 p-2 text-sm text-yellow-700">
                                 受信者情報を読み込み中... 少々お待ちください
@@ -193,10 +190,7 @@
                                 </div>
                             </div>
                         </form>
-                    </div>
-                </div>
-            </div>
-        </main>
+        </div>
         <!-- Toast container (fixed top-right) -->
         <div class="fixed right-4 top-4 z-50" aria-live="polite">
             <div class="space-y-2">

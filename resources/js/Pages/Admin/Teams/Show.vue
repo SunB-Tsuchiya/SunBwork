@@ -169,9 +169,7 @@ const leaderName = computed(() => {
             <h2 class="text-xl font-semibold leading-tight text-gray-800">チーム詳細</h2>
         </template>
 
-        <div class="py-8">
-            <div class="mx-auto max-w-4xl sm:px-6 lg:px-8">
-                <div class="bg-white p-6 shadow sm:rounded-lg">
+        <div class="mx-auto max-w-4xl rounded bg-white p-6 shadow">
                     <div class="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div>
                             <div class="text-sm text-gray-500">ID</div>
@@ -218,8 +216,6 @@ const leaderName = computed(() => {
                             編集
                         </button>
                     </div>
-                </div>
-            </div>
         </div>
     </AppLayout>
 </template>

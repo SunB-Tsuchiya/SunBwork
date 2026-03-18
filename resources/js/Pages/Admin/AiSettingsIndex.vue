@@ -12,10 +12,7 @@ const user = page.props.user;
             <h2 class="text-xl font-semibold leading-tight text-gray-800">AI設定</h2>
         </template>
 
-        <main>
-            <div class="py-2">
-                <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                    <div class="bg-white p-6 shadow-xl sm:rounded-lg">
+        <div class="rounded bg-white p-6 shadow">
                         <div class="mb-4 flex items-center justify-between">
                             <h1 class="text-2xl font-bold">AI設定</h1>
                             <Link :href="route('admin.ai.create')" class="rounded bg-blue-600 px-3 py-2 text-white">新規作成</Link>
@@ -62,9 +59,6 @@ const user = page.props.user;
                                 </ul>
                             </nav>
                         </div>
-                    </div>
-                </div>
-            </div>
-        </main>
+        </div>
     </AppLayout>
 </template>

@@ -4,10 +4,7 @@
             <h2 class="text-xl font-semibold">メール詳細</h2>
         </template>
 
-        <main>
-            <div class="py-2">
-                <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                    <div class="bg-white p-6 shadow sm:rounded-lg">
+        <div class="rounded bg-white p-6 shadow">
                         <div class="mb-4 flex items-center justify-between">
                             <a :href="route('messages.index')" class="text-sm text-blue-600 underline">← 一覧に戻る</a>
                             <div>
@@ -80,11 +77,7 @@
                             </div>
                             <div v-else class="mt-2 text-sm text-gray-500">添付ファイルなし</div>
                         </div>
-                    </div>
-                </div>
-            </div>
-            <!-- dev-only JSON dump removed -->
-        </main>
+        <!-- dev-only JSON dump removed -->
     </AppLayout>
 
     <!-- Preview Modal -->

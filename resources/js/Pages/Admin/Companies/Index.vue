@@ -26,7 +26,7 @@ const confirmDelete = (companyId) => {
                 <!-- <Link :href="route('admin.companies.create')" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">新規会社登録</Link> -->
             </div>
         </template>
-        <div class="mb-6 overflow-hidden bg-white p-6 shadow-xl sm:rounded-lg">
+        <div class="rounded bg-white p-6 shadow">
             <div v-for="company in companies" :key="company.id" class="mb-8 rounded-lg bg-blue-50 p-6 shadow">
                 <div class="mb-4 flex items-center text-2xl font-bold text-blue-800">
                     <span>会社名：{{ company.name }}</span>

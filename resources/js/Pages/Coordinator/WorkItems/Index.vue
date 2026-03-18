@@ -287,7 +287,7 @@ async function saveOrder(table, ids) {
         <template #header>
             <h2 class="text-xl font-semibold leading-tight text-gray-800">【進行管理】{{ $page.props.auth.user.name || 'ユーザー' }}さんのページ</h2>
         </template>
-        <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
+        <div class="rounded bg-white p-6 shadow">
             <h1 class="mb-4 text-2xl font-semibold">Work Items（作業項目）</h1>
             <div class="mb-2 flex flex-wrap items-center gap-4">
                 <!-- Company select: visible to superadmin only -->

@@ -4,7 +4,7 @@
             <h2 class="text-xl font-semibold">ガントチャート PoC</h2>
         </template>
 
-        <div class="p-6">
+        <div class="rounded bg-white p-6 shadow">
             <GanttWrapper :tasks="tasks" @update-task="onUpdateTask" />
 
             <!-- Debug: show tasks payload and button to inject sample -->

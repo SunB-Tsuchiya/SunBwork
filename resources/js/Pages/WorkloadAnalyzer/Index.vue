@@ -296,9 +296,7 @@ function diffMinutes(estimated, actual) {
 
         <Head title="作業量分析" />
 
-        <div class="py-2">
-            <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                <div class="mb-6 overflow-hidden bg-white p-6 shadow-xl sm:rounded-lg">
+        <div class="rounded bg-white p-6 shadow">
                     <p class="text-sm text-gray-500">自分の会社・部署・チームのメンバーごとの簡易分析ビュー（プレースホルダ）</p>
 
                     <div class="mb-4 mt-4 flex items-center justify-between">
@@ -434,8 +432,6 @@ function diffMinutes(estimated, actual) {
 
                         <div v-if="!companies.length" class="text-sm text-gray-500">会社データがありません。</div>
                     </div>
-                </div>
-            </div>
         </div>
     </AppLayout>
 </template>

@@ -19,7 +19,7 @@ const user = page.props.user;
         </template>
 
         <!-- プロフィール情報表示 -->
-        <div class="mb-6 overflow-hidden bg-white p-6 shadow-xl sm:rounded-lg">
+        <div class="rounded bg-white p-6 shadow">
             <h3 class="mb-4 text-lg font-medium text-gray-900">進行管理プロフィール情報</h3>
             <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div>

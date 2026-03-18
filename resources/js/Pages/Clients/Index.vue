@@ -10,9 +10,7 @@ const props = defineProps({ clients: Array });
             <h2 class="text-xl font-semibold leading-tight text-gray-800">【進行管理】{{ $page.props.auth.user.name || 'ユーザー' }}さんのページ</h2>
         </template>
 
-        <main class="py-12">
-            <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                <div class="bg-white p-6 shadow-xl sm:rounded-lg">
+        <div class="rounded bg-white p-6 shadow">
                     <div class="mb-6 flex items-center justify-between">
                         <h1 class="text-2xl font-bold">クライアント一覧</h1>
                         <Link :href="route('leader.clients.create')" class="rounded bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
@@ -52,8 +50,6 @@ const props = defineProps({ clients: Array });
                             </table>
                         </div>
                     </template>
-                </div>
-            </div>
-        </main>
+        </div>
     </AppLayout>
 </template>

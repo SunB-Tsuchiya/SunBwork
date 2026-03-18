@@ -91,9 +91,7 @@ const handleDelete = async (teamId) => {
         <template #header>
             <h2 class="text-xl font-semibold leading-tight text-gray-800">チーム一覧</h2>
         </template>
-        <main>
-            <div class="py-2">
-                <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
+        <div class="rounded bg-white p-6 shadow">
                     <div class="mb-4 flex items-center justify-between">
                         <div class="flex gap-4">
                             <button
@@ -123,7 +121,7 @@ const handleDelete = async (teamId) => {
                             </button>
                         </div>
                     </div>
-                    <div class="mb-6 overflow-hidden bg-white p-6 shadow-xl sm:rounded-lg">
+                    <div class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-gray-200">
                             <thead>
                                 <tr>
@@ -165,8 +163,6 @@ const handleDelete = async (teamId) => {
                             </tbody>
                         </table>
                     </div>
-                </div>
-            </div>
-        </main>
+        </div>
     </AppLayout>
 </template>

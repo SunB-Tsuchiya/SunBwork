@@ -5,11 +5,7 @@
                 <h2 class="text-xl font-semibold leading-tight text-gray-800">チームメンバー管理</h2>
             </div>
         </template>
-        <main>
-            <div class="py-2">
-                <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                    <div class="overflow-hidden bg-white shadow-xl sm:rounded-lg">
-                        <div class="p-6">
+        <div class="rounded bg-white p-6 shadow">
                             <div class="mb-4 flex items-center justify-between">
                                 <h3 class="text-lg font-medium text-gray-900">登録チームメンバー一覧</h3>
                                 <div class="flex items-center space-x-2">
@@ -133,11 +129,7 @@
                                     </button>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </main>
+        </div>
     </AppLayout>
 </template>
 <script setup>

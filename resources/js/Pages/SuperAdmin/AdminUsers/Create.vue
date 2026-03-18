@@ -221,9 +221,7 @@ const submit = () => {
             </div>
         </template>
 
-        <div class="py-12">
-            <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                <div class="mb-8 overflow-hidden bg-white p-6 shadow-xl sm:rounded-lg">
+        <div class="rounded bg-white p-6 shadow">
                     <!-- <h3 class="text-lg font-medium text-blue-900 mb-2">CSV一括登録</h3>
                     <p class="text-sm text-blue-700 mb-4">
                         CSVファイルを使用して複数のユーザーを一度に登録できます。
@@ -366,8 +364,6 @@ const submit = () => {
                             </PrimaryButton>
                         </div>
                     </form>
-                </div>
-            </div>
         </div>
     </AppLayout>
 </template>

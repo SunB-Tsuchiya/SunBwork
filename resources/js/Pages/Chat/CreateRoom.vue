@@ -194,8 +194,7 @@ function createRoom() {
         <template #header>
             <h2 class="text-xl font-semibold leading-tight text-gray-800">チャットルーム作成</h2>
         </template>
-        <div class="py-6">
-            <div class="mx-auto max-w-3xl rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-3xl rounded bg-white p-6 shadow">
                 <div class="mb-4">
                     <label class="mr-4 font-bold">ルーム種別:</label>
                     <label class="mr-4"><input type="radio" value="private" v-model="roomType" /> パーソナル</label>
@@ -312,6 +311,5 @@ function createRoom() {
                     <div v-if="errors.members" class="mt-1 text-sm text-red-600">{{ errors.members }}</div>
                 </div>
             </div>
-        </div>
     </AppLayout>
 </template>

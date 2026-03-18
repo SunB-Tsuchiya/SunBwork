@@ -114,9 +114,7 @@ function markReadAllRoute() {
             <h2 class="text-xl font-semibold leading-tight text-gray-800">{{ props.headerTitle }}</h2>
         </template>
 
-        <div class="py-6">
-            <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                <div class="mb-4 flex items-center justify-between">
+        <div class="mb-4 flex items-center justify-between">
                     <div class="flex items-center space-x-3">
                         <label class="text-sm">表示:</label>
                         <select v-model="viewMode" class="rounded border px-2 py-1 text-sm">
@@ -210,7 +208,5 @@ function markReadAllRoute() {
                         </template>
                     </div>
                 </div>
-            </div>
-        </div>
     </AppLayout>
 </template>

@@ -66,8 +66,7 @@ const getRoleLabel = (role) => {
             </div>
         </template>
 
-        <div class="py-12">
-            <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
+        <div class="rounded bg-white p-6 shadow">
                 <!-- 登録先情報 -->
                 <div class="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
                     <h3 class="mb-3 text-lg font-medium text-blue-800">📍 登録先情報</h3>
@@ -201,7 +200,6 @@ const getRoleLabel = (role) => {
                         </form>
                     </div>
                 </div>
-            </div>
         </div>
     </AppLayout>
 </template>

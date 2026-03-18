@@ -68,8 +68,8 @@ const submit = () => {
         <template #header>
             <h2 class="text-xl font-semibold leading-tight text-gray-800">会社新規登録</h2>
         </template>
-        <div class="py-6">
-            <form @submit.prevent="submit" class="mx-auto max-w-2xl">
+        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
+            <form @submit.prevent="submit">
                 <div class="mb-6">
                     <InputLabel for="name" value="会社名" />
                     <TextInput id="name" v-model="form.name" type="text" class="mt-1 block w-full" required autofocus />

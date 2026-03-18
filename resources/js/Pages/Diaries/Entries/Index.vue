@@ -50,9 +50,7 @@ const groupedByDate = computed(() => {
             <h2 class="text-xl font-semibold leading-tight text-gray-800">日報一覧</h2>
         </template>
 
-        <div class="py-6">
-            <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                <!-- render diaries grouped by date -->
+        <!-- render diaries grouped by date -->
                 <div v-for="(list, date) in groupedByDate" :key="date" class="mb-8">
                     <div class="mb-2">
                         <h3 class="flex items-center gap-2 text-lg font-bold">
@@ -93,7 +91,5 @@ const groupedByDate = computed(() => {
                         :fullContent="props.date === date"
                     />
                 </div>
-            </div>
-        </div>
     </AppLayout>
 </template>

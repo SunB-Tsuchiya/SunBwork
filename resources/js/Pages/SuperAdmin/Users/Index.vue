@@ -106,10 +106,7 @@ const getAssignmentName = (assignment_id) => {
 			</div>
 		</template>
 
-		<div class="py-12">
-			<div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-				<div class="bg-white overflow-hidden shadow-xl sm:rounded-lg">
-					<div class="p-6">
+		<div class="rounded bg-white p-6 shadow">
 						<div class="flex items-center justify-between mb-4">
 							<h3 class="text-lg font-medium text-gray-900">登録アカウント一覧</h3>
 							<div class="text-sm text-gray-500">総数: {{ users.length }}人</div>
@@ -166,8 +163,6 @@ const getAssignmentName = (assignment_id) => {
 						</div>
 					</div>
 				</div>
-			</div>
-		</div>
 	</AppLayout>
 </template>
 

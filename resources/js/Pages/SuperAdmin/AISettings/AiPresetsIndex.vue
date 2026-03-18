@@ -27,10 +27,7 @@ const submit = async () => {
             <h2 class="text-xl font-semibold leading-tight text-gray-800">AIプリセット管理</h2>
         </template>
 
-        <main>
-            <div class="py-2">
-                <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                    <div class="bg-white p-6 shadow-xl sm:rounded-lg">
+        <div class="rounded bg-white p-6 shadow">
                         <div class="mb-4">
                             <h3 class="font-semibold">新規プリセット</h3>
                             <div class="mt-2 grid grid-cols-1 gap-2 md:grid-cols-3">
@@ -68,9 +65,6 @@ const submit = async () => {
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </div>
-            </div>
-        </main>
+        </div>
     </AppLayout>
 </template>

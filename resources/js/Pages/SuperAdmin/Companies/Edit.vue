@@ -60,8 +60,8 @@ const removeRole = (depIdx, assignmentIdx) => {
         <template #header>
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">会社編集</h2>
         </template>
-        <div class="py-6">
-            <form @submit.prevent="submit" class="max-w-2xl mx-auto">
+        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
+            <form @submit.prevent="submit">
                 <div class="mb-6">
                     <InputLabel for="name" value="会社名" />
                     <TextInput id="name" v-model="form.name" type="text" class="mt-1 block w-full" required autofocus />

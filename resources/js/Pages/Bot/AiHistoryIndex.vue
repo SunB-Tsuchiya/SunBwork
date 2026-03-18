@@ -4,9 +4,7 @@
             <h2 class="text-xl font-semibold leading-tight text-gray-800">AI 会話履歴</h2>
         </template>
 
-        <div class="py-12">
-            <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white p-6 shadow">
                     <!-- Admin: scope tabs -->
                     <div
                         v-if="$page.props.auth && ($page.props.auth.user?.user_role === 'admin' || $page.props.auth.user?.user_role === 'superadmin')"
@@ -125,7 +123,6 @@
                         </div>
                     </div>
                 </div>
-            </div>
         </div>
     </AppLayout>
 </template>
