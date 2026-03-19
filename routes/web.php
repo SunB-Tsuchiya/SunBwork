@@ -225,13 +225,17 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         // CSV一括登録（リソースルートより前に配置）
         Route::get('users/csv/upload', [App\Http\Controllers\Admin\UserController::class, 'csvUpload'])->name('users.csv.upload');
         Route::post('users/csv/preview', [App\Http\Controllers\Admin\UserController::class, 'csvPreview'])->name('users.csv.preview');
-
         Route::post('users/csv/store', [App\Http\Controllers\Admin\UserController::class, 'csvStore'])->name('users.csv.store');
+        Route::get('users/csv/sample', [App\Http\Controllers\Admin\UserController::class, 'csvSampleDownload'])->name('users.csv.sample');
 
         // ユーザー管理
         Route::resource('users', App\Http\Controllers\Admin\UserController::class);
 
-        // クライアント管理（Admin用）: 管理者はクライアントの CRUD を扱える（作成/編集等）
+        // クライアント管理（Admin用）
+        Route::get('clients/csv/upload', [App\Http\Controllers\ClientController::class, 'csvUpload'])->name('clients.csv.upload');
+        Route::post('clients/csv/preview', [App\Http\Controllers\ClientController::class, 'csvPreview'])->name('clients.csv.preview');
+        Route::post('clients/csv/store', [App\Http\Controllers\ClientController::class, 'csvStore'])->name('clients.csv.store');
+        Route::get('clients/csv/sample', [App\Http\Controllers\ClientController::class, 'csvSampleDownload'])->name('clients.csv.sample');
         Route::resource('clients', App\Http\Controllers\ClientController::class)->only(['index', 'create', 'store', 'edit', 'update']);
 
         // 会社管理 (会社作成/管理は SuperAdmin 側に一本化しました)
@@ -323,6 +327,10 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     ->group(function () {
         Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
         // クライアント管理（Leader用）
+        Route::get('clients/csv/upload', [App\Http\Controllers\ClientController::class, 'csvUpload'])->name('clients.csv.upload');
+        Route::post('clients/csv/preview', [App\Http\Controllers\ClientController::class, 'csvPreview'])->name('clients.csv.preview');
+        Route::post('clients/csv/store', [App\Http\Controllers\ClientController::class, 'csvStore'])->name('clients.csv.store');
+        Route::get('clients/csv/sample', [App\Http\Controllers\ClientController::class, 'csvSampleDownload'])->name('clients.csv.sample');
         Route::resource('clients', App\Http\Controllers\ClientController::class)->only(['index', 'create', 'store', 'edit', 'update']);
         // Leader diary interactions (leader can view diaries for departments/units they lead)
         Route::get('diaryinteractions', [App\Http\Controllers\Diaries\DiaryInteractionController::class, 'index'])->name('diaryinteractions.index');

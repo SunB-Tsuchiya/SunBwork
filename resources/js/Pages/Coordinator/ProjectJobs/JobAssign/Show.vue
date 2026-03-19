@@ -4,7 +4,7 @@
             <h2 class="text-xl font-semibold leading-tight text-gray-800">割当を見る</h2>
         </template>
 
-        <div class="mx-auto max-w-3xl rounded bg-white p-6 shadow">
+        <div class="rounded bg-white p-6 shadow">
             <h1 class="mb-4 text-2xl font-bold">割当 #{{ assignment.id }}</h1>
 
             <AssignmentForm :projectJob="projectJob" :members="$page.props.members || []" :assignments="[assignment]" :editMode="false" />

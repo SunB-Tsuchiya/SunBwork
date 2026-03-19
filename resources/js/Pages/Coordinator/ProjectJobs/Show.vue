@@ -12,7 +12,7 @@
             <h2 class="text-xl font-semibold leading-tight text-gray-800">【進行管理】{{ $page.props.auth.user.name || 'ユーザー' }}さんのページ</h2>
         </template>
 
-        <div class="mx-auto max-w-4xl rounded bg-white p-6 shadow">
+        <div class="rounded bg-white p-6 shadow">
             <h1 class="mb-6 text-2xl font-bold">プロジェクトジョブ作成</h1>
 
             <div class="mb-4">

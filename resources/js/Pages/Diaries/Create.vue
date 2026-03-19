@@ -322,7 +322,7 @@ function stripHtml(html) {
 
 <template>
     <AppLayout title="日報作成">
-        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
+        <div class="rounded bg-white p-6 shadow">
             <h1 class="mb-4 text-2xl font-bold">日報作成 ({{ props.date }})</h1>
 
             <!-- single event form (tabs removed) -->

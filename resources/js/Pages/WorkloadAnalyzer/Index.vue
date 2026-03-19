@@ -260,7 +260,7 @@ function diffMinutes(estimated, actual) {
 <template>
     <AppLayout title="作業量分析">
         <template #header>
-            <div>
+            <div class="flex items-center gap-2.5">
                 <h1 class="text-2xl font-semibold">作業量分析</h1>
                 <h2 class="text-lg text-gray-600">{{ selectedYmLabel }}</h2>
             </div>
@@ -297,141 +297,138 @@ function diffMinutes(estimated, actual) {
         <Head title="作業量分析" />
 
         <div class="rounded bg-white p-6 shadow">
-                    <p class="text-sm text-gray-500">自分の会社・部署・チームのメンバーごとの簡易分析ビュー（プレースホルダ）</p>
+            <p class="text-sm text-gray-500">自分の会社・部署・チームのメンバーごとの簡易分析ビュー（プレースホルダ）</p>
 
-                    <div class="mb-4 mt-4 flex items-center justify-between">
-                        <div>
-                            <label class="mr-2 text-sm text-gray-600">年月:</label>
-                            <select class="rounded border px-2 py-1 text-sm" v-model="selectedYm" @change="changeYm">
-                                <option v-for="m in months" :key="m.value" :value="m.value">{{ m.label }}</option>
-                            </select>
-                        </div>
-                        <div class="text-sm text-gray-500">表示中: {{ selectedYm }}</div>
+            <div class="mb-4 mt-4 flex items-center justify-between">
+                <div>
+                    <label class="mr-2 text-sm text-gray-600">年月:</label>
+                    <select class="w-40 rounded border px-3 py-1 text-sm" v-model="selectedYm" @change="changeYm">
+                        <option v-for="m in months" :key="m.value" :value="m.value">{{ m.label }}</option>
+                    </select>
+                </div>
+                <div class="text-sm text-gray-500">表示中: {{ selectedYm }}</div>
+            </div>
+
+            <div class="space-y-8">
+                <div v-for="company in companies" :key="`company-${company.id}`" class="rounded-lg border p-4">
+                    <div class="mb-3 flex items-center justify-between">
+                        <h2 class="text-lg font-medium">{{ company.name }}</h2>
+                        <div class="text-sm text-gray-500">会社</div>
                     </div>
 
-                    <div class="space-y-8">
-                        <div v-for="company in companies" :key="`company-${company.id}`" class="rounded-lg border p-4">
-                            <div class="mb-3 flex items-center justify-between">
-                                <h2 class="text-lg font-medium">{{ company.name }}</h2>
-                                <div class="text-sm text-gray-500">会社</div>
-                            </div>
-
-                            <!-- Render each department as a subheading with its own table -->
-                            <template v-if="(company.departments || []).length">
-                                <div class="space-y-4">
-                                    <div v-for="dept in company.departments" :key="`dept-${dept.id}`">
-                                        <h3 class="text-sm font-medium text-gray-700">部署: {{ dept.name }}</h3>
-                                        <div class="mt-2 overflow-hidden bg-white shadow sm:rounded-lg">
-                                            <table class="w-full min-w-full table-fixed divide-y divide-gray-200">
-                                                <thead>
-                                                    <tr>
-                                                        <!-- widths: 順位 1/9, 名前 2/9, チーム 2/9, 偏差値 1/9, 総合ポイント 1/9, 内容 2/9 -->
-                                                        <th
-                                                            style="width: 8%"
-                                                            class="cursor-pointer px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
-                                                            @click="toggleSort('rank')"
-                                                        >
-                                                            順位
-                                                            <svg
-                                                                class="ml-1 inline-block h-3 w-3 text-gray-400"
-                                                                viewBox="0 0 24 24"
-                                                                fill="none"
-                                                                xmlns="http://www.w3.org/2000/svg"
-                                                                aria-hidden
-                                                            >
-                                                                <path
-                                                                    d="M6 9l6 6 6-6"
-                                                                    stroke="currentColor"
-                                                                    stroke-width="2"
-                                                                    stroke-linecap="round"
-                                                                    stroke-linejoin="round"
-                                                                />
-                                                            </svg>
-                                                        </th>
-                                                        <th
-                                                            style="width: 16%"
-                                                            class="cursor-pointer px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
-                                                            @click="toggleSort('name')"
-                                                        >
-                                                            名前
-                                                            <span v-if="sortKey === 'name'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
-                                                        </th>
-                                                        <th
-                                                            style="width: 12%"
-                                                            class="cursor-pointer px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
-                                                            @click="toggleSort('team')"
-                                                        >
-                                                            チーム
-                                                            <span v-if="sortKey === 'team'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
-                                                        </th>
-                                                        <th
-                                                            style="width: 14%"
-                                                            class="cursor-pointer px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
-                                                            @click="toggleSort('deviation')"
-                                                        >
-                                                            偏差値
-                                                            <span v-if="sortKey === 'deviation'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
-                                                        </th>
-                                                        <th
-                                                            style="width: 14%"
-                                                            class="cursor-pointer px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
-                                                            @click="toggleSort('overall')"
-                                                        >
-                                                            総合ポイント
-                                                            <span v-if="sortKey === 'overall'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
-                                                        </th>
-                                                        <th
-                                                            style="width: 44%"
-                                                            class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
-                                                        >
-                                                            内容
-                                                        </th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody class="divide-y divide-gray-200 bg-white">
-                                                    <template v-for="row in getDeptRows(dept)" :key="`m-${row.id}-${row.team || 'dept'}`">
-                                                        <tr class="cursor-pointer transition-colors hover:bg-green-50" @click="onMemberRowClick(row)">
-                                                            <td style="width: 8%" class="px-6 py-4 text-sm font-medium text-gray-900">
-                                                                {{ row.rank }}
-                                                            </td>
-                                                            <td
-                                                                style="width: 16%"
-                                                                class="max-w-[160px] truncate px-6 py-4 text-sm font-medium text-gray-900"
-                                                            >
-                                                                {{ row.name }}
-                                                            </td>
-                                                            <td style="width: 12%" class="max-w-[120px] truncate px-6 py-4 text-sm text-gray-500">
-                                                                {{ row.team || '' }}
-                                                            </td>
-                                                            <td style="width: 8%" class="px-6 py-4 text-sm text-gray-500">
-                                                                {{ row.deviation ?? '-' }}
-                                                            </td>
-                                                            <td style="width: 14%" class="px-6 py-4 text-sm text-gray-500">{{ row.overall }}</td>
-                                                            <td style="width: 44%" class="hidden px-6 py-4 text-sm text-gray-500 sm:table-cell">
-                                                                <div class="text-xs text-gray-600">
-                                                                    <div>ステージ合計: {{ row.aggregates?.points?.stage ?? 0 }} ポイント</div>
-                                                                    <div>サイズ合計: {{ row.aggregates?.points?.size ?? 0 }} ポイント</div>
-                                                                    <div>種別合計: {{ row.aggregates?.points?.type ?? 0 }} ポイント</div>
-                                                                    <div>難易度合計: {{ row.aggregates?.points?.difficulty ?? 0 }} ポイント</div>
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                    </template>
-                                                    <tr v-if="flattenDepartmentRows(dept).length === 0">
-                                                        <td colspan="6" class="px-6 py-4 text-sm text-gray-500">メンバーが見つかりません</td>
-                                                    </tr>
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
+                    <!-- Render each department as a subheading with its own table -->
+                    <template v-if="(company.departments || []).length">
+                        <div class="space-y-4">
+                            <div v-for="dept in company.departments" :key="`dept-${dept.id}`">
+                                <h3 class="text-sm font-medium text-gray-700">部署: {{ dept.name }}</h3>
+                                <div class="mt-2 overflow-hidden bg-white shadow sm:rounded-lg">
+                                    <table class="w-full min-w-full table-fixed divide-y divide-gray-200">
+                                        <thead>
+                                            <tr>
+                                                <!-- widths: 順位 1/9, 名前 2/9, チーム 2/9, 偏差値 1/9, 総合ポイント 1/9, 内容 2/9 -->
+                                                <th
+                                                    style="width: 8%"
+                                                    class="cursor-pointer px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                                                    @click="toggleSort('rank')"
+                                                >
+                                                    順位
+                                                    <svg
+                                                        class="ml-1 inline-block h-3 w-3 text-gray-400"
+                                                        viewBox="0 0 24 24"
+                                                        fill="none"
+                                                        xmlns="http://www.w3.org/2000/svg"
+                                                        aria-hidden
+                                                    >
+                                                        <path
+                                                            d="M6 9l6 6 6-6"
+                                                            stroke="currentColor"
+                                                            stroke-width="2"
+                                                            stroke-linecap="round"
+                                                            stroke-linejoin="round"
+                                                        />
+                                                    </svg>
+                                                </th>
+                                                <th
+                                                    style="width: 16%"
+                                                    class="cursor-pointer px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                                                    @click="toggleSort('name')"
+                                                >
+                                                    名前
+                                                    <span v-if="sortKey === 'name'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
+                                                </th>
+                                                <th
+                                                    style="width: 12%"
+                                                    class="cursor-pointer px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                                                    @click="toggleSort('team')"
+                                                >
+                                                    チーム
+                                                    <span v-if="sortKey === 'team'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
+                                                </th>
+                                                <th
+                                                    style="width: 14%"
+                                                    class="cursor-pointer px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                                                    @click="toggleSort('deviation')"
+                                                >
+                                                    偏差値
+                                                    <span v-if="sortKey === 'deviation'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
+                                                </th>
+                                                <th
+                                                    style="width: 14%"
+                                                    class="cursor-pointer px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                                                    @click="toggleSort('overall')"
+                                                >
+                                                    総合ポイント
+                                                    <span v-if="sortKey === 'overall'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
+                                                </th>
+                                                <th
+                                                    style="width: 44%"
+                                                    class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                                                >
+                                                    内容
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-200 bg-white">
+                                            <template v-for="row in getDeptRows(dept)" :key="`m-${row.id}-${row.team || 'dept'}`">
+                                                <tr class="cursor-pointer transition-colors hover:bg-green-50" @click="onMemberRowClick(row)">
+                                                    <td style="width: 8%" class="px-6 py-4 text-sm font-medium text-gray-900">
+                                                        {{ row.rank }}
+                                                    </td>
+                                                    <td style="width: 16%" class="max-w-[160px] truncate px-6 py-4 text-sm font-medium text-gray-900">
+                                                        {{ row.name }}
+                                                    </td>
+                                                    <td style="width: 12%" class="max-w-[120px] truncate px-6 py-4 text-sm text-gray-500">
+                                                        {{ row.team || '' }}
+                                                    </td>
+                                                    <td style="width: 8%" class="px-6 py-4 text-sm text-gray-500">
+                                                        {{ row.deviation ?? '-' }}
+                                                    </td>
+                                                    <td style="width: 14%" class="px-6 py-4 text-sm text-gray-500">{{ row.overall }}</td>
+                                                    <td style="width: 44%" class="hidden px-6 py-4 text-sm text-gray-500 sm:table-cell">
+                                                        <div class="text-xs text-gray-600">
+                                                            <div>ステージ合計: {{ row.aggregates?.points?.stage ?? 0 }} ポイント</div>
+                                                            <div>サイズ合計: {{ row.aggregates?.points?.size ?? 0 }} ポイント</div>
+                                                            <div>種別合計: {{ row.aggregates?.points?.type ?? 0 }} ポイント</div>
+                                                            <div>難易度合計: {{ row.aggregates?.points?.difficulty ?? 0 }} ポイント</div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            </template>
+                                            <tr v-if="flattenDepartmentRows(dept).length === 0">
+                                                <td colspan="6" class="px-6 py-4 text-sm text-gray-500">メンバーが見つかりません</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
                                 </div>
-                            </template>
-
-                            <div v-if="!(company.departments || []).length" class="text-sm text-gray-500">部署データがありません。</div>
+                            </div>
                         </div>
+                    </template>
 
-                        <div v-if="!companies.length" class="text-sm text-gray-500">会社データがありません。</div>
-                    </div>
+                    <div v-if="!(company.departments || []).length" class="text-sm text-gray-500">部署データがありません。</div>
+                </div>
+
+                <div v-if="!companies.length" class="text-sm text-gray-500">会社データがありません。</div>
+            </div>
         </div>
     </AppLayout>
 </template>

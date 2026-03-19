@@ -224,9 +224,10 @@ const currentRouteContext = computed(() => {
         if (r.startsWith('superadmin.')) return 'superadmin';
         if (r.startsWith('admin.')) return 'admin';
         if (r.startsWith('leader.') || r.startsWith('workload_setting.')) return 'leader';
-        if (r.startsWith('coordinator.')) return 'coordinator';
-        // fallback to actual user role
-        return page.props.auth?.user?.user_role || 'user';
+        if (r.startsWith('coordinator.') || r.startsWith('project_jobs.')) return 'coordinator';
+        // user エリアのルート（user.*, diaries.*, calendar.*, myjobbox 等）は常に 'user' を返す
+        // 上位ロールのユーザーが User メニューを押した場合も UserNavigationTabs を表示する
+        return 'user';
     } catch (e) {
         return page.props.auth?.user?.user_role || 'user';
     }
@@ -595,7 +596,7 @@ const currentRouteContext = computed(() => {
                                 :href="route('leader.workload_analyzer.index')"
                                 :active="route().current('leader.workload_analyzer.*')"
                             >
-                                <span class="text-orange-600">作業量分析</span>
+                                <span class="text-orange-600"></span>
                             </ResponsiveNavLink>
                             <ResponsiveNavLink :href="route('workload_setting.index')" :active="route().current('workload_setting.*')">
                                 <span class="text-orange-600">作業項目設定</span>
@@ -728,7 +729,7 @@ const currentRouteContext = computed(() => {
 
             <!-- Page Heading -->
             <header v-if="$slots.header" class="bg-white shadow">
-                <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-6 sm:px-6 lg:px-8">
+                <div class="mx-auto flex min-h-[4.5rem] max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
                     <div class="flex-1">
                         <slot name="header" />
                     </div>

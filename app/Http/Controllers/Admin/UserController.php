@@ -211,6 +211,29 @@ class UserController extends Controller
     }
 
     /**
+     * Download sample CSV file for bulk user import
+     */
+    public function csvSampleDownload()
+    {
+        $rows = [
+            ['name', 'email', 'password', 'assignment', 'user_role'],
+            ['山田太郎', 'yamada@example.com', 'Password123!', '一般社員', 'user'],
+            ['鈴木花子', 'suzuki@example.com', 'Password123!', '一般社員', 'coordinator'],
+            ['田中一郎', 'tanaka@example.com', 'Password123!', '一般社員', 'leader'],
+        ];
+
+        $csv = '';
+        foreach ($rows as $row) {
+            $csv .= implode(',', array_map(fn($v) => '"' . str_replace('"', '""', $v) . '"', $row)) . "\n";
+        }
+
+        // BOM付きUTF-8でExcelでも文字化けしない
+        return response("\xEF\xBB\xBF" . $csv)
+            ->header('Content-Type', 'text/csv; charset=UTF-8')
+            ->header('Content-Disposition', 'attachment; filename="users_sample.csv"');
+    }
+
+    /**
      * Show CSV upload form
      */
     public function csvUpload()

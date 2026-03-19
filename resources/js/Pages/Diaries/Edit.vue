@@ -371,7 +371,7 @@ const back = () => {
 
 <template>
     <AppLayout title="日報編集">
-        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
+        <div class="rounded bg-white p-6 shadow">
             <h1 class="mb-4 text-2xl font-bold">日報編集 ({{ props.diary.date }})</h1>
             <form @submit.prevent="submit">
                 <div class="mb-4">

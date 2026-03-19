@@ -188,6 +188,7 @@ const groupedByDate = computed(() => {
             <h2 class="text-xl font-semibold leading-tight text-gray-800">{{ props.headerTitle }}</h2>
         </template>
 
+        <div class="rounded bg-white p-6 shadow">
         <!-- 一覧に戻るリンクを見出し下に表示 -->
         <div class="mb-2">
             <a :href="route(routeForIndex())" class="text-sm text-blue-600 hover:underline">一覧に戻る</a>
@@ -229,5 +230,6 @@ const groupedByDate = computed(() => {
                         :useInteractionRoutes="true"
                     />
                 </div>
+        </div>
     </AppLayout>
 </template>

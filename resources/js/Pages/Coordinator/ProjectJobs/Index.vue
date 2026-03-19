@@ -3,7 +3,7 @@
         <template #header>
             <h2 class="text-xl font-semibold leading-tight text-gray-800">【進行管理】{{ $page.props.auth.user.name || 'ユーザー' }}さんのページ</h2>
         </template>
-        <div class="mx-auto max-w-4xl rounded bg-white p-6 shadow">
+        <div class="rounded bg-white p-6 shadow">
             <div class="mb-6 flex items-center justify-between">
                 <h1 class="text-2xl font-bold">案件一覧</h1>
                 <Link :href="route('coordinator.project_jobs.create')" class="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"

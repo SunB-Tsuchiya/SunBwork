@@ -830,88 +830,87 @@ function onCompositionEnd() {
             </div>
         </transition>
         <div class="mx-auto flex max-w-6xl flex-col gap-4 rounded bg-white p-4 shadow" style="height: calc(100vh - 140px)">
-                <div class="mb-4 flex items-center justify-between">
-                    <div class="flex items-center gap-3">
-                        <button
-                            type="button"
-                            @click="openChatRoomFileModal"
-                            class="inline-flex items-center rounded bg-green-600 px-3 py-2 text-white shadow-lg"
-                        >
-                            ファイルアップロード
-                        </button>
-                    </div>
+            <div class="mb-4 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <button
+                        type="button"
+                        @click="openChatRoomFileModal"
+                        class="inline-flex items-center rounded bg-green-600 px-3 py-2 text-white shadow-lg"
+                    >
+                        ファイルアップロード
+                    </button>
                 </div>
+            </div>
 
-                <div class="flex w-full flex-1 gap-4 overflow-hidden">
-                    <!-- 左カラム: ルーム一覧のみ (モバイルは非表示) -->
-                    <aside class="hidden w-64 flex-shrink-0 border-r border-gray-100 px-3 py-2 md:block">
-                        <div class="mb-2 flex items-center justify-between">
-                            <div class="text-sm font-medium">ルーム一覧</div>
-                            <a href="/chat/rooms" class="text-xs text-blue-600 hover:underline">一覧へ</a>
-                        </div>
-                        <ul class="room-index space-y-1 text-sm leading-tight">
-                            <li v-for="r in rooms" :key="r.id" class="rounded px-0 py-0">
-                                <a
-                                    :href="`/chat/rooms/${r.id}`"
-                                    @click="onRoomClick($event, r)"
-                                    @keydown.enter.prevent="selectRoom(r)"
-                                    :class="[
-                                        'flex w-full cursor-pointer items-center justify-between rounded px-2 py-2 transition-colors hover:bg-indigo-100 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300',
-                                        r.id === currentRoom.id ? 'bg-indigo-200 font-semibold text-gray-900' : '',
-                                    ]"
-                                    :aria-current="r.id === currentRoom.id ? 'true' : null"
+            <div class="flex w-full flex-1 gap-4 overflow-hidden">
+                <!-- 左カラム: ルーム一覧のみ (モバイルは非表示) -->
+                <aside class="hidden w-64 flex-shrink-0 border-r border-gray-100 px-3 py-2 md:block">
+                    <div class="mb-2 flex items-center justify-between">
+                        <div class="text-sm font-medium">ルーム一覧</div>
+                        <a href="/chat/rooms" class="text-xs text-blue-600 hover:underline">一覧へ</a>
+                    </div>
+                    <ul class="room-index space-y-1 text-sm leading-tight">
+                        <li v-for="r in rooms" :key="r.id" class="rounded px-0 py-0">
+                            <a
+                                :href="`/chat/rooms/${r.id}`"
+                                @click="onRoomClick($event, r)"
+                                @keydown.enter.prevent="selectRoom(r)"
+                                :class="[
+                                    'flex w-full cursor-pointer items-center justify-between rounded px-2 py-2 transition-colors hover:bg-indigo-100 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300',
+                                    r.id === currentRoom.id ? 'bg-indigo-200 font-semibold text-gray-900' : '',
+                                ]"
+                                :aria-current="r.id === currentRoom.id ? 'true' : null"
+                            >
+                                <div class="truncate text-sm text-gray-800">
+                                    {{ r.name || (r.type === 'private' ? r.users && r.users.find((u) => u.id !== user.id)?.name : '(無名)') }}
+                                </div>
+                                <span
+                                    v-if="r.unread_count"
+                                    class="ml-2 inline-flex items-center rounded-full bg-red-500 px-2 py-0.5 text-xs font-semibold text-white"
+                                    >{{ r.unread_count }}</span
                                 >
-                                    <div class="truncate text-sm text-gray-800">
-                                        {{ r.name || (r.type === 'private' ? r.users && r.users.find((u) => u.id !== user.id)?.name : '(無名)') }}
-                                    </div>
-                                    <span
-                                        v-if="r.unread_count"
-                                        class="ml-2 inline-flex items-center rounded-full bg-red-500 px-2 py-0.5 text-xs font-semibold text-white"
-                                        >{{ r.unread_count }}</span
-                                    >
-                                </a>
-                            </li>
-                        </ul>
-                    </aside>
+                            </a>
+                        </li>
+                    </ul>
+                </aside>
 
-                    <!-- メンバーモーダル -->
-                    <div v-if="showMembers" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-                        <div class="min-w-[300px] rounded bg-white p-6 shadow-lg">
-                            <div class="mb-4 flex items-center justify-between">
-                                <span class="text-lg font-bold">メンバー一覧</span>
-                                <button @click="showMembers = false" class="text-gray-500 hover:text-gray-800">×</button>
-                            </div>
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">担当</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">名前</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-for="member in sortedMembers" :key="member.id">
-                                        <td class="px-4 py-2">{{ getAssignmentName(member.assignment_id) }}</td>
-                                        <td class="px-4 py-2">{{ member.name }}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                            <div class="mt-4 flex justify-end">
-                                <button @click="showMembers = false" class="rounded bg-blue-600 px-4 py-2 text-white">閉じる</button>
-                            </div>
+                <!-- メンバーモーダル -->
+                <div v-if="showMembers" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+                    <div class="min-w-[300px] rounded bg-white p-6 shadow-lg">
+                        <div class="mb-4 flex items-center justify-between">
+                            <span class="text-lg font-bold">メンバー一覧</span>
+                            <button @click="showMembers = false" class="text-gray-500 hover:text-gray-800">×</button>
+                        </div>
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">担当</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">名前</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="member in sortedMembers" :key="member.id">
+                                    <td class="px-4 py-2">{{ getAssignmentName(member.assignment_id) }}</td>
+                                    <td class="px-4 py-2">{{ member.name }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div class="mt-4 flex justify-end">
+                            <button @click="showMembers = false" class="rounded bg-blue-600 px-4 py-2 text-white">閉じる</button>
                         </div>
                     </div>
-
-                    <main class="flex-1 overflow-auto px-4 py-2">
-                        <MessageArea
-                            :room="currentRoom"
-                            :initialMessages="messages"
-                            :user="user"
-                            widthClass="w-full"
-                            :openUploadModal="openChatRoomFileModal"
-                            @request-open-upload="openChatRoomFileModal"
-                        />
-                    </main>
                 </div>
+
+                <main class="flex-1 overflow-auto px-4 py-2">
+                    <MessageArea
+                        :room="currentRoom"
+                        :initialMessages="messages"
+                        :user="user"
+                        widthClass="w-full"
+                        :openUploadModal="openChatRoomFileModal"
+                        @request-open-upload="openChatRoomFileModal"
+                    />
+                </main>
             </div>
         </div>
         <!-- File upload modal (ChatRoom) -->
@@ -961,6 +960,7 @@ function onCompositionEnd() {
                     </template>
                 </div>
             </div>
+        </div>
     </AppLayout>
 </template>
 <style scoped>

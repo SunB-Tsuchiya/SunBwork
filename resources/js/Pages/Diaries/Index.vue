@@ -74,97 +74,96 @@ const selectedPerPage = computed(() => (props.meta && props.meta.per_page ? Numb
             <h2 class="text-xl font-semibold leading-tight text-gray-800">日報一覧</h2>
         </template>
 
-        <div class="mb-4 flex items-center justify-between">
-                    <div class="flex items-center">
-                        <h1 class="text-2xl font-bold">日報一覧</h1>
-                        <button @click="showCalendar = true" class="ml-4 text-gray-600 hover:text-blue-600" ref="calendarBtn">
-                            <FontAwesomeIcon :icon="faCalendar" size="lg" />
-                        </button>
-                        <div v-if="showCalendar">
-                            <!-- オーバーレイ -->
-                            <div class="fixed inset-0 z-40 bg-transparent" @click="showCalendar = false"></div>
-                            <!-- カレンダー本体 -->
-                            <div class="calendar-popup absolute left-auto top-full z-50 ml-2 mt-2">
-                                <div class="min-w-[300px] rounded bg-white p-4 shadow-lg">
-                                    <Calendar @date-select="handleDateSelect" />
-                                    <button @click="showCalendar = false" class="mt-2 text-xs text-gray-500 hover:text-blue-600">閉じる</button>
-                                </div>
+        <div class="rounded bg-white p-6 shadow">
+            <div class="mb-4 flex items-center justify-between">
+                <div class="flex items-center">
+                    <h1 class="text-2xl font-bold">日報一覧</h1>
+                    <button @click="showCalendar = true" class="ml-4 text-gray-600 hover:text-blue-600" ref="calendarBtn">
+                        <FontAwesomeIcon :icon="faCalendar" size="lg" />
+                    </button>
+                    <div v-if="showCalendar">
+                        <!-- オーバーレイ -->
+                        <div class="fixed inset-0 z-40 bg-transparent" @click="showCalendar = false"></div>
+                        <!-- カレンダー本体 -->
+                        <div class="calendar-popup absolute left-auto top-full z-50 ml-2 mt-2">
+                            <div class="min-w-[300px] rounded bg-white p-4 shadow-lg">
+                                <Calendar @date-select="handleDateSelect" />
+                                <button @click="showCalendar = false" class="mt-2 text-xs text-gray-500 hover:text-blue-600">閉じる</button>
                             </div>
                         </div>
                     </div>
-
-                    <div>
-                        <Link :href="route('diaries.create')" class="rounded bg-green-600 px-4 py-2 text-white">新しく日報を書く</Link>
-                    </div>
                 </div>
 
-                <div class="mb-4">
-                    <label class="mr-2 text-sm">期間:</label>
-                    <select v-model.number="selectedDays" class="rounded border px-2 py-1 text-sm">
-                        <option :value="7">7日分を表示</option>
-                        <option :value="30">30日分を表示</option>
-                        <option :value="90">90日分を表示</option>
-                    </select>
-                    <button class="ml-2 rounded bg-blue-600 px-3 py-1 text-xs text-white" @click.prevent="applyFilters">適用</button>
+                <div>
+                    <Link :href="route('diaries.create')" class="rounded bg-green-600 px-4 py-2 text-white">新しく日報を書く</Link>
                 </div>
+            </div>
 
-                <!-- For personal diaries, show only date and content. Hide name/id/dept/read columns by configuring DiaryTable props. -->
-                <DiaryTable
-                    :diaries="props.diaries"
-                    :routePrefix="'diaries'"
-                    :serverMode="true"
-                    :meta="props.meta"
-                    :pageSize="selectedPerPage"
-                    :filters="props.filters"
-                    :maxDescriptionLines="2"
-                    :showUnreadToggle="false"
-                    :fullContent="false"
-                    :useInteractionRoutes="false"
-                    :showReadColumn="false"
-                    :showCheckboxes="false"
-                    :searchable="false"
-                    :compact="true"
-                    :hidePagination="true"
-                />
+            <div class="mb-4">
+                <label class="mr-2 text-sm">期間:</label>
+                <select v-model.number="selectedDays" class="w-50 w-40 rounded border px-2 py-1 text-sm">
+                    <option :value="7">7日分を表示</option>
+                    <option :value="30">30日分を表示</option>
+                    <option :value="90">90日分を表示</option>
+                </select>
+                <button class="ml-2 rounded bg-blue-600 px-3 py-1 text-xs text-white" @click.prevent="applyFilters">適用</button>
+            </div>
 
-                <!-- pagination -->
-                <div class="mt-6 flex items-center justify-between">
-                    <div>
-                        <button
-                            class="mr-2 rounded border px-3 py-1"
-                            :disabled="currentPage <= 1"
-                            @click.prevent="goToPage(Math.max(1, currentPage - 1))"
-                        >
-                            前
+            <!-- For personal diaries, show only date and content. Hide name/id/dept/read columns by configuring DiaryTable props. -->
+            <DiaryTable
+                :diaries="props.diaries"
+                :routePrefix="'diaries'"
+                :serverMode="true"
+                :meta="props.meta"
+                :pageSize="selectedPerPage"
+                :filters="props.filters"
+                :maxDescriptionLines="2"
+                :showUnreadToggle="false"
+                :fullContent="false"
+                :useInteractionRoutes="false"
+                :showReadColumn="false"
+                :showCheckboxes="false"
+                :searchable="false"
+                :compact="true"
+                :hidePagination="true"
+            />
+
+            <!-- pagination -->
+            <div class="mt-6 flex items-center justify-between">
+                <div>
+                    <button
+                        class="mr-2 rounded border px-3 py-1"
+                        :disabled="currentPage <= 1"
+                        @click.prevent="goToPage(Math.max(1, currentPage - 1))"
+                    >
+                        前
+                    </button>
+                    <button
+                        class="rounded border px-3 py-1"
+                        :disabled="currentPage >= lastPage"
+                        @click.prevent="goToPage(Math.min(lastPage, currentPage + 1))"
+                    >
+                        次
+                    </button>
+                </div>
+                <div class="text-sm text-gray-600">
+                    ページ: <span class="font-medium">{{ currentPage }}</span> / {{ lastPage }}
+                </div>
+                <div class="text-sm text-gray-600">
+                    合計:
+                    <span class="font-medium">{{
+                        props.meta && props.meta.total ? props.meta.total : props.diaries ? props.diaries.length : 0
+                    }}</span>
+                </div>
+                <div class="space-x-1">
+                    <template v-for="p in Array.from({ length: lastPage }, (_, i) => i + 1)" :key="p">
+                        <button @click.prevent="goToPage(p)" :class="['rounded px-2 py-1', p === currentPage ? 'bg-blue-600 text-white' : 'border']">
+                            {{ p }}
                         </button>
-                        <button
-                            class="rounded border px-3 py-1"
-                            :disabled="currentPage >= lastPage"
-                            @click.prevent="goToPage(Math.min(lastPage, currentPage + 1))"
-                        >
-                            次
-                        </button>
-                    </div>
-                    <div class="text-sm text-gray-600">
-                        ページ: <span class="font-medium">{{ currentPage }}</span> / {{ lastPage }}
-                    </div>
-                    <div class="text-sm text-gray-600">
-                        合計:
-                        <span class="font-medium">{{
-                            props.meta && props.meta.total ? props.meta.total : props.diaries ? props.diaries.length : 0
-                        }}</span>
-                    </div>
-                    <div class="space-x-1">
-                        <template v-for="p in Array.from({ length: lastPage }, (_, i) => i + 1)" :key="p">
-                            <button
-                                @click.prevent="goToPage(p)"
-                                :class="['rounded px-2 py-1', p === currentPage ? 'bg-blue-600 text-white' : 'border']"
-                            >
-                                {{ p }}
-                            </button>
-                        </template>
-                    </div>
+                    </template>
                 </div>
+            </div>
+        </div>
     </AppLayout>
 </template>
 

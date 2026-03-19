@@ -3,7 +3,7 @@
         <template #header>
             <h2 class="text-xl font-semibold leading-tight text-gray-800">【進行管理】{{ $page.props.auth.user.name || 'ユーザー' }}さんのページ</h2>
         </template>
-        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
+        <div class="rounded bg-white p-6 shadow">
             <h1 class="mb-6 text-2xl font-bold">案件編集</h1>
             <form @submit.prevent="submit">
                 <div class="mb-4">

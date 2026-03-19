@@ -4,7 +4,7 @@
             <h2 class="text-xl font-semibold leading-tight text-gray-800">割当編集</h2>
         </template>
 
-        <div class="mx-auto max-w-3xl rounded bg-white p-6 shadow">
+        <div class="rounded bg-white p-6 shadow">
             <h1 class="mb-4 text-2xl font-bold">割当を編集</h1>
 
             <AssignmentForm :projectJob="projectJob" :members="members" :assignments="assignments" :editMode="true" />

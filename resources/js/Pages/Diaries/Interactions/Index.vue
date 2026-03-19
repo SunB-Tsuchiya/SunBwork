@@ -114,99 +114,101 @@ function markReadAllRoute() {
             <h2 class="text-xl font-semibold leading-tight text-gray-800">{{ props.headerTitle }}</h2>
         </template>
 
-        <div class="mb-4 flex items-center justify-between">
-                    <div class="flex items-center space-x-3">
-                        <label class="text-sm">表示:</label>
-                        <select v-model="viewMode" class="rounded border px-2 py-1 text-sm">
-                            <option value="day">日別表示</option>
-                            <option value="month">月別に表示</option>
-                        </select>
+        <div class="rounded bg-white p-6 shadow">
+            <div class="mb-4 flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <label class="text-sm">表示:</label>
+                    <select v-model="viewMode" class="w-40 rounded border px-2 py-1 text-sm">
+                        <option value="day">日別表示</option>
+                        <option value="month">月別に表示</option>
+                    </select>
 
-                        <label class="text-sm">期間:</label>
-                        <select v-model.number="selectedDays" class="rounded border px-2 py-1 text-sm">
-                            <option :value="7">7日分を表示</option>
-                            <option :value="30">30日分を表示</option>
-                            <option :value="90">90日分を表示</option>
-                        </select>
+                    <label class="text-sm">期間:</label>
+                    <select v-model.number="selectedDays" class="w-30 w-40 rounded border px-2 py-1 text-sm">
+                        <option :value="7">7日分を表示</option>
+                        <option :value="30">30日分を表示</option>
+                        <option :value="90">90日分を表示</option>
+                    </select>
 
-                        <button @click.prevent="applyFilters" class="ml-2 rounded bg-blue-600 px-3 py-1 text-xs text-white">適用</button>
-                    </div>
+                    <button @click.prevent="applyFilters" class="ml-2 rounded bg-blue-600 px-3 py-1 text-xs text-white">適用</button>
                 </div>
+            </div>
 
-                <div v-for="(list, date) in groupedByDate" :key="date" class="mb-8">
-                    <div class="mb-2">
-                        <h3 class="flex items-center gap-2 text-lg font-bold">
-                            <span>{{ formatDate(date) }}</span>
-                            <Link
-                                :href="route(routeForIndex(date), { date: date })"
-                                class="inline-flex items-center rounded border bg-white px-2 py-1 text-xs hover:bg-gray-50"
-                                aria-label="日付別表示へ"
-                            >
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke-width="2"
-                                    stroke="currentColor"
-                                    class="mr-1 h-4 w-4"
-                                >
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-                                </svg>
-                                <span class="text-xs">一覧を見る</span>
-                            </Link>
-
-                            <button
-                                v-if="props.date === date"
-                                @click.prevent="() => Inertia.post(route(markReadAllRoute()), { date: date })"
-                                class="ml-2 inline-flex items-center rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700"
-                            >
-                                全部既読にする
-                            </button>
-                        </h3>
-                    </div>
-                    <DiaryTable
-                        :diaries="list"
-                        :routePrefix="props.routePrefix"
-                        :serverMode="true"
-                        :meta="props.meta"
-                        :filters="tableFilters"
-                        :maxDescriptionLines="1"
-                        :showUnreadToggle="false"
-                        :fullContent="props.date === date"
-                        :useInteractionRoutes="true"
-                    />
-                </div>
-                <!-- pagination -->
-                <div class="mt-6 flex items-center justify-between">
-                    <div>
-                        <button
-                            class="mr-2 rounded border px-3 py-1"
-                            :disabled="currentPage <= 1"
-                            @click.prevent="() => Inertia.get(pageRoute(Math.max(1, currentPage - 1)))"
+            <div v-for="(list, date) in groupedByDate" :key="date" class="mb-8">
+                <div class="mb-2">
+                    <h3 class="flex items-center gap-2 text-lg font-bold">
+                        <span>{{ formatDate(date) }}</span>
+                        <Link
+                            :href="route(routeForIndex(date), { date: date })"
+                            class="inline-flex items-center rounded border bg-white px-2 py-1 text-xs hover:bg-gray-50"
+                            aria-label="日付別表示へ"
                         >
-                            前
-                        </button>
-                        <button
-                            class="rounded border px-3 py-1"
-                            :disabled="currentPage >= lastPage"
-                            @click.prevent="() => Inertia.get(pageRoute(Math.min(lastPage, currentPage + 1)))"
-                        >
-                            次
-                        </button>
-                    </div>
-                    <div class="text-sm text-gray-600">
-                        ページ: <span class="font-medium">{{ currentPage }}</span> / {{ lastPage }}
-                    </div>
-                    <div class="space-x-1">
-                        <template v-for="p in pageRange" :key="p">
-                            <button
-                                @click.prevent="() => Inertia.get(pageRoute(p))"
-                                :class="['rounded px-2 py-1', p === currentPage ? 'bg-blue-600 text-white' : 'border']"
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke-width="2"
+                                stroke="currentColor"
+                                class="mr-1 h-4 w-4"
                             >
-                                {{ p }}
-                            </button>
-                        </template>
-                    </div>
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                            </svg>
+                            <span class="text-xs">一覧を見る</span>
+                        </Link>
+
+                        <button
+                            v-if="props.date === date"
+                            @click.prevent="() => Inertia.post(route(markReadAllRoute()), { date: date })"
+                            class="ml-2 inline-flex items-center rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700"
+                        >
+                            全部既読にする
+                        </button>
+                    </h3>
                 </div>
+                <DiaryTable
+                    :diaries="list"
+                    :routePrefix="props.routePrefix"
+                    :serverMode="true"
+                    :meta="props.meta"
+                    :filters="tableFilters"
+                    :maxDescriptionLines="1"
+                    :showUnreadToggle="false"
+                    :fullContent="props.date === date"
+                    :useInteractionRoutes="true"
+                />
+            </div>
+            <!-- pagination -->
+            <div class="mt-6 flex items-center justify-between">
+                <div>
+                    <button
+                        class="mr-2 rounded border px-3 py-1"
+                        :disabled="currentPage <= 1"
+                        @click.prevent="() => Inertia.get(pageRoute(Math.max(1, currentPage - 1)))"
+                    >
+                        前
+                    </button>
+                    <button
+                        class="rounded border px-3 py-1"
+                        :disabled="currentPage >= lastPage"
+                        @click.prevent="() => Inertia.get(pageRoute(Math.min(lastPage, currentPage + 1)))"
+                    >
+                        次
+                    </button>
+                </div>
+                <div class="text-sm text-gray-600">
+                    ページ: <span class="font-medium">{{ currentPage }}</span> / {{ lastPage }}
+                </div>
+                <div class="space-x-1">
+                    <template v-for="p in pageRange" :key="p">
+                        <button
+                            @click.prevent="() => Inertia.get(pageRoute(p))"
+                            :class="['rounded px-2 py-1', p === currentPage ? 'bg-blue-600 text-white' : 'border']"
+                        >
+                            {{ p }}
+                        </button>
+                    </template>
+                </div>
+            </div>
+        </div>
     </AppLayout>
 </template>

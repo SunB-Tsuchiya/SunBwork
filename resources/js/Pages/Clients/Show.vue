@@ -1,29 +1,31 @@
-<template>
-  <AppLayout title="クライアント詳細">
-    <template #header>
-      <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-        【進行管理】{{ $page.props.auth.user.name || 'ユーザー' }}さんのページ
-      </h2>
-    </template>
-    <div class="max-w-2xl mx-auto p-6 bg-white rounded shadow">
-      <h1 class="text-2xl font-bold mb-6">クライアント詳細</h1>
-      <div class="mb-4"><strong>ID:</strong> {{ client.id }}</div>
-      <div class="mb-4"><strong>会社名:</strong> {{ client.name }}</div>
-      <div class="mb-4"><strong>詳細:</strong> {{ client.detail }}</div>
-      <div class="mb-4"><strong>独自案件:</strong> {{ client.fromSA ? '○' : '' }}</div>
-      <div class="flex gap-4 mt-6">
-  <Link :href="route('leader.clients.edit', client.id)" class="bg-yellow-200 px-4 py-2 rounded">編集</Link>
-  <Link :href="route('leader.clients.index')" class="bg-gray-200 px-4 py-2 rounded">一覧へ戻る</Link>
-      </div>
-    </div>
-  </AppLayout>
-</template>
-
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
+
 const props = defineProps({ client: Object });
+
+const page = usePage();
+const routePrefix = computed(() => {
+    const role = page.props.auth?.user?.user_role ?? 'leader';
+    return ['admin', 'superadmin'].includes(role) ? 'admin' : 'leader';
+});
 </script>
 
-<style scoped>
-</style>
+<template>
+    <AppLayout title="クライアント詳細">
+        <template #header>
+            <h2 class="text-xl font-semibold leading-tight text-gray-800">クライアント詳細</h2>
+        </template>
+
+        <div class="rounded bg-white p-6 shadow">
+            <div class="mb-4"><strong>ID:</strong> {{ client.id }}</div>
+            <div class="mb-4"><strong>会社名:</strong> {{ client.name }}</div>
+            <div class="mb-4"><strong>詳細:</strong> {{ client.notes }}</div>
+            <div class="mt-6 flex gap-4">
+                <Link :href="route(`${routePrefix}.clients.edit`, client.id)" class="rounded bg-orange-600 px-4 py-2 font-bold text-white hover:bg-orange-700">編集</Link>
+                <Link :href="route(`${routePrefix}.clients.index`)" class="rounded bg-gray-200 px-4 py-2 font-bold text-gray-700 hover:bg-gray-300">一覧へ戻る</Link>
+            </div>
+        </div>
+    </AppLayout>
+</template>

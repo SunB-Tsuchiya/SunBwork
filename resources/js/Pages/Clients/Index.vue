@@ -1,23 +1,27 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
+
 const props = defineProps({ clients: Array });
+
+const page = usePage();
+const routePrefix = computed(() => {
+    const role = page.props.auth?.user?.user_role ?? 'leader';
+    return ['admin', 'superadmin'].includes(role) ? 'admin' : 'leader';
+});
 </script>
 
 <template>
     <AppLayout title="クライアント一覧">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">【進行管理】{{ $page.props.auth.user.name || 'ユーザー' }}さんのページ</h2>
+            <h2 class="text-xl font-semibold leading-tight text-gray-800">クライアント管理</h2>
+        </template>
+        <template #headerExtras>
+            <Link :href="route(`${routePrefix}.clients.create`)" class="rounded bg-orange-600 px-4 py-2 font-bold text-white hover:bg-orange-700">新規作成</Link>
         </template>
 
         <div class="rounded bg-white p-6 shadow">
-                    <div class="mb-6 flex items-center justify-between">
-                        <h1 class="text-2xl font-bold">クライアント一覧</h1>
-                        <Link :href="route('leader.clients.create')" class="rounded bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
-                            >新規作成</Link
-                        >
-                    </div>
-
                     <template v-if="props.clients.length === 0">
                         <p class="py-8 text-gray-500">クライアントはまだ登録されていません</p>
                     </template>
@@ -30,7 +34,6 @@ const props = defineProps({ clients: Array });
                                         <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">ID</th>
                                         <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">名前</th>
                                         <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">詳細</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">独自案件</th>
                                         <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">操作</th>
                                     </tr>
                                 </thead>
@@ -39,9 +42,8 @@ const props = defineProps({ clients: Array });
                                         <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900">{{ client.id }}</td>
                                         <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900">{{ client.name }}</td>
                                         <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-700">{{ client.detail || client.notes || '' }}</td>
-                                        <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900">{{ client.fromSA ? '○' : '' }}</td>
                                         <td class="whitespace-nowrap px-6 py-4 text-sm">
-                                            <Link :href="route('leader.clients.edit', client.id)" class="text-blue-600 hover:text-blue-900"
+                                            <Link :href="route(`${routePrefix}.clients.edit`, client.id)" class="text-blue-600 hover:text-blue-900"
                                                 >編集</Link
                                             >
                                         </td>

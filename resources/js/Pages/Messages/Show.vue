@@ -5,79 +5,79 @@
         </template>
 
         <div class="rounded bg-white p-6 shadow">
-                        <div class="mb-4 flex items-center justify-between">
-                            <a :href="route('messages.index')" class="text-sm text-blue-600 underline">← 一覧に戻る</a>
-                            <div>
-                                <button
-                                    v-if="
-                                        currentUserId &&
-                                        (currentUserId === (localMessage?.from_user_id ?? localMessage?.from_user?.id) ||
-                                            (Array.isArray(localMessage?.recipients) &&
-                                                localMessage.recipients.some((r) => (r.user_id ?? r.user?.id) === currentUserId)))
-                                    "
-                                    @click.prevent="onTrashClick"
-                                    class="rounded bg-red-50 px-2 py-1 text-sm text-red-700 hover:bg-red-100"
-                                >
-                                    {{ isTrashedByCurrentUser ? '完全削除' : '削除' }}
-                                </button>
-                            </div>
-                        </div>
-                        <h3 class="text-lg font-semibold">{{ subjectText }}</h3>
-                        <div class="mt-1 text-sm text-gray-500">差出人: {{ senderName }}</div>
-                        <div class="mt-4 text-sm text-gray-700" v-html="sanitizedBody" @click="onBodyClick"></div>
+            <div class="mb-4 flex items-center justify-between">
+                <a :href="route('messages.index')" class="text-sm text-blue-600 underline">← 一覧に戻る</a>
+                <div>
+                    <button
+                        v-if="
+                            currentUserId &&
+                            (currentUserId === (localMessage?.from_user_id ?? localMessage?.from_user?.id) ||
+                                (Array.isArray(localMessage?.recipients) &&
+                                    localMessage.recipients.some((r) => (r.user_id ?? r.user?.id) === currentUserId)))
+                        "
+                        @click.prevent="onTrashClick"
+                        class="rounded bg-red-50 px-2 py-1 text-sm text-red-700 hover:bg-red-100"
+                    >
+                        {{ isTrashedByCurrentUser ? '完全削除' : '削除' }}
+                    </button>
+                </div>
+            </div>
+            <h3 class="text-lg font-semibold">{{ subjectText }}</h3>
+            <div class="mt-1 text-sm text-gray-500">差出人: {{ senderName }}</div>
+            <div class="mt-4 text-sm text-gray-700" v-html="sanitizedBody" @click="onBodyClick"></div>
 
-                        <div class="mt-6">
-                            <label class="block text-sm font-medium text-gray-700">添付ファイル</label>
-                            <div v-if="attachmentsList && attachmentsList.length">
-                                <ul class="mt-2 space-y-2">
-                                    <li
-                                        v-for="file in attachmentsList"
-                                        :key="file.id || file.url"
-                                        class="flex items-center justify-between rounded bg-gray-50 p-2"
-                                    >
-                                        <div class="flex items-center gap-3">
-                                            <div v-if="ensureThumb(file)" class="flex-shrink-0">
-                                                <img :src="ensureThumb(file)" alt="thumb" class="h-12 w-12 rounded object-cover" />
-                                            </div>
-                                            <div>
-                                                <div class="text-sm font-medium text-gray-900">{{ file.original_name }}</div>
-                                                <div class="text-xs text-gray-500">
-                                                    {{ file.size || 0 ? (file.size / 1024).toFixed(1) + ' KB' : '-' }} • {{ file.mime_type || '-' }}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="flex items-center gap-3">
-                                            <button
-                                                v-if="file && (file.url || file.path || file.id)"
-                                                type="button"
-                                                @click.prevent="openAttachmentInModal(file)"
-                                                class="text-blue-600 underline"
-                                            >
-                                                開く
-                                            </button>
-                                            <a
-                                                v-if="file.url || file.path || file.id"
-                                                :href="downloadHref(file)"
-                                                :download="file.original_name"
-                                                class="text-gray-600"
-                                                >ダウンロード</a
-                                            >
-                                            <button
-                                                v-if="$page.props.auth?.user?.id === file.user_id"
-                                                type="button"
-                                                @click.prevent="confirmDelete(file)"
-                                                class="text-red-600"
-                                            >
-                                                削除
-                                            </button>
-                                            <span v-else-if="!(file.url || file.path || file.id)" class="text-sm text-gray-500">(利用不可)</span>
-                                        </div>
-                                    </li>
-                                </ul>
+            <div class="mt-6">
+                <label class="block text-sm font-medium text-gray-700">添付ファイル</label>
+                <div v-if="attachmentsList && attachmentsList.length">
+                    <ul class="mt-2 space-y-2">
+                        <li
+                            v-for="file in attachmentsList"
+                            :key="file.id || file.url"
+                            class="flex items-center justify-between rounded bg-gray-50 p-2"
+                        >
+                            <div class="flex items-center gap-3">
+                                <div v-if="ensureThumb(file)" class="flex-shrink-0">
+                                    <img :src="ensureThumb(file)" alt="thumb" class="h-12 w-12 rounded object-cover" />
+                                </div>
+                                <div>
+                                    <div class="text-sm font-medium text-gray-900">{{ file.original_name }}</div>
+                                    <div class="text-xs text-gray-500">
+                                        {{ file.size || 0 ? (file.size / 1024).toFixed(1) + ' KB' : '-' }} • {{ file.mime_type || '-' }}
+                                    </div>
+                                </div>
                             </div>
-                            <div v-else class="mt-2 text-sm text-gray-500">添付ファイルなし</div>
-                        </div>
-        <!-- dev-only JSON dump removed -->
+                            <div class="flex items-center gap-3">
+                                <button
+                                    v-if="file && (file.url || file.path || file.id)"
+                                    type="button"
+                                    @click.prevent="openAttachmentInModal(file)"
+                                    class="text-blue-600 underline"
+                                >
+                                    開く
+                                </button>
+                                <a
+                                    v-if="file.url || file.path || file.id"
+                                    :href="downloadHref(file)"
+                                    :download="file.original_name"
+                                    class="text-gray-600"
+                                    >ダウンロード</a
+                                >
+                                <button
+                                    v-if="$page.props.auth?.user?.id === file.user_id"
+                                    type="button"
+                                    @click.prevent="confirmDelete(file)"
+                                    class="text-red-600"
+                                >
+                                    削除
+                                </button>
+                                <span v-else-if="!(file.url || file.path || file.id)" class="text-sm text-gray-500">(利用不可)</span>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+                <div v-else class="mt-2 text-sm text-gray-500">添付ファイルなし</div>
+            </div>
+        </div>
     </AppLayout>
 
     <!-- Preview Modal -->

@@ -160,6 +160,38 @@ SunBWork/
 </AppLayout>
 ```
 
+### レイアウト統一ルール（必須）
+
+全ページで以下のパターンに統一すること。新規ページ作成・既存ページ修正の際は必ずこのルールに従う。
+
+**NG パターン（使ってはいけない）:**
+```vue
+<!-- AppLayout がすでに py-12 / max-w-7xl を提供しているため、以下は二重になる -->
+<main>
+  <div class="py-2">
+    <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
+      <div class="bg-white p-6 shadow-xl sm:rounded-lg">
+        <!-- コンテンツ -->
+      </div>
+    </div>
+  </div>
+</main>
+```
+
+**OK パターン（統一形式）:**
+```vue
+<!-- デフォルトスロットに直接カードを置く -->
+<div class="rounded bg-white p-6 shadow">
+  <!-- コンテンツ -->
+</div>
+```
+
+**チェックリスト（コード修正時に確認）:**
+- [ ] `<main>` タグをデフォルトスロット直下に置いていないか
+- [ ] `py-2` / `py-12` の重複ラップをしていないか
+- [ ] `mx-auto max-w-7xl sm:px-6 lg:px-8` の重複ラップをしていないか
+- [ ] カードクラスが `rounded bg-white p-6 shadow` になっているか（`shadow-xl sm:rounded-lg` ではない）
+
 **AppLayout が提供するスロット:**
 - `#header` - ページ上部の白いヘッダーバー
 - `#headerExtras` - ヘッダーバー右端に追加コンテンツ
@@ -192,6 +224,109 @@ SunBWork/
 ```js
 route('coordinator.project_jobs.show', { projectJob: job.id })
 ```
+
+---
+
+## ロール共有ページのルーティングルール
+
+### タブメニューとルートプレフィックスの対応
+
+`AppLayout.vue` の `currentRouteContext` computed は現在のルート名のプレフィックスでタブを決定する:
+
+```js
+if (r.startsWith('superadmin.')) return 'superadmin';
+if (r.startsWith('admin.'))      return 'admin';
+if (r.startsWith('leader.') || r.startsWith('workload_setting.')) return 'leader';
+if (r.startsWith('coordinator.') || r.startsWith('project_jobs.')) return 'coordinator';
+return 'user'; // ← 必ず 'user' を返す。user_role にフォールバックしてはいけない
+```
+
+**重要:** フォールバックを `user_role` にすると、上位ロールのユーザーが User ページを開いたとき自分のロールのタブが出てしまう。必ず `'user'` を返すこと。
+
+### 複数ロールで共有するページの実装パターン
+
+Admin と Leader が同じ Vue ページ（例: `Clients/` 配下）を共有する場合、リンク先・フォーム送信先・リダイレクト先をロールに応じて動的に解決する。
+
+**フロントエンド（Vue）— routePrefix computed:**
+```js
+import { usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
+
+const page = usePage();
+const routePrefix = computed(() => {
+    const role = page.props.auth?.user?.user_role ?? 'leader';
+    return ['admin', 'superadmin'].includes(role) ? 'admin' : 'leader';
+});
+```
+
+**テンプレート内での使い方（`.value` は不要）:**
+```vue
+<!-- テンプレート内: computed は自動アンラップされるので .value なし -->
+<Link :href="route(`${routePrefix}.clients.index`)">一覧へ戻る</Link>
+```
+
+**スクリプト内での使い方（`.value` が必要）:**
+```js
+function submit() {
+    form.post(route(`${routePrefix.value}.clients.store`));
+}
+```
+
+> NG: テンプレート内で `${routePrefix.value}` と書くと `'admin'.value` = undefined になる
+
+**バックエンド（PHP）— routePrefix() ヘルパー:**
+
+共有コントローラ（例: `ClientController`）にプライベートメソッドを置き、リダイレクト先をロールで解決する:
+```php
+private function routePrefix(): string
+{
+    $role = Auth::user()->user_role ?? 'leader';
+    return match ($role) {
+        'admin', 'superadmin' => 'admin',
+        default => 'leader',
+    };
+}
+
+// store/update/destroy のリダイレクトで使用
+return redirect()->route("{$this->routePrefix()}.clients.index");
+```
+
+### Clients テーブルの注意点
+
+`clients` テーブルのカラムは `notes`（詳細テキスト）。フォームフィールド名 `detail` との乖離に注意:
+- Vue フォーム初期値: `detail: props.client.notes`（DBカラム名で読む）
+- コントローラ保存時: `$data['notes'] = $data['detail'] ?? null; unset($data['detail']);`
+- `$fillable` に `'notes'` が含まれていることを確認（`'detail'` は存在しない）
+
+---
+
+## CSV アップロード実装パターン
+
+Admin/Users と Clients で確立した標準パターン。新たに CSV 一括登録を実装する場合はこれに従う。
+
+**ルート定義（リソースルートより前に配置）:**
+```php
+Route::get('xxx/csv/upload',  [XxxController::class, 'csvUpload'])->name('xxx.csv.upload');
+Route::post('xxx/csv/preview',[XxxController::class, 'csvPreview'])->name('xxx.csv.preview');
+Route::post('xxx/csv/store',  [XxxController::class, 'csvStore'])->name('xxx.csv.store');
+Route::get('xxx/csv/sample',  [XxxController::class, 'csvSampleDownload'])->name('xxx.csv.sample');
+Route::resource('xxx', XxxController::class)->only([...]);
+```
+
+**Vue ページ構成:**
+1. `CsvUpload.vue` — ファイル選択 + サンプル CSV ダウンロードボタン
+2. `CsvPreview.vue` — プレビューテーブル + 確認後に store へ POST
+
+**サンプル CSV は BOM 付き UTF-8 で返す（Excel 文字化け対策）:**
+```php
+return response("\xEF\xBB\xBF" . $csv)
+    ->header('Content-Type', 'text/csv; charset=UTF-8')
+    ->header('Content-Disposition', 'attachment; filename="sample.csv"');
+```
+
+**SuperAdmin 向け会社選択:**
+- `csvUpload()` でロールが superadmin の場合のみ `companies` を props に渡す
+- Vue 側で `v-if="isSuperAdmin"` のセレクトを表示し、選択必須にする
 
 ---
 
