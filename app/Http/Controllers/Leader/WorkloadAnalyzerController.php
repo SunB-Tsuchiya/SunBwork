@@ -17,6 +17,9 @@ use App\Models\Stage;
 use App\Models\Size;
 use App\Models\WorkItemType;
 use App\Models\Difficulty;
+use App\Models\EventItemType;
+use App\Models\WorktimeItemType;
+use App\Models\WorkRecord;
 use Illuminate\Support\Facades\DB;
 
 class WorkloadAnalyzerController extends Controller
@@ -36,9 +39,23 @@ class WorkloadAnalyzerController extends Controller
             $end = now()->endOfDay();
         }
 
+        // load worktime coefficients (通常残業 / 超過残業)
+        $worktimeCoefficients = WorktimeItemType::all()->keyBy('id');
+        $normalOvertimeCoeff = 1.0;
+        $excessOvertimeCoeff = 1.0;
+        foreach ($worktimeCoefficients as $wt) {
+            if ($wt->type === 'over') {
+                if ($wt->name === '超過残業') {
+                    $excessOvertimeCoeff = (float) $wt->coefficient;
+                } elseif ($wt->name === '残業') {
+                    $normalOvertimeCoeff = (float) $wt->coefficient;
+                }
+            }
+        }
+
         // helper to calculate aggregates for a given user id and model class
         // Extended to compute per-category points (stage/size/type/difficulty) and overall points
-        $calcAggregates = function ($userId) use ($start, $end) {
+        $calcAggregates = function ($userId) use ($start, $end, $normalOvertimeCoeff, $excessOvertimeCoeff) {
             $result = [
                 'assigned' => [
                     'pages' => 0,
@@ -232,13 +249,67 @@ class WorkloadAnalyzerController extends Controller
             }
             $difficultyTotal = round($difficultyTotal, 1);
 
+            // --- compute event points for this user ---
+            $eventTotalPoints = 0.0;
+            try {
+                $evItems = \App\Models\Event::where('user_id', $userId)
+                    ->whereBetween('starts_at', [$start, $end])
+                    ->get();
+                $evCoeffMap = EventItemType::pluck('coefficient', 'id')->toArray();
+                foreach ($evItems as $ev) {
+                    $hours = 0.0;
+                    try {
+                        if ($ev->starts_at && $ev->ends_at) {
+                            $s = \Carbon\Carbon::parse($ev->starts_at);
+                            $e2 = \Carbon\Carbon::parse($ev->ends_at);
+                            $hours = max(0.0, $e2->diffInMinutes($s) / 60.0);
+                        }
+                    } catch (\Throwable $evE) {}
+                    if ($hours <= 0) continue;
+                    $eid = $ev->event_item_type_id ?? null;
+                    $coeff = ($eid && isset($evCoeffMap[$eid])) ? (float)$evCoeffMap[$eid] : 1.0;
+                    $eventTotalPoints += $hours * $coeff;
+                }
+            } catch (\Throwable $evErr) {}
+            $eventTotalPoints = round($eventTotalPoints, 1);
+
+            // compute overtime stats and points for this user in the period
+            $overtimeNormalMinutes = 0;
+            $overtimeExcessMinutes = 0;
+            try {
+                $wrRecords = WorkRecord::where('user_id', $userId)
+                    ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+                    ->get(['overtime_minutes']);
+                $result['overtime_minutes']    = (int) $wrRecords->sum('overtime_minutes');
+                // 通常残業: 0 < overtime_minutes <= 180 (≤3時間)
+                $normalRecords = $wrRecords->filter(fn($r) => ($r->overtime_minutes ?? 0) > 0 && ($r->overtime_minutes ?? 0) <= 180);
+                // 超過残業: overtime_minutes > 180 (>3時間)
+                $excessRecords = $wrRecords->filter(fn($r) => ($r->overtime_minutes ?? 0) > 180);
+                $result['overtime_days_normal'] = $normalRecords->count();
+                $result['overtime_days_excess'] = $excessRecords->count();
+                $overtimeNormalMinutes = (int) $normalRecords->sum('overtime_minutes');
+                $overtimeExcessMinutes = (int) $excessRecords->sum('overtime_minutes');
+            } catch (\Throwable $e) {
+                $result['overtime_minutes']     = 0;
+                $result['overtime_days_normal'] = 0;
+                $result['overtime_days_excess'] = 0;
+            }
+
+            $overtimeNormalPoints = round($overtimeNormalMinutes * $normalOvertimeCoeff, 1);
+            $overtimeExcessPoints = round($overtimeExcessMinutes * $excessOvertimeCoeff, 1);
+            $overtimeTotalPoints  = round($overtimeNormalPoints + $overtimeExcessPoints, 1);
+
             // attach points summary into aggregates
             $result['points'] = [
                 'stage' => $stagePointsTotal,
                 'size' => $sizeTotal,
                 'type' => $typeTotal,
                 'difficulty' => $difficultyTotal,
-                'overall' => $stagePointsTotal,
+                'event' => $eventTotalPoints,
+                'overtime' => $overtimeTotalPoints,
+                'overtime_normal' => $overtimeNormalPoints,
+                'overtime_excess' => $overtimeExcessPoints,
+                'overall' => $stagePointsTotal + $eventTotalPoints + $overtimeTotalPoints,
                 'total_amount' => $totalAmount,
             ];
 
@@ -249,11 +320,11 @@ class WorkloadAnalyzerController extends Controller
 
         // SuperAdmin: 全会社のデータ
         if (method_exists($user, 'isSuperAdmin') ? $user->isSuperAdmin() : (($user->user_role ?? '') === 'superadmin')) {
-            $companies = Company::with(['departments.teams.members'])->get();
+            $companies = Company::with(['departments.teams.members.assignment'])->get();
         }
         // Admin: 自社の全メンバー
         elseif (method_exists($user, 'isAdmin') ? $user->isAdmin() : (($user->user_role ?? '') === 'admin')) {
-            $companies = Company::with(['departments.teams.members'])
+            $companies = Company::with(['departments.teams.members.assignment'])
                 ->where('id', $user->company_id)
                 ->get();
         }
@@ -261,7 +332,7 @@ class WorkloadAnalyzerController extends Controller
         else {
             // Leader: find teams where leader is a member (unit teams)
             // This is a conservative implementation: find teams where user is a member and load related members
-            $teams = $user->teams()->with(['members', 'department', 'company'])->get();
+            $teams = $user->teams()->with(['members.assignment', 'department', 'company'])->get();
 
             // Build companies structure from teams
             $companies = [];
@@ -313,7 +384,7 @@ class WorkloadAnalyzerController extends Controller
                     'id' => $team->id,
                     'name' => $team->name,
                     'members' => $team->members->map(function ($m) {
-                        return ['id' => $m->id, 'name' => $m->name];
+                        return ['id' => $m->id, 'name' => $m->name, 'assignment_name' => $m->assignment->name ?? ''];
                     })->toArray(),
                 ];
 
@@ -327,7 +398,7 @@ class WorkloadAnalyzerController extends Controller
                         }
                     }
                     if (!$exists) {
-                        $companies[$companyIndex]['departments'][$deptIndex]['members'][] = ['id' => $m->id, 'name' => $m->name];
+                        $companies[$companyIndex]['departments'][$deptIndex]['members'][] = ['id' => $m->id, 'name' => $m->name, 'assignment_name' => $m->assignment->name ?? ''];
                     }
                 }
             }
@@ -344,14 +415,14 @@ class WorkloadAnalyzerController extends Controller
                     $members = $dept->members ?? collect();
                     foreach ($members as $m) {
                         $agg = $calcAggregates($m->id);
-                        $deptArr['members'][] = ['id' => $m->id, 'name' => $m->name, 'aggregates' => $agg];
+                        $deptArr['members'][] = ['id' => $m->id, 'name' => $m->name, 'assignment_name' => $m->assignment->name ?? '', 'aggregates' => $agg];
                     }
                     // teams
                     foreach ($dept->teams ?? collect() as $team) {
                         $teamArr = ['id' => $team->id, 'name' => $team->name, 'members' => []];
                         foreach ($team->members ?? collect() as $tm) {
                             $agg = $calcAggregates($tm->id);
-                            $teamArr['members'][] = ['id' => $tm->id, 'name' => $tm->name, 'aggregates' => $agg];
+                            $teamArr['members'][] = ['id' => $tm->id, 'name' => $tm->name, 'assignment_name' => $tm->assignment->name ?? '', 'aggregates' => $agg];
                         }
                         $deptArr['teams'][] = $teamArr;
                     }
@@ -376,6 +447,80 @@ class WorkloadAnalyzerController extends Controller
                 }
             }
             $companiesArray = $companies;
+        }
+
+        // Compute per-department percentile scores (0–100 per category, 0–600 overall)
+        // Raw scores already include coefficients; percentile ranks within the department ensure
+        // categories with vastly different scales (pages vs minutes vs hours) are compared fairly.
+        $pCats = ['stage', 'size', 'type', 'difficulty', 'event', 'overtime'];
+        try {
+            foreach ($companiesArray as $ci => $c) {
+                foreach ($c['departments'] as $di => $d) {
+                    // Collect unique members and their per-category raw scores
+                    $mScores = []; // [uid => [cat => rawScore]]
+                    foreach ($d['members'] ?? [] as $m) {
+                        $uid = $m['id'];
+                        if (!isset($mScores[$uid])) {
+                            foreach ($pCats as $cat) {
+                                $mScores[$uid][$cat] = (float)($m['aggregates']['points'][$cat] ?? 0);
+                            }
+                        }
+                    }
+                    foreach ($d['teams'] ?? [] as $t) {
+                        foreach ($t['members'] ?? [] as $tm) {
+                            $uid = $tm['id'];
+                            if (!isset($mScores[$uid])) {
+                                foreach ($pCats as $cat) {
+                                    $mScores[$uid][$cat] = (float)($tm['aggregates']['points'][$cat] ?? 0);
+                                }
+                            }
+                        }
+                    }
+                    $n = count($mScores);
+                    if ($n === 0) continue;
+
+                    // Percentile per category: ties get average rank
+                    $mPct = []; // [uid => [cat => percentile]]
+                    foreach ($pCats as $cat) {
+                        foreach ($mScores as $uid => $scores) {
+                            $my = $scores[$cat];
+                            $above = 0; $tied = 0;
+                            foreach ($mScores as $other) {
+                                if ($other[$cat] > $my) $above++;
+                                elseif (abs($other[$cat] - $my) < 0.001) $tied++;
+                            }
+                            $avgRank = $above + ($tied + 1) / 2.0;
+                            $mPct[$uid][$cat] = $n === 1 ? 100.0 : max(0.0, round((($n - $avgRank) / ($n - 1)) * 100.0, 1));
+                        }
+                    }
+                    // overall = sum of all 6 category percentiles (max 600)
+                    foreach ($mScores as $uid => $_) {
+                        $tot = 0.0;
+                        foreach ($pCats as $cat) $tot += $mPct[$uid][$cat] ?? 0;
+                        $mPct[$uid]['overall'] = round($tot, 1);
+                    }
+
+                    // Write back: set percentile_scores and replace points.overall with percentile overall
+                    foreach ($d['members'] as $mi => $m) {
+                        $uid = $m['id'];
+                        if (isset($mPct[$uid])) {
+                            $companiesArray[$ci]['departments'][$di]['members'][$mi]['aggregates']['percentile_scores'] = $mPct[$uid];
+                            $companiesArray[$ci]['departments'][$di]['members'][$mi]['aggregates']['points']['overall'] = $mPct[$uid]['overall'];
+                        }
+                    }
+                    foreach ($d['teams'] as $ti => $t) {
+                        foreach ($t['members'] as $tmi => $tm) {
+                            $uid = $tm['id'];
+                            if (isset($mPct[$uid])) {
+                                $companiesArray[$ci]['departments'][$di]['teams'][$ti]['members'][$tmi]['aggregates']['percentile_scores'] = $mPct[$uid];
+                                $companiesArray[$ci]['departments'][$di]['teams'][$ti]['members'][$tmi]['aggregates']['points']['overall'] = $mPct[$uid]['overall'];
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // ignore percentile errors — fall back to raw overall
         }
 
         // Compute company-level ranks and deviation (偏差値) per company
@@ -439,7 +584,12 @@ class WorkloadAnalyzerController extends Controller
             // ignore any errors computing deviation
         }
 
-        return Inertia::render('WorkloadAnalyzer/Index', [
+        $routeName = $request->route()?->getName() ?? '';
+        $component = str_ends_with($routeName, 'category_rank')
+            ? 'WorkloadAnalyzer/CategoryRank'
+            : 'WorkloadAnalyzer/Index';
+
+        return Inertia::render($component, [
             'companies' => $companiesArray ?? [],
             'selected_ym' => $ym,
         ]);
@@ -867,6 +1017,91 @@ class WorkloadAnalyzerController extends Controller
             }
         }
 
+        // --- event_item_types aggregation: sum hours per event_item_type_id ---
+        $eventTypeSums = []; // event_item_type_id => hours
+        try {
+            $evItems = \App\Models\Event::where('user_id', $userId)
+                ->whereBetween('starts_at', [$start, $end])
+                ->get();
+            foreach ($evItems as $ev) {
+                $hours = 0.0;
+                try {
+                    if ($ev->starts_at && $ev->ends_at) {
+                        $s = \Carbon\Carbon::parse($ev->starts_at);
+                        $e2 = \Carbon\Carbon::parse($ev->ends_at);
+                        $hours = max(0.0, $e2->diffInMinutes($s) / 60.0);
+                    }
+                } catch (\Throwable $evE) {}
+                if ($hours <= 0) continue;
+                $eid = $ev->event_item_type_id ?? null;
+                if (!isset($eventTypeSums[$eid])) $eventTypeSums[$eid] = 0.0;
+                $eventTypeSums[$eid] += $hours;
+            }
+        } catch (\Throwable $evErr) {}
+
+        $eventTypeLabels = [];
+        $eventTypeData   = [];
+        $eventTypeCoefficients = [];
+        $eventTypePoints = [];
+        $eventTotalPoints = 0.0;
+        if (count($eventTypeSums)) {
+            $evTypes = EventItemType::orderBy('sort_order')->get()->keyBy('id');
+            // include "未設定" for null key
+            foreach ($eventTypeSums as $eid => $hours) {
+                $hours = round($hours, 2);
+                $label = ($eid && isset($evTypes[$eid])) ? $evTypes[$eid]->name : '未設定';
+                $coeff = ($eid && isset($evTypes[$eid]) && isset($evTypes[$eid]->coefficient))
+                    ? (float)$evTypes[$eid]->coefficient : 1.0;
+                $pts   = round($hours * $coeff, 1);
+                $eventTypeLabels[]      = $label;
+                $eventTypeData[]        = $hours;
+                $eventTypeCoefficients[] = $coeff;
+                $eventTypePoints[]      = $pts;
+                $eventTotalPoints       += $pts;
+            }
+        }
+        $eventTotalPoints = round($eventTotalPoints, 1);
+
+        // --- overtime distribution: 5固定バケット + 通常/超過日数 + ポイント ---
+        $totalOvertimeMinutes  = 0;
+        $overtimeDaysNormal    = 0; // ≤180min
+        $overtimeDaysExcess    = 0; // >180min
+        $overtimeNormalMinutes = 0;
+        $overtimeExcessMinutes = 0;
+        $overtimeLabels = ['〜1時間', '〜2時間', '〜3時間', '〜4時間', '4時間〜'];
+        $overtimeCounts = [0, 0, 0, 0, 0];
+        // load worktime coefficients
+        $showWorktimeCoeffs  = WorktimeItemType::all();
+        $showNormalCoeff     = 1.0;
+        $showExcessCoeff     = 1.0;
+        foreach ($showWorktimeCoeffs as $wt) {
+            if ($wt->type === 'over') {
+                if ($wt->name === '超過残業') $showExcessCoeff = (float) $wt->coefficient;
+                elseif ($wt->name === '残業') $showNormalCoeff = (float) $wt->coefficient;
+            }
+        }
+        try {
+            $workRecords = WorkRecord::where('user_id', $userId)
+                ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+                ->get(['overtime_minutes']);
+            $totalOvertimeMinutes = (int) $workRecords->sum('overtime_minutes');
+
+            foreach ($workRecords as $wr) {
+                $min = (int) ($wr->overtime_minutes ?? 0);
+                if ($min <= 0) continue;
+                if ($min <= 60)       { $overtimeCounts[0]++; $overtimeDaysNormal++; $overtimeNormalMinutes += $min; }
+                elseif ($min <= 120)  { $overtimeCounts[1]++; $overtimeDaysNormal++; $overtimeNormalMinutes += $min; }
+                elseif ($min <= 180)  { $overtimeCounts[2]++; $overtimeDaysNormal++; $overtimeNormalMinutes += $min; }
+                elseif ($min <= 240)  { $overtimeCounts[3]++; $overtimeDaysExcess++; $overtimeExcessMinutes += $min; }
+                else                  { $overtimeCounts[4]++; $overtimeDaysExcess++; $overtimeExcessMinutes += $min; }
+            }
+        } catch (\Throwable $e) {
+            // ignore
+        }
+        $overtimeNormalPoints = round($overtimeNormalMinutes * $showNormalCoeff, 1);
+        $overtimeExcessPoints = round($overtimeExcessMinutes * $showExcessCoeff, 1);
+        $overtimeTotalPoints  = round($overtimeNormalPoints + $overtimeExcessPoints, 1);
+
         // --- Defensive normalization: ensure shapes are consistent ---
         // Guarantee stage labels and data are arrays
         $stage_labels_safe = is_array($stageLabels) ? $stageLabels : [];
@@ -1148,6 +1383,79 @@ class WorkloadAnalyzerController extends Controller
             return ['total_points' => round($pts, 1), 'total_amount' => $amt];
         };
 
+        // Helper: compute all 6 raw category scores for any user (used for group-wide percentile)
+        $computeUserCategoryScores = function ($uid) use ($start, $end, $showNormalCoeff, $showExcessCoeff) {
+            $s = ['stage' => 0.0, 'size' => 0.0, 'type' => 0.0, 'difficulty' => 0.0, 'event' => 0.0, 'overtime' => 0.0];
+            try {
+                $aItems = ProjectJobAssignment::where(function ($q) use ($uid) {
+                    $q->where('user_id', $uid);
+                    if (Schema::hasColumn('project_job_assignments', 'assigned_to')) {
+                        $q->orWhere('assigned_to', $uid);
+                    }
+                })->where(function ($q) use ($start, $end) {
+                    if (Schema::hasColumn('project_job_assignments', 'desired_start_date')) {
+                        $q->whereBetween('desired_start_date', [$start->toDateString(), $end->toDateString()]);
+                    } else {
+                        $q->whereBetween('created_at', [$start, $end]);
+                    }
+                })->get();
+                $sItems = ProjectJobAssignmentByMyself::where('user_id', $uid)->where(function ($q) use ($start, $end) {
+                    if (Schema::hasColumn('project_job_assignment_by_myself', 'desired_start_date')) {
+                        $q->whereBetween('desired_start_date', [$start->toDateString(), $end->toDateString()]);
+                    } else {
+                        $q->whereBetween('created_at', [$start, $end]);
+                    }
+                })->get();
+                foreach ($aItems->concat($sItems) as $item) {
+                    $pages = 0;
+                    if (isset($item->amounts) && $item->amounts && isset($item->amounts_unit) && $item->amounts_unit === 'page') {
+                        $pages = (int)$item->amounts;
+                    } elseif (isset($item->pages) && $item->pages) {
+                        $pages = (int)$item->pages;
+                    }
+                    if ($pages <= 0) continue;
+                    $stageC = 1.0; $typeC = 1.0; $sizeC = 1.0; $diffC = 1.0;
+                    try { if ($item->stage_id) { $st = \App\Models\Stage::find($item->stage_id); if ($st) $stageC = (float)$st->coefficient; } } catch (\Throwable $e) {}
+                    try { if ($item->work_item_type_id) { $tp = \App\Models\WorkItemType::find($item->work_item_type_id); if ($tp) $typeC = (float)$tp->coefficient; } } catch (\Throwable $e) {}
+                    try { if ($item->size_id) { $sz = \App\Models\Size::find($item->size_id); if ($sz) $sizeC = (float)$sz->coefficient; } } catch (\Throwable $e) {}
+                    try {
+                        $diff = $item->difficulty ?? null;
+                        if ($diff) {
+                            $dObj = is_numeric($diff) ? \App\Models\Difficulty::find((int)$diff) : \App\Models\Difficulty::where('name', $diff)->first();
+                            if ($dObj) $diffC = (float)$dObj->coefficient;
+                        }
+                    } catch (\Throwable $e) {}
+                    $s['stage']      += $pages * $stageC * $diffC;
+                    $s['type']       += $pages * $typeC  * $diffC;
+                    $s['size']       += $pages * $sizeC  * $diffC;
+                    $s['difficulty'] += $pages * $diffC;
+                }
+            } catch (\Throwable $e) {}
+            try {
+                $evCoeffMap = EventItemType::pluck('coefficient', 'id')->toArray();
+                $evItems = \App\Models\Event::where('user_id', $uid)->whereBetween('starts_at', [$start, $end])->get();
+                foreach ($evItems as $ev) {
+                    if (!$ev->starts_at || !$ev->ends_at) continue;
+                    $hours = max(0.0, \Carbon\Carbon::parse($ev->ends_at)->diffInMinutes(\Carbon\Carbon::parse($ev->starts_at)) / 60.0);
+                    if ($hours <= 0) continue;
+                    $coeff = ($ev->event_item_type_id && isset($evCoeffMap[$ev->event_item_type_id])) ? (float)$evCoeffMap[$ev->event_item_type_id] : 1.0;
+                    $s['event'] += $hours * $coeff;
+                }
+            } catch (\Throwable $e) {}
+            try {
+                $wrRecs = WorkRecord::where('user_id', $uid)->whereBetween('date', [$start->toDateString(), $end->toDateString()])->get(['overtime_minutes']);
+                $nm = 0; $xm = 0;
+                foreach ($wrRecs as $wr) {
+                    $min = (int)($wr->overtime_minutes ?? 0);
+                    if ($min <= 0) continue;
+                    if ($min <= 180) $nm += $min; else $xm += $min;
+                }
+                $s['overtime'] = $nm * $showNormalCoeff + $xm * $showExcessCoeff;
+            } catch (\Throwable $e) {}
+            foreach ($s as $k => $v) $s[$k] = round($v, 1);
+            return $s;
+        };
+
         // determine comparison group: prefer users in the same company as the viewed user
         $groupUserIds = [];
         try {
@@ -1191,11 +1499,45 @@ class WorkloadAnalyzerController extends Controller
             if (!in_array($userId, $groupUserIds)) $groupUserIds[] = $userId;
         }
 
-        // compute per-user total_points for the group
+        // compute per-user total_points for the group (raw, used for legacy team stats)
         $teamPoints = [];
         foreach ($groupUserIds as $gid) {
             $res = $computeUserPoints($gid);
             $teamPoints[$gid] = $res['total_points'];
+        }
+
+        // compute per-category scores for each group member and percentile for the viewed user
+        $showPCats = ['stage', 'size', 'type', 'difficulty', 'event', 'overtime'];
+        $groupCatScores = [];
+        foreach ($groupUserIds as $gid) {
+            $groupCatScores[$gid] = $computeUserCategoryScores($gid);
+        }
+        if (!isset($groupCatScores[$userId])) {
+            $groupCatScores[$userId] = $computeUserCategoryScores($userId);
+        }
+        $gn = count($groupCatScores);
+        $viewerPercentile = [];
+        foreach ($showPCats as $cat) {
+            $my = $groupCatScores[$userId][$cat] ?? 0;
+            $above = 0; $tied = 0;
+            foreach ($groupCatScores as $sc) {
+                if ($sc[$cat] > $my) $above++;
+                elseif (abs($sc[$cat] - $my) < 0.001) $tied++;
+            }
+            $avgRank = $above + ($tied + 1) / 2.0;
+            $viewerPercentile[$cat] = $gn === 1 ? 100.0 : max(0.0, round((($gn - $avgRank) / ($gn - 1)) * 100.0, 1));
+        }
+        $viewerPercentile['overall'] = round(array_sum(array_map(fn($cat) => $viewerPercentile[$cat], $showPCats)), 1);
+
+        // per-category rank within comparison group (1 = highest score)
+        $categoryRanks = [];
+        foreach ($showPCats as $cat) {
+            $myScore = $groupCatScores[$userId][$cat] ?? 0;
+            $rank = 1;
+            foreach ($groupCatScores as $sc) {
+                if ($sc[$cat] > $myScore) $rank++;
+            }
+            $categoryRanks[$cat] = $rank;
         }
         $teamValues = array_values($teamPoints);
         $teamCount = count($teamValues);
@@ -1304,8 +1646,20 @@ class WorkloadAnalyzerController extends Controller
             // ignore logging errors
         }
 
+        $userName = null;
+        try {
+            if (isset($viewedUser) && $viewedUser) {
+                $userName = $viewedUser->name ?? null;
+            }
+            if (!$userName) {
+                $u = \App\Models\User::find($userId);
+                if ($u) $userName = $u->name ?? null;
+            }
+        } catch (\Throwable $e) {}
+
         return Inertia::render('WorkloadAnalyzer/Show', [
             'user_id' => $userId,
+            'user_name' => $userName,
             'selected_ym' => $ym,
             'totals' => $totals,
             // Provide normalized arrays to avoid client-side undefined indexing
@@ -1330,6 +1684,11 @@ class WorkloadAnalyzerController extends Controller
             'difficulty_labels' => $difficultyLabels ?? [],
             'difficulty_data' => $difficultyData ?? [],
             'difficulties' => $difficulties ?? [],
+            'event_type_labels' => $eventTypeLabels ?? [],
+            'event_type_data' => $eventTypeData ?? [],
+            'event_type_coefficients' => $eventTypeCoefficients ?? [],
+            'event_type_points' => $eventTypePoints ?? [],
+            'event_total_points' => $eventTotalPoints ?? 0.0,
             // Team-level statistics for comparison (mean/std/devscore/percentile)
             'team_mean_points' => round($teamMean, 2),
             'team_std_points' => round($teamStd, 2),
@@ -1337,6 +1696,21 @@ class WorkloadAnalyzerController extends Controller
             'deviation_score' => $deviationScore,
             'team_percentile' => $teamPercentile,
             'team_ranking' => $ranking,
+            // overtime
+            'total_overtime_minutes'       => $totalOvertimeMinutes ?? 0,
+            'overtime_days_normal'         => $overtimeDaysNormal ?? 0,
+            'overtime_days_excess'         => $overtimeDaysExcess ?? 0,
+            'overtime_distribution_labels' => $overtimeLabels,
+            'overtime_distribution_data'   => $overtimeCounts,
+            'overtime_normal_points'       => $overtimeNormalPoints ?? 0.0,
+            'overtime_excess_points'       => $overtimeExcessPoints ?? 0.0,
+            'total_overtime_points'        => $overtimeTotalPoints ?? 0.0,
+            'overtime_normal_coeff'        => $showNormalCoeff ?? 1.0,
+            'overtime_excess_coeff'        => $showExcessCoeff ?? 1.0,
+            // per-category percentile scores (0–100 each, 0–600 overall)
+            'percentile_scores'            => $viewerPercentile ?? [],
+            'category_ranks'               => $categoryRanks ?? [],
+            'group_count'                  => $gn ?? 0,
         ]);
     }
 
@@ -1357,12 +1731,16 @@ class WorkloadAnalyzerController extends Controller
         $sizes = Size::orderBy('id')->get(['id', 'name', 'coefficient'])->toArray();
         $types = WorkItemType::orderBy('id')->get(['id', 'name', 'coefficient'])->toArray();
         $difficulties = Difficulty::orderBy('sort_order')->get(['id', 'name', 'coefficient'])->toArray();
+        $eventItemTypes = EventItemType::orderBy('sort_order')->get(['id', 'name', 'coefficient'])->toArray();
+        $worktimeItemTypes = WorktimeItemType::orderBy('sort_order')->get(['id', 'name', 'coefficient', 'type'])->toArray();
 
         return Inertia::render('WorkloadAnalyzer/Settings', [
             'stages' => $stages,
             'sizes' => $sizes,
             'types' => $types,
             'difficulties' => $difficulties,
+            'eventItemTypes' => $eventItemTypes,
+            'worktimeItemTypes' => $worktimeItemTypes,
         ]);
     }
 
@@ -1383,7 +1761,7 @@ class WorkloadAnalyzerController extends Controller
         $rows = $payload['rows'];
 
         // Allow only known tables
-        $allowed = ['stages', 'sizes', 'types', 'difficulties'];
+        $allowed = ['stages', 'sizes', 'types', 'difficulties', 'event_item_types', 'worktime_item_types'];
         if (!in_array($table, $allowed, true)) {
             return redirect()->back()->with('error', '不正なテーブル名です。');
         }
@@ -1412,6 +1790,12 @@ class WorkloadAnalyzerController extends Controller
                     break;
                 case 'difficulties':
                     $model = Difficulty::class;
+                    break;
+                case 'event_item_types':
+                    $model = EventItemType::class;
+                    break;
+                case 'worktime_item_types':
+                    $model = WorktimeItemType::class;
                     break;
                 default:
                     $model = null;

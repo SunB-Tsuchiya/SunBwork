@@ -410,9 +410,201 @@ URL::temporarySignedRoute('attachments.signed', $expires, ['path' => $path])
 
 ## ワークロード解析
 
-- 設定 (stages/sizes/types/difficulties) に `coefficient` を持たせて `estimated_hours` と掛け合わせて集計
-- 設定ページは XHR 保存（JSON 応答）+ トースト通知
-- ルーティング: 静的な `settings` をパラメタライズされたルートより前に定義すること
+### 関連ファイル一覧
+
+| ファイル | 役割 |
+|---|---|
+| `app/Http/Controllers/Leader/WorkloadAnalyzerController.php` | 全ロジックの中心。index/show/settings/saveSettings/categoryRank を持つ |
+| `app/Models/WorktimeItemType.php` | 残業種別モデル（name, coefficient, sort_order, type） |
+| `resources/js/Pages/WorkloadAnalyzer/Index.vue` | 一覧・総合ランキングページ |
+| `resources/js/Pages/WorkloadAnalyzer/Show.vue` | 個人詳細ページ（カテゴリ別パネル・レーダーチャート） |
+| `resources/js/Pages/WorkloadAnalyzer/CategoryRank.vue` | カテゴリ別ランキングページ |
+| `resources/js/Pages/WorkloadAnalyzer/Settings.vue` | 係数設定ページ |
+| `resources/js/Components/AnalysisPanel.vue` | カテゴリ別分析パネルコンポーネント（円グラフ＋詳細テーブル） |
+
+---
+
+### ルーティング
+
+**ルート定義は admin / superadmin / leader の 3 グループにそれぞれ同名で定義されている。**
+静的ルートをパラメタライズドルート（`{user}`）より前に必ず配置すること。
+
+```php
+Route::get('workload-analyzer',              [..., 'index'])        ->name('workload_analyzer.index');
+Route::get('workload-analyzer/category-rank',[..., 'index'])        ->name('workload_analyzer.category_rank');
+Route::get('workload-analyzer/settings',     [..., 'settings'])     ->name('workload_analyzer.settings');
+Route::post('workload-analyzer/settings',    [..., 'saveSettings']) ->name('workload_analyzer.settings.save');
+Route::get('workload-analyzer/{user}',       [..., 'show'])         ->name('workload_analyzer.show');
+```
+
+`category-rank` と `index` は **同じコントローラメソッド `index()`** を使用し、
+メソッド内でルート名を見て Inertia コンポーネントを切り替える：
+
+```php
+$routeName = $request->route()?->getName() ?? '';
+$component = str_ends_with($routeName, 'category_rank')
+    ? 'WorkloadAnalyzer/CategoryRank'
+    : 'WorkloadAnalyzer/Index';
+return Inertia::render($component, ['companies' => ..., 'selected_ym' => ...]);
+```
+
+---
+
+### 係数設定テーブル（DB）
+
+| テーブル | モデル | 主なカラム |
+|---|---|---|
+| `stages` | `Stage` | name, coefficient |
+| `sizes` | `Size` | name, coefficient |
+| `work_item_types` | `WorkItemType` | name, coefficient, slug |
+| `difficulties` | `Difficulty` | name, coefficient |
+| `event_item_types` | `EventItemType` | name, coefficient |
+| `worktime_item_types` | `WorktimeItemType` | name, coefficient, sort_order, type('over'/'short') |
+
+`worktime_item_types` の初期データ:
+- 残業（type=over, coefficient=1.00, sort_order=1） ← 通常残業（≤3時間/日）
+- 早退（type=short, coefficient=1.00, sort_order=2）
+- 超過残業（type=over, coefficient=0.80, sort_order=3） ← 超過残業（>3時間/日）
+
+設定ページは XHR (axios) 保存 → JSON レスポンス → toast 通知。
+
+---
+
+### ポイント計算の仕組み（最重要）
+
+#### ① 各カテゴリの生スコア計算
+
+```
+ステージ  = Σ (ページ × ステージ係数 × 難易度係数)
+サイズ    = Σ (ページ × サイズ係数   × 難易度係数)
+種別      = Σ (ページ × 種別係数     × 難易度係数)
+難易度    = Σ (ページ × 難易度係数)
+イベント  = Σ (イベント時間[h] × イベント種別係数)
+残業(通常)= 合計残業分[min, ≤180/日] × 通常残業係数
+残業(超過)= 合計残業分[min, >180/日] × 超過残業係数
+残業生スコア = 残業(通常) + 残業(超過)
+```
+
+- 残業の通常/超過の閾値は **180分（3時間）/日**
+- `work_records.overtime_minutes` の値を1日ごとに判定
+
+#### ② パーセンタイルランク変換（部署内）
+
+生スコアをそのまま合算すると、ページ数が多いカテゴリが支配的になるため、
+**部署内でパーセンタイル（0〜100）に変換**してから合算する。
+
+```
+比較対象: 同部署の全メンバー（N 人）
+above = 自分より生スコアが高いメンバー数
+tied  = 自分と同じ生スコアのメンバー数
+avgRank = above + (tied + 1) / 2      ← 同値タイは平均順位
+パーセンタイル = (N − avgRank) / (N − 1) × 100
+※ N = 1 の場合は 100 固定
+```
+
+- index() では `$calcAggregates` で生スコアを計算後、**部署単位で2次処理**してパーセンタイルを付与
+- 結果は `member.aggregates.percentile_scores.{stage|size|type|difficulty|event|overtime|overall}` に格納
+- `member.aggregates.points.overall` はパーセンタイルの overall（0〜600）で上書きされる
+
+#### ③ 総合ポイント（0〜600）
+
+```
+総合ポイント = ステージ + サイズ + 種別 + 難易度 + イベント + 残業
+            （各 0〜100 のパーセンタイル値を合算）
+```
+
+#### ④ 偏差値（参考値）
+
+```
+比較グループ: 同会社の全ユーザー
+z = (自分の総合ポイント − グループ平均) / グループ標準偏差
+偏差値 = 50 + 10 × z
+```
+
+偏差値の比較母集団は「会社全体」。パーセンタイルの母集団「部署」とは異なる。
+
+#### ⑤ カテゴリ別順位（show ページ用）
+
+```
+比較対象: 同会社のアクティブユーザー（当月に作業データがある全員）
+各カテゴリの生スコアで降順ソート → 1位から順位付与
+同値タイ: 全員に same rank（above のカウント方式）
+```
+
+show ページの `category_ranks.{cat}` に格納し、`group_count` が比較人数。
+
+---
+
+### index() のデータフロー
+
+```
+1. $calcAggregates クロージャ定義
+   - 各ユーザーの 6カテゴリ生スコア + 残業統計を計算
+   - points.{stage|size|type|difficulty|event|overtime|overall} に格納
+   - points.overtime = normalMin × normalCoeff + excessMin × excessCoeff
+   - points.overall（この時点では生スコア合算）
+2. $companiesArray 構築（company > dept > team > member）
+3. 各メンバーに $calcAggregates($m->id) の結果を付与
+4. 【パーセンタイル計算】部署単位で生スコア → パーセンタイル変換
+   - percentile_scores を付与
+   - points.overall をパーセンタイル overall で上書き
+5. 【偏差値計算】会社単位で points.overall から偏差値を計算
+6. Inertia::render で companies 配列を渡す
+```
+
+---
+
+### show() のデータフロー
+
+```
+1. 対象ユーザーの詳細計算（stage/type/size/difficulty の内訳ラベル・データ）
+2. イベント詳細計算
+3. 残業分布計算（5バケット: 〜1h/〜2h/〜3h/〜4h/4h〜）+ パーセンタイル用残業分集計
+4. $computeUserPoints クロージャ（比較グループ全員の生総合ポイント用）
+5. $computeUserCategoryScores クロージャ（6カテゴリ生スコア返却 / パーセンタイル用）
+6. 比較グループ特定（同会社ユーザー or 当月アクティブユーザー）
+7. グループ全員の 6カテゴリ生スコアを計算
+8. 対象ユーザーのパーセンタイルと順位を計算 → percentile_scores / category_ranks / group_count
+9. Inertia::render で全データを渡す
+```
+
+---
+
+### フロントエンド（Index.vue）の構造
+
+- **viewMode**: `'total'`（部署全体）/ `'by_role'`（役割ごと）トグル
+- **総合ポイント表示**: `row.aggregates.points.overall`（= パーセンタイル合計 0〜600）
+- **内容セル**: `row.aggregates.percentile_scores.{cat}` を各カテゴリ表示（0〜100pt）
+- **残業セル**: `aggregates.overtime_minutes`（合計）/ `overtime_days_normal`（通常日数）/ `overtime_days_excess`（超過日数）
+- **役割**: `row.aggregates` ではなく `row.assignment_name`（コントローラで `m.assignment->name` を付与）
+
+---
+
+### フロントエンド（Show.vue）の構造
+
+- **AnalysisPanel コンポーネント**: 各カテゴリのパネル。`percentile`・`rank`・`group_count` を渡すとサマリーカードに表示される
+- **レーダーチャート**: `percentile_scores` の 6カテゴリ値（0〜100）を使用。生スコアは使わない
+- **合計ポイント表示**: `overallPoints = percentile_scores.overall`（0〜600）
+- **計算方法モーダル**: `showCalcModal` フラグ。モーダル内に概要・詳細を日本語で記載済み
+
+---
+
+### CategoryRank.vue の構造
+
+- `companies` / `selected_ym` を props で受け取る（Index.vue と同一データ）
+- カテゴリ選択ボタン（7種）で表示カテゴリを切り替え
+- 各カテゴリの **生スコア** で部署内ランキングを表示（パーセンタイルではなく生値）
+- `aggregates.points.{cat}` / `aggregates.assigned.pages + self.pages`（総ページ）を使用
+
+---
+
+### 計算方法を変更する際の注意
+
+1. **生スコアの計算式を変える** → `$calcAggregates`（index 用）と `$computeUserCategoryScores`（show 用）の**両方**を変更すること
+2. **残業の閾値（180分）を変える** → `$calcAggregates` 内、`$computeUserCategoryScores` 内、`show()` の残業分布ブロックの**3箇所**を変更
+3. **カテゴリを追加する** → `$pCats` 配列（index のパーセンタイルブロック）・`$showPCats`（show のパーセンタイルブロック）に追加。Vue の radar chart ラベルも更新
+4. **比較母集団を変える** → index はパーセンタイルを「部署単位」で計算。show は「会社単位」。それぞれ独立しているため両方を確認
+5. **係数の取得方法** → コード内で `\App\Models\Stage::find($sid)` 等を都度クエリしている。N+1 問題が出る場合は事前に `pluck()` でキャッシュすること（`EventItemType::pluck('coefficient', 'id')` のパターンが既存にある）
 
 ---
 

@@ -6,18 +6,20 @@
 
         <div class="mx-auto max-w-6xl rounded bg-white p-6 shadow">
             <h1 class="mb-4 text-2xl font-bold">MyJobBox：{{ props.projectJob?.name || '' }}</h1>
+
+            <!-- 検索・フィルター行 -->
             <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div class="mb-4 flex items-center gap-2">
+                <div class="flex items-center gap-2">
                     <input
                         v-model="page.props.q_model"
                         @keyup.enter="search"
-                        placeholder="タイトル/詳細/担当で検索"
+                        placeholder="タイトル/詳細で検索"
                         class="w-72 rounded border px-3 py-2 text-sm"
                     />
                     <button class="rounded bg-blue-600 px-3 py-2 text-white" @click.prevent="search">検索</button>
                     <button class="ml-2 rounded border px-3 py-2" @click.prevent="clearSearch">クリア</button>
                 </div>
-                <div class="mb-4 md:ml-4 md:mt-0">
+                <div>
                     <Link
                         :href="typeof route === 'function' ? route('project_jobs.assignments.create_user') : '/project_jobs/assignments/create-user'"
                         class="rounded bg-blue-600 px-4 py-2 text-white"
@@ -25,15 +27,16 @@
                     >
                 </div>
             </div>
-            <div>
-                <div class="mb-4 flex items-center" style="gap: 10px; justify-content: flex-start">
-                    <label for="periodSelect" class="text-sm text-gray-700">期間:</label>
+
+            <!-- 月セレクター + 完了非表示チェック -->
+            <div class="mt-3 flex flex-wrap items-center gap-4">
+                <div class="flex items-center gap-2">
+                    <label class="text-sm text-gray-700">年月:</label>
                     <select
-                        id="periodSelect"
                         v-model="page.props.period_model"
                         @change="search"
                         class="rounded border px-3 py-2 text-sm"
-                        style="width: 9.5em; min-width: 9.5em"
+                        style="width: 9.5em"
                     >
                         <option value="all">全期間</option>
                         <option v-for="m in monthOptions" :key="m.value" :value="m.value">
@@ -41,159 +44,81 @@
                         </option>
                     </select>
                 </div>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="min-w-full border">
-                    <thead>
-                        <tr class="bg-gray-100">
-                            <!-- <th class="border px-4 py-2">送受信</th>
-                            <th class="border px-4 py-2">相手</th> -->
-                            <th class="cursor-pointer border px-4 py-2" @click.prevent="changeSort('desired_start_date')">
-                                予定日・時刻 <span v-if="isSorted('desired_start_date')">{{ sortIcon() }}</span>
-                            </th>
-                            <th class="cursor-pointer border px-4 py-2" @click.prevent="changeSort('subject')">
-                                タイトル <span v-if="isSorted('subject')">{{ sortIcon() }}</span>
-                            </th>
-                            <th class="border px-4 py-2">クライアント</th>
-                            <!-- <th class="border px-4 py-2">既読</th> -->
-                            <th class="border px-4 py-2">ステータス</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr
-                            v-for="m in props.myAssignments?.data || displayMessages"
-                            :key="m.id"
-                            :class="['cursor-pointer hover:bg-gray-100', m.__is_new ? 'new-highlight' : '']"
-                            @click.prevent="rowClick(m, $event)"
-                            role="button"
-                        >
-                            <!-- <td class="border px-4 py-2">
-                                <span class="inline-flex items-center gap-2">
-                                    <span
-                                        :class="
-                                            page.props.auth.user &&
-                                            page.props.auth.user.id &&
-                                            m.sender &&
-                                            m.sender.id &&
-                                            page.props.auth.user.id === m.sender.id
-                                                ? 'bg-blue-500'
-                                                : 'bg-gray-400'
-                                        "
-                                        class="inline-block h-3 w-3 rounded-full"
-                                        :title="
-                                            page.props.auth.user &&
-                                            page.props.auth.user.id &&
-                                            m.sender &&
-                                            m.sender.id &&
-                                            page.props.auth.user.id === m.sender.id
-                                                ? '送信'
-                                                : '受信'
-                                        "
-                                    ></span>
-                                    <span class="text-sm text-gray-700">{{
-                                        page.props.auth.user &&
-                                        page.props.auth.user.id &&
-                                        m.sender &&
-                                        m.sender.id &&
-                                        page.props.auth.user.id === m.sender.id
-                                            ? '送信'
-                                            : '受信'
-                                    }}</span>
-                                </span>
-                            </td>
-                            <td class="border px-4 py-2 text-sm text-gray-700">
-                                {{ m.user?.name || m.sender?.name || m.project_job_assignment?.user?.name || '-' }}
-                            </td> -->
-                            <td class="border px-4 py-2">
-                                <div v-if="getFirstEvent(m)">
-                                    {{
-                                        formatDateTimeRange(
-                                            getFirstEvent(m).start || getFirstEvent(m).starts_at,
-                                            getFirstEvent(m).end || getFirstEvent(m).ends_at,
-                                        )
-                                    }}
-                                </div>
-                                <div
-                                    v-else-if="
-                                        m.desired_start_date ||
-                                        m.desired_at ||
-                                        (m.project_job_assignment &&
-                                            (m.project_job_assignment.desired_start_date || m.project_job_assignment.desired_at))
-                                    "
-                                >
-                                    {{
-                                        formatDateTimeRange(
-                                            m.desired_start_date ||
-                                                m.desired_at ||
-                                                (m.project_job_assignment &&
-                                                    (m.project_job_assignment.desired_start_date || m.project_job_assignment.desired_at)),
-                                            m.desired_time || (m.project_job_assignment && m.project_job_assignment.desired_time),
-                                        )
-                                    }}
-                                </div>
-                                <div v-else>-</div>
-                            </td>
-                            <td class="border px-4 py-2">{{ m.title || m.subject || (m.body && m.body.slice(0, 80)) || '' }}</td>
-                            <td class="border px-4 py-2">
-                                {{
-                                    m.projectJob?.client?.name ||
-                                    m.project_job?.client?.name ||
-                                    m.project_job_assignment?.projectJob?.client?.name ||
-                                    '-'
-                                }}
-                            </td>
-                            <!-- <td class="border px-4 py-2">
-                                <template v-if="!(m.read_at || m.readAt || m.project_job_assignment?.read_at)">
-                                    <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800"
-                                        >未読</span
-                                    >
-                                </template>
-                                <template v-else>
-                                    <span class="text-sm text-gray-600">既読</span>
-                                </template>
-                            </td> -->
-                            <td class="border px-4 py-2">
-                                <TooltipProvider :delay-duration="0">
-                                    <Tooltip>
-                                        <TooltipTrigger>
-                                            <span
-                                                :class="statusBadgeClass(getAssignmentStatus(m))"
-                                                class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-                                            >
-                                                <span v-html="statusIcon(getAssignmentStatus(m))" class="mr-1 inline-flex h-3 w-3"></span>
-                                                {{ getAssignmentStatus(m) }}
-                                            </span>
-                                        </TooltipTrigger>
-                                        <TooltipContent class="jobbox-tooltip max-w-xs">{{ statusTooltip(getAssignmentStatus(m)) }}</TooltipContent>
-                                    </Tooltip>
-                                </TooltipProvider>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                <label class="flex cursor-pointer items-center gap-2 text-sm text-gray-700 select-none">
+                    <input type="checkbox" v-model="hideCompleted" class="h-4 w-4 rounded border-gray-300" />
+                    完了を表示しない
+                </label>
             </div>
 
-            <div class="mt-4 flex items-center justify-between">
-                <div class="text-sm text-gray-600">全 {{ props.myAssignments?.total || props.messages?.total || localMessages?.length || 0 }} 件</div>
-                <div class="flex items-center space-x-2">
-                    <button
-                        :disabled="!(props.myAssignments?.prev_page_url || props.messages?.prev_page_url)"
-                        @click.prevent="navigateTo(props.myAssignments?.prev_page_url || props.messages?.prev_page_url)"
-                        class="rounded border px-3 py-1 disabled:opacity-50"
-                    >
-                        前へ
-                    </button>
-                    <div class="text-sm">
-                        {{ props.myAssignments?.current_page || props.messages?.current_page || 0 }} /
-                        {{ props.myAssignments?.last_page || props.messages?.last_page || 0 }}
+            <!-- 日グループ表示 -->
+            <div class="mt-4 overflow-x-auto">
+                <div v-if="displayGroups.length === 0" class="py-8 text-center text-sm text-gray-400">
+                    表示するデータがありません。
+                </div>
+
+                <template v-for="group in displayGroups" :key="group.date">
+                    <!-- 日付ヘッダー -->
+                    <div class="mt-4 rounded bg-gray-100 px-4 py-1.5 text-sm font-semibold text-gray-700 first:mt-0">
+                        {{ group.label }}
+                        <span class="ml-2 text-xs font-normal text-gray-500">{{ group.items.length }} 件</span>
                     </div>
-                    <button
-                        :disabled="!(props.myAssignments?.next_page_url || props.messages?.next_page_url)"
-                        @click.prevent="navigateTo(props.myAssignments?.next_page_url || props.messages?.next_page_url)"
-                        class="rounded border px-3 py-1 disabled:opacity-50"
-                    >
-                        次へ
-                    </button>
+
+                    <table class="min-w-full border">
+                        <thead>
+                            <tr class="bg-gray-50">
+                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">時間</th>
+                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">タイトル</th>
+                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">クライアント</th>
+                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">ステータス</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr
+                                v-for="m in group.items"
+                                :key="m.id"
+                                :class="['cursor-pointer hover:bg-gray-100', m.__is_new ? 'new-highlight' : '']"
+                                @click.prevent="rowClick(m, $event)"
+                                role="button"
+                            >
+                                <td class="border px-3 py-2 text-sm text-gray-600">{{ getStartTime(m) }}</td>
+                                <td class="border px-3 py-2 text-sm">{{ m.title || '-' }}</td>
+                                <td class="border px-3 py-2 text-sm text-gray-600">
+                                    {{ m.projectJob?.client?.name || m.project_job?.client?.name || '-' }}
+                                </td>
+                                <td class="border px-3 py-2">
+                                    <div class="flex items-center gap-2">
+                                        <TooltipProvider :delay-duration="0">
+                                            <Tooltip>
+                                                <TooltipTrigger>
+                                                    <span
+                                                        :class="statusBadgeClass(getAssignmentStatus(m))"
+                                                        class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+                                                    >
+                                                        <span v-html="statusIcon(getAssignmentStatus(m))" class="mr-1 inline-flex h-3 w-3"></span>
+                                                        {{ getAssignmentStatus(m) }}
+                                                    </span>
+                                                </TooltipTrigger>
+                                                <TooltipContent class="jobbox-tooltip max-w-xs">{{ statusTooltip(getAssignmentStatus(m)) }}</TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
+                                        <button
+                                            v-if="getAssignmentStatus(m) !== '完了'"
+                                            @click.stop="completeAssignment(m)"
+                                            class="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700 active:bg-green-800"
+                                        >完了</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </template>
+            </div>
+
+            <!-- 件数 -->
+            <div class="mt-4 flex items-center justify-between">
+                <div class="text-sm text-gray-600">
+                    表示中 {{ totalDisplayCount }} 件
+                    <span v-if="hideCompleted && hiddenCompletedCount > 0" class="ml-2 text-xs text-gray-400">（完了 {{ hiddenCompletedCount }} 件を非表示）</span>
                 </div>
             </div>
 
@@ -208,48 +133,173 @@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
+
 const props = defineProps({ projectJob: Object, messages: Object, myAssignments: Object });
 const page = usePage();
 page.props.q_model = page.props.q || '';
 page.props.period_model = page.props.period ?? '';
 const monthOptions = computed(() => (Array.isArray(page.props.monthOptions) ? page.props.monthOptions : []));
-// propagate server sort state into the component for UI
-const currentSort = page.props.sort || null;
-const currentDir = page.props.dir || 'desc';
 
-const sortState = reactive({ sort: currentSort, dir: currentDir });
+// 完了非表示フラグ（デフォルト：完了を隠す）
+const hideCompleted = ref(true);
 
-const localMessages = ref(props.messages?.data || []);
-const displayMessages = computed(() => {
-    const arr = Array.isArray(localMessages.value) ? localMessages.value : [];
-    const byAssign = new Map();
-    for (const m of arr) {
-        const aid = m.project_job_assignment && m.project_job_assignment.id ? String(m.project_job_assignment.id) : `noassign-${m.id}`;
-        if (!byAssign.has(aid)) {
-            byAssign.set(aid, m);
-            continue;
-        }
-        // prefer the most recently created message
-        const existing = byAssign.get(aid);
-        const eCreated = existing && existing.created_at ? new Date(existing.created_at) : null;
-        const mCreated = m && m.created_at ? new Date(m.created_at) : null;
-        if (!eCreated && mCreated) {
-            byAssign.set(aid, m);
-        } else if (eCreated && mCreated && mCreated > eCreated) {
-            byAssign.set(aid, m);
-        }
-    }
-    return Array.from(byAssign.values());
+// ローカル状態（完了ボタンで即時更新するため）
+// Inertia プロキシをシャローコピーして純粋な JS オブジェクトにする（Vue リアクティビティのため）
+const toPlain = (arr) => (Array.isArray(arr) ? arr.map((item) => ({ ...item })) : []);
+const localAssignments = ref(toPlain(props.myAssignments?.data));
+
+// Inertia が props を更新した際（DB 最新値）に反映する
+watch(() => props.myAssignments?.data, (newData) => {
+    localAssignments.value = toPlain(newData);
 });
 
-function isSorted(key) {
-    return sortState.sort === key;
+// ===== ユーティリティ =====
+
+function formatDateLabel(dateStr) {
+    if (!dateStr) return '日付なし';
+    try {
+        const d = new Date(dateStr + 'T00:00:00');
+        const y = d.getFullYear();
+        const mo = d.getMonth() + 1;
+        const day = d.getDate();
+        const dow = ['日', '月', '火', '水', '木', '金', '土'][d.getDay()];
+        return `${y}年${mo}月${day}日（${dow}）`;
+    } catch (e) {
+        return dateStr;
+    }
 }
 
-function sortIcon() {
-    return sortState.dir === 'asc' ? '▲' : '▼';
+function getDateKey(m) {
+    // desired_at is a datetime field; extract date part
+    const da = m.desired_at ? String(m.desired_at).split('T')[0].split(' ')[0] : null;
+    const de = m.desired_end_date ? String(m.desired_end_date).split('T')[0] : null;
+    const firstEvent = getFirstEvent(m);
+    const ev = firstEvent ? String(firstEvent.start || firstEvent.starts_at || '').split('T')[0] : null;
+    return da || de || ev || (m.created_at ? String(m.created_at).split('T')[0] : '') || '';
 }
+
+function getStartTime(m) {
+    const firstEvent = getFirstEvent(m);
+    if (firstEvent) {
+        const s = firstEvent.start || firstEvent.starts_at || '';
+        if (s.includes('T')) return s.split('T')[1]?.slice(0, 5) || '-';
+        if (s.includes(' ')) return s.split(' ')[1]?.slice(0, 5) || '-';
+    }
+    const t = m.desired_time || '';
+    if (!t) return '-';
+    return String(t).slice(0, 5);
+}
+
+function getTimeKey(m) {
+    const firstEvent = getFirstEvent(m);
+    if (firstEvent) {
+        const s = firstEvent.start || firstEvent.starts_at || '';
+        if (s.includes('T')) return s.split('T')[1]?.slice(0, 5) || '00:00';
+        if (s.includes(' ')) return s.split(' ')[1]?.slice(0, 5) || '00:00';
+    }
+    return m.desired_time ? String(m.desired_time).slice(0, 5) : '00:00';
+}
+
+function getFirstEvent(m) {
+    try {
+        if (m.events) {
+            if (Array.isArray(m.events) && m.events.length) return m.events[0];
+            if (m.events.data && Array.isArray(m.events.data) && m.events.data.length) return m.events.data[0];
+        }
+    } catch (e) {}
+    return null;
+}
+
+// ===== 表示データ =====
+
+// 日グループ（日付降順、同日内は開始時刻昇順）
+const displayGroups = computed(() => {
+    let assignments = Array.isArray(localAssignments.value) ? localAssignments.value : [];
+
+    if (hideCompleted.value) {
+        assignments = assignments.filter((m) => getAssignmentStatus(m) !== '完了');
+    }
+
+    const grouped = new Map();
+    for (const m of assignments) {
+        const dk = getDateKey(m);
+        if (!grouped.has(dk)) grouped.set(dk, []);
+        grouped.get(dk).push(m);
+    }
+
+    for (const items of grouped.values()) {
+        items.sort((a, b) => getTimeKey(a).localeCompare(getTimeKey(b)));
+    }
+
+    const sortedKeys = Array.from(grouped.keys()).sort((a, b) => {
+        if (!a) return 1;
+        if (!b) return -1;
+        return b.localeCompare(a);
+    });
+
+    return sortedKeys.map((dk) => ({
+        date: dk,
+        label: formatDateLabel(dk),
+        items: grouped.get(dk),
+    }));
+});
+
+const totalDisplayCount = computed(() => displayGroups.value.reduce((sum, g) => sum + g.items.length, 0));
+
+const hiddenCompletedCount = computed(() => {
+    if (!hideCompleted.value) return 0;
+    return (Array.isArray(localAssignments.value) ? localAssignments.value : []).filter((m) => getAssignmentStatus(m) === '完了').length;
+});
+
+// ===== 完了処理 =====
+
+async function completeAssignment(m) {
+    if (!confirm('完了しますか？')) return;
+    const assignmentId = m.id;
+    if (!assignmentId) {
+        alert('割当情報が見つかりません。');
+        return;
+    }
+    try {
+        const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        const xsrfMatch = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
+        const xsrf = xsrfMatch ? decodeURIComponent(xsrfMatch[1]) : null;
+        const url =
+            typeof route === 'function'
+                ? route('myjobbox.assignments.complete', { assignment: assignmentId })
+                : `/myjobbox/assignments/${assignmentId}/complete`;
+        const res = await fetch(url, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': token,
+                ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}),
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        });
+        if (res.ok) {
+            const idx = localAssignments.value.findIndex((x) => x.id === m.id);
+            if (idx >= 0) {
+                // splice で新オブジェクトに置き換えて Vue リアクティビティを確実にトリガー
+                localAssignments.value.splice(idx, 1, {
+                    ...localAssignments.value[idx],
+                    completed: true,
+                    status: { key: 'completed', name: '完了' },
+                    status_model: { key: 'completed', name: '完了' },
+                });
+            }
+        } else {
+            alert('完了処理に失敗しました。');
+        }
+    } catch (err) {
+        console.error('[MyJobBox] completeAssignment error', err);
+        alert('完了処理に失敗しました。');
+    }
+}
+
+// ===== ナビゲーション =====
 
 function search() {
     try {
@@ -258,142 +308,18 @@ function search() {
         const params = new URLSearchParams();
         params.set('q', page.props.q_model || '');
         params.set('period', page.props.period_model === undefined ? '' : page.props.period_model);
-        const qs = params.toString();
-        window.location.href = `/myjobbox${qs ? `?${qs}` : ''}`;
+        window.location.href = `/myjobbox?${params.toString()}`;
     }
 }
 
-function navigateTo(url) {
-    if (!url) return;
-    try {
-        router.get(url);
-    } catch (e) {
-        try {
-            window.location.href = url;
-        } catch (err) {
-            // ignore
-        }
-    }
-}
-
-function formatDate(d) {
-    if (!d) return '-';
-    try {
-        const s = String(d).split('T')[0];
-        return s;
-    } catch (e) {
-        return String(d).split('T')[0] || '-';
-    }
-}
-
-function formatTime(t) {
-    if (!t) return '';
-    const core = String(t).split('.')[0];
-    const parts = core.split(':');
-    if (parts.length >= 2) return parts[0].padStart(2, '0') + ':' + parts[1].padStart(2, '0');
-    return t;
-}
-
-function formatDateTimeRange(start, end) {
-    if (!start && !end) return '-';
-
-    let s = start == null ? '' : String(start);
-    let e = end == null ? '' : String(end);
-
-    // If start contains a full range like "2026-01-12T09:00-2026-01-12T17:00" and end is empty,
-    // split it into start and end parts.
-    if ((!e || e === '') && s.includes('T') && s.includes('-')) {
-        const parts = s.split('-');
-        if (parts.length >= 2) {
-            const left = parts[0];
-            const right = parts.slice(1).join('-');
-            s = left;
-            e = right;
-        }
-    }
-
-    // If end contains a full range and start is a date-only string, pick times from end.
-    if (e && e.includes('T') && e.includes('-') && !(s.includes('T') || s.includes(':'))) {
-        const parts = e.split('-');
-        if (parts.length >= 2) {
-            const left = parts[0];
-            const right = parts.slice(1).join('-');
-            // left holds a datetime for the start time, right holds datetime for end time
-            const startDate = formatDate(s);
-            const startTime = formatTime(left);
-            const endTime = formatTime(right);
-            if (startTime && endTime) return `${startDate} ${startTime}-${endTime}`;
-            if (startTime) return `${startDate} ${startTime}`;
-            return startDate;
-        }
-    }
-
-    const startDate = s ? formatDate(s) : '';
-    const endDate = e ? formatDate(e) : '';
-
-    // extract time parts
-    function extractTimeFrom(str, preferLastSegment = false) {
-        if (!str) return '';
-        // if it's a combined range like "09:00-17:00"
-        if (str.includes('-') && !str.includes('T')) {
-            const p = str.split('-');
-            return preferLastSegment ? formatTime(p[p.length - 1]) : formatTime(p[0]);
-        }
-        // if contains 'T', take substring after 'T' up to end or before '-' if present
-        if (str.includes('T')) {
-            const afterT = str.split('T')[1] || '';
-            const beforeDash = afterT.split('-')[0];
-            return formatTime(beforeDash);
-        }
-        // if contains space-separated time
-        if (str.includes(' ')) {
-            const parts = str.split(' ');
-            return formatTime(parts[1] || parts[0]);
-        }
-        // otherwise treat as time
-        return formatTime(str);
-    }
-
-    const startTime = extractTimeFrom(s, false);
-    const endTime = extractTimeFrom(e, true);
-
-    if (startDate && endDate && startDate === endDate) {
-        if (startTime || endTime) return `${startDate} ${startTime || ''}${endTime ? '-' + endTime : ''}`.trim();
-        return `${startDate}`;
-    }
-
-    if (startDate && endDate) {
-        if (startTime && endTime) return `${startDate} ${startTime}-${endDate} ${endTime}`;
-        if (startTime) return `${startDate} ${startTime}-${endDate}`;
-        return `${startDate}-${endDate}`;
-    }
-
-    if (startDate) return startTime ? `${startDate} ${startTime}` : `${startDate}`;
-    if (endDate) return endTime ? `${endDate} ${endTime}` : `${endDate}`;
-    return '-';
-}
-
-function getFirstEvent(m) {
-    // m.events may be an array or a paginated object { data: [...] }
-    try {
-        if (m.events) {
-            if (Array.isArray(m.events) && m.events.length) return m.events[0];
-            if (m.events.data && Array.isArray(m.events.data) && m.events.data.length) return m.events.data[0];
-        }
-        if (m.project_job_assignment && m.project_job_assignment.events) {
-            const e = m.project_job_assignment.events;
-            if (Array.isArray(e) && e.length) return e[0];
-            if (e.data && Array.isArray(e.data) && e.data.length) return e.data[0];
-        }
-    } catch (e) {
-        // defensive: ignore and return null
-    }
-    return null;
+function clearSearch() {
+    page.props.q_model = '';
+    search();
 }
 
 function getBackLink() {
     try {
-        if (props.projectJob && props.projectJob.id) {
+        if (props.projectJob?.id) {
             return typeof route === 'function' ? route('project_jobs.show', props.projectJob.id) : `/project_jobs/${props.projectJob.id}`;
         }
         return typeof route === 'function' ? route('dashboard') : '/';
@@ -404,49 +330,31 @@ function getBackLink() {
 
 function getAssignmentLink(m) {
     try {
-        if (props.myAssignments) {
-            return typeof route === 'function' ? route('user.myjobbox.show', { assignment: m.id }) : `/myjobbox/${m.id}`;
-        }
-        // fallback to jobbox message link when shape is message
-        let pjId = props.projectJob?.id;
-        if (!pjId) {
-            pjId = m.project_job_assignment?.project_job?.id || m.project_job_assignment?.project_job_id || null;
-        }
-        if (!pjId) return '#';
-        try {
-            if (page.props.auth.user && page.props.auth.user.isCoordinator) {
-                return route('coordinator.project_jobs.jobbox.show', { projectJob: pjId, message: m.id });
-            }
-            return route('project_jobs.jobbox.show', { projectJob: pjId, message: m.id });
-        } catch (e) {
-            return '#';
-        }
+        return typeof route === 'function' ? route('user.myjobbox.show', { assignment: m.id }) : `/myjobbox/${m.id}`;
     } catch (e) {
         return '#';
     }
 }
 
 async function rowClick(m, event) {
-    const tag = event.target && event.target.tagName ? event.target.tagName.toLowerCase() : '';
-    if (tag === 'a' || tag === 'button' || (event.target.closest && event.target.closest('a,button'))) return;
+    const tag = event.target?.tagName?.toLowerCase() || '';
+    if (tag === 'a' || tag === 'button' || event.target.closest?.('a,button')) return;
 
-    // If this is an assignment (myAssignments) try to find a linked event first
+    // Try to navigate to linked event first
     try {
-        if (props.myAssignments && m && (m.id || m.project_job_assignment_id || m.project_job_assignment?.id)) {
-            const assId = m.id || m.project_job_assignment_id || (m.project_job_assignment && m.project_job_assignment.id);
-            const userId = m.user?.id || m.user_id || (page.props.auth.user && page.props.auth.user.id) || '';
-            // Query events index for this user and job id; backend returns JSON array
+        const assId = m.id;
+        const userId = m.user?.id || m.user_id || page.props.auth?.user?.id || '';
+        if (assId) {
             let eventsUrl = null;
             try {
                 eventsUrl = typeof route === 'function' ? route('events.index') : '/events';
                 const query = [];
                 if (userId) query.push('user_id=' + encodeURIComponent(userId));
                 if (assId) query.push('job=' + encodeURIComponent(assId));
-                if (query.length) eventsUrl = eventsUrl + '?' + query.join('&');
+                if (query.length) eventsUrl += '?' + query.join('&');
             } catch (e) {
                 eventsUrl = '/events?job=' + encodeURIComponent(assId);
             }
-
             try {
                 const res = await fetch(eventsUrl, {
                     credentials: 'same-origin',
@@ -456,285 +364,98 @@ async function rowClick(m, event) {
                     const payload = await res.json();
                     if (Array.isArray(payload) && payload.length > 0) {
                         const ev = payload[0];
-                        const evId = ev.id || ev.event_id || (ev.extendedProps && (ev.extendedProps.event_id || ev.extendedProps.id));
+                        const evId = ev.id || ev.event_id || ev.extendedProps?.event_id || ev.extendedProps?.id;
                         if (evId) {
-                            try {
-                                router.get(typeof route === 'function' ? route('events.show', evId) : '/events/' + evId);
-                                return;
-                            } catch (err) {
-                                try {
-                                    window.location.href = typeof route === 'function' ? route('events.show', evId) : '/events/' + evId;
-                                    return;
-                                } catch (er) {}
-                            }
+                            try { router.get(typeof route === 'function' ? route('events.show', evId) : '/events/' + evId); return; } catch {}
+                            try { window.location.href = '/events/' + evId; return; } catch {}
                         }
                     }
                 }
-            } catch (e) {
-                // ignore fetch errors and fallback to assignment link
-            }
+            } catch {}
         }
-    } catch (e) {
-        // ignore
-    }
+    } catch {}
 
     const url = getAssignmentLink(m);
     if (url && url !== '#') {
-        try {
-            router.visit(url, { preserveState: false });
-        } catch (e) {
-            try {
-                window.location.href = url;
-            } catch (err) {}
-        }
+        try { router.visit(url, { preserveState: false }); } catch (e) { window.location.href = url; }
     }
 }
 
+// ===== ステータス表示 =====
+
 function getAssignmentStatus(m) {
     try {
-        // Prefer canonical status object when available (in assignment.status.key)
-        const jam = m || {};
-        const assignment = m || {};
-
-        const statusKey = (assignment.status && assignment.status.key) || (jam.status && jam.status.key) || null;
+        // completed フラグを最優先（boolean が true なら確実に完了）
+        if (Boolean(m.completed)) return '完了';
+        // status（ローカル更新後）または status_model（DB から eager load された関連）のキーを確認
+        const statusKey = m.status?.key || m.status_model?.key || null;
         if (statusKey) {
             switch (statusKey) {
-                case 'completed':
-                    return '完了';
-                case 'scheduled':
-                    return 'セット済み';
-                case 'confirmed':
-                    return '確認済み';
+                case 'completed': return '完了';
+                case 'scheduled': return 'セット済み';
+                case 'confirmed': return '確認済み';
                 case 'received':
-                    return '受信済み';
-                // legacy slugs fallback
                 case 'order':
-                    return '受信済み';
-                case 'in_progress':
-                    return '受信済み';
-                default:
-                    // unknown key — fall back to flag logic below
-                    break;
+                case 'in_progress': return '進行中';
+                default: break;
             }
         }
-
-        // Fallback for older data shapes: use existing flag/timestamp heuristics
-        const completed = Boolean(jam.completed) || Boolean(assignment.completed);
-        if (completed) return '完了';
-
-        const scheduled = Boolean(jam.scheduled) || Boolean(assignment.scheduled) || Boolean(assignment.scheduled_at);
-        if (scheduled) return 'セット済み';
-
-        const accepted = Boolean(jam.accepted) || Boolean(assignment.accepted);
-        const readAt = jam.read_at || assignment.read_at || null;
-        // If message has been read but not necessarily accepted, show '既読済み'
-        if (readAt) {
-            if (accepted) return '確認済み';
-            return '既読済み';
-        }
-        if (accepted) return '受信済み';
-
+        if (Boolean(m.scheduled) || Boolean(m.scheduled_at)) return 'セット済み';
         return '-';
-    } catch (err) {
+    } catch {
         return '-';
     }
 }
 
 function statusBadgeClass(status) {
-    const s = status || '';
-    switch (s) {
-        case '完了':
-            // Match calendar completed color (yellow)
-            return 'bg-yellow-100 text-yellow-800';
-        case 'セット済み':
-            // Scheduled matches calendar blue
-            return 'bg-blue-100 text-blue-800';
-        case '確認済み':
-            // Confirmed -> green to align with calendar/positive state
-            return 'bg-green-100 text-green-800';
-        case '受信済み':
-            return 'bg-indigo-100 text-indigo-800';
-        case '既読済み':
-            return 'bg-gray-100 text-gray-700';
-        default:
-            return 'bg-gray-100 text-gray-700';
+    switch (status) {
+        case '完了': return 'bg-yellow-100 text-yellow-800';
+        case 'セット済み': return 'bg-blue-100 text-blue-800';
+        case '確認済み': return 'bg-green-100 text-green-800';
+        case '受信済み': return 'bg-indigo-100 text-indigo-800';
+        case '既読済み': return 'bg-gray-100 text-gray-700';
+        default: return 'bg-gray-100 text-gray-700';
     }
 }
 
 function statusTooltip(status) {
     switch (status) {
-        case '完了':
-            return '作業が完了しています。';
-        case 'セット済み':
-            return '作業の予定がカレンダーにセットされています。';
-        case '確認済み':
-            return '受信者が内容を確認しました（既読）。';
-        case '受信済み':
-            return '受信者にメッセージが届いています（未確認）。';
-        case '既読済み':
-            return '既に既読となっています。';
-        default:
-            return '';
+        case '完了': return '作業が完了しています。';
+        case 'セット済み': return '作業の予定がカレンダーにセットされています。';
+        case '確認済み': return '受信者が内容を確認しました（既読）。';
+        case '受信済み': return '受信者にメッセージが届いています（未確認）。';
+        case '既読済み': return '既に既読となっています。';
+        default: return '';
     }
 }
 
 function statusIcon(status) {
-    // return small SVG icons as strings
     switch (status) {
-        case '完了':
-            return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3 text-yellow-800"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 00-1.414-1.414L7 12.172 4.707 9.879a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l9-9z" clip-rule="evenodd"/></svg>`;
-        case 'セット済み':
-            return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3 text-blue-800"><path d="M6 2a1 1 0 000 2h8a1 1 0 100-2H6zM3 6a1 1 0 011-1h12a1 1 0 011 1v9a2 2 0 01-2 2H5a2 2 0 01-2-2V6z"/></svg>`;
-        case '確認済み':
-            return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3 text-green-800"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zM9 7h2v5H9V7zm0 7h2v2H9v-2z"/></svg>`;
-        case '受信済み':
-            return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3 text-indigo-800"><path d="M2 5a2 2 0 012-2h12a2 2 0 012 2v1l-8 4.5L2 6V5z"/><path d="M18 8.118V15a2 2 0 01-2 2H4a2 2 0 01-2-2V8.118l8 4.5 8-4.5z"/></svg>`;
-        case '既読済み':
-            return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3 text-gray-800"><path d="M3 5a1 1 0 011-1h12a1 1 0 011 1v9a2 2 0 01-2 2H5a2 2 0 01-2-2V5z"/></svg>`;
-        default:
-            return '';
+        case '完了': return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3 text-yellow-800"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 00-1.414-1.414L7 12.172 4.707 9.879a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l9-9z" clip-rule="evenodd"/></svg>`;
+        case 'セット済み': return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3 text-blue-800"><path d="M6 2a1 1 0 000 2h8a1 1 0 100-2H6zM3 6a1 1 0 011-1h12a1 1 0 011 1v9a2 2 0 01-2 2H5a2 2 0 01-2-2V6z"/></svg>`;
+        case '確認済み': return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3 text-green-800"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zM9 7h2v5H9V7zm0 7h2v2H9v-2z"/></svg>`;
+        case '受信済み': return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3 text-indigo-800"><path d="M2 5a2 2 0 012-2h12a2 2 0 012 2v1l-8 4.5L2 6V5z"/><path d="M18 8.118V15a2 2 0 01-2 2H4a2 2 0 01-2-2V8.118l8 4.5 8-4.5z"/></svg>`;
+        case '既読済み': return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3 text-gray-800"><path d="M3 5a1 1 0 011-1h12a1 1 0 011 1v9a2 2 0 01-2 2H5a2 2 0 01-2-2V5z"/></svg>`;
+        default: return '';
     }
 }
-
-function changeSort(key) {
-    // toggle direction if same key
-    if (sortState.sort === key) {
-        sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
-    } else {
-        sortState.sort = key;
-        sortState.dir = 'asc';
-    }
-
-    const params = { q: page.props.q_model, period: page.props.period_model, sort: sortState.sort, dir: sortState.dir };
-    try {
-        router.get(route('user.myjobbox.index'), params, { preserveState: false });
-    } catch (err) {
-        // fallback: reload current url with query params
-        router.get(window.location.pathname, params, { preserveState: false });
-    }
-}
-
-function clearSearch() {
-    page.props.q_model = '';
-    search();
-}
-
-onMounted(() => {
-    try {
-        // debugger;
-        // console.log('DEBUG page.props', page.props);
-        const authUser = page.props.auth.user;
-        if (!authUser || !window.Echo) return;
-        const channel = window.Echo.private('jobmessages.' + authUser.id);
-        channel.listen('JobMessageCreated', async (e) => {
-            // event payload received (silently handled)
-            // DO NOT show a page-local toast here; toasts are centralized in AppLayout
-            // to avoid duplicate toasts across the app.
-
-            // If the event includes a full jam payload, use it. Otherwise, if only an id is provided,
-            // attempt to fetch the jam via a lightweight endpoint.
-            try {
-                let jam = null;
-                if (e.jam) {
-                    jam = e.jam;
-                } else if (e.job_assignment_message_id) {
-                    // Try to fetch the jam item from the server (lightweight show endpoint)
-                    try {
-                        const resp = await fetch(route('api.jobbox.show', { id: e.job_assignment_message_id }), {
-                            credentials: 'same-origin',
-                            headers: { Accept: 'application/json' },
-                        });
-                        if (resp.ok) {
-                            const json = await resp.json();
-                            jam = json.data || json;
-                        }
-                    } catch (fetchErr) {
-                        // fetch jam failed (non-fatal)
-                    }
-                }
-
-                const newJamBase = jam
-                    ? { ...jam }
-                    : {
-                          id: e.job_assignment_message_id || e.message_id || `tmp-${Date.now()}`,
-                          subject: e.subject || null,
-                          body: e.jam && e.jam.body ? e.jam.body : null,
-                          sender: {
-                              name: e.from_user_name || null,
-                              id: e.from_user_id || (e.jam && e.jam.sender && e.jam.sender.id ? e.jam.sender.id : null),
-                          },
-                          project_job_assignment: null,
-                          read_at: e.jam && e.jam.read_at ? e.jam.read_at : null,
-                          from_user_id: e.from_user_id || (e.jam && e.jam.sender && e.jam.sender.id ? e.jam.sender.id : null),
-                      };
-
-                // If body contains an inline desired_start_date, try to extract YYYY-MM-DD and populate the preview
-                try {
-                    const bodyHtml = (newJamBase.body || '') + (e.jam && e.jam.body ? e.jam.body : '');
-                    const match =
-                        bodyHtml.match(/希望開始日[:：\s]*([0-9]{4}-[0-9]{2}-[0-9]{2})/i) ||
-                        bodyHtml.match(/希望日[:：\s]*([0-9]{4}-[0-9]{2}-[0-9]{2})/i);
-                    if (match && match[1]) {
-                        newJamBase.project_job_assignment = newJamBase.project_job_assignment || {};
-                        newJamBase.project_job_assignment.desired_start_date = match[1];
-                    } else if (e.jam && e.jam.project_job_assignment && e.jam.project_job_assignment.desired_start_date) {
-                        newJamBase.project_job_assignment = newJamBase.project_job_assignment || {};
-                        newJamBase.project_job_assignment.desired_start_date = e.jam.project_job_assignment.desired_start_date;
-                    }
-                    // Prefer jam-level read_at if provided
-                    if (e.jam && e.jam.read_at) {
-                        newJamBase.read_at = e.jam.read_at;
-                    }
-                } catch (err) {
-                    // ignore parsing errors
-                }
-
-                const newJam = { ...newJamBase, __is_new: true };
-
-                // Prepend and keep pagination length consistent
-                localMessages.value.unshift(newJam);
-                const perPage = props.messages?.per_page || 20;
-                if (localMessages.value.length > perPage) {
-                    localMessages.value.splice(perPage);
-                }
-
-                // If server provided total, increment it in a local shadow so UI shows updated total
-                try {
-                    if (!props.messages) props.messages = {};
-                    props.messages.total = (props.messages.total || localMessages.value.length) + 1;
-                } catch (err) {
-                    // non-fatal
-                }
-
-                // Clear the new highlight after 20 seconds
-                setTimeout(() => {
-                    const idx = localMessages.value.findIndex((x) => x.id === newJam.id);
-                    if (idx >= 0) {
-                        localMessages.value[idx].__is_new = false;
-                    }
-                }, 20000);
-            } catch (err) {
-                // JobMessageCreated handling failed (non-fatal)
-            }
-        });
-
-        // Listen for JobMessageRead so the UI can mark specific JAM rows as read in real-time.
-        channel.listen('JobMessageRead', (e) => {
-            try {
-                const mid = e && e.message_id ? e.message_id : null;
-                if (!mid) return;
-                const idx = localMessages.value.findIndex((x) => Number(x.id) === Number(mid));
-                if (idx >= 0) {
-                    // Prefer the read_at timestamp from the event payload when available
-                    const eventReadAt = e && e.read_at ? e.read_at : null;
-                    localMessages.value[idx].read_at = eventReadAt || new Date().toISOString();
-                }
-            } catch (err) {
-                // non-fatal
-            }
-        });
-    } catch (err) {
-        // JobBox Echo subscribe failed (non-fatal)
-    }
-});
 </script>
+
+<style>
+.jobbox-tooltip {
+    background-color: #eff6ff !important;
+    color: #0f172a !important;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06) !important;
+    border: 1px solid rgba(14, 165, 233, 0.12) !important;
+    border-radius: 8px !important;
+    padding: 0.5rem 0.75rem !important;
+    font-size: 0.875rem !important;
+}
+.jobbox-tooltip .bg-primary { background-color: #eff6ff !important; }
+.jobbox-tooltip .fill-primary { fill: #eff6ff !important; }
+.jobbox-tooltip .size-2\.5 { width: 10px; height: 10px; }
+</style>
+
+<style scoped>
+.new-highlight { background-color: #fff7cc; }
+</style>

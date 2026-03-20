@@ -11,6 +11,8 @@ const props = defineProps({
     sizes: { type: Array, default: () => [] },
     types: { type: Array, default: () => [] },
     difficulties: { type: Array, default: () => [] },
+    eventItemTypes: { type: Array, default: () => [] },
+    worktimeItemTypes: { type: Array, default: () => [] },
 });
 
 // build options 0..3 step 0.25
@@ -24,6 +26,8 @@ const stagesMap = reactive({});
 const sizesMap = reactive({});
 const typesMap = reactive({});
 const difficultiesMap = reactive({});
+const eventItemTypesMap = reactive({});
+const worktimeItemTypesMap = reactive({});
 
 // initialize maps from props
 props.stages.forEach((s) => {
@@ -38,8 +42,14 @@ props.types.forEach((t) => {
 props.difficulties.forEach((d) => {
     difficultiesMap[d.id] = String(typeof d.coefficient !== 'undefined' ? parseFloat(d.coefficient).toFixed(2) : '1.00');
 });
+props.eventItemTypes.forEach((e) => {
+    eventItemTypesMap[e.id] = String(typeof e.coefficient !== 'undefined' ? parseFloat(e.coefficient).toFixed(2) : '1.00');
+});
+props.worktimeItemTypes.forEach((o) => {
+    worktimeItemTypesMap[o.id] = String(typeof o.coefficient !== 'undefined' ? parseFloat(o.coefficient).toFixed(2) : '1.00');
+});
 
-const saving = reactive({ stages: false, sizes: false, types: false, difficulties: false });
+const saving = reactive({ stages: false, sizes: false, types: false, difficulties: false, event_item_types: false, worktime_item_types: false });
 
 const { showToast } = useToasts();
 
@@ -54,6 +64,10 @@ function saveTable(table) {
         rows = Object.keys(typesMap).map((id) => ({ id: Number(id), coefficient: Number(parseFloat(typesMap[id]) || 0) }));
     } else if (table === 'difficulties') {
         rows = Object.keys(difficultiesMap).map((id) => ({ id: Number(id), coefficient: Number(parseFloat(difficultiesMap[id]) || 0) }));
+    } else if (table === 'event_item_types') {
+        rows = Object.keys(eventItemTypesMap).map((id) => ({ id: Number(id), coefficient: Number(parseFloat(eventItemTypesMap[id]) || 0) }));
+    } else if (table === 'worktime_item_types') {
+        rows = Object.keys(worktimeItemTypesMap).map((id) => ({ id: Number(id), coefficient: Number(parseFloat(worktimeItemTypesMap[id]) || 0) }));
     }
 
     saving[table] = true;
@@ -178,6 +192,66 @@ function saveTable(table) {
                                         class="inline-flex items-center rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700"
                                     >
                                         <span v-if="!saving.difficulties">保存（難易度）</span>
+                                        <span v-else>保存中…</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Event Item Types -->
+                        <section>
+                            <h2 class="mb-2 text-sm font-medium">イベント</h2>
+                            <div class="rounded border bg-gray-50 p-3">
+                                <div v-if="!props.eventItemTypes.length" class="text-sm text-gray-500">イベントカテゴリが設定されていません。</div>
+                                <div v-for="e in props.eventItemTypes" :key="e.id" class="flex items-center justify-between py-1">
+                                    <div class="text-sm text-gray-700">{{ e.name }}</div>
+                                    <div>
+                                        <select v-model="eventItemTypesMap[e.id]" class="w-28 rounded border px-2 py-1 text-sm">
+                                            <option v-for="o in options" :key="o" :value="o">{{ o }}</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="pt-3">
+                                    <button
+                                        :disabled="saving.event_item_types"
+                                        @click="saveTable('event_item_types')"
+                                        class="inline-flex items-center rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700"
+                                    >
+                                        <span v-if="!saving.event_item_types">保存（イベント）</span>
+                                        <span v-else>保存中…</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Overtime Item Types -->
+                        <section>
+                            <h2 class="mb-2 text-sm font-medium">残業・早退係数</h2>
+                            <div class="rounded border bg-gray-50 p-3">
+                                <div v-if="!props.worktimeItemTypes.length" class="text-sm text-gray-500">残業・早退の種別が設定されていません。</div>
+                                <div v-for="o in props.worktimeItemTypes" :key="o.id" class="flex items-center justify-between py-1">
+                                    <div class="flex items-center gap-2">
+                                        <span
+                                            class="rounded px-1.5 py-0.5 text-xs font-medium"
+                                            :class="o.type === 'over' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'"
+                                        >
+                                            {{ o.type === 'over' ? '残業' : '早退' }}
+                                        </span>
+                                        <span class="text-sm text-gray-700">{{ o.name }}</span>
+                                    </div>
+                                    <div>
+                                        <select v-model="worktimeItemTypesMap[o.id]" class="w-28 rounded border px-2 py-1 text-sm">
+                                            <option v-for="opt in options" :key="opt" :value="opt">{{ opt }}</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="pt-3">
+                                    <button
+                                        :disabled="saving.worktime_item_types"
+                                        @click="saveTable('worktime_item_types')"
+                                        class="inline-flex items-center rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700"
+                                    >
+                                        <span v-if="!saving.worktime_item_types">保存（残業・早退）</span>
                                         <span v-else>保存中…</span>
                                     </button>
                                 </div>

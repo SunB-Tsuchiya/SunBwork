@@ -15,6 +15,9 @@
                     :user-projects="userProjects"
                 />
             </div>
+            <div class="mt-4">
+                <Link :href="route('user.myjobbox.index')" class="rounded bg-gray-200 px-4 py-2">戻る</Link>
+            </div>
         </div>
     </AppLayout>
 </template>
@@ -22,7 +25,7 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
 import AssignmentFormUser from '@/Pages/Coordinator/ProjectJobs/JobAssign/AssignmentForm_user.vue';
-import { usePage } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
 import { ref } from 'vue';
 
 const page = usePage();

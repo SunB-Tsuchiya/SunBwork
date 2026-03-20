@@ -7,6 +7,9 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use App\Models\Diary;
+use App\Models\Event;
+use App\Models\ProjectJobAssignment;
+use Illuminate\Support\Facades\Schema;
 
 class DashboardController extends Controller
 {
@@ -75,8 +78,72 @@ class DashboardController extends Controller
             }
         }
 
+        // カレンダー用データ（User Dashboard のみ）
+        $diaries = [];
+        $events = [];
+        $jobs = [];
+        if ($component === 'Dashboard') {
+            $diary_from = now()->subDays(20)->startOfDay();
+            $diary_to   = now()->endOfDay();
+            $event_from = now()->subMonth(1)->startOfMonth();
+            $event_to   = now()->addMonth(1)->endOfMonth();
+
+            $diaries = Diary::where('user_id', $user->id)
+                ->when(Schema::hasColumn('diaries', 'date'), fn($q) =>
+                    $q->whereBetween('date', [$diary_from, $diary_to])
+                )
+                ->get();
+
+            $eventQuery = Event::where('user_id', $user->id);
+            $select = ['id', 'title'];
+            if (Schema::hasColumn('events', 'starts_at')) {
+                $eventQuery->whereBetween('starts_at', [$event_from, $event_to]);
+                $select[] = 'starts_at';
+            } elseif (Schema::hasColumn('events', 'start')) {
+                $eventQuery->whereBetween('start', [$event_from, $event_to]);
+                $select[] = 'start';
+            }
+            foreach (['ends_at', 'end', 'body', 'description', 'project_job_assignment_id'] as $col) {
+                if (Schema::hasColumn('events', $col)) $select[] = $col;
+            }
+            $events = $eventQuery->get($select)->map(function ($e) {
+                $arr = $e->toArray();
+                $startVal = $e->start ?? $arr['start'] ?? $arr['starts_at'] ?? $arr['startsAt'] ?? null;
+                $endVal   = $e->end   ?? $arr['end']   ?? $arr['ends_at']   ?? $arr['endsAt']   ?? null;
+                $descVal  = $e->description ?? $arr['description'] ?? $arr['body'] ?? null;
+                $pjaId    = $arr['project_job_assignment_id'] ?? ($e->project_job_assignment_id ?? null);
+                return [
+                    'id'                         => $e->id,
+                    'title'                      => $e->title,
+                    'start'                      => $startVal,
+                    'end'                        => $endVal,
+                    'allDay'                     => $arr['allDay'] ?? false,
+                    'description'                => $descVal,
+                    'color'                      => $arr['color'] ?? ($e->color ?? null),
+                    'project_job_assignment_id'  => $pjaId,
+                    'extendedProps'              => array_merge($arr['extendedProps'] ?? [], [
+                        'project_job_assignment_id' => $pjaId,
+                        'description'               => $descVal,
+                    ]),
+                ];
+            })->values();
+
+            $jobs = ProjectJobAssignment::where('user_id', $user->id)
+                ->where(fn($q) => $q->where('accepted', true)->orWhere('assigned', true))
+                ->with('projectJob')
+                ->get()
+                ->map(fn($a) => [
+                    'id'             => $a->id,
+                    'title'          => $a->title ?: ($a->projectJob?->name ?? '無題'),
+                    'preferred_date' => $a->desired_start_date?->format('Y-m-d'),
+                ]);
+        }
+
         return Inertia::render($component, [
-            'user' => $user,
+            'user'    => $user,
+            'diaries' => $diaries,
+            'events'  => $events,
+            'jobs'    => $jobs,
         ]);
     }
 }

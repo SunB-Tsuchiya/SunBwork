@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Event;
+use App\Models\EventItemType;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
@@ -200,6 +201,7 @@ class EventController extends Controller
     {
         $data = $request->validate([
             'date' => 'required|date',
+            'event_item_type_id' => 'nullable|exists:event_item_types,id',
             'title' => 'required|string|max:255',
             'description' => [
                 'required',
@@ -251,6 +253,7 @@ class EventController extends Controller
 
         $event = new Event();
         $event->user_id = Auth::id();
+        $event->event_item_type_id = $data['event_item_type_id'] ?? null;
         $event->title = $data['title'];
         $event->description = $data['description'];
         $event->start = $data['start'];
@@ -778,7 +781,11 @@ class EventController extends Controller
     // イベント新規作成画面表示
     public function create(Request $request)
     {
-        $date = $request->query('date', now()->toDateString());
+        $date        = $request->query('date', now()->toDateString());
+        $startHour   = $request->query('startHour');
+        $startMinute = $request->query('startMinute');
+        $endHour     = $request->query('endHour');
+        $endMinute   = $request->query('endMinute');
         $jobId = $request->query('job');
         $jobData = null;
         if ($jobId) {
@@ -870,18 +877,25 @@ class EventController extends Controller
             $statuses = [];
         }
 
+        $eventItemTypes = EventItemType::orderBy('sort_order')->get(['id', 'name', 'slug', 'coefficient']);
+
         $props = [
-            'date' => $date,
-            'job' => $jobData,
-            'userClients' => $userClients,
-            'userProjects' => $userProjects,
-            'members' => $members,
-            'company' => $company,
-            'department' => $department,
-            'types' => $types,
-            'sizes' => $sizes,
-            'stages' => $stages,
-            'statuses' => $statuses,
+            'date'           => $date,
+            'startHour'      => $startHour   ? str_pad($startHour,   2, '0', STR_PAD_LEFT) : null,
+            'startMinute'    => $startMinute ? str_pad($startMinute, 2, '0', STR_PAD_LEFT) : null,
+            'endHour'        => $endHour     ? str_pad($endHour,     2, '0', STR_PAD_LEFT) : null,
+            'endMinute'      => $endMinute   ? str_pad($endMinute,   2, '0', STR_PAD_LEFT) : null,
+            'job'            => $jobData,
+            'userClients'    => $userClients,
+            'userProjects'   => $userProjects,
+            'members'        => $members,
+            'company'        => $company,
+            'department'     => $department,
+            'types'          => $types,
+            'sizes'          => $sizes,
+            'stages'         => $stages,
+            'statuses'       => $statuses,
+            'eventItemTypes' => $eventItemTypes,
         ];
 
         // Prepare a simplified debug-friendly copy of props so logs are readable
@@ -957,6 +971,36 @@ class EventController extends Controller
             $userProjects = [];
         }
 
+        // 「その他」クライアント・プロジェクトを全社共通で確保し、リストの末尾に追加
+        $otherClientId = null;
+        $otherProjectId = null;
+        try {
+            $otherClient = \App\Models\Client::firstOrCreate(
+                ['name' => 'その他', 'company_id' => null],
+                ['notes' => 'デフォルト「その他」クライアント']
+            );
+            $otherProject = \App\Models\ProjectJob::firstOrCreate(
+                ['title' => 'その他', 'client_id' => $otherClient->id],
+                ['detail' => 'デフォルト「その他」案件']
+            );
+            $otherClientId = $otherClient->id;
+            $otherProjectId = $otherProject->id;
+
+            $userClients = collect($userClients);
+            if (!$userClients->contains('id', $otherClientId)) {
+                $userClients = $userClients->push(['id' => $otherClientId, 'name' => 'その他']);
+            }
+            $userClients = $userClients->values()->toArray();
+
+            $userProjects = collect($userProjects);
+            if (!$userProjects->contains('id', $otherProjectId)) {
+                $userProjects = $userProjects->push(['id' => $otherProjectId, 'title' => 'その他', 'client_id' => $otherClientId]);
+            }
+            $userProjects = $userProjects->values()->toArray();
+        } catch (\Throwable $__e) {
+            // 取得失敗時はそのまま続行
+        }
+
         $members = [];
         try {
             if ($user) {
@@ -996,6 +1040,9 @@ class EventController extends Controller
             $statuses = [];
         }
 
+        // 新規登録時のデフォルトステータス：「進行中」(slug=in_progress) のIDを取得
+        $inProgressStatusId = collect($statuses)->firstWhere('slug', 'in_progress')?->id ?? null;
+
         $prefillEvent = null;
         if ($date) {
             $prefillEvent = [
@@ -1022,6 +1069,9 @@ class EventController extends Controller
             'job' => $jobData,
             'userClients' => $userClients,
             'userProjects' => $userProjects,
+            'other_client_id' => $otherClientId,
+            'other_project_id' => $otherProjectId,
+            'in_progress_status_id' => $inProgressStatusId,
             'members' => $members,
             'company' => $company,
             'department' => $department,

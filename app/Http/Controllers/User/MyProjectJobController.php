@@ -69,7 +69,7 @@ class MyProjectJobController extends Controller
             $appendParams['q'] = $q;
         }
 
-        $myAssignments = $baseAssignments->paginate(20)->appends($appendParams);
+        $myAssignments = $baseAssignments->paginate($usePeriodFilter ? 500 : 50)->appends($appendParams);
 
         $monthValues = ProjectJobAssignmentByMyself::where('user_id', $user->id)
             ->selectRaw("DATE_FORMAT(COALESCE(desired_end_date, created_at), '%Y-%m') as ym")
@@ -100,6 +100,45 @@ class MyProjectJobController extends Controller
             'jobid' => $jobid,
             'registerFlags' => $registerFlags,
         ]);
+    }
+
+    /**
+     * Mark a MyJobBox assignment (ProjectJobAssignmentByMyself) as completed.
+     */
+    public function completeAssignment(Request $request, \App\Models\ProjectJobAssignmentByMyself $assignment)
+    {
+        $user = $request->user();
+        if (!$user || $assignment->user_id !== $user->id) {
+            return response()->json(['error' => 'Access denied'], 403);
+        }
+        try {
+            // completed カラムが存在する場合のみセット（カラム不存在時の SQL エラーを防ぐ）
+            if (\Illuminate\Support\Facades\Schema::hasColumn('project_job_assignment_by_myself', 'completed')) {
+                $assignment->completed = true;
+            }
+            // status_id を 完了 ステータスに更新
+            if (\Illuminate\Support\Facades\Schema::hasColumn('project_job_assignment_by_myself', 'status_id')) {
+                try {
+                    $status = \Illuminate\Support\Facades\DB::table('statuses')
+                        ->where('key', 'completed')
+                        ->orWhere('slug', 'completed')
+                        ->first();
+                    if (!$status) {
+                        $statusId = \Illuminate\Support\Facades\DB::table('statuses')->insertGetId([
+                            'key' => 'completed', 'slug' => 'completed', 'name' => '完了',
+                            'created_at' => now(), 'updated_at' => now(),
+                        ]);
+                    } else {
+                        $statusId = $status->id;
+                    }
+                    $assignment->status_id = $statusId;
+                } catch (\Throwable $__e) {}
+            }
+            $assignment->save();
+        } catch (\Throwable $__e) {
+            return response()->json(['error' => $__e->getMessage()], 500);
+        }
+        return response()->json(['success' => true, 'assignment_id' => $assignment->id]);
     }
 
     /**

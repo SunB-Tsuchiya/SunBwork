@@ -136,7 +136,7 @@
                         </div>
 
                         <div class="mt-2 text-right">
-                            <div v-if="assignment.linked_assignment_id">
+                            <div v-if="assignment.linked_assignment_id && projectJob?.id">
                                 <Link
                                     :href="
                                         route('coordinator.project_jobs.assignments.show', {
@@ -178,7 +178,7 @@
 
                             <Link
                                 v-else
-                                :href="route('events.create', { job: assignment.id })"
+                                :href="typeof route === 'function' ? route('events.create', { job: assignment.id }) : `/events/create?job=${assignment.id}`"
                                 class="rounded bg-blue-500 px-3 py-2 text-sm text-white hover:bg-blue-600"
                                 >予定をセット</Link
                             >
@@ -198,7 +198,7 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, ref } from 'vue';
-import { route } from 'ziggy-js';
+
 const { projectJob, assignment } = defineProps({ projectJob: Object, assignment: Object });
 const page = usePage();
 
@@ -238,9 +238,11 @@ function formatEstimatedHours(h) {
 }
 
 function routeBack() {
-    return page.props.auth.user && page.props.auth.user.isCoordinator
-        ? route('coordinator.project_jobs.assignments.index', { projectJob: projectJob.id })
-        : route('project_jobs.jobbox.index', { projectJob: projectJob.id });
+    try {
+        return typeof route === 'function' ? route('user.myjobbox.index') : '/myjobbox';
+    } catch (e) {
+        return '/myjobbox';
+    }
 }
 
 // If this assignment appears scheduled, fetch events for the assigned user
@@ -249,7 +251,7 @@ onMounted(async () => {
         const assigneeId = assignment && (assignment.user?.id || assignment.user_id || null);
         const isScheduled = Boolean(assignment && (assignment.scheduled || assignment.scheduled_at));
         if (assigneeId && isScheduled) {
-            const url = route('events.index') + '?user_id=' + encodeURIComponent(assigneeId) + '&job=' + encodeURIComponent(assignment.id);
+            const url = (typeof route === 'function' ? route('events.index') : '/events') + '?user_id=' + encodeURIComponent(assigneeId) + '&job=' + encodeURIComponent(assignment.id);
             const res = await fetch(url, {
                 method: 'GET',
                 credentials: 'same-origin',
@@ -271,10 +273,6 @@ onMounted(async () => {
 
 const events = ref([]);
 const isSubmittingComplete = ref(false);
-
-function totalMinutes() {
-    return formattedEvents.value.reduce((acc, ev) => acc + (ev.minutes || 0), 0);
-}
 
 function formatDurationFromMinutes(mins) {
     const h = Math.floor(mins / 60);
@@ -301,13 +299,6 @@ const displaySize = computed(() => {
     return assignment?.size?.name || assignment?.size?.label || assignment?.size_label || '-';
 });
 
-const displayStage = computed(() => {
-    return assignment?.stage?.name || assignment?.stage?.label || assignment?.stage_label || '-';
-});
-
-const displayStatus = computed(() => {
-    return assignment?.status?.name || assignment?.statusModel?.name || assignment?.statusModel?.label || assignment?.status_label || '-';
-});
 
 const isAssignee = computed(() => {
     try {
@@ -346,37 +337,50 @@ const editDate = computed(() => {
 });
 
 const editHref = computed(() => {
-    return route('calendar.index') + '?date=' + encodeURIComponent(editDate.value) + '&user_id=' + encodeURIComponent(assignment.user?.id || '');
+    const base = typeof route === 'function' ? route('calendar.index') : '/calendar';
+    return base + '?date=' + encodeURIComponent(editDate.value) + '&user_id=' + encodeURIComponent(assignment.user?.id || '');
 });
 
-function submitComplete() {
+async function submitComplete() {
     try {
         if (!confirm('このジョブを完了としてマークしますか？')) return;
-        const ev = Array.isArray(events.value) && events.value.length > 0 ? events.value[0] : null;
-        if (!ev) {
-            alert('完了対象の予定が見つかりません。');
-            return;
-        }
-        const evId = ev.id || ev.event_id || (ev.extendedProps && (ev.extendedProps.event_id || ev.extendedProps.id)) || null;
-        if (!evId) {
-            alert('完了対象の予定IDが見つかりません。');
+        if (!assignment || !assignment.id) {
+            alert('割当情報が見つかりません。');
             return;
         }
         isSubmittingComplete.value = true;
-        router.post(
-            route('events.complete', { event: evId }),
-            {},
-            {
-                onSuccess: () => {
-                    window.location.reload();
-                },
-                onError: () => {
-                    isSubmittingComplete.value = false;
-                },
+        const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        const xsrfMatch = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
+        const xsrf = xsrfMatch ? decodeURIComponent(xsrfMatch[1]) : null;
+        const url =
+            typeof route === 'function'
+                ? route('myjobbox.assignments.complete', { assignment: assignment.id })
+                : `/myjobbox/assignments/${assignment.id}/complete`;
+        const res = await fetch(url, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': token,
+                ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}),
+                'X-Requested-With': 'XMLHttpRequest',
             },
-        );
+        });
+        if (res.ok) {
+            // 完了後はindexへ遷移（DBの最新値を取得するため）
+            try {
+                router.get(typeof route === 'function' ? route('user.myjobbox.index') : '/myjobbox');
+            } catch (e) {
+                window.location.href = '/myjobbox';
+            }
+        } else {
+            isSubmittingComplete.value = false;
+            alert('完了処理に失敗しました。');
+        }
     } catch (e) {
+        isSubmittingComplete.value = false;
         console.debug('submitComplete error', e);
+        alert('完了処理に失敗しました。');
     }
 }
 

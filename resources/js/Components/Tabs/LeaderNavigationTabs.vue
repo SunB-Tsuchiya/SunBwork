@@ -39,6 +39,12 @@ const tab = (key) => [
             >
                 作業項目設定
             </Link>
+            <Link
+                :href="route('leader.work_records.index')"
+                :class="tab('work_records')"
+            >
+                勤務時間管理
+            </Link>
         </nav>
     </div>
 </template>

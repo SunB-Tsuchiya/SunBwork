@@ -11,6 +11,8 @@ use Intervention\Image\ImageManager;
 use App\Models\Diary;
 use App\Models\Attachment;
 use App\Models\User;
+use App\Models\WorkRecord;
+use App\Models\Worktype;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Log;
@@ -180,8 +182,18 @@ class DiaryController extends Controller
             // 既に日報がある場合は編集画面へ
             return redirect()->route('diaries.edit', $diary->id);
         }
+
+        $user         = Auth::user();
+        $isSuperAdmin = ($user->user_role ?? '') === 'superadmin';
+        $worktypes    = $isSuperAdmin
+            ? \App\Models\Worktype::orderBy('sort_order')->get(['id', 'name', 'start_time', 'end_time'])
+            : \App\Models\Worktype::where('company_id', $user->company_id)
+                ->orderBy('sort_order')
+                ->get(['id', 'name', 'start_time', 'end_time']);
+
         return Inertia::render('Diaries/Create', [
-            'date' => $date,
+            'date'      => $date,
+            'worktypes' => $worktypes,
         ]);
     }
 
@@ -189,7 +201,10 @@ class DiaryController extends Controller
     {
 
         $data = $request->validate([
-            'date' => 'required|date',
+            'date'       => 'required|date',
+            'work_style' => 'nullable|string|max:50',
+            'start_time' => 'nullable|date_format:H:i',
+            'end_time'   => 'nullable|date_format:H:i',
             'content' => [
                 'required',
                 function ($attribute, $value, $fail) {
@@ -200,17 +215,17 @@ class DiaryController extends Controller
             ],
         ]);
         // ensure diary is associated with the authenticated user
-        // The schema uses timestamps rather than a dedicated `date` column.
         $createdAt = Carbon::parse($data['date'])->startOfDay();
         $diary = new Diary();
         $diary->user_id = Auth::id();
-        // Persist explicit diary date (migration requires non-null date column)
-        $diary->date = $createdAt->toDateString();
+        $diary->date    = $createdAt->toDateString();
         $diary->content = $data['content'];
         $diary->created_at = $createdAt;
         $diary->updated_at = $createdAt;
-        // pre-save debug logging removed
         $diary->save();
+
+        // work_records に勤務時間を upsert
+        $this->upsertWorkRecord($request, $data['date'], Auth::user());
 
         // 本文内の [[attachment:{id}:filename]] プレースホルダを検出し、該当する attachments レコードを日報に紐付ける
         $contentForScan = $data['content'] ?? $request->input('content', '');
@@ -345,8 +360,34 @@ class DiaryController extends Controller
     public function edit(Diary $diary)
     {
         $this->authorize('update', $diary);
+
+        $user         = Auth::user();
+        $isSuperAdmin = ($user->user_role ?? '') === 'superadmin';
+        $worktypes    = $isSuperAdmin
+            ? \App\Models\Worktype::orderBy('sort_order')->get(['id', 'name', 'start_time', 'end_time'])
+            : \App\Models\Worktype::where('company_id', $user->company_id)
+                ->orderBy('sort_order')
+                ->get(['id', 'name', 'start_time', 'end_time']);
+
+        $dateStr    = $diary->date instanceof \Carbon\Carbon
+            ? $diary->date->toDateString()
+            : (string) $diary->date;
+        $workRecord = WorkRecord::where('user_id', $diary->user_id)
+            ->where('date', $dateStr)
+            ->first();
+
+        // date を純粋な Y-m-d 文字列に変換して渡す（Carbon→ISO変換でタイムゾーンずれを防ぐ）
+        $diaryArr = $diary->toArray();
+        $diaryArr['date'] = $dateStr;
+
         return Inertia::render('Diaries/Edit', [
-            'diary' => $diary,
+            'diary'       => $diaryArr,
+            'worktypes'   => $worktypes,
+            'workRecord'  => $workRecord ? [
+                'worktype_id' => $workRecord->worktype_id,
+                'start_time'  => substr($workRecord->start_time ?? '', 0, 5),
+                'end_time'    => substr($workRecord->end_time   ?? '', 0, 5),
+            ] : null,
         ]);
     }
 
@@ -355,10 +396,16 @@ class DiaryController extends Controller
         $this->authorize('update', $diary);
         // Quick path: if the request contains `content`, treat this as the Quill-based edit
         if ($request->input('content') !== null) {
-            // ensure date exists for validation: use existing diary date if absent
-            $request->merge(['date' => $request->input('date', $diary->date)]);
+            // ensure date exists for validation: always use pure date string (Y-m-d)
+            $existingDate = $diary->date instanceof \Carbon\Carbon
+                ? $diary->date->toDateString()
+                : date('Y-m-d', strtotime((string) $diary->date));
+            $request->merge(['date' => $request->input('date', $existingDate)]);
             $data = $request->validate([
-                'date' => 'required|date',
+                'date'       => 'required|date',
+                'work_style' => 'nullable|string|max:50',
+                'start_time' => 'nullable|date_format:H:i',
+                'end_time'   => 'nullable|date_format:H:i',
                 'content' => [
                     'required',
                     function ($attribute, $value, $fail) {
@@ -369,7 +416,11 @@ class DiaryController extends Controller
                 ],
             ]);
             $data['user_id'] = Auth::id();
-            $diary->update($data);
+            $data['date']    = \Carbon\Carbon::parse($data['date'])->toDateString();
+            $diary->update(['date' => $data['date'], 'content' => $data['content'], 'user_id' => $data['user_id']]);
+
+            // work_records を upsert
+            $this->upsertWorkRecord($request, $data['date'], Auth::user());
 
             // 本文内の [[attachment:{id}:filename]] プレースホルダを検出し、該当する attachments レコードを日報に紐付ける
             $contentForScan = $data['content'] ?? $request->input('content', '');
@@ -462,5 +513,60 @@ class DiaryController extends Controller
         }
         $diary->delete();
         return redirect()->route('dashboard');
+    }
+
+    /**
+     * work_records に勤務時間を upsert する共通処理
+     */
+    private function upsertWorkRecord(Request $request, string $date, $user): void
+    {
+        $startTime = $request->input('start_time'); // "HH:MM"
+        $endTime   = $request->input('end_time');   // "HH:MM"
+        $workStyle = $request->input('work_style');
+
+        Log::info('upsertWorkRecord called', [
+            'date'       => $date,
+            'start_time' => $startTime,
+            'end_time'   => $endTime,
+            'work_style' => $workStyle,
+            'all_input'  => array_keys($request->all()),
+        ]);
+
+        if (!$startTime || !$endTime) {
+            Log::info('upsertWorkRecord: skipped (no start_time or end_time)');
+            return;
+        }
+
+        // worktype を名前で検索
+        $worktype = $workStyle
+            ? Worktype::where('company_id', $user->company_id)
+                ->where('name', $workStyle)
+                ->first()
+            : null;
+
+        $scheduledStart = $worktype ? substr($worktype->start_time, 0, 5) : null;
+        $scheduledEnd   = $worktype ? substr($worktype->end_time,   0, 5) : null;
+
+        $record = new WorkRecord();
+        $record->start_time       = $startTime . ':00';
+        $record->end_time         = $endTime   . ':00';
+        $record->scheduled_start  = $scheduledStart ? $scheduledStart . ':00' : null;
+        $record->scheduled_end    = $scheduledEnd   ? $scheduledEnd   . ':00' : null;
+        $record->calcOvertime();
+
+        WorkRecord::updateOrCreate(
+            ['user_id' => $user->id, 'date' => $date],
+            [
+                'company_id'          => $user->company_id,
+                'department_id'       => $user->department_id,
+                'worktype_id'         => $worktype?->id,
+                'start_time'          => $record->start_time,
+                'end_time'            => $record->end_time,
+                'scheduled_start'     => $record->scheduled_start,
+                'scheduled_end'       => $record->scheduled_end,
+                'overtime_minutes'    => $record->overtime_minutes,
+                'early_leave_minutes' => $record->early_leave_minutes,
+            ]
+        );
     }
 }

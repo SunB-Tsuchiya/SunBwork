@@ -12,6 +12,7 @@ class Event extends Model
     protected $fillable = [
         'user_id',
         'title',
+        'event_item_type_id',
         // DB has 'body', controllers use 'description'
         'body',
         // DB has 'starts_at'/'ends_at', controllers prefer 'start'/'end'
@@ -32,6 +33,11 @@ class Event extends Model
         'starts_at' => 'datetime',
         'ends_at' => 'datetime',
     ];
+
+    public function eventItemType()
+    {
+        return $this->belongsTo(EventItemType::class);
+    }
 
     public function attachments()
     {

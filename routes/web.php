@@ -103,8 +103,13 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::get('/user/jobbox', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'user'])
         ->name('user.jobbox.index');
 
+    // JobBox: mark an assignment as completed (accessible by any authenticated user for their own assignments)
+    Route::post('/jobbox/assignments/{assignment}/complete', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'completeAssignment'])
+        ->name('jobbox.assignments.complete');
+
     // MyJobBox: user-scoped JobBox page (personal messages/assignments)
     Route::get('/myjobbox', [\App\Http\Controllers\User\MyProjectJobController::class, 'index'])->name('user.myjobbox.index');
+    Route::post('/myjobbox/assignments/{assignment}/complete', [\App\Http\Controllers\User\MyProjectJobController::class, 'completeAssignment'])->name('myjobbox.assignments.complete');
     Route::get('/myjobbox/{assignment}', [\App\Http\Controllers\User\MyProjectJobController::class, 'showAssignment'])->name('user.myjobbox.show');
 
     // チーム切り替え
@@ -268,9 +273,17 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('/ai-presets', [\App\Http\Controllers\Admin\AiPresetsController::class, 'store'])->name('ai.presets.store');
         Route::put('/ai-presets/{ai_preset}', [\App\Http\Controllers\Admin\AiPresetsController::class, 'update'])->name('ai.presets.update');
         Route::delete('/ai-presets/{ai_preset}', [\App\Http\Controllers\Admin\AiPresetsController::class, 'destroy'])->name('ai.presets.destroy');
+        // 勤務形態設定
+        Route::get('worktypes', [App\Http\Controllers\Admin\WorktypeController::class, 'index'])->name('worktypes.index');
+        Route::get('worktypes/edit', [App\Http\Controllers\Admin\WorktypeController::class, 'edit'])->name('worktypes.edit');
+        Route::post('worktypes/update', [App\Http\Controllers\Admin\WorktypeController::class, 'update'])->name('worktypes.update');
+        // 勤務時間管理
+        Route::get('work-records', [App\Http\Controllers\WorkRecordController::class, 'index'])->name('work_records.index');
+
         // Admin: Workload Analyzer (company-wide)
         Route::get('workload-analyzer', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'index'])->name('workload_analyzer.index');
-        // Register settings routes before the parameterized {user} route so 'settings' is not captured as {user}
+        // Register static routes before the parameterized {user} route
+        Route::get('workload-analyzer/category-rank', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'index'])->name('workload_analyzer.category_rank');
         Route::get('workload-analyzer/settings', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'settings'])->name('workload_analyzer.settings');
         Route::post('workload-analyzer/settings', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'saveSettings'])->name('workload_analyzer.settings.save');
         Route::get('workload-analyzer/{user}', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'show'])->name('workload_analyzer.show');
@@ -315,6 +328,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::delete('/ai-presets/{ai_preset}', [\App\Http\Controllers\SuperAdmin\AiPresetsController::class, 'destroy'])->name('ai.presets.destroy');
         // SuperAdmin: Workload Analyzer (global)
         Route::get('workload-analyzer', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'index'])->name('workload_analyzer.index');
+        Route::get('workload-analyzer/category-rank', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'index'])->name('workload_analyzer.category_rank');
     });
 
 
@@ -340,10 +354,13 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('diaryinteractions/mark-read-all', [App\Http\Controllers\Diaries\DiaryInteractionController::class, 'markReadAll'])->name('diaryinteractions.mark_read_all');
         // Leader: Workload Analyzer (show company/department/team members and analysis placeholders)
         Route::get('workload-analyzer', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'index'])->name('workload_analyzer.index');
-        // ensure static 'settings' route is registered before the parameterized {user} route
+        // ensure static routes are registered before the parameterized {user} route
+        Route::get('workload-analyzer/category-rank', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'index'])->name('workload_analyzer.category_rank');
         Route::get('workload-analyzer/settings', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'settings'])->name('workload_analyzer.settings');
         Route::post('workload-analyzer/settings', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'saveSettings'])->name('workload_analyzer.settings.save');
         Route::get('workload-analyzer/{user}', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'show'])->name('workload_analyzer.show');
+        // 勤務時間管理
+        Route::get('work-records', [App\Http\Controllers\WorkRecordController::class, 'index'])->name('work_records.index');
     });
 
 // クライアント管理（Admin用）は上の admin グループに統合済み（重複削除）

@@ -22,15 +22,47 @@ const simpleToolbar = [
 ];
 
 const props = defineProps({
-    date: String,
+    date:      { type: String, default: '' },
+    worktypes: { type: Array,  default: () => [] },
 });
+
+function parseTime(t) {
+    const parts = (t || '00:00').substring(0, 5).split(':');
+    return { hour: parts[0] || '00', minute: parts[1] || '00' };
+}
+
+// 先頭の worktype をデフォルトにする
+const firstWt  = props.worktypes[0] ?? null;
+const defStart = parseTime(firstWt?.start_time ?? '08:00');
+const defEnd   = parseTime(firstWt?.end_time   ?? '17:00');
 
 const content = ref('');
 const form = useForm({
-    date: props.date,
+    date:         props.date,
+    work_style:   firstWt?.name ?? '',
+    start_hour:   defStart.hour,
+    start_minute: defStart.minute,
+    end_hour:     defEnd.hour,
+    end_minute:   defEnd.minute,
+    start_time:   `${defStart.hour}:${defStart.minute}`,
+    end_time:     `${defEnd.hour}:${defEnd.minute}`,
     content,
     files: [],
 });
+
+const hours   = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
+const minutes = ['00', '15', '30', '45'];
+
+function onWorktypeChange() {
+    const wt = props.worktypes.find((w) => w.name === form.work_style);
+    if (!wt) return;
+    const s = parseTime(wt.start_time);
+    const e = parseTime(wt.end_time);
+    form.start_hour   = s.hour;
+    form.start_minute = s.minute;
+    form.end_hour     = e.hour;
+    form.end_minute   = e.minute;
+}
 
 // UI state for tabs
 // (tabs removed for Diaries.Create — moved to Events/Create)
@@ -270,6 +302,8 @@ const submit = () => {
     if (html === '' || html === '<p><br></p>' || html === '<p></p>') {
         form.content = '';
     }
+    form.start_time = `${form.start_hour}:${form.start_minute}`;
+    form.end_time = `${form.end_hour}:${form.end_minute}`;
     form.post(route('diaries.store'), {
         forceFormData: true,
         onStart: () => {
@@ -323,7 +357,7 @@ function stripHtml(html) {
 <template>
     <AppLayout title="日報作成">
         <div class="rounded bg-white p-6 shadow">
-            <h1 class="mb-4 text-2xl font-bold">日報作成 ({{ props.date }})</h1>
+            <h1 class="mb-4 text-2xl font-bold">日報作成 ({{ form.date }})</h1>
 
             <!-- single event form (tabs removed) -->
             <div>
@@ -331,9 +365,39 @@ function stripHtml(html) {
                     <div v-if="Object.keys(form.errors).length" class="mb-4 text-red-600">
                         <ul></ul>
                     </div>
-                    <div class="mb-4">
-                        <label class="mb-1 block text-sm font-medium text-gray-700">日付</label>
-                        <input type="date" v-model="form.date" class="w-full rounded border p-2" />
+                    <div class="mb-4 flex flex-wrap gap-4">
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-gray-700">日付</label>
+                            <input type="date" v-model="form.date" class="rounded border p-2 text-sm" />
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-gray-700">勤務形態</label>
+                            <select v-model="form.work_style" class="rounded border p-2 text-sm" @change="onWorktypeChange">
+                                <option v-for="wt in worktypes" :key="wt.id" :value="wt.name">{{ wt.name }}</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-gray-700">始業時間</label>
+                            <div class="flex items-center gap-1">
+                                <select v-model="form.start_hour" class="w-16 rounded border p-2 text-sm">
+                                    <option v-for="h in hours" :key="h" :value="h">{{ parseInt(h) }}時</option>
+                                </select>
+                                <select v-model="form.start_minute" class="w-16 rounded border p-2 text-sm">
+                                    <option v-for="m in minutes" :key="m" :value="m">{{ m }}分</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-gray-700">終業時間</label>
+                            <div class="flex items-center gap-1">
+                                <select v-model="form.end_hour" class="w-16 rounded border p-2 text-sm">
+                                    <option v-for="h in hours" :key="h" :value="h">{{ parseInt(h) }}時</option>
+                                </select>
+                                <select v-model="form.end_minute" class="w-16 rounded border p-2 text-sm">
+                                    <option v-for="m in minutes" :key="m" :value="m">{{ m }}分</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
                     <div class="mb-4">
                         <label class="mb-1 block text-sm font-medium text-gray-700">内容</label>

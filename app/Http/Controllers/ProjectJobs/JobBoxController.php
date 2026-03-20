@@ -118,7 +118,7 @@ class JobBoxController extends Controller
             'message.fromUser',
             'projectJobAssignment.user',
         ])
-            ->paginate(20)
+            ->paginate($usePeriodFilter ? 500 : 50)
             ->appends(array_filter(['q' => $q, 'period' => $periodModel, 'sort' => $sort, 'dir' => $dir]));
         // Attach canonical `status` object to each loaded assignment for frontend convenience
         try {
@@ -249,7 +249,7 @@ class JobBoxController extends Controller
 
         // Ensure statusModel is loaded for each linked assignment
         $messages = $base->with(['sender', 'message.recipients.user', 'message.fromUser', 'projectJobAssignment.projectJob.client', 'projectJobAssignment.statusModel', 'projectJobAssignment.user'])
-            ->paginate(20)
+            ->paginate($usePeriodFilter ? 500 : 50)
             ->appends(array_filter(['q' => $q, 'period' => $periodModel, 'sort' => $sort, 'dir' => $dir]));
 
         $monthValues = JobAssignmentMessage::join('project_job_assignments', 'job_assignment_messages.project_job_assignment_id', '=', 'project_job_assignments.id')
@@ -354,7 +354,7 @@ class JobBoxController extends Controller
         }
 
         $messages = $base->with(['sender', 'message.recipients.user', 'message.fromUser', 'projectJobAssignment.projectJob.client', 'projectJobAssignment.statusModel', 'projectJobAssignment.user'])
-            ->paginate(20)
+            ->paginate($usePeriodFilter ? 500 : 50)
             ->appends(array_filter(['q' => $q, 'period' => $periodModel, 'sort' => $sort, 'dir' => $dir]));
 
         $monthValues = JobAssignmentMessage::join('project_job_assignments', 'job_assignment_messages.project_job_assignment_id', '=', 'project_job_assignments.id')
@@ -848,6 +848,41 @@ class JobBoxController extends Controller
      * with a JobAssignmentMessage for traceability, then broadcast a job
      * specific event so coordinators receive the notification.
      */
+    /**
+     * Mark a ProjectJobAssignment as completed (status = completed, completed = true).
+     * Accessible by the assignee or privileged roles.
+     */
+    public function completeAssignment(Request $request, ProjectJobAssignment $assignment)
+    {
+        $user = $request->user();
+        $isPrivileged = $user && (method_exists($user, 'isCoordinator') && ($user->isCoordinator() || $user->isLeader() || $user->isAdmin() || $user->isSuperAdmin()));
+
+        if (!$isPrivileged && (!$user || $assignment->user_id !== $user->id)) {
+            return response()->json(['error' => 'Access denied'], 403);
+        }
+
+        try {
+            $assignment->completed = true;
+        } catch (\Throwable $__e) {}
+
+        // Set status to 'completed'
+        try {
+            if (Schema::hasTable('statuses') && Schema::hasColumn('project_job_assignments', 'status_id')) {
+                $status = DB::table('statuses')->where('key', 'completed')->orWhere('slug', 'completed')->first();
+                if (!$status) {
+                    $statusId = DB::table('statuses')->insertGetId(['key' => 'completed', 'slug' => 'completed', 'name' => '完了', 'created_at' => now(), 'updated_at' => now()]);
+                } else {
+                    $statusId = $status->id;
+                }
+                $assignment->status_id = $statusId;
+            }
+        } catch (\Throwable $__e) {}
+
+        $assignment->save();
+
+        return response()->json(['success' => true, 'assignment_id' => $assignment->id]);
+    }
+
     public function reply(ProjectJob $projectJob, Request $request)
     {
         $data = $request->validate([

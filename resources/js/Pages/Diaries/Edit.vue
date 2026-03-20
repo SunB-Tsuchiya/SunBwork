@@ -20,9 +20,32 @@ const simpleToolbar = [
     ['clean'],
 ];
 
-const props = defineProps({ diary: Object });
+const props = defineProps({
+    diary:      { type: Object, required: true },
+    worktypes:  { type: Array,  default: () => [] },
+    workRecord: { type: Object, default: null },
+});
 const content = ref('');
 let editorInstance = null;
+
+const hours   = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
+const minutes = ['00', '15', '30', '45'];
+
+function parseHourMinute(timeStr, defaultHour) {
+    if (!timeStr) return { hour: defaultHour, minute: '00' };
+    const parts = String(timeStr).split(':');
+    return { hour: parts[0]?.padStart(2, '0') || defaultHour, minute: parts[1]?.padStart(2, '0') || '00' };
+}
+
+// 初期値: work_record があればそこから、なければ先頭 worktype のデフォルトを使う
+const firstWt   = props.worktypes[0] ?? null;
+const initStart = props.workRecord?.start_time || firstWt?.start_time || '08:00';
+const initEnd   = props.workRecord?.end_time   || firstWt?.end_time   || '17:00';
+const initWtId  = props.workRecord?.worktype_id ?? firstWt?.id ?? null;
+const initWt    = props.worktypes.find((w) => w.id === initWtId) ?? firstWt;
+
+const st = parseHourMinute(initStart, '08');
+const et = parseHourMinute(initEnd,   '17');
 
 onMounted(() => {
     // mounted
@@ -87,9 +110,28 @@ const { showToast } = useToasts();
 const isSubmitting = ref(false);
 
 const form = useForm({
-    content: content.value,
-    files: [],
+    date:         props.diary.date,
+    work_style:   initWt?.name ?? '',
+    start_hour:   st.hour,
+    start_minute: st.minute,
+    end_hour:     et.hour,
+    end_minute:   et.minute,
+    start_time:   `${st.hour}:${st.minute}`,
+    end_time:     `${et.hour}:${et.minute}`,
+    content:      content.value,
+    files:        [],
 });
+
+function onWorktypeChange() {
+    const wt = props.worktypes.find((w) => w.name === form.work_style);
+    if (!wt) return;
+    const s = parseHourMinute(wt.start_time, '08');
+    const e = parseHourMinute(wt.end_time,   '17');
+    form.start_hour   = s.hour;
+    form.start_minute = s.minute;
+    form.end_hour     = e.hour;
+    form.end_minute   = e.minute;
+}
 
 // Upload config and helpers (copied/adapted from Create.vue)
 const MAX_UPLOAD_SIZE = 5 * 1024 * 1024; // 5MB
@@ -251,9 +293,11 @@ const submit = () => {
         const url = route('diaries.update', props.diary.id);
         const fd = new FormData();
         fd.append('_method', 'PUT');
-        // include main fields expected by quick-path: content and date
         fd.append('content', form.content || '');
         if (form.date) fd.append('date', form.date);
+        fd.append('work_style', form.work_style || '');
+        fd.append('start_time', `${form.start_hour}:${form.start_minute}`);
+        fd.append('end_time',   `${form.end_hour}:${form.end_minute}`);
         // If there are actual File objects to send (unlikely here because files are uploaded immediately), append them
         try {
             // if form.rawFiles exists (not used by default), append
@@ -298,6 +342,8 @@ const submit = () => {
             });
     } else {
         // no files: use normal Inertia form.put to preserve Inertia behaviour
+        form.start_time = `${form.start_hour}:${form.start_minute}`;
+        form.end_time   = `${form.end_hour}:${form.end_minute}`;
         form.put(route('diaries.update', props.diary.id), {
             forceFormData: false,
             onStart: () => {
@@ -372,8 +418,42 @@ const back = () => {
 <template>
     <AppLayout title="日報編集">
         <div class="rounded bg-white p-6 shadow">
-            <h1 class="mb-4 text-2xl font-bold">日報編集 ({{ props.diary.date }})</h1>
+            <h1 class="mb-4 text-2xl font-bold">日報編集</h1>
             <form @submit.prevent="submit">
+                <div class="mb-4 flex flex-wrap gap-4">
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">日付</label>
+                        <input type="date" v-model="form.date" class="rounded border p-2 text-sm" />
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">勤務形態</label>
+                        <select v-model="form.work_style" class="rounded border p-2 text-sm" @change="onWorktypeChange">
+                            <option v-for="wt in worktypes" :key="wt.id" :value="wt.name">{{ wt.name }}</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">始業時間</label>
+                        <div class="flex items-center gap-1">
+                            <select v-model="form.start_hour" class="w-16 rounded border p-2 text-sm">
+                                <option v-for="h in hours" :key="h" :value="h">{{ parseInt(h) }}時</option>
+                            </select>
+                            <select v-model="form.start_minute" class="w-16 rounded border p-2 text-sm">
+                                <option v-for="m in minutes" :key="m" :value="m">{{ m }}分</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">終業時間</label>
+                        <div class="flex items-center gap-1">
+                            <select v-model="form.end_hour" class="w-16 rounded border p-2 text-sm">
+                                <option v-for="h in hours" :key="h" :value="h">{{ parseInt(h) }}時</option>
+                            </select>
+                            <select v-model="form.end_minute" class="w-16 rounded border p-2 text-sm">
+                                <option v-for="m in minutes" :key="m" :value="m">{{ m }}分</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
                 <div class="mb-4">
                     <label class="mb-1 block text-sm font-medium text-gray-700">内容</label>
                     <QuillEditor

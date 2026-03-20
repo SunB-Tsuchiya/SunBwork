@@ -10,6 +10,9 @@ const members = page.props.members || [];
 const assignments = page.props.assignments || [];
 const userClients = page.props.userClients || [];
 const userProjects = page.props.userProjects || [];
+const otherClientId = page.props.other_client_id ?? null;
+const otherProjectId = page.props.other_project_id ?? null;
+const inProgressStatusId = page.props.in_progress_status_id ?? null;
 const defaultUserId = page.props.auth && page.props.auth.user ? page.props.auth.user.id : null;
 const prefillEvent = ref(page.props.prefillEvent || null);
 </script>
@@ -30,6 +33,9 @@ const prefillEvent = ref(page.props.prefillEvent || null);
                     :defaultUserId="defaultUserId"
                     :user-clients="userClients"
                     :user-projects="userProjects"
+                    :other-client-id="otherClientId"
+                    :other-project-id="otherProjectId"
+                    :default-status-id="inProgressStatusId"
                 />
             </div>
         </div>

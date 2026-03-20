@@ -158,6 +158,15 @@ for (let i = 0; i < 12; i++) {
     months.push({ value: `${y}-${m}`, label: `${y}年${m}月` });
 }
 
+function goToCategoryRank() {
+    const ym = selectedYm.value || currentMonth;
+    try {
+        Inertia.get(route(`${routeNamePrefix}.workload_analyzer.category_rank`, { ym }));
+        return;
+    } catch (e) {}
+    window.location.href = `${rolePrefix}/workload-analyzer/category-rank?ym=${ym}`;
+}
+
 function changeYm() {
     const ym = selectedYm.value || currentMonth;
     try {
@@ -182,7 +191,7 @@ function flattenCompanyRows(company) {
             const key = `u:${m.id}`;
             if (seen.has(key)) return;
             seen.add(key);
-            rows.push({ id: m.id, name: m.name, department: d.name, team: null, aggregates: m.aggregates || {} });
+            rows.push({ id: m.id, name: m.name, department: d.name, assignment_name: m.assignment_name || '', aggregates: m.aggregates || {} });
         });
 
         // team-level members
@@ -191,7 +200,7 @@ function flattenCompanyRows(company) {
                 const key = `u:${m.id}`;
                 if (seen.has(key)) return;
                 seen.add(key);
-                rows.push({ id: m.id, name: m.name, department: d.name, team: t.name, aggregates: m.aggregates || {} });
+                rows.push({ id: m.id, name: m.name, department: d.name, assignment_name: m.assignment_name || '', aggregates: m.aggregates || {} });
             });
         });
     });
@@ -207,7 +216,7 @@ function flattenDepartmentRows(dept) {
         const key = `u:${m.id}`;
         if (seen.has(key)) return;
         seen.add(key);
-        rows.push({ id: m.id, name: m.name, team: null, aggregates: m.aggregates || {} });
+        rows.push({ id: m.id, name: m.name, assignment_name: m.assignment_name || '', aggregates: m.aggregates || {} });
     });
     // team members
     (dept.teams || []).forEach((t) => {
@@ -215,7 +224,7 @@ function flattenDepartmentRows(dept) {
             const key = `u:${m.id}`;
             if (seen.has(key)) return;
             seen.add(key);
-            rows.push({ id: m.id, name: m.name, team: t.name, aggregates: m.aggregates || {} });
+            rows.push({ id: m.id, name: m.name, assignment_name: m.assignment_name || '', aggregates: m.aggregates || {} });
         });
     });
     return rows;
@@ -246,6 +255,53 @@ function formatHour(h) {
     const n = Number(h) || 0;
     // show with one decimal if needed
     return Number.isInteger(n) ? String(n) : String(Math.round(n * 10) / 10);
+}
+
+// 表示モード: 'total' = 部署全体, 'by_role' = 役割ごと
+const viewMode = ref('total');
+
+// 役割ごとにグループ化し、グループ内でランク付け
+function getDeptRowsByRole(dept) {
+    const rows = getDeptRows(dept); // 既存のソート済みリスト
+    const groups = {};
+    const order = [];
+    for (const row of rows) {
+        const key = row.assignment_name || '—';
+        if (!groups[key]) {
+            groups[key] = [];
+            order.push(key);
+        }
+        groups[key].push(row);
+    }
+    return order.map((key) => {
+        const members = groups[key];
+        // グループ内でランク付け (deviation降順)
+        const ranked = [...members].sort((a, b) => {
+            const da = a.deviation === null || typeof a.deviation === 'undefined' ? -Infinity : a.deviation;
+            const db = b.deviation === null || typeof b.deviation === 'undefined' ? -Infinity : b.deviation;
+            if (db !== da) return db - da;
+            return (b.overall || 0) - (a.overall || 0);
+        });
+        const rankMap = new Map();
+        let currentRank = 0;
+        let prevDev = null;
+        for (const it of ranked) {
+            if (prevDev === null || it.deviation !== prevDev) {
+                currentRank += 1;
+                prevDev = it.deviation;
+            }
+            rankMap.set(it.id, currentRank);
+        }
+        const sorted = sortRowsGeneric(members.map((r) => ({ ...r, rank: rankMap.get(r.id) || 0 })));
+        return { label: key, rows: sorted };
+    });
+}
+
+function formatOvertimeMinutes(min) {
+    if (!min) return '—';
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    return h > 0 ? `${h}h${m > 0 ? m + 'm' : ''}` : `${m}m`;
 }
 
 function diffMinutes(estimated, actual) {
@@ -297,7 +353,18 @@ function diffMinutes(estimated, actual) {
         <Head title="作業量分析" />
 
         <div class="rounded bg-white p-6 shadow">
-            <p class="text-sm text-gray-500">自分の会社・部署・チームのメンバーごとの簡易分析ビュー（プレースホルダ）</p>
+            <h1 class="mb-4 text-xl font-semibold text-gray-800">総合ランキング</h1>
+
+            <!-- ランキング種別トグル -->
+            <div class="mb-4 flex gap-2">
+                <button
+                    class="rounded px-4 py-1.5 text-sm font-medium transition-colors bg-blue-600 text-white"
+                >総合ランク</button>
+                <button
+                    @click="goToCategoryRank"
+                    class="rounded px-4 py-1.5 text-sm font-medium transition-colors bg-gray-100 text-gray-600 hover:bg-gray-200"
+                >カテゴリ別ランク</button>
+            </div>
 
             <div class="mb-4 mt-4 flex items-center justify-between">
                 <div>
@@ -320,7 +387,23 @@ function diffMinutes(estimated, actual) {
                     <template v-if="(company.departments || []).length">
                         <div class="space-y-4">
                             <div v-for="dept in company.departments" :key="`dept-${dept.id}`">
-                                <h3 class="text-sm font-medium text-gray-700">部署: {{ dept.name }}</h3>
+                                <div class="flex items-center gap-2">
+                                    <h3 class="text-sm font-medium text-gray-700">部署: {{ dept.name }}</h3>
+                                    <button
+                                        @click="viewMode = 'total'"
+                                        :class="viewMode === 'total' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                                        class="rounded px-2 py-0.5 text-xs font-medium transition-colors"
+                                    >
+                                        総合
+                                    </button>
+                                    <button
+                                        @click="viewMode = 'by_role'"
+                                        :class="viewMode === 'by_role' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                                        class="rounded px-2 py-0.5 text-xs font-medium transition-colors"
+                                    >
+                                        役割ごと
+                                    </button>
+                                </div>
                                 <div class="mt-2 overflow-hidden bg-white shadow sm:rounded-lg">
                                     <table class="w-full min-w-full table-fixed divide-y divide-gray-200">
                                         <thead>
@@ -349,7 +432,7 @@ function diffMinutes(estimated, actual) {
                                                     </svg>
                                                 </th>
                                                 <th
-                                                    style="width: 16%"
+                                                    style="width: 14%"
                                                     class="cursor-pointer px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
                                                     @click="toggleSort('name')"
                                                 >
@@ -357,15 +440,13 @@ function diffMinutes(estimated, actual) {
                                                     <span v-if="sortKey === 'name'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
                                                 </th>
                                                 <th
-                                                    style="width: 12%"
-                                                    class="cursor-pointer px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
-                                                    @click="toggleSort('team')"
+                                                    style="width: 10%"
+                                                    class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
                                                 >
-                                                    チーム
-                                                    <span v-if="sortKey === 'team'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
+                                                    役割
                                                 </th>
                                                 <th
-                                                    style="width: 14%"
+                                                    style="width: 12%"
                                                     class="cursor-pointer px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
                                                     @click="toggleSort('deviation')"
                                                 >
@@ -373,7 +454,7 @@ function diffMinutes(estimated, actual) {
                                                     <span v-if="sortKey === 'deviation'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
                                                 </th>
                                                 <th
-                                                    style="width: 14%"
+                                                    style="width: 13%"
                                                     class="cursor-pointer px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
                                                     @click="toggleSort('overall')"
                                                 >
@@ -381,7 +462,13 @@ function diffMinutes(estimated, actual) {
                                                     <span v-if="sortKey === 'overall'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
                                                 </th>
                                                 <th
-                                                    style="width: 44%"
+                                                    style="width: 17%"
+                                                    class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                                                >
+                                                    残業
+                                                </th>
+                                                <th
+                                                    style="width: 26%"
                                                     class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
                                                 >
                                                     内容
@@ -389,34 +476,111 @@ function diffMinutes(estimated, actual) {
                                             </tr>
                                         </thead>
                                         <tbody class="divide-y divide-gray-200 bg-white">
-                                            <template v-for="row in getDeptRows(dept)" :key="`m-${row.id}-${row.team || 'dept'}`">
-                                                <tr class="cursor-pointer transition-colors hover:bg-green-50" @click="onMemberRowClick(row)">
-                                                    <td style="width: 8%" class="px-6 py-4 text-sm font-medium text-gray-900">
-                                                        {{ row.rank }}
-                                                    </td>
-                                                    <td style="width: 16%" class="max-w-[160px] truncate px-6 py-4 text-sm font-medium text-gray-900">
-                                                        {{ row.name }}
-                                                    </td>
-                                                    <td style="width: 12%" class="max-w-[120px] truncate px-6 py-4 text-sm text-gray-500">
-                                                        {{ row.team || '' }}
-                                                    </td>
-                                                    <td style="width: 8%" class="px-6 py-4 text-sm text-gray-500">
-                                                        {{ row.deviation ?? '-' }}
-                                                    </td>
-                                                    <td style="width: 14%" class="px-6 py-4 text-sm text-gray-500">{{ row.overall }}</td>
-                                                    <td style="width: 44%" class="hidden px-6 py-4 text-sm text-gray-500 sm:table-cell">
-                                                        <div class="text-xs text-gray-600">
-                                                            <div>ステージ合計: {{ row.aggregates?.points?.stage ?? 0 }} ポイント</div>
-                                                            <div>サイズ合計: {{ row.aggregates?.points?.size ?? 0 }} ポイント</div>
-                                                            <div>種別合計: {{ row.aggregates?.points?.type ?? 0 }} ポイント</div>
-                                                            <div>難易度合計: {{ row.aggregates?.points?.difficulty ?? 0 }} ポイント</div>
-                                                        </div>
-                                                    </td>
+                                            <!-- 総合モード -->
+                                            <template v-if="viewMode === 'total'">
+                                                <template v-for="row in getDeptRows(dept)" :key="`m-${row.id}`">
+                                                    <tr class="cursor-pointer transition-colors hover:bg-green-50" @click="onMemberRowClick(row)">
+                                                        <td style="width: 8%" class="px-6 py-4 text-sm font-medium text-gray-900">{{ row.rank }}</td>
+                                                        <td
+                                                            style="width: 14%"
+                                                            class="max-w-[130px] truncate px-6 py-4 text-sm font-medium text-gray-900"
+                                                        >
+                                                            {{ row.name }}
+                                                        </td>
+                                                        <td style="width: 10%" class="px-6 py-4 text-xs text-gray-500">
+                                                            {{ row.assignment_name || '—' }}
+                                                        </td>
+                                                        <td style="width: 12%" class="px-6 py-4 text-sm text-gray-500">{{ row.deviation ?? '-' }}</td>
+                                                        <td style="width: 13%" class="px-6 py-4 text-sm text-gray-500">{{ row.overall }}</td>
+                                                        <td style="width: 17%" class="px-6 py-4 text-xs">
+                                                            <template v-if="row.aggregates?.overtime_minutes">
+                                                                <div class="text-red-600">
+                                                                    合計時間: {{ formatOvertimeMinutes(row.aggregates.overtime_minutes) }}
+                                                                </div>
+                                                                <div class="text-gray-600">
+                                                                    通常残業: {{ row.aggregates.overtime_days_normal ?? 0 }}日
+                                                                </div>
+                                                                <div class="text-gray-600">
+                                                                    超過残業: {{ row.aggregates.overtime_days_excess ?? 0 }}日
+                                                                </div>
+                                                            </template>
+                                                            <span v-else class="text-gray-400">—</span>
+                                                        </td>
+                                                        <td style="width: 26%" class="hidden px-6 py-4 text-sm text-gray-500 sm:table-cell">
+                                                            <div class="text-xs text-gray-600">
+                                                                <div>ステージ: {{ row.aggregates?.percentile_scores?.stage ?? 0 }}pt</div>
+                                                                <div>サイズ: {{ row.aggregates?.percentile_scores?.size ?? 0 }}pt</div>
+                                                                <div>種別: {{ row.aggregates?.percentile_scores?.type ?? 0 }}pt</div>
+                                                                <div>難易度: {{ row.aggregates?.percentile_scores?.difficulty ?? 0 }}pt</div>
+                                                                <div>イベント: {{ row.aggregates?.percentile_scores?.event ?? 0 }}pt</div>
+                                                                <div>残業: {{ row.aggregates?.percentile_scores?.overtime ?? 0 }}pt</div>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                </template>
+                                                <tr v-if="flattenDepartmentRows(dept).length === 0">
+                                                    <td colspan="7" class="px-6 py-4 text-sm text-gray-500">メンバーが見つかりません</td>
                                                 </tr>
                                             </template>
-                                            <tr v-if="flattenDepartmentRows(dept).length === 0">
-                                                <td colspan="6" class="px-6 py-4 text-sm text-gray-500">メンバーが見つかりません</td>
-                                            </tr>
+
+                                            <!-- 役割ごとモード -->
+                                            <template v-else>
+                                                <template v-for="group in getDeptRowsByRole(dept)" :key="`group-${group.label}`">
+                                                    <!-- グループヘッダー行 -->
+                                                    <tr class="bg-blue-50">
+                                                        <td colspan="7" class="px-4 py-1.5 text-xs font-semibold text-blue-700">
+                                                            {{ group.label }}
+                                                        </td>
+                                                    </tr>
+                                                    <!-- グループ内メンバー -->
+                                                    <tr
+                                                        v-for="row in group.rows"
+                                                        :key="`m-${row.id}`"
+                                                        class="cursor-pointer transition-colors hover:bg-green-50"
+                                                        @click="onMemberRowClick(row)"
+                                                    >
+                                                        <td style="width: 8%" class="px-6 py-4 text-sm font-medium text-gray-900">{{ row.rank }}</td>
+                                                        <td
+                                                            style="width: 14%"
+                                                            class="max-w-[130px] truncate px-6 py-4 text-sm font-medium text-gray-900"
+                                                        >
+                                                            {{ row.name }}
+                                                        </td>
+                                                        <td style="width: 10%" class="px-6 py-4 text-xs text-gray-500">
+                                                            {{ row.assignment_name || '—' }}
+                                                        </td>
+                                                        <td style="width: 12%" class="px-6 py-4 text-sm text-gray-500">{{ row.deviation ?? '-' }}</td>
+                                                        <td style="width: 13%" class="px-6 py-4 text-sm text-gray-500">{{ row.overall }}</td>
+                                                        <td style="width: 17%" class="px-6 py-4 text-xs">
+                                                            <template v-if="row.aggregates?.overtime_minutes">
+                                                                <div class="text-red-600">
+                                                                    合計時間: {{ formatOvertimeMinutes(row.aggregates.overtime_minutes) }}
+                                                                </div>
+                                                                <div class="text-gray-600">
+                                                                    通常残業: {{ row.aggregates.overtime_days_normal ?? 0 }}日
+                                                                </div>
+                                                                <div class="text-gray-600">
+                                                                    超過残業: {{ row.aggregates.overtime_days_excess ?? 0 }}日
+                                                                </div>
+                                                            </template>
+                                                            <span v-else class="text-gray-400">—</span>
+                                                        </td>
+                                                        <td style="width: 26%" class="hidden px-6 py-4 text-sm text-gray-500 sm:table-cell">
+                                                            <div class="text-xs text-gray-600">
+                                                                <div>ステージ: {{ row.aggregates?.percentile_scores?.stage ?? 0 }}pt</div>
+                                                                <div>サイズ: {{ row.aggregates?.percentile_scores?.size ?? 0 }}pt</div>
+                                                                <div>種別: {{ row.aggregates?.percentile_scores?.type ?? 0 }}pt</div>
+                                                                <div>難易度: {{ row.aggregates?.percentile_scores?.difficulty ?? 0 }}pt</div>
+                                                                <div>イベント: {{ row.aggregates?.percentile_scores?.event ?? 0 }}pt</div>
+                                                                <div>残業: {{ row.aggregates?.percentile_scores?.overtime ?? 0 }}pt</div>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                </template>
+                                                <tr v-if="flattenDepartmentRows(dept).length === 0">
+                                                    <td colspan="7" class="px-6 py-4 text-sm text-gray-500">メンバーが見つかりません</td>
+                                                </tr>
+                                            </template>
                                         </tbody>
                                     </table>
                                 </div>

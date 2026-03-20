@@ -3,7 +3,7 @@
         <div v-for="(block, idx) in assignments" :key="idx" class="mb-4 rounded border p-4">
             <label class="mb-1 block font-semibold">クライアント</label>
             <div class="w-full">
-                <select v-model="block._client_id" :disabled="!editMode" class="w-full rounded border px-3 py-2">
+                <select v-model="block._client_id" :disabled="!editMode" class="w-full rounded border px-3 py-2" @change="onClientChange(idx)">
                     <option value="">-- 選択 --</option>
                     <option v-for="c in userClients" :key="c.id" :value="String(c.id)">{{ c.name }}</option>
                 </select>
@@ -45,7 +45,7 @@
                     <select
                         v-else
                         v-model="block.work_item_type_id"
-                        :disabled="!hasDepartment(block) || !editMode"
+                        :disabled="!editMode"
                         @change="onInlineSelectionChange(idx)"
                         class="mt-1 w-full rounded border px-2 py-1 text-sm"
                     >
@@ -61,7 +61,7 @@
                     <select
                         v-else
                         v-model="block.size_id"
-                        :disabled="!hasDepartment(block) || !editMode"
+                        :disabled="!editMode"
                         @change="onInlineSelectionChange(idx)"
                         class="mt-1 w-full rounded border px-2 py-1 text-sm"
                     >
@@ -79,7 +79,7 @@
                     <select
                         v-else
                         v-model="block.stage_id"
-                        :disabled="!hasDepartment(block) || !editMode"
+                        :disabled="!editMode"
                         @change="onInlineSelectionChange(idx)"
                         class="mt-1 w-full rounded border px-2 py-1 text-sm"
                     >
@@ -89,15 +89,18 @@
                         </option>
                     </select>
                 </div>
-                <div v-if="!props.hideStatus">
-                    <label class="block text-sm font-medium">Status</label>
+                <div>
+                    <label class="block text-sm font-medium">
+                        Status
+                        <span v-if="!block.id && props.defaultStatusId" class="ml-1 text-xs font-normal text-gray-400">（新規固定）</span>
+                    </label>
                     <div v-if="!editMode" class="mt-1 w-full rounded border bg-gray-50 px-3 py-2 text-sm">
                         {{ itemName('statuses', block.status_id) }}
                     </div>
                     <select
                         v-else
                         v-model="block.status_id"
-                        :disabled="!editMode"
+                        :disabled="!editMode || (!block.id && props.defaultStatusId !== null && props.defaultStatusId !== undefined)"
                         @change="onInlineSelectionChange(idx)"
                         class="mt-1 w-full rounded border px-2 py-1 text-sm"
                     >
@@ -235,6 +238,8 @@ const props = defineProps({
     editMode: { type: Boolean, default: true },
     userClients: { type: Array, default: () => [] },
     userProjects: { type: Array, default: () => [] },
+    otherClientId: { type: [Number, String], default: null },
+    otherProjectId: { type: [Number, String], default: null },
     event: { type: Object, default: null },
     hideStatus: { type: Boolean, default: false },
     defaultStatusId: { type: [Number, String], default: null },
@@ -433,7 +438,14 @@ assignments.value.forEach((a) => {
     if (a.work_item_type_id === undefined) a.work_item_type_id = a.work_item_type_id || null;
     if (a.size_id === undefined) a.size_id = a.size_id || null;
     if (a.stage_id === undefined) a.stage_id = a.stage_id || null;
-    if (a.status_id === undefined) a.status_id = a.status_id || null;
+    if (a.status_id === undefined || a.status_id === null) {
+        // 新規割当（idなし）で defaultStatusId が指定されている場合は進行中などの初期値をセット
+        if (!a.id && props.defaultStatusId !== null && props.defaultStatusId !== undefined) {
+            a.status_id = String(props.defaultStatusId);
+        } else {
+            a.status_id = a.status_id || null;
+        }
+    }
     if (a.difficulty === undefined) a.difficulty = a.difficulty || 'normal';
     if (a.difficulty_id === undefined || a.difficulty_id === null) {
         try {
@@ -704,6 +716,10 @@ function onAmountDigitsChange(idx) {
 
 function projectsForBlock(block) {
     if (!block || !block._client_id) return props.userProjects || [];
+    // 「その他」クライアントが選ばれた場合は「その他」プロジェクトのみ
+    if (props.otherClientId !== null && String(block._client_id) === String(props.otherClientId)) {
+        return (props.userProjects || []).filter((p) => props.otherProjectId !== null && String(p.id) === String(props.otherProjectId));
+    }
     return (props.userProjects || []).filter((p) => String(p.client_id) === String(block._client_id));
 }
 
@@ -717,6 +733,18 @@ function projectName(block) {
         }
     } catch (e) {}
     return '-';
+}
+
+function onClientChange(idx) {
+    const b = assignments.value[idx];
+    if (!b) return;
+    if (props.otherClientId !== null && String(b._client_id) === String(props.otherClientId)) {
+        // 「その他」クライアントを選択 → プロジェクトも「その他」に固定
+        b.project_job_id = props.otherProjectId !== null ? String(props.otherProjectId) : '';
+    } else {
+        // 他のクライアントに変更 → プロジェクトをリセット
+        b.project_job_id = '';
+    }
 }
 
 function addBlock() {

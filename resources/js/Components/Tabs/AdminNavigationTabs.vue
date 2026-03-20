@@ -52,6 +52,18 @@ const tab = (key) => [
             >
                 作業量分析
             </Link>
+            <Link
+                :href="route('admin.worktypes.index')"
+                :class="tab('worktypes')"
+            >
+                勤務形態設定
+            </Link>
+            <Link
+                :href="route('admin.work_records.index')"
+                :class="tab('work_records')"
+            >
+                勤務時間管理
+            </Link>
         </nav>
     </div>
 </template>

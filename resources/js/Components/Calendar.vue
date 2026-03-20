@@ -4,7 +4,7 @@
             <button @click="openEventModal" class="rounded bg-blue-600 px-4 py-2 text-white">予定作成</button>
             <button @click="goToJobCreate" class="rounded bg-indigo-600 px-4 py-2 text-white">ジョブ作成</button>
             <button @click="goToDiaryCreate" class="rounded bg-orange-500 px-4 py-2 text-white">{{ props.diaryLabel }}作成</button>
-            <button @click="goToAssignedJobs" class="rounded bg-green-600 px-4 py-2 text-white">依頼一覧</button>
+            <!-- <button @click="goToAssignedJobs" class="rounded bg-green-600 px-4 py-2 text-white">依頼一覧</button> -->
         </div>
         <FullCalendar ref="fullCalendarRef" :options="calendarOptions" :events="events" />
         <!-- 予定作成モーダル -->
@@ -130,9 +130,11 @@ const form = ref({
     date: '',
 });
 
-// clicked time when user clicks a time slot (used by select modal to prefill create)
+// clicked/dragged time range (used by select modal to prefill create)
 const clickedStartHour = ref(null);
 const clickedStartMinute = ref(null);
+const clickedEndHour = ref(null);
+const clickedEndMinute = ref(null);
 
 // カレンダーで選択中の日付（初期値は今日）
 const today = new Date();
@@ -195,11 +197,15 @@ function buildDateTimeParams() {
     if (clickedStartHour.value !== null && clickedStartMinute.value !== null) {
         const hh = String(clickedStartHour.value).padStart(2, '0');
         const mm = String(clickedStartMinute.value).padStart(2, '0');
-        const nextHour = String((Number(hh) + 1) % 24).padStart(2, '0');
         params.startHour = hh;
         params.startMinute = mm;
-        params.endHour = nextHour;
-        params.endMinute = mm;
+        if (clickedEndHour.value !== null && clickedEndMinute.value !== null) {
+            params.endHour = String(clickedEndHour.value).padStart(2, '0');
+            params.endMinute = String(clickedEndMinute.value).padStart(2, '0');
+        } else {
+            params.endHour = String((Number(hh) + 1) % 24).padStart(2, '0');
+            params.endMinute = mm;
+        }
     }
     return params;
 }
@@ -227,6 +233,8 @@ function openEventModalFromSelect() {
     showSelectModal.value = false;
     clickedStartHour.value = null;
     clickedStartMinute.value = null;
+    clickedEndHour.value = null;
+    clickedEndMinute.value = null;
 }
 
 function goToDiaryCreateFromSelect() {
@@ -273,9 +281,33 @@ function handleDateSelect(selectionInfo) {
     // カレンダーで日付選択時に選択日を保持
     const dateStr = selectionInfo.startStr.split('T')[0];
     selectedDate.value = dateStr;
-    // reset schedule id when selecting a bare date - calendar can receive schedule context via props/events
     selectedScheduleId.value = null;
-    // 予定・日報作成選択モーダルを表示
+
+    // ドラッグで時間範囲が選択されたとき start/end を抽出
+    try {
+        const startObj = selectionInfo.start;
+        const endObj = selectionInfo.end;
+        if (startObj && (startObj.getHours() !== 0 || selectionInfo.startStr.includes('T'))) {
+            clickedStartHour.value = startObj.getHours();
+            clickedStartMinute.value = startObj.getMinutes() < 30 ? 0 : 30;
+        } else {
+            clickedStartHour.value = null;
+            clickedStartMinute.value = null;
+        }
+        if (endObj && (endObj.getHours() !== 0 || selectionInfo.endStr.includes('T'))) {
+            clickedEndHour.value = endObj.getHours();
+            clickedEndMinute.value = endObj.getMinutes() < 30 ? 0 : 30;
+        } else {
+            clickedEndHour.value = null;
+            clickedEndMinute.value = null;
+        }
+    } catch (e) {
+        clickedStartHour.value = null;
+        clickedStartMinute.value = null;
+        clickedEndHour.value = null;
+        clickedEndMinute.value = null;
+    }
+
     showSelectModal.value = true;
 }
 

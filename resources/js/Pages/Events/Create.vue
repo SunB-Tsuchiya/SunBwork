@@ -4,7 +4,14 @@ import { Link, useForm } from '@inertiajs/vue3';
 import { getCurrentInstance, nextTick, onMounted, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
 
-const props = defineProps({ date: { type: String, default: '' } });
+const props = defineProps({
+    date:           { type: String, default: '' },
+    startHour:      { type: String, default: null },
+    startMinute:    { type: String, default: null },
+    endHour:        { type: String, default: null },
+    endMinute:      { type: String, default: null },
+    eventItemTypes: { type: Array,  default: () => [] },
+});
 
 function formatJstDate(dateStr) {
     if (!dateStr) return '';
@@ -20,20 +27,16 @@ function formatJstDate(dateStr) {
     }
 }
 
-const defaultStartHour = '09';
-const defaultStartMinute = '00';
-const defaultEndHour = '10';
-const defaultEndMinute = '00';
-
 const form = useForm({
-    date: props.date || '',
-    title: '',
-    description: '',
-    startHour: defaultStartHour,
-    startMinute: defaultStartMinute,
-    endHour: defaultEndHour,
-    endMinute: defaultEndMinute,
-    files: [],
+    date:                props.date || '',
+    event_item_type_id:  props.eventItemTypes[0]?.id ?? null,
+    title:               '',
+    description:         '',
+    startHour:           props.startHour   ?? '09',
+    startMinute:         props.startMinute ?? '00',
+    endHour:             props.endHour     ?? '10',
+    endMinute:           props.endMinute   ?? '00',
+    files:               [],
 });
 
 let returnTo = '';
@@ -170,6 +173,14 @@ watch(
             <form @submit.prevent="submit">
                 <div v-if="errorMessage" class="mb-4 rounded border-l-4 border-red-500 bg-red-50 p-3 text-red-700">
                     {{ errorMessage }}
+                </div>
+
+                <div class="mb-4">
+                    <label class="mb-1 block text-sm font-medium text-gray-700">種類</label>
+                    <select v-model="form.event_item_type_id" class="w-full rounded border p-2">
+                        <option :value="null">— 未選択 —</option>
+                        <option v-for="t in eventItemTypes" :key="t.id" :value="t.id">{{ t.name }}</option>
+                    </select>
                 </div>
 
                 <div class="mb-4">
