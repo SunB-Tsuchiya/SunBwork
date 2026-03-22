@@ -35,6 +35,30 @@ import { route } from 'ziggy-js';
 
 const props = defineProps({
     diary: Object,
+    workRecord: { type: Object, default: null },
+});
+
+// 残業を「○時間○分」形式に変換
+const overtimeLabel = computed(() => {
+    const min = props.workRecord?.overtime_minutes ?? 0;
+    if (!min) return null;
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    return h > 0 ? `${h}時間${m > 0 ? m + '分' : ''}` : `${m}分`;
+});
+
+// タイムライン範囲を勤務記録から決定
+const timelineStartHour = computed(() => {
+    const t = props.workRecord?.start_time;
+    if (!t) return 8;
+    return Math.max(0, Math.floor(parseInt(t.split(':')[0], 10)) - 1);
+});
+const timelineEndHour = computed(() => {
+    const t = props.workRecord?.end_time;
+    if (!t) return 20;
+    const h = parseInt(t.split(':')[0], 10);
+    const m = parseInt(t.split(':')[1] ?? '0', 10);
+    return Math.min(24, h + (m > 0 ? 2 : 1));
 });
 
 const editHref = computed(() => {
@@ -1111,55 +1135,76 @@ onUnmounted(() => {
         </template>
 
         <div class="rounded bg-white p-6 shadow">
-                    <h1 class="mb-4 text-2xl font-bold">日報 {{ formatJstDate(props.diary.date) }}</h1>
-                    <div class="prose mb-6">
+            <h1 class="mb-3 text-2xl font-bold">日報 {{ formatJstDate(props.diary.date) }}</h1>
+
+            <!-- 勤務情報バー -->
+            <div v-if="workRecord" class="mb-4 flex flex-wrap items-center gap-x-5 gap-y-1 rounded border border-gray-200 bg-gray-50 px-4 py-2 text-sm">
+                <span v-if="workRecord.work_style" class="font-medium text-gray-700">{{ workRecord.work_style }}</span>
+                <span v-if="workRecord.start_time" class="text-gray-600">
+                    開始 <span class="font-semibold text-gray-800">{{ workRecord.start_time }}</span>
+                </span>
+                <span v-if="workRecord.end_time" class="text-gray-600">
+                    終了 <span class="font-semibold text-gray-800">{{ workRecord.end_time }}</span>
+                </span>
+                <span v-if="overtimeLabel" class="text-gray-600">
+                    残業 <span class="font-semibold text-gray-800">{{ overtimeLabel }}</span>
+                </span>
+                <span v-if="!overtimeLabel && (workRecord.start_time || workRecord.end_time)" class="text-gray-400">残業なし</span>
+            </div>
+
+            <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <!-- 左列: 日報内容 + コメント + ボタン -->
+                <div class="flex flex-col gap-3">
+                    <div class="prose max-h-52 overflow-y-auto rounded border p-3 text-sm">
                         <div v-html="sanitizedContent" @click="onBodyClick"></div>
                     </div>
-                    <!-- 追加: 既読ユーザー名と保存されたコメントをユーザー日記にも表示 -->
+
                     <!-- 既読者表示 -->
-                    <div v-if="readerNames.length" class="mb-4 text-sm text-gray-600">
-                        <strong class="mr-2">既読:</strong>
-                        <span>{{ readerNames.join(', ') }}</span>
+                    <div v-if="readerNames.length" class="text-sm text-gray-600">
+                        <strong class="mr-1">既読:</strong>{{ readerNames.join(', ') }}
                     </div>
+
                     <!-- 保存されたコメント表示 -->
-                    <div class="mb-4">
-                        <h3 class="mb-2 font-semibold">保存されたコメント</h3>
-                        <div v-if="!(props.diary.comments || []).length" class="mb-2 text-sm text-gray-600">コメントはありません</div>
+                    <div>
+                        <h3 class="mb-1 text-sm font-semibold text-gray-700">コメント</h3>
+                        <div v-if="!(props.diary.comments || []).length" class="text-sm text-gray-400">コメントはありません</div>
                         <div
                             v-for="(c, idx) in props.diary.comments || []"
                             :key="c.id || idx"
-                            class="mb-2 flex items-start justify-between rounded border p-3"
+                            class="mb-1 flex items-start justify-between rounded border p-2"
                         >
                             <div class="text-sm text-gray-700">
-                                <strong>{{ c.user_name || c.user_name }}</strong
-                                >： <span class="whitespace-pre-wrap">{{ c.comment }}</span>
+                                <strong>{{ c.user_name }}</strong>：
+                                <span class="whitespace-pre-wrap">{{ c.comment }}</span>
                             </div>
-                            <div v-if="c.user_id === $page.props.auth?.user?.id" class="ml-4">
+                            <div v-if="c.user_id === $page.props.auth?.user?.id" class="ml-3 shrink-0">
                                 <button @click.prevent="deleteComment(c.id, idx)" class="text-sm text-red-600 hover:underline">削除</button>
                             </div>
                         </div>
                     </div>
-                    <div class="mb-4 flex space-x-4">
-                        <!-- 今日の日報表示時は新規作成ボタンを非表示 -->
-                        <!-- <Link v-if="formatJstDate(props.diary.date) !== todayJst" :href="route('diaries.create')" class="px-4 py-2 bg-green-600 text-white rounded">新しく日報を書く</Link> -->
-                        <Link :href="editHref" class="rounded bg-blue-600 px-4 py-2 text-white">編集</Link>
-                        <button @click="deleteDiary" class="rounded bg-red-600 px-4 py-2 text-white">削除</button>
-                        <button @click="back" class="rounded bg-gray-200 px-4 py-2 text-gray-700">戻る</button>
+
+                    <div class="flex space-x-3">
+                        <Link :href="editHref" class="rounded bg-blue-600 px-4 py-2 text-sm text-white">編集</Link>
+                        <button @click="deleteDiary" class="rounded bg-red-600 px-4 py-2 text-sm text-white">削除</button>
+                        <button @click="back" class="rounded bg-gray-200 px-4 py-2 text-sm text-gray-700">戻る</button>
                     </div>
-                    <!-- タイムライン（コンポーネント化） -->
-                    <div class="mb-6">
-                        <label class="mb-2 block text-sm font-medium text-gray-700">当日の予定</label>
-                        <TimelineDiary
-                            :date="formatJstDate(props.diary.date)"
-                            :events="events"
-                            :startHour="startHour"
-                            :endHour="endHour"
-                            :editable="true"
-                            @update:events="onTimelineUpdate"
-                            @open-create="onTimelineOpenCreate"
-                            @open-edit="onTimelineOpenEdit"
-                        />
-                    </div>
+                </div>
+
+                <!-- 右列: 当日の予定 -->
+                <div>
+                    <label class="mb-2 block text-sm font-medium text-gray-700">当日の予定</label>
+                    <TimelineDiary
+                        :date="formatJstDate(props.diary.date)"
+                        :events="events"
+                        :startHour="timelineStartHour"
+                        :endHour="timelineEndHour"
+                        :editable="true"
+                        @update:events="onTimelineUpdate"
+                        @open-create="onTimelineOpenCreate"
+                        @open-edit="onTimelineOpenEdit"
+                    />
+                </div>
+            </div>
                     <div class="mb-4">
                         <label class="block text-sm font-medium text-gray-700">添付ファイル</label>
                         <div v-if="attachmentsList && attachmentsList.length">

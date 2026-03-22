@@ -177,7 +177,7 @@ class DiaryController extends Controller
     {
         $date = $request->query('date', now()->toDateString());
         $userId = Auth::id();
-        $diary = Diary::where('user_id', $userId)->whereDate('created_at', $date)->first();
+        $diary = Diary::where('user_id', $userId)->where('date', $date)->first();
         if ($diary) {
             // 既に日報がある場合は編集画面へ
             return redirect()->route('diaries.edit', $diary->id);
@@ -214,14 +214,10 @@ class DiaryController extends Controller
                 }
             ],
         ]);
-        // ensure diary is associated with the authenticated user
-        $createdAt = Carbon::parse($data['date'])->startOfDay();
         $diary = new Diary();
         $diary->user_id = Auth::id();
-        $diary->date    = $createdAt->toDateString();
+        $diary->date    = Carbon::parse($data['date'])->toDateString();
         $diary->content = $data['content'];
-        $diary->created_at = $createdAt;
-        $diary->updated_at = $createdAt;
         $diary->save();
 
         // work_records に勤務時間を upsert
@@ -352,8 +348,27 @@ class DiaryController extends Controller
             return $formatted + ['id' => $att->id, 'status' => $att->status];
         })->values();
 
+        // 勤務記録を取得
+        $diaryDate = $diary->date instanceof \Carbon\Carbon
+            ? $diary->date->toDateString()
+            : date('Y-m-d', strtotime((string) $diary->date));
+        $workRecordRaw = WorkRecord::with('worktype')
+            ->where('user_id', $diary->user_id)
+            ->where('date', $diaryDate)
+            ->first();
+        $workRecordData = null;
+        if ($workRecordRaw) {
+            $workRecordData = [
+                'work_style'       => $workRecordRaw->worktype?->name ?? null,
+                'start_time'       => $workRecordRaw->start_time ? substr($workRecordRaw->start_time, 0, 5) : null,
+                'end_time'         => $workRecordRaw->end_time   ? substr($workRecordRaw->end_time,   0, 5) : null,
+                'overtime_minutes' => $workRecordRaw->overtime_minutes ?? 0,
+            ];
+        }
+
         return Inertia::render('Diaries/Show', [
-            'diary' => $diaryArray,
+            'diary'      => $diaryArray,
+            'workRecord' => $workRecordData,
         ]);
     }
 
@@ -568,5 +583,41 @@ class DiaryController extends Controller
                 'early_leave_minutes' => $record->early_leave_minutes,
             ]
         );
+    }
+
+    /**
+     * 過去データから流用 用: 過去の日報一覧を JSON で返す
+     */
+    public function pastData(Request $request)
+    {
+        $user      = Auth::user();
+        $dateRange = $request->input('date_range', 'last');
+        $now       = Carbon::now();
+
+        $query = Diary::where('user_id', $user->id)
+            ->whereDate('date', '<', $now->toDateString()) // 今日より前
+            ->orderBy('date', 'desc');
+
+        if ($dateRange === 'week') {
+            $query->whereBetween('date', [$now->copy()->subDays(7)->toDateString(), $now->copy()->subDay()->toDateString()]);
+        } elseif ($dateRange === 'month') {
+            $query->whereBetween('date', [$now->copy()->subDays(30)->toDateString(), $now->copy()->subDay()->toDateString()]);
+        } else {
+            // 前回: 直近1件
+            $query->limit(1);
+        }
+
+        $records = $query->get()->map(function ($d) {
+            $plain = strip_tags($d->content ?? '');
+            $plain = html_entity_decode($plain, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            return [
+                'id'              => $d->id,
+                'date'            => $d->date,
+                'content'         => $d->content, // HTML そのまま
+                'content_preview' => mb_strimwidth($plain, 0, 60, '…'),
+            ];
+        });
+
+        return response()->json(['records' => $records]);
     }
 }

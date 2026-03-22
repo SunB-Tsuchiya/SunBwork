@@ -9,6 +9,7 @@ use App\Models\Diary;
 use App\Models\User;
 use App\Models\Team;
 use App\Models\Unit;
+use App\Models\WorkRecord;
 use Illuminate\Support\Facades\Auth;
 
 class DiaryInteractionController extends Controller
@@ -362,7 +363,7 @@ class DiaryInteractionController extends Controller
             abort(403, 'この日報を表示する権限がありません');
         }
 
-        $diary->load('user', 'comments');
+        $diary->load('user.department', 'comments');
 
         $readBy = $diary->read_by ?? [];
         $readByNames = [];
@@ -384,6 +385,8 @@ class DiaryInteractionController extends Controller
         $diaryArray = $diary->toArray();
         $diaryArray['read_by_names'] = $readByNames;
         $diaryArray['read_by'] = $readByStructured;
+        $diaryArray['user_name'] = $diary->user?->name ?? '';
+        $diaryArray['department_name'] = $diary->user?->department?->name ?? '';
         $diaryArray['comments'] = array_map(function ($c) {
             return [
                 'id' => $c['id'] ?? null,
@@ -394,11 +397,30 @@ class DiaryInteractionController extends Controller
             ];
         }, $diaryArray['comments'] ?? []);
 
+        // 勤務記録を取得
+        $diaryDate = $diary->date instanceof \Carbon\Carbon
+            ? $diary->date->toDateString()
+            : date('Y-m-d', strtotime((string) $diary->date));
+        $workRecord = WorkRecord::with('worktype')
+            ->where('user_id', $diary->user_id)
+            ->where('date', $diaryDate)
+            ->first();
+        $workRecordData = null;
+        if ($workRecord) {
+            $workRecordData = [
+                'work_style'       => $workRecord->worktype?->name ?? null,
+                'start_time'       => $workRecord->start_time ? substr($workRecord->start_time, 0, 5) : null,
+                'end_time'         => $workRecord->end_time   ? substr($workRecord->end_time,   0, 5) : null,
+                'overtime_minutes' => $workRecord->overtime_minutes ?? 0,
+            ];
+        }
+
         $routePrefix = $isAdmin ? 'admin' : 'leader';
 
         return Inertia::render('Diaries/Interactions/Show', [
-            'diary' => $diaryArray,
+            'diary'       => $diaryArray,
             'routePrefix' => $routePrefix,
+            'workRecord'  => $workRecordData,
         ]);
     }
 

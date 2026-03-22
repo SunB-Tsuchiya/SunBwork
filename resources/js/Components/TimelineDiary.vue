@@ -1,7 +1,7 @@
 <template>
     <div>
         <div ref="scrollWrapperRef" class="w-full overflow-x-auto rounded border bg-gray-50">
-            <div ref="timelineContentRef" :style="{ minWidth: windowMinutes * usedPxPerMin + 200 + 'px' }" class="px-2 py-2">
+            <div ref="timelineContentRef" class="px-2 py-2">
                 <div class="flex items-center justify-between px-2">
                     <div ref="labelsRowRef" class="relative h-6 w-full text-xs text-gray-600">
                         <template v-for="h in hourLabels" :key="h">
@@ -128,17 +128,34 @@ const startHourRef = ref(props.startHour);
 const endHourRef = ref(props.endHour);
 const pxPerMinuteRef = ref(props.pxPerMinute);
 
+// props が変化したとき（親から startHour/endHour が遅れて渡される場合）に追随する
+watch(() => props.startHour, (v) => { startHourRef.value = v; });
+watch(() => props.endHour,   (v) => { endHourRef.value   = v; });
+
+// スクロールラッパーの幅をリアクティブに追跡
+const containerWidth = ref(0);
+let resizeObserver = null;
+
+onMounted(() => {
+    if (scrollWrapperRef.value) {
+        containerWidth.value = scrollWrapperRef.value.clientWidth;
+        resizeObserver = new ResizeObserver((entries) => {
+            containerWidth.value = entries[0]?.contentRect.width ?? scrollWrapperRef.value?.clientWidth ?? 0;
+        });
+        resizeObserver.observe(scrollWrapperRef.value);
+    }
+});
+
+onUnmounted(() => {
+    resizeObserver?.disconnect();
+});
+
 const windowMinutes = computed(() => (endHourRef.value - startHourRef.value) * 60);
 const usedPxPerMin = computed(() => {
-    try {
-        const measured =
-            timelineContentRef.value && timelineContentRef.value && windowMinutes.value > 0
-                ? timelineContentRef.value.clientWidth / windowMinutes.value
-                : null;
-        return measured || pxPerMinuteRef.value;
-    } catch (e) {
-        return pxPerMinuteRef.value;
+    if (containerWidth.value > 0 && windowMinutes.value > 0) {
+        return containerWidth.value / windowMinutes.value;
     }
+    return pxPerMinuteRef.value;
 });
 
 const hourLabels = computed(() => {

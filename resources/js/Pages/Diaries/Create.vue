@@ -1,7 +1,7 @@
 <script setup>
 import useToasts from '@/Composables/useToasts';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Link, useForm } from '@inertiajs/vue3';
+import { Link, router, useForm } from '@inertiajs/vue3';
 import { QuillEditor } from '@vueup/vue-quill';
 import axios from 'axios';
 import 'quill/dist/quill.snow.css';
@@ -63,6 +63,18 @@ function onWorktypeChange() {
     form.end_hour     = e.hour;
     form.end_minute   = e.minute;
 }
+
+// 日付が変わったらサーバー側で既存日報の有無をチェック
+// create() が既存日報を検出すれば edit へリダイレクト、なければ新日付でフォームを再表示
+watch(
+    () => form.date,
+    (newDate, oldDate) => {
+        if (!newDate || newDate === oldDate) return;
+        router.visit(route('diaries.create') + '?date=' + newDate, {
+            preserveScroll: true,
+        });
+    },
+);
 
 // UI state for tabs
 // (tabs removed for Diaries.Create — moved to Events/Create)
@@ -352,12 +364,85 @@ function stripHtml(html) {
         .replace(/&nbsp;/g, ' ')
         .replace(/&amp;/g, '&');
 }
+
+// ===== 過去データから流用 =====
+const showPastModal = ref(false);
+const pastDateRange = ref('last');
+const pastLoading = ref(false);
+const pastError = ref('');
+const pastRecords = ref([]);
+
+const pastRangeOptions = [
+    { value: 'last',  label: '前回' },
+    { value: 'week',  label: '7日間' },
+    { value: 'month', label: '30日間' },
+];
+
+function openPastModal() {
+    showPastModal.value = true;
+    if (pastRecords.value.length === 0) fetchPastDiaries();
+}
+
+function closePastModal() {
+    showPastModal.value = false;
+}
+
+async function fetchPastDiaries() {
+    pastLoading.value = true;
+    pastError.value = '';
+    try {
+        const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        const xsrfMatch = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
+        const xsrf = xsrfMatch ? decodeURIComponent(xsrfMatch[1]) : null;
+        const url = route('diaries.past_data') + '?date_range=' + pastDateRange.value;
+        const res = await fetch(url, {
+            credentials: 'same-origin',
+            headers: {
+                'X-CSRF-TOKEN': token,
+                ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}),
+                'X-Requested-With': 'XMLHttpRequest',
+                Accept: 'application/json',
+            },
+        });
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        pastRecords.value = data.records || [];
+    } catch {
+        pastError.value = 'データの取得に失敗しました。';
+    } finally {
+        pastLoading.value = false;
+    }
+}
+
+watch(pastDateRange, () => {
+    if (showPastModal.value) fetchPastDiaries();
+});
+
+function applyPastDiary(rec) {
+    const html = rec.content ?? '';
+    // form の値を直接セット（Quill の emit 経由に頼らない）
+    form.content = html;
+    content.value = html;
+    // Quill の内部状態も直接更新
+    if (editorInstance) {
+        try {
+            const delta = editorInstance.clipboard.convert(html);
+            editorInstance.setContents(delta);
+        } catch (e) {
+            editorInstance.root.innerHTML = html;
+        }
+    }
+    closePastModal();
+}
 </script>
 
 <template>
     <AppLayout title="日報作成">
         <div class="rounded bg-white p-6 shadow">
-            <h1 class="mb-4 text-2xl font-bold">日報作成 ({{ form.date }})</h1>
+            <div class="mb-4 flex items-center justify-between">
+                <h1 class="text-2xl font-bold">日報作成 ({{ form.date }})</h1>
+                <button type="button" @click="openPastModal" class="rounded bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700">過去データから流用</button>
+            </div>
 
             <!-- single event form (tabs removed) -->
             <div>
@@ -441,6 +526,65 @@ function stripHtml(html) {
             <!-- job tab removed from Diaries.Create.vue -->
         </div>
     </AppLayout>
+
+    <!-- 過去データから流用 モーダル -->
+    <div v-if="showPastModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="closePastModal">
+        <div class="relative mx-4 flex max-h-[85vh] w-full max-w-2xl flex-col rounded-lg bg-white shadow-xl">
+            <!-- ヘッダー -->
+            <div class="flex items-center justify-between border-b px-6 py-4">
+                <h2 class="text-lg font-semibold text-gray-800">過去の日報から流用</h2>
+                <button @click="closePastModal" class="text-gray-500 hover:text-gray-700">✕</button>
+            </div>
+
+            <!-- 期間選択 -->
+            <div class="border-b px-6 py-3">
+                <div class="flex gap-2">
+                    <button
+                        v-for="opt in pastRangeOptions"
+                        :key="opt.value"
+                        @click="pastDateRange = opt.value"
+                        :class="pastDateRange === opt.value ? 'bg-blue-600 text-white' : 'border text-gray-700 hover:bg-gray-100'"
+                        class="rounded px-4 py-1.5 text-sm"
+                    >{{ opt.label }}</button>
+                </div>
+                <button
+                    @click="fetchPastDiaries"
+                    :disabled="pastLoading"
+                    class="mt-3 rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-60"
+                >{{ pastLoading ? '取得中...' : '検索' }}</button>
+            </div>
+
+            <!-- 結果 -->
+            <div class="flex-1 overflow-y-auto px-6 py-4">
+                <p v-if="pastError" class="mb-3 text-sm text-red-600">{{ pastError }}</p>
+                <p v-if="!pastLoading && pastRecords.length === 0" class="py-8 text-center text-sm text-gray-400">該当する日報がありません。</p>
+                <table v-if="pastRecords.length > 0" class="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 w-28">日付</th>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">内容（プレビュー）</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        <tr
+                            v-for="rec in pastRecords"
+                            :key="rec.id"
+                            @click="applyPastDiary(rec)"
+                            class="cursor-pointer hover:bg-blue-50"
+                        >
+                            <td class="px-3 py-2 text-gray-600">{{ rec.date }}</td>
+                            <td class="px-3 py-2 text-gray-700">{{ rec.content_preview || '（内容なし）' }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- フッター -->
+            <div class="border-t px-6 py-3 text-right">
+                <button @click="closePastModal" class="rounded bg-gray-200 px-4 py-2 text-sm text-gray-700 hover:bg-gray-300">閉じる</button>
+            </div>
+        </div>
+    </div>
 </template>
 
 <style scoped>
