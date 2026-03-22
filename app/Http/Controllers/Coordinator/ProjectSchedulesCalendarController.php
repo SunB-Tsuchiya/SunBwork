@@ -19,7 +19,7 @@ class ProjectSchedulesCalendarController extends Controller
             // For PoC return schedules where the user is assigned or all if coordinator
             // Avoid selecting a fragile subset of columns (some environments may differ)
             // and normalize the result to a plain array that always includes project_job_id.
-            $query = ProjectSchedule::query()->with('assignments');
+            $query = ProjectSchedule::query();
             // If a project_id filter is provided, apply it
             if ($request->filled('project_job_id')) {
                 $query->where('project_job_id', $request->input('project_job_id'));
@@ -58,7 +58,7 @@ class ProjectSchedulesCalendarController extends Controller
             if ($pj) {
                 $project = [
                     'id' => $pj->id,
-                    'name' => $pj->name,
+                    'name' => $pj->title,
                     'jobcode' => $pj->jobcode ?? null,
                 ];
                 if ($pj->client) {

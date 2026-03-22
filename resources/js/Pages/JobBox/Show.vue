@@ -134,13 +134,12 @@
 
                         <!-- Determine if current user is the assignee -->
                         <template v-if="isAssignee">
-                            <!-- If assignee and scheduled, show '予定を編集' (link to events index filtered to this job/user) -->
+                            <!-- 今日の作業をMyJobとして記録 -->
                             <Link
-                                v-if="assignment.scheduled || assignment.scheduled_at"
-                                :href="editHref"
+                                :href="scheduleHref"
                                 class="rounded bg-blue-500 px-3 py-2 text-sm text-white hover:bg-blue-600"
                             >
-                                予定を編集
+                                今日の予定をセット
                             </Link>
 
                             <!-- 完了にするボタン: イベントがある場合は表示 -->
@@ -157,11 +156,6 @@
                                     {{ isAssignmentCompleted ? '完了済み' : '完了にする' }}
                                 </button>
                             </div>
-
-                            <!-- If assignee and not scheduled, show the regular '予定をセット' button -->
-                            <Link v-else :href="getSetHref()" class="rounded bg-blue-500 px-3 py-2 text-sm text-white hover:bg-blue-600">
-                                予定をセット
-                            </Link>
                         </template>
 
                         <!-- For non-assignee (sender/others), keep showing the 'セット済' badge when scheduled -->
@@ -253,7 +247,7 @@ function routeBack() {
                 projectJob && projectJob.id ? `/project_jobs/${projectJob.id}/assignments` : '/jobbox',
             );
         }
-        return safeRoute('project_jobs.jobbox.index', { projectJob: projectJob?.id }, '/jobbox');
+        return safeRoute('user.project_jobs.jobbox.index', { projectJob: projectJob?.id }, '/jobbox');
     } catch (e) {
         return '/jobbox';
     }
@@ -407,28 +401,33 @@ const editDate = computed(() => {
     return new Date().toISOString().slice(0, 10);
 });
 
-const editHref = computed(() => {
-    // If there is an event linked to a project_job_assignment, prefer opening
-    // the user assignment create form so the user can create a "by myself" record.
-    const ev = Array.isArray(events.value) && events.value.length > 0 ? events.value[0] : null;
-    if (ev && ev.project_job_assignment_id) {
-        const params = new URLSearchParams();
-        params.set('job', String(ev.project_job_assignment_id));
-        // pass project context
-        try {
-            if (projectJob && projectJob.id) params.set('projectJob', String(projectJob.id));
-        } catch (e) {}
-        // Prefill fields from assignment when available
-        try {
-            if (assignment && assignment.sender_id) params.set('sender_id', String(assignment.sender_id));
-            if (assignment && assignment.desired_end_date) params.set('desired_end_date', String(assignment.desired_end_date));
-            if (assignment && assignment.desired_time) params.set('desired_time', String(assignment.desired_time));
-            if (assignment && assignment.estimated_hours !== undefined && assignment.estimated_hours !== null)
-                params.set('estimated_hours', String(assignment.estimated_hours));
-        } catch (e) {}
+// 「今日の予定をセット」→ events.create_job with today's date and assignment prefill
+const scheduleHref = computed(() => {
+    if (!assignment?.id) return '#';
+    const today = new Date().toISOString().slice(0, 10);
+    const base = safeRoute('events.create_job', {}, '/events/create-job');
+    return base + '?job=' + encodeURIComponent(assignment.id) + '&date=' + encodeURIComponent(today);
+});
 
-        // route to the user assignment create page (which redirects to events.create_job)
-        return safeRoute('project_jobs.assignments.create_user', {}, '/project_jobs/assignments/create-user') + '?' + params.toString();
+const editHref = computed(() => {
+    const isCoordinator = page.props.auth?.user?.isCoordinator;
+
+    // Coordinator: go directly to the coordinator assignment edit page (full form + time setting)
+    if (isCoordinator && projectJob?.id && assignment?.id) {
+        return safeRoute(
+            'coordinator.project_jobs.assignments.edit',
+            { projectJob: projectJob.id, assignment: assignment.id },
+            `/coordinator/project_jobs/${projectJob.id}/assignments/${assignment.id}/edit`,
+        );
+    }
+
+    // Non-coordinator: load coordinator assignment data via edit_user (prefilled form)
+    if (assignment?.id) {
+        const fallback = '/project_jobs/assignments/edit-user?job=' + encodeURIComponent(assignment.id);
+        try {
+            if (typeof route === 'function') return route('user.project_jobs.assignments.edit') + '?job=' + encodeURIComponent(assignment.id);
+        } catch (e) {}
+        return fallback;
     }
 
     // Fallback: Navigate to calendar index with date and user_id so calendar focuses the day
@@ -478,22 +477,40 @@ function submitComplete() {
 
 function getSetHref() {
     try {
+        const isCoordinator = page.props.auth?.user?.isCoordinator;
+
         if (linkedAssignmentId && linkedAssignmentId.value) {
             const jid = String(linkedAssignmentId.value);
             const fallback = '/project_jobs/assignments/edit-user?job=' + encodeURIComponent(jid);
-            // route for edit_user may not be available client-side, so append query string if ziggy present
             try {
-                if (typeof route === 'function') return route('project_jobs.assignments.edit_user') + '?job=' + encodeURIComponent(jid);
+                if (typeof route === 'function') return route('user.project_jobs.assignments.edit') + '?job=' + encodeURIComponent(jid);
             } catch (e) {
                 return fallback;
             }
             return fallback;
         }
-        try {
-            return safeRoute('events.create', { job: assignment.id }, '/events/create?job=' + encodeURIComponent(assignment.id));
-        } catch (e) {
-            return '/events/create?job=' + encodeURIComponent(assignment.id);
+
+        // Coordinator: go to the coordinator assignment edit page (full form + time setting)
+        if (isCoordinator && projectJob?.id && assignment?.id) {
+            return safeRoute(
+                'coordinator.project_jobs.assignments.edit',
+                { projectJob: projectJob.id, assignment: assignment.id },
+                `/coordinator/project_jobs/${projectJob.id}/assignments/${assignment.id}/edit`,
+            );
         }
+
+        // Regular user: load coordinator data via edit_user
+        if (assignment?.id) {
+            const fallback = '/project_jobs/assignments/edit-user?job=' + encodeURIComponent(assignment.id);
+            try {
+                if (typeof route === 'function') return route('user.project_jobs.assignments.edit') + '?job=' + encodeURIComponent(assignment.id);
+            } catch (e) {
+                return fallback;
+            }
+            return fallback;
+        }
+
+        return '#';
     } catch (e) {
         return '#';
     }

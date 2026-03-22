@@ -432,4 +432,110 @@ class MyProjectJobController extends Controller
         // Inertiaリダイレクト時にフロントでリロードを促すため、フラッシュメッセージを渡す
         return redirect()->route('coordinator.project_jobs.index')->with('reload', true);
     }
+
+    /**
+     * Return past MyJob records for the reuse modal (JSON).
+     * Filters: mode=date|project, date_range=yesterday|7days|30days,
+     *          client_id, project_job_id, hide_completed=1
+     */
+    public function pastData(Request $request)
+    {
+        $user = $request->user();
+        $mode = $request->query('mode', 'date');
+        $hideCompleted = (bool) $request->query('hide_completed', 0);
+        $clientId = $request->query('client_id');
+        $projectJobId = $request->query('project_job_id');
+
+        $query = ProjectJobAssignmentByMyself::where('user_id', $user->id)
+            ->with(['projectJob.client', 'workItemType', 'size', 'stage']);
+
+        if ($hideCompleted) {
+            $query->where(function ($q) {
+                $q->whereNull('completed')->orWhere('completed', false);
+            });
+        }
+
+        if ($mode === 'date') {
+            $range = $request->query('date_range', 'yesterday');
+            $now = Carbon::now();
+            if ($range === 'yesterday') {
+                $from = $now->copy()->subDay()->startOfDay();
+                $to   = $now->copy()->subDay()->endOfDay();
+            } elseif ($range === '7days') {
+                $from = $now->copy()->subDays(7)->startOfDay();
+                $to   = $now->copy()->endOfDay();
+            } else { // 30days
+                $from = $now->copy()->subDays(30)->startOfDay();
+                $to   = $now->copy()->endOfDay();
+            }
+            $query->where(function ($q) use ($from, $to) {
+                $q->whereBetween('desired_end_date', [$from->toDateString(), $to->toDateString()])
+                  ->orWhereBetween('created_at', [$from, $to]);
+            });
+        } else {
+            // project mode
+            if ($projectJobId) {
+                $query->where('project_job_id', $projectJobId);
+            } elseif ($clientId) {
+                $query->whereHas('projectJob', function ($q) use ($clientId) {
+                    $q->where('client_id', $clientId);
+                });
+            }
+        }
+
+        $records = $query->orderBy('created_at', 'desc')->limit(100)->get()
+            ->map(function ($m) {
+                return [
+                    'id'               => $m->id,
+                    'title'            => $m->title,
+                    'detail'           => $m->detail,
+                    'project_job_id'   => $m->project_job_id,
+                    'project_job_name' => $m->projectJob?->title ?? $m->projectJob?->name ?? '-',
+                    'client_id'        => $m->projectJob?->client_id,
+                    'client_name'      => $m->projectJob?->client?->name ?? '-',
+                    'work_item_type_id'=> $m->work_item_type_id,
+                    'work_item_type'   => $m->workItemType?->name ?? '-',
+                    'size_id'          => $m->size_id,
+                    'size'             => $m->size?->name ?? '-',
+                    'stage_id'         => $m->stage_id,
+                    'stage'            => $m->stage?->name ?? '-',
+                    'difficulty_id'    => $m->difficulty_id,
+                    'estimated_hours'  => $m->estimated_hours,
+                    'desired_end_date' => $m->desired_end_date,
+                    'desired_time'     => $m->desired_time,
+                    'completed'        => (bool) $m->completed,
+                    'created_at'       => $m->created_at?->format('Y-m-d'),
+                ];
+            });
+
+        // Build distinct clients from user's MyJob records (all time)
+        $clients = ProjectJobAssignmentByMyself::where('user_id', $user->id)
+            ->with('projectJob.client')
+            ->get()
+            ->map(fn($m) => $m->projectJob?->client)
+            ->filter()
+            ->unique('id')
+            ->map(fn($c) => ['id' => $c->id, 'name' => $c->name])
+            ->values();
+
+        // If client_id given, return projects for that client
+        $projects = collect();
+        if ($clientId) {
+            $projects = ProjectJobAssignmentByMyself::where('user_id', $user->id)
+                ->whereHas('projectJob', fn($q) => $q->where('client_id', $clientId))
+                ->with('projectJob')
+                ->get()
+                ->map(fn($m) => $m->projectJob)
+                ->filter()
+                ->unique('id')
+                ->map(fn($j) => ['id' => $j->id, 'title' => $j->title ?? $j->name ?? '-'])
+                ->values();
+        }
+
+        return response()->json([
+            'records'  => $records,
+            'clients'  => $clients,
+            'projects' => $projects,
+        ]);
+    }
 }

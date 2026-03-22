@@ -30,7 +30,7 @@ function getJobboxLink() {
         // fallthrough
     }
     try {
-        return route('project_jobs.jobbox.index');
+        return route('coordinator.jobbox');
     } catch (e) {
         return '/jobbox';
     }

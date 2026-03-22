@@ -7,9 +7,12 @@ use App\Models\ProjectJob;
 use App\Models\JobAssignmentMessage;
 use App\Models\ProjectJobAssignment;
 use Illuminate\Http\Request;
+use App\Models\Event;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Inertia\Inertia;
 
 class JobBoxController extends Controller
 {
@@ -215,9 +218,12 @@ class JobBoxController extends Controller
 
         $base = JobAssignmentMessage::select('job_assignment_messages.*')
             ->join('project_job_assignments', 'job_assignment_messages.project_job_assignment_id', '=', 'project_job_assignments.id')
+            ->join('project_jobs', 'project_job_assignments.project_job_id', '=', 'project_jobs.id')
             ->leftJoin('users as senders', 'job_assignment_messages.sender_id', '=', 'senders.id')
             ->where(function ($qry) use ($user) {
-                $qry->where('project_job_assignments.user_id', $user->id)->orWhere('job_assignment_messages.sender_id', $user->id);
+                $qry->where('project_job_assignments.user_id', $user->id)
+                    ->orWhere('job_assignment_messages.sender_id', $user->id)
+                    ->orWhere('project_jobs.user_id', $user->id);
             });
 
         if ($q) {
@@ -253,8 +259,11 @@ class JobBoxController extends Controller
             ->appends(array_filter(['q' => $q, 'period' => $periodModel, 'sort' => $sort, 'dir' => $dir]));
 
         $monthValues = JobAssignmentMessage::join('project_job_assignments', 'job_assignment_messages.project_job_assignment_id', '=', 'project_job_assignments.id')
+            ->join('project_jobs', 'project_job_assignments.project_job_id', '=', 'project_jobs.id')
             ->where(function ($qry) use ($user) {
-                $qry->where('project_job_assignments.user_id', $user->id)->orWhere('job_assignment_messages.sender_id', $user->id);
+                $qry->where('project_job_assignments.user_id', $user->id)
+                    ->orWhere('job_assignment_messages.sender_id', $user->id)
+                    ->orWhere('project_jobs.user_id', $user->id);
             })
             ->selectRaw("DATE_FORMAT(COALESCE(project_job_assignments.desired_end_date, job_assignment_messages.created_at), '%Y-%m') as ym")
             ->groupBy('ym')
@@ -985,11 +994,145 @@ class JobBoxController extends Controller
 
             DB::commit();
 
-            return redirect()->route('project_jobs.jobbox.show', ['projectJob' => $projectJob->id, 'message' => $jam->id])->with('success', '完了報告を送信しました。');
+            return redirect()->route('user.project_jobs.jobbox.show', ['projectJob' => $projectJob->id, 'message' => $jam->id])->with('success', '完了報告を送信しました。');
         } catch (\Throwable $e) {
             DB::rollBack();
             report($e);
             return redirect()->back()->with('error', '完了報告の送信中にエラーが発生しました。');
         }
+    }
+
+    /**
+     * Show a schedule-only form for a coordinator-assigned job.
+     * Job content is read-only; only date/time can be set.
+     */
+    public function schedule(Request $request, ProjectJobAssignment $assignment)
+    {
+        $user = $request->user();
+
+        // Authorize: only the assignee or privileged users may access
+        $isAssignee = $user && $assignment->user_id === $user->id;
+        $isPrivileged = $user && (method_exists($user, 'isCoordinator') && ($user->isCoordinator() || $user->isAdmin() || $user->isSuperAdmin()));
+        if (! $isAssignee && ! $isPrivileged) {
+            abort(403);
+        }
+
+        $assignment->load(['projectJob.client', 'user', 'size', 'stage', 'workItemType', 'statusModel', 'difficultyModel']);
+
+        // Find existing event linked to this assignment for the current user
+        $existingEvent = null;
+        if (Schema::hasColumn('events', 'project_job_assignment_id')) {
+            $existingEvent = Event::where('project_job_assignment_id', $assignment->id)
+                ->where('user_id', $user->id)
+                ->latest()
+                ->first();
+        }
+
+        return Inertia::render('JobBox/Schedule', [
+            'assignment' => $assignment,
+            'projectJob' => $assignment->projectJob,
+            'existingEvent' => $existingEvent,
+        ]);
+    }
+
+    /**
+     * Store or update the schedule (event) for a coordinator-assigned job.
+     */
+    public function storeSchedule(Request $request, ProjectJobAssignment $assignment)
+    {
+        $user = $request->user();
+
+        $isAssignee = $user && $assignment->user_id === $user->id;
+        $isPrivileged = $user && (method_exists($user, 'isCoordinator') && ($user->isCoordinator() || $user->isAdmin() || $user->isSuperAdmin()));
+        if (! $isAssignee && ! $isPrivileged) {
+            abort(403);
+        }
+
+        $data = $request->validate([
+            'date'        => 'required|date',
+            'startHour'   => 'required|integer|min:0|max:23',
+            'startMinute' => 'required|integer|min:0|max:59',
+            'endHour'     => 'required|integer|min:0|max:23',
+            'endMinute'   => 'required|integer|min:0|max:59',
+            'event_id'    => 'nullable|integer|exists:events,id',
+        ]);
+
+        $start = $data['date'] . ' ' . str_pad($data['startHour'], 2, '0', STR_PAD_LEFT) . ':' . str_pad($data['startMinute'], 2, '0', STR_PAD_LEFT) . ':00';
+        $end   = $data['date'] . ' ' . str_pad($data['endHour'], 2, '0', STR_PAD_LEFT) . ':' . str_pad($data['endMinute'], 2, '0', STR_PAD_LEFT) . ':00';
+
+        $title = $assignment->title ?: ($assignment->projectJob->title ?? 'ジョブ作業');
+        $description = $assignment->detail ?: $title;
+
+        DB::beginTransaction();
+        try {
+            if ($data['event_id']) {
+                // Update existing event
+                $event = Event::find($data['event_id']);
+                if ($event) {
+                    $event->start = $start;
+                    $event->end   = $end;
+                    if (Schema::hasColumn('events', 'date')) {
+                        $event->date = $data['date'];
+                    }
+                    $event->save();
+                }
+            } else {
+                // Create new event
+                $event = new Event();
+                $event->user_id     = $user->id;
+                $event->title       = $title;
+                $event->description = $description;
+                $event->start       = $start;
+                $event->end         = $end;
+                if (Schema::hasColumn('events', 'date')) {
+                    $event->date = $data['date'];
+                }
+                if (Schema::hasColumn('events', 'project_job_assignment_id')) {
+                    $event->project_job_assignment_id = $assignment->id;
+                }
+                $event->save();
+
+                // Mark assignment as scheduled
+                if (Schema::hasColumn('project_job_assignments', 'scheduled')) {
+                    $assignment->scheduled = true;
+                }
+                if (Schema::hasColumn('project_job_assignments', 'scheduled_at')) {
+                    $assignment->scheduled_at = $event->start;
+                }
+                // Update status to scheduled if statuses table has a matching record
+                try {
+                    $status = DB::table('statuses')->where('key', 'scheduled')->first();
+                    if ($status && Schema::hasColumn('project_job_assignments', 'status_id')) {
+                        $assignment->status_id = $status->id;
+                    }
+                } catch (\Throwable $__e) {}
+                $assignment->save();
+
+                // Update JobAssignmentMessage scheduled flags
+                try {
+                    JobAssignmentMessage::where('project_job_assignment_id', $assignment->id)
+                        ->where(function ($q) {
+                            $q->whereNull('scheduled')->orWhere('scheduled', false);
+                        })
+                        ->update(['scheduled' => true, 'scheduled_at' => $event->start]);
+                } catch (\Throwable $__e) {}
+            }
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            report($e);
+            return redirect()->back()->with('error', 'スケジュールの保存中にエラーが発生しました。');
+        }
+
+        // Redirect back to jobbox show
+        $message = JobAssignmentMessage::where('project_job_assignment_id', $assignment->id)
+            ->latest()->first();
+        if ($message && $assignment->projectJob) {
+            return redirect()
+                ->route('user.project_jobs.jobbox.show', ['projectJob' => $assignment->project_job_id, 'message' => $message->id])
+                ->with('success', 'スケジュールを保存しました。');
+        }
+        return redirect()->route('user.jobbox.index')->with('success', 'スケジュールを保存しました。');
     }
 }

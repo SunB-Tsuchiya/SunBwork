@@ -16,10 +16,12 @@ class ProjectJob extends Model
         'client_id',
         'detail',
         'schedule',
+        'completed',
     ];
 
     protected $casts = [
         'schedule' => 'array',
+        'completed' => 'boolean',
     ];
 
     public function user()

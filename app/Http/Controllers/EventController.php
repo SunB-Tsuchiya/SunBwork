@@ -933,10 +933,31 @@ class EventController extends Controller
         $endHour = $request->query('endHour');
         $endMinute = $request->query('endMinute');
         $jobData = null;
+        $jobAssignments = null; // prefill data for AssignmentForm_user
         if ($jobId) {
             $assignment = \App\Models\ProjectJobAssignment::with(['projectJob.client', 'projectJob', 'user', 'size', 'stage', 'workItemType', 'statusModel'])->find($jobId);
             if ($assignment) {
                 $jobData = $assignment->toEventPrefill();
+                // Build assignments prefill with IDs for dropdowns, amounts intentionally null
+                $jobAssignments = [[
+                    'id' => null,
+                    'project_job_id' => $assignment->project_job_id,
+                    '_client_id' => $assignment->projectJob?->client?->id ?? '',
+                    'title_suffix' => $assignment->title ?? '',
+                    'detail' => $assignment->detail ?? '',
+                    'difficulty_id' => $assignment->difficulty_id ?? null,
+                    'desired_start_date' => $date, // today
+                    'desired_end_date' => $assignment->desired_end_date
+                        ? (method_exists($assignment->desired_end_date, 'format') ? $assignment->desired_end_date->format('Y-m-d') : (string) $assignment->desired_end_date)
+                        : null,
+                    'desired_time' => $assignment->desired_time ?? null,
+                    'estimated_hours' => $assignment->estimated_hours ?? null,
+                    'work_item_type_id' => $assignment->work_item_type_id ?? null,
+                    'size_id' => $assignment->size_id ?? null,
+                    'stage_id' => $assignment->stage_id ?? null,
+                    'amounts' => null, // intentionally empty: record daily work separately
+                    'amounts_unit' => 'page',
+                ]];
             }
         }
 
@@ -1067,6 +1088,7 @@ class EventController extends Controller
         $props = [
             'date' => $date,
             'job' => $jobData,
+            'assignments' => $jobAssignments, // pre-filled from coordinator assignment (amounts=null)
             'userClients' => $userClients,
             'userProjects' => $userProjects,
             'other_client_id' => $otherClientId,

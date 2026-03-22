@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 use App\Models\ProjectJob;
 use App\Models\ProjectJobAssignment;
+use App\Models\Client;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 
 class ProjectJobAssignmentsController extends Controller
@@ -718,5 +720,136 @@ class ProjectJobAssignmentsController extends Controller
         });
 
         return redirect()->route('coordinator.project_jobs.assignments.index', ['projectJob' => $projectJob->id]);
+    }
+
+    /**
+     * Show project-selection page for standalone assignment creation.
+     * Returns owned clients and projects for dropdown selection.
+     */
+    public function selectProject(Request $request)
+    {
+        $user = $request->user();
+
+        $ownedProjects = ProjectJob::where('user_id', $user->id)
+            ->where(function ($q) {
+                $q->where('completed', false)->orWhereNull('completed');
+            })
+            ->with('client')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $clients = $ownedProjects
+            ->whereNotNull('client')
+            ->pluck('client')
+            ->unique('id')
+            ->values()
+            ->map(fn($c) => ['id' => $c->id, 'name' => $c->name]);
+
+        $projects = $ownedProjects->map(fn($p) => [
+            'id' => $p->id,
+            'title' => $p->title,
+            'client_id' => $p->client_id,
+        ])->values();
+
+        return Inertia::render('Coordinator/ProjectJobs/JobAssign/SelectProject', [
+            'clients' => $clients,
+            'projects' => $projects,
+        ]);
+    }
+
+    /**
+     * Return JSON of past ProjectJobAssignments for the current coordinator (projects they own).
+     * Used by the "過去データから流用" modal in the assignment form.
+     */
+    public function pastData(Request $request)
+    {
+        $user = $request->user();
+
+        $mode = $request->input('mode', 'date');
+        $hideCompleted = filter_var($request->input('hide_completed', true), FILTER_VALIDATE_BOOLEAN);
+        $dateRange = $request->input('date_range', 'yesterday');
+        $clientId = $request->input('client_id');
+        $projectJobId = $request->input('project_job_id');
+
+        $query = ProjectJobAssignment::with(['projectJob.client'])
+            ->whereHas('projectJob', function ($q) use ($user) {
+                $q->where('user_id', $user->id);
+            })
+            ->orderBy('created_at', 'desc');
+
+        if ($hideCompleted) {
+            try {
+                if (Schema::hasColumn('project_job_assignments', 'completed')) {
+                    $query->where(function ($q) {
+                        $q->where('completed', false)->orWhereNull('completed');
+                    });
+                }
+            } catch (\Throwable $e) {}
+        }
+
+        if ($mode === 'date') {
+            $now = Carbon::now();
+            switch ($dateRange) {
+                case 'week':
+                    $start = $now->copy()->subDays(7)->startOfDay();
+                    $end = $now->copy()->endOfDay();
+                    break;
+                case 'month':
+                    $start = $now->copy()->subDays(30)->startOfDay();
+                    $end = $now->copy()->endOfDay();
+                    break;
+                default: // yesterday
+                    $start = $now->copy()->subDay()->startOfDay();
+                    $end = $now->copy()->subDay()->endOfDay();
+            }
+            $query->whereBetween('created_at', [$start, $end]);
+        } elseif ($mode === 'project') {
+            if ($projectJobId) {
+                $query->where('project_job_id', $projectJobId);
+            } elseif ($clientId) {
+                $query->whereHas('projectJob', function ($q) use ($clientId) {
+                    $q->where('client_id', $clientId);
+                });
+            }
+        }
+
+        $records = $query->limit(100)->get()->map(function ($a) {
+            return [
+                'id' => $a->id,
+                'project_job_id' => $a->project_job_id,
+                'client_id' => $a->projectJob?->client?->id,
+                'client_name' => $a->projectJob?->client?->name ?? '-',
+                'project_job_name' => $a->projectJob?->title ?? '-',
+                'title' => $a->title,
+                'detail' => $a->detail,
+                'work_item_type_id' => $a->work_item_type_id,
+                'size_id' => $a->size_id,
+                'stage_id' => $a->stage_id,
+                'difficulty_id' => $a->difficulty_id,
+                'desired_end_date' => $a->desired_end_date ? $a->desired_end_date->format('Y-m-d') : null,
+                'desired_time' => $a->desired_time,
+                'estimated_hours' => $a->estimated_hours !== null ? (float) $a->estimated_hours : null,
+                'amounts' => $a->amounts ?? null,
+                'amounts_unit' => $a->amounts_unit ?? 'page',
+                'created_at' => $a->created_at ? $a->created_at->format('Y-m-d') : null,
+            ];
+        });
+
+        // Clients for dropdown (coordinator's own projects' clients)
+        $clients = Client::whereHas('projectJobs', function ($q) use ($user) {
+            $q->where('user_id', $user->id);
+        })->orderBy('name')->get(['id', 'name']);
+
+        // Projects for dropdown
+        $projects = ProjectJob::where('user_id', $user->id)
+            ->orderBy('created_at', 'desc')
+            ->get(['id', 'title', 'client_id'])
+            ->map(fn($p) => ['id' => $p->id, 'title' => $p->title, 'client_id' => $p->client_id]);
+
+        return response()->json([
+            'records' => $records,
+            'clients' => $clients,
+            'projects' => $projects,
+        ]);
     }
 }

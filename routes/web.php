@@ -97,7 +97,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     // available at /user/jobbox.
     Route::get('/jobbox', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'global'])
         ->middleware('coordinator')
-        ->name('project_jobs.index');
+        ->name('coordinator.jobbox');
 
     // User-scoped jobbox: show messages where the assignment's user_id == auth id
     Route::get('/user/jobbox', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'user'])
@@ -105,10 +105,11 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
 
     // JobBox: mark an assignment as completed (accessible by any authenticated user for their own assignments)
     Route::post('/jobbox/assignments/{assignment}/complete', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'completeAssignment'])
-        ->name('jobbox.assignments.complete');
+        ->name('user.jobbox.assignments.complete');
 
     // MyJobBox: user-scoped JobBox page (personal messages/assignments)
     Route::get('/myjobbox', [\App\Http\Controllers\User\MyProjectJobController::class, 'index'])->name('user.myjobbox.index');
+    Route::get('/myjobbox/past-data', [\App\Http\Controllers\User\MyProjectJobController::class, 'pastData'])->name('user.myjobbox.past_data');
     Route::post('/myjobbox/assignments/{assignment}/complete', [\App\Http\Controllers\User\MyProjectJobController::class, 'completeAssignment'])->name('myjobbox.assignments.complete');
     Route::get('/myjobbox/{assignment}', [\App\Http\Controllers\User\MyProjectJobController::class, 'showAssignment'])->name('user.myjobbox.show');
 
@@ -169,20 +170,21 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::get('/chat/rooms/create', [App\Http\Controllers\Chat\ChatController::class, 'createRoom'])->name('chat.rooms.create');
     Route::post('/chat/rooms', [App\Http\Controllers\Chat\ChatController::class, 'storeRoom'])->name('chat.rooms.store');
 
-    // Allow assigned users to view jobbox (read-only). These routes mirror coordinator jobbox but are under authenticated user middleware.
-    Route::get('project_jobs/{projectJob}/jobbox', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'index'])->name('project_jobs.jobbox.index');
-    Route::get('project_jobs/{projectJob}/jobbox/{message}', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'show'])->name('project_jobs.jobbox.show');
-    // Allow assigned users to send a completion reply back to coordinators
-    Route::post('project_jobs/{projectJob}/jobbox/reply', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'reply'])->name('project_jobs.jobbox.reply');
-    // Allow authenticated users to create a single assignment (their own) without coordinator side-effects
-    Route::post('project_jobs/{projectJob}/assignments/user', [App\Http\Controllers\User\ProjectJobAssignmentController::class, 'store'])->name('project_jobs.assignments.store_user');
-    // Allow authenticated users to update their assignment (edit)
-    Route::patch('project_jobs/{projectJob}/assignments/{assignment}/user', [App\Http\Controllers\User\ProjectJobAssignmentController::class, 'update'])->name('project_jobs.assignments.update_user');
-    // Standalone page for user assignment form — redirect to controller-backed job create
+    // User-facing jobbox routes (read-only, for assigned users)
+    Route::get('project_jobs/{projectJob}/jobbox', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'index'])->name('user.project_jobs.jobbox.index');
+    Route::get('project_jobs/{projectJob}/jobbox/{message}', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'show'])->name('user.project_jobs.jobbox.show');
+    Route::post('project_jobs/{projectJob}/jobbox/reply', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'reply'])->name('user.project_jobs.jobbox.reply');
+    // User self-assignment routes
+    Route::post('project_jobs/{projectJob}/assignments/user', [App\Http\Controllers\User\ProjectJobAssignmentController::class, 'store'])->name('user.project_jobs.assignments.store');
+    Route::patch('project_jobs/{projectJob}/assignments/{assignment}/user', [App\Http\Controllers\User\ProjectJobAssignmentController::class, 'update'])->name('user.project_jobs.assignments.update');
     Route::get('project_jobs/assignments/create-user', [\App\Http\Controllers\ProjectJobs\ProjectJobAssignmentUserController::class, 'create'])
-        ->name('project_jobs.assignments.create_user');
+        ->name('user.project_jobs.assignments.create');
     Route::get('/project_jobs/assignments/edit-user', [\App\Http\Controllers\ProjectJobs\ProjectJobAssignmentUserController::class, 'edit'])
-        ->name('project_jobs.assignments.edit_user');
+        ->name('user.project_jobs.assignments.edit');
+    Route::get('/project_jobs/assignments/{assignment}/schedule', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'schedule'])
+        ->name('user.project_jobs.assignments.schedule');
+    Route::put('/project_jobs/assignments/{assignment}/schedule', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'storeSchedule'])
+        ->name('user.project_jobs.assignments.schedule.store');
     Route::get('/chat/rooms/{id}', [App\Http\Controllers\Chat\ChatController::class, 'showRoom'])->name('chat.rooms.show');
 
     // Workload setting: show lists (stages, sizes, statuses, difficulties) scoped by company
@@ -374,13 +376,17 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         // Project_job CRUD
         Route::get('project_jobs', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'index'])->name('project_jobs.index');
         Route::get('project_jobs/create', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'create'])->name('project_jobs.create');
+        // Static assignment routes must come before {projectJob} parameterized routes
+        Route::get('project_jobs/past-assignments', [App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'pastData'])->name('project_jobs.past_assignments');
+        Route::get('project_jobs/assignment-select', [App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'selectProject'])->name('project_jobs.assignment_select');
         Route::post('project_jobs', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'store'])->name('project_jobs.store');
+        Route::post('project_jobs/{projectJob}/complete', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'complete'])->name('project_jobs.complete');
         Route::get('project_jobs/{projectJob}', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'show'])->name('project_jobs.show');
         Route::get('project_jobs/{projectJob}/edit', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'edit'])->name('project_jobs.edit');
         Route::put('project_jobs/{projectJob}', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'update'])->name('project_jobs.update');
         Route::delete('project_jobs/{projectJob}', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'destroy'])->name('project_jobs.destroy');
         // Project job assignment (JobAssign)
-        Route::get('project_jobs/{projectJob}/assignments', [App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'index'])->name('project_jobs.assignments.index');
+        Route::get('project_jobs/{projectJob}/assignments',[App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'index'])->name('project_jobs.assignments.index');
         Route::get('project_jobs/{projectJob}/assignments/create', [App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'create'])->name('project_jobs.assignments.create');
         Route::get('project_jobs/{projectJob}/assignments/{assignment}/edit', [App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'edit'])->name('project_jobs.assignments.edit');
         // Show (read-only) view for a single assignment

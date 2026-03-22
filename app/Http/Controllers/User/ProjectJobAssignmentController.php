@@ -9,6 +9,7 @@ use Inertia\Inertia;
 use App\Models\ProjectJob;
 use App\Models\ProjectJobAssignmentByMyself;
 use App\Models\ProjectJobAssignment;
+use App\Models\JobAssignmentMessage;
 use App\Models\Event;
 use Illuminate\Support\Facades\Schema;
 
@@ -131,6 +132,44 @@ class ProjectJobAssignmentController extends Controller
                         }
                     } catch (\Throwable $__eSetRead2) {
                     }
+                }
+
+                // If the project job is owned by a Coordinator, also register to JobBox
+                // so the owner can see self-reported work by users.
+                try {
+                    if ($projectJob->user_id && $user && $projectJob->user_id !== $user->id) {
+                        $pja = ProjectJobAssignment::create([
+                            'project_job_id' => $projectJob->id,
+                            'user_id' => $user->id,
+                            'sender_id' => $user->id,
+                            'title' => $a['title'],
+                            'detail' => $a['detail'] ?? null,
+                            'difficulty_id' => $difficultyId,
+                            'desired_end_date' => $a['desired_start_date'] ?? $a['desired_end_date'] ?? null,
+                            'desired_time' => $a['desired_time'] ?? null,
+                            'estimated_hours' => $a['estimated_hours'] ?? null,
+                            'work_item_type_id' => $a['work_item_type_id'] ?? null,
+                            'size_id' => $a['size_id'] ?? null,
+                            'stage_id' => $a['stage_id'] ?? null,
+                            'status_id' => $a['status_id'] ?? null,
+                            'company_id' => $a['company_id'] ?? null,
+                            'department_id' => $a['department_id'] ?? null,
+                            'amounts' => $a['amounts'] ?? null,
+                            'amounts_unit' => $a['amounts_unit'] ?? null,
+                            'assigned' => true,
+                            'accepted' => true,
+                            'read_at' => now(),
+                        ]);
+
+                        JobAssignmentMessage::create([
+                            'project_job_assignment_id' => $pja->id,
+                            'sender_id' => $user->id,
+                            'subject' => $a['title'],
+                            'body' => $a['detail'] ?? '',
+                        ]);
+                    }
+                } catch (\Throwable $__eJobBox) {
+                    \Illuminate\Support\Facades\Log::warning('Failed to mirror ProjectJobAssignmentByMyself to JobBox', ['error' => $__eJobBox->getMessage()]);
                 }
 
                 // Create corresponding Event if events table supports linking

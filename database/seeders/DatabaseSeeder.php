@@ -8,37 +8,69 @@ class DatabaseSeeder extends Seeder
 {
     /**
      * Seed the application's database.
+     *
+     * ============================================================
+     * 【デプロイ手順】
+     * 本番（さくらレンタルサーバー）へのデプロイ時は以下を実行:
+     *   php artisan migrate
+     *   php artisan db:seed
+     *
+     * サンプルデータ（z_ プレフィックス）は開発環境専用です。
+     * 本番デプロイ時は $sampleData = false のままにしてください。
+     * ============================================================
      */
     public function run(): void
     {
+        // ────────────────────────────────────────────────────────
+        // 本番・開発共通マスターデータ（必ず実行）
+        // 全 Seeder は updateOrInsert / firstOrCreate で冪等性あり
+        // ────────────────────────────────────────────────────────
         $this->call([
-            // ensure superadmin company, superadmin and its team are created before other dependent seeders
+            // Superadmin 会社・ユーザー・チーム（依存関係の起点）
             CreateSuperadminCompanySeeder::class,
             CreateSuperadminSeeder::class,
             CreateSuperadminTeamSeeder::class,
-            // core data
+
+            // 本体企業・部署・役職・チーム
             CompanySeeder::class,
             DepartmentSeeder::class,
             AssignmentSeeder::class,
-            // teams depend on companies/departments
-            \Database\Seeders\TeamSeeder::class,
-            // users depend on companies/departments/assignments/teams
-            // UserSeeder::class,s
+            TeamSeeder::class,
+
+            // AI プリセット（config/ai_presets.php から読み込み）
             AiPresetsSeeder::class,
-            // WorkItems related seeders
-            \Database\Seeders\WorkItemTypesSeeder::class,
-            \Database\Seeders\SizesSeeder::class,
-            \Database\Seeders\StatusesSeeder::class,
-            // Canonical status keys used by status_id columns
-            \Database\Seeders\StatusesTableSeeder::class,
-            \Database\Seeders\StagesSeeder::class,
-            \Database\Seeders\DifficultiesSeeder::class,
-            \Database\Seeders\WorkItemPresetsSeeder::class,
-            // この下はサンプル用のファイルです。必要ないときは消します。
-            z_SampleAdminUserSeeder::class,
-            z_SampleUsers22Seeder::class,
-            z_SampleDiariesSeeder::class,
-            z_ClientSeeder::class,
+
+            // 作業種別・サイズ・ステージ・難易度マスター
+            WorkItemTypesSeeder::class,
+            SizesSeeder::class,
+            StagesSeeder::class,
+            DifficultiesSeeder::class,
+
+            // ステータスマスター（status_id カラム用 key 付き）
+            StatusesSeeder::class,
+            StatusesTableSeeder::class,
+
+            // 作業項目プリセット
+            WorkItemPresetsSeeder::class,
+
+            // 「その他」クライアント・案件（EventController が参照する共通レコード）
+            OtherClientProjectSeeder::class,
         ]);
+
+        // ────────────────────────────────────────────────────────
+        // 開発環境専用サンプルデータ
+        // 本番デプロイ時は false のままにすること
+        // ────────────────────────────────────────────────────────
+        $sampleData = false; // 本番: false / 開発環境でサンプルデータが必要なら true に変更
+
+        if ($sampleData) {
+            $this->call([
+                z_SampleAdminUserSeeder::class,  // Admin サンプルユーザー (ito@test.com)
+                z_SampleUsers22Seeder::class,    // 22名 サンプルユーザー
+                z_SampleDiariesSeeder::class,    // サンプル日報
+                z_ClientSeeder::class,           // サンプル得意先（朝日デザイン等）
+                z_ProjectJobsSeeder::class,      // サンプル案件（クライアントに紐付く）
+            ]);
+        }
     }
 }

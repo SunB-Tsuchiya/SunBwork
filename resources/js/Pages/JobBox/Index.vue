@@ -1,11 +1,17 @@
 <template>
-    <AppLayout :title="`JobBox - ${props.projectJob?.name || ''}`">
+    <AppLayout :title="`JobBox - ${props.projectJob?.title || props.projectJob?.name || '全体'}`">
         <template #header>
             <h2 class="text-xl font-semibold leading-tight text-gray-800">JobBox — ジョブ関連メッセージ</h2>
         </template>
 
         <div class="mx-auto max-w-6xl rounded bg-white p-6 shadow">
-            <h1 class="mb-4 text-2xl font-bold">JobBox：{{ props.projectJob?.name || '' }}</h1>
+            <div class="mb-4 flex items-center justify-between">
+                <h1 class="text-2xl font-bold">JobBox：{{ props.projectJob?.title || props.projectJob?.name || '全体' }}</h1>
+                <Link
+                    :href="route('coordinator.project_jobs.assignment_select')"
+                    class="rounded bg-green-600 px-4 py-2 text-sm text-white hover:bg-green-700"
+                >新規作成</Link>
+            </div>
 
             <!-- 検索・フィルター行 -->
             <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -43,14 +49,27 @@
                 </label>
             </div>
 
-            <!-- 日グループ表示 -->
+            <!-- グループ表示切替ボタン -->
+            <div class="mt-4 flex gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1 w-fit">
+                <button
+                    v-for="mode in viewModes"
+                    :key="mode.key"
+                    @click="viewMode = mode.key"
+                    :class="viewMode === mode.key
+                        ? 'bg-white text-blue-700 font-semibold shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'"
+                    class="rounded px-4 py-1.5 text-sm transition-all"
+                >{{ mode.label }}</button>
+            </div>
+
+            <!-- グループ表示 -->
             <div class="mt-4 overflow-x-auto">
                 <div v-if="displayGroups.length === 0" class="py-8 text-center text-sm text-gray-400">
                     表示するデータがありません。
                 </div>
 
-                <template v-for="group in displayGroups" :key="group.date">
-                    <!-- 日付ヘッダー -->
+                <template v-for="group in displayGroups" :key="group.key">
+                    <!-- グループヘッダー -->
                     <div class="mt-4 rounded bg-gray-100 px-4 py-1.5 text-sm font-semibold text-gray-700 first:mt-0">
                         {{ group.label }}
                         <span class="ml-2 text-xs font-normal text-gray-500">{{ group.items.length }} 件</span>
@@ -64,6 +83,7 @@
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">時間</th>
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">タイトル</th>
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">クライアント</th>
+                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">案件名</th>
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">既読</th>
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">ステータス</th>
                             </tr>
@@ -89,6 +109,7 @@
                                 <td class="border px-3 py-2 text-sm text-gray-600">{{ getStartTime(m) }}</td>
                                 <td class="border px-3 py-2 text-sm">{{ m.subject || (m.body && m.body.slice(0, 60)) }}</td>
                                 <td class="border px-3 py-2 text-sm text-gray-600">{{ getClientName(m) }}</td>
+                                <td class="border px-3 py-2 text-sm text-gray-600">{{ getProjectJobTitle(m) }}</td>
                                 <td class="border px-3 py-2">
                                     <template v-if="isUnread(m)">
                                         <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">未読</span>
@@ -98,27 +119,10 @@
                                     </template>
                                 </td>
                                 <td class="border px-3 py-2">
-                                    <div class="flex items-center gap-2">
-                                        <TooltipProvider :delay-duration="0">
-                                            <Tooltip>
-                                                <TooltipTrigger>
-                                                    <span
-                                                        :class="statusBadgeClass(getAssignmentStatus(m))"
-                                                        class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-                                                    >
-                                                        <span v-html="statusIcon(getAssignmentStatus(m))" class="mr-1 inline-flex h-3 w-3"></span>
-                                                        {{ getAssignmentStatus(m) }}
-                                                    </span>
-                                                </TooltipTrigger>
-                                                <TooltipContent class="jobbox-tooltip max-w-xs">{{ statusTooltip(getAssignmentStatus(m)) }}</TooltipContent>
-                                            </Tooltip>
-                                        </TooltipProvider>
-                                        <button
-                                            v-if="getAssignmentStatus(m) !== '完了'"
-                                            @click.stop="completeAssignment(m)"
-                                            class="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700 active:bg-green-800"
-                                        >完了</button>
-                                    </div>
+                                    <span
+                                        :class="statusBadgeClass(getAssignmentStatus(m))"
+                                        class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+                                    >{{ getAssignmentStatus(m) }}</span>
                                 </td>
                             </tr>
                         </tbody>
@@ -142,7 +146,6 @@
 </template>
 
 <script setup>
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import useToasts from '@/Composables/useToasts';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
@@ -158,6 +161,14 @@ const sortState = reactive({ sort: page.props.sort || null, dir: page.props.dir 
 
 // 完了非表示フラグ（デフォルト：完了を隠す）
 const hideCompleted = ref(true);
+
+// グループ表示モード
+const viewMode = ref('date');
+const viewModes = [
+    { key: 'date', label: '日付ごと' },
+    { key: 'client', label: 'クライアントごと' },
+    { key: 'project', label: '案件ごと' },
+];
 
 // ===== ユーティリティ =====
 
@@ -192,12 +203,29 @@ function getDateKey(m) {
 function getStartTime(m) {
     const t = m.project_job_assignment?.start_time || m.project_job_assignment?.desired_time || '';
     if (!t) return '-';
-    // HH:MM:SS → HH:MM
     return String(t).slice(0, 5);
 }
 
 function getTimeKey(m) {
     return m.project_job_assignment?.start_time || m.project_job_assignment?.desired_time || '00:00';
+}
+
+function getClientName(m) {
+    try {
+        if (m.project_job_assignment?.project_job?.client?.name) return m.project_job_assignment.project_job.client.name;
+        if (props.projectJob?.client?.name) return props.projectJob.client.name;
+        return '-';
+    } catch {
+        return '-';
+    }
+}
+
+function getProjectJobTitle(m) {
+    try {
+        return m.project_job_assignment?.project_job?.title || m.project_job_assignment?.project_job?.name || props.projectJob?.title || props.projectJob?.name || '-';
+    } catch {
+        return '-';
+    }
 }
 
 // ===== 表示データ =====
@@ -223,40 +251,67 @@ function deduplicateByAssignment(arr) {
     return Array.from(byAssign.values());
 }
 
-// 日グループ（日付降順、同日内は開始時刻昇順）
+function getGroupKey(m) {
+    if (viewMode.value === 'client') return getClientName(m) || '未設定';
+    if (viewMode.value === 'project') return getProjectJobTitle(m) || '未設定';
+    return getDateKey(m);
+}
+
+function getGroupLabel(key) {
+    if (viewMode.value === 'date') return formatDateLabel(key);
+    return key || '未設定';
+}
+
+// グループ表示（日付降順 or クライアント/案件ごと日付昇順）
 const displayGroups = computed(() => {
     let messages = deduplicateByAssignment(Array.isArray(localMessages.value) ? localMessages.value : []);
 
-    // 完了非表示フィルター
-    const allCount = messages.length;
     if (hideCompleted.value) {
         messages = messages.filter((m) => getAssignmentStatus(m) !== '完了');
     }
 
-    // 日付でグループ化
     const grouped = new Map();
     for (const m of messages) {
-        const dk = getDateKey(m);
-        if (!grouped.has(dk)) grouped.set(dk, []);
-        grouped.get(dk).push(m);
+        const key = getGroupKey(m);
+        if (!grouped.has(key)) grouped.set(key, []);
+        grouped.get(key).push(m);
     }
 
-    // 同日内を時刻昇順にソート
+    // グループ内ソート
     for (const items of grouped.values()) {
-        items.sort((a, b) => getTimeKey(a).localeCompare(getTimeKey(b)));
+        if (viewMode.value === 'date') {
+            // 同日内: 開始時刻昇順
+            items.sort((a, b) => getTimeKey(a).localeCompare(getTimeKey(b)));
+        } else {
+            // クライアント/案件ごと: 日付昇順、同日内は時刻昇順
+            items.sort((a, b) => {
+                const da = getDateKey(a) || '';
+                const db = getDateKey(b) || '';
+                if (da !== db) return da.localeCompare(db);
+                return getTimeKey(a).localeCompare(getTimeKey(b));
+            });
+        }
     }
 
-    // 日付降順（31日→1日）
-    const sortedKeys = Array.from(grouped.keys()).sort((a, b) => {
-        if (!a) return 1;
-        if (!b) return -1;
-        return b.localeCompare(a);
-    });
+    // グループ順ソート
+    let sortedKeys = Array.from(grouped.keys());
+    if (viewMode.value === 'date') {
+        // 日付降順
+        sortedKeys.sort((a, b) => {
+            if (!a) return 1;
+            if (!b) return -1;
+            return b.localeCompare(a);
+        });
+    } else {
+        // 五十音順
+        sortedKeys.sort((a, b) => a.localeCompare(b, 'ja'));
+    }
 
-    return sortedKeys.map((dk) => ({
-        date: dk,
-        label: formatDateLabel(dk),
-        items: grouped.get(dk),
+    return sortedKeys.map((key) => ({
+        key,
+        date: key,
+        label: getGroupLabel(key),
+        items: grouped.get(key),
     }));
 });
 
@@ -267,50 +322,6 @@ const hiddenCompletedCount = computed(() => {
     const all = deduplicateByAssignment(Array.isArray(localMessages.value) ? localMessages.value : []);
     return all.filter((m) => getAssignmentStatus(m) === '完了').length;
 });
-
-// ===== 完了処理 =====
-
-async function completeAssignment(m) {
-    if (!confirm('完了しますか？')) return;
-    const assignmentId = m.project_job_assignment?.id;
-    if (!assignmentId) {
-        alert('割当情報が見つかりません。');
-        return;
-    }
-    try {
-        const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
-        const xsrfMatch = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
-        const xsrf = xsrfMatch ? decodeURIComponent(xsrfMatch[1]) : null;
-        const url = typeof route === 'function' ? route('jobbox.assignments.complete', { assignment: assignmentId }) : `/jobbox/assignments/${assignmentId}/complete`;
-        const res = await fetch(url, {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': token,
-                ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}),
-                'X-Requested-With': 'XMLHttpRequest',
-            },
-        });
-        if (res.ok) {
-            // ローカル状態を即時更新
-            const idx = localMessages.value.findIndex((x) => x.id === m.id);
-            if (idx >= 0) {
-                const msg = localMessages.value[idx];
-                if (msg.project_job_assignment) {
-                    msg.project_job_assignment.status = { key: 'completed', name: '完了' };
-                    msg.project_job_assignment.completed = true;
-                    msg.project_job_assignment.status_id = null; // force re-evaluate via status key
-                }
-            }
-        } else {
-            alert('完了処理に失敗しました。');
-        }
-    } catch (err) {
-        console.error('[JobBox] completeAssignment error', err);
-        alert('完了処理に失敗しました。');
-    }
-}
 
 // ===== 既存ロジック（変更なし） =====
 
@@ -374,11 +385,11 @@ async function rowClick(m, event) {
 function search() {
     const pjId = props.projectJob?.id;
     if (!pjId) {
-        const target = page.props.auth.user?.isCoordinator ? 'project_jobs.index' : 'user.jobbox.index';
+        const target = page.props.auth.user?.isCoordinator ? 'coordinator.jobbox' : 'user.jobbox.index';
         router.get(route(target), { q: page.props.q_model, period: page.props.period_model }, { preserveState: false });
         return;
     }
-    const r = page.props.auth.user?.isCoordinator ? 'coordinator.project_jobs.jobbox.index' : 'project_jobs.jobbox.index';
+    const r = page.props.auth.user?.isCoordinator ? 'coordinator.project_jobs.jobbox.index' : 'user.project_jobs.jobbox.index';
     router.get(route(r, { projectJob: pjId }), { q: page.props.q_model, period: page.props.period_model }, { preserveState: false });
 }
 
@@ -404,7 +415,7 @@ function getMessageLink(m) {
         if (!pjId) pjId = m.project_job_assignment?.project_job?.id || m.project_job_assignment?.project_job_id || null;
         if (!pjId) return '#';
         if (page.props.auth.user?.isCoordinator) return route('coordinator.project_jobs.jobbox.show', { projectJob: pjId, message: m.id });
-        return route('project_jobs.jobbox.show', { projectJob: pjId, message: m.id });
+        return route('user.project_jobs.jobbox.show', { projectJob: pjId, message: m.id });
     } catch {
         return '#';
     }
@@ -431,16 +442,6 @@ function getCounterparty(m) {
     }
 }
 
-function getClientName(m) {
-    try {
-        if (m.project_job_assignment?.project_job?.client?.name) return m.project_job_assignment.project_job.client.name;
-        if (props.projectJob?.client?.name) return props.projectJob.client.name;
-        return '-';
-    } catch {
-        return '-';
-    }
-}
-
 function getAssignmentStatus(m) {
     try {
         const jam = m || {};
@@ -449,19 +450,19 @@ function getAssignmentStatus(m) {
         if (statusKey) {
             switch (statusKey) {
                 case 'completed': return '完了';
-                case 'scheduled': return 'セット済み';
-                case 'confirmed': return '確認済み';
+                case 'scheduled': return 'セット済';
+                case 'confirmed': return '確認済';
                 case 'received':
                 case 'order':
-                case 'in_progress': return '受信済み';
+                case 'in_progress': return '受信済';
                 default: break;
             }
         }
         if (Boolean(jam.completed) || Boolean(assignment.completed)) return '完了';
-        if (Boolean(jam.scheduled) || Boolean(assignment.scheduled) || Boolean(assignment.scheduled_at)) return 'セット済み';
+        if (Boolean(jam.scheduled) || Boolean(assignment.scheduled) || Boolean(assignment.scheduled_at)) return 'セット済';
         const readAt = jam.read_at || assignment.read_at || null;
-        if (readAt) return Boolean(jam.accepted) || Boolean(assignment.accepted) ? '確認済み' : '既読済み';
-        if (Boolean(jam.accepted) || Boolean(assignment.accepted)) return '受信済み';
+        if (readAt) return Boolean(jam.accepted) || Boolean(assignment.accepted) ? '確認済' : '既読済';
+        if (Boolean(jam.accepted) || Boolean(assignment.accepted)) return '受信済';
         return '-';
     } catch {
         return '-';
@@ -471,33 +472,11 @@ function getAssignmentStatus(m) {
 function statusBadgeClass(status) {
     switch (status) {
         case '完了': return 'bg-yellow-100 text-yellow-800';
-        case 'セット済み': return 'bg-blue-100 text-blue-800';
-        case '確認済み': return 'bg-green-100 text-green-800';
-        case '受信済み': return 'bg-indigo-100 text-indigo-800';
-        case '既読済み': return 'bg-gray-100 text-gray-700';
+        case 'セット済': return 'bg-blue-100 text-blue-800';
+        case '確認済': return 'bg-green-100 text-green-800';
+        case '受信済': return 'bg-indigo-100 text-indigo-800';
+        case '既読済': return 'bg-gray-100 text-gray-700';
         default: return 'bg-gray-100 text-gray-700';
-    }
-}
-
-function statusTooltip(status) {
-    switch (status) {
-        case '完了': return '作業が完了しています。';
-        case 'セット済み': return '作業の予定がカレンダーにセットされています。';
-        case '確認済み': return '受信者が内容を確認しました（既読）。';
-        case '受信済み': return '受信者にメッセージが届いています（未確認）。';
-        case '既読済み': return '既に既読となっています。';
-        default: return '';
-    }
-}
-
-function statusIcon(status) {
-    switch (status) {
-        case '完了': return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3 text-yellow-800"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 00-1.414-1.414L7 12.172 4.707 9.879a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l9-9z" clip-rule="evenodd"/></svg>`;
-        case 'セット済み': return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3 text-blue-800"><path d="M6 2a1 1 0 000 2h8a1 1 0 100-2H6zM3 6a1 1 0 011-1h12a1 1 0 011 1v9a2 2 0 01-2 2H5a2 2 0 01-2-2V6z"/></svg>`;
-        case '確認済み': return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3 text-green-800"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zM9 7h2v5H9V7zm0 7h2v2H9v-2z"/></svg>`;
-        case '受信済み': return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3 text-indigo-800"><path d="M2 5a2 2 0 012-2h12a2 2 0 012 2v1l-8 4.5L2 6V5z"/><path d="M18 8.118V15a2 2 0 01-2 2H4a2 2 0 01-2-2V8.118l8 4.5 8-4.5z"/></svg>`;
-        case '既読済み': return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3 text-gray-800"><path d="M3 5a1 1 0 011-1h12a1 1 0 011 1v9a2 2 0 01-2 2H5a2 2 0 01-2-2V5z"/></svg>`;
-        default: return '';
     }
 }
 
@@ -592,9 +571,6 @@ onMounted(() => {
     padding: 0.5rem 0.75rem !important;
     font-size: 0.875rem !important;
 }
-.jobbox-tooltip .bg-primary { background-color: #eff6ff !important; }
-.jobbox-tooltip .fill-primary { fill: #eff6ff !important; }
-.jobbox-tooltip .size-2\.5 { width: 10px; height: 10px; }
 </style>
 
 <style scoped>

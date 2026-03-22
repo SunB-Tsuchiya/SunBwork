@@ -21,7 +21,7 @@
                 </div>
                 <div>
                     <Link
-                        :href="typeof route === 'function' ? route('project_jobs.assignments.create_user') : '/project_jobs/assignments/create-user'"
+                        :href="typeof route === 'function' ? route('user.project_jobs.assignments.create') : '/project_jobs/assignments/create-user'"
                         class="rounded bg-blue-600 px-4 py-2 text-white"
                         >新規ジョブ作成</Link
                     >

@@ -34,6 +34,7 @@ class ProjectSchedulesController extends Controller
         $data = $request->validate([
             'project_job_id' => 'required|exists:project_jobs,id',
             'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date',
             'color' => 'nullable|string|max:32',

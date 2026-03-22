@@ -3,7 +3,6 @@ import ApplicationMark from '@/Components/ApplicationMark.vue';
 import Banner from '@/Components/Banner.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
-import NavLink from '@/Components/NavLink.vue';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
 import AdminNavigationTabs from '@/Components/Tabs/AdminNavigationTabs.vue';
 import CoordinatorNavigationTabs from '@/Components/Tabs/CoordinatorNavigationTabs.vue';
@@ -82,9 +81,9 @@ watch(
 const jobLink = computed(() => {
     try {
         // Prefer the named Ziggy route for the JobBox index if available
-        if (typeof route === 'function' && route().has && route().has('project_jobs.index')) {
+        if (typeof route === 'function' && route().has && route().has('coordinator.jobbox')) {
             try {
-                return route('project_jobs.index');
+                return route('coordinator.jobbox');
             } catch (e) {
                 // ignore and fall back to literal path
             }
@@ -201,17 +200,41 @@ const getTopTabActive = () => {
         return '';
     }
 };
+// role nav link class — active role gets solid background + white text
+function roleNavClass(role) {
+    const base = 'inline-flex items-center justify-center rounded-md min-w-[7rem] px-3 py-1 text-sm font-medium transition-colors';
+    const activeMap = {
+        superadmin:  'bg-yellow-500 text-white font-semibold',
+        admin:       'bg-red-500 text-white font-semibold',
+        leader:      'bg-orange-500 text-white font-semibold',
+        coordinator: 'bg-green-600 text-white font-semibold',
+        user:        'bg-blue-500 text-white font-semibold',
+    };
+    const inactiveMap = {
+        superadmin:  'text-yellow-600 hover:text-yellow-800',
+        admin:       'text-red-600 hover:text-red-800',
+        leader:      'text-orange-600 hover:text-orange-800',
+        coordinator: 'text-green-600 hover:text-green-800',
+        user:        'text-blue-600 hover:text-blue-800',
+    };
+    return `${base} ${currentRouteContext.value === role ? activeMap[role] : inactiveMap[role]}`;
+}
+
 // compute active key for coordinator tabs (projects vs jobs)
 const computeCoordinatorActive = () => {
     try {
         const r = route().current();
         if (!r) return '';
-        // if route name includes 'assignments' treat as jobs list/assignments area
+        // jobbox routes → jobs tab
+        if (r.includes('jobbox')) return 'jobs';
+        // assignments routes → jobs tab
         if (r.includes('assignments')) return 'jobs';
-        // otherwise default to projects
-        return 'projects';
+        // explicit project_jobs routes (index/show/create/edit) → projects tab
+        if (r.match(/^coordinator\.project_jobs\.(index|show|create|edit|store|update|destroy|complete)$/)) return 'projects';
+        // no match (e.g. dashboard) → no tab active
+        return '';
     } catch (e) {
-        return 'projects';
+        return '';
     }
 };
 
@@ -224,9 +247,9 @@ const currentRouteContext = computed(() => {
         if (r.startsWith('superadmin.')) return 'superadmin';
         if (r.startsWith('admin.')) return 'admin';
         if (r.startsWith('leader.') || r.startsWith('workload_setting.')) return 'leader';
-        if (r.startsWith('coordinator.') || r.startsWith('project_jobs.')) return 'coordinator';
-        // user エリアのルート（user.*, diaries.*, calendar.*, myjobbox 等）は常に 'user' を返す
-        // 上位ロールのユーザーが User メニューを押した場合も UserNavigationTabs を表示する
+        if (r.startsWith('coordinator.')) return 'coordinator';
+        // user.project_jobs.* / user.jobbox.* は user エリア
+        // それ以外の user.* も user エリア
         return 'user';
     } catch (e) {
         return page.props.auth?.user?.user_role || 'user';
@@ -264,65 +287,37 @@ const currentRouteContext = computed(() => {
                                         (typeof route === 'function' ? route().has('superadmin.dashboard') : false)
                                     "
                                 >
-                                    <NavLink :href="route('superadmin.dashboard')" :active="route().current('superadmin.dashboard')">
-                                        <span class="text-yellow-600">SuperAdmin</span>
-                                    </NavLink>
-                                    <NavLink :href="route('admin.dashboard')" :active="route().current('admin.dashboard')">
-                                        <span class="text-red-600">Admin</span>
-                                    </NavLink>
-                                    <NavLink :href="route('leader.dashboard')" :active="route().current('leader.dashboard')">
-                                        <span class="text-orange-600">Leader</span>
-                                    </NavLink>
-                                    <NavLink :href="route('coordinator.dashboard')" :active="route().current('coordinator.dashboard')">
-                                        <span class="text-green-600">Coordinator</span>
-                                    </NavLink>
-                                    <NavLink :href="route('user.dashboard')" :active="route().current('user.dashboard')">
-                                        <span class="text-blue-600">User</span>
-                                    </NavLink>
+                                    <Link :href="route('superadmin.dashboard')" :class="roleNavClass('superadmin')">SuperAdmin</Link>
+                                    <Link :href="route('admin.dashboard')" :class="roleNavClass('admin')">Admin</Link>
+                                    <Link :href="route('leader.dashboard')" :class="roleNavClass('leader')">Leader</Link>
+                                    <Link :href="route('coordinator.dashboard')" :class="roleNavClass('coordinator')">Coordinator</Link>
+                                    <Link :href="route('user.dashboard')" :class="roleNavClass('user')">User</Link>
                                 </template>
 
                                 <!-- Admin用ナビゲーション -->
                                 <template v-else-if="$page.props.auth.user.user_role === 'admin'">
-                                    <NavLink :href="route('admin.dashboard')" :active="route().current('admin.dashboard')">
-                                        <span class="text-red-600">Admin</span>
-                                    </NavLink>
-                                    <NavLink :href="route('leader.dashboard')" :active="route().current('leader.dashboard')">
-                                        <span class="text-orange-600">Leader</span>
-                                    </NavLink>
-                                    <NavLink :href="route('coordinator.dashboard')" :active="route().current('coordinator.dashboard')">
-                                        <span class="text-green-600">Coordinator</span>
-                                    </NavLink>
-                                    <NavLink :href="route('user.dashboard')" :active="route().current('user.dashboard')">
-                                        <span class="text-blue-600">User</span>
-                                    </NavLink>
+                                    <Link :href="route('admin.dashboard')" :class="roleNavClass('admin')">Admin</Link>
+                                    <Link :href="route('leader.dashboard')" :class="roleNavClass('leader')">Leader</Link>
+                                    <Link :href="route('coordinator.dashboard')" :class="roleNavClass('coordinator')">Coordinator</Link>
+                                    <Link :href="route('user.dashboard')" :class="roleNavClass('user')">User</Link>
                                 </template>
 
                                 <!-- Leader用ナビゲーション -->
                                 <template v-else-if="$page.props.auth.user.user_role === 'leader'">
-                                    <NavLink :href="route('leader.dashboard')" :active="route().current('leader.dashboard')">
-                                        <span class="text-orange-600">Leader</span>
-                                    </NavLink>
-                                    <NavLink :href="route('coordinator.dashboard')" :active="route().current('coordinator.dashboard')">
-                                        <span class="text-green-600">Coordinator</span>
-                                    </NavLink>
-                                    <NavLink :href="route('user.dashboard')" :active="route().current('user.dashboard')">
-                                        <span class="text-blue-600">User</span>
-                                    </NavLink>
+                                    <Link :href="route('leader.dashboard')" :class="roleNavClass('leader')">Leader</Link>
+                                    <Link :href="route('coordinator.dashboard')" :class="roleNavClass('coordinator')">Coordinator</Link>
+                                    <Link :href="route('user.dashboard')" :class="roleNavClass('user')">User</Link>
                                 </template>
 
                                 <!-- Coordinator用ナビゲーション -->
                                 <template v-else-if="$page.props.auth.user.user_role === 'coordinator'">
-                                    <NavLink :href="route('coordinator.dashboard')" :active="route().current('coordinator.dashboard')">
-                                        <span class="text-green-600">Coordinator</span>
-                                    </NavLink>
-                                    <NavLink :href="route('user.dashboard')" :active="route().current('user.dashboard')">
-                                        <span class="text-blue-600">User</span>
-                                    </NavLink>
+                                    <Link :href="route('coordinator.dashboard')" :class="roleNavClass('coordinator')">Coordinator</Link>
+                                    <Link :href="route('user.dashboard')" :class="roleNavClass('user')">User</Link>
                                 </template>
 
                                 <!-- 一般ユーザー用ナビゲーション -->
                                 <template v-else>
-                                    <NavLink :href="route('dashboard')" :active="route().current('dashboard')"> Dashboard </NavLink>
+                                    <Link :href="route('dashboard')" :class="roleNavClass('user')">Dashboard</Link>
                                 </template>
                             </div>
                         </div>
@@ -341,7 +336,7 @@ const currentRouteContext = computed(() => {
                                 </Link>
                             </div> -->
                             <!-- Messages link -->
-                            <!-- <div class="relative ms-3 flex items-center">
+                            <div class="relative ms-3 flex items-center">
                                 <Link :href="route('messages.index')" class="flex items-center text-sm text-gray-600 hover:text-gray-800">
                                     <span>メール</span>
                                     <span
@@ -350,7 +345,7 @@ const currentRouteContext = computed(() => {
                                         >{{ unreadMessages }}</span
                                     >
                                 </Link>
-                            </div> -->
+                            </div>
                             <!-- JobBox link -->
                             <!-- <div class="relative ms-3 flex items-center">
                                 <Link :href="jobLink" class="flex items-center text-sm text-gray-600 hover:text-gray-800" @click="handleJobClick">

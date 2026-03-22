@@ -13,17 +13,57 @@ class ProjectJobController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $jobs = ProjectJob::with('client')
-            ->where('user_id', $user->id)
-            ->get();
-        // フラッシュデータからjobid/register_flagsを取得
+        $q = $request->input('q', '');
+        $period = $request->input('period', '');
+
+        $query = ProjectJob::with('client')
+            ->where('user_id', $user->id);
+
+        if ($q) {
+            $query->where(function ($q2) use ($q) {
+                $q2->where('title', 'like', "%{$q}%")
+                    ->orWhereHas('client', fn($c) => $c->where('name', 'like', "%{$q}%"));
+            });
+        }
+
+        if ($period && $period !== 'all') {
+            [$y, $m] = explode('-', $period);
+            $query->whereYear('created_at', $y)->whereMonth('created_at', $m);
+        }
+
+        $jobs = $query->orderBy('created_at', 'desc')->get();
+
+        // 直近12ヶ月の月オプション
+        $monthOptions = [];
+        for ($i = 0; $i < 12; $i++) {
+            $d = now()->subMonths($i);
+            $monthOptions[] = [
+                'value' => $d->format('Y-m'),
+                'label' => $d->format('Y年n月'),
+            ];
+        }
+
         $jobid = session('jobid');
         $registerFlags = session('register_flags', []);
         return Inertia::render('Coordinator/ProjectJobs/Index', [
             'jobs' => $jobs,
             'jobid' => $jobid,
             'registerFlags' => $registerFlags,
+            'monthOptions' => $monthOptions,
+            'q' => $q,
+            'period' => $period,
         ]);
+    }
+
+    public function complete(Request $request, ProjectJob $projectJob)
+    {
+        $user = $request->user();
+        if (!$user || $projectJob->user_id !== $user->id) {
+            return response()->json(['error' => 'Access denied'], 403);
+        }
+        $projectJob->completed = true;
+        $projectJob->save();
+        return response()->json(['success' => true, 'id' => $projectJob->id]);
     }
 
     public function create()
@@ -142,7 +182,10 @@ class ProjectJobController extends Controller
             $assignmentEvents = [];
         }
 
-        // hasSchedule computed and returned to Inertia props
+        // スケジュール一覧（Show に表として表示するため）
+        $schedules = \App\Models\ProjectSchedule::where('project_job_id', $projectJob->id)
+            ->orderBy('start_date')
+            ->get(['id', 'name', 'description', 'start_date', 'end_date']);
 
         return Inertia::render('Coordinator/ProjectJobs/Show', [
             'job' => $projectJob,
@@ -151,6 +194,7 @@ class ProjectJobController extends Controller
             'registerFlags' => $registerFlags,
             'hasSchedule' => $hasSchedule,
             'assignmentEvents' => $assignmentEvents,
+            'schedules' => $schedules,
         ]);
     }
 

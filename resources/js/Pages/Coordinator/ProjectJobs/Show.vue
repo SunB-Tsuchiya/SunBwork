@@ -64,6 +64,34 @@
                             {{ hasScheduleFlag ? 'スケジュール詳細' : 'スケジュール登録' }}
                         </button>
                     </div>
+
+                    <!-- スケジュール一覧テーブル -->
+                    <div v-if="schedules.length > 0" class="mt-3 overflow-x-auto">
+                        <table class="min-w-full border text-sm">
+                            <thead>
+                                <tr class="bg-gray-50">
+                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">開始日</th>
+                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">終了日</th>
+                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">タイトル</th>
+                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">内容</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr
+                                    v-for="s in schedules"
+                                    :key="s.id"
+                                    class="cursor-pointer hover:bg-blue-50"
+                                    @click="goScheduleDetail(s)"
+                                >
+                                    <td class="border px-3 py-2 text-gray-700">{{ formatDate(s.start_date) }}</td>
+                                    <td class="border px-3 py-2 text-gray-700">{{ formatDate(s.end_date) }}</td>
+                                    <td class="border px-3 py-2 font-medium text-gray-900">{{ s.name || '-' }}</td>
+                                    <td class="border px-3 py-2 text-gray-600">{{ truncate(s.description, 40) }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div v-else-if="hasScheduleFlag" class="mt-2 text-sm text-gray-400">スケジュールデータがありません。</div>
                 </div>
 
                 <div class="mb-4">
@@ -132,6 +160,7 @@ import { computed, onMounted, ref } from 'vue';
 
 const page = usePage();
 const job = page.props.job || {};
+const schedules = computed(() => Array.isArray(page.props.schedules) ? page.props.schedules : []);
 
 // allow server to pass an explicit hasSchedule flag (more reliable)
 const serverHasSchedule = page.props.hasSchedule;
@@ -180,6 +209,29 @@ function goSchedule() {
     if (id) router.visit(route('coordinator.project_jobs.schedule', { projectJob: id }));
 }
 
+function goScheduleDetail() {
+    // スケジュール個別の show ページはないため、カレンダー画面へ遷移
+    const pjId = job.id || null;
+    if (!pjId) return;
+    const url = route('coordinator.project_schedules.calendar') + '?project_job_id=' + encodeURIComponent(pjId);
+    router.visit(url);
+}
+
+function formatDate(v) {
+    if (!v) return '-';
+    try {
+        return String(v).split('T')[0];
+    } catch {
+        return String(v);
+    }
+}
+
+function truncate(text, len) {
+    if (!text) return '-';
+    const s = String(text);
+    return s.length > len ? s.slice(0, len) + '…' : s;
+}
+
 function goProjectTeammember() {
     const id = job.id || null;
     if (id) {
@@ -220,81 +272,6 @@ function goAnalysis() {
     if (id) router.visit(route('coordinator.project_jobs.analysis', { projectJob: id }));
 }
 
-// assignment events passed from server
-const assignmentEvents = computed(() => {
-    return Array.isArray(page.props.assignmentEvents) ? page.props.assignmentEvents : [];
-});
-
-// Group assignmentEvents by assignment_name (fallback to assignment_id) and sum total minutes per group
-const groupedAssignments = computed(() => {
-    const map = {};
-    assignmentEvents.value.forEach((row) => {
-        const name = row.assignment_name || `assignment-${row.assignment_id || 'unknown'}`;
-        if (!map[name]) map[name] = { name, items: [], totalMinutes: 0 };
-        map[name].items.push(row);
-
-        // accumulate minutes if start/end are valid
-        try {
-            const s = row.start ? new Date(row.start) : null;
-            const e = row.end ? new Date(row.end) : null;
-            if (s && e && !isNaN(s.getTime()) && !isNaN(e.getTime())) {
-                let diff = Math.round((e - s) / 60000);
-                if (diff < 0) diff = 0;
-                map[name].totalMinutes += diff;
-            }
-        } catch (err) {
-            // ignore
-        }
-    });
-
-    // convert to array and sort each group's items by start
-    return Object.keys(map).map((k) => {
-        const g = map[k];
-        g.items.sort((a, b) => {
-            if (!a.start) return 1;
-            if (!b.start) return -1;
-            return new Date(a.start) - new Date(b.start);
-        });
-        return g;
-    });
-});
-
-function formatDurationFromMinutes(minutes) {
-    if (!minutes && minutes !== 0) return '-';
-    const m = Math.max(0, Math.round(Number(minutes) || 0));
-    const h = Math.floor(m / 60);
-    const mm = m % 60;
-    if (h > 0) return `${h}時間${mm}分`;
-    return `${mm}分`;
-}
-
-function formatDateTime(v) {
-    if (!v) return '-';
-    try {
-        const d = new Date(v);
-        if (isNaN(d.getTime())) return String(v);
-        return d.toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-    } catch (e) {
-        return String(v);
-    }
-}
-
-function formatDuration(startV, endV) {
-    if (!startV || !endV) return '-';
-    try {
-        const s = new Date(startV);
-        const e = new Date(endV);
-        if (isNaN(s.getTime()) || isNaN(e.getTime())) return '-';
-        let diff = Math.round((e - s) / 60000); // minutes
-        if (diff < 0) diff = 0;
-        const h = Math.floor(diff / 60);
-        const m = diff % 60;
-        if (h > 0) return `${h}時間${m}分`;
-        return `${m}分`;
-    } catch (err) {
-        return '-';
-    }
-}
 </script>
 
 <style scoped>

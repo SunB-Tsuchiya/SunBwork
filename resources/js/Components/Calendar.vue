@@ -164,9 +164,9 @@ const fullCalendarRef = ref(null);
 function goToAssignedJobs() {
     try {
         // Prefer named Ziggy route for JobBox index if available
-        if (typeof route === 'function' && route().has && route().has('project_jobs.index')) {
+        if (typeof route === 'function' && route().has && route().has('coordinator.jobbox')) {
             try {
-                router.get(route('project_jobs.index'));
+                router.get(route('coordinator.jobbox'));
                 return;
             } catch (e) {
                 // fallthrough to fallback

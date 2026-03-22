@@ -491,9 +491,19 @@ function goToDiaryCreate() {
     showMemoModal.value = true;
 }
 function handleDateSelect(selectionInfo) {
-    // カレンダーの日付クリックでは即メモモーダルを開く（その日付をセット）
     const dateStr = selectionInfo.startStr.split('T')[0];
     selectedDate.value = dateStr;
+    // project_job 経由のカレンダーでは予定作成モーダルを開く
+    if (props.project) {
+        simpleEventTitle.value = '';
+        simpleEventIsRange.value = false;
+        simpleEventStartDate.value = dateStr;
+        simpleEventEndDate.value = dateStr;
+        simpleEventMemo.value = '';
+        showSimpleEventModal.value = true;
+        return;
+    }
+    // それ以外はメモモーダルを開く
     memoDate.value = dateStr;
     selectedScheduleIdForMemo.value = null;
     memoBody.value = '';
@@ -1877,6 +1887,7 @@ async function submitSimpleEvent() {
         const payload = {
             project_job_id: props.project ? props.project.id || props.project.project_job_id || props.project.project_job?.id : null,
             name: simpleEventTitle.value,
+            description: simpleEventMemo.value || null,
             start_date: simpleEventStartDate.value,
             end_date: simpleEventIsRange.value ? simpleEventEndDate.value : simpleEventStartDate.value,
             color: simpleEventLabel.value || null,

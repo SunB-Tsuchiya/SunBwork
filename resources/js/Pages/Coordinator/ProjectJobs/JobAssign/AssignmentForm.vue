@@ -1064,7 +1064,7 @@ async function save() {
                 } catch (e) {}
                 return;
             }
-            const url = route('project_jobs.assignments.store_user', { projectJob: computedProjectJobId });
+            const url = route('user.project_jobs.assignments.store', { projectJob: computedProjectJobId });
             const rel =
                 typeof window !== 'undefined' && url && url.indexOf(window.location.origin) === 0 ? url.replace(window.location.origin, '') : url;
             // console.log('[AssignmentForm_user] posting (fetch) to (relative):', rel);
