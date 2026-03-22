@@ -1,0 +1,1 @@
+import{d as t,o as s,a as o}from"./app-BohqNBzg.js";const l={__name:"Index",setup(r){return(a,e)=>(s(),t("div",null,e[0]||(e[0]=[o("p",{class:"text-sm text-gray-500"},"This directory will contain pages/components related to sending job requests to users.",-1)])))}};export{l as default};
