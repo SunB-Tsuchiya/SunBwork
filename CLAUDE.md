@@ -839,3 +839,195 @@ php artisan config:clear && php artisan cache:clear
 - `z_instructions/attachment_guidelines.md` - 添付ファイルガイドライン
 
 > `z_instructions/backups/` 配下のファイルは読み飛ばす。
+
+---
+
+## 日報（Diary）実装ルール
+
+### タイムスタンプに関する注意（重要）
+
+`DiaryController::store()` で日報を保存する際、**`created_at` / `updated_at` を明示的にセットしてはいけない**。
+かつて `$diary->created_at = Carbon::parse($data['date'])->startOfDay()` が設定されており、常に 00:00:00 になるバグがあった。Laravel に任せて `now()` を使わせること。
+
+```php
+// NG: 時刻が強制的に 00:00:00 になる
+$diary->created_at = Carbon::parse($data['date'])->startOfDay();
+
+// OK: Laravel が now() を自動設定する
+$diary->date = Carbon::parse($data['date'])->toDateString();
+$diary->save(); // created_at / updated_at は触らない
+```
+
+### 既存日報チェックは `date` カラムで行う
+
+`DiaryController::create()` で既存日報の存在チェックをする際は `whereDate('created_at', $date)` ではなく `where('date', $date)` を使うこと。
+`created_at` は作成した実際の日時（昨日の日報を今日付けで作成した場合などにずれる）。
+
+```php
+// NG
+$diary = Diary::where('user_id', $userId)->whereDate('created_at', $date)->first();
+
+// OK
+$diary = Diary::where('user_id', $userId)->where('date', $date)->first();
+```
+
+### Quill エディタへのコンテンツ外部セット
+
+`@vueup/vue-quill` は `v-model` の外部変更だけでは内部状態が更新されない。
+過去データ流用などでプログラムからコンテンツをセットする場合は、**`form.content` への代入** と **`editorInstance` への直接更新** の両方が必要。
+
+```js
+function applyPastContent(html) {
+    form.content = html;         // Inertia form に反映
+    content.value = html;        // ref にも反映
+    if (editorInstance) {
+        try {
+            const delta = editorInstance.clipboard.convert(html);
+            editorInstance.setContents(delta);  // Quill 内部状態を更新
+        } catch (e) {
+            editorInstance.root.innerHTML = html;
+        }
+    }
+}
+```
+
+`editorInstance` は `@ready="handleEditorReady"` で取得したグローバル変数。
+
+### 日付変更時の既存日報リダイレクト
+
+Create.vue の日付セレクターが変わったとき、`router.visit` でサーバーの `create()` を再度呼ぶ。
+`create()` は `where('date', $date)` で既存日報を検出し、あれば自動的に edit へリダイレクトする。
+
+```js
+watch(
+    () => form.date,
+    (newDate, oldDate) => {
+        if (!newDate || newDate === oldDate) return;
+        router.visit(route('diaries.create') + '?date=' + newDate, {
+            preserveScroll: true,
+        });
+    },
+);
+```
+
+### 日報 Show ページのレイアウト
+
+`Diaries/Show.vue` および `Diaries/Interactions/Show.vue` は**2カラムグリッド**レイアウト。
+- 左列: 日報本文（`max-h-52 overflow-y-auto`）＋ コメント ＋ ボタン
+- 右列: TimelineDiary（当日の予定）
+- タイトル下に**勤務情報バー**（勤務形態・開始・終了・残業時間）
+
+勤務情報バーのデータは `DiaryController::show()` および `DiaryInteractionController::show()` で
+`WorkRecord::with('worktype')` を取得して `workRecord` prop として渡す。
+
+`Interactions/Show.vue` のみ超過残業（240分以上）で赤字表示。`Diaries/Show.vue` は赤字なし。
+
+---
+
+## TimelineDiary コンポーネント ルール
+
+**ファイル:** `resources/js/Components/TimelineDiary.vue`
+
+### 水平スクロールしない実装（重要）
+
+TimelineDiary は `ResizeObserver` でラッパー幅をリアクティブに取得し、
+`usedPxPerMin = containerWidth / windowMinutes` で自動フィットする。
+**`minWidth` をピクセルで強制してはいけない**（ビューポートより大きくなり水平スクロールが発生する）。
+
+```js
+// 正しい実装
+const containerWidth = ref(0);
+onMounted(() => {
+    containerWidth.value = scrollWrapperRef.value.clientWidth;
+    resizeObserver = new ResizeObserver((entries) => {
+        containerWidth.value = entries[0]?.contentRect.width ?? 0;
+    });
+    resizeObserver.observe(scrollWrapperRef.value);
+});
+const usedPxPerMin = computed(() => {
+    if (containerWidth.value > 0 && windowMinutes.value > 0) {
+        return containerWidth.value / windowMinutes.value;
+    }
+    return pxPerMinuteRef.value;
+});
+```
+
+### startHour / endHour を勤務記録から動的に決定
+
+各 Show ページで `workRecord.start_time` / `workRecord.end_time` から表示範囲を計算して渡す。
+
+```js
+const timelineStartHour = computed(() => {
+    const t = props.workRecord?.start_time; // "HH:MM"
+    if (!t) return 8;
+    return Math.max(0, Math.floor(parseInt(t.split(':')[0], 10)) - 1);
+});
+const timelineEndHour = computed(() => {
+    const t = props.workRecord?.end_time;
+    if (!t) return 20;
+    const h = parseInt(t.split(':')[0], 10);
+    const m = parseInt(t.split(':')[1] ?? '0', 10);
+    return Math.min(24, h + (m > 0 ? 2 : 1));
+});
+```
+
+### props 変化への追随
+
+`startHour` / `endHour` props が親から遅れて渡される場合があるため、`watch` を設ける。
+
+```js
+watch(() => props.startHour, (v) => { startHourRef.value = v; });
+watch(() => props.endHour,   (v) => { endHourRef.value   = v; });
+```
+
+---
+
+## Coordinator 割当フロー ルール
+
+### 案件選択中間ページ（SelectProject）
+
+Coordinator が新規割当を作成する際は、直接フォームに遷移せず中間ページを経由する。
+
+- **ルート:** `GET coordinator/project_jobs/assignment-select` → `coordinator.project_jobs.assignment_select`
+- **コントローラー:** `ProjectJobAssignmentsController::selectProject()`
+  - `ProjectJob::where('user_id', $user->id)` でオーナーである案件のみ取得
+  - クライアントで絞り込み → 案件選択 → assignments.create へ遷移
+- **Vue ページ:** `Pages/Coordinator/ProjectJobs/JobAssign/SelectProject.vue`
+
+### ルート定義の順序（必須）
+
+`project_jobs/{projectJob}` のような**パラメータ化ルートより前に静的ルートを定義**すること。
+後ろに置くと文字列（例: `assignment-select`）がパラメータとして捕捉されて 404 になる。
+
+```php
+// OK: 静的ルートが先
+Route::get('project_jobs/past-assignments',  [...'pastData'])->name('...');
+Route::get('project_jobs/assignment-select', [...'selectProject'])->name('...');
+Route::get('project_jobs/{projectJob}',      [...'show'])->name('...');  // 後
+```
+
+### 「過去データから流用」モーダルの実装パターン
+
+AssignmentForm（Edit.vue）や Diary（Create.vue）で共通して使うパターン。
+
+**フロントエンド:**
+1. 「過去データから流用」ボタン → モーダル表示
+2. `fetch` API で `?mode=date|project` などのフィルターを付けてデータ取得
+3. テーブルで行クリック → `selectRecord(rec)` で親フォームに値を注入
+
+**AssignmentForm への注入:**
+`assignments` prop と `:key="formKey"` を使い、formKey をインクリメントしてフォームを再マウント。
+
+```js
+const formKey = ref(0);
+function selectRecord(rec) {
+    formAssignments.value = [{ ...rec, id: null, amounts: null }];
+    formKey.value += 1;  // AssignmentForm を再マウントして初期値を反映
+    closeModal();
+}
+```
+
+**バックエンド (`pastData` メソッド):**
+- `whereHas('projectJob', fn => q->where('user_id', $user->id))` でオーナー所有案件のみ
+- `date` モード: `desired_end_date` 範囲フィルター
+- `project` モード: `project_job_id` フィルター + 案件一覧を返す

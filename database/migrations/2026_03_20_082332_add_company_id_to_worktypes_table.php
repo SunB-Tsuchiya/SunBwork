@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -17,8 +16,7 @@ return new class extends Migration
             $table->foreign('company_id')->references('id')->on('companies')->nullOnDelete();
         });
 
-        // 既存の4件に company_id=2 を設定
-        DB::table('worktypes')->update(['company_id' => 2]);
+        // company_id のバックフィルは WorktypeSeeder で行う（migrate 実行時は companies テーブルが空のため）
     }
 
     /**

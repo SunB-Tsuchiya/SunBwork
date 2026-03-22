@@ -31,11 +31,12 @@ class DatabaseSeeder extends Seeder
             CreateSuperadminSeeder::class,
             CreateSuperadminTeamSeeder::class,
 
-            // 本体企業・部署・役職・チーム
+            // 本体企業・部署・役職・チーム・勤務形態
             CompanySeeder::class,
             DepartmentSeeder::class,
             AssignmentSeeder::class,
             TeamSeeder::class,
+            WorktypeSeeder::class,
 
             // AI プリセット（config/ai_presets.php から読み込み）
             AiPresetsSeeder::class,
