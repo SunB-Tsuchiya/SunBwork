@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-axios.defaults.baseURL = window.location?.origin || '';
+axios.defaults.baseURL = (window.location?.origin || '') + (import.meta.env.VITE_APP_BASE_PATH || '');
 axios.defaults.withCredentials = true; // これも必須
 
 window.axios = axios;
@@ -74,13 +74,13 @@ const initEcho = () => {
 };
 
 // CSRF cookie を取得してから Echo を初期化する（race を防ぐ）
+// REVERB キーが設定されている場合のみ Echo を初期化する
 window.axios
     .get('/sanctum/csrf-cookie')
     .then(() => {
-        initEcho();
+        if (import.meta.env.VITE_REVERB_APP_KEY) initEcho();
     })
     .catch((err) => {
-        // 取得に失敗しても念のため初期化を試みるが、コンソールに警告を出す
         console.warn('Failed to fetch /sanctum/csrf-cookie before Echo init', err);
-        initEcho();
+        if (import.meta.env.VITE_REVERB_APP_KEY) initEcho();
     });
