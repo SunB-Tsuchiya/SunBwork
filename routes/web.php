@@ -23,12 +23,7 @@ Route::get('/attachments/signed', [App\Http\Controllers\AttachmentController::cl
     ->name('attachments.signed');
 
 Route::get('/', function () {
-    return Inertia::render('Welcome', [
-        'canLogin' => Route::has('login'),
-        'canRegister' => Route::has('register'),
-        'laravelVersion' => Application::VERSION,
-        'phpVersion' => PHP_VERSION,
-    ]);
+    return redirect()->route('login');
 });
 // Temporary public debug route to send test completion mail (remove after testing)
 Route::get('/debug/events/send-test-completion', [App\Http\Controllers\EventController::class, 'sendTestCompletion'])->name('debug.events.send_test_completion');
