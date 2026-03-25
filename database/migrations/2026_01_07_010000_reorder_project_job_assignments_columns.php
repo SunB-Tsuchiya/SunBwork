@@ -18,6 +18,7 @@ return new class extends Migration
     public function up(): void
     {
         if (!Schema::hasTable('project_job_assignments')) return;
+        if (DB::getDriverName() === 'sqlite') return;
 
         // Adjust these MODIFY statements to match your actual column definitions.
         // The examples below use typical definitions inferred from the codebase.
@@ -77,6 +78,7 @@ return new class extends Migration
         // but precise reversal is environment-specific. Keep this migration
         // reversible only if you update types/positions accordingly.
         if (!Schema::hasTable('project_job_assignments')) return;
+        if (DB::getDriverName() === 'sqlite') return;
 
         try {
             // Move starts_at/ends_at and sender_id back to the end as before
