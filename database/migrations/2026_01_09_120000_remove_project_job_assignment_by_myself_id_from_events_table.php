@@ -25,6 +25,10 @@ return new class extends Migration
             return;
         }
 
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
         // Try to detect a foreign key constraint name and drop it first (MySQL only)
         if (DB::getDriverName() !== 'sqlite') {
             $database = DB::getDatabaseName();
