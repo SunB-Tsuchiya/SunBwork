@@ -9,6 +9,9 @@ return new class extends Migration
 {
     public function up()
     {
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
         // Attempt to drop common foreign key constraints by conventional names first.
         // This is defensive for MySQL which requires FK constraints to be removed before dropping columns.
         try {
