@@ -15,6 +15,8 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (DB::getDriverName() === 'sqlite') return;
+
         if (!Schema::hasTable('project_job_assignments') || !Schema::hasTable('difficulties')) {
             return;
         }

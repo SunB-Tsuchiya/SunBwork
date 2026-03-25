@@ -9,6 +9,8 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (DB::getDriverName() === 'sqlite') return;
+
         // Copy numeric mm columns into width/height and set unit='mm' for those rows, then drop mm columns
         if (Schema::hasColumn('sizes', 'width_mm')) {
             DB::statement("UPDATE sizes SET width = width_mm, height = height_mm, unit = 'mm' WHERE (width IS NULL OR width = 0) AND (width_mm IS NOT NULL OR height_mm IS NOT NULL)");
@@ -23,6 +25,8 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (DB::getDriverName() === 'sqlite') return;
+
         Schema::table('sizes', function (Blueprint $table) {
             if (!Schema::hasColumn('sizes', 'width_mm')) {
                 $table->integer('width_mm')->nullable()->after('unit');
