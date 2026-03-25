@@ -15,6 +15,7 @@ export default defineConfigWithVueTs(
             '@typescript-eslint/no-explicit-any': 'off',
             'vue/block-lang': 'off',
             '@typescript-eslint/no-unused-vars': 'warn',
+            'vue/no-mutating-props': 'off',
         },
     },
     prettier,
