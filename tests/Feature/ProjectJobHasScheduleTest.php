@@ -18,18 +18,17 @@ class ProjectJobHasScheduleTest extends TestCase
         // Create user and authenticate
         $user = User::factory()->create();
 
-        // Create a client and a project job owned by user
+        // Create a client and a project job owned by user.
+        // clients table columns: name, notes (detail/fromSB do not exist).
+        // project_jobs table columns: jobcode, title, user_id, client_id, detail.
         $client = \App\Models\Client::create([
             'name' => 'Test Client',
-            'detail' => null,
-            'fromSB' => false,
         ]);
         $job = ProjectJob::create([
             'jobcode' => 'TEST-123',
-            'name' => 'Test Job',
+            'title' => 'Test Job',
             'user_id' => $user->id,
             'client_id' => $client->id,
-            'detail' => null,
         ]);
 
         // Add a schedule for this project job

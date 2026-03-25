@@ -3,5 +3,7 @@
 it('returns a successful response', function () {
     $response = $this->get('/');
 
-    $response->assertStatus(200);
+    // The root path redirects unauthenticated guests to the login page.
+    $response->assertStatus(302);
+    $response->assertRedirect(route('login'));
 });
