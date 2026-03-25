@@ -25,19 +25,20 @@ return new class extends Migration
             return;
         }
 
-        // Try to detect a foreign key constraint name and drop it first
-        $database = DB::getDatabaseName();
-        $rows = DB::select(
-            'SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ? AND REFERENCED_TABLE_NAME IS NOT NULL',
-            [$database, 'events', 'project_job_assignment_by_myself_id']
-        );
+        // Try to detect a foreign key constraint name and drop it first (MySQL only)
+        if (DB::getDriverName() !== 'sqlite') {
+            $database = DB::getDatabaseName();
+            $rows = DB::select(
+                'SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ? AND REFERENCED_TABLE_NAME IS NOT NULL',
+                [$database, 'events', 'project_job_assignment_by_myself_id']
+            );
 
-        if (!empty($rows) && !empty($rows[0]->CONSTRAINT_NAME)) {
-            $constraint = $rows[0]->CONSTRAINT_NAME;
-            Schema::table('events', function (Blueprint $table) use ($constraint) {
-                // dropForeign accepts the index/constraint name
-                $table->dropForeign($constraint);
-            });
+            if (!empty($rows) && !empty($rows[0]->CONSTRAINT_NAME)) {
+                $constraint = $rows[0]->CONSTRAINT_NAME;
+                Schema::table('events', function (Blueprint $table) use ($constraint) {
+                    $table->dropForeign($constraint);
+                });
+            }
         }
 
         Schema::table('events', function (Blueprint $table) {
