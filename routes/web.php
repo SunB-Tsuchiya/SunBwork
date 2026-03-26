@@ -308,6 +308,16 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('adminusers/csv/preview', [App\Http\Controllers\SuperAdmin\AdminUserController::class, 'csvPreview'])->name('adminusers.csv.preview');
         Route::post('adminusers/csv/store', [App\Http\Controllers\SuperAdmin\AdminUserController::class, 'csvStore'])->name('adminusers.csv.store');
 
+        // 役職称号管理
+        Route::get('position-titles', [App\Http\Controllers\SuperAdmin\PositionTitleController::class, 'index'])->name('position_titles.index');
+        Route::get('position-titles/edit', [App\Http\Controllers\SuperAdmin\PositionTitleController::class, 'edit'])->name('position_titles.edit');
+        Route::put('position-titles', [App\Http\Controllers\SuperAdmin\PositionTitleController::class, 'update'])->name('position_titles.update');
+
+        // Admin 権限管理
+        Route::get('admin-permissions', [App\Http\Controllers\SuperAdmin\AdminPermissionController::class, 'index'])->name('admin_permissions.index');
+        Route::get('admin-permissions/{adminuser}/edit', [App\Http\Controllers\SuperAdmin\AdminPermissionController::class, 'edit'])->name('admin_permissions.edit');
+        Route::put('admin-permissions/{adminuser}', [App\Http\Controllers\SuperAdmin\AdminPermissionController::class, 'update'])->name('admin_permissions.update');
+
         // 会社管理
         Route::resource('companies', App\Http\Controllers\SuperAdmin\CompanyController::class);
 
