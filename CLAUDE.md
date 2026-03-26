@@ -40,10 +40,13 @@ git add <変更ファイル> public/build/ resources/js/ziggy.js
 git commit -m "feat/fix/build: ..."
 ```
 
-**⑤ .env をローカル用に戻す（Claude が実行）**
+**⑤ .env をローカル用に戻してローカルビルドも実行（Claude が実行）**
 ```bash
 sed -i 's/^VITE_APP_BASE_PATH=\/members$/VITE_APP_BASE_PATH=/' /home/w229/SunBwork/.env
+docker compose exec laravel bash -lc "npm run build"
 ```
+- さくら用ビルドをコミットした後、ローカルも再ビルドしないと `/members/build/assets/` を参照してローカルが 404 になる
+- このローカルビルドは**コミットしない**（git status で public/build/ が modified になるが無視してよい）
 
 **⑥ ユーザーへの指示（Claude がテキストで伝える）**
 
