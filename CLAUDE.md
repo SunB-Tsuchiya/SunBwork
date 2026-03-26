@@ -9,6 +9,62 @@
 - Vue / JS ファイルを変更したら、必ず最後に `npm run build` を実行すること（許可済み）。
 - `npm run build` はプロジェクトルート（`/home/w229/SunBwork`）で実行する。
 
+### ユーザーから「gitにアップ」「さくらにデプロイ」を求められたときの Claude の手順
+
+ユーザーから git コミット・デプロイを求められたら、Claude は以下の順序で **自動的に** 実施し、最後にユーザーへ操作指示を出す。
+
+**① 未コミットファイルの確認（Claude が実行）**
+```bash
+git status --short | grep -v "public/build"
+```
+- 未追加ファイル（??）や変更ファイル（M）がないか確認する
+- Controller / Model / Migration / Seeder / routes/web.php の追加漏れに特に注意
+
+**② routes/web.php に変更があれば Ziggy を再生成（Claude が実行）**
+```bash
+docker compose exec laravel bash -lc "php artisan ziggy:generate resources/js/ziggy.js"
+```
+- 新しいルートを追加・削除した場合は必ず実行する
+- @routes ディレクティブで動的配信されるが、IDE補完と整合性のため更新する
+
+**③ さくら用ビルド（Claude が実行）**
+```bash
+sed -i 's/^VITE_APP_BASE_PATH=$/VITE_APP_BASE_PATH=\/members/' /home/w229/SunBwork/.env
+docker compose exec laravel bash -lc "npm run build"
+```
+- ビルド成功を確認してから次へ進む
+
+**④ 全ファイルをコミット（Claude が実行）**
+```bash
+git add <変更ファイル> public/build/ resources/js/ziggy.js
+git commit -m "feat/fix/build: ..."
+```
+
+**⑤ .env をローカル用に戻す（Claude が実行）**
+```bash
+sed -i 's/^VITE_APP_BASE_PATH=\/members$/VITE_APP_BASE_PATH=/' /home/w229/SunBwork/.env
+```
+
+**⑥ ユーザーへの指示（Claude がテキストで伝える）**
+
+Claude はここで止まり、以下をユーザーに伝える：
+
+```
+【あなたの操作が必要です】
+
+1. ターミナルで push:
+   git push origin main
+
+2. さくら SSH で:
+   cd ~/SunBWork && git pull && php artisan migrate && php artisan config:clear
+   ※ マイグレーションがない場合は migrate は省略可
+```
+
+**注意事項:**
+- `git push` はターミナル認証が必要なため Claude は実行できない → ユーザーが手動実行
+- さくらSSHの操作も Claude はできない → ユーザーが手動実行
+- `VITE_APP_BASE_PATH` は必ずコミット後に空に戻す（ローカル開発が壊れる）
+
 ---
 
 ## プロジェクト概要
@@ -915,28 +971,26 @@ VITE_APP_BASE_PATH=/members
 
 ### 通常デプロイフロー
 
-**フロントエンドを変更した場合:**
-```bash
-# ローカルで
-npm run build
-git add public/build/ && git commit -m "..." && git push
+> **重要:** さくら用のビルド（`VITE_APP_BASE_PATH=/members`）が必要。ローカルビルド（空）のままpushすると `/build/assets/` のパスになり、さくらで 404 になる。
+> Claude と一緒に作業する場合は「Claude へのワークフロー指示」セクションの手順に従う。
 
-# サーバーで
-cd ~/SunBWork && git pull && php artisan config:clear
+**チェックリスト（毎回確認）:**
+- [ ] 新規ファイル（Controller/Model/Migration/Seeder）の追加漏れがないか
+- [ ] `routes/web.php` を変更した場合 → `php artisan ziggy:generate resources/js/ziggy.js` を実行
+- [ ] `VITE_APP_BASE_PATH=/members` に変更してから `npm run build`
+- [ ] コミット後に `VITE_APP_BASE_PATH=` (空) に戻す
+
+**さくらで実行する手順:**
+```bash
+cd ~/SunBWork
+git pull
+php artisan migrate          # マイグレーションがある場合のみ
+php artisan config:clear && php artisan cache:clear
 ```
 
-**PHP/設定のみ変更した場合:**
+**`sessions` テーブルなど既存テーブルで migrate がエラーになる場合:**
 ```bash
-# ローカルで
-git add . && git commit -m "..." && git push
-
-# サーバーで
-cd ~/SunBWork && git pull && php artisan config:clear
-```
-
-**マイグレーションがある場合はサーバーで追加:**
-```bash
-php artisan migrate
+php artisan tinker --execute="DB::table('migrations')->insert(['migration' => '2026_03_25_132123_create_sessions_table', 'batch' => DB::table('migrations')->max('batch')]);"
 ```
 
 ---
