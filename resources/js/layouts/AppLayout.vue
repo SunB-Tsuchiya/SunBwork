@@ -408,19 +408,19 @@ const currentRouteContext = computed(() => {
 
                                     <template #content>
                                         <!-- Account Management -->
-                                        <div class="block px-4 py-2 text-xs text-gray-400">Manage Account</div>
+                                        <div class="block px-4 py-2 text-xs text-gray-400">アカウント管理</div>
 
-                                        <DropdownLink :href="route('profile.show')"> Profile </DropdownLink>
+                                        <DropdownLink :href="route('profile.show')"> プロフィール </DropdownLink>
 
                                         <DropdownLink v-if="$page.props.jetstream.hasApiFeatures" :href="route('api-tokens.index')">
-                                            API Tokens
+                                            API トークン
                                         </DropdownLink>
 
                                         <div class="border-t border-gray-200" />
 
                                         <!-- Authentication -->
                                         <form @submit.prevent="logout">
-                                            <DropdownLink as="button"> Log Out </DropdownLink>
+                                            <DropdownLink as="button"> ログアウト </DropdownLink>
                                         </form>
                                     </template>
                                 </Dropdown>
@@ -649,26 +649,26 @@ const currentRouteContext = computed(() => {
                         </div>
 
                         <div class="mt-3 space-y-1">
-                            <ResponsiveNavLink :href="route('profile.show')" :active="route().current('profile.show')"> Profile </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('profile.show')" :active="route().current('profile.show')"> プロフィール </ResponsiveNavLink>
 
                             <ResponsiveNavLink
                                 v-if="$page.props.jetstream.hasApiFeatures"
                                 :href="route('api-tokens.index')"
                                 :active="route().current('api-tokens.index')"
                             >
-                                API Tokens
+                                API トークン
                             </ResponsiveNavLink>
 
                             <!-- Authentication -->
                             <form method="POST" @submit.prevent="logout">
-                                <ResponsiveNavLink as="button"> Log Out </ResponsiveNavLink>
+                                <ResponsiveNavLink as="button"> ログアウト </ResponsiveNavLink>
                             </form>
 
                             <!-- Team Management -->
                             <template v-if="$page.props.jetstream.hasTeamFeatures">
                                 <div class="border-t border-gray-200" />
 
-                                <div class="block px-4 py-2 text-xs text-gray-400">Manage Team</div>
+                                <div class="block px-4 py-2 text-xs text-gray-400">チーム管理</div>
 
                                 <!-- Team Settings -->
                                 <ResponsiveNavLink
@@ -676,7 +676,7 @@ const currentRouteContext = computed(() => {
                                     :href="route('teams.show', $page.props.auth.user.current_team)"
                                     :active="route().current('teams.show')"
                                 >
-                                    Team Settings
+                                    チーム設定
                                 </ResponsiveNavLink>
 
                                 <ResponsiveNavLink
@@ -684,14 +684,14 @@ const currentRouteContext = computed(() => {
                                     :href="route('teams.create')"
                                     :active="route().current('teams.create')"
                                 >
-                                    Create New Team
+                                    新しいチームを作成
                                 </ResponsiveNavLink>
 
                                 <!-- Team Switcher -->
                                 <template v-if="$page.props.auth.user.all_teams && $page.props.auth.user.all_teams.length > 1">
                                     <div class="border-t border-gray-200" />
 
-                                    <div class="block px-4 py-2 text-xs text-gray-400">Switch Teams</div>
+                                    <div class="block px-4 py-2 text-xs text-gray-400">チームを切り替える</div>
 
                                     <template v-for="team in $page.props.auth.user.all_teams || []" :key="team.id">
                                         <form @submit.prevent="switchToTeam(team)">
