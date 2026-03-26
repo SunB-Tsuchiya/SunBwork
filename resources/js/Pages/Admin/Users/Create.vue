@@ -11,10 +11,9 @@ import { ref, computed, watch } from 'vue';
 
 // props: companies（親から渡す）
 const props = defineProps({
-    companies: {
-        type: Array,
-        default: () => [],
-    },
+    companies:    { type: Array, default: () => [] },
+    adminTitles:  { type: Array, default: () => [] },
+    leaderTitles: { type: Array, default: () => [] },
 });
 
 const form = useForm({
@@ -24,7 +23,8 @@ const form = useForm({
     password_confirmation: '',
     company_id: '',
     department_id: '',
-    assignment_id: '', // assignment_idで統一
+    assignment_id: '',
+    position_title_id: '',
     user_role: 'user',
     terms: false,
 });
@@ -135,6 +135,16 @@ const availableAssignments = computed(() => {
     if (!department || !department.assignments) return [];
     return department.assignments.filter(assignment => assignment.active);
 });
+
+// 選択中の user_role に応じて表示する役職称号
+const availablePositionTitles = computed(() => {
+    if (form.user_role === 'admin') return props.adminTitles;
+    if (form.user_role === 'leader') return props.leaderTitles;
+    return [];
+});
+
+// user_role が変わったら役職称号をリセット
+watch(() => form.user_role, () => { form.position_title_id = ''; });
 
 const userAssignmentOptions = [
     { value: 'admin', label: '管理者', description: '全ての機能にアクセス可能' },
@@ -354,6 +364,21 @@ const submit = () => {
                             </option>
                         </select>
                         <InputError class="mt-2" :message="errors.user_role || form.errors.user_role" />
+                    </div>
+
+                    <div v-if="availablePositionTitles.length > 0" class="mt-4">
+                        <InputLabel for="position_title_id" value="役職称号" />
+                        <select
+                            id="position_title_id"
+                            v-model="form.position_title_id"
+                            class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
+                        >
+                            <option value="">-- なし --</option>
+                            <option v-for="title in availablePositionTitles" :key="title.id" :value="title.id">
+                                {{ title.name }}
+                            </option>
+                        </select>
+                        <InputError class="mt-2" :message="form.errors.position_title_id" />
                     </div>
 
                     <!-- 利用規約チェックは管理画面では不要なら省略 -->

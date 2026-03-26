@@ -182,6 +182,8 @@ const getTopTabActive = () => {
     try {
         const r = route().current();
         if (!r) return '';
+        if (r.includes('admin_permissions')) return 'admin_permissions';
+        if (r.includes('position_titles')) return 'position_titles';
         if (r.includes('users') || r.includes('adminusers')) return 'users';
         if (r.includes('companies')) return 'companies';
         if (r.includes('debug') || r.includes('api')) return 'debug';

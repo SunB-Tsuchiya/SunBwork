@@ -6,7 +6,7 @@ import { computed, ref } from 'vue';
 // 管理者アカウント削除処理
 function deleteUser(id) {
     if (confirm('本当にこの管理者アカウントを削除しますか？')) {
-        router.delete(route('superadmin.adminusers.destroy', id), {
+        router.delete(route('superadmin.adminusers.destroy', { adminuser: id }), {
             onSuccess: () => {
                 router.visit(route('superadmin.adminusers.index'));
             },
@@ -329,11 +329,11 @@ const getAssignmentText = (assignment) => {
                                         </td> -->
                                         <td class="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
                                             <div class="flex justify-end space-x-2">
-                                                <Link :href="route('superadmin.adminusers.show', user.id)" class="text-blue-600 hover:text-blue-900">
+                                                <Link :href="route('superadmin.adminusers.show', { adminuser: user.id })" class="text-blue-600 hover:text-blue-900">
                                                     詳細
                                                 </Link>
                                                 <Link
-                                                    :href="route('superadmin.adminusers.edit', user.id)"
+                                                    :href="route('superadmin.adminusers.edit', { adminuser: user.id })"
                                                     class="text-yellow-600 hover:text-yellow-900"
                                                 >
                                                     編集

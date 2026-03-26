@@ -4,6 +4,13 @@
 
 ---
 
+## Claude へのワークフロー指示
+
+- Vue / JS ファイルを変更したら、必ず最後に `npm run build` を実行すること（許可済み）。
+- `npm run build` はプロジェクトルート（`/home/w229/SunBwork`）で実行する。
+
+---
+
 ## プロジェクト概要
 
 **SunBWork** は Laravel + Inertia.js (Vue 3) + Vite + Tailwind CSS で構築された SPA 型の業務管理システム。

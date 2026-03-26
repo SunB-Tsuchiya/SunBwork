@@ -8,6 +8,7 @@ use App\Models\Team;
 use App\Models\Company;
 use App\Models\Department;
 use App\Models\Assignment;
+use App\Models\PositionTitle;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
@@ -48,8 +49,12 @@ class UserController extends Controller
             $q->where('active', true);
         }])->where('active', true)->get();
 
+        $positionTitles = PositionTitle::orderBy('sort_order')->get()->groupBy('applicable_role');
+
         return Inertia::render('Admin/Users/Create', [
-            'companies' => $companies,
+            'companies'    => $companies,
+            'adminTitles'  => $positionTitles->get('admin',  collect())->values(),
+            'leaderTitles' => $positionTitles->get('leader', collect())->values(),
         ]);
     }
 
@@ -91,15 +96,18 @@ class UserController extends Controller
             $departmentTeam = Team::where('department_id', $request->department_id)
                 ->first();
 
+            $positionTitleId = $request->input('position_title_id') ?: null;
+
             $user = User::create([
-                'name' => $request->name,
-                'email' => $request->email,
-                'password' => Hash::make($request->password),
-                'company_id' => $request->company_id,
-                'department_id' => $request->department_id,
-                'assignment_id' => $request->assignment_id,
-                'current_team_id' => $request->company_id,
-                'user_role' => $request->user_role,
+                'name'              => $request->name,
+                'email'             => $request->email,
+                'password'          => Hash::make($request->password),
+                'company_id'        => $request->company_id,
+                'department_id'     => $request->department_id,
+                'assignment_id'     => $request->assignment_id,
+                'position_title_id' => $positionTitleId,
+                'current_team_id'   => $request->company_id,
+                'user_role'         => $request->user_role,
                 'email_verified_at' => now(),
             ]);
 
@@ -213,13 +221,32 @@ class UserController extends Controller
     /**
      * Download sample CSV file for bulk user import
      */
-    public function csvSampleDownload()
+    public function csvSampleDownload(Request $request)
     {
+        // 選択された部署の担当名を取得してサンプルに使用
+        $departmentId = $request->query('department_id');
+        $assignments  = [];
+        if ($departmentId) {
+            $assignments = \App\Models\Assignment::where('department_id', $departmentId)
+                ->where('active', true)
+                ->orderBy('id')
+                ->pluck('name')
+                ->toArray();
+        }
+        // 担当が取れなければ汎用例を使用
+        if (empty($assignments)) {
+            $assignments = ['進行管理', 'オペレーター', 'そのほか'];
+        }
+
+        // leader 用役職称号のサンプル（DBから取得）
+        $leaderTitle = \App\Models\PositionTitle::where('applicable_role', 'leader')
+            ->orderBy('sort_order')->value('name') ?? '部長';
+
         $rows = [
-            ['name', 'email', 'password', 'assignment', 'user_role'],
-            ['山田太郎', 'yamada@example.com', 'Password123!', '一般社員', 'user'],
-            ['鈴木花子', 'suzuki@example.com', 'Password123!', '一般社員', 'coordinator'],
-            ['田中一郎', 'tanaka@example.com', 'Password123!', '一般社員', 'leader'],
+            ['name', 'email', 'password', 'assignment', 'user_role', 'position_title'],
+            ['山田太郎', 'yamada@example.com',  'Password123!', $assignments[0],                            'user',        ''],
+            ['鈴木花子', 'suzuki@example.com',  'Password123!', $assignments[1] ?? $assignments[0],         'coordinator', ''],
+            ['田中一郎', 'tanaka@example.com',  'Password123!', $assignments[array_key_last($assignments)], 'leader',      $leaderTitle],
         ];
 
         $csv = '';
@@ -283,6 +310,7 @@ class UserController extends Controller
             $csvData = [];
             $errors = [];
             $warnings = []; // 自動修正の警告
+            $seenEmails = [];
             $line = 0;
 
             // 選択された部署情報を取得
@@ -295,26 +323,33 @@ class UserController extends Controller
                 while (($data = fgetcsv($handle, 1000, ',')) !== FALSE) {
                     $line++;
 
-                    // CSV形式: name,email,password,assignment,user_role
+                    // CSV形式: name,email,password,assignment,user_role[,position_title]
                     if (count($data) < 5) {
-                        $errors[] = "行 {$line}: データが不足しています（5列必要です）";
+                        $errors[] = "行 {$line}: データが不足しています（5列以上必要です）";
                         continue;
                     }
 
-                    $assignmentName = trim($data[3]);
-                    $assignment_id = \App\Models\Assignment::where('name', $assignmentName)
+                    $assignmentName    = trim($data[3]);
+                    $positionTitleName = trim($data[5] ?? '');
+                    $assignment_id     = \App\Models\Assignment::where('name', $assignmentName)
                         ->where('department_id', $department->id)
                         ->value('id');
+                    $position_title_id = $positionTitleName
+                        ? \App\Models\PositionTitle::where('name', $positionTitleName)->value('id')
+                        : null;
+
                     $userData = [
-                        'line' => $line,
-                        'name' => trim($data[0]),
-                        'email' => trim($data[1]),
-                        'password' => trim($data[2]),
-                        'assignment' => $assignmentName,
-                        'assignment_id' => $assignment_id,
-                        'user_role' => trim($data[4]),
-                        'company_id' => $request->company_id,
-                        'department_id' => $request->department_id,
+                        'line'              => $line,
+                        'name'              => trim($data[0]),
+                        'email'             => trim($data[1]),
+                        'password'          => trim($data[2]),
+                        'assignment'        => $assignmentName,
+                        'assignment_id'     => $assignment_id,
+                        'user_role'         => trim($data[4]),
+                        'position_title'    => $positionTitleName,
+                        'position_title_id' => $position_title_id,
+                        'company_id'        => $request->company_id,
+                        'department_id'     => $request->department_id,
                     ];
 
                     // 基本的なバリデーション
@@ -346,14 +381,27 @@ class UserController extends Controller
                         $warnings[] = "行 {$line}: ユーザー権限「{$userRoleResult['original']}」を「{$userRoleResult['fixed']}」に自動修正しました";
                     }
 
-                    // superadmin以外のadmin登録を禁止: CSVに'user_role'が'admin'を含む場合はエラー
+                    // superadmin以外のadmin登録を禁止
                     if (strtolower(trim($userData['user_role'])) === 'admin') {
-                        $errors[] = "行 {$line}: CSVからの管理者(admin)登録は許可されていません。superadmin ユーザーのみ手動で作成してください。";
+                        $errors[] = "行 {$line}: CSVからの管理者(admin)登録は許可されていません。";
                     }
 
-                    // 重複チェック
-                    if (User::where('email', $userData['email'])->exists()) {
-                        $errors[] = "行 {$line}: メールアドレス '{$userData['email']}' は既に使用されています";
+                    // position_title は leader のみ設定可能
+                    if (!empty($userData['position_title']) && $userData['user_role'] !== 'leader') {
+                        $warnings[] = "行 {$line}: 役職称号はリーダーのみ設定できます（{$userData['user_role']} には無効）。役職称号を空にしました。";
+                        $userData['position_title']    = '';
+                        $userData['position_title_id'] = null;
+                    }
+
+                    // CSV内重複チェック
+                    if (in_array(strtolower($userData['email']), $seenEmails ?? [])) {
+                        $errors[] = "行 {$line}: メールアドレス '{$userData['email']}' はこのCSV内で重複しています";
+                    } else {
+                        $seenEmails[] = strtolower($userData['email']);
+                        // DBとの重複チェック
+                        if (User::where('email', $userData['email'])->exists()) {
+                            $errors[] = "行 {$line}: メールアドレス '{$userData['email']}' は既に使用されています";
+                        }
                     }
 
                     $csvData[] = $userData;
@@ -420,23 +468,22 @@ class UserController extends Controller
                 'users.*.email' => 'required|string|lowercase|email|max:255|unique:users',
                 'users.*.password' => 'required|string',
                 'users.*.assignment_id' => 'required|exists:assignments,id',
-                // CSV経由での 'admin' 登録は不可にするため、'admin' を除外
-                'users.*.user_role' => 'required|in:leader,coordinator,user',
+                // CSV経由での 'admin' 登録は不可
+                'users.*.user_role'         => 'required|in:leader,coordinator,user',
+                'users.*.position_title_id' => 'nullable|exists:position_titles,id',
                 'company_id' => 'required|exists:companies,id',
                 'department_id' => 'required|exists:departments,id',
             ]);
             Log::info('Validation passed');
         } catch (\Illuminate\Validation\ValidationException $e) {
             Log::error('Validation failed: ', $e->errors());
-            // バリデーションエラー時は元の画面に戻し、エラー内容をInertiaで返す
-            return redirect()->back()
-                ->withErrors($e->errors())
-                ->withInput();
+            return redirect()->route('admin.users.csv.upload')
+                ->with('error', 'バリデーションエラーが発生しました。CSVファイルを確認してください。')
+                ->withErrors($e->errors());
         } catch (\Exception $e) {
             Log::error('csvStore unexpected error: ' . $e->getMessage());
-            return redirect()->back()
-                ->withErrors(['batch' => '予期せぬエラーが発生しました: ' . $e->getMessage()])
-                ->withInput();
+            return redirect()->route('admin.users.csv.upload')
+                ->with('error', '予期せぬエラーが発生しました: ' . $e->getMessage());
         }
 
         $successCount = 0;
@@ -455,9 +502,8 @@ class UserController extends Controller
             ->first();
 
         if (!$departmentTeam) {
-            return redirect()->back()
-                ->withErrors(['department' => '選択された部署のチームが見つかりません。'])
-                ->withInput();
+            return redirect()->route('admin.users.csv.upload')
+                ->withErrors(['department' => '選択された部署のチームが見つかりません。']);
         }
 
         DB::beginTransaction();
@@ -472,15 +518,24 @@ class UserController extends Controller
                         ->where('department_id', $department->id)
                         ->value('id');
                 }
+                // position_title_id の解決（leader のみ有効）
+                $position_title_id = null;
+                if (($userData['user_role'] ?? '') === 'leader') {
+                    $position_title_id = $userData['position_title_id'] ?? null;
+                    if (!$position_title_id && !empty($userData['position_title'])) {
+                        $position_title_id = \App\Models\PositionTitle::where('name', $userData['position_title'])->value('id');
+                    }
+                }
                 $user = User::create([
-                    'name' => $userData['name'],
-                    'email' => $userData['email'],
-                    'password' => Hash::make($userData['password']),
-                    'company_id' => $userData['company_id'],
-                    'department_id' => $userData['department_id'],
-                    'assignment_id' => $assignment_id,
-                    'user_role' => $userData['user_role'],
-                    'current_team_id' => $departmentTeam ? $departmentTeam->id : null,
+                    'name'              => $userData['name'],
+                    'email'             => $userData['email'],
+                    'password'          => Hash::make($userData['password']),
+                    'company_id'        => $userData['company_id'],
+                    'department_id'     => $userData['department_id'],
+                    'assignment_id'     => $assignment_id,
+                    'position_title_id' => $position_title_id,
+                    'user_role'         => $userData['user_role'],
+                    'current_team_id'   => $departmentTeam ? $departmentTeam->id : null,
                 ]);
                 $role = ($userData['user_role'] === 'admin') ? 'admin' : 'viewer';
                 // 会社チームに登録
@@ -501,16 +556,15 @@ class UserController extends Controller
         } catch (\Illuminate\Validation\ValidationException $e) {
             DB::rollBack();
             Log::error('csvStore validation error: ', $e->errors());
-            return redirect()->back()
-                ->withErrors($e->errors())
-                ->withInput();
+            return redirect()->route('admin.users.csv.upload')
+                ->with('error', 'バリデーションエラーが発生しました。CSVファイルを確認してください。')
+                ->withErrors($e->errors());
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('csvStore failed: ' . $e->getMessage());
             Log::error('Exception trace: ' . $e->getTraceAsString());
-            return redirect()->back()
-                ->withErrors(['batch' => 'ユーザー登録中にエラーが発生しました: ' . $e->getMessage()])
-                ->withInput();
+            return redirect()->route('admin.users.csv.upload')
+                ->with('error', 'ユーザー登録中にエラーが発生しました: ' . $e->getMessage());
         }
     }
 

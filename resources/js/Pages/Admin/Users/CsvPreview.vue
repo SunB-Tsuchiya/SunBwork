@@ -114,34 +114,30 @@ const getRoleLabel = (role) => {
                         <table class="min-w-full divide-y divide-gray-200">
                             <thead class="bg-gray-50">
                                 <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">行番号</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">名前</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">メールアドレス</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">担当</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">システム権限</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">行</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">名前</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">メールアドレス</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">担当</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">システム権限</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">役職称号</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-200 bg-white">
                                 <tr v-for="user in form.users" :key="user.line" class="hover:bg-gray-50">
-                                    <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
-                                        {{ user.line }}
-                                    </td>
-                                    <td class="whitespace-nowrap px-6 py-4">
-                                        <div class="text-sm font-medium text-gray-900">{{ user.name }}</div>
-                                    </td>
-                                    <td class="whitespace-nowrap px-6 py-4">
-                                        <div class="text-sm text-gray-900">{{ user.email }}</div>
-                                    </td>
-                                    <td class="whitespace-nowrap px-6 py-4">
-                                        <div class="text-sm text-gray-900">{{ user.assignment }}</div>
-                                    </td>
-                                    <td class="whitespace-nowrap px-6 py-4">
+                                    <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-500">{{ user.line }}</td>
+                                    <td class="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">{{ user.name }}</td>
+                                    <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-900">{{ user.email }}</td>
+                                    <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-900">{{ user.assignment }}</td>
+                                    <td class="whitespace-nowrap px-4 py-3">
                                         <span
                                             class="inline-flex rounded-full px-2 text-xs font-semibold leading-5"
                                             :class="getRoleBadgeClass(user.user_role)"
                                         >
                                             {{ getRoleLabel(user.user_role) }}
                                         </span>
+                                    </td>
+                                    <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
+                                        {{ user.position_title || '—' }}
                                     </td>
                                 </tr>
                             </tbody>

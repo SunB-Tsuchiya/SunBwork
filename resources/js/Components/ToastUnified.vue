@@ -47,8 +47,8 @@
 
 <script setup>
 import useToasts from '@/Composables/useToasts';
-import { usePage } from '@inertiajs/vue3';
-import { onMounted, reactive } from 'vue';
+import { router, usePage } from '@inertiajs/vue3';
+import { onMounted, onUnmounted, reactive } from 'vue';
 
 const { toasts: composableToasts, dismissToast, toastClass } = useToasts();
 
@@ -92,16 +92,29 @@ function dismiss(id) {
     dismissToast(id);
 }
 
-onMounted(() => {
-    // initialize from page flash/errors
-    const flash = page.props.value?.flash || {};
-    if (flash.message) {
+function checkFlashAndErrors() {
+    const flash = page.props.flash;
+    if (flash && flash.message) {
         pushLocal({ id: `flash-${Date.now()}`, type: flash.type || 'success', message: flash.message });
     }
-    const errors = page.props.value?.errors || {};
+    const errors = page.props.errors || {};
     if (errors && Object.keys(errors).length) {
-        pushLocal({ id: `errors-${Date.now()}`, type: 'error', message: 'エラーがあります。詳細はページをご確認ください。' });
+        const firstKey = Object.keys(errors)[0];
+        const firstVal = errors[firstKey];
+        const msg = Array.isArray(firstVal) ? firstVal[0] : String(firstVal || '');
+        pushLocal({ id: `errors-${Date.now()}`, type: 'error', message: msg || 'エラーがあります。詳細はページをご確認ください。' });
     }
+}
+
+let removeNavigateListener = null;
+
+onMounted(() => {
+    checkFlashAndErrors();
+
+    // ナビゲーション（Inertiaのリダイレクト含む）後にもflash/errorsを検知
+    removeNavigateListener = router.on('navigate', () => {
+        checkFlashAndErrors();
+    });
 
     // Listen for events dispatched by AppLayout (jobrequest/message)
     window.addEventListener('jobrequest:received', (ev) => {
@@ -146,6 +159,10 @@ onMounted(() => {
     } catch (err) {
         // non-fatal
     }
+});
+
+onUnmounted(() => {
+    if (removeNavigateListener) removeNavigateListener();
 });
 </script>
 

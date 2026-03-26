@@ -41,6 +41,9 @@ class DatabaseSeeder extends Seeder
             // AI プリセット（config/ai_presets.php から読み込み）
             AiPresetsSeeder::class,
 
+            // 役職称号マスター
+            PositionTitlesSeeder::class,
+
             // 作業種別・サイズ・ステージ・難易度マスター
             WorkItemTypesSeeder::class,
             SizesSeeder::class,

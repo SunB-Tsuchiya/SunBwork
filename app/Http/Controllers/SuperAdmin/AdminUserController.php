@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rules;
+use App\Models\PositionTitle;
 use Inertia\Inertia;
 
 class AdminUserController extends Controller
@@ -50,8 +51,12 @@ class AdminUserController extends Controller
             $q->where('active', true);
         }])->where('active', true)->get();
 
+        $positionTitles = PositionTitle::orderBy('sort_order')->get()->groupBy('applicable_role');
+
         return Inertia::render('SuperAdmin/AdminUsers/Create', [
-            'companies' => $companies,
+            'companies'      => $companies,
+            'adminTitles'    => $positionTitles->get('admin',  collect())->values(),
+            'leaderTitles'   => $positionTitles->get('leader', collect())->values(),
         ]);
     }
 
@@ -92,15 +97,18 @@ class AdminUserController extends Controller
         $departmentTeam = Team::where('department_id', $request->department_id)
             ->first();
 
+        $positionTitleId = $request->input('position_title_id') ?: null;
+
         $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'company_id' => $request->company_id,
-            'department_id' => $departmentId,
-            'assignment_id' => $assignmentId,
-            'current_team_id' => $request->company_id,
-            'user_role' => $request->user_role,
+            'name'              => $request->name,
+            'email'             => $request->email,
+            'password'          => Hash::make($request->password),
+            'company_id'        => $request->company_id,
+            'department_id'     => $departmentId,
+            'assignment_id'     => $assignmentId,
+            'position_title_id' => $positionTitleId,
+            'current_team_id'   => $request->company_id,
+            'user_role'         => $request->user_role,
             'email_verified_at' => now(),
         ]);
 
@@ -117,48 +125,69 @@ class AdminUserController extends Controller
             ->with('success', 'ユーザーが正常に作成されました。');
     }
 
-    public function show(User $user)
+    public function show(User $adminuser)
     {
+        $adminuser->load(['company', 'department', 'assignment']);
+
         return Inertia::render('SuperAdmin/AdminUsers/Show', [
-            'user' => $user,
+            'user' => $adminuser,
         ]);
     }
 
-    public function edit(User $user)
+    public function edit(User $adminuser)
     {
+        $adminuser->load(['company', 'department', 'assignment']);
+
+        $companies = Company::with(['departments.assignments' => function ($q) {
+            $q->where('active', true);
+        }])->where('active', true)->get();
+
+        $positionTitles = PositionTitle::orderBy('sort_order')->get()->groupBy('applicable_role');
+
         return Inertia::render('SuperAdmin/AdminUsers/Edit', [
-            'user' => $user,
+            'user'         => $adminuser,
+            'companies'    => $companies,
+            'adminTitles'  => $positionTitles->get('admin',  collect())->values(),
+            'leaderTitles' => $positionTitles->get('leader', collect())->values(),
         ]);
     }
 
-    public function update(Request $request, User $user)
+    public function update(Request $request, User $adminuser)
     {
         $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|lowercase|email|max:255|unique:users,email,' . $user->id,
-            'assignment' => 'required|string|max:255',
-            'user_role' => 'required|in:admin,leader,coordinator, user',
+            'name'              => 'required|string|max:255',
+            'email'             => 'required|string|lowercase|email|max:255|unique:users,email,' . $adminuser->id,
+            'department_id'     => 'nullable|exists:departments,id',
+            'assignment_id'     => 'nullable|exists:assignments,id',
+            'position_title_id' => 'nullable|exists:position_titles,id',
+            'user_role'         => 'required|in:admin,leader,coordinator,user',
         ]);
 
-        $user->update([
-            'name' => $request->name,
-            'email' => $request->email,
-            'assignment' => $request->assignment,
-            'user_role' => $request->user_role,
+        $departmentId     = $request->input('department_id') ?: null;
+        $assignmentId     = $request->input('assignment_id') ?: null;
+        $positionTitleId  = $request->input('position_title_id') ?: null;
+
+        $adminuser->update([
+            'name'              => $request->name,
+            'email'             => $request->email,
+            'department_id'     => $departmentId,
+            'assignment_id'     => $assignmentId,
+            'position_title_id' => $positionTitleId,
+            'user_role'         => $request->user_role,
         ]);
 
         return redirect()->route('superadmin.adminusers.index')
             ->with('success', 'ユーザー情報が更新されました。');
     }
 
-    public function destroy(User $user)
+    public function destroy(User $adminuser)
     {
-        if ($user->id === Auth::id()) {
+        if ($adminuser->id === Auth::id()) {
             return redirect()->route('superadmin.adminusers.index')
                 ->with('error', '自分自身のアカウントは削除できません。');
         }
 
-        $user->delete();
+        $adminuser->delete();
 
         return redirect()->route('superadmin.adminusers.index')
             ->with('success', 'ユーザーが削除されました。');

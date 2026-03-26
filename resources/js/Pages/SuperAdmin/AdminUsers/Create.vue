@@ -10,10 +10,9 @@ import { computed, ref, watch } from 'vue';
 
 // props: companies（親から渡す）
 const props = defineProps({
-    companies: {
-        type: Array,
-        default: () => [],
-    },
+    companies:    { type: Array, default: () => [] },
+    adminTitles:  { type: Array, default: () => [] },
+    leaderTitles: { type: Array, default: () => [] },
 });
 
 const form = useForm({
@@ -23,10 +22,21 @@ const form = useForm({
     password_confirmation: '',
     company_id: '',
     department_id: '',
-    assignment_id: '', // assignment_idで統一
+    assignment_id: '',
+    position_title_id: '',
     user_role: 'admin',
     terms: false,
 });
+
+// 選択中の user_role に応じて表示する役職称号
+const availablePositionTitles = computed(() => {
+    if (form.user_role === 'admin') return props.adminTitles;
+    if (form.user_role === 'leader') return props.leaderTitles;
+    return [];
+});
+
+// user_role が変わったら役職称号をリセット
+watch(() => form.user_role, () => { form.position_title_id = ''; });
 
 // 日本語バリデーションメッセージ
 const validationMessages = {
@@ -92,12 +102,10 @@ function validateField(field) {
             else delete errors.value.company_id;
             break;
         case 'department_id':
-            if (!form.department_id) errors.value.department_id = validationMessages.department_id.required;
-            else delete errors.value.department_id;
+            delete errors.value.department_id;
             break;
         case 'assignment_id':
-            if (!form.assignment_id) errors.value.assignment_id = validationMessages.assignment_id.required;
-            else delete errors.value.assignment_id;
+            delete errors.value.assignment_id;
             break;
         case 'user_role':
             if (!form.user_role) errors.value.user_role = validationMessages.user_role.required;
@@ -142,7 +150,7 @@ watch(
 
 // 送信前に全項目バリデーション
 function validateAll() {
-    ['name', 'email', 'password', 'password_confirmation', 'company_id', 'department_id', 'assignment_id', 'user_role'].forEach(validateField);
+    ['name', 'email', 'password', 'password_confirmation', 'company_id', 'user_role'].forEach(validateField);
     return Object.keys(errors.value).length === 0;
 }
 
@@ -312,7 +320,6 @@ const submit = () => {
                                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                             >
                                 <option value="">-- なし（未設定） --</option>
-                                <option value="--">-- 部署を選択してください --</option>
                                 <option v-for="department in selectedCompanyDepartments" :key="department.id" :value="department.id">
                                     {{ department.name }}
                                 </option>
@@ -329,7 +336,6 @@ const submit = () => {
                                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                             >
                                 <option value="">-- なし（未設定） --</option>
-                                <option value="--">-- 担当を選択してください --</option>
                                 <option v-for="assignment in availableAssignments" :key="assignment.id" :value="assignment.id">
                                     {{ assignment.name }}
                                 </option>
@@ -351,6 +357,21 @@ const submit = () => {
                                 </option>
                             </select>
                             <InputError class="mt-2" :message="errors.user_role || form.errors.user_role" />
+                        </div>
+
+                        <div v-if="availablePositionTitles.length > 0" class="mt-4">
+                            <InputLabel for="position_title_id" value="役職称号" />
+                            <select
+                                id="position_title_id"
+                                v-model="form.position_title_id"
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            >
+                                <option value="">-- なし --</option>
+                                <option v-for="title in availablePositionTitles" :key="title.id" :value="title.id">
+                                    {{ title.name }}
+                                </option>
+                            </select>
+                            <InputError class="mt-2" :message="form.errors.position_title_id" />
                         </div>
 
                         <!-- 利用規約チェックは管理画面では不要なら省略 -->

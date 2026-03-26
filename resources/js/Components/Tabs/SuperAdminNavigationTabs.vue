@@ -29,6 +29,18 @@ const tab = (key) => [
                 Adminユーザー管理
             </Link>
             <Link
+                :href="route('superadmin.admin_permissions.index')"
+                :class="tab('admin_permissions')"
+            >
+                Admin権限管理
+            </Link>
+            <Link
+                :href="route('superadmin.position_titles.index')"
+                :class="tab('position_titles')"
+            >
+                役職称号管理
+            </Link>
+            <Link
                 v-if="typeof route === 'function' && route().has('superadmin.ai.index')"
                 :href="route('superadmin.ai.index')"
                 :class="tab('ai')"

@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\AdminPermission;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -35,21 +36,29 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $flashMessage = session('success') ?? session('error') ?? null;
+        $flashType    = session('success') ? 'success' : (session('error') ? 'error' : 'success');
+
         return [
             ...parent::share($request),
+            'flash' => $flashMessage ? ['message' => $flashMessage, 'type' => $flashType] : null,
             // Share authenticated user basic info and helper role flags for frontend permission checks
             'auth' => [
                 'user' => $request->user()
                     ? array_merge(
                         $request->user()->only(['id', 'name', 'email', 'user_role', 'company_id', 'department_id']),
                         [
-                            'isAdmin' => $request->user()->isAdmin(),
-                            'isLeader' => $request->user()->isLeader(),
-                            'isCoordinator' => $request->user()->isCoordinator(),
+                            'isAdmin'      => $request->user()->isAdmin(),
+                            'isLeader'     => $request->user()->isLeader(),
+                            'isCoordinator'=> $request->user()->isCoordinator(),
                             'isSuperAdmin' => $request->user()->isSuperAdmin(),
-                            'isUser' => $request->user()->isUser(),
+                            'isUser'       => $request->user()->isUser(),
                         ]
                     )
+                    : null,
+                // Admin 権限（admin ロール時のみ取得、それ以外は null）
+                'adminPermissions' => $request->user()?->isAdmin()
+                    ? AdminPermission::where('user_id', $request->user()->id)->first()
                     : null,
             ],
         ];

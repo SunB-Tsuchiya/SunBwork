@@ -4,7 +4,7 @@ import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, useForm } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 const props = defineProps({
     companies: Array,
@@ -30,6 +30,16 @@ const selectedCompanyDepartments = computed(() => {
 const onCompanyChange = () => {
     form.department_id = '';
 };
+
+// 会社・部署が両方選択されているときのみダウンロード可
+const canDownloadSample = computed(() => !!form.company_id && !!form.department_id);
+
+// サンプルCSVのURL（department_idをクエリパラメータで渡す）
+const sampleUrl = computed(() =>
+    canDownloadSample.value
+        ? route('admin.users.csv.sample') + '?department_id=' + form.department_id
+        : '#'
+);
 
 const selectFile = () => {
     fileInput.value.click();
@@ -65,17 +75,18 @@ const submit = () => {
                     <p class="mb-3 text-sm text-gray-700">CSVファイルは以下の形式で作成してください：</p>
                     <div class="rounded border bg-white p-3 font-mono text-sm">
                         <div class="mb-1 text-gray-500"># ヘッダー行（必須）</div>
-                        <div class="font-semibold">name,email,password,assignment,user_role</div>
+                        <div class="font-semibold">name,email,password,assignment,user_role,position_title</div>
                         <div class="mb-1 mt-2 text-gray-500"># データ行の例</div>
-                        <div>山田太郎,yamada@example.com,password123,管理者,user</div>
-                        <div>佐藤花子,sato@example.com,password456,進行管理,leader</div>
+                        <div>山田太郎,yamada@example.com,Password123!,進行管理,user,</div>
+                        <div>佐藤花子,sato@example.com,Password123!,オペレーター,coordinator,</div>
+                        <div>田中一郎,tanaka@example.com,Password123!,そのほか,leader,部長</div>
                     </div>
                     <div class="mt-4 text-sm text-gray-600">
                         <h4 class="mb-2 font-semibold">各列の説明：</h4>
                         <ul class="space-y-1">
                             <li><strong>name:</strong> ユーザー名</li>
                             <li><strong>email:</strong> メールアドレス（重複不可）</li>
-                            <li><strong>password:</strong> パスワード</li>
+                            <li><strong>password:</strong> パスワード（8文字以上）</li>
                             <li>
                                 <strong>assignment:</strong> 担当（部署により異なる）
                                 <ul class="ml-4 mt-1 space-y-1 text-xs text-gray-600">
@@ -84,7 +95,14 @@ const submit = () => {
                                     <li>製版：進行管理、オペレーター、そのほか</li>
                                 </ul>
                             </li>
-                            <li><strong>user_role:</strong> システム権限（admin/leader/coordinator/user のいずれか）</li>
+                            <li><strong>user_role:</strong> システム権限（leader / coordinator / user のいずれか）</li>
+                            <li>
+                                <strong>position_title:</strong> 役職称号（任意・空欄可）
+                                <ul class="ml-4 mt-1 space-y-1 text-xs text-gray-600">
+                                    <li class="text-yellow-700">※ リーダーの場合のみ有効：部長、次長、課長、課長代理、係長</li>
+                                    <li>リーダー以外は空欄にしてください</li>
+                                </ul>
+                            </li>
                         </ul>
                     </div>
 
@@ -168,12 +186,20 @@ const submit = () => {
                         </div>
                         <div class="mt-2">
                             <a
-                                :href="route('admin.users.csv.sample')"
+                                v-if="canDownloadSample"
+                                :href="sampleUrl"
                                 download
                                 class="inline-flex items-center rounded border border-gray-300 bg-white px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50"
                             >
                                 ⬇ サンプルCSVをダウンロード
                             </a>
+                            <span
+                                v-else
+                                class="inline-flex items-center rounded border border-gray-200 bg-gray-100 px-4 py-2 text-xs font-semibold text-gray-400 cursor-not-allowed"
+                                title="会社・部署を選択するとダウンロードできます"
+                            >
+                                ⬇ サンプルCSVをダウンロード（会社・部署を先に選択）
+                            </span>
                         </div>
                     </div>
 

@@ -35,6 +35,7 @@ class User extends Authenticatable
         'company_id',
         'department_id',
         'assignment_id',
+        'position_title_id',
     ];
 
     /**
@@ -119,6 +120,22 @@ class User extends Authenticatable
         return $this->user_role === 'user';
     }
 
+
+    /**
+     * Admin 権限設定
+     */
+    public function adminPermission()
+    {
+        return $this->hasOne(\App\Models\AdminPermission::class);
+    }
+
+    /**
+     * 役職称号
+     */
+    public function positionTitle()
+    {
+        return $this->belongsTo(\App\Models\PositionTitle::class);
+    }
 
     /**
      * ユーザーの担当（アサインメント）
