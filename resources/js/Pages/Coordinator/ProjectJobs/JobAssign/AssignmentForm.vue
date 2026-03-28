@@ -314,7 +314,7 @@
 import SelectionModal from '@/Components/SelectionModal.vue';
 import { inertiaFetch } from '@/Composables/useInertiaFetch';
 import useToasts from '@/Composables/useToasts';
-import { Link, usePage } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, inject, onMounted, ref, watch } from 'vue';
 
 const props = defineProps({
@@ -1372,104 +1372,24 @@ async function save() {
             })),
         };
 
-        try {
-            const auth = effectiveAuthUser();
-            const allForAuth = payload.assignments.every((x) => String(x.user_id) === String(auth ? auth.id : null));
-            const computedProjectJobId =
-                props.projectJob && props.projectJob.id ? props.projectJob.id : payload.assignments[0] ? payload.assignments[0].project_job_id : null;
-
-            if (allForAuth) {
-                if (!computedProjectJobId) {
-                    console.error('[AssignmentForm] missing projectJob id when attempting user-store', {
-                        computedProjectJobId,
-                        sampleAssignment: payload.assignments[0],
-                    });
-                    try {
-                        alert('プロジェクトが選択されていません。プロジェクトを選択してください。');
-                    } catch (e) {}
-                    return;
-                }
-                const url = route('user.project_jobs.assignments.store', { projectJob: computedProjectJobId });
-                const rel =
-                    typeof window !== 'undefined' && url && url.indexOf(window.location.origin) === 0 ? url.replace(window.location.origin, '') : url;
-
-                const token = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
-                try {
-                    const res = await inertiaFetch(rel, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': token,
-                            'X-Requested-With': 'XMLHttpRequest',
-                            'X-Inertia': 'true',
-                        },
-                        body: JSON.stringify(payload),
-                    });
-                    if (res.ok) {
-                        location.reload();
-                        return;
-                    } else {
-                        const txt = await res.text().catch(() => '');
-                        console.error('[AssignmentForm] fetch POST failed:', res.status, txt);
-                        alert('保存に失敗しました（' + res.status + '）');
-                        return;
-                    }
-                } catch (err) {
-                    console.error('[AssignmentForm] fetch POST error:', err);
-                    alert('保存に失敗しました（ネットワークエラー）');
-                    return;
-                } finally {
-                    saving.value = false;
-                }
-            }
-        } catch (e) {
-            console.warn('[AssignmentForm] allForAuth check failed, falling back to coordinator route', e);
-        }
-
         const coordinatorProjectJobId =
             props.projectJob && props.projectJob.id ? props.projectJob.id : payload.assignments[0] ? payload.assignments[0].project_job_id : null;
+
         if (!coordinatorProjectJobId) {
-            console.error('[AssignmentForm] missing projectJob id for coordinator-store', { sampleAssignment: payload.assignments[0] });
-            try {
-                alert('プロジェクトが選択されていません。プロジェクトを選択してください。');
-            } catch (e) {}
+            alert('プロジェクトが選択されていません。プロジェクトを選択してください。');
             saving.value = false;
             return;
         }
 
-        try {
-            const url2 = route('coordinator.project_jobs.assignments.store', { projectJob: coordinatorProjectJobId });
-            const rel2 =
-                typeof window !== 'undefined' && url2 && url2.indexOf(window.location.origin) === 0 ? url2.replace(window.location.origin, '') : url2;
-            const token2 = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
-            const res2 = await inertiaFetch(rel2, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': token2,
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-Inertia': 'true',
-                },
-                body: JSON.stringify(payload),
-            });
-
-            if (!res2 || res2.navigated) return;
-
-            if (res2.ok) {
-                location.reload();
-                return;
-            } else {
-                const txt2 = await res2.text().catch(() => '');
-                console.error('[AssignmentForm] coordinator fetch POST failed:', res2.status, txt2);
-                alert('保存に失敗しました（' + res2.status + '）');
-                return;
+        router.post(
+            route('coordinator.project_jobs.assignments.store', { projectJob: coordinatorProjectJobId }),
+            payload,
+            {
+                onFinish: () => { saving.value = false; },
+                onError: () => { alert('保存に失敗しました'); },
             }
-        } catch (err2) {
-            console.error('[AssignmentForm] coordinator fetch error:', err2);
-            alert('保存に失敗しました（ネットワークエラー）');
-        } finally {
-            saving.value = false;
-        }
+        );
+        return;
     } else {
         // user mode save
         saving.value = true;
