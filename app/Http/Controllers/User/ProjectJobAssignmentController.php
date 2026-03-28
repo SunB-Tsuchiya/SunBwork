@@ -50,13 +50,6 @@ class ProjectJobAssignmentController extends Controller
         // (removed temporary debug logging)
 
         foreach ($data['assignments'] as $a) {
-            // basic logical validations
-            if (!empty($a['desired_start_date']) && !empty($a['desired_end_date'])) {
-                if ($a['desired_end_date'] < $a['desired_start_date']) {
-                    return back()->withErrors(['assignments' => '終了希望日は割当希望日より前にできません。'])->withInput();
-                }
-            }
-
             DB::transaction(function () use ($projectJob, $a, $user) {
                 // prefer explicit difficulty_id only
                 $difficultyId = !empty($a['difficulty_id']) ? (int) $a['difficulty_id'] : null;
