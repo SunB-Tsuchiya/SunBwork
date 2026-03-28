@@ -3,7 +3,9 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { Link } from '@inertiajs/vue3';
 
 const props = defineProps({
-    admins: { type: Array, default: () => [] },
+    admins:     { type: Array,  default: () => [] },
+    indexRoute: { type: String, default: 'superadmin.admin_permissions.index' },
+    editRoute:  { type: String, default: 'superadmin.admin_permissions.edit' },
 });
 
 const permLabels = {
@@ -74,7 +76,7 @@ const permKeys = Object.keys(permLabels);
                             </td>
                             <td class="whitespace-nowrap px-4 py-3 text-center">
                                 <Link
-                                    :href="route('superadmin.admin_permissions.edit', { adminuser: admin.id })"
+                                    :href="route(editRoute, { adminuser: admin.id })"
                                     class="rounded bg-indigo-600 px-3 py-1 text-xs font-bold text-white hover:bg-indigo-700"
                                 >
                                     権限設定

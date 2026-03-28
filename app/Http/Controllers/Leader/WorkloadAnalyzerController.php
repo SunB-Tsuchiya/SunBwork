@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Leader;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\ChecksAdminPermission;
+use App\Http\Controllers\Concerns\ChecksLeaderPermission;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\Company;
@@ -24,8 +26,12 @@ use Illuminate\Support\Facades\DB;
 
 class WorkloadAnalyzerController extends Controller
 {
+    use ChecksAdminPermission, ChecksLeaderPermission;
+
     public function index(Request $request)
     {
+        $this->requireAdminPermission('workload_analysis');
+        $this->requireLeaderPermission('workload_analysis');
         // month selection: expect query param 'ym' as YYYY-MM or use current month
         $ym = $request->query('ym');
         if (!$ym) {
@@ -597,6 +603,8 @@ class WorkloadAnalyzerController extends Controller
 
     public function show(Request $request, $userId)
     {
+        $this->requireAdminPermission('workload_analysis');
+        $this->requireLeaderPermission('workload_analysis');
         $ym = $request->query('ym') ?: now()->format('Y-m');
         [$year, $month] = explode('-', $ym);
         $start = Carbon::createFromDate($year, $month, 1)->startOfDay();
@@ -1719,6 +1727,8 @@ class WorkloadAnalyzerController extends Controller
      */
     public function settings(Request $request)
     {
+        $this->requireAdminPermission('workload_analysis');
+        $this->requireLeaderPermission('workload_analysis');
         // log entry for diagnostics: help determine whether this handler is invoked
         try {
             \Illuminate\Support\Facades\Log::debug('WorkloadAnalyzerController::settings invoked', ['path' => $request->path(), 'method' => $request->method()]);
@@ -1749,6 +1759,8 @@ class WorkloadAnalyzerController extends Controller
      */
     public function saveSettings(Request $request)
     {
+        $this->requireAdminPermission('workload_analysis');
+        $this->requireLeaderPermission('workload_analysis');
         // Accept per-table payloads. Payload should be an object like { table: 'stages', rows: [{id:1, coefficient:1.25}, ...] }
         $payload = $request->all();
 

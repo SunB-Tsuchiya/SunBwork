@@ -1,10 +1,10 @@
 <template>
     <div class="calendar-container">
-        <div class="mb-4 flex gap-4">
+        <div class="mb-4 flex flex-wrap gap-2">
             <button @click="openEventModal" class="rounded bg-blue-600 px-4 py-2 text-white">予定作成</button>
             <button @click="goToJobCreate" class="rounded bg-indigo-600 px-4 py-2 text-white">ジョブ作成</button>
             <button @click="goToDiaryCreate" class="rounded bg-orange-500 px-4 py-2 text-white">{{ props.diaryLabel }}作成</button>
-            <!-- <button @click="goToAssignedJobs" class="rounded bg-green-600 px-4 py-2 text-white">依頼一覧</button> -->
+            <button @click="openScheduleModal" class="rounded border border-gray-400 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">日程設定</button>
         </div>
         <FullCalendar ref="fullCalendarRef" :options="calendarOptions" :events="events" />
         <!-- 予定作成モーダル -->
@@ -85,6 +85,58 @@
             </div>
         </div>
 
+        <!-- 週間日程設定モーダル -->
+        <div v-if="showScheduleModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div class="w-full max-w-sm rounded-lg bg-white p-6 shadow-lg">
+                <h2 class="mb-4 text-lg font-bold">週間日程設定</h2>
+                <p class="mb-3 text-xs text-gray-500">空白はデフォルト設定を使用します。</p>
+                <table class="w-full text-sm">
+                    <tbody>
+                        <!-- 全日一括変更 -->
+                        <tr class="border-b-2 border-gray-300 bg-gray-50">
+                            <td class="py-2 pr-3 font-bold text-gray-800 w-24">全日</td>
+                            <td class="py-2">
+                                <select
+                                    :value="null"
+                                    @change="(e) => { const v = e.target.value ? Number(e.target.value) : null; weekDays.forEach(d => d.worktype_id = v); e.target.value = ''; }"
+                                    class="w-full rounded border-gray-300 text-sm focus:border-blue-400 focus:ring-blue-400"
+                                >
+                                    <option value="">— 一括選択 —</option>
+                                    <option :value="null">— デフォルト —</option>
+                                    <option v-for="wt in worktypes" :key="wt.id" :value="wt.id">
+                                        {{ wt.name }}
+                                        <template v-if="wt.start_time"> ({{ wt.start_time.substring(0, 5) }}〜)</template>
+                                    </option>
+                                </select>
+                            </td>
+                        </tr>
+                        <!-- 曜日ごと -->
+                        <tr v-for="day in weekDays" :key="day.date" class="border-b last:border-0">
+                            <td class="py-2 pr-3 font-medium text-gray-700 w-24">{{ day.label }}</td>
+                            <td class="py-2">
+                                <select
+                                    v-model="day.worktype_id"
+                                    class="w-full rounded border-gray-300 text-sm focus:border-blue-400 focus:ring-blue-400"
+                                >
+                                    <option :value="null">— デフォルト —</option>
+                                    <option v-for="wt in worktypes" :key="wt.id" :value="wt.id">
+                                        {{ wt.name }}
+                                        <template v-if="wt.start_time"> ({{ wt.start_time.substring(0, 5) }}〜)</template>
+                                    </option>
+                                </select>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="mt-5 flex justify-end gap-3">
+                    <button @click="showScheduleModal = false" class="rounded bg-gray-200 px-4 py-2 text-sm">キャンセル</button>
+                    <button @click="saveWeekSchedule" :disabled="savingSchedule" class="rounded bg-blue-600 px-4 py-2 text-sm text-white disabled:opacity-50">
+                        {{ savingSchedule ? '保存中…' : '保存' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- schedule-specific UI removed — this Calendar is personal-only -->
     </div>
 </template>
@@ -116,7 +168,166 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    initialView: {
+        type: String,
+        default: 'timeGridWeek',
+    },
+    defaultWorktype: {
+        type: Object,
+        default: null,
+    },
+    worktypes: {
+        type: Array,
+        default: () => [],
+    },
+    dailyWorktypes: {
+        type: Array,
+        default: () => [],
+    },
 });
+
+// 日ごとの勤務形態マップ { 'YYYY-MM-DD': worktype_id }（ローカル更新可能）
+const localDailyWorktypes = ref([...(props.dailyWorktypes ?? [])]);
+
+const dailyWorktypeMap = computed(() => {
+    const map = {};
+    localDailyWorktypes.value.forEach((d) => {
+        if (d.date) map[d.date] = d.worktype_id;
+    });
+    return map;
+});
+
+// 指定日の有効な勤務形態を返す（日次設定 > デフォルト）
+function getWorktypeForDate(dateStr) {
+    const wid = dailyWorktypeMap.value[dateStr];
+    if (wid) {
+        const wt = props.worktypes.find((w) => w.id === wid);
+        if (wt) return wt;
+    }
+    return props.defaultWorktype ?? null;
+}
+
+// 夜勤判定: デフォルト勤務形態の start_time が 16:00 以降なら夜勤
+const isNightShift = computed(() => {
+    if (!props.defaultWorktype?.start_time) return false;
+    const h = parseInt(props.defaultWorktype.start_time.substring(0, 2), 10);
+    return h >= 16;
+});
+
+// スロット表示範囲
+// 夜勤: 16:00 〜 30:00 (翌 06:00)、通常: 07:00 〜 24:00
+const slotMinTime = computed(() => (isNightShift.value ? '16:00:00' : '07:00:00'));
+const slotMaxTime = computed(() => (isNightShift.value ? '30:00:00' : '24:00:00'));
+
+// 初期スクロール位置: 現在時刻の 1 時間前
+// 夜勤かつ深夜 0〜6 時は FullCalendar の 24+h 表記に合わせる
+const scrollTime = computed(() => {
+    const now = new Date();
+    let h = now.getHours();
+    const m = now.getMinutes();
+    if (isNightShift.value && h < 6) {
+        h += 24; // 深夜帯は 24xx 表記
+    }
+    const scrollH = Math.max(isNightShift.value ? 16 : 7, h - 1);
+    return `${String(scrollH).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
+});
+
+// ---- 表示中の日付範囲（datesSet で更新） ----
+const viewStart = ref(null); // Date
+const viewEnd = ref(null);   // Date（exclusive）
+
+// ---- 始業前グレー背景イベント ----
+const backgroundEvents = computed(() => {
+    if (!viewStart.value) return [];
+    const results = [];
+    const cur = new Date(viewStart.value);
+    const end = viewEnd.value ? new Date(viewEnd.value) : new Date(viewStart.value);
+    end.setDate(end.getDate() + 1);
+    const slotMin = isNightShift.value ? 16 : 7;
+
+    while (cur < end) {
+        const dateStr =
+            cur.getFullYear() +
+            '-' + String(cur.getMonth() + 1).padStart(2, '0') +
+            '-' + String(cur.getDate()).padStart(2, '0');
+        const wt = getWorktypeForDate(dateStr);
+        if (wt?.start_time) {
+            const [sh, sm] = wt.start_time.split(':').map(Number);
+            const startMins = sh * 60 + sm;
+            if (startMins > slotMin * 60) {
+                results.push({
+                    start: `${dateStr}T${String(slotMin).padStart(2, '0')}:00:00`,
+                    end: `${dateStr}T${wt.start_time.substring(0, 5)}:00`,
+                    display: 'background',
+                    color: 'rgba(0,0,0,0.08)',
+                });
+            }
+        }
+        cur.setDate(cur.getDate() + 1);
+    }
+    return results;
+});
+
+// ---- 週間日程設定モーダル ----
+const showScheduleModal = ref(false);
+const weekDays = ref([]);    // [{ date, label, worktype_id }]
+const savingSchedule = ref(false);
+const DAY_NAMES = ['月', '火', '水', '木', '金', '土', '日'];
+
+function getMondayOfWeek(d) {
+    const day = d.getDay(); // 0=Sun
+    const diff = day === 0 ? -6 : 1 - day;
+    const mon = new Date(d);
+    mon.setDate(d.getDate() + diff);
+    return mon;
+}
+
+function openScheduleModal() {
+    const refDate = viewStart.value
+        ? new Date(viewStart.value)
+        : new Date(selectedDate.value);
+    const monday = getMondayOfWeek(refDate);
+
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + i);
+        const dateStr =
+            d.getFullYear() +
+            '-' + String(d.getMonth() + 1).padStart(2, '0') +
+            '-' + String(d.getDate()).padStart(2, '0');
+        days.push({
+            date: dateStr,
+            label: `${d.getMonth() + 1}/${d.getDate()}(${DAY_NAMES[i]})`,
+            worktype_id: dailyWorktypeMap.value[dateStr] ?? props.defaultWorktype?.id ?? null,
+        });
+    }
+    weekDays.value = days;
+    showScheduleModal.value = true;
+}
+
+async function saveWeekSchedule() {
+    savingSchedule.value = true;
+    try {
+        await axios.post('/user/daily-worktypes', { days: weekDays.value });
+        // ローカル状態を更新
+        weekDays.value.forEach((day) => {
+            const idx = localDailyWorktypes.value.findIndex((d) => d.date === day.date);
+            if (!day.worktype_id) {
+                if (idx >= 0) localDailyWorktypes.value.splice(idx, 1);
+            } else if (idx >= 0) {
+                localDailyWorktypes.value.splice(idx, 1, { date: day.date, worktype_id: day.worktype_id });
+            } else {
+                localDailyWorktypes.value.push({ date: day.date, worktype_id: day.worktype_id });
+            }
+        });
+        showScheduleModal.value = false;
+    } catch {
+        alert('保存に失敗しました');
+    } finally {
+        savingSchedule.value = false;
+    }
+}
 
 const showModal = ref(false);
 const showSelectModal = ref(false);
@@ -343,7 +554,7 @@ function handleTimeSlotClick(info) {
 
 // 日報がある日をイベントとして表示（タイトルは●アイコン）
 // Merge diaries, events, and assigned jobs into FullCalendar events
-const events = ref([
+const baseEvents = ref([
     // 日報（オレンジ）
     ...props.diaries.map((diary) => {
         // UTC→JST(+9h)変換
@@ -414,15 +625,22 @@ const events = ref([
     // Assigned jobs display removed per UX request: do not include props.jobs in calendar events
 ]);
 
+// 通常イベント + 始業前背景イベントを結合
+const allEvents = computed(() => [...baseEvents.value, ...backgroundEvents.value]);
+
 // debug logs removed after investigation
 
 const calendarOptions = computed(() => ({
     plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],
     // choose initial view: if all events are all-day, use month grid so they are visible
-    initialView: events.value && events.value.length > 0 && events.value.every((ev) => ev.allDay) ? 'dayGridMonth' : 'timeGridWeek',
+    initialView: props.initialView,
     // initialDate allows FullCalendar to open on a specific day (YYYY-MM-DD)
     initialDate: selectedDate.value,
-    events: events.value,
+    events: allEvents.value,
+    datesSet: function (info) {
+        viewStart.value = info.start;
+        viewEnd.value = info.end;
+    },
     locale: 'ja',
     headerToolbar: {
         left: 'prev,next today',
@@ -431,9 +649,10 @@ const calendarOptions = computed(() => ({
     },
     selectable: true,
     dateClick: handleTimeSlotClick,
-    // show time slots starting at 07:00 and use 30-minute intervals for consistent labels
-    slotMinTime: '07:00:00',
-    slotMaxTime: '24:00:00',
+    slotMinTime: slotMinTime.value,
+    slotMaxTime: slotMaxTime.value,
+    scrollTime: scrollTime.value,
+    scrollTimeReset: false,
     firstDay: 1,
     weekText: '\u9031',
     dayHeaderFormat: { weekday: 'short' },
@@ -448,14 +667,27 @@ const calendarOptions = computed(() => ({
         const md = month && day ? `${month}/${day}` : '';
         const weekdayText = arg.text || '';
 
+        // 勤務形態名を取得（dayGridMonth では表示しない）
+        let wtHtml = '';
+        if (viewType !== 'dayGridMonth' && d) {
+            const dateStr =
+                d.getFullYear() +
+                '-' + String(d.getMonth() + 1).padStart(2, '0') +
+                '-' + String(d.getDate()).padStart(2, '0');
+            const wt = getWorktypeForDate(dateStr);
+            if (wt?.name) {
+                wtHtml = `<div class="fc-day-worktype">${wt.name}</div>`;
+            }
+        }
+
         // 月表示（dayGridMonth）のときは日付 (md) を表示しない
         if (viewType === 'dayGridMonth') {
             return { html: `<div class="fc-day-header-bottom">${weekdayText}</div>` };
         }
 
-        // それ以外のビューでは「12/1」(上段) + 曜日(下段) を二段表示
+        // それ以外のビューでは「12/1」(上段) + 曜日(下段) + 勤務形態(下段) を表示
         return {
-            html: `<div class="fc-day-header-top">${md}</div><div class="fc-day-header-bottom">${weekdayText}</div>`,
+            html: `<div class="fc-day-header-top">${md}</div><div class="fc-day-header-bottom">${weekdayText}</div>${wtHtml}`,
         };
     },
     // keep internal grid at 15-minute increments but show labels every 30 minutes
@@ -862,5 +1094,16 @@ const submitEvent = async () => {
     font-size: 0.75rem;
     font-weight: 600;
     color: rgba(15, 23, 42, 0.7);
+}
+/* 勤務形態名（ヘッダー内） */
+.fc .fc-col-header-cell .fc-day-worktype {
+    font-size: 0.68rem;
+    font-weight: 500;
+    color: rgba(37, 99, 235, 0.85);
+    line-height: 1.2;
+    padding-top: 0.1rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 </style>

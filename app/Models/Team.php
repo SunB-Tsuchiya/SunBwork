@@ -30,6 +30,14 @@ class Team extends JetstreamTeam
     ];
 
     /**
+     * サブリーダー（多対多 via team_sub_leaders）
+     */
+    public function subLeaders()
+    {
+        return $this->belongsToMany(\App\Models\User::class, 'team_sub_leaders', 'team_id', 'user_id')->withTimestamps();
+    }
+
+    /**
      * The event map for the model.
      *
      * @var array<string, class-string>

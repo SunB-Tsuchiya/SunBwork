@@ -19,6 +19,22 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    calendarView: {
+        type: String,
+        default: 'timeGridWeek',
+    },
+    defaultWorktype: {
+        type: Object,
+        default: null,
+    },
+    worktypes: {
+        type: Array,
+        default: () => [],
+    },
+    dailyWorktypes: {
+        type: Array,
+        default: () => [],
+    },
 });
 </script>
 
@@ -28,7 +44,15 @@ const props = defineProps({
             <h2 class="text-xl font-semibold leading-tight text-gray-800">予定表</h2>
         </template>
         <div class="rounded bg-white p-6 shadow">
-            <Calendar :diaries="diaries" :events="events" :jobs="jobs" />
+            <Calendar
+                :diaries="diaries"
+                :events="events"
+                :jobs="jobs"
+                :initial-view="calendarView"
+                :default-worktype="defaultWorktype"
+                :worktypes="worktypes"
+                :daily-worktypes="dailyWorktypes"
+            />
         </div>
     </AppLayout>
 </template>

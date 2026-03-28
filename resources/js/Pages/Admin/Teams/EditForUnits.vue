@@ -7,7 +7,7 @@ import { computed, onMounted, ref } from 'vue';
 const page = usePage();
 const props = page.props;
 const team = props.team || {};
-const unit = props.unit || null; // controller should provide unit data when team_type === 'unit'
+const unit = props.unit || null;
 
 const companies = ref(props.companies || []);
 const departments = ref(props.departments || []);
@@ -21,6 +21,7 @@ const form = useForm({
     description: unit?.description ?? team.description ?? '',
     // normalize leader_id to string to match option values
     leader_id: unit?.leader_id ? String(unit.leader_id) : null,
+    sub_leader_ids: (props.sub_leader_ids || []).map(String),
     // unit.members is an array of User models (eager-loaded); normalize to strings to match checkbox values
     member_ids: unit?.members?.map((m) => String(m.id)) || [],
 });
@@ -79,11 +80,31 @@ const submit = () => {
                     </div>
 
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">リーダー</label>
+                        <label class="block text-sm font-medium text-gray-700">リーダー（代表者）</label>
                         <select v-model="form.leader_id" class="input mt-1 w-full">
                             <option value="">-- 選択 --</option>
                             <option v-for="u in leaders" :key="u.id" :value="String(u.id)">{{ u.name }} ({{ u.user_role }})</option>
                         </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">サブリーダー（副代表・複数可）</label>
+                        <div class="mt-2 space-y-1 rounded border border-gray-200 p-3">
+                            <div v-if="leaders.length === 0" class="text-sm text-gray-400">候補ユーザーがいません</div>
+                            <label
+                                v-for="u in leaders.filter(l => String(l.id) !== form.leader_id)"
+                                :key="u.id"
+                                class="flex items-center gap-2 text-sm"
+                            >
+                                <input
+                                    type="checkbox"
+                                    :value="String(u.id)"
+                                    v-model="form.sub_leader_ids"
+                                    class="rounded border-gray-300 text-indigo-600"
+                                />
+                                {{ u.name }} ({{ u.user_role }})
+                            </label>
+                        </div>
                     </div>
 
                     <div>

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\ChecksAdminPermission;
 use Illuminate\Http\Request;
 use App\Models\Unit;
 use App\Models\UnitMember;
@@ -13,8 +14,11 @@ use Inertia\Inertia;
 
 class UnitController extends Controller
 {
+    use ChecksAdminPermission;
+
     public function create()
     {
+        $this->requireAdminPermission('team_management');
         $user = Auth::user();
 
         // SuperAdmin can choose any company; regular admin only their own company
@@ -33,9 +37,10 @@ class UnitController extends Controller
             ->whereIn('company_id', $companyIds)
             ->get();
 
-        // leaders (for leader select) - allow superadmin and admin
+        // leaders (for leader/sub-leader select) - allow superadmin, admin, leader
         $leaders = \App\Models\User::select(['id', 'name', 'user_role'])
-            ->whereIn('user_role', ['superadmin', 'admin'])
+            ->whereIn('user_role', ['superadmin', 'admin', 'leader'])
+            ->whereIn('company_id', $companyIds)
             ->get();
 
         return Inertia::render('Admin/Teams/Create', [
@@ -48,14 +53,17 @@ class UnitController extends Controller
 
     public function store(Request $request)
     {
+        $this->requireAdminPermission('team_management');
         $validated = $request->validate([
-            'company_id' => 'nullable|exists:companies,id',
-            'department_id' => 'nullable|exists:departments,id',
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'leader_id' => 'nullable|exists:users,id',
-            'member_ids' => 'array',
-            'member_ids.*' => 'exists:users,id',
+            'company_id'      => 'nullable|exists:companies,id',
+            'department_id'   => 'nullable|exists:departments,id',
+            'name'            => 'required|string|max:255',
+            'description'     => 'nullable|string',
+            'leader_id'       => 'nullable|exists:users,id',
+            'sub_leader_ids'  => 'array',
+            'sub_leader_ids.*'=> 'exists:users,id',
+            'member_ids'      => 'array',
+            'member_ids.*'    => 'exists:users,id',
         ]);
         // server-side ownership and consistency checks
         $user = Auth::user();
@@ -111,6 +119,16 @@ class UnitController extends Controller
                     'team_id' => $team->id,
                     'user_id' => $validated['leader_id'],
                     'role' => 'owner',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            // サブリーダーを登録
+            foreach ($validated['sub_leader_ids'] ?? [] as $subId) {
+                DB::table('team_sub_leaders')->insertOrIgnore([
+                    'team_id'    => $team->id,
+                    'user_id'    => $subId,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);

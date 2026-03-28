@@ -88,6 +88,14 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
     Route::get('/user/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('user.dashboard');
 
+    // ユーザー設定
+    Route::get('/user/settings',      [App\Http\Controllers\User\UserSettingController::class, 'index'])->name('user.settings.index');
+    Route::get('/user/settings/edit', [App\Http\Controllers\User\UserSettingController::class, 'edit'])->name('user.settings.edit');
+    Route::put('/user/settings',      [App\Http\Controllers\User\UserSettingController::class, 'update'])->name('user.settings.update');
+
+    // 日ごと勤務形態設定
+    Route::post('/user/daily-worktypes', [App\Http\Controllers\User\UserDailyWorktypeController::class, 'store'])->name('user.daily_worktypes.store');
+
     // Shortcut route: global JobBox - coordinator-only. User-specific jobbox is
     // available at /user/jobbox.
     Route::get('/jobbox', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'global'])
@@ -286,6 +294,18 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('workload-analyzer/settings', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'settings'])->name('workload_analyzer.settings');
         Route::post('workload-analyzer/settings', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'saveSettings'])->name('workload_analyzer.settings.save');
         Route::get('workload-analyzer/{user}', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'show'])->name('workload_analyzer.show');
+
+        // 代表者 Admin のみ: Admin 権限管理
+        Route::middleware('representative')->group(function () {
+            Route::get('admin-permissions', [App\Http\Controllers\SuperAdmin\AdminPermissionController::class, 'index'])->name('admin_permissions.index');
+            Route::get('admin-permissions/{adminuser}/edit', [App\Http\Controllers\SuperAdmin\AdminPermissionController::class, 'edit'])->name('admin_permissions.edit');
+            Route::put('admin-permissions/{adminuser}', [App\Http\Controllers\SuperAdmin\AdminPermissionController::class, 'update'])->name('admin_permissions.update');
+        });
+
+        // Admin: Leader 権限管理
+        Route::get('leader-permissions', [App\Http\Controllers\Admin\LeaderPermissionController::class, 'index'])->name('leader_permissions.index');
+        Route::get('leader-permissions/{leaderuser}/edit', [App\Http\Controllers\Admin\LeaderPermissionController::class, 'edit'])->name('leader_permissions.edit');
+        Route::put('leader-permissions/{leaderuser}', [App\Http\Controllers\Admin\LeaderPermissionController::class, 'update'])->name('leader_permissions.update');
     });
 
 
@@ -370,6 +390,16 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('workload-analyzer/{user}', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'show'])->name('workload_analyzer.show');
         // 勤務時間管理
         Route::get('work-records', [App\Http\Controllers\WorkRecordController::class, 'index'])->name('work_records.index');
+
+        // ユニットチーム管理（Leader用）
+        Route::get('teams/create', [App\Http\Controllers\Leader\UnitController::class, 'create'])->name('teams.create');
+        Route::post('teams', [App\Http\Controllers\Leader\UnitController::class, 'store'])->name('units.store');
+        Route::resource('teams', App\Http\Controllers\Leader\TeamController::class)->only(['index', 'show', 'edit', 'update', 'destroy']);
+
+        // 全 Leader: Leader 権限管理（スコープはコントローラで制御）
+        Route::get('leader-permissions', [App\Http\Controllers\Admin\LeaderPermissionController::class, 'index'])->name('leader_permissions.index');
+        Route::get('leader-permissions/{leaderuser}/edit', [App\Http\Controllers\Admin\LeaderPermissionController::class, 'edit'])->name('leader_permissions.edit');
+        Route::put('leader-permissions/{leaderuser}', [App\Http\Controllers\Admin\LeaderPermissionController::class, 'update'])->name('leader_permissions.update');
     });
 
 // クライアント管理（Admin用）は上の admin グループに統合済み（重複削除）

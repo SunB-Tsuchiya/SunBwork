@@ -1306,3 +1306,220 @@ function selectRecord(rec) {
 - `whereHas('projectJob', fn => q->where('user_id', $user->id))` でオーナー所有案件のみ
 - `date` モード: `desired_end_date` 範囲フィルター
 - `project` モード: `project_job_id` フィルター + 案件一覧を返す
+
+---
+
+## 権限・ロール設計ルール
+
+### ロール階層
+
+```
+SuperAdmin > Admin > Leader / Coordinator > User
+```
+
+- **SuperAdmin**: 全社横断。全権限をバイパスする（チェック不要）
+- **Admin**: 自社内の全管理権限。Leader の上位互換。Leader 機能は制限なくアクセス可能
+- **Leader**: 自分が担当するチームの管理権限。フラグで個別制御
+- **Coordinator**: 案件・割当管理。権限フラグ管理なし（ロール自体で制御）
+- **User**: 一般ユーザー。閲覧・自己操作のみ
+
+### Admin 権限フラグ（`admin_permissions` テーブル）
+
+| フラグキー | 対象機能 | 対象コントローラー |
+|---|---|---|
+| `company_management` | 会社管理 | `Admin/CompanyController` |
+| `user_management` | ユーザー管理 | `Admin/UserController` |
+| `team_management` | チーム管理 | `Admin/TeamController`, `Admin/UnitController` |
+| `diary_management` | 日報管理 | `DiaryInteractionController` |
+| `client_management` | クライアント管理 | `ClientController` |
+| `workload_analysis` | 作業量分析 | `Leader/WorkloadAnalyzerController` |
+| `worktype_setting` | 勤務種別設定 | 専用コントローラー |
+| `work_record_management` | 勤務時間管理 | `WorkRecordController` |
+
+### Leader 権限フラグ（`leader_permissions` テーブル）
+
+| フラグキー | 対象機能 | 対象コントローラー |
+|---|---|---|
+| `client_management` | クライアント管理 | `ClientController` |
+| `diary_management` | 日報管理 | `DiaryInteractionController` |
+| `workload_analysis` | 作業量分析 | `Leader/WorkloadAnalyzerController` |
+| `workload_setting` | 作業項目設定 | `WorkloadSettingController` |
+| `work_record_management` | 勤務時間管理 | `WorkRecordController` |
+
+### 権限チェックの実装パターン
+
+**バックエンド（Trait）:**
+
+```php
+// Admin 権限チェック
+use App\Http\Controllers\Concerns\ChecksAdminPermission;
+$this->requireAdminPermission('diary_management');  // 権限なしは abort(403)
+
+// Leader 権限チェック
+use App\Http\Controllers\Concerns\ChecksLeaderPermission;
+$this->requireLeaderPermission('diary_management');
+```
+
+両方の Trait を use する場合は両方呼ぶ。SuperAdmin / Admin はどちらのチェックも通過する:
+
+```php
+use ChecksAdminPermission, ChecksLeaderPermission;
+
+public function index()
+{
+    $this->requireAdminPermission('diary_management');
+    $this->requireLeaderPermission('diary_management');
+    // ...
+}
+```
+
+**`ChecksAdminPermission` の動作:**
+- SuperAdmin → 常にパス
+- Admin で `admin_permissions` レコードなし → 全権限 ON（パス）
+- Admin で レコードあり かつ フラグ `false` → `abort(403)`
+- Admin 以外（Leader 等）→ チェックをスキップ（そのまま通過）
+
+**`ChecksLeaderPermission` の動作:**
+- SuperAdmin / Admin → 常にパス
+- Leader で `leader_permissions` レコードなし → 全権限 ON（パス）
+- Leader で レコードあり かつ フラグ `false` → `abort(403)`
+- Leader 以外 → チェックをスキップ
+
+### フロントエンド（タブ表示制御）
+
+`HandleInertiaRequests` で `auth.adminPermissions` / `auth.leaderPermissions` を共有。
+
+**AdminNavigationTabs.vue:**
+```js
+const perm = computed(() => page.props.auth?.adminPermissions ?? null);
+const can = (key) => perm.value === null || perm.value[key] === true;
+```
+
+**LeaderNavigationTabs.vue:**
+```js
+const perm = computed(() => page.props.auth?.leaderPermissions ?? null);
+const can = (key) => perm.value === null || perm.value[key] === true;
+```
+
+`perm.value === null`（レコードなし）の場合は全フラグ ON として扱う。
+
+### 権限設定ページのスコープ
+
+**Admin権限管理（`Admin/AdminPermissionController`）:**
+- SuperAdmin: 全 Admin ユーザーを管理可能
+- Admin: 同社内の Admin ユーザーを管理可能
+- ルートプレフィックス: SuperAdmin も `admin.*` ルートを使う（`superadmin.admin_permissions.*` は存在しない）
+
+**Leader権限管理（`Admin/LeaderPermissionController`）:**
+- SuperAdmin / Admin: 自社内の全 Leader を管理
+- 部署リーダー（`team_type='department'` の `leader_id`）: 自分の部署配下の全ユニットチームのリーダー・サブリーダーを管理
+- ユニットチームリーダー: 自分のチームのサブリーダーのみ管理
+- ルートプレフィックス: SuperAdmin / Admin → `admin.*`、Leader → `leader.*`
+
+```php
+// LeaderPermissionController::routePrefix()
+private function routePrefix(User $user): string
+{
+    if ($user->isSuperAdmin() || $user->isAdmin()) return 'admin';
+    return 'leader';
+}
+```
+
+### 常に権限フラグなしでアクセスできる機能
+
+以下は権限フラグの制御対象外（ロールさえ合えば常にアクセス可）:
+
+| 機能 | 対象ロール | 理由 |
+|---|---|---|
+| **チーム管理** (`leader.teams.*`) | Leader | チームの存在がリーダーの前提条件のため |
+| **Leader権限管理** (`leader.leader_permissions.*`) | Leader | 権限設定ページ自体を制御する必要がないため |
+| **Admin権限管理** (`admin.admin_permissions.*`) | Admin / SuperAdmin | 同上 |
+
+### Leader チームスコープ
+
+Leader がアクセスできるチーム・メンバーのスコープ:
+
+- **部署リーダー**（`team_type='department'` チームの `leader_id`）: 自部署の全ユニットチームを閲覧・管理可能
+- **ユニットチームリーダー**（`team_type='unit'` チームの `leader_id`）: 自分のチームのみ
+- **サブリーダー**（`team_sub_leaders` ピボットテーブルに登録）: 自分がサブリーダーのチームのみ
+
+日報・クライアント等のデータスコープも上記に準拠。`DiaryInteractionController::buildPermittedUserIds()` 参照。
+
+### 設計上の注意点
+
+1. **Admin は Leader の上位互換**: `WorkloadSettingController` など Leader 専用権限しかないコントローラーに Admin がアクセスしても制限なし。これは意図した設計（Admin に `workload_setting` フラグはない）
+2. **デフォルトは全権限 ON**: 新規ユーザーに `admin_permissions` / `leader_permissions` レコードがない状態では全機能にアクセス可。制限したい場合はレコードを作成してフラグを `false` に設定する
+3. **`team_sub_leaders` ピボット**: サブリーダーの権限スコープはこのピボットで管理。新機能でリーダースコープが必要な場合は必ずこのテーブルも確認すること
+4. **Ziggy ルートエラーに注意**: `routePrefix()` の戻り値が存在しないルートプレフィックスを返すと Ziggy エラーになる。SuperAdmin が Admin の権限設定ページにアクセスする場合は `'admin'` を返す（`'superadmin'` ではない）
+
+---
+
+## ユーザー設定・カレンダー勤務日程ルール
+
+### 関連テーブルと役割
+
+| テーブル | 用途 |
+|---|---|
+| `user_settings` | ユーザーごとのデフォルト設定（基本勤務形態 `worktype_id`、カレンダー表示 `calendar_view`） |
+| `user_monthly_schedules` | 日ごとの勤務形態上書き。1ユーザー×1ヶ月=1レコード（JSON圧縮） |
+
+### `user_monthly_schedules` の設計
+
+```
+user_id | year_month | schedule（JSON）
+10      | 2026-03    | {"23": 2, "24": 1, "28": 3}
+10      | 2026-04    | {"01": 2, "07": 1}
+```
+
+- `schedule` の key = 2桁の日（`"01"`〜`"31"`）、value = `worktype_id`（整数）
+- key が存在しない日 = デフォルト設定（`user_settings.worktype_id`）を使用
+- 100ユーザー×10年 ≒ 1,200レコード（旧の1行/日方式の約1/300）
+
+### 勤務形態の解決優先順位
+
+```
+日ごと設定（user_monthly_schedules） > デフォルト設定（user_settings.worktype_id） > 一覧の先頭
+```
+
+**重要**: 日報作成（`DiaryController::create()`）では対象日の勤務形態を上記順で解決し、フォームの初期選択に使う。
+
+```php
+$dailyWorktypeId   = \App\Models\UserMonthlySchedule::worktypeIdForDate($user->id, $date);
+$defaultWorktypeId = $dailyWorktypeId ?? $user->userSetting?->worktype_id;
+```
+
+### デフォルト設定変更時のリセット
+
+`UserSettingController::update()` で `worktype_id` が変わった場合、`user_monthly_schedules` を全削除する（日ごとの設定をリセット）。
+
+### 関連ファイル一覧
+
+| ファイル | 役割 |
+|---|---|
+| `app/Models/UserSetting.php` | ユーザー設定モデル |
+| `app/Models/UserMonthlySchedule.php` | 月次勤務形態モデル（`worktypeIdForDate` スタティックメソッド付き） |
+| `app/Http/Controllers/User/UserSettingController.php` | 設定 index/edit/update |
+| `app/Http/Controllers/User/UserDailyWorktypeController.php` | 週間日程保存（POST `/user/daily-worktypes`）|
+| `app/Http/Controllers/CalendarController.php` | カレンダーに `defaultWorktype`/`worktypes`/`dailyWorktypes` を渡す |
+| `resources/js/Components/Calendar.vue` | 勤務形態表示・日程設定モーダル・背景グレー |
+| `resources/js/Pages/User/Settings/` | ユーザー設定 Index/Edit ページ |
+
+### カレンダーの勤務形態連動
+
+**day ヘッダー表示:** 週・日ビューの各日ヘッダーに勤務形態名を青字で表示（`fc-day-worktype` CSS クラス）。
+
+**始業前グレー背景:** `display: 'background'` イベントでスロット開始時刻〜始業時刻を薄くグレー表示。各日の有効勤務形態（日次 > デフォルト）から計算。
+
+**夜勤モード:** `defaultWorktype.start_time >= 16:00` の場合、`slotMinTime: '16:00:00'`、`slotMaxTime: '30:00:00'`（翌6時まで）で表示。
+
+**`scrollTimeReset: false`:** モーダル開閉でスクロール位置がリセットされないよう設定。
+
+**初期スクロール:** アクセス時刻の1時間前に自動スクロール。夜勤の深夜帯は FullCalendar の 24+h 表記（例: 1:00am → `'25:00:00'`）に変換。
+
+### 週間日程設定モーダル（カレンダー内）
+
+- 「日程設定」ボタンから開く
+- 現在表示中の週（月〜日）を `viewStart`（FullCalendar の `datesSet` コールバック）から算出
+- **全日行:** セレクト変更で全曜日を一括更新。選択後は「— 一括選択 —」に戻り個別修正可能
+- 保存後はページリロードなしでヘッダー表示・背景グレーが即座に更新
+- デフォルト設定変更時は全日次設定がリセットされる

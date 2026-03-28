@@ -19,6 +19,9 @@ const page = usePage();
 // admin_permissions が null（未設定）の場合は全権限オン扱い
 const perm = computed(() => page.props.auth?.adminPermissions ?? null);
 const can = (key) => perm.value === null || perm.value[key] === true;
+
+// 代表者 Admin は Admin 権限管理タブを表示
+const isRepresentative = computed(() => page.props.auth?.user?.isRepresentative ?? false);
 </script>
 
 <template>
@@ -43,7 +46,7 @@ const can = (key) => perm.value === null || perm.value[key] === true;
                 :href="route('admin.teams.index')"
                 :class="tab('teams')"
             >
-                チーム管理
+                部署管理
             </Link>
             <Link
                 v-if="can('diary_management')"
@@ -79,6 +82,19 @@ const can = (key) => perm.value === null || perm.value[key] === true;
                 :class="tab('work_records')"
             >
                 勤務時間管理
+            </Link>
+            <Link
+                v-if="isRepresentative"
+                :href="route('admin.admin_permissions.index')"
+                :class="tab('admin_permissions')"
+            >
+                Admin権限管理
+            </Link>
+            <Link
+                :href="route('admin.leader_permissions.index')"
+                :class="tab('leader_permissions')"
+            >
+                Leader権限管理
             </Link>
         </nav>
     </div>

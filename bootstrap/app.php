@@ -35,11 +35,13 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->alias([
-            'superadmin' => \App\Http\Middleware\SuperadminMiddleware::class,
-            'admin' => \App\Http\Middleware\AdminMiddleware::class,
-            'leader' => \App\Http\Middleware\LeaderMiddleware::class,
-            'coordinator' => \App\Http\Middleware\CoordinatorMiddleware::class,
-            'owner' => \App\Http\Middleware\OwnerMiddleware::class, // 後方互換性のため残す
+            'superadmin'     => \App\Http\Middleware\SuperadminMiddleware::class,
+            'admin'          => \App\Http\Middleware\AdminMiddleware::class,
+            'leader'         => \App\Http\Middleware\LeaderMiddleware::class,
+            'coordinator'    => \App\Http\Middleware\CoordinatorMiddleware::class,
+            'owner'          => \App\Http\Middleware\OwnerMiddleware::class, // 後方互換性のため残す
+            'representative'        => \App\Http\Middleware\EnsureIsRepresentative::class,
+            'representative_leader' => \App\Http\Middleware\EnsureIsRepresentativeLeader::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

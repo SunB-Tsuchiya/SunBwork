@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ChecksLeaderPermission;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -14,6 +15,7 @@ use App\Models\Difficulty;
 
 class WorkloadSettingController extends Controller
 {
+    use ChecksLeaderPermission;
     /**
      * 各タイプの設定（モデル・ソートカラム・ラベル）
      */
@@ -113,6 +115,7 @@ class WorkloadSettingController extends Controller
      */
     public function index(Request $request)
     {
+        $this->requireLeaderPermission('workload_setting');
         $user      = $request->user();
         $companyId = $user?->company_id ?? null;
 
@@ -136,6 +139,7 @@ class WorkloadSettingController extends Controller
      */
     public function edit(Request $request, string $type)
     {
+        $this->requireLeaderPermission('workload_setting');
         $configs = $this->typeConfig();
         abort_if(!array_key_exists($type, $configs), 404);
 
@@ -155,6 +159,7 @@ class WorkloadSettingController extends Controller
      */
     public function store(Request $request, string $type)
     {
+        $this->requireLeaderPermission('workload_setting');
         $configs = $this->typeConfig();
         abort_if(!array_key_exists($type, $configs), 404);
 

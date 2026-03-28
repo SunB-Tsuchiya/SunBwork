@@ -14,7 +14,7 @@ const tab = (key) => [
 
 <template>
     <div class="mb-6">
-        <nav class="flex space-x-8" aria-label="Tabs">
+        <nav class="flex flex-wrap gap-2" aria-label="Tabs">
             <Link href="/myjobbox" :class="tab('myjob')">
                 マイジョブ
             </Link>
@@ -26,6 +26,9 @@ const tab = (key) => [
             </Link>
             <Link :href="route('calendar.index')" :class="tab('calendar')">
                 予定表
+            </Link>
+            <Link :href="route('user.settings.index')" :class="tab('settings')">
+                設定
             </Link>
         </nav>
     </div>

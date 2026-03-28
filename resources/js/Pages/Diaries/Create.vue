@@ -22,8 +22,9 @@ const simpleToolbar = [
 ];
 
 const props = defineProps({
-    date:      { type: String, default: '' },
-    worktypes: { type: Array,  default: () => [] },
+    date:              { type: String, default: '' },
+    worktypes:         { type: Array,  default: () => [] },
+    defaultWorktypeId: { type: Number, default: null },
 });
 
 function parseTime(t) {
@@ -31,8 +32,10 @@ function parseTime(t) {
     return { hour: parts[0] || '00', minute: parts[1] || '00' };
 }
 
-// 先頭の worktype をデフォルトにする
-const firstWt  = props.worktypes[0] ?? null;
+// ユーザー設定の基本勤務形態を優先し、なければ先頭を使う
+const firstWt = (props.defaultWorktypeId
+    ? props.worktypes.find((w) => w.id === props.defaultWorktypeId)
+    : null) ?? props.worktypes[0] ?? null;
 const defStart = parseTime(firstWt?.start_time ?? '08:00');
 const defEnd   = parseTime(firstWt?.end_time   ?? '17:00');
 

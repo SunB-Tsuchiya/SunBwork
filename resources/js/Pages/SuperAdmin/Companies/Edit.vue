@@ -10,10 +10,20 @@ const props = defineProps({
         type: Object,
         required: true,
     },
+    adminUsers: {
+        type: Array,
+        default: () => [],
+    },
+    leaderUsers: {
+        type: Array,
+        default: () => [],
+    },
 });
 
 const form = useForm({
     name: props.company.name,
+    representative_id: props.company.representative_id ?? null,
+    representative_leader_id: props.company.representative_leader_id ?? null,
     departments: props.company.departments?.map(dep => ({
         id: dep.id,
         name: dep.name,
@@ -26,7 +36,6 @@ const addRole = (depIdx) => {
 };
 
 const submit = () => {
-    // バリデーション: 部署名・担当名が空白の場合は登録不可
     for (const dep of form.departments) {
         if (!dep.name.trim()) {
             alert('部署名を入力してください');
@@ -39,7 +48,7 @@ const submit = () => {
             }
         }
     }
-    form.put(route('admin.companies.update', props.company.id));
+    form.put(route('superadmin.companies.update', props.company.id));
 };
 
 const removeDepartment = (depIdx) => {
@@ -58,38 +67,160 @@ const removeRole = (depIdx, assignmentIdx) => {
 <template>
     <AppLayout title="会社編集">
         <template #header>
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">会社編集</h2>
+            <h2 class="text-xl font-semibold leading-tight text-gray-800">会社編集</h2>
         </template>
-        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
-            <form @submit.prevent="submit">
-                <div class="mb-6">
-                    <InputLabel for="name" value="会社名" />
-                    <TextInput id="name" v-model="form.name" type="text" class="mt-1 block w-full" required autofocus />
-                </div>
-                <div v-for="(department, depIdx) in form.departments" :key="department.id" class="mb-6 p-4 bg-blue-50 rounded">
-                    <div class="flex items-center mb-2">
-                        <InputLabel :for="`department-name-${depIdx}`" :value="`部署名`" />
-                        <button type="button" @click="removeDepartment(depIdx)" class="ml-4 px-2 py-1 bg-red-200 text-red-800 rounded hover:bg-red-300 transition">削除</button>
+
+        <div class="rounded bg-white p-6 shadow">
+            <div class="mx-auto max-w-2xl">
+                <form @submit.prevent="submit">
+                    <!-- 会社名 -->
+                    <div class="mb-6">
+                        <InputLabel for="name" value="会社名" />
+                        <TextInput id="name" v-model="form.name" type="text" class="mt-1 block w-full" required autofocus />
                     </div>
-                    <TextInput :id="`department-name-${depIdx}`" v-model="department.name" type="text" class="mt-1 block w-full mb-2" required />
-                    <div class="ml-4">
-                        <div class="flex items-center mb-1">
-                            <span class="block font-semibold">担当名</span>
-                            <button type="button" @click="addRole(depIdx)" class="ml-4 px-2 py-1 bg-blue-200 text-blue-800 rounded hover:bg-blue-300 transition">＋追加</button>
+
+                    <!-- 代表者 -->
+                    <div class="mb-6 rounded border border-gray-200">
+                        <div class="border-b border-gray-200 bg-gray-50 px-4 py-2 text-sm font-medium text-gray-700">
+                            代表者
                         </div>
-                        <div v-for="(assignment, assignmentIdx) in department.assignments" :key="assignment.id ?? assignmentIdx" class="mb-2 flex items-center">
-                            <TextInput :id="`assignment-name-${depIdx}-${assignmentIdx}`" v-model="assignment.name" type="text" class="mt-1 block w-full" required />
-                            <button type="button" @click="removeRole(depIdx, assignmentIdx)" class="ml-2 px-2 py-1 bg-red-200 text-red-800 rounded hover:bg-red-300 transition">削除</button>
+                        <div class="p-4">
+                            <div v-if="adminUsers.length === 0" class="text-sm text-gray-400">
+                                この会社に所属する Admin ユーザーがいません。
+                            </div>
+                            <div v-else class="space-y-2">
+                                <label class="flex items-center gap-2 text-sm">
+                                    <input
+                                        type="radio"
+                                        :value="null"
+                                        v-model="form.representative_id"
+                                        class="accent-indigo-600"
+                                    />
+                                    <span class="text-gray-400">未設定</span>
+                                </label>
+                                <label
+                                    v-for="admin in adminUsers"
+                                    :key="admin.id"
+                                    class="flex items-center gap-2 text-sm"
+                                >
+                                    <input
+                                        type="radio"
+                                        :value="admin.id"
+                                        v-model="form.representative_id"
+                                        class="accent-indigo-600"
+                                    />
+                                    <span class="font-medium">{{ admin.name }}</span>
+                                    <span class="text-gray-400">{{ admin.email }}</span>
+                                </label>
+                            </div>
                         </div>
                     </div>
-                </div>
-                <div class="flex justify-end">
-                    <PrimaryButton type="submit" :disabled="form.processing">
-                        更新
-                    </PrimaryButton>
-                    <Link v-if="typeof route === 'function' && route().has('admin.companies.index')" :href="route('admin.companies.index')" class="ml-4 text-gray-600 hover:underline">戻る</Link>
-                </div>
-            </form>
+
+                    <!-- 代表者リーダー -->
+                    <div class="mb-6 rounded border border-gray-200">
+                        <div class="border-b border-gray-200 bg-gray-50 px-4 py-2 text-sm font-medium text-gray-700">
+                            代表者リーダー
+                        </div>
+                        <div class="p-4">
+                            <div v-if="leaderUsers.length === 0" class="text-sm text-gray-400">
+                                この会社に所属する Leader ユーザーがいません。
+                            </div>
+                            <div v-else class="space-y-2">
+                                <label class="flex items-center gap-2 text-sm">
+                                    <input
+                                        type="radio"
+                                        :value="null"
+                                        v-model="form.representative_leader_id"
+                                        class="accent-indigo-600"
+                                    />
+                                    <span class="text-gray-400">未設定</span>
+                                </label>
+                                <label
+                                    v-for="leader in leaderUsers"
+                                    :key="leader.id"
+                                    class="flex items-center gap-2 text-sm"
+                                >
+                                    <input
+                                        type="radio"
+                                        :value="leader.id"
+                                        v-model="form.representative_leader_id"
+                                        class="accent-indigo-600"
+                                    />
+                                    <span class="font-medium">{{ leader.name }}</span>
+                                    <span class="text-gray-400">{{ leader.email }}</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 部署・担当 -->
+                    <div class="mb-2 text-sm font-medium text-gray-700">部署・担当</div>
+                    <div class="mb-4 divide-y divide-gray-200 rounded border border-gray-200">
+                        <div v-for="(department, depIdx) in form.departments" :key="department.id" class="p-4">
+                            <!-- 部署名 -->
+                            <div class="mb-2 flex items-center gap-2">
+                                <span class="w-16 shrink-0 text-sm font-medium text-gray-600">部署名</span>
+                                <TextInput
+                                    :id="`department-name-${depIdx}`"
+                                    v-model="department.name"
+                                    type="text"
+                                    class="block flex-1"
+                                    required
+                                />
+                                <button
+                                    type="button"
+                                    @click="removeDepartment(depIdx)"
+                                    class="rounded border border-red-300 px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                                >
+                                    部署削除
+                                </button>
+                            </div>
+
+                            <!-- 担当名 -->
+                            <div class="ml-8 mt-3 border-l-2 border-gray-200 pl-4">
+                                <div class="mb-2 flex items-center gap-2">
+                                    <span class="text-xs font-medium text-gray-500">担当名</span>
+                                    <button
+                                        type="button"
+                                        @click="addRole(depIdx)"
+                                        class="rounded border border-indigo-300 px-2 py-0.5 text-xs text-indigo-600 hover:bg-indigo-50"
+                                    >
+                                        ＋追加
+                                    </button>
+                                </div>
+                                <div
+                                    v-for="(assignment, assignmentIdx) in department.assignments"
+                                    :key="assignment.id ?? assignmentIdx"
+                                    class="mb-2 flex items-center gap-2"
+                                >
+                                    <TextInput
+                                        :id="`assignment-name-${depIdx}-${assignmentIdx}`"
+                                        v-model="assignment.name"
+                                        type="text"
+                                        class="block flex-1"
+                                        required
+                                    />
+                                    <button
+                                        type="button"
+                                        @click="removeRole(depIdx, assignmentIdx)"
+                                        class="rounded border border-red-300 px-2 py-0.5 text-xs text-red-600 hover:bg-red-50"
+                                    >
+                                        削除
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ボタン -->
+                    <div class="flex items-center justify-end gap-3">
+                        <Link :href="route('superadmin.companies.index')" class="text-sm text-gray-600 hover:underline">
+                            戻る
+                        </Link>
+                        <PrimaryButton type="submit" :disabled="form.processing">更新</PrimaryButton>
+                    </div>
+                </form>
+            </div>
         </div>
     </AppLayout>
 </template>

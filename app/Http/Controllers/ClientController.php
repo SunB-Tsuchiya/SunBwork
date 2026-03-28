@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ChecksAdminPermission;
+use App\Http\Controllers\Concerns\ChecksLeaderPermission;
 use App\Models\Client;
 use App\Models\Company;
 use Illuminate\Http\Request;
@@ -12,8 +14,12 @@ use Illuminate\Support\Facades\Auth;
 
 class ClientController extends Controller
 {
+    use ChecksAdminPermission, ChecksLeaderPermission;
+
     public function index()
     {
+        $this->requireAdminPermission('client_management');
+        $this->requireLeaderPermission('client_management');
         $user = Auth::user();
         if ($user && $user->user_role === 'superadmin') {
             $clients = Client::all();
@@ -27,12 +33,16 @@ class ClientController extends Controller
 
     public function create()
     {
+        $this->requireAdminPermission('client_management');
+        $this->requireLeaderPermission('client_management');
         $this->authorize('create', Client::class);
         return Inertia::render('Clients/Create');
     }
 
     public function store(Request $request)
     {
+        $this->requireAdminPermission('client_management');
+        $this->requireLeaderPermission('client_management');
         $user = Auth::user();
         $this->authorize('create', Client::class);
 
@@ -57,12 +67,16 @@ class ClientController extends Controller
 
     public function edit(Client $client)
     {
+        $this->requireAdminPermission('client_management');
+        $this->requireLeaderPermission('client_management');
         $this->authorize('view', $client);
         return Inertia::render('Clients/Edit', ['client' => $client]);
     }
 
     public function update(Request $request, Client $client)
     {
+        $this->requireAdminPermission('client_management');
+        $this->requireLeaderPermission('client_management');
         $this->authorize('update', $client);
 
         $data = $request->validate([
@@ -87,12 +101,16 @@ class ClientController extends Controller
 
     public function show(Client $client)
     {
+        $this->requireAdminPermission('client_management');
+        $this->requireLeaderPermission('client_management');
         $this->authorize('view', $client);
         return Inertia::render('Clients/Show', ['client' => $client]);
     }
 
     public function destroy(Client $client)
     {
+        $this->requireAdminPermission('client_management');
+        $this->requireLeaderPermission('client_management');
         $this->authorize('delete', $client);
         $client->delete();
         return redirect()->route("{$this->routePrefix()}.clients.index");
@@ -111,6 +129,8 @@ class ClientController extends Controller
     /** サンプルCSVダウンロード */
     public function csvSampleDownload()
     {
+        $this->requireAdminPermission('client_management');
+        $this->requireLeaderPermission('client_management');
         $rows = [
             ['name', 'detail'],
             ['株式会社サンプル', '詳細テキスト（省略可）'],
@@ -128,6 +148,8 @@ class ClientController extends Controller
     /** CSVアップロード画面 */
     public function csvUpload()
     {
+        $this->requireAdminPermission('client_management');
+        $this->requireLeaderPermission('client_management');
         $this->authorize('create', Client::class);
         $user = Auth::user();
         $companies = ($user && $user->user_role === 'superadmin')
@@ -139,6 +161,8 @@ class ClientController extends Controller
     /** CSVプレビュー */
     public function csvPreview(Request $request)
     {
+        $this->requireAdminPermission('client_management');
+        $this->requireLeaderPermission('client_management');
         $this->authorize('create', Client::class);
         $request->validate([
             'csv_file'   => 'required|file|mimes:csv,txt|max:2048',
@@ -196,6 +220,8 @@ class ClientController extends Controller
     /** CSV一括登録 */
     public function csvStore(Request $request)
     {
+        $this->requireAdminPermission('client_management');
+        $this->requireLeaderPermission('client_management');
         $this->authorize('create', Client::class);
         $request->validate([
             'clients'    => 'required|array',

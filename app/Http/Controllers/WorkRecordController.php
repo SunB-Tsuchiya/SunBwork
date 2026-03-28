@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ChecksAdminPermission;
+use App\Http\Controllers\Concerns\ChecksLeaderPermission;
 use App\Models\Company;
 use App\Models\Team;
 use App\Models\Unit;
@@ -13,8 +15,12 @@ use Inertia\Inertia;
 
 class WorkRecordController extends Controller
 {
+    use ChecksAdminPermission, ChecksLeaderPermission;
+
     public function index(Request $request)
     {
+        $this->requireAdminPermission('work_record_management');
+        $this->requireLeaderPermission('work_record_management');
         $user         = Auth::user();
         $role         = $user->user_role ?? 'leader';
         $isSuperAdmin = $role === 'superadmin';

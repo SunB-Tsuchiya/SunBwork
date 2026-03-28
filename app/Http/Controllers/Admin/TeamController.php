@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\ChecksAdminPermission;
 use Illuminate\Http\Request;
 use App\Models\Team;
 use Inertia\Inertia;
@@ -11,8 +12,11 @@ use Illuminate\Support\Facades\DB;
 
 class TeamController extends Controller
 {
+    use ChecksAdminPermission;
+
     public function index()
     {
+        $this->requireAdminPermission('team_management');
         // チーム一覧をcompany, departmentリレーション付きで取得
         $teams = Team::with(['company', 'department'])->get();
         return Inertia::render('Admin/Teams/Index', [
@@ -22,6 +26,7 @@ class TeamController extends Controller
 
     public function edit($id)
     {
+        $this->requireAdminPermission('team_management');
         $team = Team::with(['company', 'department'])->findOrFail($id);
         $companies = \App\Models\Company::active()->get(['id', 'name']);
         $departments = \App\Models\Department::active()->get(['id', 'name', 'company_id']);
@@ -47,6 +52,9 @@ class TeamController extends Controller
             $props['leaders'] = $leaders;
         }
 
+        // サブリーダー一覧
+        $props['sub_leader_ids'] = $team->subLeaders()->pluck('users.id')->toArray();
+
         // If this is a unit team, include the Unit model for the edit form
         if ($team->team_type === 'unit') {
             $unit = \App\Models\Unit::with(['members:id,name'])
@@ -63,24 +71,29 @@ class TeamController extends Controller
 
     public function update(Request $request, $id)
     {
+        $this->requireAdminPermission('team_management');
         $team = Team::findOrFail($id);
         // remember previous leader to allow demotion when changed
         $oldLeaderId = $team->leader_id;
         // If the team is a company or department team, only allow updating leader_id and description.
         if (in_array($team->team_type, ['company', 'department'])) {
             $validated = $request->validate([
-                'leader_id' => 'nullable|exists:users,id',
-                'description' => 'nullable|string|max:2000',
+                'leader_id'       => 'nullable|exists:users,id',
+                'sub_leader_ids'  => 'array',
+                'sub_leader_ids.*'=> 'exists:users,id',
+                'description'     => 'nullable|string|max:2000',
             ]);
         } else {
             $validated = $request->validate([
-                'name' => 'required|string|max:255',
-                'company_id' => 'nullable|exists:companies,id',
-                'department_id' => 'nullable|exists:departments,id',
-                'leader_id' => 'nullable|exists:users,id',
-                'description' => 'nullable|string|max:2000',
-                'member_ids' => 'array',
-                'member_ids.*' => 'exists:users,id',
+                'name'            => 'required|string|max:255',
+                'company_id'      => 'nullable|exists:companies,id',
+                'department_id'   => 'nullable|exists:departments,id',
+                'leader_id'       => 'nullable|exists:users,id',
+                'sub_leader_ids'  => 'array',
+                'sub_leader_ids.*'=> 'exists:users,id',
+                'description'     => 'nullable|string|max:2000',
+                'member_ids'      => 'array',
+                'member_ids.*'    => 'exists:users,id',
             ]);
         }
 
@@ -246,12 +259,21 @@ class TeamController extends Controller
             logger()->warning('Failed to adjust team_user pivot roles after leader change', ['team_id' => $team->id, 'leader_id' => $leaderId, 'error' => $_exAttach->getMessage()]);
         }
 
+        // サブリーダーを sync
+        try {
+            $subLeaderIds = array_filter(array_map('intval', $validated['sub_leader_ids'] ?? []), fn($id) => $id > 0);
+            $team->subLeaders()->sync($subLeaderIds);
+        } catch (\Throwable $_exSub) {
+            logger()->warning('Failed to sync sub_leaders', ['team_id' => $team->id, 'error' => $_exSub->getMessage()]);
+        }
+
         return redirect()->route('admin.teams.index')->with('success', 'チーム情報を更新しました');
     }
 
     // Show a single team (resource route expects this)
     public function show($id)
     {
+        $this->requireAdminPermission('team_management');
         // eager load company, department and related users with minimal necessary columns
         $team = Team::with(['company', 'department', 'users' => function ($q) {
             $q->select(['users.id', 'users.name', 'users.user_role', 'users.department_id', 'users.assignment_id', 'users.company_id']);
@@ -272,6 +294,7 @@ class TeamController extends Controller
     // Destroy a team
     public function destroy($id)
     {
+        $this->requireAdminPermission('team_management');
         $team = Team::findOrFail($id);
         // Ensure pivot rows are removed even if model events are disabled
         try {

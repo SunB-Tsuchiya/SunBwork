@@ -6,6 +6,8 @@ import useToasts from '@/Composables/useToasts';
 const props = defineProps({
     admin:       { type: Object, required: true },
     permissions: { type: Object, required: true },
+    updateRoute: { type: String, default: 'superadmin.admin_permissions.update' },
+    indexRoute:  { type: String, default: 'superadmin.admin_permissions.index' },
 });
 
 const { addToast } = useToasts();
@@ -33,7 +35,7 @@ const form = useForm({
 });
 
 const submit = () => {
-    form.put(route('superadmin.admin_permissions.update', { adminuser: props.admin.id }), {
+    form.put(route(props.updateRoute, { adminuser: props.admin.id }), {
         onSuccess: () => {
             addToast('権限設定を保存しました', 'success');
         },
@@ -44,7 +46,7 @@ const submit = () => {
 };
 
 const goBack = () => {
-    window.location.href = route('superadmin.admin_permissions.index');
+    window.location.href = route(props.indexRoute);
 };
 </script>
 

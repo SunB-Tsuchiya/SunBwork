@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Diaries;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\ChecksAdminPermission;
+use App\Http\Controllers\Concerns\ChecksLeaderPermission;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\Diary;
@@ -11,9 +13,11 @@ use App\Models\Team;
 use App\Models\Unit;
 use App\Models\WorkRecord;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class DiaryInteractionController extends Controller
 {
+    use ChecksAdminPermission, ChecksLeaderPermission;
     /**
      * Build the list of permitted user IDs visible to the current actor
      * (admin -> company users, leader -> department/unit members).
@@ -35,31 +39,40 @@ class DiaryInteractionController extends Controller
             return array_values(array_unique(array_filter($userIds)));
         }
 
-        // leader check and gather users from teams
-        $isLeader = Team::where('leader_id', $currentUser->id)->whereIn('team_type', ['department', 'unit'])->exists();
-        if ($isLeader) {
-            $teams = Team::where('leader_id', $currentUser->id)
-                ->whereIn('team_type', ['department', 'unit'])
-                ->get();
+        // リーダーとして所属するチーム（leader_id）
+        $leaderTeams = Team::where('leader_id', $currentUser->id)
+            ->whereIn('team_type', ['department', 'unit'])
+            ->get();
 
-            foreach ($teams as $team) {
-                if ($team->team_type === 'department' && $team->department_id) {
-                    $deptUsers = User::where('company_id', $team->company_id)
-                        ->where('department_id', $team->department_id)
-                        ->pluck('id')
-                        ->toArray();
-                    $userIds = array_merge($userIds, $deptUsers);
-                }
+        // サブリーダーとして所属するユニットチーム
+        $subLeaderTeamIds = DB::table('team_sub_leaders')
+            ->where('user_id', $currentUser->id)
+            ->pluck('team_id');
+        $subLeaderTeams = Team::whereIn('id', $subLeaderTeamIds)
+            ->where('team_type', 'unit')
+            ->get();
 
-                if ($team->team_type === 'unit') {
-                    $unit = Unit::where('company_id', $team->company_id)
-                        ->where('department_id', $team->department_id)
-                        ->where('name', $team->name)
-                        ->first();
-                    if ($unit) {
-                        $members = $unit->members()->pluck('users.id')->toArray();
-                        $userIds = array_merge($userIds, $members);
-                    }
+        $allTeams = $leaderTeams->merge($subLeaderTeams)->unique('id');
+
+        foreach ($allTeams as $team) {
+            if ($team->team_type === 'department' && $team->department_id) {
+                // 部署リーダー: 部署内の全ユーザー
+                $deptUsers = User::where('company_id', $team->company_id)
+                    ->where('department_id', $team->department_id)
+                    ->pluck('id')
+                    ->toArray();
+                $userIds = array_merge($userIds, $deptUsers);
+            }
+
+            if ($team->team_type === 'unit') {
+                // ユニットリーダー/サブリーダー: ユニットメンバーのみ
+                $unit = Unit::where('company_id', $team->company_id)
+                    ->where('department_id', $team->department_id)
+                    ->where('name', $team->name)
+                    ->first();
+                if ($unit) {
+                    $members = $unit->members()->pluck('users.id')->toArray();
+                    $userIds = array_merge($userIds, $members);
                 }
             }
         }
@@ -69,6 +82,8 @@ class DiaryInteractionController extends Controller
 
     public function index(Request $request)
     {
+        $this->requireAdminPermission('diary_management');
+        $this->requireLeaderPermission('diary_management');
         $currentUser = Auth::user();
         $isAdmin = ($currentUser->user_role ?? '') === 'admin';
 
@@ -355,6 +370,8 @@ class DiaryInteractionController extends Controller
 
     public function show(Diary $diary)
     {
+        $this->requireAdminPermission('diary_management');
+        $this->requireLeaderPermission('diary_management');
         $currentUser = Auth::user();
         $isAdmin = ($currentUser->user_role ?? '') === 'admin';
         $permitted = $this->buildPermittedUserIds($currentUser);
@@ -426,6 +443,8 @@ class DiaryInteractionController extends Controller
 
     public function markRead(Request $request, Diary $diary)
     {
+        $this->requireAdminPermission('diary_management');
+        $this->requireLeaderPermission('diary_management');
         $currentUser = Auth::user();
         $isAdmin = ($currentUser->user_role ?? '') === 'admin';
         $permitted = $this->buildPermittedUserIds($currentUser);
@@ -451,6 +470,8 @@ class DiaryInteractionController extends Controller
 
     public function markReadAll(Request $request)
     {
+        $this->requireAdminPermission('diary_management');
+        $this->requireLeaderPermission('diary_management');
         $currentUser = Auth::user();
         $date = $request->input('date');
         if (!$date) return redirect()->back()->with('error', '日付が指定されていません');

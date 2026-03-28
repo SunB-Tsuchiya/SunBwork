@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\ChecksAdminPermission;
 use App\Models\Company;
 use App\Models\Worktype;
 use Illuminate\Http\Request;
@@ -11,8 +12,11 @@ use Inertia\Inertia;
 
 class WorktypeController extends Controller
 {
+    use ChecksAdminPermission;
+
     public function index()
     {
+        $this->requireAdminPermission('worktype_setting');
         $user = Auth::user();
         $isSuperAdmin = ($user->user_role ?? '') === 'superadmin';
 
@@ -51,6 +55,7 @@ class WorktypeController extends Controller
 
     public function edit(Request $request)
     {
+        $this->requireAdminPermission('worktype_setting');
         $user         = Auth::user();
         $isSuperAdmin = ($user->user_role ?? '') === 'superadmin';
         $companyId    = $isSuperAdmin
@@ -70,6 +75,7 @@ class WorktypeController extends Controller
 
     public function update(Request $request)
     {
+        $this->requireAdminPermission('worktype_setting');
         $rows = $request->validate([
             'rows'              => 'required|array',
             'rows.*.id'         => 'nullable|integer|exists:worktypes,id',

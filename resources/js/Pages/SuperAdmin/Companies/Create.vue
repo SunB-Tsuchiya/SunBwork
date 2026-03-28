@@ -37,7 +37,6 @@ const removeAssignment = (depIdx, assignmentIdx) => {
 };
 
 const submit = () => {
-    // バリデーション: 部署名・担当名が空白の場合は登録不可
     for (const dep of form.departments) {
         if (!dep.name.trim()) {
             alert('部署名を入力してください');
@@ -50,16 +49,7 @@ const submit = () => {
             }
         }
     }
-    const routeName = 'superadmin.companies.store';
-    // Debug logging removed
-    try {
-        const url = route(routeName);
-        // Debug logging removed
-        form.post(url);
-    } catch (e) {
-        console.error('[Create.vue][SuperAdmin] Ziggy route resolution failed for', routeName, e);
-        throw e;
-    }
+    form.post(route('superadmin.companies.store'));
 };
 </script>
 
@@ -68,63 +58,95 @@ const submit = () => {
         <template #header>
             <h2 class="text-xl font-semibold leading-tight text-gray-800">会社新規登録</h2>
         </template>
-        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
-            <form @submit.prevent="submit">
-                <div class="mb-6">
-                    <InputLabel for="name" value="会社名" />
-                    <TextInput id="name" v-model="form.name" type="text" class="mt-1 block w-full" required autofocus />
-                </div>
-                <div v-for="(department, depIdx) in form.departments" :key="depIdx" class="mb-6 rounded bg-blue-50 p-4">
-                    <div class="mb-2 flex items-center">
-                        <InputLabel :for="`department-name-${depIdx}`" :value="`部署名`" />
+
+        <div class="rounded bg-white p-6 shadow">
+            <div class="mx-auto max-w-2xl">
+                <form @submit.prevent="submit">
+                    <!-- 会社名 -->
+                    <div class="mb-6">
+                        <InputLabel for="name" value="会社名" />
+                        <TextInput id="name" v-model="form.name" type="text" class="mt-1 block w-full" required autofocus />
+                    </div>
+
+                    <!-- 部署 -->
+                    <div class="mb-2 text-sm font-medium text-gray-700">部署・担当</div>
+                    <div class="mb-4 divide-y divide-gray-200 rounded border border-gray-200">
+                        <div v-for="(department, depIdx) in form.departments" :key="depIdx" class="p-4">
+                            <!-- 部署名 -->
+                            <div class="mb-2 flex items-center gap-2">
+                                <span class="w-16 shrink-0 text-sm font-medium text-gray-600">部署名</span>
+                                <TextInput
+                                    :id="`department-name-${depIdx}`"
+                                    v-model="department.name"
+                                    type="text"
+                                    class="block flex-1"
+                                    required
+                                />
+                                <button
+                                    type="button"
+                                    @click="removeDepartment(depIdx)"
+                                    class="rounded border border-red-300 px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                                >
+                                    部署削除
+                                </button>
+                            </div>
+
+                            <!-- 担当名 -->
+                            <div class="ml-8 mt-3 border-l-2 border-gray-200 pl-4">
+                                <div class="mb-2 flex items-center gap-2">
+                                    <span class="text-xs font-medium text-gray-500">担当名</span>
+                                    <button
+                                        type="button"
+                                        @click="addAssignment(depIdx)"
+                                        class="rounded border border-indigo-300 px-2 py-0.5 text-xs text-indigo-600 hover:bg-indigo-50"
+                                    >
+                                        ＋追加
+                                    </button>
+                                </div>
+                                <div
+                                    v-for="(assignment, assignmentIdx) in department.assignments"
+                                    :key="assignmentIdx"
+                                    class="mb-2 flex items-center gap-2"
+                                >
+                                    <TextInput
+                                        :id="`assignment-name-${depIdx}-${assignmentIdx}`"
+                                        v-model="assignment.name"
+                                        type="text"
+                                        class="block flex-1"
+                                        required
+                                    />
+                                    <button
+                                        type="button"
+                                        @click="removeAssignment(depIdx, assignmentIdx)"
+                                        class="rounded border border-red-300 px-2 py-0.5 text-xs text-red-600 hover:bg-red-50"
+                                    >
+                                        削除
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 部署追加 -->
+                    <div class="mb-6">
                         <button
                             type="button"
-                            @click="removeDepartment(depIdx)"
-                            class="ml-4 rounded bg-red-200 px-2 py-1 text-red-800 transition hover:bg-red-300"
+                            @click="addDepartment"
+                            class="rounded border border-indigo-300 px-3 py-1 text-sm text-indigo-600 hover:bg-indigo-50"
                         >
-                            削除
+                            ＋部署追加
                         </button>
                     </div>
-                    <TextInput :id="`department-name-${depIdx}`" v-model="department.name" type="text" class="mb-2 mt-1 block w-full" required />
-                    <div class="ml-4">
-                        <div class="mb-1 flex items-center">
-                            <span class="block font-semibold">担当名</span>
-                            <button
-                                type="button"
-                                @click="addAssignment(depIdx)"
-                                class="ml-4 rounded bg-blue-200 px-2 py-1 text-blue-800 transition hover:bg-blue-300"
-                            >
-                                ＋追加
-                            </button>
-                        </div>
-                        <div v-for="(assignment, assignmentIdx) in department.assignments" :key="assignmentIdx" class="mb-2 flex items-center">
-                            <TextInput
-                                :id="`assignment-name-${depIdx}-${assignmentIdx}`"
-                                v-model="assignment.name"
-                                type="text"
-                                class="mt-1 block w-full"
-                                required
-                            />
-                            <button
-                                type="button"
-                                @click="removeAssignment(depIdx, assignmentIdx)"
-                                class="ml-2 rounded bg-red-200 px-2 py-1 text-red-800 transition hover:bg-red-300"
-                            >
-                                削除
-                            </button>
-                        </div>
+
+                    <!-- ボタン -->
+                    <div class="flex items-center justify-end gap-3">
+                        <Link :href="route('superadmin.companies.index')" class="text-sm text-gray-600 hover:underline">
+                            戻る
+                        </Link>
+                        <PrimaryButton type="submit" :disabled="form.processing">登録</PrimaryButton>
                     </div>
-                </div>
-                <div class="mb-6">
-                    <button type="button" @click="addDepartment" class="rounded bg-blue-200 px-3 py-1 text-blue-800 transition hover:bg-blue-300">
-                        ＋部署追加
-                    </button>
-                </div>
-                <div class="flex justify-end">
-                    <PrimaryButton type="submit" :disabled="form.processing"> 登録 </PrimaryButton>
-                    <Link :href="route('superadmin.companies.index')" class="ml-4 text-gray-600 hover:underline">戻る</Link>
-                </div>
-            </form>
+                </form>
+            </div>
         </div>
     </AppLayout>
 </template>

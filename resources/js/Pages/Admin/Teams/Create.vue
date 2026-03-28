@@ -21,7 +21,7 @@ const leaderOptions = computed(() => {
     return users.value.filter((u) => roles.includes((u.user_role || '').toString()));
 });
 
-const form = useForm({ company_id: '', department_id: '', name: '', description: '', leader_id: '', member_ids: [] });
+const form = useForm({ company_id: '', department_id: '', name: '', description: '', leader_id: '', sub_leader_ids: [], member_ids: [] });
 
 const availableDepartments = computed(() => {
     if (!form.company_id) return [];
@@ -98,11 +98,31 @@ const submit = () => {
                         </div>
 
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">リーダー</label>
+                            <label class="block text-sm font-medium text-gray-700">リーダー（代表者）</label>
                             <select v-model="form.leader_id" class="input mt-1 w-full">
                                 <option value="">-- 選択 --</option>
                                 <option v-for="u in leaderOptions" :key="u.id" :value="u.id">{{ u.name }} ({{ u.user_role }})</option>
                             </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">サブリーダー（副代表・複数可）</label>
+                            <div class="mt-2 space-y-1 rounded border border-gray-200 p-3">
+                                <div v-if="leaderOptions.length === 0" class="text-sm text-gray-400">会社を選択してください</div>
+                                <label
+                                    v-for="u in leaderOptions.filter(u => String(u.id) !== String(form.leader_id))"
+                                    :key="u.id"
+                                    class="flex items-center gap-2 text-sm"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        :value="u.id"
+                                        v-model="form.sub_leader_ids"
+                                        class="rounded border-gray-300 text-indigo-600"
+                                    />
+                                    {{ u.name }} ({{ u.user_role }})
+                                </label>
+                            </div>
                         </div>
 
                         <div>

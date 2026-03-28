@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\ChecksAdminPermission;
 use App\Models\User;
 use App\Models\Team;
 use App\Models\Company;
@@ -21,11 +22,14 @@ use PhpParser\Node\Expr\Assign;
 
 class UserController extends Controller
 {
+    use ChecksAdminPermission;
+
     /**
      * Display a listing of users
      */
     public function index()
     {
+        $this->requireAdminPermission('user_management');
         $users = User::orderBy('created_at', 'desc')->get();
         $assignments = \App\Models\Assignment::all();
         $departments = Department::all();
@@ -44,6 +48,7 @@ class UserController extends Controller
      */
     public function create()
     {
+        $this->requireAdminPermission('user_management');
         // 会社ごとに部署・役職をネストして取得
         $companies = Company::with(['departments.assignments' => function($q){
             $q->where('active', true);
@@ -63,6 +68,7 @@ class UserController extends Controller
      */
     public function store(Request $request)
     {
+        $this->requireAdminPermission('user_management');
         // 管理者作成は superadmin のみ許可 (server-side guard)
     $current = Auth::user();
     if ($request->input('user_role') === 'admin' && (! $current || $current->user_role !== 'superadmin')) {
@@ -150,6 +156,7 @@ class UserController extends Controller
      */
     public function show(User $user)
     {
+        $this->requireAdminPermission('user_management');
         return Inertia::render('Admin/Users/Show', [
             'user' => $user,
         ]);
@@ -160,6 +167,7 @@ class UserController extends Controller
      */
     public function edit(User $user)
     {
+        $this->requireAdminPermission('user_management');
         return Inertia::render('Admin/Users/Edit', [
             'user' => $user,
         ]);
@@ -170,6 +178,7 @@ class UserController extends Controller
      */
     public function update(Request $request, User $user)
     {
+        $this->requireAdminPermission('user_management');
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|lowercase|email|max:255|unique:users,email,' . $user->id,
@@ -200,6 +209,7 @@ class UserController extends Controller
      */
     public function destroy(User $user)
     {
+        $this->requireAdminPermission('user_management');
         // 現在ログイン中のAdminユーザーは削除できない
         if ($user->id === Auth::id()) {
             return redirect()->route('admin.users.index')
@@ -223,6 +233,7 @@ class UserController extends Controller
      */
     public function csvSampleDownload(Request $request)
     {
+        $this->requireAdminPermission('user_management');
         // 選択された部署の担当名を取得してサンプルに使用
         $departmentId = $request->query('department_id');
         $assignments  = [];
@@ -265,6 +276,7 @@ class UserController extends Controller
      */
     public function csvUpload()
     {
+        $this->requireAdminPermission('user_management');
         $companies = Company::with('departments')->where('active', 1)->get();
 
         return Inertia::render('Admin/Users/CsvUpload', [
@@ -277,6 +289,7 @@ class UserController extends Controller
      */
     public function csvPreview(Request $request)
     {
+        $this->requireAdminPermission('user_management');
         $request->validate([
             'csv_file' => 'required|file|mimes:csv,txt|max:2048',
             'company_id' => 'required|exists:companies,id',
@@ -457,6 +470,7 @@ class UserController extends Controller
      */
     public function csvStore(Request $request)
     {
+        $this->requireAdminPermission('user_management');
         Log::info('csvStore method called');
         Log::info('Request method: ' . $request->method());
         Log::info('Request data: ', $request->all());

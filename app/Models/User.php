@@ -81,11 +81,37 @@ class User extends Authenticatable
     }
 
     /**
+     * 会社の代表者 Admin かどうかを確認
+     */
+    public function isRepresentative(): bool
+    {
+        if (! $this->isAdmin() || ! $this->company_id || ! $this->id) {
+            return false;
+        }
+        return \App\Models\Company::where('id', $this->company_id)
+            ->where('representative_id', $this->id)
+            ->exists();
+    }
+
+    /**
      * Check if user is leader
      */
     public function isLeader(): bool
     {
         return $this->user_role === 'leader';
+    }
+
+    /**
+     * 会社の代表者 Leader かどうかを確認
+     */
+    public function isRepresentativeLeader(): bool
+    {
+        if (! $this->isLeader() || ! $this->company_id || ! $this->id) {
+            return false;
+        }
+        return \App\Models\Company::where('id', $this->company_id)
+            ->where('representative_leader_id', $this->id)
+            ->exists();
     }
 
     /**
@@ -127,6 +153,22 @@ class User extends Authenticatable
     public function adminPermission()
     {
         return $this->hasOne(\App\Models\AdminPermission::class);
+    }
+
+    /**
+     * Leader 権限設定
+     */
+    public function leaderPermission()
+    {
+        return $this->hasOne(\App\Models\LeaderPermission::class);
+    }
+
+    /**
+     * ユーザー設定
+     */
+    public function userSetting()
+    {
+        return $this->hasOne(\App\Models\UserSetting::class);
     }
 
     /**

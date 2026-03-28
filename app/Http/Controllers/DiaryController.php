@@ -191,9 +191,14 @@ class DiaryController extends Controller
                 ->orderBy('sort_order')
                 ->get(['id', 'name', 'start_time', 'end_time']);
 
+        // 対象日の勤務形態：日次設定 → デフォルト設定 の順で解決
+        $dailyWorktypeId   = \App\Models\UserMonthlySchedule::worktypeIdForDate($user->id, $date);
+        $defaultWorktypeId = $dailyWorktypeId ?? $user->userSetting?->worktype_id;
+
         return Inertia::render('Diaries/Create', [
-            'date'      => $date,
-            'worktypes' => $worktypes,
+            'date'               => $date,
+            'worktypes'          => $worktypes,
+            'defaultWorktypeId'  => $defaultWorktypeId,
         ]);
     }
 

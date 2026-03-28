@@ -8,7 +8,7 @@ import TextInput from '@/Components/TextInput.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import EditForUnits from '@/Pages/Admin/Teams/EditForUnits.vue';
 import { useForm, usePage } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 const page = usePage();
 const team = page.props.team;
@@ -24,37 +24,30 @@ const form = useForm({
     role_id: team.role_id || '',
     // leader_id は user id または 'superadmin' という特別値を取り得る
     leader_id: team.leader_id || team.leader_user_id || '',
+    sub_leader_ids: (page.props.sub_leader_ids || []).map(String),
     description: team.description || '',
 });
 
-// leader 候補はユーザーから選ぶ。SuperAdmin を特別オプションとして先頭に入れる。
+// leader/sub-leader 候補: superadmin, admin, leader
 const leaderCandidates = computed(() => {
-    // まず候補ユーザーを取得: page.props.users, team.users, 会社の users などを順に参照
     const allUsers = page.props.users || team.users || (team.company && team.company.users) || [];
-
-    // フィルタ: user_role が admin または leader の人のみ
     let list = Array.isArray(allUsers) ? allUsers.slice() : [];
 
     list = list.filter((u) => {
         const role = String(u.user_role || '').toLowerCase();
-        if (role === 'admin' || role === 'leader') {
-            // 会社フィルタ
+        if (role === 'admin' || role === 'leader' || role === 'superadmin') {
             if (form.company_id && String(u.company_id) !== String(form.company_id)) return false;
-            // 部署フィルタがある場合は同じ部署の人のみ
-            if (form.department_id && String(u.department_id) !== String(form.department_id)) return false;
             return true;
         }
         return false;
     });
 
-    // map to SelectInput 形式
-    const options = list.map((u) => ({ value: u.id, label: `${u.name || u.display_name || u.email || 'ID:' + u.id}` }));
-
-    // 常に SuperAdmin を先頭に追加して、システム管理者をリーダーにする選択を可能にする
-    options.unshift({ value: 'superadmin', label: 'Super Admin (全権限)' });
-
-    return options;
+    return list.map((u) => ({ value: String(u.id), label: `${u.name} (${u.user_role})` }));
 });
+
+const subLeaderCandidates = computed(() =>
+    leaderCandidates.value.filter((c) => c.value !== String(form.leader_id))
+);
 
 const updateTeam = () => {
     form.put(route('admin.teams.update', { team: team.id }), {
@@ -119,15 +112,35 @@ const isRestricted = computed(() => {
                                 </div>
                             </template>
 
-                            <!-- 変更: リーダー選択を "人" から選ぶ UI にする -->
+                            <!-- リーダー選択 -->
                             <div class="col-span-6 mt-4 sm:col-span-4">
-                                <InputLabel for="leader_id" value="リーダー（ユーザー）" />
+                                <InputLabel for="leader_id" value="リーダー（代表者）" />
                                 <SelectInput id="leader_id" v-model="form.leader_id" :options="leaderCandidates" class="mt-1 block w-full" />
-                                <p class="mt-1 text-sm text-gray-500">
-                                    リーダーを選択してください。候補は Admin / Leader のユーザーで、会社や部署によって絞り込まれます。SuperAdmin
-                                    を選ぶと全権限となります。
-                                </p>
                                 <InputError :message="form.errors.leader_id" class="mt-2" />
+                            </div>
+
+                            <!-- サブリーダー選択 -->
+                            <div class="col-span-6 mt-4 sm:col-span-4">
+                                <InputLabel value="サブリーダー（副代表・複数可）" />
+                                <div class="mt-2 space-y-1 rounded border border-gray-200 p-3">
+                                    <div v-if="subLeaderCandidates.length === 0" class="text-sm text-gray-400">
+                                        候補ユーザーがいません
+                                    </div>
+                                    <label
+                                        v-for="c in subLeaderCandidates"
+                                        :key="c.value"
+                                        class="flex items-center gap-2 text-sm"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            :value="c.value"
+                                            v-model="form.sub_leader_ids"
+                                            class="rounded border-gray-300 text-indigo-600"
+                                        />
+                                        {{ c.label }}
+                                    </label>
+                                </div>
+                                <InputError :message="form.errors.sub_leader_ids" class="mt-2" />
                             </div>
 
                             <!-- 追加: 説明 (description) -->

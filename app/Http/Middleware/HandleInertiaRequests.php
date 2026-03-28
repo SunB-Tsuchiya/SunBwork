@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\AdminPermission;
+use App\Models\LeaderPermission;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -48,17 +49,23 @@ class HandleInertiaRequests extends Middleware
                     ? array_merge(
                         $request->user()->only(['id', 'name', 'email', 'user_role', 'company_id', 'department_id']),
                         [
-                            'isAdmin'      => $request->user()->isAdmin(),
-                            'isLeader'     => $request->user()->isLeader(),
-                            'isCoordinator'=> $request->user()->isCoordinator(),
-                            'isSuperAdmin' => $request->user()->isSuperAdmin(),
-                            'isUser'       => $request->user()->isUser(),
+                            'isAdmin'          => $request->user()->isAdmin(),
+                            'isLeader'         => $request->user()->isLeader(),
+                            'isCoordinator'    => $request->user()->isCoordinator(),
+                            'isSuperAdmin'     => $request->user()->isSuperAdmin(),
+                            'isUser'           => $request->user()->isUser(),
+                            'isRepresentative'       => $request->user()->isAdmin() && $request->user()->isRepresentative(),
+                            'isRepresentativeLeader' => $request->user()->isLeader() && $request->user()->isRepresentativeLeader(),
                         ]
                     )
                     : null,
                 // Admin 権限（admin ロール時のみ取得、それ以外は null）
                 'adminPermissions' => $request->user()?->isAdmin()
                     ? AdminPermission::where('user_id', $request->user()->id)->first()
+                    : null,
+                // Leader 権限（leader ロール時のみ取得、それ以外は null）
+                'leaderPermissions' => $request->user()?->isLeader()
+                    ? LeaderPermission::where('user_id', $request->user()->id)->first()
                     : null,
             ],
         ];
