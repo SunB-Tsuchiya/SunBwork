@@ -74,13 +74,18 @@ const initEcho = () => {
 };
 
 // CSRF cookie を取得してから Echo を初期化する（race を防ぐ）
-// REVERB キーが設定されている場合のみ Echo を初期化する
+// REVERB キーが設定されており、かつ wss://localhost への接続でない場合のみ Echo を初期化する
+const basePath = import.meta.env.VITE_APP_BASE_PATH || '';
+const csrfUrl  = basePath + '/sanctum/csrf-cookie';
+const echoHost = import.meta.env.VITE_REVERB_HOST?.replace(/"/g, '') || '';
+const echoEnabled = import.meta.env.VITE_REVERB_APP_KEY && echoHost && echoHost !== 'localhost';
+
 window.axios
-    .get('/sanctum/csrf-cookie')
+    .get(csrfUrl)
     .then(() => {
-        if (import.meta.env.VITE_REVERB_APP_KEY) initEcho();
+        if (echoEnabled) initEcho();
     })
     .catch((err) => {
-        console.warn('Failed to fetch /sanctum/csrf-cookie before Echo init', err);
-        if (import.meta.env.VITE_REVERB_APP_KEY) initEcho();
+        console.warn('Failed to fetch CSRF cookie before Echo init', err);
+        if (echoEnabled) initEcho();
     });

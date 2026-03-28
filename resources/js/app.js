@@ -16,7 +16,8 @@ const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
         // bootstrap.js already calls axios.get('/sanctum/csrf-cookie'), but
         // ensure we await it here so the app mounts only after the cookie is present.
         if (window.axios) {
-            await window.axios.get('/sanctum/csrf-cookie');
+            const basePath = import.meta.env.VITE_APP_BASE_PATH || '';
+            await window.axios.get(basePath + '/sanctum/csrf-cookie');
         }
     } catch (e) {
         // ignore - we'll still mount the app even if CSRF fetch fails
