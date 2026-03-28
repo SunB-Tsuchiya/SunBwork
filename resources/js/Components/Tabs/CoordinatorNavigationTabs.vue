@@ -11,13 +11,6 @@ const tab = (key) => [
 ];
 
 function getAssignmentsLink() {
-    try {
-        if (props.projectJob && props.projectJob.id) {
-            return route('coordinator.project_jobs.assignments.index', { projectJob: props.projectJob.id });
-        }
-    } catch (e) {
-        // fallthrough
-    }
     return route('coordinator.project_jobs.index');
 }
 
