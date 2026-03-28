@@ -1,6 +1,6 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
-import AssignmentFormUser from '@/Pages/Coordinator/ProjectJobs/JobAssign/AssignmentForm_user.vue';
+import AssignmentFormUser from '@/Pages/Coordinator/ProjectJobs/JobAssign/AssignmentForm.vue';
 import { Link, useForm, usePage } from '@inertiajs/vue3';
 import { getCurrentInstance, nextTick, onMounted, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
@@ -346,6 +346,7 @@ watch(
             <div v-else>
                 <h2 class="mb-4 text-lg font-medium text-gray-700">（ジョブ向け）ジョブ作成 / 割当フォーム</h2>
                 <AssignmentFormUser
+                    mode="user"
                     :projectJob="projectJob"
                     :members="members"
                     :assignments="assignments"

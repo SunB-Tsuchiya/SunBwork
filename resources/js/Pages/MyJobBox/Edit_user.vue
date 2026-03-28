@@ -4,6 +4,7 @@
             <h1 class="mb-4 text-2xl font-bold">ジョブ編集（マイジョブ）</h1>
             <div>
                 <AssignmentFormUser
+                    mode="user"
                     :projectJob="projectJob"
                     :members="members"
                     :assignments="assignments"
@@ -24,7 +25,7 @@
 
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
-import AssignmentFormUser from '@/Pages/Coordinator/ProjectJobs/JobAssign/AssignmentForm_user.vue';
+import AssignmentFormUser from '@/Pages/Coordinator/ProjectJobs/JobAssign/AssignmentForm.vue';
 import { Link, usePage } from '@inertiajs/vue3';
 import { ref } from 'vue';
 

@@ -1,6 +1,6 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
-import AssignmentFormUser from '@/Pages/Coordinator/ProjectJobs/JobAssign/AssignmentForm_user.vue';
+import AssignmentFormUser from '@/Pages/Coordinator/ProjectJobs/JobAssign/AssignmentForm.vue';
 import { usePage } from '@inertiajs/vue3';
 import { ref, watch } from 'vue';
 
@@ -159,6 +159,7 @@ function fmt(v) { return v ?? '-'; }
             <div class="rounded border border-gray-100 p-4 shadow-sm">
                 <h2 class="mb-4 text-lg font-medium text-gray-700">割当内容</h2>
                 <AssignmentFormUser
+                    mode="user"
                     :key="formKey"
                     :projectJob="projectJob"
                     :members="members"
