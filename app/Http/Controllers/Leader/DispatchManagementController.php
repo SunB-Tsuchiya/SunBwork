@@ -32,7 +32,7 @@ class DispatchManagementController extends Controller
             ->orderBy('department_id')
             ->orderBy('name')
             ->get()
-            ->map(fn ($u) => [
+            ->map(fn($u) => [
                 'id'                  => $u->id,
                 'name'                => $u->name,
                 'email'               => $u->email,
@@ -44,7 +44,10 @@ class DispatchManagementController extends Controller
                 'diary_required'      => $u->isDiaryRequired(),
                 'diary_required_override' => $u->employmentSetting?->diary_required,
                 'agency_name'         => $u->dispatchProfile?->agency_name ?? '',
+                'contract_start'      => $u->dispatchProfile?->contract_start?->format('Y-m-d') ?? '',
                 'contract_end'        => $u->dispatchProfile?->contract_end?->format('Y-m-d') ?? '',
+                'is_hidden'           => (bool) ($u->dispatchProfile?->is_hidden ?? false),
+                'is_active'           => (bool) ($u->dispatchProfile?->is_active ?? true),
             ]);
 
         return Inertia::render('Leader/DispatchManagement/Index', [
@@ -78,6 +81,8 @@ class DispatchManagementController extends Controller
                 'contract_start'  => $dispatchUser->dispatchProfile?->contract_start?->format('Y-m-d') ?? '',
                 'contract_end'    => $dispatchUser->dispatchProfile?->contract_end?->format('Y-m-d') ?? '',
                 'dispatch_notes'  => $dispatchUser->dispatchProfile?->notes ?? '',
+                'is_hidden'       => (bool) ($dispatchUser->dispatchProfile?->is_hidden ?? false),
+                'is_active'       => (bool) ($dispatchUser->dispatchProfile?->is_active ?? true),
             ],
         ]);
     }
@@ -98,6 +103,8 @@ class DispatchManagementController extends Controller
             'contract_start'   => 'nullable|date',
             'contract_end'     => 'nullable|date|after_or_equal:contract_start',
             'dispatch_notes'   => 'nullable|string|max:1000',
+            'is_hidden'        => 'nullable|boolean',
+            'is_active'        => 'nullable|boolean',
         ]);
 
         // 雇用形態を users テーブルに保存
@@ -116,15 +123,10 @@ class DispatchManagementController extends Controller
             UserEmploymentSetting::where('user_id', $dispatchUser->id)->delete();
         }
 
-        // dispatch_profiles: agency_name / contract_start / contract_end / notes を保存
-        // dispatch / outsource の場合のみ保持。その他の場合はレコードを削除
+        // dispatch_profiles を保存（dispatch/outsource の場合は常に upsert。それ以外は削除）
         $isDispatchType = in_array($validated['employment_type'], ['dispatch', 'outsource']);
-        $hasProfileData = ($validated['agency_name'] ?? '') !== ''
-            || ($validated['contract_start'] ?? '') !== ''
-            || ($validated['contract_end'] ?? '') !== ''
-            || ($validated['dispatch_notes'] ?? '') !== '';
 
-        if ($isDispatchType && $hasProfileData) {
+        if ($isDispatchType) {
             DispatchProfile::updateOrCreate(
                 ['user_id' => $dispatchUser->id],
                 [
@@ -132,15 +134,35 @@ class DispatchManagementController extends Controller
                     'contract_start' => $validated['contract_start'] ?? null,
                     'contract_end'   => $validated['contract_end'] ?? null,
                     'notes'          => $validated['dispatch_notes'] ?? null,
+                    'is_hidden'      => (bool) ($validated['is_hidden'] ?? false),
+                    'is_active'      => (bool) ($validated['is_active'] ?? true),
                 ]
             );
-        } elseif (! $isDispatchType) {
+        } else {
             DispatchProfile::where('user_id', $dispatchUser->id)->delete();
         }
 
         return redirect()
             ->route('leader.dispatch_management.index')
             ->with('success', "{$dispatchUser->name} の雇用形態を更新しました。");
+    }
+
+    /**
+     * 一覧の「非表示」フラグをトグル
+     */
+    public function toggleHidden(Request $request, User $dispatchUser)
+    {
+        $this->requireLeaderPermission('dispatch_management');
+        $this->authorizeUserAccess($dispatchUser);
+
+        $isHidden = (bool) $request->validate(['is_hidden' => 'required|boolean'])['is_hidden'];
+
+        DispatchProfile::updateOrCreate(
+            ['user_id' => $dispatchUser->id],
+            ['is_hidden' => $isHidden]
+        );
+
+        return back();
     }
 
     /**

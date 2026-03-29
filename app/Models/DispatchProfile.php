@@ -13,6 +13,8 @@ class DispatchProfile extends Model
         'contract_start',
         'contract_end',
         'notes',
+        'is_hidden',
+        'is_active',
     ];
 
     protected function casts(): array
@@ -20,6 +22,8 @@ class DispatchProfile extends Model
         return [
             'contract_start' => 'date',
             'contract_end'   => 'date',
+            'is_hidden'      => 'boolean',
+            'is_active'      => 'boolean',
         ];
     }
 

@@ -72,10 +72,12 @@ class WorkloadSettingController extends Controller
             'work_item_types' => [
                 'items.*.sort_order'  => 'nullable|integer|min:0',
                 'items.*.description' => 'nullable|string|max:1000',
+                'items.*.group'       => 'nullable|string|max:50',
             ],
             'sizes' => [
                 'items.*.sort_order'  => 'nullable|integer|min:0',
                 'items.*.label'       => 'nullable|string|max:255',
+                'items.*.group'       => 'nullable|string|max:50',
             ],
             'statuses' => [
                 'items.*.sort_order'  => 'nullable|integer|min:0',

@@ -1,6 +1,6 @@
 <script setup>
-import AppLayout from '@/layouts/AppLayout.vue';
 import LeaderNavigationTabs from '@/Components/Tabs/LeaderNavigationTabs.vue';
+import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, useForm } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
@@ -9,9 +9,9 @@ const props = defineProps({
 });
 
 const EMPLOYMENT_TYPE_OPTIONS = [
-    { value: 'regular',   label: '正社員',   desc: '日報必須（デフォルト）' },
-    { value: 'contract',  label: '契約社員', desc: '日報必須（デフォルト）' },
-    { value: 'dispatch',  label: '派遣社員', desc: '日報任意（デフォルト）' },
+    { value: 'regular', label: '正社員', desc: '日報必須（デフォルト）' },
+    { value: 'contract', label: '契約社員', desc: '日報必須（デフォルト）' },
+    { value: 'dispatch', label: '派遣社員', desc: '日報任意（デフォルト）' },
     { value: 'outsource', label: '業務委託', desc: '日報任意（デフォルト）' },
 ];
 
@@ -22,18 +22,18 @@ const initialDiaryOverride = props.dispatchUser.diary_required_override;
 const form = useForm({
     employment_type: props.dispatchUser.employment_type || 'regular',
     // null = デフォルト（employment_type に従う）、true/false = 個別上書き
-    diary_required:  initialDiaryOverride ?? null,
+    diary_required: initialDiaryOverride ?? null,
     // 派遣プロフィール
-    agency_name:     props.dispatchUser.agency_name || '',
-    contract_start:  props.dispatchUser.contract_start || '',
-    contract_end:    props.dispatchUser.contract_end || '',
-    dispatch_notes:  props.dispatchUser.dispatch_notes || '',
+    agency_name: props.dispatchUser.agency_name || '',
+    contract_start: props.dispatchUser.contract_start || '',
+    contract_end: props.dispatchUser.contract_end || '',
+    dispatch_notes: props.dispatchUser.dispatch_notes || '',
+    is_hidden: props.dispatchUser.is_hidden ?? false,
+    is_active: props.dispatchUser.is_active ?? true,
 });
 
 // 現在のemployment_typeで「デフォルト日報義務」はどちらか
-const defaultDiaryRequired = computed(() =>
-    !['dispatch', 'outsource'].includes(form.employment_type)
-);
+const defaultDiaryRequired = computed(() => !['dispatch', 'outsource'].includes(form.employment_type));
 
 // 実際に適用される diary_required の値
 const effectiveDiaryRequired = computed(() => {
@@ -42,9 +42,7 @@ const effectiveDiaryRequired = computed(() => {
 });
 
 // 派遣・業務委託かどうか
-const isDispatchType = computed(() =>
-    ['dispatch', 'outsource'].includes(form.employment_type)
-);
+const isDispatchType = computed(() => ['dispatch', 'outsource'].includes(form.employment_type));
 
 // 契約終了日の警告
 const contractEndWarning = computed(() => {
@@ -99,16 +97,9 @@ function resetDiaryToDefault() {
                                 v-for="opt in EMPLOYMENT_TYPE_OPTIONS"
                                 :key="opt.value"
                                 class="flex cursor-pointer items-start gap-2 rounded-lg border p-3 transition"
-                                :class="form.employment_type === opt.value
-                                    ? 'border-orange-400 bg-orange-50'
-                                    : 'border-gray-200 hover:bg-gray-50'"
+                                :class="form.employment_type === opt.value ? 'border-orange-400 bg-orange-50' : 'border-gray-200 hover:bg-gray-50'"
                             >
-                                <input
-                                    type="radio"
-                                    :value="opt.value"
-                                    v-model="form.employment_type"
-                                    class="mt-0.5 accent-orange-500"
-                                />
+                                <input type="radio" :value="opt.value" v-model="form.employment_type" class="mt-0.5 accent-orange-500" />
                                 <div>
                                     <div class="text-sm font-medium text-gray-800">{{ opt.label }}</div>
                                     <div class="text-xs text-gray-400">{{ opt.desc }}</div>
@@ -126,12 +117,16 @@ function resetDiaryToDefault() {
                                 <span class="text-sm text-gray-600">
                                     <span class="font-medium">デフォルト:</span>
                                     {{ defaultDiaryRequired ? '必須' : '任意' }}
-                                    （{{ form.employment_type === 'regular' || form.employment_type === 'contract' ? '正社員・契約社員' : '派遣・業務委託' }}）
+                                    （{{
+                                        form.employment_type === 'regular' || form.employment_type === 'contract'
+                                            ? '正社員・契約社員'
+                                            : '派遣・業務委託'
+                                    }}）
                                 </span>
                                 <button
                                     v-if="form.diary_required !== null"
                                     type="button"
-                                    class="text-xs text-gray-400 hover:text-gray-600 underline"
+                                    class="text-xs text-gray-400 underline hover:text-gray-600"
                                     @click="resetDiaryToDefault"
                                 >
                                     デフォルトに戻す
@@ -141,33 +136,18 @@ function resetDiaryToDefault() {
                             <!-- 個別上書き -->
                             <div class="space-y-2">
                                 <label class="flex cursor-pointer items-center gap-2">
-                                    <input
-                                        type="radio"
-                                        :value="null"
-                                        v-model="form.diary_required"
-                                        class="accent-orange-500"
-                                    />
+                                    <input type="radio" :value="null" v-model="form.diary_required" class="accent-orange-500" />
                                     <span class="text-sm text-gray-700">
                                         デフォルトに従う
                                         <span class="ml-1 text-xs text-gray-400">（現在: {{ defaultDiaryRequired ? '必須' : '任意' }}）</span>
                                     </span>
                                 </label>
                                 <label class="flex cursor-pointer items-center gap-2">
-                                    <input
-                                        type="radio"
-                                        :value="true"
-                                        v-model="form.diary_required"
-                                        class="accent-orange-500"
-                                    />
+                                    <input type="radio" :value="true" v-model="form.diary_required" class="accent-orange-500" />
                                     <span class="text-sm text-gray-700">必須（個別上書き）</span>
                                 </label>
                                 <label class="flex cursor-pointer items-center gap-2">
-                                    <input
-                                        type="radio"
-                                        :value="false"
-                                        v-model="form.diary_required"
-                                        class="accent-orange-500"
-                                    />
+                                    <input type="radio" :value="false" v-model="form.diary_required" class="accent-orange-500" />
                                     <span class="text-sm text-gray-700">任意（個別上書き）</span>
                                 </label>
                             </div>
@@ -239,6 +219,38 @@ function resetDiaryToDefault() {
                                     placeholder="契約条件・注意事項など"
                                 ></textarea>
                             </div>
+
+                            <!-- 在籍ステータス -->
+                            <div class="border-t border-orange-100 pt-3">
+                                <label class="mb-1 block text-xs font-medium text-gray-600">在籍ステータス</label>
+                                <div class="flex gap-4">
+                                    <label class="flex cursor-pointer items-center gap-2">
+                                        <input type="radio" :value="true" v-model="form.is_active" class="accent-orange-500" />
+                                        <span class="text-sm text-gray-700">在籍中</span>
+                                    </label>
+                                    <label class="flex cursor-pointer items-center gap-2">
+                                        <input type="radio" :value="false" v-model="form.is_active" class="accent-gray-500" />
+                                        <span class="text-sm text-gray-700">非在籍</span>
+                                    </label>
+                                </div>
+                                <p class="mt-1 text-xs text-gray-400">
+                                    期間未設定 → 在籍中 / 契約終了日超過 → 自動で契約終了表示 / 手動で「非在籍」にも設定できます
+                                </p>
+                            </div>
+
+                            <!-- 非表示フラグ -->
+                            <div class="border-t border-orange-100 pt-3">
+                                <label class="flex cursor-pointer items-start gap-2">
+                                    <input type="checkbox" v-model="form.is_hidden" class="mt-0.5 h-4 w-4 accent-gray-500" />
+                                    <div>
+                                        <span class="text-sm font-medium text-gray-700">一覧から非表示にする</span>
+                                        <p class="mt-0.5 text-xs text-gray-400">
+                                            チェックするとスポット勤務の方など一時的に非表示にできます。
+                                            一覧ページの「非表示も表示」ボタンで確認・解除できます。
+                                        </p>
+                                    </div>
+                                </label>
+                            </div>
                         </div>
                     </div>
 
@@ -249,10 +261,7 @@ function resetDiaryToDefault() {
 
                     <!-- ボタン -->
                     <div class="flex items-center justify-between">
-                        <Link
-                            :href="route('leader.dispatch_management.index')"
-                            class="text-sm text-gray-500 hover:text-gray-700"
-                        >
+                        <Link :href="route('leader.dispatch_management.index')" class="text-sm text-gray-500 hover:text-gray-700">
                             ← 一覧に戻る
                         </Link>
                         <button

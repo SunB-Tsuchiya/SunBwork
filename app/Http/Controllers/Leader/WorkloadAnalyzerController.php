@@ -14,7 +14,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Schema;
 use Carbon\Carbon;
 use App\Models\ProjectJobAssignment;
-use App\Models\ProjectJobAssignmentByMyself;
+// ProjectJobAssignmentByMyself unified into ProjectJobAssignment (sender_id = user_id)
 use App\Models\Stage;
 use App\Models\Size;
 use App\Models\WorkItemType;
@@ -87,7 +87,7 @@ class WorkloadAnalyzerController extends Controller
             })->where(function ($q) use ($start, $end) {
                 // prefer desired_start_date filter if column exists
                 if (Schema::hasColumn('project_job_assignments', 'desired_start_date')) {
-                    $q->whereBetween('desired_start_date', [$start->toDateString(), $end->toDateString()]);
+                    $q->whereBetween('desired_end_date', [$start->toDateString(), $end->toDateString()]);
                 } else {
                     $q->whereBetween('created_at', [$start, $end]);
                 }
@@ -111,13 +111,9 @@ class WorkloadAnalyzerController extends Controller
                 }
             }
 
-            // Self tasks (project_job_assignment_by_myself)
-            $selfQ = ProjectJobAssignmentByMyself::where('user_id', $userId)->where(function ($q) use ($start, $end) {
-                if (Schema::hasColumn('project_job_assignment_by_myself', 'desired_start_date')) {
-                    $q->whereBetween('desired_start_date', [$start->toDateString(), $end->toDateString()]);
-                } else {
-                    $q->whereBetween('created_at', [$start, $end]);
-                }
+            // Self tasks (sender_id = user_id in unified project_job_assignments)
+            $selfQ = ProjectJobAssignment::selfAssigned()->where('user_id', $userId)->where(function ($q) use ($start, $end) {
+                $q->whereBetween('desired_end_date', [$start->toDateString(), $end->toDateString()]);
             });
             $self = $selfQ->get();
             foreach ($self as $s) {
@@ -701,7 +697,7 @@ class WorkloadAnalyzerController extends Controller
                 }
             })->where(function ($q) use ($start, $end) {
                 if (Schema::hasColumn('project_job_assignments', 'desired_start_date')) {
-                    $q->whereBetween('desired_start_date', [$start->toDateString(), $end->toDateString()]);
+                    $q->whereBetween('desired_end_date', [$start->toDateString(), $end->toDateString()]);
                 } else {
                     $q->whereBetween('created_at', [$start, $end]);
                 }
@@ -721,12 +717,8 @@ class WorkloadAnalyzerController extends Controller
                 }
             }
 
-            $self = ProjectJobAssignmentByMyself::where('user_id', $userId)->where(function ($q) use ($start, $end) {
-                if (Schema::hasColumn('project_job_assignment_by_myself', 'desired_start_date')) {
-                    $q->whereBetween('desired_start_date', [$start->toDateString(), $end->toDateString()]);
-                } else {
-                    $q->whereBetween('created_at', [$start, $end]);
-                }
+            $self = ProjectJobAssignment::selfAssigned()->where('user_id', $userId)->where(function ($q) use ($start, $end) {
+                $q->whereBetween('desired_end_date', [$start->toDateString(), $end->toDateString()]);
             })->get();
             foreach ($self as $s) {
                 $tot['self']['total_items'] += 1;
@@ -757,7 +749,7 @@ class WorkloadAnalyzerController extends Controller
             }
         })->where(function ($q) use ($start, $end) {
             if (Schema::hasColumn('project_job_assignments', 'desired_start_date')) {
-                $q->whereBetween('desired_start_date', [$start->toDateString(), $end->toDateString()]);
+                $q->whereBetween('desired_end_date', [$start->toDateString(), $end->toDateString()]);
             } else {
                 $q->whereBetween('created_at', [$start, $end]);
             }
@@ -776,12 +768,8 @@ class WorkloadAnalyzerController extends Controller
             $stageSums[$stageId] += $pages;
         }
 
-        $selfItems = ProjectJobAssignmentByMyself::where('user_id', $userId)->where(function ($q) use ($start, $end) {
-            if (Schema::hasColumn('project_job_assignment_by_myself', 'desired_start_date')) {
-                $q->whereBetween('desired_start_date', [$start->toDateString(), $end->toDateString()]);
-            } else {
-                $q->whereBetween('created_at', [$start, $end]);
-            }
+        $selfItems = ProjectJobAssignment::selfAssigned()->where('user_id', $userId)->where(function ($q) use ($start, $end) {
+            $q->whereBetween('desired_end_date', [$start->toDateString(), $end->toDateString()]);
         })->get();
         foreach ($selfItems as $s) {
             $stageId = $s->stage_id ?? null;
@@ -1391,18 +1379,14 @@ class WorkloadAnalyzerController extends Controller
                 }
             })->where(function ($q) use ($start, $end) {
                 if (Schema::hasColumn('project_job_assignments', 'desired_start_date')) {
-                    $q->whereBetween('desired_start_date', [$start->toDateString(), $end->toDateString()]);
+                    $q->whereBetween('desired_end_date', [$start->toDateString(), $end->toDateString()]);
                 } else {
                     $q->whereBetween('created_at', [$start, $end]);
                 }
             })->get();
 
-            $sItems = ProjectJobAssignmentByMyself::where('user_id', $uid)->where(function ($q) use ($start, $end) {
-                if (Schema::hasColumn('project_job_assignment_by_myself', 'desired_start_date')) {
-                    $q->whereBetween('desired_start_date', [$start->toDateString(), $end->toDateString()]);
-                } else {
-                    $q->whereBetween('created_at', [$start, $end]);
-                }
+            $sItems = ProjectJobAssignment::selfAssigned()->where('user_id', $uid)->where(function ($q) use ($start, $end) {
+                $q->whereBetween('desired_end_date', [$start->toDateString(), $end->toDateString()]);
             })->get();
 
             // local helper to resolve difficulty coefficient per-assignment
@@ -1476,17 +1460,13 @@ class WorkloadAnalyzerController extends Controller
                     }
                 })->where(function ($q) use ($start, $end) {
                     if (Schema::hasColumn('project_job_assignments', 'desired_start_date')) {
-                        $q->whereBetween('desired_start_date', [$start->toDateString(), $end->toDateString()]);
+                        $q->whereBetween('desired_end_date', [$start->toDateString(), $end->toDateString()]);
                     } else {
                         $q->whereBetween('created_at', [$start, $end]);
                     }
                 })->get();
-                $sItems = ProjectJobAssignmentByMyself::where('user_id', $uid)->where(function ($q) use ($start, $end) {
-                    if (Schema::hasColumn('project_job_assignment_by_myself', 'desired_start_date')) {
-                        $q->whereBetween('desired_start_date', [$start->toDateString(), $end->toDateString()]);
-                    } else {
-                        $q->whereBetween('created_at', [$start, $end]);
-                    }
+                $sItems = ProjectJobAssignment::selfAssigned()->where('user_id', $uid)->where(function ($q) use ($start, $end) {
+                    $q->whereBetween('desired_end_date', [$start->toDateString(), $end->toDateString()]);
                 })->get();
                 foreach ($aItems->concat($sItems) as $item) {
                     $pages = 0;
@@ -1552,7 +1532,7 @@ class WorkloadAnalyzerController extends Controller
         if (empty($groupUserIds)) {
             $p1 = ProjectJobAssignment::where(function ($q) use ($start, $end) {
                 if (Schema::hasColumn('project_job_assignments', 'desired_start_date')) {
-                    $q->whereBetween('desired_start_date', [$start->toDateString(), $end->toDateString()]);
+                    $q->whereBetween('desired_end_date', [$start->toDateString(), $end->toDateString()]);
                 } else {
                     $q->whereBetween('created_at', [$start, $end]);
                 }
@@ -1561,7 +1541,7 @@ class WorkloadAnalyzerController extends Controller
             if (Schema::hasColumn('project_job_assignments', 'assigned_to')) {
                 $p2 = ProjectJobAssignment::where(function ($q) use ($start, $end) {
                     if (Schema::hasColumn('project_job_assignments', 'desired_start_date')) {
-                        $q->whereBetween('desired_start_date', [$start->toDateString(), $end->toDateString()]);
+                        $q->whereBetween('desired_end_date', [$start->toDateString(), $end->toDateString()]);
                     } else {
                         $q->whereBetween('created_at', [$start, $end]);
                     }
@@ -1569,12 +1549,8 @@ class WorkloadAnalyzerController extends Controller
             } else {
                 $p2 = [];
             }
-            $p3 = ProjectJobAssignmentByMyself::where(function ($q) use ($start, $end) {
-                if (Schema::hasColumn('project_job_assignment_by_myself', 'desired_start_date')) {
-                    $q->whereBetween('desired_start_date', [$start->toDateString(), $end->toDateString()]);
-                } else {
-                    $q->whereBetween('created_at', [$start, $end]);
-                }
+            $p3 = ProjectJobAssignment::selfAssigned()->where(function ($q) use ($start, $end) {
+                $q->whereBetween('desired_end_date', [$start->toDateString(), $end->toDateString()]);
             })->pluck('user_id')->toArray();
             $groupUserIds = array_filter(array_unique(array_merge($p1, $p2, $p3)));
             // ensure at least viewed user
