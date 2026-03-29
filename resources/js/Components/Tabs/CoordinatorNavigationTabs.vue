@@ -14,6 +14,10 @@ function getAssignmentsLink() {
     return route('coordinator.project_jobs.index');
 }
 
+function getCalendarLink() {
+    return route('coordinator.project_jobs.calendar');
+}
+
 function getJobboxLink() {
     try {
         if (props.projectJob && props.projectJob.id) {
@@ -34,6 +38,7 @@ function getJobboxLink() {
     <div class="mb-6">
         <nav class="flex space-x-8" aria-label="Tabs">
             <Link :href="getAssignmentsLink()" :class="tab('projects')"> 案件一覧 </Link>
+            <Link :href="getCalendarLink()" :class="tab('calendar')"> 案件カレンダー </Link>
             <Link :href="getJobboxLink()" :class="tab('jobs')"> ジョブ一覧 </Link>
         </nav>
     </div>

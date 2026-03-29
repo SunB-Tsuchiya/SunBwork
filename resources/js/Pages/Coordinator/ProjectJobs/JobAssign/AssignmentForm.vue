@@ -33,15 +33,45 @@
             <label class="mb-1 mt-2 block font-semibold">概要</label>
             <textarea v-model="block.detail" :disabled="!editMode" class="w-full rounded border px-3 py-2" rows="3"></textarea>
 
-            <label class="mb-1 mt-2 block font-semibold">作業詳細</label>
+            <!-- 割当ユーザー（概要直下に移動） -->
+            <label class="mb-1 mt-3 block font-semibold">割当ユーザー</label>
+            <div v-if="!editMode" class="mt-1 w-full rounded border bg-gray-50 px-3 py-2 text-sm">{{ memberName(block.user_id) }}</div>
+            <select v-else v-model="block.user_id" :disabled="!editMode" class="w-full rounded border px-3 py-2" @change="onUserChange(block)">
+                <option value="">未指定</option>
+                <option v-for="m in props.members || members" :key="m.id" :value="m.id">
+                    {{ m.name }}{{ m.assignment_name ? '（' + m.assignment_name + '）' : '' }}
+                </option>
+            </select>
+
+            <!-- 作業詳細ヘッダー＋フィルター -->
+            <div class="mb-1 mt-4 flex flex-wrap items-center gap-2">
+                <span class="font-semibold">作業詳細</span>
+                <template v-if="editMode">
+                    <select v-model="block._type_filter" class="rounded border px-2 py-1 text-xs text-gray-700">
+                        <option value="">業種：全部表示</option>
+                        <option value="dtp">組版・DTP</option>
+                        <option value="design">デザイン・制作</option>
+                        <option value="proof">校正・確認</option>
+                        <option value="mgmt">進行管理・事務</option>
+                        <option value="sales">営業</option>
+                        <option value="common">共通</option>
+                    </select>
+                    <select v-model="block._medium_filter" class="rounded border px-2 py-1 text-xs text-gray-700">
+                        <option value="paper">紙媒体</option>
+                        <option value="digital">デジタル</option>
+                        <option value="">媒体：全表示</option>
+                    </select>
+                </template>
+            </div>
             <div>
                 <input type="hidden" v-model="block.company_id" />
                 <input type="hidden" v-model="block.department_id" />
             </div>
 
-            <div class="mt-4 grid grid-cols-2 gap-4">
+            <!-- 作業種別（Type）＋ ステージ（Stage）を1行に -->
+            <div class="mt-3 grid grid-cols-2 gap-3">
                 <div>
-                    <label class="block text-sm font-medium">Type</label>
+                    <label class="block text-xs font-medium text-gray-600">作業種別</label>
                     <div v-if="!editMode" class="mt-1 w-full rounded border bg-gray-50 px-3 py-2 text-sm">
                         {{ itemName('types', block.work_item_type_id) }}
                     </div>
@@ -50,32 +80,18 @@
                         v-model="block.work_item_type_id"
                         :disabled="props.mode === 'coordinator' ? (!hasDepartment(block) || !editMode) : !editMode"
                         @change="onInlineSelectionChange(idx)"
-                        class="mt-1 w-full rounded border px-2 py-1 text-sm"
+                        class="mt-1 w-full rounded border px-2 py-1.5 text-sm"
                     >
                         <option value="">-- 選択 --</option>
-                        <option v-for="t in typesForSelect(block.company_id, block.department_id)" :key="t.id" :value="String(t.id)">
-                            {{ t.name }}
-                        </option>
+                        <template v-for="grp in typesGrouped(block.company_id, block.department_id, block._type_filter || '')" :key="grp.group">
+                            <optgroup :label="grp.label">
+                                <option v-for="t in grp.items" :key="t.id" :value="String(t.id)">{{ t.name }}</option>
+                            </optgroup>
+                        </template>
                     </select>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium">Size</label>
-                    <div v-if="!editMode" class="mt-1 w-full rounded border bg-gray-50 px-3 py-2 text-sm">{{ itemName('sizes', block.size_id) }}</div>
-                    <select
-                        v-else
-                        v-model="block.size_id"
-                        :disabled="props.mode === 'coordinator' ? (!hasDepartment(block) || !editMode) : !editMode"
-                        @change="onInlineSelectionChange(idx)"
-                        class="mt-1 w-full rounded border px-2 py-1 text-sm"
-                    >
-                        <option value="">-- 選択 --</option>
-                        <option v-for="s in sizesForSelect(block.company_id, block.department_id)" :key="s.id" :value="String(s.id)">
-                            {{ s.name }}
-                        </option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium">Stage</label>
+                    <label class="block text-xs font-medium text-gray-600">ステージ（校数）</label>
                     <div v-if="!editMode" class="mt-1 w-full rounded border bg-gray-50 px-3 py-2 text-sm">
                         {{ itemName('stages', block.stage_id) }}
                     </div>
@@ -84,7 +100,7 @@
                         v-model="block.stage_id"
                         :disabled="props.mode === 'coordinator' ? (!hasDepartment(block) || !editMode) : !editMode"
                         @change="onInlineSelectionChange(idx)"
-                        class="mt-1 w-full rounded border px-2 py-1 text-sm"
+                        class="mt-1 w-full rounded border px-2 py-1.5 text-sm"
                     >
                         <option value="">-- 選択 --</option>
                         <option v-for="st in stagesForSelect(block.company_id, block.department_id)" :key="st.id" :value="String(st.id)">
@@ -92,11 +108,33 @@
                         </option>
                     </select>
                 </div>
+            </div>
+
+            <!-- サイズ（Size）＋ ステータス（user モードのみ）を1行に -->
+            <div class="mt-3 grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-medium text-gray-600">サイズ</label>
+                    <div v-if="!editMode" class="mt-1 w-full rounded border bg-gray-50 px-3 py-2 text-sm">{{ itemName('sizes', block.size_id) }}</div>
+                    <select
+                        v-else
+                        v-model="block.size_id"
+                        :disabled="props.mode === 'coordinator' ? (!hasDepartment(block) || !editMode) : !editMode"
+                        @change="onInlineSelectionChange(idx)"
+                        class="mt-1 w-full rounded border px-2 py-1.5 text-sm"
+                    >
+                        <option value="">-- 選択 --</option>
+                        <template v-for="grp in sizesGrouped(block.company_id, block.department_id, block._medium_filter ?? 'paper')" :key="grp.group">
+                            <optgroup :label="grp.label">
+                                <option v-for="s in grp.items" :key="s.id" :value="String(s.id)">{{ s.name }}</option>
+                            </optgroup>
+                        </template>
+                    </select>
+                </div>
                 <!-- Status: coordinator では非表示、user では表示 -->
                 <div v-if="props.mode === 'user'">
-                    <label class="block text-sm font-medium">
-                        Status
-                        <span v-if="!block.id && props.defaultStatusId" class="ml-1 text-xs font-normal text-gray-400">（新規固定）</span>
+                    <label class="block text-xs font-medium text-gray-600">
+                        ステータス
+                        <span v-if="!block.id && props.defaultStatusId" class="ml-1 font-normal text-gray-400">（新規固定）</span>
                     </label>
                     <div v-if="!editMode" class="mt-1 w-full rounded border bg-gray-50 px-3 py-2 text-sm">
                         {{ itemName('statuses', block.status_id) }}
@@ -106,7 +144,7 @@
                         v-model="block.status_id"
                         :disabled="!editMode || (!block.id && props.defaultStatusId !== null && props.defaultStatusId !== undefined)"
                         @change="onInlineSelectionChange(idx)"
-                        class="mt-1 w-full rounded border px-2 py-1 text-sm"
+                        class="mt-1 w-full rounded border px-2 py-1.5 text-sm"
                     >
                         <option value="">-- 選択 --</option>
                         <option v-for="st in statusesForSelect(block.company_id, block.department_id)" :key="st.id" :value="String(st.id)">
@@ -116,33 +154,35 @@
                 </div>
             </div>
 
-            <!-- 数量 -->
-            <label class="mb-1 mt-4 block font-semibold">数量</label>
-            <div class="mt-1 flex items-center gap-2">
-                <div class="flex gap-1">
-                    <select
-                        v-for="n in 4"
-                        :key="n"
-                        :aria-label="`amount-digit-${n}`"
-                        v-model="block[`amount_digit_${n - 1}`]"
-                        @change="onAmountDigitsChange(idx)"
-                        :disabled="!editMode"
-                        class="w-14 rounded border px-2 py-1 text-sm"
-                    >
-                        <option v-for="d in Array.from({ length: 10 }, (_, i) => i)" :key="d" :value="String(d)">{{ d }}</option>
-                    </select>
-                </div>
+            <!-- 数量（ページ数を数値入力に変更） -->
+            <div class="mt-3 flex items-end gap-3">
                 <div>
-                    <select v-model="block.amounts_unit" :disabled="!editMode" class="mt-1 w-32 rounded border px-2 py-1 text-sm">
+                    <label class="block text-xs font-medium text-gray-600">数量</label>
+                    <div v-if="!editMode" class="mt-1 rounded border bg-gray-50 px-3 py-2 text-sm">
+                        {{ block.amounts != null ? block.amounts : '-' }}
+                        {{ block.amounts_unit === 'page' ? 'ページ' : block.amounts_unit === 'file' ? 'ファイル' : '' }}
+                    </div>
+                    <input
+                        v-else
+                        type="number"
+                        v-model.number="block.amounts"
+                        min="0"
+                        max="9999"
+                        step="1"
+                        :disabled="!editMode"
+                        class="mt-1 w-24 rounded border px-3 py-1.5 text-sm"
+                        @change="onInlineSelectionChange(idx)"
+                    />
+                </div>
+                <div v-if="editMode">
+                    <label class="block text-xs font-medium text-gray-600">単位</label>
+                    <select v-model="block.amounts_unit" :disabled="!editMode" class="mt-1 w-28 rounded border px-2 py-1.5 text-sm">
                         <option value="page">ページ</option>
                         <option value="file">ファイル</option>
                     </select>
                 </div>
-                <div class="ml-2 text-sm text-gray-600">
-                    <span v-if="block.amounts !== undefined">
-                        {{ block.amounts }}
-                        {{ block.amounts_unit === 'page' ? 'ページ' : block.amounts_unit === 'file' ? 'ファイル' : '' }}</span
-                    >
+                <div v-else class="pb-2 text-sm text-gray-500">
+                    {{ block.amounts_unit === 'page' ? 'ページ' : block.amounts_unit === 'file' ? 'ファイル' : '' }}
                 </div>
             </div>
 
@@ -181,8 +221,7 @@
                 </div>
             </div>
             <div
-                v-else
-                v-if="block.id && (block.desired_start_date || block.desired_end_date || block.desired_time_hour || block.desired_time_min)"
+                v-else-if="block.id && (block.desired_start_date || block.desired_end_date || block.desired_time_hour || block.desired_time_min)"
                 class="mt-2 flex gap-4"
             >
                 <div class="flex-1">
@@ -209,13 +248,6 @@
                     </div>
                 </template>
             </div>
-
-            <label class="mb-1 mt-2 block font-semibold">割当ユーザー</label>
-            <div v-if="!editMode" class="mt-1 w-full rounded border bg-gray-50 px-3 py-2 text-sm">{{ memberName(block.user_id) }}</div>
-            <select v-else v-model="block.user_id" :disabled="!editMode" class="w-full rounded border px-3 py-2">
-                <option value="">未指定</option>
-                <option v-for="m in props.members || members" :key="m.id" :value="m.id">{{ m.id }}：{{ m.name }}</option>
-            </select>
 
             <div v-if="props.mode === 'coordinator'" class="mt-2 text-right">
                 <template v-if="block.linked_assignment_id">
@@ -576,6 +608,8 @@ if (props.mode === 'coordinator') {
         }
         if (a.amounts === undefined) a.amounts = a.amounts || 0;
         if (a.amounts_unit === undefined) a.amounts_unit = a.amounts_unit || 'page';
+        if (a._type_filter === undefined) a._type_filter = '';
+        if (a._medium_filter === undefined) a._medium_filter = 'paper';
     });
 
     assignments.value.forEach((a) => {
@@ -731,6 +765,35 @@ watch(
 );
 
 watch(assignments, () => {}, { deep: true });
+
+// assignment_name → _type_filter の自動マッピング
+const ASSIGNMENT_TYPE_MAP = {
+    '組版': 'dtp',
+    'オペレーター': 'dtp',
+    'DTP': 'dtp',
+    'dtp': 'dtp',
+    'デザイナー': 'design',
+    'デザイン': 'design',
+    '校正': 'proof',
+    '進行管理': 'mgmt',
+    '営業': 'sales',
+};
+
+function assignmentNameToTypeFilter(assignmentName) {
+    if (!assignmentName) return '';
+    for (const [key, val] of Object.entries(ASSIGNMENT_TYPE_MAP)) {
+        if (assignmentName.includes(key)) return val;
+    }
+    return '';
+}
+
+function onUserChange(block) {
+    const membersList = props.members || members.value || [];
+    const found = membersList.find((m) => String(m.id) === String(block.user_id));
+    if (found && found.assignment_name) {
+        block._type_filter = assignmentNameToTypeFilter(found.assignment_name);
+    }
+}
 
 function clientName(block) {
     try {
@@ -942,6 +1005,57 @@ function memberName(userId) {
     return String(userId);
 }
 
+// ── グループ化ヘルパー ─────────────────────────────────────────────────────
+
+const TYPE_GROUP_ORDER  = ['dtp', 'design', 'proof', 'mgmt', 'sales', 'common'];
+const TYPE_GROUP_LABELS = {
+    dtp:    '組版・DTP',
+    design: 'デザイン・制作',
+    proof:  '校正・確認',
+    mgmt:   '進行管理・事務',
+    sales:  '営業',
+    common: '共通',
+};
+const SIZE_GROUP_ORDER  = ['paper', 'digital'];
+const SIZE_GROUP_LABELS = { paper: '紙媒体', digital: 'デジタル' };
+
+// typeFilter: '' = 全部表示、それ以外 = そのグループのみ表示
+function typesGrouped(companyId, departmentId, typeFilter) {
+    const list     = typesForSelect(companyId, departmentId);
+    const filtered = typeFilter ? list.filter((t) => (t.group || 'common') === typeFilter) : list;
+    if (typeFilter) {
+        // 単一グループ → optgroup 不要のフラット表示用に 1グループとして返す
+        return [{ group: typeFilter, label: TYPE_GROUP_LABELS[typeFilter] || typeFilter, items: filtered }];
+    }
+    const map = {};
+    for (const t of filtered) {
+        const g = t.group || 'common';
+        if (!map[g]) map[g] = [];
+        map[g].push(t);
+    }
+    return TYPE_GROUP_ORDER
+        .filter((g) => map[g])
+        .map((g) => ({ group: g, label: TYPE_GROUP_LABELS[g] || g, items: map[g] }));
+}
+
+// mediumFilter: '' = 全表示、'paper' = 紙媒体のみ、'digital' = デジタルのみ
+function sizesGrouped(companyId, departmentId, mediumFilter) {
+    const list     = sizesForSelect(companyId, departmentId);
+    const filtered = mediumFilter ? list.filter((s) => (s.group || 'paper') === mediumFilter) : list;
+    if (mediumFilter) {
+        return [{ group: mediumFilter, label: SIZE_GROUP_LABELS[mediumFilter] || mediumFilter, items: filtered }];
+    }
+    const map = {};
+    for (const s of filtered) {
+        const g = s.group || 'paper';
+        if (!map[g]) map[g] = [];
+        map[g].push(s);
+    }
+    return SIZE_GROUP_ORDER
+        .filter((g) => map[g])
+        .map((g) => ({ group: g, label: SIZE_GROUP_LABELS[g] || g, items: map[g] }));
+}
+
 function typesForSelect(companyId, departmentId) {
     const list = page.props.types || [];
     const auth = effectiveAuthUser();
@@ -1150,6 +1264,8 @@ function addBlock() {
         amounts: 0,
         amounts_unit: 'page',
         project_job: props.projectJob ? { id: props.projectJob.id, title: props.projectJob.title } : null,
+        _type_filter: '',
+        _medium_filter: 'paper',
     });
 }
 

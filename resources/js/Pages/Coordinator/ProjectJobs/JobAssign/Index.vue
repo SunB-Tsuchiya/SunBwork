@@ -25,8 +25,8 @@
                 <table class="min-w-full border">
                     <thead>
                         <tr class="bg-gray-100">
-                            <th class="cursor-pointer border px-4 py-2" @click.prevent="changeSort('desired_start_date')">
-                                希望日 <SortIcon :active="sortBy === 'desired_start_date'" :dir="sortDir" />
+                            <th class="cursor-pointer border px-4 py-2" @click.prevent="changeSort('created_at')">
+                                作成日 <SortIcon :active="sortBy === 'created_at'" :dir="sortDir" />
                             </th>
                             <th class="cursor-pointer border px-4 py-2" @click.prevent="changeSort('title')">
                                 タイトル <SortIcon :active="sortBy === 'title'" :dir="sortDir" />
@@ -49,11 +49,7 @@
                     <tbody>
                         <tr v-for="a in assignments.data" :key="a.id" class="cursor-pointer hover:bg-gray-50" @click.prevent="rowClick(a)">
                             <td class="border px-4 py-2">
-                                <div v-if="a.desired_start_date">
-                                    {{ formatDate(a.desired_start_date) }}
-                                    <span v-if="a.desired_time"> {{ formatTime(a.desired_time) }}</span>
-                                </div>
-                                <div v-else>-</div>
+                                {{ formatDate(a.created_at) }}
                             </td>
                             <td class="border px-4 py-2">
                                 <div class="font-semibold">{{ a.title }}</div>
@@ -126,7 +122,7 @@ try {
 }
 
 // reactive sort state from server-provided props
-const sortBy = page.props.sort_by || 'desired_start_date';
+const sortBy = page.props.sort_by || 'created_at';
 const sortDir = page.props.sort_dir || 'desc';
 
 function SortIcon({ active, dir }) {

@@ -158,6 +158,8 @@ for (let i = 0; i < 12; i++) {
     months.push({ value: `${y}-${m}`, label: `${y}年${m}月` });
 }
 
+const guideUrl = computed(() => `${rolePrefix}/workload-analyzer/guide`);
+
 function goToCategoryRank() {
     const ym = selectedYm.value || currentMonth;
     try {
@@ -324,10 +326,19 @@ function diffMinutes(estimated, actual) {
 
         <!-- settings button slot -->
         <template #headerExtras>
-            <div class="flex items-center">
+            <div class="flex items-center gap-2">
+                <a
+                    :href="guideUrl"
+                    class="inline-flex items-center rounded bg-blue-50 px-3 py-1 text-sm text-blue-700 hover:bg-blue-100"
+                >
+                    <svg class="mr-1.5 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    分析ガイド
+                </a>
                 <a
                     href="/leader/workload-analyzer/settings"
-                    class="ml-4 inline-flex items-center rounded bg-gray-100 px-3 py-1 text-sm text-gray-700 hover:bg-gray-200"
+                    class="inline-flex items-center rounded bg-gray-100 px-3 py-1 text-sm text-gray-700 hover:bg-gray-200"
                 >
                     <svg class="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
                         <path

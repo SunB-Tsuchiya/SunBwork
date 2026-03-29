@@ -25,12 +25,13 @@ class ProjectJobAssignmentsController extends Controller
             'desired_end_date',
             'estimated_hours',
             'assigned',
+            'created_at',
         ];
 
-        $sortBy = $request->query('sort_by', 'title');
+        $sortBy = $request->query('sort_by', 'created_at');
         $sortDir = strtolower($request->query('sort_dir', 'desc')) === 'asc' ? 'asc' : 'desc';
         if (!in_array($sortBy, $allowedSorts)) {
-            $sortBy = 'title';
+            $sortBy = 'created_at';
         }
 
         // base query
@@ -56,10 +57,10 @@ class ProjectJobAssignmentsController extends Controller
                 ->orderBy('users.name', $sortDir);
         } else {
             if (Schema::hasColumn('project_job_assignments', $sortBy)) {
-                $query = $query->orderBy($sortBy, $sortDir);
+                $query = $query->orderBy('project_job_assignments.' . $sortBy, $sortDir);
             } else {
                 // fallback
-                $query = $query->orderBy('desired_start_date', 'desc');
+                $query = $query->orderBy('project_job_assignments.created_at', 'desc');
             }
         }
 
@@ -116,8 +117,12 @@ class ProjectJobAssignmentsController extends Controller
     public function create(ProjectJob $projectJob)
     {
         // send available team members for selection
-        $members = $projectJob->teamMembers()->with('user')->get()->map(function ($m) {
-            return ['id' => $m->user?->id, 'name' => $m->user?->name];
+        $members = $projectJob->teamMembers()->with(['user', 'user.assignment'])->get()->map(function ($m) {
+            return [
+                'id'              => $m->user?->id,
+                'name'            => $m->user?->name,
+                'assignment_name' => $m->user?->assignment?->name,
+            ];
         })->filter(function ($item) {
             return $item['id'] !== null;
         })->values();
@@ -155,8 +160,8 @@ class ProjectJobAssignmentsController extends Controller
         }
 
         // lookup lists for modal (types, sizes, stages, statuses)
-        $types = \App\Models\WorkItemType::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'company_id', 'department_id']);
-        $sizes = \App\Models\Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'width', 'height', 'unit', 'company_id', 'department_id']);
+        $types = \App\Models\WorkItemType::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group', 'company_id', 'department_id']);
+        $sizes = \App\Models\Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group', 'width', 'height', 'unit', 'company_id', 'department_id']);
         $stages = \App\Models\Stage::orderBy('sort_order')->orderBy('order_index')->get(['id', 'name', 'company_id', 'department_id']);
         // Request key column as well when available so we can include canonical status.key in payload
         $statusCols = ['id', 'name', 'slug', 'company_id', 'department_id'];
@@ -198,8 +203,12 @@ class ProjectJobAssignmentsController extends Controller
 
     public function edit(ProjectJob $projectJob, ProjectJobAssignment $assignment)
     {
-        $members = $projectJob->teamMembers()->with('user')->get()->map(function ($m) {
-            return ['id' => $m->user?->id, 'name' => $m->user?->name];
+        $members = $projectJob->teamMembers()->with(['user', 'user.assignment'])->get()->map(function ($m) {
+            return [
+                'id'              => $m->user?->id,
+                'name'            => $m->user?->name,
+                'assignment_name' => $m->user?->assignment?->name,
+            ];
         })->filter(function ($item) {
             return $item['id'] !== null;
         })->values();
@@ -238,8 +247,8 @@ class ProjectJobAssignmentsController extends Controller
         }
 
         // lookup lists for modal (types, sizes, stages, statuses)
-        $types = \App\Models\WorkItemType::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'company_id', 'department_id']);
-        $sizes = \App\Models\Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'width', 'height', 'unit', 'company_id', 'department_id']);
+        $types = \App\Models\WorkItemType::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group', 'company_id', 'department_id']);
+        $sizes = \App\Models\Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group', 'width', 'height', 'unit', 'company_id', 'department_id']);
         $stages = \App\Models\Stage::orderBy('sort_order')->orderBy('order_index')->get(['id', 'name', 'company_id', 'department_id']);
         $statuses = \App\Models\Status::orderBy('sort_order')->get(['id', 'name', 'slug', 'company_id', 'department_id']);
 
@@ -344,8 +353,12 @@ class ProjectJobAssignmentsController extends Controller
         // Build display payload similar to edit(), including resolved labels and user info
         $a = $assignment;
         // prepare members and lookup lists (same as edit) so frontend can resolve names
-        $members = $projectJob->teamMembers()->with('user')->get()->map(function ($m) {
-            return ['id' => $m->user?->id, 'name' => $m->user?->name];
+        $members = $projectJob->teamMembers()->with(['user', 'user.assignment'])->get()->map(function ($m) {
+            return [
+                'id'              => $m->user?->id,
+                'name'            => $m->user?->name,
+                'assignment_name' => $m->user?->assignment?->name,
+            ];
         })->filter(function ($item) {
             return $item['id'] !== null;
         })->values();
@@ -382,8 +395,8 @@ class ProjectJobAssignmentsController extends Controller
         }
 
         // lookup lists for modal (types, sizes, stages, statuses)
-        $types = \App\Models\WorkItemType::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'company_id', 'department_id']);
-        $sizes = \App\Models\Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'width', 'height', 'unit', 'company_id', 'department_id']);
+        $types = \App\Models\WorkItemType::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group', 'company_id', 'department_id']);
+        $sizes = \App\Models\Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group', 'width', 'height', 'unit', 'company_id', 'department_id']);
         $stages = \App\Models\Stage::orderBy('sort_order')->orderBy('order_index')->get(['id', 'name', 'company_id', 'department_id']);
         $statuses = \App\Models\Status::orderBy('sort_order')->get(['id', 'name', 'slug', 'company_id', 'department_id']);
 

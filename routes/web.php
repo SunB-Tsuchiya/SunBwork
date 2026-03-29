@@ -291,6 +291,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('workload-analyzer', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'index'])->name('workload_analyzer.index');
         // Register static routes before the parameterized {user} route
         Route::get('workload-analyzer/category-rank', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'index'])->name('workload_analyzer.category_rank');
+        Route::get('workload-analyzer/guide', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'guide'])->name('workload_analyzer.guide');
         Route::get('workload-analyzer/settings', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'settings'])->name('workload_analyzer.settings');
         Route::post('workload-analyzer/settings', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'saveSettings'])->name('workload_analyzer.settings.save');
         Route::get('workload-analyzer/{user}', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'show'])->name('workload_analyzer.show');
@@ -358,6 +359,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         // SuperAdmin: Workload Analyzer (global)
         Route::get('workload-analyzer', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'index'])->name('workload_analyzer.index');
         Route::get('workload-analyzer/category-rank', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'index'])->name('workload_analyzer.category_rank');
+        Route::get('workload-analyzer/guide', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'guide'])->name('workload_analyzer.guide');
     });
 
 
@@ -385,6 +387,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('workload-analyzer', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'index'])->name('workload_analyzer.index');
         // ensure static routes are registered before the parameterized {user} route
         Route::get('workload-analyzer/category-rank', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'index'])->name('workload_analyzer.category_rank');
+        Route::get('workload-analyzer/guide', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'guide'])->name('workload_analyzer.guide');
         Route::get('workload-analyzer/settings', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'settings'])->name('workload_analyzer.settings');
         Route::post('workload-analyzer/settings', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'saveSettings'])->name('workload_analyzer.settings.save');
         Route::get('workload-analyzer/{user}', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'show'])->name('workload_analyzer.show');
@@ -416,6 +419,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         // Static assignment routes must come before {projectJob} parameterized routes
         Route::get('project_jobs/past-assignments', [App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'pastData'])->name('project_jobs.past_assignments');
         Route::get('project_jobs/assignment-select', [App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'selectProject'])->name('project_jobs.assignment_select');
+        Route::get('project_jobs/calendar', [App\Http\Controllers\Coordinator\ProjectJobsCalendarController::class, 'index'])->name('project_jobs.calendar');
         Route::post('project_jobs', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'store'])->name('project_jobs.store');
         Route::post('project_jobs/{projectJob}/complete', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'complete'])->name('project_jobs.complete');
         Route::get('project_jobs/{projectJob}', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'show'])->name('project_jobs.show');

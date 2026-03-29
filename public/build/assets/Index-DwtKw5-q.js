@@ -1,0 +1,1 @@
+import{d as t,a as s,o}from"./app-CXiHL282.js";const l={__name:"Index",setup(r){return(a,e)=>(o(),t("div",null,[...e[0]||(e[0]=[s("p",{class:"text-sm text-gray-500"},"This directory will contain pages/components related to sending job requests to users.",-1)])]))}};export{l as default};

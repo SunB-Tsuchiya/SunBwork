@@ -68,6 +68,10 @@ const props = defineProps({
     percentile_scores:            { type: Object, default: () => ({}) },
     category_ranks:               { type: Object, default: () => ({}) },
     group_count:                  { type: Number, default: 0 },
+    // 比較グループ情報 (職種グループ別パーセンタイル)
+    comparison_level:  { type: String, default: 'department' }, // 'role' | 'department'
+    peer_group_size:   { type: Number, default: 0 },
+    peer_assignment:   { type: String, default: '' },
 });
 
 // combined totals (assigned + self)
@@ -481,6 +485,20 @@ onMounted(() => {
                                 </div>
                             </div>
 
+                            <!-- Comparison group info badge -->
+                            <div v-if="props.comparison_level" class="mb-4 flex items-center gap-2 text-xs text-gray-500">
+                                <span class="rounded px-2 py-0.5"
+                                    :class="props.comparison_level === 'role' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'">
+                                    比較グループ：
+                                    <template v-if="props.comparison_level === 'role'">
+                                        同担当「{{ props.peer_assignment || '—' }}」内（{{ props.peer_group_size }} 人）
+                                    </template>
+                                    <template v-else>
+                                        部署全体（{{ props.peer_group_size }} 人）※ 同担当 3 人未満のためフォールバック
+                                    </template>
+                                </span>
+                            </div>
+
                             <!-- Charts row -->
                             <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                                 <div>
@@ -673,14 +691,24 @@ onMounted(() => {
                                     <p>
                                         各カテゴリ（ステージ・サイズ・種別・難易度・イベント・残業）ごとに
                                         <strong>生スコア</strong>（分量 × 係数）を計算し、それを
-                                        <strong>部署内でパーセンタイルランク（0〜100）</strong>に変換します。
+                                        <strong>同職種グループ内パーセンタイル（0〜100）</strong>に変換します。
                                         6カテゴリのパーセンタイルを合算した <strong>0〜600 点</strong> が総合ポイントになります。
                                     </p>
                                     <p>
-                                        スケールが大きく異なるカテゴリ（例: ページ数 vs 残業分）を
-                                        そのまま足すと一方が支配的になるため、パーセンタイル変換により
-                                        各カテゴリを <strong>等しい重みで比較</strong> できるようにしています。
+                                        担当（職種）によって作業量の規模が根本的に異なるため、
+                                        <strong>同じ担当同士で比較</strong>（職種グループ別パーセンタイル）することで
+                                        公平な評価を実現しています。
+                                        グループ人数が 3 人未満の場合は部署全体を比較対象にします。
                                     </p>
+                                    <div v-if="props.comparison_level || props.peer_assignment" class="rounded bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                                        このページの比較グループ：
+                                        <template v-if="props.comparison_level === 'role'">
+                                            同担当「{{ props.peer_assignment || '—' }}」（{{ props.peer_group_size || props.group_count }} 人）
+                                        </template>
+                                        <template v-else>
+                                            部署全体（{{ props.peer_group_size || props.group_count }} 人）※ 同担当が 3 人未満のため
+                                        </template>
+                                    </div>
                                 </div>
                             </section>
 
@@ -711,9 +739,10 @@ onMounted(() => {
 
                                     <!-- パーセンタイル変換 -->
                                     <div>
-                                        <p class="font-medium text-gray-800">② パーセンタイルランク変換（部署内）</p>
+                                        <p class="font-medium text-gray-800">② パーセンタイルランク変換（職種グループ内）</p>
                                         <div class="mt-1 space-y-1 rounded bg-gray-50 p-3 font-mono text-xs">
-                                            <div>比較対象: 同部署の全メンバー（N 人）</div>
+                                            <div>比較対象: 同担当グループのメンバー（N 人）</div>
+                                            <div>　　　　  ※ グループ人数 &lt; 3 の場合は部署全体にフォールバック</div>
                                             <div>自分より生スコアが高いメンバー数 = above</div>
                                             <div>自分と同じ生スコアのメンバー数  = tied</div>
                                             <div>平均順位 avgRank = above + (tied + 1) / 2</div>
@@ -722,7 +751,7 @@ onMounted(() => {
                                             <div>※ 同値タイは平均順位を使い全員に同じパーセンタイルを付与</div>
                                         </div>
                                         <p class="mt-1 text-xs text-gray-500">
-                                            1位 → 100、最下位 → 0、中間は線形補間。
+                                            1位 → 100、最下位 → 0、中間は線形補間。校正者は校正者同士、組版は組版同士で比較。
                                         </p>
                                     </div>
 

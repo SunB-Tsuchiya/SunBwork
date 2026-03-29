@@ -240,11 +240,13 @@ function formatEstimatedHours(h) {
 
 function routeBack() {
     try {
-        if (page.props.auth.user && page.props.auth.user.isCoordinator) {
+        const user = page.props.auth?.user;
+        const isPrivileged = user && (user.isCoordinator || user.isLeader || user.isAdmin || user.isSuperAdmin);
+        if (isPrivileged && projectJob?.id) {
             return safeRoute(
-                'coordinator.project_jobs.assignments.index',
-                { projectJob: projectJob?.id },
-                projectJob && projectJob.id ? `/project_jobs/${projectJob.id}/assignments` : '/jobbox',
+                'coordinator.project_jobs.show',
+                { projectJob: projectJob.id },
+                `/coordinator/project_jobs/${projectJob.id}`,
             );
         }
         return safeRoute('user.project_jobs.jobbox.index', { projectJob: projectJob?.id }, '/jobbox');

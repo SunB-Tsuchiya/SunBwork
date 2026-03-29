@@ -23,6 +23,15 @@ class JobBoxController extends Controller
         $user = $request->user();
         $isPrivileged = $user && (method_exists($user, 'isCoordinator') && ($user->isCoordinator() || $user->isLeader() || $user->isAdmin() || $user->isSuperAdmin()));
 
+        // Privileged users accessed via the user route → redirect to coordinator-prefixed URL
+        // so that AppLayout shows coordinator tabs instead of user tabs.
+        if ($isPrivileged) {
+            $routeName = $request->route()?->getName();
+            if ($routeName === 'user.project_jobs.jobbox.index') {
+                return redirect()->route('coordinator.project_jobs.jobbox.index', ['projectJob' => $projectJob->id]);
+            }
+        }
+
         // Additionally allow the project owner or any user who has sent a job-assignment
         // message for this project to view the project jobbox even if they are not
         // explicitly assigned. This lets senders (coordinators or project owners)
@@ -401,6 +410,17 @@ class JobBoxController extends Controller
         // Authorization: allow privileged roles or assigned users only
         $user = \Illuminate\Support\Facades\Auth::user();
         $isPrivileged = $user && (method_exists($user, 'isCoordinator') && ($user->isCoordinator() || $user->isLeader() || $user->isAdmin() || $user->isSuperAdmin()));
+
+        // Privileged users accessed via the user route → redirect to coordinator-prefixed URL
+        if ($isPrivileged) {
+            $routeName = request()->route()?->getName();
+            if ($routeName === 'user.project_jobs.jobbox.show') {
+                return redirect()->route('coordinator.project_jobs.jobbox.show', [
+                    'projectJob' => $projectJob->id,
+                    'message'    => $message->id,
+                ]);
+            }
+        }
         if (! $isPrivileged) {
             $hasAssignment = \App\Models\ProjectJobAssignment::where('project_job_id', $projectJob->id)
                 ->where('user_id', $user ? $user->id : 0)

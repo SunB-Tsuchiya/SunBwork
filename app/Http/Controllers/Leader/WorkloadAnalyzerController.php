@@ -456,20 +456,49 @@ class WorkloadAnalyzerController extends Controller
         }
 
         // Compute per-department percentile scores (0–100 per category, 0–600 overall)
-        // Raw scores already include coefficients; percentile ranks within the department ensure
-        // categories with vastly different scales (pages vs minutes vs hours) are compared fairly.
+        // 【職種グループ別パーセンタイル】
+        // 同じ担当（assignment_name）を持つメンバー同士で比較する。
+        // グループ人数が 3 人未満の場合は部署全体を比較対象にフォールバックする。
+        // これにより、校正者のページ数と組版者のページ数を直接比較せず、
+        // 「同職種内での相対的な貢献度」を公平に評価できる。
         $pCats = ['stage', 'size', 'type', 'difficulty', 'event', 'overtime'];
+
+        // Reusable closure: compute percentile scores for a given set of UIDs within a score map
+        $computePct = function (array $uidList, array $allScores, array $cats): array {
+            $groupN = count($uidList);
+            $result = [];
+            foreach ($cats as $cat) {
+                foreach ($uidList as $uid) {
+                    $my = $allScores[$uid][$cat] ?? 0.0;
+                    $above = 0; $tied = 0;
+                    foreach ($uidList as $other) {
+                        $ov = $allScores[$other][$cat] ?? 0.0;
+                        if ($ov > $my) $above++;
+                        elseif (abs($ov - $my) < 0.001) $tied++;
+                    }
+                    $avgRank = $above + ($tied + 1) / 2.0;
+                    $result[$uid][$cat] = $groupN === 1
+                        ? 100.0
+                        : max(0.0, round((($groupN - $avgRank) / ($groupN - 1)) * 100.0, 1));
+                }
+            }
+            return $result;
+        };
+
         try {
             foreach ($companiesArray as $ci => $c) {
                 foreach ($c['departments'] as $di => $d) {
-                    // Collect unique members and their per-category raw scores
-                    $mScores = []; // [uid => [cat => rawScore]]
+                    // Collect unique members: scores + assignment_name
+                    $mScores = [];      // [uid => [cat => rawScore]]
+                    $mAssignment = [];  // [uid => assignment_name]
+
                     foreach ($d['members'] ?? [] as $m) {
                         $uid = $m['id'];
                         if (!isset($mScores[$uid])) {
                             foreach ($pCats as $cat) {
                                 $mScores[$uid][$cat] = (float)($m['aggregates']['points'][$cat] ?? 0);
                             }
+                            $mAssignment[$uid] = $m['assignment_name'] ?? '';
                         }
                     }
                     foreach ($d['teams'] ?? [] as $t) {
@@ -479,39 +508,57 @@ class WorkloadAnalyzerController extends Controller
                                 foreach ($pCats as $cat) {
                                     $mScores[$uid][$cat] = (float)($tm['aggregates']['points'][$cat] ?? 0);
                                 }
+                                $mAssignment[$uid] = $tm['assignment_name'] ?? '';
                             }
                         }
                     }
+
                     $n = count($mScores);
                     if ($n === 0) continue;
 
-                    // Percentile per category: ties get average rank
-                    $mPct = []; // [uid => [cat => percentile]]
-                    foreach ($pCats as $cat) {
-                        foreach ($mScores as $uid => $scores) {
-                            $my = $scores[$cat];
-                            $above = 0; $tied = 0;
-                            foreach ($mScores as $other) {
-                                if ($other[$cat] > $my) $above++;
-                                elseif (abs($other[$cat] - $my) < 0.001) $tied++;
+                    // Department-wide percentile (fallback for small role groups)
+                    $allUids  = array_keys($mScores);
+                    $deptPct  = $computePct($allUids, $mScores, $pCats);
+
+                    // Group by assignment_name
+                    $roleGroups = []; // [assignment_name => [uid, ...]]
+                    foreach ($allUids as $uid) {
+                        $role = $mAssignment[$uid] ?: '未設定';
+                        $roleGroups[$role][] = $uid;
+                    }
+
+                    // Choose role-group percentile (N≥3) or dept fallback (N<3)
+                    $mPct       = []; // [uid => [cat => percentile]]
+                    $mCompLevel = []; // [uid => 'role'|'department']
+                    foreach ($roleGroups as $role => $uids) {
+                        if (count($uids) >= 3) {
+                            $rolePct = $computePct($uids, $mScores, $pCats);
+                            foreach ($uids as $uid) {
+                                $mPct[$uid]       = $rolePct[$uid];
+                                $mCompLevel[$uid] = 'role';
                             }
-                            $avgRank = $above + ($tied + 1) / 2.0;
-                            $mPct[$uid][$cat] = $n === 1 ? 100.0 : max(0.0, round((($n - $avgRank) / ($n - 1)) * 100.0, 1));
+                        } else {
+                            foreach ($uids as $uid) {
+                                $mPct[$uid]       = $deptPct[$uid];
+                                $mCompLevel[$uid] = 'department';
+                            }
                         }
                     }
+
                     // overall = sum of all 6 category percentiles (max 600)
-                    foreach ($mScores as $uid => $_) {
+                    foreach ($allUids as $uid) {
                         $tot = 0.0;
                         foreach ($pCats as $cat) $tot += $mPct[$uid][$cat] ?? 0;
                         $mPct[$uid]['overall'] = round($tot, 1);
                     }
 
-                    // Write back: set percentile_scores and replace points.overall with percentile overall
+                    // Write back
                     foreach ($d['members'] as $mi => $m) {
                         $uid = $m['id'];
                         if (isset($mPct[$uid])) {
                             $companiesArray[$ci]['departments'][$di]['members'][$mi]['aggregates']['percentile_scores'] = $mPct[$uid];
-                            $companiesArray[$ci]['departments'][$di]['members'][$mi]['aggregates']['points']['overall'] = $mPct[$uid]['overall'];
+                            $companiesArray[$ci]['departments'][$di]['members'][$mi]['aggregates']['points']['overall']  = $mPct[$uid]['overall'];
+                            $companiesArray[$ci]['departments'][$di]['members'][$mi]['aggregates']['comparison_level']  = $mCompLevel[$uid] ?? 'department';
                         }
                     }
                     foreach ($d['teams'] as $ti => $t) {
@@ -519,7 +566,8 @@ class WorkloadAnalyzerController extends Controller
                             $uid = $tm['id'];
                             if (isset($mPct[$uid])) {
                                 $companiesArray[$ci]['departments'][$di]['teams'][$ti]['members'][$tmi]['aggregates']['percentile_scores'] = $mPct[$uid];
-                                $companiesArray[$ci]['departments'][$di]['teams'][$ti]['members'][$tmi]['aggregates']['points']['overall'] = $mPct[$uid]['overall'];
+                                $companiesArray[$ci]['departments'][$di]['teams'][$ti]['members'][$tmi]['aggregates']['points']['overall']  = $mPct[$uid]['overall'];
+                                $companiesArray[$ci]['departments'][$di]['teams'][$ti]['members'][$tmi]['aggregates']['comparison_level']  = $mCompLevel[$uid] ?? 'department';
                             }
                         }
                     }
@@ -1515,6 +1563,7 @@ class WorkloadAnalyzerController extends Controller
         }
 
         // compute per-category scores for each group member and percentile for the viewed user
+        // 【職種グループ別パーセンタイル】show ページでも同じ担当同士で比較する
         $showPCats = ['stage', 'size', 'type', 'difficulty', 'event', 'overtime'];
         $groupCatScores = [];
         foreach ($groupUserIds as $gid) {
@@ -1523,27 +1572,46 @@ class WorkloadAnalyzerController extends Controller
         if (!isset($groupCatScores[$userId])) {
             $groupCatScores[$userId] = $computeUserCategoryScores($userId);
         }
-        $gn = count($groupCatScores);
+
+        // Collect assignment_name per user in comparison group
+        $showAssignmentMap = [];
+        try {
+            $groupUsers = \App\Models\User::with('assignment')->whereIn('id', array_keys($groupCatScores))->get();
+            foreach ($groupUsers as $gu) {
+                $showAssignmentMap[$gu->id] = $gu->assignment->name ?? '';
+            }
+        } catch (\Throwable $e) {}
+
+        // Determine peer UIDs for the viewed user: same assignment_name, N≥3 → role group; else company-wide
+        $viewerAssignment = $showAssignmentMap[$userId] ?? '';
+        $sameRoleUids = array_filter(array_keys($groupCatScores), fn($uid) => ($showAssignmentMap[$uid] ?? '') === $viewerAssignment);
+        $sameRoleUids = array_values($sameRoleUids);
+        $showComparisonLevel = count($sameRoleUids) >= 3 ? 'role' : 'department';
+        $showPeerUids = $showComparisonLevel === 'role' ? $sameRoleUids : array_keys($groupCatScores);
+
+        // Percentile for the viewed user within the chosen peer group
+        $peerN = count($showPeerUids);
         $viewerPercentile = [];
         foreach ($showPCats as $cat) {
             $my = $groupCatScores[$userId][$cat] ?? 0;
             $above = 0; $tied = 0;
-            foreach ($groupCatScores as $sc) {
-                if ($sc[$cat] > $my) $above++;
-                elseif (abs($sc[$cat] - $my) < 0.001) $tied++;
+            foreach ($showPeerUids as $peerUid) {
+                $ov = $groupCatScores[$peerUid][$cat] ?? 0;
+                if ($ov > $my) $above++;
+                elseif (abs($ov - $my) < 0.001) $tied++;
             }
             $avgRank = $above + ($tied + 1) / 2.0;
-            $viewerPercentile[$cat] = $gn === 1 ? 100.0 : max(0.0, round((($gn - $avgRank) / ($gn - 1)) * 100.0, 1));
+            $viewerPercentile[$cat] = $peerN === 1 ? 100.0 : max(0.0, round((($peerN - $avgRank) / ($peerN - 1)) * 100.0, 1));
         }
         $viewerPercentile['overall'] = round(array_sum(array_map(fn($cat) => $viewerPercentile[$cat], $showPCats)), 1);
 
-        // per-category rank within comparison group (1 = highest score)
+        // per-category rank within the chosen peer group (1 = highest score)
         $categoryRanks = [];
         foreach ($showPCats as $cat) {
             $myScore = $groupCatScores[$userId][$cat] ?? 0;
             $rank = 1;
-            foreach ($groupCatScores as $sc) {
-                if ($sc[$cat] > $myScore) $rank++;
+            foreach ($showPeerUids as $peerUid) {
+                if (($groupCatScores[$peerUid][$cat] ?? 0) > $myScore) $rank++;
             }
             $categoryRanks[$cat] = $rank;
         }
@@ -1718,8 +1786,23 @@ class WorkloadAnalyzerController extends Controller
             // per-category percentile scores (0–100 each, 0–600 overall)
             'percentile_scores'            => $viewerPercentile ?? [],
             'category_ranks'               => $categoryRanks ?? [],
-            'group_count'                  => $gn ?? 0,
+            'group_count'                  => $peerN ?? count($groupCatScores),
+            // 比較グループ情報
+            'comparison_level'             => $showComparisonLevel ?? 'department',
+            'peer_group_size'              => $peerN ?? count($groupCatScores),
+            'peer_assignment'              => $viewerAssignment ?? '',
         ]);
+    }
+
+    /**
+     * Show analysis guide / explanation page
+     */
+    public function guide(Request $request)
+    {
+        $this->requireAdminPermission('workload_analysis');
+        $this->requireLeaderPermission('workload_analysis');
+
+        return Inertia::render('WorkloadAnalyzer/AnalysisGuide');
     }
 
     /**
