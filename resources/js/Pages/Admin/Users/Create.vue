@@ -26,8 +26,16 @@ const form = useForm({
     assignment_id: '',
     position_title_id: '',
     user_role: 'user',
+    employment_type: 'regular',
     terms: false,
 });
+
+const EMPLOYMENT_TYPE_OPTIONS = [
+    { value: 'regular',   label: '正社員' },
+    { value: 'contract',  label: '契約社員' },
+    { value: 'dispatch',  label: '派遣社員' },
+    { value: 'outsource', label: '業務委託' },
+];
 
 // 日本語バリデーションメッセージ
 const validationMessages = {
@@ -364,6 +372,20 @@ const submit = () => {
                             </option>
                         </select>
                         <InputError class="mt-2" :message="errors.user_role || form.errors.user_role" />
+                    </div>
+
+                    <div class="mt-4">
+                        <InputLabel for="employment_type" value="雇用形態" />
+                        <select
+                            id="employment_type"
+                            v-model="form.employment_type"
+                            class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
+                        >
+                            <option v-for="opt in EMPLOYMENT_TYPE_OPTIONS" :key="opt.value" :value="opt.value">
+                                {{ opt.label }}
+                            </option>
+                        </select>
+                        <InputError class="mt-2" :message="form.errors.employment_type" />
                     </div>
 
                     <div v-if="availablePositionTitles.length > 0" class="mt-4">

@@ -96,7 +96,12 @@ class ProjectJobAssignmentsController extends Controller
                 // keep status_id for backward compatibility
                 'status_id' => $a->status_id ?? null,
                 'status' => $statusObj,
-                'user' => $a->user ? ['id' => $a->user->id, 'name' => $a->user->name] : null,
+                'user' => $a->user ? [
+                    'id'                    => $a->user->id,
+                    'name'                  => $a->user->name,
+                    'employment_type'       => $a->user->employment_type ?? 'regular',
+                    'employment_type_label' => $a->user->employmentTypeLabel(),
+                ] : null,
             ];
         });
 
@@ -119,9 +124,11 @@ class ProjectJobAssignmentsController extends Controller
         // send available team members for selection
         $members = $projectJob->teamMembers()->with(['user', 'user.assignment'])->get()->map(function ($m) {
             return [
-                'id'              => $m->user?->id,
-                'name'            => $m->user?->name,
-                'assignment_name' => $m->user?->assignment?->name,
+                'id'                    => $m->user?->id,
+                'name'                  => $m->user?->name,
+                'assignment_name'       => $m->user?->assignment?->name,
+                'employment_type'       => $m->user?->employment_type ?? 'regular',
+                'employment_type_label' => $m->user ? $m->user->employmentTypeLabel() : '',
             ];
         })->filter(function ($item) {
             return $item['id'] !== null;
@@ -205,9 +212,11 @@ class ProjectJobAssignmentsController extends Controller
     {
         $members = $projectJob->teamMembers()->with(['user', 'user.assignment'])->get()->map(function ($m) {
             return [
-                'id'              => $m->user?->id,
-                'name'            => $m->user?->name,
-                'assignment_name' => $m->user?->assignment?->name,
+                'id'                    => $m->user?->id,
+                'name'                  => $m->user?->name,
+                'assignment_name'       => $m->user?->assignment?->name,
+                'employment_type'       => $m->user?->employment_type ?? 'regular',
+                'employment_type_label' => $m->user ? $m->user->employmentTypeLabel() : '',
             ];
         })->filter(function ($item) {
             return $item['id'] !== null;
@@ -355,9 +364,11 @@ class ProjectJobAssignmentsController extends Controller
         // prepare members and lookup lists (same as edit) so frontend can resolve names
         $members = $projectJob->teamMembers()->with(['user', 'user.assignment'])->get()->map(function ($m) {
             return [
-                'id'              => $m->user?->id,
-                'name'            => $m->user?->name,
-                'assignment_name' => $m->user?->assignment?->name,
+                'id'                    => $m->user?->id,
+                'name'                  => $m->user?->name,
+                'assignment_name'       => $m->user?->assignment?->name,
+                'employment_type'       => $m->user?->employment_type ?? 'regular',
+                'employment_type_label' => $m->user ? $m->user->employmentTypeLabel() : '',
             ];
         })->filter(function ($item) {
             return $item['id'] !== null;

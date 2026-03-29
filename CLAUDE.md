@@ -1709,3 +1709,110 @@ $defaultWorktypeId = $dailyWorktypeId ?? $user->userSetting?->worktype_id;
 - **全日行:** セレクト変更で全曜日を一括更新。選択後は「— 一括選択 —」に戻り個別修正可能
 - 保存後はページリロードなしでヘッダー表示・背景グレーが即座に更新
 - デフォルト設定変更時は全日次設定がリセットされる
+
+---
+
+## 雇用形態管理（派遣・業務委託）ルール
+
+### DB設計
+
+| テーブル | モデル | 役割 |
+|---|---|---|
+| `users.employment_type` | `User` | 雇用形態 enum（regular/contract/dispatch/outsource）。デフォルト `regular` |
+| `user_employment_settings` | `UserEmploymentSetting` | per-user フラグ上書き（`diary_required` 等）|
+| `dispatch_profiles` | `DispatchProfile` | dispatch/outsource 専用の付加情報（派遣会社名・契約期間・備考）|
+| `leader_permissions.dispatch_management` | — | dispatch_management タブの表示権限フラグ |
+
+### employment_type の値と意味
+
+| 値 | 日本語 | 日報デフォルト | バッジ色 |
+|---|---|---|---|
+| `regular` | 正社員 | 必須 | 青 (`bg-blue-100 text-blue-700`) |
+| `contract` | 契約社員 | 必須 | 緑 (`bg-green-100 text-green-700`) |
+| `dispatch` | 派遣社員 | **任意** | オレンジ (`bg-orange-100 text-orange-700`) |
+| `outsource` | 業務委託 | **任意** | パープル (`bg-purple-100 text-purple-700`) |
+
+### User モデルのメソッド
+
+```php
+// 日報義務判定: user_employment_settings が優先、なければ employment_type のデフォルトを返す
+$user->isDiaryRequired(): bool
+
+// 雇用形態の日本語ラベル
+$user->employmentTypeLabel(): string
+
+// リレーション
+$user->employmentSetting()   // hasOne UserEmploymentSetting
+$user->dispatchProfile()     // hasOne DispatchProfile
+```
+
+### 日報義務の判定ロジック（重要）
+
+```
+user_employment_settings レコードあり → そのフラグ値を使用（個別上書き）
+レコードなし → employment_type が regular/contract → true（必須）
+             → employment_type が dispatch/outsource → false（任意）
+```
+
+`DiaryController::index()` で `diary_required_user_ids` を計算して Inertia props に渡す。日報一覧の「未提出」マーカーはこのリストを使う。
+
+### 派遣管理ページ（Leader）
+
+- **ルート:** `leader.dispatch_management.index / .edit / .update`
+- **コントローラー:** `app/Http/Controllers/Leader/DispatchManagementController.php`
+- **Vue ページ:** `resources/js/Pages/Leader/DispatchManagement/Index.vue` / `Edit.vue`
+- **権限フラグ:** `leader_permissions.dispatch_management = true` のリーダーのみタブが表示される
+- **スコープ:** `buildPermittedUserIds()` で DiaryController と同じリーダースコープを適用
+
+**Edit.vue の機能:**
+- 雇用形態（4択ラジオ）
+- 日報設定（デフォルト/必須上書き/任意上書き）
+- dispatch/outsource 選択時のみ「派遣会社情報」セクションを表示（agency_name / contract_start / contract_end / notes）
+- 契約終了日が30日以内→オレンジ警告、過去→赤警告をリアルタイム表示
+
+**Index.vue の機能:**
+- 雇用形態フィルターボタン
+- 派遣会社名・契約終了日列（dispatch/outsource のみ表示）
+- 契約終了日: `残N日`（30日以内）/ `期限切れ`（過去）バッジ付き警告
+
+### ワークロードランキングでの雇用形態フィルター
+
+`WorkloadAnalyzer/Index.vue` と `CategoryRank.vue` に雇用形態フィルターボタンを実装済み。
+
+- `employmentFilter` ref: `'all'` / `'regular_contract'` / `'dispatch_outsource'`
+- `matchesEmploymentFilter(m)` で getDeptRows / getDeptRanking を絞り込む
+- コントローラーは `employment_type` / `employment_type_label` をメンバー配列に含めること
+
+```php
+// WorkloadAnalyzerController でのメンバー配列
+'employment_type'       => $m->employment_type ?? 'regular',
+'employment_type_label' => $m->employmentTypeLabel(),
+```
+
+### 割当フォーム（AssignmentForm.vue）での雇用形態表示
+
+- `memberEmploymentType(userId)`: 割当ユーザーの雇用形態を返すヘルパー
+- `EMPLOYMENT_BADGE` const: 雇用形態 → バッジクラスのマッピング
+- dispatch/outsource のユーザーを選択すると**オレンジ警告ボックス**を表示
+- 読み取り専用モードでも名前横にバッジを表示
+
+コントローラー（`ProjectJobAssignmentsController`）は `create()` / `edit()` / `show()` の members 配列と `index()` の user オブジェクトに `employment_type` / `employment_type_label` を含めること。
+
+### 新規ユーザー登録・CSV一括登録での雇用形態
+
+**個別登録（`Admin/Users/Create.vue`）:**
+- 「雇用形態」セレクトを権限レベルの下に配置。デフォルト: 正社員
+
+**CSV一括登録:**
+- CSV列順: `name, email, password, assignment, user_role, position_title, employment_type`（7列目、任意・空欄時は `regular`）
+- 日本語表記（正社員・派遣社員等）→英語キーに自動修正
+- サンプル CSV にも雇用形態列を含む
+- CsvPreview テーブルに雇用形態バッジ列を表示
+
+**`UserController::store()` と `csvStore()` の両方で `employment_type` を `User::create()` に渡すこと。**
+
+### dispatch_profiles の保存ルール
+
+- dispatch / outsource の場合のみ保存・更新
+- regular / contract に変更した場合は `DispatchProfile` レコードを削除
+- データが全て空の場合はレコードを作成しない（`hasProfileData` フラグで判定）

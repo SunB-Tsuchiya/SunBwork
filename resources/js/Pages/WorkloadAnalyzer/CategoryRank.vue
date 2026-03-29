@@ -108,6 +108,32 @@ const categories = [
 const selectedCategory = ref('total_pages');
 const currentCategory = computed(() => categories.find((c) => c.key === selectedCategory.value) ?? categories[0]);
 
+// 雇用形態フィルター
+const employmentFilter = ref('all'); // 'all' | 'regular_contract' | 'dispatch_outsource'
+
+const EMPLOYMENT_FILTER_OPTIONS = [
+    { value: 'all',                label: 'すべて' },
+    { value: 'regular_contract',   label: '正社員・契約社員' },
+    { value: 'dispatch_outsource', label: '派遣・業務委託' },
+];
+
+function employmentBadgeClass(type) {
+    switch (type) {
+        case 'dispatch':  return 'bg-orange-100 text-orange-700';
+        case 'outsource': return 'bg-purple-100 text-purple-700';
+        case 'contract':  return 'bg-green-100 text-green-700';
+        default:          return '';
+    }
+}
+
+function matchesEmploymentFilter(m) {
+    if (employmentFilter.value === 'all') return true;
+    const t = m.employment_type || 'regular';
+    if (employmentFilter.value === 'regular_contract') return t === 'regular' || t === 'contract';
+    if (employmentFilter.value === 'dispatch_outsource') return t === 'dispatch' || t === 'outsource';
+    return true;
+}
+
 // 部署ごとにメンバーを収集（重複排除）してカテゴリ値でランキング
 function getDeptRanking(dept) {
     const seen = new Set();
@@ -122,7 +148,7 @@ function getDeptRanking(dept) {
     });
 
     const getValue = currentCategory.value.getValue;
-    const scored = members.map((m) => ({ ...m, _score: getValue(m) }));
+    const scored = members.filter(matchesEmploymentFilter).map((m) => ({ ...m, _score: getValue(m) }));
     scored.sort((a, b) => b._score - a._score);
 
     // 同値タイは同順位
@@ -190,8 +216,8 @@ const rankBadgeClass = (rank) => {
         <div class="rounded bg-white p-6 shadow">
             <h1 class="mb-4 text-xl font-semibold text-gray-800">総合ランキング</h1>
 
-            <!-- ランキング種別トグル -->
-            <div class="mb-4 flex gap-2">
+            <!-- ランキング種別トグル + 雇用形態フィルター -->
+            <div class="mb-3 flex flex-wrap items-center gap-2">
                 <button
                     @click="goToOverallRank"
                     class="rounded px-4 py-1.5 text-sm font-medium transition-colors bg-gray-100 text-gray-600 hover:bg-gray-200"
@@ -199,6 +225,22 @@ const rankBadgeClass = (rank) => {
                 <button
                     class="rounded px-4 py-1.5 text-sm font-medium transition-colors bg-blue-600 text-white"
                 >カテゴリ別ランク</button>
+
+                <!-- 雇用形態フィルター -->
+                <div class="ml-auto flex items-center gap-1.5">
+                    <span class="text-xs text-gray-500">雇用形態:</span>
+                    <button
+                        v-for="opt in EMPLOYMENT_FILTER_OPTIONS"
+                        :key="opt.value"
+                        class="rounded-full border px-3 py-0.5 text-xs transition"
+                        :class="employmentFilter === opt.value
+                            ? 'border-orange-400 bg-orange-100 text-orange-700 font-semibold'
+                            : 'border-gray-200 text-gray-500 hover:bg-gray-50'"
+                        @click="employmentFilter = opt.value"
+                    >
+                        {{ opt.label }}
+                    </button>
+                </div>
             </div>
 
             <!-- 年月セレクタ -->
@@ -252,7 +294,14 @@ const rankBadgeClass = (rank) => {
                                             class="inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold"
                                         >{{ row._rank }}</span>
                                     </td>
-                                    <td class="px-4 py-2 font-medium text-gray-800">{{ row.name }}</td>
+                                    <td class="px-4 py-2 font-medium text-gray-800">
+                                        {{ row.name }}
+                                        <span
+                                            v-if="employmentBadgeClass(row.employment_type)"
+                                            class="ml-1 inline-block rounded-full px-1.5 py-0 text-xs font-normal"
+                                            :class="employmentBadgeClass(row.employment_type)"
+                                        >{{ row.employment_type_label }}</span>
+                                    </td>
                                     <td class="px-4 py-2 text-gray-500">{{ row.assignment_name || '—' }}</td>
                                     <td class="px-4 py-2 text-right font-semibold text-gray-700">
                                         {{ currentCategory.format(row._score) }}

@@ -26,21 +26,24 @@ class AssignmentSeeder extends Seeder
 
         $mapping = [
             'INFO' => [
-                ['name' => '進行管理', 'code' => 'shinko', 'sort_order' => 0],
+                ['name' => '進行管理',     'code' => 'shinko',   'sort_order' => 0],
                 ['name' => 'オペレーター', 'code' => 'operator', 'sort_order' => 1],
-                ['name' => '校正', 'code' => 'kousei', 'sort_order' => 2],
-                ['name' => '営業', 'code' => 'eigyo', 'sort_order' => 3],
-                ['name' => 'そのほか', 'code' => 'other', 'sort_order' => 4],
+                ['name' => '制作',         'code' => 'seisaku',  'sort_order' => 2],
+                ['name' => '校正',         'code' => 'kousei',   'sort_order' => 3],
+                ['name' => '営業',         'code' => 'eigyo',    'sort_order' => 4],
+                ['name' => 'そのほか',     'code' => 'other',    'sort_order' => 5],
             ],
             'SEIHAN' => [
-                ['name' => '進行管理', 'code' => 'shinko', 'sort_order' => 0],
+                ['name' => '進行管理',     'code' => 'shinko',   'sort_order' => 0],
                 ['name' => 'オペレーター', 'code' => 'operator', 'sort_order' => 1],
-                ['name' => 'そのほか', 'code' => 'other', 'sort_order' => 2],
+                ['name' => '制作',         'code' => 'seisaku',  'sort_order' => 2],
+                ['name' => 'そのほか',     'code' => 'other',    'sort_order' => 3],
             ],
             'ONDEMAND' => [
-                ['name' => '進行管理', 'code' => 'shinko', 'sort_order' => 0],
+                ['name' => '進行管理',     'code' => 'shinko',   'sort_order' => 0],
                 ['name' => 'オペレーター', 'code' => 'operator', 'sort_order' => 1],
-                ['name' => 'そのほか', 'code' => 'other', 'sort_order' => 2],
+                ['name' => '制作',         'code' => 'seisaku',  'sort_order' => 2],
+                ['name' => 'そのほか',     'code' => 'other',    'sort_order' => 3],
             ],
         ];
 

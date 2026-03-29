@@ -297,11 +297,21 @@ class DiaryController extends Controller
 
         $filters = ['q' => '', 'days' => $days, 'perPage' => $perPage, 'unread' => $unread];
 
+        // 日報義務ユーザー ID セット（リーダーが「未提出」を追跡すべき対象）
+        $diaryRequiredUserIds = User::whereIn('id', $userIds)
+            ->with('employmentSetting')
+            ->get()
+            ->filter(fn ($u) => $u->isDiaryRequired())
+            ->pluck('id')
+            ->values()
+            ->toArray();
+
         return Inertia::render('Diaries/Interactions/Index', [
-            'departments' => $departments,
-            'date' => null,
-            'meta' => $meta,
-            'filters' => $filters,
+            'departments'            => $departments,
+            'date'                   => null,
+            'meta'                   => $meta,
+            'filters'                => $filters,
+            'diary_required_user_ids' => $diaryRequiredUserIds,
         ]);
     }
 

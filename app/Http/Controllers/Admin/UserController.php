@@ -114,6 +114,7 @@ class UserController extends Controller
                 'position_title_id' => $positionTitleId,
                 'current_team_id'   => $request->company_id,
                 'user_role'         => $request->user_role,
+                'employment_type'   => $request->input('employment_type', 'regular'),
                 'email_verified_at' => now(),
             ]);
 
@@ -254,10 +255,11 @@ class UserController extends Controller
             ->orderBy('sort_order')->value('name') ?? '部長';
 
         $rows = [
-            ['name', 'email', 'password', 'assignment', 'user_role', 'position_title'],
-            ['山田太郎', 'yamada@example.com',  'Password123!', $assignments[0],                            'user',        ''],
-            ['鈴木花子', 'suzuki@example.com',  'Password123!', $assignments[1] ?? $assignments[0],         'coordinator', ''],
-            ['田中一郎', 'tanaka@example.com',  'Password123!', $assignments[array_key_last($assignments)], 'leader',      $leaderTitle],
+            ['name', 'email', 'password', 'assignment', 'user_role', 'position_title', 'employment_type'],
+            ['山田太郎', 'yamada@example.com',  'Password123!', $assignments[0],                            'user',        '',            'regular'],
+            ['鈴木花子', 'suzuki@example.com',  'Password123!', $assignments[1] ?? $assignments[0],         'coordinator', '',            'dispatch'],
+            ['田中一郎', 'tanaka@example.com',  'Password123!', $assignments[array_key_last($assignments)], 'leader',      $leaderTitle,  'regular'],
+            ['佐藤次郎', 'sato@example.com',    'Password123!', $assignments[0],                            'user',        '',            'outsource'],
         ];
 
         $csv = '';
@@ -336,7 +338,7 @@ class UserController extends Controller
                 while (($data = fgetcsv($handle, 1000, ',')) !== FALSE) {
                     $line++;
 
-                    // CSV形式: name,email,password,assignment,user_role[,position_title]
+                    // CSV形式: name,email,password,assignment,user_role[,position_title[,employment_type]]
                     if (count($data) < 5) {
                         $errors[] = "行 {$line}: データが不足しています（5列以上必要です）";
                         continue;
@@ -344,6 +346,7 @@ class UserController extends Controller
 
                     $assignmentName    = trim($data[3]);
                     $positionTitleName = trim($data[5] ?? '');
+                    $employmentTypeRaw = trim($data[6] ?? '');
                     $assignment_id     = \App\Models\Assignment::where('name', $assignmentName)
                         ->where('department_id', $department->id)
                         ->value('id');
@@ -361,6 +364,7 @@ class UserController extends Controller
                         'user_role'         => trim($data[4]),
                         'position_title'    => $positionTitleName,
                         'position_title_id' => $position_title_id,
+                        'employment_type'   => $employmentTypeRaw ?: 'regular',
                         'company_id'        => $request->company_id,
                         'department_id'     => $request->department_id,
                     ];
@@ -397,6 +401,17 @@ class UserController extends Controller
                     // superadmin以外のadmin登録を禁止
                     if (strtolower(trim($userData['user_role'])) === 'admin') {
                         $errors[] = "行 {$line}: CSVからの管理者(admin)登録は許可されていません。";
+                    }
+
+                    // 雇用形態のバリデーションと自動修正
+                    $employmentTypeResult = $this->validateAndFixEmploymentType($userData['employment_type']);
+                    if (isset($employmentTypeResult['error'])) {
+                        $errors[] = "行 {$line}: {$employmentTypeResult['error']}";
+                    } elseif (isset($employmentTypeResult['fixed'])) {
+                        $userData['employment_type'] = $employmentTypeResult['fixed'];
+                        $warnings[] = "行 {$line}: 雇用形態「{$employmentTypeResult['original']}」を「{$employmentTypeResult['fixed']}」に自動修正しました";
+                    } else {
+                        $userData['employment_type'] = $employmentTypeResult['value'];
                     }
 
                     // position_title は leader のみ設定可能
@@ -549,6 +564,7 @@ class UserController extends Controller
                     'assignment_id'     => $assignment_id,
                     'position_title_id' => $position_title_id,
                     'user_role'         => $userData['user_role'],
+                    'employment_type'   => $userData['employment_type'] ?? 'regular',
                     'current_team_id'   => $departmentTeam ? $departmentTeam->id : null,
                 ]);
                 $role = ($userData['user_role'] === 'admin') ? 'admin' : 'viewer';
@@ -580,6 +596,40 @@ class UserController extends Controller
             return redirect()->route('admin.users.csv.upload')
                 ->with('error', 'ユーザー登録中にエラーが発生しました: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * 雇用形態の自動修正とバリデーション
+     */
+    private function validateAndFixEmploymentType(string $value): array
+    {
+        $valid = ['regular', 'contract', 'dispatch', 'outsource'];
+
+        // 空欄はデフォルト regular
+        if ($value === '' || $value === null) {
+            return ['value' => 'regular'];
+        }
+
+        // 完全一致（英語）
+        if (in_array($value, $valid)) {
+            return ['value' => $value];
+        }
+
+        // 日本語表記 → 英語キー
+        $map = [
+            '正社員'   => 'regular',
+            '契約社員' => 'contract',
+            '派遣社員' => 'dispatch',
+            '派遣'     => 'dispatch',
+            '業務委託' => 'outsource',
+            '委託'     => 'outsource',
+        ];
+
+        if (isset($map[$value])) {
+            return ['fixed' => $map[$value], 'original' => $value];
+        }
+
+        return ['error' => "雇用形態「{$value}」は無効です（regular / contract / dispatch / outsource のいずれかを指定してください）"];
     }
 
     /**

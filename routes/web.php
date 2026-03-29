@@ -399,6 +399,19 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('teams', [App\Http\Controllers\Leader\UnitController::class, 'store'])->name('units.store');
         Route::resource('teams', App\Http\Controllers\Leader\TeamController::class)->only(['index', 'show', 'edit', 'update', 'destroy']);
 
+        // 派遣・業務委託管理
+        Route::get('dispatch-management', [App\Http\Controllers\Leader\DispatchManagementController::class, 'index'])->name('dispatch_management.index');
+        Route::get('dispatch-management/{dispatchUser}/edit', [App\Http\Controllers\Leader\DispatchManagementController::class, 'edit'])->name('dispatch_management.edit');
+        Route::put('dispatch-management/{dispatchUser}', [App\Http\Controllers\Leader\DispatchManagementController::class, 'update'])->name('dispatch_management.update');
+
+        // 部署リーダー用ユーザー管理
+        Route::get('user-management', [App\Http\Controllers\Leader\UserManagementController::class, 'index'])->name('user_management.index');
+        Route::get('user-management/create', [App\Http\Controllers\Leader\UserManagementController::class, 'create'])->name('user_management.create');
+        Route::post('user-management', [App\Http\Controllers\Leader\UserManagementController::class, 'store'])->name('user_management.store');
+        Route::post('user-management/bulk-update', [App\Http\Controllers\Leader\UserManagementController::class, 'bulkUpdate'])->name('user_management.bulk_update');
+        Route::get('user-management/{user}/edit', [App\Http\Controllers\Leader\UserManagementController::class, 'edit'])->name('user_management.edit');
+        Route::put('user-management/{user}', [App\Http\Controllers\Leader\UserManagementController::class, 'update'])->name('user_management.update');
+
         // 全 Leader: Leader 権限管理（スコープはコントローラで制御）
         Route::get('leader-permissions', [App\Http\Controllers\Admin\LeaderPermissionController::class, 'index'])->name('leader_permissions.index');
         Route::get('leader-permissions/{leaderuser}/edit', [App\Http\Controllers\Admin\LeaderPermissionController::class, 'edit'])->name('leader_permissions.edit');

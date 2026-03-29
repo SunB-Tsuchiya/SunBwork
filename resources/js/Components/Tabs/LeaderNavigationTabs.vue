@@ -19,11 +19,21 @@ const page = usePage();
 // leader_permissions が null（未設定）の場合は全権限オン扱い
 const perm = computed(() => page.props.auth?.leaderPermissions ?? null);
 const can = (key) => perm.value === null || perm.value[key] === true;
+
+// 部署リーダーのみユーザー管理タブを表示
+const isDepartmentLeader = computed(() => page.props.auth?.user?.isDepartmentLeader === true);
 </script>
 
 <template>
     <div class="mb-6">
         <nav class="flex flex-wrap gap-2" aria-label="Tabs">
+            <Link
+                v-if="isDepartmentLeader && can('user_management')"
+                :href="route('leader.user_management.index')"
+                :class="tab('user_management')"
+            >
+                ユーザー管理
+            </Link>
             <Link
                 :href="route('leader.teams.index')"
                 :class="tab('teams')"
@@ -64,6 +74,13 @@ const can = (key) => perm.value === null || perm.value[key] === true;
                 :class="tab('work_records')"
             >
                 勤務時間管理
+            </Link>
+            <Link
+                v-if="can('dispatch_management')"
+                :href="route('leader.dispatch_management.index')"
+                :class="tab('dispatch')"
+            >
+                派遣管理
             </Link>
             <Link
                 :href="route('leader.leader_permissions.index')"

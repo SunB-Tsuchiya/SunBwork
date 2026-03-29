@@ -18,6 +18,8 @@ const permItems = [
     { key: 'workload_analysis',      label: '作業量分析' },
     { key: 'workload_setting',       label: '作業項目設定' },
     { key: 'work_record_management', label: '勤務時間管理' },
+    { key: 'dispatch_management',    label: '派遣管理' },
+    { key: 'user_management',        label: 'ユーザー管理（部署リーダーのみ有効）' },
 ];
 
 const form = useForm({
@@ -26,6 +28,8 @@ const form = useForm({
     workload_analysis:      props.permissions.workload_analysis,
     workload_setting:       props.permissions.workload_setting,
     work_record_management: props.permissions.work_record_management,
+    dispatch_management:    props.permissions.dispatch_management,
+    user_management:        props.permissions.user_management,
 });
 
 const submit = () => {

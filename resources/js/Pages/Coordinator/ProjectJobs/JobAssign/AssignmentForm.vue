@@ -35,13 +35,40 @@
 
             <!-- 割当ユーザー（概要直下に移動） -->
             <label class="mb-1 mt-3 block font-semibold">割当ユーザー</label>
-            <div v-if="!editMode" class="mt-1 w-full rounded border bg-gray-50 px-3 py-2 text-sm">{{ memberName(block.user_id) }}</div>
-            <select v-else v-model="block.user_id" :disabled="!editMode" class="w-full rounded border px-3 py-2" @change="onUserChange(block)">
-                <option value="">未指定</option>
-                <option v-for="m in props.members || members" :key="m.id" :value="m.id">
-                    {{ m.name }}{{ m.assignment_name ? '（' + m.assignment_name + '）' : '' }}
-                </option>
-            </select>
+            <div v-if="!editMode" class="mt-1 flex items-center gap-2 rounded border bg-gray-50 px-3 py-2 text-sm">
+                <span>{{ memberName(block.user_id) }}</span>
+                <span
+                    v-if="EMPLOYMENT_BADGE[memberEmploymentType(block.user_id)?.employment_type]"
+                    class="rounded-full px-2 py-0 text-xs font-medium"
+                    :class="EMPLOYMENT_BADGE[memberEmploymentType(block.user_id)?.employment_type].cls"
+                >
+                    {{ EMPLOYMENT_BADGE[memberEmploymentType(block.user_id)?.employment_type].label }}
+                </span>
+            </div>
+            <div v-else>
+                <select v-model="block.user_id" class="w-full rounded border px-3 py-2" @change="onUserChange(block)">
+                    <option value="">未指定</option>
+                    <option v-for="m in props.members || members" :key="m.id" :value="m.id">
+                        {{ m.name }}{{ m.assignment_name ? '（' + m.assignment_name + '）' : '' }}
+                        {{ ['dispatch','outsource','contract'].includes(m.employment_type) ? '【' + m.employment_type_label + '】' : '' }}
+                    </option>
+                </select>
+                <!-- 選択後の雇用形態バッジ（派遣・業務委託のみ表示） -->
+                <div
+                    v-if="EMPLOYMENT_BADGE[memberEmploymentType(block.user_id)?.employment_type]"
+                    class="mt-1.5 flex items-center gap-1.5 rounded border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs"
+                >
+                    <span
+                        class="rounded-full px-2 py-0.5 font-medium"
+                        :class="EMPLOYMENT_BADGE[memberEmploymentType(block.user_id)?.employment_type].cls"
+                    >
+                        {{ EMPLOYMENT_BADGE[memberEmploymentType(block.user_id)?.employment_type].label }}
+                    </span>
+                    <span class="text-orange-700">
+                        このユーザーは{{ EMPLOYMENT_BADGE[memberEmploymentType(block.user_id)?.employment_type].label }}です。
+                    </span>
+                </div>
+            </div>
 
             <!-- 作業詳細ヘッダー＋フィルター -->
             <div class="mb-1 mt-4 flex flex-wrap items-center gap-2">
@@ -774,6 +801,7 @@ const ASSIGNMENT_TYPE_MAP = {
     'dtp': 'dtp',
     'デザイナー': 'design',
     'デザイン': 'design',
+    '制作': 'design',
     '校正': 'proof',
     '進行管理': 'mgmt',
     '営業': 'sales',
@@ -1004,6 +1032,19 @@ function memberName(userId) {
     } catch (e) {}
     return String(userId);
 }
+
+/** 選択中ユーザーの雇用形態情報を返す */
+function memberEmploymentType(userId) {
+    if (!userId) return null;
+    const membersList = props.members || [];
+    return membersList.find((m) => String(m.id) === String(userId)) ?? null;
+}
+
+const EMPLOYMENT_BADGE = {
+    dispatch:  { label: '派遣社員', cls: 'bg-orange-100 text-orange-700' },
+    outsource: { label: '業務委託', cls: 'bg-purple-100 text-purple-700' },
+    contract:  { label: '契約社員', cls: 'bg-green-100 text-green-700' },
+};
 
 // ── グループ化ヘルパー ─────────────────────────────────────────────────────
 

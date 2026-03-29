@@ -32,6 +32,7 @@ class User extends Authenticatable
         'email',
         'password',
         'user_role',
+        'employment_type',
         'company_id',
         'department_id',
         'assignment_id',
@@ -146,6 +147,64 @@ class User extends Authenticatable
         return $this->user_role === 'user';
     }
 
+    /**
+     * 部署リーダーかどうかを確認（department チームの leader_id が自分）
+     */
+    public function isDepartmentLeader(): bool
+    {
+        if (! $this->isLeader() || ! $this->company_id) {
+            return false;
+        }
+        return \App\Models\Team::where('team_type', 'department')
+            ->where('company_id', $this->company_id)
+            ->where('leader_id', $this->id)
+            ->exists();
+    }
+
+
+    /**
+     * 雇用形態設定（per-user 上書き可能な義務・権限フラグ）
+     */
+    public function employmentSetting()
+    {
+        return $this->hasOne(\App\Models\UserEmploymentSetting::class);
+    }
+
+    /**
+     * 派遣・業務委託プロフィール（派遣会社名・契約期間等）
+     */
+    public function dispatchProfile()
+    {
+        return $this->hasOne(\App\Models\DispatchProfile::class);
+    }
+
+    /**
+     * 日報が義務かどうかを返す。
+     * 派遣・業務委託はデフォルト false。per-user 設定で上書き可能。
+     */
+    public function isDiaryRequired(): bool
+    {
+        $setting = $this->employmentSetting;
+        if ($setting !== null) {
+            return (bool) $setting->diary_required;
+        }
+        // レコードなし: 正社員・契約社員は必須、派遣・業務委託は任意
+        return ! in_array($this->employment_type ?? 'regular', ['dispatch', 'outsource']);
+    }
+
+    /**
+     * 雇用形態の日本語ラベル
+     */
+    public function employmentTypeLabel(): string
+    {
+        return match ($this->employment_type ?? 'regular') {
+            'regular'   => '正社員',
+            'contract'  => '契約社員',
+            'dispatch'  => '派遣社員',
+            'outsource' => '業務委託',
+            default     => '正社員',
+        };
+    }
 
     /**
      * Admin 権限設定

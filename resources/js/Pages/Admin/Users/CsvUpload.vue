@@ -75,11 +75,12 @@ const submit = () => {
                     <p class="mb-3 text-sm text-gray-700">CSVファイルは以下の形式で作成してください：</p>
                     <div class="rounded border bg-white p-3 font-mono text-sm">
                         <div class="mb-1 text-gray-500"># ヘッダー行（必須）</div>
-                        <div class="font-semibold">name,email,password,assignment,user_role,position_title</div>
+                        <div class="font-semibold">name,email,password,assignment,user_role,position_title,employment_type</div>
                         <div class="mb-1 mt-2 text-gray-500"># データ行の例</div>
-                        <div>山田太郎,yamada@example.com,Password123!,進行管理,user,</div>
-                        <div>佐藤花子,sato@example.com,Password123!,オペレーター,coordinator,</div>
-                        <div>田中一郎,tanaka@example.com,Password123!,そのほか,leader,部長</div>
+                        <div>山田太郎,yamada@example.com,Password123!,進行管理,user,,regular</div>
+                        <div>佐藤花子,sato@example.com,Password123!,オペレーター,coordinator,,dispatch</div>
+                        <div>田中一郎,tanaka@example.com,Password123!,そのほか,leader,部長,contract</div>
+                        <div>鈴木次郎,suzuki@example.com,Password123!,校正,user,,outsource</div>
                     </div>
                     <div class="mt-4 text-sm text-gray-600">
                         <h4 class="mb-2 font-semibold">各列の説明：</h4>
@@ -101,6 +102,15 @@ const submit = () => {
                                 <ul class="ml-4 mt-1 space-y-1 text-xs text-gray-600">
                                     <li class="text-yellow-700">※ リーダーの場合のみ有効：部長、次長、課長、課長代理、係長</li>
                                     <li>リーダー以外は空欄にしてください</li>
+                                </ul>
+                            </li>
+                            <li>
+                                <strong>employment_type:</strong> 雇用形態（任意・空欄時は「正社員」として登録）
+                                <ul class="ml-4 mt-1 space-y-1 text-xs text-gray-600">
+                                    <li><span class="rounded-full bg-blue-100 px-1.5 text-blue-700">regular</span> または <span class="rounded-full bg-blue-100 px-1.5 text-blue-700">正社員</span> — 正社員（デフォルト）</li>
+                                    <li><span class="rounded-full bg-green-100 px-1.5 text-green-700">contract</span> または <span class="rounded-full bg-green-100 px-1.5 text-green-700">契約社員</span> — 契約社員</li>
+                                    <li><span class="rounded-full bg-orange-100 px-1.5 text-orange-700">dispatch</span> または <span class="rounded-full bg-orange-100 px-1.5 text-orange-700">派遣社員</span> — 派遣社員（日報任意）</li>
+                                    <li><span class="rounded-full bg-purple-100 px-1.5 text-purple-700">outsource</span> または <span class="rounded-full bg-purple-100 px-1.5 text-purple-700">業務委託</span> — 業務委託（日報任意）</li>
                                 </ul>
                             </li>
                         </ul>

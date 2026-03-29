@@ -190,7 +190,7 @@ const getAssignmentText = (assignment) => {
         <template #header>
             <div class="flex items-center justify-between">
                 <h2 class="text-xl font-semibold leading-tight text-gray-800">ユーザー管理</h2>
-                <template v-if="myuser?.user_role === 'superadmin'">
+                <template v-if="myuser?.user_role === 'superadmin' || myuser?.user_role === 'admin'">
                     <Link :href="route('admin.users.create')" class="rounded bg-red-600 px-4 py-2 font-bold text-white hover:bg-red-700">
                         新規ユーザー登録
                     </Link>

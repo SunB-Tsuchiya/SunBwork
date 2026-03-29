@@ -390,7 +390,13 @@ class WorkloadAnalyzerController extends Controller
                     'id' => $team->id,
                     'name' => $team->name,
                     'members' => $team->members->map(function ($m) {
-                        return ['id' => $m->id, 'name' => $m->name, 'assignment_name' => $m->assignment->name ?? ''];
+                        return [
+                            'id'                    => $m->id,
+                            'name'                  => $m->name,
+                            'assignment_name'       => $m->assignment->name ?? '',
+                            'employment_type'       => $m->employment_type ?? 'regular',
+                            'employment_type_label' => $m->employmentTypeLabel(),
+                        ];
                     })->toArray(),
                 ];
 
@@ -404,7 +410,13 @@ class WorkloadAnalyzerController extends Controller
                         }
                     }
                     if (!$exists) {
-                        $companies[$companyIndex]['departments'][$deptIndex]['members'][] = ['id' => $m->id, 'name' => $m->name, 'assignment_name' => $m->assignment->name ?? ''];
+                        $companies[$companyIndex]['departments'][$deptIndex]['members'][] = [
+                            'id'                    => $m->id,
+                            'name'                  => $m->name,
+                            'assignment_name'       => $m->assignment->name ?? '',
+                            'employment_type'       => $m->employment_type ?? 'regular',
+                            'employment_type_label' => $m->employmentTypeLabel(),
+                        ];
                     }
                 }
             }
@@ -421,14 +433,28 @@ class WorkloadAnalyzerController extends Controller
                     $members = $dept->members ?? collect();
                     foreach ($members as $m) {
                         $agg = $calcAggregates($m->id);
-                        $deptArr['members'][] = ['id' => $m->id, 'name' => $m->name, 'assignment_name' => $m->assignment->name ?? '', 'aggregates' => $agg];
+                        $deptArr['members'][] = [
+                            'id'                    => $m->id,
+                            'name'                  => $m->name,
+                            'assignment_name'       => $m->assignment->name ?? '',
+                            'employment_type'       => $m->employment_type ?? 'regular',
+                            'employment_type_label' => $m->employmentTypeLabel(),
+                            'aggregates'            => $agg,
+                        ];
                     }
                     // teams
                     foreach ($dept->teams ?? collect() as $team) {
                         $teamArr = ['id' => $team->id, 'name' => $team->name, 'members' => []];
                         foreach ($team->members ?? collect() as $tm) {
                             $agg = $calcAggregates($tm->id);
-                            $teamArr['members'][] = ['id' => $tm->id, 'name' => $tm->name, 'assignment_name' => $tm->assignment->name ?? '', 'aggregates' => $agg];
+                            $teamArr['members'][] = [
+                                'id'                    => $tm->id,
+                                'name'                  => $tm->name,
+                                'assignment_name'       => $tm->assignment->name ?? '',
+                                'employment_type'       => $tm->employment_type ?? 'regular',
+                                'employment_type_label' => $tm->employmentTypeLabel(),
+                                'aggregates'            => $agg,
+                            ];
                         }
                         $deptArr['teams'][] = $teamArr;
                     }

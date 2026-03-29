@@ -43,16 +43,30 @@ const getRoleBadgeClass = (role) => {
 
 const getRoleLabel = (role) => {
     switch (role) {
-        case 'admin':
-            return '管理者';
-        case 'leader':
-            return 'リーダー';
-        case 'user':
-            return 'ユーザー';
-        case 'coordinator':
-            return '進行管理';
-        default:
-            return role;
+        case 'admin':       return '管理者';
+        case 'leader':      return 'リーダー';
+        case 'user':        return 'ユーザー';
+        case 'coordinator': return '進行管理';
+        default:            return role;
+    }
+};
+
+const getEmploymentBadgeClass = (type) => {
+    switch (type) {
+        case 'contract':  return 'bg-green-100 text-green-700';
+        case 'dispatch':  return 'bg-orange-100 text-orange-700';
+        case 'outsource': return 'bg-purple-100 text-purple-700';
+        default:          return 'bg-blue-100 text-blue-700';
+    }
+};
+
+const getEmploymentLabel = (type) => {
+    switch (type) {
+        case 'regular':   return '正社員';
+        case 'contract':  return '契約社員';
+        case 'dispatch':  return '派遣社員';
+        case 'outsource': return '業務委託';
+        default:          return type || '正社員';
     }
 };
 </script>
@@ -120,6 +134,7 @@ const getRoleLabel = (role) => {
                                     <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">担当</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">システム権限</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">役職称号</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">雇用形態</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-200 bg-white">
@@ -138,6 +153,14 @@ const getRoleLabel = (role) => {
                                     </td>
                                     <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
                                         {{ user.position_title || '—' }}
+                                    </td>
+                                    <td class="whitespace-nowrap px-4 py-3">
+                                        <span
+                                            class="inline-flex rounded-full px-2 text-xs font-semibold leading-5"
+                                            :class="getEmploymentBadgeClass(user.employment_type)"
+                                        >
+                                            {{ getEmploymentLabel(user.employment_type) }}
+                                        </span>
                                     </td>
                                 </tr>
                             </tbody>

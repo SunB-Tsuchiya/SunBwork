@@ -13,6 +13,8 @@ class LeaderPermission extends Model
         'workload_analysis',
         'workload_setting',
         'work_record_management',
+        'dispatch_management',
+        'user_management',
     ];
 
     protected $casts = [
@@ -21,6 +23,8 @@ class LeaderPermission extends Model
         'workload_analysis'      => 'boolean',
         'workload_setting'       => 'boolean',
         'work_record_management' => 'boolean',
+        'dispatch_management'    => 'boolean',
+        'user_management'        => 'boolean',
     ];
 
     public function user()
@@ -37,6 +41,8 @@ class LeaderPermission extends Model
             'workload_analysis'      => true,
             'workload_setting'       => true,
             'work_record_management' => true,
+            'dispatch_management'    => true,
+            'user_management'        => true,
         ];
     }
 }

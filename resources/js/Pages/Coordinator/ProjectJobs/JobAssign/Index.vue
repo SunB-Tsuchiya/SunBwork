@@ -55,7 +55,18 @@
                                 <div class="font-semibold">{{ a.title }}</div>
                                 <div class="text-sm text-gray-600">{{ projectJob.client?.name || '-' }}</div>
                             </td>
-                            <td class="border px-4 py-2">{{ a.user?.name || '-' }}</td>
+                            <td class="border px-4 py-2">
+                                <span>{{ a.user?.name || '-' }}</span>
+                                <span
+                                    v-if="a.user?.employment_type && a.user.employment_type !== 'regular'"
+                                    class="ml-1 inline-block rounded-full px-1.5 py-0 text-xs"
+                                    :class="{
+                                        'bg-orange-100 text-orange-700': a.user.employment_type === 'dispatch',
+                                        'bg-purple-100 text-purple-700': a.user.employment_type === 'outsource',
+                                        'bg-green-100 text-green-700': a.user.employment_type === 'contract',
+                                    }"
+                                >{{ a.user.employment_type_label }}</span>
+                            </td>
                             <td class="border px-4 py-2">
                                 {{ a.desired_end_date || '-' }}
                                 <span v-if="a.desired_time">

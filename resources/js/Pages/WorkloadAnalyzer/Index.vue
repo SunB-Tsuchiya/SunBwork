@@ -95,11 +95,13 @@ function sortRowsGeneric(rows) {
 }
 
 function getDeptRows(dept) {
-    const base = flattenDepartmentRows(dept).map((r) => ({
-        ...r,
-        deviation: r.aggregates?.deviation_score ?? null,
-        overall: r.aggregates?.points?.overall ?? 0,
-    }));
+    const base = flattenDepartmentRows(dept)
+        .filter(matchesEmploymentFilter)
+        .map((r) => ({
+            ...r,
+            deviation: r.aggregates?.deviation_score ?? null,
+            overall: r.aggregates?.points?.overall ?? 0,
+        }));
 
     // compute dense rank by deviation desc (independent of current sort)
     const rankArr = [...base].sort((a, b) => {
@@ -188,21 +190,18 @@ function flattenCompanyRows(company) {
     const rows = [];
     const seen = new Set();
     (company.departments || []).forEach((d) => {
-        // department-level members
         (d.members || []).forEach((m) => {
             const key = `u:${m.id}`;
             if (seen.has(key)) return;
             seen.add(key);
-            rows.push({ id: m.id, name: m.name, department: d.name, assignment_name: m.assignment_name || '', aggregates: m.aggregates || {} });
+            rows.push({ id: m.id, name: m.name, department: d.name, assignment_name: m.assignment_name || '', employment_type: m.employment_type || 'regular', employment_type_label: m.employment_type_label || '', aggregates: m.aggregates || {} });
         });
-
-        // team-level members
         (d.teams || []).forEach((t) => {
             (t.members || []).forEach((m) => {
                 const key = `u:${m.id}`;
                 if (seen.has(key)) return;
                 seen.add(key);
-                rows.push({ id: m.id, name: m.name, department: d.name, assignment_name: m.assignment_name || '', aggregates: m.aggregates || {} });
+                rows.push({ id: m.id, name: m.name, department: d.name, assignment_name: m.assignment_name || '', employment_type: m.employment_type || 'regular', employment_type_label: m.employment_type_label || '', aggregates: m.aggregates || {} });
             });
         });
     });
@@ -213,20 +212,18 @@ function flattenCompanyRows(company) {
 function flattenDepartmentRows(dept) {
     const rows = [];
     const seen = new Set();
-    // department-level members (not in a team)
     (dept.members || []).forEach((m) => {
         const key = `u:${m.id}`;
         if (seen.has(key)) return;
         seen.add(key);
-        rows.push({ id: m.id, name: m.name, assignment_name: m.assignment_name || '', aggregates: m.aggregates || {} });
+        rows.push({ id: m.id, name: m.name, assignment_name: m.assignment_name || '', employment_type: m.employment_type || 'regular', employment_type_label: m.employment_type_label || '', aggregates: m.aggregates || {} });
     });
-    // team members
     (dept.teams || []).forEach((t) => {
         (t.members || []).forEach((m) => {
             const key = `u:${m.id}`;
             if (seen.has(key)) return;
             seen.add(key);
-            rows.push({ id: m.id, name: m.name, assignment_name: m.assignment_name || '', aggregates: m.aggregates || {} });
+            rows.push({ id: m.id, name: m.name, assignment_name: m.assignment_name || '', employment_type: m.employment_type || 'regular', employment_type_label: m.employment_type_label || '', aggregates: m.aggregates || {} });
         });
     });
     return rows;
@@ -261,6 +258,32 @@ function formatHour(h) {
 
 // 表示モード: 'total' = 部署全体, 'by_role' = 役割ごと
 const viewMode = ref('total');
+
+// 雇用形態フィルター
+const employmentFilter = ref('all'); // 'all' | 'regular_contract' | 'dispatch_outsource'
+
+const EMPLOYMENT_FILTER_OPTIONS = [
+    { value: 'all',               label: 'すべて' },
+    { value: 'regular_contract',  label: '正社員・契約社員' },
+    { value: 'dispatch_outsource', label: '派遣・業務委託' },
+];
+
+function employmentBadgeClass(type) {
+    switch (type) {
+        case 'dispatch':  return 'bg-orange-100 text-orange-700';
+        case 'outsource': return 'bg-purple-100 text-purple-700';
+        case 'contract':  return 'bg-green-100 text-green-700';
+        default:          return ''; // 正社員はバッジ非表示
+    }
+}
+
+function matchesEmploymentFilter(row) {
+    if (employmentFilter.value === 'all') return true;
+    const t = row.employment_type || 'regular';
+    if (employmentFilter.value === 'regular_contract') return t === 'regular' || t === 'contract';
+    if (employmentFilter.value === 'dispatch_outsource') return t === 'dispatch' || t === 'outsource';
+    return true;
+}
 
 // 役割ごとにグループ化し、グループ内でランク付け
 function getDeptRowsByRole(dept) {
@@ -367,7 +390,7 @@ function diffMinutes(estimated, actual) {
             <h1 class="mb-4 text-xl font-semibold text-gray-800">総合ランキング</h1>
 
             <!-- ランキング種別トグル -->
-            <div class="mb-4 flex gap-2">
+            <div class="mb-3 flex flex-wrap items-center gap-2">
                 <button
                     class="rounded px-4 py-1.5 text-sm font-medium transition-colors bg-blue-600 text-white"
                 >総合ランク</button>
@@ -375,6 +398,22 @@ function diffMinutes(estimated, actual) {
                     @click="goToCategoryRank"
                     class="rounded px-4 py-1.5 text-sm font-medium transition-colors bg-gray-100 text-gray-600 hover:bg-gray-200"
                 >カテゴリ別ランク</button>
+
+                <!-- 雇用形態フィルター -->
+                <div class="ml-auto flex items-center gap-1.5">
+                    <span class="text-xs text-gray-500">雇用形態:</span>
+                    <button
+                        v-for="opt in EMPLOYMENT_FILTER_OPTIONS"
+                        :key="opt.value"
+                        class="rounded-full border px-3 py-0.5 text-xs transition"
+                        :class="employmentFilter === opt.value
+                            ? 'border-orange-400 bg-orange-100 text-orange-700 font-semibold'
+                            : 'border-gray-200 text-gray-500 hover:bg-gray-50'"
+                        @click="employmentFilter = opt.value"
+                    >
+                        {{ opt.label }}
+                    </button>
+                </div>
             </div>
 
             <div class="mb-4 mt-4 flex items-center justify-between">
@@ -494,9 +533,16 @@ function diffMinutes(estimated, actual) {
                                                         <td style="width: 8%" class="px-6 py-4 text-sm font-medium text-gray-900">{{ row.rank }}</td>
                                                         <td
                                                             style="width: 14%"
-                                                            class="max-w-[130px] truncate px-6 py-4 text-sm font-medium text-gray-900"
+                                                            class="px-6 py-4 text-sm font-medium text-gray-900"
                                                         >
-                                                            {{ row.name }}
+                                                            <div class="truncate max-w-[120px]">{{ row.name }}</div>
+                                                            <span
+                                                                v-if="employmentBadgeClass(row.employment_type)"
+                                                                class="mt-0.5 inline-block rounded-full px-1.5 py-0 text-xs font-normal"
+                                                                :class="employmentBadgeClass(row.employment_type)"
+                                                            >
+                                                                {{ row.employment_type_label }}
+                                                            </span>
                                                         </td>
                                                         <td style="width: 10%" class="px-6 py-4 text-xs text-gray-500">
                                                             {{ row.assignment_name || '—' }}
@@ -529,7 +575,7 @@ function diffMinutes(estimated, actual) {
                                                         </td>
                                                     </tr>
                                                 </template>
-                                                <tr v-if="flattenDepartmentRows(dept).length === 0">
+                                                <tr v-if="getDeptRows(dept).length === 0">
                                                     <td colspan="7" class="px-6 py-4 text-sm text-gray-500">メンバーが見つかりません</td>
                                                 </tr>
                                             </template>
@@ -553,9 +599,16 @@ function diffMinutes(estimated, actual) {
                                                         <td style="width: 8%" class="px-6 py-4 text-sm font-medium text-gray-900">{{ row.rank }}</td>
                                                         <td
                                                             style="width: 14%"
-                                                            class="max-w-[130px] truncate px-6 py-4 text-sm font-medium text-gray-900"
+                                                            class="px-6 py-4 text-sm font-medium text-gray-900"
                                                         >
-                                                            {{ row.name }}
+                                                            <div class="truncate max-w-[120px]">{{ row.name }}</div>
+                                                            <span
+                                                                v-if="employmentBadgeClass(row.employment_type)"
+                                                                class="mt-0.5 inline-block rounded-full px-1.5 py-0 text-xs font-normal"
+                                                                :class="employmentBadgeClass(row.employment_type)"
+                                                            >
+                                                                {{ row.employment_type_label }}
+                                                            </span>
                                                         </td>
                                                         <td style="width: 10%" class="px-6 py-4 text-xs text-gray-500">
                                                             {{ row.assignment_name || '—' }}
