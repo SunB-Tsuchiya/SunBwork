@@ -7,8 +7,14 @@
 ## Claude へのワークフロー指示
 
 - Vue / JS ファイルを変更したら、必ず最後に `npm run build` を実行すること（許可済み）。
-- `npm run build` はプロジェクトルート（`/home/tchirosb/SunBWork`）で実行する。
+- `npm run build` はプロジェクトルート（`/home/w229/SunBwork`）で実行する。
 - Artisan は必ずコンテナ内: `docker compose exec laravel bash -lc "php artisan ..."`
+- **Docker が使えない場合はホスト上の npm（node v24, npm v11）で直接 `npm run build` を実行する。**
+
+### public/build/assets が root 所有になる問題
+
+Docker コンテナ内でビルドすると `public/build/assets/` が root 所有になり、次回のホストからの `npm run build` が `EACCES Permission denied` で失敗する。
+対処: `sudo chown -R $USER:$USER public/build/ && sudo chmod -R 755 public/build/assets`
 
 ### ユーザーから「gitにアップ」「さくらにデプロイ」を求められたときの手順
 
@@ -20,11 +26,11 @@
 docker compose exec laravel bash -lc "php artisan ziggy:generate resources/js/ziggy.js"
 ```
 
-③ さくら用ビルド:
+③ さくら用ビルド（`.env` の VITE_APP_BASE_PATH は **2箇所** ある）:
 
 ```bash
-sed -i 's/^VITE_APP_BASE_PATH=$/VITE_APP_BASE_PATH=\/members/' /home/tchirosb/SunBWork/.env
-docker compose exec laravel bash -lc "npm run build"
+sed -i 's/^VITE_APP_BASE_PATH=$/VITE_APP_BASE_PATH=\/members/' /home/w229/SunBwork/.env
+npm run build
 ```
 
 ④ コミット:
@@ -37,8 +43,8 @@ git commit -m "feat/fix/build: ..."
 ⑤ .env をローカル用に戻してローカルビルドも実行（コミット不要）:
 
 ```bash
-sed -i 's/^VITE_APP_BASE_PATH=\/members$/VITE_APP_BASE_PATH=/' /home/tchirosb/SunBWork/.env
-docker compose exec laravel bash -lc "npm run build"
+sed -i 's/^VITE_APP_BASE_PATH=\/members$/VITE_APP_BASE_PATH=/' /home/w229/SunBwork/.env
+npm run build
 ```
 
 ⑥ ユーザーへ伝える:
@@ -397,6 +403,24 @@ cd ~/SunBWork && git pull && php artisan migrate && php artisan config:clear && 
 
 ---
 
+## Admin/Users/Edit フォーム仕様
+
+`resources/js/Pages/Admin/Users/Edit.vue` は Create.vue と同等のフルフォームに拡張済み。
+
+**フィールド:** name / email / password（空=変更なし）/ password_confirmation / company_id / department_id / assignment_id / user_role / employment_type / position_title_id
+
+**computed:**
+- `selectedCompanyDepartments` — 選択会社の部署一覧
+- `availableAssignments` — 選択部署の担当一覧
+- `availablePositionTitles` — user_role に応じた役職一覧（admin/leader のみ表示）
+- `filteredRoleOptions` — 表示可能なロール選択肢
+
+**watch によるカスケードリセット:** company_id 変更 → department_id/assignment_id リセット / department_id 変更 → assignment_id リセット / user_role 変更 → position_title_id リセット
+
+**コントローラ (`Admin/UserController`):** `edit()` で companies（部署・担当付き）と positionTitles を取得して渡す。`update()` で全フィールド検証・更新・チーム同期。
+
+---
+
 ## 権限・ロール設計ルール
 
 **ロール階層:** SuperAdmin > Admin > Leader / Coordinator > User
@@ -445,3 +469,50 @@ cd ~/SunBWork && git pull && php artisan migrate && php artisan config:clear && 
 **CSV 登録:** 7列目が `employment_type`（空欄時は `regular`）。日本語表記→英語キーに自動変換。
 
 **dispatch_profiles:** dispatch/outsource のみ保存。regular/contract に変更時はレコード削除。
+
+---
+
+## ProjectJob 共同管理（2026-03-30 実装）
+
+**ピボットテーブル:** `project_job_coordinators`（`project_job_id`, `user_id`, UNIQUE）
+
+**代表（リーダー）:** `project_jobs.user_id` / **サブCo:** ピボットに複数登録可
+
+**候補者条件:** `user_role = 'coordinator'` **または** `assignments.code = 'shinko'`（進行管理）→ SuperAdmin/Admin/Leader でも担当が進行管理なら選出対象
+
+**ProjectJob モデル:** `coordinators()` → `belongsToMany(User, 'project_job_coordinators')`
+
+**ProjectJobController:**
+- `index()` — `user_id = me` OR ピボット登録済みの案件を表示
+- `store()/update()` — `sub_coordinator_ids` を受け取り sync（リーダー自身は除外）
+- `complete()` — `isJobCoordinator()` でリーダー・サブCo両方に許可
+
+**`coordinatorCandidates()` ヘルパー:** `where('user_role','coordinator')->orWhereHas('assignment', code='shinko')`
+
+---
+
+## Coordinator タブメニュー構成（2026-03-30 変更）
+
+クライアント管理 → 案件一覧 → ジョブ一覧 → 案件カレンダー
+
+**クライアント管理を Leader から Coordinator に移管:**
+- `coordinator.clients.*` ルート追加（`ClientController` 共用）
+- `ClientController::routePrefix()` に `'coordinator' => 'coordinator'` 追加
+- `Clients/` 各 Vue（Index/Create/Edit/CsvUpload）の `routePrefix` computed を coordinator 対応
+- Leader タブからは削除していない（Leader も引き続き利用可）
+
+---
+
+## Leader ユーザー管理タブ（2026-03-30 変更）
+
+- `LeaderNavigationTabs.vue`: `v-if="isDepartmentLeader && can('user_management')"` → `v-if="isDepartmentLeader"` に変更
+- `UserManagementController`: 全メソッドから `requireLeaderPermission('user_management')` を削除（`getDeptTeam()` が認可ゲート）
+- 部署リーダーであれば権限フラグ不問でタブ最左端に表示・アクセス可
+- ユーザー一覧は `department_id` で自部署に絞り込み済み（変更なし）
+
+---
+
+## APP_NAME
+
+`.env` の `APP_NAME=SB`（旧: Laravel）→ ブラウザタブ「ページ名 - SB」で表示。
+さくら本番 `.env` も同様に変更 + `php artisan config:clear` 必要。

@@ -199,7 +199,7 @@ const isDirty = (userId) => dirtyRows.value.some((r) => r.id === userId);
                             <td class="whitespace-nowrap px-4 py-3 text-right">
                                 <Link
                                     :href="route('leader.user_management.edit', { user: user.id })"
-                                    class="text-sm font-medium text-orange-600 hover:text-orange-800"
+                                    class="inline-flex items-center rounded bg-orange-100 px-3 py-1 text-sm font-medium text-orange-700 hover:bg-orange-200"
                                 >
                                     編集
                                 </Link>

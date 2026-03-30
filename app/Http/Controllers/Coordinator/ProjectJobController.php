@@ -72,11 +72,14 @@ class ProjectJobController extends Controller
     }
 
     /**
-     * Coordinator候補（coordinator ロールの全ユーザー）を返す
+     * Coordinator候補:
+     *   - user_role = coordinator、または
+     *   - 担当(assignment.code) = 'shinko'（進行管理）のユーザー
      */
     private function coordinatorCandidates(): \Illuminate\Support\Collection
     {
         return User::where('user_role', 'coordinator')
+            ->orWhereHas('assignment', fn ($q) => $q->where('code', 'shinko'))
             ->orderBy('name')
             ->get(['id', 'name']);
     }

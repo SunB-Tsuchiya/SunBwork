@@ -328,17 +328,17 @@ const getAssignmentText = (assignment) => {
                                             </span>
                                         </td> -->
                                         <td class="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
-                                            <div class="flex justify-end space-x-2">
-                                                <Link :href="route('superadmin.adminusers.show', { adminuser: user.id })" class="text-blue-600 hover:text-blue-900">
+                                            <div class="flex justify-end gap-2">
+                                                <Link :href="route('superadmin.adminusers.show', { adminuser: user.id })" class="inline-flex items-center rounded bg-blue-100 px-3 py-1 text-sm font-medium text-blue-700 hover:bg-blue-200">
                                                     詳細
                                                 </Link>
                                                 <Link
                                                     :href="route('superadmin.adminusers.edit', { adminuser: user.id })"
-                                                    class="text-yellow-600 hover:text-yellow-900"
+                                                    class="inline-flex items-center rounded bg-yellow-100 px-3 py-1 text-sm font-medium text-yellow-700 hover:bg-yellow-200"
                                                 >
                                                     編集
                                                 </Link>
-                                                <button @click="deleteUser(user.id)" class="text-red-600 hover:text-red-900">削除</button>
+                                                <button @click="deleteUser(user.id)" class="inline-flex items-center rounded bg-red-100 px-3 py-1 text-sm font-medium text-red-700 hover:bg-red-200">削除</button>
                                             </div>
                                         </td>
                                     </tr>
