@@ -59,6 +59,21 @@ class ProjectJobAssignment extends Model
         // removed desired_start_date, starts_at, ends_at from dates
     ];
 
+    // sender_id = user_id → 自己割当（旧 project_job_assignment_by_myself）
+    public function scopeSelfAssigned($query)
+    {
+        return $query->whereColumn('sender_id', 'user_id');
+    }
+
+    // sender_id ≠ user_id または sender_id IS NULL → Coordinator 割当
+    public function scopeCoordinatorAssigned($query)
+    {
+        return $query->where(function ($q) {
+            $q->whereColumn('sender_id', '!=', 'user_id')
+              ->orWhereNull('sender_id');
+        });
+    }
+
     public function sender()
     {
         return $this->belongsTo(User::class, 'sender_id');
