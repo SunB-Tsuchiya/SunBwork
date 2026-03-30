@@ -169,8 +169,20 @@ class UserController extends Controller
     public function edit(User $user)
     {
         $this->requireAdminPermission('user_management');
+
+        $companies = Company::with(['departments' => function ($q) {
+            $q->with(['assignments' => function ($q2) {
+                $q2->where('active', true);
+            }]);
+        }])->where('active', true)->get();
+
+        $positionTitles = PositionTitle::orderBy('sort_order')->get()->groupBy('applicable_role');
+
         return Inertia::render('Admin/Users/Edit', [
-            'user' => $user,
+            'user'         => $user,
+            'companies'    => $companies,
+            'adminTitles'  => $positionTitles->get('admin',  collect())->values(),
+            'leaderTitles' => $positionTitles->get('leader', collect())->values(),
         ]);
     }
 
@@ -180,12 +192,6 @@ class UserController extends Controller
     public function update(Request $request, User $user)
     {
         $this->requireAdminPermission('user_management');
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|lowercase|email|max:255|unique:users,email,' . $user->id,
-            'assignment' => 'required|string|max:255',
-            'user_role' => 'required|string',
-        ]);
 
         // 非 superadmin が user_role を 'admin' に変更できないようサーバー側でガード
         $current = Auth::user();
@@ -194,12 +200,50 @@ class UserController extends Controller
                 ->with('error', '管理者への昇格は許可されていません。');
         }
 
-        $user->update([
-            'name' => $request->name,
-            'email' => $request->email,
-            'assignment' => $request->assignment,
-            'user_role' => $request->user_role,
-        ]);
+        $rules = [
+            'name'        => 'required|string|max:255',
+            'email'       => 'required|string|lowercase|email|max:255|unique:users,email,' . $user->id,
+            'user_role'   => 'required|string|in:admin,leader,coordinator,user',
+            'company_id'  => 'required|exists:companies,id',
+            'department_id' => 'required|exists:departments,id',
+            'assignment_id' => 'required|exists:assignments,id',
+            'employment_type' => 'nullable|string|in:regular,contract,dispatch,outsource',
+            'position_title_id' => 'nullable|exists:position_titles,id',
+        ];
+
+        // パスワードは入力があれば変更
+        if ($request->filled('password')) {
+            $rules['password'] = ['required', 'confirmed', Rules\Password::defaults()];
+        }
+
+        $request->validate($rules);
+
+        $updateData = [
+            'name'              => $request->name,
+            'email'             => $request->email,
+            'user_role'         => $request->user_role,
+            'company_id'        => $request->company_id,
+            'department_id'     => $request->department_id,
+            'assignment_id'     => $request->assignment_id,
+            'employment_type'   => $request->input('employment_type', 'regular'),
+            'position_title_id' => $request->input('position_title_id') ?: null,
+        ];
+
+        if ($request->filled('password')) {
+            $updateData['password'] = Hash::make($request->password);
+        }
+
+        $user->update($updateData);
+
+        // 会社・部署チームの同期
+        $companyTeam    = Team::where('company_id', $request->company_id)->where('team_type', 'company')->first();
+        $departmentTeam = Team::where('department_id', $request->department_id)->first();
+        $role = ($request->user_role === 'admin') ? 'admin' : 'viewer';
+
+        $syncTeams = [];
+        if ($companyTeam)    $syncTeams[$companyTeam->id]    = ['role' => $role];
+        if ($departmentTeam) $syncTeams[$departmentTeam->id] = ['role' => $role];
+        if ($syncTeams) $user->teams()->sync($syncTeams);
 
         return redirect()->route('admin.users.index')
             ->with('success', 'ユーザー情報が更新されました。');
