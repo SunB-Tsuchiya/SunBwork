@@ -33,13 +33,13 @@ const user = page.props.user;
                 <div>
                     <label class="block text-sm font-medium text-gray-700">会社・部署</label>
                     <p class="mt-1 text-sm text-gray-900">
-                        {{ user?.current_team?.company_name || '未設定' }}
-                        <span v-if="user?.current_team?.department_name"> - {{ user.current_team.department_name }}</span>
+                        {{ user?.company?.name || user?.current_team?.company_name || '未設定' }}
+                        <span v-if="user?.department?.name || user?.current_team?.department_name"> - {{ user?.department?.name || user?.current_team?.department_name }}</span>
                     </p>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700">担当</label>
-                    <p class="mt-1 text-sm text-gray-900">{{ user?.role || '未設定' }}</p>
+                    <p class="mt-1 text-sm text-gray-900">{{ user?.assignment?.name || '未設定' }}</p>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700">権限レベル</label>

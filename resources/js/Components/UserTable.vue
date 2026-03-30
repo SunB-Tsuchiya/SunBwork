@@ -247,12 +247,12 @@ const sortedUsers = computed(() => {
                         }}</span>
                     </td>
                     <td class="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
-                        <div class="flex justify-end space-x-2">
-                            <Link :href="route('admin.users.show', user.id)" class="text-blue-600 hover:text-blue-900">詳細</Link>
-                            <span v-if="showActions">
-                                <Link :href="route('admin.users.edit', user.id)" class="text-yellow-600 hover:text-yellow-900">編集</Link>
-                                <button @click="deleteUser(user.id)" class="text-red-600 hover:text-red-900">削除</button>
-                            </span>
+                        <div class="flex justify-end gap-2">
+                            <Link :href="route('admin.users.show', user.id)" class="inline-flex items-center rounded bg-blue-100 px-3 py-1 text-sm font-medium text-blue-700 hover:bg-blue-200">詳細</Link>
+                            <template v-if="showActions">
+                                <Link :href="route('admin.users.edit', user.id)" class="inline-flex items-center rounded bg-yellow-100 px-3 py-1 text-sm font-medium text-yellow-700 hover:bg-yellow-200">編集</Link>
+                                <button @click="deleteUser(user.id)" class="inline-flex items-center rounded bg-red-100 px-3 py-1 text-sm font-medium text-red-700 hover:bg-red-200">削除</button>
+                            </template>
                         </div>
                     </td>
                 </tr>
