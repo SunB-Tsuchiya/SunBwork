@@ -122,7 +122,8 @@ class ClientController extends Controller
         $role = Auth::user()->user_role ?? 'leader';
         return match ($role) {
             'admin', 'superadmin' => 'admin',
-            default => 'leader',
+            'coordinator'         => 'coordinator',
+            default               => 'leader',
         };
     }
 

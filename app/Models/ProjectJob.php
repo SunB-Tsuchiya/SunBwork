@@ -29,6 +29,12 @@ class ProjectJob extends Model
         return $this->belongsTo(User::class);
     }
 
+    // サブCoordinator（リーダー以外の共同管理者）
+    public function coordinators()
+    {
+        return $this->belongsToMany(User::class, 'project_job_coordinators');
+    }
+
     public function client()
     {
         return $this->belongsTo(Client::class);

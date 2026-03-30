@@ -28,7 +28,7 @@ const isDepartmentLeader = computed(() => page.props.auth?.user?.isDepartmentLea
     <div class="mb-6">
         <nav class="flex flex-wrap gap-2" aria-label="Tabs">
             <Link
-                v-if="isDepartmentLeader && can('user_management')"
+                v-if="isDepartmentLeader"
                 :href="route('leader.user_management.index')"
                 :class="tab('user_management')"
             >

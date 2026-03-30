@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Leader;
 
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Concerns\ChecksLeaderPermission;
 use App\Models\Assignment;
 use App\Models\PositionTitle;
 use App\Models\Team;
@@ -16,8 +15,6 @@ use Inertia\Inertia;
 
 class UserManagementController extends Controller
 {
-    use ChecksLeaderPermission;
-
     /**
      * 部署リーダーチームを取得。該当しない場合は 403。
      */
@@ -39,7 +36,6 @@ class UserManagementController extends Controller
     /** ユーザー一覧（同部署のみ） */
     public function index()
     {
-        $this->requireLeaderPermission('user_management');
         $deptTeam = $this->getDeptTeam();
 
         $users = User::where('company_id', Auth::user()->company_id)
@@ -62,7 +58,6 @@ class UserManagementController extends Controller
     /** 新規ユーザー登録フォーム */
     public function create()
     {
-        $this->requireLeaderPermission('user_management');
         $deptTeam = $this->getDeptTeam();
 
         $assignments = Assignment::where('department_id', $deptTeam->department_id)
@@ -82,7 +77,6 @@ class UserManagementController extends Controller
     /** ユーザー登録処理 */
     public function store(Request $request)
     {
-        $this->requireLeaderPermission('user_management');
         $deptTeam = $this->getDeptTeam();
         $leader   = Auth::user();
 
@@ -137,7 +131,6 @@ class UserManagementController extends Controller
     /** 編集フォーム */
     public function edit(User $user)
     {
-        $this->requireLeaderPermission('user_management');
         $deptTeam = $this->getDeptTeam();
 
         if ($user->department_id !== $deptTeam->department_id) {
@@ -162,7 +155,6 @@ class UserManagementController extends Controller
     /** 更新処理 */
     public function update(Request $request, User $user)
     {
-        $this->requireLeaderPermission('user_management');
         $deptTeam = $this->getDeptTeam();
 
         if ($user->department_id !== $deptTeam->department_id) {
@@ -198,7 +190,6 @@ class UserManagementController extends Controller
     /** 一覧編集モードからの一括保存 */
     public function bulkUpdate(Request $request)
     {
-        $this->requireLeaderPermission('user_management');
         $deptTeam = $this->getDeptTeam();
 
         $request->validate([

@@ -13,7 +13,11 @@ const props = defineProps({
 const page = usePage();
 const role = computed(() => page.props.auth?.user?.user_role ?? 'leader');
 const isSuperAdmin = computed(() => role.value === 'superadmin');
-const routePrefix = computed(() => ['admin', 'superadmin'].includes(role.value) ? 'admin' : 'leader');
+const routePrefix = computed(() => {
+    if (['admin', 'superadmin'].includes(role.value)) return 'admin';
+    if (role.value === 'coordinator') return 'coordinator';
+    return 'leader';
+});
 
 const form = useForm({
     csv_file:   null,

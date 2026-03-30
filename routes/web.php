@@ -426,6 +426,13 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     ->group(function () {
         Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
 
+        // クライアント管理（Coordinator用）
+        Route::get('clients/csv/upload', [App\Http\Controllers\ClientController::class, 'csvUpload'])->name('clients.csv.upload');
+        Route::post('clients/csv/preview', [App\Http\Controllers\ClientController::class, 'csvPreview'])->name('clients.csv.preview');
+        Route::post('clients/csv/store', [App\Http\Controllers\ClientController::class, 'csvStore'])->name('clients.csv.store');
+        Route::get('clients/csv/sample', [App\Http\Controllers\ClientController::class, 'csvSampleDownload'])->name('clients.csv.sample');
+        Route::resource('clients', App\Http\Controllers\ClientController::class)->only(['index', 'create', 'store', 'edit', 'update']);
+
         // Project_job CRUD
         Route::get('project_jobs', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'index'])->name('project_jobs.index');
         Route::get('project_jobs/create', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'create'])->name('project_jobs.create');

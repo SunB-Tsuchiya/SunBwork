@@ -37,9 +37,10 @@ function getJobboxLink() {
 <template>
     <div class="mb-6">
         <nav class="flex space-x-8" aria-label="Tabs">
+            <Link :href="route('coordinator.clients.index')" :class="tab('clients')"> クライアント管理 </Link>
             <Link :href="getAssignmentsLink()" :class="tab('projects')"> 案件一覧 </Link>
-            <Link :href="getCalendarLink()" :class="tab('calendar')"> 案件カレンダー </Link>
             <Link :href="getJobboxLink()" :class="tab('jobs')"> ジョブ一覧 </Link>
+            <Link :href="getCalendarLink()" :class="tab('calendar')"> 案件カレンダー </Link>
         </nav>
     </div>
 </template>

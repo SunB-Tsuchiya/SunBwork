@@ -33,11 +33,25 @@
                     <div v-if="form.errors.title" class="mt-1 text-sm text-red-600">{{ form.errors.title }}</div>
                 </div>
                 <div class="mb-4">
-                    <label class="mb-1 block font-semibold">担当ユーザー</label>
-                    <input v-model="form.user_name" type="text" class="w-full rounded border bg-gray-100 px-3 py-2" readonly />
-                    <div v-if="form.errors.user_id || form.errors.coordinator_id" class="mt-1 text-sm text-red-600">
-                        {{ form.errors.user_id || form.errors.coordinator_id }}
+                    <label class="mb-1 block font-semibold">リーダー（代表Coordinator）</label>
+                    <select v-model="form.user_id" class="w-full rounded border px-3 py-2" required>
+                        <option value="" disabled>選択してください</option>
+                        <option v-for="c in props.coordinatorCandidates" :key="c.id" :value="c.id">{{ c.name }}</option>
+                    </select>
+                    <div v-if="form.errors.user_id" class="mt-1 text-sm text-red-600">{{ form.errors.user_id }}</div>
+                </div>
+                <div class="mb-4">
+                    <label class="mb-1 block font-semibold">サブCoordinator（複数可）</label>
+                    <div class="rounded border px-3 py-2 max-h-40 overflow-y-auto space-y-1">
+                        <template v-for="c in subCandidates" :key="c.id">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" :value="c.id" v-model="form.sub_coordinator_ids" class="rounded" />
+                                <span>{{ c.name }}</span>
+                            </label>
+                        </template>
+                        <p v-if="subCandidates.length === 0" class="text-sm text-gray-400">候補なし</p>
                     </div>
+                    <div v-if="form.errors.sub_coordinator_ids" class="mt-1 text-sm text-red-600">{{ form.errors.sub_coordinator_ids }}</div>
                 </div>
                 <div class="mb-4">
                     <label class="mb-1 block font-semibold">クライアント</label>
@@ -127,20 +141,29 @@
 import DialogModal from '@/Components/DialogModal.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { router, useForm, usePage } from '@inertiajs/vue3';
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
+
+const props = defineProps({
+    coordinatorCandidates: { type: Array, default: () => [] },
+});
 
 const page = usePage();
 const form = useForm({
     jobcode: '',
     title: '',
     user_id: page.props.auth.user.id,
-    user_name: page.props.auth.user.name,
+    sub_coordinator_ids: [],
     client_id: '',
     client_name: '',
     detail: '',
     teammember: null,
     schedule: null,
 });
+
+// リーダーとして選択中のユーザーを除いたサブCo候補
+const subCandidates = computed(() =>
+    props.coordinatorCandidates.filter((c) => c.id !== form.user_id),
+);
 
 const jobcodeError = ref('');
 function validateJobcode(e) {
@@ -224,9 +247,8 @@ function selectClient(client) {
 const errorLabels = {
     jobcode: '伝票番号',
     title: '案件タイトル',
-    user_id: '担当ユーザーID',
-    user_name: '担当ユーザー',
-    coordinator_id: '担当ユーザー',
+    user_id: 'リーダー',
+    sub_coordinator_ids: 'サブCoordinator',
     client_id: 'クライアントID',
     client_name: 'クライアント名',
     detail: '詳細',

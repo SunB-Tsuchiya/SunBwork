@@ -6,7 +6,9 @@ import { computed } from 'vue';
 const page = usePage();
 const routePrefix = computed(() => {
     const role = page.props.auth?.user?.user_role ?? 'leader';
-    return ['admin', 'superadmin'].includes(role) ? 'admin' : 'leader';
+    if (['admin', 'superadmin'].includes(role)) return 'admin';
+    if (role === 'coordinator') return 'coordinator';
+    return 'leader';
 });
 
 const form = useForm({

@@ -222,18 +222,21 @@ function roleNavClass(role) {
     return `${base} ${currentRouteContext.value === role ? activeMap[role] : inactiveMap[role]}`;
 }
 
-// compute active key for coordinator tabs (projects vs jobs)
+// compute active key for coordinator tabs
 const computeCoordinatorActive = () => {
     try {
         const r = route().current();
         if (!r) return '';
+        // clients routes → clients tab
+        if (r.startsWith('coordinator.clients')) return 'clients';
         // jobbox routes → jobs tab
         if (r.includes('jobbox')) return 'jobs';
         // assignments routes → jobs tab
         if (r.includes('assignments')) return 'jobs';
+        // calendar → calendar tab
+        if (r.includes('calendar')) return 'calendar';
         // explicit project_jobs routes (index/show/create/edit) → projects tab
         if (r.match(/^coordinator\.project_jobs\.(index|show|create|edit|store|update|destroy|complete)$/)) return 'projects';
-        // no match (e.g. dashboard) → no tab active
         return '';
     } catch (e) {
         return '';
@@ -603,10 +606,22 @@ const currentRouteContext = computed(() => {
                         <!-- Coordinator sub-tabs -->
                         <template v-else-if="currentRouteContext === 'coordinator'">
                             <ResponsiveNavLink
+                                :href="route('coordinator.clients.index')"
+                                :active="route().current('coordinator.clients.*')"
+                            >
+                                <span class="text-green-600">クライアント管理</span>
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink
                                 :href="route('coordinator.project_jobs.index')"
                                 :active="route().current('coordinator.project_jobs.*')"
                             >
                                 <span class="text-green-600">案件一覧</span>
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink
+                                :href="route('coordinator.project_jobs.calendar')"
+                                :active="route().current('coordinator.project_jobs.calendar')"
+                            >
+                                <span class="text-green-600">案件カレンダー</span>
                             </ResponsiveNavLink>
                         </template>
 

@@ -15,8 +15,23 @@
                     <input v-model="form.title" type="text" class="w-full rounded border px-3 py-2" required />
                 </div>
                 <div class="mb-4">
-                    <label class="mb-1 block font-semibold">担当ユーザー</label>
-                    <input v-model="form.user_name" type="text" class="w-full rounded border bg-gray-100 px-3 py-2" readonly />
+                    <label class="mb-1 block font-semibold">リーダー（代表Coordinator）</label>
+                    <select v-model="form.user_id" class="w-full rounded border px-3 py-2" required>
+                        <option value="" disabled>選択してください</option>
+                        <option v-for="c in props.coordinatorCandidates" :key="c.id" :value="c.id">{{ c.name }}</option>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label class="mb-1 block font-semibold">サブCoordinator（複数可）</label>
+                    <div class="rounded border px-3 py-2 max-h-40 overflow-y-auto space-y-1">
+                        <template v-for="c in subCandidates" :key="c.id">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" :value="c.id" v-model="form.sub_coordinator_ids" class="rounded" />
+                                <span>{{ c.name }}</span>
+                            </label>
+                        </template>
+                        <p v-if="subCandidates.length === 0" class="text-sm text-gray-400">候補なし</p>
+                    </div>
                 </div>
                 <div class="mb-4">
                     <label class="mb-1 block font-semibold">クライアント</label>
@@ -71,15 +86,11 @@
 
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Link, router, useForm, usePage } from '@inertiajs/vue3';
+import { Link, router, useForm } from '@inertiajs/vue3';
 import { computed } from 'vue';
-const props = defineProps({ job: Object });
-const page = usePage();
-// user_idからユーザー名を取得
-const userName = computed(() => {
-    if (props.job.user && props.job.user.name) return props.job.user.name;
-    if (page.props.user && page.props.user.id === props.job.user_id) return page.props.user.name;
-    return '';
+const props = defineProps({
+    job: Object,
+    coordinatorCandidates: { type: Array, default: () => [] },
 });
 function decodeField(val, fallback = '') {
     if (val === null || val === undefined) return fallback;
@@ -108,7 +119,7 @@ const form = useForm({
     jobcode: props.job.jobcode || '',
     title: props.job.title || props.job.name || '',
     user_id: props.job.user_id || '',
-    user_name: userName.value,
+    sub_coordinator_ids: props.job.sub_coordinator_ids || [],
     client_id: props.job.client_id || '',
     client_name: props.job.client?.name || '',
     // support both { "text": "..." } JSON and plain text
@@ -121,6 +132,11 @@ const form = useForm({
     teammember: decodedTeammember || null,
     schedule: decodedSchedule || null,
 });
+// リーダーとして選択中のユーザーを除いたサブCo候補
+const subCandidates = computed(() =>
+    props.coordinatorCandidates.filter((c) => c.id !== form.user_id),
+);
+
 function submit() {
     form.put(route('coordinator.project_jobs.update', { projectJob: props.job.id }));
 }

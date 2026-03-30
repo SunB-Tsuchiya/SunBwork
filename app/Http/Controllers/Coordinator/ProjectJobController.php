@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Coordinator;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\ProjectJob;
+use App\Models\User;
+use Illuminate\Support\Arr;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Log;
 
@@ -17,7 +19,10 @@ class ProjectJobController extends Controller
         $period = $request->input('period', '');
 
         $query = ProjectJob::with('client')
-            ->where('user_id', $user->id);
+            ->where(function ($q) use ($user) {
+                $q->where('user_id', $user->id)
+                    ->orWhereHas('coordinators', fn ($c) => $c->where('users.id', $user->id));
+            });
 
         if ($q) {
             $query->where(function ($q2) use ($q) {
@@ -55,10 +60,31 @@ class ProjectJobController extends Controller
         ]);
     }
 
+    /**
+     * ログインユーザーがこの案件のCoordinator（リーダーまたはサブCo）かどうか判定
+     */
+    private function isJobCoordinator(ProjectJob $job, User $user): bool
+    {
+        if ($job->user_id === $user->id) {
+            return true;
+        }
+        return $job->coordinators()->where('users.id', $user->id)->exists();
+    }
+
+    /**
+     * Coordinator候補（coordinator ロールの全ユーザー）を返す
+     */
+    private function coordinatorCandidates(): \Illuminate\Support\Collection
+    {
+        return User::where('user_role', 'coordinator')
+            ->orderBy('name')
+            ->get(['id', 'name']);
+    }
+
     public function complete(Request $request, ProjectJob $projectJob)
     {
         $user = $request->user();
-        if (!$user || $projectJob->user_id !== $user->id) {
+        if (!$user || !$this->isJobCoordinator($projectJob, $user)) {
             return response()->json(['error' => 'Access denied'], 403);
         }
         $projectJob->completed = true;
@@ -68,28 +94,36 @@ class ProjectJobController extends Controller
 
     public function create()
     {
-        return Inertia::render('Coordinator/ProjectJobs/Create');
+        return Inertia::render('Coordinator/ProjectJobs/Create', [
+            'coordinatorCandidates' => $this->coordinatorCandidates(),
+        ]);
     }
 
     public function store(Request $request)
     {
-
-
         try {
             $data = $request->validate([
-                'jobcode' => ['nullable', 'string', 'max:255', 'regex:/^[0-9\-]+$/'],
-                'title' => 'required|string|max:255',
-                'user_id' => 'required|exists:users,id',
-                'client_id' => 'required|exists:clients,id',
-                'detail' => 'nullable|string',
+                'jobcode'             => ['nullable', 'string', 'max:255', 'regex:/^[0-9\-]+$/'],
+                'title'               => 'required|string|max:255',
+                'user_id'             => 'required|exists:users,id',
+                'client_id'           => 'required|exists:clients,id',
+                'detail'              => 'nullable|string',
+                'sub_coordinator_ids' => 'nullable|array',
+                'sub_coordinator_ids.*' => 'exists:users,id',
             ]);
-            // detailはプレーンテキストで保存
+
+            $subIds = Arr::pull($data, 'sub_coordinator_ids', []);
             $job = ProjectJob::create($data);
-            // 新規作成時はメンバー/スケジュール未設定のため案内を出す
-            $registerFlags = ['teammember', 'schedule'];
+
+            // リーダー自身はピボットに入れない（重複回避）
+            $syncIds = array_values(array_filter($subIds, fn ($id) => $id != $job->user_id));
+            if (!empty($syncIds)) {
+                $job->coordinators()->sync($syncIds);
+            }
+
             return redirect()->route('coordinator.project_jobs.show', $job->id)
                 ->with('jobid', $job->id)
-                ->with('register_flags', $registerFlags);
+                ->with('register_flags', ['teammember', 'schedule']);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return redirect()->back()
                 ->withErrors($e->validator)
@@ -102,7 +136,7 @@ class ProjectJobController extends Controller
         $jobid = session('jobid');
         $registerFlags = session('register_flags', []);
         // reload projectJob with team members and their user relation, and also ensure user and client relations are loaded
-        $projectJob->load(['teamMembers.user', 'user', 'client']);
+        $projectJob->load(['teamMembers.user', 'user', 'client', 'coordinators']);
         $members = $projectJob->teamMembers->map(function ($m) {
             return [
                 'id' => $m->id,
@@ -242,8 +276,11 @@ class ProjectJobController extends Controller
                 'created_at'       => $a->created_at?->format('Y-m-d'),
             ]);
 
+        $subCoordinators = $projectJob->coordinators->map(fn ($c) => ['id' => $c->id, 'name' => $c->name]);
+
         return Inertia::render('Coordinator/ProjectJobs/Show', [
             'job' => $projectJob,
+            'subCoordinators' => $subCoordinators,
             'members' => $members,
             'jobid' => $jobid,
             'registerFlags' => $registerFlags,
@@ -369,9 +406,7 @@ class ProjectJobController extends Controller
 
     public function edit(ProjectJob $projectJob)
     {
-        // Ensure team members (and their user relation) are loaded so the Edit page
-        // receives the same `teammember` shape as the Show page expects.
-        $projectJob->load(['teamMembers.user', 'user', 'client']);
+        $projectJob->load(['teamMembers.user', 'user', 'client', 'coordinators']);
 
         $members = $projectJob->teamMembers->map(function ($m) {
             return [
@@ -386,10 +421,15 @@ class ProjectJobController extends Controller
             ];
         });
 
-        // pass job as an array merged with teammember so client sees `job.teammember`
-        $jobArray = array_merge($projectJob->toArray(), ['teammember' => $members]);
+        $jobArray = array_merge($projectJob->toArray(), [
+            'teammember'          => $members,
+            'sub_coordinator_ids' => $projectJob->coordinators->pluck('id')->toArray(),
+        ]);
 
-        return Inertia::render('Coordinator/ProjectJobs/Edit', ['job' => $jobArray]);
+        return Inertia::render('Coordinator/ProjectJobs/Edit', [
+            'job'                  => $jobArray,
+            'coordinatorCandidates' => $this->coordinatorCandidates(),
+        ]);
     }
 
     /**
@@ -407,15 +447,23 @@ class ProjectJobController extends Controller
     {
         try {
             $data = $request->validate([
-                'jobcode' => ['nullable', 'string', 'max:255', 'regex:/^[0-9\-]+$/'],
-                'title' => 'required|string|max:255',
-                'user_id' => 'required|exists:users,id',
-                'client_id' => 'required|exists:clients,id',
-                'detail' => 'nullable|string',
-                'schedule' => 'nullable|array',
+                'jobcode'               => ['nullable', 'string', 'max:255', 'regex:/^[0-9\-]+$/'],
+                'title'                 => 'required|string|max:255',
+                'user_id'               => 'required|exists:users,id',
+                'client_id'             => 'required|exists:clients,id',
+                'detail'                => 'nullable|string',
+                'schedule'              => 'nullable|array',
+                'sub_coordinator_ids'   => 'nullable|array',
+                'sub_coordinator_ids.*' => 'exists:users,id',
             ]);
-            // detailはプレーンテキストで保存
+
+            $subIds = Arr::pull($data, 'sub_coordinator_ids', []);
             $projectJob->update($data);
+
+            // リーダー自身はピボットに入れない
+            $syncIds = array_values(array_filter($subIds, fn ($id) => $id != $projectJob->user_id));
+            $projectJob->coordinators()->sync($syncIds);
+
             return redirect()->route('coordinator.project_jobs.index');
         } catch (\Illuminate\Validation\ValidationException $e) {
             return redirect()->back()

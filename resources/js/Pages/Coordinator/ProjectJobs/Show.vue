@@ -26,7 +26,10 @@
                     </h1>
                     <p class="mt-1 text-xs text-gray-500">
                         <span v-if="job.jobcode">伝票番号: {{ job.jobcode }}　</span>
-                        <span v-if="job.user?.name">担当: {{ job.user.name }}</span>
+                        <span v-if="job.user?.name">リーダー: {{ job.user.name }}</span>
+                    </p>
+                    <p v-if="subCoordinators.length > 0" class="mt-0.5 text-xs text-gray-400">
+                        サブCo: {{ subCoordinators.map((c) => c.name).join('、') }}
                     </p>
                 </div>
 
@@ -295,6 +298,7 @@ const hasScheduleFlag = computed(() =>
 
 const members   = page.props.members || [];
 const hasMembers = computed(() => Array.isArray(members) && members.length > 0);
+const subCoordinators = computed(() => page.props.subCoordinators || []);
 
 // Confirm prompt after initial creation
 onMounted(() => {
