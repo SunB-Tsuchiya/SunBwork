@@ -75,8 +75,9 @@ const initEcho = () => {
 
 // CSRF cookie を取得してから Echo を初期化する（race を防ぐ）
 // REVERB キーが設定されており、かつ wss://localhost への接続でない場合のみ Echo を初期化する
-const basePath = import.meta.env.VITE_APP_BASE_PATH || '';
-const csrfUrl  = basePath + '/sanctum/csrf-cookie';
+// NOTE: axios.defaults.baseURL には VITE_APP_BASE_PATH 分のパスが含まれている。
+// そのため URL に再度 basePath を付けると /members/members/... と二重になる。
+const csrfUrl  = '/sanctum/csrf-cookie';
 const echoHost = import.meta.env.VITE_REVERB_HOST?.replace(/"/g, '') || '';
 const echoEnabled = import.meta.env.VITE_REVERB_APP_KEY && echoHost && echoHost !== 'localhost';
 
