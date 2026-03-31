@@ -353,10 +353,10 @@ class JobBoxController extends Controller
         $periodParam = $request->query('period');
         $usePeriodFilter = true;
         $periodModel = $periodParam;
-        if ($periodParam === null) {
-            $periodModel = now()->format('Y-m');
-        } elseif ($periodParam === '' || $periodParam === 'all') {
+        if ($periodParam === null || $periodParam === '' || $periodParam === 'all') {
+            // デフォルト: 全期間表示
             $usePeriodFilter = false;
+            $periodModel = 'all';
         }
 
         $periodStart = null;
@@ -366,9 +366,8 @@ class JobBoxController extends Controller
                 $periodStart = Carbon::createFromFormat('Y-m', $periodModel)->startOfMonth();
                 $periodEnd = Carbon::createFromFormat('Y-m', $periodModel)->endOfMonth();
             } catch (\Throwable $__e) {
-                $periodModel = now()->format('Y-m');
-                $periodStart = Carbon::createFromFormat('Y-m', $periodModel)->startOfMonth();
-                $periodEnd = Carbon::createFromFormat('Y-m', $periodModel)->endOfMonth();
+                $usePeriodFilter = false;
+                $periodModel = 'all';
             }
         }
         $sort = $request->input('sort');
