@@ -32,6 +32,11 @@ return Application::configure(basePath: dirname(__DIR__))
             AddLinkHeadersForPreloadedAssets::class,
         ]);
 
+        // CSRF 除外: api/jobbox/*/read は auth:sanctum で保護済みのため safe
+        $middleware->validateCsrfTokens(except: [
+            'api/jobbox/*/read',
+        ]);
+
         $middleware->alias([
             'superadmin'     => \App\Http\Middleware\SuperadminMiddleware::class,
             'admin'          => \App\Http\Middleware\AdminMiddleware::class,
