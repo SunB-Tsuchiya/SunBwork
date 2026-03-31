@@ -90,7 +90,7 @@ const jobLink = computed(() => {
         }
 
         // Fallback to a literal path that maps to Pages/JobBox/Index.vue in the SPA router
-        return '/jobbox';
+        return '/coordinator/jobbox';
     } catch (e) {
         // final fallback
     }

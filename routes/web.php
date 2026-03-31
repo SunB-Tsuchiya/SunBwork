@@ -96,9 +96,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     // 日ごと勤務形態設定
     Route::post('/user/daily-worktypes', [App\Http\Controllers\User\UserDailyWorktypeController::class, 'store'])->name('user.daily_worktypes.store');
 
-    // Shortcut route: global JobBox - coordinator-only. User-specific jobbox is
-    // available at /user/jobbox.
-    Route::get('/jobbox', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'global'])
+    // Coordinator JobBox - accessible at /coordinator/jobbox
+    Route::get('/coordinator/jobbox', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'global'])
         ->middleware('coordinator')
         ->name('coordinator.jobbox');
 
@@ -107,7 +106,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
         ->name('user.jobbox.index');
 
     // JobBox: mark an assignment as completed (accessible by any authenticated user for their own assignments)
-    Route::post('/jobbox/assignments/{assignment}/complete', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'completeAssignment'])
+    Route::post('/coordinator/jobbox/assignments/{assignment}/complete', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'completeAssignment'])
         ->name('user.jobbox.assignments.complete');
 
     // MyJobBox: user-scoped JobBox page (personal messages/assignments)

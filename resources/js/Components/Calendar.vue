@@ -390,7 +390,7 @@ function goToAssignedJobs() {
         // ignore
     }
     // fallback literal path
-    router.get('/jobbox');
+    router.get('/coordinator/jobbox');
 }
 
 onMounted(() => {

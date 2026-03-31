@@ -401,11 +401,11 @@ function clearSearch() {
 function getBackLink() {
     const pjId = props.projectJob?.id;
     try {
-        if (!pjId) return '/jobbox';
+        if (!pjId) return '/coordinator/jobbox';
         if (page.props.auth.user?.isCoordinator) return route('coordinator.project_jobs.show', { projectJob: pjId });
         return route('project_jobs.show', { projectJob: pjId });
     } catch {
-        return '/jobbox';
+        return '/coordinator/jobbox';
     }
 }
 

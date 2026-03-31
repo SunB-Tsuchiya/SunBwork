@@ -249,9 +249,9 @@ function routeBack() {
                 `/coordinator/project_jobs/${projectJob.id}`,
             );
         }
-        return safeRoute('user.project_jobs.jobbox.index', { projectJob: projectJob?.id }, '/jobbox');
+        return safeRoute('user.project_jobs.jobbox.index', { projectJob: projectJob?.id }, '/coordinator/jobbox');
     } catch (e) {
-        return '/jobbox';
+        return '/coordinator/jobbox';
     }
 }
 

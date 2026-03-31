@@ -29,7 +29,7 @@ function getJobboxLink() {
     try {
         return route('coordinator.jobbox');
     } catch (e) {
-        return '/jobbox';
+        return '/coordinator/jobbox';
     }
 }
 </script>
