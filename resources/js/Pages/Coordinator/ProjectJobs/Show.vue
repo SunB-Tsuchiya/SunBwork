@@ -207,12 +207,22 @@
                                 {{ group.label }}
                                 <span class="ml-2 text-xs font-normal text-gray-500">{{ group.items.length }} 件</span>
                             </div>
-                            <table class="min-w-full border">
+                            <table class="w-full table-fixed border" style="min-width: 960px;">
+                                <colgroup>
+                                    <col style="width: 100px"> <!-- 発信者 -->
+                                    <col style="width: 100px"> <!-- 受信者 -->
+                                    <col style="width: 140px"> <!-- 締め切り -->
+                                    <col style="width: 15%">   <!-- タイトル -->
+                                    <col style="width: 130px"> <!-- クライアント -->
+                                    <col style="width: 160px"> <!-- 案件名 -->
+                                    <col style="width: 56px">  <!-- 既読 -->
+                                    <col style="width: 88px">  <!-- ステータス -->
+                                </colgroup>
                                 <thead>
                                     <tr class="bg-gray-50">
-                                        <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">送受信</th>
-                                        <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">相手</th>
-                                        <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">時間</th>
+                                        <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">発信者</th>
+                                        <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">受信者</th>
+                                        <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">締め切り</th>
                                         <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">タイトル</th>
                                         <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">クライアント</th>
                                         <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">案件名</th>
@@ -228,20 +238,12 @@
                                         @click.prevent="historyRowClick(m, $event)"
                                         role="button"
                                     >
-                                        <td class="border px-3 py-2">
-                                            <span class="inline-flex items-center gap-1">
-                                                <span
-                                                    :class="historyIsSentByMe(m) ? 'bg-blue-500' : 'bg-gray-400'"
-                                                    class="inline-block h-3 w-3 rounded-full"
-                                                ></span>
-                                                <span class="text-xs text-gray-600">{{ historyIsSentByMe(m) ? '送信' : '受信' }}</span>
-                                            </span>
-                                        </td>
-                                        <td class="border px-3 py-2 text-sm text-gray-700">{{ historyGetCounterparty(m) }}</td>
-                                        <td class="border px-3 py-2 text-sm text-gray-600">{{ historyGetStartTime(m) }}</td>
-                                        <td class="border px-3 py-2 text-sm">{{ m.subject || (m.body && m.body.slice(0, 60)) }}</td>
-                                        <td class="border px-3 py-2 text-sm text-gray-600">{{ job.client?.name || '-' }}</td>
-                                        <td class="border px-3 py-2 text-sm text-gray-600">{{ job.title || job.name || '-' }}</td>
+                                        <td class="break-words border px-3 py-2 text-sm text-gray-700">{{ historyGetSender(m) }}</td>
+                                        <td class="break-words border px-3 py-2 text-sm text-gray-700">{{ historyGetRecipients(m) }}</td>
+                                        <td class="break-words whitespace-pre-line border px-3 py-2 text-sm text-gray-600">{{ historyGetDeadline(m) }}</td>
+                                        <td class="break-words border px-3 py-2 text-sm">{{ m.subject || (m.body && m.body.slice(0, 60)) }}</td>
+                                        <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ job.client?.name || '-' }}</td>
+                                        <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ job.title || job.name || '-' }}</td>
                                         <td class="border px-3 py-2">
                                             <template v-if="historyIsUnread(m)">
                                                 <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">未読</span>
@@ -490,6 +492,43 @@ function statusBadgeClass(status) {
 function historyIsSentByMe(m) {
     const authId = page.props.auth?.user?.id;
     return authId && m.sender?.id && authId === m.sender.id;
+}
+
+function historyGetSender(m) {
+    try {
+        return m.sender?.name || m.message?.fromUser?.name || '-';
+    } catch {
+        return '-';
+    }
+}
+
+function historyGetRecipients(m) {
+    try {
+        const recs = m.message && Array.isArray(m.message.recipients) ? m.message.recipients : [];
+        if (recs.length) {
+            const names = recs.map((r) => r.user?.name || r.name || null).filter(Boolean);
+            if (names.length) return names.join(', ');
+        }
+        if (m.project_job_assignment?.user?.name) return m.project_job_assignment.user.name;
+        return '-';
+    } catch {
+        return '-';
+    }
+}
+
+function historyGetDeadline(m) {
+    try {
+        const date = m.project_job_assignment?.desired_end_date || null;
+        if (!date) return '-';
+        const parts = String(date).split('T')[0].split('-');
+        if (parts.length !== 3) return String(date).split('T')[0];
+        const formatted = `${parts[0]}/${parts[1]}/${parts[2]}`;
+        const time = m.project_job_assignment?.start_time || m.project_job_assignment?.desired_time || '';
+        if (time) return `${formatted}\n${String(time).slice(0, 5)}`;
+        return formatted;
+    } catch {
+        return '-';
+    }
 }
 
 function historyGetCounterparty(m) {
