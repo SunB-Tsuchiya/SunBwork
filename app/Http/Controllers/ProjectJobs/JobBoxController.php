@@ -802,8 +802,10 @@ class JobBoxController extends Controller
         if (! $isPrivileged) {
             abort(403, 'Access denied.');
         }
-        if ($message->sender_id && $user->id !== $message->sender_id) {
-            abort(403, '作成者以外は編集できません。');
+        $isSenderOrLeader = ($message->sender_id && $user->id === $message->sender_id)
+            || $user->isLeader() || $user->isAdmin() || $user->isSuperAdmin();
+        if (! $isSenderOrLeader) {
+            abort(403, '作成者またはリーダー以外は編集できません。');
         }
 
         $message->load([
@@ -824,8 +826,10 @@ class JobBoxController extends Controller
         if (! $isPrivileged) {
             abort(403, 'Access denied.');
         }
-        if ($message->sender_id && $user->id !== $message->sender_id) {
-            abort(403, '作成者以外は編集できません。');
+        $isSenderOrLeader = ($message->sender_id && $user->id === $message->sender_id)
+            || $user->isLeader() || $user->isAdmin() || $user->isSuperAdmin();
+        if (! $isSenderOrLeader) {
+            abort(403, '作成者またはリーダー以外は編集できません。');
         }
 
         $data = $request->validate([

@@ -134,11 +134,10 @@
 
                         <!-- Coordinator: edit/delete buttons -->
                         <template v-if="isPrivilegedUser">
-                            <Link
-                                v-if="isSender"
-                                :href="safeRoute('coordinator.project_jobs.jobbox.edit', { projectJob: projectJob?.id, message: message?.id })"
+                            <button
                                 class="rounded bg-yellow-500 px-4 py-2 text-white hover:bg-yellow-600"
-                            >編集</Link>
+                                @click.prevent="editMessage"
+                            >編集</button>
                             <button
                                 class="rounded bg-red-500 px-4 py-2 text-white hover:bg-red-600"
                                 @click.prevent="deleteMessage"
@@ -405,12 +404,30 @@ const isSender = computed(() => {
     }
 });
 
+// 送信者またはリーダー以上は編集・削除可能
+const canEditDelete = computed(() => {
+    try {
+        const u = page.props.auth?.user;
+        if (!u) return false;
+        return isSender.value || u.isLeader || u.isAdmin || u.isSuperAdmin;
+    } catch (e) {
+        return false;
+    }
+});
+
+function editMessage() {
+    if (!canEditDelete.value) {
+        alert('作成者またはリーダー以外は編集できません。');
+        return;
+    }
+    router.visit(
+        safeRoute('coordinator.project_jobs.jobbox.edit', { projectJob: projectJob?.id, message: message?.id }),
+    );
+}
+
 function deleteMessage() {
-    // 送信者以外は削除不可
-    const authUserId = page.props.auth?.user?.id;
-    const senderId = message?.sender_id;
-    if (authUserId && senderId && authUserId !== senderId) {
-        alert('作成者以外は削除できません。');
+    if (!canEditDelete.value) {
+        alert('作成者またはリーダー以外は削除できません。');
         return;
     }
     if (!confirm('このメッセージを本当に削除しますか？この操作は取り消せません。')) return;
