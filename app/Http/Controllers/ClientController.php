@@ -210,6 +210,91 @@ class ClientController extends Controller
             ->with('success', "「{$clientName}」の案件をすべて「{$mergeIntoName}」に移し、統合しました。");
     }
 
+    /** 重複チェック（登録・編集前のフロント呼び出し用 JSON エンドポイント） */
+    public function checkDuplicate(Request $request)
+    {
+        $this->requireAdminPermission('client_management');
+        $this->requireLeaderPermission('client_management');
+
+        $request->validate([
+            'name'       => 'required|string|max:255',
+            'exclude_id' => 'nullable|integer',
+        ]);
+
+        $inputNormalized = $this->normalizeClientName($request->name);
+
+        $user  = Auth::user();
+        $query = Client::select('id', 'name');
+
+        if (!($user && $user->user_role === 'superadmin')) {
+            $query->forCompany($user->company_id ?? null);
+        }
+        if ($request->filled('exclude_id')) {
+            $query->where('id', '!=', (int) $request->exclude_id);
+        }
+
+        $duplicates = $query->get()
+            ->filter(fn($c) => $this->normalizeClientName($c->name) === $inputNormalized)
+            ->map(fn($c) => ['id' => $c->id, 'name' => $c->name])
+            ->values();
+
+        return response()->json(['duplicates' => $duplicates]);
+    }
+
+    /**
+     * クライアント名を正規化して重複比較用文字列を返す。
+     *
+     * 変換内容:
+     *  1. 全角英数字・スペースを半角に変換
+     *  2. 法人格（株式会社・有限会社など、前後どちらでも）を除去
+     *  3. スペース・中黒を除去
+     *  4. 小文字化
+     */
+    private function normalizeClientName(string $name): string
+    {
+        // 全角英数字・スペース → 半角
+        $name = mb_convert_kana($name, 'as', 'UTF-8');
+
+        // 除去する法人格リスト（長い順に並べて部分一致を防ぐ）
+        $suffixes = [
+            '特定非営利活動法人',
+            '公益社団法人',
+            '公益財団法人',
+            '一般社団法人',
+            '一般財団法人',
+            '医療法人社団',
+            '医療法人財団',
+            '株式会社',
+            '有限会社',
+            '合同会社',
+            '合資会社',
+            '合名会社',
+            '医療法人',
+            '学校法人',
+            '宗教法人',
+            '（株）',
+            '(株)',
+            '（有）',
+            '(有)',
+            '㈱',
+            '㈲',
+        ];
+
+        foreach ($suffixes as $suffix) {
+            $quoted = preg_quote($suffix, '/');
+            $name   = preg_replace('/^' . $quoted . '/u', '', $name);
+            $name   = preg_replace('/' . $quoted . '$/u', '', $name);
+        }
+
+        // スペース・全角スペース・中黒を除去
+        $name = preg_replace('/[\s　・]+/u', '', $name);
+
+        // 小文字化（英字対応）
+        $name = mb_strtolower($name, 'UTF-8');
+
+        return $name;
+    }
+
     /** ルートプレフィックスをロールから解決 */
     private function routePrefix(): string
     {
