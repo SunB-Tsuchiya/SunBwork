@@ -91,13 +91,18 @@ function onBack() {
     try {
         if (props.diary_id) {
             const p = typeof window !== 'undefined' && window.location && window.location.pathname ? window.location.pathname : '';
-            const parts = p.split('/').filter(Boolean);
-            const prefix = parts.length && (parts[0] === 'leader' || parts[0] === 'admin' || parts[0] === 'admin2') ? `/${parts[0]}` : '';
+            // /members/leader/... のようなベースパス付きにも対応
+            const prefixMatch = p.match(/\/(leader|admin|admin2)(\/|$)/);
+            const prefix = prefixMatch ? prefixMatch[1] : '';
             if (prefix) {
-                window.location.href = `${prefix}/diaryinteractions/${props.diary_id}`;
-                return;
+                try {
+                    window.location.href = route(`${prefix}.diaryinteractions.show`, { diary: props.diary_id });
+                    return;
+                } catch (e) { /* fall through */ }
             }
-            window.location.href = `/diaryinteractions/interactions?diary=${encodeURIComponent(props.diary_id)}`;
+            try {
+                window.location.href = route('diaryinteractions.interactions.index');
+            } catch (e) { /* ignore */ }
             return;
         }
     } catch (e) {
@@ -106,9 +111,9 @@ function onBack() {
 
     // Final fallback
     try {
-        window.location.href = '/diaryinteractions/interactions';
+        window.location.href = route('diaryinteractions.interactions.index');
     } catch (e) {
-        /* ignore */
+        window.location.href = '/diaryinteractions/interactions';
     }
 }
 

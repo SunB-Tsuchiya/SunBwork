@@ -372,7 +372,7 @@ async function rowClick(m, event) {
                         const evId = ev.id || ev.event_id || ev.extendedProps?.event_id || ev.extendedProps?.id;
                         if (evId) {
                             try { router.get(typeof route === 'function' ? route('events.show', evId) : '/events/' + evId); return; } catch {}
-                            try { window.location.href = '/events/' + evId; return; } catch {}
+                            try { window.location.href = route('events.show', { event: evId }); return; } catch {}
                         }
                     }
                 }

@@ -81,7 +81,7 @@ const formattedDate = computed(() => {
 
 function routeForIndex(date) {
     const prefix = props.routePrefix || 'diaries';
-    if (prefix === 'diaries') return 'diaryinteractions.index';
+    if (prefix === 'diaries') return 'diaryinteractions.interactions.index';
     return `${prefix}.diaryinteractions.index`;
 }
 
@@ -138,7 +138,7 @@ function markRead() {
                 const indexRouteName = prefix === 'diaries' ? 'diaryinteractions.index' : `${prefix}.diaryinteractions.index`;
                 window.location.href = route(indexRouteName);
             } catch (e) {
-                window.location.href = '/diaryinteractions/interactions';
+                window.location.href = route('diaryinteractions.interactions.index');
             }
         } catch (e) {
             console.error('markRead fetch error', e);
@@ -149,7 +149,7 @@ function markRead() {
 function goIndex() {
     // Navigate back to the diary interactions index for the given prefix
     const prefix = props.routePrefix || 'diaries';
-    const routeName = prefix === 'diaries' ? 'diaryinteractions.index' : `${prefix}.diaryinteractions.index`;
+    const routeName = prefix === 'diaries' ? 'diaryinteractions.interactions.index' : `${prefix}.diaryinteractions.index`;
     try {
         // prefer Ziggy route resolution when available on the page
         const url = route(routeName);
@@ -159,10 +159,11 @@ function goIndex() {
         // fallback to explicit prefix paths
     }
 
-    let redirectUrl = `/diaryinteractions/interactions`;
-    if (prefix === 'admin') redirectUrl = route('admin.diaryinteractions.index');
-    else if (prefix === 'leader') redirectUrl = route('leader.diaryinteractions.index');
-    window.location.href = redirectUrl;
+    try {
+        window.location.href = route('diaryinteractions.interactions.index');
+    } catch (e) {
+        window.location.href = '/diaryinteractions/interactions';
+    }
 }
 
 // --- events timetable state for interactions show (read-only) ---
@@ -209,12 +210,15 @@ function onTimelineOpenEdit(payload) {
     const id = payload.id;
     try {
         // include diary id so the event show page can render a back link
-        const url = route('diaryinteractions.events.show', { event: id }) + `?diary=${encodeURIComponent(props.diary.id)}`;
+        const url = route('diaryinteractions.diaryinteractions.events.show', { event: id }) + `?diary=${encodeURIComponent(props.diary.id)}`;
         window.location.href = url;
         return;
     } catch (e) {
-        // fallback to prefixed path
-        window.location.href = `/diaryinteractions/events/${id}`;
+        try {
+            window.location.href = route('diaryinteractions.interactions.index');
+        } catch (e2) {
+            window.location.href = '/diaryinteractions/interactions';
+        }
         return;
     }
 }

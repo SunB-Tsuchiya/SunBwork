@@ -305,7 +305,7 @@ function search() {
         const params = new URLSearchParams();
         params.set('q', page.props.q_model || '');
         params.set('period', page.props.period_model === undefined ? '' : page.props.period_model);
-        window.location.href = `/myjobbox?${params.toString()}`;
+        window.location.href = route('user.myjobbox.index') + '?' + params.toString();
     }
 }
 
@@ -364,7 +364,7 @@ async function rowClick(m, event) {
                         const evId = ev.id || ev.event_id || ev.extendedProps?.event_id || ev.extendedProps?.id;
                         if (evId) {
                             try { router.get(typeof route === 'function' ? route('events.show', evId) : '/events/' + evId); return; } catch {}
-                            try { window.location.href = '/events/' + evId; return; } catch {}
+                            try { window.location.href = route('events.show', { event: evId }); return; } catch {}
                         }
                     }
                 }

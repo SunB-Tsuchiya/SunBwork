@@ -144,14 +144,21 @@ function onTimelineOpenCreate(payload) {
             );
             return;
         } catch (e) {
-            window.location.href = `/events/create?date=${encodeURIComponent(formatJstDate(props.diary.date))}&startHour=${hh}&startMinute=${mm}&endHour=${String(Math.min(23, parseInt(hh) + 1)).padStart(2, '0')}&endMinute=${mm}&return_to=${encodeURIComponent(current)}`;
+            window.location.href = route('events.create', {
+                date: formatJstDate(props.diary.date),
+                startHour: hh,
+                startMinute: mm,
+                endHour: String(Math.min(23, parseInt(hh) + 1)).padStart(2, '0'),
+                endMinute: mm,
+                return_to: current,
+            });
             return;
         }
     }
     try {
         router.get(route('events.create', { date: formatJstDate(props.diary.date), return_to: current }));
     } catch (e) {
-        window.location.href = `/events/create?date=${encodeURIComponent(formatJstDate(props.diary.date))}&return_to=${encodeURIComponent(current)}`;
+        window.location.href = route('events.create', { date: formatJstDate(props.diary.date), return_to: current });
     }
 }
 
@@ -163,7 +170,7 @@ function onTimelineOpenEdit(payload) {
         try {
             router.get(route('events.show', { event: id }));
         } catch (e) {
-            window.location.href = `/events/${id}`;
+            window.location.href = route('events.show', { event: id });
         }
         return;
     }
@@ -177,7 +184,7 @@ function onTimelineOpenEdit(payload) {
                 router.get(route('events.edit', { event: id, startHour: hh, startMinute: mm, return_to: current }));
                 return;
             } catch (e) {
-                window.location.href = `/events/${id}/edit?startHour=${hh}&startMinute=${mm}`;
+                window.location.href = route('events.edit', { event: id, startHour: hh, startMinute: mm });
                 return;
             }
         }
@@ -185,7 +192,7 @@ function onTimelineOpenEdit(payload) {
     try {
         router.get(route('events.edit', { event: id }));
     } catch (e) {
-        window.location.href = `/events/${id}/edit`;
+        window.location.href = route('events.edit', { event: id });
     }
 }
 
@@ -720,7 +727,7 @@ function openEventModal(ev, mouseEvent) {
                     router.get(route('events.edit', { event: id, startHour: hh, startMinute: mm, return_to: current }));
                     return;
                 } catch (e) {
-                    window.location.href = `/events/${id}/edit?startHour=${hh}&startMinute=${mm}&return_to=${encodeURIComponent(current)}`;
+                    window.location.href = route('events.edit', { event: id, startHour: hh, startMinute: mm });
                     return;
                 }
             }
@@ -729,7 +736,7 @@ function openEventModal(ev, mouseEvent) {
             router.get(route('events.edit', { event: id }));
             return;
         } catch (e) {
-            window.location.href = `/events/${id}/edit`;
+            window.location.href = route('events.edit', { event: id });
             return;
         }
     }
@@ -779,7 +786,14 @@ function createFromSelect() {
         );
     } catch (e) {
         // fallback to setting window.location (ensure current is encoded)
-        window.location.href = `/events/create?date=${encodeURIComponent(formatJstDate(props.diary.date))}&startHour=${hh}&startMinute=${mm}&endHour=${endH}&endMinute=${endM}&return_to=${encodeURIComponent(current)}`;
+        window.location.href = route('events.create', {
+            date: formatJstDate(props.diary.date),
+            startHour: hh,
+            startMinute: mm,
+            endHour: endH,
+            endMinute: endM,
+            return_to: current,
+        });
     }
 }
 
@@ -996,7 +1010,7 @@ async function endDrag(e) {
         try {
             router.get(route('events.edit', { event: id }));
         } catch (err) {
-            window.location.href = `/events/${id}/edit`;
+            window.location.href = route('events.edit', { event: id });
         }
         dragging.value = false;
         draggingEventId.value = null;

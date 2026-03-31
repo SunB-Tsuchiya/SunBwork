@@ -436,7 +436,7 @@ async function exportConversation() {
             // open download in new tab
             window.open(res.data.url, '_blank');
         } else if (res && res.data && res.data.filename) {
-            window.location.href = '/bot/export/download/' + encodeURIComponent(res.data.filename);
+            window.location.href = route('bot.export.download', { filename: res.data.filename });
         } else {
             alert('エクスポートに失敗しました。');
         }

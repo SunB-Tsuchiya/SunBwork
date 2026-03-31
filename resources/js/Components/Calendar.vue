@@ -809,7 +809,7 @@ const calendarOptions = computed(() => ({
                         router.get(route('diaries.show', { diary: info.event.extendedProps.diary_id }));
                     } catch (e) {
                         // Ziggy route may not be available in some contexts - fallback to a safe URL
-                        window.location.href = `/diaries/${info.event.extendedProps.diary_id}`;
+                        window.location.href = route('diaries.show', { diary: info.event.extendedProps.diary_id });
                     }
                     return;
                 }
@@ -832,7 +832,7 @@ const calendarOptions = computed(() => ({
                         try {
                             router.get(route('events.show', { event: evId }));
                         } catch (e) {
-                            window.location.href = `/events/${evId}`;
+                            window.location.href = route('events.show', { event: evId });
                         }
                         return;
                     }
@@ -854,7 +854,7 @@ const calendarOptions = computed(() => ({
                             // Prefer navigating to the explicit event id
                             router.get(route('events.show', { event: explicitEvId }));
                         } catch (e) {
-                            window.location.href = `/events/${explicitEvId}`;
+                            window.location.href = route('events.show', { event: explicitEvId });
                         }
                         return;
                     }
@@ -862,7 +862,7 @@ const calendarOptions = computed(() => ({
                         // Quick existence probe: try HEAD first, then GET as a fallback if HEAD isn't supported.
                         let exists = false;
                         try {
-                            const headResp = await fetch(`/events/${jid}`, { method: 'HEAD', credentials: 'same-origin' });
+                            const headResp = await fetch(route('events.show', { event: jid }), { method: 'HEAD', credentials: 'same-origin' });
                             exists = headResp.ok;
                         } catch (headErr) {
                             exists = false;
@@ -870,7 +870,7 @@ const calendarOptions = computed(() => ({
 
                         if (!exists) {
                             try {
-                                const getResp = await fetch(`/events/${jid}`, { method: 'GET', credentials: 'same-origin' });
+                                const getResp = await fetch(route('events.show', { event: jid }), { method: 'GET', credentials: 'same-origin' });
                                 exists = getResp.ok;
                             } catch (getErr) {
                                 exists = false;
@@ -881,7 +881,7 @@ const calendarOptions = computed(() => ({
                             try {
                                 router.get(route('events.show', { event: jid }));
                             } catch (e) {
-                                window.location.href = `/events/${jid}`;
+                                window.location.href = route('events.show', { event: jid });
                             }
                         } else {
                             try {
@@ -890,7 +890,7 @@ const calendarOptions = computed(() => ({
                                 try {
                                     router.get(route('assigned-jobs.show', { id: jid }));
                                 } catch (e2) {
-                                    window.location.href = `/assigned-jobs/${jid}`;
+                                    window.location.href = route('user.assigned-jobs.show', { id: jid });
                                 }
                             }
                         }
@@ -899,7 +899,7 @@ const calendarOptions = computed(() => ({
                         try {
                             router.get(route('assigned-jobs.show', { id: jid }));
                         } catch (e) {
-                            window.location.href = `/assigned-jobs/${jid}`;
+                            window.location.href = route('user.assigned-jobs.show', { id: jid });
                         }
                     }
                     return;
@@ -926,7 +926,7 @@ const calendarOptions = computed(() => ({
                     try {
                         router.get(route('events.show', { event: evId }));
                     } catch (e) {
-                        window.location.href = `/events/${evId}`;
+                        window.location.href = route('events.show', { event: evId });
                     }
                 }
             }

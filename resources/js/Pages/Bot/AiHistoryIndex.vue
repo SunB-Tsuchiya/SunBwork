@@ -320,10 +320,9 @@ function confirmDelete(id) {
 
 function goToShow(id) {
     try {
-        Inertia.visit(`/bot/chat?load_conversation=${id}`);
+        Inertia.visit(route('bot.chat', { load_conversation: id }));
     } catch (e) {
-        // fallback
-        window.location.href = `/bot/chat?load_conversation=${id}`;
+        window.location.href = route('bot.chat', { load_conversation: id });
     }
 }
 </script>

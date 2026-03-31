@@ -368,7 +368,7 @@ async function submitComplete() {
             try {
                 router.get(typeof route === 'function' ? route('user.myjobbox.index') : '/myjobbox');
             } catch (e) {
-                window.location.href = '/myjobbox';
+                window.location.href = route('user.myjobbox.index');
             }
         } else {
             isSubmittingComplete.value = false;
