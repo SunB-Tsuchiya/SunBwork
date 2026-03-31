@@ -103,15 +103,15 @@ function markRead() {
 
     (async () => {
         try {
-            const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
-            const csrf = match ? decodeURIComponent(match[1]) : null;
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
             const res = await fetch(target, {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: {
                     'Content-Type': 'application/json',
-                    ...(csrf ? { 'X-XSRF-TOKEN': csrf } : {}),
+                    'X-CSRF-TOKEN': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest',
                 },
                 body: JSON.stringify({ comment: comment.value }),
             });
