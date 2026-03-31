@@ -858,7 +858,9 @@ class JobBoxController extends Controller
 
         $message->delete();
 
-        return redirect()->back()->with('success', 'メッセージを削除しました。');
+        return redirect()->route('coordinator.project_jobs.jobbox.index', [
+            'projectJob' => $projectJob->id,
+        ])->with('success', 'メッセージを削除しました。');
     }
 
     public function store(ProjectJob $projectJob, Request $request)

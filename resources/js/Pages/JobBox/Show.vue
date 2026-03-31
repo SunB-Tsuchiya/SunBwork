@@ -392,12 +392,21 @@ const isPrivilegedUser = computed(() => {
 });
 
 function deleteMessage() {
+    // 送信者以外は削除不可
+    const authUserId = page.props.auth?.user?.id;
+    const senderId = message?.sender_id;
+    if (authUserId && senderId && authUserId !== senderId) {
+        alert('作成者以外は削除できません。');
+        return;
+    }
     if (!confirm('このメッセージを本当に削除しますか？この操作は取り消せません。')) return;
     router.delete(
         safeRoute('coordinator.project_jobs.jobbox.destroy', { projectJob: projectJob?.id, message: message?.id }),
         {
             onSuccess: () => {
-                router.visit(safeRoute('coordinator.project_jobs.show', { projectJob: projectJob?.id }, `/coordinator/project_jobs/${projectJob?.id}`));
+                router.visit(
+                    safeRoute('coordinator.project_jobs.jobbox.index', { projectJob: projectJob?.id }, `/coordinator/project_jobs/${projectJob?.id}/jobbox`),
+                );
             },
             onError: (errors) => {
                 console.error('deleteMessage error', errors);
