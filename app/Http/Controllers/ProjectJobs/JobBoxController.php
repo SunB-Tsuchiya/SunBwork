@@ -232,7 +232,14 @@ class JobBoxController extends Controller
             ->where(function ($qry) use ($user) {
                 $qry->where('project_job_assignments.user_id', $user->id)
                     ->orWhere('job_assignment_messages.sender_id', $user->id)
-                    ->orWhere('project_jobs.user_id', $user->id);
+                    ->orWhere('project_jobs.user_id', $user->id)
+                    // 副リーダー（サブCo）: project_job_coordinators に登録された案件の全ジョブ履歴を表示
+                    ->orWhereExists(function ($sub) use ($user) {
+                        $sub->select(DB::raw(1))
+                            ->from('project_job_coordinators')
+                            ->whereColumn('project_job_coordinators.project_job_id', 'project_jobs.id')
+                            ->where('project_job_coordinators.user_id', $user->id);
+                    });
             });
 
         if ($q) {
@@ -272,7 +279,13 @@ class JobBoxController extends Controller
             ->where(function ($qry) use ($user) {
                 $qry->where('project_job_assignments.user_id', $user->id)
                     ->orWhere('job_assignment_messages.sender_id', $user->id)
-                    ->orWhere('project_jobs.user_id', $user->id);
+                    ->orWhere('project_jobs.user_id', $user->id)
+                    ->orWhereExists(function ($sub) use ($user) {
+                        $sub->select(DB::raw(1))
+                            ->from('project_job_coordinators')
+                            ->whereColumn('project_job_coordinators.project_job_id', 'project_jobs.id')
+                            ->where('project_job_coordinators.user_id', $user->id);
+                    });
             })
             ->selectRaw("DATE_FORMAT(COALESCE(project_job_assignments.desired_end_date, job_assignment_messages.created_at), '%Y-%m') as ym")
             ->groupBy('ym')
