@@ -481,4 +481,54 @@ class ProjectJobController extends Controller
         // Inertiaリダイレクト時にフロントでリロードを促すため、フラッシュメッセージを渡す
         return redirect()->route('coordinator.project_jobs.index')->with('reload', true);
     }
+
+    /**
+     * 案件名の重複チェック（登録前のフロント呼び出し用 JSON エンドポイント）
+     * 同一クライアントで類似タイトルが存在する場合に返す（警告のみ、保存は任意）
+     */
+    public function checkDuplicate(\Illuminate\Http\Request $request)
+    {
+        $request->validate([
+            'title'      => 'required|string|max:255',
+            'client_id'  => 'required|integer|exists:clients,id',
+            'exclude_id' => 'nullable|integer',
+        ]);
+
+        $inputNormalized = $this->normalizeTitle($request->title);
+        $clientId        = (int) $request->client_id;
+
+        $query = ProjectJob::where('client_id', $clientId)
+            ->select('id', 'title', 'created_at');
+
+        if ($request->filled('exclude_id')) {
+            $query->where('id', '!=', (int) $request->exclude_id);
+        }
+
+        $duplicates = $query->get()
+            ->filter(fn($j) => $this->normalizeTitle($j->title) === $inputNormalized)
+            ->map(fn($j) => [
+                'id'         => $j->id,
+                'title'      => $j->title,
+                'created_at' => $j->created_at?->format('Y年n月'),
+            ])
+            ->values();
+
+        return response()->json(['duplicates' => $duplicates]);
+    }
+
+    /**
+     * 案件タイトルを正規化して重複比較用文字列を返す。
+     * - 全角英数字・スペース → 半角
+     * - スペース・中黒・記号を除去
+     * - 小文字化
+     */
+    private function normalizeTitle(string $title): string
+    {
+        // 全角英数字・スペース → 半角
+        $title = mb_convert_kana($title, 'as', 'UTF-8');
+        // スペース・全角スペース・中黒を除去
+        $title = preg_replace('/[\s　・\-_]+/u', '', $title);
+        // 小文字化
+        return mb_strtolower($title, 'UTF-8');
+    }
 }

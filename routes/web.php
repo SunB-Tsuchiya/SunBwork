@@ -449,6 +449,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('project_jobs/past-assignments', [App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'pastData'])->name('project_jobs.past_assignments');
         Route::get('project_jobs/assignment-select', [App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'selectProject'])->name('project_jobs.assignment_select');
         Route::get('project_jobs/calendar', [App\Http\Controllers\Coordinator\ProjectJobsCalendarController::class, 'index'])->name('project_jobs.calendar');
+        Route::post('project_jobs/check-duplicate', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'checkDuplicate'])->name('project_jobs.check_duplicate');
         Route::post('project_jobs', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'store'])->name('project_jobs.store');
         Route::post('project_jobs/{projectJob}/complete', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'complete'])->name('project_jobs.complete');
         Route::get('project_jobs/{projectJob}', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'show'])->name('project_jobs.show');

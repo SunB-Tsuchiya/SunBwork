@@ -134,6 +134,46 @@
                 </template>
             </DialogModal>
         </div>
+
+        <!-- 案件名重複チェック警告モーダル -->
+        <DialogModal :show="showDuplicateModal" @close="closeDuplicateModal">
+            <template #title>
+                <span class="flex items-center gap-2 text-yellow-700">
+                    <svg class="h-5 w-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                    </svg>
+                    類似案件が見つかりました
+                </span>
+            </template>
+            <template #content>
+                <div class="space-y-3">
+                    <p class="text-sm text-gray-700">同一クライアントに似た名前の案件がすでに登録されています。</p>
+                    <ul class="divide-y divide-yellow-100 rounded border border-yellow-200 bg-yellow-50">
+                        <li v-for="job in duplicateJobs" :key="job.id" class="flex items-center justify-between px-3 py-2 text-sm">
+                            <span class="font-medium text-gray-800">{{ job.title }}</span>
+                            <span class="ml-3 whitespace-nowrap text-xs text-gray-500">{{ job.created_at }}</span>
+                        </li>
+                    </ul>
+                    <p class="text-sm text-gray-600">タイトルを変えるか、そのまま登録するか選択してください。</p>
+                </div>
+            </template>
+            <template #footer>
+                <div class="flex w-full justify-between">
+                    <button
+                        class="rounded bg-gray-200 px-4 py-2 text-sm text-gray-700 hover:bg-gray-300"
+                        @click="closeDuplicateModal"
+                    >
+                        閉じる（タイトルを変更する）
+                    </button>
+                    <button
+                        class="rounded bg-orange-500 px-4 py-2 text-sm text-white hover:bg-orange-600"
+                        @click="forceSubmit"
+                    >
+                        それでも登録する
+                    </button>
+                </div>
+            </template>
+        </DialogModal>
     </AppLayout>
 </template>
 
@@ -254,7 +294,16 @@ const errorLabels = {
     detail: '詳細',
 };
 
-function submit() {
+// ===== 案件名重複チェック =====
+const showDuplicateModal = ref(false);
+const duplicateJobs = ref([]);
+const isCheckingDuplicate = ref(false);
+
+function closeDuplicateModal() {
+    showDuplicateModal.value = false;
+}
+
+async function submit() {
     // jobcode は未入力を許可。入力がある場合は数字とハイフンのみ許可する。
     if (form.jobcode && !/^[0-9\-]+$/.test(form.jobcode)) {
         jobcodeError.value = '数字とハイフンのみ入力できます';
@@ -262,6 +311,42 @@ function submit() {
         return;
     }
 
+    // クライアントと案件タイトルが揃っている場合のみ重複チェック
+    if (form.client_id && form.title) {
+        isCheckingDuplicate.value = true;
+        try {
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+            const res = await fetch(route('coordinator.project_jobs.check_duplicate'), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'X-CSRF-TOKEN': csrf,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({ title: form.title, client_id: form.client_id }),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.duplicates && data.duplicates.length > 0) {
+                    duplicateJobs.value = data.duplicates;
+                    showDuplicateModal.value = true;
+                    isCheckingDuplicate.value = false;
+                    return; // ユーザーの選択待ち
+                }
+            }
+        } catch {
+            // チェック失敗時はそのまま保存続行
+        } finally {
+            isCheckingDuplicate.value = false;
+        }
+    }
+
+    doSubmit();
+}
+
+function doSubmit() {
     // teammember/scheduleはnullで送信
     form.teammember = null;
     form.schedule = null;
@@ -281,6 +366,11 @@ function submit() {
             }
         },
     });
+}
+
+function forceSubmit() {
+    closeDuplicateModal();
+    doSubmit();
 }
 
 // If this page was opened with ?project_job_id=123, show a quick link to the calendar PoC
