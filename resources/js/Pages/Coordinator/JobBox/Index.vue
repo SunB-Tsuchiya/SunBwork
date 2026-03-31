@@ -75,12 +75,22 @@
                         <span class="ml-2 text-xs font-normal text-gray-500">{{ group.items.length }} 件</span>
                     </div>
 
-                    <table class="min-w-full border">
+                    <table class="w-full table-fixed border" style="min-width: 820px;">
+                        <colgroup>
+                            <col style="width: 100px"> <!-- 発信者 -->
+                            <col style="width: 100px"> <!-- 受信者 -->
+                            <col style="width: 116px"> <!-- 締め切り -->
+                            <col>                       <!-- タイトル -->
+                            <col style="width: 100px"> <!-- クライアント -->
+                            <col style="width: 130px"> <!-- 案件名 -->
+                            <col style="width: 56px">  <!-- 既読 -->
+                            <col style="width: 88px">  <!-- ステータス -->
+                        </colgroup>
                         <thead>
                             <tr class="bg-gray-50">
-                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">送受信</th>
-                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">相手</th>
-                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">時間</th>
+                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">発信者</th>
+                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">受信者</th>
+                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">締め切り</th>
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">タイトル</th>
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">クライアント</th>
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">案件名</th>
@@ -96,20 +106,12 @@
                                 @click.prevent="rowClick(m, $event)"
                                 role="button"
                             >
-                                <td class="border px-3 py-2">
-                                    <span class="inline-flex items-center gap-1">
-                                        <span
-                                            :class="isSentByMe(m) ? 'bg-blue-500' : 'bg-gray-400'"
-                                            class="inline-block h-3 w-3 rounded-full"
-                                        ></span>
-                                        <span class="text-xs text-gray-600">{{ isSentByMe(m) ? '送信' : '受信' }}</span>
-                                    </span>
-                                </td>
-                                <td class="border px-3 py-2 text-sm text-gray-700">{{ getCounterparty(m) }}</td>
-                                <td class="border px-3 py-2 text-sm text-gray-600">{{ getStartTime(m) }}</td>
-                                <td class="border px-3 py-2 text-sm">{{ m.subject || (m.body && m.body.slice(0, 60)) }}</td>
-                                <td class="border px-3 py-2 text-sm text-gray-600">{{ getClientName(m) }}</td>
-                                <td class="border px-3 py-2 text-sm text-gray-600">{{ getProjectJobTitle(m) }}</td>
+                                <td class="break-words border px-3 py-2 text-sm text-gray-700">{{ getSender(m) }}</td>
+                                <td class="break-words border px-3 py-2 text-sm text-gray-700">{{ getRecipients(m) }}</td>
+                                <td class="break-words whitespace-pre-line border px-3 py-2 text-sm text-gray-600">{{ getDeadline(m) }}</td>
+                                <td class="break-words border px-3 py-2 text-sm">{{ m.subject || (m.body && m.body.slice(0, 60)) }}</td>
+                                <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ getClientName(m) }}</td>
+                                <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ getProjectJobTitle(m) }}</td>
                                 <td class="border px-3 py-2">
                                     <template v-if="isUnread(m)">
                                         <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">未読</span>
@@ -396,6 +398,43 @@ function getMessageLink(m) {
         return route('coordinator.project_jobs.jobbox.show', { projectJob: pjId, message: m.id });
     } catch {
         return '#';
+    }
+}
+
+function getSender(m) {
+    try {
+        return m.sender?.name || m.message?.fromUser?.name || '-';
+    } catch {
+        return '-';
+    }
+}
+
+function getRecipients(m) {
+    try {
+        const recs = m.message && Array.isArray(m.message.recipients) ? m.message.recipients : [];
+        if (recs.length) {
+            const names = recs.map((r) => r.user?.name || r.name || null).filter(Boolean);
+            if (names.length) return names.join(', ');
+        }
+        if (m.project_job_assignment?.user?.name) return m.project_job_assignment.user.name;
+        return '-';
+    } catch {
+        return '-';
+    }
+}
+
+function getDeadline(m) {
+    try {
+        const date = m.project_job_assignment?.desired_end_date || null;
+        if (!date) return '-';
+        const parts = String(date).split('T')[0].split('-');
+        if (parts.length !== 3) return String(date).split('T')[0];
+        const formatted = `${parts[0]}/${parts[1]}/${parts[2]}`;
+        const time = m.project_job_assignment?.start_time || m.project_job_assignment?.desired_time || '';
+        if (time) return `${formatted}\n${String(time).slice(0, 5)}`;
+        return formatted;
+    } catch {
+        return '-';
     }
 }
 
