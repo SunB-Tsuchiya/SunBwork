@@ -636,7 +636,7 @@ function historyRowClick(m, event) {
         const msgId = m.id;
         if (pjId && msgId) {
             router.visit(
-                route('coordinator.project_jobs.jobbox.show', { projectJob: pjId, message: msgId }),
+                route('coordinator.project_jobs.jobbox.show', { projectJob: pjId, message: msgId }) + '?from=project',
                 { preserveState: false },
             );
         }

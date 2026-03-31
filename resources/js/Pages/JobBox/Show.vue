@@ -256,6 +256,15 @@ function routeBack() {
         const user = page.props.auth?.user;
         const isPrivileged = user && (user.isCoordinator || user.isLeader || user.isAdmin || user.isSuperAdmin);
         if (isPrivileged) {
+            // プロジェクト詳細から来た場合はプロジェクト詳細に戻る
+            const fromProject = new URLSearchParams(window.location.search).get('from') === 'project';
+            if (fromProject && projectJob?.id) {
+                return safeRoute(
+                    'coordinator.project_jobs.show',
+                    { projectJob: projectJob.id },
+                    `/coordinator/project_jobs/${projectJob.id}`,
+                );
+            }
             return safeRoute('coordinator.jobbox', {}, '/coordinator/jobbox');
         }
         return safeRoute('user.project_jobs.jobbox.index', { projectJob: projectJob?.id }, '/coordinator/jobbox');
