@@ -65,7 +65,6 @@ class ProjectTeamMembersController extends Controller
     }
     public function create()
     {
-        $members = User::orderBy('created_at', 'desc')->with(['department', 'assignment'])->get();
         $departments = Department::all();
         $assignments = Assignment::all();
         $user = Auth::user();
@@ -73,12 +72,39 @@ class ProjectTeamMembersController extends Controller
         // Allow optional project_job_id to be passed via querystring from previous step
         $projectJobId = request()->query('project_job_id');
 
+        $leaderDepartmentId = null;
+        $preCheckedIds = [];
+
+        if ($projectJobId) {
+            $projectJob = \App\Models\ProjectJob::with(['user', 'coordinators'])->find($projectJobId);
+            if ($projectJob) {
+                // リーダーの部署で絞り込む
+                if ($projectJob->user) {
+                    $leaderDepartmentId = $projectJob->user->department_id;
+                }
+                // リーダーとサブCoordinatorを初期チェック済みにする
+                $preCheckedIds = array_values(array_filter(array_unique(array_merge(
+                    [$projectJob->user_id],
+                    $projectJob->coordinators->pluck('id')->toArray()
+                ))));
+            }
+        }
+
+        // リーダーの部署でメンバーを絞り込む（project_job_idがない場合は全員表示）
+        $membersQuery = User::orderBy('created_at', 'desc')->with(['department', 'assignment']);
+        if ($leaderDepartmentId) {
+            $membersQuery->where('department_id', $leaderDepartmentId);
+        }
+        $members = $membersQuery->get();
+
         return Inertia::render('Coordinator/ProjectTeamMembers/Create', [
             'members' => $members,
             'departments' => $departments,
             'assignments' => $assignments,
             'user' => $user,
             'project_job_id' => $projectJobId,
+            'pre_checked_ids' => $preCheckedIds,
+            'leader_department_id' => $leaderDepartmentId,
         ]);
     }
 }

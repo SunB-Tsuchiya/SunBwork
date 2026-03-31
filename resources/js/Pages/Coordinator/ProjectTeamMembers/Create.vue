@@ -145,12 +145,18 @@ const props = defineProps({
     departments: Array,
     assignments: Array,
     user: Object,
+    pre_checked_ids: { type: Array, default: () => [] },
+    leader_department_id: { type: [Number, String, null], default: null },
 });
 const showSearchModal = ref(false);
 const selectedDepartmentId = ref('');
 const selectedAssignmentId = ref('');
-// ログインユーザーをデフォルト選択
-const selectedMemberIds = ref(props.user ? [props.user.id] : []);
+// リーダー・サブCoordinatorをデフォルト選択（未指定時はログインユーザー）
+const selectedMemberIds = ref(
+    props.pre_checked_ids && props.pre_checked_ids.length > 0
+        ? [...props.pre_checked_ids]
+        : props.user ? [props.user.id] : []
+);
 // If selected_user_ids is passed via querystring (when editing from Show), parse and apply
 try {
     const qp = new URLSearchParams(window.location.search);
