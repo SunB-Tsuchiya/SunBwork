@@ -338,6 +338,35 @@ cd ~/SunBWork && git pull && php artisan migrate && php artisan config:clear && 
 
 **Vite ビルド:** `VITE_APP_BASE_PATH` が空なら `/build/assets/...`、`/members` なら `/members/build/assets/...`。`loadEnv` で読むこと（`process.env` では .env を読まない）。
 
+**ナビゲーションは必ず `route()` を使う（重要）:**
+さくら本番は `/members` ベースパスがあるため、JS 内でのパスをハードコードすると 404 になる。
+
+```js
+// NG: ハードコード（ローカルは動くが本番で 404）
+window.location.href = `/events/${id}`;
+window.location.href = '/myjobbox';
+
+// OK: Ziggy の route() を使う（ベースパスを自動解決）
+window.location.href = route('events.show', { event: id });
+window.location.href = route('user.myjobbox.index');
+router.get(route('events.show', { event: id })); // Inertia 遷移が望ましい
+```
+
+try/catch フォールバックも `route()` を使うこと。catch 内でも `window.location.href = route(...)` とする。
+
+**CSRF トークンは meta tag から取得する（重要）:**
+さくら本番では `XSRF-TOKEN` クッキーが発行されないため、`document.cookie.match(/XSRF-TOKEN=/)` を使う fetch リクエストは全て 419 エラーになる。
+
+```js
+// NG: クッキー方式（さくらで 419）
+const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
+headers: { 'X-XSRF-TOKEN': match ? decodeURIComponent(match[1]) : '' }
+
+// OK: meta tag 方式
+const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' }
+```
+
 ---
 
 ## Migration / Seeder ルール
