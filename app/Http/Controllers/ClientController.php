@@ -7,8 +7,11 @@ use App\Http\Controllers\Concerns\ChecksLeaderPermission;
 use App\Models\Client;
 use App\Models\Company;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Auth;
 
@@ -132,6 +135,79 @@ class ClientController extends Controller
         $client->delete();
         return redirect()->route("{$this->routePrefix()}.clients.index")
             ->with('success', "「{$client->name}」を削除しました。");
+    }
+
+    /** クライアント検索JSON（json エンドポイント：全ロール共用） */
+    public function clientsJson(Request $request)
+    {
+        $this->requireAdminPermission('client_management');
+        $this->requireLeaderPermission('client_management');
+
+        $user  = Auth::user();
+        $query = Client::select('id', 'name');
+
+        if (!($user && $user->user_role === 'superadmin')) {
+            $query->forCompany($user->company_id ?? null);
+        }
+
+        if ($request->filled('id')) {
+            $client = (clone $query)->find((int) $request->id);
+            return $client ? response()->json($client) : response()->json(null, 404);
+        }
+
+        if ($request->filled('name')) {
+            $query->where('name', 'like', '%' . $request->name . '%');
+        }
+
+        return response()->json($query->orderBy('name')->get());
+    }
+
+    /** クライアント統合（merge_into_id に全案件を移して自身を削除） */
+    public function merge(Request $request, Client $client)
+    {
+        $this->requireAdminPermission('client_management');
+        $this->requireLeaderPermission('client_management');
+        $this->authorize('delete', $client);
+
+        $request->validate([
+            'merge_into_id' => [
+                'required',
+                'integer',
+                Rule::exists('clients', 'id'),
+                Rule::notIn([$client->id]),
+            ],
+        ]);
+
+        $mergeIntoId = (int) $request->merge_into_id;
+        $mergeInto   = Client::findOrFail($mergeIntoId);
+
+        // superadmin 以外は同一会社のクライアント間でのみ統合可
+        $user = Auth::user();
+        if ($user->user_role !== 'superadmin') {
+            if ((int) ($mergeInto->company_id ?? 0) !== (int) ($client->company_id ?? 0)) {
+                return back()->with('error', '異なる会社のクライアントには統合できません。');
+            }
+        }
+
+        $clientName   = $client->name;
+        $mergeIntoName = $mergeInto->name;
+
+        DB::transaction(function () use ($client, $mergeInto) {
+            // project_jobs の client_id を移行
+            $client->projectJobs()->update(['client_id' => $mergeInto->id]);
+
+            // job_requests テーブルが存在すれば移行
+            if (Schema::hasTable('job_requests')) {
+                DB::table('job_requests')
+                    ->where('client_id', $client->id)
+                    ->update(['client_id' => $mergeInto->id]);
+            }
+
+            $client->delete();
+        });
+
+        return redirect()->route("{$this->routePrefix()}.clients.index")
+            ->with('success', "「{$clientName}」の案件をすべて「{$mergeIntoName}」に移し、統合しました。");
     }
 
     /** ルートプレフィックスをロールから解決 */

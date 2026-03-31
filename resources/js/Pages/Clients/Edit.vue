@@ -22,9 +22,18 @@ function submit() {
     form.put(route(`${routePrefix.value}.clients.update`, props.client.id));
 }
 
-// 削除モーダル
-const showDeleteModal = ref(false);
+// ===== 削除・統合モーダル =====
+const showModal = ref(false);
+// 'error'=削除ブロック表示  'select'=統合先選択
+const modalStep = ref('error');
 const deleteError = ref(null);
+
+// 統合先選択ステップ用
+const clientList = ref([]);
+const clientNameFilter = ref('');
+const mergeTarget = ref(null);
+const isFetchingClients = ref(false);
+const isMerging = ref(false);
 
 // サーバーから返ってきた削除エラーをウォッチ
 watch(
@@ -32,19 +41,74 @@ watch(
     (val) => {
         if (val) {
             deleteError.value = val;
-            showDeleteModal.value = true;
+            modalStep.value = 'error';
+            showModal.value = true;
         }
     },
     { immediate: true },
 );
 
+function closeModal() {
+    showModal.value = false;
+    modalStep.value = 'error';
+    mergeTarget.value = null;
+    clientNameFilter.value = '';
+}
+
+// 案件なしクライアントの直接削除確認
 function confirmDelete() {
     if (!confirm(`「${props.client.name}」を削除してもよいですか？\nこの操作は取り消せません。`)) return;
     router.delete(route(`${routePrefix.value}.clients.destroy`, props.client.id));
 }
 
-function closeModal() {
-    showDeleteModal.value = false;
+// ===== 統合先選択ステップ =====
+const filteredClients = computed(() => {
+    const q = clientNameFilter.value.trim().toLowerCase();
+    return clientList.value.filter(
+        (c) => c.id !== props.client.id && (!q || c.name.toLowerCase().includes(q)),
+    );
+});
+
+async function openSelectStep() {
+    isFetchingClients.value = true;
+    try {
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+        const res = await fetch(route(`${routePrefix.value}.clients.json`), {
+            headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin',
+        });
+        if (!res.ok) throw new Error('fetch failed');
+        clientList.value = await res.json();
+    } catch {
+        alert('クライアント一覧の取得に失敗しました。ページを再読み込みしてください。');
+        return;
+    } finally {
+        isFetchingClients.value = false;
+    }
+    mergeTarget.value = null;
+    clientNameFilter.value = '';
+    modalStep.value = 'select';
+}
+
+function selectMergeTarget(client) {
+    mergeTarget.value = client;
+}
+
+function executeMerge() {
+    if (!mergeTarget.value) return;
+    const count = deleteError.value?.projectJobCount ?? '';
+    const msg =
+        `「${props.client.name}」の案件 ${count} 件をすべて\n` +
+        `「${mergeTarget.value.name}」に移し、クライアントを削除します。\n\n` +
+        `この操作は取り消せません。よろしいですか？`;
+    if (!confirm(msg)) return;
+
+    isMerging.value = true;
+    router.post(
+        route(`${routePrefix.value}.clients.merge`, props.client.id),
+        { merge_into_id: mergeTarget.value.id },
+        { onFinish: () => { isMerging.value = false; } },
+    );
 }
 </script>
 
@@ -78,60 +142,175 @@ function closeModal() {
             </form>
         </div>
 
-        <!-- 削除ブロックモーダル -->
+        <!-- 削除・統合モーダル -->
         <Teleport to="body">
-            <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center">
+            <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center">
                 <!-- オーバーレイ -->
                 <div class="absolute inset-0 bg-black/50" @click="closeModal" />
 
                 <!-- モーダル本体 -->
-                <div class="relative z-10 w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
-                    <!-- ヘッダー -->
-                    <div class="mb-4 flex items-center gap-3">
-                        <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-red-100">
-                            <svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-                            </svg>
+                <div class="relative z-10 w-full max-w-lg rounded-lg bg-white shadow-xl">
+
+                    <!-- ===== Step: error ===== -->
+                    <template v-if="modalStep === 'error'">
+                        <div class="p-6">
+                            <!-- ヘッダー -->
+                            <div class="mb-4 flex items-center gap-3">
+                                <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-red-100">
+                                    <svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                                    </svg>
+                                </div>
+                                <h3 class="text-lg font-semibold text-gray-900">そのままでは削除できません</h3>
+                            </div>
+
+                            <!-- 本文 -->
+                            <div v-if="deleteError" class="mb-6 space-y-3">
+                                <p class="text-sm text-gray-700">
+                                    クライアント <strong class="text-gray-900">「{{ deleteError.clientName }}」</strong> には
+                                    現在 <strong class="text-red-600">{{ deleteError.projectJobCount }} 件</strong> の案件が紐付いているため削除できません。
+                                </p>
+
+                                <!-- 案件一覧（最大5件） -->
+                                <div class="rounded-md bg-gray-50 p-3">
+                                    <p class="mb-2 text-xs font-medium uppercase tracking-wider text-gray-500">紐付いている案件（一部）</p>
+                                    <ul class="space-y-1">
+                                        <li v-for="(title, i) in deleteError.projectJobTitles" :key="i" class="flex items-center gap-2 text-sm text-gray-700">
+                                            <span class="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-gray-400" />
+                                            {{ title }}
+                                        </li>
+                                    </ul>
+                                    <p v-if="deleteError.projectJobCount > deleteError.projectJobTitles.length" class="mt-2 text-xs text-gray-500">
+                                        ほか {{ deleteError.projectJobCount - deleteError.projectJobTitles.length }} 件…
+                                    </p>
+                                </div>
+
+                                <p class="text-sm text-gray-500">
+                                    別のクライアントへ統合することで削除できます。統合すると紐付いている案件の客先がすべて移行されます。
+                                </p>
+                            </div>
+
+                            <!-- フッター -->
+                            <div class="flex items-center justify-between gap-3">
+                                <button
+                                    type="button"
+                                    :disabled="isFetchingClients"
+                                    class="flex items-center gap-2 rounded bg-orange-600 px-4 py-2 font-bold text-white hover:bg-orange-700 disabled:opacity-60"
+                                    @click="openSelectStep"
+                                >
+                                    <svg v-if="isFetchingClients" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                                    </svg>
+                                    統合先クライアントを選ぶ
+                                </button>
+                                <button
+                                    type="button"
+                                    class="rounded bg-gray-200 px-4 py-2 font-bold text-gray-700 hover:bg-gray-300"
+                                    @click="closeModal"
+                                >
+                                    閉じる
+                                </button>
+                            </div>
                         </div>
-                        <h3 class="text-lg font-semibold text-gray-900">削除できません</h3>
-                    </div>
+                    </template>
 
-                    <!-- 本文 -->
-                    <div v-if="deleteError" class="mb-6 space-y-3">
-                        <p class="text-sm text-gray-700">
-                            クライアント <strong class="text-gray-900">「{{ deleteError.clientName }}」</strong> には
-                            現在 <strong class="text-red-600">{{ deleteError.projectJobCount }} 件</strong> の案件が紐付いているため削除できません。
-                        </p>
+                    <!-- ===== Step: select ===== -->
+                    <template v-if="modalStep === 'select'">
+                        <div class="p-6">
+                            <!-- ヘッダー -->
+                            <div class="mb-4 flex items-center gap-3">
+                                <button type="button" class="flex-shrink-0 rounded p-1 text-gray-500 hover:bg-gray-100" @click="modalStep = 'error'">
+                                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                                    </svg>
+                                </button>
+                                <h3 class="text-lg font-semibold text-gray-900">統合先クライアントを選択</h3>
+                            </div>
 
-                        <!-- 案件一覧（最大5件） -->
-                        <div class="rounded-md bg-gray-50 p-3">
-                            <p class="mb-2 text-xs font-medium uppercase tracking-wider text-gray-500">紐付いている案件（一部）</p>
-                            <ul class="space-y-1">
-                                <li v-for="(title, i) in deleteError.projectJobTitles" :key="i" class="flex items-center gap-2 text-sm text-gray-700">
-                                    <span class="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-gray-400" />
-                                    {{ title }}
-                                </li>
-                            </ul>
-                            <p v-if="deleteError.projectJobCount > deleteError.projectJobTitles.length" class="mt-2 text-xs text-gray-500">
-                                ほか {{ deleteError.projectJobCount - deleteError.projectJobTitles.length }} 件…
-                            </p>
+                            <!-- 移行元の表示 -->
+                            <div class="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                                <span class="font-medium">削除：</span>{{ deleteError?.clientName }}
+                                （案件 {{ deleteError?.projectJobCount }} 件）
+                            </div>
+
+                            <!-- 名前フィルター -->
+                            <div class="mb-3">
+                                <input
+                                    v-model="clientNameFilter"
+                                    type="text"
+                                    placeholder="クライアント名で絞り込み…"
+                                    class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+                                />
+                            </div>
+
+                            <!-- クライアント一覧 -->
+                            <div class="mb-4 max-h-60 overflow-y-auto rounded border border-gray-200">
+                                <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                    <thead class="sticky top-0 bg-gray-50">
+                                        <tr>
+                                            <th class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">ID</th>
+                                            <th class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">クライアント名</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-100 bg-white">
+                                        <tr
+                                            v-for="c in filteredClients"
+                                            :key="c.id"
+                                            class="cursor-pointer transition-colors"
+                                            :class="mergeTarget?.id === c.id ? 'bg-blue-100' : 'hover:bg-blue-50'"
+                                            @click="selectMergeTarget(c)"
+                                        >
+                                            <td class="px-3 py-2 text-gray-500">{{ c.id }}</td>
+                                            <td class="px-3 py-2 font-medium text-gray-900">
+                                                <div class="flex items-center gap-2">
+                                                    <span v-if="mergeTarget?.id === c.id" class="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-blue-500">
+                                                        <svg class="h-2.5 w-2.5 text-white" fill="currentColor" viewBox="0 0 12 12">
+                                                            <path d="M3.707 5.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4a1 1 0 00-1.414-1.414L5 6.586 3.707 5.293z"/>
+                                                        </svg>
+                                                    </span>
+                                                    {{ c.name }}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <tr v-if="filteredClients.length === 0">
+                                            <td colspan="2" class="px-3 py-6 text-center text-gray-400">該当するクライアントがありません</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- 選択中クライアントの確認表示 -->
+                            <div v-if="mergeTarget" class="mb-4 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm">
+                                <span class="text-blue-600">統合先：</span>
+                                <strong class="text-blue-900">{{ mergeTarget.name }}</strong>
+                            </div>
+
+                            <!-- フッター -->
+                            <div class="flex items-center justify-between gap-3">
+                                <button
+                                    type="button"
+                                    :disabled="!mergeTarget || isMerging"
+                                    class="flex items-center gap-2 rounded bg-red-600 px-4 py-2 font-bold text-white hover:bg-red-700 disabled:opacity-40"
+                                    @click="executeMerge"
+                                >
+                                    <svg v-if="isMerging" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                                    </svg>
+                                    この客先に統合して削除
+                                </button>
+                                <button
+                                    type="button"
+                                    class="rounded bg-gray-200 px-4 py-2 font-bold text-gray-700 hover:bg-gray-300"
+                                    @click="closeModal"
+                                >
+                                    キャンセル
+                                </button>
+                            </div>
                         </div>
+                    </template>
 
-                        <p class="text-sm text-gray-500">
-                            削除するには、まず紐付いている案件のクライアントを変更するか、別のクライアントへ統合してください。
-                        </p>
-                    </div>
-
-                    <!-- フッター -->
-                    <div class="flex justify-end">
-                        <button
-                            type="button"
-                            class="rounded bg-gray-200 px-4 py-2 font-bold text-gray-700 hover:bg-gray-300"
-                            @click="closeModal"
-                        >
-                            閉じる
-                        </button>
-                    </div>
                 </div>
             </div>
         </Teleport>

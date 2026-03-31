@@ -247,6 +247,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('clients/csv/preview', [App\Http\Controllers\ClientController::class, 'csvPreview'])->name('clients.csv.preview');
         Route::post('clients/csv/store', [App\Http\Controllers\ClientController::class, 'csvStore'])->name('clients.csv.store');
         Route::get('clients/csv/sample', [App\Http\Controllers\ClientController::class, 'csvSampleDownload'])->name('clients.csv.sample');
+        Route::get('clients/json', [App\Http\Controllers\ClientController::class, 'clientsJson'])->name('clients.json');
+        Route::post('clients/{client}/merge', [App\Http\Controllers\ClientController::class, 'merge'])->name('clients.merge');
         Route::resource('clients', App\Http\Controllers\ClientController::class)->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
 
         // 会社管理 (会社作成/管理は SuperAdmin 側に一本化しました)
@@ -375,6 +377,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('clients/csv/preview', [App\Http\Controllers\ClientController::class, 'csvPreview'])->name('clients.csv.preview');
         Route::post('clients/csv/store', [App\Http\Controllers\ClientController::class, 'csvStore'])->name('clients.csv.store');
         Route::get('clients/csv/sample', [App\Http\Controllers\ClientController::class, 'csvSampleDownload'])->name('clients.csv.sample');
+        Route::get('clients/json', [App\Http\Controllers\ClientController::class, 'clientsJson'])->name('clients.json');
+        Route::post('clients/{client}/merge', [App\Http\Controllers\ClientController::class, 'merge'])->name('clients.merge');
         Route::resource('clients', App\Http\Controllers\ClientController::class)->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
         // Leader diary interactions (leader can view diaries for departments/units they lead)
         Route::get('diaryinteractions', [App\Http\Controllers\Diaries\DiaryInteractionController::class, 'index'])->name('diaryinteractions.index');
@@ -430,18 +434,9 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('clients/csv/preview', [App\Http\Controllers\ClientController::class, 'csvPreview'])->name('clients.csv.preview');
         Route::post('clients/csv/store', [App\Http\Controllers\ClientController::class, 'csvStore'])->name('clients.csv.store');
         Route::get('clients/csv/sample', [App\Http\Controllers\ClientController::class, 'csvSampleDownload'])->name('clients.csv.sample');
-        // クライアント検索JSON（案件作成モーダル用）
-        Route::get('clients/json', function (Request $request) {
-            $query = \App\Models\Client::select('id', 'name');
-            if ($request->filled('id')) {
-                $client = $query->find((int) $request->id);
-                return $client ? response()->json($client) : response()->json(null, 404);
-            }
-            if ($request->filled('name')) {
-                $query->where('name', 'like', '%' . $request->name . '%');
-            }
-            return response()->json($query->orderBy('name')->get());
-        })->name('clients.json');
+        // クライアント検索JSON（案件作成モーダル用・統合先選択用）
+        Route::get('clients/json', [App\Http\Controllers\ClientController::class, 'clientsJson'])->name('clients.json');
+        Route::post('clients/{client}/merge', [App\Http\Controllers\ClientController::class, 'merge'])->name('clients.merge');
         Route::resource('clients', App\Http\Controllers\ClientController::class)->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
 
         // Project_job CRUD
