@@ -98,8 +98,8 @@ const eventTypeLabel = computed(() => props.event?.event_item_type?.name ?? null
                     </div>
                 </div>
 
-                <!-- 詳細テキスト -->
-                <div v-if="event.description" class="border-t px-5 py-4">
+                <!-- 詳細テキスト（ジョブイベントでない場合のみ表示） -->
+                <div v-if="event.description && !assignment" class="border-t px-5 py-4">
                     <h4 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">詳細</h4>
                     <p class="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">{{ event.description }}</p>
                 </div>
@@ -135,8 +135,15 @@ const eventTypeLabel = computed(() => props.event?.event_item_type?.name ?? null
 
             <!-- ジョブ割り当て詳細カード -->
             <div v-if="assignment">
-                <h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">紐づきジョブ割り当て</h2>
                 <AssignmentDetailCard :assignment="assignment" />
+                <div v-if="event.description" class="mt-3 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+                    <div class="border-b bg-gray-50 px-5 py-3">
+                        <h4 class="text-xs font-semibold uppercase tracking-wide text-gray-400">コメント</h4>
+                    </div>
+                    <div class="px-5 py-4">
+                        <p class="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">{{ event.description }}</p>
+                    </div>
+                </div>
             </div>
 
         </div>
