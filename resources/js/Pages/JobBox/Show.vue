@@ -255,12 +255,8 @@ function routeBack() {
     try {
         const user = page.props.auth?.user;
         const isPrivileged = user && (user.isCoordinator || user.isLeader || user.isAdmin || user.isSuperAdmin);
-        if (isPrivileged && projectJob?.id) {
-            return safeRoute(
-                'coordinator.project_jobs.jobbox.index',
-                { projectJob: projectJob.id },
-                `/coordinator/project_jobs/${projectJob.id}/jobbox`,
-            );
+        if (isPrivileged) {
+            return safeRoute('coordinator.jobbox', {}, '/coordinator/jobbox');
         }
         return safeRoute('user.project_jobs.jobbox.index', { projectJob: projectJob?.id }, '/coordinator/jobbox');
     } catch (e) {
