@@ -112,8 +112,26 @@ class ClientController extends Controller
         $this->requireAdminPermission('client_management');
         $this->requireLeaderPermission('client_management');
         $this->authorize('delete', $client);
+
+        $projectJobCount = $client->projectJobs()->count();
+
+        if ($projectJobCount > 0) {
+            $projectJobTitles = $client->projectJobs()
+                ->orderBy('id')
+                ->limit(5)
+                ->pluck('title')
+                ->toArray();
+
+            return back()->with('clientDeleteError', [
+                'clientName'       => $client->name,
+                'projectJobCount'  => $projectJobCount,
+                'projectJobTitles' => $projectJobTitles,
+            ]);
+        }
+
         $client->delete();
-        return redirect()->route("{$this->routePrefix()}.clients.index");
+        return redirect()->route("{$this->routePrefix()}.clients.index")
+            ->with('success', "「{$client->name}」を削除しました。");
     }
 
     /** ルートプレフィックスをロールから解決 */

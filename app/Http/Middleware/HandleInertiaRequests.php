@@ -43,6 +43,7 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'flash' => $flashMessage ? ['message' => $flashMessage, 'type' => $flashType] : null,
+            'clientDeleteError' => session('clientDeleteError'),
             // Share authenticated user basic info and helper role flags for frontend permission checks
             'auth' => [
                 'user' => $request->user()
