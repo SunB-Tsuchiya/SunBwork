@@ -19,16 +19,7 @@ const handleDelete = async (teamId) => {
     if (!confirm('チームを削除します。よろしいですか？')) return;
     if (!confirm('本当に削除してよいですか？')) return;
     try {
-        const tokenMeta = document.querySelector('meta[name="csrf-token"]');
-        const getCookie = (name) => {
-            const match = document.cookie.match(new RegExp('(^|; )' + name.replace(/([.$?*|{}()\[\]\\/+^])/g, '\\$1') + '=([^;]*)'));
-            return match ? match[2] : null;
-        };
-        let csrf = tokenMeta ? tokenMeta.getAttribute('content') : null;
-        if (!csrf) {
-            const raw = getCookie('XSRF-TOKEN');
-            if (raw) csrf = decodeURIComponent(raw);
-        }
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
         const res = await fetch(`/admin/teams/${teamId}`, {
             method: 'DELETE',
             headers: {

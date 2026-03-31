@@ -1622,9 +1622,7 @@ async function save() {
             const firstAssignmentHasId = payload.assignments[0] && payload.assignments[0].id;
             if (firstAssignmentHasId) {
                 const assignmentId = payload.assignments[0].id;
-                const token = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
-                const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
-                const xsrf = match ? decodeURIComponent(match[1]) : null;
+                const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
                 if (allForAuth) {
                     const url = route('user.project_jobs.assignments.update', { projectJob: computedProjectJobId, assignment: assignmentId });
                     const rel =
@@ -1636,7 +1634,6 @@ async function save() {
                             headers: {
                                 'Content-Type': 'application/json',
                                 'X-CSRF-TOKEN': token,
-                                ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}),
                                 'X-Requested-With': 'XMLHttpRequest',
                                 'X-Inertia': 'true',
                             },
@@ -1706,9 +1703,7 @@ async function save() {
                 const rel =
                     typeof window !== 'undefined' && url && url.indexOf(window.location.origin) === 0 ? url.replace(window.location.origin, '') : url;
 
-                const token = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
-                const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
-                const xsrf = match ? decodeURIComponent(match[1]) : null;
+                const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
                 try {
                     const res = await inertiaFetch(rel, {
@@ -1717,7 +1712,6 @@ async function save() {
                         headers: {
                             'Content-Type': 'application/json',
                             'X-CSRF-TOKEN': token,
-                            ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}),
                             'X-Requested-With': 'XMLHttpRequest',
                             'X-Inertia': 'true',
                         },
@@ -1761,16 +1755,13 @@ async function save() {
             const url2 = route('coordinator.project_jobs.assignments.store', { projectJob: coordinatorProjectJobId });
             const rel2 =
                 typeof window !== 'undefined' && url2 && url2.indexOf(window.location.origin) === 0 ? url2.replace(window.location.origin, '') : url2;
-            const token2 = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
-            const match2 = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
-            const xsrf2 = match2 ? decodeURIComponent(match2[1]) : null;
+            const token2 = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
             const res2 = await inertiaFetch(rel2, {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': token2,
-                    ...(xsrf2 ? { 'X-XSRF-TOKEN': xsrf2 } : {}),
                     'X-Requested-With': 'XMLHttpRequest',
                     'X-Inertia': 'true',
                 },

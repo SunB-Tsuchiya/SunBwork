@@ -193,15 +193,12 @@ async function fetchModalData() {
             if (modalClientId.value) params.set('client_id', modalClientId.value);
             if (modalProjectJobId.value) params.set('project_job_id', modalProjectJobId.value);
         }
-        const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
-        const xsrfMatch = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
-        const xsrf = xsrfMatch ? decodeURIComponent(xsrfMatch[1]) : null;
+        const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
         const url = (typeof route === 'function' ? route('coordinator.project_jobs.past_assignments') : '/coordinator/project_jobs/past-assignments') + '?' + params.toString();
         const res = await fetch(url, {
             credentials: 'same-origin',
             headers: {
                 'X-CSRF-TOKEN': token,
-                ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}),
                 'X-Requested-With': 'XMLHttpRequest',
                 Accept: 'application/json',
             },

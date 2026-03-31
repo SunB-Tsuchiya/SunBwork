@@ -242,9 +242,7 @@ function rowClick(event, job) {
 async function completeJob(job) {
     if (!confirm('この案件を完了としてマークしますか？')) return;
     try {
-        const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
-        const xsrfMatch = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
-        const xsrf = xsrfMatch ? decodeURIComponent(xsrfMatch[1]) : null;
+        const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
         const url = route('coordinator.project_jobs.complete', { projectJob: job.id });
         const res = await fetch(url, {
             method: 'POST',
@@ -252,7 +250,6 @@ async function completeJob(job) {
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': token,
-                ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}),
                 'X-Requested-With': 'XMLHttpRequest',
             },
         });

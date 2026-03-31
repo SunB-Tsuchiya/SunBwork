@@ -394,15 +394,12 @@ async function fetchPastDiaries() {
     pastLoading.value = true;
     pastError.value = '';
     try {
-        const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
-        const xsrfMatch = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
-        const xsrf = xsrfMatch ? decodeURIComponent(xsrfMatch[1]) : null;
+        const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
         const url = route('diaries.past_data') + '?date_range=' + pastDateRange.value;
         const res = await fetch(url, {
             credentials: 'same-origin',
             headers: {
                 'X-CSRF-TOKEN': token,
-                ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}),
                 'X-Requested-With': 'XMLHttpRequest',
                 Accept: 'application/json',
             },

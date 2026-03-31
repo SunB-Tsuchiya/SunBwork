@@ -48,7 +48,7 @@ async function uploadSingleFile(file) {
     try {
         const res = await axios.post('/bot/files', form, {
             withCredentials: true,
-            headers: { 'Content-Type': 'multipart/form-data', 'X-XSRF-TOKEN': getXsrfToken() },
+            headers: { 'Content-Type': 'multipart/form-data', 'X-CSRF-TOKEN': getXsrfToken() },
         });
         if (res && res.data && res.data.file) return res.data.file;
         return null;
@@ -73,7 +73,7 @@ async function sendViaMessageArea(text) {
         if (conversationId.value) payload.conversation_id = conversationId.value;
         const res = await axios.post('/bot/chat', payload, {
             withCredentials: true,
-            headers: { 'X-XSRF-TOKEN': getXsrfToken() },
+            headers: { 'X-CSRF-TOKEN': getXsrfToken() },
         });
         const reply = res.data.reply || '(応答なし)';
         // replace temp message
@@ -170,7 +170,7 @@ function getCookie(name) {
 }
 
 function getXsrfToken() {
-    return getCookie('XSRF-TOKEN') || '';
+    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 }
 
 // Ensure a local path has a leading slash when used in hrefs
@@ -464,7 +464,7 @@ async function sendMessage() {
         if (conversationId.value) payload.conversation_id = conversationId.value;
         const res = await axios.post('/bot/chat', payload, {
             withCredentials: true,
-            headers: { 'X-XSRF-TOKEN': getXsrfToken() },
+            headers: { 'X-CSRF-TOKEN': getXsrfToken() },
         });
         const reply = res.data.reply || '(応答なし)';
         // mark temp as sent
@@ -523,7 +523,7 @@ async function uploadSelectedFiles() {
         try {
             const res = await axios.post('/bot/files', form, {
                 withCredentials: true,
-                headers: { 'Content-Type': 'multipart/form-data', 'X-XSRF-TOKEN': getXsrfToken() },
+                headers: { 'Content-Type': 'multipart/form-data', 'X-CSRF-TOKEN': getXsrfToken() },
                 onUploadProgress: (ev) => {
                     const pct = ev.total ? Math.round((ev.loaded / ev.total) * 100) : 0;
                     uploadProgress.value[f.name] = pct;
@@ -562,7 +562,7 @@ async function uploadSelectedFiles() {
                         };
                         if (conversationId.value) payload.conversation_id = conversationId.value;
                         // fire-and-forget; server may use summarize_file or hidden_reference to ingest file
-                        await axios.post('/bot/chat', payload, { withCredentials: true, headers: { 'X-XSRF-TOKEN': getXsrfToken() } });
+                        await axios.post('/bot/chat', payload, { withCredentials: true, headers: { 'X-CSRF-TOKEN': getXsrfToken() } });
                     } catch (e) {
                         // don't surface errors to the user
                         console.debug('hidden reference request failed', e?.message || e);
@@ -605,7 +605,7 @@ async function deleteUploadedFile(fileMeta) {
             .post(
                 url,
                 { path: fileMeta.path || fileMeta.url || fileMeta.original_name },
-                { withCredentials: true, headers: { 'X-XSRF-TOKEN': getXsrfToken() } },
+                { withCredentials: true, headers: { 'X-CSRF-TOKEN': getXsrfToken() } },
             )
             .catch(() => null);
         if (res && res.data && (res.data.success || res.status === 200)) {
@@ -655,7 +655,7 @@ async function summarizeFile(meta) {
         payload.summarize_file = meta;
         const res = await axios.post('/bot/chat', payload, {
             withCredentials: true,
-            headers: { 'X-XSRF-TOKEN': getXsrfToken() },
+            headers: { 'X-CSRF-TOKEN': getXsrfToken() },
         });
         const summary = res.data && res.data.reply ? res.data.reply : '(要約が返されませんでした)';
         // replace temp message with final AI summary
@@ -736,13 +736,13 @@ async function saveConversation() {
         if (conversationId.value) {
             const res = await axios.put(`/bot/history/${conversationId.value}`, payload, {
                 withCredentials: true,
-                headers: { 'X-XSRF-TOKEN': getXsrfToken() },
+                headers: { 'X-CSRF-TOKEN': getXsrfToken() },
             });
             return res.data;
         } else {
             const res = await axios.post('/bot/history', payload, {
                 withCredentials: true,
-                headers: { 'X-XSRF-TOKEN': getXsrfToken() },
+                headers: { 'X-CSRF-TOKEN': getXsrfToken() },
             });
             // remember conversation id so subsequent saves update same conversation
             if (res && res.data && res.data.id) {
@@ -796,11 +796,11 @@ function handleBeforeUnload(e) {
                 navigator.sendBeacon(url, blob);
             } catch (beErr) {
                 // fallback to async post if beacon fails
-                axios.post('/bot/history', payload, { withCredentials: true, headers: { 'X-XSRF-TOKEN': token } }).catch(() => {});
+                axios.post('/bot/history', payload, { withCredentials: true, headers: { 'X-CSRF-TOKEN': token } }).catch(() => {});
             }
         } else {
             // best-effort async
-            axios.post('/bot/history', payload, { withCredentials: true, headers: { 'X-XSRF-TOKEN': token } }).catch(() => {});
+            axios.post('/bot/history', payload, { withCredentials: true, headers: { 'X-CSRF-TOKEN': token } }).catch(() => {});
         }
     } catch (err) {}
 }

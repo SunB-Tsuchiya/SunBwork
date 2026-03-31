@@ -349,9 +349,7 @@ async function submitComplete() {
             return;
         }
         isSubmittingComplete.value = true;
-        const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
-        const xsrfMatch = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
-        const xsrf = xsrfMatch ? decodeURIComponent(xsrfMatch[1]) : null;
+        const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
         const url =
             typeof route === 'function'
                 ? route('myjobbox.assignments.complete', { assignment: assignment.id })
@@ -362,7 +360,6 @@ async function submitComplete() {
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': token,
-                ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}),
                 'X-Requested-With': 'XMLHttpRequest',
             },
         });
