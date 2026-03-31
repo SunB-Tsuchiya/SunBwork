@@ -513,6 +513,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         // JobBox (job-assignment related messages)
         Route::get('project_jobs/{projectJob}/jobbox', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'index'])->name('project_jobs.jobbox.index');
         Route::get('project_jobs/{projectJob}/jobbox/{message}', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'show'])->name('project_jobs.jobbox.show');
+        Route::get('project_jobs/{projectJob}/jobbox/{message}/edit', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'edit'])->name('project_jobs.jobbox.edit');
+        Route::put('project_jobs/{projectJob}/jobbox/{message}', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'update'])->name('project_jobs.jobbox.update');
         Route::post('project_jobs/{projectJob}/jobbox', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'store'])->name('project_jobs.jobbox.store');
         Route::delete('project_jobs/{projectJob}/jobbox/{message}', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'destroy'])->name('project_jobs.jobbox.destroy');
         // Project job analysis (ジョブ分析)

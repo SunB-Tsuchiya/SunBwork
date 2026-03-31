@@ -795,6 +795,46 @@ class JobBoxController extends Controller
     /**
      * Delete a JobAssignmentMessage
      */
+    public function edit(ProjectJob $projectJob, JobAssignmentMessage $message)
+    {
+        $user = \Illuminate\Support\Facades\Auth::user();
+        $isPrivileged = $user && (method_exists($user, 'isCoordinator') && ($user->isCoordinator() || $user->isLeader() || $user->isAdmin() || $user->isSuperAdmin()));
+        if (! $isPrivileged) {
+            abort(403, 'Access denied.');
+        }
+
+        $message->load([
+            'projectJobAssignment.user',
+            'projectJobAssignment.projectJob.client',
+        ]);
+
+        return inertia('JobBox/Edit', [
+            'projectJob' => $projectJob,
+            'message'    => $message,
+        ]);
+    }
+
+    public function update(ProjectJob $projectJob, JobAssignmentMessage $message, \Illuminate\Http\Request $request)
+    {
+        $user = \Illuminate\Support\Facades\Auth::user();
+        $isPrivileged = $user && (method_exists($user, 'isCoordinator') && ($user->isCoordinator() || $user->isLeader() || $user->isAdmin() || $user->isSuperAdmin()));
+        if (! $isPrivileged) {
+            abort(403, 'Access denied.');
+        }
+
+        $data = $request->validate([
+            'subject' => 'nullable|string|max:255',
+            'body'    => 'nullable|string',
+        ]);
+
+        $message->update($data);
+
+        return redirect()->route('coordinator.project_jobs.jobbox.show', [
+            'projectJob' => $projectJob->id,
+            'message'    => $message->id,
+        ])->with('success', 'メッセージを更新しました。');
+    }
+
     public function destroy(ProjectJob $projectJob, JobAssignmentMessage $message)
     {
         // authorize the user - reuse existing policy if present

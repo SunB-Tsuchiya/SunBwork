@@ -132,6 +132,18 @@
                     <div class="flex items-center gap-2">
                         <Link :href="routeBack()" class="rounded bg-gray-200 px-4 py-2">戻る</Link>
 
+                        <!-- Coordinator: edit/delete buttons -->
+                        <template v-if="isPrivilegedUser">
+                            <Link
+                                :href="safeRoute('coordinator.project_jobs.jobbox.edit', { projectJob: projectJob?.id, message: message?.id })"
+                                class="rounded bg-yellow-500 px-4 py-2 text-white hover:bg-yellow-600"
+                            >編集</Link>
+                            <button
+                                class="rounded bg-red-500 px-4 py-2 text-white hover:bg-red-600"
+                                @click.prevent="deleteMessage"
+                            >削除</button>
+                        </template>
+
                         <!-- Determine if current user is the assignee -->
                         <template v-if="isAssignee">
                             <!-- 今日の作業をMyJobとして記録 -->
@@ -369,6 +381,31 @@ const isAssignee = computed(() => {
         return false;
     }
 });
+
+const isPrivilegedUser = computed(() => {
+    try {
+        const u = page.props.auth?.user;
+        return u && (u.isCoordinator || u.isLeader || u.isAdmin || u.isSuperAdmin);
+    } catch (e) {
+        return false;
+    }
+});
+
+function deleteMessage() {
+    if (!confirm('このメッセージを本当に削除しますか？この操作は取り消せません。')) return;
+    router.delete(
+        safeRoute('coordinator.project_jobs.jobbox.destroy', { projectJob: projectJob?.id, message: message?.id }),
+        {
+            onSuccess: () => {
+                router.visit(safeRoute('coordinator.project_jobs.show', { projectJob: projectJob?.id }, `/coordinator/project_jobs/${projectJob?.id}`));
+            },
+            onError: (errors) => {
+                console.error('deleteMessage error', errors);
+                alert('削除に失敗しました。');
+            },
+        },
+    );
+}
 
 // Whether the assignment is already completed (backend may set flag or status)
 const isAssignmentCompleted = computed(() => {
