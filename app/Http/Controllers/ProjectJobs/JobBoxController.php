@@ -204,10 +204,10 @@ class JobBoxController extends Controller
         $periodParam = $request->query('period');
         $usePeriodFilter = true;
         $periodModel = $periodParam;
-        if ($periodParam === null) {
-            $periodModel = now()->format('Y-m');
-        } elseif ($periodParam === '' || $periodParam === 'all') {
+        if ($periodParam === null || $periodParam === '' || $periodParam === 'all') {
+            // デフォルト: 全期間表示
             $usePeriodFilter = false;
+            $periodModel = 'all';
         }
 
         $periodStart = null;
@@ -249,10 +249,11 @@ class JobBoxController extends Controller
         }
 
         if ($usePeriodFilter && $periodStart && $periodEnd) {
-            $base->whereBetween(
-                DB::raw('COALESCE(project_job_assignments.desired_end_date, job_assignment_messages.created_at)'),
-                [$periodStart, $periodEnd]
-            );
+            // 締め切り日（desired_end_date）または依頼日（created_at）が選択月に含まれる場合に表示
+            $base->where(function ($sub) use ($periodStart, $periodEnd) {
+                $sub->whereBetween('project_job_assignments.desired_end_date', [$periodStart, $periodEnd])
+                    ->orWhereBetween('job_assignment_messages.created_at', [$periodStart, $periodEnd]);
+            });
         }
 
         switch ($sort) {
@@ -274,7 +275,8 @@ class JobBoxController extends Controller
             ->paginate($usePeriodFilter ? 500 : 50)
             ->appends(array_filter(['q' => $q, 'period' => $periodModel, 'sort' => $sort, 'dir' => $dir]));
 
-        $monthValues = JobAssignmentMessage::join('project_job_assignments', 'job_assignment_messages.project_job_assignment_id', '=', 'project_job_assignments.id')
+        // 締め切り日からの月リスト
+        $monthsFromEndDate = JobAssignmentMessage::join('project_job_assignments', 'job_assignment_messages.project_job_assignment_id', '=', 'project_job_assignments.id')
             ->join('project_jobs', 'project_job_assignments.project_job_id', '=', 'project_jobs.id')
             ->where(function ($qry) use ($user) {
                 $qry->where('project_job_assignments.user_id', $user->id)
@@ -287,10 +289,30 @@ class JobBoxController extends Controller
                             ->where('project_job_coordinators.user_id', $user->id);
                     });
             })
-            ->selectRaw("DATE_FORMAT(COALESCE(project_job_assignments.desired_end_date, job_assignment_messages.created_at), '%Y-%m') as ym")
+            ->whereNotNull('project_job_assignments.desired_end_date')
+            ->selectRaw("DATE_FORMAT(project_job_assignments.desired_end_date, '%Y-%m') as ym")
             ->groupBy('ym')
-            ->orderBy('ym', 'desc')
             ->pluck('ym');
+
+        // 依頼日（メッセージ作成日）からの月リスト
+        $monthsFromCreated = JobAssignmentMessage::join('project_job_assignments', 'job_assignment_messages.project_job_assignment_id', '=', 'project_job_assignments.id')
+            ->join('project_jobs', 'project_job_assignments.project_job_id', '=', 'project_jobs.id')
+            ->where(function ($qry) use ($user) {
+                $qry->where('project_job_assignments.user_id', $user->id)
+                    ->orWhere('job_assignment_messages.sender_id', $user->id)
+                    ->orWhere('project_jobs.user_id', $user->id)
+                    ->orWhereExists(function ($sub) use ($user) {
+                        $sub->select(DB::raw(1))
+                            ->from('project_job_coordinators')
+                            ->whereColumn('project_job_coordinators.project_job_id', 'project_jobs.id')
+                            ->where('project_job_coordinators.user_id', $user->id);
+                    });
+            })
+            ->selectRaw("DATE_FORMAT(job_assignment_messages.created_at, '%Y-%m') as ym")
+            ->groupBy('ym')
+            ->pluck('ym');
+
+        $monthValues = $monthsFromEndDate->merge($monthsFromCreated)->filter()->unique()->sort()->reverse()->values();
 
         $monthOptions = $monthValues
             ->filter()
