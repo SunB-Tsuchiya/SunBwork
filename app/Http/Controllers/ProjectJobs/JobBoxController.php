@@ -802,6 +802,9 @@ class JobBoxController extends Controller
         if (! $isPrivileged) {
             abort(403, 'Access denied.');
         }
+        if ($message->sender_id && $user->id !== $message->sender_id) {
+            abort(403, '作成者以外は編集できません。');
+        }
 
         $message->load([
             'projectJobAssignment.user',
@@ -820,6 +823,9 @@ class JobBoxController extends Controller
         $isPrivileged = $user && (method_exists($user, 'isCoordinator') && ($user->isCoordinator() || $user->isLeader() || $user->isAdmin() || $user->isSuperAdmin()));
         if (! $isPrivileged) {
             abort(403, 'Access denied.');
+        }
+        if ($message->sender_id && $user->id !== $message->sender_id) {
+            abort(403, '作成者以外は編集できません。');
         }
 
         $data = $request->validate([

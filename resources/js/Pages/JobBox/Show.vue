@@ -135,6 +135,7 @@
                         <!-- Coordinator: edit/delete buttons -->
                         <template v-if="isPrivilegedUser">
                             <Link
+                                v-if="isSender"
                                 :href="safeRoute('coordinator.project_jobs.jobbox.edit', { projectJob: projectJob?.id, message: message?.id })"
                                 class="rounded bg-yellow-500 px-4 py-2 text-white hover:bg-yellow-600"
                             >編集</Link>
@@ -386,6 +387,14 @@ const isPrivilegedUser = computed(() => {
     try {
         const u = page.props.auth?.user;
         return u && (u.isCoordinator || u.isLeader || u.isAdmin || u.isSuperAdmin);
+    } catch (e) {
+        return false;
+    }
+});
+
+const isSender = computed(() => {
+    try {
+        return page.props.auth?.user?.id === message?.sender_id;
     } catch (e) {
         return false;
     }
