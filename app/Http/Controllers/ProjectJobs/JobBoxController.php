@@ -304,7 +304,7 @@ class JobBoxController extends Controller
             })
             ->values();
 
-        return inertia('JobBox/Index', [
+        return inertia('Coordinator/JobBox/Index', [
             'projectJob' => null,
             'messages' => $messages,
             'q' => $q,
