@@ -431,6 +431,18 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('clients/csv/preview', [App\Http\Controllers\ClientController::class, 'csvPreview'])->name('clients.csv.preview');
         Route::post('clients/csv/store', [App\Http\Controllers\ClientController::class, 'csvStore'])->name('clients.csv.store');
         Route::get('clients/csv/sample', [App\Http\Controllers\ClientController::class, 'csvSampleDownload'])->name('clients.csv.sample');
+        // クライアント検索JSON（案件作成モーダル用）
+        Route::get('clients/json', function (Request $request) {
+            $query = \App\Models\Client::select('id', 'name');
+            if ($request->filled('id')) {
+                $client = $query->find((int) $request->id);
+                return $client ? response()->json($client) : response()->json(null, 404);
+            }
+            if ($request->filled('name')) {
+                $query->where('name', 'like', '%' . $request->name . '%');
+            }
+            return response()->json($query->orderBy('name')->get());
+        })->name('clients.json');
         Route::resource('clients', App\Http\Controllers\ClientController::class)->only(['index', 'create', 'store', 'edit', 'update']);
 
         // Project_job CRUD
