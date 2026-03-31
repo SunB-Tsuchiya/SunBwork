@@ -23,6 +23,7 @@ class Event extends Model
         'start',
         'end',
         'description',
+        'interruption_minutes',
     ];
 
     // Ensure accessor-backed attributes are included when the model is converted to array/JSON

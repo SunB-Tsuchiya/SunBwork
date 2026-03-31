@@ -215,6 +215,8 @@ class EventController extends Controller
             'startMinute' => 'required',
             'endHour' => 'required',
             'endMinute' => 'required',
+            'interrupted_event_ids' => 'nullable|array',
+            'interrupted_event_ids.*' => 'integer',
         ]);
         $data['user_id'] = Auth::id();
         // Debug: log that store was invoked and incoming data to help trace why assignments are not marked
@@ -270,6 +272,35 @@ class EventController extends Controller
             // ignore environment/schema checks
         }
         $event->save();
+
+        // 中断イベントの interruption_minutes を更新（差し込み作業による中断時間を記録）
+        $interruptedEventIds = $request->input('interrupted_event_ids', []);
+        if (!empty($interruptedEventIds)) {
+            $newStart = Carbon::parse($data['start']);
+            $newEnd   = Carbon::parse($data['end']);
+            foreach ($interruptedEventIds as $interruptedId) {
+                try {
+                    $interruptedEvent = Event::where('id', (int) $interruptedId)
+                        ->where('user_id', Auth::id())
+                        ->first();
+                    if ($interruptedEvent && $interruptedEvent->starts_at && $interruptedEvent->ends_at) {
+                        $evStart = Carbon::parse($interruptedEvent->starts_at);
+                        $evEnd   = Carbon::parse($interruptedEvent->ends_at);
+                        $overlapStart = $newStart->gt($evStart) ? $newStart : $evStart;
+                        $overlapEnd   = $newEnd->lt($evEnd)    ? $newEnd   : $evEnd;
+                        $overlapMins  = max(0, (int) (($overlapEnd->timestamp - $overlapStart->timestamp) / 60));
+                        if ($overlapMins > 0) {
+                            $interruptedEvent->increment('interruption_minutes', $overlapMins);
+                        }
+                    }
+                } catch (\Throwable $__e) {
+                    Log::warning('EventController: failed to update interruption_minutes', [
+                        'interrupted_event_id' => $interruptedId,
+                        'error' => $__e->getMessage(),
+                    ]);
+                }
+            }
+        }
 
         // If this event was created for a job assignment, mark that assignment as scheduled.
         $jobId = $request->input('job_id');
@@ -603,10 +634,19 @@ class EventController extends Controller
     public function show(Event $event)
     {
         // 添付ファイルも取得する場合はリレーションをロード
-        $event->load('attachments');
-        // if this event is linked to a project job assignment, eager-load that assignment
+        $event->load(['attachments', 'eventItemType']);
+        // if this event is linked to a project job assignment, eager-load that assignment with all lookup relations
         if (Schema::hasColumn('events', 'project_job_assignment_id') && $event->project_job_assignment_id) {
-            $event->load('projectJobAssignment.projectJob.client');
+            $event->load([
+                'projectJobAssignment.projectJob.client',
+                'projectJobAssignment.workItemType',
+                'projectJobAssignment.size',
+                'projectJobAssignment.stage',
+                'projectJobAssignment.statusModel',
+                'projectJobAssignment.difficultyModel',
+                'projectJobAssignment.user',
+                'projectJobAssignment.sender',
+            ]);
         }
         $hideEdit = request()->query('hide_edit') ? true : false;
         return Inertia::render('Events/Show', [

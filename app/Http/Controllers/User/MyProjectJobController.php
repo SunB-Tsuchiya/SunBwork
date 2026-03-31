@@ -152,7 +152,7 @@ class MyProjectJobController extends Controller
         }
 
         // eager load relations used by the frontend
-        $assignment->load(['projectJob.client', 'user', 'size', 'stage', 'workItemType', 'statusModel']);
+        $assignment->load(['projectJob.client', 'user', 'sender', 'size', 'stage', 'workItemType', 'statusModel', 'difficultyModel']);
 
         $projectJob = $assignment->projectJob ?? null;
 
