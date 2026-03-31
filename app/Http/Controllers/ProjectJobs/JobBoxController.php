@@ -377,7 +377,12 @@ class JobBoxController extends Controller
         $base = JobAssignmentMessage::select('job_assignment_messages.*')
             ->join('project_job_assignments', 'job_assignment_messages.project_job_assignment_id', '=', 'project_job_assignments.id')
             ->leftJoin('users as senders', 'job_assignment_messages.sender_id', '=', 'senders.id')
-            ->where('project_job_assignments.user_id', $user->id);
+            ->where('project_job_assignments.user_id', $user->id)
+            // MyJobBox（自己割当: sender_id = user_id）を除外し、Coordinator割当のみ表示
+            ->where(function ($qry) {
+                $qry->whereNull('project_job_assignments.sender_id')
+                    ->orWhereColumn('project_job_assignments.sender_id', '!=', 'project_job_assignments.user_id');
+            });
 
         if ($q) {
             $base->where(function ($sub) use ($q) {
@@ -412,6 +417,10 @@ class JobBoxController extends Controller
 
         $monthValues = JobAssignmentMessage::join('project_job_assignments', 'job_assignment_messages.project_job_assignment_id', '=', 'project_job_assignments.id')
             ->where('project_job_assignments.user_id', $user->id)
+            ->where(function ($qry) {
+                $qry->whereNull('project_job_assignments.sender_id')
+                    ->orWhereColumn('project_job_assignments.sender_id', '!=', 'project_job_assignments.user_id');
+            })
             ->selectRaw("DATE_FORMAT(COALESCE(project_job_assignments.desired_end_date, job_assignment_messages.created_at), '%Y-%m') as ym")
             ->groupBy('ym')
             ->orderBy('ym', 'desc')
