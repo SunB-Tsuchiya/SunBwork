@@ -334,6 +334,11 @@ APP_DEBUG=false
 cd ~/SunBWork && git pull && php artisan migrate && php artisan config:clear && php artisan cache:clear
 ```
 
+**⚠️ `php artisan migrate` を忘れると新機能が壊れる（実績あり）:**
+- 2026-03-28 の3マイグレーション（`user_settings` / `user_monthly_schedules`）を未実行でデプロイしたところ、カレンダーの勤務形態セレクトが空・シフト名が非表示になった
+- 症状: ローカルは正常 / さくらのみ壊れる / エラーは500ではなくページは表示されるが prop が空
+- 対処: `php artisan migrate` で解決
+
 **`sessions` テーブルなどで migrate エラー時:** tinker で migrations テーブルに手動 insert。
 
 **Vite ビルド:** `VITE_APP_BASE_PATH` が空なら `/build/assets/...`、`/members` なら `/members/build/assets/...`。`loadEnv` で読むこと（`process.env` では .env を読まない）。
@@ -482,6 +487,19 @@ headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' }
 `worktype_id` 変更時は `user_monthly_schedules` を全削除（日次設定リセット）。
 
 **カレンダー連動:** 勤務形態名をヘッダーに表示 / 始業前グレー背景 / 夜勤モード / 初期スクロールは1時間前 / `scrollTimeReset: false`
+
+**依存マイグレーション（2026-03-28 追加）:** カレンダー日程設定機能は以下3つのマイグレーションがすべて実行済みである必要がある。未実行の場合、カレンダーページが無音で壊れ `worktypes` / `dailyWorktypes` が空になる（フロントのセレクトメニューが空・シフト名が非表示）。
+- `2026_03_28_200001_create_user_settings_table` → `user_settings`（デフォルト勤務形態・カレンダービュー）
+- `2026_03_28_200002_create_user_daily_worktypes_table` → 中間テーブル（次のマイグレーションで削除される）
+- `2026_03_28_200003_replace_daily_worktypes_with_monthly_schedules` → `user_monthly_schedules`（週間日程 JSON）
+
+**CalendarController の防御実装:** `worktypes` 取得 / `userSetting()` 取得 / `UserMonthlySchedule` 取得の3箇所を try/catch で囲み、テーブル未存在の場合でもページが壊れずログにエラーが出るようにしてある。問題発生時は `storage/logs/laravel.log` の `CalendarController` ログを確認すること。
+
+**未マイグレーション症状まとめ:**
+- カレンダー「日程設定」モーダルの勤務形態セレクトが空
+- カレンダー日付ヘッダーにシフト名が出ない
+- 始業前グレー背景が出ない
+→ 必ず `php artisan migrate` を実行すること
 
 ---
 
