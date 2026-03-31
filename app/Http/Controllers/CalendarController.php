@@ -104,45 +104,63 @@ class CalendarController extends Controller
 
         if ($user) {
             // 会社の勤務形態一覧（company_id が null の SuperAdmin は全社分を取得）
-            $worktypeQuery = Worktype::orderBy('sort_order');
-            if ($user->company_id) {
-                $worktypeQuery->where('company_id', $user->company_id);
+            try {
+                $worktypeQuery = Worktype::orderBy('sort_order');
+                if ($user->company_id) {
+                    $worktypeQuery->where('company_id', $user->company_id);
+                }
+                $worktypes = $worktypeQuery->get(['id', 'name', 'start_time', 'end_time'])->toArray();
+                \Illuminate\Support\Facades\Log::info('CalendarController worktypes', [
+                    'user_id'        => $user->id,
+                    'company_id'     => $user->company_id,
+                    'worktypes_count' => count($worktypes),
+                ]);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error('CalendarController worktypes error: ' . $e->getMessage());
             }
-            $worktypes = $worktypeQuery->get(['id', 'name', 'start_time', 'end_time'])->toArray();
 
             // ユーザー設定
-            $setting = $user->userSetting()->with('worktype')->first();
-            if ($setting) {
-                if ($setting->calendar_view) {
-                    $calendarView = $setting->calendar_view;
+            try {
+                $setting = $user->userSetting()->with('worktype')->first();
+                if ($setting) {
+                    if ($setting->calendar_view) {
+                        $calendarView = $setting->calendar_view;
+                    }
+                    if ($setting->worktype) {
+                        $defaultWorktype = [
+                            'id'         => $setting->worktype->id,
+                            'name'       => $setting->worktype->name,
+                            'start_time' => $setting->worktype->start_time,
+                            'end_time'   => $setting->worktype->end_time,
+                        ];
+                    }
                 }
-                if ($setting->worktype) {
-                    $defaultWorktype = [
-                        'id'         => $setting->worktype->id,
-                        'name'       => $setting->worktype->name,
-                        'start_time' => $setting->worktype->start_time,
-                        'end_time'   => $setting->worktype->end_time,
-                    ];
-                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error('CalendarController userSetting error: ' . $e->getMessage());
             }
 
             // 日ごと勤務形態（±3ヶ月）：月次 JSON を展開
-            $fromYm = now()->subMonths(3)->format('Y-m');
-            $toYm   = now()->addMonths(3)->format('Y-m');
-            $dailyWorktypes = [];
-            UserMonthlySchedule::where('user_id', $user->id)
-                ->whereBetween('year_month', [$fromYm, $toYm])
-                ->get(['year_month', 'schedule'])
-                ->each(function ($ms) use (&$dailyWorktypes) {
-                    foreach (($ms->schedule ?? []) as $dd => $worktypeId) {
-                        if ($worktypeId) {
-                            $dailyWorktypes[] = [
-                                'date'        => $ms->year_month . '-' . $dd,
-                                'worktype_id' => (int) $worktypeId,
-                            ];
+            try {
+                $fromYm = now()->subMonths(3)->format('Y-m');
+                $toYm   = now()->addMonths(3)->format('Y-m');
+                $dailyWorktypes = [];
+                UserMonthlySchedule::where('user_id', $user->id)
+                    ->whereBetween('year_month', [$fromYm, $toYm])
+                    ->get(['year_month', 'schedule'])
+                    ->each(function ($ms) use (&$dailyWorktypes) {
+                        foreach (($ms->schedule ?? []) as $dd => $worktypeId) {
+                            if ($worktypeId) {
+                                $dailyWorktypes[] = [
+                                    'date'        => $ms->year_month . '-' . $dd,
+                                    'worktype_id' => (int) $worktypeId,
+                                ];
+                            }
                         }
-                    }
-                });
+                    });
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error('CalendarController dailyWorktypes error: ' . $e->getMessage());
+                $dailyWorktypes = [];
+            }
         }
 
         return Inertia::render('Calendar', [

@@ -23,6 +23,12 @@ class UserDailyWorktypeController extends Controller
 
         $user = Auth::user();
 
+        // user_monthly_schedules テーブルが未マイグレーションの場合は 503 を返す
+        if (!\Illuminate\Support\Facades\Schema::hasTable('user_monthly_schedules')) {
+            \Illuminate\Support\Facades\Log::error('user_monthly_schedules table not found. Run: php artisan migrate');
+            return response()->json(['error' => 'migration_required'], 503);
+        }
+
         // 月ごとにグループ化して JSON を更新
         $byMonth = collect($request->days)->groupBy(fn($d) => substr($d['date'], 0, 7));
 
