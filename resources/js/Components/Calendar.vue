@@ -6,7 +6,7 @@
             <button @click="goToDiaryCreate" class="rounded bg-orange-500 px-4 py-2 text-white">{{ props.diaryLabel }}作成</button>
             <button @click="openScheduleModal" class="rounded border border-gray-400 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">日程設定</button>
         </div>
-        <FullCalendar ref="fullCalendarRef" :options="calendarOptions" :events="events" />
+        <FullCalendar ref="fullCalendarRef" :options="calendarOptions" />
         <!-- 予定作成モーダル -->
         <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
             <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
@@ -309,7 +309,7 @@ function openScheduleModal() {
 async function saveWeekSchedule() {
     savingSchedule.value = true;
     try {
-        await axios.post('/user/daily-worktypes', { days: weekDays.value });
+        await axios.post(route('user.daily_worktypes.store'), { days: weekDays.value });
         // ローカル状態を更新
         weekDays.value.forEach((day) => {
             const idx = localDailyWorktypes.value.findIndex((d) => d.date === day.date);
@@ -322,6 +322,9 @@ async function saveWeekSchedule() {
             }
         });
         showScheduleModal.value = false;
+        // ヘッダーの勤務形態名・グレー背景を即時反映
+        await nextTick();
+        fullCalendarRef.value?.getApi()?.render();
     } catch {
         alert('保存に失敗しました');
     } finally {
