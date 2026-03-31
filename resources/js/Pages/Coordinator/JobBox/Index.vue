@@ -75,14 +75,14 @@
                         <span class="ml-2 text-xs font-normal text-gray-500">{{ group.items.length }} 件</span>
                     </div>
 
-                    <table class="w-full table-fixed border" style="min-width: 820px;">
+                    <table class="w-full table-fixed border" style="min-width: 960px;">
                         <colgroup>
                             <col style="width: 100px"> <!-- 発信者 -->
                             <col style="width: 100px"> <!-- 受信者 -->
-                            <col style="width: 116px"> <!-- 締め切り -->
-                            <col>                       <!-- タイトル -->
-                            <col style="width: 100px"> <!-- クライアント -->
-                            <col style="width: 130px"> <!-- 案件名 -->
+                            <col style="width: 140px"> <!-- 締め切り -->
+                            <col style="width: 15%">   <!-- タイトル -->
+                            <col style="width: 130px"> <!-- クライアント -->
+                            <col style="width: 160px"> <!-- 案件名 -->
                             <col style="width: 56px">  <!-- 既読 -->
                             <col style="width: 88px">  <!-- ステータス -->
                         </colgroup>
