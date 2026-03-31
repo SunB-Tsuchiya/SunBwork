@@ -627,10 +627,10 @@ const currentRouteContext = computed(() => {
 
                         <!-- User sub-tabs -->
                         <template v-else>
-                            <ResponsiveNavLink href="/myjobbox" :active="route().current('myjobbox')">
+                            <ResponsiveNavLink :href="route('user.myjobbox.index')" :active="route().current('user.myjobbox*')">
                                 <span class="text-blue-600">マイジョブ</span>
                             </ResponsiveNavLink>
-                            <ResponsiveNavLink href="/user/jobbox" :active="route().current('user.jobbox*')">
+                            <ResponsiveNavLink :href="route('user.jobbox.index')" :active="route().current('user.jobbox*')">
                                 <span class="text-blue-600">依頼されたジョブ</span>
                             </ResponsiveNavLink>
                             <ResponsiveNavLink :href="route('diaries.index')" :active="route().current('diaries.*')">

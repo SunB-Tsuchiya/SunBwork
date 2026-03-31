@@ -15,10 +15,10 @@ const tab = (key) => [
 <template>
     <div class="mb-6">
         <nav class="flex flex-wrap gap-2" aria-label="Tabs">
-            <Link href="/myjobbox" :class="tab('myjob')">
+            <Link :href="route('user.myjobbox.index')" :class="tab('myjob')">
                 マイジョブ
             </Link>
-            <Link href="/user/jobbox" :class="tab('jobbox')">
+            <Link :href="route('user.jobbox.index')" :class="tab('jobbox')">
                 依頼されたジョブ
             </Link>
             <Link :href="route('diaries.index')" :class="tab('diaries')">
