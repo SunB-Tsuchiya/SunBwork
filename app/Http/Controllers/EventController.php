@@ -16,6 +16,7 @@ use Carbon\Carbon;
 use Intervention\Image\ImageManager;
 use Inertia\Inertia;
 use App\Models\ProjectJobAssignment;
+use App\Models\ProjectJobAssignmentByMyself;
 use App\Models\Message;
 use App\Models\MessageRecipient;
 use App\Events\MessageCreated;
@@ -230,9 +231,10 @@ class EventController extends Controller
         $jobId = $request->input('job_id');
         if ($jobId) {
             try {
-                $existingAssignment = ProjectJobAssignment::find($jobId);
+                // events.project_job_assignment_id は project_job_assignment_by_myself の FK
+                $existingAssignment = ProjectJobAssignmentByMyself::find($jobId);
                 if ($existingAssignment) {
-                    if (Schema::hasColumn('project_job_assignments', 'scheduled') && $existingAssignment->scheduled) {
+                    if (Schema::hasColumn('project_job_assignment_by_myself', 'scheduled') && $existingAssignment->scheduled) {
                         // Redirect back to assigned-jobs with a flash message indicating it's already set
                         return redirect()->route('user.assigned-jobs.index')->with('error', 'このジョブは既にセット済です。');
                     }
@@ -306,7 +308,8 @@ class EventController extends Controller
         $jobId = $request->input('job_id');
         if ($jobId) {
             try {
-                $assignment = ProjectJobAssignment::find($jobId);
+                // events.project_job_assignment_id は project_job_assignment_by_myself の FK
+                $assignment = ProjectJobAssignmentByMyself::find($jobId);
                 if ($assignment) {
                     // Log current assignment scheduled state before updating for debugging
                     try {
@@ -322,21 +325,21 @@ class EventController extends Controller
                     // Use a transaction to ensure consistency
                     DB::transaction(function () use ($assignment, $event) {
                         // If the assignments table has scheduled_at column, set it to event start
-                        if (Schema::hasColumn('project_job_assignments', 'scheduled_at')) {
+                        if (Schema::hasColumn('project_job_assignment_by_myself', 'scheduled_at')) {
                             $assignment->scheduled_at = $event->start;
                         }
                         // If there's a boolean scheduled flag, set it true
-                        if (Schema::hasColumn('project_job_assignments', 'scheduled')) {
+                        if (Schema::hasColumn('project_job_assignment_by_myself', 'scheduled')) {
                             $assignment->scheduled = true;
                         }
                         // If the assignments table keeps a separate `date` column, and it's empty,
                         // populate it with the event's date portion so calendar-based flows have a date.
-                        if (Schema::hasColumn('project_job_assignments', 'date') && empty($assignment->date)) {
+                        if (Schema::hasColumn('project_job_assignment_by_myself', 'date') && empty($assignment->date)) {
                             $assignment->date = date('Y-m-d', strtotime($event->start));
                         }
                         // If statuses table exists, set scheduled status
                         try {
-                            if (Schema::hasTable('statuses') && Schema::hasColumn('project_job_assignments', 'status_id')) {
+                            if (Schema::hasTable('statuses') && Schema::hasColumn('project_job_assignment_by_myself', 'status_id')) {
                                 $status = DB::table('statuses')->where('key', 'scheduled')->first();
                                 if (!$status) {
                                     $statusId = DB::table('statuses')->insertGetId(['key' => 'scheduled', 'name' => 'セット済み', 'created_at' => now(), 'updated_at' => now()]);
@@ -830,7 +833,8 @@ class EventController extends Controller
         $jobData = null;
         if ($jobId) {
             // load lookup relations so Create page can prefill human-friendly labels
-            $assignment = \App\Models\ProjectJobAssignment::with(['projectJob.client', 'projectJob', 'user', 'size', 'stage', 'workItemType', 'statusModel'])->find($jobId);
+            // events.project_job_assignment_id は project_job_assignment_by_myself の FK
+            $assignment = \App\Models\ProjectJobAssignmentByMyself::with(['projectJob.client', 'projectJob', 'user', 'size', 'stage', 'workItemType', 'statusModel'])->find($jobId);
             if ($assignment) {
                 // Use model helper to produce consistent prefill data
                 $jobData = $assignment->toEventPrefill();

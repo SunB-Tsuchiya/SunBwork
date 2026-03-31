@@ -48,12 +48,13 @@ class Event extends Model
     }
 
     /**
-     * Optional relation to ProjectJobAssignment so events created from a job
-     * can be linked back to the assignment.
+     * Optional relation to ProjectJobAssignmentByMyself so events created from a
+     * self-assigned job (MyJobBox) can be linked back to the correct assignment.
+     * events.project_job_assignment_id は project_job_assignment_by_myself テーブルの FK。
      */
     public function projectJobAssignment()
     {
-        return $this->belongsTo(ProjectJobAssignment::class, 'project_job_assignment_id');
+        return $this->belongsTo(ProjectJobAssignmentByMyself::class, 'project_job_assignment_id');
     }
 
     public function projectJobAssignmentByMyself()
