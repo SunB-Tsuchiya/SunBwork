@@ -135,10 +135,8 @@ function markRead() {
 
             // Redirect to the correct interactions index depending on prefix
             try {
-                let redirectUrl = '/diaryinteractions/interactions';
-                if (prefix === 'admin') redirectUrl = '/admin/diaryinteractions';
-                else if (prefix === 'leader') redirectUrl = '/leader/diaryinteractions';
-                window.location.href = redirectUrl;
+                const indexRouteName = prefix === 'diaries' ? 'diaryinteractions.index' : `${prefix}.diaryinteractions.index`;
+                window.location.href = route(indexRouteName);
             } catch (e) {
                 window.location.href = '/diaryinteractions/interactions';
             }
@@ -162,8 +160,8 @@ function goIndex() {
     }
 
     let redirectUrl = `/diaryinteractions/interactions`;
-    if (prefix === 'admin') redirectUrl = `/admin/diaryinteractions`;
-    else if (prefix === 'leader') redirectUrl = `/leader/diaryinteractions`;
+    if (prefix === 'admin') redirectUrl = route('admin.diaryinteractions.index');
+    else if (prefix === 'leader') redirectUrl = route('leader.diaryinteractions.index');
     window.location.href = redirectUrl;
 }
 
