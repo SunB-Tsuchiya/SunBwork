@@ -103,11 +103,12 @@ class CalendarController extends Controller
         $dailyWorktypes  = [];
 
         if ($user) {
-            // 会社の勤務形態一覧
-            $worktypes = Worktype::where('company_id', $user->company_id)
-                ->orderBy('sort_order')
-                ->get(['id', 'name', 'start_time', 'end_time'])
-                ->toArray();
+            // 会社の勤務形態一覧（company_id が null の SuperAdmin は全社分を取得）
+            $worktypeQuery = Worktype::orderBy('sort_order');
+            if ($user->company_id) {
+                $worktypeQuery->where('company_id', $user->company_id);
+            }
+            $worktypes = $worktypeQuery->get(['id', 'name', 'start_time', 'end_time'])->toArray();
 
             // ユーザー設定
             $setting = $user->userSetting()->with('worktype')->first();
