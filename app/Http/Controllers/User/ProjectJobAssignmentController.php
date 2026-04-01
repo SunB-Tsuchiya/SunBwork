@@ -42,6 +42,7 @@ class ProjectJobAssignmentController extends Controller
             'assignments.*.amounts' => 'nullable|integer|min:0',
             'assignments.*.amounts_unit' => 'nullable|string|in:page,file',
             'assignments.*.sender_id' => 'nullable|exists:users,id',
+            'assignments.*.source_assignment_id' => 'nullable|exists:project_job_assignments,id',
         ]);
 
         // validated payload received (debug logging removed)
@@ -56,6 +57,7 @@ class ProjectJobAssignmentController extends Controller
 
                 $createPayload = [
                     'project_job_id' => $projectJob->id,
+                    'project_job_assignment_id' => isset($a['source_assignment_id']) ? (int) $a['source_assignment_id'] : null,
                     'user_id' => $user ? $user->id : null,
                     'sender_id' => $user ? $user->id : null,
                     'title' => $a['title'],

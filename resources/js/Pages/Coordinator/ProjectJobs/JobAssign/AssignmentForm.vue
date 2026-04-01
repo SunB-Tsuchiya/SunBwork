@@ -672,6 +672,7 @@ function normalizeAssignment(a) {
             amounts_unit: a.amounts_unit ?? 'page',
             _medium_filter: a._medium_filter ?? '',
             _type_filter: a._type_filter ?? '',
+            source_assignment_id: a.source_assignment_id || null,
         };
     }
 }
@@ -1708,6 +1709,7 @@ async function save() {
                     : (a.status_id ?? null),
                 amounts: typeof a.amounts === 'number' ? a.amounts : Number(a.amounts) || 0,
                 amounts_unit: a.amounts_unit || 'page',
+                source_assignment_id: a.source_assignment_id || null,
             })),
         };
 

@@ -14,6 +14,7 @@ class ProjectJobAssignmentByMyself extends Model
 
     protected $fillable = [
         'project_job_id',
+        'project_job_assignment_id',
         'user_id',
         'estimated_hours',
         'title',

@@ -2,10 +2,16 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import AssignmentDetailCard from '@/Components/AssignmentDetailCard.vue';
 import { Link, router } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { route } from 'ziggy-js';
 
-const props = defineProps({ event: Object, hide_edit: { type: Boolean, default: false } });
+const props = defineProps({
+    event: Object,
+    hide_edit: { type: Boolean, default: false },
+    coordinator_assignment: { type: Object, default: null },
+});
+
+const showCompleteModal = ref(false);
 
 const assignment = computed(() => props.event?.project_job_assignment ?? null);
 
@@ -48,8 +54,20 @@ function confirmDelete() {
 }
 
 function submitComplete() {
-    if (!confirm('このジョブを完了としてマークしますか？')) return;
+    // Coordinator割当が存在しかつ未完了の場合はモーダルで確認
+    if (props.coordinator_assignment && !props.coordinator_assignment.completed) {
+        showCompleteModal.value = true;
+        return;
+    }
+    // Coordinator割当なし → そのまま完了
     router.post(route('events.complete', { event: props.event.id }));
+}
+
+function doComplete(alsoCompleteCoordinator) {
+    showCompleteModal.value = false;
+    router.post(route('events.complete', { event: props.event.id }), {
+        also_complete_coordinator: alsoCompleteCoordinator,
+    });
 }
 
 const eventTypeLabel = computed(() => props.event?.event_item_type?.name ?? null);
@@ -146,6 +164,34 @@ const eventTypeLabel = computed(() => props.event?.event_item_type?.name ?? null
                 </div>
             </div>
 
+        </div>
+
+        <!-- Coordinator割当 完了確認モーダル -->
+        <div v-if="showCompleteModal"
+             class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+             @click.self="showCompleteModal = false">
+            <div class="mx-4 w-full max-w-md rounded-lg bg-white shadow-xl">
+                <div class="border-b px-6 py-4">
+                    <h2 class="text-lg font-semibold text-gray-800">ジョブを完了にする</h2>
+                </div>
+                <div class="p-6 text-sm text-gray-700">
+                    <p class="mb-3">この作業記録を完了にします。</p>
+                    <p>コーディネーター割当<br>
+                        <strong class="text-gray-900">「{{ coordinator_assignment?.title }}」</strong><br>
+                        も同時に完了にしますか？
+                    </p>
+                </div>
+                <div class="flex justify-end gap-2 border-t px-6 py-4">
+                    <button @click="doComplete(false)"
+                            class="rounded bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300">
+                        自分の記録のみ完了
+                    </button>
+                    <button @click="doComplete(true)"
+                            class="rounded bg-yellow-600 px-4 py-2 text-sm font-medium text-white hover:bg-yellow-700">
+                        両方完了にする
+                    </button>
+                </div>
+            </div>
         </div>
     </AppLayout>
 </template>
