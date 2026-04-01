@@ -1718,68 +1718,25 @@ async function save() {
             const firstAssignmentHasId = payload.assignments[0] && payload.assignments[0].id;
             if (firstAssignmentHasId) {
                 const assignmentId = payload.assignments[0].id;
-                const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
                 if (allForAuth) {
-                    const url = route('user.project_jobs.assignments.update', { projectJob: computedProjectJobId, assignment: assignmentId });
-                    const rel =
-                        typeof window !== 'undefined' && url && url.indexOf(window.location.origin) === 0 ? url.replace(window.location.origin, '') : url;
-                    try {
-                        const res = await inertiaFetch(rel, {
-                            method: 'PATCH',
-                            credentials: 'same-origin',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRF-TOKEN': token,
-                                'X-Requested-With': 'XMLHttpRequest',
-                                'X-Inertia': 'true',
-                            },
-                            body: JSON.stringify(payload.assignments[0]),
-                        });
-                        if (!res || res.navigated) return;
-                        if (res.ok || res.redirected) {
-                            location.reload();
-                            return;
+                    router.patch(
+                        route('user.project_jobs.assignments.update', { projectJob: computedProjectJobId, assignment: assignmentId }),
+                        payload.assignments[0],
+                        {
+                            onFinish: () => { saving.value = false; },
+                            onError: () => { alert('保存に失敗しました'); },
                         }
-                        const txt = await res.text().catch(() => '');
-                        console.error('[AssignmentForm_user] update PATCH failed:', res.status, txt);
-                        alert('保存に失敗しました（' + res.status + '）');
-                    } catch (err) {
-                        console.error('[AssignmentForm_user] update PATCH error:', err);
-                        alert('保存に失敗しました（ネットワークエラー）');
-                    } finally {
-                        saving.value = false;
-                    }
+                    );
                     return;
                 } else {
-                    const url = route('coordinator.project_jobs.assignments.update', { projectJob: computedProjectJobId, assignment: assignmentId });
-                    const rel =
-                        typeof window !== 'undefined' && url && url.indexOf(window.location.origin) === 0 ? url.replace(window.location.origin, '') : url;
-                    try {
-                        const res = await inertiaFetch(rel, {
-                            method: 'PUT',
-                            credentials: 'same-origin',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRF-TOKEN': token,
-                                'X-Requested-With': 'XMLHttpRequest',
-                                'X-Inertia': 'true',
-                            },
-                            body: JSON.stringify(payload.assignments[0]),
-                        });
-                        if (!res || res.navigated) return;
-                        if (res.ok || res.redirected) {
-                            location.reload();
-                            return;
+                    router.put(
+                        route('coordinator.project_jobs.assignments.update', { projectJob: computedProjectJobId, assignment: assignmentId }),
+                        payload.assignments[0],
+                        {
+                            onFinish: () => { saving.value = false; },
+                            onError: () => { alert('保存に失敗しました'); },
                         }
-                        const txt = await res.text().catch(() => '');
-                        console.error('[AssignmentForm_user] coordinator update PUT failed:', res.status, txt);
-                        alert('保存に失敗しました（' + res.status + '）');
-                    } catch (err) {
-                        console.error('[AssignmentForm_user] coordinator update PUT error:', err);
-                        alert('保存に失敗しました（ネットワークエラー）');
-                    } finally {
-                        saving.value = false;
-                    }
+                    );
                     return;
                 }
             }
@@ -1795,42 +1752,15 @@ async function save() {
                     } catch (e) {}
                     return;
                 }
-                const url = route('user.project_jobs.assignments.store', { projectJob: computedProjectJobId });
-                const rel =
-                    typeof window !== 'undefined' && url && url.indexOf(window.location.origin) === 0 ? url.replace(window.location.origin, '') : url;
-
-                const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-
-                try {
-                    const res = await inertiaFetch(rel, {
-                        method: 'POST',
-                        credentials: 'same-origin',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': token,
-                            'X-Requested-With': 'XMLHttpRequest',
-                            'X-Inertia': 'true',
-                        },
-                        body: JSON.stringify(payload),
-                    });
-
-                    if (!res || res.navigated) return;
-
-                    if (res.ok) {
-                        location.reload();
-                        return;
+                router.post(
+                    route('user.project_jobs.assignments.store', { projectJob: computedProjectJobId }),
+                    payload,
+                    {
+                        onFinish: () => { saving.value = false; },
+                        onError: () => { alert('保存に失敗しました'); },
                     }
-
-                    const txt = await res.text().catch(() => '');
-                    console.error('[AssignmentForm_user] fetch POST failed:', res.status, txt);
-                    alert('保存に失敗しました（' + res.status + '）');
-                } catch (err) {
-                    console.error('[AssignmentForm_user] fetch POST error:', err);
-                    alert('保存に失敗しました（ネットワークエラー）');
-                    return;
-                } finally {
-                    saving.value = false;
-                }
+                );
+                return;
             }
         } catch (e) {
             console.warn('[AssignmentForm_user] allForAuth check failed, falling back to coordinator route', e);
@@ -1847,68 +1777,14 @@ async function save() {
             return;
         }
 
-        try {
-            const url2 = route('coordinator.project_jobs.assignments.store', { projectJob: coordinatorProjectJobId });
-            const rel2 =
-                typeof window !== 'undefined' && url2 && url2.indexOf(window.location.origin) === 0 ? url2.replace(window.location.origin, '') : url2;
-            const token2 = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-            const res2 = await inertiaFetch(rel2, {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': token2,
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-Inertia': 'true',
-                },
-                body: JSON.stringify(payload),
-            });
-
-            if (!res2 || res2.navigated) return;
-
-            if (res2.redirected && res2.url) {
-                window.location.href = res2.url;
-                return;
+        router.post(
+            route('coordinator.project_jobs.assignments.store', { projectJob: coordinatorProjectJobId }),
+            payload,
+            {
+                onFinish: () => { saving.value = false; },
+                onError: () => { alert('保存に失敗しました'); },
             }
-            if (res2.ok) {
-                location.reload();
-                return;
-            }
-            if (res2.status === 409) {
-                const inertiaLocation = res2.headers.get('x-inertia-location') || res2.headers.get('X-Inertia-Location') || null;
-                const locationHeader = res2.headers.get('location') || null;
-                const dest = inertiaLocation || locationHeader;
-                if (dest) {
-                    if (/^https?:\/\//i.test(dest)) {
-                        window.location.href = dest;
-                    } else {
-                        window.location.href = window.location.origin + dest;
-                    }
-                    return;
-                }
-                window.location.reload();
-                return;
-            }
-            if (res2.status >= 300 && res2.status < 400) {
-                const locationHeader = res2.headers.get('location') || null;
-                if (locationHeader) {
-                    if (/^https?:\/\//i.test(locationHeader)) {
-                        window.location.href = locationHeader;
-                    } else {
-                        window.location.href = window.location.origin + locationHeader;
-                    }
-                    return;
-                }
-            }
-            const txt2 = await res2.text().catch(() => '');
-            console.error('[AssignmentForm_user] coordinator fetch POST failed:', res2.status, txt2);
-            alert('保存に失敗しました（' + res2.status + '）');
-        } catch (err2) {
-            console.error('[AssignmentForm_user] coordinator fetch error:', err2);
-            alert('保存に失敗しました（ネットワークエラー）');
-        } finally {
-            saving.value = false;
-        }
+        );
     }
 }
 
