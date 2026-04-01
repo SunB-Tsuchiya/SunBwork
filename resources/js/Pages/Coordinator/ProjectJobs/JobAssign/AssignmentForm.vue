@@ -523,7 +523,10 @@ async function checkEventOverlaps() {
         const start = `${workDate.value} ${String(startTimeHour.value).padStart(2, '0')}:${String(startTimeMin.value || '00').padStart(2, '0')}:00`;
         const end = `${workDate.value} ${String(endTimeHour.value).padStart(2, '0')}:${String(endTimeMin.value || '00').padStart(2, '0')}:00`;
 
-        const res = await fetch('/events', {
+        // Construct the Ziggy route properly
+        const url = route('events.index') + `?date=${encodeURIComponent(workDate.value)}`;
+
+        const res = await fetch(url, {
             method: 'GET',
             credentials: 'same-origin',
             headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
@@ -1634,7 +1637,7 @@ async function save() {
         saving.value = true;
 
         // Check for overlapping events
-        if (!proceedWithOverlap.value && props.mode === 'user' && editMode) {
+        if (!proceedWithOverlap.value && props.mode === 'user' && props.editMode) {
             const overlaps = await checkEventOverlaps();
             if (overlaps && overlaps.length > 0) {
                 overlappingEvents.value = overlaps;
