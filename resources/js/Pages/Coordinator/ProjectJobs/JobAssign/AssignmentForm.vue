@@ -626,9 +626,9 @@ function normalizeAssignment(a) {
             desired_time_min: a.desired_time ? a.desired_time.split(':')[1] || '00' : a.desired_time_min || '00',
             estimated_hours: a.estimated_hours !== undefined && a.estimated_hours !== null ? a.estimated_hours : '',
             user_id: a.user_id || (a.user ? a.user.id : '') || '',
-            work_item_type_id: a.work_item_type_id || null,
-            size_id: a.size_id || null,
-            stage_id: a.stage_id || null,
+            work_item_type_id: a.work_item_type_id != null ? String(a.work_item_type_id) : null,
+            size_id: a.size_id != null ? String(a.size_id) : null,
+            stage_id: a.stage_id != null ? String(a.stage_id) : null,
             status_id: 1,
             company_id: a.company_id || null,
             department_id: a.department_id || null,
@@ -664,12 +664,14 @@ function normalizeAssignment(a) {
                 ? a.start_time.split(':')[1] || '00'
                 : a.start_time_min || (a.desired_time ? a.desired_time.split(':')[1] : '00'),
             estimated_hours: a.estimated_hours !== undefined && a.estimated_hours !== null ? a.estimated_hours : '',
-            work_item_type_id: a.work_item_type_id ?? null,
-            size_id: a.size_id ?? null,
-            stage_id: a.stage_id ?? null,
-            status_id: a.status_id ?? null,
+            work_item_type_id: a.work_item_type_id != null ? String(a.work_item_type_id) : null,
+            size_id: a.size_id != null ? String(a.size_id) : null,
+            stage_id: a.stage_id != null ? String(a.stage_id) : null,
+            status_id: a.status_id != null ? String(a.status_id) : null,
             amounts: a.amounts !== undefined && a.amounts !== null ? a.amounts : a.amounts_unit ? 0 : undefined,
             amounts_unit: a.amounts_unit ?? 'page',
+            _medium_filter: a._medium_filter ?? '',
+            _type_filter: a._type_filter ?? '',
         };
     }
 }

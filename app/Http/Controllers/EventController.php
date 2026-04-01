@@ -1260,9 +1260,15 @@ class EventController extends Controller
 
                 $members = [];
                 try {
-                    if ($user) $members = [['id' => $user->id, 'name' => $user->name]];
+                    $memberUserIds = array_filter(array_unique([
+                        $user ? $user->id : null,
+                        $assignment ? $assignment->user_id : null,
+                    ]));
+                    $members = \App\Models\User::whereIn('id', array_values($memberUserIds))
+                        ->get(['id', 'name'])
+                        ->toArray();
                 } catch (\Throwable $__e) {
-                    $members = [];
+                    if ($user) $members = [['id' => $user->id, 'name' => $user->name]];
                 }
 
                 $company = null;
@@ -1280,8 +1286,8 @@ class EventController extends Controller
                 $stages = [];
                 $statuses = [];
                 try {
-                    $types = \App\Models\WorkItemType::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'company_id', 'department_id']);
-                    $sizes = \App\Models\Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'width', 'height', 'unit', 'company_id', 'department_id']);
+                    $types = \App\Models\WorkItemType::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group', 'company_id', 'department_id']);
+                    $sizes = \App\Models\Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group', 'width', 'height', 'unit', 'company_id', 'department_id']);
                     $stages = \App\Models\Stage::orderBy('sort_order')->orderBy('order_index')->get(['id', 'name', 'company_id', 'department_id']);
                     $statuses = \App\Models\Status::orderBy('sort_order')->get(['id', 'name', 'slug', 'company_id', 'department_id']);
                 } catch (\Throwable $__e) {
