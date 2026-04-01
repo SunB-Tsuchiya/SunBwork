@@ -358,6 +358,43 @@
         @selected="onSelected"
     />
 
+    <!-- Event overlap warning modal -->
+    <div v-if="showOverlapModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div class="mx-4 w-full max-w-md rounded-lg bg-white shadow-xl">
+            <div class="border-b px-6 py-4">
+                <h2 class="text-lg font-semibold text-red-700">予定が重複しています</h2>
+            </div>
+            <div class="p-6">
+                <p class="mb-4 text-sm text-gray-700">
+                    選択した日時に以下の予定が重複しています。差し込み作業として記録されます。
+                </p>
+                <div class="mb-4 max-h-40 overflow-y-auto rounded border border-red-200 bg-red-50">
+                    <div v-for="(e, idx) in overlappingEvents" :key="idx" class="border-b px-3 py-2 text-sm last:border-b-0">
+                        <div class="font-medium text-gray-800">{{ e.title || e.name || '(無題)' }}</div>
+                        <div class="text-xs text-gray-600">
+                            {{ new Date(e.start).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) }} -
+                            {{ new Date(e.end).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 border-t px-6 py-4">
+                <button
+                    @click="closeOverlapModal"
+                    class="rounded bg-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-300"
+                >
+                    キャンセル
+                </button>
+                <button
+                    @click="proceedAnyway"
+                    class="rounded bg-orange-600 px-4 py-2 text-white hover:bg-orange-700"
+                >
+                    それでも作成する
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast container -->
     <div class="fixed bottom-4 right-4 z-50 space-y-2">
         <div v-for="t in toasts" :key="t.id" :class="toastClass(t.type)" class="max-w-sm">
@@ -444,6 +481,11 @@ const startTimeMin = ref('00');
 const endTimeHour = ref('10');
 const endTimeMin = ref('00');
 
+// Event overlap checking state
+const overlappingEvents = ref([]);
+const showOverlapModal = ref(false);
+const proceedWithOverlap = ref(false);
+
 function normalizeToDateTimePartsLocal(dt) {
     if (!dt) return { date: '', time: '' };
     const s = String(dt);
@@ -469,6 +511,46 @@ function makeLabel(kind, id) {
     if (!Array.isArray(list)) return null;
     const found = list.find((x) => String(x.id) === String(id));
     return found ? `${kind.replace(/s$/, '')}: ${found.name}` : null;
+}
+
+// Event overlap checking function
+async function checkEventOverlaps() {
+    if (!workDate.value || !startTimeHour.value || !endTimeHour.value) {
+        return [];
+    }
+
+    try {
+        const start = `${workDate.value} ${String(startTimeHour.value).padStart(2, '0')}:${String(startTimeMin.value || '00').padStart(2, '0')}:00`;
+        const end = `${workDate.value} ${String(endTimeHour.value).padStart(2, '0')}:${String(endTimeMin.value || '00').padStart(2, '0')}:00`;
+
+        const res = await fetch('/events', {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+        });
+
+        if (res.ok) {
+            const events = await res.json();
+            if (!Array.isArray(events)) return [];
+
+            const startTime = new Date(start).getTime();
+            const endTime = new Date(end).getTime();
+
+            // Filter events that overlap with the new event
+            const overlaps = events.filter((e) => {
+                const eStart = new Date(e.start).getTime();
+                const eEnd = new Date(e.end).getTime();
+                // Check if there's any overlap
+                return startTime < eEnd && endTime > eStart;
+            });
+
+            return overlaps;
+        }
+    } catch (err) {
+        console.warn('Failed to check event overlaps:', err);
+    }
+
+    return [];
 }
 
 function resolveDifficultyId(val) {
@@ -1551,6 +1633,17 @@ async function save() {
         // user mode save
         saving.value = true;
 
+        // Check for overlapping events
+        if (!proceedWithOverlap.value && props.mode === 'user' && editMode) {
+            const overlaps = await checkEventOverlaps();
+            if (overlaps && overlaps.length > 0) {
+                overlappingEvents.value = overlaps;
+                showOverlapModal.value = true;
+                saving.value = false;
+                return;
+            }
+        }
+
         try {
             if (assignments.value && assignments.value.length) {
                 const a0 = assignments.value[0];
@@ -1814,6 +1907,19 @@ async function save() {
             saving.value = false;
         }
     }
+}
+
+// Helper functions for overlap modal
+function closeOverlapModal() {
+    showOverlapModal.value = false;
+    overlappingEvents.value = [];
+    proceedWithOverlap.value = false;
+}
+
+function proceedAnyway() {
+    proceedWithOverlap.value = true;
+    showOverlapModal.value = false;
+    save();
 }
 </script>
 
