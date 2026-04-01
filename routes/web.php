@@ -124,7 +124,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::resource('diaries', App\Http\Controllers\DiaryController::class)
         ->only(['create', 'store', 'show', 'edit', 'update', 'destroy', 'index']);
 
-    // Diary comment delete (authenticated users can delete their own comment)
+    // Diary comment update/delete (authenticated users can edit/delete their own comment)
+    Route::patch('diary-comments/{comment}', [App\Http\Controllers\DiaryCommentController::class, 'update'])->name('diary_comments.update');
     Route::delete('diary-comments/{comment}', [App\Http\Controllers\DiaryCommentController::class, 'destroy'])->name('diary_comments.destroy');
 
     // Attachment deletion (authenticated users) - allow frontend to call DELETE /attachments/{id}

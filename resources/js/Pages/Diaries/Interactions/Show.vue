@@ -39,6 +39,11 @@ const timelineEndHour = computed(() => {
 
 const comment = ref('');
 
+// 編集用の状態管理
+const editingCommentId = ref(null);
+const editingCommentText = ref('');
+const isUpdatingComment = ref(false);
+
 // 追加: 既読ユーザー名を安全に取り出すヘルパー
 const readerNames = computed(() => {
     const rb = props.diary?.read_by || [];
@@ -271,6 +276,76 @@ async function deleteComment(commentId, idx) {
         alert('コメントの削除中にエラーが発生しました');
     }
 }
+
+// コメント編集：編集モーダルを開く
+function editComment(c) {
+    editingCommentId.value = c.id;
+    editingCommentText.value = c.comment;
+}
+
+// コメント編集キャンセル
+function cancelEdit() {
+    editingCommentId.value = null;
+    editingCommentText.value = '';
+}
+
+// コメント更新：サーバーに POST
+async function updateComment() {
+    if (!editingCommentId.value || !editingCommentText.value.trim()) {
+        alert('コメントを入力してください');
+        return;
+    }
+
+    const commentId = editingCommentId.value;
+    let target;
+    try {
+        target = route('diary_comments.update', commentId);
+    } catch (e) {
+        console.warn('Ziggy route failed for diary_comments.update', e);
+        target = `/diary-comments/${commentId}`;
+    }
+
+    isUpdatingComment.value = true;
+    try {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        const res = await fetch(target, {
+            method: 'PATCH',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: JSON.stringify({ comment: editingCommentText.value }),
+        });
+
+        if (!res.ok) {
+            console.error('updateComment failed', res.status, await res.text());
+            alert('コメントの更新に失敗しました');
+            return;
+        }
+
+        const data = await res.json();
+
+        // update local comment in diary.comments
+        try {
+            const arr = props.diary.comments || [];
+            const found = arr.findIndex((x) => x.id === commentId || x.id === Number(commentId));
+            if (found >= 0) {
+                arr[found].comment = editingCommentText.value;
+            }
+        } catch (e) {
+            console.warn('local comment array update failed', e);
+        }
+
+        cancelEdit();
+    } catch (e) {
+        console.error('updateComment error', e);
+        alert('コメントの更新中にエラーが発生しました');
+    } finally {
+        isUpdatingComment.value = false;
+    }
+}
 </script>
 
 <template>
@@ -331,7 +406,8 @@ async function deleteComment(commentId, idx) {
                                 <strong>{{ c.user_name }}</strong>：
                                 <span class="whitespace-pre-wrap">{{ c.comment }}</span>
                             </div>
-                            <div v-if="c.user_id === $page.props.auth?.user?.id" class="ml-3 shrink-0">
+                            <div v-if="c.user_id === $page.props.auth?.user?.id" class="ml-3 flex shrink-0 gap-1">
+                                <button @click.prevent="editComment(c)" class="text-sm text-blue-600 hover:underline">編集</button>
                                 <button @click.prevent="deleteComment(c.id, idx)" class="text-sm text-red-600 hover:underline">削除</button>
                             </div>
                         </div>
@@ -361,6 +437,34 @@ async function deleteComment(commentId, idx) {
             <div class="mt-4 flex justify-end space-x-2">
                 <button @click="goIndex" class="rounded bg-gray-200 px-4 py-2 text-gray-700">一覧へ</button>
                 <button @click="markRead" class="rounded bg-blue-600 px-4 py-2 text-white">既読にする</button>
+            </div>
+
+            <!-- コメント編集モーダル -->
+            <div v-if="editingCommentId" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+                <div class="w-full max-w-md rounded bg-white p-6 shadow-lg">
+                    <h3 class="mb-4 text-lg font-semibold text-gray-800">コメントを編集</h3>
+                    <textarea
+                        v-model="editingCommentText"
+                        rows="4"
+                        class="mb-4 block w-full rounded border px-3 py-2 text-sm"
+                        placeholder="コメントを入力してください"
+                    ></textarea>
+                    <div class="flex justify-end gap-2">
+                        <button
+                            @click="cancelEdit"
+                            class="rounded bg-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-400"
+                        >
+                            キャンセル
+                        </button>
+                        <button
+                            @click="updateComment"
+                            :disabled="isUpdatingComment"
+                            class="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
+                        >
+                            {{ isUpdatingComment ? '更新中...' : '更新' }}
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </AppLayout>
