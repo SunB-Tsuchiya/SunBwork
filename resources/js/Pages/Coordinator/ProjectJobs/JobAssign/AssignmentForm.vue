@@ -408,7 +408,6 @@
 
 <script setup>
 import SelectionModal from '@/Components/SelectionModal.vue';
-import { inertiaFetch } from '@/Composables/useInertiaFetch';
 import useToasts from '@/Composables/useToasts';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, inject, onMounted, ref, watch } from 'vue';
