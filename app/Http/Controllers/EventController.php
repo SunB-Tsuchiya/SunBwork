@@ -714,15 +714,48 @@ class EventController extends Controller
             }
             $assignment->save();
 
-            // update any JobAssignmentMessage rows to reflect completed state
+            // ── Coordinator の project_job_assignments にも完了を反映 ──────────────
+            // by_myself と同一の project_job_id + user_id を持つ coordinator 割当を更新し、
+            // Coordinator の JobBox にステータスが表示されるようにする。
             try {
-                if (Schema::hasColumn('job_assignment_messages', 'completed')) {
-                    \App\Models\JobAssignmentMessage::where('project_job_assignment_id', $assignment->id)
-                        ->update(['completed' => true]);
+                $completedStatusId = null;
+                if (Schema::hasTable('statuses')) {
+                    $completedStatus = DB::table('statuses')->where('key', 'completed')->orWhere('slug', 'completed')->first();
+                    $completedStatusId = $completedStatus ? $completedStatus->id : null;
                 }
+
+                $coordinatorAssignments = ProjectJobAssignment::where('project_job_id', $assignment->project_job_id)
+                    ->where('user_id', $assignment->user_id)
+                    ->get();
+
+                foreach ($coordinatorAssignments as $cAssignment) {
+                    if (Schema::hasColumn('project_job_assignments', 'completed')) {
+                        $cAssignment->completed = true;
+                    }
+                    if ($completedStatusId && Schema::hasColumn('project_job_assignments', 'status_id')) {
+                        $cAssignment->status_id = $completedStatusId;
+                    }
+                    $cAssignment->save();
+
+                    // job_assignment_messages も更新
+                    if (Schema::hasColumn('job_assignment_messages', 'completed')) {
+                        \App\Models\JobAssignmentMessage::where('project_job_assignment_id', $cAssignment->id)
+                            ->update(['completed' => true]);
+                    }
+                    if ($completedStatusId && Schema::hasColumn('job_assignment_messages', 'status_id')) {
+                        \App\Models\JobAssignmentMessage::where('project_job_assignment_id', $cAssignment->id)
+                            ->update(['status_id' => $completedStatusId]);
+                    }
+                }
+
+                Log::info('EventController: synced completion to coordinator assignments', [
+                    'by_myself_id' => $assignment->id,
+                    'coordinator_assignment_ids' => $coordinatorAssignments->pluck('id')->toArray(),
+                ]);
             } catch (\Throwable $__e) {
-                // non-fatal
+                Log::warning('EventController: failed to sync completion to coordinator assignments', ['error' => $__e->getMessage()]);
             }
+            // ──────────────────────────────────────────────────────────────────────
 
             // Prefix event title with completion marker for persistent visibility
             $prefix = '【完了】';
