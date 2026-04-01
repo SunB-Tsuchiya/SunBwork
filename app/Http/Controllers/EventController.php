@@ -204,14 +204,7 @@ class EventController extends Controller
             'date' => 'required|date',
             'event_item_type_id' => 'nullable|exists:event_item_types,id',
             'title' => 'required|string|max:255',
-            'description' => [
-                'required',
-                function ($attribute, $value, $fail) {
-                    if (trim(strip_tags($value)) === '') {
-                        $fail('説明を入力してください。');
-                    }
-                }
-            ],
+            'description' => 'nullable|string',
             'startHour' => 'required',
             'startMinute' => 'required',
             'endHour' => 'required',

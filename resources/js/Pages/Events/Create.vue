@@ -127,9 +127,9 @@ const submit = () => {
         return;
     }
 
-    const evUrl = `/events?date=${encodeURIComponent(form.date)}`;
+    const evUrl = route('events.index') + `?date=${encodeURIComponent(form.date)}`;
     fetch(evUrl, {
-        headers: { Accept: 'application/json' },
+        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         credentials: 'same-origin',
     })
         .then((res) => {
