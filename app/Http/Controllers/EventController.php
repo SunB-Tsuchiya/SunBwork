@@ -687,19 +687,20 @@ class EventController extends Controller
         try {
             DB::beginTransaction();
 
-            $assignment = ProjectJobAssignment::find($event->project_job_assignment_id);
+            // events.project_job_assignment_id は project_job_assignment_by_myself の FK
+            $assignment = ProjectJobAssignmentByMyself::find($event->project_job_assignment_id);
             if (!$assignment) {
                 DB::rollBack();
                 return redirect()->back()->with('error', '関連する割り当てが見つかりません。');
             }
 
             // mark assignment completed if column exists
-            if (Schema::hasColumn('project_job_assignments', 'completed')) {
+            if (Schema::hasColumn('project_job_assignment_by_myself', 'completed')) {
                 $assignment->completed = true;
             }
             // set status_id to 'completed' if statuses table exists
             try {
-                if (Schema::hasTable('statuses') && Schema::hasColumn('project_job_assignments', 'status_id')) {
+                if (Schema::hasTable('statuses') && Schema::hasColumn('project_job_assignment_by_myself', 'status_id')) {
                     $status = DB::table('statuses')->where('key', 'completed')->first();
                     if (!$status) {
                         $statusId = DB::table('statuses')->insertGetId(['key' => 'completed', 'name' => '完了', 'created_at' => now(), 'updated_at' => now()]);
@@ -1227,7 +1228,8 @@ class EventController extends Controller
         // alongside the event. Otherwise fall back to the normal Events/Edit.
         try {
             if (Schema::hasColumn('events', 'project_job_assignment_id') && $event->project_job_assignment_id) {
-                $assignment = ProjectJobAssignment::with(['projectJob.client', 'projectJob'])->find($event->project_job_assignment_id);
+                // events.project_job_assignment_id は project_job_assignment_by_myself の FK
+                $assignment = ProjectJobAssignmentByMyself::with(['projectJob.client', 'projectJob'])->find($event->project_job_assignment_id);
 
                 // Gather same lookup lists as create/createJob so the form has selects
                 $user = request()->user();
