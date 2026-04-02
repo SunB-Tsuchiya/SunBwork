@@ -472,6 +472,7 @@ class ProjectJobController extends Controller
             ]);
 
             $subIds = Arr::pull($data, 'sub_coordinator_ids', []);
+            Arr::pull($data, 'schedule'); // project_jobs テーブルに schedule カラムなし
             $projectJob->update($data);
 
             // リーダー自身はピボットに入れない
