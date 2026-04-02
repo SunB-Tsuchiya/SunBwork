@@ -97,9 +97,9 @@ const showGroupModal = ref(false);
 const newGroupName = ref('');
 const groupModalError = ref('');
 
-// グループ並べ替えモーダル用ステート
-const showGroupSortModal = ref(false);
-const modalGroups = ref([]); // モーダル内での一時的な並び順
+// グループ編集モーダル用ステート
+const showGroupEditModal = ref(false);
+const modalGroups = ref([]); // [{ key, nameInput }]
 
 // props を reactive なローカルコピーに変換
 const state = reactive({
@@ -216,11 +216,14 @@ function addNewGroup() {
     addRow(name);
 }
 
-// ---- グループ並べ替えモーダル ----
-function openGroupSortModal() {
+// ---- グループ編集モーダル ----
+function openGroupEditModal() {
     if (!groupConfig.value) return;
-    modalGroups.value = [...groupConfig.value.groups];
-    showGroupSortModal.value = true;
+    modalGroups.value = groupConfig.value.groups.map((g) => ({
+        key: g ?? null,
+        nameInput: groupConfig.value.labels[g] ?? (g !== null ? String(g) : 'グループなし'),
+    }));
+    showGroupEditModal.value = true;
 }
 
 function moveGroupUp(idx) {
@@ -239,11 +242,43 @@ function moveGroupDown(idx) {
     a[idx] = tmp;
 }
 
-function applyGroupSort() {
-    if (groupConfig.value) {
-        groupConfig.value.groups = [...modalGroups.value];
+function isGroupInUse(key) {
+    return state.items.some((i) => !i._deleted && (i.group ?? null) === (key ?? null));
+}
+
+function deleteModalGroup(idx) {
+    modalGroups.value.splice(idx, 1);
+}
+
+function applyGroupEdit() {
+    if (!groupConfig.value) return;
+    const originalGroupKeys = new Set((groupConfigByType[props.type]?.groups ?? []).map((g) => g ?? null));
+    const newGroups = [];
+    const newLabels = { ...groupConfig.value.labels };
+    for (const mg of modalGroups.value) {
+        const oldKey = mg.key ?? null;
+        const inputLabel = mg.nameInput.trim();
+        const isCustom = oldKey !== null && !originalGroupKeys.has(oldKey);
+        // カスタムグループ: 名前変更 → キーも変更して items も更新（永続化のため）
+        const newKey = isCustom && inputLabel && inputLabel !== oldKey ? inputLabel : oldKey;
+        newGroups.push(newKey);
+        const labelKey = newKey === null ? 'null' : String(newKey);
+        newLabels[labelKey] = inputLabel || (newKey !== null ? String(newKey) : 'グループなし');
+        if (isCustom && newKey !== oldKey) {
+            for (const item of state.items) {
+                if ((item.group ?? null) === oldKey) item.group = newKey;
+            }
+            delete newLabels[String(oldKey)];
+        }
     }
-    showGroupSortModal.value = false;
+    // 削除されたグループのラベルをクリア
+    const remainingLabelKeys = new Set(newGroups.map((k) => (k === null ? 'null' : String(k))));
+    for (const k of Object.keys(newLabels)) {
+        if (!remainingLabelKeys.has(k)) delete newLabels[k];
+    }
+    groupConfig.value.groups = newGroups;
+    groupConfig.value.labels = newLabels;
+    showGroupEditModal.value = false;
 }
 
 function groupLabel(key) {
@@ -449,7 +484,7 @@ function revert() {
                                         class="rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-400 focus:outline-none disabled:bg-gray-100 disabled:text-gray-400"
                                     >
                                         <option v-for="g in groupConfig.groups" :key="g ?? '__null__'" :value="g">
-                                            {{ groupConfig.labels[g] ?? groupConfig.labels['null'] ?? 'グループなし' }}
+                                            {{ groupConfig.labels[g] ?? (g !== null ? String(g) : 'グループなし') }}
                                         </option>
                                     </select>
                                 </td>
@@ -491,14 +526,14 @@ function revert() {
                     >
                         + グループを追加
                     </button>
-                    <!-- work_item_types のみ: グループの並べ替え -->
+                    <!-- work_item_types のみ: グループを編集 -->
                     <button
                         v-if="groupConfig && type === 'work_item_types'"
                         type="button"
                         class="rounded border border-indigo-500 px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50"
-                        @click="openGroupSortModal"
+                        @click="openGroupEditModal"
                     >
-                        ⇅ グループを並べ替え
+                        ✎ グループを編集
                     </button>
                 </div>
                 <div class="flex gap-3">
@@ -550,42 +585,65 @@ function revert() {
             </div>
         </div>
 
-        <!-- グループ並べ替えモーダル -->
+        <!-- グループ編集モーダル -->
         <div
-            v-if="showGroupSortModal"
+            v-if="showGroupEditModal"
             class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-            @click.self="showGroupSortModal = false"
+            @click.self="showGroupEditModal = false"
         >
-            <div class="mx-4 w-full max-w-sm rounded-lg bg-white shadow-xl">
+            <div class="mx-4 w-full max-w-md rounded-lg bg-white shadow-xl">
                 <div class="border-b px-6 py-4">
-                    <h2 class="text-lg font-semibold text-gray-800">グループを並べ替え</h2>
+                    <h2 class="text-lg font-semibold text-gray-800">グループを編集</h2>
                 </div>
                 <div class="max-h-96 overflow-y-auto p-4">
                     <ul class="divide-y divide-gray-100">
                         <li
-                            v-for="(gKey, idx) in modalGroups"
-                            :key="gKey ?? '__null__'"
-                            class="flex items-center justify-between gap-3 px-2 py-2.5"
+                            v-for="(mg, idx) in modalGroups"
+                            :key="mg.key ?? '__null__'"
+                            class="py-2"
                         >
-                            <span class="text-sm text-gray-800">{{ groupLabel(gKey) }}</span>
-                            <div class="flex flex-col gap-0.5">
+                            <div class="flex items-center gap-2">
+                                <!-- 並べ替えボタン -->
+                                <div class="flex flex-col gap-0.5">
+                                    <button
+                                        type="button"
+                                        :disabled="idx === 0"
+                                        class="flex h-6 w-6 items-center justify-center rounded text-gray-400 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-30"
+                                        @click="moveGroupUp(idx)"
+                                    >
+                                        ▲
+                                    </button>
+                                    <button
+                                        type="button"
+                                        :disabled="idx === modalGroups.length - 1"
+                                        class="flex h-6 w-6 items-center justify-center rounded text-gray-400 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-30"
+                                        @click="moveGroupDown(idx)"
+                                    >
+                                        ▼
+                                    </button>
+                                </div>
+                                <!-- 名前入力（null グループは変更不可） -->
+                                <input
+                                    v-if="mg.key !== null"
+                                    v-model="mg.nameInput"
+                                    type="text"
+                                    class="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-400 focus:outline-none"
+                                />
+                                <span v-else class="flex-1 text-sm text-gray-400">グループなし（変更不可）</span>
+                                <!-- 削除ボタン -->
                                 <button
                                     type="button"
-                                    :disabled="idx === 0"
-                                    class="flex h-6 w-6 items-center justify-center rounded text-gray-500 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-30"
-                                    @click="moveGroupUp(idx)"
+                                    :disabled="isGroupInUse(mg.key) || mg.key === null"
+                                    class="whitespace-nowrap rounded px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-gray-300"
+                                    @click="deleteModalGroup(idx)"
                                 >
-                                    ▲
-                                </button>
-                                <button
-                                    type="button"
-                                    :disabled="idx === modalGroups.length - 1"
-                                    class="flex h-6 w-6 items-center justify-center rounded text-gray-500 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-30"
-                                    @click="moveGroupDown(idx)"
-                                >
-                                    ▼
+                                    削除
                                 </button>
                             </div>
+                            <!-- 使用中の注意書き -->
+                            <p v-if="isGroupInUse(mg.key)" class="mt-1 pl-14 text-xs text-orange-600">
+                                ⚠ このグループには項目があるため削除できません
+                            </p>
                         </li>
                     </ul>
                 </div>
@@ -593,14 +651,14 @@ function revert() {
                     <button
                         type="button"
                         class="rounded bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300"
-                        @click="showGroupSortModal = false"
+                        @click="showGroupEditModal = false"
                     >
                         キャンセル
                     </button>
                     <button
                         type="button"
                         class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-                        @click="applyGroupSort"
+                        @click="applyGroupEdit"
                     >
                         適用
                     </button>
