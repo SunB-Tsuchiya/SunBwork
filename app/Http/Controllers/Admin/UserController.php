@@ -85,7 +85,7 @@ class UserController extends Controller
                 'user_role' => [
                     'required',
                     function($attribute, $value, $fail) {
-                        $allowed = ['admin', 'leader', 'coordinator', 'user'];
+                        $allowed = ['admin', 'leader', 'coordinator', 'clerk', 'user'];
                         if (!in_array($value, $allowed)) {
                             $fail("{$attribute} の値 '{$value}' は許可されていません（許可値: " . implode(',', $allowed) . ")");
                         }
@@ -203,7 +203,7 @@ class UserController extends Controller
         $rules = [
             'name'        => 'required|string|max:255',
             'email'       => 'required|string|lowercase|email|max:255|unique:users,email,' . $user->id,
-            'user_role'   => 'required|string|in:admin,leader,coordinator,user',
+            'user_role'   => 'required|string|in:admin,leader,coordinator,clerk,user',
             'company_id'  => 'required|exists:companies,id',
             'department_id' => 'required|exists:departments,id',
             'assignment_id' => 'required|exists:assignments,id',
@@ -542,7 +542,7 @@ class UserController extends Controller
                 'users.*.password' => 'required|string',
                 'users.*.assignment_id' => 'required|exists:assignments,id',
                 // CSV経由での 'admin' 登録は不可
-                'users.*.user_role'         => 'required|in:leader,coordinator,user',
+                'users.*.user_role'         => 'required|in:leader,coordinator,clerk,user',
                 'users.*.position_title_id' => 'nullable|exists:position_titles,id',
                 'company_id' => 'required|exists:companies,id',
                 'department_id' => 'required|exists:departments,id',
@@ -824,7 +824,7 @@ class UserController extends Controller
      */
     private function validateAndFixUserRole($userRole)
     {
-        $validUserRoles = ['admin', 'leader', 'coordinator', 'user'];
+        $validUserRoles = ['admin', 'leader', 'coordinator', 'clerk', 'user'];
 
         // タイポ修正マップ
         $typoFixes = [
@@ -833,6 +833,7 @@ class UserController extends Controller
             '管理者' => 'admin',
             'リーダー' => 'leader',
             'manager' => 'leader',
+            'クラーク' => 'clerk',
             'ユーザー' => 'user',
             'member' => 'user',
             'cordinator' => 'coordinator',
