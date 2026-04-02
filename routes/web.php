@@ -435,6 +435,14 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 
 // クライアント管理（Admin用）は上の admin グループに統合済み（重複削除）
 // Coordinator Routes (AdminとCoordinatorのみアクセス可能)
+// Clerk Routes (Clerk / Admin / SuperAdmin / 部署リーダーのみアクセス可能)
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'clerk'])
+    ->prefix('clerk')
+    ->name('clerk.')
+    ->group(function () {
+        Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
+    });
+
 Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'coordinator'])
     ->prefix('coordinator')
     ->name('coordinator.')

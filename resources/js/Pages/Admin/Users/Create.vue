@@ -158,6 +158,7 @@ const userAssignmentOptions = [
     { value: 'admin', label: '管理者', description: '全ての機能にアクセス可能' },
     { value: 'leader', label: 'リーダー', description: 'コンテンツ管理とユーザー機能にアクセス可能' },
     { value: 'coordinator', label: '進行管理', description: 'タスク管理とユーザー機能にアクセス可能' },
+    { value: 'clerk', label: 'クラーク（経理・事務）', description: '経理・事務機能にアクセス可能' },
     { value: 'user', label: 'ユーザー', description: '基本機能のみアクセス可能' }
 ];
 

@@ -5,6 +5,7 @@ import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
 import AdminNavigationTabs from '@/Components/Tabs/AdminNavigationTabs.vue';
+import ClerkNavigationTabs from '@/Components/Tabs/ClerkNavigationTabs.vue';
 import CoordinatorNavigationTabs from '@/Components/Tabs/CoordinatorNavigationTabs.vue';
 import LeaderNavigationTabs from '@/Components/Tabs/LeaderNavigationTabs.vue';
 import SuperAdminNavigationTabs from '@/Components/Tabs/SuperAdminNavigationTabs.vue';
@@ -209,6 +210,7 @@ function roleNavClass(role) {
         superadmin:  'bg-yellow-500 text-white font-semibold',
         admin:       'bg-red-500 text-white font-semibold',
         leader:      'bg-orange-500 text-white font-semibold',
+        clerk:       'bg-purple-600 text-white font-semibold',
         coordinator: 'bg-green-600 text-white font-semibold',
         user:        'bg-blue-500 text-white font-semibold',
     };
@@ -216,6 +218,7 @@ function roleNavClass(role) {
         superadmin:  'text-yellow-600 hover:text-yellow-800',
         admin:       'text-red-600 hover:text-red-800',
         leader:      'text-orange-600 hover:text-orange-800',
+        clerk:       'text-purple-600 hover:text-purple-800',
         coordinator: 'text-green-600 hover:text-green-800',
         user:        'text-blue-600 hover:text-blue-800',
     };
@@ -253,6 +256,7 @@ const currentRouteContext = computed(() => {
         if (r.startsWith('admin.')) return 'admin';
         if (r.startsWith('leader.') || r.startsWith('workload_setting.')) return 'leader';
         if (r.startsWith('coordinator.')) return 'coordinator';
+        if (r.startsWith('clerk.')) return 'clerk';
         // user.project_jobs.* / user.jobbox.* は user エリア
         // それ以外の user.* も user エリア
         return 'user';
@@ -295,6 +299,7 @@ const currentRouteContext = computed(() => {
                                     <Link :href="route('superadmin.dashboard')" :class="roleNavClass('superadmin')">SuperAdmin</Link>
                                     <Link :href="route('admin.dashboard')" :class="roleNavClass('admin')">Admin</Link>
                                     <Link :href="route('leader.dashboard')" :class="roleNavClass('leader')">Leader</Link>
+                                    <Link :href="route('clerk.dashboard')" :class="roleNavClass('clerk')">Clerk</Link>
                                     <Link :href="route('coordinator.dashboard')" :class="roleNavClass('coordinator')">Coordinator</Link>
                                     <Link :href="route('user.dashboard')" :class="roleNavClass('user')">User</Link>
                                 </template>
@@ -303,13 +308,26 @@ const currentRouteContext = computed(() => {
                                 <template v-else-if="$page.props.auth.user.user_role === 'admin'">
                                     <Link :href="route('admin.dashboard')" :class="roleNavClass('admin')">Admin</Link>
                                     <Link :href="route('leader.dashboard')" :class="roleNavClass('leader')">Leader</Link>
+                                    <Link :href="route('clerk.dashboard')" :class="roleNavClass('clerk')">Clerk</Link>
                                     <Link :href="route('coordinator.dashboard')" :class="roleNavClass('coordinator')">Coordinator</Link>
                                     <Link :href="route('user.dashboard')" :class="roleNavClass('user')">User</Link>
                                 </template>
 
-                                <!-- Leader用ナビゲーション -->
+                                <!-- Leader用ナビゲーション（部署リーダーはClerkも表示） -->
                                 <template v-else-if="$page.props.auth.user.user_role === 'leader'">
                                     <Link :href="route('leader.dashboard')" :class="roleNavClass('leader')">Leader</Link>
+                                    <Link
+                                        v-if="$page.props.auth.user.isDepartmentLeader"
+                                        :href="route('clerk.dashboard')"
+                                        :class="roleNavClass('clerk')"
+                                    >Clerk</Link>
+                                    <Link :href="route('coordinator.dashboard')" :class="roleNavClass('coordinator')">Coordinator</Link>
+                                    <Link :href="route('user.dashboard')" :class="roleNavClass('user')">User</Link>
+                                </template>
+
+                                <!-- Clerk用ナビゲーション（Coordinator+User権限を持つ） -->
+                                <template v-else-if="$page.props.auth.user.user_role === 'clerk'">
+                                    <Link :href="route('clerk.dashboard')" :class="roleNavClass('clerk')">Clerk</Link>
                                     <Link :href="route('coordinator.dashboard')" :class="roleNavClass('coordinator')">Coordinator</Link>
                                     <Link :href="route('user.dashboard')" :class="roleNavClass('user')">User</Link>
                                 </template>
@@ -774,6 +792,7 @@ const currentRouteContext = computed(() => {
                                 <SuperAdminNavigationTabs v-if="currentRouteContext === 'superadmin'" :active="getTopTabActive()" />
                                 <AdminNavigationTabs v-else-if="currentRouteContext === 'admin'" :active="getTopTabActive()" />
                                 <LeaderNavigationTabs v-else-if="currentRouteContext === 'leader'" :active="getTopTabActive()" />
+                                <ClerkNavigationTabs v-else-if="currentRouteContext === 'clerk'" :active="getTopTabActive()" />
                                 <CoordinatorNavigationTabs
                                     v-else-if="currentRouteContext === 'coordinator'"
                                     :projectJob="page.props.projectJob"

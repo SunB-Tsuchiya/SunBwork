@@ -63,6 +63,8 @@ class DashboardController extends Controller
             $component = 'Leader/Dashboard';
         } elseif (str_starts_with($path, 'coordinator/')) {
             $component = 'Coordinator/Dashboard';
+        } elseif (str_starts_with($path, 'clerk/')) {
+            $component = 'Clerk/Dashboard';
         } elseif (str_starts_with($path, 'user/')) {
             $component = 'Dashboard';
         } else {
@@ -75,6 +77,8 @@ class DashboardController extends Controller
                 return redirect()->route('leader.dashboard');
             } elseif ($user->user_role === 'coordinator') {
                 return redirect()->route('coordinator.dashboard');
+            } elseif ($user->user_role === 'clerk') {
+                return redirect()->route('clerk.dashboard');
             } else {
                 $component = 'Dashboard';
             }

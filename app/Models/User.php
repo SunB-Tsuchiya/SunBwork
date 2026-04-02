@@ -140,6 +140,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Check if user is clerk (経理・事務)
+     */
+    public function isClerk(): bool
+    {
+        return $this->user_role === 'clerk';
+    }
+
+    /**
      * Check if user is regular user
      */
     public function isUser(): bool
