@@ -2,7 +2,7 @@
 import useToasts from '@/Composables/useToasts';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Head, router, usePage } from '@inertiajs/vue3';
-import { computed, reactive, toRaw } from 'vue';
+import { computed, reactive, ref, toRaw } from 'vue';
 
 const props = defineProps({
     type: { type: String, required: true },
@@ -74,7 +74,18 @@ const groupConfigByType = {
     },
 };
 
-const groupConfig = computed(() => groupConfigByType[props.type] ?? null);
+// groupConfig をミュータブルな ref に（カスタムグループ追加のため）
+const _init = groupConfigByType[props.type];
+const groupConfig = ref(
+    _init
+        ? { groups: [..._init.groups], labels: { ..._init.labels } }
+        : null,
+);
+
+// グループ追加モーダル用ステート
+const showGroupModal = ref(false);
+const newGroupName = ref('');
+const groupModalError = ref('');
 
 // props を reactive なローカルコピーに変換
 const state = reactive({
@@ -96,10 +107,17 @@ const sortedItems = computed(() => {
 });
 
 // グループ別セクション（グループ設定がある場合のみ）
+// items に存在するが groupConfig にないカスタムグループも末尾に表示する
 const groupedSections = computed(() => {
     if (!groupConfig.value) return null;
     const { groups, labels } = groupConfig.value;
-    return groups.map((key) => {
+    // items から groupConfig 未登録のグループを抽出して末尾追加
+    const configKeys = groups.map((g) => g ?? null);
+    const extraKeys = [...new Set(state.items.map((i) => i.group ?? null))].filter(
+        (k) => !configKeys.includes(k),
+    );
+    const allGroups = [...groups, ...extraKeys];
+    return allGroups.map((key) => {
         const normalizedKey = key ?? null;
         const items = state.items
             .filter((i) => (i.group ?? null) === normalizedKey)
@@ -107,7 +125,7 @@ const groupedSections = computed(() => {
         return {
             key: normalizedKey,
             keyStr: key !== null && key !== undefined ? String(key) : 'null',
-            label: labels[key] ?? labels['null'] ?? 'グループなし',
+            label: labels[key] ?? labels['null'] ?? (key !== null ? String(key) : 'グループなし'),
             items,
         };
     });
@@ -162,9 +180,41 @@ function undoDelete(item) {
     item._deleted = false;
 }
 
+// 新しいグループを追加してセクションを作成する
+function addNewGroup() {
+    const name = newGroupName.value.trim();
+    if (!name) {
+        groupModalError.value = 'グループ名を入力してください';
+        return;
+    }
+    // 既存グループキー（null も含む）と重複チェック
+    const existing = groupConfig.value.groups.map((g) => g ?? null);
+    if (existing.includes(name)) {
+        groupModalError.value = '同名のグループがすでに存在します';
+        return;
+    }
+    groupConfig.value.groups.push(name);
+    groupConfig.value.labels[name] = name;
+    showGroupModal.value = false;
+    newGroupName.value = '';
+    groupModalError.value = '';
+    // 新グループに空行を自動追加
+    addRow(name);
+}
+
 const { showToast, showValidationErrors } = useToasts();
 
 function save() {
+    // グループ化タイプ: 各グループに最低1件の有効な項目が必要
+    if (groupConfig.value && groupedSections.value) {
+        for (const section of groupedSections.value) {
+            const active = section.items.filter((i) => !i._deleted);
+            if (active.length === 0) {
+                showToast(`「${section.label}」グループには最低1件の項目が必要です`, 'error');
+                return;
+            }
+        }
+    }
     router.post(
         route('workload_setting.store', { type: props.type }),
         { items: toRaw(state.items) },
@@ -372,19 +422,71 @@ function revert() {
 
             <!-- フッターボタン -->
             <div class="mt-4 flex items-center justify-between">
-                <!-- グループ化タイプは各グループヘッダーに「+ 追加」ボタンがあるため非表示 -->
-                <button
-                    v-if="!groupedSections"
-                    type="button"
-                    class="rounded border border-blue-600 px-4 py-2 text-sm text-blue-600 hover:bg-blue-50"
-                    @click="addRow()"
-                >
-                    + 行を追加
-                </button>
-                <div v-else />
+                <div class="flex gap-2">
+                    <!-- グループ化タイプは各グループヘッダーに「+ 追加」ボタンがあるため非表示 -->
+                    <button
+                        v-if="!groupedSections"
+                        type="button"
+                        class="rounded border border-blue-600 px-4 py-2 text-sm text-blue-600 hover:bg-blue-50"
+                        @click="addRow()"
+                    >
+                        + 行を追加
+                    </button>
+                    <!-- グループ化タイプのみ: 新しいグループを追加 -->
+                    <button
+                        v-if="groupConfig"
+                        type="button"
+                        class="rounded border border-green-600 px-4 py-2 text-sm text-green-600 hover:bg-green-50"
+                        @click="showGroupModal = true"
+                    >
+                        + グループを追加
+                    </button>
+                </div>
                 <div class="flex gap-3">
                     <button type="button" class="rounded border px-4 py-2 text-sm text-gray-600 hover:bg-gray-50" @click="revert">リセット</button>
                     <button type="button" class="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700" @click="save">保存する</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- グループ追加モーダル -->
+        <div
+            v-if="showGroupModal"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+            @click.self="showGroupModal = false"
+        >
+            <div class="mx-4 w-full max-w-sm rounded-lg bg-white shadow-xl">
+                <div class="border-b px-6 py-4">
+                    <h2 class="text-lg font-semibold text-gray-800">新しいグループを追加</h2>
+                </div>
+                <div class="p-6">
+                    <label class="mb-1 block text-sm font-medium text-gray-700">
+                        グループ名 <span class="text-red-500">*</span>
+                    </label>
+                    <input
+                        v-model="newGroupName"
+                        type="text"
+                        class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+                        placeholder="例：特殊処理"
+                        @keydown.enter.prevent="addNewGroup"
+                    />
+                    <p v-if="groupModalError" class="mt-1 text-xs text-red-500">{{ groupModalError }}</p>
+                </div>
+                <div class="flex justify-end gap-2 border-t px-6 py-4">
+                    <button
+                        type="button"
+                        class="rounded bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                        @click="showGroupModal = false; newGroupName = ''; groupModalError = ''"
+                    >
+                        キャンセル
+                    </button>
+                    <button
+                        type="button"
+                        class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+                        @click="addNewGroup"
+                    >
+                        追加
+                    </button>
                 </div>
             </div>
         </div>
