@@ -84,6 +84,15 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     // Fetch latest summary for a conversation (used by frontend SummaryPanel)
     Route::get('/bot/conversations/{id}/summary', [App\Http\Controllers\Bot\BotController::class, 'summary'])->name('bot.conversations.summary');
 
+    // 使い方ガイド
+    Route::prefix('guide')->name('guide.')->group(function () {
+        Route::get('/', [App\Http\Controllers\GuideController::class, 'index'])->name('index');
+        Route::get('/user', [App\Http\Controllers\GuideController::class, 'user'])->name('user');
+        Route::get('/coordinator', [App\Http\Controllers\GuideController::class, 'coordinator'])->name('coordinator');
+        Route::get('/leader', [App\Http\Controllers\GuideController::class, 'leader'])->name('leader');
+        Route::get('/admin', [App\Http\Controllers\GuideController::class, 'admin'])->name('admin');
+    });
+
     // Ziggy用: 明示的にuser.dashboardルートを追加
     Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
     Route::get('/user/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('user.dashboard');
@@ -453,6 +462,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('project_jobs/check-duplicate', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'checkDuplicate'])->name('project_jobs.check_duplicate');
         Route::post('project_jobs', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'store'])->name('project_jobs.store');
         Route::post('project_jobs/{projectJob}/complete', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'complete'])->name('project_jobs.complete');
+        Route::post('project_jobs/{projectJob}/uncomplete', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'uncomplete'])->name('project_jobs.uncomplete');
         Route::get('project_jobs/{projectJob}', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'show'])->name('project_jobs.show');
         Route::get('project_jobs/{projectJob}/edit', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'edit'])->name('project_jobs.edit');
         Route::put('project_jobs/{projectJob}', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'update'])->name('project_jobs.update');

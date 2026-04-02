@@ -8,7 +8,7 @@
             <form @submit.prevent="submit">
                 <div class="mb-4">
                     <label class="mb-1 block font-semibold">伝票番号</label>
-                    <input v-model="form.jobcode" type="text" class="w-full rounded border px-3 py-2" required />
+                    <input v-model="form.jobcode" type="text" class="w-full rounded border px-3 py-2" />
                 </div>
                 <div class="mb-4">
                     <label class="mb-1 block font-semibold">案件タイトル</label>
@@ -75,9 +75,19 @@
                         </button>
                     </div>
                 </div>
-                <div class="mt-6 flex gap-4">
+                <div class="mt-6 flex flex-wrap items-center gap-4">
                     <button type="submit" class="rounded bg-blue-600 px-6 py-2 text-white hover:bg-blue-700">更新</button>
                     <Link :href="route('coordinator.project_jobs.index')" class="rounded bg-gray-200 px-4 py-2">一覧へ戻る</Link>
+                    <span v-if="props.job.completed" class="inline-flex items-center rounded-full bg-yellow-100 px-3 py-1 text-sm font-medium text-yellow-800">完了済み</span>
+                    <button
+                        v-if="props.job.completed"
+                        type="button"
+                        class="rounded bg-orange-500 px-4 py-2 text-white hover:bg-orange-600"
+                        :disabled="uncompleting"
+                        @click="uncomplete"
+                    >
+                        {{ uncompleting ? '処理中...' : '未完了にする' }}
+                    </button>
                 </div>
             </form>
         </div>
@@ -87,7 +97,7 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 const props = defineProps({
     job: Object,
     coordinatorCandidates: { type: Array, default: () => [] },
@@ -139,6 +149,30 @@ const subCandidates = computed(() =>
 
 function submit() {
     form.put(route('coordinator.project_jobs.update', { projectJob: props.job.id }));
+}
+
+const uncompleting = ref(false);
+async function uncomplete() {
+    if (!confirm('この案件を未完了に戻しますか？')) return;
+    uncompleting.value = true;
+    try {
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        const url = route('coordinator.project_jobs.uncomplete', { projectJob: props.job.id });
+        const res = await fetch(url, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        if (res.ok) {
+            router.visit(route('coordinator.project_jobs.edit', { projectJob: props.job.id }), { preserveState: false });
+        } else {
+            alert('未完了への変更に失敗しました。');
+        }
+    } catch {
+        alert('未完了への変更に失敗しました。');
+    } finally {
+        uncompleting.value = false;
+    }
 }
 function goSchedule() {
     router.visit(route('coordinator.project_jobs.schedule', { projectJob: props.job.id }));

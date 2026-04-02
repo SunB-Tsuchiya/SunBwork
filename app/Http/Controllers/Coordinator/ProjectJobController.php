@@ -95,6 +95,17 @@ class ProjectJobController extends Controller
         return response()->json(['success' => true, 'id' => $projectJob->id]);
     }
 
+    public function uncomplete(Request $request, ProjectJob $projectJob)
+    {
+        $user = $request->user();
+        if (!$user || !$this->isJobCoordinator($projectJob, $user)) {
+            return response()->json(['error' => 'Access denied'], 403);
+        }
+        $projectJob->completed = false;
+        $projectJob->save();
+        return response()->json(['success' => true, 'id' => $projectJob->id]);
+    }
+
     public function create()
     {
         return Inertia::render('Coordinator/ProjectJobs/Create', [
