@@ -9,6 +9,8 @@ use Inertia\Inertia;
 use App\Models\Diary;
 use App\Models\Event;
 use App\Models\ProjectJobAssignment;
+use App\Models\UserMonthlySchedule;
+use App\Models\Worktype;
 use Illuminate\Support\Facades\Schema;
 
 class DashboardController extends Controller
@@ -139,11 +141,77 @@ class DashboardController extends Controller
                 ]);
         }
 
+        // ユーザー設定からカレンダー表示モードと基本勤務形態を取得（User Dashboard のみ）
+        $calendarView    = 'timeGridWeek';
+        $defaultWorktype = null;
+        $worktypes       = [];
+        $dailyWorktypes  = [];
+
+        if ($component === 'Dashboard') {
+            // 会社の勤務形態一覧
+            try {
+                $worktypeQuery = Worktype::orderBy('sort_order');
+                if ($user->company_id) {
+                    $worktypeQuery->where('company_id', $user->company_id);
+                }
+                $worktypes = $worktypeQuery->get(['id', 'name', 'start_time', 'end_time'])->toArray();
+            } catch (\Throwable $e) {
+                Log::error('DashboardController worktypes error: ' . $e->getMessage());
+            }
+
+            // ユーザー設定
+            try {
+                $setting = $user->userSetting()->with('worktype')->first();
+                if ($setting) {
+                    if ($setting->calendar_view) {
+                        $calendarView = $setting->calendar_view;
+                    }
+                    if ($setting->worktype) {
+                        $defaultWorktype = [
+                            'id'         => $setting->worktype->id,
+                            'name'       => $setting->worktype->name,
+                            'start_time' => $setting->worktype->start_time,
+                            'end_time'   => $setting->worktype->end_time,
+                        ];
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::error('DashboardController userSetting error: ' . $e->getMessage());
+            }
+
+            // 日ごと勤務形態（±3ヶ月）：月次 JSON を展開
+            try {
+                $fromYm = now()->subMonths(3)->format('Y-m');
+                $toYm   = now()->addMonths(3)->format('Y-m');
+                $dailyWorktypes = [];
+                UserMonthlySchedule::where('user_id', $user->id)
+                    ->whereBetween('year_month', [$fromYm, $toYm])
+                    ->get(['year_month', 'schedule'])
+                    ->each(function ($ms) use (&$dailyWorktypes) {
+                        foreach (($ms->schedule ?? []) as $dd => $worktypeId) {
+                            if ($worktypeId) {
+                                $dailyWorktypes[] = [
+                                    'date'        => $ms->year_month . '-' . $dd,
+                                    'worktype_id' => (int) $worktypeId,
+                                ];
+                            }
+                        }
+                    });
+            } catch (\Throwable $e) {
+                Log::error('DashboardController dailyWorktypes error: ' . $e->getMessage());
+                $dailyWorktypes = [];
+            }
+        }
+
         return Inertia::render($component, [
-            'user'    => $user,
-            'diaries' => $diaries,
-            'events'  => $events,
-            'jobs'    => $jobs,
+            'user'            => $user,
+            'diaries'         => $diaries,
+            'events'          => $events,
+            'jobs'            => $jobs,
+            'calendarView'    => $calendarView,
+            'defaultWorktype' => $defaultWorktype,
+            'worktypes'       => $worktypes,
+            'dailyWorktypes'  => $dailyWorktypes,
         ]);
     }
 }

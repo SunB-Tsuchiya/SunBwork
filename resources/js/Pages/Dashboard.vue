@@ -17,6 +17,22 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    calendarView: {
+        type: String,
+        default: 'timeGridWeek',
+    },
+    defaultWorktype: {
+        type: Object,
+        default: null,
+    },
+    worktypes: {
+        type: Array,
+        default: () => [],
+    },
+    dailyWorktypes: {
+        type: Array,
+        default: () => [],
+    },
 });
 
 // ユーザー情報はinertiaのpropsから取得する
@@ -94,7 +110,16 @@ const showProfile = ref(false);
         </div>
         <!-- カレンダー -->
         <div class="rounded bg-white p-6 shadow">
-            <Calendar :diaries="diaries" :events="events" :jobs="jobs" diary-label="日報" />
+            <Calendar
+                :diaries="diaries"
+                :events="events"
+                :jobs="jobs"
+                :initial-view="calendarView"
+                :default-worktype="defaultWorktype"
+                :worktypes="worktypes"
+                :daily-worktypes="dailyWorktypes"
+                diary-label="日報"
+            />
         </div>
         <!--AI用メモ：ここまでを各ページのコンテンツとする-->
 
