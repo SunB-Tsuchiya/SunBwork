@@ -592,3 +592,22 @@ headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' }
 
 `.env` の `APP_NAME=SB`（旧: Laravel）→ ブラウザタブ「ページ名 - SB」で表示。
 さくら本番 `.env` も同様に変更 + `php artisan config:clear` 必要。
+
+---
+
+## ProjectJob 完了/未完了 機能（2026-04-02 実装）
+
+- `complete()`: `completed = true` で保存
+- `uncomplete()`: `completed = false` で保存（2026-04-02 追加）
+- ルート名: `coordinator.project_jobs.complete` / `coordinator.project_jobs.uncomplete`
+- `Edit.vue`: 完了済みバッジ + 「未完了にする」ボタン実装済み（完了時のみ表示）
+- `Edit.vue`: `jobcode` フィールドに `required` 属性なし（空欄で保存可）
+
+---
+
+## project_jobs テーブルの注意事項（さくら本番）⚠️
+
+- **`schedule` カラムはさくら本番に存在しない**（ローカル開発 DB にのみ存在）
+- `ProjectJobController::update()` では `Arr::pull($data, 'schedule')` を `$projectJob->update($data)` の前に必ず呼ぶこと（現在実装済み）
+- このカラムをバリデーション通過後の `$data` に入れたまま `update()` するとさくら本番で `Column not found: 1054 Unknown column 'schedule'` エラーが発生する
+- 同様に本番に存在しないカラムを `$data` に含めた場合は同じ対処（`Arr::pull`）が必要
