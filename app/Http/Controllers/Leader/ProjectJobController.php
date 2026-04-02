@@ -29,6 +29,7 @@ class ProjectJobController extends Controller
         if ($q) {
             $query->where(function ($q2) use ($q) {
                 $q2->where('title', 'like', "%{$q}%")
+                    ->orWhere('jobcode', 'like', "%{$q}%")
                     ->orWhereHas('client', fn ($c) => $c->where('name', 'like', "%{$q}%"));
             });
         }

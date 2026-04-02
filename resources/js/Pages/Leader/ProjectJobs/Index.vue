@@ -4,8 +4,8 @@
             <h2 class="text-xl font-semibold leading-tight text-gray-800">【リーダー】案件総覧</h2>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
-            <div class="mb-6">
+        <div class="mx-auto max-w-6xl rounded bg-white p-6 shadow">
+            <div class="mb-4">
                 <h1 class="text-2xl font-bold">案件総覧</h1>
                 <p class="mt-1 text-sm text-gray-500">部署内のすべての案件を表示しています（読み取り専用）</p>
             </div>
@@ -16,8 +16,8 @@
                     <input
                         v-model="qModel"
                         @keyup.enter="search"
-                        placeholder="案件名/クライアントで検索"
-                        class="w-72 rounded border px-3 py-2 text-sm"
+                        placeholder="案件名/クライアント/伝票番号で検索"
+                        class="w-80 rounded border px-3 py-2 text-sm"
                     />
                     <button class="rounded bg-orange-600 px-3 py-2 text-sm text-white hover:bg-orange-700" @click.prevent="search">検索</button>
                     <button class="ml-2 rounded border px-3 py-2 text-sm" @click.prevent="clearSearch">クリア</button>
@@ -35,8 +35,8 @@
                         style="width: 9.5em"
                     >
                         <option value="all">全期間</option>
-                        <option v-for="m in monthOptions" :key="m.value" :value="m.value">
-                            {{ m.label }}
+                        <option v-for="mo in monthOptions" :key="mo.value" :value="mo.value">
+                            {{ mo.label }}
                         </option>
                     </select>
                 </div>
@@ -46,22 +46,45 @@
                 </label>
             </div>
 
-            <!-- 月グループ表示 -->
+            <!-- グループ表示切替タブ -->
+            <div class="mt-4 flex gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1 w-fit">
+                <button
+                    v-for="mode in viewModes"
+                    :key="mode.key"
+                    @click="viewMode = mode.key"
+                    :class="viewMode === mode.key
+                        ? 'bg-white text-orange-700 font-semibold shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'"
+                    class="rounded px-4 py-1.5 text-sm transition-all"
+                >{{ mode.label }}</button>
+            </div>
+
+            <!-- グループ表示 -->
             <div class="mt-4 overflow-x-auto">
                 <div v-if="displayGroups.length === 0" class="py-8 text-center text-sm text-gray-400">
                     表示するデータがありません。
                 </div>
 
-                <template v-for="group in displayGroups" :key="group.month">
-                    <!-- 月ヘッダー -->
+                <template v-for="group in displayGroups" :key="group.key">
+                    <!-- グループヘッダー -->
                     <div class="mt-4 rounded bg-orange-50 px-4 py-1.5 text-sm font-semibold text-orange-800 first:mt-0">
                         {{ group.label }}
                         <span class="ml-2 text-xs font-normal text-orange-500">{{ group.items.length }} 件</span>
                     </div>
 
-                    <table class="min-w-full divide-y divide-gray-200 border">
+                    <table class="w-full table-fixed border" style="min-width: 860px;">
+                        <colgroup>
+                            <col style="width: 100px"> <!-- 伝票番号 -->
+                            <col style="width: 100px"> <!-- 登録日 -->
+                            <col>                      <!-- 案件名 -->
+                            <col style="width: 150px"> <!-- クライアント -->
+                            <col style="width: 100px"> <!-- 担当Co -->
+                            <col style="width: 72px">  <!-- ステータス -->
+                            <col style="width: 52px">  <!-- 詳細 -->
+                        </colgroup>
                         <thead>
                             <tr class="bg-gray-50">
+                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">伝票番号</th>
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">
                                     <button class="flex items-center gap-1 hover:text-gray-800" @click="toggleSort('created_at')">
                                         登録日<span class="text-gray-400">{{ sortIndicator('created_at') }}</span>
@@ -70,7 +93,7 @@
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">案件名</th>
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">
                                     <button class="flex items-center gap-1 hover:text-gray-800" @click="toggleSort('client')">
-                                        クライアント名<span class="text-gray-400">{{ sortIndicator('client') }}</span>
+                                        クライアント<span class="text-gray-400">{{ sortIndicator('client') }}</span>
                                     </button>
                                 </th>
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">担当Co</th>
@@ -89,10 +112,11 @@
                                 class="cursor-pointer hover:bg-orange-50"
                                 @click="rowClick($event, job)"
                             >
-                                <td class="border px-3 py-2 text-sm text-gray-600">{{ formatDate(job.created_at) }}</td>
-                                <td class="border px-3 py-2 text-sm">{{ job.title || job.name }}</td>
-                                <td class="border px-3 py-2 text-sm text-gray-600">{{ job.client?.name || '-' }}</td>
-                                <td class="border px-3 py-2 text-sm text-gray-600">{{ job.user?.name || '-' }}</td>
+                                <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ job.jobcode || '-' }}</td>
+                                <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ formatDate(job.created_at) }}</td>
+                                <td class="break-words border px-3 py-2 text-sm">{{ job.title || job.name }}</td>
+                                <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ job.client?.name || '-' }}</td>
+                                <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ job.user?.name || '-' }}</td>
                                 <td class="border px-3 py-2">
                                     <span
                                         :class="job.completed ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-700'"
@@ -125,6 +149,7 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
+import { route } from 'ziggy-js';
 
 const props = defineProps({
     jobs: Array,
@@ -139,6 +164,14 @@ const hideCompleted = ref(true);
 
 const monthOptions = computed(() => (Array.isArray(props.monthOptions) ? props.monthOptions : []));
 const localJobs = ref((props.jobs || []).map((j) => ({ ...j })));
+
+// グループ表示モード
+const viewMode = ref('date');
+const viewModes = [
+    { key: 'date', label: '日付ごと' },
+    { key: 'client', label: 'クライアントごと' },
+    { key: 'project', label: '案件ごと' },
+];
 
 // ===== ソート =====
 
@@ -155,7 +188,7 @@ function toggleSort(key) {
 }
 
 function sortIndicator(key) {
-    if (sortKey.value !== key) return ' ↕';
+    if (sortKey.value !== key) return ' ⇕';
     return sortDir.value === 'asc' ? ' ↑' : ' ↓';
 }
 
@@ -178,7 +211,7 @@ function sortJobs(jobs) {
     });
 }
 
-// ===== 月グループ =====
+// ===== ユーティリティ =====
 
 function formatDate(dateStr) {
     if (!dateStr) return '-';
@@ -189,15 +222,33 @@ function formatDate(dateStr) {
     }
 }
 
-function getMonthKey(job) {
+function getClientName(job) {
+    return job.client?.name || '-';
+}
+
+function getJobTitle(job) {
+    return job.title || job.name || '-';
+}
+
+// ===== グループキー =====
+
+function getGroupKey(job) {
+    if (viewMode.value === 'client') return getClientName(job) || '未設定';
+    if (viewMode.value === 'project') return getJobTitle(job) || '未設定';
+    // date: 登録年月でグループ
     return job.created_at ? String(job.created_at).slice(0, 7) : '';
 }
 
-function formatMonthLabel(monthStr) {
-    if (!monthStr) return '日付なし';
-    const [y, m] = monthStr.split('-');
-    return `${y}年${parseInt(m)}月`;
+function getGroupLabel(key) {
+    if (viewMode.value === 'date') {
+        if (!key) return '日付なし';
+        const [y, m] = key.split('-');
+        return `${y}年${parseInt(m)}月`;
+    }
+    return key || '未設定';
 }
+
+// ===== 表示データ =====
 
 const displayGroups = computed(() => {
     let jobs = Array.isArray(localJobs.value) ? localJobs.value : [];
@@ -210,21 +261,26 @@ const displayGroups = computed(() => {
 
     const grouped = new Map();
     for (const j of jobs) {
-        const mk = getMonthKey(j);
-        if (!grouped.has(mk)) grouped.set(mk, []);
-        grouped.get(mk).push(j);
+        const key = getGroupKey(j);
+        if (!grouped.has(key)) grouped.set(key, []);
+        grouped.get(key).push(j);
     }
 
-    const sortedKeys = Array.from(grouped.keys()).sort((a, b) => {
-        if (!a) return 1;
-        if (!b) return -1;
-        return b.localeCompare(a);
-    });
+    let sortedKeys = Array.from(grouped.keys());
+    if (viewMode.value === 'date') {
+        sortedKeys.sort((a, b) => {
+            if (!a) return 1;
+            if (!b) return -1;
+            return b.localeCompare(a);
+        });
+    } else {
+        sortedKeys.sort((a, b) => a.localeCompare(b, 'ja'));
+    }
 
-    return sortedKeys.map((mk) => ({
-        month: mk,
-        label: formatMonthLabel(mk),
-        items: grouped.get(mk),
+    return sortedKeys.map((key) => ({
+        key,
+        label: getGroupLabel(key),
+        items: grouped.get(key),
     }));
 });
 
@@ -253,3 +309,7 @@ function clearSearch() {
     search();
 }
 </script>
+
+<style scoped>
+.new-highlight { background-color: #fff7ed; }
+</style>
