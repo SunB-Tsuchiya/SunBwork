@@ -8,6 +8,7 @@ const props = defineProps({
     type: { type: String, required: true },
     typeLabel: { type: String, required: true },
     items: { type: Array, default: () => [] },
+    groupOrders: { type: Array, default: () => [] },
 });
 
 // タイプ別ソートキー（順序列に使うフィールド名。null = 順序なし）
@@ -82,10 +83,23 @@ const groupConfig = ref(
         : null,
 );
 
+// サーバーから保存済み順序が送られてきた場合、groupConfig.groups を並べ替える
+if (groupConfig.value && props.groupOrders && props.groupOrders.length > 0) {
+    const gc = groupConfig.value;
+    // 保存順に存在するグループを並べ、未保存のグループは末尾追加
+    const saved = props.groupOrders.filter((k) => gc.groups.some((g) => (g ?? null) === (k ?? null)));
+    const rest  = gc.groups.filter((g) => !saved.some((k) => (k ?? null) === (g ?? null)));
+    gc.groups = [...saved, ...rest];
+}
+
 // グループ追加モーダル用ステート
 const showGroupModal = ref(false);
 const newGroupName = ref('');
 const groupModalError = ref('');
+
+// グループ並べ替えモーダル用ステート
+const showGroupSortModal = ref(false);
+const modalGroups = ref([]); // モーダル内での一時的な並び順
 
 // props を reactive なローカルコピーに変換
 const state = reactive({
@@ -202,6 +216,42 @@ function addNewGroup() {
     addRow(name);
 }
 
+// ---- グループ並べ替えモーダル ----
+function openGroupSortModal() {
+    if (!groupConfig.value) return;
+    modalGroups.value = [...groupConfig.value.groups];
+    showGroupSortModal.value = true;
+}
+
+function moveGroupUp(idx) {
+    if (idx <= 0) return;
+    const a = modalGroups.value;
+    const tmp = a[idx - 1];
+    a[idx - 1] = a[idx];
+    a[idx] = tmp;
+}
+
+function moveGroupDown(idx) {
+    const a = modalGroups.value;
+    if (idx >= a.length - 1) return;
+    const tmp = a[idx + 1];
+    a[idx + 1] = a[idx];
+    a[idx] = tmp;
+}
+
+function applyGroupSort() {
+    if (groupConfig.value) {
+        groupConfig.value.groups = [...modalGroups.value];
+    }
+    showGroupSortModal.value = false;
+}
+
+function groupLabel(key) {
+    if (!groupConfig.value) return String(key ?? 'グループなし');
+    return groupConfig.value.labels[key] ?? groupConfig.value.labels['null'] ?? (key !== null ? String(key) : 'グループなし');
+}
+// ---------------------------------
+
 const { showToast, showValidationErrors } = useToasts();
 
 function save() {
@@ -217,7 +267,7 @@ function save() {
     }
     router.post(
         route('workload_setting.store', { type: props.type }),
-        { items: toRaw(state.items) },
+        { items: toRaw(state.items), group_orders: groupConfig.value ? groupConfig.value.groups.map((g) => g ?? null) : undefined },
         {
             preserveState: true,
             onSuccess: () => {
@@ -441,6 +491,15 @@ function revert() {
                     >
                         + グループを追加
                     </button>
+                    <!-- グループ化タイプのみ: グループの並べ替え -->
+                    <button
+                        v-if="groupConfig"
+                        type="button"
+                        class="rounded border border-indigo-500 px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50"
+                        @click="openGroupSortModal"
+                    >
+                        ⇅ グループを並べ替え
+                    </button>
                 </div>
                 <div class="flex gap-3">
                     <button type="button" class="rounded border px-4 py-2 text-sm text-gray-600 hover:bg-gray-50" @click="revert">リセット</button>
@@ -486,6 +545,64 @@ function revert() {
                         @click="addNewGroup"
                     >
                         追加
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- グループ並べ替えモーダル -->
+        <div
+            v-if="showGroupSortModal"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+            @click.self="showGroupSortModal = false"
+        >
+            <div class="mx-4 w-full max-w-sm rounded-lg bg-white shadow-xl">
+                <div class="border-b px-6 py-4">
+                    <h2 class="text-lg font-semibold text-gray-800">グループを並べ替え</h2>
+                </div>
+                <div class="max-h-96 overflow-y-auto p-4">
+                    <ul class="divide-y divide-gray-100">
+                        <li
+                            v-for="(gKey, idx) in modalGroups"
+                            :key="gKey ?? '__null__'"
+                            class="flex items-center justify-between gap-3 px-2 py-2.5"
+                        >
+                            <span class="text-sm text-gray-800">{{ groupLabel(gKey) }}</span>
+                            <div class="flex flex-col gap-0.5">
+                                <button
+                                    type="button"
+                                    :disabled="idx === 0"
+                                    class="flex h-6 w-6 items-center justify-center rounded text-gray-500 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-30"
+                                    @click="moveGroupUp(idx)"
+                                >
+                                    ▲
+                                </button>
+                                <button
+                                    type="button"
+                                    :disabled="idx === modalGroups.length - 1"
+                                    class="flex h-6 w-6 items-center justify-center rounded text-gray-500 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-30"
+                                    @click="moveGroupDown(idx)"
+                                >
+                                    ▼
+                                </button>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+                <div class="flex justify-end gap-2 border-t px-6 py-4">
+                    <button
+                        type="button"
+                        class="rounded bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                        @click="showGroupSortModal = false"
+                    >
+                        キャンセル
+                    </button>
+                    <button
+                        type="button"
+                        class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                        @click="applyGroupSort"
+                    >
+                        適用
                     </button>
                 </div>
             </div>

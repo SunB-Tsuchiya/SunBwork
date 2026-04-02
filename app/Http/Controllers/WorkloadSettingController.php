@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\ChecksLeaderPermission;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -150,9 +151,10 @@ class WorkloadSettingController extends Controller
         $companyId = $user?->company_id ?? null;
 
         return Inertia::render('WorkloadSetting/Edit', [
-            'type'      => $type,
-            'typeLabel' => $config['label'],
-            'items'     => $this->fetchItems($config['model'], $config['orderBy'], $companyId),
+            'type'        => $type,
+            'typeLabel'   => $config['label'],
+            'items'       => $this->fetchItems($config['model'], $config['orderBy'], $companyId),
+            'groupOrders' => $this->fetchGroupOrders($type, $companyId),
         ]);
     }
 
@@ -229,7 +231,40 @@ class WorkloadSettingController extends Controller
             $modelClass::create($data);
         }
 
+        // グループ表示順を保存（group_orders が送られてきた場合のみ）
+        $groupOrders = $request->input('group_orders');
+        if (is_array($groupOrders) && count($groupOrders) > 0) {
+            $this->saveGroupOrders($type, $companyId, $groupOrders);
+        }
+
         return redirect()->route('workload_setting.index');
+    }
+
+    /**
+     * グループ表示順をDBに保存
+     */
+    private function saveGroupOrders(string $type, ?int $companyId, array $groupOrders): void
+    {
+        if (!Schema::hasTable('workload_group_orders')) return;
+
+        DB::table('workload_group_orders')
+            ->where('type', $type)
+            ->where(function ($q) use ($companyId) {
+                $q->whereNull('company_id');
+                if ($companyId) $q->orWhere('company_id', $companyId);
+            })
+            ->delete();
+
+        foreach ($groupOrders as $sortIdx => $groupKey) {
+            DB::table('workload_group_orders')->insert([
+                'company_id' => $companyId,
+                'type'       => $type,
+                'group_key'  => $groupKey === '__null__' ? null : ($groupKey === '' ? null : $groupKey),
+                'sort_order' => (int) $sortIdx,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
     }
 
     /**
@@ -246,5 +281,23 @@ class WorkloadSettingController extends Controller
         }
 
         return $query->get();
+    }
+
+    /**
+     * グループ表示順をDBから取得（保存済み順序の group_key 配列を返す）
+     */
+    private function fetchGroupOrders(string $type, ?int $companyId): array
+    {
+        if (!Schema::hasTable('workload_group_orders')) return [];
+
+        return DB::table('workload_group_orders')
+            ->where('type', $type)
+            ->where(function ($q) use ($companyId) {
+                $q->whereNull('company_id');
+                if ($companyId) $q->orWhere('company_id', $companyId);
+            })
+            ->orderBy('sort_order')
+            ->pluck('group_key')
+            ->toArray();
     }
 }
