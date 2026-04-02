@@ -139,7 +139,7 @@ const groupedSections = computed(() => {
         return {
             key: normalizedKey,
             keyStr: key !== null && key !== undefined ? String(key) : 'null',
-            label: labels[key] ?? labels['null'] ?? (key !== null ? String(key) : 'グループなし'),
+            label: labels[key] ?? (key !== null ? String(key) : 'グループなし'),
             items,
         };
     });
@@ -248,7 +248,7 @@ function applyGroupSort() {
 
 function groupLabel(key) {
     if (!groupConfig.value) return String(key ?? 'グループなし');
-    return groupConfig.value.labels[key] ?? groupConfig.value.labels['null'] ?? (key !== null ? String(key) : 'グループなし');
+    return groupConfig.value.labels[key] ?? (key !== null ? String(key) : 'グループなし');
 }
 // ---------------------------------
 
@@ -482,18 +482,18 @@ function revert() {
                     >
                         + 行を追加
                     </button>
-                    <!-- グループ化タイプのみ: 新しいグループを追加 -->
+                    <!-- work_item_types のみ: 新しいグループを追加 -->
                     <button
-                        v-if="groupConfig"
+                        v-if="groupConfig && type === 'work_item_types'"
                         type="button"
                         class="rounded border border-green-600 px-4 py-2 text-sm text-green-600 hover:bg-green-50"
                         @click="showGroupModal = true"
                     >
                         + グループを追加
                     </button>
-                    <!-- グループ化タイプのみ: グループの並べ替え -->
+                    <!-- work_item_types のみ: グループの並べ替え -->
                     <button
-                        v-if="groupConfig"
+                        v-if="groupConfig && type === 'work_item_types'"
                         type="button"
                         class="rounded border border-indigo-500 px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50"
                         @click="openGroupSortModal"
