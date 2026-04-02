@@ -314,11 +314,18 @@ class ProjectJobAssignmentController extends Controller
         $user = $request->user();
 
         DB::transaction(function () use ($assignment, $data, $user) {
-            // Find existing by-myself record for this canonical assignment and user
-            $by = ProjectJobAssignmentByMyself::where('project_job_id', $assignment->project_job_id)
-                ->where('user_id', $user ? $user->id : null)
-                ->orderByDesc('created_at')
-                ->first();
+            // Find the by-myself record by the exact assignment id passed in the route.
+            // Previously this used project_job_id + user_id which could match a *different*
+            // (newer) record when the same "その他" project had multiple assignments, causing
+            // the wrong record (and wrong linked event) to be updated.
+            $by = ProjectJobAssignmentByMyself::where('id', $assignment->id)->first();
+            // Fallback: if not found via strict id lookup, try the old project_job_id + user_id search
+            if (!$by) {
+                $by = ProjectJobAssignmentByMyself::where('project_job_id', $assignment->project_job_id)
+                    ->where('user_id', $user ? $user->id : null)
+                    ->where('id', $assignment->id)
+                    ->first();
+            }
 
             $payload = [
                 'project_job_id' => $assignment->project_job_id ?? null,
