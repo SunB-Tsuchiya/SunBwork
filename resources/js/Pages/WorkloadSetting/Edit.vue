@@ -86,10 +86,11 @@ const groupConfig = ref(
 // サーバーから保存済み順序が送られてきた場合、groupConfig.groups を並べ替える
 if (groupConfig.value && props.groupOrders && props.groupOrders.length > 0) {
     const gc = groupConfig.value;
-    // 保存順に存在するグループを並べ、未保存のグループは末尾追加
-    const saved = props.groupOrders.filter((k) => gc.groups.some((g) => (g ?? null) === (k ?? null)));
-    const rest  = gc.groups.filter((g) => !saved.some((k) => (k ?? null) === (g ?? null)));
-    gc.groups = [...saved, ...rest];
+    // props.groupOrders をそのまま順序として使う（カスタムグループも含む）
+    // gc.groups にあるが DB 未保存のグループは末尾に追加
+    const savedOrder = props.groupOrders.map((k) => k ?? null);
+    const rest = gc.groups.filter((g) => !savedOrder.includes(g ?? null));
+    gc.groups = [...savedOrder, ...rest];
 }
 
 // グループ追加モーダル用ステート
