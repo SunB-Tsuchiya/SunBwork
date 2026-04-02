@@ -154,7 +154,7 @@ class WorkloadSettingController extends Controller
             'type'        => $type,
             'typeLabel'   => $config['label'],
             'items'       => $this->fetchItems($config['model'], $config['orderBy'], $companyId),
-            'groupOrders' => $this->fetchGroupOrders($type, $companyId),
+            'groupOrders' => $type === 'work_item_types' ? $this->fetchGroupOrders($type, $companyId) : [],
         ]);
     }
 
@@ -231,9 +231,9 @@ class WorkloadSettingController extends Controller
             $modelClass::create($data);
         }
 
-        // グループ表示順を保存（group_orders が送られてきた場合のみ）
+        // グループ表示順を保存（work_item_types のみ、group_orders が送られてきた場合）
         $groupOrders = $request->input('group_orders');
-        if (is_array($groupOrders) && count($groupOrders) > 0) {
+        if ($type === 'work_item_types' && is_array($groupOrders) && count($groupOrders) > 0) {
             $this->saveGroupOrders($type, $companyId, $groupOrders);
         }
 

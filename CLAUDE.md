@@ -435,6 +435,15 @@ headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' }
 
 **案件カレンダー:** `coordinator.project_jobs.calendar` → `CalendarAll.vue` / 12色パレット自動割り当て / 「完了済み非表示」チェック付き
 
+**ProjectJob 登録時の案件名重複チェック:**
+- `ProjectJobController::checkDuplicate()` — 同一 `client_id` スコープで `normalizeTitle()` 適用後に比較、類似案件を JSON 返却
+- `normalizeTitle()` — `mb_convert_kana 'as'`（全角→半角）+ スペース/`・/-/_` 除去 + `mb_strtolower`
+- ルート: `POST coordinator/project_jobs/check-duplicate` → `coordinator.project_jobs.check_duplicate`
+- フロント: `Create.vue` の `submit()` を `async` 化。保存前に自動チェックし、類似案件があれば警告モーダルを表示
+- モーダルの選択肢: **「それでも登録する」**（オレンジ、任意登録可）/ **「閉じる（タイトルを変更する）」**（灰色、ブロック）
+- クライアント重複チェック（`clients.check_duplicate`）と違い、**こちらは警告のみで強制ブロックしない**
+- ルートは静的ルートとして `project_jobs.store` より前・パラメータ化ルートより前に配置すること
+
 ---
 
 ## Admin/Users/Edit フォーム仕様
@@ -547,6 +556,26 @@ headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' }
 - `ClientController::routePrefix()` に `'coordinator' => 'coordinator'` 追加
 - `Clients/` 各 Vue（Index/Create/Edit/CsvUpload）の `routePrefix` computed を coordinator 対応
 - Leader タブからは削除していない（Leader も引き続き利用可）
+
+**クライアント削除・統合機能（2026-04-01 実装）:**
+- `destroy()` — `projectJobs()->count() > 0` の場合は削除不可。session に `clientDeleteError`（案件数・案件タイトル）を格納して redirect back
+- `HandleInertiaRequests::share()` に `clientDeleteError => session('clientDeleteError')` を追加済み
+- `Edit.vue` で `page.props.clientDeleteError` を watch → 2ステップモーダル表示
+  - Step1: エラー表示（案件一覧最大5件）→「統合先クライアントを選ぶ」ボタン
+  - Step2: `clients.json` からクライアント一覧を fetch してテーブル表示、行クリックで統合先選択 → `router.post(clients.merge)`
+- `merge(request)` — DB::transaction で `project_jobs.client_id` と `job_requests.client_id` を統合先に更新後、元レコード削除。同一会社チェックあり（superadmin は exempt）
+- `clientsJson()` — company スコープで名前検索して JSON 返却（元の coordinator インライン closure を統合）
+
+**クライアント登録時の重複チェック（2026-04-01 実装）:**
+- `checkDuplicate()` — 入力名を `normalizeClientName()` で正規化し、同社の全クライアントと比較
+- `normalizeClientName()` — 全角→半角 + 法人格17種（株式会社・有限会社等、前後両パターン）除去 + スペース/句読点除去 + 小文字化
+- ルート: `POST clients/check-duplicate` → `{admin|leader|coordinator}.clients.check_duplicate`（3グループ全て）
+- `Clients/Create.vue` の `submit()` でチェックを先行実行。重複あれば保存を**強制ブロック**し「名前を変更してください」モーダルのみ表示（「それでも登録」ボタンなし）
+
+**CoordinatorMiddleware 修正（2026-04-01）:**
+- `isLeader()` を allow-list から削除済み（Leader が `/coordinator/*` にアクセス不可になった）
+- Before: `!isCoordinator() && !isLeader() && !isAdmin() && !isSuperAdmin()`
+- After: `!isCoordinator() && !isAdmin() && !isSuperAdmin()`
 
 ---
 
