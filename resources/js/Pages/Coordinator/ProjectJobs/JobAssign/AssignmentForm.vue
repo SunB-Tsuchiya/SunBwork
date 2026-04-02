@@ -1161,9 +1161,12 @@ function typesGrouped(companyId, departmentId, typeFilter) {
         if (!map[g]) map[g] = [];
         map[g].push(t);
     }
-    return TYPE_GROUP_ORDER
-        .filter((g) => map[g])
-        .map((g) => ({ group: g, label: TYPE_GROUP_LABELS[g] || g, items: map[g] }));
+    // ハードコード済みグループを順序通りに並べ、未知のカスタムグループは末尾追加
+    const knownGroups = TYPE_GROUP_ORDER.filter((g) => map[g]).map((g) => ({ group: g, label: TYPE_GROUP_LABELS[g] || g, items: map[g] }));
+    const extraGroups = Object.keys(map)
+        .filter((g) => !TYPE_GROUP_ORDER.includes(g))
+        .map((g) => ({ group: g, label: g, items: map[g] }));
+    return [...knownGroups, ...extraGroups];
 }
 
 // mediumFilter: '' = 全表示、'paper' = 紙媒体のみ、'digital' = デジタルのみ

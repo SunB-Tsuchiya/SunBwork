@@ -36,10 +36,16 @@ const groupConfigByType = {
 function computeGroupedSections(type, items) {
     const config = groupConfigByType[type];
     if (!config || !items) return null;
-    const sections = config.groups
+    // ハードコード済みグループに加え、DB に存在するカスタムグループも末尾追加
+    const configKeys = config.groups.map((k) => k ?? null);
+    const extraKeys = [...new Set(items.map((i) => i.group ?? null))].filter(
+        (k) => !configKeys.includes(k),
+    );
+    const allGroups = [...config.groups, ...extraKeys];
+    const sections = allGroups
         .map((key) => ({
             key,
-            label: config.labels[key] ?? config.labels['null'] ?? 'グループなし',
+            label: config.labels[key] ?? (key !== null ? String(key) : 'グループなし'),
             items: items.filter((i) => (i.group ?? null) === (key ?? null)),
         }))
         .filter((s) => s.items.length > 0);
