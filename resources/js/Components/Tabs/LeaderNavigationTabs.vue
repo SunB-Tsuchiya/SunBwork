@@ -35,7 +35,7 @@ const isDepartmentLeader = computed(() => page.props.auth?.user?.isDepartmentLea
                 ユーザー管理
             </Link>
             <Link
-                v-if="isDepartmentLeader"
+                v-if="isDepartmentLeader && can('project_job_overview')"
                 :href="route('leader.project_jobs.index')"
                 :class="tab('project_jobs')"
             >

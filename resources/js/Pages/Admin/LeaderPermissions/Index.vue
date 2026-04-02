@@ -14,6 +14,7 @@ const permLabels = {
     workload_analysis:      '作業量分析',
     workload_setting:       '作業項目設定',
     work_record_management: '勤務時間管理',
+    project_job_overview:   '案件総覧',
 };
 
 const permKeys = Object.keys(permLabels);

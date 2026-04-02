@@ -78,6 +78,7 @@ class LeaderPermissionController extends Controller
                 'work_record_management' => $perm->work_record_management  ?? true,
                 'dispatch_management'    => $perm->dispatch_management     ?? false,
                 'user_management'        => $perm->user_management         ?? false,
+                'project_job_overview'   => $perm->project_job_overview    ?? true,
             ],
             'updateRoute' => $updateRoute,
             'indexRoute'  => $indexRoute,
@@ -98,6 +99,7 @@ class LeaderPermissionController extends Controller
             'work_record_management' => 'boolean',
             'dispatch_management'    => 'boolean',
             'user_management'        => 'boolean',
+            'project_job_overview'   => 'boolean',
         ]);
 
         LeaderPermission::updateOrCreate(['user_id' => $leaderuser->id], $data);
@@ -135,6 +137,7 @@ class LeaderPermissionController extends Controller
                 'work_record_management' => $perm?->work_record_management  ?? true,
                 'dispatch_management'    => $perm?->dispatch_management     ?? false,
                 'user_management'        => $perm?->user_management         ?? false,
+                'project_job_overview'   => $perm?->project_job_overview    ?? true,
             ];
         });
     }

@@ -20,6 +20,7 @@ const permItems = [
     { key: 'work_record_management', label: '勤務時間管理' },
     { key: 'dispatch_management',    label: '派遣管理' },
     { key: 'user_management',        label: 'ユーザー管理（部署リーダーのみ有効）' },
+    { key: 'project_job_overview',   label: '案件総覧（部署リーダーのみ有効）' },
 ];
 
 const form = useForm({
@@ -30,6 +31,7 @@ const form = useForm({
     work_record_management: props.permissions.work_record_management,
     dispatch_management:    props.permissions.dispatch_management,
     user_management:        props.permissions.user_management,
+    project_job_overview:   props.permissions.project_job_overview,
 });
 
 const submit = () => {
