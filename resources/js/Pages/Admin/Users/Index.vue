@@ -156,12 +156,16 @@ const getAssignmentName = (assignment_id) => {
 
 const getAssignmentBadgeClass = (assignment) => {
     switch (assignment) {
+        case 'superadmin':
+            return 'bg-yellow-100 text-yellow-800';
         case 'admin':
             return 'bg-red-100 text-red-800';
         case 'leader':
             return 'bg-orange-100 text-orange-800';
-        case 'user':
-            return 'bg-green-100 text-blue-800';
+        case 'coordinator':
+            return 'bg-green-100 text-green-800';
+        case 'clerk':
+            return 'bg-purple-100 text-purple-800';
         case 'user':
             return 'bg-blue-100 text-blue-800';
         default:
@@ -171,12 +175,16 @@ const getAssignmentBadgeClass = (assignment) => {
 
 const getAssignmentText = (assignment) => {
     switch (assignment) {
+        case 'superadmin':
+            return 'サイト管理者';
         case 'admin':
             return '管理者';
         case 'leader':
             return 'リーダー';
         case 'coordinator':
             return '進行管理';
+        case 'clerk':
+            return '事務・経理';
         case 'user':
             return 'ユーザー';
         default:
