@@ -650,7 +650,16 @@ function normalizeAssignment(a) {
             id: a.id || null,
             project_job: a.project_job || null,
             project_job_id: a.project_job_id || (a.project_job && a.project_job.id) || null,
-            _client_id: a._client_id || (a.project_job && (a.project_job.client?.id || a.project_job.client_id)) || '',
+            _client_id:
+                a._client_id ||
+                (a.project_job && (a.project_job.client?.id || a.project_job.client_id)) ||
+                // その他案件の場合: project_job_id が otherProjectId と一致すれば otherClientId を補完
+                (props.otherProjectId !== null &&
+                    (a.project_job_id || (a.project_job && a.project_job.id)) &&
+                    String(a.project_job_id || (a.project_job && a.project_job.id)) === String(props.otherProjectId)
+                    ? String(props.otherClientId)
+                    : '') ||
+                '',
             title_suffix: a.title ? a.title.replace(/^.*：/, '').trim() : a.title_suffix || '',
             detail: a.detail || '',
             user_id: a.user_id || (effectiveAuthUser() ? effectiveAuthUser().id : null),

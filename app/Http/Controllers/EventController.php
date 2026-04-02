@@ -1326,6 +1326,34 @@ class EventController extends Controller
                     $userProjects = [];
                 }
 
+                // 「その他」クライアント・プロジェクトを確保し、リストに追加
+                $otherClientId = null;
+                $otherProjectId = null;
+                try {
+                    $otherClient = \App\Models\Client::firstOrCreate(
+                        ['name' => 'その他', 'company_id' => null],
+                        ['notes' => 'デフォルト「その他」クライアント']
+                    );
+                    $otherProject = \App\Models\ProjectJob::firstOrCreate(
+                        ['title' => 'その他', 'client_id' => $otherClient->id],
+                        ['detail' => 'デフォルト「その他」案件']
+                    );
+                    $otherClientId = $otherClient->id;
+                    $otherProjectId = $otherProject->id;
+                    $userClients = collect($userClients);
+                    if (!$userClients->contains('id', $otherClientId)) {
+                        $userClients = $userClients->push(['id' => $otherClientId, 'name' => 'その他']);
+                    }
+                    $userProjects = collect($userProjects);
+                    if (!$userProjects->contains('id', $otherProjectId)) {
+                        $userProjects = $userProjects->push(['id' => $otherProjectId, 'title' => 'その他', 'client_id' => $otherClientId]);
+                    }
+                    $userClients = $userClients->values();
+                    $userProjects = $userProjects->values();
+                } catch (\Throwable $__e) {
+                    // その他確保失敗は無視
+                }
+
                 $members = [];
                 try {
                     $memberUserIds = array_filter(array_unique([
@@ -1370,6 +1398,8 @@ class EventController extends Controller
                     'projectJobAssignment' => $assignment,
                     'userClients' => $userClients,
                     'userProjects' => $userProjects,
+                    'otherClientId' => $otherClientId,
+                    'otherProjectId' => $otherProjectId,
                     'members' => $members,
                     'company' => $company,
                     'department' => $department,

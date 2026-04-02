@@ -12,6 +12,8 @@
                     :defaultUserId="defaultUserId"
                     :user-clients="userClients"
                     :user-projects="userProjects"
+                    :other-client-id="otherClientId"
+                    :other-project-id="otherProjectId"
                     :event="event"
                 />
                 <div class="mt-6 border-t pt-4">
@@ -46,6 +48,8 @@ const members = page.props.members || [];
 const assignments = assignment ? [assignment] : [];
 const userClients = page.props.userClients || [];
 const userProjects = page.props.userProjects || [];
+const otherClientId = page.props.otherClientId ?? null;
+const otherProjectId = page.props.otherProjectId ?? null;
 const defaultUserId = page.props.auth && page.props.auth.user ? page.props.auth.user.id : null;
 const event = page.props.event || null;
 
