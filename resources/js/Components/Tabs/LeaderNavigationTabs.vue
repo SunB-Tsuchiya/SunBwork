@@ -22,6 +22,8 @@ const can = (key) => perm.value === null || perm.value[key] === true;
 
 // 部署リーダーのみユーザー管理タブを表示
 const isDepartmentLeader = computed(() => page.props.auth?.user?.isDepartmentLeader === true);
+// Admin / SuperAdmin は常にアクセス可
+const isAdminOrAbove = computed(() => ['admin', 'superadmin'].includes(page.props.auth?.user?.user_role));
 </script>
 
 <template>
@@ -35,7 +37,7 @@ const isDepartmentLeader = computed(() => page.props.auth?.user?.isDepartmentLea
                 ユーザー管理
             </Link>
             <Link
-                v-if="isDepartmentLeader && can('project_job_overview')"
+                v-if="(isDepartmentLeader || isAdminOrAbove) && can('project_job_overview')"
                 :href="route('leader.project_jobs.index')"
                 :class="tab('project_jobs')"
             >
