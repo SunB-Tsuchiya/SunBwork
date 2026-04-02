@@ -345,41 +345,13 @@ function goto(url) {
     router.visit(url, { preserveState: false });
 }
 
-async function rowClick(m, event) {
+function rowClick(m, event) {
     const tag = event.target?.tagName?.toLowerCase() || '';
     if (tag === 'a' || tag === 'button' || event.target.closest?.('a,button')) return;
 
-    try {
-        const assId = m.project_job_assignment?.id || m.project_job_assignment_id || m.id || null;
-        const userId = m.project_job_assignment?.user?.id || m.project_job_assignment?.user_id || page.props.auth.user?.id || '';
-        if (assId) {
-            let eventsUrl = null;
-            try {
-                eventsUrl = typeof route === 'function' ? route('events.index') : '/events';
-                const query = [];
-                if (userId) query.push('user_id=' + encodeURIComponent(userId));
-                if (assId) query.push('job=' + encodeURIComponent(assId));
-                if (query.length) eventsUrl += '?' + query.join('&');
-            } catch (e) {
-                eventsUrl = '/events?job=' + encodeURIComponent(assId);
-            }
-            try {
-                const res = await fetch(eventsUrl, { credentials: 'same-origin', headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
-                if (res.ok) {
-                    const payload = await res.json();
-                    if (Array.isArray(payload) && payload.length > 0) {
-                        const ev = payload[0];
-                        const evId = ev.id || ev.event_id || ev.extendedProps?.event_id || ev.extendedProps?.id;
-                        if (evId) {
-                            try { router.get(typeof route === 'function' ? route('events.show', evId) : '/events/' + evId); return; } catch {}
-                            try { window.location.href = route('events.show', { event: evId }); return; } catch {}
-                        }
-                    }
-                }
-            } catch {}
-        }
-    } catch {}
-
+    // user/jobbox はCoordinator依頼ジョブ（assignment-job）の一覧。
+    // assignment-job-by-myself（events）とは別物のため、events検索は行わず
+    // 直接メッセージ詳細ページへ遷移する。
     const url = getMessageLink(m);
     if (url && url !== '#') router.visit(url, { preserveState: false });
 }

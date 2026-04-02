@@ -93,6 +93,7 @@ class ProjectJobAssignmentsController extends Controller
                 'estimated_hours' => isset($a->estimated_hours) ? (float) $a->estimated_hours : null,
                 'assigned' => (bool) $a->assigned,
                 'accepted' => (bool) $a->accepted,
+                'completed' => (bool) ($a->completed ?? false),
                 // keep status_id for backward compatibility
                 'status_id' => $a->status_id ?? null,
                 'status' => $statusObj,

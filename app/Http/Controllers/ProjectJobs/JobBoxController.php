@@ -414,6 +414,27 @@ class JobBoxController extends Controller
             ->paginate($usePeriodFilter ? 500 : 50)
             ->appends(array_filter(['q' => $q, 'period' => $periodModel, 'sort' => $sort, 'dir' => $dir]));
 
+        // Attach canonical `status` object to each loaded assignment so frontend getAssignmentStatus() works correctly
+        try {
+            $messages->getCollection()->transform(function ($msg) {
+                try {
+                    if (isset($msg->projectJobAssignment) && $msg->projectJobAssignment && isset($msg->projectJobAssignment->statusModel) && $msg->projectJobAssignment->statusModel) {
+                        $sm = $msg->projectJobAssignment->statusModel;
+                        $msg->projectJobAssignment->status = [
+                            'id' => $sm->id,
+                            'key' => $sm->key ?? $sm->slug ?? null,
+                            'name' => $sm->name,
+                        ];
+                    }
+                } catch (\Throwable $__e) {
+                    // non-fatal
+                }
+                return $msg;
+            });
+        } catch (\Throwable $__e) {
+            // non-fatal
+        }
+
         $monthValues = JobAssignmentMessage::join('project_job_assignments', 'job_assignment_messages.project_job_assignment_id', '=', 'project_job_assignments.id')
             ->where('project_job_assignments.user_id', $user->id)
             ->where(function ($qry) {

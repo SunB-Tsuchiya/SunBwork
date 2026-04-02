@@ -234,6 +234,8 @@ function formatEstimatedHours(h) {
 }
 
 function statusText(a) {
+    // completed フラグ / status.key が最優先（assignment-job が完了済みか確認）
+    if (a.completed || a.status?.key === 'completed') return '完了';
     if (!a.assigned) return '未発信';
     // assigned にフラグが立っていて accepted が false の場合は「送信済み」と表示
     if (a.assigned && !a.accepted) return '送信済み';

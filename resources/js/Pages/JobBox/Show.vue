@@ -24,28 +24,9 @@
                 </div>
 
                 <!-- セットされた予定 -->
-                <div v-if="showScheduledSection" class="border-t px-5 py-4">
-                    <h4 class="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">セットされた予定</h4>
-                    <div v-if="formattedEvents.length === 0" class="text-sm text-gray-600">予定が見つかりません。</div>
-                    <table v-else class="w-full text-sm text-gray-700">
-                        <thead>
-                            <tr class="border-b">
-                                <th class="py-2 text-left">作業日</th>
-                                <th class="py-2 text-left">開始時間</th>
-                                <th class="py-2 text-left">終了時間</th>
-                                <th class="py-2 text-left">作業時間合計</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="ev in formattedEvents" :key="ev.id">
-                                <td class="py-2">{{ ev.dateStr }}</td>
-                                <td class="py-2">{{ ev.startTime }}</td>
-                                <td class="py-2">{{ ev.endTime }}</td>
-                                <td class="py-2">{{ formatDurationFromMinutes(ev.minutes) }}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+                <!-- assignment-job（Coordinator依頼）はevents.project_job_assignment_idを
+                     使わないため、このセクションは表示しない。
+                     ユーザーが自分でスケジュールする場合はMyJobBoxを使う。 -->
 
                 <!-- ボタン類 -->
                 <div class="flex flex-wrap items-center gap-2 border-t bg-gray-50 px-5 py-3">
@@ -57,18 +38,20 @@
                     </template>
 
                     <template v-if="isAssignee">
-                        <Link :href="scheduleHref" class="inline-flex items-center gap-1.5 rounded bg-blue-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-600">今日の予定をセット</Link>
-                        <div v-if="(assignment.scheduled || assignment.scheduled_at) && formattedEvents.length > 0">
-                            <button
-                                @click="submitComplete"
-                                :class="isAssignmentCompleted || isSubmittingComplete
-                                    ? 'cursor-not-allowed inline-flex items-center gap-1.5 rounded bg-yellow-800 px-3 py-1.5 text-sm font-medium text-white opacity-70'
-                                    : 'inline-flex items-center gap-1.5 rounded bg-yellow-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-yellow-700'"
-                                :disabled="isAssignmentCompleted || isSubmittingComplete"
-                            >
-                                {{ isAssignmentCompleted ? '完了済み' : '完了にする' }}
-                            </button>
-                        </div>
+                        <!-- MyJobBoxへのリンク。assignment-job（Coordinator依頼）のスケジュール設定は
+                             MyJobBoxで行う（assignment-job-by-myselfとしてMyJobBoxに登録）。 -->
+                        <Link :href="myJobBoxHref" class="inline-flex items-center gap-1.5 rounded bg-blue-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-600">MyJobBoxで予定をセット</Link>
+                        <!-- assignment-job（Coordinator依頼）の完了。
+                             directly project_job_assignments を更新し、Coordinatorの一覧に反映される -->
+                        <button
+                            @click="submitComplete"
+                            :class="isAssignmentCompleted || isSubmittingComplete
+                                ? 'cursor-not-allowed inline-flex items-center gap-1.5 rounded bg-yellow-800 px-3 py-1.5 text-sm font-medium text-white opacity-70'
+                                : 'inline-flex items-center gap-1.5 rounded bg-yellow-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-yellow-700'"
+                            :disabled="isAssignmentCompleted || isSubmittingComplete"
+                        >
+                            {{ isAssignmentCompleted ? '完了済み' : '完了にする' }}
+                        </button>
                     </template>
 
                     <div v-if="linkedAssignmentId" class="ml-auto">
@@ -376,6 +359,15 @@ const isAssignmentCompleted = computed(() => {
     }
 });
 
+// MyJobBox インデックスへのリンク。
+// assignment-job（Coordinator依頼）のスケジュール設定は
+// MyJobBox（assignment-job-by-myself）で行う。
+// ※ events.create_job に coordinator assignment ID を渡してはいけない
+//    （events.project_job_assignment_id は project_job_assignment_by_myself.id への FK）。
+const myJobBoxHref = computed(() => {
+    return safeRoute('user.myjobbox.index', {}, '/myjobbox');
+});
+
 // If events exist, pick the first event's date (ISO YYYY-MM-DD). Otherwise fall back
 // to assignment.scheduled_at or assignment.date or today's date. Support both
 // `start`/`end` and `starts_at`/`ends_at` field names returned by the API.
@@ -437,34 +429,48 @@ const editHref = computed(() => {
 function submitComplete() {
     try {
         if (!confirm('このジョブを完了としてマークしますか？')) return;
-        // Derive a best-effort event id from fetched events
-        const ev = Array.isArray(events.value) && events.value.length > 0 ? events.value[0] : null;
-        if (!ev) {
-            alert('完了対象の予定が見つかりません。');
-            return;
-        }
-        const evId = ev.id || ev.event_id || (ev.extendedProps && (ev.extendedProps.event_id || ev.extendedProps.id)) || null;
-        if (!evId) {
-            alert('完了対象の予定IDが見つかりません。');
+
+        // assignment-job（Coordinator依頼）を直接完了にする。
+        // events.complete（assignment-job-by-myself用）ではなく、
+        // user.jobbox.assignments.complete を使って project_job_assignments を更新する。
+        // これにより Coordinator の一覧にも「完了」が反映される。
+        const assId = assignment?.id;
+        if (!assId) {
+            alert('割当IDが見つかりません。');
             return;
         }
         isSubmittingComplete.value = true;
-        const completeUrl = safeRoute('events.complete', { event: evId }, `/events/${evId}/complete`);
-        router.post(
-            completeUrl,
-            {},
-            {
-                onSuccess: () => {
-                    // reload to reflect server-side state (assignment marked completed)
-                    window.location.reload();
-                },
-                onError: () => {
-                    isSubmittingComplete.value = false;
-                },
-            },
+        const completeUrl = safeRoute(
+            'user.jobbox.assignments.complete',
+            { assignment: assId },
+            `/coordinator/jobbox/assignments/${assId}/complete`,
         );
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        fetch(completeUrl, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'X-CSRF-TOKEN': csrf,
+                'X-Requested-With': 'XMLHttpRequest',
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({}),
+        })
+            .then(async (res) => {
+                if (res.ok) {
+                    window.location.reload();
+                } else {
+                    const body = await res.json().catch(() => ({}));
+                    isSubmittingComplete.value = false;
+                    alert(body?.error || '完了処理に失敗しました。');
+                }
+            })
+            .catch(() => {
+                isSubmittingComplete.value = false;
+                alert('完了処理に失敗しました。');
+            });
     } catch (e) {
-        // swallow to avoid breaking the page
         console.debug('submitComplete error', e);
     }
 }
