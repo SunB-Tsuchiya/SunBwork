@@ -72,15 +72,14 @@
                         <span class="ml-2 text-xs font-normal text-orange-500">{{ group.items.length }} 件</span>
                     </div>
 
-                    <table class="w-full table-fixed border" style="min-width: 860px;">
+                    <table class="w-full table-fixed border" style="min-width: 780px;">
                         <colgroup>
-                            <col style="width: 100px"> <!-- 伝票番号 -->
-                            <col style="width: 100px"> <!-- 登録日 -->
-                            <col>                      <!-- 案件名 -->
-                            <col style="width: 150px"> <!-- クライアント -->
-                            <col style="width: 100px"> <!-- 担当Co -->
-                            <col style="width: 72px">  <!-- ステータス -->
-                            <col style="width: 52px">  <!-- 詳細 -->
+                            <col style="width: 90px">  <!-- 伝票番号 -->
+                            <col style="width: 90px">  <!-- 登録日 -->
+                            <col style="width: 60%">   <!-- 案件名 -->
+                            <col style="width: 12%">   <!-- クライアント -->
+                            <col style="width: 10%">   <!-- 担当Co -->
+                            <col style="width: 9%">    <!-- ステータス -->
                         </colgroup>
                         <thead>
                             <tr class="bg-gray-50">
@@ -102,7 +101,6 @@
                                         ステータス<span class="text-gray-400">{{ sortIndicator('status') }}</span>
                                     </button>
                                 </th>
-                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">詳細</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -123,13 +121,6 @@
                                         class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
                                     >{{ job.completed ? '完了' : '進行中' }}</span>
                                 </td>
-                                <td class="border px-3 py-2">
-                                    <Link
-                                        :href="route('leader.project_jobs.show', { projectJob: job.id })"
-                                        class="rounded bg-orange-100 px-2 py-1 text-xs text-orange-700 hover:bg-orange-200"
-                                        @click.stop
-                                    >詳細</Link>
-                                </td>
                             </tr>
                         </tbody>
                     </table>
@@ -147,7 +138,7 @@
 
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Link, router } from '@inertiajs/vue3';
+import { router } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import { route } from 'ziggy-js';
 
