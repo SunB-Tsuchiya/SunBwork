@@ -114,7 +114,7 @@ const groupedSections = computed(() => {
 });
 
 // テーブルの colspan
-const colSpan = computed(() => columns.value.length + 1 + (sortKey.value ? 1 : 0));
+const colSpan = computed(() => columns.value.length + 1 + (sortKey.value ? 1 : 0) + (groupConfig.value ? 1 : 0));
 
 // 隣の行と sort_order 値を入れ替える（contextItems = スコープ内のアイテム配列）
 function moveUp(item, contextItems) {
@@ -208,6 +208,7 @@ function revert() {
                             <th v-for="col in columns" :key="col.key" class="px-3 py-2 text-left font-medium text-gray-600">
                                 {{ col.label }}<span v-if="col.required" class="text-red-500">*</span>
                             </th>
+                            <th v-if="groupConfig" class="w-36 px-3 py-2 text-left font-medium text-gray-600">グループ</th>
                             <th class="px-3 py-2 text-left font-medium text-gray-600">操作</th>
                         </tr>
                     </thead>
@@ -340,6 +341,17 @@ function revert() {
                                     <p v-if="fieldError(item, col.key)" class="mt-0.5 text-xs text-red-500">
                                         {{ fieldError(item, col.key) }}
                                     </p>
+                                </td>
+                                <td class="px-3 py-2">
+                                    <select
+                                        v-model="item.group"
+                                        :disabled="!!item._deleted"
+                                        class="rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-400 focus:outline-none disabled:bg-gray-100 disabled:text-gray-400"
+                                    >
+                                        <option v-for="g in groupConfig.groups" :key="g ?? '__null__'" :value="g">
+                                            {{ groupConfig.labels[g] ?? groupConfig.labels['null'] ?? 'グループなし' }}
+                                        </option>
+                                    </select>
                                 </td>
                                 <td class="whitespace-nowrap px-3 py-2">
                                     <button v-if="!item._deleted" type="button" class="text-red-600 hover:underline" @click="markDelete(item)">
