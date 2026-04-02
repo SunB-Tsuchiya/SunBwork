@@ -77,7 +77,7 @@
                             <col style="width: 90px">  <!-- 伝票番号 -->
                             <col style="width: 90px">  <!-- 登録日 -->
                             <col style="width: 60%">   <!-- 案件名 -->
-                            <col style="width: 12%">   <!-- クライアント -->
+                            <col style="width: 15.6%"> <!-- クライアント -->
                             <col style="width: 10%">   <!-- 担当Co -->
                             <col style="width: 9%">    <!-- ステータス -->
                         </colgroup>
