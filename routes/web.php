@@ -431,6 +431,10 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('leader-permissions', [App\Http\Controllers\Admin\LeaderPermissionController::class, 'index'])->name('leader_permissions.index');
         Route::get('leader-permissions/{leaderuser}/edit', [App\Http\Controllers\Admin\LeaderPermissionController::class, 'edit'])->name('leader_permissions.edit');
         Route::put('leader-permissions/{leaderuser}', [App\Http\Controllers\Admin\LeaderPermissionController::class, 'update'])->name('leader_permissions.update');
+
+        // 案件総覧（部署リーダー: 部署内全案件を読み取り専用で閲覧）
+        Route::get('project-jobs', [App\Http\Controllers\Leader\ProjectJobController::class, 'index'])->name('project_jobs.index');
+        Route::get('project-jobs/{projectJob}', [App\Http\Controllers\Leader\ProjectJobController::class, 'show'])->name('project_jobs.show');
     });
 
 // クライアント管理（Admin用）は上の admin グループに統合済み（重複削除）
