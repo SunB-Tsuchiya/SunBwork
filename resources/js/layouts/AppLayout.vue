@@ -351,6 +351,15 @@ const currentRouteContext = computed(() => {
                                     >
                                 </Link>
                             </div>
+                            <!-- 使い方ガイド link -->
+                            <div class="relative ms-3 flex items-center">
+                                <Link :href="route('guide.index')" class="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-800">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+                                    </svg>
+                                    <span>使い方ガイド</span>
+                                </Link>
+                            </div>
                             <!-- JobBox link -->
                             <!-- <div class="relative ms-3 flex items-center">
                                 <Link :href="jobLink" class="flex items-center text-sm text-gray-600 hover:text-gray-800" @click="handleJobClick">
