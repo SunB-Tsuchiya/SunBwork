@@ -539,7 +539,10 @@ async function checkEventOverlaps() {
             const endTime = new Date(end).getTime();
 
             // Filter events that overlap with the new event
+            // 編集中のイベント自身（同一 ID）は除外する
+            const currentEventId = props.event ? Number(props.event.id) : null;
             const overlaps = events.filter((e) => {
+                if (currentEventId !== null && Number(e.id) === currentEventId) return false;
                 const eStart = new Date(e.start).getTime();
                 const eEnd = new Date(e.end).getTime();
                 // Check if there's any overlap

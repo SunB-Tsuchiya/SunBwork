@@ -87,7 +87,7 @@ const submit = () => {
             const newStart = new Date(`${form.date}T${form.startHour}:${form.startMinute}:00`);
             const newEnd = new Date(`${form.date}T${form.endHour}:${form.endMinute}:00`);
             const overlap = events.some((ev) => {
-                if (ev.id === props.event.id) return false; // 自分自身は除外
+                if (Number(ev.id) === Number(props.event.id)) return false; // 自分自身は除外
                 const evStart = new Date(ev.start);
                 const evEnd = new Date(ev.end);
                 return newStart < evEnd && newEnd > evStart;
