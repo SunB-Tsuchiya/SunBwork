@@ -219,7 +219,13 @@ function addNewGroup() {
 // ---- グループ編集モーダル ----
 function openGroupEditModal() {
     if (!groupConfig.value) return;
-    modalGroups.value = groupConfig.value.groups.map((g) => ({
+    // groupConfig.groups に未登録のカスタムグループ（extraKeys）も含める
+    const configKeys = groupConfig.value.groups.map((g) => g ?? null);
+    const extraKeys = [...new Set(state.items.map((i) => i.group ?? null))].filter(
+        (k) => !configKeys.includes(k),
+    );
+    const allGroups = [...groupConfig.value.groups, ...extraKeys];
+    modalGroups.value = allGroups.map((g) => ({
         key: g ?? null,
         nameInput: groupConfig.value.labels[g] ?? (g !== null ? String(g) : 'グループなし'),
     }));
