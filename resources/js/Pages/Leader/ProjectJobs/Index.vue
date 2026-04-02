@@ -72,10 +72,10 @@
                         <span class="ml-2 text-xs font-normal text-orange-500">{{ group.items.length }} 件</span>
                     </div>
 
-                    <table class="w-full table-fixed border" style="min-width: 780px;">
+                    <table class="w-full table-fixed border" style="min-width: 840px;">
                         <colgroup>
-                            <col style="width: 90px">  <!-- 伝票番号 -->
-                            <col style="width: 90px">  <!-- 登録日 -->
+                            <col style="width: 117px"> <!-- 伝票番号 -->
+                            <col style="width: 117px"> <!-- 登録日 -->
                             <col style="width: 60%">   <!-- 案件名 -->
                             <col style="width: 15.6%"> <!-- クライアント -->
                             <col style="width: 10%">   <!-- 担当Co -->
