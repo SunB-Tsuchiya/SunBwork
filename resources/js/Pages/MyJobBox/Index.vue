@@ -39,32 +39,52 @@
                         style="width: 9.5em"
                     >
                         <option value="all">全期間</option>
-                        <option v-for="m in monthOptions" :key="m.value" :value="m.value">
-                            {{ m.label }}
+                        <option v-for="mo in monthOptions" :key="mo.value" :value="mo.value">
+                            {{ mo.label }}
                         </option>
                     </select>
                 </div>
             </div>
 
-            <!-- 日グループ表示 -->
+            <!-- グループ表示切替タブ -->
+            <div class="mt-4 flex gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1 w-fit">
+                <button
+                    v-for="mode in viewModes"
+                    :key="mode.key"
+                    @click="viewMode = mode.key"
+                    :class="viewMode === mode.key
+                        ? 'bg-white text-blue-700 font-semibold shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'"
+                    class="rounded px-4 py-1.5 text-sm transition-all"
+                >{{ mode.label }}</button>
+            </div>
+
+            <!-- グループ表示 -->
             <div class="mt-4 overflow-x-auto">
                 <div v-if="displayGroups.length === 0" class="py-8 text-center text-sm text-gray-400">
                     表示するデータがありません。
                 </div>
 
-                <template v-for="group in displayGroups" :key="group.date">
-                    <!-- 日付ヘッダー -->
+                <template v-for="group in displayGroups" :key="group.key">
+                    <!-- グループヘッダー -->
                     <div class="mt-4 rounded bg-gray-100 px-4 py-1.5 text-sm font-semibold text-gray-700 first:mt-0">
                         {{ group.label }}
                         <span class="ml-2 text-xs font-normal text-gray-500">{{ group.items.length }} 件</span>
                     </div>
 
-                    <table class="min-w-full border">
+                    <table class="w-full table-fixed border" style="min-width: 720px;">
+                        <colgroup>
+                            <col style="width: 140px"> <!-- 日付 -->
+                            <col style="width: 25%">   <!-- タイトル -->
+                            <col style="width: 160px"> <!-- クライアント -->
+                            <col>                      <!-- 案件 -->
+                        </colgroup>
                         <thead>
                             <tr class="bg-gray-50">
-                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">時間</th>
+                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">日付</th>
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">タイトル</th>
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">クライアント</th>
+                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">案件</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -75,11 +95,10 @@
                                 @click.prevent="rowClick(m, $event)"
                                 role="button"
                             >
-                                <td class="border px-3 py-2 text-sm text-gray-600">{{ getStartTime(m) }}</td>
-                                <td class="border px-3 py-2 text-sm">{{ m.title || '-' }}</td>
-                                <td class="border px-3 py-2 text-sm text-gray-600">
-                                    {{ m.projectJob?.client?.name || m.project_job?.client?.name || '-' }}
-                                </td>
+                                <td class="break-words whitespace-pre-line border px-3 py-2 text-sm text-gray-600">{{ getDateDisplay(m) }}</td>
+                                <td class="break-words border px-3 py-2 text-sm">{{ m.title || '-' }}</td>
+                                <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ getClientName(m) }}</td>
+                                <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ getProjectJobTitle(m) }}</td>
                             </tr>
                         </tbody>
                     </table>
@@ -104,6 +123,7 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
+import { route } from 'ziggy-js';
 
 const props = defineProps({ projectJob: Object, messages: Object, myAssignments: Object });
 const page = usePage();
@@ -120,6 +140,14 @@ const localAssignments = ref(toPlain(props.myAssignments?.data));
 watch(() => props.myAssignments?.data, (newData) => {
     localAssignments.value = toPlain(newData);
 });
+
+// グループ表示モード
+const viewMode = ref('date');
+const viewModes = [
+    { key: 'date', label: '日付ごと' },
+    { key: 'client', label: 'クライアントごと' },
+    { key: 'project', label: '案件ごと' },
+];
 
 // ===== ユーティリティ =====
 
@@ -178,33 +206,81 @@ function getFirstEvent(m) {
     return null;
 }
 
+function getClientName(m) {
+    try {
+        return m.projectJob?.client?.name || m.project_job?.client?.name || '-';
+    } catch { return '-'; }
+}
+
+function getProjectJobTitle(m) {
+    try {
+        return m.projectJob?.title || m.projectJob?.name || m.project_job?.title || m.project_job?.name || '-';
+    } catch { return '-'; }
+}
+
+function getDateDisplay(m) {
+    const dk = getDateKey(m);
+    if (!dk) return '-';
+    const parts = String(dk).split('-');
+    if (parts.length !== 3) return dk;
+    const formatted = `${parts[0]}/${parts[1]}/${parts[2]}`;
+    const time = getStartTime(m);
+    if (time && time !== '-') return `${formatted}\n${time}`;
+    return formatted;
+}
+
+function getGroupKey(m) {
+    if (viewMode.value === 'client') return getClientName(m) || '未設定';
+    if (viewMode.value === 'project') return getProjectJobTitle(m) || '未設定';
+    return getDateKey(m);
+}
+
+function getGroupLabel(key) {
+    if (viewMode.value === 'date') return formatDateLabel(key);
+    return key || '未設定';
+}
+
 // ===== 表示データ =====
 
-// 日グループ（日付降順、同日内は開始時刻昇順）
 const displayGroups = computed(() => {
     let assignments = Array.isArray(localAssignments.value) ? localAssignments.value : [];
 
     const grouped = new Map();
     for (const m of assignments) {
-        const dk = getDateKey(m);
-        if (!grouped.has(dk)) grouped.set(dk, []);
-        grouped.get(dk).push(m);
+        const key = getGroupKey(m);
+        if (!grouped.has(key)) grouped.set(key, []);
+        grouped.get(key).push(m);
     }
 
     for (const items of grouped.values()) {
-        items.sort((a, b) => getTimeKey(a).localeCompare(getTimeKey(b)));
+        if (viewMode.value === 'date') {
+            items.sort((a, b) => getTimeKey(a).localeCompare(getTimeKey(b)));
+        } else {
+            items.sort((a, b) => {
+                const da = getDateKey(a) || '';
+                const db = getDateKey(b) || '';
+                if (da !== db) return da.localeCompare(db);
+                return getTimeKey(a).localeCompare(getTimeKey(b));
+            });
+        }
     }
 
-    const sortedKeys = Array.from(grouped.keys()).sort((a, b) => {
-        if (!a) return 1;
-        if (!b) return -1;
-        return b.localeCompare(a);
-    });
+    let sortedKeys = Array.from(grouped.keys());
+    if (viewMode.value === 'date') {
+        sortedKeys.sort((a, b) => {
+            if (!a) return 1;
+            if (!b) return -1;
+            return b.localeCompare(a);
+        });
+    } else {
+        sortedKeys.sort((a, b) => a.localeCompare(b, 'ja'));
+    }
 
-    return sortedKeys.map((dk) => ({
-        date: dk,
-        label: formatDateLabel(dk),
-        items: grouped.get(dk),
+    return sortedKeys.map((key) => ({
+        key,
+        date: key,
+        label: getGroupLabel(key),
+        items: grouped.get(key),
     }));
 });
 
