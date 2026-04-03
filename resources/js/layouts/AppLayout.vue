@@ -70,6 +70,12 @@ const inboxToast = vueRef('');
 const unreadMessages = vueRef(page.props.user?.unread_messages_count || 0);
 // job-specific unread count provided by server when available
 const unreadJobMessages = vueRef(page.props.user?.unread_job_messages_count || 0);
+// お知らせ未読数
+const unreadAnnouncements = vueRef(page.props.unreadAnnouncements || 0);
+watch(
+    () => page.props.unreadAnnouncements,
+    (v) => { unreadAnnouncements.value = v || 0; },
+);
 
 // keep reactive when Inertia page props update
 watch(
@@ -358,6 +364,17 @@ const currentRouteContext = computed(() => {
                                     >
                                 </Link>
                             </div> -->
+                            <!-- お知らせ link -->
+                            <div class="relative ms-3 flex items-center">
+                                <Link :href="route('announcements.index')" class="flex items-center text-sm text-gray-600 hover:text-gray-800">
+                                    <span>お知らせ</span>
+                                    <span
+                                        v-if="unreadAnnouncements > 0"
+                                        class="ms-2 inline-flex items-center justify-center rounded-full bg-red-500 px-2 py-0.5 text-xs text-white"
+                                        >{{ unreadAnnouncements }}</span
+                                    >
+                                </Link>
+                            </div>
                             <!-- Messages link -->
                             <div class="relative ms-3 flex items-center">
                                 <Link :href="route('messages.index')" class="flex items-center text-sm text-gray-600 hover:text-gray-800">

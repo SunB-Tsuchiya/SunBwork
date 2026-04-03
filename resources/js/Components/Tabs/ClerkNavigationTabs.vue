@@ -17,7 +17,9 @@ const tab = (key) => [
 <template>
     <div class="mb-6">
         <nav class="flex flex-wrap gap-2" aria-label="Tabs">
-            <!-- Clerk 専用タブはここに追加予定 -->
+            <Link :href="route('clerk.announcements.index')" :class="tab('announcements')">
+                お知らせ通知
+            </Link>
         </nav>
     </div>
 </template>

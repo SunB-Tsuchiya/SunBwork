@@ -445,6 +445,20 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     ->name('clerk.')
     ->group(function () {
         Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
+
+        // お知らせ管理（送信側）
+        Route::get('announcements', [App\Http\Controllers\Clerk\AnnouncementController::class, 'index'])->name('announcements.index');
+        Route::get('announcements/create', [App\Http\Controllers\Clerk\AnnouncementController::class, 'create'])->name('announcements.create');
+        Route::post('announcements', [App\Http\Controllers\Clerk\AnnouncementController::class, 'store'])->name('announcements.store');
+    });
+
+// お知らせ受信（全認証ユーザー）
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified'])
+    ->prefix('announcements')
+    ->name('announcements.')
+    ->group(function () {
+        Route::get('/', [App\Http\Controllers\AnnouncementController::class, 'index'])->name('index');
+        Route::get('/{recipient}', [App\Http\Controllers\AnnouncementController::class, 'show'])->name('show');
     });
 
 Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'coordinator'])

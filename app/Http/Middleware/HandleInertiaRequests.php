@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\AdminPermission;
+use App\Models\AnnouncementRecipient;
 use App\Models\LeaderPermission;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -40,10 +41,18 @@ class HandleInertiaRequests extends Middleware
         $flashMessage = session('success') ?? session('error') ?? null;
         $flashType    = session('success') ? 'success' : (session('error') ? 'error' : 'success');
 
+        $unreadAnnouncements = 0;
+        if ($request->user()) {
+            $unreadAnnouncements = AnnouncementRecipient::where('user_id', $request->user()->id)
+                ->whereNull('read_at')
+                ->count();
+        }
+
         return [
             ...parent::share($request),
             'flash' => $flashMessage ? ['message' => $flashMessage, 'type' => $flashType] : null,
             'clientDeleteError' => session('clientDeleteError'),
+            'unreadAnnouncements' => $unreadAnnouncements,
             // Share authenticated user basic info and helper role flags for frontend permission checks
             'auth' => [
                 'user' => $request->user()
