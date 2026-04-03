@@ -84,7 +84,7 @@ import AssignmentDetailCard from '@/Components/AssignmentDetailCard.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, ref } from 'vue';
 import { route } from 'ziggy-js';
-const { projectJob, message } = defineProps({ projectJob: Object, message: Object });
+const { projectJob, message, canDelete } = defineProps({ projectJob: Object, message: Object, canDelete: { type: Boolean, default: false } });
 const page = usePage();
 
 // Safe route helper: prefer Ziggy `route()` when available, else return fallback string.
@@ -302,20 +302,12 @@ const isSender = computed(() => {
     }
 });
 
-// 送信者またはリーダー以上は編集・削除可能
-const canEditDelete = computed(() => {
-    try {
-        const u = page.props.auth?.user;
-        if (!u) return false;
-        return isSender.value || u.isLeader || u.isAdmin || u.isSuperAdmin;
-    } catch (e) {
-        return false;
-    }
-});
+// 送信者・リーダー以上・案件担当Coは編集・削除可能
+const canEditDelete = computed(() => canDelete === true);
 
 function editMessage() {
     if (!canEditDelete.value) {
-        alert('作成者またはリーダー以外は編集できません。');
+        alert('編集する権限がありません。');
         return;
     }
     router.visit(
@@ -325,7 +317,7 @@ function editMessage() {
 
 function deleteMessage() {
     if (!canEditDelete.value) {
-        alert('作成者またはリーダー以外は削除できません。');
+        alert('削除する権限がありません。');
         return;
     }
     if (!confirm('このメッセージを本当に削除しますか？この操作は取り消せません。')) return;

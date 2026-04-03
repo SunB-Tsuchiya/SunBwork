@@ -623,10 +623,23 @@ class JobBoxController extends Controller
             $difficulties = collect();
         }
 
+        // 削除権限の判定
+        $currentUser = auth()->user();
+        $canDelete = false;
+        if ($currentUser) {
+            $isSender        = $message->sender_id === $currentUser->id;
+            $isAdminOrAbove  = $currentUser->isSuperAdmin() || $currentUser->isAdmin();
+            $isLeader        = $currentUser->isLeader();
+            $isProjectOwner  = $projectJob->user_id === $currentUser->id;
+            $isSubCo         = $projectJob->coordinators()->where('users.id', $currentUser->id)->exists();
+            $canDelete = $isSender || $isAdminOrAbove || $isLeader || $isProjectOwner || $isSubCo;
+        }
+
         return inertia('JobBox/Show', [
             'projectJob' => $projectJob,
             'message' => $message,
             'difficulties' => $difficulties,
+            'canDelete' => $canDelete,
         ]);
     }
 
@@ -866,15 +879,18 @@ class JobBoxController extends Controller
         ])->with('success', 'メッセージを更新しました。');
     }
 
-    public function destroy(ProjectJob $projectJob, JobAssignmentMessage $message)
+    public function destroy(Request $request, ProjectJob $projectJob, JobAssignmentMessage $message)
     {
-        // authorize the user - reuse existing policy if present
-        if (method_exists($this, 'authorize')) {
-            try {
-                $this->authorize('delete', $message);
-            } catch (\Exception $e) {
-                // fallthrough - continue without throwing so user gets redirected
-            }
+        $user = $request->user();
+
+        $isSender        = $message->sender_id === $user->id;
+        $isAdminOrAbove  = $user->isSuperAdmin() || $user->isAdmin();
+        $isLeader        = $user->isLeader();
+        $isProjectOwner  = $projectJob->user_id === $user->id;
+        $isSubCo         = $projectJob->coordinators()->where('users.id', $user->id)->exists();
+
+        if (! ($isSender || $isAdminOrAbove || $isLeader || $isProjectOwner || $isSubCo)) {
+            abort(403, '削除する権限がありません。');
         }
 
         // If this job message has an associated Message record, delete it and recipients
