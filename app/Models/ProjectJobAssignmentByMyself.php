@@ -15,7 +15,8 @@ use Illuminate\Database\Eloquent\Builder;
  */
 class ProjectJobAssignmentByMyself extends ProjectJobAssignment
 {
-    // $table はデフォルトの 'project_job_assignments' を継承
+    // 親クラスと同じテーブルを明示（Laravelがクラス名から自動推測するのを防ぐ）
+    protected $table = 'project_job_assignments';
 
     protected static function booted(): void
     {
