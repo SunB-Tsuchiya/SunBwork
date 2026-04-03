@@ -292,6 +292,24 @@ class ProjectJobController extends Controller
 
         $subCoordinators = $projectJob->coordinators->map(fn ($c) => ['id' => $c->id, 'name' => $c->name]);
 
+        // 進行管理表一覧
+        $progressSheets = $projectJob->progressSheets()
+            ->select(['id', 'name', 'created_at'])
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(fn ($s) => [
+                'id'         => $s->id,
+                'name'       => $s->name,
+                'created_at' => $s->created_at?->format('Y-m-d'),
+            ]);
+
+        // テンプレート一覧（シート作成モーダル用）
+        $userId = $request->user()->id;
+        $sheetTemplates = \App\Models\ProgressTemplate::where('is_shared', true)
+            ->orWhere('created_by', $userId)
+            ->orderByDesc('updated_at')
+            ->get(['id', 'name']);
+
         return Inertia::render('Coordinator/ProjectJobs/Show', [
             'job' => $projectJob,
             'subCoordinators' => $subCoordinators,
@@ -303,6 +321,8 @@ class ProjectJobController extends Controller
             'schedules' => $schedules,
             'jobHistory' => $jobHistory,
             'unsentAssignments' => $unsentAssignments,
+            'progressSheets' => $progressSheets,
+            'sheetTemplates' => $sheetTemplates,
         ]);
     }
 

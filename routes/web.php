@@ -124,6 +124,11 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::post('/myjobbox/assignments/{assignment}/complete', [\App\Http\Controllers\User\MyProjectJobController::class, 'completeAssignment'])->name('myjobbox.assignments.complete');
     Route::get('/myjobbox/{assignment}', [\App\Http\Controllers\User\MyProjectJobController::class, 'showAssignment'])->name('user.myjobbox.show');
 
+    // 進行管理表（User 閲覧・担当者登録）
+    Route::get('/user/progress-sheets/{sheet}', [\App\Http\Controllers\User\ProgressSheetController::class, 'show'])->name('user.progress_sheets.show');
+    Route::post('/user/progress-sheets/{sheet}/cells/{cell}/assign', [\App\Http\Controllers\User\ProgressSheetController::class, 'assign'])->name('progress_sheets.cells.assign');
+    Route::delete('/user/progress-sheets/{sheet}/cells/{cell}/assign', [\App\Http\Controllers\User\ProgressSheetController::class, 'unassign'])->name('progress_sheets.cells.unassign');
+
     // チーム切り替え
     Route::put('/current-team', [App\Http\Controllers\CurrentTeamController::class, 'update'])->name('current-team.update');
 
@@ -556,6 +561,31 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::delete('project_jobs/{projectJob}/jobbox/{message}', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'destroy'])->name('project_jobs.jobbox.destroy');
         // Project job analysis (ジョブ分析)
         Route::get('project_jobs/{projectJob}/analysis', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'analysis'])->name('project_jobs.analysis');
+
+        // ── 進行管理テンプレート ────────────────────────────────────
+        Route::get('progress-templates', [App\Http\Controllers\Coordinator\ProgressTemplateController::class, 'index'])->name('progress_templates.index');
+        Route::get('progress-templates/create', [App\Http\Controllers\Coordinator\ProgressTemplateController::class, 'create'])->name('progress_templates.create');
+        Route::post('progress-templates', [App\Http\Controllers\Coordinator\ProgressTemplateController::class, 'store'])->name('progress_templates.store');
+        Route::get('progress-templates/{template}/edit', [App\Http\Controllers\Coordinator\ProgressTemplateController::class, 'edit'])->name('progress_templates.edit');
+        Route::put('progress-templates/{template}', [App\Http\Controllers\Coordinator\ProgressTemplateController::class, 'update'])->name('progress_templates.update');
+        Route::delete('progress-templates/{template}', [App\Http\Controllers\Coordinator\ProgressTemplateController::class, 'destroy'])->name('progress_templates.destroy');
+
+        // ── 進行管理シート ────────────────────────────────────────
+        Route::post('project_jobs/{projectJob}/progress-sheets', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'store'])->name('project_jobs.progress_sheets.store');
+        Route::get('progress-sheets/{sheet}', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'show'])->name('progress_sheets.show');
+        Route::put('progress-sheets/{sheet}', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'update'])->name('progress_sheets.update');
+        Route::delete('progress-sheets/{sheet}', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'destroy'])->name('progress_sheets.destroy');
+        Route::post('progress-sheets/{sheet}/register-template', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'registerAsTemplate'])->name('progress_sheets.register_template');
+
+        // ── 行管理 ────────────────────────────────────────────────
+        Route::post('progress-sheets/{sheet}/rows', [App\Http\Controllers\Coordinator\ProgressRowController::class, 'store'])->name('progress_sheets.rows.store');
+        Route::put('progress-sheets/{sheet}/rows/{row}', [App\Http\Controllers\Coordinator\ProgressRowController::class, 'update'])->name('progress_sheets.rows.update');
+        Route::delete('progress-sheets/{sheet}/rows/{row}', [App\Http\Controllers\Coordinator\ProgressRowController::class, 'destroy'])->name('progress_sheets.rows.destroy');
+        Route::post('progress-sheets/{sheet}/rows/import', [App\Http\Controllers\Coordinator\ProgressRowController::class, 'import'])->name('progress_sheets.rows.import');
+        Route::put('progress-sheets/{sheet}/rows-reorder', [App\Http\Controllers\Coordinator\ProgressRowController::class, 'reorder'])->name('progress_sheets.rows.reorder');
+
+        // ── セル一括更新 ──────────────────────────────────────────
+        Route::put('progress-sheets/{sheet}/cells', [App\Http\Controllers\Coordinator\ProgressCellController::class, 'bulkUpdate'])->name('progress_sheets.cells.update');
     });
 
 

@@ -1,0 +1,153 @@
+<?php
+
+namespace App\Http\Controllers\User;
+
+use App\Http\Controllers\Controller;
+use App\Models\ProgressCell;
+use App\Models\ProgressRow;
+use App\Models\ProgressSheet;
+use App\Models\ProjectJobAssignment;
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
+
+class ProgressSheetController extends Controller
+{
+    /**
+     * 進行管理表の閲覧（User 向け）
+     */
+    public function show(Request $request, ProgressSheet $sheet)
+    {
+        $sheet->load(['projectJob.client', 'projectJob.coordinators']);
+        $projectJob = $sheet->projectJob;
+
+        $this->authorizeView($request->user(), $projectJob);
+
+        $rows = $sheet->rows()->get(['id', 'label', 'order']);
+
+        $cells = ProgressCell::whereIn('row_id', $rows->pluck('id'))
+            ->with('valueUser:id,name')
+            ->get()
+            ->map(fn ($c) => [
+                'id'              => $c->id,
+                'row_id'          => $c->row_id,
+                'col_key'         => $c->col_key,
+                'value_text'      => $c->value_text,
+                'value_date'      => $c->value_date?->format('Y-m-d'),
+                'value_bool'      => $c->value_bool,
+                'value_user_id'   => $c->value_user_id,
+                'value_user_name' => $c->valueUser?->name,
+                'assignment_id'   => $c->assignment_id,
+            ]);
+
+        return Inertia::render('User/ProgressSheets/Show', [
+            'sheet'      => [
+                'id'            => $sheet->id,
+                'name'          => $sheet->name,
+                'column_config' => $sheet->column_config,
+            ],
+            'rows'       => $rows,
+            'cells'      => $cells,
+            'projectJob' => [
+                'id'    => $projectJob->id,
+                'title' => $projectJob->title,
+            ],
+            'authUser'   => [
+                'id'   => $request->user()->id,
+                'name' => $request->user()->name,
+            ],
+        ]);
+    }
+
+    /**
+     * User が担当者セルに自分を登録（MyJob化）
+     */
+    public function assign(Request $request, ProgressSheet $sheet, ProgressCell $cell)
+    {
+        $user      = $request->user();
+        $projectJob = $sheet->projectJob;
+        $this->authorizeView($user, $projectJob);
+
+        // cell が sheet に属することを確認
+        $row = ProgressRow::where('id', $cell->row_id)
+            ->where('sheet_id', $sheet->id)
+            ->firstOrFail();
+
+        DB::transaction(function () use ($cell, $user, $projectJob, $row) {
+            // 既に自分が登録済みなら何もしない
+            if ($cell->value_user_id === $user->id) {
+                return;
+            }
+
+            // col_key に対応するラベルを column_config から取得
+            $colLabel = $this->findColLabel($sheet->column_config ?? [], $cell->col_key);
+
+            // MyJob用に project_job_assignments にレコードを作成
+            $assignment = ProjectJobAssignment::create([
+                'project_job_id' => $projectJob->id,
+                'user_id'        => $user->id,
+                'sender_id'      => $user->id,
+                'title'          => $projectJob->title . ' - ' . $row->label . '/' . $colLabel,
+            ]);
+
+            $cell->update([
+                'value_user_id' => $user->id,
+                'assignment_id' => $assignment->id,
+            ]);
+        });
+
+        return back()->with('success', '自分を担当者として登録しました。');
+    }
+
+    /**
+     * User が担当者登録を解除
+     */
+    public function unassign(Request $request, ProgressSheet $sheet, ProgressCell $cell)
+    {
+        $user = $request->user();
+        $this->authorizeView($user, $sheet->projectJob);
+
+        // 自分の登録のみ解除可能
+        abort_unless($cell->value_user_id === $user->id, 403);
+
+        ProgressRow::where('id', $cell->row_id)
+            ->where('sheet_id', $sheet->id)
+            ->firstOrFail();
+
+        $cell->update([
+            'value_user_id' => null,
+            'assignment_id' => null,
+        ]);
+
+        return back()->with('success', '担当者登録を解除しました。');
+    }
+
+    // ─────
+
+    private function authorizeView(User $user, $projectJob): void
+    {
+        $isOwner  = $projectJob->user_id === $user->id;
+        $isSub    = $projectJob->coordinators()->where('users.id', $user->id)->exists();
+        $isMember = $projectJob->teamMembers()->where('user_id', $user->id)->exists();
+        $isAdmin  = in_array($user->user_role, ['admin', 'superadmin']);
+
+        abort_unless($isOwner || $isSub || $isMember || $isAdmin, 403);
+    }
+
+    private function findColLabel(array $nodes, string $key): string
+    {
+        foreach ($nodes as $node) {
+            if ($node['key'] === $key) {
+                return $node['label'] ?? $key;
+            }
+            if (!empty($node['children'])) {
+                $found = $this->findColLabel($node['children'], $key);
+                if ($found !== $key) {
+                    return $found;
+                }
+            }
+        }
+        return $key;
+    }
+}

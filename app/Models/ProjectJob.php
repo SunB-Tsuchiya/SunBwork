@@ -57,4 +57,9 @@ class ProjectJob extends Model
     {
         return $this->hasMany(\App\Models\ProjectJobAssignment::class, 'project_job_id');
     }
+
+    public function progressSheets()
+    {
+        return $this->hasMany(\App\Models\ProgressSheet::class, 'project_job_id');
+    }
 }

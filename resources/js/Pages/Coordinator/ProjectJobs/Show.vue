@@ -270,14 +270,93 @@
                     </div>
                 </section>
 
+                <!-- ── 進行管理表セクション ──────────────────── -->
+                <section class="py-5">
+                    <div class="mb-3 flex items-center gap-4">
+                        <h3 class="font-semibold text-gray-800">進行管理表</h3>
+                        <button
+                            type="button"
+                            class="rounded border border-indigo-300 px-3 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
+                            @click="showCreateSheetModal = true"
+                        >
+                            新規作成
+                        </button>
+                        <Link
+                            :href="route('coordinator.progress_templates.index')"
+                            class="text-xs text-gray-500 hover:underline"
+                        >
+                            テンプレート管理
+                        </Link>
+                    </div>
+
+                    <div v-if="progressSheets.length > 0" class="flex flex-wrap gap-3">
+                        <Link
+                            v-for="ps in progressSheets"
+                            :key="ps.id"
+                            :href="route('coordinator.progress_sheets.show', { sheet: ps.id })"
+                            class="rounded border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm hover:bg-indigo-50 hover:border-indigo-200"
+                        >
+                            <p class="font-medium text-gray-800">{{ ps.name }}</p>
+                            <p class="text-xs text-gray-400">{{ ps.created_at }}</p>
+                        </Link>
+                    </div>
+                    <p v-else class="text-sm text-gray-400">進行管理表なし</p>
+                </section>
+
             </div><!-- /divide-y -->
         </div>
     </AppLayout>
+
+    <!-- ── 進行管理表 新規作成モーダル ──── -->
+    <div
+        v-if="showCreateSheetModal"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+        @click.self="showCreateSheetModal = false"
+    >
+        <div class="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
+            <h3 class="mb-4 text-lg font-semibold text-gray-800">進行管理表を作成</h3>
+
+            <label class="block text-sm font-medium text-gray-700">シート名 <span class="text-red-500">*</span></label>
+            <input
+                v-model="newSheetName"
+                type="text"
+                class="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+                placeholder="例: 本文用"
+            />
+
+            <label class="mt-3 block text-sm font-medium text-gray-700">テンプレート（任意）</label>
+            <select
+                v-model="newSheetTemplateId"
+                class="mt-1 w-full rounded border border-gray-300 px-2 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+            >
+                <option :value="null">— 使用しない —</option>
+                <option v-for="t in sheetTemplates" :key="t.id" :value="t.id">{{ t.name }}</option>
+            </select>
+
+            <div class="mt-5 flex justify-end gap-3">
+                <button
+                    type="button"
+                    class="rounded border border-gray-300 px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+                    @click="showCreateSheetModal = false"
+                >
+                    キャンセル
+                </button>
+                <button
+                    type="button"
+                    class="rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
+                    @click="createSheet"
+                >
+                    作成
+                </button>
+            </div>
+        </div>
+    </div>
+
 </template>
 
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
-import { router, usePage } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, ref } from 'vue';
 
 const page = usePage();
@@ -378,6 +457,26 @@ function truncate(text, len) {
 // ── 未発信の割当 ──────────────────────────────────────────────────────────
 
 const localUnsent = ref(Array.isArray(page.props.unsentAssignments) ? [...page.props.unsentAssignments] : []);
+
+// ── 進行管理表 ───────────────────────────────────────────────────────────
+
+const progressSheets = computed(() => Array.isArray(page.props.progressSheets) ? page.props.progressSheets : []);
+const sheetTemplates = computed(() => Array.isArray(page.props.sheetTemplates) ? page.props.sheetTemplates : []);
+const showCreateSheetModal = ref(false);
+const newSheetName = ref('');
+const newSheetTemplateId = ref(null);
+
+function createSheet() {
+    const name = newSheetName.value.trim();
+    if (!name) {
+        alert('シート名を入力してください。');
+        return;
+    }
+    router.post(
+        route('coordinator.project_jobs.progress_sheets.store', { projectJob: job.id }),
+        { name, template_id: newSheetTemplateId.value ?? null },
+    );
+}
 const sendingIds   = ref(new Set());
 
 function sendUnsent(a) {
