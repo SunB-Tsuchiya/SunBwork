@@ -16,17 +16,54 @@ class AnnouncementController extends Controller
     {
         $announcements = Announcement::where('sender_id', $request->user()->id)
             ->withCount('recipients')
+            ->withCount(['recipients as read_count' => fn ($q) => $q->whereNotNull('read_at')])
             ->orderByDesc('created_at')
             ->get()
             ->map(fn ($a) => [
-                'id'           => $a->id,
-                'title'        => $a->title,
-                'target_type'  => $a->target_type,
+                'id'               => $a->id,
+                'title'            => $a->title,
+                'target_type'      => $a->target_type,
                 'recipients_count' => $a->recipients_count,
-                'created_at'   => $a->created_at->format('Y/m/d H:i'),
+                'read_count'       => $a->read_count,
+                'created_at'       => $a->created_at->format('Y/m/d H:i'),
             ]);
 
         return Inertia::render('Clerk/Announcements/Index', compact('announcements'));
+    }
+
+    /** Clerk: 送信済みお知らせ詳細（受信者一覧＋既読状況） */
+    public function show(Request $request, Announcement $announcement)
+    {
+        // 自分が送信したものだけ閲覧可
+        abort_if($announcement->sender_id !== $request->user()->id, 403);
+
+        $recipients = $announcement->recipients()
+            ->with('user:id,name,employment_type,assignment_id')
+            ->with('user.assignment:id,name')
+            ->orderByRaw('read_at IS NULL DESC') // 未読を上に
+            ->orderBy('read_at')
+            ->get()
+            ->map(fn ($r) => [
+                'id'              => $r->id,
+                'name'            => $r->user->name ?? '(削除済)',
+                'assignment_name' => $r->user->assignment?->name ?? '',
+                'employment_type' => $r->user->employment_type ?? '',
+                'is_read'         => $r->read_at !== null,
+                'read_at'         => $r->read_at?->format('Y/m/d H:i'),
+            ]);
+
+        return Inertia::render('Clerk/Announcements/Show', [
+            'announcement' => [
+                'id'               => $announcement->id,
+                'title'            => $announcement->title,
+                'content'          => $announcement->content,
+                'target_type'      => $announcement->target_type,
+                'recipients_count' => $recipients->count(),
+                'read_count'       => $recipients->where('is_read', true)->count(),
+                'created_at'       => $announcement->created_at->format('Y/m/d H:i'),
+            ],
+            'recipients' => $recipients,
+        ]);
     }
 
     /** Clerk: 作成フォーム */
@@ -69,9 +106,6 @@ class AnnouncementController extends Controller
             'employees_only' => User::whereIn('employment_type', ['regular', 'contract'])->pluck('id')->toArray(),
             'individual'     => $request->user_ids,
         };
-
-        // 送信者自身は除外
-        $recipientIds = array_filter($recipientIds, fn ($id) => $id !== $request->user()->id);
 
         $rows = array_map(fn ($uid) => [
             'announcement_id' => $announcement->id,

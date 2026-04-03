@@ -450,6 +450,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('announcements', [App\Http\Controllers\Clerk\AnnouncementController::class, 'index'])->name('announcements.index');
         Route::get('announcements/create', [App\Http\Controllers\Clerk\AnnouncementController::class, 'create'])->name('announcements.create');
         Route::post('announcements', [App\Http\Controllers\Clerk\AnnouncementController::class, 'store'])->name('announcements.store');
+        Route::get('announcements/{announcement}', [App\Http\Controllers\Clerk\AnnouncementController::class, 'show'])->name('announcements.show');
     });
 
 // お知らせ受信（全認証ユーザー）
