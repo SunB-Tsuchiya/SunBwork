@@ -466,11 +466,18 @@ headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' }
 
 ## 権限・ロール設計ルール
 
-**ロール階層:** SuperAdmin > Admin > Leader / Coordinator > User
+**ロール階層:** SuperAdmin > Admin > Leader / Coordinator > **Clerk** > User
+
+**Clerk ロール（2026-04-02 追加）:**
+- `user_role = 'clerk'` / バッジカラー: 紫（`bg-purple-100 text-purple-800`）/ 表示名: 「事務・経理」
+- Coordinator と同等以上の権限（経理・事務機能へのアクセス）
+- `AdminUserController` のバリデーション `in:admin,leader,coordinator,clerk,user` に含まれる
+- CSV 一括登録でも `clerk` は有効（日本語: 「クラーク」で自動変換）
+- `UserTable.vue` / `Admin/Users/Index.vue` の `getAssignmentText()` / `getAssignmentBadgeClass()` 両方に定義が必要
 
 **Admin 権限フラグ（`admin_permissions`）:** `company_management` / `user_management` / `team_management` / `diary_management` / `client_management` / `workload_analysis` / `worktype_setting` / `work_record_management`
 
-**Leader 権限フラグ（`leader_permissions`）:** `client_management` / `diary_management` / `workload_analysis` / `workload_setting` / `work_record_management` / `dispatch_management`
+**Leader 権限フラグ（`leader_permissions`）:** `client_management` / `diary_management` / `workload_analysis` / `workload_setting` / `work_record_management` / `dispatch_management` / `project_job_overview`
 
 **権限チェック Trait:** `ChecksAdminPermission` / `ChecksLeaderPermission`。レコードなしは全権限 ON。
 
@@ -576,6 +583,32 @@ headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' }
 - `isLeader()` を allow-list から削除済み（Leader が `/coordinator/*` にアクセス不可になった）
 - Before: `!isCoordinator() && !isLeader() && !isAdmin() && !isSuperAdmin()`
 - After: `!isCoordinator() && !isAdmin() && !isSuperAdmin()`
+
+---
+
+## Leader 案件総覧（2026-04-02 実装）
+
+**概要:** Leader が自部署に関係する全案件を読み取り専用で閲覧できる機能。Coordinator の案件一覧（自分が担当のもののみ）とは異なり、部署全員の案件が対象。
+
+**ルート:** `leader/project-jobs` プレフィックス（Coordinator の `coordinator/project-jobs` と混在しない）
+- `GET leader/project-jobs` → `leader.project_jobs.index`
+- `GET leader/project-jobs/{projectJob}` → `leader.project_jobs.show`
+- **コントローラ:** `app/Http/Controllers/Leader/ProjectJobController.php`
+
+**部署フィルター:** `whereHas('user', dept_id)` OR `whereHas('coordinators', dept_id)` — オーナーもサブCoも対象
+
+**タブ表示条件:** `(isDepartmentLeader || isAdminOrAbove) && can('project_job_overview')`
+- `isAdminOrAbove` = `['admin','superadmin'].includes(user.user_role)` — Admin/SuperAdmin も /leader/* ルート訪問時に表示される
+- `isDepartmentLeader` のみでは Admin/SuperAdmin が表示されないため両方必要
+
+**Vueページ:**
+- `resources/js/Pages/Leader/ProjectJobs/Index.vue` — 月別グループ、担当Co列あり、行クリックで詳細へ
+- `resources/js/Pages/Leader/ProjectJobs/Show.vue` — 読み取り専用詳細（編集・削除・完了ボタンなし）
+
+**権限管理:** `leader_permissions.project_job_overview`（`boolean default true`）
+- Migration: `2026_04_02_200001_add_project_job_overview_to_leader_permissions.php`
+- `Admin/LeaderPermissions/Edit.vue` でトグル可能（ラベル: 「案件総覧（部署リーダーのみ有効）」）
+- Admin/SuperAdmin は `leaderPermissions === null` → `can()` が全 true → 常に表示
 
 ---
 
