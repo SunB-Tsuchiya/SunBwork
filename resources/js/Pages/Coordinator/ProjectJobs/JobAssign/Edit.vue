@@ -18,7 +18,7 @@
 
             <div class="mt-4">
                 <Link
-                    :href="route('coordinator.project_jobs.assignments.index', { projectJob: projectJob ? projectJob.id : '' })"
+                    :href="route('coordinator.project_jobs.index')"
                     class="rounded bg-gray-200 px-4 py-2"
                     >戻る</Link
                 >
@@ -136,11 +136,36 @@ import AssignmentForm from '@/Pages/Coordinator/ProjectJobs/JobAssign/Assignment
 import { Link } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 
-const props = defineProps({ projectJob: Object, members: Array, assignments: Array });
+const props = defineProps({
+    projectJob: Object,
+    members: Array,
+    assignments: Array,
+    prefill_title: { type: String, default: null },
+    prefill_stage_id: { type: [String, Number], default: null },
+    prefill_size_id: { type: [String, Number], default: null },
+    prefill_work_item_type_id: { type: [String, Number], default: null },
+});
 const projectJob = props.projectJob;
 const members = props.members || [];
 
-const formAssignments = ref(props.assignments || []);
+// 進行管理表のjoblink経由でprefill_titleが渡された場合、1ブロックを初期化する
+const formAssignments = ref(
+  props.assignments?.length
+    ? props.assignments
+    : props.prefill_title
+      ? [{
+          id: null,
+          title: props.prefill_title,
+          project_job_id: props.projectJob?.id ?? null,
+          stage_id: props.prefill_stage_id ?? null,
+          size_id: props.prefill_size_id ?? null,
+          work_item_type_id: props.prefill_work_item_type_id ?? null,
+          _locked_stage: !!props.prefill_stage_id,
+          _locked_size: !!props.prefill_size_id,
+          _locked_work_item_type: !!props.prefill_work_item_type_id,
+        }]
+      : []
+);
 const formKey = ref(0);
 
 // ===== モーダル状態 =====

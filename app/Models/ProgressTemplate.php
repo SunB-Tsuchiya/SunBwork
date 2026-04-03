@@ -10,12 +10,14 @@ class ProgressTemplate extends Model
         'name',
         'description',
         'column_config',
+        'row_config',
         'created_by',
         'is_shared',
     ];
 
     protected $casts = [
         'column_config' => 'array',
+        'row_config'    => 'array',
         'is_shared'     => 'boolean',
     ];
 

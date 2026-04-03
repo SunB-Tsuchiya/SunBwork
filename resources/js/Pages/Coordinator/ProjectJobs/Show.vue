@@ -28,6 +28,10 @@
                         <span v-if="job.jobcode">伝票番号: {{ job.jobcode }}　</span>
                         <span v-if="job.user?.name">リーダー: {{ job.user.name }}</span>
                     </p>
+                    <p class="mt-0.5 text-xs text-gray-500">
+                        <span v-if="job.size?.name">版型: <span class="font-medium text-gray-700">{{ job.size.name }}</span>　</span>
+                        <span v-if="job.page_count">総ページ数: <span class="font-medium text-gray-700">{{ job.page_count }} ページ</span></span>
+                    </p>
                     <p v-if="subCoordinators.length > 0" class="mt-0.5 text-xs text-gray-400">
                         サブCo: {{ subCoordinators.map((c) => c.name).join('、') }}
                     </p>

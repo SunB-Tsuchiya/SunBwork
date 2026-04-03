@@ -37,7 +37,11 @@ class ProgressTemplateController extends Controller
     public function create()
     {
         return Inertia::render('Coordinator/ProgressTemplates/Edit', [
-            'template' => null,
+            'template'    => null,
+            'stages'      => \App\Models\Stage::orderBy('id')->get(['id', 'name']),
+            'sizes'       => \App\Models\Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group']),
+            'assignments' => \App\Models\Assignment::orderBy('name')->get(['id', 'name', 'code']),
+            'workItemTypes' => \App\Models\WorkItemType::orderBy('id')->get(['id', 'name', 'group']),
         ]);
     }
 
@@ -47,6 +51,7 @@ class ProgressTemplateController extends Controller
             'name'          => 'required|string|max:255',
             'description'   => 'nullable|string',
             'column_config' => 'required|array',
+            'row_config'    => 'nullable|array',
             'is_shared'     => 'boolean',
         ]);
 
@@ -54,6 +59,7 @@ class ProgressTemplateController extends Controller
             'name'          => $validated['name'],
             'description'   => $validated['description'] ?? null,
             'column_config' => $validated['column_config'],
+            'row_config'    => $validated['row_config'] ?? [],
             'created_by'    => $request->user()->id,
             'is_shared'     => $validated['is_shared'] ?? false,
         ]);
@@ -72,9 +78,14 @@ class ProgressTemplateController extends Controller
                 'name'          => $template->name,
                 'description'   => $template->description,
                 'column_config' => $template->column_config,
+                'row_config'    => $template->row_config ?? [],
                 'is_shared'     => $template->is_shared,
                 'created_by'    => $template->created_by,
             ],
+            'stages'      => \App\Models\Stage::orderBy('id')->get(['id', 'name']),
+            'sizes'       => \App\Models\Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group']),
+            'assignments' => \App\Models\Assignment::orderBy('name')->get(['id', 'name', 'code']),
+            'workItemTypes' => \App\Models\WorkItemType::orderBy('id')->get(['id', 'name', 'group']),
         ]);
     }
 
@@ -86,6 +97,7 @@ class ProgressTemplateController extends Controller
             'name'          => 'required|string|max:255',
             'description'   => 'nullable|string',
             'column_config' => 'required|array',
+            'row_config'    => 'nullable|array',
             'is_shared'     => 'boolean',
         ]);
 

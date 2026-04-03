@@ -7,7 +7,11 @@
                 {{ clientName(block) }}
             </div>
             <div v-else class="w-full">
-                <select v-model="block._client_id" :disabled="!editMode" class="w-full rounded border px-3 py-2" @change="onClientChange(idx)">
+                <div v-if="block._locked_client" class="flex items-center rounded border bg-gray-100 px-3 py-2 text-sm text-gray-600">
+                    <span>{{ userClients.find(c => String(c.id) === String(block._client_id))?.name ?? block._client_id }}</span>
+                    <span class="ml-auto text-xs text-gray-400">🔒 進行表から</span>
+                </div>
+                <select v-else v-model="block._client_id" :disabled="!editMode" class="w-full rounded border px-3 py-2" @change="onClientChange(idx)">
                     <option value="">-- 選択 --</option>
                     <option v-for="c in userClients" :key="c.id" :value="String(c.id)">{{ c.name }}</option>
                 </select>
@@ -19,7 +23,11 @@
                 {{ projectName(block) }}
             </div>
             <div v-else>
-                <select v-model="block.project_job_id" :disabled="!editMode" class="w-full rounded border px-3 py-2">
+                <div v-if="block._locked_project" class="flex items-center rounded border bg-gray-100 px-3 py-2 text-sm text-gray-600">
+                    <span>{{ (props.userProjects || []).find(p => String(p.id) === String(block.project_job_id))?.title ?? block.project_job_id }}</span>
+                    <span class="ml-auto text-xs text-gray-400">🔒 進行表から</span>
+                </div>
+                <select v-else v-model="block.project_job_id" :disabled="!editMode" class="w-full rounded border px-3 py-2">
                     <option value="">-- 選択 --</option>
                     <option v-for="p in projectsForBlock(block)" :key="p.id" :value="p.id">{{ p.title || p.name }}</option>
                 </select>
@@ -99,8 +107,9 @@
             <div class="mt-3 grid grid-cols-2 gap-3">
                 <div>
                     <label class="block text-xs font-medium text-gray-600">作業種別</label>
-                    <div v-if="!editMode" class="mt-1 w-full rounded border bg-gray-50 px-3 py-2 text-sm">
+                    <div v-if="!editMode || block._locked_work_item_type" class="mt-1 w-full rounded border bg-gray-100 px-3 py-2 text-sm text-gray-500">
                         {{ itemName('types', block.work_item_type_id) }}
+                        <span v-if="block._locked_work_item_type" class="ml-2 text-xs text-gray-400">🔒 進行表から</span>
                     </div>
                     <select
                         v-else
@@ -119,8 +128,9 @@
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-gray-600">ステージ（校数）</label>
-                    <div v-if="!editMode" class="mt-1 w-full rounded border bg-gray-50 px-3 py-2 text-sm">
+                    <div v-if="!editMode || block._locked_stage" class="mt-1 w-full rounded border bg-gray-100 px-3 py-2 text-sm text-gray-500">
                         {{ itemName('stages', block.stage_id) }}
+                        <span v-if="block._locked_stage" class="ml-2 text-xs text-gray-400">🔒 進行表から</span>
                     </div>
                     <select
                         v-else
@@ -141,7 +151,11 @@
             <div class="mt-3 grid grid-cols-2 gap-3">
                 <div>
                     <label class="block text-xs font-medium text-gray-600">サイズ</label>
-                    <div v-if="!editMode" class="mt-1 w-full rounded border bg-gray-50 px-3 py-2 text-sm">{{ itemName('sizes', block.size_id) }}</div>
+                    <div v-if="!editMode || projectJobSizeId || block._locked_size" class="mt-1 w-full rounded border bg-gray-100 px-3 py-2 text-sm text-gray-500">
+                        {{ itemName('sizes', block.size_id) || '(未設定)' }}
+                        <span v-if="projectJobSizeId" class="ml-2 text-xs text-gray-400">🔒 案件で固定</span>
+                        <span v-else-if="block._locked_size" class="ml-2 text-xs text-gray-400">🔒 進行表から</span>
+                    </div>
                     <select
                         v-else
                         v-model="block.size_id"
@@ -431,6 +445,9 @@ const props = defineProps({
 });
 const page = usePage();
 
+// projectJobにサイズが設定されている場合、割当ブロックのサイズを固定する
+const projectJobSizeId = computed(() => props.projectJob?.size_id ? String(props.projectJob.size_id) : null);
+
 const injectedAuthUser = inject('authUser', null);
 const injectedUser = inject('user', null);
 
@@ -630,7 +647,7 @@ function normalizeAssignment(a) {
             estimated_hours: a.estimated_hours !== undefined && a.estimated_hours !== null ? a.estimated_hours : '',
             user_id: a.user_id || (a.user ? a.user.id : '') || '',
             work_item_type_id: a.work_item_type_id != null ? String(a.work_item_type_id) : null,
-            size_id: a.size_id != null ? String(a.size_id) : null,
+            size_id: a.size_id != null ? String(a.size_id) : (props.projectJob?.size_id ? String(props.projectJob.size_id) : null),
             stage_id: a.stage_id != null ? String(a.stage_id) : null,
             status_id: 1,
             company_id: a.company_id || null,
@@ -644,6 +661,9 @@ function normalizeAssignment(a) {
             project_job:
                 a.project_job ||
                 (props.projectJob ? { id: props.projectJob.id, title: props.projectJob.title, client: props.projectJob.client || null } : null),
+            _locked_stage: a._locked_stage || false,
+            _locked_size: a._locked_size || false,
+            _locked_work_item_type: a._locked_work_item_type || false,
         };
     } else {
         return {
@@ -677,7 +697,7 @@ function normalizeAssignment(a) {
                 : a.start_time_min || (a.desired_time ? a.desired_time.split(':')[1] : '00'),
             estimated_hours: a.estimated_hours !== undefined && a.estimated_hours !== null ? a.estimated_hours : '',
             work_item_type_id: a.work_item_type_id != null ? String(a.work_item_type_id) : null,
-            size_id: a.size_id != null ? String(a.size_id) : null,
+            size_id: a.size_id != null ? String(a.size_id) : (props.projectJob?.size_id ? String(props.projectJob.size_id) : null),
             stage_id: a.stage_id != null ? String(a.stage_id) : null,
             status_id: a.status_id != null ? String(a.status_id) : null,
             amounts: a.amounts !== undefined && a.amounts !== null ? a.amounts : a.amounts_unit ? 0 : undefined,
@@ -685,6 +705,11 @@ function normalizeAssignment(a) {
             _medium_filter: a._medium_filter ?? '',
             _type_filter: a._type_filter ?? '',
             source_assignment_id: a.source_assignment_id || null,
+            _locked_client: a._locked_client || false,
+            _locked_project: a._locked_project || false,
+            _locked_stage: a._locked_stage || false,
+            _locked_size: a._locked_size || false,
+            _locked_work_item_type: a._locked_work_item_type || false,
         };
     }
 }
@@ -1409,6 +1434,7 @@ function addBlock() {
         project_job: props.projectJob ? { id: props.projectJob.id, title: props.projectJob.title } : null,
         _type_filter: '',
         _medium_filter: 'paper',
+        size_id: props.projectJob?.size_id ? String(props.projectJob.size_id) : null,
     });
 }
 

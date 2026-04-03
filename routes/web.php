@@ -129,6 +129,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::get('/user/progress-sheets/{sheet}', [\App\Http\Controllers\User\ProgressSheetController::class, 'show'])->name('user.progress_sheets.show');
     Route::post('/user/progress-sheets/{sheet}/cells/{cell}/assign', [\App\Http\Controllers\User\ProgressSheetController::class, 'assign'])->name('progress_sheets.cells.assign');
     Route::delete('/user/progress-sheets/{sheet}/cells/{cell}/assign', [\App\Http\Controllers\User\ProgressSheetController::class, 'unassign'])->name('progress_sheets.cells.unassign');
+    Route::post('/user/progress-sheets/{sheet}/cells/link-job', [\App\Http\Controllers\User\ProgressSheetController::class, 'linkJob'])->name('progress_sheets.cells.link_job_user');
 
     // チーム切り替え
     Route::put('/current-team', [App\Http\Controllers\CurrentTeamController::class, 'update'])->name('current-team.update');
@@ -587,6 +588,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 
         // ── セル一括更新 ──────────────────────────────────────────
         Route::put('progress-sheets/{sheet}/cells', [App\Http\Controllers\Coordinator\ProgressCellController::class, 'bulkUpdate'])->name('progress_sheets.cells.update');
+        Route::post('progress-sheets/{sheet}/cells/link-job', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'linkJob'])->name('progress_sheets.cells.link_job');
     });
 
 

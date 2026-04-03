@@ -15,6 +15,8 @@ class ProjectJob extends Model
         'user_id',
         'client_id',
         'detail',
+        'size_id',
+        'page_count',
         'schedule',
         'completed',
     ];
@@ -22,6 +24,7 @@ class ProjectJob extends Model
     protected $casts = [
         'schedule' => 'array',
         'completed' => 'boolean',
+        'page_count' => 'integer',
     ];
 
     public function user()
@@ -38,6 +41,11 @@ class ProjectJob extends Model
     public function client()
     {
         return $this->belongsTo(Client::class);
+    }
+
+    public function size()
+    {
+        return $this->belongsTo(Size::class);
     }
 
     // ProjectTeamMembers relation

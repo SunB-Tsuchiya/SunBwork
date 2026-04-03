@@ -1031,6 +1031,12 @@ class EventController extends Controller
         // reuse much of create() logic but render a dedicated job creation page
         $date = $request->query('date', now()->toDateString());
         $jobId = $request->query('job');
+        $prefillTitle = $request->query('title'); // 進行管理表からの遷移時にタイトルをprefill
+        $prefillClientId = $request->query('client_id');       // 進行管理表: クライアントID
+        $prefillProjectJobId = $request->query('project_job_id'); // 進行管理表: 案件ID
+        $prefillStageId = $request->query('stage_id');          // 進行管理表: ステージID
+        $prefillSizeId = $request->query('size_id');             // 進行管理表: サイズID
+        $prefillWorkItemTypeId = $request->query('work_item_type_id'); // 進行管理表: 作業種別ID
         $startHour = $request->query('startHour');
         $startMinute = $request->query('startMinute');
         $endHour = $request->query('endHour');
@@ -1063,6 +1069,24 @@ class EventController extends Controller
                     'amounts_unit' => 'page',
                 ]];
             }
+        }
+
+        // 進行管理表 joblink 経由でタイトルが渡された場合（$jobId なし）、prefill assignments を構築
+        if (!$jobId && $prefillTitle) {
+            $jobAssignments = [[
+                'id' => null,
+                'project_job_id' => $prefillProjectJobId ?? null,
+                '_client_id' => $prefillClientId ? (string)$prefillClientId : '',
+                'title' => $prefillTitle,
+                'stage_id' => $prefillStageId ?? null,
+                'size_id' => $prefillSizeId ?? null,
+                'work_item_type_id' => $prefillWorkItemTypeId ?? null,
+                '_locked_client' => (bool)$prefillClientId,
+                '_locked_project' => (bool)$prefillProjectJobId,
+                '_locked_stage' => (bool)$prefillStageId,
+                '_locked_size' => (bool)$prefillSizeId,
+                '_locked_work_item_type' => (bool)$prefillWorkItemTypeId,
+            ]];
         }
 
         $user = $request->user();
@@ -1191,6 +1215,7 @@ class EventController extends Controller
 
         $props = [
             'date' => $date,
+            'prefill_title' => $prefillTitle, // 進行管理表joblink経由の場合にタイトルをprefill
             'job' => $jobData,
             'assignments' => $jobAssignments, // pre-filled from coordinator assignment (amounts=null)
             'userClients' => $userClients,

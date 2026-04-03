@@ -16,7 +16,15 @@ const defaultUserId = page.props.auth && page.props.auth.user ? page.props.auth.
 const prefillEvent = ref(page.props.prefillEvent || null);
 
 // assignments for the form (may be replaced by past-data reuse)
-const formAssignments = ref(page.props.assignments || []);
+// 進行管理表のjoblink経由でprefill_titleが渡された場合、1ブロックを初期化する
+const prefillTitle = page.props.prefill_title ?? null;
+const formAssignments = ref(
+  page.props.assignments?.length
+    ? page.props.assignments
+    : prefillTitle
+      ? [{ id: null, title: prefillTitle, project_job_id: null }]
+      : []
+);
 const formKey = ref(0); // increment to force re-mount of AssignmentFormUser
 
 // ── Reuse modal state ──────────────────────────────────────────────────────

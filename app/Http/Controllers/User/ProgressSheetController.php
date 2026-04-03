@@ -27,18 +27,22 @@ class ProgressSheetController extends Controller
         $rows = $sheet->rows()->get(['id', 'label', 'order']);
 
         $cells = ProgressCell::whereIn('row_id', $rows->pluck('id'))
-            ->with('valueUser:id,name')
+            ->with(['valueUser:id,name', 'assignment:id,title,detail,desired_end_date,completed,user_id,sender_id'])
             ->get()
             ->map(fn ($c) => [
-                'id'              => $c->id,
-                'row_id'          => $c->row_id,
-                'col_key'         => $c->col_key,
-                'value_text'      => $c->value_text,
-                'value_date'      => $c->value_date?->format('Y-m-d'),
-                'value_bool'      => $c->value_bool,
-                'value_user_id'   => $c->value_user_id,
-                'value_user_name' => $c->valueUser?->name,
-                'assignment_id'   => $c->assignment_id,
+                'id'                   => $c->id,
+                'row_id'               => $c->row_id,
+                'col_key'              => $c->col_key,
+                'value_text'           => $c->value_text,
+                'value_date'           => $c->value_date?->format('Y-m-d'),
+                'value_bool'           => $c->value_bool,
+                'value_user_id'        => $c->value_user_id,
+                'value_user_name'      => $c->valueUser?->name,
+                'assignment_id'        => $c->assignment_id,
+                'assignment_title'     => $c->assignment?->title,
+                'assignment_completed' => $c->assignment?->completed,
+                'assignment_user_id'   => $c->assignment?->user_id,
+                'assignment_end_date'  => $c->assignment?->desired_end_date?->format('Y-m-d'),
             ]);
 
         return Inertia::render('User/ProgressSheets/Show', [
@@ -50,14 +54,53 @@ class ProgressSheetController extends Controller
             'rows'       => $rows,
             'cells'      => $cells,
             'projectJob' => [
-                'id'    => $projectJob->id,
-                'title' => $projectJob->title,
+                'id'          => $projectJob->id,
+                'title'       => $projectJob->title,
+                'client_name' => $projectJob->client?->name,
             ],
             'authUser'   => [
                 'id'   => $request->user()->id,
                 'name' => $request->user()->name,
             ],
         ]);
+    }
+
+    /**
+     * セルにMyJobを紐付けて登録（自己割当のみ）
+     */
+    public function linkJob(Request $request, ProgressSheet $sheet)
+    {
+        $user = $request->user();
+        $this->authorizeView($user, $sheet->projectJob);
+
+        $validated = $request->validate([
+            'row_id'           => 'required|integer',
+            'col_key'          => 'required|string',
+            'title'            => 'required|string|max:255',
+            'detail'           => 'nullable|string',
+            'desired_end_date' => 'nullable|date',
+        ]);
+
+        $allowedRowIds = ProgressRow::where('sheet_id', $sheet->id)->pluck('id')->toArray();
+        abort_unless(in_array($validated['row_id'], $allowedRowIds), 403);
+
+        DB::transaction(function () use ($validated, $sheet, $user) {
+            $assignment = ProjectJobAssignment::create([
+                'project_job_id'   => $sheet->project_job_id,
+                'user_id'          => $user->id,
+                'sender_id'        => $user->id,
+                'title'            => $validated['title'],
+                'detail'           => $validated['detail'] ?? null,
+                'desired_end_date' => $validated['desired_end_date'] ?? null,
+            ]);
+
+            ProgressCell::updateOrCreate(
+                ['row_id' => $validated['row_id'], 'col_key' => $validated['col_key']],
+                ['assignment_id' => $assignment->id]
+            );
+        });
+
+        return back()->with('success', 'MyJobに登録しました。');
     }
 
     /**

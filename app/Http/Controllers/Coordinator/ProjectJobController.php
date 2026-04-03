@@ -108,8 +108,10 @@ class ProjectJobController extends Controller
 
     public function create()
     {
+        $sizes = \App\Models\Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group']);
         return Inertia::render('Coordinator/ProjectJobs/Create', [
             'coordinatorCandidates' => $this->coordinatorCandidates(),
+            'sizes' => $sizes,
         ]);
     }
 
@@ -121,6 +123,8 @@ class ProjectJobController extends Controller
                 'title'               => 'required|string|max:255',
                 'user_id'             => 'required|exists:users,id',
                 'client_id'           => 'required|exists:clients,id',
+                'size_id'             => 'nullable|exists:sizes,id',
+                'page_count'          => 'nullable|integer|min:1|max:99999',
                 'detail'              => 'nullable|string',
                 'sub_coordinator_ids' => 'nullable|array',
                 'sub_coordinator_ids.*' => 'exists:users,id',
@@ -150,7 +154,7 @@ class ProjectJobController extends Controller
         $jobid = session('jobid');
         $registerFlags = session('register_flags', []);
         // reload projectJob with team members and their user relation, and also ensure user and client relations are loaded
-        $projectJob->load(['teamMembers.user', 'user', 'client', 'coordinators']);
+        $projectJob->load(['teamMembers.user', 'user', 'client', 'coordinators', 'size']);
         $members = $projectJob->teamMembers->map(function ($m) {
             return [
                 'id' => $m->id,
@@ -460,9 +464,11 @@ class ProjectJobController extends Controller
             'sub_coordinator_ids' => $projectJob->coordinators->pluck('id')->toArray(),
         ]);
 
+        $sizes = \App\Models\Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group']);
         return Inertia::render('Coordinator/ProjectJobs/Edit', [
             'job'                  => $jobArray,
             'coordinatorCandidates' => $this->coordinatorCandidates(),
+            'sizes' => $sizes,
         ]);
     }
 
@@ -485,6 +491,8 @@ class ProjectJobController extends Controller
                 'title'                 => 'required|string|max:255',
                 'user_id'               => 'required|exists:users,id',
                 'client_id'             => 'required|exists:clients,id',
+                'size_id'               => 'nullable|exists:sizes,id',
+                'page_count'            => 'nullable|integer|min:1|max:99999',
                 'detail'                => 'nullable|string',
                 'schedule'              => 'nullable|array',
                 'sub_coordinator_ids'   => 'nullable|array',

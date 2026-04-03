@@ -120,8 +120,12 @@ class ProjectJobAssignmentsController extends Controller
         ]);
     }
 
-    public function create(ProjectJob $projectJob)
+    public function create(Request $request, ProjectJob $projectJob)
     {
+        $prefillTitle = $request->query('title'); // 進行管理表joblink経由の場合にタイトルをprefill
+        $prefillStageId = $request->query('stage_id');
+        $prefillSizeId = $request->query('size_id');
+        $prefillWorkItemTypeId = $request->query('work_item_type_id');
         // send available team members for selection
         $members = $projectJob->teamMembers()->with(['user', 'user.assignment'])->get()->map(function ($m) {
             return [
@@ -198,6 +202,10 @@ class ProjectJobAssignmentsController extends Controller
             'assignments' => [],
             'editMode' => false,
             'companies' => $companies,
+            'prefill_title' => $prefillTitle,
+            'prefill_stage_id' => $prefillStageId,
+            'prefill_size_id' => $prefillSizeId,
+            'prefill_work_item_type_id' => $prefillWorkItemTypeId,
             'types' => $types,
             'sizes' => $sizes,
             'stages' => $stages,

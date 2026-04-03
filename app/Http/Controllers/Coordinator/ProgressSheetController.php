@@ -8,6 +8,7 @@ use App\Models\ProgressTemplate;
 use App\Models\ProgressRow;
 use App\Models\ProgressCell;
 use App\Models\ProjectJob;
+use App\Models\ProjectJobAssignment;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -51,6 +52,21 @@ class ProgressSheetController extends Controller
             'created_by'     => $request->user()->id,
         ]);
 
+        // テンプレートのrow_configがあれば台割行を初期作成
+        if (!empty($template) && !empty($template->row_config)) {
+            $rows = [];
+            foreach ($template->row_config as $order => $rowDef) {
+                $rows[] = [
+                    'sheet_id'   => $sheet->id,
+                    'label'      => $rowDef['label'] ?? '',
+                    'order'      => $order,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }
+            ProgressRow::insert($rows);
+        }
+
         return redirect()->route('coordinator.progress_sheets.show', $sheet->id);
     }
 
@@ -59,7 +75,7 @@ class ProgressSheetController extends Controller
      */
     public function show(Request $request, ProgressSheet $sheet)
     {
-        $sheet->load(['projectJob.client', 'projectJob.user', 'projectJob.coordinators']);
+        $sheet->load(['projectJob.client', 'projectJob.size', 'projectJob.user', 'projectJob.coordinators']);
         $projectJob = $sheet->projectJob;
 
         $canEdit = $this->canEdit($request->user(), $projectJob);
@@ -67,18 +83,22 @@ class ProgressSheetController extends Controller
         $rows = $sheet->rows()->get(['id', 'label', 'order']);
 
         $cells = ProgressCell::whereIn('row_id', $rows->pluck('id'))
-            ->with('valueUser:id,name')
+            ->with(['valueUser:id,name', 'assignment:id,title,detail,desired_end_date,completed,user_id,sender_id'])
             ->get()
             ->map(fn($c) => [
-                'id'           => $c->id,
-                'row_id'       => $c->row_id,
-                'col_key'      => $c->col_key,
-                'value_text'   => $c->value_text,
-                'value_date'   => $c->value_date?->format('Y-m-d'),
-                'value_bool'   => $c->value_bool,
-                'value_user_id'=> $c->value_user_id,
-                'value_user_name' => $c->valueUser?->name,
-                'assignment_id'=> $c->assignment_id,
+                'id'                    => $c->id,
+                'row_id'                => $c->row_id,
+                'col_key'               => $c->col_key,
+                'value_text'            => $c->value_text,
+                'value_date'            => $c->value_date?->format('Y-m-d'),
+                'value_bool'            => $c->value_bool,
+                'value_user_id'         => $c->value_user_id,
+                'value_user_name'       => $c->valueUser?->name,
+                'assignment_id'         => $c->assignment_id,
+                'assignment_title'      => $c->assignment?->title,
+                'assignment_completed'  => $c->assignment?->completed,
+                'assignment_user_id'    => $c->assignment?->user_id,
+                'assignment_end_date'   => $c->assignment?->desired_end_date?->format('Y-m-d'),
             ]);
 
         // 担当者選択用ユーザー一覧（案件メンバー + Coordinator）
@@ -87,6 +107,12 @@ class ProgressSheetController extends Controller
         $ownerId = $projectJob->user_id;
         $userIds = array_unique(array_merge($memberIds, $coIds, [$ownerId]));
         $users = User::whereIn('id', $userIds)->orderBy('name')->get(['id', 'name']);
+
+        // 列タイプ用マスターデータ
+        $stages = \App\Models\Stage::orderBy('id')->get(['id', 'name']);
+        $sizes = \App\Models\Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group']);
+        $assignments = \App\Models\Assignment::orderBy('name')->get(['id', 'name', 'code']);
+        $workItemTypes = \App\Models\WorkItemType::orderBy('id')->get(['id', 'name', 'group']);
 
         // テンプレート一覧（シート作成モーダル用）
         $userId = $request->user()->id;
@@ -102,12 +128,21 @@ class ProgressSheetController extends Controller
                 'column_config' => $sheet->column_config,
                 'created_by'    => $sheet->created_by,
             ],
-            'rows'       => $rows,
-            'cells'      => $cells,
-            'users'      => $users,
-            'projectJob' => [
-                'id'    => $projectJob->id,
-                'title' => $projectJob->title,
+            'rows'        => $rows,
+            'cells'       => $cells,
+            'users'       => $users,
+            'stages'      => $stages,
+            'sizes'       => $sizes,
+            'assignments' => $assignments,
+            'workItemTypes' => $workItemTypes,
+            'projectJob'  => [
+                'id'          => $projectJob->id,
+                'title'       => $projectJob->title,
+                'client_name' => $projectJob->client?->name,
+                'client_id'   => $projectJob->client?->id,
+                'size_id'     => $projectJob->size_id,
+                'size_name'   => $projectJob->size?->name,
+                'page_count'  => $projectJob->page_count,
             ],
             'canEdit'    => $canEdit,
             'templates'  => $templates,
@@ -164,6 +199,48 @@ class ProgressSheetController extends Controller
         ]);
 
         return back()->with('success', 'テンプレートとして登録しました。');
+    }
+
+    /**
+     * セルにジョブを紐付けて登録（自分 → MyJob / 他者 → Coordinator割当）
+     */
+    public function linkJob(Request $request, ProgressSheet $sheet)
+    {
+        $user = $request->user();
+        $this->authorizeJobAccess($user, $sheet->projectJob);
+
+        $validated = $request->validate([
+            'row_id'           => 'required|integer',
+            'col_key'          => 'required|string',
+            'title'            => 'required|string|max:255',
+            'detail'           => 'nullable|string',
+            'desired_end_date' => 'nullable|date',
+            'assignee_user_id' => 'nullable|integer|exists:users,id',
+        ]);
+
+        $allowedRowIds = ProgressRow::where('sheet_id', $sheet->id)->pluck('id')->toArray();
+        abort_unless(in_array($validated['row_id'], $allowedRowIds), 403);
+
+        $assigneeId = $validated['assignee_user_id'] ?? $user->id;
+        $senderId   = $user->id;
+
+        DB::transaction(function () use ($validated, $sheet, $assigneeId, $senderId) {
+            $assignment = ProjectJobAssignment::create([
+                'project_job_id'   => $sheet->project_job_id,
+                'user_id'          => $assigneeId,
+                'sender_id'        => $senderId,
+                'title'            => $validated['title'],
+                'detail'           => $validated['detail'] ?? null,
+                'desired_end_date' => $validated['desired_end_date'] ?? null,
+            ]);
+
+            ProgressCell::updateOrCreate(
+                ['row_id' => $validated['row_id'], 'col_key' => $validated['col_key']],
+                ['assignment_id' => $assignment->id]
+            );
+        });
+
+        return back()->with('success', 'ジョブを登録しました。');
     }
 
     // ───── helpers ─────

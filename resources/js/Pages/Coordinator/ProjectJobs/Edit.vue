@@ -41,6 +41,43 @@
                     </div>
                 </div>
                 <div class="mb-4">
+                    <label class="mb-1 block font-semibold">サイズ</label>
+                    <!-- 媒体グループ切り替え -->
+                    <div class="mb-2 flex gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1 w-fit">
+                        <button
+                            v-for="opt in mediumOptions"
+                            :key="opt.value"
+                            type="button"
+                            :class="sizeFilter === opt.value ? 'bg-white text-indigo-700 font-semibold shadow-sm' : 'text-gray-600 hover:text-gray-900'"
+                            class="rounded px-4 py-1.5 text-sm transition-all"
+                            @click="sizeFilter = opt.value"
+                        >{{ opt.label }}</button>
+                    </div>
+                    <select v-model="form.size_id" class="w-full rounded border px-3 py-2">
+                        <option value="">-- 選択しない --</option>
+                        <template v-for="grp in filteredSizeGroups" :key="grp.group">
+                            <optgroup :label="grp.label">
+                                <option v-for="s in grp.items" :key="s.id" :value="s.id">{{ s.name }}</option>
+                            </optgroup>
+                        </template>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label class="mb-1 block font-semibold">総ページ数</label>
+                    <input
+                        v-model.number="form.page_count"
+                        type="number"
+                        min="1"
+                        max="99999"
+                        step="1"
+                        class="w-40 rounded border px-3 py-2"
+                        placeholder="例: 128"
+                        @input="validatePageCount"
+                    />
+                    <span class="ml-2 text-sm text-gray-500">ページ</span>
+                    <div v-if="pageCountError" class="mt-1 text-sm text-red-600">{{ pageCountError }}</div>
+                </div>
+                <div class="mb-4">
                     <label class="mb-1 block font-semibold">詳細</label>
                     <textarea v-model="form.detail" class="w-full rounded border px-3 py-2" rows="3"></textarea>
                 </div>
@@ -98,9 +135,54 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
+
+// ── サイズフィルター ──────────────────────────────────────
+const sizeFilter = ref('paper');
+const mediumOptions = [
+    { value: 'paper', label: '紙媒体' },
+    { value: 'digital', label: 'デジタル' },
+    { value: '', label: '全て' },
+];
+
+const GROUP_LABELS = {
+    paper: '紙媒体', digital: 'デジタル', web: 'Web', other: 'その他',
+};
+
+const filteredSizeGroups = computed(() => {
+    const list = props.sizes ?? [];
+    const filtered = sizeFilter.value ? list.filter((s) => s.group === sizeFilter.value) : list;
+    const map = new Map();
+    for (const s of filtered) {
+        const g = s.group || 'other';
+        if (!map.has(g)) map.set(g, []);
+        map.get(g).push(s);
+    }
+    return [...map.entries()].map(([group, items]) => ({
+        group,
+        label: GROUP_LABELS[group] ?? group,
+        items,
+    }));
+});
+
+// ── ページ数バリデーション ───────────────────────────────
+const pageCountError = ref('');
+function validatePageCount() {
+    const val = form.page_count;
+    if (val === '' || val === null || val === undefined) {
+        pageCountError.value = '';
+        return;
+    }
+    const n = Number(val);
+    if (!Number.isInteger(n) || n < 1 || n > 99999) {
+        pageCountError.value = '1〜99999の整数を入力してください';
+    } else {
+        pageCountError.value = '';
+    }
+}
 const props = defineProps({
     job: Object,
     coordinatorCandidates: { type: Array, default: () => [] },
+    sizes: { type: Array, default: () => [] },
 });
 function decodeField(val, fallback = '') {
     if (val === null || val === undefined) return fallback;
@@ -132,6 +214,8 @@ const form = useForm({
     sub_coordinator_ids: props.job.sub_coordinator_ids || [],
     client_id: props.job.client_id || '',
     client_name: props.job.client?.name || '',
+    size_id: props.job.size_id || '',
+    page_count: props.job.page_count || '',
     // support both { "text": "..." } JSON and plain text
     detail:
         decodedDetail && typeof decodedDetail === 'object' && 'text' in decodedDetail
