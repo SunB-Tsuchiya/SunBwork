@@ -215,11 +215,16 @@ class ProjectJobAssignmentController extends Controller
                                     $endTimePart = $eh . ':' . $em;
                                 }
 
-                                if ($startTimePart) {
-                                    $eventStart = \Carbon\Carbon::parse($datePart . ' ' . $startTimePart);
-                                }
+                                // start_time がなければ 00:00 をデフォルトにしてイベントを必ず作成
+                                $startTimePart = $startTimePart ?: '00:00';
+                                $eventStart = \Carbon\Carbon::parse($datePart . ' ' . $startTimePart);
+
                                 if ($endTimePart) {
                                     $eventEnd = \Carbon\Carbon::parse($datePart . ' ' . $endTimePart);
+                                }
+                                // end が start 以下なら end を start + 1時間 に補正
+                                if ($eventEnd && $eventEnd->lessThanOrEqualTo($eventStart)) {
+                                    $eventEnd = $eventStart->copy()->addHour();
                                 }
                             }
                         } catch (\Throwable $__parseE) {

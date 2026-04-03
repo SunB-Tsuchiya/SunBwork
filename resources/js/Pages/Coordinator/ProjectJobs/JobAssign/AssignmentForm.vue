@@ -1653,6 +1653,19 @@ async function save() {
         // user mode save
         saving.value = true;
 
+        // 開始と終了が同じ場合は保存不可
+        if (props.mode === 'user') {
+            const sh = String(startTimeHour.value || '').padStart(2, '0');
+            const sm = String(startTimeMin.value || '00').padStart(2, '0');
+            const eh = String(endTimeHour.value || '').padStart(2, '0');
+            const em = String(endTimeMin.value || '00').padStart(2, '0');
+            if (sh && eh && `${sh}:${sm}` === `${eh}:${em}`) {
+                alert('開始時間と終了時間が同じです。終了時間を開始時間より後に設定してください。');
+                saving.value = false;
+                return;
+            }
+        }
+
         // Check for overlapping events
         if (!proceedWithOverlap.value && props.mode === 'user' && props.editMode) {
             const overlaps = await checkEventOverlaps();
