@@ -130,6 +130,11 @@ class ProjectJobAssignment extends Model
         return $this->belongsTo(Department::class, 'department_id');
     }
 
+    public function events()
+    {
+        return $this->hasMany(\App\Models\Event::class, 'project_job_assignment_id');
+    }
+
     /**
      * Build a standardized array for pre-filling Event creation forms.
      * Includes assignment fields, linked project job fields and client info when available.
