@@ -145,7 +145,7 @@ class ProjectJobController extends Controller
         }
     }
 
-    public function show(ProjectJob $projectJob)
+    public function show(Request $request, ProjectJob $projectJob)
     {
         $jobid = session('jobid');
         $registerFlags = session('register_flags', []);
