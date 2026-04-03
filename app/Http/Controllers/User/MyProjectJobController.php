@@ -156,10 +156,32 @@ class MyProjectJobController extends Controller
 
         $projectJob = $assignment->projectJob ?? null;
 
+        // 本人または Admin 以上が削除可能
+        $canDelete = $assignment->user_id === $user->id
+            || $user->isSuperAdmin()
+            || $user->isAdmin();
+
         return Inertia::render('MyJobBox/Show', [
             'projectJob' => $projectJob,
             'assignment' => $assignment,
+            'canDelete'  => $canDelete,
         ]);
+    }
+
+    /**
+     * Delete a MyJobBox assignment.
+     */
+    public function destroyAssignment(Request $request, \App\Models\ProjectJobAssignmentByMyself $assignment)
+    {
+        $user = $request->user();
+        if (! $user || ($assignment->user_id !== $user->id && ! $user->isSuperAdmin() && ! $user->isAdmin())) {
+            abort(403, '削除する権限がありません。');
+        }
+
+        $assignment->delete();
+
+        return redirect()->route('user.myjobbox.index')
+            ->with('success', 'ジョブ割り当てを削除しました。');
     }
 
     public function create()

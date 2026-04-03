@@ -35,6 +35,9 @@ class ProjectJobAssignment extends Model
         'difficulty_id',
         // starts_at/ends_at removed from fillable
         'sender_id',
+        'read_at',
+        'scheduled',
+        'scheduled_at',
     ];
 
     protected $casts = [
@@ -50,6 +53,8 @@ class ProjectJobAssignment extends Model
         'read_at' => 'datetime',
         // starts_at/ends_at removed from casts
         'sender_id' => 'integer',
+        'scheduled' => 'boolean',
+        'scheduled_at' => 'datetime',
     ];
 
     protected $dates = [

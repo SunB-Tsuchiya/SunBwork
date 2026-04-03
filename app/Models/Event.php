@@ -54,7 +54,7 @@ class Event extends Model
      */
     public function projectJobAssignment()
     {
-        return $this->belongsTo(ProjectJobAssignmentByMyself::class, 'project_job_assignment_id');
+        return $this->belongsTo(ProjectJobAssignment::class, 'project_job_assignment_id');
     }
 
     public function projectJobAssignmentByMyself()

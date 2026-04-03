@@ -64,6 +64,14 @@
                     戻る
                 </Link>
 
+                <button
+                    v-if="canDelete"
+                    @click="deleteAssignment"
+                    class="ml-auto inline-flex items-center rounded bg-red-100 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-200"
+                >
+                    削除
+                </button>
+
                 <template v-if="isAssignee">
                     <Link
                         v-if="assignment.scheduled || assignment.scheduled_at"
@@ -120,7 +128,7 @@ import AssignmentDetailCard from '@/Components/AssignmentDetailCard.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, ref } from 'vue';
 
-const { projectJob, assignment } = defineProps({ projectJob: Object, assignment: Object });
+const { projectJob, assignment, canDelete } = defineProps({ projectJob: Object, assignment: Object, canDelete: { type: Boolean, default: false } });
 const page = usePage();
 
 const isAssignee = computed(() => {
@@ -150,6 +158,18 @@ function routeBack() {
     } catch (e) {
         return '/myjobbox';
     }
+}
+
+function deleteAssignment() {
+    if (!confirm('このジョブ割り当てを本当に削除しますか？この操作は取り消せません。')) return;
+    router.delete(
+        typeof route === 'function'
+            ? route('user.myjobbox.destroy', { assignment: assignment?.id })
+            : `/myjobbox/${assignment?.id}`,
+        {
+            onError: () => alert('削除に失敗しました。'),
+        },
+    );
 }
 
 // ---- 予定（events）関連 ----

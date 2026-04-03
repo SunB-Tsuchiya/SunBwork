@@ -160,8 +160,14 @@ scopeCoordinatorAssigned() // sender_id != user_id OR sender_id IS NULL
 ### ProjectJobAssignmentByMyself モデル
 
 `ProjectJobAssignment` を継承したエイリアス（後方互換のため残存）。
-`$table = 'project_job_assignments'` / `booted()` で `whereColumn('sender_id', 'user_id')` のグローバルスコープを自動適用。
+`$table` は親クラスの `'project_job_assignments'` を使用（**旧テーブルは参照しない**）。
+`booted()` で `whereColumn('sender_id', 'user_id')` のグローバルスコープを自動適用。
 **新コードでは `ProjectJobAssignment::selfAssigned()` スコープを使うこと。**
+
+> **migration 2026_04_03_300001** により、旧テーブル `project_job_assignment_by_myself` の
+> 全データ（48件）を `project_job_assignments` へ移行済み。`sender_id = user_id` が自己割当マーカー。
+> 旧テーブルはバックアップとして残存しているが、アプリからは参照しない。
+> `events.project_job_assignment_id` も新テーブルのIDに更新済み。
 
 ### JobBox vs MyJobBox の違い
 
