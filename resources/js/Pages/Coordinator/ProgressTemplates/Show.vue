@@ -43,9 +43,9 @@
       <!-- 2カラム: 行・列構成 -->
       <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
 
-        <!-- 台割行テンプレート -->
+        <!-- 列管理 -->
         <div class="rounded bg-white p-6 shadow">
-          <h3 class="mb-3 font-semibold text-gray-700">台割行テンプレート</h3>
+          <h3 class="mb-3 font-semibold text-gray-700">列管理</h3>
           <div v-if="template.row_config.length === 0" class="text-sm text-gray-400 italic">
             行が設定されていません
           </div>
@@ -77,9 +77,9 @@
           </ul>
         </div>
 
-        <!-- 列・ステージ構成 -->
+        <!-- 行・ステージ構成 -->
         <div class="rounded bg-white p-6 shadow">
-          <h3 class="mb-3 font-semibold text-gray-700">列・ステージ構成</h3>
+          <h3 class="mb-3 font-semibold text-gray-700">行・ステージ構成</h3>
           <div v-if="template.column_config.length === 0" class="text-sm text-gray-400 italic">
             列が設定されていません
           </div>

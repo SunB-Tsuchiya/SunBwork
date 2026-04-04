@@ -43,12 +43,10 @@
             進行管理表の<span class="font-medium text-gray-600">縦軸（行）</span>となる台割の項目を設定します。
             グループで見出し行を作り、その下に子行を追加できます。
           </p>
-          <div class="overflow-x-auto rounded border border-gray-200">
-            <div class="flex gap-2 p-2">
+          <div class="rounded border border-gray-200 p-2 space-y-2">
               <div
                 v-for="(row, idx) in form.row_config"
                 :key="row.key"
-                class="flex-shrink-0 w-96"
               >
               <!-- 親行ヘッダー -->
               <div
@@ -143,22 +141,14 @@
                 </div>
               </div>
             </div>
-            </div>
           </div>
-          <div class="flex gap-2 mt-2">
+          <div class="mt-2">
             <button
               type="button"
               class="flex-1 flex items-center justify-center rounded border border-dashed border-gray-300 py-1.5 text-sm text-gray-500 hover:border-indigo-400 hover:text-indigo-500"
               @click="addRow"
             >
               ＋ 行を追加
-            </button>
-            <button
-              type="button"
-              class="flex-1 flex items-center justify-center rounded border border-dashed border-gray-300 py-1.5 text-sm text-gray-500 hover:border-indigo-400 hover:text-indigo-500"
-              @click="addColumn"
-            >
-              ＋ 列を追加
             </button>
           </div>
           <p v-if="errors.row_config" class="mt-1 text-xs text-red-500">{{ errors.row_config }}</p>
@@ -323,10 +313,6 @@ function addRow() {
     // グループがない場合はトップレベルの行を追加
     rows.push({ key: genKey(), label: '' });
   }
-}
-
-function addColumn() {
-  form.value.row_config.push({ key: genKey(), label: '' });
 }
 
 function removeRow(idx) {

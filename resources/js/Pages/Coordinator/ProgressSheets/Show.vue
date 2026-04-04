@@ -858,7 +858,7 @@ function addChildToAllGroups() {
   // 順次処理で各行に子要素を追加
   let index = 0;
 
-  function processNext() {
+    function processNext() {
     if (index >= allRows.length) {
       // すべて完了したらページをリロード
       router.reload({ preserveScroll: true });
@@ -870,6 +870,11 @@ function addChildToAllGroups() {
     const hasChildren = childrenOf.value[row.id]?.length > 0;
 
     index++;
+    // Optimistic update: まずローカルに仮の子行を追加して即時表示させ、
+    // サーバ応答を受け取ったら正式な rows に同期する。
+    const tempId = 'tmp-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+    // 仮行を追加（親子どちらでも同じ形で追加することで UI がグループ化を反映する）
+    localRows.value.push({ id: tempId, sheet_id: props.sheet.id, label, parent_id: row.id, order: null, created_at: new Date().toISOString() });
 
     if (hasChildren) {
       // 既にグループ化されている場合：子要素を追加
@@ -878,9 +883,16 @@ function addChildToAllGroups() {
         { label, parent_id: row.id },
         {
           preserveScroll: true,
-          onSuccess: processNext,
+          onSuccess: (page) => {
+            // サーバから返された rows をローカルに同期
+            syncRowsFromPage(page);
+            processNext();
+          },
           onError: (errors) => {
             console.error('子要素追加エラー:', errors);
+            // 仮行を削除
+            const ti = localRows.value.findIndex((r) => r.id === tempId);
+            if (ti >= 0) localRows.value.splice(ti, 1);
             alert(`「${row.label}」への子要素追加に失敗しました。`);
             processNext();
           }
@@ -893,9 +905,16 @@ function addChildToAllGroups() {
         { child_label: label },
         {
           preserveScroll: true,
-          onSuccess: processNext,
+          onSuccess: (page) => {
+            // サーバから返された rows をローカルに同期
+            syncRowsFromPage(page);
+            processNext();
+          },
           onError: (errors) => {
             console.error('グループ化エラー:', errors);
+            // 仮行を削除
+            const ti = localRows.value.findIndex((r) => r.id === tempId);
+            if (ti >= 0) localRows.value.splice(ti, 1);
             alert(`「${row.label}」のグループ化に失敗しました。`);
             processNext();
           }
