@@ -145,13 +145,22 @@
             </div>
             </div>
           </div>
-          <button
-            type="button"
-            class="flex-shrink-0 w-96 flex items-center justify-center mt-2 rounded border border-dashed border-gray-300 py-1.5 text-sm text-gray-500 hover:border-indigo-400 hover:text-indigo-500"
-            @click="addRow"
-          >
-            ＋ 行を追加
-          </button>
+          <div class="flex gap-2 mt-2">
+            <button
+              type="button"
+              class="flex-1 flex items-center justify-center rounded border border-dashed border-gray-300 py-1.5 text-sm text-gray-500 hover:border-indigo-400 hover:text-indigo-500"
+              @click="addRow"
+            >
+              ＋ 行を追加
+            </button>
+            <button
+              type="button"
+              class="flex-1 flex items-center justify-center rounded border border-dashed border-gray-300 py-1.5 text-sm text-gray-500 hover:border-indigo-400 hover:text-indigo-500"
+              @click="addColumn"
+            >
+              ＋ 列を追加
+            </button>
+          </div>
           <p v-if="errors.row_config" class="mt-1 text-xs text-red-500">{{ errors.row_config }}</p>
         </div>
 
@@ -304,6 +313,10 @@ const form = ref({
 // ── 台割行の操作 ───────────────────────────────
 
 function addRow() {
+  form.value.row_config.push({ key: genKey(), label: '' });
+}
+
+function addColumn() {
   form.value.row_config.push({ key: genKey(), label: '' });
 }
 
