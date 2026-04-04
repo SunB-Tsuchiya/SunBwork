@@ -725,3 +725,66 @@ watch(() => page.props.progressSheets, (fresh) => {
 - `ProjectJobController::update()` では `Arr::pull($data, 'schedule')` を `$projectJob->update($data)` の前に必ず呼ぶこと（現在実装済み）
 - このカラムをバリデーション通過後の `$data` に入れたまま `update()` するとさくら本番で `Column not found: 1054 Unknown column 'schedule'` エラーが発生する
 - 同様に本番に存在しないカラムを `$data` に含めた場合は同じ対処（`Arr::pull`）が必要
+
+---
+
+## マイジョブ 続きジョブ連動機能（2026-04-04 実装）
+
+### 概要
+
+日をまたいだジョブを「続き」として連動させる機能。`project_job_assignments.source_assignment_id`（自己参照 FK）でチェーンを形成。
+
+### DBスキーマ
+
+```
+project_job_assignments.source_assignment_id  NULLABLE UNSIGNED BIGINT
+  → project_job_assignments.id 参照（自己参照FK、nullOnDelete）
+```
+
+**マイグレーション:** `2026_04_04_200001_add_source_assignment_id_to_project_job_assignments.php`
+- SQLite（テスト環境）では外部キー制約なしでカラムのみ追加（ガード修正済み）
+- さくら本番では `php artisan migrate` 必須
+
+### 続きジョブの作成フロー
+
+1. 「過去データから流用」モーダルでジョブを選択
+2. 「続きとして設定」でフォームに `source_assignment_id: rec.id` をセット
+3. `ProjectJobAssignmentController::store()` で `source_assignment_id` を保存
+
+**フロントエンド:** `Events/Create_Job.vue` / `MyJobBox/Create_user.vue` に確認モーダル実装
+
+### 完了カスケードのルール
+
+続きジョブを完了にすると、`source_assignment_id` を辿って全祖先ジョブも自動完了（深さ最大20）。
+
+**コントローラ:** `MyProjectJobController::completeAssignment()` 内で実装。
+
+### チェーンAPI
+
+`GET /myjobbox/assignments/{id}/chain` → `user.myjobbox.assignments.chain`
+
+ルートから全子孫を BFS で収集して返す。`Show.vue` のチェーンパネルが呼び出す。
+
+### ProjectJobAssignmentController の重要な注意
+
+`store()` 内で `sender_id` の上書き処理に注意:
+
+```php
+// NG（バグ）: フォームから sender_id が渡らない場合に null になる
+$createPayload['sender_id'] = $a['sender_id'] ?? null;
+
+// 正解: フォームになければ認証ユーザーをデフォルトにする
+$createPayload['sender_id'] = $a['sender_id'] ?? ($user ? $user->id : null);
+```
+
+`sender_id = null` になると `ProjectJobAssignmentByMyself` のグローバルスコープ（`sender_id = user_id`）に一致せず、`completeAssignment` が 404 を返す。
+
+### UI の挙動
+
+- `MyJobBox/Index.vue`: `source_assignment_id` があれば `↩続き` バッジ（orange-100）を表示
+- `MyJobBox/Show.vue`: オレンジ色のチェーンパネルで元ジョブ・続きジョブへのリンクとシリーズ合計時間を表示
+- 進行表とのリンク: 元ジョブに紐づく `ProgressCell` は続きジョブ作成時には上書きされない（元セルのまま維持）
+
+### テスト
+
+`tests/Feature/ProgressSheetJobChainTest.php` に6件のテストを追加。すべて PASS 確認済み。
