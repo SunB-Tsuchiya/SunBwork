@@ -847,22 +847,34 @@ function addChildToAllGroups() {
   const label = bulkChildLabel.value.trim();
   if (!label) return;
 
-  // グループ化されたすべての行を取得
-  const groups = topLevelRows.value.filter(row => childrenOf.value[row.id]?.length > 0);
+  // すべてのトップレベル行を取得
+  const allRows = topLevelRows.value;
 
-  if (groups.length === 0) {
-    alert('グループ化された行がありません。まず行をグループ化してください。');
+  if (allRows.length === 0) {
+    alert('行がありません。まず行を追加してください。');
     return;
   }
 
-  // 各グループに子要素を追加
-  const promises = groups.map(group =>
-    router.post(
-      route('coordinator.progress_sheets.rows.store', { sheet: props.sheet.id }),
-      { label, parent_id: group.id },
-      { preserveScroll: true }
-    )
-  );
+  // 各行に子要素を追加（グループ化されていない場合は自動的にグループ化）
+  const promises = allRows.map(row => {
+    const hasChildren = childrenOf.value[row.id]?.length > 0;
+
+    if (hasChildren) {
+      // 既にグループ化されている場合：子要素を追加
+      return router.post(
+        route('coordinator.progress_sheets.rows.store', { sheet: props.sheet.id }),
+        { label, parent_id: row.id },
+        { preserveScroll: true }
+      );
+    } else {
+      // グループ化されていない場合：まずグループ化してから子要素を追加
+      return router.post(
+        route('coordinator.progress_sheets.rows.make_group', { sheet: props.sheet.id, row: row.id }),
+        { child_label: label },
+        { preserveScroll: true }
+      );
+    }
+  });
 
   // すべてのリクエストが完了したらページを同期
   Promise.all(promises).then(() => {
