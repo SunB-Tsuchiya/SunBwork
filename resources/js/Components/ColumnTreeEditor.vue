@@ -103,10 +103,10 @@
           v-if="node.type === 'group' || (node.children && node.children.length > 0)"
           type="button"
           class="rounded bg-blue-50 px-2 py-0.5 text-xs text-blue-600 hover:bg-blue-100"
-          title="行を追加"
+          title="子列追加"
           @click="addChild(node)"
         >
-          ＋行を追加
+          ＋列
         </button>
 
         <!-- グループ複製 -->
