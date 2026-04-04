@@ -55,10 +55,24 @@
           </td>
         </tr>
 
-        <template v-for="row in rows" :key="row.id">
-          <tr class="hover:bg-gray-50">
+        <template v-for="row in displayRows" :key="row.id">
+          <!-- グループ見出し行（全colspan） -->
+          <tr v-if="row._isGroup" class="bg-indigo-50">
+            <td
+              :colspan="leafCount + 1"
+              class="border border-gray-200 px-3 py-1.5 text-xs font-semibold text-indigo-700"
+            >
+              {{ row.label }}
+            </td>
+          </tr>
+
+          <!-- データ行 -->
+          <tr v-else class="hover:bg-gray-50">
             <!-- 行ラベル -->
-            <td class="border border-gray-200 bg-gray-50 px-3 py-1.5 font-medium text-gray-700 whitespace-nowrap align-middle">
+            <td
+              class="border border-gray-200 bg-gray-50 px-3 py-1.5 font-medium text-gray-700 whitespace-nowrap align-middle"
+              :class="row._isChild ? 'pl-6' : ''"
+            >
               <div class="flex items-center gap-2">
                 <span>{{ row.label }}</span>
                 <template v-if="editMode">
@@ -137,6 +151,29 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['cell-update', 'edit-row', 'delete-row', 'job-link-open', 'job-link-detail', 'complete-assignment']);
+
+// ── 行ツリー展開（parent_id を使って表示順に並べる） ────────
+const displayRows = computed(() => {
+  const childrenOf = {};
+  for (const r of props.rows) {
+    if (r.parent_id) {
+      (childrenOf[r.parent_id] ??= []).push(r);
+    }
+  }
+  const result = [];
+  for (const row of props.rows.filter((r) => !r.parent_id)) {
+    const children = childrenOf[row.id] ?? [];
+    if (children.length > 0) {
+      result.push({ ...row, _isGroup: true });
+      for (const child of children) {
+        result.push({ ...child, _isChild: true });
+      }
+    } else {
+      result.push(row);
+    }
+  }
+  return result;
+});
 
 // ── 折りたたみ状態 ──────────────────────────────────────────
 const collapsedGroups = reactive(new Set());

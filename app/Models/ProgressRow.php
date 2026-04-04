@@ -10,6 +10,7 @@ class ProgressRow extends Model
         'sheet_id',
         'label',
         'order',
+        'parent_id',
     ];
 
     public function sheet()

@@ -19,18 +19,52 @@ class ProgressRowController extends Controller
         $this->authorizeEdit($request->user(), $sheet);
 
         $validated = $request->validate([
-            'label' => 'required|string|max:255',
+            'label'     => 'required|string|max:255',
+            'parent_id' => 'nullable|integer|exists:progress_rows,id',
+        ]);
+
+        // 孫行は禁止
+        if (!empty($validated['parent_id'])) {
+            $parent = ProgressRow::findOrFail($validated['parent_id']);
+            abort_unless($parent->sheet_id === $sheet->id, 422, '親行が同じシートに属していません。');
+            abort_unless(is_null($parent->parent_id), 422, '孫行は作成できません。');
+        }
+
+        $maxOrder = $sheet->rows()->max('order') ?? -1;
+
+        ProgressRow::create([
+            'sheet_id'  => $sheet->id,
+            'label'     => $validated['label'],
+            'order'     => $maxOrder + 1,
+            'parent_id' => $validated['parent_id'] ?? null,
+        ]);
+
+        return back()->with('success', '行を追加しました。');
+    }
+
+    /**
+     * 既存のフラット行をグループ親に変換し、その子行を1件追加
+     */
+    public function makeGroup(Request $request, ProgressSheet $sheet, ProgressRow $row)
+    {
+        $this->authorizeEdit($request->user(), $sheet);
+        abort_unless($row->sheet_id === $sheet->id, 404);
+        abort_unless(is_null($row->parent_id), 422, 'すでに子行のため、グループ親にできません。');
+
+        $validated = $request->validate([
+            'child_label' => 'required|string|max:255',
         ]);
 
         $maxOrder = $sheet->rows()->max('order') ?? -1;
 
-        $row = ProgressRow::create([
-            'sheet_id' => $sheet->id,
-            'label'    => $validated['label'],
-            'order'    => $maxOrder + 1,
+        ProgressRow::create([
+            'sheet_id'  => $sheet->id,
+            'label'     => $validated['child_label'],
+            'order'     => $maxOrder + 1,
+            'parent_id' => $row->id,
         ]);
 
-        return back()->with('success', '行を追加しました。');
+        return back()->with('success', 'グループ化しました。');
     }
 
     /**
@@ -58,6 +92,8 @@ class ProgressRowController extends Controller
         $this->authorizeEdit($request->user(), $sheet);
         abort_unless($row->sheet_id === $sheet->id, 404);
 
+        // 子行を先に削除（SQLite は CASCADE FK 未対応のため）
+        ProgressRow::where('parent_id', $row->id)->delete();
         $row->delete();
 
         return back()->with('success', '行を削除しました。');

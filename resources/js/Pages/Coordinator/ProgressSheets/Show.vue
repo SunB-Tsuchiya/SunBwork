@@ -126,33 +126,72 @@
             </div>
           </details>
 
-          <!-- 行一覧 -->
+          <!-- 行一覧（ツリー表示） -->
           <div class="space-y-1">
-            <div
-              v-for="(row, idx) in localRows"
-              :key="row.id"
-              class="flex items-center gap-2 rounded border border-gray-200 px-3 py-1.5"
-            >
-              <span class="flex-1 text-sm">{{ row.label }}</span>
-              <button
-                v-if="idx > 0"
-                type="button"
-                class="text-xs text-gray-400 hover:text-gray-600"
-                @click="moveRowUp(idx)"
-              >↑</button>
-              <button
-                v-if="idx < localRows.length - 1"
-                type="button"
-                class="text-xs text-gray-400 hover:text-gray-600"
-                @click="moveRowDown(idx)"
-              >↓</button>
-              <button
-                type="button"
-                class="text-xs text-red-400 hover:text-red-600"
-                @click="deleteRow(row)"
-              >✕</button>
-            </div>
-            <div v-if="localRows.length === 0" class="py-2 text-center text-sm text-gray-400">行がありません</div>
+            <template v-for="(row, idx) in topLevelRows" :key="row.id">
+
+              <!-- グループ親行 -->
+              <div v-if="childrenOf[row.id]?.length > 0">
+                <div class="flex items-center gap-2 rounded border border-indigo-200 bg-indigo-50 px-3 py-1.5">
+                  <span class="flex-1 text-sm font-medium text-indigo-700">{{ row.label }}</span>
+                  <span class="rounded bg-indigo-100 px-1.5 py-0.5 text-xs text-indigo-600">見出し</span>
+                  <button type="button" class="rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-600 hover:bg-blue-100" @click="startAddChild(row.id)">＋子行</button>
+                  <button v-if="idx > 0" type="button" class="text-xs text-gray-400 hover:text-gray-600" @click="moveTopRowUp(idx)">↑</button>
+                  <button v-if="idx < topLevelRows.length - 1" type="button" class="text-xs text-gray-400 hover:text-gray-600" @click="moveTopRowDown(idx)">↓</button>
+                  <button type="button" class="text-xs text-red-400 hover:text-red-600" @click="deleteRow(row)">✕</button>
+                </div>
+                <!-- 子行 -->
+                <div class="ml-6 mt-1 space-y-1 border-l border-indigo-200 pl-2">
+                  <div
+                    v-for="child in childrenOf[row.id]"
+                    :key="child.id"
+                    class="flex items-center gap-2 rounded border border-gray-200 bg-white px-3 py-1"
+                  >
+                    <span class="flex-1 text-sm">{{ child.label }}</span>
+                    <button type="button" class="text-xs text-red-400 hover:text-red-600" @click="deleteRow(child)">✕</button>
+                  </div>
+                  <!-- 子行追加インライン入力 -->
+                  <div v-if="addingChildTo === row.id" class="flex gap-2 pt-1">
+                    <input
+                      v-model="newChildLabel"
+                      type="text"
+                      class="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none"
+                      placeholder="子行ラベル"
+                      @keydown.enter.prevent="confirmAddChild(row)"
+                      @keydown.escape="addingChildTo = null"
+                    />
+                    <button type="button" class="rounded bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700" @click="confirmAddChild(row)">追加</button>
+                    <button type="button" class="text-xs text-gray-400 hover:text-gray-600" @click="addingChildTo = null">✕</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- フラット行 -->
+              <div v-else>
+                <div class="flex items-center gap-2 rounded border border-gray-200 px-3 py-1.5">
+                  <span class="flex-1 text-sm">{{ row.label }}</span>
+                  <button type="button" class="rounded bg-indigo-50 px-1.5 py-0.5 text-xs text-indigo-600 hover:bg-indigo-100" @click="startAddChild(row.id)" title="グループ化して子行を追加">グループ化</button>
+                  <button v-if="idx > 0" type="button" class="text-xs text-gray-400 hover:text-gray-600" @click="moveTopRowUp(idx)">↑</button>
+                  <button v-if="idx < topLevelRows.length - 1" type="button" class="text-xs text-gray-400 hover:text-gray-600" @click="moveTopRowDown(idx)">↓</button>
+                  <button type="button" class="text-xs text-red-400 hover:text-red-600" @click="deleteRow(row)">✕</button>
+                </div>
+                <!-- グループ化インライン入力 -->
+                <div v-if="addingChildTo === row.id" class="ml-6 mt-1 flex gap-2 border-l border-indigo-200 pl-2">
+                  <input
+                    v-model="newChildLabel"
+                    type="text"
+                    class="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none"
+                    placeholder="最初の子行ラベル"
+                    @keydown.enter.prevent="confirmAddChild(row)"
+                    @keydown.escape="addingChildTo = null"
+                  />
+                  <button type="button" class="rounded bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700" @click="confirmAddChild(row)">追加</button>
+                  <button type="button" class="text-xs text-gray-400 hover:text-gray-600" @click="addingChildTo = null">✕</button>
+                </div>
+              </div>
+
+            </template>
+            <div v-if="topLevelRows.length === 0" class="py-2 text-center text-sm text-gray-400">行がありません</div>
           </div>
 
           <!-- 並び替え保存ボタン -->
@@ -392,6 +431,8 @@ const showRegisterModal = ref(false);
 const registerTemplateName = ref('');
 const newRowLabel = ref('');
 const importText = ref('');
+const addingChildTo = ref(null);
+const newChildLabel = ref('');
 
 // ── ジョブリンク ──────────────────────────────────────
 const jobLinkModal = ref({ open: false, isSelfAssign: true, rowId: null, colKey: null });
@@ -648,9 +689,27 @@ const localCells = ref(props.cells.map((c) => ({ ...c })));
 // セル pending（未保存の変更）
 const pendingCells = ref([]);
 
-const rowOrderChanged = computed(() => {
-  return localRows.value.some((r, i) => r.order !== i);
+// ── 行ツリー計算 ───────────────────────────────────────────
+const topLevelRows = computed(() =>
+  localRows.value.filter((r) => !r.parent_id)
+);
+
+const childrenOf = computed(() => {
+  const map = {};
+  for (const r of localRows.value) {
+    if (r.parent_id) {
+      (map[r.parent_id] ??= []).push(r);
+    }
+  }
+  return map;
 });
+
+// 並び替え変更検出（トップレベルのみ）
+let savedTopLevelIds = props.rows.filter((r) => !r.parent_id).map((r) => r.id);
+
+const rowOrderChanged = computed(() =>
+  JSON.stringify(topLevelRows.value.map((r) => r.id)) !== JSON.stringify(savedTopLevelIds)
+);
 
 // ── 列構成 ──
 function onColumnChange(updated) {
@@ -669,6 +728,13 @@ function saveColumnConfig() {
 }
 
 // ── 行管理 ──
+function syncRowsFromPage(page) {
+  if (page.props.rows) {
+    localRows.value = page.props.rows.map((r) => ({ ...r }));
+    savedTopLevelIds = localRows.value.filter((r) => !r.parent_id).map((r) => r.id);
+  }
+}
+
 function addRow() {
   const label = newRowLabel.value.trim();
   if (!label) return;
@@ -678,7 +744,7 @@ function addRow() {
     {
       preserveScroll: true,
       onSuccess: (page) => {
-        localRows.value = page.props.rows?.map((r) => ({ ...r })) ?? localRows.value;
+        syncRowsFromPage(page);
         newRowLabel.value = '';
       },
     }
@@ -694,7 +760,7 @@ function importRows() {
     {
       preserveScroll: true,
       onSuccess: (page) => {
-        localRows.value = page.props.rows?.map((r) => ({ ...r })) ?? localRows.value;
+        syncRowsFromPage(page);
         importText.value = '';
       },
     }
@@ -702,38 +768,106 @@ function importRows() {
 }
 
 function deleteRow(row) {
-  if (!confirm(`行「${row.label}」を削除しますか？セルデータも全て削除されます。`)) return;
+  const hasChildren = childrenOf.value[row.id]?.length > 0;
+  const msg = hasChildren
+    ? `グループ「${row.label}」と子行をすべて削除しますか？セルデータも全て削除されます。`
+    : `行「${row.label}」を削除しますか？セルデータも全て削除されます。`;
+  if (!confirm(msg)) return;
   router.delete(
     route('coordinator.progress_sheets.rows.destroy', { sheet: props.sheet.id, row: row.id }),
     {
       preserveScroll: true,
-      onSuccess: (page) => {
-        localRows.value = page.props.rows?.map((r) => ({ ...r })) ?? localRows.value.filter((r) => r.id !== row.id);
-      },
+      onSuccess: (page) => { syncRowsFromPage(page); },
     }
   );
 }
 
-function moveRowUp(idx) {
-  if (idx < 1) return;
-  const tmp = localRows.value[idx - 1];
-  localRows.value[idx - 1] = localRows.value[idx];
-  localRows.value[idx] = tmp;
+function startAddChild(rowId) {
+  addingChildTo.value = rowId;
+  newChildLabel.value = '';
 }
 
-function moveRowDown(idx) {
-  if (idx >= localRows.value.length - 1) return;
-  const tmp = localRows.value[idx + 1];
-  localRows.value[idx + 1] = localRows.value[idx];
-  localRows.value[idx] = tmp;
+function confirmAddChild(row) {
+  const label = newChildLabel.value.trim();
+  if (!label) return;
+  const hasChildren = childrenOf.value[row.id]?.length > 0;
+  if (hasChildren) {
+    // 既存グループに子行を追加
+    router.post(
+      route('coordinator.progress_sheets.rows.store', { sheet: props.sheet.id }),
+      { label, parent_id: row.id },
+      {
+        preserveScroll: true,
+        onSuccess: (page) => {
+          syncRowsFromPage(page);
+          addingChildTo.value = null;
+          newChildLabel.value = '';
+        },
+      }
+    );
+  } else {
+    // フラット行をグループ化（make-group）
+    router.post(
+      route('coordinator.progress_sheets.rows.make_group', { sheet: props.sheet.id, row: row.id }),
+      { child_label: label },
+      {
+        preserveScroll: true,
+        onSuccess: (page) => {
+          syncRowsFromPage(page);
+          addingChildTo.value = null;
+          newChildLabel.value = '';
+        },
+      }
+    );
+  }
+}
+
+/** top-levelの行グループ（親+子）をフラット配列から取り出す */
+function extractGroup(arr, parentRow) {
+  const result = [parentRow];
+  for (const r of arr) {
+    if (r.parent_id === parentRow.id) result.push(r);
+  }
+  return result;
+}
+
+function moveTopRowUp(idx) {
+  if (idx < 1) return;
+  const topRows = localRows.value.filter((r) => !r.parent_id);
+  const rowA = topRows[idx];     // 上に移動する行
+  const rowB = topRows[idx - 1]; // 下に移動する行
+  const groupA = extractGroup(localRows.value, rowA);
+  const groupB = extractGroup(localRows.value, rowB);
+  // 両グループを除いた残り
+  const rest = localRows.value.filter((r) => !groupA.includes(r) && !groupB.includes(r));
+  // groupBより前の行
+  const before = rest.filter((r) => localRows.value.indexOf(r) < localRows.value.indexOf(rowB));
+  const after  = rest.filter((r) => localRows.value.indexOf(r) > Math.max(...groupA.map((r) => localRows.value.indexOf(r))));
+  localRows.value = [...before, ...groupA, ...groupB, ...after];
+}
+
+function moveTopRowDown(idx) {
+  const topRows = localRows.value.filter((r) => !r.parent_id);
+  if (idx >= topRows.length - 1) return;
+  const rowA = topRows[idx];     // 下に移動する行
+  const rowB = topRows[idx + 1]; // 上に移動する行
+  const groupA = extractGroup(localRows.value, rowA);
+  const groupB = extractGroup(localRows.value, rowB);
+  const rest = localRows.value.filter((r) => !groupA.includes(r) && !groupB.includes(r));
+  const before = rest.filter((r) => localRows.value.indexOf(r) < localRows.value.indexOf(rowA));
+  const after  = rest.filter((r) => localRows.value.indexOf(r) > Math.max(...groupB.map((r) => localRows.value.indexOf(r))));
+  localRows.value = [...before, ...groupB, ...groupA, ...after];
 }
 
 function saveRowOrder() {
-  const ids = localRows.value.map((r) => r.id);
+  const ids = topLevelRows.value.map((r) => r.id);
   router.put(
     route('coordinator.progress_sheets.rows.reorder', { sheet: props.sheet.id }),
     { ids },
-    { preserveScroll: true }
+    {
+      preserveScroll: true,
+      onSuccess: (page) => { syncRowsFromPage(page); },
+    }
   );
 }
 

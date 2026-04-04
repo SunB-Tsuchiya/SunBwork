@@ -54,17 +54,33 @@ class ProgressSheetController extends Controller
 
         // テンプレートのrow_configがあれば台割行を初期作成
         if (!empty($template) && !empty($template->row_config)) {
-            $rows = [];
-            foreach ($template->row_config as $order => $rowDef) {
-                $rows[] = [
-                    'sheet_id'   => $sheet->id,
-                    'label'      => $rowDef['label'] ?? '',
-                    'order'      => $order,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
+            $order = 0;
+            foreach ($template->row_config as $rowDef) {
+                if (!empty($rowDef['children'])) {
+                    // グループ親行
+                    $parent = ProgressRow::create([
+                        'sheet_id'   => $sheet->id,
+                        'label'      => $rowDef['label'] ?? '',
+                        'order'      => $order++,
+                        'parent_id'  => null,
+                    ]);
+                    foreach ($rowDef['children'] as $childDef) {
+                        ProgressRow::create([
+                            'sheet_id'   => $sheet->id,
+                            'label'      => $childDef['label'] ?? '',
+                            'order'      => $order++,
+                            'parent_id'  => $parent->id,
+                        ]);
+                    }
+                } else {
+                    ProgressRow::create([
+                        'sheet_id'   => $sheet->id,
+                        'label'      => $rowDef['label'] ?? '',
+                        'order'      => $order++,
+                        'parent_id'  => null,
+                    ]);
+                }
             }
-            ProgressRow::insert($rows);
         }
 
         return redirect()->route('coordinator.progress_sheets.show', $sheet->id);
@@ -80,7 +96,7 @@ class ProgressSheetController extends Controller
 
         $canEdit = $this->canEdit($request->user(), $projectJob, $sheet);
 
-        $rows = $sheet->rows()->get(['id', 'label', 'order']);
+        $rows = $sheet->rows()->orderBy('order')->get(['id', 'label', 'order', 'parent_id']);
 
         $cells = ProgressCell::whereIn('row_id', $rows->pluck('id'))
             ->with(['valueUser:id,name', 'assignment:id,title,detail,desired_end_date,completed,user_id,sender_id'])

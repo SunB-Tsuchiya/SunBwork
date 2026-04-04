@@ -593,6 +593,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::put('progress-sheets/{sheet}/rows/{row}', [App\Http\Controllers\Coordinator\ProgressRowController::class, 'update'])->name('progress_sheets.rows.update');
         Route::delete('progress-sheets/{sheet}/rows/{row}', [App\Http\Controllers\Coordinator\ProgressRowController::class, 'destroy'])->name('progress_sheets.rows.destroy');
         Route::post('progress-sheets/{sheet}/rows/import', [App\Http\Controllers\Coordinator\ProgressRowController::class, 'import'])->name('progress_sheets.rows.import');
+        Route::post('progress-sheets/{sheet}/rows/{row}/make-group', [App\Http\Controllers\Coordinator\ProgressRowController::class, 'makeGroup'])->name('progress_sheets.rows.make_group');
         Route::put('progress-sheets/{sheet}/rows-reorder', [App\Http\Controllers\Coordinator\ProgressRowController::class, 'reorder'])->name('progress_sheets.rows.reorder');
 
         // ── セル一括更新 ──────────────────────────────────────────
