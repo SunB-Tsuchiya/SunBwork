@@ -313,7 +313,16 @@ const form = ref({
 // ── 台割行の操作 ───────────────────────────────
 
 function addRow() {
-  form.value.row_config.push({ key: genKey(), label: '' });
+  // 最後のグループに子行を追加、グループがない場合はトップレベルの行を追加
+  const rows = form.value.row_config;
+  const lastGroup = rows.slice().reverse().find(row => row.children && row.children.length > 0);
+  if (lastGroup) {
+    if (!lastGroup.children) lastGroup.children = [];
+    lastGroup.children.push({ key: genKey(), label: '' });
+  } else {
+    // グループがない場合はトップレベルの行を追加
+    rows.push({ key: genKey(), label: '' });
+  }
 }
 
 function addColumn() {
