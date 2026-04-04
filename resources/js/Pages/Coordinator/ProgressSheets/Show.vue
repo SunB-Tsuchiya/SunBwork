@@ -106,6 +106,24 @@
             </button>
           </div>
 
+          <!-- すべてに子要素を追加 -->
+          <div class="mb-3 flex gap-2">
+            <input
+              v-model="bulkChildLabel"
+              type="text"
+              class="flex-1 rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-indigo-400 focus:outline-none"
+              placeholder="例: 学部学科"
+              @keydown.enter.prevent="addChildToAllGroups"
+            />
+            <button
+              type="button"
+              class="rounded bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700"
+              @click="addChildToAllGroups"
+            >
+              すべてに子要素を追加
+            </button>
+          </div>
+
           <!-- テキストエリアで一括インポート -->
           <details class="mb-3">
             <summary class="cursor-pointer text-sm text-gray-500 hover:text-gray-700">一括インポート（改行区切り）</summary>
@@ -127,10 +145,9 @@
           </details>
 
           <!-- 行一覧（ツリー表示） -->
-          <div class="overflow-x-auto rounded border border-gray-200">
-            <div class="flex gap-2 p-2">
+          <div class="rounded border border-gray-200 p-2 space-y-2">
               <template v-for="(row, idx) in topLevelRows" :key="row.id">
-                <div class="flex-shrink-0 w-96">
+                <div>
 
               <!-- グループ親行 -->
               <div v-if="childrenOf[row.id]?.length > 0">
@@ -194,8 +211,7 @@
 
                 </div>
               </template>
-            </div>
-            </div>
+          </div>
             <div v-if="topLevelRows.length === 0" class="py-2 text-center text-sm text-gray-400">行がありません</div>
 
           <!-- 並び替え保存ボタン -->
@@ -437,6 +453,7 @@ const newRowLabel = ref('');
 const importText = ref('');
 const addingChildTo = ref(null);
 const newChildLabel = ref('');
+const bulkChildLabel = ref('');
 
 // ── ジョブリンク ──────────────────────────────────────
 const jobLinkModal = ref({ open: false, isSelfAssign: true, rowId: null, colKey: null });
@@ -824,6 +841,37 @@ function confirmAddChild(row) {
       }
     );
   }
+}
+
+function addChildToAllGroups() {
+  const label = bulkChildLabel.value.trim();
+  if (!label) return;
+
+  // グループ化されたすべての行を取得
+  const groups = topLevelRows.value.filter(row => childrenOf.value[row.id]?.length > 0);
+
+  if (groups.length === 0) {
+    alert('グループ化された行がありません。まず行をグループ化してください。');
+    return;
+  }
+
+  // 各グループに子要素を追加
+  const promises = groups.map(group =>
+    router.post(
+      route('coordinator.progress_sheets.rows.store', { sheet: props.sheet.id }),
+      { label, parent_id: group.id },
+      { preserveScroll: true }
+    )
+  );
+
+  // すべてのリクエストが完了したらページを同期
+  Promise.all(promises).then(() => {
+    router.reload({ preserveScroll: true });
+    bulkChildLabel.value = '';
+  }).catch(error => {
+    console.error('一括子要素追加エラー:', error);
+    alert('一部の追加に失敗しました。ページをリロードしてください。');
+  });
 }
 
 /** top-levelの行グループ（親+子）をフラット配列から取り出す */
