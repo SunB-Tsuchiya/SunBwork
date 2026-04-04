@@ -576,6 +576,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('progress-templates', [App\Http\Controllers\Coordinator\ProgressTemplateController::class, 'index'])->name('progress_templates.index');
         Route::get('progress-templates/create', [App\Http\Controllers\Coordinator\ProgressTemplateController::class, 'create'])->name('progress_templates.create');
         Route::post('progress-templates', [App\Http\Controllers\Coordinator\ProgressTemplateController::class, 'store'])->name('progress_templates.store');
+        Route::get('progress-templates/{template}', [App\Http\Controllers\Coordinator\ProgressTemplateController::class, 'show'])->name('progress_templates.show');
         Route::get('progress-templates/{template}/edit', [App\Http\Controllers\Coordinator\ProgressTemplateController::class, 'edit'])->name('progress_templates.edit');
         Route::put('progress-templates/{template}', [App\Http\Controllers\Coordinator\ProgressTemplateController::class, 'update'])->name('progress_templates.update');
         Route::delete('progress-templates/{template}', [App\Http\Controllers\Coordinator\ProgressTemplateController::class, 'destroy'])->name('progress_templates.destroy');

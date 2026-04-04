@@ -68,6 +68,29 @@ class ProgressTemplateController extends Controller
             ->with('success', 'テンプレートを作成しました。');
     }
 
+    public function show(Request $request, ProgressTemplate $template)
+    {
+        $userId = $request->user()->id;
+        $isOwner = $template->created_by === $userId;
+        $isAdmin = in_array($request->user()->user_role, ['admin', 'superadmin']);
+        abort_unless($isOwner || $isAdmin || $template->is_shared, 403);
+
+        return Inertia::render('Coordinator/ProgressTemplates/Show', [
+            'template' => [
+                'id'            => $template->id,
+                'name'          => $template->name,
+                'description'   => $template->description,
+                'column_config' => $template->column_config,
+                'row_config'    => $template->row_config ?? [],
+                'is_shared'     => $template->is_shared,
+                'created_by'    => $template->created_by,
+                'creator_name'  => $template->creator?->name,
+                'updated_at'    => $template->updated_at?->format('Y-m-d'),
+            ],
+            'canEdit' => $isOwner || $isAdmin,
+        ]);
+    }
+
     public function edit(Request $request, ProgressTemplate $template)
     {
         $this->authorizeEdit($request->user(), $template);

@@ -177,14 +177,18 @@
             :work-item-types="props.workItemTypes"
             @change="onColumnChange"
           />
-          <button
-            type="button"
-            class="mt-3 rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
-            @click="saveColumnConfig"
-          >
-            列構成を保存
-          </button>
         </div>
+      </div>
+
+      <!-- 編集モード保存ボタン -->
+      <div v-if="editMode && canEdit" class="mb-6 flex justify-center">
+        <button
+          type="button"
+          class="rounded bg-indigo-600 px-8 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+          @click="saveColumnConfig"
+        >
+          保存
+        </button>
       </div>
 
       <!-- ── 通常モード：進行管理表テーブル ──────────────── -->
