@@ -5,7 +5,9 @@
             <button @click="goToJobCreate" class="rounded bg-indigo-600 px-4 py-2 text-white">ジョブ作成（独自）</button>
             <button @click="openJobSheetModal" class="rounded bg-purple-600 px-4 py-2 text-white">ジョブ作成（進行表から）</button>
             <button @click="goToDiaryCreate" class="rounded bg-orange-500 px-4 py-2 text-white">{{ props.diaryLabel }}作成</button>
-            <button @click="openScheduleModal" class="rounded border border-gray-400 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">日程設定</button>
+            <button @click="openScheduleModal" class="rounded border border-gray-400 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                日程設定
+            </button>
         </div>
         <FullCalendar ref="fullCalendarRef" :options="calendarOptions" />
         <!-- 予定作成モーダル -->
@@ -88,7 +90,11 @@
         </div>
 
         <!-- 進行表から案件選択モーダル -->
-        <div v-if="showJobSheetModal" class="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-50" @click.self="showJobSheetModal = false">
+        <div
+            v-if="showJobSheetModal"
+            class="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-50"
+            @click.self="showJobSheetModal = false"
+        >
             <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
                 <h2 class="mb-4 text-lg font-bold">案件を選択（進行表から）</h2>
 
@@ -114,15 +120,19 @@
 
                     <!-- 案件選択後のアクションボタン -->
                     <div v-if="jsSelectedProjectId" class="mt-4 flex justify-end gap-2">
-                        <button
-                            @click="goToProjectShow"
-                            class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-                        >詳細を見る（進行表へ）</button>
+                        <button @click="goToProjectShow" class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+                            詳細を見る（進行表へ）
+                        </button>
                     </div>
                 </div>
 
                 <div class="mt-4 flex justify-end">
-                    <button @click="showJobSheetModal = false" class="rounded border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">閉じる</button>
+                    <button
+                        @click="showJobSheetModal = false"
+                        class="rounded border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
+                    >
+                        閉じる
+                    </button>
                 </div>
             </div>
         </div>
@@ -136,11 +146,17 @@
                     <tbody>
                         <!-- 全日一括変更 -->
                         <tr class="border-b-2 border-gray-300 bg-gray-50">
-                            <td class="py-2 pr-3 font-bold text-gray-800 w-24">全日</td>
+                            <td class="w-24 py-2 pr-3 font-bold text-gray-800">全日</td>
                             <td class="py-2">
                                 <select
                                     :value="null"
-                                    @change="(e) => { const v = e.target.value ? Number(e.target.value) : null; weekDays.forEach(d => d.worktype_id = v); e.target.value = ''; }"
+                                    @change="
+                                        (e) => {
+                                            const v = e.target.value ? Number(e.target.value) : null;
+                                            weekDays.forEach((d) => (d.worktype_id = v));
+                                            e.target.value = '';
+                                        }
+                                    "
                                     class="w-full rounded border-gray-300 text-sm focus:border-blue-400 focus:ring-blue-400"
                                 >
                                     <option value="">— 一括選択 —</option>
@@ -154,7 +170,7 @@
                         </tr>
                         <!-- 曜日ごと -->
                         <tr v-for="day in weekDays" :key="day.date" class="border-b last:border-0">
-                            <td class="py-2 pr-3 font-medium text-gray-700 w-24">{{ day.label }}</td>
+                            <td class="w-24 py-2 pr-3 font-medium text-gray-700">{{ day.label }}</td>
                             <td class="py-2">
                                 <select
                                     v-model="day.worktype_id"
@@ -172,7 +188,11 @@
                 </table>
                 <div class="mt-5 flex justify-end gap-3">
                     <button @click="showScheduleModal = false" class="rounded bg-gray-200 px-4 py-2 text-sm">キャンセル</button>
-                    <button @click="saveWeekSchedule" :disabled="savingSchedule" class="rounded bg-blue-600 px-4 py-2 text-sm text-white disabled:opacity-50">
+                    <button
+                        @click="saveWeekSchedule"
+                        :disabled="savingSchedule"
+                        class="rounded bg-blue-600 px-4 py-2 text-sm text-white disabled:opacity-50"
+                    >
                         {{ savingSchedule ? '保存中…' : '保存' }}
                     </button>
                 </div>
@@ -276,7 +296,7 @@ const scrollTime = computed(() => {
 
 // ---- 表示中の日付範囲（datesSet で更新） ----
 const viewStart = ref(null); // Date
-const viewEnd = ref(null);   // Date（exclusive）
+const viewEnd = ref(null); // Date（exclusive）
 
 // ---- 始業前グレー背景イベント ----
 const backgroundEvents = computed(() => {
@@ -288,10 +308,7 @@ const backgroundEvents = computed(() => {
     const slotMin = isNightShift.value ? 16 : 7;
 
     while (cur < end) {
-        const dateStr =
-            cur.getFullYear() +
-            '-' + String(cur.getMonth() + 1).padStart(2, '0') +
-            '-' + String(cur.getDate()).padStart(2, '0');
+        const dateStr = cur.getFullYear() + '-' + String(cur.getMonth() + 1).padStart(2, '0') + '-' + String(cur.getDate()).padStart(2, '0');
         const wt = getWorktypeForDate(dateStr);
         if (wt?.start_time) {
             const [sh, sm] = wt.start_time.split(':').map(Number);
@@ -312,7 +329,7 @@ const backgroundEvents = computed(() => {
 
 // ---- 週間日程設定モーダル ----
 const showScheduleModal = ref(false);
-const weekDays = ref([]);    // [{ date, label, worktype_id }]
+const weekDays = ref([]); // [{ date, label, worktype_id }]
 const savingSchedule = ref(false);
 const DAY_NAMES = ['月', '火', '水', '木', '金', '土', '日'];
 
@@ -325,19 +342,14 @@ function getMondayOfWeek(d) {
 }
 
 function openScheduleModal() {
-    const refDate = viewStart.value
-        ? new Date(viewStart.value)
-        : new Date(selectedDate.value);
+    const refDate = viewStart.value ? new Date(viewStart.value) : new Date(selectedDate.value);
     const monday = getMondayOfWeek(refDate);
 
     const days = [];
     for (let i = 0; i < 7; i++) {
         const d = new Date(monday);
         d.setDate(monday.getDate() + i);
-        const dateStr =
-            d.getFullYear() +
-            '-' + String(d.getMonth() + 1).padStart(2, '0') +
-            '-' + String(d.getDate()).padStart(2, '0');
+        const dateStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
         days.push({
             date: dateStr,
             label: `${d.getMonth() + 1}/${d.getDate()}(${DAY_NAMES[i]})`,
@@ -432,7 +444,7 @@ function goToAssignedJobs() {
         // ignore
     }
     // fallback literal path
-    router.get('/coordinator/jobbox');
+    router.get(route('coordinator.jobbox'));
 }
 
 onMounted(() => {
@@ -776,10 +788,7 @@ const calendarOptions = computed(() => ({
         // 勤務形態名を取得（dayGridMonth では表示しない）
         let wtHtml = '';
         if (viewType !== 'dayGridMonth' && d) {
-            const dateStr =
-                d.getFullYear() +
-                '-' + String(d.getMonth() + 1).padStart(2, '0') +
-                '-' + String(d.getDate()).padStart(2, '0');
+            const dateStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
             const wt = getWorktypeForDate(dateStr);
             if (wt?.name) {
                 wtHtml = `<div class="fc-day-worktype">${wt.name}</div>`;

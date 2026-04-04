@@ -244,7 +244,7 @@ function search() {
         if (qModel.value) params.set('q', qModel.value);
         if (periodModel.value) params.set('period', periodModel.value);
         if (localSortStatus.value) params.set('sort_status', localSortStatus.value);
-        window.location.href = '/user/project-jobs?' + params.toString();
+        window.location.href = route('user.project_jobs.index') + '?' + params.toString();
     }
 }
 
@@ -259,7 +259,7 @@ function goShow(job) {
     try {
         router.visit(route('user.project_jobs.show', { projectJob: job.id }));
     } catch {
-        window.location.href = `/user/project-jobs/${job.id}`;
+        window.location.href = route('user.project_jobs.show', { projectJob: job.id });
     }
 }
 </script>

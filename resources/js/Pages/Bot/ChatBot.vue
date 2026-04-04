@@ -71,7 +71,7 @@ async function sendViaMessageArea(text) {
         if (systemPrompt.value && systemPrompt.value.trim()) payload.system_prompt = systemPrompt.value.trim();
         if (uploadedFiles.value.length) payload.files = uploadedFiles.value;
         if (conversationId.value) payload.conversation_id = conversationId.value;
-        const res = await axios.post('/bot/chat', payload, {
+        const res = await axios.post(route('bot.chat.api'), payload, {
             withCredentials: true,
             headers: { 'X-CSRF-TOKEN': getXsrfToken() },
         });
@@ -282,7 +282,7 @@ function selectHistory(h) {
     // load via existing loader
     loadConversation(h.id);
     try {
-        window.history.pushState({}, '', `/bot/chat?load_conversation=${encodeURIComponent(h.id)}`);
+        window.history.pushState({}, '', route('bot.chat') + `?load_conversation=${encodeURIComponent(h.id)}`);
     } catch (e) {}
 }
 
@@ -462,7 +462,7 @@ async function sendMessage() {
         if (systemPrompt.value && systemPrompt.value.trim()) payload.system_prompt = systemPrompt.value.trim();
         if (uploadedFiles.value.length) payload.files = uploadedFiles.value;
         if (conversationId.value) payload.conversation_id = conversationId.value;
-        const res = await axios.post('/bot/chat', payload, {
+        const res = await axios.post(route('bot.chat.api'), payload, {
             withCredentials: true,
             headers: { 'X-CSRF-TOKEN': getXsrfToken() },
         });
@@ -562,7 +562,7 @@ async function uploadSelectedFiles() {
                         };
                         if (conversationId.value) payload.conversation_id = conversationId.value;
                         // fire-and-forget; server may use summarize_file or hidden_reference to ingest file
-                        await axios.post('/bot/chat', payload, { withCredentials: true, headers: { 'X-CSRF-TOKEN': getXsrfToken() } });
+                        await axios.post(route('bot.chat.api'), payload, { withCredentials: true, headers: { 'X-CSRF-TOKEN': getXsrfToken() } });
                     } catch (e) {
                         // don't surface errors to the user
                         console.debug('hidden reference request failed', e?.message || e);
@@ -600,7 +600,7 @@ async function deleteUploadedFile(fileMeta) {
     // Attempt server-side deletion if endpoint exists
     try {
         // API not guaranteed; try a conventional route first
-        const url = '/bot/files/delete';
+        const url = route('bot.files.delete');
         const res = await axios
             .post(
                 url,
@@ -653,7 +653,7 @@ async function summarizeFile(meta) {
         if (conversationId.value) payload.conversation_id = conversationId.value;
         // include file meta so server can fetch/process it; server must handle summarize_file key
         payload.summarize_file = meta;
-        const res = await axios.post('/bot/chat', payload, {
+        const res = await axios.post(route('bot.chat.api'), payload, {
             withCredentials: true,
             headers: { 'X-CSRF-TOKEN': getXsrfToken() },
         });
@@ -677,7 +677,7 @@ async function summarizeFile(meta) {
 
 async function loadConversation(id) {
     try {
-        const res = await axios.get(`/bot/history/${id}/json`);
+        const res = await axios.get(route('bot.history.show.json', { id }));
         const conv = res.data;
         conversationId.value = conv.id;
         systemPrompt.value = conv.system_prompt || '';
@@ -734,13 +734,13 @@ async function saveConversation() {
             })),
         };
         if (conversationId.value) {
-            const res = await axios.put(`/bot/history/${conversationId.value}`, payload, {
+            const res = await axios.put(route('bot.history.update', { id: conversationId.value }), payload, {
                 withCredentials: true,
                 headers: { 'X-CSRF-TOKEN': getXsrfToken() },
             });
             return res.data;
         } else {
-            const res = await axios.post('/bot/history', payload, {
+            const res = await axios.post(route('bot.history.store'), payload, {
                 withCredentials: true,
                 headers: { 'X-CSRF-TOKEN': getXsrfToken() },
             });
@@ -782,7 +782,7 @@ function handleBeforeUnload(e) {
                 meta: m.file ? { file: m.file } : null,
             })),
         };
-        let url = '/bot/history';
+        let url = route('bot.history.store');
         const token = getXsrfToken();
         // If we have a token, append as _token so Laravel's VerifyCsrfToken can see it from request input.
         if (token) {
@@ -796,11 +796,11 @@ function handleBeforeUnload(e) {
                 navigator.sendBeacon(url, blob);
             } catch (beErr) {
                 // fallback to async post if beacon fails
-                axios.post('/bot/history', payload, { withCredentials: true, headers: { 'X-CSRF-TOKEN': token } }).catch(() => {});
+                axios.post(route('bot.history.store'), payload, { withCredentials: true, headers: { 'X-CSRF-TOKEN': token } }).catch(() => {});
             }
         } else {
             // best-effort async
-            axios.post('/bot/history', payload, { withCredentials: true, headers: { 'X-CSRF-TOKEN': token } }).catch(() => {});
+            axios.post(route('bot.history.store'), payload, { withCredentials: true, headers: { 'X-CSRF-TOKEN': token } }).catch(() => {});
         }
     } catch (err) {}
 }

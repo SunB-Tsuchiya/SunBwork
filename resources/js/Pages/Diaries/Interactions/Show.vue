@@ -164,11 +164,7 @@ function goIndex() {
         // fallback to explicit prefix paths
     }
 
-    try {
-        window.location.href = route('diaryinteractions.interactions.index');
-    } catch (e) {
-        window.location.href = '/diaryinteractions/interactions';
-    }
+    window.location.href = route('diaryinteractions.interactions.index');
 }
 
 // --- events timetable state for interactions show (read-only) ---
@@ -222,7 +218,7 @@ function onTimelineOpenEdit(payload) {
         try {
             window.location.href = route('diaryinteractions.interactions.index');
         } catch (e2) {
-            window.location.href = '/diaryinteractions/interactions';
+            // route unavailable; can't navigate further
         }
         return;
     }

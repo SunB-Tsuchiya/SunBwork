@@ -112,7 +112,7 @@ function thumbnailSrc(file) {
     const thumbPath = file.thumb_path || file.path || null;
     if (thumbPath && typeof thumbPath === 'string') {
         // use chat stream endpoint instead of public storage path
-        return ensureUrlSafe('/chat/attachments?path=' + encodeURIComponent(thumbPath.replace(/^\//, '')));
+        return ensureUrlSafe(route('chat.attachments.stream') + '?path=' + encodeURIComponent(thumbPath.replace(/^\//, '')));
     }
     // fallback to the stream endpoint builder
     return buildStreamUrl(file);
@@ -217,13 +217,13 @@ function attachmentHref(file, preferStream = true) {
         }
 
         // Last resort: try to build a stream query using original_name
-        if (file.original_name) return ensureUrlSafe('/chat/attachments?path=' + encodeURIComponent(file.original_name));
+        if (file.original_name) return ensureUrlSafe(route('chat.attachments.stream') + '?path=' + encodeURIComponent(file.original_name));
     } catch (e) {
         // fallback to existing heuristics
         if (preferStream && tryStream) return ensureUrlSafe(sanitizeUrl(tryStream) || tryStream);
         if (tryUrl) return ensureUrlSafe(sanitizeUrl(tryUrl) || tryUrl);
-        if (file.path) return ensureUrlSafe('/chat/attachments?path=' + encodeURIComponent(file.path));
-        if (file.original_name) return ensureUrlSafe('/chat/attachments?path=' + encodeURIComponent(file.original_name));
+        if (file.path) return ensureUrlSafe(route('chat.attachments.stream') + '?path=' + encodeURIComponent(file.path));
+        if (file.original_name) return ensureUrlSafe(route('chat.attachments.stream') + '?path=' + encodeURIComponent(file.original_name));
     }
     return null;
 }
@@ -236,9 +236,9 @@ function ensureUrlSafe(candidate) {
     if (!s) return null;
     if (s.startsWith('/')) return s;
     if (s.startsWith('storage/')) return '/' + s;
-    if (s.startsWith('attachments/')) return `/chat/attachments?path=${encodeURIComponent(s)}`;
-    if (s.startsWith('chat/')) return `/chat/attachments?path=${encodeURIComponent(s)}`;
-    if (s.startsWith('bot/')) return `/bot/attachments?path=${encodeURIComponent(s)}`;
+    if (s.startsWith('attachments/')) return route('chat.attachments.stream') + '?path=' + encodeURIComponent(s);
+    if (s.startsWith('chat/')) return route('chat.attachments.stream') + '?path=' + encodeURIComponent(s);
+    if (s.startsWith('bot/')) return route('bot.files.stream') + '?path=' + encodeURIComponent(s);
     return '/' + s;
 }
 
@@ -563,7 +563,7 @@ function handleDrop(e) {
             if (data && data.id) {
                 if (data.file && !data.file.streamUrl) {
                     const p = data.file.path || data.file.thumb_path || data.file.url || data.file.original_name;
-                    data.file.streamUrl = `/chat/attachments?path=${encodeURIComponent(p)}`;
+                    data.file.streamUrl = route('chat.attachments.stream') + '?path=' + encodeURIComponent(p);
                 }
                 let real = {
                     id: data.id,
@@ -659,7 +659,7 @@ async function onFileInputChange(e) {
             if (data && data.id) {
                 if (data.file && !data.file.streamUrl) {
                     const p = data.file.path || data.file.thumb_path || data.file.url || data.file.original_name;
-                    data.file.streamUrl = `/chat/attachments?path=${encodeURIComponent(p)}`;
+                    data.file.streamUrl = route('chat.attachments.stream') + '?path=' + encodeURIComponent(p);
                 }
                 let real = {
                     id: data.id,
@@ -709,7 +709,7 @@ function openFileModal(file, messageId = null) {
     if (!file) return;
     if (props.openAttachmentFn) return props.openAttachmentFn(file, messageId);
     const streamUrl =
-        attachmentHref(file, false) || `/chat/attachments?path=${encodeURIComponent(file.path || file.url || file.thumb_path || file.original_name)}`;
+        attachmentHref(file, false) || (route('chat.attachments.stream') + '?path=' + encodeURIComponent(file.path || file.url || file.thumb_path || file.original_name));
     fileModal.value.open = true;
     fileModal.value.file = { ...file, streamUrl };
     fileModal.value.messageId = messageId;

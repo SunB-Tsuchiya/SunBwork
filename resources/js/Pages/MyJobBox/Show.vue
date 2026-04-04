@@ -5,7 +5,6 @@
         </template>
 
         <div class="mx-auto max-w-3xl space-y-4">
-
             <!-- ジョブ割り当て詳細カード -->
             <AssignmentDetailCard :assignment="assignment" />
 
@@ -66,25 +65,23 @@
                 <div class="divide-y divide-orange-100 px-5 py-3">
                     <!-- 元ジョブへのリンク -->
                     <div v-if="sourceItem" class="flex items-center gap-3 py-2">
-                        <span class="text-xs text-orange-600 font-medium w-16 shrink-0">元ジョブ↑</span>
-                        <button
-                            @click="goChainItem(sourceItem)"
-                            class="text-sm text-blue-700 underline hover:text-blue-900 text-left"
-                        >{{ sourceItem.title }}</button>
+                        <span class="w-16 shrink-0 text-xs font-medium text-orange-600">元ジョブ↑</span>
+                        <button @click="goChainItem(sourceItem)" class="text-left text-sm text-blue-700 underline hover:text-blue-900">
+                            {{ sourceItem.title }}
+                        </button>
                         <span v-if="sourceItem.completed" class="ml-auto rounded-full bg-yellow-100 px-2 py-0.5 text-xs text-yellow-800">完了</span>
                     </div>
                     <!-- 続きジョブリスト -->
                     <div v-for="cont in continuationItems" :key="cont.id" class="flex items-center gap-3 py-2">
-                        <span class="text-xs text-orange-600 font-medium w-16 shrink-0">続き↓</span>
-                        <button
-                            @click="goChainItem(cont)"
-                            class="text-sm text-blue-700 underline hover:text-blue-900 text-left"
-                        >{{ cont.title }}</button>
+                        <span class="w-16 shrink-0 text-xs font-medium text-orange-600">続き↓</span>
+                        <button @click="goChainItem(cont)" class="text-left text-sm text-blue-700 underline hover:text-blue-900">
+                            {{ cont.title }}
+                        </button>
                         <span v-if="cont.completed" class="ml-auto rounded-full bg-yellow-100 px-2 py-0.5 text-xs text-yellow-800">完了</span>
                     </div>
                     <!-- シリーズ合計時間 -->
                     <div v-if="seriesTotalMinutes > 0" class="flex items-center gap-3 py-2">
-                        <span class="text-xs text-orange-600 font-medium w-16 shrink-0">合計</span>
+                        <span class="w-16 shrink-0 text-xs font-medium text-orange-600">合計</span>
                         <span class="text-sm font-bold text-orange-800">シリーズ全体: {{ formatDurationFromMinutes(seriesTotalMinutes) }}</span>
                     </div>
                 </div>
@@ -92,7 +89,10 @@
 
             <!-- アクションボタン -->
             <div class="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-white px-5 py-3 shadow-sm">
-                <Link :href="routeBack()" class="inline-flex items-center rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">
+                <Link
+                    :href="routeBack()"
+                    class="inline-flex items-center rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                >
                     戻る
                 </Link>
 
@@ -117,9 +117,11 @@
                         <button
                             @click="submitComplete"
                             :disabled="isAssignmentCompleted || isSubmittingComplete"
-                            :class="isAssignmentCompleted || isSubmittingComplete
-                                ? 'cursor-not-allowed rounded bg-yellow-800 px-3 py-1.5 text-sm font-medium text-white opacity-70'
-                                : 'rounded bg-yellow-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-yellow-700'"
+                            :class="
+                                isAssignmentCompleted || isSubmittingComplete
+                                    ? 'cursor-not-allowed rounded bg-yellow-800 px-3 py-1.5 text-sm font-medium text-white opacity-70'
+                                    : 'rounded bg-yellow-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-yellow-700'
+                            "
                         >
                             {{ isAssignmentCompleted ? '完了済み' : '完了にする' }}
                         </button>
@@ -140,10 +142,12 @@
 
                 <div v-if="assignment.linked_assignment_id && projectJob?.id" class="ml-auto">
                     <Link
-                        :href="route('coordinator.project_jobs.assignments.show', {
-                            projectJob: projectJob.id,
-                            assignment: assignment.linked_assignment_id,
-                        })"
+                        :href="
+                            route('coordinator.project_jobs.assignments.show', {
+                                projectJob: projectJob.id,
+                                assignment: assignment.linked_assignment_id,
+                            })
+                        "
                         class="text-sm text-blue-600 hover:underline"
                     >
                         割当を見る (#{{ assignment.linked_assignment_id }})
@@ -155,8 +159,8 @@
 </template>
 
 <script setup>
-import AppLayout from '@/layouts/AppLayout.vue';
 import AssignmentDetailCard from '@/Components/AssignmentDetailCard.vue';
+import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, ref } from 'vue';
 
@@ -194,14 +198,9 @@ function routeBack() {
 
 function deleteAssignment() {
     if (!confirm('このジョブ割り当てを本当に削除しますか？この操作は取り消せません。')) return;
-    router.delete(
-        typeof route === 'function'
-            ? route('user.myjobbox.destroy', { assignment: assignment?.id })
-            : `/myjobbox/${assignment?.id}`,
-        {
-            onError: () => alert('削除に失敗しました。'),
-        },
-    );
+    router.delete(typeof route === 'function' ? route('user.myjobbox.destroy', { assignment: assignment?.id }) : `/myjobbox/${assignment?.id}`, {
+        onError: () => alert('削除に失敗しました。'),
+    });
 }
 
 // ---- 予定（events）関連 ----
@@ -217,9 +216,12 @@ onMounted(async () => {
         const assigneeId = assignment && (assignment.user?.id || assignment.user_id || null);
         const isScheduled = Boolean(assignment && (assignment.scheduled || assignment.scheduled_at));
         if (assigneeId && isScheduled) {
-            const url = (typeof route === 'function' ? route('events.index') : '/events')
-                + '?user_id=' + encodeURIComponent(assigneeId)
-                + '&job=' + encodeURIComponent(assignment.id);
+            const url =
+                (typeof route === 'function' ? route('events.index') : '/events') +
+                '?user_id=' +
+                encodeURIComponent(assigneeId) +
+                '&job=' +
+                encodeURIComponent(assignment.id);
             const res = await fetch(url, {
                 method: 'GET',
                 credentials: 'same-origin',
@@ -227,9 +229,7 @@ onMounted(async () => {
             });
             if (res.ok) {
                 const payload = await res.json();
-                const evs = Array.isArray(payload)
-                    ? payload.filter((e) => String(e.project_job_assignment_id) === String(assignment.id))
-                    : [];
+                const evs = Array.isArray(payload) ? payload.filter((e) => String(e.project_job_assignment_id) === String(assignment.id)) : [];
                 events.value = evs;
             }
         }
@@ -237,9 +237,10 @@ onMounted(async () => {
         // チェーン全体を取得
         if (assignment?.id) {
             try {
-                const chainUrl = (typeof route === 'function'
-                    ? route('user.myjobbox.assignments.chain', { assignment: assignment.id })
-                    : `/myjobbox/assignments/${assignment.id}/chain`);
+                const chainUrl =
+                    typeof route === 'function'
+                        ? route('user.myjobbox.assignments.chain', { assignment: assignment.id })
+                        : `/myjobbox/assignments/${assignment.id}/chain`;
                 const chainRes = await fetch(chainUrl, {
                     credentials: 'same-origin',
                     headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
@@ -249,17 +250,18 @@ onMounted(async () => {
                     chainItems.value = chainData.chain || [];
 
                     // 他のチェーンメンバーのイベントも取得
-                    const othersIds = (chainData.chain || [])
-                        .map((c) => c.id)
-                        .filter((id) => id !== assignment.id);
+                    const othersIds = (chainData.chain || []).map((c) => c.id).filter((id) => id !== assignment.id);
                     const assigneeId2 = assignment.user?.id || assignment.user_id || null;
                     if (assigneeId2 && othersIds.length > 0) {
                         const allOtherEvs = [];
                         for (const otherId of othersIds) {
                             try {
-                                const evUrl = (typeof route === 'function' ? route('events.index') : '/events')
-                                    + '?user_id=' + encodeURIComponent(assigneeId2)
-                                    + '&job=' + encodeURIComponent(otherId);
+                                const evUrl =
+                                    (typeof route === 'function' ? route('events.index') : '/events') +
+                                    '?user_id=' +
+                                    encodeURIComponent(assigneeId2) +
+                                    '&job=' +
+                                    encodeURIComponent(otherId);
                                 const evRes = await fetch(evUrl, {
                                     credentials: 'same-origin',
                                     headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
@@ -271,12 +273,16 @@ onMounted(async () => {
                                         : [];
                                     allOtherEvs.push(...filtered);
                                 }
-                            } catch (_) { /* ignore */ }
+                            } catch (_) {
+                                /* ignore */
+                            }
                         }
                         seriesEvents.value = allOtherEvs;
                     }
                 }
-            } catch (_) { /* ignore chain fetch errors */ }
+            } catch (_) {
+                /* ignore chain fetch errors */
+            }
         }
     } catch (err) {
         // ignore
@@ -323,15 +329,9 @@ const totalInterruptionMinutes = computed(() => formattedEvents.value.reduce((su
 const totalActualMinutes = computed(() => formattedEvents.value.reduce((sum, e) => sum + e.actualMinutes, 0));
 
 // ---- チェーン関連 computed ----
-const chainOtherItems = computed(() =>
-    chainItems.value.filter((c) => c.id !== assignment?.id)
-);
-const sourceItem = computed(() =>
-    chainItems.value.find((c) => String(c.id) === String(assignment?.source_assignment_id))
-);
-const continuationItems = computed(() =>
-    chainItems.value.filter((c) => String(c.source_assignment_id) === String(assignment?.id))
-);
+const chainOtherItems = computed(() => chainItems.value.filter((c) => c.id !== assignment?.id));
+const sourceItem = computed(() => chainItems.value.find((c) => String(c.id) === String(assignment?.source_assignment_id)));
+const continuationItems = computed(() => chainItems.value.filter((c) => String(c.source_assignment_id) === String(assignment?.id)));
 const hasChain = computed(() => chainItems.value.length > 1);
 
 function formatSeriesEvent(e) {
@@ -355,12 +355,10 @@ const seriesTotalMinutes = computed(() => {
 
 function goChainItem(item) {
     try {
-        const url = typeof route === 'function'
-            ? route('user.myjobbox.show', { assignment: item.id })
-            : `/myjobbox/${item.id}`;
-        window.location.href = url;
+        const url = typeof route === 'function' ? route('user.myjobbox.show', { assignment: item.id }) : null;
+        if (url) { window.location.href = url; } else { router && router.visit && router.visit(route('user.myjobbox.show', { assignment: item.id })); }
     } catch (_) {
-        window.location.href = `/myjobbox/${item.id}`;
+        window.location.href = route('user.myjobbox.show', { assignment: item.id });
     }
 }
 
@@ -368,12 +366,16 @@ function goChainItem(item) {
 async function submitComplete() {
     try {
         if (!confirm('このジョブを完了としてマークしますか？')) return;
-        if (!assignment || !assignment.id) { alert('割当情報が見つかりません。'); return; }
+        if (!assignment || !assignment.id) {
+            alert('割当情報が見つかりません。');
+            return;
+        }
         isSubmittingComplete.value = true;
         const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-        const url = typeof route === 'function'
-            ? route('myjobbox.assignments.complete', { assignment: assignment.id })
-            : `/myjobbox/assignments/${assignment.id}/complete`;
+        const url =
+            typeof route === 'function'
+                ? route('myjobbox.assignments.complete', { assignment: assignment.id })
+                : `/myjobbox/assignments/${assignment.id}/complete`;
         const res = await fetch(url, {
             method: 'POST',
             credentials: 'same-origin',

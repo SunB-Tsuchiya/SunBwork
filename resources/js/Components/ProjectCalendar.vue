@@ -1216,7 +1216,9 @@ function goToProjectShow() {
         try {
             router.get(route('coordinator.project_jobs.show', { projectJob: pid }));
         } catch (e) {
-            router.get(`/coordinator/project_jobs/${pid}`);
+            // Ziggy unavailable — build path from Ziggy config base URL to support /members prefix
+            const _base = (window.Ziggy && window.Ziggy.url) ? (() => { try { return new URL(window.Ziggy.url).pathname.replace(/\/$/, ''); } catch (ex) { return ''; } })() : '';
+            router.get(`${_base}/coordinator/project_jobs/${pid}`);
         }
     } catch (e) {
         // ignore navigation errors
@@ -1706,8 +1708,8 @@ async function deleteEditingMemo() {
     if (!editingCommentId.value) return;
     if (!confirm('このメモを削除しますか？')) return;
     try {
-        // call destroy via explicit URL to avoid Ziggy resolving to coordinator-prefixed route
-        const url = `/project_memos/${editingCommentId.value}`;
+        // use named route to handle base path correctly (e.g. /members prefix on Sakura)
+        const url = route('project_memos.destroy', { memo: editingCommentId.value });
         await axios.delete(url);
         showEditModal.value = false;
         editingCommentId.value = null;

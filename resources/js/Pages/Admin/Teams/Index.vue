@@ -20,7 +20,7 @@ const handleDelete = async (teamId) => {
     if (!confirm('本当に削除してよいですか？')) return;
     try {
         const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-        const res = await fetch(`/admin/teams/${teamId}`, {
+        const res = await fetch(route('admin.teams.destroy', { team: teamId }), {
             method: 'DELETE',
             headers: {
                 'Content-Type': 'application/json',

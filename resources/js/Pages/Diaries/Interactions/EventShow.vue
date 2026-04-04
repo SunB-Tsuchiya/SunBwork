@@ -110,11 +110,7 @@ function onBack() {
     }
 
     // Final fallback
-    try {
-        window.location.href = route('diaryinteractions.interactions.index');
-    } catch (e) {
-        window.location.href = '/diaryinteractions/interactions';
-    }
+    window.location.href = route('diaryinteractions.interactions.index');
 }
 
 // No delete/complete actions in interactions read-only view

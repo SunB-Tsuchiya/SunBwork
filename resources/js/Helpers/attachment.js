@@ -1,11 +1,16 @@
+// Derive app base path from Vite's BASE_URL (e.g. '/members/build/' -> '/members', '/build/' -> '')
+const _APP_BASE = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.BASE_URL
+    ? import.meta.env.BASE_URL
+    : '/build/').replace(/\/build\/?$/, '');
+
 const STREAM_BASE = (function () {
-    if (typeof window === 'undefined' || !window.location) return '/api/attachments/stream';
+    if (typeof window === 'undefined' || !window.location) return _APP_BASE + '/attachments/stream';
     const p = String(window.location.pathname || '').toLowerCase();
-    if (p.startsWith('/chat')) return '/chat/attachments';
-    if (p.startsWith('/bot')) return '/bot/attachments';
+    if (p.startsWith(_APP_BASE + '/chat')) return _APP_BASE + '/chat/attachments';
+    if (p.startsWith(_APP_BASE + '/bot')) return _APP_BASE + '/bot/attachments';
     // diaries (diary pages) and default pages use the web stream endpoint by default
     // Use the web-based `/attachments/stream` (served under `web` middleware)
-    return '/attachments/stream';
+    return _APP_BASE + '/attachments/stream';
 })();
 
 export function ensureAttachmentUrl(candidate) {
@@ -31,7 +36,9 @@ export function ensureAttachmentUrl(candidate) {
         // Full http(s) -> return as-is
         if (candidate.startsWith('http://') || candidate.startsWith('https://')) return candidate;
         // Already a stream endpoint (accept both web and legacy api-prefixed forms)
-        if (candidate.startsWith('/api/attachments') || candidate.startsWith('/attachments') || candidate.startsWith('/chat/attachments'))
+        if (candidate.startsWith('/api/attachments') || candidate.startsWith('/attachments') ||
+            candidate.startsWith('/chat/attachments') || candidate.startsWith(_APP_BASE + '/chat/attachments') ||
+            candidate.startsWith(_APP_BASE + '/bot/attachments') || candidate.startsWith(_APP_BASE + '/attachments'))
             return candidate;
         // /storage/ local path -> convert to stream endpoint
         if (candidate.startsWith('/storage/')) {

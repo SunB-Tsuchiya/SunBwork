@@ -187,7 +187,7 @@ function handleDrop(e) {
                     data.file.streamUrl =
                         buildStreamUrl(data.file) ||
                         ensureUrlSafe(
-                            '/chat/attachments?path=' +
+                            route('chat.attachments.stream') + '?path=' +
                                 encodeURIComponent(data.file.path || data.file.thumb_path || data.file.url || data.file.original_name || ''),
                         );
                 }
@@ -280,7 +280,7 @@ async function onUploadInputChange(e) {
                     data.file.streamUrl =
                         buildStreamUrl(data.file) ||
                         ensureUrlSafe(
-                            '/chat/attachments?path=' +
+                            route('chat.attachments.stream') + '?path=' +
                                 encodeURIComponent(data.file.path || data.file.thumb_path || data.file.url || data.file.original_name || ''),
                         );
                 }
@@ -329,7 +329,7 @@ function openFileModal(file) {
     // build proxy URL to stream through Laravel
     const streamUrl =
         buildStreamUrl(file) ||
-        ensureUrlSafe('/chat/attachments?path=' + encodeURIComponent(file.path || file.url || file.thumb_path || file.original_name || ''));
+        ensureUrlSafe(route('chat.attachments.stream') + '?path=' + encodeURIComponent(file.path || file.url || file.thumb_path || file.original_name || ''));
     fileModal.value.open = true;
     fileModal.value.file = { ...file, streamUrl };
     // for text files, prefetch content

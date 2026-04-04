@@ -5,7 +5,6 @@
         </template>
 
         <div class="rounded bg-white p-6 shadow">
-
             <!-- ── タイトル行 ──────────────────────────────────── -->
             <div class="mb-6 flex flex-wrap items-start gap-5">
                 <div>
@@ -20,8 +19,13 @@
                         <span v-if="job.user?.name">リーダー: {{ job.user.name }}</span>
                     </p>
                     <p class="mt-0.5 text-xs text-gray-500">
-                        <span v-if="job.size?.name">版型: <span class="font-medium text-gray-700">{{ job.size.name }}</span>　</span>
-                        <span v-if="job.page_count">総ページ数: <span class="font-medium text-gray-700">{{ job.page_count }} ページ</span></span>
+                        <span v-if="job.size?.name"
+                            >版型: <span class="font-medium text-gray-700">{{ job.size.name }}</span
+                            >　</span
+                        >
+                        <span v-if="job.page_count"
+                            >総ページ数: <span class="font-medium text-gray-700">{{ job.page_count }} ページ</span></span
+                        >
                     </p>
                     <p v-if="subCoordinators.length > 0" class="mt-0.5 text-xs text-gray-400">
                         サブCo: {{ subCoordinators.map((c) => c.name).join('、') }}
@@ -29,7 +33,8 @@
                     <span
                         v-if="job.completed"
                         class="mt-2 inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800"
-                    >完了</span>
+                        >完了</span
+                    >
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2 pt-1">
@@ -37,18 +42,18 @@
                         type="button"
                         class="rounded border border-gray-300 bg-white px-4 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50"
                         @click="backToIndex"
-                    >一覧に戻る</button>
+                    >
+                        一覧に戻る
+                    </button>
                 </div>
             </div>
 
             <!-- ── 詳細メモ ─────────────────────── -->
-            <div
-                v-if="job.detail"
-                class="mb-6 whitespace-pre-wrap rounded border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700"
-            >{{ typeof job.detail === 'string' ? job.detail : JSON.stringify(job.detail) }}</div>
+            <div v-if="job.detail" class="mb-6 whitespace-pre-wrap rounded border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
+                {{ typeof job.detail === 'string' ? job.detail : JSON.stringify(job.detail) }}
+            </div>
 
             <div class="divide-y divide-gray-100">
-
                 <!-- ── スケジュールセクション ──────────────────── -->
                 <section class="py-5">
                     <h3 class="mb-3 font-semibold text-gray-800">スケジュール</h3>
@@ -128,7 +133,7 @@
                 <section class="py-5">
                     <div class="mb-3 flex flex-wrap items-center gap-4">
                         <h3 class="font-semibold text-gray-800">ジョブ履歴（自分のみ）</h3>
-                        <label class="flex cursor-pointer items-center gap-1.5 text-sm text-gray-600 select-none">
+                        <label class="flex cursor-pointer select-none items-center gap-1.5 text-sm text-gray-600">
                             <input type="checkbox" v-model="hideHistoryCompleted" class="h-4 w-4 rounded border-gray-300" />
                             完了を表示しない
                         </label>
@@ -144,14 +149,20 @@
                                 {{ group.label }}
                                 <span class="ml-2 text-xs font-normal text-gray-500">{{ group.items.length }} 件</span>
                             </div>
-                            <table class="w-full table-fixed border" style="min-width: 760px;">
+                            <table class="w-full table-fixed border" style="min-width: 760px">
                                 <colgroup>
-                                    <col style="width: 100px"> <!-- 発信者 -->
-                                    <col style="width: 100px"> <!-- 受信者 -->
-                                    <col style="width: 140px"> <!-- 締め切り -->
-                                    <col>                      <!-- タイトル -->
-                                    <col style="width: 56px">  <!-- 既読 -->
-                                    <col style="width: 88px">  <!-- ステータス -->
+                                    <col style="width: 100px" />
+                                    <!-- 発信者 -->
+                                    <col style="width: 100px" />
+                                    <!-- 受信者 -->
+                                    <col style="width: 140px" />
+                                    <!-- 締め切り -->
+                                    <col />
+                                    <!-- タイトル -->
+                                    <col style="width: 56px" />
+                                    <!-- 既読 -->
+                                    <col style="width: 88px" />
+                                    <!-- ステータス -->
                                 </colgroup>
                                 <thead>
                                     <tr class="bg-gray-50">
@@ -173,17 +184,24 @@
                                     >
                                         <td class="break-words border px-3 py-2 text-sm text-gray-700">{{ historyGetSender(m) }}</td>
                                         <td class="break-words border px-3 py-2 text-sm text-gray-700">{{ historyGetRecipients(m) }}</td>
-                                        <td class="break-words whitespace-pre-line border px-3 py-2 text-sm text-gray-600">{{ historyGetDeadline(m) }}</td>
+                                        <td class="whitespace-pre-line break-words border px-3 py-2 text-sm text-gray-600">
+                                            {{ historyGetDeadline(m) }}
+                                        </td>
                                         <td class="break-words border px-3 py-2 text-sm">{{ m.subject || (m.body && m.body.slice(0, 60)) }}</td>
                                         <td class="border px-3 py-2">
-                                            <span v-if="historyIsUnread(m)" class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">未読</span>
+                                            <span
+                                                v-if="historyIsUnread(m)"
+                                                class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800"
+                                                >未読</span
+                                            >
                                             <span v-else class="text-xs text-gray-500">既読</span>
                                         </td>
                                         <td class="border px-3 py-2">
                                             <span
                                                 :class="statusBadgeClass(historyGetStatus(m))"
                                                 class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-                                            >{{ historyGetStatus(m) }}</span>
+                                                >{{ historyGetStatus(m) }}</span
+                                            >
                                         </td>
                                     </tr>
                                 </tbody>
@@ -193,80 +211,89 @@
 
                     <div class="mt-2 text-sm text-gray-600">
                         表示中 {{ historyDisplayCount }} 件
-                        <span v-if="hideHistoryCompleted && historyHiddenCount > 0" class="ml-2 text-xs text-gray-400">（完了 {{ historyHiddenCount }} 件を非表示）</span>
+                        <span v-if="hideHistoryCompleted && historyHiddenCount > 0" class="ml-2 text-xs text-gray-400"
+                            >（完了 {{ historyHiddenCount }} 件を非表示）</span
+                        >
                     </div>
                 </section>
-
-            </div><!-- /divide-y -->
+            </div>
+            <!-- /divide-y -->
         </div>
-    <!-- ジョブリンク詳細モーダル -->
-    <div
-        v-if="jobLinkDetailModal.open"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-        @click.self="jobLinkDetailModal.open = false"
-    >
-        <div class="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
-            <h3 class="mb-3 text-lg font-semibold text-gray-800">登録済みジョブ</h3>
-            <dl class="space-y-2 text-sm">
-                <div>
-                    <dt class="text-xs font-medium text-gray-500">タイトル</dt>
-                    <dd class="text-gray-800">{{ jobLinkDetailModal.title }}</dd>
+        <!-- ジョブリンク詳細モーダル -->
+        <div
+            v-if="jobLinkDetailModal.open"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+            @click.self="jobLinkDetailModal.open = false"
+        >
+            <div class="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
+                <h3 class="mb-3 text-lg font-semibold text-gray-800">登録済みジョブ</h3>
+                <dl class="space-y-2 text-sm">
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500">タイトル</dt>
+                        <dd class="text-gray-800">{{ jobLinkDetailModal.title }}</dd>
+                    </div>
+                    <div v-if="jobLinkDetailModal.endDate">
+                        <dt class="text-xs font-medium text-gray-500">期限</dt>
+                        <dd class="text-gray-800">{{ jobLinkDetailModal.endDate }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500">状態</dt>
+                        <dd :class="jobLinkDetailModal.completed ? 'text-yellow-700' : 'text-blue-700'">
+                            {{ jobLinkDetailModal.completed ? '完了' : '未完了' }}
+                        </dd>
+                    </div>
+                </dl>
+                <div class="mt-5 flex justify-end gap-3">
+                    <button
+                        type="button"
+                        class="rounded border border-gray-300 px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+                        @click="jobLinkDetailModal.open = false"
+                    >
+                        閉じる
+                    </button>
+                    <button
+                        v-if="jobLinkDetailModal.assignmentId && !jobLinkDetailModal.completed"
+                        type="button"
+                        class="rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
+                        :disabled="jobLinkDetailModal.completing"
+                        @click="completeFromModal"
+                    >
+                        {{ jobLinkDetailModal.completing ? '処理中…' : '完了にする' }}
+                    </button>
+                    <button
+                        v-if="jobLinkDetailModal.assignmentId"
+                        type="button"
+                        class="rounded bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+                        @click="goToMyJob"
+                    >
+                        マイジョブを開く
+                    </button>
                 </div>
-                <div v-if="jobLinkDetailModal.endDate">
-                    <dt class="text-xs font-medium text-gray-500">期限</dt>
-                    <dd class="text-gray-800">{{ jobLinkDetailModal.endDate }}</dd>
-                </div>
-                <div>
-                    <dt class="text-xs font-medium text-gray-500">状態</dt>
-                    <dd :class="jobLinkDetailModal.completed ? 'text-yellow-700' : 'text-blue-700'">
-                        {{ jobLinkDetailModal.completed ? '完了' : '未完了' }}
-                    </dd>
-                </div>
-            </dl>
-            <div class="mt-5 flex justify-end gap-3">
-                <button
-                    type="button"
-                    class="rounded border border-gray-300 px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
-                    @click="jobLinkDetailModal.open = false"
-                >閉じる</button>
-                <button
-                    v-if="jobLinkDetailModal.assignmentId && !jobLinkDetailModal.completed"
-                    type="button"
-                    class="rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
-                    :disabled="jobLinkDetailModal.completing"
-                    @click="completeFromModal"
-                >{{ jobLinkDetailModal.completing ? '処理中…' : '完了にする' }}</button>
-                <button
-                    v-if="jobLinkDetailModal.assignmentId"
-                    type="button"
-                    class="rounded bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
-                    @click="goToMyJob"
-                >マイジョブを開く</button>
             </div>
         </div>
-    </div>
-
     </AppLayout>
 </template>
 
 <script setup>
-import AppLayout from '@/layouts/AppLayout.vue';
 import ProgressTable from '@/Components/ProgressTable.vue';
+import AppLayout from '@/layouts/AppLayout.vue';
 import { router, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import { route } from 'ziggy-js';
 
 const page = usePage();
-const job  = page.props.job || {};
-const schedules = computed(() => Array.isArray(page.props.schedules) ? page.props.schedules : []);
-const members   = page.props.members || [];
+const job = page.props.job || {};
+const schedules = computed(() => (Array.isArray(page.props.schedules) ? page.props.schedules : []));
+const members = page.props.members || [];
 const hasMembers = computed(() => Array.isArray(members) && members.length > 0);
 const subCoordinators = computed(() => page.props.subCoordinators || []);
 const progressSheets = computed(() => page.props.progressSheets || []);
-const localSheets = ref((page.props.progressSheets || []).map((s) => ({
-    ...s,
-    cells: (s.cells || []).map((c) => ({ ...c })),
-})));
+const localSheets = ref(
+    (page.props.progressSheets || []).map((s) => ({
+        ...s,
+        cells: (s.cells || []).map((c) => ({ ...c })),
+    })),
+);
 
 // ── 進行表 ────────────────────────────────────────────────────────────────
 
@@ -292,7 +319,9 @@ async function onCompleteAssignment(sheet, { assignmentId }) {
                 }
             }
         }
-    } catch { /* ignore */ }
+    } catch {
+        /* ignore */
+    }
 }
 
 async function completeFromModal() {
@@ -316,8 +345,11 @@ async function completeFromModal() {
                 }
             }
         }
-    } catch { /* ignore */ }
-    finally { jobLinkDetailModal.value.completing = false; }
+    } catch {
+        /* ignore */
+    } finally {
+        jobLinkDetailModal.value.completing = false;
+    }
 }
 
 function openJobLink(sheet, { rowId, colKey }) {
@@ -364,7 +396,7 @@ function backToIndex() {
     try {
         router.visit(route('user.project_jobs.index'));
     } catch {
-        window.location.href = '/user/project-jobs';
+        window.location.href = route('user.project_jobs.index');
     }
 }
 
@@ -372,7 +404,11 @@ function backToIndex() {
 
 function formatDate(v) {
     if (!v) return '-';
-    try { return String(v).split('T')[0]; } catch { return String(v); }
+    try {
+        return String(v).split('T')[0];
+    } catch {
+        return String(v);
+    }
 }
 
 function truncate(text, len) {
@@ -386,11 +422,7 @@ function truncate(text, len) {
 const hideHistoryCompleted = ref(true);
 
 function historyGetDateKey(m) {
-    return (
-        m.project_job_assignment?.desired_end_date ||
-        (m.created_at ? String(m.created_at).split('T')[0] : null) ||
-        ''
-    );
+    return m.project_job_assignment?.desired_end_date || (m.created_at ? String(m.created_at).split('T')[0] : null) || '';
 }
 
 function historyGetTimeKey(m) {
@@ -417,13 +449,18 @@ function historyGetStatus(m) {
         const statusKey = assignment.status?.key || null;
         if (statusKey) {
             switch (statusKey) {
-                case 'completed':  return '完了';
-                case 'scheduled':  return 'セット済';
-                case 'confirmed':  return '確認済';
+                case 'completed':
+                    return '完了';
+                case 'scheduled':
+                    return 'セット済';
+                case 'confirmed':
+                    return '確認済';
                 case 'received':
                 case 'order':
-                case 'in_progress': return '受信済';
-                default: break;
+                case 'in_progress':
+                    return '受信済';
+                default:
+                    break;
             }
         }
         if (Boolean(m.completed) || Boolean(assignment.completed)) return '完了';
@@ -439,16 +476,25 @@ function historyGetStatus(m) {
 
 function statusBadgeClass(status) {
     switch (status) {
-        case '完了':    return 'bg-yellow-100 text-yellow-800';
-        case 'セット済': return 'bg-blue-100 text-blue-800';
-        case '確認済':  return 'bg-green-100 text-green-800';
-        case '受信済':  return 'bg-indigo-100 text-indigo-800';
-        default:        return 'bg-gray-100 text-gray-700';
+        case '完了':
+            return 'bg-yellow-100 text-yellow-800';
+        case 'セット済':
+            return 'bg-blue-100 text-blue-800';
+        case '確認済':
+            return 'bg-green-100 text-green-800';
+        case '受信済':
+            return 'bg-indigo-100 text-indigo-800';
+        default:
+            return 'bg-gray-100 text-gray-700';
     }
 }
 
 function historyGetSender(m) {
-    try { return m.sender?.name || m.message?.fromUser?.name || '-'; } catch { return '-'; }
+    try {
+        return m.sender?.name || m.message?.fromUser?.name || '-';
+    } catch {
+        return '-';
+    }
 }
 
 function historyGetRecipients(m) {
@@ -460,7 +506,9 @@ function historyGetRecipients(m) {
         }
         if (m.project_job_assignment?.user?.name) return m.project_job_assignment.user.name;
         return '-';
-    } catch { return '-'; }
+    } catch {
+        return '-';
+    }
 }
 
 function historyGetDeadline(m) {
@@ -473,7 +521,9 @@ function historyGetDeadline(m) {
         const time = m.project_job_assignment?.start_time || m.project_job_assignment?.desired_time || '';
         if (time) return `${formatted}\n${String(time).slice(0, 5)}`;
         return formatted;
-    } catch { return '-'; }
+    } catch {
+        return '-';
+    }
 }
 
 function historyIsUnread(m) {
@@ -489,14 +539,19 @@ function historyIsUnread(m) {
             if (rec) return !rec.read_at;
         }
         return true;
-    } catch { return false; }
+    } catch {
+        return false;
+    }
 }
 
 function historyDeduplicate(arr) {
     const byAssign = new Map();
     for (const m of arr) {
         const aid = m.project_job_assignment?.id ? String(m.project_job_assignment.id) : `noassign-${m.id}`;
-        if (!byAssign.has(aid)) { byAssign.set(aid, m); continue; }
+        if (!byAssign.has(aid)) {
+            byAssign.set(aid, m);
+            continue;
+        }
         const existing = byAssign.get(aid);
         const eCreated = existing?.created_at ? new Date(existing.created_at) : null;
         const mCreated = m?.created_at ? new Date(m.created_at) : null;
@@ -547,13 +602,10 @@ function historyRowClick(m, event) {
     if (tag === 'a' || tag === 'button' || event.target.closest?.('a,button')) return;
 
     try {
-        const pjId  = job.id;
+        const pjId = job.id;
         const msgId = m.id;
         if (pjId && msgId) {
-            router.visit(
-                route('user.project_jobs.jobbox.show', { projectJob: pjId, message: msgId }) + '?from=project',
-                { preserveState: false },
-            );
+            router.visit(route('user.project_jobs.jobbox.show', { projectJob: pjId, message: msgId }) + '?from=project', { preserveState: false });
         }
     } catch {}
 }

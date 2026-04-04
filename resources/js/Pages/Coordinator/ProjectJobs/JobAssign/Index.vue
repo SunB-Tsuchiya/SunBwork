@@ -166,8 +166,9 @@ function rowClick(a) {
             url = route('coordinator.project_jobs.assignments.show', { projectJob: projectJob.id, assignment: a.id });
         } catch (zigErr) {
             // Ziggy route not available in the client manifest; build fallback path
-            // Ziggy route missing — fallback to manual path
-            url = `/coordinator/project_jobs/${projectJob.id}/assignments/${a.id}`;
+            // Ziggy route missing — fallback to manual path (derive base path from window.Ziggy for Sakura compatibility)
+            const _base = (window.Ziggy && window.Ziggy.url) ? (() => { try { return new URL(window.Ziggy.url).pathname.replace(/\/$/, ''); } catch (e) { return ''; } })() : '';
+            url = `${_base}/coordinator/project_jobs/${projectJob.id}/assignments/${a.id}`;
         }
         router.visit(url, { preserveState: false });
     } catch (err) {
