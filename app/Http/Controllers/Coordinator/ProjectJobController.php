@@ -307,6 +307,22 @@ class ProjectJobController extends Controller
                 'created_at' => $s->created_at?->format('Y-m-d'),
             ]);
 
+        // 進行表に紐づいているアサインメント ID 一覧（ジョブ履歴の分類に使用）
+        $sheetLinkedAssignmentIds = [];
+        try {
+            $sheetLinkedAssignmentIds = \Illuminate\Support\Facades\DB::table('progress_cells')
+                ->join('progress_rows', 'progress_rows.id', '=', 'progress_cells.row_id')
+                ->join('progress_sheets', 'progress_sheets.id', '=', 'progress_rows.sheet_id')
+                ->where('progress_sheets.project_job_id', $projectJob->id)
+                ->whereNotNull('progress_cells.assignment_id')
+                ->pluck('progress_cells.assignment_id')
+                ->unique()
+                ->values()
+                ->toArray();
+        } catch (\Throwable $e) {
+            $sheetLinkedAssignmentIds = [];
+        }
+
         // テンプレート一覧（シート作成モーダル用）
         $userId = $request->user()->id;
         $sheetTemplates = \App\Models\ProgressTemplate::where('is_shared', true)
@@ -327,6 +343,7 @@ class ProjectJobController extends Controller
             'unsentAssignments' => $unsentAssignments,
             'progressSheets' => $progressSheets,
             'sheetTemplates' => $sheetTemplates,
+            'sheetLinkedAssignmentIds' => $sheetLinkedAssignmentIds,
         ]);
     }
 

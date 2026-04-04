@@ -11,6 +11,7 @@ use App\Models\ProjectJobAssignmentByMyself;
 use App\Models\ProjectJobAssignment;
 use App\Models\JobAssignmentMessage;
 use App\Models\Event;
+use App\Models\ProgressCell;
 use Illuminate\Support\Facades\Schema;
 
 class ProjectJobAssignmentController extends Controller
@@ -43,6 +44,9 @@ class ProjectJobAssignmentController extends Controller
             'assignments.*.amounts_unit' => 'nullable|string|in:page,file',
             'assignments.*.sender_id' => 'nullable|exists:users,id',
             'assignments.*.source_assignment_id' => 'nullable|exists:project_job_assignments,id',
+            'assignments.*._progress_sheet_id' => 'nullable|integer',
+            'assignments.*._row_id' => 'nullable|integer',
+            'assignments.*._col_key' => 'nullable|string|max:64',
         ]);
 
         // validated payload received (debug logging removed)
@@ -57,7 +61,7 @@ class ProjectJobAssignmentController extends Controller
 
                 $createPayload = [
                     'project_job_id' => $projectJob->id,
-                    'project_job_assignment_id' => isset($a['source_assignment_id']) ? (int) $a['source_assignment_id'] : null,
+                    'source_assignment_id' => isset($a['source_assignment_id']) ? (int) $a['source_assignment_id'] : null,
                     'user_id' => $user ? $user->id : null,
                     'sender_id' => $user ? $user->id : null,
                     'title' => $a['title'],
@@ -85,7 +89,9 @@ class ProjectJobAssignmentController extends Controller
                 // `project_job_assignment_by_myself` table so users' own schedules
                 // are stored separately from coordinator-created canonical rows.
                 if (class_exists(ProjectJobAssignmentByMyself::class)) {
-                    $createPayload['sender_id'] = $a['sender_id'] ?? null;
+                    // 自己割当ジョブは sender_id = user_id が必須。
+                    // フォームから sender_id が送られない場合は認証ユーザーをデフォルトにする。
+                    $createPayload['sender_id'] = $a['sender_id'] ?? ($user ? $user->id : null);
                     // Set assignment flags and timestamps when saving from user-side job creation
                     try {
                         if (Schema::hasColumn('project_job_assignment_by_myself', 'assigned')) {
@@ -126,6 +132,22 @@ class ProjectJobAssignmentController extends Controller
                             $assignment->save();
                         }
                     } catch (\Throwable $__eSetRead2) {
+                    }
+                }
+
+                // 進行表セルリンク: _progress_sheet_id / _row_id / _col_key が渡された場合
+                if (!empty($a['_progress_sheet_id']) && !empty($a['_row_id']) && !empty($a['_col_key'])) {
+                    try {
+                        ProgressCell::updateOrCreate(
+                            ['row_id' => (int)$a['_row_id'], 'col_key' => (string)$a['_col_key']],
+                            ['assignment_id' => $assignment->id]
+                        );
+                    } catch (\Throwable $__eCellLink) {
+                        \Illuminate\Support\Facades\Log::warning('Failed to link ProgressCell after user assignment', [
+                            'error' => $__eCellLink->getMessage(),
+                            'row_id' => $a['_row_id'],
+                            'col_key' => $a['_col_key'],
+                        ]);
                     }
                 }
 

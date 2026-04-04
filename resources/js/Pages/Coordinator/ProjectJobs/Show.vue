@@ -201,74 +201,152 @@
                         </label>
                     </div>
 
-                    <div v-if="historyGroups.length === 0" class="text-sm text-gray-400">
+                    <div v-if="historyDisplayCount === 0 && historyHiddenCount === 0" class="text-sm text-gray-400">
                         {{ (page.props.jobHistory || []).length === 0 ? 'ジョブ履歴なし' : '表示するデータがありません。' }}
                     </div>
+                    <template v-else>
 
-                    <div v-else class="overflow-x-auto">
-                        <template v-for="group in historyGroups" :key="group.key">
-                            <div class="mt-4 rounded bg-gray-100 px-4 py-1.5 text-sm font-semibold text-gray-700 first:mt-0">
-                                {{ group.label }}
-                                <span class="ml-2 text-xs font-normal text-gray-500">{{ group.items.length }} 件</span>
-                            </div>
-                            <table class="w-full table-fixed border" style="min-width: 960px;">
-                                <colgroup>
-                                    <col style="width: 100px"> <!-- 発信者 -->
-                                    <col style="width: 100px"> <!-- 受信者 -->
-                                    <col style="width: 140px"> <!-- 締め切り -->
-                                    <col style="width: 15%">   <!-- タイトル -->
-                                    <col style="width: 130px"> <!-- クライアント -->
-                                    <col style="width: 160px"> <!-- 案件名 -->
-                                    <col style="width: 56px">  <!-- 既読 -->
-                                    <col style="width: 88px">  <!-- ステータス -->
-                                </colgroup>
-                                <thead>
-                                    <tr class="bg-gray-50">
-                                        <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">発信者</th>
-                                        <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">受信者</th>
-                                        <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">締め切り</th>
-                                        <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">タイトル</th>
-                                        <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">クライアント</th>
-                                        <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">案件名</th>
-                                        <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">既読</th>
-                                        <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">ステータス</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr
-                                        v-for="m in group.items"
-                                        :key="m.id"
-                                        class="cursor-pointer hover:bg-gray-100"
-                                        @click.prevent="historyRowClick(m, $event)"
-                                        role="button"
-                                    >
-                                        <td class="break-words border px-3 py-2 text-sm text-gray-700">{{ historyGetSender(m) }}</td>
-                                        <td class="break-words border px-3 py-2 text-sm text-gray-700">{{ historyGetRecipients(m) }}</td>
-                                        <td class="break-words whitespace-pre-line border px-3 py-2 text-sm text-gray-600">{{ historyGetDeadline(m) }}</td>
-                                        <td class="break-words border px-3 py-2 text-sm">{{ m.subject || (m.body && m.body.slice(0, 60)) }}</td>
-                                        <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ job.client?.name || '-' }}</td>
-                                        <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ job.title || job.name || '-' }}</td>
-                                        <td class="border px-3 py-2">
-                                            <template v-if="historyIsUnread(m)">
-                                                <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">未読</span>
-                                            </template>
-                                            <template v-else>
-                                                <span class="text-xs text-gray-500">既読</span>
-                                            </template>
-                                        </td>
-                                        <td class="border px-3 py-2">
-                                            <span
-                                                :class="statusBadgeClass(historyGetStatus(m))"
-                                                class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-                                            >{{ historyGetStatus(m) }}</span>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </template>
-                    </div>
+                        <!-- ── 進行表に関連するジョブ ── -->
+                        <div class="mb-4">
+                            <button
+                                type="button"
+                                class="flex w-full items-center gap-2 rounded bg-indigo-50 px-4 py-2 text-left text-sm font-semibold text-indigo-800 hover:bg-indigo-100"
+                                @click="historyLinkedOpen = !historyLinkedOpen"
+                            >
+                                <span>{{ historyLinkedOpen ? '▼' : '▶' }}</span>
+                                <span>進行表に関連するジョブ</span>
+                                <span class="ml-1 text-xs font-normal text-indigo-500">
+                                    {{ historyLinkedCount }} 件
+                                </span>
+                            </button>
+                            <template v-if="historyLinkedOpen">
+                                <div v-if="historyGroupsLinked.length === 0" class="mt-2 px-4 text-sm text-gray-400">
+                                    {{ historyLinkedCount === 0 ? '該当なし' : '表示するデータがありません。' }}
+                                </div>
+                                <div v-else class="overflow-x-auto">
+                                    <template v-for="group in historyGroupsLinked" :key="group.key">
+                                        <div class="mt-3 rounded bg-gray-100 px-4 py-1.5 text-sm font-semibold text-gray-700 first:mt-2">
+                                            {{ group.label }}
+                                            <span class="ml-2 text-xs font-normal text-gray-500">{{ group.items.length }} 件</span>
+                                        </div>
+                                        <table class="w-full table-fixed border" style="min-width: 760px;">
+                                            <colgroup>
+                                                <col style="width: 100px">
+                                                <col style="width: 100px">
+                                                <col style="width: 140px">
+                                                <col>
+                                                <col style="width: 56px">
+                                                <col style="width: 88px">
+                                            </colgroup>
+                                            <thead>
+                                                <tr class="bg-gray-50">
+                                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">発信者</th>
+                                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">受信者</th>
+                                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">締め切り</th>
+                                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">タイトル</th>
+                                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">既読</th>
+                                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">ステータス</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr
+                                                    v-for="m in group.items"
+                                                    :key="m.id"
+                                                    class="cursor-pointer hover:bg-indigo-50"
+                                                    @click.prevent="historyRowClick(m, $event)"
+                                                    role="button"
+                                                >
+                                                    <td class="break-words border px-3 py-2 text-sm text-gray-700">{{ historyGetSender(m) }}</td>
+                                                    <td class="break-words border px-3 py-2 text-sm text-gray-700">{{ historyGetRecipients(m) }}</td>
+                                                    <td class="break-words whitespace-pre-line border px-3 py-2 text-sm text-gray-600">{{ historyGetDeadline(m) }}</td>
+                                                    <td class="break-words border px-3 py-2 text-sm">{{ m.subject || (m.body && m.body.slice(0, 60)) }}</td>
+                                                    <td class="border px-3 py-2">
+                                                        <span v-if="historyIsUnread(m)" class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">未読</span>
+                                                        <span v-else class="text-xs text-gray-500">既読</span>
+                                                    </td>
+                                                    <td class="border px-3 py-2">
+                                                        <span :class="statusBadgeClass(historyGetStatus(m))" class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">{{ historyGetStatus(m) }}</span>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
 
-                    <div class="mt-2 text-sm text-gray-600">
+                        <!-- ── 進行表に関連しないジョブ ── -->
+                        <div>
+                            <button
+                                type="button"
+                                class="flex w-full items-center gap-2 rounded bg-gray-100 px-4 py-2 text-left text-sm font-semibold text-gray-700 hover:bg-gray-200"
+                                @click="historyOtherOpen = !historyOtherOpen"
+                            >
+                                <span>{{ historyOtherOpen ? '▼' : '▶' }}</span>
+                                <span>進行表に関連しないジョブ</span>
+                                <span class="ml-1 text-xs font-normal text-gray-500">
+                                    {{ historyOtherCount }} 件
+                                </span>
+                            </button>
+                            <template v-if="historyOtherOpen">
+                                <div v-if="historyGroupsOther.length === 0" class="mt-2 px-4 text-sm text-gray-400">
+                                    {{ historyOtherCount === 0 ? '該当なし' : '表示するデータがありません。' }}
+                                </div>
+                                <div v-else class="overflow-x-auto">
+                                    <template v-for="group in historyGroupsOther" :key="group.key">
+                                        <div class="mt-3 rounded bg-gray-100 px-4 py-1.5 text-sm font-semibold text-gray-700 first:mt-2">
+                                            {{ group.label }}
+                                            <span class="ml-2 text-xs font-normal text-gray-500">{{ group.items.length }} 件</span>
+                                        </div>
+                                        <table class="w-full table-fixed border" style="min-width: 760px;">
+                                            <colgroup>
+                                                <col style="width: 100px">
+                                                <col style="width: 100px">
+                                                <col style="width: 140px">
+                                                <col>
+                                                <col style="width: 56px">
+                                                <col style="width: 88px">
+                                            </colgroup>
+                                            <thead>
+                                                <tr class="bg-gray-50">
+                                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">発信者</th>
+                                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">受信者</th>
+                                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">締め切り</th>
+                                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">タイトル</th>
+                                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">既読</th>
+                                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">ステータス</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr
+                                                    v-for="m in group.items"
+                                                    :key="m.id"
+                                                    class="cursor-pointer hover:bg-gray-100"
+                                                    @click.prevent="historyRowClick(m, $event)"
+                                                    role="button"
+                                                >
+                                                    <td class="break-words border px-3 py-2 text-sm text-gray-700">{{ historyGetSender(m) }}</td>
+                                                    <td class="break-words border px-3 py-2 text-sm text-gray-700">{{ historyGetRecipients(m) }}</td>
+                                                    <td class="break-words whitespace-pre-line border px-3 py-2 text-sm text-gray-600">{{ historyGetDeadline(m) }}</td>
+                                                    <td class="break-words border px-3 py-2 text-sm">{{ m.subject || (m.body && m.body.slice(0, 60)) }}</td>
+                                                    <td class="border px-3 py-2">
+                                                        <span v-if="historyIsUnread(m)" class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">未読</span>
+                                                        <span v-else class="text-xs text-gray-500">既読</span>
+                                                    </td>
+                                                    <td class="border px-3 py-2">
+                                                        <span :class="statusBadgeClass(historyGetStatus(m))" class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">{{ historyGetStatus(m) }}</span>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
+
+                    </template>
+
+                    <div class="mt-3 text-sm text-gray-600">
                         表示中 {{ historyDisplayCount }} 件
                         <span v-if="hideHistoryCompleted && historyHiddenCount > 0" class="ml-2 text-xs text-gray-400">（完了 {{ historyHiddenCount }} 件を非表示）</span>
                     </div>
@@ -728,6 +806,61 @@ const historyHiddenCount = computed(() => {
     if (!hideHistoryCompleted.value) return 0;
     const raw = Array.isArray(page.props.jobHistory) ? page.props.jobHistory : [];
     return historyDeduplicate(raw).filter((m) => historyGetStatus(m) === '完了').length;
+});
+
+// ── 進行表連動ジョブ分類 ──────────────────────────────────────────────────
+
+const sheetLinkedSet = computed(() =>
+    new Set((page.props.sheetLinkedAssignmentIds || []).map(String))
+);
+
+function isSheetLinked(m) {
+    const aid = String(m.project_job_assignment_id || m.project_job_assignment?.id || '');
+    return aid !== '' && sheetLinkedSet.value.has(aid);
+}
+
+function buildHistoryGroups(messages) {
+    const grouped = new Map();
+    for (const m of messages) {
+        const key = historyGetDateKey(m);
+        if (!grouped.has(key)) grouped.set(key, []);
+        grouped.get(key).push(m);
+    }
+    for (const items of grouped.values()) {
+        items.sort((a, b) => historyGetTimeKey(a).localeCompare(historyGetTimeKey(b)));
+    }
+    const sortedKeys = Array.from(grouped.keys()).sort((a, b) => {
+        if (!a) return 1; if (!b) return -1;
+        return b.localeCompare(a);
+    });
+    return sortedKeys.map((key) => ({ key, label: historyFormatDateLabel(key), items: grouped.get(key) }));
+}
+
+const historyLinkedOpen = ref(true);
+const historyOtherOpen  = ref(false);
+
+const historyGroupsLinked = computed(() => {
+    const raw = Array.isArray(page.props.jobHistory) ? page.props.jobHistory : [];
+    let messages = historyDeduplicate(raw).filter(isSheetLinked);
+    if (hideHistoryCompleted.value) messages = messages.filter((m) => historyGetStatus(m) !== '完了');
+    return buildHistoryGroups(messages);
+});
+
+const historyGroupsOther = computed(() => {
+    const raw = Array.isArray(page.props.jobHistory) ? page.props.jobHistory : [];
+    let messages = historyDeduplicate(raw).filter((m) => !isSheetLinked(m));
+    if (hideHistoryCompleted.value) messages = messages.filter((m) => historyGetStatus(m) !== '完了');
+    return buildHistoryGroups(messages);
+});
+
+// 件数（フィルタ前の全件、セクションヘッダー用）
+const historyLinkedCount = computed(() => {
+    const raw = Array.isArray(page.props.jobHistory) ? page.props.jobHistory : [];
+    return historyDeduplicate(raw).filter(isSheetLinked).length;
+});
+const historyOtherCount = computed(() => {
+    const raw = Array.isArray(page.props.jobHistory) ? page.props.jobHistory : [];
+    return historyDeduplicate(raw).filter((m) => !isSheetLinked(m)).length;
 });
 
 function historyRowClick(m, event) {

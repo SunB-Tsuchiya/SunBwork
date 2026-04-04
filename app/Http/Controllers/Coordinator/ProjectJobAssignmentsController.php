@@ -126,6 +126,7 @@ class ProjectJobAssignmentsController extends Controller
         $prefillStageId = $request->query('stage_id');
         $prefillSizeId = $request->query('size_id');
         $prefillWorkItemTypeId = $request->query('work_item_type_id');
+        $prefillUserId = $request->query('user_id') ? (int) $request->query('user_id') : null;
         // send available team members for selection
         $members = $projectJob->teamMembers()->with(['user', 'user.assignment'])->get()->map(function ($m) {
             return [
@@ -206,6 +207,7 @@ class ProjectJobAssignmentsController extends Controller
             'prefill_stage_id' => $prefillStageId,
             'prefill_size_id' => $prefillSizeId,
             'prefill_work_item_type_id' => $prefillWorkItemTypeId,
+            'prefill_user_id' => $prefillUserId,
             'types' => $types,
             'sizes' => $sizes,
             'stages' => $stages,

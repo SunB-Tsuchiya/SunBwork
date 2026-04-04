@@ -53,6 +53,17 @@
                     {{ EMPLOYMENT_BADGE[memberEmploymentType(block.user_id)?.employment_type].label }}
                 </span>
             </div>
+            <div v-else-if="block._locked_user" class="mt-1 flex items-center gap-2 rounded border bg-gray-100 px-3 py-2 text-sm text-gray-600">
+                <span>{{ memberName(block.user_id) }}</span>
+                <span class="ml-2 text-xs text-gray-400">🔒 進行表から</span>
+                <span
+                    v-if="EMPLOYMENT_BADGE[memberEmploymentType(block.user_id)?.employment_type]"
+                    class="rounded-full px-2 py-0 text-xs font-medium"
+                    :class="EMPLOYMENT_BADGE[memberEmploymentType(block.user_id)?.employment_type].cls"
+                >
+                    {{ EMPLOYMENT_BADGE[memberEmploymentType(block.user_id)?.employment_type].label }}
+                </span>
+            </div>
             <div v-else>
                 <select v-model="block.user_id" class="w-full rounded border px-3 py-2" @change="onUserChange(block)">
                     <option value="">未指定</option>
@@ -664,6 +675,10 @@ function normalizeAssignment(a) {
             _locked_stage: a._locked_stage || false,
             _locked_size: a._locked_size || false,
             _locked_work_item_type: a._locked_work_item_type || false,
+            _locked_user: a._locked_user || false,
+            _progress_sheet_id: a._progress_sheet_id ?? null,
+            _row_id: a._row_id ?? null,
+            _col_key: a._col_key ?? null,
         };
     } else {
         return {
@@ -710,6 +725,10 @@ function normalizeAssignment(a) {
             _locked_stage: a._locked_stage || false,
             _locked_size: a._locked_size || false,
             _locked_work_item_type: a._locked_work_item_type || false,
+            _locked_user: a._locked_user || false,
+            _progress_sheet_id: a._progress_sheet_id ?? null,
+            _row_id: a._row_id ?? null,
+            _col_key: a._col_key ?? null,
         };
     }
 }

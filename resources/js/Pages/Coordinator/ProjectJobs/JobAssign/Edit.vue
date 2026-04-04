@@ -144,6 +144,7 @@ const props = defineProps({
     prefill_stage_id: { type: [String, Number], default: null },
     prefill_size_id: { type: [String, Number], default: null },
     prefill_work_item_type_id: { type: [String, Number], default: null },
+    prefill_user_id: { type: [String, Number], default: null },
 });
 const projectJob = props.projectJob;
 const members = props.members || [];
@@ -157,12 +158,14 @@ const formAssignments = ref(
           id: null,
           title: props.prefill_title,
           project_job_id: props.projectJob?.id ?? null,
+          user_id: props.prefill_user_id ?? null,
           stage_id: props.prefill_stage_id ?? null,
           size_id: props.prefill_size_id ?? null,
           work_item_type_id: props.prefill_work_item_type_id ?? null,
           _locked_stage: !!props.prefill_stage_id,
           _locked_size: !!props.prefill_size_id,
           _locked_work_item_type: !!props.prefill_work_item_type_id,
+          _locked_user: !!props.prefill_user_id,
         }]
       : []
 );

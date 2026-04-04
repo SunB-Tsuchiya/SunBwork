@@ -40,16 +40,73 @@ const records = ref([]);
 const modalClients = ref([]);
 const modalProjects = ref([]);
 
-const dateRangeOptions = [
-    { value: 'yesterday', label: '前日' },
-    { value: '7days', label: '過去7日' },
-    { value: '30days', label: '過去30日' },
-];
+// ── 続き確認モーダル ──────────────────────────────────────────────────────
+const showContinueModal = ref(false);
+const pendingRecord = ref(null);
+
+function selectRecord(rec) {
+    pendingRecord.value = rec;
+    showContinueModal.value = true;
+    closeModal();
+}
+
+function applyContinuation() {
+    const rec = pendingRecord.value;
+    if (!rec) return;
+    formAssignments.value = [{
+        project_job_id: rec.project_job_id,
+        _client_id: rec.client_id ?? '',
+        title_suffix: rec.title ?? '',
+        detail: rec.detail ?? '',
+        work_item_type_id: rec.work_item_type_id ?? null,
+        size_id: rec.size_id ?? null,
+        stage_id: rec.stage_id ?? null,
+        difficulty_id: rec.difficulty_id ?? null,
+        desired_end_date: rec.desired_end_date ?? '',
+        desired_time: rec.desired_time ?? null,
+        estimated_hours: rec.estimated_hours ?? null,
+        amounts: null,
+        status_id: null,
+        source_assignment_id: rec.id,
+    }];
+    formKey.value += 1;
+    showContinueModal.value = false;
+    pendingRecord.value = null;
+}
+
+function applyAsNew() {
+    const rec = pendingRecord.value;
+    if (!rec) return;
+    formAssignments.value = [{
+        project_job_id: rec.project_job_id,
+        _client_id: rec.client_id ?? '',
+        title_suffix: rec.title ?? '',
+        detail: rec.detail ?? '',
+        work_item_type_id: rec.work_item_type_id ?? null,
+        size_id: rec.size_id ?? null,
+        stage_id: rec.stage_id ?? null,
+        difficulty_id: rec.difficulty_id ?? null,
+        desired_end_date: rec.desired_end_date ?? '',
+        desired_time: rec.desired_time ?? null,
+        estimated_hours: rec.estimated_hours ?? null,
+        amounts: null,
+        status_id: null,
+    }];
+    formKey.value += 1;
+    showContinueModal.value = false;
+    pendingRecord.value = null;
+}
 
 function openModal() {
     showModal.value = true;
     fetchData();
 }
+
+const dateRangeOptions = [
+    { value: 'yesterday', label: '前日' },
+    { value: '7days', label: '過去7日' },
+    { value: '30days', label: '過去30日' },
+];
 
 function closeModal() {
     showModal.value = false;
@@ -120,27 +177,6 @@ async function fetchClientsOnly() {
             if (data.clients?.length) modalClients.value = data.clients;
         }
     } catch (e) {}
-}
-
-function selectRecord(rec) {
-    // Refill form with past data, excluding status and amounts
-    formAssignments.value = [{
-        project_job_id: rec.project_job_id,
-        _client_id: rec.client_id ?? '',
-        title_suffix: rec.title ?? '',
-        detail: rec.detail ?? '',
-        work_item_type_id: rec.work_item_type_id ?? null,
-        size_id: rec.size_id ?? null,
-        stage_id: rec.stage_id ?? null,
-        difficulty_id: rec.difficulty_id ?? null,
-        desired_end_date: rec.desired_end_date ?? '',
-        desired_time: rec.desired_time ?? null,
-        estimated_hours: rec.estimated_hours ?? null,
-        amounts: null,       // intentionally excluded
-        status_id: null,     // intentionally excluded
-    }];
-    formKey.value += 1; // force re-mount
-    closeModal();
 }
 
 // table display helpers
@@ -279,6 +315,39 @@ function fmt(v) { return v ?? '-'; }
                                 </tbody>
                             </table>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
+
+        <!-- 続き確認モーダル -->
+        <Teleport to="body">
+            <div v-if="showContinueModal" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50" @click.self="showContinueModal = false">
+                <div class="mx-4 w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+                    <h2 class="mb-2 text-lg font-semibold text-gray-800">引用方法を選択</h2>
+                    <p class="mb-1 text-sm text-gray-600">
+                        選択したジョブ：<span class="font-medium text-gray-900">{{ pendingRecord?.title }}</span>
+                    </p>
+                    <p class="mb-5 text-sm text-gray-500">このジョブをどのように使いますか？</p>
+                    <div class="flex flex-col gap-3">
+                        <button
+                            @click="applyContinuation"
+                            class="w-full rounded-lg bg-orange-500 px-4 py-3 text-left text-sm font-medium text-white hover:bg-orange-600"
+                        >
+                            <div class="font-semibold">↩ 続きとして設定</div>
+                            <div class="mt-0.5 text-xs opacity-90">元ジョブと連動。作業時間を合算し、完了時に元ジョブも完了します。</div>
+                        </button>
+                        <button
+                            @click="applyAsNew"
+                            class="w-full rounded-lg bg-blue-500 px-4 py-3 text-left text-sm font-medium text-white hover:bg-blue-600"
+                        >
+                            <div class="font-semibold">新規として引用</div>
+                            <div class="mt-0.5 text-xs opacity-90">内容を引き継いで独立した新しいジョブとして作成します。</div>
+                        </button>
+                        <button
+                            @click="showContinueModal = false"
+                            class="w-full rounded border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
+                        >キャンセル</button>
                     </div>
                 </div>
             </div>

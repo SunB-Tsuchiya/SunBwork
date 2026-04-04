@@ -1037,6 +1037,9 @@ class EventController extends Controller
         $prefillStageId = $request->query('stage_id');          // 進行管理表: ステージID
         $prefillSizeId = $request->query('size_id');             // 進行管理表: サイズID
         $prefillWorkItemTypeId = $request->query('work_item_type_id'); // 進行管理表: 作業種別ID
+        $prefillProgressSheetId = $request->query('progress_sheet_id'); // User進行表: シートID
+        $prefillRowId = $request->query('row_id');               // User進行表: 行ID
+        $prefillColKey = $request->query('col_key');             // User進行表: 列キー
         $startHour = $request->query('startHour');
         $startMinute = $request->query('startMinute');
         $endHour = $request->query('endHour');
@@ -1086,6 +1089,9 @@ class EventController extends Controller
                 '_locked_stage' => (bool)$prefillStageId,
                 '_locked_size' => (bool)$prefillSizeId,
                 '_locked_work_item_type' => (bool)$prefillWorkItemTypeId,
+                '_progress_sheet_id' => $prefillProgressSheetId ? (int)$prefillProgressSheetId : null,
+                '_row_id' => $prefillRowId ? (int)$prefillRowId : null,
+                '_col_key' => $prefillColKey ?? null,
             ]];
         }
 

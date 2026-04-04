@@ -264,4 +264,62 @@ class ProgressSheetController extends Controller
 
         return $isOwner || $isSub || $isAdmin || $isCreator;
     }
+
+    /**
+     * 管理者がアサインメントを「完了」に変更する
+     */
+    public function completeAssignment(Request $request, ProjectJobAssignment $assignment): \Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user, 401);
+
+        // 管理者・担当コーディネーター・本人のみ許可
+        $isAdmin = in_array($user->user_role, ['admin', 'superadmin', 'coordinator', 'clerk']);
+        $isOwner = $assignment->user_id === $user->id;
+        abort_unless($isAdmin || $isOwner, 403);
+
+        $assignment->completed = true;
+        $this->setCompletedStatus($assignment);
+        $assignment->save();
+
+        return response()->json(['success' => true, 'assignment_id' => $assignment->id]);
+    }
+
+    /**
+     * 管理者がアサインメントを「未完了」に変更する
+     */
+    public function uncompleteAssignment(Request $request, ProjectJobAssignment $assignment): \Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user, 401);
+
+        $isAdmin = in_array($user->user_role, ['admin', 'superadmin', 'coordinator', 'clerk']);
+        abort_unless($isAdmin, 403);
+
+        $assignment->completed = false;
+        $assignment->save();
+
+        return response()->json(['success' => true, 'assignment_id' => $assignment->id]);
+    }
+
+    private function setCompletedStatus(ProjectJobAssignment $assignment): void
+    {
+        try {
+            $status = \Illuminate\Support\Facades\DB::table('statuses')
+                ->where('key', 'completed')
+                ->orWhere('slug', 'completed')
+                ->first();
+            if (!$status) {
+                $statusId = \Illuminate\Support\Facades\DB::table('statuses')->insertGetId([
+                    'key' => 'completed', 'slug' => 'completed', 'name' => '完了',
+                    'created_at' => now(), 'updated_at' => now(),
+                ]);
+            } else {
+                $statusId = $status->id;
+            }
+            $assignment->status_id = $statusId;
+        } catch (\Throwable $e) {
+            // status_id 更新失敗は無視（completed フラグのみ更新）
+        }
+    }
 }

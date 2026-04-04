@@ -79,7 +79,11 @@
   </td>
 
   <!-- ジョブリンク型 -->
-  <td v-else-if="colDef.type === 'joblink'" class="border border-gray-200 px-2 py-1 text-center align-middle min-w-[80px]">
+  <td
+    v-else-if="colDef.type === 'joblink'"
+    class="border border-gray-200 px-2 py-1 text-center align-middle min-w-[80px] transition-colors"
+    :class="cell.assignment_completed ? 'bg-green-50' : ''"
+  >
     <template v-if="canEdit || jobLinkOnly">
       <button
         v-if="!cell.assignment_id"
@@ -88,16 +92,34 @@
         @click="emit('job-link-open', { rowId, colKey: colDef.key })"
       >＋ 登録</button>
       <div v-else class="flex flex-col items-center gap-0.5">
-        <span class="rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700">登録済</span>
+        <!-- 完了バッジ or 登録済バッジ -->
+        <span
+          v-if="cell.assignment_completed"
+          class="rounded bg-yellow-100 px-1.5 py-0.5 text-xs font-medium text-yellow-800"
+        >✓ 完了</span>
+        <span v-else class="rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700">登録済</span>
+        <!-- 詳細ボタン -->
         <button
           type="button"
           class="rounded bg-gray-200 px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-300"
           @click="emit('job-link-detail', { assignmentId: cell.assignment_id, assignmentTitle: cell.assignment_title, assigneeUserId: cell.assignment_user_id, endDate: cell.assignment_end_date, completed: cell.assignment_completed })"
         >詳細</button>
+        <!-- 担当者本人のみ: 完了にするボタン -->
+        <button
+          v-if="!cell.assignment_completed && authUserId && String(cell.assignment_user_id) === String(authUserId)"
+          type="button"
+          class="mt-0.5 rounded bg-indigo-100 px-2 py-0.5 text-xs text-indigo-700 hover:bg-indigo-200"
+          @click="emit('complete-assignment', { assignmentId: cell.assignment_id, rowId, colKey: colDef.key })"
+        >完了にする</button>
       </div>
     </template>
     <template v-else>
-      <span v-if="cell.assignment_id" class="rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700">登録済</span>
+      <!-- 閲覧のみ -->
+      <span
+        v-if="cell.assignment_id && cell.assignment_completed"
+        class="rounded bg-yellow-100 px-1.5 py-0.5 text-xs font-medium text-yellow-800"
+      >✓ 完了</span>
+      <span v-else-if="cell.assignment_id" class="rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700">登録済</span>
       <div v-else class="mx-auto h-6 w-full rounded border border-dashed border-gray-200 bg-gray-50"></div>
     </template>
   </td>
@@ -218,6 +240,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  authUserId: {
+    type: [Number, String, null],
+    default: null,
+  },
   users: {
     type: Array,
     default: () => [],
@@ -240,7 +266,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['update', 'job-link-open', 'job-link-detail']);
+const emit = defineEmits(['update', 'job-link-open', 'job-link-detail', 'complete-assignment']);
 
 // ── 作業時間ヘルパー ──────────────────────────────
 // value_text に "HH:MM|HH:MM" 形式で開始・終了を保存

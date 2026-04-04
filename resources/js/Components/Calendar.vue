@@ -2,7 +2,8 @@
     <div class="calendar-container">
         <div class="mb-4 flex flex-wrap gap-2">
             <button @click="openEventModal" class="rounded bg-blue-600 px-4 py-2 text-white">予定作成</button>
-            <button @click="goToJobCreate" class="rounded bg-indigo-600 px-4 py-2 text-white">ジョブ作成</button>
+            <button @click="goToJobCreate" class="rounded bg-indigo-600 px-4 py-2 text-white">ジョブ作成（独自）</button>
+            <button @click="openJobSheetModal" class="rounded bg-purple-600 px-4 py-2 text-white">ジョブ作成（進行表から）</button>
             <button @click="goToDiaryCreate" class="rounded bg-orange-500 px-4 py-2 text-white">{{ props.diaryLabel }}作成</button>
             <button @click="openScheduleModal" class="rounded border border-gray-400 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">日程設定</button>
         </div>
@@ -72,7 +73,8 @@
                 <h2 class="mb-4 text-lg font-bold">{{ selectedDate }} の操作</h2>
                 <div class="flex flex-col gap-4">
                     <button @click="openEventModalFromSelect" class="rounded bg-blue-600 px-4 py-2 text-white">予定作成</button>
-                    <button @click="goToJobCreate" class="rounded bg-blue-600 px-4 py-2 text-white">ジョブ作成</button>
+                    <button @click="goToJobCreate" class="rounded bg-indigo-600 px-4 py-2 text-white">ジョブ作成（独自）</button>
+                    <button @click="openJobSheetModal" class="rounded bg-purple-600 px-4 py-2 text-white">ジョブ作成（進行表から）</button>
 
                     <button v-if="selectedScheduleId === null" @click="goToDiaryCreateFromSelect" class="rounded bg-orange-500 px-4 py-2 text-white">
                         日報作成
@@ -81,6 +83,46 @@
                         メモ作成
                     </button>
                     <button @click="showSelectModal = false" class="rounded bg-gray-300 px-4 py-2">キャンセル</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 進行表から案件選択モーダル -->
+        <div v-if="showJobSheetModal" class="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-50" @click.self="showJobSheetModal = false">
+            <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+                <h2 class="mb-4 text-lg font-bold">案件を選択（進行表から）</h2>
+
+                <div v-if="jobSheetLoading" class="py-8 text-center text-sm text-gray-500">読み込み中…</div>
+                <div v-else>
+                    <!-- クライアント選択 -->
+                    <div class="mb-3">
+                        <label class="mb-1 block text-sm font-medium text-gray-700">クライアント</label>
+                        <select v-model="jsSelectedClientId" @change="onClientChange" class="w-full rounded border border-gray-300 px-3 py-2 text-sm">
+                            <option value="">— 選択してください —</option>
+                            <option v-for="c in jsClients" :key="c.id" :value="String(c.id)">{{ c.name }}</option>
+                        </select>
+                    </div>
+
+                    <!-- 案件選択（クライアント選択後に表示） -->
+                    <div v-if="jsSelectedClientId" class="mb-3">
+                        <label class="mb-1 block text-sm font-medium text-gray-700">案件</label>
+                        <select v-model="jsSelectedProjectId" class="w-full rounded border border-gray-300 px-3 py-2 text-sm">
+                            <option value="">— 選択してください —</option>
+                            <option v-for="p in jsFilteredProjects" :key="p.id" :value="String(p.id)">{{ p.title || p.name }}</option>
+                        </select>
+                    </div>
+
+                    <!-- 案件選択後のアクションボタン -->
+                    <div v-if="jsSelectedProjectId" class="mt-4 flex justify-end gap-2">
+                        <button
+                            @click="goToProjectShow"
+                            class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                        >詳細を見る（進行表へ）</button>
+                    </div>
+                </div>
+
+                <div class="mt-4 flex justify-end">
+                    <button @click="showJobSheetModal = false" class="rounded border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">閉じる</button>
                 </div>
             </div>
         </div>
@@ -488,6 +530,67 @@ function goToJobCreate() {
     } catch (e) {
         // fallback to existing events.create
         openEventModal();
+    }
+}
+
+// ─── 進行表から案件選択モーダル ───────────────────────────────────────────
+const showJobSheetModal = ref(false);
+const jobSheetLoading = ref(false);
+const jsClients = ref([]);
+const jsProjects = ref([]);
+const jsSelectedClientId = ref('');
+const jsSelectedProjectId = ref('');
+
+const jsFilteredProjects = computed(() => {
+    if (!jsSelectedClientId.value) return [];
+    return jsProjects.value.filter((p) => String(p.client_id) === String(jsSelectedClientId.value));
+});
+
+async function openJobSheetModal() {
+    showSelectModal.value = false;
+    jsSelectedClientId.value = '';
+    jsSelectedProjectId.value = '';
+    showJobSheetModal.value = true;
+
+    if (jsClients.value.length === 0) {
+        jobSheetLoading.value = true;
+        try {
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            const res = await fetch(route('user.project_jobs.json'), {
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': csrf, Accept: 'application/json' },
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.clients?.length) jsClients.value = data.clients;
+                if (data.projects?.length) jsProjects.value = data.projects;
+            }
+        } catch (e) {
+            // ignore fetch errors
+        } finally {
+            jobSheetLoading.value = false;
+        }
+    }
+}
+
+// jsSelectedClientId 変更時（案件は全件ロード済みなのでフィルターのみ）
+async function fetchProjectsForClient(_clientId) {
+    // jsProjects は openJobSheetModal で一括取得済み。追加取得不要。
+}
+
+// クライアント選択時に案件を取得
+function onClientChange() {
+    jsSelectedProjectId.value = '';
+    fetchProjectsForClient(jsSelectedClientId.value);
+}
+
+function goToProjectShow() {
+    if (!jsSelectedProjectId.value) return;
+    showJobSheetModal.value = false;
+    try {
+        router.visit(route('user.project_jobs.show', { projectJob: jsSelectedProjectId.value }));
+    } catch {
+        window.location.href = route('user.project_jobs.show', { projectJob: jsSelectedProjectId.value });
     }
 }
 

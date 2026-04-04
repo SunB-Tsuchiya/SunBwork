@@ -116,8 +116,10 @@
                             :can-edit="false"
                             :edit-mode="false"
                             :job-link-only="true"
+                            :auth-user-id="page.props.auth?.user?.id ?? null"
                             @job-link-open="openJobLink(sheet, $event)"
                             @job-link-detail="openJobLinkDetail($event)"
+                            @complete-assignment="onCompleteAssignment(sheet, $event)"
                         />
                     </div>
                 </section>
@@ -197,48 +199,6 @@
 
             </div><!-- /divide-y -->
         </div>
-    <!-- ジョブリンク登録モーダル -->
-    <div
-        v-if="jobLinkModal.open"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-        @click.self="jobLinkModal.open = false"
-    >
-        <div class="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
-            <h3 class="mb-4 text-lg font-semibold text-gray-800">マイジョブとして登録</h3>
-            <div class="space-y-3">
-                <div>
-                    <label class="block text-xs font-medium text-gray-600">ジョブタイトル</label>
-                    <input
-                        v-model="jobLinkModal.title"
-                        type="text"
-                        class="mt-1 w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none"
-                    />
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-gray-600">期限（任意）</label>
-                    <input
-                        v-model="jobLinkModal.endDate"
-                        type="date"
-                        class="mt-1 w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none"
-                    />
-                </div>
-            </div>
-            <div class="mt-5 flex justify-end gap-3">
-                <button
-                    type="button"
-                    class="rounded border border-gray-300 px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
-                    @click="jobLinkModal.open = false"
-                >キャンセル</button>
-                <button
-                    type="button"
-                    class="rounded bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
-                    :disabled="!jobLinkModal.title"
-                    @click="submitJobLink"
-                >登録</button>
-            </div>
-        </div>
-    </div>
-
     <!-- ジョブリンク詳細モーダル -->
     <div
         v-if="jobLinkDetailModal.open"
@@ -269,6 +229,13 @@
                     class="rounded border border-gray-300 px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
                     @click="jobLinkDetailModal.open = false"
                 >閉じる</button>
+                <button
+                    v-if="jobLinkDetailModal.assignmentId && !jobLinkDetailModal.completed"
+                    type="button"
+                    class="rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
+                    :disabled="jobLinkDetailModal.completing"
+                    @click="completeFromModal"
+                >{{ jobLinkDetailModal.completing ? '処理中…' : '完了にする' }}</button>
                 <button
                     v-if="jobLinkDetailModal.assignmentId"
                     type="button"
@@ -303,39 +270,72 @@ const localSheets = ref((page.props.progressSheets || []).map((s) => ({
 
 // ── 進行表 ────────────────────────────────────────────────────────────────
 
-const jobLinkModal = ref({ open: false, sheetId: null, rowId: null, colKey: null, title: '', endDate: '' });
-const jobLinkDetailModal = ref({ open: false, title: '', endDate: '', completed: false, assignmentId: null });
+const jobLinkDetailModal = ref({ open: false, title: '', endDate: '', completed: false, assignmentId: null, completing: false });
+
+async function onCompleteAssignment(sheet, { assignmentId }) {
+    if (!assignmentId) return;
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    try {
+        const res = await fetch(route('myjobbox.assignments.complete', { assignment: assignmentId }), {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+        });
+        if (res.ok) {
+            // localSheets 内の該当セルを更新
+            const sheetIdx = localSheets.value.findIndex((s) => s.id === sheet.id);
+            if (sheetIdx >= 0) {
+                const cells = localSheets.value[sheetIdx].cells;
+                const cellIdx = cells.findIndex((c) => c.assignment_id === assignmentId);
+                if (cellIdx >= 0) {
+                    localSheets.value[sheetIdx].cells.splice(cellIdx, 1, { ...cells[cellIdx], assignment_completed: true });
+                }
+            }
+        }
+    } catch { /* ignore */ }
+}
+
+async function completeFromModal() {
+    const assignmentId = jobLinkDetailModal.value.assignmentId;
+    if (!assignmentId || jobLinkDetailModal.value.completed) return;
+    jobLinkDetailModal.value.completing = true;
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    try {
+        const res = await fetch(route('myjobbox.assignments.complete', { assignment: assignmentId }), {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+        });
+        if (res.ok) {
+            jobLinkDetailModal.value.completed = true;
+            // localSheets 内の全シートのセルも更新
+            for (const sheet of localSheets.value) {
+                const cellIdx = sheet.cells.findIndex((c) => c.assignment_id === assignmentId);
+                if (cellIdx >= 0) {
+                    sheet.cells.splice(cellIdx, 1, { ...sheet.cells[cellIdx], assignment_completed: true });
+                }
+            }
+        }
+    } catch { /* ignore */ }
+    finally { jobLinkDetailModal.value.completing = false; }
+}
 
 function openJobLink(sheet, { rowId, colKey }) {
     const row = (sheet.rows || []).find((r) => r.id === rowId);
-    jobLinkModal.value = {
-        open: true,
-        sheetId: sheet.id,
-        rowId,
-        colKey,
-        title: row?.label ?? '',
-        endDate: '',
+    const title = row?.label ?? '';
+    const params = {
+        title,
+        project_job_id: job.id,
+        progress_sheet_id: sheet.id,
+        row_id: rowId,
+        col_key: colKey,
     };
-}
-
-function submitJobLink() {
-    const { sheetId, rowId, colKey, title, endDate } = jobLinkModal.value;
-    router.post(
-        route('user.project_jobs.progress_sheets.link_job', { projectJob: job.id, sheet: sheetId }),
-        { row_id: rowId, col_key: colKey, title, desired_end_date: endDate || null },
-        {
-            preserveScroll: true,
-            onSuccess: (page) => {
-                jobLinkModal.value.open = false;
-                // 最新のセルデータでローカル状態を更新
-                const updatedSheets = page.props.progressSheets || [];
-                localSheets.value = updatedSheets.map((s) => ({
-                    ...s,
-                    cells: (s.cells || []).map((c) => ({ ...c })),
-                }));
-            },
-        }
-    );
+    if (job.client?.id) params.client_id = job.client.id;
+    try {
+        router.visit(route('events.create_job', params));
+    } catch {
+        window.location.href = route('events.create_job', params);
+    }
 }
 
 function openJobLinkDetail({ assignmentId, assignmentTitle, endDate, completed }) {

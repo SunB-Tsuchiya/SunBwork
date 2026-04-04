@@ -19,12 +19,16 @@
                     <button class="rounded bg-blue-600 px-3 py-2 text-white" @click.prevent="search">検索</button>
                     <button class="ml-2 rounded border px-3 py-2" @click.prevent="clearSearch">クリア</button>
                 </div>
-                <div>
+                <div class="flex items-center gap-2">
                     <Link
                         :href="typeof route === 'function' ? route('user.project_jobs.assignments.create') : '/project_jobs/assignments/create-user'"
-                        class="rounded bg-blue-600 px-4 py-2 text-white"
-                        >新規ジョブ作成</Link
+                        class="rounded bg-indigo-600 px-4 py-2 text-sm text-white"
+                        >ジョブ作成（独自）</Link
                     >
+                    <button
+                        @click="openJobSheetModal"
+                        class="rounded bg-purple-600 px-4 py-2 text-sm text-white"
+                    >ジョブ作成（進行表から）</button>
                 </div>
             </div>
 
@@ -95,8 +99,10 @@
                                 @click.prevent="rowClick(m, $event)"
                                 role="button"
                             >
-                                <td class="break-words whitespace-pre-line border px-3 py-2 text-sm text-gray-600">{{ getDateDisplay(m) }}</td>
-                                <td class="break-words border px-3 py-2 text-sm">{{ m.title || '-' }}</td>
+                                <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ getDateDisplay(m) }}</td>
+                                <td class="break-words border px-3 py-2 text-sm">
+                                    <span v-if="m.source_assignment_id" class="mr-1 inline-flex items-center rounded-full bg-orange-100 px-1.5 py-0.5 text-xs font-medium text-orange-700">↩続き</span>{{ m.title || '-' }}
+                                </td>
                                 <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ getClientName(m) }}</td>
                                 <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ getProjectJobTitle(m) }}</td>
                             </tr>
@@ -116,6 +122,48 @@
                 <Link :href="getBackLink()" class="rounded bg-gray-200 px-4 py-2">戻る</Link>
             </div>
         </div>
+
+        <!-- 進行表から案件選択モーダル -->
+        <Teleport to="body">
+            <div v-if="showJobSheetModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="showJobSheetModal = false">
+                <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+                    <h2 class="mb-4 text-lg font-bold">案件を選択（進行表から）</h2>
+
+                    <div v-if="jobSheetLoading" class="py-8 text-center text-sm text-gray-500">読み込み中…</div>
+                    <div v-else>
+                        <!-- クライアント選択 -->
+                        <div class="mb-3">
+                            <label class="mb-1 block text-sm font-medium text-gray-700">クライアント</label>
+                            <select v-model="jsSelectedClientId" @change="jsSelectedProjectId = ''" class="w-full rounded border border-gray-300 px-3 py-2 text-sm">
+                                <option value="">— 選択してください —</option>
+                                <option v-for="c in jsClients" :key="c.id" :value="String(c.id)">{{ c.name }}</option>
+                            </select>
+                        </div>
+
+                        <!-- 案件選択（クライアント選択後） -->
+                        <div v-if="jsSelectedClientId" class="mb-3">
+                            <label class="mb-1 block text-sm font-medium text-gray-700">案件</label>
+                            <select v-model="jsSelectedProjectId" class="w-full rounded border border-gray-300 px-3 py-2 text-sm">
+                                <option value="">— 選択してください —</option>
+                                <option v-for="p in jsFilteredProjects" :key="p.id" :value="String(p.id)">{{ p.title || p.name }}</option>
+                            </select>
+                        </div>
+
+                        <!-- 案件選択後のアクション -->
+                        <div v-if="jsSelectedProjectId" class="mt-4 flex justify-end gap-2">
+                            <button
+                                @click="goToProjectShow"
+                                class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                            >詳細を見る（進行表へ）</button>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 flex justify-end">
+                        <button @click="showJobSheetModal = false" class="rounded border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">閉じる</button>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
     </AppLayout>
 </template>
 
@@ -124,6 +172,56 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
+
+// ─── 進行表から案件選択モーダル ───────────────────────────────────────────
+const showJobSheetModal = ref(false);
+const jobSheetLoading = ref(false);
+const jsClients = ref([]);
+const jsProjects = ref([]);
+const jsSelectedClientId = ref('');
+const jsSelectedProjectId = ref('');
+
+const jsFilteredProjects = computed(() => {
+    if (!jsSelectedClientId.value) return [];
+    return jsProjects.value.filter((p) => String(p.client_id) === String(jsSelectedClientId.value));
+});
+
+async function openJobSheetModal() {
+    jsSelectedClientId.value = '';
+    jsSelectedProjectId.value = '';
+    showJobSheetModal.value = true;
+
+    if (jsClients.value.length === 0) {
+        jobSheetLoading.value = true;
+        try {
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            const res = await fetch(route('user.project_jobs.json'), {
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': csrf, Accept: 'application/json' },
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.clients?.length) jsClients.value = data.clients;
+                if (data.projects?.length) jsProjects.value = data.projects;
+            }
+        } catch (e) {
+            // ignore
+        } finally {
+            jobSheetLoading.value = false;
+        }
+    }
+}
+
+function goToProjectShow() {
+    if (!jsSelectedProjectId.value) return;
+    showJobSheetModal.value = false;
+    try {
+        router.visit(route('user.project_jobs.show', { projectJob: jsSelectedProjectId.value }));
+    } catch {
+        window.location.href = route('user.project_jobs.show', { projectJob: jsSelectedProjectId.value });
+    }
+}
+// ──────────────────────────────────────────────────────────────────────────
 
 const props = defineProps({ projectJob: Object, messages: Object, myAssignments: Object });
 const page = usePage();

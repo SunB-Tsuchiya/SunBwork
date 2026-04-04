@@ -98,6 +98,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::get('/user/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('user.dashboard');
 
     // 案件確認（ユーザー向け案件一覧・詳細）
+    Route::get('/user/project-jobs/json', [App\Http\Controllers\User\ProjectJobController::class, 'projectsJson'])->name('user.project_jobs.json');
     Route::get('/user/project-jobs', [App\Http\Controllers\User\ProjectJobController::class, 'index'])->name('user.project_jobs.index');
     Route::get('/user/project-jobs/{projectJob}', [App\Http\Controllers\User\ProjectJobController::class, 'show'])->name('user.project_jobs.show');
 
@@ -126,6 +127,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::get('/myjobbox', [\App\Http\Controllers\User\MyProjectJobController::class, 'index'])->name('user.myjobbox.index');
     Route::get('/myjobbox/past-data', [\App\Http\Controllers\User\MyProjectJobController::class, 'pastData'])->name('user.myjobbox.past_data');
     Route::post('/myjobbox/assignments/{assignment}/complete', [\App\Http\Controllers\User\MyProjectJobController::class, 'completeAssignment'])->name('myjobbox.assignments.complete');
+    Route::get('/myjobbox/assignments/{assignment}/chain', [\App\Http\Controllers\User\MyProjectJobController::class, 'chainAssignments'])->name('user.myjobbox.assignments.chain');
     Route::get('/myjobbox/{assignment}', [\App\Http\Controllers\User\MyProjectJobController::class, 'showAssignment'])->name('user.myjobbox.show');
     Route::delete('/myjobbox/{assignment}', [\App\Http\Controllers\User\MyProjectJobController::class, 'destroyAssignment'])->name('user.myjobbox.destroy');
 
@@ -595,6 +597,10 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         // ── セル一括更新 ──────────────────────────────────────────
         Route::put('progress-sheets/{sheet}/cells', [App\Http\Controllers\Coordinator\ProgressCellController::class, 'bulkUpdate'])->name('progress_sheets.cells.update');
         Route::post('progress-sheets/{sheet}/cells/link-job', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'linkJob'])->name('progress_sheets.cells.link_job');
+
+        // ── アサインメント完了管理（管理者用）─────────────────────
+        Route::post('progress-sheets/assignments/{assignment}/complete', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'completeAssignment'])->name('coordinator.progress_sheets.assignments.complete');
+        Route::post('progress-sheets/assignments/{assignment}/uncomplete', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'uncompleteAssignment'])->name('coordinator.progress_sheets.assignments.uncomplete');
     });
 
 

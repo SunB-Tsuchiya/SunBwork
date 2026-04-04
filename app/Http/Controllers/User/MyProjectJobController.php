@@ -113,11 +113,11 @@ class MyProjectJobController extends Controller
         }
         try {
             // completed カラムが存在する場合のみセット（カラム不存在時の SQL エラーを防ぐ）
-            if (\Illuminate\Support\Facades\Schema::hasColumn('project_job_assignment_by_myself', 'completed')) {
+            if (\Illuminate\Support\Facades\Schema::hasColumn('project_job_assignments', 'completed')) {
                 $assignment->completed = true;
             }
             // status_id を 完了 ステータスに更新
-            if (\Illuminate\Support\Facades\Schema::hasColumn('project_job_assignment_by_myself', 'status_id')) {
+            if (\Illuminate\Support\Facades\Schema::hasColumn('project_job_assignments', 'status_id')) {
                 try {
                     $status = \Illuminate\Support\Facades\DB::table('statuses')
                         ->where('key', 'completed')
@@ -135,10 +135,65 @@ class MyProjectJobController extends Controller
                 } catch (\Throwable $__e) {}
             }
             $assignment->save();
+
+            // チェーン上のすべての元ジョブ（祖先）も完了にする
+            $current = $assignment;
+            $maxDepth = 20;
+            for ($i = 0; $i < $maxDepth; $i++) {
+                if (empty($current->source_assignment_id)) break;
+                $parent = \App\Models\ProjectJobAssignment::find($current->source_assignment_id);
+                if (!$parent) break;
+                if (!$parent->completed) {
+                    $parent->completed = true;
+                    $parent->save();
+                }
+                $current = $parent;
+            }
         } catch (\Throwable $__e) {
             return response()->json(['error' => $__e->getMessage()], 500);
         }
         return response()->json(['success' => true, 'assignment_id' => $assignment->id]);
+    }
+
+    /**
+     * 続きジョブのチェーン全体を返す（root から末端まで）
+     */
+    public function chainAssignments(Request $request, \App\Models\ProjectJobAssignment $assignment)
+    {
+        $user = $request->user();
+        if (!$user || $assignment->user_id !== $user->id) {
+            return response()->json(['error' => 'Access denied'], 403);
+        }
+
+        // 先祖をたどってルートを探す
+        $root = $assignment;
+        $maxDepth = 20;
+        for ($i = 0; $i < $maxDepth; $i++) {
+            if (empty($root->source_assignment_id)) break;
+            $parent = \App\Models\ProjectJobAssignment::find($root->source_assignment_id);
+            if (!$parent) break;
+            $root = $parent;
+        }
+
+        // ルートから全子孫を収集（BFS）
+        $allIds = collect([$root->id]);
+        $toProcess = collect([$root->id]);
+        for ($i = 0; $i < $maxDepth && $toProcess->isNotEmpty(); $i++) {
+            $children = \App\Models\ProjectJobAssignment::whereIn('source_assignment_id', $toProcess->toArray())
+                ->pluck('id');
+            $children->each(fn($id) => $allIds->push($id));
+            $toProcess = $children;
+        }
+
+        $chain = \App\Models\ProjectJobAssignment::whereIn('id', $allIds->unique()->toArray())
+            ->select(['id', 'title', 'created_at', 'completed', 'desired_end_date', 'source_assignment_id'])
+            ->orderBy('created_at')
+            ->get();
+
+        return response()->json([
+            'chain' => $chain,
+            'current_id' => $assignment->id,
+        ]);
     }
 
     /**

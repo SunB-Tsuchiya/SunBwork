@@ -98,6 +98,7 @@
                 :row-id="row.id"
                 :can-edit="canEdit && !editMode"
                 :job-link-only="jobLinkOnly"
+                :auth-user-id="authUserId"
                 :users="users"
                 :stages="stages"
                 :sizes="sizes"
@@ -106,6 +107,7 @@
                 @update="emit('cell-update', $event)"
                 @job-link-open="emit('job-link-open', $event)"
                 @job-link-detail="emit('job-link-detail', $event)"
+                @complete-assignment="emit('complete-assignment', $event)"
               />
             </template>
           </tr>
@@ -131,9 +133,10 @@ const props = defineProps({
   canEdit: { type: Boolean, default: false },
   editMode: { type: Boolean, default: false },
   jobLinkOnly: { type: Boolean, default: false },
+  authUserId: { type: [Number, String, null], default: null },
 });
 
-const emit = defineEmits(['cell-update', 'edit-row', 'delete-row', 'job-link-open', 'job-link-detail']);
+const emit = defineEmits(['cell-update', 'edit-row', 'delete-row', 'job-link-open', 'job-link-detail', 'complete-assignment']);
 
 // ── 折りたたみ状態 ──────────────────────────────────────────
 const collapsedGroups = reactive(new Set());

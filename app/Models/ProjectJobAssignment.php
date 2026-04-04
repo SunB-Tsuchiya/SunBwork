@@ -38,6 +38,7 @@ class ProjectJobAssignment extends Model
         'read_at',
         'scheduled',
         'scheduled_at',
+        'source_assignment_id',
     ];
 
     protected $casts = [
@@ -55,6 +56,7 @@ class ProjectJobAssignment extends Model
         'sender_id' => 'integer',
         'scheduled' => 'boolean',
         'scheduled_at' => 'datetime',
+        'source_assignment_id' => 'integer',
     ];
 
     protected $dates = [
@@ -82,6 +84,18 @@ class ProjectJobAssignment extends Model
     public function sender()
     {
         return $this->belongsTo(User::class, 'sender_id');
+    }
+
+    // 元ジョブ（続き元）
+    public function sourceAssignment()
+    {
+        return $this->belongsTo(self::class, 'source_assignment_id');
+    }
+
+    // このジョブを続きとして登録した後続ジョブ一覧
+    public function continuations()
+    {
+        return $this->hasMany(self::class, 'source_assignment_id');
     }
 
     public function projectJob()

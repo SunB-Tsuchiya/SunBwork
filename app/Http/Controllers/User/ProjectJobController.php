@@ -17,6 +17,41 @@ use Inertia\Inertia;
 
 class ProjectJobController extends Controller
 {
+    /**
+     * Return JSON list of clients and projects accessible to the current user.
+     * Used by the calendar modal for "ジョブ作成（進行表から）".
+     */
+    public function projectsJson(Request $request)
+    {
+        $user = $request->user();
+
+        $jobIds = ProjectJobAssignment::where(function ($q) use ($user) {
+            $q->where('user_id', $user->id)->orWhere('sender_id', $user->id);
+        })->pluck('project_job_id')->unique();
+
+        $jobs = ProjectJob::whereIn('id', $jobIds)
+            ->with('client')
+            ->get(['id', 'title', 'client_id']);
+
+        $clientsMap = [];
+        foreach ($jobs as $job) {
+            if ($job->client) {
+                $clientsMap[$job->client->id] = ['id' => $job->client->id, 'name' => $job->client->name ?? '-'];
+            }
+        }
+
+        $projects = $jobs->map(fn($j) => [
+            'id'        => $j->id,
+            'title'     => $j->title ?? $j->name ?? '-',
+            'client_id' => $j->client_id,
+        ])->values();
+
+        return response()->json([
+            'clients'  => array_values($clientsMap),
+            'projects' => $projects,
+        ]);
+    }
+
     public function index(Request $request)
     {
         $user       = $request->user();

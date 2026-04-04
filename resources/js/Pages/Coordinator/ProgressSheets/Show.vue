@@ -204,11 +204,13 @@
           :work-item-types="props.workItemTypes"
           :can-edit="canEdit"
           :edit-mode="false"
+          :auth-user-id="authUserId"
           @cell-update="onCellUpdate"
           @edit-row="onEditRow"
           @delete-row="deleteRow"
           @job-link-open="openJobLinkModal"
           @job-link-detail="openJobLinkDetail"
+          @complete-assignment="onCompleteAssignmentFromCell"
         />
       </div>
 
@@ -293,9 +295,23 @@
           <div><dt class="text-xs font-medium text-gray-500">タイトル</dt><dd class="text-gray-800">{{ jobLinkDetailModal.title }}</dd></div>
           <div v-if="jobLinkDetailModal.assigneeName"><dt class="text-xs font-medium text-gray-500">担当者</dt><dd class="text-gray-800">{{ jobLinkDetailModal.assigneeName }}</dd></div>
           <div v-if="jobLinkDetailModal.endDate"><dt class="text-xs font-medium text-gray-500">期限</dt><dd class="text-gray-800">{{ jobLinkDetailModal.endDate }}</dd></div>
-          <div><dt class="text-xs font-medium text-gray-500">状態</dt><dd><span :class="jobLinkDetailModal.completed ? 'text-yellow-700' : 'text-blue-700'">{{ jobLinkDetailModal.completed ? '完了' : '未完了' }}</span></dd></div>
+          <div><dt class="text-xs font-medium text-gray-500">状態</dt><dd><span :class="jobLinkDetailModal.completed ? 'text-yellow-700 font-semibold' : 'text-blue-700'">{{ jobLinkDetailModal.completed ? '✓ 完了' : '未完了' }}</span></dd></div>
         </dl>
-        <div class="mt-5 flex justify-end">
+        <div class="mt-5 flex flex-wrap justify-end gap-2">
+          <button
+            v-if="canEdit && jobLinkDetailModal.assignmentId && !jobLinkDetailModal.completed"
+            type="button"
+            class="rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+            :disabled="jobLinkDetailModal.completing"
+            @click="adminCompleteAssignment"
+          >{{ jobLinkDetailModal.completing ? '処理中…' : '完了にする' }}</button>
+          <button
+            v-if="canEdit && jobLinkDetailModal.assignmentId && jobLinkDetailModal.completed"
+            type="button"
+            class="rounded bg-orange-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-orange-600 disabled:opacity-60"
+            :disabled="jobLinkDetailModal.completing"
+            @click="adminUncompleteAssignment"
+          >{{ jobLinkDetailModal.completing ? '処理中…' : '未完了に戻す' }}</button>
           <button
             type="button"
             class="rounded border border-gray-300 px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
@@ -376,7 +392,7 @@ const importText = ref('');
 // ── ジョブリンク ──────────────────────────────────────
 const jobLinkModal = ref({ open: false, isSelfAssign: true, rowId: null, colKey: null });
 const jobLinkForm = ref({ title: '', detail: '', desiredEndDate: '', assigneeUserId: null });
-const jobLinkDetailModal = ref({ open: false, title: '', assigneeName: '', endDate: '', completed: false });
+const jobLinkDetailModal = ref({ open: false, title: '', assigneeName: '', endDate: '', completed: false, assignmentId: null, completing: false });
 
 /** 列ツリーをたどってキーまでのラベルパスを返す */
 function findBreadcrumb(nodes, key, path = []) {
@@ -524,7 +540,8 @@ function openJobLinkModal({ rowId, colKey }) {
     // 自己割当（MyJob）→ events/create-job へ遷移
     router.visit(route('events.create_job', params));
   } else {
-    // 他者割当（ジョブ依頼）→ Coordinator割当作成ページへ遷移
+    // 他者割当（ジョブ依頼）→ Coordinator割当作成ページへ遷移（担当者IDも渡す）
+    if (assigneeId) params.user_id = assigneeId;
     router.visit(route('coordinator.project_jobs.assignments.create', { projectJob: props.projectJob.id, ...params }));
   }
 }
@@ -554,7 +571,7 @@ function submitJobLink() {
   );
 }
 
-function openJobLinkDetail({ assignmentTitle, assigneeUserId, endDate, completed }) {
+function openJobLinkDetail({ assignmentId, assignmentTitle, assigneeUserId, endDate, completed }) {
   const assignee = props.users.find((u) => u.id === assigneeUserId);
   jobLinkDetailModal.value = {
     open: true,
@@ -562,7 +579,61 @@ function openJobLinkDetail({ assignmentTitle, assigneeUserId, endDate, completed
     assigneeName: assignee?.name ?? null,
     endDate: endDate ?? null,
     completed: !!completed,
+    assignmentId: assignmentId ?? null,
+    completing: false,
   };
+}
+
+// ── 管理者・担当者による完了管理 ──────────────────────────────────────────
+
+function updateLocalCellCompleted(assignmentId, completedValue) {
+  const idx = localCells.value.findIndex((c) => c.assignment_id === assignmentId);
+  if (idx >= 0) {
+    localCells.value.splice(idx, 1, { ...localCells.value[idx], assignment_completed: completedValue });
+  }
+}
+
+async function callAssignmentApi(url) {
+  const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+  const res = await fetch(url, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+async function adminCompleteAssignment() {
+  const id = jobLinkDetailModal.value.assignmentId;
+  if (!id) return;
+  jobLinkDetailModal.value.completing = true;
+  try {
+    await callAssignmentApi(route('coordinator.progress_sheets.assignments.complete', { assignment: id }));
+    jobLinkDetailModal.value.completed = true;
+    updateLocalCellCompleted(id, true);
+  } catch { /* ignore */ }
+  finally { jobLinkDetailModal.value.completing = false; }
+}
+
+async function adminUncompleteAssignment() {
+  const id = jobLinkDetailModal.value.assignmentId;
+  if (!id) return;
+  jobLinkDetailModal.value.completing = true;
+  try {
+    await callAssignmentApi(route('coordinator.progress_sheets.assignments.uncomplete', { assignment: id }));
+    jobLinkDetailModal.value.completed = false;
+    updateLocalCellCompleted(id, false);
+  } catch { /* ignore */ }
+  finally { jobLinkDetailModal.value.completing = false; }
+}
+
+async function onCompleteAssignmentFromCell({ assignmentId }) {
+  if (!assignmentId) return;
+  try {
+    await callAssignmentApi(route('coordinator.progress_sheets.assignments.complete', { assignment: assignmentId }));
+    updateLocalCellCompleted(assignmentId, true);
+  } catch { /* ignore */ }
 }
 
 // ローカルコピー
