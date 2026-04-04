@@ -163,13 +163,22 @@
     </div>
 
     <!-- 列追加ボタン -->
-    <button
-      type="button"
-      class="mt-1 flex w-full items-center justify-center rounded border border-dashed border-gray-300 py-1.5 text-sm text-gray-500 hover:border-indigo-400 hover:text-indigo-500"
-      @click="addLeaf"
-    >
-      ＋ 列を追加
-    </button>
+    <div class="mt-1 flex gap-2">
+      <button
+        type="button"
+        class="flex-1 flex items-center justify-center rounded border border-dashed border-gray-300 py-1.5 text-sm text-gray-500 hover:border-indigo-400 hover:text-indigo-500"
+        @click="addRow"
+      >
+        ＋ 行を追加
+      </button>
+      <button
+        type="button"
+        class="flex-1 flex items-center justify-center rounded border border-dashed border-gray-300 py-1.5 text-sm text-gray-500 hover:border-indigo-400 hover:text-indigo-500"
+        @click="addLeaf"
+      >
+        ＋ 列を追加
+      </button>
+    </div>
   </div>
 </template>
 
@@ -255,6 +264,11 @@ function newLeaf(label = '新しい列') {
 }
 
 function addLeaf() {
+  props.nodes.push(newLeaf());
+  emit('change', props.nodes);
+}
+
+function addRow() {
   props.nodes.push(newLeaf());
   emit('change', props.nodes);
 }
