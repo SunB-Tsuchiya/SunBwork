@@ -3,10 +3,9 @@
         <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
             <div class="mb-4 flex items-center justify-between">
                 <h1 class="text-2xl font-bold">ジョブ作成（独自）</h1>
-                <button
-                    @click="openModal"
-                    class="rounded border border-gray-300 bg-gray-50 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
-                >過去データから流用</button>
+                <button @click="openModal" class="rounded border border-gray-300 bg-gray-50 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100">
+                    過去データから流用
+                </button>
             </div>
             <div>
                 <AssignmentFormUser
@@ -40,17 +39,24 @@
                                 @click="hideCompleted = !hideCompleted"
                                 :class="hideCompleted ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'"
                                 class="rounded px-3 py-1 text-sm font-medium transition-colors"
-                            >{{ hideCompleted ? '完了を非表示中' : '完了を表示しない' }}</button>
+                            >
+                                {{ hideCompleted ? '完了を非表示中' : '完了を表示しない' }}
+                            </button>
                         </div>
                         <!-- 検索モード -->
-                        <div class="mb-4 flex gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1 w-fit">
+                        <div class="mb-4 flex w-fit gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1">
                             <button
-                                v-for="m in [{ key: 'date', label: '日付から検索' }, { key: 'project', label: '案件から検索' }]"
+                                v-for="m in [
+                                    { key: 'date', label: '日付から検索' },
+                                    { key: 'project', label: '案件から検索' },
+                                ]"
                                 :key="m.key"
                                 @click="modalMode = m.key"
-                                :class="modalMode === m.key ? 'bg-white text-blue-700 font-semibold shadow-sm' : 'text-gray-600 hover:text-gray-900'"
+                                :class="modalMode === m.key ? 'bg-white font-semibold text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'"
                                 class="rounded px-4 py-1.5 text-sm transition-all"
-                            >{{ m.label }}</button>
+                            >
+                                {{ m.label }}
+                            </button>
                         </div>
                         <!-- 日付モード -->
                         <div v-if="modalMode === 'date'" class="mb-4">
@@ -62,14 +68,14 @@
                         <div v-else class="mb-4 flex flex-wrap gap-3">
                             <div>
                                 <label class="mb-1 block text-xs text-gray-600">クライアント</label>
-                                <select v-model="selectedClientId" class="rounded border border-gray-300 px-3 py-1.5 text-sm min-w-[12rem]">
+                                <select v-model="selectedClientId" class="min-w-[12rem] rounded border border-gray-300 px-3 py-1.5 text-sm">
                                     <option value="">すべて</option>
                                     <option v-for="c in modalClients" :key="c.id" :value="String(c.id)">{{ c.name }}</option>
                                 </select>
                             </div>
                             <div v-if="selectedClientId">
                                 <label class="mb-1 block text-xs text-gray-600">案件</label>
-                                <select v-model="selectedProjectId" class="rounded border border-gray-300 px-3 py-1.5 text-sm min-w-[12rem]">
+                                <select v-model="selectedProjectId" class="min-w-[12rem] rounded border border-gray-300 px-3 py-1.5 text-sm">
                                     <option value="">すべて</option>
                                     <option v-for="p in modalProjects" :key="p.id" :value="String(p.id)">{{ p.title }}</option>
                                 </select>
@@ -103,7 +109,9 @@
                                         <td class="max-w-[8rem] truncate px-3 py-2">{{ rec.project_job_name ?? '-' }}</td>
                                         <td class="max-w-[10rem] truncate px-3 py-2">{{ rec.title ?? '-' }}</td>
                                         <td class="px-3 py-2">{{ rec.work_item_type ?? '-' }}</td>
-                                        <td class="whitespace-nowrap px-3 py-2">{{ rec.estimated_hours != null ? rec.estimated_hours + 'h' : '-' }}</td>
+                                        <td class="whitespace-nowrap px-3 py-2">
+                                            {{ rec.estimated_hours != null ? rec.estimated_hours + 'h' : '-' }}
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -115,7 +123,11 @@
 
         <!-- 続き確認モーダル -->
         <Teleport to="body">
-            <div v-if="showContinueModal" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50" @click.self="showContinueModal = false">
+            <div
+                v-if="showContinueModal"
+                class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50"
+                @click.self="showContinueModal = false"
+            >
                 <div class="mx-4 w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
                     <h2 class="mb-2 text-lg font-semibold text-gray-800">引用方法を選択</h2>
                     <p class="mb-1 text-sm text-gray-600">
@@ -140,7 +152,9 @@
                         <button
                             @click="showContinueModal = false"
                             class="w-full rounded border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
-                        >キャンセル</button>
+                        >
+                            キャンセル
+                        </button>
                     </div>
                 </div>
             </div>
@@ -212,7 +226,7 @@ function buildParams() {
 async function fetchData() {
     modalLoading.value = true;
     try {
-        const url = '/myjobbox/past-data?' + buildParams();
+        const url = route('user.myjobbox.past_data') + '?' + buildParams();
         const res = await fetch(url, {
             credentials: 'same-origin',
             headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
@@ -252,22 +266,24 @@ function selectRecord(rec) {
 function applyContinuation() {
     const rec = pendingRecord.value;
     if (!rec) return;
-    formAssignments.value = [{
-        project_job_id: rec.project_job_id,
-        _client_id: rec.client_id ?? '',
-        title_suffix: rec.title ?? '',
-        detail: rec.detail ?? '',
-        work_item_type_id: rec.work_item_type_id ?? null,
-        size_id: rec.size_id ?? null,
-        stage_id: rec.stage_id ?? null,
-        difficulty_id: rec.difficulty_id ?? null,
-        desired_end_date: rec.desired_end_date ?? '',
-        desired_time: rec.desired_time ?? null,
-        estimated_hours: rec.estimated_hours ?? null,
-        amounts: null,
-        status_id: null,
-        source_assignment_id: rec.id,
-    }];
+    formAssignments.value = [
+        {
+            project_job_id: rec.project_job_id,
+            _client_id: rec.client_id ?? '',
+            title_suffix: rec.title ?? '',
+            detail: rec.detail ?? '',
+            work_item_type_id: rec.work_item_type_id ?? null,
+            size_id: rec.size_id ?? null,
+            stage_id: rec.stage_id ?? null,
+            difficulty_id: rec.difficulty_id ?? null,
+            desired_end_date: rec.desired_end_date ?? '',
+            desired_time: rec.desired_time ?? null,
+            estimated_hours: rec.estimated_hours ?? null,
+            amounts: null,
+            status_id: null,
+            source_assignment_id: rec.id,
+        },
+    ];
     formKey.value += 1;
     showContinueModal.value = false;
     pendingRecord.value = null;
@@ -276,21 +292,23 @@ function applyContinuation() {
 function applyAsNew() {
     const rec = pendingRecord.value;
     if (!rec) return;
-    formAssignments.value = [{
-        project_job_id: rec.project_job_id,
-        _client_id: rec.client_id ?? '',
-        title_suffix: rec.title ?? '',
-        detail: rec.detail ?? '',
-        work_item_type_id: rec.work_item_type_id ?? null,
-        size_id: rec.size_id ?? null,
-        stage_id: rec.stage_id ?? null,
-        difficulty_id: rec.difficulty_id ?? null,
-        desired_end_date: rec.desired_end_date ?? '',
-        desired_time: rec.desired_time ?? null,
-        estimated_hours: rec.estimated_hours ?? null,
-        amounts: null,
-        status_id: null,
-    }];
+    formAssignments.value = [
+        {
+            project_job_id: rec.project_job_id,
+            _client_id: rec.client_id ?? '',
+            title_suffix: rec.title ?? '',
+            detail: rec.detail ?? '',
+            work_item_type_id: rec.work_item_type_id ?? null,
+            size_id: rec.size_id ?? null,
+            stage_id: rec.stage_id ?? null,
+            difficulty_id: rec.difficulty_id ?? null,
+            desired_end_date: rec.desired_end_date ?? '',
+            desired_time: rec.desired_time ?? null,
+            estimated_hours: rec.estimated_hours ?? null,
+            amounts: null,
+            status_id: null,
+        },
+    ];
     formKey.value += 1;
     showContinueModal.value = false;
     pendingRecord.value = null;
@@ -298,4 +316,3 @@ function applyAsNew() {
 </script>
 
 <style scoped></style>
-
