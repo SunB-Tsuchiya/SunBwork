@@ -97,6 +97,7 @@
                 :col-def="leaf"
                 :row-id="row.id"
                 :can-edit="canEdit && !editMode"
+                :job-link-only="jobLinkOnly"
                 :users="users"
                 :stages="stages"
                 :sizes="sizes"
@@ -129,6 +130,7 @@ const props = defineProps({
   workItemTypes: { type: Array, default: () => [] },
   canEdit: { type: Boolean, default: false },
   editMode: { type: Boolean, default: false },
+  jobLinkOnly: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['cell-update', 'edit-row', 'delete-row', 'job-link-open', 'job-link-detail']);

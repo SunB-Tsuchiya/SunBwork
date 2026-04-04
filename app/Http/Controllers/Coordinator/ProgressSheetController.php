@@ -78,7 +78,7 @@ class ProgressSheetController extends Controller
         $sheet->load(['projectJob.client', 'projectJob.size', 'projectJob.user', 'projectJob.coordinators']);
         $projectJob = $sheet->projectJob;
 
-        $canEdit = $this->canEdit($request->user(), $projectJob);
+        $canEdit = $this->canEdit($request->user(), $projectJob, $sheet);
 
         $rows = $sheet->rows()->get(['id', 'label', 'order']);
 
@@ -154,7 +154,7 @@ class ProgressSheetController extends Controller
      */
     public function update(Request $request, ProgressSheet $sheet)
     {
-        $this->authorizeJobAccess($request->user(), $sheet->projectJob);
+        $this->authorizeJobAccess($request->user(), $sheet->projectJob, $sheet);
 
         $validated = $request->validate([
             'name'          => 'sometimes|required|string|max:255',
@@ -171,7 +171,7 @@ class ProgressSheetController extends Controller
      */
     public function destroy(Request $request, ProgressSheet $sheet)
     {
-        $this->authorizeJobAccess($request->user(), $sheet->projectJob);
+        $this->authorizeJobAccess($request->user(), $sheet->projectJob, $sheet);
 
         $projectJobId = $sheet->project_job_id;
         $sheet->delete();
@@ -185,7 +185,7 @@ class ProgressSheetController extends Controller
      */
     public function registerAsTemplate(Request $request, ProgressSheet $sheet)
     {
-        $this->authorizeJobAccess($request->user(), $sheet->projectJob);
+        $this->authorizeJobAccess($request->user(), $sheet->projectJob, $sheet);
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -207,7 +207,7 @@ class ProgressSheetController extends Controller
     public function linkJob(Request $request, ProgressSheet $sheet)
     {
         $user = $request->user();
-        $this->authorizeJobAccess($user, $sheet->projectJob);
+        $this->authorizeJobAccess($user, $sheet->projectJob, $sheet);
 
         $validated = $request->validate([
             'row_id'           => 'required|integer',
@@ -245,21 +245,23 @@ class ProgressSheetController extends Controller
 
     // ───── helpers ─────
 
-    private function authorizeJobAccess(User $user, ProjectJob $projectJob): void
+    private function authorizeJobAccess(User $user, ProjectJob $projectJob, ?ProgressSheet $sheet = null): void
     {
-        $isOwner = $projectJob->user_id === $user->id;
-        $isSub   = $projectJob->coordinators()->where('users.id', $user->id)->exists();
-        $isAdmin = in_array($user->user_role, ['admin', 'superadmin']);
+        $isOwner   = $projectJob->user_id === $user->id;
+        $isSub     = $projectJob->coordinators()->where('users.id', $user->id)->exists();
+        $isAdmin   = in_array($user->user_role, ['admin', 'superadmin']);
+        $isCreator = $sheet && $sheet->created_by === $user->id;
 
-        abort_unless($isOwner || $isSub || $isAdmin, 403);
+        abort_unless($isOwner || $isSub || $isAdmin || $isCreator, 403);
     }
 
-    private function canEdit(User $user, ProjectJob $projectJob): bool
+    private function canEdit(User $user, ProjectJob $projectJob, ?ProgressSheet $sheet = null): bool
     {
-        $isOwner = $projectJob->user_id === $user->id;
-        $isSub   = $projectJob->coordinators()->where('users.id', $user->id)->exists();
-        $isAdmin = in_array($user->user_role, ['admin', 'superadmin']);
+        $isOwner   = $projectJob->user_id === $user->id;
+        $isSub     = $projectJob->coordinators()->where('users.id', $user->id)->exists();
+        $isAdmin   = in_array($user->user_role, ['admin', 'superadmin']);
+        $isCreator = $sheet && $sheet->created_by === $user->id;
 
-        return $isOwner || $isSub || $isAdmin;
+        return $isOwner || $isSub || $isAdmin || $isCreator;
     }
 }

@@ -73,6 +73,17 @@
       <!-- ── 編集モード：行管理 + 列ツリー ──────────────── -->
       <div v-if="editMode && canEdit" class="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
 
+        <!-- シート名編集 -->
+        <div class="col-span-1 lg:col-span-2">
+          <label class="block text-sm font-medium text-gray-700">シート名</label>
+          <input
+            v-model="localSheetName"
+            type="text"
+            class="mt-1 w-full max-w-sm rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-indigo-400 focus:outline-none"
+            placeholder="シート名"
+          />
+        </div>
+
         <!-- 左：行管理（台割） -->
         <div>
           <h3 class="mb-2 font-semibold text-gray-700">行管理（台割）</h3>
@@ -354,7 +365,9 @@ const props = defineProps({
 
 const authUserId = computed(() => usePage().props.auth?.user?.id ?? null);
 
-const editMode = ref(false);
+// 列が未定義の場合は自動で編集モードを開く
+const editMode = ref(props.canEdit && (props.sheet.column_config?.length ?? 0) === 0);
+const localSheetName = ref(props.sheet.name ?? '');
 const showRegisterModal = ref(false);
 const registerTemplateName = ref('');
 const newRowLabel = ref('');
@@ -572,7 +585,7 @@ function onColumnChange(updated) {
 function saveColumnConfig() {
   router.put(
     route('coordinator.progress_sheets.update', { sheet: props.sheet.id }),
-    { column_config: localColumnConfig.value },
+    { name: localSheetName.value, column_config: localColumnConfig.value },
     {
       preserveScroll: true,
       onSuccess: () => { editMode.value = false; },

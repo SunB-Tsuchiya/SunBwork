@@ -19,6 +19,11 @@ return new class extends Migration
             return;
         }
 
+        // 旧テーブルが存在しない場合はスキップ（既に統合済み or ローカル環境で未作成）
+        if (! Schema::hasTable('project_job_assignment_by_myself')) {
+            return;
+        }
+
         // 1. project_job_assignments に scheduled_at を追加（未存在の場合）
         if (! Schema::hasColumn('project_job_assignments', 'scheduled_at')) {
             Schema::table('project_job_assignments', function (Blueprint $table) {

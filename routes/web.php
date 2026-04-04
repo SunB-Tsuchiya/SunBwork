@@ -97,6 +97,10 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
     Route::get('/user/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('user.dashboard');
 
+    // 案件確認（ユーザー向け案件一覧・詳細）
+    Route::get('/user/project-jobs', [App\Http\Controllers\User\ProjectJobController::class, 'index'])->name('user.project_jobs.index');
+    Route::get('/user/project-jobs/{projectJob}', [App\Http\Controllers\User\ProjectJobController::class, 'show'])->name('user.project_jobs.show');
+
     // ユーザー設定
     Route::get('/user/settings',      [App\Http\Controllers\User\UserSettingController::class, 'index'])->name('user.settings.index');
     Route::get('/user/settings/edit', [App\Http\Controllers\User\UserSettingController::class, 'edit'])->name('user.settings.edit');
@@ -195,6 +199,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::get('project_jobs/{projectJob}/jobbox', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'index'])->name('user.project_jobs.jobbox.index');
     Route::get('project_jobs/{projectJob}/jobbox/{message}', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'show'])->name('user.project_jobs.jobbox.show');
     Route::post('project_jobs/{projectJob}/jobbox/reply', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'reply'])->name('user.project_jobs.jobbox.reply');
+    // User progress sheet cell link (MyJob登録)
+    Route::post('/user/project-jobs/{projectJob}/progress-sheets/{sheet}/link-job', [App\Http\Controllers\User\ProjectJobController::class, 'linkProgressCell'])->name('user.project_jobs.progress_sheets.link_job');
     // User self-assignment routes
     Route::post('project_jobs/{projectJob}/assignments/user', [App\Http\Controllers\User\ProjectJobAssignmentController::class, 'store'])->name('user.project_jobs.assignments.store');
     Route::patch('project_jobs/{projectJob}/assignments/{assignment}/user', [App\Http\Controllers\User\ProjectJobAssignmentController::class, 'update'])->name('user.project_jobs.assignments.update');

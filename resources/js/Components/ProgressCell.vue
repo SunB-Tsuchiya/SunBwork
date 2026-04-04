@@ -80,7 +80,7 @@
 
   <!-- ジョブリンク型 -->
   <td v-else-if="colDef.type === 'joblink'" class="border border-gray-200 px-2 py-1 text-center align-middle min-w-[80px]">
-    <template v-if="canEdit">
+    <template v-if="canEdit || jobLinkOnly">
       <button
         v-if="!cell.assignment_id"
         type="button"
@@ -211,6 +211,10 @@ const props = defineProps({
     required: true,
   },
   canEdit: {
+    type: Boolean,
+    default: false,
+  },
+  jobLinkOnly: {
     type: Boolean,
     default: false,
   },

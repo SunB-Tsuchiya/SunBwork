@@ -15,6 +15,9 @@ const tab = (key) => [
 <template>
     <div class="mb-6">
         <nav class="flex flex-wrap gap-2" aria-label="Tabs">
+            <Link :href="route('user.project_jobs.index')" :class="tab('project_jobs')">
+                案件確認
+            </Link>
             <Link :href="route('user.myjobbox.index')" :class="tab('myjob')">
                 マイジョブ
             </Link>
