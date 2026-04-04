@@ -127,8 +127,10 @@
           </details>
 
           <!-- 行一覧（ツリー表示） -->
-          <div class="space-y-1">
-            <template v-for="(row, idx) in topLevelRows" :key="row.id">
+          <div class="overflow-x-auto rounded border border-gray-200">
+            <div class="flex gap-2 p-2">
+              <template v-for="(row, idx) in topLevelRows" :key="row.id">
+                <div class="flex-shrink-0 w-96">
 
               <!-- グループ親行 -->
               <div v-if="childrenOf[row.id]?.length > 0">
@@ -190,9 +192,11 @@
                 </div>
               </div>
 
-            </template>
+                </div>
+              </template>
+            </div>
+            </div>
             <div v-if="topLevelRows.length === 0" class="py-2 text-center text-sm text-gray-400">行がありません</div>
-          </div>
 
           <!-- 並び替え保存ボタン -->
           <button

@@ -43,11 +43,13 @@
             進行管理表の<span class="font-medium text-gray-600">縦軸（行）</span>となる台割の項目を設定します。
             グループで見出し行を作り、その下に子行を追加できます。
           </p>
-          <div class="space-y-1">
-            <div
-              v-for="(row, idx) in form.row_config"
-              :key="row.key"
-            >
+          <div class="overflow-x-auto rounded border border-gray-200">
+            <div class="flex gap-2 p-2">
+              <div
+                v-for="(row, idx) in form.row_config"
+                :key="row.key"
+                class="flex-shrink-0 w-96"
+              >
               <!-- 親行ヘッダー -->
               <div
                 class="flex items-center gap-2 rounded border px-3 py-2"
@@ -141,10 +143,11 @@
                 </div>
               </div>
             </div>
+            </div>
           </div>
           <button
             type="button"
-            class="mt-2 flex w-full items-center justify-center rounded border border-dashed border-gray-300 py-1.5 text-sm text-gray-500 hover:border-indigo-400 hover:text-indigo-500"
+            class="flex-shrink-0 w-96 flex items-center justify-center mt-2 rounded border border-dashed border-gray-300 py-1.5 text-sm text-gray-500 hover:border-indigo-400 hover:text-indigo-500"
             @click="addRow"
           >
             ＋ 行を追加
