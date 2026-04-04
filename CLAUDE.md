@@ -644,6 +644,81 @@ headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' }
 
 ---
 
+## ProgressSheet（進行管理表）実装ルール（2026-04-03 追加）
+
+**関連ファイル:**
+- `app/Http/Controllers/Coordinator/ProgressSheetController.php`
+- `resources/js/Pages/Coordinator/ProgressSheets/Show.vue`
+- `resources/js/Components/ProgressTable.vue`
+- `resources/js/Components/ProgressCell.vue`
+- `resources/js/Pages/User/ProjectJobs/Show.vue`（User向け閲覧）
+
+### canEdit 権限チェック
+
+`canEdit()` は以下のいずれかで true:
+- 案件オーナー（`project_jobs.user_id === auth user`）
+- サブコーディネーター（`project_job_coordinators` ピボット登録）
+- Admin/SuperAdmin
+- **シート作成者（`progress_sheets.created_by === auth user`）** ← テンプレート参照で作成された場合もこれが必要
+
+```php
+private function canEdit(User $user, ProjectJob $projectJob, ?ProgressSheet $sheet = null): bool
+{
+    $isOwner   = $projectJob->user_id === $user->id;
+    $isSub     = $projectJob->coordinators()->where('users.id', $user->id)->exists();
+    $isAdmin   = in_array($user->user_role, ['admin', 'superadmin']);
+    $isCreator = $sheet && $sheet->created_by === $user->id;
+    return $isOwner || $isSub || $isAdmin || $isCreator;
+}
+```
+
+`show()` / `update()` / `destroy()` / `registerAsTemplate()` / `linkJob()` 全てに `$sheet` を渡すこと。
+
+### jobLinkOnly パターン（User向け読み取り専用 + ジョブリンク操作のみ）
+
+`canEdit=false` かつ `jobLinkOnly=true` の組み合わせ:
+- `ProgressCell`: チェックボックス・日付・ユーザー・テキスト等は全て読み取り表示
+- `ProgressCell`: joblink セルのみ `canEdit || jobLinkOnly` で登録・詳細ボタンを表示
+- `ProgressTable`: `jobLinkOnly` prop を受け取り各 `ProgressCell` に渡す
+
+### User 案件確認タブ（2026-04-03 実装）
+
+- タブ: `UserNavigationTabs.vue` に「案件確認」を最左端に追加
+- ルート: `GET /user/project-jobs` → `user.project_jobs.index` / `GET /user/project-jobs/{id}` → `user.project_jobs.show`
+- コントローラ: `app/Http/Controllers/User/ProjectJobController.php`
+  - `index()`: `project_job_assignments` で `user_id` or `sender_id` が自分の案件を一覧
+  - `show()`: 詳細表示 + `progressSheets`（行・セル付き）を props で渡す
+  - `linkProgressCell()`: 自己割当 ProjectJobAssignment 作成 + ProgressCell 紐付けを1トランザクションで実行
+
+### User側 MyJob 登録フロー（進行表から）
+
+1. User が `Show.vue` で進行表の joblink セルの「＋ 登録」をクリック
+2. インラインモーダルでタイトル（行ラベルで事前入力）・期日を入力
+3. `POST user/project-jobs/{job}/progress-sheets/{sheet}/link-job` → `user.project_jobs.progress_sheets.link_job`
+4. サーバ側: `ProjectJobAssignment::create(sender_id=user_id)` + `ProgressCell::updateOrCreate(assignment_id=...)`
+5. Inertia `back()` で `progressSheets` prop が更新される → `localSheets` を watch で同期
+6. セルが「詳細」ボタンに切り替わり、クリックで `user.myjobbox.show` へ遷移
+
+**`localSheets` の作り方（reactive proxy 回避）:**
+```js
+const localSheets = ref(
+  (page.props.progressSheets || []).map((s) => ({
+    ...s,
+    cells: (s.cells || []).map((c) => ({ ...c })),
+  }))
+);
+watch(() => page.props.progressSheets, (fresh) => {
+  if (fresh) localSheets.value = fresh.map((s) => ({ ...s, cells: (s.cells || []).map((c) => ({ ...c })) }));
+});
+```
+
+### シート名編集（editMode 時）
+
+`Show.vue` でシート名を `editMode` 中に編集可能。`saveColumnConfig()` に `name` を含めて PUT する。
+`column_config` が空の場合は自動的に `editMode = true` で開く。
+
+---
+
 ## project_jobs テーブルの注意事項（さくら本番）⚠️
 
 - **`schedule` カラムはさくら本番に存在しない**（ローカル開発 DB にのみ存在）
