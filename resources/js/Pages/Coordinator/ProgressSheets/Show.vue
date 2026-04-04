@@ -855,35 +855,57 @@ function addChildToAllGroups() {
     return;
   }
 
-  // 各行に子要素を追加（グループ化されていない場合は自動的にグループ化）
-  const promises = allRows.map(row => {
+  // 順次処理で各行に子要素を追加
+  let index = 0;
+
+  function processNext() {
+    if (index >= allRows.length) {
+      // すべて完了したらページをリロード
+      router.reload({ preserveScroll: true });
+      bulkChildLabel.value = '';
+      return;
+    }
+
+    const row = allRows[index];
     const hasChildren = childrenOf.value[row.id]?.length > 0;
+
+    index++;
 
     if (hasChildren) {
       // 既にグループ化されている場合：子要素を追加
-      return router.post(
+      router.post(
         route('coordinator.progress_sheets.rows.store', { sheet: props.sheet.id }),
         { label, parent_id: row.id },
-        { preserveScroll: true }
+        {
+          preserveScroll: true,
+          onSuccess: processNext,
+          onError: (errors) => {
+            console.error('子要素追加エラー:', errors);
+            alert(`「${row.label}」への子要素追加に失敗しました。`);
+            processNext();
+          }
+        }
       );
     } else {
       // グループ化されていない場合：まずグループ化してから子要素を追加
-      return router.post(
+      router.post(
         route('coordinator.progress_sheets.rows.make_group', { sheet: props.sheet.id, row: row.id }),
         { child_label: label },
-        { preserveScroll: true }
+        {
+          preserveScroll: true,
+          onSuccess: processNext,
+          onError: (errors) => {
+            console.error('グループ化エラー:', errors);
+            alert(`「${row.label}」のグループ化に失敗しました。`);
+            processNext();
+          }
+        }
       );
     }
-  });
+  }
 
-  // すべてのリクエストが完了したらページを同期
-  Promise.all(promises).then(() => {
-    router.reload({ preserveScroll: true });
-    bulkChildLabel.value = '';
-  }).catch(error => {
-    console.error('一括子要素追加エラー:', error);
-    alert('一部の追加に失敗しました。ページをリロードしてください。');
-  });
+  // 最初の処理を開始
+  processNext();
 }
 
 /** top-levelの行グループ（親+子）をフラット配列から取り出す */
