@@ -219,6 +219,79 @@ class ProjectJobController extends Controller
             ]);
         }
 
+        // 進行表リンク済みで jobHistory に未登録の割当を合成エントリとして追加
+        $sheetLinkedAssignmentIds = [];
+        try {
+            $sheetLinkedAssignmentIds = DB::table('progress_cells')
+                ->join('progress_rows', 'progress_rows.id', '=', 'progress_cells.row_id')
+                ->join('progress_sheets', 'progress_sheets.id', '=', 'progress_rows.sheet_id')
+                ->where('progress_sheets.project_job_id', $projectJob->id)
+                ->whereNotNull('progress_cells.assignment_id')
+                ->pluck('progress_cells.assignment_id')
+                ->unique()
+                ->map(fn ($id) => (int) $id)
+                ->toArray();
+
+            if (!empty($sheetLinkedAssignmentIds)) {
+                $existingAids = collect(
+                    $jobHistory instanceof \Illuminate\Support\Collection ? $jobHistory->toArray() : (array) $jobHistory
+                )->map(fn ($m) => (int) ($m['project_job_assignment_id'] ?? $m['project_job_assignment']['id'] ?? 0))
+                 ->filter()->unique()->toArray();
+
+                $missingIds = array_values(array_diff($sheetLinkedAssignmentIds, $existingAids));
+
+                if (!empty($missingIds)) {
+                    $missings = ProjectJobAssignment::whereIn('id', $missingIds)
+                        ->where('project_job_id', $projectJob->id)
+                        ->with(['user', 'statusModel'])
+                        ->get();
+
+                    $synths = $missings->map(function ($a) {
+                        $sm = $a->statusModel;
+                        return [
+                            'id'                        => null,
+                            'project_job_assignment_id' => $a->id,
+                            'subject'                   => $a->title,
+                            'body'                      => null,
+                            'created_at'                => $a->created_at,
+                            'read_at'                   => $a->read_at,
+                            'sender'                    => $a->user
+                                ? ['id' => $a->user->id, 'name' => $a->user->name]
+                                : null,
+                            'message'                   => null,
+                            'project_job_assignment'    => [
+                                'id'               => $a->id,
+                                'title'            => $a->title,
+                                'user_id'          => $a->user_id,
+                                'desired_end_date' => $a->desired_end_date?->format('Y-m-d'),
+                                'start_time'       => $a->start_time,
+                                'completed'        => (bool) $a->completed,
+                                'scheduled'        => (bool) ($a->scheduled ?? false),
+                                'scheduled_at'     => $a->scheduled_at,
+                                'read_at'          => $a->read_at,
+                                'status'           => $sm
+                                    ? ['id' => $sm->id, 'key' => $sm->key ?? $sm->slug ?? null, 'name' => $sm->name]
+                                    : null,
+                                'user'             => $a->user
+                                    ? ['id' => $a->user->id, 'name' => $a->user->name]
+                                    : null,
+                            ],
+                        ];
+                    })->toArray();
+
+                    $base = $jobHistory instanceof \Illuminate\Support\Collection
+                        ? $jobHistory->toArray()
+                        : (array) $jobHistory;
+                    $jobHistory = array_merge($base, $synths);
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Failed to add sheet-linked synthetic jobHistory entries', [
+                'error'          => $e->getMessage(),
+                'project_job_id' => $projectJob->id,
+            ]);
+        }
+
         $subCoordinators = $projectJob->coordinators->map(fn ($c) => ['id' => $c->id, 'name' => $c->name]);
 
         // 進行表（名前一覧のみ。詳細は user.progress_sheets.show で取得）

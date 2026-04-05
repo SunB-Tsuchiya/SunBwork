@@ -306,6 +306,66 @@ class ProjectJobController extends Controller
             $sheetLinkedAssignmentIds = [];
         }
 
+        // 進行表リンク済みで jobHistory に未登録の割当を合成エントリとして追加
+        // （進行表から登録された自己割当は job_assignment_messages を経由しないため jobHistory に出ない）
+        try {
+            $existingAids = collect(
+                $jobHistory instanceof \Illuminate\Support\Collection ? $jobHistory->toArray() : (array) $jobHistory
+            )->map(fn ($m) => (int) ($m['project_job_assignment_id'] ?? $m['project_job_assignment']['id'] ?? 0))
+             ->filter()->unique()->toArray();
+
+            $missingIds = array_values(array_diff(
+                array_map('intval', $sheetLinkedAssignmentIds),
+                $existingAids
+            ));
+
+            if (!empty($missingIds)) {
+                $missings = \App\Models\ProjectJobAssignment::whereIn('id', $missingIds)
+                    ->with(['user', 'statusModel'])
+                    ->get();
+
+                $synths = $missings->map(function ($a) {
+                    $sm = $a->statusModel;
+                    return [
+                        'id'                        => null,
+                        'project_job_assignment_id' => $a->id,
+                        'subject'                   => $a->title,
+                        'body'                      => null,
+                        'created_at'                => $a->created_at,
+                        'read_at'                   => $a->read_at,
+                        'sender'                    => $a->user
+                            ? ['id' => $a->user->id, 'name' => $a->user->name]
+                            : null,
+                        'message'                   => null,
+                        'project_job_assignment'    => [
+                            'id'               => $a->id,
+                            'title'            => $a->title,
+                            'user_id'          => $a->user_id,
+                            'desired_end_date' => $a->desired_end_date?->format('Y-m-d'),
+                            'start_time'       => $a->start_time,
+                            'completed'        => (bool) $a->completed,
+                            'scheduled'        => (bool) ($a->scheduled ?? false),
+                            'scheduled_at'     => $a->scheduled_at,
+                            'read_at'          => $a->read_at,
+                            'status'           => $sm
+                                ? ['id' => $sm->id, 'key' => $sm->key ?? $sm->slug ?? null, 'name' => $sm->name]
+                                : null,
+                            'user'             => $a->user
+                                ? ['id' => $a->user->id, 'name' => $a->user->name]
+                                : null,
+                        ],
+                    ];
+                })->toArray();
+
+                $base = $jobHistory instanceof \Illuminate\Support\Collection
+                    ? $jobHistory->toArray()
+                    : (array) $jobHistory;
+                $jobHistory = array_merge($base, $synths);
+            }
+        } catch (\Throwable $_) {
+            // non-fatal
+        }
+
         // テンプレート一覧（シート作成モーダル用）
         $userId = $request->user()->id;
         $sheetTemplates = \App\Models\ProgressTemplate::where('is_shared', true)

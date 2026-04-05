@@ -187,7 +187,6 @@
                                                 <col style="width: 100px">
                                                 <col style="width: 140px">
                                                 <col>
-                                                <col style="width: 56px">
                                                 <col style="width: 88px">
                                             </colgroup>
                                             <thead>
@@ -196,7 +195,6 @@
                                                     <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">受信者</th>
                                                     <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">締め切り</th>
                                                     <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">タイトル</th>
-                                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">既読</th>
                                                     <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">ステータス</th>
                                                 </tr>
                                             </thead>
@@ -212,10 +210,6 @@
                                                     <td class="break-words border px-3 py-2 text-sm text-gray-700">{{ historyGetRecipients(m) }}</td>
                                                     <td class="break-words whitespace-pre-line border px-3 py-2 text-sm text-gray-600">{{ historyGetDeadline(m) }}</td>
                                                     <td class="break-words border px-3 py-2 text-sm">{{ m.subject || (m.body && m.body.slice(0, 60)) }}</td>
-                                                    <td class="border px-3 py-2">
-                                                        <span v-if="historyIsUnread(m)" class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">未読</span>
-                                                        <span v-else class="text-xs text-gray-500">既読</span>
-                                                    </td>
                                                     <td class="border px-3 py-2">
                                                         <span :class="statusBadgeClass(historyGetStatus(m))" class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">{{ historyGetStatus(m) }}</span>
                                                     </td>
@@ -256,7 +250,6 @@
                                                 <col style="width: 100px">
                                                 <col style="width: 140px">
                                                 <col>
-                                                <col style="width: 56px">
                                                 <col style="width: 88px">
                                             </colgroup>
                                             <thead>
@@ -265,7 +258,6 @@
                                                     <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">受信者</th>
                                                     <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">締め切り</th>
                                                     <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">タイトル</th>
-                                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">既読</th>
                                                     <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">ステータス</th>
                                                 </tr>
                                             </thead>
@@ -281,10 +273,6 @@
                                                     <td class="break-words border px-3 py-2 text-sm text-gray-700">{{ historyGetRecipients(m) }}</td>
                                                     <td class="break-words whitespace-pre-line border px-3 py-2 text-sm text-gray-600">{{ historyGetDeadline(m) }}</td>
                                                     <td class="break-words border px-3 py-2 text-sm">{{ m.subject || (m.body && m.body.slice(0, 60)) }}</td>
-                                                    <td class="border px-3 py-2">
-                                                        <span v-if="historyIsUnread(m)" class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">未読</span>
-                                                        <span v-else class="text-xs text-gray-500">既読</span>
-                                                    </td>
                                                     <td class="border px-3 py-2">
                                                         <span :class="statusBadgeClass(historyGetStatus(m))" class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">{{ historyGetStatus(m) }}</span>
                                                     </td>
@@ -509,7 +497,7 @@ function createSheet() {
 }
 // ── ジョブ履歴 ────────────────────────────────────────────────────────────
 
-const hideHistoryCompleted = ref(true);
+const hideHistoryCompleted = ref(false);
 
 function historyGetDateKey(m) {
     return (

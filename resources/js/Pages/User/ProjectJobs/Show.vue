@@ -149,8 +149,6 @@
                                     <!-- 締め切り -->
                                     <col />
                                     <!-- タイトル -->
-                                    <col style="width: 56px" />
-                                    <!-- 既読 -->
                                     <col style="width: 88px" />
                                     <!-- ステータス -->
                                 </colgroup>
@@ -160,7 +158,6 @@
                                         <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">受信者</th>
                                         <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">締め切り</th>
                                         <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">タイトル</th>
-                                        <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">既読</th>
                                         <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">ステータス</th>
                                     </tr>
                                 </thead>
@@ -178,14 +175,6 @@
                                             {{ historyGetDeadline(m) }}
                                         </td>
                                         <td class="break-words border px-3 py-2 text-sm">{{ m.subject || (m.body && m.body.slice(0, 60)) }}</td>
-                                        <td class="border px-3 py-2">
-                                            <span
-                                                v-if="historyIsUnread(m)"
-                                                class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800"
-                                                >未読</span
-                                            >
-                                            <span v-else class="text-xs text-gray-500">既読</span>
-                                        </td>
                                         <td class="border px-3 py-2">
                                             <span
                                                 :class="statusBadgeClass(historyGetStatus(m))"
@@ -265,7 +254,7 @@ function truncate(text, len) {
 
 // ── ジョブ履歴 ────────────────────────────────────────────────────────────
 
-const hideHistoryCompleted = ref(true);
+const hideHistoryCompleted = ref(false);
 
 function historyGetDateKey(m) {
     return m.project_job_assignment?.desired_end_date || (m.created_at ? String(m.created_at).split('T')[0] : null) || '';
