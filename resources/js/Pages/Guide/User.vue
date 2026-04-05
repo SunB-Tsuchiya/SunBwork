@@ -37,7 +37,8 @@ import { Link } from '@inertiajs/vue3';
                     <li><a href="#calendar" class="hover:underline">5. 予定表にスケジュールを組む</a></li>
                     <li><a href="#diary" class="hover:underline">6. 日報を書く</a></li>
                     <li><a href="#other" class="hover:underline">7. その他の機能</a></li>
-                    <li><a href="#settings" class="hover:underline">8. 設定（勤務形態）</a></li>
+                    <li><a href="#project-jobs" class="hover:underline">8. 案件確認・進行管理表</a></li>
+                    <li><a href="#settings" class="hover:underline">9. 設定（勤務形態）</a></li>
                 </ol>
             </div>
 
@@ -60,6 +61,7 @@ import { Link } from '@inertiajs/vue3';
                             { name: '依頼されたジョブ', desc: 'コーディネーターから割り当てられたジョブの一覧' },
                             { name: '日報一覧', desc: '作成した日報の履歴' },
                             { name: '予定表', desc: 'カレンダー形式の予定表' },
+                            { name: '案件確認', desc: '自分が関係する案件と進行管理表を確認' },
                             { name: '設定', desc: '勤務形態・表示設定' },
                         ]" :key="tab.name" class="flex items-center gap-4 px-4 py-3">
                             <span class="w-36 rounded-md bg-blue-50 px-2 py-1 text-center text-sm font-medium text-blue-700">{{ tab.name }}</span>
@@ -234,10 +236,51 @@ import { Link } from '@inertiajs/vue3';
                 </div>
             </div>
 
-            <!-- 8. 設定 -->
-            <div id="settings" class="scroll-mt-16 rounded-xl bg-white p-6 shadow-sm">
+            <!-- 8. 案件確認・進行管理表 -->
+            <div id="project-jobs" class="scroll-mt-16 rounded-xl bg-white p-6 shadow-sm">
                 <h2 class="mb-4 flex items-center gap-2 text-xl font-bold text-gray-800">
                     <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-sm text-blue-600 font-bold">8</span>
+                    案件確認・進行管理表
+                </h2>
+                <p class="mb-4 text-gray-600">
+                    <strong class="text-blue-600">「案件確認」タブ</strong>では、自分が関係する案件と進行管理表を閲覧できます。
+                </p>
+                <div class="mb-5 flex gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4">
+                    <span class="text-2xl">📋</span>
+                    <div>
+                        <div class="mb-1 font-semibold text-blue-700">進行管理表でジョブを自分で登録できます</div>
+                        <p class="text-sm text-blue-600">
+                            Coordinator が作成した進行管理表を開くと、工程セルの「＋ 登録」ボタンから作業を <strong>MyJob（マイジョブ）</strong> として登録できます。
+                            登録後は「マイジョブ」ページから管理できます。
+                        </p>
+                    </div>
+                </div>
+                <h3 class="mb-3 font-semibold text-gray-700">進行管理表の使い方</h3>
+                <div class="mb-4 overflow-hidden rounded-xl border border-gray-100">
+                    <div v-for="step in [
+                        { num: '①', action: '案件確認タブを開く', desc: '自分が関係する案件の一覧が表示されます' },
+                        { num: '②', action: '案件名をクリックして「開く」', desc: '案件詳細ページ内の「進行管理表」セクションから開きます' },
+                        { num: '③', action: '担当セルを確認', desc: '🔒マーク付きの担当者欄に自分の名前があれば担当行です' },
+                        { num: '④', action: '「＋ 登録」でMyJobを作る', desc: '工程セルのボタンを押してタイトル・期限を確認して登録します' },
+                        { num: '⑤', action: 'マイジョブで完了にする', desc: '作業が終わったらマイジョブページで「完了」を押します' },
+                    ]" :key="step.num" class="flex items-start gap-4 border-b border-gray-50 px-4 py-3 last:border-0">
+                        <span class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">{{ step.num }}</span>
+                        <div>
+                            <div class="text-sm font-semibold text-gray-700">{{ step.action }}</div>
+                            <div class="text-xs text-gray-500">{{ step.desc }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="rounded-lg border border-yellow-100 bg-yellow-50 p-4 text-sm text-yellow-700">
+                    <strong>✓ 完了にすると：</strong>
+                    進行管理表のセルが「✓ 完了」（黄色）に自動更新されます。Coordinator がリアルタイムで進捗を確認できます。
+                </div>
+            </div>
+
+            <!-- 9. 設定 -->
+            <div id="settings" class="scroll-mt-16 rounded-xl bg-white p-6 shadow-sm">
+                <h2 class="mb-4 flex items-center gap-2 text-xl font-bold text-gray-800">
+                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-sm text-blue-600 font-bold">9</span>
                     設定（勤務形態）
                 </h2>
                 <p class="text-gray-600">

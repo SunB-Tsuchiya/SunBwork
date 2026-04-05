@@ -39,6 +39,7 @@ import { Link } from '@inertiajs/vue3';
                     <li><a href="#workrecord" class="hover:underline">7. 勤務時間管理</a></li>
                     <li><a href="#dispatch" class="hover:underline">8. 派遣管理</a></li>
                     <li><a href="#permissions" class="hover:underline">9. Leader 権限管理</a></li>
+                    <li><a href="#project-jobs" class="hover:underline">10. 案件総覧・進行管理表</a></li>
                 </ol>
             </div>
 
@@ -66,6 +67,7 @@ import { Link } from '@inertiajs/vue3';
                             { name: '作業項目設定', cond: '権限あり', desc: '作業種別・サイズ・ステージの設定' },
                             { name: '勤務時間管理', cond: '権限あり', desc: '部署の勤務記録の確認・管理' },
                             { name: '派遣管理', cond: '権限あり', desc: '派遣・業務委託メンバーの情報管理' },
+                            { name: '案件総覧', cond: '権限あり', desc: '自部署の案件を一覧・詳細確認（読み取り専用）' },
                             { name: 'Leader権限管理', cond: '全リーダー', desc: '他リーダーへの権限付与・変更' },
                         ]" :key="tab.name" class="flex items-center gap-4 px-4 py-3">
                             <span class="w-36 rounded-md bg-orange-50 px-2 py-1 text-center text-sm font-medium text-orange-700">{{ tab.name }}</span>
@@ -272,6 +274,37 @@ import { Link } from '@inertiajs/vue3';
                         <span class="w-36 rounded-md bg-orange-50 px-2 py-1 text-center text-sm font-medium text-orange-700">{{ p.flag }}</span>
                         <span class="text-sm text-gray-600">{{ p.desc }}</span>
                     </div>
+                </div>
+            </div>
+
+            <!-- 10. 案件総覧・進行管理表 -->
+            <div id="project-jobs" class="scroll-mt-16 rounded-xl bg-white p-6 shadow-sm">
+                <h2 class="mb-1 flex items-center gap-2 text-xl font-bold text-gray-800">
+                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-100 text-sm text-orange-600 font-bold">10</span>
+                    案件総覧・進行管理表
+                </h2>
+                <div class="mb-4 text-xs text-orange-500 font-medium">※ 部署リーダー権限（案件総覧）がある場合に表示</div>
+                <p class="mb-4 text-gray-600">
+                    <strong class="text-orange-600">「案件総覧」タブ</strong>では、自部署に関係するすべての案件を閲覧できます（読み取り専用）。<br />
+                    案件の担当 Coordinator・メンバー・ステータスを月別グループで確認できます。
+                </p>
+                <div class="mb-4 grid gap-3 sm:grid-cols-2">
+                    <div v-for="item in [
+                        { icon: '📋', title: '案件一覧を見る', desc: '月別グループで自部署の全案件を一覧表示。担当Co・完了状態を確認できます' },
+                        { icon: '🔍', title: '案件詳細を確認', desc: '担当Coordinator・サブCo・チームメンバーを詳細ページで確認できます' },
+                    ]" :key="item.title" class="rounded-xl border border-gray-100 p-4">
+                        <div class="mb-2 text-xl">{{ item.icon }}</div>
+                        <div class="mb-1 text-sm font-semibold text-gray-700">{{ item.title }}</div>
+                        <p class="text-xs text-gray-500">{{ item.desc }}</p>
+                    </div>
+                </div>
+                <div class="rounded-lg border border-amber-100 bg-amber-50 p-4 text-sm text-amber-700">
+                    <strong>📊 進行管理表について：</strong>
+                    <span class="mt-1 block">
+                        現在、Leader の案件詳細ページに進行管理表は表示されません。<br />
+                        進行管理表の詳細は担当 Coordinator に確認するか、担当ユーザーの「案件確認」タブから閲覧できます。<br />
+                        Leader 自身がメンバーとして案件に関わっている場合は、「案件確認」タブで直接進行管理表を確認できます。
+                    </span>
                 </div>
             </div>
 
