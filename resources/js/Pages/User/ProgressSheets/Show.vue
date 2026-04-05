@@ -175,11 +175,34 @@ function backToJob() {
     }
 }
 
+// ── ジョブタイトル構築ヘルパー ────────────────────────────────────
+
+function findBreadcrumb(nodes, key, path = []) {
+    for (const node of nodes) {
+        const currentPath = [...path, node.label];
+        if (node.key === key) return currentPath;
+        if (node.children?.length) {
+            const found = findBreadcrumb(node.children, key, currentPath);
+            if (found) return found;
+        }
+    }
+    return null;
+}
+
+function buildJobTitle(rowId, colKey) {
+    const row = localRows.value.find((r) => r.id === rowId);
+    const parentRow = row?.parent_id ? localRows.value.find((r) => r.id === row.parent_id) : null;
+    const breadcrumb = findBreadcrumb(localColumnConfig.value, colKey);
+    const parentPath = breadcrumb ? breadcrumb.slice(0, -1) : [];
+    const rowPart = [parentRow?.label, row?.label].filter(Boolean).join('ー');
+    const colPart = parentPath.filter(Boolean).join('ー');
+    return [rowPart, colPart].filter(Boolean).join('_');
+}
+
 // ── ジョブリンク「＋ 登録」 ───────────────────────────────────────
 
 function openJobLink({ rowId, colKey }) {
-    const row = localRows.value.find((r) => r.id === rowId);
-    const title = row?.label ?? '';
+    const title = buildJobTitle(rowId, colKey);
     const params = {
         title,
         project_job_id: props.projectJob.id,

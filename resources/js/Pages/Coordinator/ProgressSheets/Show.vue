@@ -597,12 +597,15 @@ function findAncestorGroupId(colKey, type, masterList) {
   return null;
 }
 
-/** ジョブタイトルを自動構築：「行の項目名ー大見出しー中見出し」 */
+/** ジョブタイトルを自動構築：「親行ラベルー縦軸ラベル_横軸中見出しー列ラベル」 */
 function buildJobTitle(rowId, colKey) {
   const row = localRows.value.find((r) => r.id === rowId);
+  const parentRow = row?.parent_id ? localRows.value.find((r) => r.id === row.parent_id) : null;
   const breadcrumb = findBreadcrumb(localColumnConfig.value, colKey); // [top, ..., leaf]
   const parentPath = breadcrumb ? breadcrumb.slice(0, -1) : []; // leafを除く親グループパス
-  return [row?.label, ...parentPath].filter(Boolean).join('ー');
+  const rowPart = [parentRow?.label, row?.label].filter(Boolean).join('ー');
+  const colPart = parentPath.filter(Boolean).join('ー');
+  return [rowPart, colPart].filter(Boolean).join('_');
 }
 
 function onAssigneeChange() {
