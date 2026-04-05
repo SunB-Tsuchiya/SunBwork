@@ -42,7 +42,7 @@
                     :rows="localRows"
                     :column-config="localColumnConfig"
                     :cells="localCells"
-                    :users="[]"
+                    :users="props.users"
                     :stages="[]"
                     :sizes="[]"
                     :assignments="[]"
@@ -123,6 +123,7 @@ import { route } from 'ziggy-js';
 const props = defineProps({
     sheet: Object,
     projectJob: Object,
+    users: { type: Array, default: () => [] },
 });
 
 const page = usePage();

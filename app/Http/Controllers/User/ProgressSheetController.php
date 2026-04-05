@@ -54,6 +54,13 @@ class ProgressSheetController extends Controller
                 'assignment_end_date'  => $c->assignment?->desired_end_date?->format('Y-m-d'),
             ]);
 
+        // ユーザー名解決用（案件メンバー + Coordinator + オーナー）
+        $memberIds = $projectJob->teamMembers()->pluck('user_id')->toArray();
+        $coIds     = $projectJob->coordinators->pluck('id')->toArray();
+        $ownerId   = $projectJob->user_id;
+        $userIds   = array_unique(array_merge($memberIds, $coIds, [$ownerId]));
+        $users     = User::whereIn('id', $userIds)->orderBy('name')->get(['id', 'name']);
+
         return Inertia::render('User/ProgressSheets/Show', [
             'sheet'      => [
                 'id'            => $sheet->id,
@@ -62,6 +69,7 @@ class ProgressSheetController extends Controller
                 'rows'          => $rows,
                 'cells'         => $cells,
             ],
+            'users'      => $users,
             'projectJob' => [
                 'id'          => $projectJob->id,
                 'title'       => $projectJob->title ?? $projectJob->name ?? '-',
