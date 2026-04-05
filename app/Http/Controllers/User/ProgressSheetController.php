@@ -19,12 +19,21 @@ class ProgressSheetController extends Controller
      */
     public function show(Request $request, ProgressSheet $sheet)
     {
-        $sheet->load(['projectJob.client', 'projectJob.coordinators']);
+        $user = $request->user();
+        $sheet->load(['projectJob.client', 'projectJob.size', 'projectJob.coordinators']);
         $projectJob = $sheet->projectJob;
 
-        $this->authorizeView($request->user(), $projectJob);
+        // アクセス確認：自分が割り当てられている案件のみ
+        $hasAccess = \App\Models\ProjectJobAssignment::where('project_job_id', $projectJob->id)
+            ->where(function ($q) use ($user) {
+                $q->where('user_id', $user->id)->orWhere('sender_id', $user->id);
+            })->exists();
 
-        $rows = $sheet->rows()->get(['id', 'label', 'order']);
+        if (!$hasAccess) {
+            abort(403);
+        }
+
+        $rows = $sheet->rows()->orderBy('order')->get(['id', 'label', 'order', 'parent_id']);
 
         $cells = ProgressCell::whereIn('row_id', $rows->pluck('id'))
             ->with(['valueUser:id,name', 'assignment:id,title,detail,desired_end_date,completed,user_id,sender_id'])
@@ -49,18 +58,17 @@ class ProgressSheetController extends Controller
             'sheet'      => [
                 'id'            => $sheet->id,
                 'name'          => $sheet->name,
-                'column_config' => $sheet->column_config,
+                'column_config' => $sheet->column_config ?? [],
+                'rows'          => $rows,
+                'cells'         => $cells,
             ],
-            'rows'       => $rows,
-            'cells'      => $cells,
             'projectJob' => [
                 'id'          => $projectJob->id,
-                'title'       => $projectJob->title,
-                'client_name' => $projectJob->client?->name,
-            ],
-            'authUser'   => [
-                'id'   => $request->user()->id,
-                'name' => $request->user()->name,
+                'title'       => $projectJob->title ?? $projectJob->name ?? '-',
+                'client_id'   => $projectJob->client_id ?? null,
+                'client_name' => $projectJob->client?->name ?? null,
+                'size_name'   => $projectJob->size?->name ?? null,
+                'page_count'  => $projectJob->page_count ?? null,
             ],
         ]);
     }

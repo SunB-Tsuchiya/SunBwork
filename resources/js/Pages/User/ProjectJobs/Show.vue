@@ -98,34 +98,24 @@
                     <p v-else class="text-sm text-gray-400">メンバー未登録</p>
                 </section>
 
-                <!-- ── 進行表セクション ──────────────────────── -->
-                <section v-if="localSheets.length > 0" class="py-5">
-                    <h3 class="mb-4 font-semibold text-gray-800">進行管理表</h3>
-
-                    <div v-for="sheet in localSheets" :key="sheet.id" class="mb-6">
-                        <h4 class="mb-2 text-sm font-medium text-gray-700">{{ sheet.name }}</h4>
-
-                        <div v-if="!sheet.column_config || sheet.column_config.length === 0" class="text-sm text-gray-400">
-                            列が定義されていません。
+                <!-- ── 進行管理表セクション ──────────────────────── -->
+                <section v-if="progressSheets.length > 0" class="py-5">
+                    <h3 class="mb-3 font-semibold text-gray-800">進行管理表</h3>
+                    <div class="flex flex-col gap-2">
+                        <div
+                            v-for="sheet in progressSheets"
+                            :key="sheet.id"
+                            class="flex items-center justify-between rounded border border-gray-200 bg-gray-50 px-4 py-2.5"
+                        >
+                            <span class="text-sm font-medium text-gray-800">{{ sheet.name }}</span>
+                            <button
+                                type="button"
+                                class="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700"
+                                @click="openSheet(sheet)"
+                            >
+                                開く
+                            </button>
                         </div>
-                        <ProgressTable
-                            v-else
-                            :rows="sheet.rows"
-                            :column-config="sheet.column_config"
-                            :cells="sheet.cells"
-                            :users="[]"
-                            :stages="[]"
-                            :sizes="[]"
-                            :assignments="[]"
-                            :work-item-types="[]"
-                            :can-edit="false"
-                            :edit-mode="false"
-                            :job-link-only="true"
-                            :auth-user-id="page.props.auth?.user?.id ?? null"
-                            @job-link-open="openJobLink(sheet, $event)"
-                            @job-link-detail="openJobLinkDetail($event)"
-                            @complete-assignment="onCompleteAssignment(sheet, $event)"
-                        />
                     </div>
                 </section>
 
@@ -219,63 +209,10 @@
             </div>
             <!-- /divide-y -->
         </div>
-        <!-- ジョブリンク詳細モーダル -->
-        <div
-            v-if="jobLinkDetailModal.open"
-            class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-            @click.self="jobLinkDetailModal.open = false"
-        >
-            <div class="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
-                <h3 class="mb-3 text-lg font-semibold text-gray-800">登録済みジョブ</h3>
-                <dl class="space-y-2 text-sm">
-                    <div>
-                        <dt class="text-xs font-medium text-gray-500">タイトル</dt>
-                        <dd class="text-gray-800">{{ jobLinkDetailModal.title }}</dd>
-                    </div>
-                    <div v-if="jobLinkDetailModal.endDate">
-                        <dt class="text-xs font-medium text-gray-500">期限</dt>
-                        <dd class="text-gray-800">{{ jobLinkDetailModal.endDate }}</dd>
-                    </div>
-                    <div>
-                        <dt class="text-xs font-medium text-gray-500">状態</dt>
-                        <dd :class="jobLinkDetailModal.completed ? 'text-yellow-700' : 'text-blue-700'">
-                            {{ jobLinkDetailModal.completed ? '完了' : '未完了' }}
-                        </dd>
-                    </div>
-                </dl>
-                <div class="mt-5 flex justify-end gap-3">
-                    <button
-                        type="button"
-                        class="rounded border border-gray-300 px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
-                        @click="jobLinkDetailModal.open = false"
-                    >
-                        閉じる
-                    </button>
-                    <button
-                        v-if="jobLinkDetailModal.assignmentId && !jobLinkDetailModal.completed"
-                        type="button"
-                        class="rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
-                        :disabled="jobLinkDetailModal.completing"
-                        @click="completeFromModal"
-                    >
-                        {{ jobLinkDetailModal.completing ? '処理中…' : '完了にする' }}
-                    </button>
-                    <button
-                        v-if="jobLinkDetailModal.assignmentId"
-                        type="button"
-                        class="rounded bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
-                        @click="goToMyJob"
-                    >
-                        マイジョブを開く
-                    </button>
-                </div>
-            </div>
-        </div>
     </AppLayout>
 </template>
 
 <script setup>
-import ProgressTable from '@/Components/ProgressTable.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { router, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
@@ -288,105 +225,14 @@ const members = page.props.members || [];
 const hasMembers = computed(() => Array.isArray(members) && members.length > 0);
 const subCoordinators = computed(() => page.props.subCoordinators || []);
 const progressSheets = computed(() => page.props.progressSheets || []);
-const localSheets = ref(
-    (page.props.progressSheets || []).map((s) => ({
-        ...s,
-        cells: (s.cells || []).map((c) => ({ ...c })),
-    })),
-);
 
-// ── 進行表 ────────────────────────────────────────────────────────────────
+// ── 進行管理表を開く ──────────────────────────────────────────────
 
-const jobLinkDetailModal = ref({ open: false, title: '', endDate: '', completed: false, assignmentId: null, completing: false });
-
-async function onCompleteAssignment(sheet, { assignmentId }) {
-    if (!assignmentId) return;
-    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+function openSheet(sheet) {
     try {
-        const res = await fetch(route('myjobbox.assignments.complete', { assignment: assignmentId }), {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
-        });
-        if (res.ok) {
-            // localSheets 内の該当セルを更新
-            const sheetIdx = localSheets.value.findIndex((s) => s.id === sheet.id);
-            if (sheetIdx >= 0) {
-                const cells = localSheets.value[sheetIdx].cells;
-                const cellIdx = cells.findIndex((c) => c.assignment_id === assignmentId);
-                if (cellIdx >= 0) {
-                    localSheets.value[sheetIdx].cells.splice(cellIdx, 1, { ...cells[cellIdx], assignment_completed: true });
-                }
-            }
-        }
+        router.visit(route('user.progress_sheets.show', { sheet: sheet.id }));
     } catch {
-        /* ignore */
-    }
-}
-
-async function completeFromModal() {
-    const assignmentId = jobLinkDetailModal.value.assignmentId;
-    if (!assignmentId || jobLinkDetailModal.value.completed) return;
-    jobLinkDetailModal.value.completing = true;
-    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-    try {
-        const res = await fetch(route('myjobbox.assignments.complete', { assignment: assignmentId }), {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
-        });
-        if (res.ok) {
-            jobLinkDetailModal.value.completed = true;
-            // localSheets 内の全シートのセルも更新
-            for (const sheet of localSheets.value) {
-                const cellIdx = sheet.cells.findIndex((c) => c.assignment_id === assignmentId);
-                if (cellIdx >= 0) {
-                    sheet.cells.splice(cellIdx, 1, { ...sheet.cells[cellIdx], assignment_completed: true });
-                }
-            }
-        }
-    } catch {
-        /* ignore */
-    } finally {
-        jobLinkDetailModal.value.completing = false;
-    }
-}
-
-function openJobLink(sheet, { rowId, colKey }) {
-    const row = (sheet.rows || []).find((r) => r.id === rowId);
-    const title = row?.label ?? '';
-    const params = {
-        title,
-        project_job_id: job.id,
-        progress_sheet_id: sheet.id,
-        row_id: rowId,
-        col_key: colKey,
-    };
-    if (job.client?.id) params.client_id = job.client.id;
-    try {
-        router.visit(route('events.create_job', params));
-    } catch {
-        window.location.href = route('events.create_job', params);
-    }
-}
-
-function openJobLinkDetail({ assignmentId, assignmentTitle, endDate, completed }) {
-    jobLinkDetailModal.value = {
-        open: true,
-        title: assignmentTitle ?? '(タイトルなし)',
-        endDate: endDate ?? null,
-        completed: !!completed,
-        assignmentId: assignmentId ?? null,
-    };
-}
-
-function goToMyJob() {
-    const id = jobLinkDetailModal.value.assignmentId;
-    if (!id) return;
-    try {
-        router.visit(route('user.myjobbox.show', { assignment: id }));
-    } catch {
-        window.location.href = route('user.myjobbox.show', { assignment: id });
+        window.location.href = route('user.progress_sheets.show', { sheet: sheet.id });
     }
 }
 

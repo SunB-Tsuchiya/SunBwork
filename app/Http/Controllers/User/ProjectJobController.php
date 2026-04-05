@@ -4,8 +4,6 @@ namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
 use App\Models\JobAssignmentMessage;
-use App\Models\ProgressCell;
-use App\Models\ProgressRow;
 use App\Models\ProgressSheet;
 use App\Models\ProjectJob;
 use App\Models\ProjectJobAssignment;
@@ -223,39 +221,11 @@ class ProjectJobController extends Controller
 
         $subCoordinators = $projectJob->coordinators->map(fn ($c) => ['id' => $c->id, 'name' => $c->name]);
 
-        // 進行表
-        $sheets = ProgressSheet::where('project_job_id', $projectJob->id)
+        // 進行表（名前一覧のみ。詳細は user.progress_sheets.show で取得）
+        $progressSheets = ProgressSheet::where('project_job_id', $projectJob->id)
             ->orderBy('id')
-            ->get(['id', 'name', 'column_config']);
-
-        $progressSheets = $sheets->map(function ($sheet) {
-            $rows = $sheet->rows()->orderBy('order')->get(['id', 'label', 'order']);
-            $cells = ProgressCell::whereIn('row_id', $rows->pluck('id'))
-                ->with(['valueUser:id,name', 'assignment:id,title,detail,desired_end_date,completed,user_id,sender_id'])
-                ->get()
-                ->map(fn ($c) => [
-                    'id'                   => $c->id,
-                    'row_id'               => $c->row_id,
-                    'col_key'              => $c->col_key,
-                    'value_text'           => $c->value_text,
-                    'value_date'           => $c->value_date?->format('Y-m-d'),
-                    'value_bool'           => $c->value_bool,
-                    'value_user_id'        => $c->value_user_id,
-                    'value_user_name'      => $c->valueUser?->name,
-                    'assignment_id'        => $c->assignment_id,
-                    'assignment_title'     => $c->assignment?->title,
-                    'assignment_completed' => $c->assignment?->completed,
-                    'assignment_user_id'   => $c->assignment?->user_id,
-                    'assignment_end_date'  => $c->assignment?->desired_end_date?->format('Y-m-d'),
-                ]);
-            return [
-                'id'            => $sheet->id,
-                'name'          => $sheet->name,
-                'column_config' => $sheet->column_config ?? [],
-                'rows'          => $rows,
-                'cells'         => $cells,
-            ];
-        });
+            ->get(['id', 'name'])
+            ->map(fn ($s) => ['id' => $s->id, 'name' => $s->name]);
 
         return Inertia::render('User/ProjectJobs/Show', [
             'job'             => $projectJob,
