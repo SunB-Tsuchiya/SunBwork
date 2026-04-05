@@ -18,7 +18,7 @@
 
         <div class="rounded bg-white p-6 shadow">
             <!-- ツールバー -->
-            <div class="mb-4 flex items-center gap-3">
+            <div class="flex items-center gap-3">
                 <button
                     type="button"
                     class="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
@@ -27,27 +27,34 @@
                     ← 案件詳細に戻る
                 </button>
             </div>
+        </div>
 
-            <!-- 進行管理表 -->
-            <div v-if="!localColumnConfig.length" class="py-8 text-center text-gray-400">列が定義されていません。</div>
-            <ProgressTable
+        <!-- 進行管理表 -->
+        <div class="mt-4">
+            <div v-if="!localColumnConfig.length" class="rounded bg-white p-6 shadow py-8 text-center text-gray-400">列が定義されていません。</div>
+            <div
                 v-else
-                :rows="localRows"
-                :column-config="localColumnConfig"
-                :cells="localCells"
-                :users="[]"
-                :stages="[]"
-                :sizes="[]"
-                :assignments="[]"
-                :work-item-types="[]"
-                :can-edit="false"
-                :edit-mode="false"
-                :job-link-only="true"
-                :auth-user-id="page.props.auth?.user?.id ?? null"
-                @job-link-open="openJobLink"
-                @job-link-detail="openJobLinkDetail"
-                @complete-assignment="onCompleteAssignment"
-            />
+                class="overflow-auto rounded bg-white shadow"
+                style="max-height: calc(100vh - 240px); min-height: 200px; width: 100vw; margin-left: calc(-50vw + 50%);"
+            >
+                <ProgressTable
+                    :rows="localRows"
+                    :column-config="localColumnConfig"
+                    :cells="localCells"
+                    :users="[]"
+                    :stages="[]"
+                    :sizes="[]"
+                    :assignments="[]"
+                    :work-item-types="[]"
+                    :can-edit="false"
+                    :edit-mode="false"
+                    :job-link-only="true"
+                    :auth-user-id="page.props.auth?.user?.id ?? null"
+                    @job-link-open="openJobLink"
+                    @job-link-detail="openJobLinkDetail"
+                    @complete-assignment="onCompleteAssignment"
+                />
+            </div>
         </div>
 
         <!-- ジョブリンク詳細モーダル -->

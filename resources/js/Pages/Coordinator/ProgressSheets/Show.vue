@@ -250,13 +250,19 @@
         </button>
       </div>
 
-      <!-- ── 通常モード：進行管理表テーブル ──────────────── -->
-      <div v-if="!editMode || !canEdit">
-        <div v-if="localColumnConfig.length === 0" class="py-8 text-center text-gray-400">
-          列が定義されていません。編集モードで列を追加してください。
-        </div>
+    </div>
+
+    <!-- ── 通常モード：進行管理表テーブル ──────────────── -->
+    <div v-if="!editMode || !canEdit" class="mt-4">
+      <div v-if="localColumnConfig.length === 0" class="rounded bg-white p-6 shadow py-8 text-center text-gray-400">
+        列が定義されていません。編集モードで列を追加してください。
+      </div>
+      <div
+        v-else
+        class="overflow-auto rounded bg-white shadow"
+        style="max-height: calc(100vh - 280px); min-height: 200px; width: 100vw; margin-left: calc(-50vw + 50%);"
+      >
         <ProgressTable
-          v-else
           :rows="localRows"
           :column-config="localColumnConfig"
           :cells="localCells"
@@ -276,7 +282,6 @@
           @complete-assignment="onCompleteAssignmentFromCell"
         />
       </div>
-
     </div>
 
     <!-- ── ジョブリンク登録モーダル ──────────────────── -->

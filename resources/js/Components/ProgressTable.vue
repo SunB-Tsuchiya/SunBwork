@@ -1,5 +1,5 @@
 <template>
-  <div class="overflow-x-auto">
+  <div>
     <!-- トグルバー -->
     <div v-if="topLevelGroups.length > 0" class="mb-2 flex flex-wrap items-center gap-2">
       <span class="text-xs text-gray-500">表示切替：</span>
@@ -19,7 +19,7 @@
 
     <table class="min-w-full border-collapse text-sm">
       <!-- ── 多段ヘッダー ── -->
-      <thead>
+      <thead class="sticky top-0 z-10">
         <tr v-for="(headerRow, depth) in headerRows" :key="depth" class="bg-gray-50">
           <!-- 行ラベル列（最初の thead 行にのみ rowspan で表示） -->
           <th

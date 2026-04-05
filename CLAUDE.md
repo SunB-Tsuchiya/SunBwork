@@ -40,12 +40,14 @@ git add <変更ファイル> public/build/ resources/js/ziggy.js
 git commit -m "feat/fix/build: ..."
 ```
 
-⑤ .env をローカル用に戻してローカルビルドも実行（コミット不要）:
+⑤ **コミット直後** に .env をローカル用に戻してローカルビルドも実行（コミット不要）:
 
 ```bash
 sed -i 's/^VITE_APP_BASE_PATH=\/members$/VITE_APP_BASE_PATH=/' /home/w229/SunBwork/.env
 npm run build
 ```
+
+> ⚠️ 重要: ⑤ を実行しないとローカル開発環境の .env が本番（さくら用）のままになり、次回の開発ビルドで `/members` ベースパスが適用され、ローカル環境が壊れます。必ずコミット直後に実行してください。
 
 ⑥ ユーザーへ伝える:
 
