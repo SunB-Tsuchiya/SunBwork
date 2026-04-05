@@ -717,12 +717,15 @@ class EventController extends Controller
             }
 
             // ── by_myself を完了にする ────────────────────────────────────────
-            if (Schema::hasColumn('project_job_assignment_by_myself', 'completed')) {
+            // NOTE: ProjectJobAssignmentByMyself のテーブルは project_job_assignments。
+            // 旧テーブル名 'project_job_assignment_by_myself' ではなく実テーブルを参照する。
+            $assignmentTable = $assignment->getTable();
+            if (Schema::hasColumn($assignmentTable, 'completed')) {
                 $assignment->completed = true;
             }
             $completedStatusId = null;
             try {
-                if (Schema::hasTable('statuses') && Schema::hasColumn('project_job_assignment_by_myself', 'status_id')) {
+                if (Schema::hasTable('statuses') && Schema::hasColumn($assignmentTable, 'status_id')) {
                     $status = DB::table('statuses')->where('key', 'completed')->first();
                     if (!$status) {
                         $completedStatusId = DB::table('statuses')->insertGetId(['key' => 'completed', 'name' => '完了', 'created_at' => now(), 'updated_at' => now()]);
@@ -746,7 +749,7 @@ class EventController extends Controller
 
                     // by_myself に直接紐づいた coordinator assignment を優先して更新
                     $coordinatorIds = [];
-                    if (Schema::hasColumn('project_job_assignment_by_myself', 'project_job_assignment_id') && $assignment->project_job_assignment_id) {
+                    if (Schema::hasColumn($assignmentTable, 'project_job_assignment_id') && $assignment->project_job_assignment_id) {
                         $coordinatorIds = [$assignment->project_job_assignment_id];
                     } else {
                         // FK がない場合は project_job_id + user_id でフォールバック
