@@ -31,7 +31,14 @@
 
   <!-- ユーザー型 -->
   <td v-else-if="colDef.type === 'user'" class="border border-gray-200 px-2 py-1 align-middle min-w-[120px]">
-    <template v-if="canEdit">
+    <!-- joblink によるロック（担当者固定表示） -->
+    <template v-if="lockedUserId">
+      <div class="flex items-center gap-1 rounded border border-gray-200 bg-gray-50 px-1 py-0.5">
+        <span class="flex-1 text-sm text-gray-700">{{ lockedUserName }}</span>
+        <span class="text-xs text-gray-400" title="ジョブリンクの担当者">🔒</span>
+      </div>
+    </template>
+    <template v-else-if="canEdit">
       <select
         :value="cell.value_user_id || ''"
         class="w-full rounded border border-gray-300 px-1 py-0.5 text-sm focus:border-indigo-400 focus:outline-none"
@@ -249,6 +256,10 @@ const props = defineProps({
     type: [Number, String, null],
     default: null,
   },
+  lockedUserId: {
+    type: [Number, String, null],
+    default: null,
+  },
   users: {
     type: Array,
     default: () => [],
@@ -315,6 +326,11 @@ const assignmentUserName = computed(() => {
   const uid = props.cell?.assignment_user_id;
   if (!uid) return null;
   return props.users.find((u) => String(u.id) === String(uid))?.name ?? null;
+});
+
+const lockedUserName = computed(() => {
+  if (!props.lockedUserId) return null;
+  return props.users.find((u) => String(u.id) === String(props.lockedUserId))?.name ?? String(props.lockedUserId);
 });
 
 const stageLabel = computed(() => {

@@ -118,6 +118,7 @@
                 :sizes="sizes"
                 :assignments="assignments"
                 :work-item-types="workItemTypes"
+                :locked-user-id="lockedUserIdForCell(row.id, leaf.key, leaf.type)"
                 @update="emit('cell-update', $event)"
                 @job-link-open="emit('job-link-open', $event)"
                 @job-link-detail="emit('job-link-detail', $event)"
@@ -285,6 +286,34 @@ const cellMap = computed(() => {
 
 function getCellData(rowId, colKey) {
   return cellMap.value[`${rowId}_${colKey}`] ?? {};
+}
+
+/** 同じ親グループ内の子ノード一覧を返す（見つからなければ null） */
+function getSiblingNodes(nodes, key) {
+  for (const node of nodes) {
+    if (node.children?.length) {
+      if (node.children.some((c) => c.key === key)) return node.children;
+      const found = getSiblingNodes(node.children, key);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+/**
+ * user 型セルに対して、同グループの joblink セルの assignment_user_id を返す。
+ * joblink が未登録 or user 型でなければ null。
+ */
+function lockedUserIdForCell(rowId, colKey, colType) {
+  if (colType !== 'user') return null;
+  const siblings = getSiblingNodes(props.columnConfig, colKey);
+  if (!siblings) return null;
+  const joblinkLeaves = collectLeaves(siblings).filter((l) => l.type === 'joblink');
+  for (const jl of joblinkLeaves) {
+    const cell = cellMap.value[`${rowId}_${jl.key}`];
+    if (cell?.assignment_user_id) return cell.assignment_user_id;
+  }
+  return null;
 }
 
 // ── グループのサマリー文字列（折りたたみ時） ────────────────
