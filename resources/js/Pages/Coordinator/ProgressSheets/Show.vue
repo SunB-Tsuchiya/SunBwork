@@ -259,8 +259,9 @@
       </div>
       <div
         v-else
+        ref="tableWrapRef"
         class="overflow-auto rounded bg-white shadow px-4 py-2"
-        style="max-height: calc(100vh - 280px); min-height: 200px; width: 100vw; margin-left: calc(-50vw + 50%);"
+        :style="{ height: tableHeight, minHeight: '200px', width: '100vw', marginLeft: 'calc(-50vw + 50%)' }"
       >
         <ProgressTable
           :rows="localRows"
@@ -427,7 +428,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import ProgressTable from '@/Components/ProgressTable.vue';
@@ -448,6 +449,27 @@ const props = defineProps({
 });
 
 const authUserId = computed(() => usePage().props.auth?.user?.id ?? null);
+
+// ── テーブルコンテナの動的高さ計算 ──────────────────────────
+const tableWrapRef = ref(null);
+const tableHeight = ref('calc(100vh - 350px)');
+
+function calcTableHeight() {
+  if (!tableWrapRef.value) return;
+  const top = tableWrapRef.value.getBoundingClientRect().top;
+  tableHeight.value = `${window.innerHeight - top - 4}px`;
+}
+
+onMounted(() => {
+  calcTableHeight();
+  window.addEventListener('resize', calcTableHeight);
+  document.body.style.overflowX = 'hidden';
+});
+
+onUnmounted(() => {
+  window.removeEventListener('resize', calcTableHeight);
+  document.body.style.overflowX = '';
+});
 
 // 列が未定義の場合は自動で編集モードを開く
 const editMode = ref(props.canEdit && (props.sheet.column_config?.length ?? 0) === 0);

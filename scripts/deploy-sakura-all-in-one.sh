@@ -40,8 +40,8 @@ if [[ $# -lt 2 ]]; then
   bash scripts/deploy-sakura-all-in-one.sh <sakura-user> <sakura-host> [オプション]
 
 例:
-  bash scripts/deploy-sakura-all-in-one.sh w229 silverlamb759.sakura.ne.jp
-  bash scripts/deploy-sakura-all-in-one.sh w229 silverlamb759.sakura.ne.jp --skip-ziggy --no-push
+  bash scripts/deploy-sakura-all-in-one.sh silverlamb759 silverlamb759.sakura.ne.jp
+  bash scripts/deploy-sakura-all-in-one.sh silverlamb759 silverlamb759.sakura.ne.jp --skip-ziggy --no-push
 
 オプション:
   --skip-ziggy    : Ziggy 再生成をスキップ

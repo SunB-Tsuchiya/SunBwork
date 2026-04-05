@@ -31,7 +31,7 @@ git add scripts/
 git commit -m "docs: デプロイガイド追加"
 
 # その後、デプロイスクリプトを実行
-bash scripts/deploy-sakura-all-in-one.sh w229 silverlamb759.sakura.ne.jp
+bash scripts/deploy-sakura-all-in-one.sh silverlamb759 silverlamb759.sakura.ne.jp
 ```
 
 ---
@@ -51,16 +51,16 @@ bash scripts/deploy-sakura-all-in-one.sh <sakura-user> <sakura-host> [オプシ�
 bash scripts/deploy-sakura-all-in-one.sh silverlamb759 silverlamb759.sakura.ne.jp
 
 # Ziggy 再生成をスキップ（routes/web.php に変更がない場合）
-bash scripts/deploy-sakura-all-in-one.sh w229 silverlamb759.sakura.ne.jp --skip-ziggy
+bash scripts/deploy-sakura-all-in-one.sh silverlamb759 silverlamb759.sakura.ne.jp --skip-ziggy
 
 # migrate をスキップ（マイグレーションがない場合）
-bash scripts/deploy-sakura-all-in-one.sh w229 silverlamb759.sakura.ne.jp --skip-migrate
+bash scripts/deploy-sakura-all-in-one.sh silverlamb759 silverlamb759.sakura.ne.jp --skip-migrate
 
 # 両方スキップ
-bash scripts/deploy-sakura-all-in-one.sh w229 silverlamb759.sakura.ne.jp --skip-ziggy --skip-migrate
+bash scripts/deploy-sakura-all-in-one.sh silverlamb759 silverlamb759.sakura.ne.jp --skip-ziggy --skip-migrate
 
 # git push のみ、リモートは手動（CI で自動デプロイする場合など）
-bash scripts/deploy-sakura-all-in-one.sh w229 silverlamb759.sakura.ne.jp --no-push
+bash scripts/deploy-sakura-all-in-one.sh silverlamb759 silverlamb759.sakura.ne.jp --no-push
 ```
 
 #### このコマンドの流れ：
@@ -111,7 +111,7 @@ git push origin main
 さくらに SSH 接続:
 
 ```bash
-ssh w229@silverlamb759.sakura.ne.jp
+ssh silverlamb759@silverlamb759.sakura.ne.jp
 cd ~/SunBWork
 bash scripts/deploy-sakura-remote.sh
 ```
@@ -237,7 +237,7 @@ php artisan tinker
 bash scripts/deploy-sakura-local.sh --commit-msg "fix: 重大なバグ修正"
 
 # 全自動スクリプト
-bash scripts/deploy-sakura-all-in-one.sh w229 silverlamb759.sakura.ne.jp --commit-msg "fix: 重大なバグ修正"
+bash scripts/deploy-sakura-all-in-one.sh silverlamb759 silverlamb759.sakura.ne.jp --commit-msg "fix: 重大なバグ修正"
 ```
 
 ---
