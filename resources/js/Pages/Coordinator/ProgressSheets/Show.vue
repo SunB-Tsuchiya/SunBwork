@@ -628,6 +628,10 @@ function openJobLinkModal({ rowId, colKey }) {
   if (workItemTypeId) params.work_item_type_id = workItemTypeId;
   if (props.projectJob?.client_id) params.client_id = props.projectJob.client_id;
   params.project_job_id = props.projectJob.id;
+  // 進行表セルリンクに必要な情報を渡す（セル登録後に assignment_id が紐付くようにする）
+  params.progress_sheet_id = props.sheet.id;
+  params.row_id = rowId;
+  params.col_key = colKey;
 
   if (isSelf) {
     // 自己割当（MyJob）→ events/create-job へ遷移

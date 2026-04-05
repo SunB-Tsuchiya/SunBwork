@@ -127,6 +127,10 @@ class ProjectJobAssignmentsController extends Controller
         $prefillSizeId = $request->query('size_id');
         $prefillWorkItemTypeId = $request->query('work_item_type_id');
         $prefillUserId = $request->query('user_id') ? (int) $request->query('user_id') : null;
+        // 進行管理表セルリンク用（joblink登録後に assignment_id を紐付ける）
+        $prefillProgressSheetId = $request->query('progress_sheet_id') ? (int) $request->query('progress_sheet_id') : null;
+        $prefillRowId = $request->query('row_id') ? (int) $request->query('row_id') : null;
+        $prefillColKey = $request->query('col_key');
         // send available team members for selection
         $members = $projectJob->teamMembers()->with(['user', 'user.assignment'])->get()->map(function ($m) {
             return [
@@ -208,6 +212,9 @@ class ProjectJobAssignmentsController extends Controller
             'prefill_size_id' => $prefillSizeId,
             'prefill_work_item_type_id' => $prefillWorkItemTypeId,
             'prefill_user_id' => $prefillUserId,
+            'prefill_progress_sheet_id' => $prefillProgressSheetId,
+            'prefill_row_id' => $prefillRowId,
+            'prefill_col_key' => $prefillColKey,
             'types' => $types,
             'sizes' => $sizes,
             'stages' => $stages,
@@ -605,6 +612,9 @@ class ProjectJobAssignmentsController extends Controller
             'assignments.*.sender_id' => 'nullable|exists:users,id',
             'assignments.*.title' => 'nullable|string|max:255',
             'assignments.*.description' => 'nullable|string',
+            'assignments.*._progress_sheet_id' => 'nullable|integer',
+            'assignments.*._row_id' => 'nullable|integer',
+            'assignments.*._col_key' => 'nullable|string|max:64',
         ]);
 
         foreach ($data['assignments'] as $a) {
@@ -654,7 +664,22 @@ class ProjectJobAssignmentsController extends Controller
 
                 $assignment = ProjectJobAssignment::create($createData);
 
-                // (debug logs removed)
+                // 進行表セルリンク: _progress_sheet_id / _row_id / _col_key が渡された場合
+                if (!empty($a['_progress_sheet_id']) && !empty($a['_row_id']) && !empty($a['_col_key'])) {
+                    try {
+                        \App\Models\ProgressCell::updateOrCreate(
+                            ['row_id' => (int) $a['_row_id'], 'col_key' => (string) $a['_col_key']],
+                            ['assignment_id' => $assignment->id]
+                        );
+                    } catch (\Throwable $__eCellLink) {
+                        \Illuminate\Support\Facades\Log::warning('Failed to link ProgressCell after coordinator assignment', [
+                            'error'   => $__eCellLink->getMessage(),
+                            'row_id'  => $a['_row_id'],
+                            'col_key' => $a['_col_key'],
+                        ]);
+                    }
+                }
+
                 // previously we created a separate WorkItem here; now assignment stores type/size/stage/status/company/department directly
                 // No-op for WorkItem creation - clients should send lookup ids on assignment payload instead.
             });
