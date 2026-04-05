@@ -719,6 +719,32 @@ watch(() => page.props.progressSheets, (fresh) => {
 `Show.vue` でシート名を `editMode` 中に編集可能。`saveColumnConfig()` に `name` を含めて PUT する。
 `column_config` が空の場合は自動的に `editMode = true` で開く。
 
+### user型セル × joblinkセルのロック連動（2026-04-05 実装）
+
+joblink セルに担当者が登録されると、**同グループ内の user 型セルが自動的に担当者名でロック表示**される。
+
+**実装場所:**
+- `ProgressTable.vue`: `getSiblingNodes()` + `lockedUserIdForCell(rowId, colKey, colType)` を追加
+- `ProgressCell.vue`: `lockedUserId` prop + `lockedUserName` computed を追加
+
+**ロジック:**
+1. `lockedUserIdForCell()` が同グループ内の joblink セルの `assignment_user_id` を探す
+2. user 型セルに `:locked-user-id` を渡す
+3. `lockedUserId` がある場合 → 担当者名 + 🔒 で固定表示（セレクター非表示）
+4. `lockedUserId` がない場合 → 従来通り（Coordinator: セレクター / User: テキスト）
+
+**注意:** joblink セル内には担当者名を表示しない（user 型セルに出るため重複回避）。
+
+### User/ProgressSheets/Show.vue — users prop（2026-04-05 修正）
+
+`User/ProgressSheetController::show()` で `users` を取得して props に追加。
+`User/ProgressSheets/Show.vue` で `:users="[]"` → `:users="props.users"` に変更。
+これにより user 型セルの value_user_id がユーザー名に正しく解決される。
+
+**修正ファイル:**
+- `app/Http/Controllers/User/ProgressSheetController.php` — 案件メンバー・Co・オーナーを集めた `$users` を追加
+- `resources/js/Pages/User/ProgressSheets/Show.vue` — `users` prop を `defineProps` に追加し `ProgressTable` へ渡す
+
 ---
 
 ## project_jobs テーブルの注意事項（さくら本番）⚠️
