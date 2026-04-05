@@ -105,8 +105,6 @@
           class="rounded bg-yellow-100 px-1.5 py-0.5 text-xs font-medium text-yellow-800"
         >✓ 完了</span>
         <span v-else class="rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700">登録済</span>
-        <!-- 担当者名 -->
-        <span v-if="assignmentUserName" class="text-xs text-gray-600">{{ assignmentUserName }}</span>
         <!-- 詳細ボタン -->
         <button
           type="button"
@@ -130,7 +128,6 @@
           class="rounded bg-yellow-100 px-1.5 py-0.5 text-xs font-medium text-yellow-800"
         >✓ 完了</span>
         <span v-else class="rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700">登録済</span>
-        <span v-if="assignmentUserName" class="text-xs text-gray-600">{{ assignmentUserName }}</span>
       </div>
       <div v-else class="mx-auto h-6 w-full rounded border border-dashed border-gray-200 bg-gray-50"></div>
     </template>
