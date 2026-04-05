@@ -1783,6 +1783,9 @@ async function save() {
                 amounts: typeof a.amounts === 'number' ? a.amounts : Number(a.amounts) || 0,
                 amounts_unit: a.amounts_unit || 'page',
                 source_assignment_id: a.source_assignment_id || null,
+                _progress_sheet_id: a._progress_sheet_id ?? null,
+                _row_id: a._row_id ?? null,
+                _col_key: a._col_key ?? null,
             })),
         };
 

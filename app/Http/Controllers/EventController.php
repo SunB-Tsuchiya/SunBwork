@@ -1159,6 +1159,37 @@ class EventController extends Controller
             // 取得失敗時はそのまま続行
         }
 
+        // 進行表からのprefill: client/projectがuserListsに含まれていない場合は先頭に追加する
+        // （CoordinatorがTeamMember未登録でも正しい名前が表示されるように）
+        try {
+            if ($prefillClientId) {
+                $userClients = collect($userClients);
+                if (!$userClients->contains('id', (int)$prefillClientId)) {
+                    $pfClient = \App\Models\Client::find((int)$prefillClientId);
+                    if ($pfClient) {
+                        $userClients = $userClients->prepend(['id' => $pfClient->id, 'name' => $pfClient->name ?? '']);
+                    }
+                }
+                $userClients = $userClients->values()->toArray();
+            }
+            if ($prefillProjectJobId) {
+                $userProjects = collect($userProjects);
+                if (!$userProjects->contains('id', (int)$prefillProjectJobId)) {
+                    $pfProject = \App\Models\ProjectJob::find((int)$prefillProjectJobId);
+                    if ($pfProject) {
+                        $userProjects = $userProjects->prepend([
+                            'id' => $pfProject->id,
+                            'title' => $pfProject->title ?? '',
+                            'client_id' => $pfProject->client_id,
+                        ]);
+                    }
+                }
+                $userProjects = $userProjects->values()->toArray();
+            }
+        } catch (\Throwable $__e) {
+            // 取得失敗時はそのまま続行
+        }
+
         $members = [];
         try {
             if ($user) {
