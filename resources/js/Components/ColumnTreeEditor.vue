@@ -65,7 +65,7 @@
           v-model="node.label"
           type="text"
           class="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none"
-          placeholder="列名"
+          placeholder="セレクターの値"
           @input="emit('change', nodes)"
         />
 
@@ -232,10 +232,20 @@ function workItemTypesGrouped() {
   }));
 }
 
-/** タイプが変わったとき、不一致なラベルをリセット */
+const TYPE_DEFAULT_LABELS = {
+  date: '日付',
+  checkbox: 'チェック',
+  user: '担当者',
+  worktime: '作業時間',
+  joblink: '登録',
+};
+
+/** タイプが変わったとき、不一致なラベルをリセット / デフォルトラベルを自動入力 */
 function onTypeChange(node) {
   if (LABEL_SELECT_TYPES.includes(node.type)) {
     node.label = '';
+  } else if (TYPE_DEFAULT_LABELS[node.type] !== undefined) {
+    node.label = TYPE_DEFAULT_LABELS[node.type];
   }
   emit('change', props.nodes);
 }
