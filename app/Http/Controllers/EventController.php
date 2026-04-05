@@ -1077,13 +1077,14 @@ class EventController extends Controller
             }
         }
 
-        // 進行管理表 joblink 経由でタイトルが渡された場合（$jobId なし）、prefill assignments を構築
-        if (!$jobId && $prefillTitle) {
+        // 進行管理表 joblink 経由でタイトルまたは progress_sheet_id が渡された場合（$jobId なし）、prefill assignments を構築
+        // $prefillTitle が空でも $prefillProgressSheetId があれば prefill を作成する
+        if (!$jobId && ($prefillTitle || $prefillProgressSheetId)) {
             $jobAssignments = [[
                 'id' => null,
                 'project_job_id' => $prefillProjectJobId ?? null,
                 '_client_id' => $prefillClientId ? (string)$prefillClientId : '',
-                'title' => $prefillTitle,
+                'title' => $prefillTitle ?? '',
                 'stage_id' => $prefillStageId ?? null,
                 'size_id' => $prefillSizeId ?? null,
                 'work_item_type_id' => $prefillWorkItemTypeId ?? null,
@@ -1217,17 +1218,23 @@ class EventController extends Controller
         $sizes = [];
         $stages = [];
         $statuses = [];
+        // 各テーブルのクエリは独立した try-catch で囲む（1つ失敗しても他に影響しないよう）
         try {
             $types = \App\Models\WorkItemType::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group', 'company_id', 'department_id']);
+        } catch (\Throwable $__e) { $types = []; }
+        try {
             $sizes = \App\Models\Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group', 'width', 'height', 'unit', 'company_id', 'department_id']);
+        } catch (\Throwable $__e) { $sizes = []; }
+        try {
             $stages = \App\Models\Stage::orderBy('sort_order')->orderBy('order_index')->get(['id', 'name', 'company_id', 'department_id']);
-            $statuses = \App\Models\Status::orderBy('sort_order')->get(['id', 'name', 'slug', 'company_id', 'department_id']);
         } catch (\Throwable $__e) {
-            $types = [];
-            $sizes = [];
-            $stages = [];
-            $statuses = [];
+            try {
+                $stages = \App\Models\Stage::orderBy('id')->get(['id', 'name']);
+            } catch (\Throwable $__e2) { $stages = []; }
         }
+        try {
+            $statuses = \App\Models\Status::orderBy('sort_order')->get(['id', 'name', 'slug', 'company_id', 'department_id']);
+        } catch (\Throwable $__e) { $statuses = []; }
 
         // 新規登録時のデフォルトステータス：「進行中」(slug=in_progress) のIDを取得
         $inProgressStatusId = collect($statuses)->firstWhere('slug', 'in_progress')?->id ?? null;

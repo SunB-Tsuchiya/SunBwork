@@ -562,9 +562,9 @@ function findSiblingCellValue(colKey, rowId, type) {
 }
 
 /**
- * colKey の祖先グループノードをたどり、指定 type のグループがあれば
- * そのラベル（名前）を masterList で逆引きして ID を返す。
- * 大見出し（グループノード）に stage/workItemType などが設定されている場合のフォールバック。
+ * colKey の祖先グループノードから指定型のIDを返す
+ * 1. type 一致 + label 一致（本来の動作）
+ * 2. type 不問で label がマスターリストに一致（グループノードが text 型でも stage 名のラベルを持つ場合）
  */
 function findAncestorGroupId(colKey, type, masterList) {
   function collectAncestors(nodes, key, path = []) {
@@ -580,9 +580,16 @@ function findAncestorGroupId(colKey, type, masterList) {
   }
   const ancestors = collectAncestors(localColumnConfig.value, colKey);
   if (!ancestors) return null;
-  // 近い祖先を優先（逆順）
+  // 1. type 一致優先
   for (const ancestor of [...ancestors].reverse()) {
     if (ancestor.type === type && ancestor.label) {
+      const found = masterList.find((item) => item.name === ancestor.label);
+      if (found) return String(found.id);
+    }
+  }
+  // 2. type 不問 ─ ラベル名がマスターリストに一致する祖先（text 型グループ見出しにステージ名がつく場合など）
+  for (const ancestor of [...ancestors].reverse()) {
+    if (ancestor.label) {
       const found = masterList.find((item) => item.name === ancestor.label);
       if (found) return String(found.id);
     }
