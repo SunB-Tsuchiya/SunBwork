@@ -98,6 +98,8 @@
           class="rounded bg-yellow-100 px-1.5 py-0.5 text-xs font-medium text-yellow-800"
         >✓ 完了</span>
         <span v-else class="rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700">登録済</span>
+        <!-- 担当者名 -->
+        <span v-if="assignmentUserName" class="text-xs text-gray-600">{{ assignmentUserName }}</span>
         <!-- 詳細ボタン -->
         <button
           type="button"
@@ -115,11 +117,14 @@
     </template>
     <template v-else>
       <!-- 閲覧のみ -->
-      <span
-        v-if="cell.assignment_id && cell.assignment_completed"
-        class="rounded bg-yellow-100 px-1.5 py-0.5 text-xs font-medium text-yellow-800"
-      >✓ 完了</span>
-      <span v-else-if="cell.assignment_id" class="rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700">登録済</span>
+      <div v-if="cell.assignment_id" class="flex flex-col items-center gap-0.5">
+        <span
+          v-if="cell.assignment_completed"
+          class="rounded bg-yellow-100 px-1.5 py-0.5 text-xs font-medium text-yellow-800"
+        >✓ 完了</span>
+        <span v-else class="rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700">登録済</span>
+        <span v-if="assignmentUserName" class="text-xs text-gray-600">{{ assignmentUserName }}</span>
+      </div>
       <div v-else class="mx-auto h-6 w-full rounded border border-dashed border-gray-200 bg-gray-50"></div>
     </template>
   </td>
@@ -305,6 +310,12 @@ function onWorktimeChange(which, val) {
 
 // ── ステージ / サイズ / 作業分担 / 作業種別 ──────────────────────────
 const GROUP_LABELS = { paper: '紙媒体', digital: 'デジタル', web: 'Web', other: 'その他', dtp: 'DTP・組版', proof: '校正', design: 'デザイン', common: '共通' };
+
+const assignmentUserName = computed(() => {
+  const uid = props.cell?.assignment_user_id;
+  if (!uid) return null;
+  return props.users.find((u) => String(u.id) === String(uid))?.name ?? null;
+});
 
 const stageLabel = computed(() => {
   const id = props.cell?.value_text;
