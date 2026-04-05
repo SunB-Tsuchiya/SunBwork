@@ -277,23 +277,6 @@ class ProjectJobController extends Controller
             $jobHistory = [];
         }
 
-        // 未発信の割当（assigned=false）
-        $unsentAssignments = $projectJob->projectJobAssignments()
-            ->with(['user'])
-            ->where('assigned', false)
-            ->orderBy('created_at', 'desc')
-            ->get()
-            ->map(fn($a) => [
-                'id'               => $a->id,
-                'title'            => $a->title,
-                'user_id'          => $a->user_id,
-                'user_name'        => $a->user?->name,
-                'detail'           => $a->detail,
-                'desired_end_date' => $a->desired_end_date?->format('Y-m-d'),
-                'estimated_hours'  => $a->estimated_hours,
-                'created_at'       => $a->created_at?->format('Y-m-d'),
-            ]);
-
         $subCoordinators = $projectJob->coordinators->map(fn ($c) => ['id' => $c->id, 'name' => $c->name]);
 
         // 進行管理表一覧
@@ -340,7 +323,6 @@ class ProjectJobController extends Controller
             'assignmentEvents' => $assignmentEvents,
             'schedules' => $schedules,
             'jobHistory' => $jobHistory,
-            'unsentAssignments' => $unsentAssignments,
             'progressSheets' => $progressSheets,
             'sheetTemplates' => $sheetTemplates,
             'sheetLinkedAssignmentIds' => $sheetLinkedAssignmentIds,

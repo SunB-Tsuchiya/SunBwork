@@ -143,54 +143,6 @@
                     <p v-else class="text-sm text-gray-400">メンバー未登録</p>
                 </section>
 
-                <!-- ── 未発信の割当セクション ───────────────────── -->
-                <section v-if="localUnsent.length > 0" class="py-5">
-                    <div class="mb-3 flex flex-wrap items-center gap-4">
-                        <h3 class="font-semibold text-gray-800">未発信の割当</h3>
-                        <span class="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700">
-                            {{ localUnsent.length }} 件
-                        </span>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full border text-sm">
-                            <thead>
-                                <tr class="bg-gray-50">
-                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">作成日</th>
-                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">タイトル</th>
-                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">担当者</th>
-                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">締切希望日</th>
-                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">見積時間</th>
-                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">操作</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-100 bg-white">
-                                <tr
-                                    v-for="a in localUnsent"
-                                    :key="a.id"
-                                    class="cursor-pointer hover:bg-gray-50"
-                                    @click.stop="goAssignmentEdit(a, $event)"
-                                >
-                                    <td class="border px-3 py-2 text-gray-600">{{ a.created_at || '-' }}</td>
-                                    <td class="border px-3 py-2 font-medium text-gray-800">{{ a.title || '-' }}</td>
-                                    <td class="border px-3 py-2 text-gray-700">{{ a.user_name || '-' }}</td>
-                                    <td class="border px-3 py-2 text-gray-600">{{ a.desired_end_date || '-' }}</td>
-                                    <td class="border px-3 py-2 text-gray-600">{{ a.estimated_hours != null ? a.estimated_hours + 'h' : '-' }}</td>
-                                    <td class="border px-3 py-2">
-                                        <button
-                                            type="button"
-                                            class="rounded bg-blue-500 px-3 py-1 text-xs font-medium text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
-                                            :disabled="sendingIds.has(a.id)"
-                                            @click.stop="sendUnsent(a)"
-                                        >
-                                            {{ sendingIds.has(a.id) ? '送信中...' : '発信する' }}
-                                        </button>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
-
                 <!-- ── ジョブ履歴セクション ───────────────────── -->
                 <section class="py-5">
                     <div class="mb-3 flex flex-wrap items-center gap-4">
@@ -536,10 +488,6 @@ function truncate(text, len) {
     return s.length > len ? s.slice(0, len) + '…' : s;
 }
 
-// ── 未発信の割当 ──────────────────────────────────────────────────────────
-
-const localUnsent = ref(Array.isArray(page.props.unsentAssignments) ? [...page.props.unsentAssignments] : []);
-
 // ── 進行管理表 ───────────────────────────────────────────────────────────
 
 const progressSheets = computed(() => Array.isArray(page.props.progressSheets) ? page.props.progressSheets : []);
@@ -559,48 +507,6 @@ function createSheet() {
         { name, template_id: newSheetTemplateId.value ?? null },
     );
 }
-const sendingIds   = ref(new Set());
-
-function sendUnsent(a) {
-    if (sendingIds.value.has(a.id)) return;
-    const toUserId = a.user_id;
-    const payload = {
-        project_job_assignment_id: a.id,
-        to: toUserId ? [toUserId] : [],
-        subject: a.title || null,
-        body: `割り当て依頼\nジョブ: ${job.title || ''}\n割り当て: ${a.title || ''}\n\n担当ユーザー: ${a.user_name || '（未割当）'}\n\nアプリで詳しい情報を確認できます。`,
-        attachments: [],
-    };
-    sendingIds.value = new Set([...sendingIds.value, a.id]);
-    router.post(
-        route('coordinator.project_jobs.jobbox.store', { projectJob: job.id }),
-        payload,
-        {
-            onSuccess: () => {
-                localUnsent.value = localUnsent.value.filter((x) => x.id !== a.id);
-                sendingIds.value = new Set([...sendingIds.value].filter((id) => id !== a.id));
-            },
-            onError: () => {
-                sendingIds.value = new Set([...sendingIds.value].filter((id) => id !== a.id));
-                alert('発信に失敗しました。');
-            },
-            preserveState: true,
-            preserveScroll: true,
-        },
-    );
-}
-
-function goAssignmentEdit(a, event) {
-    const tag = event?.target?.tagName?.toLowerCase() || '';
-    if (tag === 'button' || event?.target?.closest?.('button')) return;
-    try {
-        router.visit(
-            route('coordinator.project_jobs.assignments.edit', { projectJob: job.id, assignment: a.id }),
-            { preserveState: false },
-        );
-    } catch {}
-}
-
 // ── ジョブ履歴 ────────────────────────────────────────────────────────────
 
 const hideHistoryCompleted = ref(true);
