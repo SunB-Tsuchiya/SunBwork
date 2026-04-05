@@ -34,7 +34,7 @@
             <div v-if="!localColumnConfig.length" class="rounded bg-white p-6 shadow py-8 text-center text-gray-400">列が定義されていません。</div>
             <div
                 v-else
-                class="overflow-auto rounded bg-white shadow"
+                class="overflow-auto rounded bg-white shadow px-4 py-2"
                 style="max-height: calc(100vh - 240px); min-height: 200px; width: 100vw; margin-left: calc(-50vw + 50%);"
             >
                 <ProgressTable

@@ -259,7 +259,7 @@
       </div>
       <div
         v-else
-        class="overflow-auto rounded bg-white shadow"
+        class="overflow-auto rounded bg-white shadow px-4 py-2"
         style="max-height: calc(100vh - 280px); min-height: 200px; width: 100vw; margin-left: calc(-50vw + 50%);"
       >
         <ProgressTable

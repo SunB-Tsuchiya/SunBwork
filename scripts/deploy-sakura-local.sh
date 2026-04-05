@@ -81,15 +81,11 @@ echo ""
 # ② routes/web.php 変更があれば Ziggy 再生成
 if [[ $SKIP_ZIGGY -eq 0 ]]; then
   echo "② Ziggy を再生成中..."
-  if cd "$PROJECT_ROOT" && git diff --name-only © | grep -q "routes/web.php"; then
-    echo "  routes/web.php が変更されています。Ziggy を再生成します..."
-    docker compose exec laravel bash -lc "php artisan ziggy:generate resources/js/ziggy.js" || {
-      echo "⚠️  Ziggy 生成に失敗しましたが、続行します..."
-    }
-    echo "✅ Ziggy 再生成完了"
-  else
-    echo "  routes/web.php に変更はありません（スキップ）"
-  fi
+  echo "  Ziggy を再生成します..."
+  docker compose exec laravel bash -lc "php artisan ziggy:generate resources/js/ziggy.js" || {
+    echo "⚠️  Ziggy 生成に失敗しましたが、続行します..."
+  }
+  echo "✅ Ziggy 再生成完了"
 fi
 
 echo ""

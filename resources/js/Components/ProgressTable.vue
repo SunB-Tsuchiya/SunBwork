@@ -19,13 +19,13 @@
 
     <table class="min-w-full border-collapse text-sm">
       <!-- ── 多段ヘッダー ── -->
-      <thead class="sticky top-0 z-10">
+      <thead class="sticky top-0 z-20">
         <tr v-for="(headerRow, depth) in headerRows" :key="depth" class="bg-gray-50">
           <!-- 行ラベル列（最初の thead 行にのみ rowspan で表示） -->
           <th
             v-if="depth === 0"
             :rowspan="maxDepth"
-            class="border border-gray-300 bg-gray-100 px-3 py-2 text-left text-xs font-semibold text-gray-600 align-middle"
+            class="sticky left-0 z-30 border border-gray-300 bg-gray-100 px-3 py-2 text-left text-xs font-semibold text-gray-600 align-middle"
           >
             台割
           </th>
@@ -70,7 +70,7 @@
           <tr v-else class="hover:bg-gray-50">
             <!-- 行ラベル -->
             <td
-              class="border border-gray-200 bg-gray-50 px-3 py-1.5 font-medium text-gray-700 whitespace-nowrap align-middle"
+              class="sticky left-0 z-10 border border-gray-200 bg-gray-50 px-3 py-1.5 font-medium text-gray-700 whitespace-nowrap align-middle"
               :class="row._isChild ? 'pl-6' : ''"
             >
               <div class="flex items-center gap-2">
