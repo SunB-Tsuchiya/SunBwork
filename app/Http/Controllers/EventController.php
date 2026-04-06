@@ -518,14 +518,7 @@ class EventController extends Controller
         $data = $request->validate([
             'date' => 'required|date',
             'title' => 'required|string|max:255',
-            'description' => [
-                'required',
-                function ($attribute, $value, $fail) {
-                    if (trim(strip_tags($value)) === '') {
-                        $fail('説明を入力してください。');
-                    }
-                }
-            ],
+            'description' => 'nullable|string',
             'startHour' => 'required',
             'startMinute' => 'required',
             'endHour' => 'required',
