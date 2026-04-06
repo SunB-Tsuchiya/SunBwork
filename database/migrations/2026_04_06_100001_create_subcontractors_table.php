@@ -10,8 +10,7 @@ return new class extends Migration
     {
         Schema::create('subcontractors', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
-            $table->string('company_name')->nullable();
+            $table->string('name'); // 個人名・会社名どちらでも
             $table->string('email')->nullable();
             $table->string('phone')->nullable();
             $table->text('notes')->nullable();

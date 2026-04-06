@@ -43,7 +43,6 @@ class SubcontractorController extends Controller
 
         $data = $request->validate([
             'name'         => 'required|string|max:255',
-            'company_name' => 'required|string|max:255',
             'email'        => 'nullable|email|max:255',
             'phone'        => 'nullable|string|max:50',
             'notes'        => 'nullable|string',
@@ -97,7 +96,6 @@ class SubcontractorController extends Controller
     {
         $data = $request->validate([
             'name'         => 'required|string|max:255',
-            'company_name' => 'required|string|max:255',
             'email'        => 'nullable|email|max:255',
             'phone'        => 'nullable|string|max:50',
             'notes'        => 'nullable|string',

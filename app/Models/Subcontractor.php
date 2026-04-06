@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Subcontractor extends Model
 {
-    protected $fillable = ['name', 'company_name', 'email', 'phone', 'notes', 'company_id'];
+    protected $fillable = ['name', 'email', 'phone', 'notes', 'company_id'];
 
     /** 管理担当のCoordinator（多対多） */
     public function coordinators(): BelongsToMany

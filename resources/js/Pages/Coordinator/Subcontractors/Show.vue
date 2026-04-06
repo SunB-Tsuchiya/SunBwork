@@ -44,12 +44,8 @@ function destroy() {
                 <h3 class="mb-4 text-base font-semibold text-gray-700">基本情報</h3>
                 <dl class="space-y-3">
                     <div>
-                        <dt class="text-xs font-medium text-gray-500">名前</dt>
+                        <dt class="text-xs font-medium text-gray-500">名前 / 会社名</dt>
                         <dd class="text-gray-900">{{ props.subcontractor.name }}</dd>
-                    </div>
-                    <div>
-                        <dt class="text-xs font-medium text-gray-500">会社名</dt>
-                        <dd class="text-gray-900">{{ props.subcontractor.company_name ?? '—' }}</dd>
                     </div>
                     <div>
                         <dt class="text-xs font-medium text-gray-500">メールアドレス</dt>

@@ -9,7 +9,6 @@ const props = defineProps({
 
 const form = useForm({
     name: props.subcontractor.name,
-    company_name: props.subcontractor.company_name ?? '',
     email: props.subcontractor.email ?? '',
     phone: props.subcontractor.phone ?? '',
     notes: props.subcontractor.notes ?? '',
@@ -39,14 +38,10 @@ function submit() {
         <div class="rounded bg-white p-6 shadow">
             <form @submit.prevent="submit" class="space-y-4 max-w-lg">
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-gray-700">名前 <span class="text-red-500">*</span></label>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">名前 / 会社名 <span class="text-red-500">*</span></label>
+                    <p class="mb-1 text-xs text-gray-400">個人名・会社名どちらでも可</p>
                     <input v-model="form.name" type="text" required class="w-full rounded border px-2 py-1 text-sm" />
                     <p v-if="form.errors.name" class="mt-1 text-xs text-red-600">{{ form.errors.name }}</p>
-                </div>
-                <div>
-                    <label class="mb-1 block text-sm font-medium text-gray-700">会社名 <span class="text-red-500">*</span></label>
-                    <input v-model="form.company_name" type="text" required class="w-full rounded border px-2 py-1 text-sm" />
-                    <p v-if="form.errors.company_name" class="mt-1 text-xs text-red-600">{{ form.errors.company_name }}</p>
                 </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">メールアドレス</label>

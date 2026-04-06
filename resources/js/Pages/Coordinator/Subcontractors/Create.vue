@@ -7,7 +7,6 @@ const props = defineProps({ coordinators: Array });
 
 const form = useForm({
     name: '',
-    company_name: '',
     email: '',
     phone: '',
     notes: '',
@@ -20,7 +19,7 @@ const duplicates = ref([]);
 const isChecking = ref(false);
 
 async function submit() {
-    if (!form.name.trim() || !form.company_name.trim()) return;
+    if (!form.name.trim()) return;
 
     isChecking.value = true;
     try {
@@ -72,14 +71,10 @@ function toggleCoordinator(id) {
         <div class="rounded bg-white p-6 shadow">
             <form @submit.prevent="submit" class="space-y-4 max-w-lg">
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-gray-700">名前 <span class="text-red-500">*</span></label>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">名前 / 会社名 <span class="text-red-500">*</span></label>
+                    <p class="mb-1 text-xs text-gray-400">個人名・会社名どちらでも可</p>
                     <input v-model="form.name" type="text" required class="w-full rounded border px-2 py-1 text-sm" />
                     <p v-if="form.errors.name" class="mt-1 text-xs text-red-600">{{ form.errors.name }}</p>
-                </div>
-                <div>
-                    <label class="mb-1 block text-sm font-medium text-gray-700">会社名 <span class="text-red-500">*</span></label>
-                    <input v-model="form.company_name" type="text" required class="w-full rounded border px-2 py-1 text-sm" />
-                    <p v-if="form.errors.company_name" class="mt-1 text-xs text-red-600">{{ form.errors.company_name }}</p>
                 </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">メールアドレス</label>
@@ -151,7 +146,6 @@ function toggleCoordinator(id) {
                         <li v-for="d in duplicates" :key="d.id" class="flex items-center gap-2 text-sm text-gray-800">
                             <span class="h-1.5 w-1.5 rounded-full bg-yellow-500 flex-shrink-0" />
                             <span class="font-medium">{{ d.name }}</span>
-                            <span v-if="d.company_name" class="text-gray-500">（{{ d.company_name }}）</span>
                         </li>
                     </ul>
                 </div>

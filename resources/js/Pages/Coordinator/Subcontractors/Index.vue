@@ -25,8 +25,7 @@ const props = defineProps({ subcontractors: Array });
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">名前</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">会社名</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">名前 / 会社名</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">担当Co</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">割当数</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">操作</th>
@@ -39,7 +38,6 @@ const props = defineProps({ subcontractors: Array });
                                         {{ sub.name }}
                                     </Link>
                                 </td>
-                                <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-700">{{ sub.company_name ?? '—' }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-700">
                                     <span v-if="sub.coordinators && sub.coordinators.length">
                                         {{ sub.coordinators.map((c) => c.name).join('、') }}
