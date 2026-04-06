@@ -62,9 +62,13 @@ class ProjectJobController extends Controller
 
     /**
      * ログインユーザーがこの案件のCoordinator（リーダーまたはサブCo）かどうか判定
+     * Admin/SuperAdmin/Clerk は全案件許可
      */
     private function isJobCoordinator(ProjectJob $job, User $user): bool
     {
+        if ($user->isAdmin() || $user->isSuperAdmin() || $user->isClerk()) {
+            return true;
+        }
         if ($job->user_id === $user->id) {
             return true;
         }
@@ -73,12 +77,13 @@ class ProjectJobController extends Controller
 
     /**
      * Coordinator候補:
-     *   - user_role = coordinator、または
+     *   - user_role = coordinator または clerk、または
      *   - 担当(assignment.code) = 'shinko'（進行管理）のユーザー
      */
     private function coordinatorCandidates(): \Illuminate\Support\Collection
     {
         return User::where('user_role', 'coordinator')
+            ->orWhere('user_role', 'clerk')
             ->orWhereHas('assignment', fn ($q) => $q->where('code', 'shinko'))
             ->orderBy('name')
             ->get(['id', 'name']);

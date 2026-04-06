@@ -61,7 +61,8 @@ class HandleInertiaRequests extends Middleware
                         [
                             'isAdmin'          => $request->user()->isAdmin(),
                             'isLeader'         => $request->user()->isLeader(),
-                            'isCoordinator'    => $request->user()->isCoordinator(),
+                            'isCoordinator'    => $request->user()->isCoordinator() || $request->user()->isClerk(),
+                            'isClerk'          => $request->user()->isClerk(),
                             'isSuperAdmin'     => $request->user()->isSuperAdmin(),
                             'isUser'           => $request->user()->isUser(),
                             'isRepresentative'       => $request->user()->isAdmin() && $request->user()->isRepresentative(),

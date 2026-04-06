@@ -68,9 +68,10 @@ class ProjectMemosController extends Controller
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        // Allow owner or coordinator/admin/leader/superadmin
+        // Allow owner or coordinator/clerk/admin/leader/superadmin
         $canUpdate = ($user->id === $memo->user_id)
             || (method_exists($user, 'isCoordinator') && $user->isCoordinator())
+            || (method_exists($user, 'isClerk') && $user->isClerk())
             || (method_exists($user, 'isAdmin') && $user->isAdmin())
             || (method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin())
             || (method_exists($user, 'isLeader') && $user->isLeader());
@@ -99,9 +100,10 @@ class ProjectMemosController extends Controller
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        // Allow owner or coordinator/admin/leader/superadmin
+        // Allow owner or coordinator/clerk/admin/leader/superadmin
         $canDelete = ($user->id === $memo->user_id)
             || (method_exists($user, 'isCoordinator') && $user->isCoordinator())
+            || (method_exists($user, 'isClerk') && $user->isClerk())
             || (method_exists($user, 'isAdmin') && $user->isAdmin())
             || (method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin())
             || (method_exists($user, 'isLeader') && $user->isLeader());
