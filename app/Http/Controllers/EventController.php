@@ -524,24 +524,16 @@ class EventController extends Controller
             'endHour' => 'required',
             'endMinute' => 'required',
         ]);
-        // debug logging removed
-        $data['description'] = $request->input('description', '');
-        $data['user_id'] = Auth::id();
-        $newStart = date('Y-m-d H:i:00', strtotime($data['date'] . ' ' . $data['startHour'] . ':' . $data['startMinute']));
-        $newEnd   = date('Y-m-d H:i:00', strtotime($data['date'] . ' ' . $data['endHour'] . ':' . $data['endMinute']));
         $dateStr  = $data['date'];
+        $newStart = $dateStr . ' ' . $data['startHour'] . ':' . $data['startMinute'] . ':00';
+        $newEnd   = $dateStr . ' ' . $data['endHour']   . ':' . $data['endMinute']   . ':00';
 
-        // DB直接更新で starts_at/ends_at を確実に書き換える（モデルのセッター/キャスト干渉を回避）
-        $updateCols = [
-            'title' => $data['title'],
-            'body'  => $data['description'],
-        ];
-        if (Schema::hasColumn('events', 'starts_at')) $updateCols['starts_at'] = $newStart;
-        if (Schema::hasColumn('events', 'ends_at'))   $updateCols['ends_at']   = $newEnd;
-        if (Schema::hasColumn('events', 'date'))       $updateCols['date']      = $dateStr;
-
-        DB::table('events')->where('id', $event->id)->update($updateCols);
-        $event->refresh();
+        // update_from_calendar() と同じ方式でモデル経由で保存
+        $event->title       = $data['title'];
+        $event->description = $data['description'] ?? '';
+        $event->start       = $newStart;
+        $event->end         = $newEnd;
+        $event->save();
 
         // 紐づく project_job_assignment の時間フィールドも同期
         if (Schema::hasColumn('events', 'project_job_assignment_id') && $event->project_job_assignment_id) {
