@@ -287,8 +287,10 @@ class ProjectJobAssignmentController extends Controller
             'detail' => 'nullable|string',
             'difficulty_id' => 'nullable|exists:difficulties,id',
             'estimated_hours' => 'nullable|numeric|min:0',
+            'desired_start_date' => 'nullable|date',
             'desired_end_date' => 'nullable|date',
             'desired_time' => 'nullable|date_format:H:i',
+            'start_time' => 'nullable|date_format:H:i',
             'work_item_type_id' => 'nullable|exists:work_item_types,id',
             'size_id' => 'nullable|exists:sizes,id',
             'status_id' => 'nullable|exists:statuses,id',
@@ -325,6 +327,7 @@ class ProjectJobAssignmentController extends Controller
                 'difficulty_id' => $data['difficulty_id'] ?? null,
                 'desired_end_date' => $data['desired_end_date'] ?? null,
                 'desired_time' => $data['desired_time'] ?? null,
+                'start_time' => $data['start_time'] ?? null,
                 'estimated_hours' => $data['estimated_hours'] ?? null,
                 'work_item_type_id' => $data['work_item_type_id'] ?? null,
                 'size_id' => $data['size_id'] ?? null,
@@ -356,26 +359,24 @@ class ProjectJobAssignmentController extends Controller
                     $lines[] = '詳細:';
                     $lines[] = $by->detail ?? '';
 
-                    // assemble start/end if desired_end_date provided
+                    // assemble start/end:
+                    // 作業日 (desired_start_date from request) を優先し、なければ existing event の date を使う
                     $eventStart = null;
                     $eventEnd = null;
                     try {
-                        if (!empty($by->desired_end_date)) {
-                            $datePart = $by->desired_end_date;
+                        // 作業日: リクエストの desired_start_date 優先、次に既存イベントの日付
+                        $datePart = $data['desired_start_date'] ?? null;
+                        if (empty($datePart) && $event) {
+                            $datePart = \Carbon\Carbon::parse($event->start)->toDateString();
+                        }
+                        if (empty($datePart)) {
+                            $datePart = $by->desired_end_date ?? null;
+                        }
+                        if (!empty($datePart)) {
                             $startTimePart = $by->start_time ?? null;
                             $endTimePart = $by->desired_time ?? null;
-                            if (empty($startTimePart) && (isset($by->start_time_hour) || isset($by->start_time_min))) {
-                                $sh = isset($by->start_time_hour) ? sprintf('%02d', $by->start_time_hour) : '09';
-                                $sm = isset($by->start_time_min) ? sprintf('%02d', $by->start_time_min) : '00';
-                                $startTimePart = $sh . ':' . $sm;
-                            }
-                            if (empty($endTimePart) && (isset($by->desired_time_hour) || isset($by->desired_time_min))) {
-                                $eh = isset($by->desired_time_hour) ? sprintf('%02d', $by->desired_time_hour) : '10';
-                                $em = isset($by->desired_time_min) ? sprintf('%02d', $by->desired_time_min) : '00';
-                                $endTimePart = $eh . ':' . $em;
-                            }
                             if ($startTimePart) $eventStart = \Carbon\Carbon::parse($datePart . ' ' . $startTimePart);
-                            if ($endTimePart) $eventEnd = \Carbon\Carbon::parse($datePart . ' ' . $endTimePart);
+                            if ($endTimePart)   $eventEnd   = \Carbon\Carbon::parse($datePart . ' ' . $endTimePart);
                         }
                     } catch (\Throwable $__pe) {
                     }
@@ -417,6 +418,6 @@ class ProjectJobAssignmentController extends Controller
             }
         });
 
-        return redirect()->route('calendar.index');
+        return redirect()->back()->with('success', 'ジョブを更新しました。');
     }
 }
