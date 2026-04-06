@@ -607,7 +607,7 @@ class EventController extends Controller
                 }
             }
         }
-        return redirect()->route('calendar.index');
+        return redirect()->back()->with('success', 'イベントを更新しました。');
     }
 
     // 予定の削除
