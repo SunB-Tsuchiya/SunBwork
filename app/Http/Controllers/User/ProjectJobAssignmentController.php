@@ -418,6 +418,16 @@ class ProjectJobAssignmentController extends Controller
             }
         });
 
+        // 保存後は紐づくイベントの show へリダイレクト（なければ back）
+        try {
+            if (Schema::hasTable('events') && Schema::hasColumn('events', 'project_job_assignment_id')) {
+                $linkedEvent = Event::where('project_job_assignment_id', $assignment->id)->first();
+                if ($linkedEvent) {
+                    return redirect()->route('events.show', $linkedEvent->id)->with('success', 'ジョブを更新しました。');
+                }
+            }
+        } catch (\Throwable $__e) {}
+
         return redirect()->back()->with('success', 'ジョブを更新しました。');
     }
 }
