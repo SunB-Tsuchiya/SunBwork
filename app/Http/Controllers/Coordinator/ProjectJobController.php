@@ -286,12 +286,14 @@ class ProjectJobController extends Controller
 
         // 進行管理表一覧
         $progressSheets = $projectJob->progressSheets()
-            ->select(['id', 'name', 'created_at'])
-            ->orderByDesc('created_at')
+            ->select(['id', 'name', 'sort_order', 'created_at'])
+            ->orderBy('sort_order')
+            ->orderBy('id')
             ->get()
             ->map(fn ($s) => [
                 'id'         => $s->id,
                 'name'       => $s->name,
+                'sort_order' => $s->sort_order,
                 'created_at' => $s->created_at?->format('Y-m-d'),
             ]);
 

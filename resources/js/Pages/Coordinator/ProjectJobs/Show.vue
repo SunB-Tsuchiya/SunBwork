@@ -303,6 +303,14 @@
                         >
                             新規作成
                         </button>
+                        <button
+                            v-if="progressSheets.length > 1"
+                            type="button"
+                            class="rounded border border-gray-300 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                            @click="openReorderModal"
+                        >
+                            順序を変更
+                        </button>
                         <Link
                             :href="route('coordinator.progress_templates.index')"
                             class="text-xs text-gray-500 hover:underline"
@@ -311,16 +319,30 @@
                         </Link>
                     </div>
 
-                    <div v-if="progressSheets.length > 0" class="flex flex-wrap gap-3">
-                        <Link
-                            v-for="ps in progressSheets"
-                            :key="ps.id"
-                            :href="route('coordinator.progress_sheets.show', { sheet: ps.id })"
-                            class="rounded border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm hover:bg-indigo-50 hover:border-indigo-200"
-                        >
-                            <p class="font-medium text-gray-800">{{ ps.name }}</p>
-                            <p class="text-xs text-gray-400">{{ ps.created_at }}</p>
-                        </Link>
+                    <div v-if="progressSheets.length > 0" class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">シート名</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">作成日</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200 bg-white">
+                                <tr v-for="ps in progressSheets" :key="ps.id" class="hover:bg-gray-50">
+                                    <td class="px-4 py-2 text-sm font-medium text-gray-900">{{ ps.name }}</td>
+                                    <td class="px-4 py-2 text-sm text-gray-500">{{ ps.created_at }}</td>
+                                    <td class="px-4 py-2">
+                                        <Link
+                                            :href="route('coordinator.progress_sheets.show', { sheet: ps.id })"
+                                            class="rounded bg-indigo-600 px-3 py-1 text-xs font-medium text-white hover:bg-indigo-700"
+                                        >
+                                            開く
+                                        </Link>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                     <p v-else class="text-sm text-gray-400">進行管理表なし</p>
                 </section>
@@ -370,6 +392,44 @@
                 >
                     作成
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── 進行管理表 並び順モーダル ──── -->
+    <div
+        v-if="showReorderModal"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+        @click.self="showReorderModal = false"
+    >
+        <div class="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
+            <h3 class="mb-4 text-lg font-semibold text-gray-800">進行管理表の順序を変更</h3>
+            <ul class="mb-5 space-y-2">
+                <li
+                    v-for="(sheet, idx) in reorderList"
+                    :key="sheet.id"
+                    class="flex items-center gap-2 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
+                >
+                    <span class="flex-1 font-medium text-gray-800">{{ sheet.name }}</span>
+                    <button
+                        type="button"
+                        :disabled="idx === 0"
+                        class="rounded p-1 text-gray-500 hover:bg-gray-200 disabled:opacity-30"
+                        @click="moveSheet(idx, -1)"
+                        title="上へ"
+                    >▲</button>
+                    <button
+                        type="button"
+                        :disabled="idx === reorderList.length - 1"
+                        class="rounded p-1 text-gray-500 hover:bg-gray-200 disabled:opacity-30"
+                        @click="moveSheet(idx, 1)"
+                        title="下へ"
+                    >▼</button>
+                </li>
+            </ul>
+            <div class="flex justify-end gap-3">
+                <button type="button" class="rounded border border-gray-300 px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-50" @click="showReorderModal = false">キャンセル</button>
+                <button type="button" class="rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700" @click="saveSheetOrder">保存</button>
             </div>
         </div>
     </div>
@@ -494,6 +554,40 @@ function createSheet() {
         route('coordinator.project_jobs.progress_sheets.store', { projectJob: job.id }),
         { name, template_id: newSheetTemplateId.value ?? null },
     );
+}
+
+// ── 進行管理表 並び順モーダル ──────────────────────────────────────────────
+const showReorderModal = ref(false);
+const reorderList = ref([]);
+
+function openReorderModal() {
+    reorderList.value = [...progressSheets.value].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+    showReorderModal.value = true;
+}
+
+function moveSheet(index, dir) {
+    const list = reorderList.value;
+    const target = index + dir;
+    if (target < 0 || target >= list.length) return;
+    [list[index], list[target]] = [list[target], list[index]];
+}
+
+function saveSheetOrder() {
+    const ids = reorderList.value.map((s) => s.id);
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+    fetch(route('coordinator.project_jobs.progress_sheets.reorder', { projectJob: job.id }), {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': csrf,
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({ ids }),
+    }).then(() => {
+        showReorderModal.value = false;
+        router.reload({ only: ['progressSheets'] });
+    });
 }
 // ── ジョブ履歴 ────────────────────────────────────────────────────────────
 

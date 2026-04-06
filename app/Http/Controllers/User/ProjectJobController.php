@@ -296,9 +296,10 @@ class ProjectJobController extends Controller
 
         // 進行表（名前一覧のみ。詳細は user.progress_sheets.show で取得）
         $progressSheets = ProgressSheet::where('project_job_id', $projectJob->id)
+            ->orderBy('sort_order')
             ->orderBy('id')
-            ->get(['id', 'name'])
-            ->map(fn ($s) => ['id' => $s->id, 'name' => $s->name]);
+            ->get(['id', 'name', 'sort_order'])
+            ->map(fn ($s) => ['id' => $s->id, 'name' => $s->name, 'sort_order' => $s->sort_order]);
 
         return Inertia::render('User/ProjectJobs/Show', [
             'job'             => $projectJob,

@@ -101,21 +101,29 @@
                 <!-- ── 進行管理表セクション ──────────────────────── -->
                 <section v-if="progressSheets.length > 0" class="py-5">
                     <h3 class="mb-3 font-semibold text-gray-800">進行管理表</h3>
-                    <div class="flex flex-col gap-2">
-                        <div
-                            v-for="sheet in progressSheets"
-                            :key="sheet.id"
-                            class="flex items-center justify-between rounded border border-gray-200 bg-gray-50 px-4 py-2.5"
-                        >
-                            <span class="text-sm font-medium text-gray-800">{{ sheet.name }}</span>
-                            <button
-                                type="button"
-                                class="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700"
-                                @click="openSheet(sheet)"
-                            >
-                                開く
-                            </button>
-                        </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">シート名</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200 bg-white">
+                                <tr v-for="sheet in progressSheets" :key="sheet.id" class="hover:bg-gray-50">
+                                    <td class="px-4 py-2 text-sm font-medium text-gray-900">{{ sheet.name }}</td>
+                                    <td class="px-4 py-2">
+                                        <button
+                                            type="button"
+                                            class="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700"
+                                            @click="openSheet(sheet)"
+                                        >
+                                            開く
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </section>
 

@@ -50,6 +50,7 @@ class ProgressSheetController extends Controller
             'name'           => $validated['name'],
             'column_config'  => $columnConfig,
             'created_by'     => $request->user()->id,
+            'sort_order'     => ProgressSheet::where('project_job_id', $projectJob->id)->max('sort_order') + 1,
         ]);
 
         // テンプレートのrow_configがあれば台割行を初期作成
@@ -84,6 +85,30 @@ class ProgressSheetController extends Controller
         }
 
         return redirect()->route('coordinator.progress_sheets.show', $sheet->id);
+    }
+
+    /**
+     * 案件配下のシートの並び順を更新
+     * body: { ids: [1, 3, 2, ...] } (並び順通りのシートID配列)
+     */
+    public function reorderSheets(Request $request, ProjectJob $projectJob): \Illuminate\Http\JsonResponse
+    {
+        $this->authorizeJobAccess($request->user(), $projectJob);
+
+        $validated = $request->validate([
+            'ids'   => 'required|array',
+            'ids.*' => 'integer',
+        ]);
+
+        DB::transaction(function () use ($projectJob, $validated) {
+            foreach ($validated['ids'] as $order => $id) {
+                ProgressSheet::where('id', $id)
+                    ->where('project_job_id', $projectJob->id)
+                    ->update(['sort_order' => $order]);
+            }
+        });
+
+        return response()->json(['ok' => true]);
     }
 
     /**

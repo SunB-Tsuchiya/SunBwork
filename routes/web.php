@@ -587,6 +587,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 
         // ── 進行管理シート ────────────────────────────────────────
         Route::post('project_jobs/{projectJob}/progress-sheets', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'store'])->name('project_jobs.progress_sheets.store');
+        Route::put('project_jobs/{projectJob}/progress-sheets/reorder', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'reorderSheets'])->name('project_jobs.progress_sheets.reorder');
         Route::get('progress-sheets/{sheet}', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'show'])->name('progress_sheets.show');
         Route::put('progress-sheets/{sheet}', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'update'])->name('progress_sheets.update');
         Route::delete('progress-sheets/{sheet}', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'destroy'])->name('progress_sheets.destroy');
