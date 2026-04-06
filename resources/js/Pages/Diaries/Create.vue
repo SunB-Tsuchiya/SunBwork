@@ -406,7 +406,16 @@ async function fetchPastDiaries() {
         });
         if (!res.ok) throw new Error();
         const data = await res.json();
-        pastRecords.value = data.records || [];
+        pastRecords.value = (data.records || []).map((rec) => {
+            const dateObj = new Date(rec.date);
+            const year = dateObj.getFullYear();
+            const month = dateObj.getMonth() + 1;
+            const day = dateObj.getDate();
+            return {
+                ...rec,
+                date: `${year}年${month}月${day}日`,
+            };
+        });
     } catch {
         pastError.value = 'データの取得に失敗しました。';
     } finally {
