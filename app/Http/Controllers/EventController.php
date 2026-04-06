@@ -540,9 +540,9 @@ class EventController extends Controller
             try {
                 $assignment = \App\Models\ProjectJobAssignment::withoutGlobalScopes()->find($event->project_job_assignment_id);
                 if ($assignment) {
-                    // desired_end_date（締め切り）はイベント時間編集で変更しない
-                    $assignment->start_time   = sprintf('%02d:%02d', $data['startHour'], $data['startMinute']);
-                    $assignment->desired_time = sprintf('%02d:%02d', $data['endHour'], $data['endMinute']);
+                    // desired_end_date（締め切り日）・desired_time（締め切り時刻）はイベント時間編集で変更しない
+                    // end_time カラムは存在しないため終了時刻は同期しない
+                    $assignment->start_time = sprintf('%02d:%02d', $data['startHour'], $data['startMinute']);
                     $assignment->save();
                 }
             } catch (\Throwable $__e) {
