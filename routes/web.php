@@ -483,6 +483,10 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     ->group(function () {
         Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
 
+        // 外注先管理
+        Route::post('subcontractors/check-duplicate', [App\Http\Controllers\Coordinator\SubcontractorController::class, 'checkDuplicate'])->name('subcontractors.check_duplicate');
+        Route::resource('subcontractors', App\Http\Controllers\Coordinator\SubcontractorController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy']);
+
         // クライアント管理（Coordinator用）
         Route::get('clients/csv/upload', [App\Http\Controllers\ClientController::class, 'csvUpload'])->name('clients.csv.upload');
         Route::post('clients/csv/preview', [App\Http\Controllers\ClientController::class, 'csvPreview'])->name('clients.csv.preview');

@@ -40,16 +40,21 @@
     </template>
     <template v-else-if="canEdit">
       <select
-        :value="cell.value_user_id || ''"
+        :value="cell.value_subcontractor_id ? ('s_' + cell.value_subcontractor_id) : (cell.value_user_id ? ('u_' + cell.value_user_id) : '')"
         class="w-full rounded border border-gray-300 px-1 py-0.5 text-sm focus:border-indigo-400 focus:outline-none"
-        @change="emit('update', { row_id: rowId, col_key: colDef.key, value_type: 'user', value: $event.target.value ? Number($event.target.value) : null })"
+        @change="onUserCellChange($event.target.value)"
       >
         <option value="">—</option>
-        <option v-for="u in users" :key="u.id" :value="u.id">{{ u.name }}</option>
+        <optgroup v-if="users.length" label="メンバー">
+          <option v-for="u in users" :key="'u_' + u.id" :value="'u_' + u.id">{{ u.name }}</option>
+        </optgroup>
+        <optgroup v-if="subcontractors.length" label="外注先">
+          <option v-for="s in subcontractors" :key="'s_' + s.id" :value="'s_' + s.id">{{ s.name }}</option>
+        </optgroup>
       </select>
     </template>
     <template v-else>
-      <span class="text-sm text-gray-700">{{ cell.value_user_name ?? '' }}</span>
+      <span class="text-sm text-gray-700">{{ cell.value_subcontractor_name ?? cell.value_user_name ?? '' }}</span>
     </template>
   </td>
 
@@ -261,6 +266,10 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  subcontractors: {
+    type: Array,
+    default: () => [],
+  },
   stages: {
     type: Array,
     default: () => [],
@@ -329,6 +338,18 @@ const lockedUserName = computed(() => {
   if (!props.lockedUserId) return null;
   return props.users.find((u) => String(u.id) === String(props.lockedUserId))?.name ?? String(props.lockedUserId);
 });
+
+function onUserCellChange(val) {
+  if (!val) {
+    emit('update', { row_id: props.rowId, col_key: props.colDef.key, value_type: 'user', value: null });
+    return;
+  }
+  if (val.startsWith('s_')) {
+    emit('update', { row_id: props.rowId, col_key: props.colDef.key, value_type: 'subcontractor', value: Number(val.slice(2)) });
+  } else {
+    emit('update', { row_id: props.rowId, col_key: props.colDef.key, value_type: 'user', value: Number(val.slice(2)) });
+  }
+}
 
 const stageLabel = computed(() => {
   const id = props.cell?.value_text;

@@ -13,6 +13,7 @@ class ProgressCell extends Model
         'value_date',
         'value_bool',
         'value_user_id',
+        'value_subcontractor_id',
         'assignment_id',
     ];
 
@@ -29,6 +30,11 @@ class ProgressCell extends Model
     public function valueUser()
     {
         return $this->belongsTo(User::class, 'value_user_id');
+    }
+
+    public function valueSubcontractor()
+    {
+        return $this->belongsTo(Subcontractor::class, 'value_subcontractor_id');
     }
 
     public function assignment()

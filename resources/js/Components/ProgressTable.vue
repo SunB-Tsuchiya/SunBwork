@@ -114,6 +114,7 @@
                 :job-link-only="jobLinkOnly"
                 :auth-user-id="authUserId"
                 :users="users"
+                :subcontractors="subcontractors"
                 :stages="stages"
                 :sizes="sizes"
                 :assignments="assignments"
@@ -141,6 +142,7 @@ const props = defineProps({
   columnConfig: { type: Array, default: () => [] },
   cells: { type: Array, default: () => [] },
   users: { type: Array, default: () => [] },
+  subcontractors: { type: Array, default: () => [] },
   stages: { type: Array, default: () => [] },
   sizes: { type: Array, default: () => [] },
   assignments: { type: Array, default: () => [] },

@@ -99,22 +99,25 @@ class ProgressSheetController extends Controller
         $rows = $sheet->rows()->orderBy('order')->get(['id', 'label', 'order', 'parent_id']);
 
         $cells = ProgressCell::whereIn('row_id', $rows->pluck('id'))
-            ->with(['valueUser:id,name', 'assignment:id,title,detail,desired_end_date,completed,user_id,sender_id'])
+            ->with(['valueUser:id,name', 'valueSubcontractor:id,name,company_name', 'assignment:id,title,detail,desired_end_date,completed,user_id,sender_id,subcontractor_id'])
             ->get()
             ->map(fn($c) => [
-                'id'                    => $c->id,
-                'row_id'                => $c->row_id,
-                'col_key'               => $c->col_key,
-                'value_text'            => $c->value_text,
-                'value_date'            => $c->value_date?->format('Y-m-d'),
-                'value_bool'            => $c->value_bool,
-                'value_user_id'         => $c->value_user_id,
-                'value_user_name'       => $c->valueUser?->name,
-                'assignment_id'         => $c->assignment_id,
-                'assignment_title'      => $c->assignment?->title,
-                'assignment_completed'  => $c->assignment?->completed,
-                'assignment_user_id'    => $c->assignment?->user_id,
-                'assignment_end_date'   => $c->assignment?->desired_end_date?->format('Y-m-d'),
+                'id'                         => $c->id,
+                'row_id'                     => $c->row_id,
+                'col_key'                    => $c->col_key,
+                'value_text'                 => $c->value_text,
+                'value_date'                 => $c->value_date?->format('Y-m-d'),
+                'value_bool'                 => $c->value_bool,
+                'value_user_id'              => $c->value_user_id,
+                'value_user_name'            => $c->valueUser?->name,
+                'value_subcontractor_id'     => $c->value_subcontractor_id,
+                'value_subcontractor_name'   => $c->valueSubcontractor ? ($c->valueSubcontractor->name . '（' . $c->valueSubcontractor->company_name . '）') : null,
+                'assignment_id'              => $c->assignment_id,
+                'assignment_title'           => $c->assignment?->title,
+                'assignment_completed'       => $c->assignment?->completed,
+                'assignment_user_id'         => $c->assignment?->user_id,
+                'assignment_subcontractor_id' => $c->assignment?->subcontractor_id,
+                'assignment_end_date'        => $c->assignment?->desired_end_date?->format('Y-m-d'),
             ]);
 
         // 担当者選択用ユーザー一覧（案件メンバー + Coordinator）
@@ -123,6 +126,16 @@ class ProgressSheetController extends Controller
         $ownerId = $projectJob->user_id;
         $userIds = array_unique(array_merge($memberIds, $coIds, [$ownerId]));
         $users = User::whereIn('id', $userIds)->orderBy('name')->get(['id', 'name']);
+
+        // ログインCoordinatorが管理する外注先
+        $authUser = $request->user();
+        $subcontractors = \App\Models\Subcontractor::managedBy($authUser->id)
+            ->get(['id', 'name', 'company_name'])
+            ->map(fn($s) => [
+                'id'           => $s->id,
+                'name'         => $s->name . '（' . $s->company_name . '）',
+                'is_subcontractor' => true,
+            ]);
 
         // 列タイプ用マスターデータ
         $stages = \App\Models\Stage::orderBy('id')->get(['id', 'name']);
@@ -146,7 +159,8 @@ class ProgressSheetController extends Controller
             ],
             'rows'        => $rows,
             'cells'       => $cells,
-            'users'       => $users,
+            'users'          => $users,
+            'subcontractors' => $subcontractors,
             'stages'      => $stages,
             'sizes'       => $sizes,
             'assignments' => $assignments,

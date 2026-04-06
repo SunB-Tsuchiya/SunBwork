@@ -26,7 +26,7 @@ class ProgressCellController extends Controller
             'cells'              => 'required|array',
             'cells.*.row_id'     => 'required|integer',
             'cells.*.col_key'    => 'required|string',
-            'cells.*.value_type' => 'required|in:text,date,bool,user',
+            'cells.*.value_type' => 'required|in:text,date,bool,user,subcontractor',
             'cells.*.value'      => 'nullable',
         ]);
 
@@ -40,10 +40,11 @@ class ProgressCellController extends Controller
                 }
 
                 $data = [
-                    'value_text'    => null,
-                    'value_date'    => null,
-                    'value_bool'    => null,
-                    'value_user_id' => null,
+                    'value_text'             => null,
+                    'value_date'             => null,
+                    'value_bool'             => null,
+                    'value_user_id'          => null,
+                    'value_subcontractor_id' => null,
                 ];
 
                 switch ($item['value_type']) {
@@ -58,6 +59,9 @@ class ProgressCellController extends Controller
                         break;
                     case 'user':
                         $data['value_user_id'] = $item['value'] ?: null;
+                        break;
+                    case 'subcontractor':
+                        $data['value_subcontractor_id'] = $item['value'] ?: null;
                         break;
                 }
 

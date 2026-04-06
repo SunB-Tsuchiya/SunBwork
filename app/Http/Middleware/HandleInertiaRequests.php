@@ -52,6 +52,7 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'flash' => $flashMessage ? ['message' => $flashMessage, 'type' => $flashType] : null,
             'clientDeleteError' => session('clientDeleteError'),
+            'subcontractorDeleteError' => session('subcontractorDeleteError'),
             'unreadAnnouncements' => $unreadAnnouncements,
             // Share authenticated user basic info and helper role flags for frontend permission checks
             'auth' => [

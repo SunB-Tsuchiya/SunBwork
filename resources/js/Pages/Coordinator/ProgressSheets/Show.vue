@@ -268,6 +268,7 @@
           :column-config="localColumnConfig"
           :cells="localCells"
           :users="users"
+          :subcontractors="props.subcontractors ?? []"
           :stages="props.stages"
           :sizes="props.sizes"
           :assignments="props.assignments"
@@ -446,6 +447,7 @@ const props = defineProps({
   rows: Array,
   cells: Array,
   users: Array,
+  subcontractors: { type: Array, default: () => [] },
   stages: { type: Array, default: () => [] },
   sizes: { type: Array, default: () => [] },
   assignments: { type: Array, default: () => [] },
