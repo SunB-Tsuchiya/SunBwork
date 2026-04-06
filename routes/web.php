@@ -599,11 +599,11 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         // ── セル一括更新 ──────────────────────────────────────────
         Route::put('progress-sheets/{sheet}/cells', [App\Http\Controllers\Coordinator\ProgressCellController::class, 'bulkUpdate'])->name('progress_sheets.cells.update');
         Route::post('progress-sheets/{sheet}/cells/link-job', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'linkJob'])->name('progress_sheets.cells.link_job');
-        Route::delete('progress-sheets/{sheet}/cells/unlink-job', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'unlinkJob'])->name('coordinator.progress_sheets.cells.unlink_job');
+        Route::delete('progress-sheets/{sheet}/cells/unlink-job', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'unlinkJob'])->name('progress_sheets.cells.unlink_job');
 
         // ── アサインメント完了管理（管理者用）─────────────────────
-        Route::post('progress-sheets/assignments/{assignment}/complete', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'completeAssignment'])->name('coordinator.progress_sheets.assignments.complete');
-        Route::post('progress-sheets/assignments/{assignment}/uncomplete', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'uncompleteAssignment'])->name('coordinator.progress_sheets.assignments.uncomplete');
+        Route::post('progress-sheets/assignments/{assignment}/complete', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'completeAssignment'])->name('progress_sheets.assignments.complete');
+        Route::post('progress-sheets/assignments/{assignment}/uncomplete', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'uncompleteAssignment'])->name('progress_sheets.assignments.uncomplete');
     });
 
 
