@@ -377,10 +377,18 @@ class JobBoxController extends Controller
             ->join('project_job_assignments', 'job_assignment_messages.project_job_assignment_id', '=', 'project_job_assignments.id')
             ->leftJoin('users as senders', 'job_assignment_messages.sender_id', '=', 'senders.id')
             ->where('project_job_assignments.user_id', $user->id)
-            // MyJobBox（自己割当: sender_id = user_id）を除外し、Coordinator割当のみ表示
-            ->where(function ($qry) {
-                $qry->whereNull('project_job_assignments.sender_id')
-                    ->orWhereColumn('project_job_assignments.sender_id', '!=', 'project_job_assignments.user_id');
+            // 自己割当を除外: (1) sender_id=user_id（MyJobBox経由）または
+            // (2) sender_id=NULL かつメッセージ送信者が自分自身（Coordinator画面から自分に割り当て）
+            ->where(function ($qry) use ($user) {
+                $qry->where(function ($q) {
+                    // sender_id が設定されていて、かつ自分以外が送った（通常のCoordinator割当）
+                    $q->whereNotNull('project_job_assignments.sender_id')
+                        ->whereColumn('project_job_assignments.sender_id', '!=', 'project_job_assignments.user_id');
+                })->orWhere(function ($q) use ($user) {
+                    // sender_id が未設定で、メッセージ送信者が自分以外（外部Coordinatorからの割当）
+                    $q->whereNull('project_job_assignments.sender_id')
+                        ->where('job_assignment_messages.sender_id', '!=', $user->id);
+                });
             });
 
         if ($q) {
@@ -437,9 +445,14 @@ class JobBoxController extends Controller
 
         $monthValues = JobAssignmentMessage::join('project_job_assignments', 'job_assignment_messages.project_job_assignment_id', '=', 'project_job_assignments.id')
             ->where('project_job_assignments.user_id', $user->id)
-            ->where(function ($qry) {
-                $qry->whereNull('project_job_assignments.sender_id')
-                    ->orWhereColumn('project_job_assignments.sender_id', '!=', 'project_job_assignments.user_id');
+            ->where(function ($qry) use ($user) {
+                $qry->where(function ($q) {
+                    $q->whereNotNull('project_job_assignments.sender_id')
+                        ->whereColumn('project_job_assignments.sender_id', '!=', 'project_job_assignments.user_id');
+                })->orWhere(function ($q) use ($user) {
+                    $q->whereNull('project_job_assignments.sender_id')
+                        ->where('job_assignment_messages.sender_id', '!=', $user->id);
+                });
             })
             ->selectRaw("DATE_FORMAT(COALESCE(project_job_assignments.desired_end_date, job_assignment_messages.created_at), '%Y-%m') as ym")
             ->groupBy('ym')
