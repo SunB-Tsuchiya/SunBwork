@@ -534,30 +534,28 @@ class EventController extends Controller
         // debug logging removed
         $data['description'] = $request->input('description', '');
         $data['user_id'] = Auth::id();
-        $data['start'] = date('Y-m-d H:i:00', strtotime($data['date'] . ' ' . $data['startHour'] . ':' . $data['startMinute']));
-        $data['end'] = date('Y-m-d H:i:00', strtotime($data['date'] . ' ' . $data['endHour'] . ':' . $data['endMinute']));
-        if (Schema::hasColumn('events', 'starts_at')) {
-            $data['starts_at'] = $data['start'];
-        }
-        if (Schema::hasColumn('events', 'ends_at')) {
-            $data['ends_at'] = $data['end'];
-        }
-        // Ensure we only include `date` if the column exists; otherwise remove it to avoid SQL errors.
-        if (Schema::hasColumn('events', 'date')) {
-            $data['date'] = $data['date'] ?? date('Y-m-d', strtotime($data['start']));
-        } else {
-            if (array_key_exists('date', $data)) {
-                unset($data['date']);
-            }
-        }
-        $event->update($data);
+        $newStart = date('Y-m-d H:i:00', strtotime($data['date'] . ' ' . $data['startHour'] . ':' . $data['startMinute']));
+        $newEnd   = date('Y-m-d H:i:00', strtotime($data['date'] . ' ' . $data['endHour'] . ':' . $data['endMinute']));
+        $dateStr  = $data['date'];
+
+        // DB直接更新で starts_at/ends_at を確実に書き換える（モデルのセッター/キャスト干渉を回避）
+        $updateCols = [
+            'title' => $data['title'],
+            'body'  => $data['description'],
+        ];
+        if (Schema::hasColumn('events', 'starts_at')) $updateCols['starts_at'] = $newStart;
+        if (Schema::hasColumn('events', 'ends_at'))   $updateCols['ends_at']   = $newEnd;
+        if (Schema::hasColumn('events', 'date'))       $updateCols['date']      = $dateStr;
+
+        DB::table('events')->where('id', $event->id)->update($updateCols);
+        $event->refresh();
 
         // 紐づく project_job_assignment の時間フィールドも同期
         if (Schema::hasColumn('events', 'project_job_assignment_id') && $event->project_job_assignment_id) {
             try {
                 $assignment = \App\Models\ProjectJobAssignment::withoutGlobalScopes()->find($event->project_job_assignment_id);
                 if ($assignment) {
-                    $assignment->desired_end_date = $data['date'];
+                    $assignment->desired_end_date = $dateStr;
                     $assignment->start_time       = sprintf('%02d:%02d', $data['startHour'], $data['startMinute']);
                     $assignment->desired_time     = sprintf('%02d:%02d', $data['endHour'], $data['endMinute']);
                     $assignment->save();
