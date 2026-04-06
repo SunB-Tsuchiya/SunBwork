@@ -292,6 +292,37 @@ class ProjectJobController extends Controller
             ]);
         }
 
+        // jobHistory の各エントリにカレンダーイベント情報を付加（作業日表示用）
+        try {
+            $jhArr = $jobHistory instanceof \Illuminate\Support\Collection ? $jobHistory->toArray() : (array) $jobHistory;
+            $assignmentIds = collect($jhArr)
+                ->map(fn ($m) => (int) ($m['project_job_assignment_id'] ?? $m['project_job_assignment']['id'] ?? 0))
+                ->filter()->unique()->values()->toArray();
+
+            if (!empty($assignmentIds)) {
+                $eventsByAssignment = DB::table('events')
+                    ->whereIn('project_job_assignment_id', $assignmentIds)
+                    ->whereNotNull('starts_at')
+                    ->orderBy('starts_at')
+                    ->get(['project_job_assignment_id', 'starts_at', 'ends_at'])
+                    ->keyBy('project_job_assignment_id');
+
+                $jobHistory = array_map(function ($m) use ($eventsByAssignment) {
+                    $aid = (int) ($m['project_job_assignment_id'] ?? $m['project_job_assignment']['id'] ?? 0);
+                    if ($aid && isset($eventsByAssignment[$aid])) {
+                        $ev = $eventsByAssignment[$aid];
+                        $m['event_starts_at'] = $ev->starts_at;
+                        $m['event_ends_at']   = $ev->ends_at;
+                    }
+                    return $m;
+                }, $jhArr);
+            } else {
+                $jobHistory = $jhArr;
+            }
+        } catch (\Throwable $_) {
+            // non-fatal
+        }
+
         $subCoordinators = $projectJob->coordinators->map(fn ($c) => ['id' => $c->id, 'name' => $c->name]);
 
         // 進行表（名前一覧のみ。詳細は user.progress_sheets.show で取得）

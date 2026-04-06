@@ -193,7 +193,7 @@
                                                 <tr class="bg-gray-50">
                                                     <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">発信者</th>
                                                     <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">受信者</th>
-                                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">締め切り</th>
+                                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">作業日</th>
                                                     <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">タイトル</th>
                                                     <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">ステータス</th>
                                                 </tr>
@@ -208,7 +208,7 @@
                                                 >
                                                     <td class="break-words border px-3 py-2 text-sm text-gray-700">{{ historyGetSender(m) }}</td>
                                                     <td class="break-words border px-3 py-2 text-sm text-gray-700">{{ historyGetRecipients(m) }}</td>
-                                                    <td class="break-words whitespace-pre-line border px-3 py-2 text-sm text-gray-600">{{ historyGetDeadline(m) }}</td>
+                                                    <td class="break-words whitespace-pre-line border px-3 py-2 text-sm text-gray-600">{{ historyGetWorkDate(m) }}</td>
                                                     <td class="break-words border px-3 py-2 text-sm">{{ m.subject || (m.body && m.body.slice(0, 60)) }}</td>
                                                     <td class="border px-3 py-2">
                                                         <span :class="statusBadgeClass(historyGetStatus(m))" class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">{{ historyGetStatus(m) }}</span>
@@ -256,7 +256,7 @@
                                                 <tr class="bg-gray-50">
                                                     <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">発信者</th>
                                                     <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">受信者</th>
-                                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">締め切り</th>
+                                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">作業日</th>
                                                     <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">タイトル</th>
                                                     <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">ステータス</th>
                                                 </tr>
@@ -271,7 +271,7 @@
                                                 >
                                                     <td class="break-words border px-3 py-2 text-sm text-gray-700">{{ historyGetSender(m) }}</td>
                                                     <td class="break-words border px-3 py-2 text-sm text-gray-700">{{ historyGetRecipients(m) }}</td>
-                                                    <td class="break-words whitespace-pre-line border px-3 py-2 text-sm text-gray-600">{{ historyGetDeadline(m) }}</td>
+                                                    <td class="break-words whitespace-pre-line border px-3 py-2 text-sm text-gray-600">{{ historyGetWorkDate(m) }}</td>
                                                     <td class="break-words border px-3 py-2 text-sm">{{ m.subject || (m.body && m.body.slice(0, 60)) }}</td>
                                                     <td class="border px-3 py-2">
                                                         <span :class="statusBadgeClass(historyGetStatus(m))" class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">{{ historyGetStatus(m) }}</span>
@@ -594,6 +594,7 @@ function saveSheetOrder() {
 const hideHistoryCompleted = ref(false);
 
 function historyGetDateKey(m) {
+    if (m.event_starts_at) return String(m.event_starts_at).replace(' ', 'T').split('T')[0];
     return (
         m.project_job_assignment?.desired_start_date ||
         m.project_job_assignment?.desired_end_date ||
@@ -603,6 +604,12 @@ function historyGetDateKey(m) {
 }
 
 function historyGetTimeKey(m) {
+    if (m.event_starts_at) {
+        try {
+            const d = new Date(String(m.event_starts_at).replace(' ', 'T'));
+            return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+        } catch { /* fallthrough */ }
+    }
     return m.project_job_assignment?.start_time || m.project_job_assignment?.desired_time || '00:00';
 }
 
@@ -685,16 +692,30 @@ function historyGetRecipients(m) {
     }
 }
 
-function historyGetDeadline(m) {
+function historyGetWorkDate(m) {
     try {
+        if (m.event_starts_at) {
+            const norm = String(m.event_starts_at).replace(' ', 'T');
+            const dateStr = norm.split('T')[0];
+            const parts = dateStr.split('-');
+            if (parts.length === 3) {
+                const formatted = `${parts[0]}/${parts[1]}/${parts[2]}`;
+                const d = new Date(norm);
+                const startTime = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+                if (m.event_ends_at) {
+                    const e = new Date(String(m.event_ends_at).replace(' ', 'T'));
+                    const endTime = `${String(e.getHours()).padStart(2, '0')}:${String(e.getMinutes()).padStart(2, '0')}`;
+                    return `${formatted}\n${startTime}〜${endTime}`;
+                }
+                return `${formatted}\n${startTime}〜`;
+            }
+        }
+        // fallback: assignment の締め切り日
         const date = m.project_job_assignment?.desired_end_date || null;
         if (!date) return '-';
         const parts = String(date).split('T')[0].split('-');
         if (parts.length !== 3) return String(date).split('T')[0];
-        const formatted = `${parts[0]}/${parts[1]}/${parts[2]}`;
-        const time = m.project_job_assignment?.start_time || m.project_job_assignment?.desired_time || '';
-        if (time) return `${formatted}\n${String(time).slice(0, 5)}`;
-        return formatted;
+        return `${parts[0]}/${parts[1]}/${parts[2]}`;
     } catch {
         return '-';
     }
