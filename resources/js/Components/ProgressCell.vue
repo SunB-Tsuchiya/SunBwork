@@ -109,7 +109,7 @@
         <button
           type="button"
           class="rounded bg-gray-200 px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-300"
-          @click="emit('job-link-detail', { assignmentId: cell.assignment_id, assignmentTitle: cell.assignment_title, assigneeUserId: cell.assignment_user_id, endDate: cell.assignment_end_date, completed: cell.assignment_completed })"
+          @click="emit('job-link-detail', { assignmentId: cell.assignment_id, assignmentTitle: cell.assignment_title, assigneeUserId: cell.assignment_user_id, endDate: cell.assignment_end_date, completed: cell.assignment_completed, rowId, colKey: colDef.key })"
         >詳細</button>
         <!-- 担当者本人のみ: 完了にするボタン -->
         <button

@@ -618,7 +618,26 @@ class EventController extends Controller
             }
             $attachment->delete();
         }
+        // イベント削除後、同じ assignment に紐づくイベントがなくなった場合は ProgressCell のリンクもクリア
+        $assignmentIdToCheck = null;
+        try {
+            if (Schema::hasColumn('events', 'project_job_assignment_id')) {
+                $assignmentIdToCheck = $event->project_job_assignment_id;
+            }
+        } catch (\Throwable $e) { /* ignore */ }
+
         $event->delete();
+
+        if ($assignmentIdToCheck) {
+            try {
+                $remaining = \App\Models\Event::where('project_job_assignment_id', $assignmentIdToCheck)->count();
+                if ($remaining === 0) {
+                    \App\Models\ProgressCell::where('assignment_id', $assignmentIdToCheck)
+                        ->update(['assignment_id' => null]);
+                }
+            } catch (\Throwable $e) { /* ignore */ }
+        }
+
         // If this request came from Inertia, return a redirect (Inertia expects a redirect/Inertia response).
         if (request()->header('X-Inertia')) {
             return redirect()->route('calendar.index');

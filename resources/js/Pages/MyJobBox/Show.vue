@@ -164,7 +164,12 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, ref } from 'vue';
 
-const { projectJob, assignment, canDelete } = defineProps({ projectJob: Object, assignment: Object, canDelete: { type: Boolean, default: false } });
+const { projectJob, assignment, canDelete, linkedProgressCellCount } = defineProps({
+    projectJob: Object,
+    assignment: Object,
+    canDelete: { type: Boolean, default: false },
+    linkedProgressCellCount: { type: Number, default: 0 },
+});
 const page = usePage();
 
 const isAssignee = computed(() => {
@@ -197,7 +202,10 @@ function routeBack() {
 }
 
 function deleteAssignment() {
-    if (!confirm('このジョブ割り当てを本当に削除しますか？この操作は取り消せません。')) return;
+    const msg = linkedProgressCellCount > 0
+        ? `このジョブ割り当てを削除しますか？\n\n⚠ このジョブは進行管理表（${linkedProgressCellCount}件）に登録されています。\n削除すると管理表の登録情報も同時にクリアされます。\n\nこの操作は取り消せません。`
+        : 'このジョブ割り当てを本当に削除しますか？この操作は取り消せません。';
+    if (!confirm(msg)) return;
     router.delete(typeof route === 'function' ? route('user.myjobbox.destroy', { assignment: assignment?.id }) : `/myjobbox/${assignment?.id}`, {
         onError: () => alert('削除に失敗しました。'),
     });

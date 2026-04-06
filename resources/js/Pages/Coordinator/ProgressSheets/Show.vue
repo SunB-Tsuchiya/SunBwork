@@ -382,6 +382,13 @@
             @click="adminUncompleteAssignment"
           >{{ jobLinkDetailModal.completing ? '処理中…' : '未完了に戻す' }}</button>
           <button
+            v-if="canEdit"
+            type="button"
+            class="rounded bg-red-100 px-4 py-1.5 text-sm font-medium text-red-700 hover:bg-red-200 disabled:opacity-60"
+            :disabled="jobLinkDetailModal.unlinking"
+            @click="unlinkJobFromCell"
+          >{{ jobLinkDetailModal.unlinking ? '処理中…' : '削除する' }}</button>
+          <button
             type="button"
             class="rounded border border-gray-300 px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
             @click="jobLinkDetailModal.open = false"
@@ -485,7 +492,7 @@ const bulkChildLabel = ref('');
 // ── ジョブリンク ──────────────────────────────────────
 const jobLinkModal = ref({ open: false, isSelfAssign: true, rowId: null, colKey: null });
 const jobLinkForm = ref({ title: '', detail: '', desiredEndDate: '', assigneeUserId: null });
-const jobLinkDetailModal = ref({ open: false, title: '', assigneeName: '', endDate: '', completed: false, assignmentId: null, completing: false });
+const jobLinkDetailModal = ref({ open: false, title: '', assigneeName: '', endDate: '', completed: false, assignmentId: null, completing: false, unlinking: false, rowId: null, colKey: null });
 
 /** 列ツリーをたどってキーまでのラベルパスを返す */
 function findBreadcrumb(nodes, key, path = []) {
@@ -678,7 +685,7 @@ function submitJobLink() {
   );
 }
 
-function openJobLinkDetail({ assignmentId, assignmentTitle, assigneeUserId, endDate, completed }) {
+function openJobLinkDetail({ assignmentId, assignmentTitle, assigneeUserId, endDate, completed, rowId, colKey }) {
   const assignee = props.users.find((u) => u.id === assigneeUserId);
   jobLinkDetailModal.value = {
     open: true,
@@ -688,6 +695,9 @@ function openJobLinkDetail({ assignmentId, assignmentTitle, assigneeUserId, endD
     completed: !!completed,
     assignmentId: assignmentId ?? null,
     completing: false,
+    unlinking: false,
+    rowId: rowId ?? null,
+    colKey: colKey ?? null,
   };
 }
 
@@ -733,6 +743,54 @@ async function adminUncompleteAssignment() {
     updateLocalCellCompleted(id, false);
   } catch { /* ignore */ }
   finally { jobLinkDetailModal.value.completing = false; }
+}
+
+async function unlinkJobFromCell() {
+  const modal = jobLinkDetailModal.value;
+  if (!modal.rowId || !modal.colKey) return;
+
+  const hasAssignment = !!modal.assignmentId;
+  const msg = hasAssignment
+    ? 'この登録情報を削除しますか？\n\n・カレンダーの予定がない場合はマイジョブも削除されます。\n・カレンダーの予定がある場合はマイジョブは管理シートと無関係なジョブとして残ります。'
+    : 'この登録情報を削除しますか？（マイジョブのデータが見つからないため、セルのリンクのみクリアされます）';
+  if (!confirm(msg)) return;
+
+  modal.unlinking = true;
+  try {
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    const res = await fetch(route('coordinator.progress_sheets.cells.unlink_job', { sheet: props.sheet.id }), {
+      method: 'DELETE',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': csrf,
+        'X-Requested-With': 'XMLHttpRequest',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({ row_id: modal.rowId, col_key: modal.colKey }),
+    });
+    if (res.ok) {
+      // ローカルセルをクリア
+      const idx = localCells.value.findIndex((c) => c.row_id === modal.rowId && c.col_key === modal.colKey);
+      if (idx >= 0) {
+        localCells.value.splice(idx, 1, {
+          ...localCells.value[idx],
+          assignment_id: null,
+          assignment_title: null,
+          assignment_completed: null,
+          assignment_user_id: null,
+          assignment_end_date: null,
+        });
+      }
+      modal.open = false;
+    } else {
+      alert('削除に失敗しました。');
+    }
+  } catch {
+    alert('削除に失敗しました。');
+  } finally {
+    modal.unlinking = false;
+  }
 }
 
 async function onCompleteAssignmentFromCell({ assignmentId }) {

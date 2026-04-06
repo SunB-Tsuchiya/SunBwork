@@ -216,10 +216,19 @@ class MyProjectJobController extends Controller
             || $user->isSuperAdmin()
             || $user->isAdmin();
 
+        // 進行管理表との紐付け件数（削除確認UI用）
+        $linkedProgressCellCount = 0;
+        try {
+            $linkedProgressCellCount = \App\Models\ProgressCell::where('assignment_id', $assignment->id)->count();
+        } catch (\Throwable $e) {
+            // progress_cells テーブルが存在しない場合は無視
+        }
+
         return Inertia::render('MyJobBox/Show', [
-            'projectJob' => $projectJob,
-            'assignment' => $assignment,
-            'canDelete'  => $canDelete,
+            'projectJob'              => $projectJob,
+            'assignment'              => $assignment,
+            'canDelete'               => $canDelete,
+            'linkedProgressCellCount' => $linkedProgressCellCount,
         ]);
     }
 
@@ -231,6 +240,14 @@ class MyProjectJobController extends Controller
         $user = $request->user();
         if (! $user || ($assignment->user_id !== $user->id && ! $user->isSuperAdmin() && ! $user->isAdmin())) {
             abort(403, '削除する権限がありません。');
+        }
+
+        // ProgressCell の assignment_id を明示的にクリア（Sakura FK 非依存の救済措置）
+        try {
+            \App\Models\ProgressCell::where('assignment_id', $assignment->id)
+                ->update(['assignment_id' => null]);
+        } catch (\Throwable $e) {
+            // progress_cells テーブルが存在しない場合は無視
         }
 
         $assignment->delete();

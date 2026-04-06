@@ -259,6 +259,62 @@ class ProgressSheetController extends Controller
         return back()->with('success', 'ジョブを登録しました。');
     }
 
+    /**
+     * セルの登録情報（assignment_id）を削除する
+     * イベントがなければ assignment も削除する（救済措置含む）
+     */
+    public function unlinkJob(Request $request, ProgressSheet $sheet): \Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+        $this->authorizeJobAccess($user, $sheet->projectJob, $sheet);
+
+        $validated = $request->validate([
+            'row_id' => 'required|integer',
+            'col_key' => 'required|string',
+        ]);
+
+        DB::transaction(function () use ($validated) {
+            $cell = ProgressCell::where('row_id', $validated['row_id'])
+                ->where('col_key', $validated['col_key'])
+                ->first();
+
+            if (!$cell) {
+                return;
+            }
+
+            $assignmentId = $cell->assignment_id;
+
+            // セルの assignment_id をクリア
+            $cell->assignment_id = null;
+            $cell->save();
+
+            if (!$assignmentId) {
+                return;
+            }
+
+            $assignment = ProjectJobAssignment::find($assignmentId);
+            if (!$assignment) {
+                // 孤立参照（Sakura救済措置）: セルのクリアのみで完了
+                return;
+            }
+
+            // イベントがなければ assignment も削除
+            $hasEvents = false;
+            try {
+                $hasEvents = \Illuminate\Support\Facades\Schema::hasColumn('events', 'project_job_assignment_id')
+                    && \App\Models\Event::where('project_job_assignment_id', $assignmentId)->exists();
+            } catch (\Throwable $e) {
+                // ignore
+            }
+
+            if (!$hasEvents) {
+                $assignment->delete();
+            }
+        });
+
+        return response()->json(['success' => true]);
+    }
+
     // ───── helpers ─────
 
     private function authorizeJobAccess(User $user, ProjectJob $projectJob, ?ProgressSheet $sheet = null): void
