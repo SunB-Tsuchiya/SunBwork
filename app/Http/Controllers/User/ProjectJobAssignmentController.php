@@ -149,6 +149,17 @@ class ProjectJobAssignmentController extends Controller
                             'col_key' => $a['_col_key'],
                         ]);
                     }
+
+                    // 進行表経由でジョブ登録 → リーダーへ通知
+                    try {
+                        if ($user) {
+                            \App\Services\JobNotificationService::notifyProgressRegistered($user, $projectJob, $assignment);
+                        }
+                    } catch (\Throwable $__eNotify) {
+                        \Illuminate\Support\Facades\Log::warning('Failed to send progress registration notification', [
+                            'error' => $__eNotify->getMessage(),
+                        ]);
+                    }
                 }
 
                 // Create corresponding Event if events table supports linking

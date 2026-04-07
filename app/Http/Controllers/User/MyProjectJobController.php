@@ -138,7 +138,8 @@ class MyProjectJobController extends Controller
 
             // ジョブ通知（進行管理表リンクあり → リーダーへ / なし → Coordinator依頼分のみ依頼主＋リーダーへ）
             try {
-                $projectJob = $assignment->projectJob;
+                $projectJob = $assignment->projectJob
+                    ?? \App\Models\ProjectJob::find($assignment->project_job_id);
                 if ($projectJob) {
                     $hasProgressLink = \App\Models\ProgressCell::where('assignment_id', $assignment->id)->exists();
                     if ($hasProgressLink) {

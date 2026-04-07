@@ -816,3 +816,60 @@ $createPayload['sender_id'] = $a['sender_id'] ?? ($user ? $user->id : null);
 ### テスト
 
 `tests/Feature/ProgressSheetJobChainTest.php` に6件のテストを追加。すべて PASS 確認済み。
+
+---
+
+## ジョブ通知機能（2026-04-07 実装）
+
+### 概要
+
+Coordinator がジョブを割り当てたとき、ユーザーが完了したとき、進行管理表でジョブを登録・完了したときに通知を発行するシステム。
+
+**マイグレーション:** `2026_04_07_200001_create_job_notifications_table.php`（さくらでは `php artisan migrate` 必須）
+
+### 主要ファイル
+
+| ファイル | 役割 |
+|---|---|
+| `app/Models/JobNotification.php` | Eloquent モデル |
+| `app/Services/JobNotificationService.php` | 通知生成の集中ロジック（static メソッド） |
+| `app/Http/Controllers/JobNotificationController.php` | index / show |
+| `resources/js/Pages/JobNotifications/Index.vue` | 日別・月別・期間フィルター付き一覧 |
+
+### 通知タイプと発火条件
+
+| type | 発火タイミング | 送信先 |
+|---|---|---|
+| `new_job` | Coordinator がジョブ割り当て作成 | 受信者本人 |
+| `new_job_info` | 同上 | 案件オーナー＋サブCo（自分以外） |
+| `completed` | ユーザーがJobBox完了 | 依頼主（sender） |
+| `completed_info` | 同上 | 案件オーナー＋サブCo（自分以外） |
+| `progress_registered` | 進行表からMyJob登録 | 案件オーナー＋サブCo |
+| `progress_completed` | 進行表連動ジョブ完了 | 案件オーナー＋サブCo |
+
+**自己割当（`sender_id = user_id`）の完了は `completed` を送らない。**
+
+### 通知クリック時の挙動（`JobNotificationController::show()`）
+
+1. `job_notifications.read_at` を更新
+2. 対応する `ProjectJobAssignment.read_at` と `status_id`（confirmed）を更新
+3. `JobAssignmentMessage.read_at` も更新
+4. リダイレクト先:
+   - `new_job` → `user.project_jobs.jobbox.show`（JobAssignmentMessage 経由）
+   - `new_job`（JAM なし） → `user.myjobbox.show`
+   - `completed` → `project_jobs.jobbox.show`（Coordinator 側）
+   - その他 → ロール別の `project_jobs.show`
+
+### ナビゲーション
+
+`AppLayout.vue` のメールアイコンリンク先を `job-notifications.index` に変更。未読件数バッジを `unreadJobNotifications`（`HandleInertiaRequests` で全ページ共有）で表示。
+
+### 割り当て発信フロー（2026-04-07 変更）
+
+**「保存して送信」ボタン**: `AssignmentForm.vue`（coordinator モード）から `send_immediately: true` を送信すると、`ProjectJobAssignmentsController::store()` が割り当て保存と同時に `JobAssignmentMessage` を作成・`assigned = true`・ブロードキャストまで実行する。一覧からの「発信」ボタンは既存割当の後送用として残存。
+
+### 進行管理表アクセス制御（2026-04-07 修正）
+
+`User/ProgressSheetController::authorizeView()` の条件:
+- 案件オーナー / サブCo / **チームメンバー**（`project_job_team_members`）/ Admin / **`project_job_assignments` に割り当て済み**
+- `show()` も同メソッドを使用（旧: assignment のみチェックしていた）

@@ -761,6 +761,23 @@ class EventController extends Controller
             }
             $assignment->save();
 
+            // ジョブ通知（進行管理表リンクあり → リーダーへ / なし → Coordinator依頼分のみ）
+            try {
+                $user = $request->user();
+                $pj   = $assignment->projectJob
+                    ?? \App\Models\ProjectJob::find($assignment->project_job_id);
+                if ($user && $pj) {
+                    $hasProgressLink = \App\Models\ProgressCell::where('assignment_id', $assignment->id)->exists();
+                    if ($hasProgressLink) {
+                        \App\Services\JobNotificationService::notifyProgressCompleted($user, $pj, $assignment);
+                    } else {
+                        \App\Services\JobNotificationService::notifyCompleted($user, $assignment, $pj);
+                    }
+                }
+            } catch (\Throwable $__eNotify) {
+                \Illuminate\Support\Facades\Log::warning('EventController: JobNotification dispatch error', ['error' => $__eNotify->getMessage()]);
+            }
+
             // ── Coordinator の project_job_assignments を完了にする（ユーザーが承認した場合のみ）──
             if ($alsoCompleteCoordinator) {
                 try {

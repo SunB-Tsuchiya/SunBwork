@@ -23,15 +23,8 @@ class ProgressSheetController extends Controller
         $sheet->load(['projectJob.client', 'projectJob.size', 'projectJob.coordinators']);
         $projectJob = $sheet->projectJob;
 
-        // アクセス確認：自分が割り当てられている案件のみ
-        $hasAccess = \App\Models\ProjectJobAssignment::where('project_job_id', $projectJob->id)
-            ->where(function ($q) use ($user) {
-                $q->where('user_id', $user->id)->orWhere('sender_id', $user->id);
-            })->exists();
-
-        if (!$hasAccess) {
-            abort(403);
-        }
+        // アクセス確認：案件メンバー・割当ユーザー・オーナー・サブCo・管理者
+        $this->authorizeView($user, $projectJob);
 
         $rows = $sheet->rows()->orderBy('order')->get(['id', 'label', 'order', 'parent_id']);
 
@@ -100,7 +93,8 @@ class ProgressSheetController extends Controller
         $allowedRowIds = ProgressRow::where('sheet_id', $sheet->id)->pluck('id')->toArray();
         abort_unless(in_array($validated['row_id'], $allowedRowIds), 403);
 
-        DB::transaction(function () use ($validated, $sheet, $user) {
+        $createdAssignment = null;
+        DB::transaction(function () use ($validated, $sheet, $user, &$createdAssignment) {
             $assignment = ProjectJobAssignment::create([
                 'project_job_id'   => $sheet->project_job_id,
                 'user_id'          => $user->id,
@@ -114,7 +108,16 @@ class ProgressSheetController extends Controller
                 ['row_id' => $validated['row_id'], 'col_key' => $validated['col_key']],
                 ['assignment_id' => $assignment->id]
             );
+
+            $createdAssignment = $assignment;
         });
+
+        if ($createdAssignment) {
+            $projectJob = $sheet->projectJob ?? \App\Models\ProjectJob::find($sheet->project_job_id);
+            if ($projectJob) {
+                \App\Services\JobNotificationService::notifyProgressRegistered($user, $projectJob, $createdAssignment);
+            }
+        }
 
         return back()->with('success', 'MyJobに登録しました。');
     }
@@ -186,12 +189,16 @@ class ProgressSheetController extends Controller
 
     private function authorizeView(User $user, $projectJob): void
     {
-        $isOwner  = $projectJob->user_id === $user->id;
-        $isSub    = $projectJob->coordinators()->where('users.id', $user->id)->exists();
-        $isMember = $projectJob->teamMembers()->where('user_id', $user->id)->exists();
-        $isAdmin  = in_array($user->user_role, ['admin', 'superadmin']);
+        $isOwner    = $projectJob->user_id === $user->id;
+        $isSub      = $projectJob->coordinators()->where('users.id', $user->id)->exists();
+        $isMember   = $projectJob->teamMembers()->where('user_id', $user->id)->exists();
+        $isAdmin    = in_array($user->user_role, ['admin', 'superadmin']);
+        $isAssigned = ProjectJobAssignment::where('project_job_id', $projectJob->id)
+            ->where(function ($q) use ($user) {
+                $q->where('user_id', $user->id)->orWhere('sender_id', $user->id);
+            })->exists();
 
-        abort_unless($isOwner || $isSub || $isMember || $isAdmin, 403);
+        abort_unless($isOwner || $isSub || $isMember || $isAdmin || $isAssigned, 403);
     }
 
     private function findColLabel(array $nodes, string $key): string

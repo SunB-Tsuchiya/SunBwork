@@ -1029,7 +1029,8 @@ class JobBoxController extends Controller
 
         // ジョブ通知
         try {
-            $pj = $assignment->projectJob;
+            $pj = $assignment->projectJob
+                ?? \App\Models\ProjectJob::find($assignment->project_job_id);
             if ($pj) {
                 $hasProgressLink = \App\Models\ProgressCell::where('assignment_id', $assignment->id)->exists();
                 if ($hasProgressLink) {
