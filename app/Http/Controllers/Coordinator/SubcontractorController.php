@@ -136,7 +136,7 @@ class SubcontractorController extends Controller
         }
 
         $normalized = $this->normalizeName($name);
-        $existing = $query->get(['id', 'name', 'company_name']);
+        $existing = $query->get(['id', 'name']);
         $duplicates = $existing->filter(fn ($s) => $this->normalizeName($s->name) === $normalized && $normalized !== '')->values();
 
         return response()->json(['duplicates' => $duplicates]);

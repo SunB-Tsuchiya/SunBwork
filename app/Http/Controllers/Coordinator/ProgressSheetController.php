@@ -124,7 +124,7 @@ class ProgressSheetController extends Controller
         $rows = $sheet->rows()->orderBy('order')->get(['id', 'label', 'order', 'parent_id']);
 
         $cells = ProgressCell::whereIn('row_id', $rows->pluck('id'))
-            ->with(['valueUser:id,name', 'valueSubcontractor:id,name,company_name', 'assignment:id,title,detail,desired_end_date,completed,user_id,sender_id,subcontractor_id'])
+            ->with(['valueUser:id,name', 'valueSubcontractor:id,name', 'assignment:id,title,detail,desired_end_date,completed,user_id,sender_id,subcontractor_id'])
             ->get()
             ->map(fn($c) => [
                 'id'                         => $c->id,
@@ -136,7 +136,7 @@ class ProgressSheetController extends Controller
                 'value_user_id'              => $c->value_user_id,
                 'value_user_name'            => $c->valueUser?->name,
                 'value_subcontractor_id'     => $c->value_subcontractor_id,
-                'value_subcontractor_name'   => $c->valueSubcontractor ? ($c->valueSubcontractor->name . '（' . $c->valueSubcontractor->company_name . '）') : null,
+                'value_subcontractor_name'   => $c->valueSubcontractor?->name,
                 'assignment_id'              => $c->assignment_id,
                 'assignment_title'           => $c->assignment?->title,
                 'assignment_completed'       => $c->assignment?->completed,
@@ -155,10 +155,10 @@ class ProgressSheetController extends Controller
         // ログインCoordinatorが管理する外注先
         $authUser = $request->user();
         $subcontractors = \App\Models\Subcontractor::managedBy($authUser->id)
-            ->get(['id', 'name', 'company_name'])
+            ->get(['id', 'name'])
             ->map(fn($s) => [
-                'id'           => $s->id,
-                'name'         => $s->name . '（' . $s->company_name . '）',
+                'id'               => $s->id,
+                'name'             => $s->name,
                 'is_subcontractor' => true,
             ]);
 
