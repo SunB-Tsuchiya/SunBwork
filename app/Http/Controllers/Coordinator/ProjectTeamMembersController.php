@@ -31,6 +31,13 @@ class ProjectTeamMembersController extends Controller
                     'project_job_id' => $projectJobId,
                     'user_id' => $userId,
                 ]);
+                
+                // メンバー追加時に自動的に project_job_assignments レコードも作成
+                // これにより、User 側の /user/project-jobs に案件が表示される
+                \App\Models\ProjectJobAssignment::firstOrCreate([
+                    'project_job_id' => $projectJobId,
+                    'user_id' => $userId,
+                ]);
             }
             DB::commit();
             return redirect()->route('coordinator.project_jobs.show', ['projectJob' => $projectJobId])
