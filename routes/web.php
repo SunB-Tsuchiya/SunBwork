@@ -201,6 +201,9 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::get('project_jobs/{projectJob}/jobbox', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'index'])->name('user.project_jobs.jobbox.index');
     Route::get('project_jobs/{projectJob}/jobbox/{message}', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'show'])->name('user.project_jobs.jobbox.show');
     Route::post('project_jobs/{projectJob}/jobbox/reply', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'reply'])->name('user.project_jobs.jobbox.reply');
+    // JobBox JSON API (SPA session auth — must be in web.php, not api.php)
+    Route::get('/api/jobbox/{id}', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'apiShow'])->name('api.jobbox.show');
+    Route::post('/api/jobbox/{id}/read', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'apiMarkRead'])->name('api.jobbox.read');
     // User progress sheet cell link (MyJob登録)
     Route::post('/user/project-jobs/{projectJob}/progress-sheets/{sheet}/link-job', [App\Http\Controllers\User\ProjectJobController::class, 'linkProgressCell'])->name('user.project_jobs.progress_sheets.link_job');
     // User self-assignment routes

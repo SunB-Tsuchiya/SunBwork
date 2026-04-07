@@ -369,6 +369,12 @@
         </dl>
         <div class="mt-5 flex flex-wrap justify-end gap-2">
           <button
+            v-if="jobLinkDetailModal.assignmentId"
+            type="button"
+            class="rounded bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+            @click="openAssignmentDetail(jobLinkDetailModal.assignmentId)"
+          >ジョブ詳細を開く</button>
+          <button
             v-if="canEdit && jobLinkDetailModal.assignmentId && !jobLinkDetailModal.completed"
             type="button"
             class="rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
@@ -685,6 +691,11 @@ function submitJobLink() {
       },
     }
   );
+}
+
+function openAssignmentDetail(assignmentId) {
+  if (!assignmentId || !props.projectJob?.id) return;
+  router.visit(route('project_jobs.assignments.show', { projectJob: props.projectJob.id, assignment: assignmentId }));
 }
 
 function openJobLinkDetail({ assignmentId, assignmentTitle, assigneeUserId, endDate, completed, rowId, colKey }) {

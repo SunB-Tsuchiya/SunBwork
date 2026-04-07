@@ -743,21 +743,9 @@ class JobBoxController extends Controller
         $user = $request->user();
         $jam = JobAssignmentMessage::findOrFail($id);
 
-        // Authorization: only assignee or privileged roles or sender/owner can mark
-        $isPrivileged = $user && (method_exists($user, 'isCoordinator') && ($user->isCoordinator() || $user->isLeader() || $user->isAdmin() || $user->isSuperAdmin()));
-        $isOwner = false;
-        try {
-            $pj = $jam->projectJobAssignment ? $jam->projectJobAssignment->projectJob : null;
-            if ($pj && $pj->user_id && $user && $user->id === $pj->user_id) $isOwner = true;
-        } catch (\Throwable $__e) {
-            // ignore
-        }
-
-        $isSender = $user && $jam->sender_id && $user->id === $jam->sender_id;
-        $isAssignee = $user && $jam->project_job_assignment && $jam->project_job_assignment->user_id && $user->id === $jam->project_job_assignment->user_id;
-
-        if (! $isPrivileged && ! $isOwner && ! $isSender && ! $isAssignee) {
-            return response()->json(['error' => 'Access denied'], 403);
+        // 既読マークは認証済みユーザーであれば許可（表示権限は呼び出し元ページで確認済み）
+        if (! $user) {
+            return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
         if (! $jam->read_at) {

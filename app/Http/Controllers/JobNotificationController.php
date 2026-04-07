@@ -124,7 +124,19 @@ class JobNotificationController extends Controller
             }
         }
 
-        // new_job_info / completed_info / progress_* / fallback → 案件詳細
+        // progress_registered / progress_completed → assignment 詳細ページへ直接遷移
+        if (in_array($type, ['progress_registered', 'progress_completed']) && $assignmentId && $projectJobId) {
+            try {
+                return redirect()->route('project_jobs.assignments.show', [
+                    'projectJob'  => $projectJobId,
+                    'assignment'  => $assignmentId,
+                ]);
+            } catch (\Throwable $e) {
+                // fallthrough
+            }
+        }
+
+        // new_job_info / completed_info / fallback → 案件詳細
         $projectJobRoute = match (true) {
             $user->isAdmin() || $user->isSuperAdmin() => 'coordinator.project_jobs.show',
             $user->isCoordinator() || $user->isClerk() => 'coordinator.project_jobs.show',

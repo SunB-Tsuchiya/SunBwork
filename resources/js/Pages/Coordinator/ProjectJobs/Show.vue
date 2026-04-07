@@ -51,6 +51,11 @@
                     >ジョブ割り当て</button>
                     <button
                         type="button"
+                        class="rounded border border-indigo-300 bg-white px-4 py-1.5 text-sm font-medium text-indigo-600 hover:bg-indigo-50"
+                        @click="goAssignmentList"
+                    >割り当て一覧</button>
+                    <button
+                        type="button"
                         class="rounded bg-teal-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-teal-700"
                         @click="goAnalysis"
                     >ジョブ詳細</button>
@@ -517,6 +522,11 @@ function backToIndex() {
 function goJobAssign() {
     const id = job.id;
     if (id) router.visit(route('coordinator.project_jobs.assignments.create', { projectJob: id }));
+}
+
+function goAssignmentList() {
+    const id = job.id;
+    if (id) router.visit(route('coordinator.project_jobs.assignments.index', { projectJob: id }));
 }
 
 function goAnalysis() {

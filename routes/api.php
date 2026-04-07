@@ -165,11 +165,6 @@ Route::get('/debug/public/attachments/stream', function (Request $request) {
 
 Route::middleware(['web', 'auth:sanctum'])->post('/chat/messages/{message}/read', [\App\Http\Controllers\Chat\ChatController::class, 'markAsRead']);
 
-// JobBox lightweight fetch for event-driven previews
-// These endpoints are SPA-facing and need the session + CSRF handling provided
-// by the `web` middleware so browser XHRs using first-party cookies work.
-Route::middleware(['web', 'auth:sanctum'])->get('/jobbox/{id}', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'apiShow'])->name('api.jobbox.show');
-// Mark a JobAssignmentMessage as read (SPA-friendly JSON endpoint)
-Route::middleware(['web', 'auth:sanctum'])->post('/jobbox/{id}/read', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'apiMarkRead'])->name('api.jobbox.read');
+// JobBox routes moved to routes/web.php (SPA session auth requires web middleware)
 
 // End of API route definitions
