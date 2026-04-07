@@ -23,14 +23,9 @@ class JobBoxController extends Controller
         $user = $request->user();
         $isPrivileged = $user && (method_exists($user, 'isCoordinator') && ($user->isCoordinator() || $user->isLeader() || $user->isAdmin() || $user->isSuperAdmin()));
 
-        // Privileged users accessed via the user route → redirect to coordinator-prefixed URL
-        // so that AppLayout shows coordinator tabs instead of user tabs.
-        if ($isPrivileged) {
-            $routeName = $request->route()?->getName();
-            if ($routeName === 'user.project_jobs.jobbox.index') {
-                return redirect()->route('coordinator.project_jobs.jobbox.index', ['projectJob' => $projectJob->id]);
-            }
-        }
+        // routeContext: user ルート経由ならば 'user'、coordinator ルート経由ならば 'coordinator'
+        $routeName = $request->route()?->getName();
+        $routeContext = str_starts_with((string) $routeName, 'user.') ? 'user' : 'coordinator';
 
         // Additionally allow the project owner or any user who has sent a job-assignment
         // message for this project to view the project jobbox even if they are not
@@ -186,6 +181,7 @@ class JobBoxController extends Controller
             'monthOptions' => $monthOptions,
             'sort' => $sort,
             'dir' => $dir,
+            'routeContext' => $routeContext,
         ]);
     }
 
@@ -461,25 +457,20 @@ class JobBoxController extends Controller
             'monthOptions' => $monthOptions,
             'sort' => $sort,
             'dir' => $dir,
+            'routeContext' => 'user',
         ]);
     }
 
-    public function show(ProjectJob $projectJob, JobAssignmentMessage $message)
+    public function show(ProjectJob $projectJob, JobAssignmentMessage $message, Request $request)
     {
         // Authorization: allow privileged roles or assigned users only
-        $user = \Illuminate\Support\Facades\Auth::user();
+        $user = $request->user();
         $isPrivileged = $user && (method_exists($user, 'isCoordinator') && ($user->isCoordinator() || $user->isLeader() || $user->isAdmin() || $user->isSuperAdmin()));
 
-        // Privileged users accessed via the user route → redirect to coordinator-prefixed URL
-        if ($isPrivileged) {
-            $routeName = request()->route()?->getName();
-            if ($routeName === 'user.project_jobs.jobbox.show') {
-                return redirect()->route('coordinator.project_jobs.jobbox.show', [
-                    'projectJob' => $projectJob->id,
-                    'message'    => $message->id,
-                ]);
-            }
-        }
+        // routeContext: user ルート経由ならば 'user'、coordinator ルート経由ならば 'coordinator'
+        $showRouteName = $request->route()?->getName();
+        $showRouteContext = str_starts_with((string) $showRouteName, 'user.') ? 'user' : 'coordinator';
+
         if (! $isPrivileged) {
             $hasAssignment = \App\Models\ProjectJobAssignment::where('project_job_id', $projectJob->id)
                 ->where('user_id', $user ? $user->id : 0)
@@ -619,14 +610,13 @@ class JobBoxController extends Controller
         }
 
         // 削除権限の判定
-        $currentUser = auth()->user();
         $canDelete = false;
-        if ($currentUser) {
-            $isSender        = $message->sender_id === $currentUser->id;
-            $isAdminOrAbove  = $currentUser->isSuperAdmin() || $currentUser->isAdmin();
-            $isLeader        = $currentUser->isLeader();
-            $isProjectOwner  = $projectJob->user_id === $currentUser->id;
-            $isSubCo         = $projectJob->coordinators()->where('users.id', $currentUser->id)->exists();
+        if ($user) {
+            $isSender        = $message->sender_id === $user->id;
+            $isAdminOrAbove  = $user->isSuperAdmin() || $user->isAdmin();
+            $isLeader        = $user->isLeader();
+            $isProjectOwner  = $projectJob->user_id === $user->id;
+            $isSubCo         = $projectJob->coordinators()->where('users.id', $user->id)->exists();
             $canDelete = $isSender || $isAdminOrAbove || $isLeader || $isProjectOwner || $isSubCo;
         }
 
@@ -635,6 +625,7 @@ class JobBoxController extends Controller
             'message' => $message,
             'difficulties' => $difficulties,
             'canDelete' => $canDelete,
+            'routeContext' => $showRouteContext,
         ]);
     }
 

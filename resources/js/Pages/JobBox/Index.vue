@@ -8,6 +8,7 @@
             <div class="mb-4 flex items-center justify-between">
                 <h1 class="text-2xl font-bold">JobBox：{{ props.projectJob?.title || props.projectJob?.name || '全体' }}</h1>
                 <Link
+                    v-if="props.routeContext === 'coordinator'"
                     :href="route('coordinator.project_jobs.assignment_select')"
                     class="rounded bg-green-600 px-4 py-2 text-sm text-white hover:bg-green-700"
                 >新規作成</Link>
@@ -153,7 +154,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, reactive, ref } from 'vue';
 
-const props = defineProps({ projectJob: Object, messages: Object });
+const props = defineProps({ projectJob: Object, messages: Object, routeContext: { type: String, default: 'coordinator' } });
 const page = usePage();
 page.props.q_model = page.props.q || '';
 page.props.period_model = page.props.period ?? '';
@@ -358,12 +359,13 @@ function rowClick(m, event) {
 
 function search() {
     const pjId = props.projectJob?.id;
+    const isCoordinatorContext = props.routeContext === 'coordinator';
     if (!pjId) {
-        const target = page.props.auth.user?.isCoordinator ? 'coordinator.jobbox' : 'user.jobbox.index';
+        const target = isCoordinatorContext ? 'coordinator.jobbox' : 'user.jobbox.index';
         router.get(route(target), { q: page.props.q_model, period: page.props.period_model }, { preserveState: false });
         return;
     }
-    const r = page.props.auth.user?.isCoordinator ? 'coordinator.project_jobs.jobbox.index' : 'user.project_jobs.jobbox.index';
+    const r = isCoordinatorContext ? 'coordinator.project_jobs.jobbox.index' : 'user.project_jobs.jobbox.index';
     router.get(route(r, { projectJob: pjId }), { q: page.props.q_model, period: page.props.period_model }, { preserveState: false });
 }
 
@@ -375,11 +377,10 @@ function clearSearch() {
 function getBackLink() {
     const pjId = props.projectJob?.id;
     try {
-        if (!pjId) return '/coordinator/jobbox';
-        if (page.props.auth.user?.isCoordinator) return route('coordinator.project_jobs.show', { projectJob: pjId });
-        return route('project_jobs.show', { projectJob: pjId });
+        if (!pjId) return props.routeContext === 'coordinator' ? route('coordinator.jobbox') : route('user.jobbox.index');
+        return route('coordinator.project_jobs.show', { projectJob: pjId });
     } catch {
-        return '/coordinator/jobbox';
+        return props.routeContext === 'coordinator' ? '/coordinator/jobbox' : '/user/jobbox';
     }
 }
 
@@ -388,7 +389,7 @@ function getMessageLink(m) {
     try {
         if (!pjId) pjId = m.project_job_assignment?.project_job?.id || m.project_job_assignment?.project_job_id || null;
         if (!pjId) return '#';
-        if (page.props.auth.user?.isCoordinator) return route('coordinator.project_jobs.jobbox.show', { projectJob: pjId, message: m.id });
+        if (props.routeContext === 'coordinator') return route('coordinator.project_jobs.jobbox.show', { projectJob: pjId, message: m.id });
         return route('user.project_jobs.jobbox.show', { projectJob: pjId, message: m.id });
     } catch {
         return '#';

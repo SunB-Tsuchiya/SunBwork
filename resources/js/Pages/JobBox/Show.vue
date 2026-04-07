@@ -63,17 +63,6 @@
             <!-- ジョブ割り当て詳細カード -->
             <AssignmentDetailCard :assignment="assignment" />
 
-            <!-- コメント（メッセージ本文） -->
-            <div v-if="message.subject || message.body" class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-                <div class="border-b bg-gray-50 px-5 py-3">
-                    <h4 class="text-xs font-semibold uppercase tracking-wide text-gray-400">コメント</h4>
-                </div>
-                <div class="px-5 py-4">
-                    <p v-if="message.subject" class="mb-1 text-sm font-semibold text-gray-700">{{ message.subject }}</p>
-                    <p v-if="message.body" class="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">{{ message.body }}</p>
-                </div>
-            </div>
-
         </div>
     </AppLayout>
 </template>
@@ -84,7 +73,7 @@ import AssignmentDetailCard from '@/Components/AssignmentDetailCard.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, ref } from 'vue';
 import { route } from 'ziggy-js';
-const { projectJob, message, canDelete } = defineProps({ projectJob: Object, message: Object, canDelete: { type: Boolean, default: false } });
+const { projectJob, message, canDelete, routeContext } = defineProps({ projectJob: Object, message: Object, canDelete: { type: Boolean, default: false }, routeContext: { type: String, default: 'coordinator' } });
 const page = usePage();
 
 // Safe route helper: prefer Ziggy `route()` when available, else return fallback string.
@@ -150,9 +139,7 @@ function formatEstimatedHours(h) {
 
 function routeBack() {
     try {
-        const user = page.props.auth?.user;
-        const isPrivileged = user && (user.isCoordinator || user.isLeader || user.isAdmin || user.isSuperAdmin);
-        if (isPrivileged) {
+        if (routeContext === 'coordinator') {
             // プロジェクト詳細から来た場合はプロジェクト詳細に戻る
             const fromProject = new URLSearchParams(window.location.search).get('from') === 'project';
             if (fromProject && projectJob?.id) {
@@ -164,9 +151,10 @@ function routeBack() {
             }
             return safeRoute('coordinator.jobbox', {}, '/coordinator/jobbox');
         }
-        return safeRoute('user.project_jobs.jobbox.index', { projectJob: projectJob?.id }, '/coordinator/jobbox');
+        // user コンテキスト
+        return safeRoute('user.jobbox.index', {}, '/user/jobbox');
     } catch (e) {
-        return '/coordinator/jobbox';
+        return '/user/jobbox';
     }
 }
 
@@ -388,10 +376,8 @@ const scheduleHref = computed(() => {
 });
 
 const editHref = computed(() => {
-    const isCoordinator = page.props.auth?.user?.isCoordinator;
-
     // Coordinator: go directly to the coordinator assignment edit page (full form + time setting)
-    if (isCoordinator && projectJob?.id && assignment?.id) {
+    if (routeContext === 'coordinator' && projectJob?.id && assignment?.id) {
         return safeRoute(
             'coordinator.project_jobs.assignments.edit',
             { projectJob: projectJob.id, assignment: assignment.id },
@@ -469,8 +455,6 @@ function submitComplete() {
 
 function getSetHref() {
     try {
-        const isCoordinator = page.props.auth?.user?.isCoordinator;
-
         if (linkedAssignmentId && linkedAssignmentId.value) {
             const jid = String(linkedAssignmentId.value);
             const fallback = '/project_jobs/assignments/edit-user?job=' + encodeURIComponent(jid);
@@ -483,7 +467,7 @@ function getSetHref() {
         }
 
         // Coordinator: go to the coordinator assignment edit page (full form + time setting)
-        if (isCoordinator && projectJob?.id && assignment?.id) {
+        if (routeContext === 'coordinator' && projectJob?.id && assignment?.id) {
             return safeRoute(
                 'coordinator.project_jobs.assignments.edit',
                 { projectJob: projectJob.id, assignment: assignment.id },
