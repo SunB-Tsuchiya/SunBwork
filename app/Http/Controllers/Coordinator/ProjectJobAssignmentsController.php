@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use App\Models\JobAssignmentMessage;
 use App\Models\ProjectJob;
 use App\Models\ProjectJobAssignment;
 use App\Models\Client;
@@ -617,6 +618,9 @@ class ProjectJobAssignmentsController extends Controller
             'assignments.*._col_key' => 'nullable|string|max:64',
         ]);
 
+        $sendImmediately = $request->boolean('send_immediately', false);
+        $senderUser = auth()->user();
+
         foreach ($data['assignments'] as $a) {
             // logical validations per assignment
             // scheduling: desired_start_date removed; only validate desired_time vs today below
@@ -631,7 +635,7 @@ class ProjectJobAssignmentsController extends Controller
             }
 
             // Create assignment and associated WorkItem in a transaction
-            DB::transaction(function () use ($projectJob, $a) {
+            DB::transaction(function () use ($projectJob, $a, $sendImmediately, $senderUser) {
                 // prefer explicit difficulty_id only
                 $difficultyId = !empty($a['difficulty_id']) ? (int) $a['difficulty_id'] : null;
 
@@ -665,15 +669,61 @@ class ProjectJobAssignmentsController extends Controller
                 $assignment = ProjectJobAssignment::create($createData);
 
                 // ジョブ通知（受信者と案件リーダー・副リーダーへ）
-                if (!empty($createData['user_id'])) {
-                    $senderUser = auth()->user();
-                    if ($senderUser) {
-                        \App\Services\JobNotificationService::notifyNewJob(
-                            $senderUser,
-                            $createData['user_id'],
-                            $projectJob,
-                            $assignment
-                        );
+                if (!empty($createData['user_id']) && $senderUser) {
+                    \App\Services\JobNotificationService::notifyNewJob(
+                        $senderUser,
+                        $createData['user_id'],
+                        $projectJob,
+                        $assignment
+                    );
+                }
+
+                // 保存して送信: JobAssignmentMessage を即時作成して依頼を発信する
+                if ($sendImmediately && !empty($createData['user_id']) && $senderUser) {
+                    try {
+                        $detailText = $a['detail'] ?? '';
+                        $assignedName = null;
+                        try {
+                            $assignedUser = \App\Models\User::find($createData['user_id']);
+                            $assignedName = $assignedUser?->name;
+                        } catch (\Throwable $_) {}
+
+                        $bodyText = implode("\n", array_filter([
+                            'ジョブ割り当て依頼',
+                            '案件: ' . ($projectJob->title ?? ''),
+                            'ジョブ: ' . ($a['title'] ?? ''),
+                            $assignedName ? '担当: ' . $assignedName : null,
+                            $detailText ? '詳細: ' . $detailText : null,
+                            !empty($a['desired_end_date']) ? '締め切り: ' . $a['desired_end_date'] : null,
+                        ]));
+
+                        $jam = JobAssignmentMessage::create([
+                            'project_job_assignment_id' => $assignment->id,
+                            'sender_id' => $senderUser->id,
+                            'subject' => $a['title'] ?? null,
+                            'body' => $bodyText,
+                        ]);
+
+                        $assignment->assigned = true;
+                        try { $assignment->accepted = true; } catch (\Throwable $_) {}
+                        $assignment->save();
+
+                        try {
+                            $jamLoaded = JobAssignmentMessage::with([
+                                'sender',
+                                'projectJobAssignment.user',
+                                'projectJobAssignment.projectJob.client',
+                            ])->find($jam->id);
+                            event(new \App\Events\JobMessageCreated(
+                                $jamLoaded,
+                                [$createData['user_id']],
+                                $jam->id
+                            ));
+                        } catch (\Throwable $_) {}
+                    } catch (\Throwable $eSend) {
+                        Log::warning('send_immediately failed after assignment store', [
+                            'error' => $eSend->getMessage(),
+                        ]);
                     }
                 }
 

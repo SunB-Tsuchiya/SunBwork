@@ -355,7 +355,7 @@
         <div class="flex gap-2" v-if="editMode">
             <template v-if="props.mode === 'coordinator'">
                 <button type="button" class="rounded bg-blue-600 px-4 py-2 text-white" @click="addBlock">ジョブブロックを追加</button>
-                <button type="submit" class="rounded bg-green-600 px-4 py-2 text-white">保存する</button>
+                <button type="submit" class="rounded bg-green-600 px-4 py-2 text-white">保存して送信</button>
                 <Link
                     :href="route('coordinator.project_jobs.assignments.index', { projectJob: projectJob ? projectJob.id : '' })"
                     class="rounded bg-gray-200 px-4 py-2"
@@ -1649,6 +1649,7 @@ async function save() {
         }
 
         const payload = {
+            send_immediately: true,
             assignments: assignments.value.map((a) => ({
                 title: assembleTitleCoord(a),
                 detail: a.detail || '',
