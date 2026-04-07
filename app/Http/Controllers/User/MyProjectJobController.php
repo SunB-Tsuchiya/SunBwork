@@ -136,6 +136,21 @@ class MyProjectJobController extends Controller
             }
             $assignment->save();
 
+            // ジョブ通知（進行管理表リンクあり → リーダーへ / なし → Coordinator依頼分のみ依頼主＋リーダーへ）
+            try {
+                $projectJob = $assignment->projectJob;
+                if ($projectJob) {
+                    $hasProgressLink = \App\Models\ProgressCell::where('assignment_id', $assignment->id)->exists();
+                    if ($hasProgressLink) {
+                        \App\Services\JobNotificationService::notifyProgressCompleted($user, $projectJob, $assignment);
+                    } else {
+                        \App\Services\JobNotificationService::notifyCompleted($user, $assignment, $projectJob);
+                    }
+                }
+            } catch (\Throwable $__eNotify) {
+                \Illuminate\Support\Facades\Log::warning('JobNotification dispatch error in completeAssignment', ['error' => $__eNotify->getMessage()]);
+            }
+
             // チェーン上のすべての元ジョブ（祖先）も完了にする
             $current = $assignment;
             $maxDepth = 20;

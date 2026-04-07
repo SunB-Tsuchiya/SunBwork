@@ -1027,6 +1027,21 @@ class JobBoxController extends Controller
 
         $assignment->save();
 
+        // ジョブ通知
+        try {
+            $pj = $assignment->projectJob;
+            if ($pj) {
+                $hasProgressLink = \App\Models\ProgressCell::where('assignment_id', $assignment->id)->exists();
+                if ($hasProgressLink) {
+                    \App\Services\JobNotificationService::notifyProgressCompleted($user, $pj, $assignment);
+                } else {
+                    \App\Services\JobNotificationService::notifyCompleted($user, $assignment, $pj);
+                }
+            }
+        } catch (\Throwable $__eNotify) {
+            \Illuminate\Support\Facades\Log::warning('JobNotification dispatch error in JobBoxController::completeAssignment', ['error' => $__eNotify->getMessage()]);
+        }
+
         return response()->json(['success' => true, 'assignment_id' => $assignment->id]);
     }
 

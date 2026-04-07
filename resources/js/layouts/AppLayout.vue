@@ -76,6 +76,12 @@ watch(
     () => page.props.unreadAnnouncements,
     (v) => { unreadAnnouncements.value = v || 0; },
 );
+// ジョブ通知未読数
+const unreadJobNotifications = vueRef(page.props.unreadJobNotifications || 0);
+watch(
+    () => page.props.unreadJobNotifications,
+    (v) => { unreadJobNotifications.value = v || 0; },
+);
 
 // keep reactive when Inertia page props update
 watch(
@@ -309,17 +315,17 @@ const currentRouteContext = computed(() => {
                                 </div>
                             </div>
 
-                            <!-- メール -->
+                            <!-- ジョブ通知 -->
                             <div class="group relative">
-                                <Link :href="route('messages.index')" class="relative flex h-8 w-8 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700">
+                                <Link :href="route('job-notifications.index')" class="relative flex h-8 w-8 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
                                     </svg>
-                                    <span v-if="unreadMessages && unreadMessages > 0" class="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[10px] text-white">{{ unreadMessages }}</span>
+                                    <span v-if="unreadJobNotifications > 0" class="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[10px] text-white">{{ unreadJobNotifications }}</span>
                                 </Link>
                                 <div class="pointer-events-none absolute right-0 top-9 z-50 w-36 rounded-md bg-gray-800 px-3 py-2 text-xs text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-                                    <p class="font-medium">メール</p>
-                                    <p class="text-gray-300">メッセージ受信箱</p>
+                                    <p class="font-medium">ジョブ通知</p>
+                                    <p class="text-gray-300">依頼・完了通知</p>
                                 </div>
                             </div>
 

@@ -477,6 +477,15 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
         Route::get('/{recipient}', [App\Http\Controllers\AnnouncementController::class, 'show'])->name('show');
     });
 
+// ジョブ通知（全認証ユーザー）
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified'])
+    ->prefix('job-notifications')
+    ->name('job-notifications.')
+    ->group(function () {
+        Route::get('/', [\App\Http\Controllers\JobNotificationController::class, 'index'])->name('index');
+        Route::get('/{jobNotification}', [\App\Http\Controllers\JobNotificationController::class, 'show'])->name('show');
+    });
+
 Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'coordinator'])
     ->prefix('coordinator')
     ->name('coordinator.')

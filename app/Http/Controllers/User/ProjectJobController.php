@@ -130,7 +130,8 @@ class ProjectJobController extends Controller
         $allowedRowIds = ProgressRow::where('sheet_id', $sheet->id)->pluck('id')->toArray();
         abort_unless(in_array($validated['row_id'], $allowedRowIds), 403);
 
-        DB::transaction(function () use ($validated, $projectJob, $sheet, $user) {
+        $createdAssignment = null;
+        DB::transaction(function () use ($validated, $projectJob, $sheet, $user, &$createdAssignment) {
             $assignment = ProjectJobAssignment::create([
                 'project_job_id'   => $projectJob->id,
                 'user_id'          => $user->id,
@@ -144,7 +145,14 @@ class ProjectJobController extends Controller
                 ['row_id' => $validated['row_id'], 'col_key' => $validated['col_key']],
                 ['assignment_id' => $assignment->id]
             );
+
+            $createdAssignment = $assignment;
         });
+
+        // 進行管理表からのジョブ登録通知（リーダー・副リーダーへ）
+        if ($createdAssignment) {
+            \App\Services\JobNotificationService::notifyProgressRegistered($user, $projectJob, $createdAssignment);
+        }
 
         return back()->with('success', 'マイジョブとして登録しました。');
     }

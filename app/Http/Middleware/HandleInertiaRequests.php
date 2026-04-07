@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Models\AdminPermission;
 use App\Models\AnnouncementRecipient;
+use App\Models\JobNotification;
 use App\Models\LeaderPermission;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -48,12 +49,20 @@ class HandleInertiaRequests extends Middleware
                 ->count();
         }
 
+        $unreadJobNotifications = 0;
+        if ($request->user()) {
+            $unreadJobNotifications = JobNotification::where('recipient_id', $request->user()->id)
+                ->whereNull('read_at')
+                ->count();
+        }
+
         return [
             ...parent::share($request),
             'flash' => $flashMessage ? ['message' => $flashMessage, 'type' => $flashType] : null,
             'clientDeleteError' => session('clientDeleteError'),
             'subcontractorDeleteError' => session('subcontractorDeleteError'),
             'unreadAnnouncements' => $unreadAnnouncements,
+            'unreadJobNotifications' => $unreadJobNotifications,
             // Share authenticated user basic info and helper role flags for frontend permission checks
             'auth' => [
                 'user' => $request->user()

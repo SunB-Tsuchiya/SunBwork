@@ -664,6 +664,19 @@ class ProjectJobAssignmentsController extends Controller
 
                 $assignment = ProjectJobAssignment::create($createData);
 
+                // ジョブ通知（受信者と案件リーダー・副リーダーへ）
+                if (!empty($createData['user_id'])) {
+                    $senderUser = auth()->user();
+                    if ($senderUser) {
+                        \App\Services\JobNotificationService::notifyNewJob(
+                            $senderUser,
+                            $createData['user_id'],
+                            $projectJob,
+                            $assignment
+                        );
+                    }
+                }
+
                 // 進行表セルリンク: _progress_sheet_id / _row_id / _col_key が渡された場合
                 if (!empty($a['_progress_sheet_id']) && !empty($a['_row_id']) && !empty($a['_col_key'])) {
                     try {
