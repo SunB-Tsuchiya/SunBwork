@@ -7,6 +7,7 @@ use App\Models\JobAssignmentMessage;
 use App\Models\ProgressSheet;
 use App\Models\ProjectJob;
 use App\Models\ProjectJobAssignment;
+use App\Models\ProjectTeamMember;
 use App\Models\ProjectSchedule;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
@@ -23,9 +24,14 @@ class ProjectJobController extends Controller
     {
         $user = $request->user();
 
-        $jobIds = ProjectJobAssignment::where(function ($q) use ($user) {
+        $assignmentJobIds = ProjectJobAssignment::where(function ($q) use ($user) {
             $q->where('user_id', $user->id)->orWhere('sender_id', $user->id);
-        })->pluck('project_job_id')->unique();
+        })->pluck('project_job_id');
+
+        $teamMemberJobIds = ProjectTeamMember::where('user_id', $user->id)
+            ->pluck('project_job_id');
+
+        $jobIds = $assignmentJobIds->merge($teamMemberJobIds)->unique();
 
         $jobs = ProjectJob::whereIn('id', $jobIds)
             ->with('client')
@@ -57,11 +63,16 @@ class ProjectJobController extends Controller
         $period     = $request->input('period', '');
         $sortStatus = $request->input('sort_status', '');
 
-        // 自分が受信者または発信者である割当が存在する案件IDを取得
-        $jobIds = ProjectJobAssignment::where(function ($query) use ($user) {
+        // 自分が受信者または発信者である割当、もしくはチームメンバーとして登録されている案件IDを取得
+        $assignmentJobIds = ProjectJobAssignment::where(function ($query) use ($user) {
             $query->where('user_id', $user->id)
                   ->orWhere('sender_id', $user->id);
-        })->pluck('project_job_id')->unique();
+        })->pluck('project_job_id');
+
+        $teamMemberJobIds = ProjectTeamMember::where('user_id', $user->id)
+            ->pluck('project_job_id');
+
+        $jobIds = $assignmentJobIds->merge($teamMemberJobIds)->unique();
 
         $query = ProjectJob::with('client')->whereIn('id', $jobIds);
 
