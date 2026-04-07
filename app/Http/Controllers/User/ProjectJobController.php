@@ -120,11 +120,13 @@ class ProjectJobController extends Controller
     {
         $user = $request->user();
 
-        // アクセス確認（自分が関係する案件）
+        // アクセス確認（自分が関係する案件、またはチームメンバー）
         $hasAccess = ProjectJobAssignment::where('project_job_id', $projectJob->id)
             ->where(function ($q) use ($user) {
                 $q->where('user_id', $user->id)->orWhere('sender_id', $user->id);
-            })->exists();
+            })->exists()
+            || ProjectTeamMember::where('project_job_id', $projectJob->id)
+                ->where('user_id', $user->id)->exists();
 
         if (!$hasAccess) {
             abort(403);
@@ -172,11 +174,13 @@ class ProjectJobController extends Controller
     {
         $user = $request->user();
 
-        // 自分が関係する案件かチェック
+        // 自分が関係する案件かチェック（アサインメントまたはチームメンバー）
         $hasAccess = ProjectJobAssignment::where('project_job_id', $projectJob->id)
             ->where(function ($q) use ($user) {
                 $q->where('user_id', $user->id)->orWhere('sender_id', $user->id);
-            })->exists();
+            })->exists()
+            || ProjectTeamMember::where('project_job_id', $projectJob->id)
+                ->where('user_id', $user->id)->exists();
 
         if (!$hasAccess) {
             abort(403);
