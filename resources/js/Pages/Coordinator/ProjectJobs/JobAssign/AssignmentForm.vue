@@ -354,8 +354,16 @@
 
         <div class="flex gap-2" v-if="editMode">
             <template v-if="props.mode === 'coordinator'">
-                <button type="button" class="rounded bg-blue-600 px-4 py-2 text-white" @click="addBlock">ジョブブロックを追加</button>
-                <button type="submit" class="rounded bg-green-600 px-4 py-2 text-white">保存して送信</button>
+                <!-- 新規作成のみ「ブロック追加」を表示 -->
+                <button v-if="!isEditMode" type="button" class="rounded bg-blue-600 px-4 py-2 text-white" @click="addBlock">ジョブブロックを追加</button>
+                <!-- 新規: 保存して送信 / 編集: 保存して再送信 + 送信せず保存 -->
+                <template v-if="isEditMode">
+                    <button type="button" class="rounded bg-green-600 px-4 py-2 text-white" :disabled="saving" @click.prevent="save(true)">保存して再送信</button>
+                    <button type="button" class="rounded bg-gray-600 px-4 py-2 text-white" :disabled="saving" @click.prevent="save(false)">送信せず保存</button>
+                </template>
+                <template v-else>
+                    <button type="submit" class="rounded bg-green-600 px-4 py-2 text-white" :disabled="saving">保存して送信</button>
+                </template>
                 <Link
                     :href="route('coordinator.project_jobs.assignments.index', { projectJob: projectJob ? projectJob.id : '' })"
                     class="rounded bg-gray-200 px-4 py-2"
@@ -1632,7 +1640,10 @@ function authDepartmentName() {
 
 const saving = ref(false);
 
-async function save() {
+// 編集モード判定: assignments[0] に id があれば既存レコードの編集
+const isEditMode = computed(() => !!(assignments.value[0]?.id));
+
+async function save(sendImmediately = true) {
     if (!props.editMode) {
         return;
     }
@@ -1674,6 +1685,9 @@ async function save() {
                 status_id: 1,
                 amounts: typeof a.amounts === 'number' ? a.amounts : Number(a.amounts) || 0,
                 amounts_unit: a.amounts_unit || 'page',
+                _progress_sheet_id: a._progress_sheet_id ?? null,
+                _row_id: a._row_id ?? null,
+                _col_key: a._col_key ?? null,
             })),
         };
 
@@ -1686,14 +1700,51 @@ async function save() {
             return;
         }
 
-        router.post(
-            route('coordinator.project_jobs.assignments.store', { projectJob: coordinatorProjectJobId }),
-            payload,
-            {
-                onFinish: () => { saving.value = false; },
-                onError: () => { alert('保存に失敗しました'); },
-            }
-        );
+        const existingId = assignments.value[0]?.id ?? null;
+
+        if (existingId) {
+            // 既存アサインの更新（PUT）
+            const a = assignments.value[0];
+            const updatePayload = {
+                title: assembleTitleCoord(a),
+                detail: a.detail || '',
+                user_id: a.user_id || null,
+                company_id: a.company_id || null,
+                department_id: a.department_id || null,
+                difficulty_id:
+                    a.difficulty_id ??
+                    (window?.page?.props?.difficulties
+                        ? (window.page.props.difficulties.find((d) => d.name === a.difficulty || d.slug === a.difficulty)?.id ?? null)
+                        : null),
+                desired_end_date: a.desired_end_date || null,
+                desired_time: String(a.desired_time_hour || '00').padStart(2, '0') + ':' + String(a.desired_time_min || '00').padStart(2, '0'),
+                estimated_hours: a.estimated_hours || null,
+                work_item_type_id: a.work_item_type_id || null,
+                size_id: a.size_id || null,
+                stage_id: a.stage_id || null,
+                status_id: a.status_id || null,
+                amounts: typeof a.amounts === 'number' ? a.amounts : Number(a.amounts) || 0,
+                amounts_unit: a.amounts_unit || 'page',
+                send_immediately: sendImmediately,
+            };
+            router.put(
+                route('coordinator.project_jobs.assignments.update', { projectJob: coordinatorProjectJobId, assignment: existingId }),
+                updatePayload,
+                {
+                    onFinish: () => { saving.value = false; },
+                    onError: () => { alert('保存に失敗しました'); },
+                }
+            );
+        } else {
+            router.post(
+                route('coordinator.project_jobs.assignments.store', { projectJob: coordinatorProjectJobId }),
+                payload,
+                {
+                    onFinish: () => { saving.value = false; },
+                    onError: () => { alert('保存に失敗しました'); },
+                }
+            );
+        }
         return;
     } else {
         // user mode save

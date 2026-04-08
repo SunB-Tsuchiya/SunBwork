@@ -241,7 +241,7 @@ async function uncomplete() {
     uncompleting.value = true;
     try {
         const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-        const url = route('coordinator.project_jobs.uncomplete', { projectJob: props.job.id });
+        const url = route('project_jobs.uncomplete', { projectJob: props.job.id });
         const res = await fetch(url, {
             method: 'POST',
             credentials: 'same-origin',

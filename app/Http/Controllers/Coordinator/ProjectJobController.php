@@ -614,8 +614,28 @@ class ProjectJobController extends Controller
 
     public function destroy(ProjectJob $projectJob)
     {
+        // 関連レコードがある場合は削除不可
+        $assignmentCount = \App\Models\ProjectJobAssignment::where('project_job_id', $projectJob->id)->count();
+        if ($assignmentCount > 0) {
+            if (request()->expectsJson()) {
+                return response()->json(['error' => "この案件には {$assignmentCount} 件のジョブ割り当てがあるため削除できません。先に割り当てを削除してください。"], 422);
+            }
+            return redirect()->back()->with('error', "この案件には {$assignmentCount} 件のジョブ割り当てがあるため削除できません。");
+        }
+
+        $sheetCount = \App\Models\ProgressSheet::where('project_job_id', $projectJob->id)->count();
+        if ($sheetCount > 0) {
+            if (request()->expectsJson()) {
+                return response()->json(['error' => "この案件には {$sheetCount} 件の進行管理表があるため削除できません。先に進行管理表を削除してください。"], 422);
+            }
+            return redirect()->back()->with('error', "この案件には {$sheetCount} 件の進行管理表があるため削除できません。");
+        }
+
         $projectJob->delete();
-        // Inertiaリダイレクト時にフロントでリロードを促すため、フラッシュメッセージを渡す
+
+        if (request()->expectsJson()) {
+            return response()->json(['success' => true]);
+        }
         return redirect()->route('coordinator.project_jobs.index')->with('reload', true);
     }
 

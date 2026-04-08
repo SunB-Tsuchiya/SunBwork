@@ -22,7 +22,15 @@ function applyFilters() {
 const groupedNotifications = computed(() => {
     const map = {};
     (props.notifications || []).forEach((n) => {
-        const raw = n.created_at ? String(n.created_at).substring(0, 10) : '不明';
+        let raw = '不明';
+        if (n.created_at) {
+            const d = toJST(n.created_at);
+            if (d) {
+                raw = d.toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' }); // YYYY-MM-DD
+            } else {
+                raw = String(n.created_at).substring(0, 10);
+            }
+        }
         const key = viewMode.value === 'month' ? raw.substring(0, 7) : raw;
         if (!map[key]) map[key] = [];
         map[key].push(n);
@@ -42,9 +50,23 @@ function formatGroupKey(key) {
     return `${y}/${m}/${d}`;
 }
 
+// UTC文字列をJST (Asia/Tokyo) に変換するヘルパー
+function toJST(dateStr) {
+    if (!dateStr) return null;
+    try {
+        return new Date(String(dateStr).replace(' ', 'T').replace(/\+.*$/, '') + 'Z');
+    } catch {
+        return null;
+    }
+}
+
 function formatTime(dateStr) {
     if (!dateStr) return '';
-    return String(dateStr).replace('T', ' ').substring(11, 16);
+    const d = toJST(dateStr);
+    if (!d) return '';
+    const h = String(d.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', hour12: false })).padStart(2, '0');
+    const m = String(d.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', minute: '2-digit' })).padStart(2, '0');
+    return `${h}:${m}`;
 }
 
 const TYPE_LABELS = {

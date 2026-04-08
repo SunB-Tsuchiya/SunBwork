@@ -312,6 +312,7 @@ class ProjectJobAssignmentsController extends Controller
             'project_job_id' => $a->project_job_id,
             'user_id' => $a->user_id,
             'title' => $a->title,
+            'title_suffix' => $a->title, // AssignmentForm の assembleTitleCoord() が参照するキー
             'detail' => $a->detail,
             'difficulty_id' => $a->difficulty_id ?? null,
             'difficulty_label' => $a->difficultyModel?->name ?? null,
@@ -325,11 +326,6 @@ class ProjectJobAssignmentsController extends Controller
             'size_id' => $a->size_id,
             'stage_id' => $a->stage_id,
             'status_id' => $a->status_id,
-            'status' => $a->statusModel ? [
-                'id' => $a->statusModel->id,
-                'key' => $a->statusModel->key ?? $a->statusModel->slug ?? null,
-                'name' => $a->statusModel->name,
-            ] : null,
             // canonical status object for frontend convenience
             'status' => $a->statusModel ? [
                 'id' => $a->statusModel->id,
@@ -540,7 +536,10 @@ class ProjectJobAssignmentsController extends Controller
             // amounts and unit: amounts is integer >= 0, unit limited to page|file
             'amounts' => 'nullable|integer|min:0',
             'amounts_unit' => 'nullable|string|in:page,file',
+            'send_immediately' => 'nullable|boolean',
         ]);
+
+        $sendImmediately = $request->boolean('send_immediately', false);
 
         // server-side logical validations
         // if end date is today, desired_time must be >= now
@@ -583,7 +582,56 @@ class ProjectJobAssignmentsController extends Controller
 
         $assignment->update($updateData);
 
-        // (debug logs removed)
+        // 保存して再送信: 既存の JobAssignmentMessage を削除し、最新内容で再作成
+        if ($sendImmediately && !empty($updateData['user_id'])) {
+            $senderUser = auth()->user();
+            try {
+                DB::transaction(function () use ($assignment, $projectJob, $updateData, $senderUser) {
+                    // 旧メッセージを削除（送信一覧が二重にならないよう）
+                    JobAssignmentMessage::where('project_job_assignment_id', $assignment->id)->delete();
+
+                    $assignedName = null;
+                    try {
+                        $assignedUser = \App\Models\User::find($updateData['user_id']);
+                        $assignedName = $assignedUser?->name;
+                    } catch (\Throwable $_) {}
+
+                    $bodyText = implode("\n", array_filter([
+                        'ジョブ割り当て依頼（更新）',
+                        '案件: ' . ($projectJob->title ?? ''),
+                        'ジョブ: ' . ($updateData['title'] ?? ''),
+                        $assignedName ? '担当: ' . $assignedName : null,
+                        !empty($updateData['detail']) ? '詳細: ' . $updateData['detail'] : null,
+                        !empty($updateData['desired_end_date']) ? '締め切り: ' . $updateData['desired_end_date'] : null,
+                    ]));
+
+                    $jam = JobAssignmentMessage::create([
+                        'project_job_assignment_id' => $assignment->id,
+                        'sender_id' => $senderUser->id,
+                        'subject' => $updateData['title'] ?? null,
+                        'body' => $bodyText,
+                    ]);
+
+                    $assignment->assigned = true;
+                    $assignment->save();
+
+                    try {
+                        $jamLoaded = JobAssignmentMessage::with([
+                            'sender',
+                            'projectJobAssignment.user',
+                            'projectJobAssignment.projectJob.client',
+                        ])->find($jam->id);
+                        event(new \App\Events\JobMessageCreated(
+                            $jamLoaded,
+                            [$updateData['user_id']],
+                            $jam->id
+                        ));
+                    } catch (\Throwable $_) {}
+                });
+            } catch (\Throwable $e) {
+                Log::warning('send_immediately failed in assignment update', ['error' => $e->getMessage()]);
+            }
+        }
 
         return redirect()->route('coordinator.project_jobs.assignments.index', ['projectJob' => $projectJob->id]);
     }

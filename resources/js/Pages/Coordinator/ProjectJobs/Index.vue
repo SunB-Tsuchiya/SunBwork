@@ -78,7 +78,6 @@
                                         ステータス<span class="text-gray-400">{{ sortIndicator('status') }}</span>
                                     </button>
                                 </th>
-                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">操作</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -92,18 +91,7 @@
                                         class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
                                     >{{ job.completed ? '完了' : '進行中' }}</span>
                                 </td>
-                                <td class="border px-3 py-2">
-                                    <div class="flex flex-wrap gap-1">
-                                        <Link :href="route('coordinator.project_jobs.show', { projectJob: job.id })" class="rounded bg-gray-200 px-2 py-1 text-xs">詳細</Link>
-                                        <Link :href="route('coordinator.project_jobs.edit', { projectJob: job.id })" class="rounded bg-yellow-200 px-2 py-1 text-xs">編集</Link>
-                                        <button
-                                            v-if="!job.completed"
-                                            @click="completeJob(job)"
-                                            class="rounded bg-green-200 px-2 py-1 text-xs hover:bg-green-300"
-                                        >完了</button>
-                                        <button @click="destroy(job.id)" class="rounded bg-red-200 px-2 py-1 text-xs hover:bg-red-300">削除</button>
-                                    </div>
-                                </td>
+
                             </tr>
                         </tbody>
                     </table>
@@ -237,35 +225,6 @@ function rowClick(event, job) {
     router.visit(route('coordinator.project_jobs.show', { projectJob: job.id }));
 }
 
-// ===== 完了処理 =====
-
-async function completeJob(job) {
-    if (!confirm('この案件を完了としてマークしますか？')) return;
-    try {
-        const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-        const url = route('coordinator.project_jobs.complete', { projectJob: job.id });
-        const res = await fetch(url, {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': token,
-                'X-Requested-With': 'XMLHttpRequest',
-            },
-        });
-        if (res.ok) {
-            const idx = localJobs.value.findIndex((x) => x.id === job.id);
-            if (idx >= 0) {
-                localJobs.value.splice(idx, 1, { ...localJobs.value[idx], completed: true });
-            }
-        } else {
-            alert('完了処理に失敗しました。');
-        }
-    } catch {
-        alert('完了処理に失敗しました。');
-    }
-}
-
 // ===== 検索 =====
 
 function search() {
@@ -275,14 +234,6 @@ function search() {
 function clearSearch() {
     page.props.q_model = '';
     search();
-}
-
-// ===== 削除 =====
-
-function destroy(id) {
-    if (confirm('本当に削除しますか？')) {
-        router.delete(route('coordinator.project_jobs.destroy', { projectJob: id }));
-    }
 }
 
 // ===== 登録後ナビゲーション =====

@@ -873,3 +873,56 @@ Coordinator がジョブを割り当てたとき、ユーザーが完了した�
 `User/ProgressSheetController::authorizeView()` の条件:
 - 案件オーナー / サブCo / **チームメンバー**（`project_job_team_members`）/ Admin / **`project_job_assignments` に割り当て済み**
 - `show()` も同メソッドを使用（旧: assignment のみチェックしていた）
+
+### 通知バグ修正（2026-04-08）
+
+**① `MyProjectJobController::completeAssignment()` の引数型バグ**
+
+- 旧: `ProjectJobAssignmentByMyself`（`sender_id = user_id` のグローバルスコープが適用）
+- Coordinator が別ユーザーに割り当てたジョブは `sender_id ≠ user_id` → **404** になり完了処理・通知が実行されなかった
+- 修正: 引数型を `ProjectJobAssignment` に変更。認可チェック `user_id !== $user->id` で保護は維持。
+
+**② ProgressSheetController::completeAssignment() に通知が欠落**
+
+- Coordinator が進行表から直接完了にした際に `notifyProgressCompleted` が呼ばれていなかった
+- 修正: `app/Http/Controllers/Coordinator/ProgressSheetController.php` の `completeAssignment()` に通知処理を追加。
+
+**③ 続きジョブチェーン越しの進行表通知が未発火**
+
+- 概要: 「続きジョブ」（`source_assignment_id` チェーン）が進行表セル (`ProgressCell`) と結びついているのはチェーンの途中（祖先）の assignment であり、カレンダーイベントに直接紐づく assignment 自体には ProgressCell がない場合がある。
+- 旧ロジック: `ProgressCell::where('assignment_id', $assignment->id)->exists()` のみチェック → ProgressCell なし → `notifyCompleted()` → 自己割当につきスキップ → **通知なし**
+- 修正内容: 直接チェックが `false` の場合、`source_assignment_id` を辿って祖先の ProgressCell の有無を確認（深さ最大 20）。見つかれば `notifyProgressCompleted` を呼ぶ。
+- 修正対象ファイル（同一ロジックを3箇所に適用）:
+  - `app/Http/Controllers/EventController.php`（カレンダーからの完了）
+  - `app/Http/Controllers/User/MyProjectJobController.php`（マイジョブBox からの完了）
+  - `app/Http/Controllers/ProjectJobs/JobBoxController.php`（受信JobBox からの完了）
+
+**④ 通知時刻の UTC→JST 変換（`resources/js/Pages/JobNotifications/Index.vue`）**
+
+- 旧: `String(dateStr).substring(11, 16)` で UTC 文字列をそのまま切り出し → 日本時間と 9 時間ずれて表示
+- 修正: `toJST()` ヘルパーで Date オブジェクトに変換し、`toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })` で表示。グループキー（日付）も同様に JST ベースに。
+
+---
+
+## アサイン編集フロー改善（2026-04-08 Claude 実装）
+
+### アサインの新規/編集判定と送信ボタン分岐
+
+**`AssignmentForm.vue`（coordinator モード）:**
+- `isEditMode` computed: `assignments[0].id` があれば既存レコードの編集と判定
+- 新規作成: 「ジョブブロックを追加」＋「保存して送信」ボタン
+- 編集時: 「保存して再送信」（緑）＋「送信せず保存」（グレー）の2ボタン表示
+- `save(sendImmediately: boolean)` で分岐。`router.put(assignments.update)` にフラット形式で送信
+- `assignmentPayload` に `title_suffix` を追加（`edit()` コントローラから）
+
+**`ProjectJobAssignmentsController::update()`:**
+- `send_immediately: true` の場合: 既存 `JobAssignmentMessage` を全削除 → 最新内容で再作成 → broadcast
+- `send_immediately: false` の場合: アサインのデータ更新のみ（送信履歴は変更しない）
+
+### JobBox Show からアサイン編集への遷移
+
+**`JobBox/Show.vue`:**
+- 「編集」ボタンを `<Link :href="assignmentEditHref">` に変更（`canDelete` ガードを廃止）
+- `assignmentEditHref` computed: `message.project_job_assignment.id` から `coordinator.project_jobs.assignments.edit` URLを生成
+- 旧: `jobbox.edit`（メッセージ本文の編集）→ 新: `assignments.edit`（アサイン内容の編集）
+- `isPrivilegedUser`（coordinator/leader/admin）であれば遷移可能

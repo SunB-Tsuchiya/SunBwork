@@ -767,7 +767,19 @@ class EventController extends Controller
                 $pj   = $assignment->projectJob
                     ?? \App\Models\ProjectJob::find($assignment->project_job_id);
                 if ($user && $pj) {
+                    // 自分自身 or ソースチェーン（祖先）に ProgressCell があれば progress_completed 通知
                     $hasProgressLink = \App\Models\ProgressCell::where('assignment_id', $assignment->id)->exists();
+                    if (!$hasProgressLink && !empty($assignment->source_assignment_id)) {
+                        // 祖先を辿って ProgressCell を探す（深さ最大 20）
+                        $cur = $assignment;
+                        for ($__i = 0; $__i < 20 && !$hasProgressLink; $__i++) {
+                            if (empty($cur->source_assignment_id)) break;
+                            $parent = \App\Models\ProjectJobAssignment::find($cur->source_assignment_id);
+                            if (!$parent) break;
+                            $hasProgressLink = \App\Models\ProgressCell::where('assignment_id', $parent->id)->exists();
+                            $cur = $parent;
+                        }
+                    }
                     if ($hasProgressLink) {
                         \App\Services\JobNotificationService::notifyProgressCompleted($user, $pj, $assignment);
                     } else {
@@ -1073,6 +1085,11 @@ class EventController extends Controller
         // reuse much of create() logic but render a dedicated job creation page
         $date = $request->query('date', now()->toDateString());
         $jobId = $request->query('job');
+        // JobBox/Show から「予定をセット（カレンダー）」で来た場合、Coordinator割当IDが渡される
+        $sourceJobAssignmentId = $request->query('source_job_assignment_id');
+        if (!$jobId && $sourceJobAssignmentId) {
+            $jobId = $sourceJobAssignmentId;
+        }
         $prefillTitle = $request->query('title'); // 進行管理表からの遷移時にタイトルをprefill
         $prefillClientId = $request->query('client_id');       // 進行管理表: クライアントID
         $prefillProjectJobId = $request->query('project_job_id'); // 進行管理表: 案件ID

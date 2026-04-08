@@ -13,9 +13,23 @@ class ProjectJobAssignmentUserController extends Controller
         $jobId = $request->query('job');
         $user = $request->user();
 
+        // JobBox/Show から「マイジョブとして登録」で来た場合（progress_cell なし）
+        // source_job_assignment_id に Coordinator 割当の ID が渡される
+        $sourceJobAssignmentId = $request->query('source_job_assignment_id');
+
         // If no prefill params, keep existing behaviour and redirect to the job create flow
-        if (!$jobId && !$request->query('sender_id') && !$request->query('desired_end_date') && !$request->query('desired_time')) {
+        if (!$jobId && !$sourceJobAssignmentId && !$request->query('sender_id') && !$request->query('desired_end_date') && !$request->query('desired_time') && !$request->query('project_job_id')) {
             return redirect()->route('events.create_job');
+        }
+
+        // source_job_assignment_id が渡された場合は Coordinator assignment から prefill 情報を取得
+        $sourceAssignment = null;
+        if ($sourceJobAssignmentId && !$jobId) {
+            try {
+                $sourceAssignment = \App\Models\ProjectJobAssignment::with(['projectJob.client', 'size', 'stage', 'workItemType'])->find($sourceJobAssignmentId);
+            } catch (\Throwable $__e) {
+                $sourceAssignment = null;
+            }
         }
 
         // Build userProjects / userClients similar to EventController::createJob
@@ -89,13 +103,41 @@ class ProjectJobAssignmentUserController extends Controller
         }
 
         // Build a single prefill assignment object for the form using query params and optional job source
-        $prefill = [
-            'project_job_id' => $request->query('projectJob') ?: null,
-            'sender_id' => $request->query('sender_id') ?: ($user ? $user->id : null),
-            'desired_end_date' => $request->query('desired_end_date') ?: null,
-            'desired_time' => $request->query('desired_time') ?: null,
-            'estimated_hours' => $request->query('estimated_hours') ?: null,
-        ];
+        if ($sourceAssignment) {
+            // Coordinator 割当から prefill を構築（JobBox/Show からの「マイジョブとして登録」）
+            $prefill = [
+                'project_job_id' => $sourceAssignment->project_job_id,
+                '_client_id' => $sourceAssignment->projectJob?->client?->id ?? ($request->query('_client_id') ?: ''),
+                'title_suffix' => $sourceAssignment->title ?? $request->query('title') ?? '',
+                'detail' => $sourceAssignment->detail ?? '',
+                'work_item_type_id' => $sourceAssignment->work_item_type_id ?? null,
+                'size_id' => $sourceAssignment->size_id ?? null,
+                'stage_id' => $sourceAssignment->stage_id ?? null,
+                'difficulty_id' => $sourceAssignment->difficulty_id ?? null,
+                'desired_end_date' => $sourceAssignment->desired_end_date
+                    ? (is_string($sourceAssignment->desired_end_date) ? $sourceAssignment->desired_end_date : $sourceAssignment->desired_end_date->format('Y-m-d'))
+                    : ($request->query('desired_end_date') ?: null),
+                'desired_time' => $sourceAssignment->desired_time ?? null,
+                'estimated_hours' => $sourceAssignment->estimated_hours ?? ($request->query('estimated_hours') ?: null),
+                'sender_id' => $user ? $user->id : null,
+                'amounts' => null,
+                'status_id' => null,
+            ];
+        } else {
+            $prefill = [
+                'project_job_id' => $request->query('project_job_id') ?: ($request->query('projectJob') ?: null),
+                '_client_id' => $request->query('_client_id') ?: '',
+                'title_suffix' => $request->query('title') ?? '',
+                'work_item_type_id' => $request->query('work_item_type_id') ?: null,
+                'size_id' => $request->query('size_id') ?: null,
+                'stage_id' => $request->query('stage_id') ?: null,
+                'difficulty_id' => $request->query('difficulty_id') ?: null,
+                'sender_id' => $request->query('sender_id') ?: ($user ? $user->id : null),
+                'desired_end_date' => $request->query('desired_end_date') ?: null,
+                'desired_time' => $request->query('desired_time') ?: null,
+                'estimated_hours' => $request->query('estimated_hours') ?: null,
+            ];
+        }
 
         $props = [
             'projectJob' => null,
@@ -112,7 +154,11 @@ class ProjectJobAssignmentUserController extends Controller
             'assignments' => [$prefill],
         ];
 
-        return Inertia::render('JobBox/create_user', $props);
+        // source_job_assignment_id がある場合（JobBox/Show からの独立ジョブ作成）→ MyJobBox/Create_user
+        // それ以外（従来の coordinator 割当経由）→ JobBox/create_user
+        $view = $sourceJobAssignmentId ? 'MyJobBox/Create_user' : 'JobBox/create_user';
+
+        return Inertia::render($view, $props);
     }
 
     public function edit(Request $request)

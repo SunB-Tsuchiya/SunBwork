@@ -59,6 +59,26 @@
                         class="rounded bg-teal-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-teal-700"
                         @click="goAnalysis"
                     >ジョブ詳細</button>
+                    <!-- 完了 / 未完了 -->
+                    <button
+                        v-if="!job.completed"
+                        type="button"
+                        class="rounded bg-green-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-green-700"
+                        @click="completeJob"
+                    >完了にする</button>
+                    <span
+                        v-else
+                        class="inline-flex items-center gap-2 rounded-full bg-yellow-100 px-3 py-1 text-sm font-medium text-yellow-800"
+                    >
+                        完了済み
+                        <button type="button" class="text-xs underline hover:no-underline" @click="uncompleteJob">取消</button>
+                    </span>
+                    <!-- 削除 -->
+                    <button
+                        type="button"
+                        class="rounded bg-red-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-red-700"
+                        @click="destroyJob"
+                    >削除</button>
                     <button
                         type="button"
                         class="rounded border border-gray-300 bg-white px-4 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50"
@@ -517,6 +537,64 @@ function goEdit() {
 
 function backToIndex() {
     router.visit(route('coordinator.project_jobs.index'));
+}
+
+async function completeJob() {
+    if (!confirm('この案件を完了としてマークしますか？')) return;
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    try {
+        const res = await fetch(route('project_jobs.complete', { projectJob: job.id }), {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        if (res.ok) {
+            router.reload({ preserveScroll: true });
+        } else {
+            alert('完了処理に失敗しました。');
+        }
+    } catch {
+        alert('完了処理に失敗しました。');
+    }
+}
+
+async function uncompleteJob() {
+    if (!confirm('完了を取り消しますか？')) return;
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    try {
+        const res = await fetch(route('project_jobs.uncomplete', { projectJob: job.id }), {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        if (res.ok) {
+            router.reload({ preserveScroll: true });
+        } else {
+            alert('未完了への変更に失敗しました。');
+        }
+    } catch {
+        alert('未完了への変更に失敗しました。');
+    }
+}
+
+async function destroyJob() {
+    if (!confirm('この案件を削除しますか？\n関連するジョブ・進行表がある場合は削除できません。')) return;
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    try {
+        const res = await fetch(route('coordinator.project_jobs.destroy', { projectJob: job.id }), {
+            method: 'DELETE',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+            router.visit(route('coordinator.project_jobs.index'));
+        } else {
+            alert(data.error || '削除できませんでした。');
+        }
+    } catch {
+        alert('削除処理に失敗しました。');
+    }
 }
 
 function goJobAssign() {

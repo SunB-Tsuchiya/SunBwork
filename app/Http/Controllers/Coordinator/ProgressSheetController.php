@@ -393,6 +393,20 @@ class ProgressSheetController extends Controller
         $this->setCompletedStatus($assignment);
         $assignment->save();
 
+        // ジョブ通知（進行管理表リンクあり → リーダー/サブCoへ）
+        try {
+            $pj = $assignment->projectJob
+                ?? \App\Models\ProjectJob::find($assignment->project_job_id);
+            if ($pj) {
+                $hasProgressLink = \App\Models\ProgressCell::where('assignment_id', $assignment->id)->exists();
+                if ($hasProgressLink) {
+                    \App\Services\JobNotificationService::notifyProgressCompleted($user, $pj, $assignment);
+                }
+            }
+        } catch (\Throwable $__eNotify) {
+            \Illuminate\Support\Facades\Log::warning('ProgressSheetController: completeAssignment notification error', ['error' => $__eNotify->getMessage()]);
+        }
+
         return response()->json(['success' => true, 'assignment_id' => $assignment->id]);
     }
 

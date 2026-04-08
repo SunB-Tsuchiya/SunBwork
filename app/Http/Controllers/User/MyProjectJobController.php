@@ -103,9 +103,10 @@ class MyProjectJobController extends Controller
     }
 
     /**
-     * Mark a MyJobBox assignment (ProjectJobAssignmentByMyself) as completed.
+     * Mark a MyJobBox assignment as completed.
+     * Accepts both self-assigned and coordinator-assigned jobs (user must be the assignee).
      */
-    public function completeAssignment(Request $request, \App\Models\ProjectJobAssignmentByMyself $assignment)
+    public function completeAssignment(Request $request, \App\Models\ProjectJobAssignment $assignment)
     {
         $user = $request->user();
         if (!$user || $assignment->user_id !== $user->id) {
@@ -142,6 +143,17 @@ class MyProjectJobController extends Controller
                     ?? \App\Models\ProjectJob::find($assignment->project_job_id);
                 if ($projectJob) {
                     $hasProgressLink = \App\Models\ProgressCell::where('assignment_id', $assignment->id)->exists();
+                    if (!$hasProgressLink && !empty($assignment->source_assignment_id)) {
+                        // 祖先を辿って ProgressCell を探す（深さ最大 20）
+                        $cur = $assignment;
+                        for ($__i = 0; $__i < 20 && !$hasProgressLink; $__i++) {
+                            if (empty($cur->source_assignment_id)) break;
+                            $parent = \App\Models\ProjectJobAssignment::find($cur->source_assignment_id);
+                            if (!$parent) break;
+                            $hasProgressLink = \App\Models\ProgressCell::where('assignment_id', $parent->id)->exists();
+                            $cur = $parent;
+                        }
+                    }
                     if ($hasProgressLink) {
                         \App\Services\JobNotificationService::notifyProgressCompleted($user, $projectJob, $assignment);
                     } else {

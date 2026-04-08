@@ -18,7 +18,7 @@
 
             <div class="mt-4">
                 <Link
-                    :href="route('coordinator.project_jobs.index')"
+                    :href="route('coordinator.project_jobs.assignments.index', { projectJob: projectJob.id })"
                     class="rounded bg-gray-200 px-4 py-2"
                     >戻る</Link
                 >

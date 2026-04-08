@@ -33,14 +33,18 @@
                     <Link :href="routeBack()" class="inline-flex items-center gap-1.5 rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">戻る</Link>
 
                     <template v-if="isPrivilegedUser">
-                        <button class="inline-flex items-center gap-1.5 rounded bg-yellow-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-yellow-600" @click.prevent="editMessage">編集</button>
-                        <button class="inline-flex items-center gap-1.5 rounded bg-red-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-600" @click.prevent="deleteMessage">削除</button>
+                        <Link
+                            :href="assignmentEditHref"
+                            class="inline-flex items-center gap-1.5 rounded bg-yellow-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-yellow-600"
+                        >編集</Link>
+                        <button v-if="canEditDelete" class="inline-flex items-center gap-1.5 rounded bg-red-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-600" @click.prevent="deleteMessage">削除</button>
                     </template>
 
                     <template v-if="isAssignee">
-                        <!-- MyJobBoxへのリンク。assignment-job（Coordinator依頼）のスケジュール設定は
-                             MyJobBoxで行う（assignment-job-by-myselfとしてMyJobBoxに登録）。 -->
-                        <Link :href="myJobBoxHref" class="inline-flex items-center gap-1.5 rounded bg-blue-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-600">MyJobBoxで予定をセット</Link>
+                        <!-- 進行表から依頼されたジョブ → events.create_job へ、独立ジョブ → マイジョブ作成フォームへ -->
+                        <Link :href="myJobBoxHref" class="inline-flex items-center gap-1.5 rounded bg-blue-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-600">
+                            {{ assignment.progress_cell_id ? 'ジョブをセット（進行表から）' : 'マイジョブとして登録' }}
+                        </Link>
                         <!-- assignment-job（Coordinator依頼）の完了。
                              directly project_job_assignments を更新し、Coordinatorの一覧に反映される -->
                         <button
@@ -293,15 +297,15 @@ const isSender = computed(() => {
 // 送信者・リーダー以上・案件担当Coは編集・削除可能
 const canEditDelete = computed(() => canDelete === true);
 
-function editMessage() {
-    if (!canEditDelete.value) {
-        alert('編集する権限がありません。');
-        return;
-    }
-    router.visit(
-        safeRoute('coordinator.project_jobs.jobbox.edit', { projectJob: projectJob?.id, message: message?.id }),
+const assignmentEditHref = computed(() => {
+    const assignmentId = assignment?.id;
+    if (!assignmentId) return '#';
+    return safeRoute(
+        'coordinator.project_jobs.assignments.edit',
+        { projectJob: projectJob?.id, assignment: assignmentId },
+        `/coordinator/project_jobs/${projectJob?.id}/assignments/${assignmentId}/edit`,
     );
-}
+});
 
 function deleteMessage() {
     if (!canEditDelete.value) {
@@ -339,13 +343,39 @@ const isAssignmentCompleted = computed(() => {
     }
 });
 
-// MyJobBox インデックスへのリンク。
-// assignment-job（Coordinator依頼）のスケジュール設定は
-// MyJobBox（assignment-job-by-myself）で行う。
-// ※ events.create_job に coordinator assignment ID を渡してはいけない
-//    （events.project_job_assignment_id は project_job_assignment_by_myself.id への FK）。
+// 「予定をセット」ボタンのリンク先を判別する。
+// 進行表から依頼されたジョブ（assignment.progress_cell_id が存在）→ events.create_job（カレンダーイベント登録）
+// 独立の自己割当ジョブ（progress_cell_id なし）→ user.project_jobs.assignments.create（マイジョブ作成フォーム）
+// どちらの場合もフォームのプレースホルダーに情報を渡す。
 const myJobBoxHref = computed(() => {
-    return safeRoute('user.myjobbox.index', {}, '/myjobbox');
+    if (!assignment?.id) return safeRoute('user.myjobbox.index', {}, '/myjobbox');
+
+    const params = new URLSearchParams();
+
+    // 共通パラメーター
+    if (assignment.project_job_id) params.set('project_job_id', String(assignment.project_job_id));
+    if (assignment.title) params.set('title', assignment.title);
+    if (assignment.desired_end_date) params.set('desired_end_date', assignment.desired_end_date);
+    if (assignment.estimated_hours != null) params.set('estimated_hours', String(assignment.estimated_hours));
+    if (assignment.work_item_type_id) params.set('work_item_type_id', String(assignment.work_item_type_id));
+    if (assignment.size_id) params.set('size_id', String(assignment.size_id));
+    if (assignment.stage_id) params.set('stage_id', String(assignment.stage_id));
+    if (assignment.difficulty_id) params.set('difficulty_id', String(assignment.difficulty_id));
+    if (assignment.detail) params.set('detail', assignment.detail);
+    // 元の Coordinator 割当 ID を渡す（独立ジョブ作成時のリンク用）
+    params.set('source_job_assignment_id', String(assignment.id));
+
+    const query = params.toString();
+
+    if (assignment.progress_cell_id) {
+        // 進行表から依頼されたジョブ → events.create_job へ（日付なし、カレンダーで選択）
+        const base = safeRoute('events.create_job', {}, '/events/create-job');
+        return base + '?' + query;
+    } else {
+        // 独立の自己割当ジョブ → マイジョブ作成フォームへ
+        const base = safeRoute('user.project_jobs.assignments.create', {}, '/project_jobs/assignments/create-user');
+        return base + '?' + query;
+    }
 });
 
 // If events exist, pick the first event's date (ISO YYYY-MM-DD). Otherwise fall back

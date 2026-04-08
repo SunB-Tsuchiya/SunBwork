@@ -591,6 +591,16 @@ class JobBoxController extends Controller
                 } catch (\Throwable $__e) {
                     // non-fatal
                 }
+
+                // 進行表セルと紐付いているか判定（progress_cells.assignment_id で逆引き）
+                try {
+                    $progressCell = \App\Models\ProgressCell::where('assignment_id', $a->id)->first();
+                    $a->progress_cell_id = $progressCell ? $progressCell->id : null;
+                    $a->progress_sheet_id = $progressCell ? $progressCell->progress_sheet_id : null;
+                } catch (\Throwable $__e) {
+                    $a->progress_cell_id = null;
+                    $a->progress_sheet_id = null;
+                }
             }
         } catch (\Throwable $__e) {
             // non-fatal: if lookup relations or attributes are missing, continue without labels
@@ -1021,6 +1031,16 @@ class JobBoxController extends Controller
                 ?? \App\Models\ProjectJob::find($assignment->project_job_id);
             if ($pj) {
                 $hasProgressLink = \App\Models\ProgressCell::where('assignment_id', $assignment->id)->exists();
+                if (!$hasProgressLink && !empty($assignment->source_assignment_id)) {
+                    $cur = $assignment;
+                    for ($__i = 0; $__i < 20 && !$hasProgressLink; $__i++) {
+                        if (empty($cur->source_assignment_id)) break;
+                        $parent = \App\Models\ProjectJobAssignment::find($cur->source_assignment_id);
+                        if (!$parent) break;
+                        $hasProgressLink = \App\Models\ProgressCell::where('assignment_id', $parent->id)->exists();
+                        $cur = $parent;
+                    }
+                }
                 if ($hasProgressLink) {
                     \App\Services\JobNotificationService::notifyProgressCompleted($user, $pj, $assignment);
                 } else {
