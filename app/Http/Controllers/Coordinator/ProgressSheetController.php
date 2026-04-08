@@ -265,25 +265,35 @@ class ProgressSheetController extends Controller
         $this->authorizeJobAccess($user, $sheet->projectJob, $sheet);
 
         $validated = $request->validate([
-            'row_id'           => 'required|integer',
-            'col_key'          => 'required|string',
-            'title'            => 'required|string|max:255',
-            'detail'           => 'nullable|string',
-            'desired_end_date' => 'nullable|date',
-            'assignee_user_id' => 'nullable|integer|exists:users,id',
+            'row_id'                    => 'required|integer',
+            'col_key'                   => 'required|string',
+            'title'                     => 'required|string|max:255',
+            'detail'                    => 'nullable|string',
+            'desired_end_date'          => 'nullable|date',
+            'assignee_user_id'          => 'nullable|integer|exists:users,id',
+            'assignee_subcontractor_id' => 'nullable|integer|exists:subcontractors,id',
         ]);
 
         $allowedRowIds = ProgressRow::where('sheet_id', $sheet->id)->pluck('id')->toArray();
         abort_unless(in_array($validated['row_id'], $allowedRowIds), 403);
 
-        $assigneeId = $validated['assignee_user_id'] ?? $user->id;
-        $senderId   = $user->id;
+        $senderId        = $user->id;
+        $subcontractorId = null;
 
-        DB::transaction(function () use ($validated, $sheet, $assigneeId, $senderId) {
+        if (!empty($validated['assignee_subcontractor_id'])) {
+            // 外注先への依頼：user_id はコーディネーター自身、subcontractor_id に外注先を保存
+            $assigneeId      = $user->id;
+            $subcontractorId = $validated['assignee_subcontractor_id'];
+        } else {
+            $assigneeId = $validated['assignee_user_id'] ?? $user->id;
+        }
+
+        DB::transaction(function () use ($validated, $sheet, $assigneeId, $senderId, $subcontractorId) {
             $assignment = ProjectJobAssignment::create([
                 'project_job_id'   => $sheet->project_job_id,
                 'user_id'          => $assigneeId,
                 'sender_id'        => $senderId,
+                'subcontractor_id' => $subcontractorId,
                 'title'            => $validated['title'],
                 'detail'           => $validated['detail'] ?? null,
                 'desired_end_date' => $validated['desired_end_date'] ?? null,

@@ -40,6 +40,7 @@ class ProjectJobAssignment extends Model
         'scheduled_at',
         'source_assignment_id',
         'start_time',
+        'subcontractor_id',
     ];
 
     protected $casts = [

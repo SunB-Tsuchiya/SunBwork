@@ -64,7 +64,7 @@ class ProgressTemplateController extends Controller
             'is_shared'     => $validated['is_shared'] ?? false,
         ]);
 
-        return redirect()->route('coordinator.progress_templates.edit', $template->id)
+        return redirect()->route('coordinator.progress_templates.index')
             ->with('success', 'テンプレートを作成しました。');
     }
 

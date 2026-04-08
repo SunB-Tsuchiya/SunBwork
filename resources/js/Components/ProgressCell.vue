@@ -32,7 +32,13 @@
   <!-- ユーザー型 -->
   <td v-else-if="colDef.type === 'user'" class="border border-gray-200 px-2 py-1 align-middle min-w-[120px]">
     <!-- joblink によるロック（担当者固定表示） -->
-    <template v-if="lockedUserId">
+    <template v-if="lockedSubcontractorId">
+      <div class="flex items-center gap-1 rounded border border-purple-100 bg-purple-50 px-1 py-0.5">
+        <span class="flex-1 text-sm text-purple-800">{{ lockedSubcontractorName }}</span>
+        <span class="text-xs text-purple-400" title="外注先ジョブの担当者">🔒</span>
+      </div>
+    </template>
+    <template v-else-if="lockedUserId">
       <div class="flex items-center gap-1 rounded border border-gray-200 bg-gray-50 px-1 py-0.5">
         <span class="flex-1 text-sm text-gray-700">{{ lockedUserName }}</span>
         <span class="text-xs text-gray-400" title="ジョブリンクの担当者">🔒</span>
@@ -114,7 +120,7 @@
         <button
           type="button"
           class="rounded bg-gray-200 px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-300"
-          @click="emit('job-link-detail', { assignmentId: cell.assignment_id, assignmentTitle: cell.assignment_title, assigneeUserId: cell.assignment_user_id, endDate: cell.assignment_end_date, completed: cell.assignment_completed, rowId, colKey: colDef.key })"
+          @click="emit('job-link-detail', { assignmentId: cell.assignment_id, assignmentTitle: cell.assignment_title, assigneeUserId: cell.assignment_user_id, assigneeSubcontractorId: cell.assignment_subcontractor_id, endDate: cell.assignment_end_date, completed: cell.assignment_completed, rowId, colKey: colDef.key })"
         >詳細</button>
         <!-- 担当者本人のみ: 完了にするボタン -->
         <button
@@ -262,6 +268,10 @@ const props = defineProps({
     type: [Number, String, null],
     default: null,
   },
+  lockedSubcontractorId: {
+    type: [Number, String, null],
+    default: null,
+  },
   users: {
     type: Array,
     default: () => [],
@@ -337,6 +347,11 @@ const assignmentUserName = computed(() => {
 const lockedUserName = computed(() => {
   if (!props.lockedUserId) return null;
   return props.users.find((u) => String(u.id) === String(props.lockedUserId))?.name ?? String(props.lockedUserId);
+});
+
+const lockedSubcontractorName = computed(() => {
+  if (!props.lockedSubcontractorId) return null;
+  return props.subcontractors.find((s) => String(s.id) === String(props.lockedSubcontractorId))?.name ?? String(props.lockedSubcontractorId);
 });
 
 function onUserCellChange(val) {

@@ -294,7 +294,7 @@
     >
       <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
         <h3 class="mb-4 text-lg font-semibold text-gray-800">
-          {{ jobLinkModal.isSelfAssign ? 'MyJobとして登録' : 'ジョブ依頼として登録' }}
+          {{ jobLinkModal.isSubcontractor ? '外注先ジョブとして登録' : (jobLinkModal.isSelfAssign ? 'MyJobとして登録' : 'ジョブ依頼として登録') }}
         </h3>
         <div class="space-y-3">
           <div>
@@ -305,7 +305,15 @@
               class="mt-1 w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-indigo-400 focus:outline-none"
             />
           </div>
-          <div>
+          <!-- 外注先の場合：名前を読み取り表示 -->
+          <div v-if="jobLinkModal.isSubcontractor">
+            <label class="block text-xs font-medium text-gray-600">外注先</label>
+            <div class="mt-1 rounded border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-700">
+              {{ subcontractors.find(s => s.id === jobLinkForm.assigneeSubcontractorId)?.name ?? '（外注先）' }}
+            </div>
+          </div>
+          <!-- 通常担当者セレクト -->
+          <div v-else>
             <label class="block text-xs font-medium text-gray-600">担当者</label>
             <select
               v-model="jobLinkForm.assigneeUserId"
@@ -332,7 +340,10 @@
               class="mt-1 w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-indigo-400 focus:outline-none"
             />
           </div>
-          <p v-if="!jobLinkModal.isSelfAssign" class="text-xs text-orange-600">
+          <p v-if="jobLinkModal.isSubcontractor" class="text-xs text-purple-600">
+            ※ 外注先への依頼ジョブとして登録します。完了は進行管理が手動で行います。
+          </p>
+          <p v-else-if="!jobLinkModal.isSelfAssign" class="text-xs text-orange-600">
             ※ 自分以外を担当者に設定するとジョブ依頼（Coordinator割当）として登録されます。
           </p>
         </div>
@@ -345,10 +356,10 @@
           <button
             type="button"
             class="rounded px-4 py-1.5 text-sm font-medium text-white"
-            :class="jobLinkModal.isSelfAssign ? 'bg-blue-600 hover:bg-blue-700' : 'bg-orange-500 hover:bg-orange-600'"
+            :class="jobLinkModal.isSubcontractor ? 'bg-purple-600 hover:bg-purple-700' : (jobLinkModal.isSelfAssign ? 'bg-blue-600 hover:bg-blue-700' : 'bg-orange-500 hover:bg-orange-600')"
             :disabled="!jobLinkForm.title"
             @click="submitJobLink"
-          >{{ jobLinkModal.isSelfAssign ? 'MyJobに登録' : 'ジョブ依頼として登録' }}</button>
+          >{{ jobLinkModal.isSubcontractor ? '外注先ジョブとして登録' : (jobLinkModal.isSelfAssign ? 'MyJobに登録' : 'ジョブ依頼として登録') }}</button>
         </div>
       </div>
     </div>
@@ -369,7 +380,7 @@
         </dl>
         <div class="mt-5 flex flex-wrap justify-end gap-2">
           <button
-            v-if="jobLinkDetailModal.assignmentId"
+            v-if="jobLinkDetailModal.assignmentId && !jobLinkDetailModal.isSubcontractor"
             type="button"
             class="rounded bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
             @click="openAssignmentDetail(jobLinkDetailModal.assignmentId)"
@@ -498,9 +509,9 @@ const newChildLabel = ref('');
 const bulkChildLabel = ref('');
 
 // ── ジョブリンク ──────────────────────────────────────
-const jobLinkModal = ref({ open: false, isSelfAssign: true, rowId: null, colKey: null });
-const jobLinkForm = ref({ title: '', detail: '', desiredEndDate: '', assigneeUserId: null });
-const jobLinkDetailModal = ref({ open: false, title: '', assigneeName: '', endDate: '', completed: false, assignmentId: null, completing: false, unlinking: false, rowId: null, colKey: null });
+const jobLinkModal = ref({ open: false, isSelfAssign: true, isSubcontractor: false, rowId: null, colKey: null });
+const jobLinkForm = ref({ title: '', detail: '', desiredEndDate: '', assigneeUserId: null, assigneeSubcontractorId: null });
+const jobLinkDetailModal = ref({ open: false, title: '', assigneeName: '', endDate: '', completed: false, assignmentId: null, completing: false, unlinking: false, rowId: null, colKey: null, isSubcontractor: false });
 
 /** 列ツリーをたどってキーまでのラベルパスを返す */
 function findBreadcrumb(nodes, key, path = []) {
@@ -548,6 +559,18 @@ function findSiblingUserValue(colKey, rowId) {
   for (const leaf of userLeaves) {
     const cell = localCells.value.find((c) => c.col_key === leaf.key && c.row_id === rowId);
     if (cell?.value_user_id) return cell.value_user_id;
+  }
+  return null;
+}
+
+/** 同じ親グループ内の user 型セルに設定されている外注先IDを返す */
+function findSiblingSubcontractorValue(colKey, rowId) {
+  const parent = findParentGroup(localColumnConfig.value, colKey);
+  if (!parent?.children) return null;
+  const userLeaves = parent.children.filter((c) => c.type === 'user' && !c.children?.length);
+  for (const leaf of userLeaves) {
+    const cell = localCells.value.find((c) => c.col_key === leaf.key && c.row_id === rowId);
+    if (cell?.value_subcontractor_id) return cell.value_subcontractor_id;
   }
   return null;
 }
@@ -629,9 +652,18 @@ function onAssigneeChange() {
 
 function openJobLinkModal({ rowId, colKey }) {
   const siblingUserId = findSiblingUserValue(colKey, rowId);
+  const siblingSubcontractorId = findSiblingSubcontractorValue(colKey, rowId);
+  const title = buildJobTitle(rowId, colKey);
+
+  // 外注先が指定されている場合（ユーザーより優先）：モーダルで直接登録
+  if (siblingSubcontractorId && !siblingUserId) {
+    jobLinkForm.value = { title, detail: '', desiredEndDate: '', assigneeUserId: null, assigneeSubcontractorId: siblingSubcontractorId };
+    jobLinkModal.value = { open: true, isSelfAssign: false, isSubcontractor: true, rowId, colKey };
+    return;
+  }
+
   const assigneeId = siblingUserId ?? authUserId.value;
   const isSelf = assigneeId === authUserId.value || !siblingUserId;
-  const title = buildJobTitle(rowId, colKey);
 
   // セル値優先、なければ大見出しグループ or projectJob フォールバック
   const sizeIdFromCell = findSiblingCellValue(colKey, rowId, 'size');
@@ -675,8 +707,12 @@ function submitJobLink() {
     title: jobLinkForm.value.title,
     detail: jobLinkForm.value.detail || null,
     desired_end_date: jobLinkForm.value.desiredEndDate || null,
-    assignee_user_id: jobLinkForm.value.assigneeUserId,
   };
+  if (jobLinkModal.value.isSubcontractor && jobLinkForm.value.assigneeSubcontractorId) {
+    payload.assignee_subcontractor_id = jobLinkForm.value.assigneeSubcontractorId;
+  } else {
+    payload.assignee_user_id = jobLinkForm.value.assigneeUserId;
+  }
   router.post(
     route('coordinator.progress_sheets.cells.link_job', { sheet: props.sheet.id }),
     payload,
@@ -698,12 +734,21 @@ function openAssignmentDetail(assignmentId) {
   router.visit(route('project_jobs.assignments.show', { projectJob: props.projectJob.id, assignment: assignmentId }));
 }
 
-function openJobLinkDetail({ assignmentId, assignmentTitle, assigneeUserId, endDate, completed, rowId, colKey }) {
-  const assignee = props.users.find((u) => u.id === assigneeUserId);
+function openJobLinkDetail({ assignmentId, assignmentTitle, assigneeUserId, assigneeSubcontractorId, endDate, completed, rowId, colKey }) {
+  let assigneeName = null;
+  if (assigneeSubcontractorId) {
+    const sub = props.subcontractors.find((s) => s.id === assigneeSubcontractorId);
+    assigneeName = sub ? `[外注] ${sub.name}` : null;
+  }
+  if (!assigneeName) {
+    const assignee = props.users.find((u) => u.id === assigneeUserId);
+    assigneeName = assignee?.name ?? null;
+  }
   jobLinkDetailModal.value = {
     open: true,
     title: assignmentTitle ?? '(タイトルなし)',
-    assigneeName: assignee?.name ?? null,
+    assigneeName,
+    isSubcontractor: !!assigneeSubcontractorId,
     endDate: endDate ?? null,
     completed: !!completed,
     assignmentId: assignmentId ?? null,
@@ -846,7 +891,7 @@ const rowOrderChanged = computed(() =>
 
 // ── 列構成 ──
 function onColumnChange(updated) {
-  localColumnConfig.value = updated;
+  localColumnConfig.value = updated.slice();
 }
 
 function saveColumnConfig() {
@@ -1103,18 +1148,26 @@ function onCellUpdate(payload) {
   // ローカルに即時反映
   const key = `${payload.row_id}_${payload.col_key}`;
   const existing = localCells.value.find((c) => c.row_id === payload.row_id && c.col_key === payload.col_key);
-  const fieldMap = { text: 'value_text', date: 'value_date', bool: 'value_bool', user: 'value_user_id' };
+  const fieldMap = { text: 'value_text', date: 'value_date', bool: 'value_bool', user: 'value_user_id', subcontractor: 'value_subcontractor_id' };
   const field = fieldMap[payload.value_type];
   if (existing) {
     existing[field] = payload.value;
     if (payload.value_type === 'user') {
       existing.value_user_name = props.users.find((u) => u.id === payload.value)?.name ?? null;
+      existing.value_subcontractor_id = null;
+      existing.value_subcontractor_name = null;
+    } else if (payload.value_type === 'subcontractor') {
+      existing.value_subcontractor_name = props.subcontractors.find((s) => s.id === payload.value)?.name ?? null;
+      existing.value_user_id = null;
+      existing.value_user_name = null;
     }
   } else {
     const cell = { row_id: payload.row_id, col_key: payload.col_key };
     cell[field] = payload.value;
     if (payload.value_type === 'user') {
       cell.value_user_name = props.users.find((u) => u.id === payload.value)?.name ?? null;
+    } else if (payload.value_type === 'subcontractor') {
+      cell.value_subcontractor_name = props.subcontractors.find((s) => s.id === payload.value)?.name ?? null;
     }
     localCells.value.push(cell);
   }

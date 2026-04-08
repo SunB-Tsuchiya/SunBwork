@@ -120,6 +120,7 @@
                 :assignments="assignments"
                 :work-item-types="workItemTypes"
                 :locked-user-id="lockedUserIdForCell(row.id, leaf.key, leaf.type)"
+                :locked-subcontractor-id="lockedSubcontractorIdForCell(row.id, leaf.key, leaf.type)"
                 @update="emit('cell-update', $event)"
                 @job-link-open="emit('job-link-open', $event)"
                 @job-link-detail="emit('job-link-detail', $event)"
@@ -304,7 +305,7 @@ function getSiblingNodes(nodes, key) {
 
 /**
  * user 型セルに対して、同グループの joblink セルの assignment_user_id を返す。
- * joblink が未登録 or user 型でなければ null。
+ * 外注先ジョブ（subcontractor_id あり）の場合は null（user_id はCoordinator自身なのでロック不要）。
  */
 function lockedUserIdForCell(rowId, colKey, colType) {
   if (colType !== 'user') return null;
@@ -313,7 +314,23 @@ function lockedUserIdForCell(rowId, colKey, colType) {
   const joblinkLeaves = collectLeaves(siblings).filter((l) => l.type === 'joblink');
   for (const jl of joblinkLeaves) {
     const cell = cellMap.value[`${rowId}_${jl.key}`];
+    if (cell?.assignment_subcontractor_id) return null; // 外注先ジョブは subcontractor 側で処理
     if (cell?.assignment_user_id) return cell.assignment_user_id;
+  }
+  return null;
+}
+
+/**
+ * user 型セルに対して、同グループの joblink セルの assignment_subcontractor_id を返す。
+ */
+function lockedSubcontractorIdForCell(rowId, colKey, colType) {
+  if (colType !== 'user') return null;
+  const siblings = getSiblingNodes(props.columnConfig, colKey);
+  if (!siblings) return null;
+  const joblinkLeaves = collectLeaves(siblings).filter((l) => l.type === 'joblink');
+  for (const jl of joblinkLeaves) {
+    const cell = cellMap.value[`${rowId}_${jl.key}`];
+    if (cell?.assignment_subcontractor_id) return cell.assignment_subcontractor_id;
   }
   return null;
 }

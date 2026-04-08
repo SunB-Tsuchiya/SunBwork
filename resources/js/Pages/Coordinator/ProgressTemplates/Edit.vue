@@ -167,7 +167,7 @@
             :sizes="props.sizes"
             :assignments="props.assignments"
             :work-item-types="props.workItemTypes"
-            @change="(updated) => { form.column_config = updated; }"
+            @change="(updated) => { form.column_config = updated.slice(); }"
           />
           <p v-if="errors.column_config" class="mt-1 text-xs text-red-500">{{ errors.column_config }}</p>
         </div>
@@ -180,30 +180,37 @@
         <div class="overflow-x-auto rounded border border-gray-200">
           <table class="min-w-full border-collapse text-xs">
             <thead class="bg-gray-50">
-              <tr>
-                <th class="border border-gray-200 px-3 py-2 text-left text-gray-500 whitespace-nowrap">
+              <!-- 多段ヘッダー -->
+              <tr v-for="(headerRow, depth) in previewHeaderRows" :key="depth">
+                <!-- 台割ラベル列（最初の行だけ rowspan で結合） -->
+                <th
+                  v-if="depth === 0"
+                  :rowspan="previewMaxDepth"
+                  class="border border-gray-200 px-3 py-2 text-left text-gray-500 whitespace-nowrap align-middle"
+                >
                   台割 ＼ 段階
                 </th>
                 <th
-                  v-for="stage in topLevelStages"
-                  :key="stage.key"
-                  class="border border-gray-200 px-3 py-2 text-center font-medium text-gray-700 whitespace-nowrap"
+                  v-for="cell in headerRow"
+                  :key="cell.key"
+                  :colspan="cell.colspan"
+                  :rowspan="cell.rowspan"
+                  class="border border-gray-200 px-3 py-2 text-center font-medium text-gray-700 whitespace-nowrap align-middle"
                 >
-                  {{ stage.label || '（未入力）' }}
+                  {{ cell.label || '（未入力）' }}
                 </th>
-                <th
-                  v-if="topLevelStages.length === 0"
-                  class="border border-gray-200 px-3 py-2 text-gray-400 italic"
-                >
-                  ← 列・ステージを追加してください
-                </th>
+              </tr>
+              <!-- 列が0件のとき -->
+              <tr v-if="previewHeaderRows.length === 0">
+                <th class="border border-gray-200 px-3 py-2 text-left text-gray-500 whitespace-nowrap">台割 ＼ 段階</th>
+                <th class="border border-gray-200 px-3 py-2 text-gray-400 italic">← 列・ステージを追加してください</th>
               </tr>
             </thead>
             <tbody>
               <tr v-if="previewRows.length === 0">
                 <td
                   class="border border-gray-200 px-3 py-2 text-gray-400 italic"
-                  :colspan="topLevelStages.length + 1"
+                  :colspan="previewLeafCols.length + 1"
                 >
                   ← 台割行を追加してください
                 </td>
@@ -213,7 +220,7 @@
                 <tr v-if="row.isGroup" class="bg-indigo-50">
                   <td
                     class="border border-gray-200 px-3 py-1.5 text-xs font-semibold text-indigo-700"
-                    :colspan="topLevelStages.length + 1"
+                    :colspan="previewLeafCols.length + 1"
                   >
                     {{ row.label || '（未入力）' }}
                   </td>
@@ -227,16 +234,13 @@
                     {{ row.label || '（未入力）' }}
                   </td>
                   <td
-                    v-for="stage in topLevelStages"
-                    :key="stage.key"
-                    class="border border-gray-200 px-4 py-2 text-center text-gray-300"
+                    v-for="leaf in previewLeafCols"
+                    :key="leaf.key"
+                    class="border border-gray-200 px-3 py-2 text-center"
                   >
-                    ―
+                    <span class="text-gray-400">{{ PREVIEW_TYPE_LABELS[leaf.type] ?? leaf.type }}</span>
                   </td>
-                  <td
-                    v-if="topLevelStages.length === 0"
-                    class="border border-gray-200 px-3 py-2"
-                  ></td>
+                  <td v-if="previewLeafCols.length === 0" class="border border-gray-200 px-3 py-2"></td>
                 </tr>
               </template>
             </tbody>
@@ -368,7 +372,71 @@ function moveRowChildDown(idx, cidx) {
 
 // ── プレビュー用 ────────────────────────────────
 
-const topLevelStages = computed(() => form.value.column_config);
+const PREVIEW_TYPE_LABELS = {
+  text: '自由入力',
+  date: '日付',
+  checkbox: 'チェック',
+  user: '担当者',
+  worktime: '作業時間',
+  stage: 'ステージ',
+  size: 'サイズ',
+  assignment: '作業分担',
+  workItemType: '作業種別',
+  joblink: '登録',
+};
+
+function collectPreviewLeaves(nodes) {
+  const leaves = [];
+  for (const node of nodes) {
+    if (!node.children || node.children.length === 0) {
+      leaves.push(node);
+    } else {
+      leaves.push(...collectPreviewLeaves(node.children));
+    }
+  }
+  return leaves;
+}
+
+function countPreviewLeaves(node) {
+  if (!node.children || node.children.length === 0) return 1;
+  return node.children.reduce((sum, c) => sum + countPreviewLeaves(c), 0);
+}
+
+function calcPreviewMaxDepth(nodes, depth = 1) {
+  let max = depth;
+  for (const node of nodes) {
+    if (node.children?.length) {
+      max = Math.max(max, calcPreviewMaxDepth(node.children, depth + 1));
+    }
+  }
+  return max;
+}
+
+const previewMaxDepth = computed(() => {
+  if (form.value.column_config.length === 0) return 1;
+  return calcPreviewMaxDepth(form.value.column_config);
+});
+
+const previewLeafCols = computed(() => collectPreviewLeaves(form.value.column_config));
+
+const previewHeaderRows = computed(() => {
+  if (form.value.column_config.length === 0) return [];
+  const depth = previewMaxDepth.value;
+  const result = Array.from({ length: depth }, () => []);
+
+  function walk(nodes, currentDepth) {
+    for (const node of nodes) {
+      const isLeaf = !node.children || node.children.length === 0;
+      const colspan = isLeaf ? 1 : countPreviewLeaves(node);
+      const rowspan = isLeaf ? depth - currentDepth + 1 : 1;
+      result[currentDepth - 1].push({ key: node.key, label: node.label, colspan, rowspan });
+      if (!isLeaf) walk(node.children, currentDepth + 1);
+    }
+  }
+
+  walk(form.value.column_config, 1);
+  return result;
+});
 
 const previewRows = computed(() => {
   const result = [];

@@ -239,7 +239,7 @@
             </div>
 
             <label class="mb-1 mt-4 block font-semibold">難易度</label>
-            <select v-model="block.difficulty" :disabled="!editMode" class="w-full rounded border px-3 py-2">
+            <select v-model="block.difficulty" :disabled="!editMode" class="w-full rounded border px-3 py-2" @change="block.difficulty_id = null">
                 <option value="light">軽い</option>
                 <option value="normal">普通</option>
                 <option value="heavy">重い</option>

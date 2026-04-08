@@ -157,7 +157,7 @@
           :sizes="sizes"
           :assignments="assignments"
           :work-item-types="workItemTypes"
-          @change="(updated) => { node.children = updated; emit('change', nodes); }"
+          @change="(updated) => { node.children = updated.slice(); emit('change', nodes); }"
         />
       </div>
     </div>
