@@ -1558,7 +1558,11 @@ class EventController extends Controller
                     'stages' => $stages,
                     'statuses' => $statuses,
                     'difficulties' => $difficulties,
-                    'difficulties' => \App\Models\Difficulty::orderBy('sort_order')->get(['id', 'name']),
-        ]);
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::error('EventController::edit failed', ['error' => $e->getMessage()]);
+        }
+        return Inertia::render('Events/Edit', ['event' => $event]);
     }
 }
