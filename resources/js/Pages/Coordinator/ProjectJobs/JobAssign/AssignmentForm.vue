@@ -594,6 +594,18 @@ async function checkEventOverlaps() {
     return [];
 }
 
+function resolveDifficultySlug(id) {
+    if (id === undefined || id === null) return 'normal';
+    const list = page.props.difficulties || null;
+    if (Array.isArray(list)) {
+        const found = list.find((d) => String(d.id) === String(id));
+        if (found) return found.slug || found.key || 'normal';
+    }
+    // フォールバック: hardcoded ID→slug
+    const map = { 1: 'light', 2: 'normal', 3: 'heavy', 4: 'serious' };
+    return map[Number(id)] || 'normal';
+}
+
 function resolveDifficultyId(val) {
     if (val === undefined || val === null || val === '') return null;
     const num = Number(val);
@@ -657,7 +669,7 @@ function normalizeAssignment(a) {
                 return raw;
             })(),
             detail: a.detail || '',
-            difficulty: a.difficulty || 'normal',
+            difficulty: a.difficulty || resolveDifficultySlug(a.difficulty_id),
             difficulty_id: a.difficulty_id ?? null,
             desired_start_date: a.desired_start_date || a.desired_date || '',
             desired_end_date: a.desired_end_date || '',
@@ -706,7 +718,7 @@ function normalizeAssignment(a) {
             title_suffix: a.title ? a.title.replace(/^.*：/, '').trim() : a.title_suffix || '',
             detail: a.detail || '',
             user_id: a.user_id || (effectiveAuthUser() ? effectiveAuthUser().id : null),
-            difficulty: a.difficulty || 'normal',
+            difficulty: a.difficulty || resolveDifficultySlug(a.difficulty_id),
             difficulty_id: a.difficulty_id ?? null,
             desired_start_date: a.desired_start_date || a.desired_date || '',
             desired_end_date: a.desired_end_date || '',
@@ -1671,9 +1683,7 @@ async function save(sendImmediately = true) {
                 department_id: a.department_id || null,
                 difficulty_id:
                     a.difficulty_id ??
-                    (window?.page?.props?.difficulties
-                        ? (window.page.props.difficulties.find((d) => d.name === a.difficulty || d.slug === a.difficulty)?.id ?? null)
-                        : null),
+                    resolveDifficultyId(a.difficulty),
                 desired_start_date: a.desired_start_date || null,
                 desired_end_date: a.desired_end_date || null,
                 start_time: String(a.start_time_hour || '00').padStart(2, '0') + ':' + String(a.start_time_min || '00').padStart(2, '0'),
@@ -1713,9 +1723,7 @@ async function save(sendImmediately = true) {
                 department_id: a.department_id || null,
                 difficulty_id:
                     a.difficulty_id ??
-                    (window?.page?.props?.difficulties
-                        ? (window.page.props.difficulties.find((d) => d.name === a.difficulty || d.slug === a.difficulty)?.id ?? null)
-                        : null),
+                    resolveDifficultyId(a.difficulty),
                 desired_end_date: a.desired_end_date || null,
                 desired_time: String(a.desired_time_hour || '00').padStart(2, '0') + ':' + String(a.desired_time_min || '00').padStart(2, '0'),
                 estimated_hours: a.estimated_hours || null,

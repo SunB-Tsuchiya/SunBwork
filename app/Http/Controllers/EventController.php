@@ -790,6 +790,19 @@ class EventController extends Controller
                 \Illuminate\Support\Facades\Log::warning('EventController: JobNotification dispatch error', ['error' => $__eNotify->getMessage()]);
             }
 
+            // チェーン上のすべての元ジョブ（祖先）も完了にする（ProgressCell が祖先を参照している場合に必要）
+            $current = $assignment;
+            for ($__i = 0; $__i < 20; $__i++) {
+                if (empty($current->source_assignment_id)) break;
+                $parent = \App\Models\ProjectJobAssignment::find($current->source_assignment_id);
+                if (!$parent) break;
+                if (!$parent->completed) {
+                    $parent->completed = true;
+                    $parent->save();
+                }
+                $current = $parent;
+            }
+
             // ── Coordinator の project_job_assignments を完了にする（ユーザーが承認した場合のみ）──
             if ($alsoCompleteCoordinator) {
                 try {
