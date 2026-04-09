@@ -1528,16 +1528,19 @@ class EventController extends Controller
                 $sizes = [];
                 $stages = [];
                 $statuses = [];
+                $difficulties = [];
                 try {
                     $types = \App\Models\WorkItemType::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group', 'company_id', 'department_id']);
                     $sizes = \App\Models\Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group', 'width', 'height', 'unit', 'company_id', 'department_id']);
                     $stages = \App\Models\Stage::orderBy('sort_order')->orderBy('order_index')->get(['id', 'name', 'company_id', 'department_id']);
                     $statuses = \App\Models\Status::orderBy('sort_order')->get(['id', 'name', 'slug', 'company_id', 'department_id']);
+                    $difficulties = \App\Models\Difficulty::orderBy('sort_order')->get(['id', 'name']);
                 } catch (\Throwable $__e) {
                     $types = [];
                     $sizes = [];
                     $stages = [];
                     $statuses = [];
+                    $difficulties = [];
                 }
 
                 return Inertia::render('JobBox/Edit_User', [
@@ -1554,14 +1557,8 @@ class EventController extends Controller
                     'sizes' => $sizes,
                     'stages' => $stages,
                     'statuses' => $statuses,
-                ]);
-            }
-        } catch (\Throwable $__e) {
-            // ignore and fall back
-        }
-
-        return Inertia::render('Events/Edit', [
-            'event' => $event,
+                    'difficulties' => $difficulties,
+                    'difficulties' => \App\Models\Difficulty::orderBy('sort_order')->get(['id', 'name']),
         ]);
     }
 }
