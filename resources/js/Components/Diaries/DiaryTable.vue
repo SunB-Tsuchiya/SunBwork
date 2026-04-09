@@ -1,4 +1,5 @@
 <script setup>
+import DOMPurify from 'dompurify';
 import { Inertia } from '@inertiajs/inertia';
 import { usePage } from '@inertiajs/vue3';
 import { computed, onMounted, ref, watch } from 'vue';
@@ -276,6 +277,10 @@ function nextPage() {
     if (internalPage.value < totalPages.value) internalPage.value += 1;
 }
 
+function sanitizeHtml(html) {
+    return DOMPurify.sanitize(html || '');
+}
+
 function toggleExpand(id) {
     if (expanded.value.includes(id)) {
         expanded.value = expanded.value.filter((i) => i !== id);
@@ -449,12 +454,14 @@ watch(
                                     : 'overflow-hidden px-4 py-4 text-sm text-gray-500'
                             "
                         >
-                            <div v-if="props.fullContent">
-                                {{ d.content ?? d.description }}
-                            </div>
+                            <div
+                                v-if="props.fullContent"
+                                class="prose prose-sm max-w-none"
+                                v-html="sanitizeHtml(d.content ?? d.description ?? '')"
+                            ></div>
                             <div v-else>
                                 <!-- Use configured line-clamp for truncation; keep expand toggle for long content -->
-                                <div :class="isExpanded(d.id) ? '' : descriptionClassFor()">{{ d.description ?? d.content }}</div>
+                                <div :class="isExpanded(d.id) ? '' : descriptionClassFor()">{{ getContentText(d) }}</div>
                                 <button
                                     v-if="(getContentText(d) || '').length > 200"
                                     @click.prevent="toggleExpand(d.id)"
