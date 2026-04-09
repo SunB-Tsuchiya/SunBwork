@@ -31,7 +31,7 @@
                     </template>
                 </div>
 
-                <div ref="timelineRef" class="relative mt-2 h-40 border-t border-gray-200" @click.stop="onBackgroundClick($event)">
+                <div ref="timelineRef" class="relative mt-2 border-t border-gray-200" style="height: calc(2.25rem * 1.25 + 0.875rem)" @click.stop="onBackgroundClick($event)">
                     <div class="pointer-events-none absolute inset-y-0 left-0 top-0 w-full">
                         <template v-for="h in hourLabels" :key="'hour-' + h">
                             <div
