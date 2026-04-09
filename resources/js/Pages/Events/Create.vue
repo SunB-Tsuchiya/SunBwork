@@ -109,8 +109,34 @@ function sendForm() {
     }
 }
 
-const submit = () => {
-    errorMessage.value = '';
+// 5分刈みの分リスト（現在値が5分刈み外の場合は動的に追加）
+const baseMins = ['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'];
+function minsOptions(currentVal) {
+    if (!currentVal || baseMins.includes(currentVal)) return baseMins;
+    return [...baseMins, currentVal].sort((a, b) => Number(a) - Number(b));
+}
+
+// 現在時刻（JST）を分丸めなしでセット
+function setCurrentTime(target) {
+    const now = new Date();
+    const jstParts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Tokyo',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+    }).formatToParts(now);
+    const h = jstParts.find((p) => p.type === 'hour').value.padStart(2, '0');
+    const m = jstParts.find((p) => p.type === 'minute').value.padStart(2, '0');
+    if (target === 'start') {
+        form.startHour = h;
+        form.startMinute = m;
+    } else {
+        form.endHour = h;
+        form.endMinute = m;
+    }
+}
+
+const submit = () => {    errorMessage.value = '';
     const newStart = new Date(`${form.date}T${form.startHour}:${form.startMinute}:00`);
     const newEnd = new Date(`${form.date}T${form.endHour}:${form.endMinute}:00`);
     if (isNaN(newStart.getTime()) || isNaN(newEnd.getTime())) {
@@ -237,32 +263,30 @@ watch(
                     <div class="flex items-center gap-8">
                         <div>
                             <label class="mb-1 block text-sm font-medium text-gray-700">開始時刻</label>
-                            <div class="flex gap-2">
+                            <div class="flex items-center gap-2">
                                 <select v-model="form.startHour" class="w-20 rounded border p-1">
                                     <option v-for="h in 24" :key="h" :value="String(h - 1).padStart(2, '0')">
                                         {{ String(h - 1).padStart(2, '0') }}
                                     </option>
                                 </select>
                                 <select v-model="form.startMinute" class="w-20 rounded border p-1">
-                                    <option v-for="m in [0, 15, 30, 45]" :key="m" :value="String(m).padStart(2, '0')">
-                                        {{ String(m).padStart(2, '0') }}
-                                    </option>
+                                    <option v-for="m in minsOptions(form.startMinute)" :key="m" :value="m">{{ m }}</option>
                                 </select>
+                                <button type="button" @click="setCurrentTime('start')" class="rounded border border-gray-300 bg-gray-50 px-2 py-1 text-xs text-gray-600 hover:bg-gray-100">現在時刻</button>
                             </div>
                         </div>
                         <div>
                             <label class="mb-1 block text-sm font-medium text-gray-700">終了時刻</label>
-                            <div class="flex gap-2">
+                            <div class="flex items-center gap-2">
                                 <select v-model="form.endHour" class="w-20 rounded border p-1">
                                     <option v-for="h in 24" :key="h" :value="String(h - 1).padStart(2, '0')">
                                         {{ String(h - 1).padStart(2, '0') }}
                                     </option>
                                 </select>
                                 <select v-model="form.endMinute" class="w-20 rounded border p-1">
-                                    <option v-for="m in [0, 15, 30, 45]" :key="m" :value="String(m).padStart(2, '0')">
-                                        {{ String(m).padStart(2, '0') }}
-                                    </option>
+                                    <option v-for="m in minsOptions(form.endMinute)" :key="m" :value="m">{{ m }}</option>
                                 </select>
+                                <button type="button" @click="setCurrentTime('end')" class="rounded border border-gray-300 bg-gray-50 px-2 py-1 text-xs text-gray-600 hover:bg-gray-100">現在時刻</button>
                             </div>
                         </div>
                     </div>

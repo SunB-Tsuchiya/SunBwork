@@ -1305,6 +1305,11 @@ class EventController extends Controller
             $statuses = \App\Models\Status::orderBy('sort_order')->get(['id', 'name', 'slug', 'company_id', 'department_id']);
         } catch (\Throwable $__e) { $statuses = []; }
 
+        $difficulties = [];
+        try {
+            $difficulties = \App\Models\Difficulty::orderBy('sort_order')->get(['id', 'name']);
+        } catch (\Throwable $__e) { $difficulties = []; }
+
         // 新規登録時のデフォルトステータス：「進行中」(slug=in_progress) のIDを取得
         $inProgressStatusId = collect($statuses)->firstWhere('slug', 'in_progress')?->id ?? null;
 
@@ -1346,6 +1351,7 @@ class EventController extends Controller
             'sizes' => $sizes,
             'stages' => $stages,
             'statuses' => $statuses,
+            'difficulties' => $difficulties,
             'prefillEvent' => $prefillEvent,
         ];
 

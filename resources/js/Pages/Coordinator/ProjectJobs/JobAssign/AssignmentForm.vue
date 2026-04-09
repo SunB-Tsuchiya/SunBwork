@@ -239,10 +239,9 @@
             </div>
 
             <label class="mb-1 mt-4 block font-semibold">難易度</label>
-            <select v-model="block.difficulty" :disabled="!editMode" class="w-full rounded border px-3 py-2" @change="block.difficulty_id = null">
-                <option value="light">軽い</option>
-                <option value="normal">普通</option>
-                <option value="heavy">重い</option>
+            <select v-model="block.difficulty_id" :disabled="!editMode" class="w-full rounded border px-3 py-2">
+                <option :value="null">-- 選択 --</option>
+                <option v-for="d in ($page.props.difficulties || [])" :key="d.id" :value="d.id">{{ d.name }}</option>
             </select>
 
             <!-- 締め切り: coordinator = 常に編集可, user = 既存レコードのみ読み取り表示 -->
@@ -328,24 +327,26 @@
                 <div class="mt-1 flex items-end gap-4">
                     <div class="flex flex-col">
                         <label class="text-xs text-gray-600">開始</label>
-                        <div class="flex gap-2">
+                        <div class="flex items-center gap-2">
                             <select v-model="startTimeHour" :disabled="!editMode" class="w-20 rounded border px-3 py-2">
                                 <option v-for="h in hours" :key="h" :value="h">{{ h }}</option>
                             </select>
                             <select v-model="startTimeMin" :disabled="!editMode" class="w-20 rounded border px-3 py-2">
-                                <option v-for="m in mins" :key="m" :value="m">{{ m }}</option>
+                                <option v-for="m in minsOptions(startTimeMin)" :key="m" :value="m">{{ m }}</option>
                             </select>
+                            <button type="button" @click="setCurrentTime('start')" :disabled="!editMode" class="rounded border border-gray-300 bg-gray-50 px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-50">現在時刻</button>
                         </div>
                     </div>
                     <div class="flex flex-col">
                         <label class="text-xs text-gray-600">終了</label>
-                        <div class="flex gap-2">
+                        <div class="flex items-center gap-2">
                             <select v-model="endTimeHour" :disabled="!editMode" class="w-20 rounded border px-3 py-2">
                                 <option v-for="h in hours" :key="h" :value="h">{{ h }}</option>
                             </select>
                             <select v-model="endTimeMin" :disabled="!editMode" class="w-20 rounded border px-3 py-2">
-                                <option v-for="m in mins" :key="m" :value="m">{{ m }}</option>
+                                <option v-for="m in minsOptions(endTimeMin)" :key="m" :value="m">{{ m }}</option>
                             </select>
+                            <button type="button" @click="setCurrentTime('end')" :disabled="!editMode" class="rounded border border-gray-300 bg-gray-50 px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-50">現在時刻</button>
                         </div>
                     </div>
                 </div>
@@ -537,7 +538,7 @@ const hours = computed(() => {
     }
     return Array.from({ length: 17 }, (_, i) => String(7 + i).padStart(2, '0'));
 });
-const mins = ['00', '15', '30', '45'];
+const mins = ['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'];
 const estimatedOptions = Array.from({ length: 32 }, (_, i) => Number(((i + 1) * 0.25).toFixed(2)));
 
 function makeLabel(kind, id) {
@@ -592,6 +593,38 @@ async function checkEventOverlaps() {
     }
 
     return [];
+}
+
+// 現在時刻（JST）を取得して開始または終了のセレクターにセット（分は丸めない）
+function setCurrentTime(target) {
+    const now = new Date();
+    // Intl.DateTimeFormat で確実にJST時刻を取得（ブラウザのタイムゾーン設定に関わらず正確）
+    const jstParts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Tokyo',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+    }).formatToParts(now);
+    const rawH = Number(jstParts.find((p) => p.type === 'hour').value);
+    const rawM = Number(jstParts.find((p) => p.type === 'minute').value);
+    const m = String(rawM).padStart(2, '0');
+    // hours配列の範囲内に収める
+    const hourNums = hours.value.map(Number);
+    const clampedH = Math.min(Math.max(rawH, hourNums[0]), hourNums[hourNums.length - 1]);
+    const h = String(clampedH).padStart(2, '0');
+    if (target === 'start') {
+        startTimeHour.value = h;
+        startTimeMin.value = m;
+    } else {
+        endTimeHour.value = h;
+        endTimeMin.value = m;
+    }
+}
+
+// 分のセレクターオプション：5分刈みベースだが、現在値が5分刈みにない場合は動的に追加
+function minsOptions(currentVal) {
+    if (!currentVal || mins.includes(currentVal)) return mins;
+    return [...mins, currentVal].sort((a, b) => Number(a) - Number(b));
 }
 
 function resolveDifficultySlug(id) {
@@ -670,7 +703,7 @@ function normalizeAssignment(a) {
             })(),
             detail: a.detail || '',
             difficulty: a.difficulty || resolveDifficultySlug(a.difficulty_id),
-            difficulty_id: a.difficulty_id ?? null,
+            difficulty_id: a.difficulty_id != null ? Number(a.difficulty_id) : resolveDifficultyId(a.difficulty),
             desired_start_date: a.desired_start_date || a.desired_date || '',
             desired_end_date: a.desired_end_date || '',
             desired_time_hour: a.desired_time ? a.desired_time.split(':')[0] || '09' : a.desired_time_hour || '09',
@@ -719,7 +752,7 @@ function normalizeAssignment(a) {
             detail: a.detail || '',
             user_id: a.user_id || (effectiveAuthUser() ? effectiveAuthUser().id : null),
             difficulty: a.difficulty || resolveDifficultySlug(a.difficulty_id),
-            difficulty_id: a.difficulty_id ?? null,
+            difficulty_id: a.difficulty_id != null ? Number(a.difficulty_id) : resolveDifficultyId(a.difficulty),
             desired_start_date: a.desired_start_date || a.desired_date || '',
             desired_end_date: a.desired_end_date || '',
             desired_time_hour: a.desired_time ? a.desired_time.split(':')[0] || '09' : a.desired_time_hour || '09',
@@ -1681,9 +1714,7 @@ async function save(sendImmediately = true) {
                 project_job_id: a.project_job_id || null,
                 company_id: a.company_id || null,
                 department_id: a.department_id || null,
-                difficulty_id:
-                    a.difficulty_id ??
-                    resolveDifficultyId(a.difficulty),
+                difficulty_id: a.difficulty_id ? Number(a.difficulty_id) : null,
                 desired_start_date: a.desired_start_date || null,
                 desired_end_date: a.desired_end_date || null,
                 start_time: String(a.start_time_hour || '00').padStart(2, '0') + ':' + String(a.start_time_min || '00').padStart(2, '0'),
@@ -1721,9 +1752,7 @@ async function save(sendImmediately = true) {
                 user_id: a.user_id || null,
                 company_id: a.company_id || null,
                 department_id: a.department_id || null,
-                difficulty_id:
-                    a.difficulty_id ??
-                    resolveDifficultyId(a.difficulty),
+                difficulty_id: a.difficulty_id ? Number(a.difficulty_id) : null,
                 desired_end_date: a.desired_end_date || null,
                 desired_time: String(a.desired_time_hour || '00').padStart(2, '0') + ':' + String(a.desired_time_min || '00').padStart(2, '0'),
                 estimated_hours: a.estimated_hours || null,
@@ -1817,12 +1846,7 @@ async function save(sendImmediately = true) {
                 project_job_id: a.project_job_id || null,
                 company_id: a.company_id || null,
                 department_id: a.department_id || null,
-                difficulty_id:
-                    a.difficulty_id ??
-                    resolveDifficultyId(a.difficulty) ??
-                    (window?.page?.props?.difficulties
-                        ? (window.page.props.difficulties.find((d) => d.name === a.difficulty || d.slug === a.difficulty)?.id ?? null)
-                        : null),
+                difficulty_id: a.difficulty_id ? Number(a.difficulty_id) : null,
                 desired_start_date: a.desired_start_date || null,
                 desired_end_date: a.desired_end_date || null,
                 start_time: a.start_time_hour
