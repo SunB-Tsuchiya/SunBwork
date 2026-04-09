@@ -636,13 +636,27 @@ headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' }
 
 ---
 
-## ProjectJob 完了/未完了 機能（2026-04-02 実装）
+## ProjectJob 完了/未完了 機能（2026-04-02 実装、2026-04-09 拡張）
 
 - `complete()`: `completed = true` で保存
 - `uncomplete()`: `completed = false` で保存（2026-04-02 追加）
 - ルート名: `coordinator.project_jobs.complete` / `coordinator.project_jobs.uncomplete`
+  - **⚠️ 必ず `coordinator.` プレフィックスを付けること。** `project_jobs.complete` では動作しない（404）
+- `Show.vue`: 完了後は `coordinator.project_jobs.index` にリダイレクト
+- `Show.vue`: 完了済み案件では「編集」「ジョブ割り当て」ボタンをグレーアウト＆`disabled`
+- `Show.vue`: 完了済みバッジ + 「未完了に戻す」ボタン（オレンジ）を表示（完了時のみ）
 - `Edit.vue`: 完了済みバッジ + 「未完了にする」ボタン実装済み（完了時のみ表示）
 - `Edit.vue`: `jobcode` フィールドに `required` 属性なし（空欄で保存可）
+
+### 完了済み案件のジョブ作成ブロック
+
+- `ProjectJobAssignmentsController::create()` / `store()` の両方で `completed` チェックを最初に行う
+  - `create()`: 完了済みなら `Show` にリダイレクト + `error` フラッシュメッセージ
+  - `store()`: 完了済みなら 422 JSON エラーを返す
+- `User\ProjectJobController::projectsJson()`: 完了済み案件を除外（`where('completed', false)`）
+  - 「ジョブ作成（進行表から）」モーダルと `MyJobBox` モーダルに影響
+- `EventController::createJob()`: 完了済み案件を除外（`->filter(fn($j) => !$j->completed)`）
+  - `events/create-job` ページのプロジェクト選択リストに影響
 
 ---
 

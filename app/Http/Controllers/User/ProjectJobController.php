@@ -34,6 +34,7 @@ class ProjectJobController extends Controller
         $jobIds = $assignmentJobIds->merge($teamMemberJobIds)->unique();
 
         $jobs = ProjectJob::whereIn('id', $jobIds)
+            ->where('completed', false)
             ->with('client')
             ->get(['id', 'title', 'client_id']);
 

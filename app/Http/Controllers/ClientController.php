@@ -19,19 +19,29 @@ class ClientController extends Controller
 {
     use ChecksAdminPermission, ChecksLeaderPermission;
 
-    public function index()
+    public function index(Request $request)
     {
         $this->requireAdminPermission('client_management');
         $this->requireLeaderPermission('client_management');
+        $showDormant = $request->boolean('dormant', false);
         $user = Auth::user();
         if ($user && $user->user_role === 'superadmin') {
-            $clients = Client::all();
+            $query = Client::query();
         } else {
             $companyId = $user->company_id ?? null;
-            $clients = Client::forCompany($companyId)->get();
+            $query = Client::forCompany($companyId);
         }
 
-        return Inertia::render('Clients/Index', ['clients' => $clients]);
+        if ($showDormant) {
+            $clients = $query->dormant()->get();
+        } else {
+            $clients = $query->active()->get();
+        }
+
+        return Inertia::render('Clients/Index', [
+            'clients'     => $clients,
+            'showDormant' => $showDormant,
+        ]);
     }
 
     public function create()
@@ -102,6 +112,25 @@ class ClientController extends Controller
         return redirect()->route("{$this->routePrefix()}.clients.index");
     }
 
+    /** 休眠状態の切り替え */
+    public function dormant(Request $request, Client $client)
+    {
+        $this->requireAdminPermission('client_management');
+        $this->requireLeaderPermission('client_management');
+        $this->authorize('update', $client);
+
+        $request->validate(['dormant' => 'required|boolean']);
+        $isDormant = (bool) $request->dormant;
+        $client->update(['is_dormant' => $isDormant]);
+
+        $msg = $isDormant
+            ? "「{$client->name}」を休眠状態にしました。"
+            : "「{$client->name}」の休眠を解除しました。";
+
+        return redirect()->route("{$this->routePrefix()}.clients.index")
+            ->with('success', $msg);
+    }
+
     public function show(Client $client)
     {
         $this->requireAdminPermission('client_management');
@@ -144,10 +173,16 @@ class ClientController extends Controller
         $this->requireLeaderPermission('client_management');
 
         $user  = Auth::user();
-        $query = Client::select('id', 'name');
+        $query = Client::select('id', 'name', 'is_dormant');
 
         if (!($user && $user->user_role === 'superadmin')) {
             $query->forCompany($user->company_id ?? null);
+        }
+
+        // 案件作成等の通常用途は休眠クライアントを除外。
+        // include_dormant=1 を渡すと統合先選択など管理画面で休眠も含めて返す。
+        if (!$request->boolean('include_dormant', false)) {
+            $query->active();
         }
 
         if ($request->filled('id')) {

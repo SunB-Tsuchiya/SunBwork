@@ -123,6 +123,12 @@ class ProjectJobAssignmentsController extends Controller
 
     public function create(Request $request, ProjectJob $projectJob)
     {
+        // 完了済み案件へのジョブ割り当て作成は禁止
+        if ($projectJob->completed) {
+            return redirect()->route('coordinator.project_jobs.show', ['projectJob' => $projectJob->id])
+                ->with('error', 'この案件は完了済みのため、新しいジョブを割り当てることはできません。');
+        }
+
         $prefillTitle = $request->query('title'); // 進行管理表joblink経由の場合にタイトルをprefill
         $prefillStageId = $request->query('stage_id');
         $prefillSizeId = $request->query('size_id');
@@ -638,6 +644,11 @@ class ProjectJobAssignmentsController extends Controller
 
     public function store(Request $request, ProjectJob $projectJob)
     {
+        // 完了済み案件へのジョブ割り当て作成は禁止
+        if ($projectJob->completed) {
+            return response()->json(['error' => 'この案件は完了済みのため、新しいジョブを割り当てることはできません。'], 422);
+        }
+
         $data = $request->validate([
             'assignments' => 'required|array',
             'assignments.*.title' => 'required|string|max:255',

@@ -1177,7 +1177,7 @@ class EventController extends Controller
                 ->get();
             $jobs = $ptms->map(function ($ptm) {
                 return $ptm->projectJob;
-            })->filter();
+            })->filter()->filter(fn($j) => !$j->completed);
 
             $userProjects = $jobs->map(function ($job) {
                 return [

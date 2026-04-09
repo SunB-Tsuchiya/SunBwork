@@ -41,12 +41,18 @@
                 <div class="flex flex-wrap items-center gap-2 pt-1">
                     <button
                         type="button"
-                        class="rounded bg-yellow-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-yellow-700"
+                        :class="job.completed
+                            ? 'rounded bg-gray-300 px-4 py-1.5 text-sm font-medium text-gray-400 cursor-not-allowed'
+                            : 'rounded bg-yellow-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-yellow-700'"
+                        :disabled="job.completed"
                         @click="goEdit"
                     >編集</button>
                     <button
                         type="button"
-                        class="rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
+                        :class="job.completed
+                            ? 'rounded bg-gray-300 px-4 py-1.5 text-sm font-medium text-gray-400 cursor-not-allowed'
+                            : 'rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700'"
+                        :disabled="job.completed"
                         @click="goJobAssign"
                     >ジョブ割り当て</button>
                     <button
@@ -66,13 +72,14 @@
                         class="rounded bg-green-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-green-700"
                         @click="completeJob"
                     >完了にする</button>
-                    <span
-                        v-else
-                        class="inline-flex items-center gap-2 rounded-full bg-yellow-100 px-3 py-1 text-sm font-medium text-yellow-800"
-                    >
-                        完了済み
-                        <button type="button" class="text-xs underline hover:no-underline" @click="uncompleteJob">取消</button>
-                    </span>
+                    <template v-else>
+                        <span class="inline-flex items-center rounded-full bg-yellow-100 px-3 py-1 text-sm font-medium text-yellow-800">完了済み</span>
+                        <button
+                            type="button"
+                            class="rounded bg-orange-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-orange-600"
+                            @click="uncompleteJob"
+                        >未完了に戻す</button>
+                    </template>
                     <!-- 削除 -->
                     <button
                         type="button"
@@ -543,13 +550,13 @@ async function completeJob() {
     if (!confirm('この案件を完了としてマークしますか？')) return;
     const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
     try {
-        const res = await fetch(route('project_jobs.complete', { projectJob: job.id }), {
+        const res = await fetch(route('coordinator.project_jobs.complete', { projectJob: job.id }), {
             method: 'POST',
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' },
         });
         if (res.ok) {
-            router.reload({ preserveScroll: true });
+            router.visit(route('coordinator.project_jobs.index'));
         } else {
             alert('完了処理に失敗しました。');
         }
@@ -562,7 +569,7 @@ async function uncompleteJob() {
     if (!confirm('完了を取り消しますか？')) return;
     const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
     try {
-        const res = await fetch(route('project_jobs.uncomplete', { projectJob: job.id }), {
+        const res = await fetch(route('coordinator.project_jobs.uncomplete', { projectJob: job.id }), {
             method: 'POST',
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' },

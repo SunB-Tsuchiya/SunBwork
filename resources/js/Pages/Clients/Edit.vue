@@ -22,6 +22,21 @@ function submit() {
     form.put(route(`${routePrefix.value}.clients.update`, props.client.id));
 }
 
+// 休眠操作
+const isDormantLoading = ref(false);
+function toggleDormant(makeDormant) {
+    if (!confirm(makeDormant
+        ? `「${props.client.name}」を休眠状態にします。\n一覧には表示されなくなります。よろしいですか？`
+        : `「${props.client.name}」の休眠を解除します。\n通常一覧に表示されるようになります。よろしいですか？`)
+    ) return;
+    isDormantLoading.value = true;
+    router.post(
+        route(`${routePrefix.value}.clients.dormant`, props.client.id),
+        { dormant: makeDormant },
+        { onFinish: () => { isDormantLoading.value = false; } },
+    );
+}
+
 // ===== 削除・統合モーダル =====
 const showModal = ref(false);
 // 'error'=削除ブロック表示  'select'=統合先選択
@@ -73,7 +88,9 @@ async function openSelectStep() {
     isFetchingClients.value = true;
     try {
         const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
-        const res = await fetch(route(`${routePrefix.value}.clients.json`), {
+        const res = await fetch(
+            route(`${routePrefix.value}.clients.json`) + '?include_dormant=1',
+            {
             headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' },
             credentials: 'same-origin',
         });
@@ -128,9 +145,38 @@ function executeMerge() {
                     <label class="mb-1 block">詳細</label>
                     <textarea v-model="form.detail" class="w-full rounded border px-2 py-1"></textarea>
                 </div>
-                <div class="mt-6 flex gap-4">
+                <!-- 休眠バッジ -->
+                <div v-if="props.client.is_dormant" class="mb-4 flex items-center gap-2 rounded-md border border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-600">
+                    <svg class="h-4 w-4 flex-shrink-0 text-gray-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" />
+                    </svg>
+                    このクライアントは現在<strong class="ml-1">休眠状態</strong>です。通常の一覧には表示されません。
+                </div>
+
+                <div class="mt-6 flex flex-wrap gap-3">
                     <button type="submit" class="rounded bg-orange-600 px-4 py-2 font-bold text-white hover:bg-orange-700">更新</button>
                     <Link :href="route(`${routePrefix}.clients.index`)" class="rounded bg-gray-200 px-4 py-2 font-bold text-gray-700 hover:bg-gray-300">一覧へ戻る</Link>
+
+                    <!-- 休眠 / 解除ボタン -->
+                    <button
+                        v-if="!props.client.is_dormant"
+                        type="button"
+                        :disabled="isDormantLoading"
+                        class="rounded bg-gray-500 px-4 py-2 font-bold text-white hover:bg-gray-600 disabled:opacity-60"
+                        @click="toggleDormant(true)"
+                    >
+                        休眠にする
+                    </button>
+                    <button
+                        v-else
+                        type="button"
+                        :disabled="isDormantLoading"
+                        class="rounded bg-blue-600 px-4 py-2 font-bold text-white hover:bg-blue-700 disabled:opacity-60"
+                        @click="toggleDormant(false)"
+                    >
+                        休眠を解除
+                    </button>
+
                     <button
                         type="button"
                         class="ml-auto rounded bg-red-600 px-4 py-2 font-bold text-white hover:bg-red-700"

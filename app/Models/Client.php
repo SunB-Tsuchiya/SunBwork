@@ -15,10 +15,12 @@ class Client extends Model
         'detail',
         'fromSB',
         'company_id',
+        'is_dormant',
     ];
 
     protected $casts = [
-        'fromSB' => 'boolean',
+        'fromSB'     => 'boolean',
+        'is_dormant' => 'boolean',
     ];
 
     public function projectJobs()
@@ -38,5 +40,21 @@ class Client extends Model
     {
         if (empty($companyId)) return $query->whereNull('company_id');
         return $query->where('company_id', $companyId);
+    }
+
+    /**
+     * Scope a query to only include active (non-dormant) clients.
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('is_dormant', false);
+    }
+
+    /**
+     * Scope a query to only include dormant clients.
+     */
+    public function scopeDormant($query)
+    {
+        return $query->where('is_dormant', true);
     }
 }

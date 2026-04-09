@@ -278,6 +278,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('clients/json', [App\Http\Controllers\ClientController::class, 'clientsJson'])->name('clients.json');
         Route::post('clients/check-duplicate', [App\Http\Controllers\ClientController::class, 'checkDuplicate'])->name('clients.check_duplicate');
         Route::post('clients/{client}/merge', [App\Http\Controllers\ClientController::class, 'merge'])->name('clients.merge');
+        Route::post('clients/{client}/dormant', [App\Http\Controllers\ClientController::class, 'dormant'])->name('clients.dormant');
         Route::resource('clients', App\Http\Controllers\ClientController::class)->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
 
         // 会社管理 (会社作成/管理は SuperAdmin 側に一本化しました)
@@ -409,6 +410,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('clients/json', [App\Http\Controllers\ClientController::class, 'clientsJson'])->name('clients.json');
         Route::post('clients/check-duplicate', [App\Http\Controllers\ClientController::class, 'checkDuplicate'])->name('clients.check_duplicate');
         Route::post('clients/{client}/merge', [App\Http\Controllers\ClientController::class, 'merge'])->name('clients.merge');
+        Route::post('clients/{client}/dormant', [App\Http\Controllers\ClientController::class, 'dormant'])->name('clients.dormant');
         Route::resource('clients', App\Http\Controllers\ClientController::class)->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
         // Leader diary interactions (leader can view diaries for departments/units they lead)
         Route::get('diaryinteractions', [App\Http\Controllers\Diaries\DiaryInteractionController::class, 'index'])->name('diaryinteractions.index');
@@ -508,6 +510,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('clients/json', [App\Http\Controllers\ClientController::class, 'clientsJson'])->name('clients.json');
         Route::post('clients/check-duplicate', [App\Http\Controllers\ClientController::class, 'checkDuplicate'])->name('clients.check_duplicate');
         Route::post('clients/{client}/merge', [App\Http\Controllers\ClientController::class, 'merge'])->name('clients.merge');
+        Route::post('clients/{client}/dormant', [App\Http\Controllers\ClientController::class, 'dormant'])->name('clients.dormant');
         Route::resource('clients', App\Http\Controllers\ClientController::class)->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
 
         // Project_job CRUD
