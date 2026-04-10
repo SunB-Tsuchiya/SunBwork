@@ -1039,3 +1039,58 @@ Coordinator がジョブを割り当てたとき、ユーザーが完了した�
 - `assignmentEditHref` computed: `message.project_job_assignment.id` から `coordinator.project_jobs.assignments.edit` URLを生成
 - 旧: `jobbox.edit`（メッセージ本文の編集）→ 新: `assignments.edit`（アサイン内容の編集）
 - `isPrivilegedUser`（coordinator/leader/admin）であれば遷移可能
+
+---
+
+## TimelineDiary コンポーネント 追加実装（2026-04-10）
+
+### 重複イベントのレーン分け
+
+イベントが時間的に重なる場合、上下に段を分けて表示する。
+
+**定数:**
+```js
+const EVENT_ROW_H = 44; // px（イベント高36px + 行間8px）
+const TIMELINE_TOP_PAD = 8; // px
+```
+
+**追加 computed / 関数:**
+- `eventLanes`: 開始時刻でソートし、空きレーン（`laneEndTimes`配列）に割り当て。`ev.id` をキーに lane番号を返す `Map`
+- `numLanes`: 使用中の最大レーン数 + 1
+- `timelineHeight`: `TIMELINE_TOP_PAD + numLanes * EVENT_ROW_H + 8` px の動的高さ
+- `getEventTop(ev)`: `TIMELINE_TOP_PAD + lane * EVENT_ROW_H` px を返す文字列
+
+**テンプレート変更:**
+- タイムライン div の高さ: 固定 → `:style="{ height: timelineHeight }"`
+- イベント div の top: `class="absolute top-2"` → `:style="{ ...getEventStyleWithOverrides(ev), top: getEventTop(ev) }"`
+
+### スクロールバー解消
+
+- `scrollWrapperRef` div: `overflow-x-auto` → `overflow-x-hidden`
+- 原因: 右端時刻ラベルが `left: containerWidth px` + `translateX(-50%)` で右半分がコンテナ外にはみ出していた
+- ◀▶ボタンで時間帯移動できるため横スクロール不要
+
+### イベント枠・影
+
+`computeEventStyle()` に追加:
+```js
+border: '2px solid rgba(255,255,255,0.7)',
+boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
+```
+
+---
+
+## 日報管理 Interactions ページ（2026-04-10 改修）
+
+### Diaries/Interactions/EventShow.vue
+
+タイムテーブルのイベントバーをクリックして開く詳細ページ。Events/Show.vue と同スタイルに統一。
+- `AssignmentDetailCard` を使用
+- `eventTypeLabel`, `isEventCompleted()`, `formatJstDateTime()`, `formatMins()`, `actualDurationText()` を実装
+- ボタンは「戻る」のみ（読み取り専用）
+- `onBack()`: referrer/pathname/Ziggy fallback（leader/admin/admin2 プレフィックス対応）
+
+### Diaries/Interactions/Show.vue
+
+日報詳細ページのレイアウトを縦1カラムに変更（旧: `lg:grid-cols-2`）。
+順序: 日報本文 → `<TimelineDiary>`（全幅） → 既読 → コメント一覧 → コメント入力
