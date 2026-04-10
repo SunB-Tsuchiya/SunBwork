@@ -204,79 +204,94 @@
 
         <!-- 週間休憩設定モーダル -->
         <div v-if="showBreakModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-            <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
+            <div class="w-full max-w-2xl rounded-lg bg-white p-6 shadow-lg">
                 <h2 class="mb-1 text-lg font-bold">週間休憩設定</h2>
-                <p class="mb-3 text-xs text-gray-500">空白にするとデフォルト設定（{{ defaultBreak.start }}〜{{ defaultBreak.end }}）を使用します。</p>
+                <p class="mb-3 text-xs text-gray-500">チェックを入れた日に休憩時間が適用されます。時間を変更するとチェックが自動で入ります。</p>
                 <table class="w-full text-sm">
                     <thead>
-                        <tr class="border-b-2 border-gray-300 text-xs text-gray-500">
-                            <th class="py-1 pr-3 text-left font-medium">日付</th>
-                            <th class="py-1 text-left font-medium" colspan="3">休憩時間</th>
+                        <tr class="border-b-2 border-gray-300 bg-gray-100 text-xs text-gray-600">
+                            <th class="py-2 pl-1 pr-3 text-left font-medium">日付</th>
+                            <th class="py-2 w-10 text-center font-medium">有効</th>
+                            <th class="py-2 text-left font-medium">開始</th>
+                            <th class="py-2 px-2 text-center font-medium">〜</th>
+                            <th class="py-2 text-left font-medium">終了</th>
                         </tr>
                     </thead>
                     <tbody>
                         <!-- 全日一括変更 -->
-                        <tr class="border-b-2 border-gray-300 bg-gray-50">
-                            <td class="w-24 py-2 pr-3 font-bold text-gray-800">全日</td>
-                            <td class="py-2" colspan="3">
+                        <tr class="border-b-2 border-gray-300 bg-teal-50">
+                            <td class="py-2 pl-1 pr-3 font-bold text-teal-800">全日一括</td>
+                            <td class="py-2 text-center">
+                                <input type="checkbox" v-model="batchAllEnabled"
+                                       @change="applyBatchAllEnabled"
+                                       class="h-4 w-4 rounded border-gray-300 accent-teal-600" />
+                            </td>
+                            <td class="py-2">
                                 <div class="flex items-center gap-1">
-                                    <select v-model="batchBreakEnabled"
-                                            @change="applyBatchBreak"
+                                    <select v-model="batchStartH" @change="applyBatchBreakTime"
                                             class="rounded border-gray-300 text-sm focus:border-teal-400 focus:ring-teal-400">
-                                        <option value="">— 一括選択 —</option>
-                                        <option value="none">休憩なし</option>
-                                        <option value="set">時間を設定</option>
+                                        <option v-for="h in 24" :key="h" :value="String(h-1).padStart(2,'0')">{{ String(h-1).padStart(2,'0') }}</option>
                                     </select>
-                                    <template v-if="batchBreakEnabled === 'set'">
-                                        <select v-model="batchStartH" class="rounded border-gray-300 text-sm">
-                                            <option v-for="h in 24" :key="h" :value="String(h-1).padStart(2,'0')">{{ String(h-1).padStart(2,'0') }}</option>
-                                        </select>
-                                        <span class="text-gray-500">:</span>
-                                        <select v-model="batchStartM" class="rounded border-gray-300 text-sm">
-                                            <option v-for="m in [0,15,30,45]" :key="m" :value="String(m).padStart(2,'0')">{{ String(m).padStart(2,'0') }}</option>
-                                        </select>
-                                        <span class="px-1 text-gray-500">〜</span>
-                                        <select v-model="batchEndH" class="rounded border-gray-300 text-sm">
-                                            <option v-for="h in 24" :key="h" :value="String(h-1).padStart(2,'0')">{{ String(h-1).padStart(2,'0') }}</option>
-                                        </select>
-                                        <span class="text-gray-500">:</span>
-                                        <select v-model="batchEndM" class="rounded border-gray-300 text-sm">
-                                            <option v-for="m in [0,15,30,45]" :key="m" :value="String(m).padStart(2,'0')">{{ String(m).padStart(2,'0') }}</option>
-                                        </select>
-                                        <button @click="applyBatchBreakTime"
-                                                class="ml-1 rounded bg-teal-600 px-2 py-1 text-xs text-white hover:bg-teal-700">
-                                            適用
-                                        </button>
-                                    </template>
+                                    <span class="text-gray-500">:</span>
+                                    <select v-model="batchStartM" @change="applyBatchBreakTime"
+                                            class="rounded border-gray-300 text-sm focus:border-teal-400 focus:ring-teal-400">
+                                        <option v-for="m in [0,15,30,45]" :key="m" :value="String(m).padStart(2,'0')">{{ String(m).padStart(2,'0') }}</option>
+                                    </select>
+                                </div>
+                            </td>
+                            <td class="py-2 px-2 text-center text-gray-400">〜</td>
+                            <td class="py-2">
+                                <div class="flex items-center gap-1">
+                                    <select v-model="batchEndH" @change="applyBatchBreakTime"
+                                            class="rounded border-gray-300 text-sm focus:border-teal-400 focus:ring-teal-400">
+                                        <option v-for="h in 24" :key="h" :value="String(h-1).padStart(2,'0')">{{ String(h-1).padStart(2,'0') }}</option>
+                                    </select>
+                                    <span class="text-gray-500">:</span>
+                                    <select v-model="batchEndM" @change="applyBatchBreakTime"
+                                            class="rounded border-gray-300 text-sm focus:border-teal-400 focus:ring-teal-400">
+                                        <option v-for="m in [0,15,30,45]" :key="m" :value="String(m).padStart(2,'0')">{{ String(m).padStart(2,'0') }}</option>
+                                    </select>
                                 </div>
                             </td>
                         </tr>
                         <!-- 日別 -->
-                        <tr v-for="day in breakDays" :key="day.date" class="border-b last:border-0">
-                            <td class="w-24 py-2 pr-3 font-medium text-gray-700">{{ day.label }}</td>
+                        <tr v-for="day in breakDays" :key="day.date"
+                            class="border-b last:border-0"
+                            :class="day.enabled ? '' : 'opacity-50'">
+                            <td class="py-2 pl-1 pr-3 font-medium text-gray-700">{{ day.label }}</td>
+                            <td class="py-2 text-center">
+                                <input type="checkbox" v-model="day.enabled"
+                                       class="h-4 w-4 rounded border-gray-300 accent-teal-600" />
+                            </td>
                             <td class="py-2">
                                 <div class="flex items-center gap-1">
-                                    <input type="checkbox" v-model="day.enabled"
-                                           class="h-4 w-4 rounded border-gray-300 accent-teal-600"
-                                           :id="'brk-' + day.date" />
-                                    <template v-if="day.enabled">
-                                        <select v-model="day.startH" class="rounded border-gray-300 text-sm focus:border-teal-400 focus:ring-teal-400">
-                                            <option v-for="h in 24" :key="h" :value="String(h-1).padStart(2,'0')">{{ String(h-1).padStart(2,'0') }}</option>
-                                        </select>
-                                        <span class="text-gray-500">:</span>
-                                        <select v-model="day.startM" class="rounded border-gray-300 text-sm focus:border-teal-400 focus:ring-teal-400">
-                                            <option v-for="m in [0,15,30,45]" :key="m" :value="String(m).padStart(2,'0')">{{ String(m).padStart(2,'0') }}</option>
-                                        </select>
-                                        <span class="px-1 text-gray-500">〜</span>
-                                        <select v-model="day.endH" class="rounded border-gray-300 text-sm focus:border-teal-400 focus:ring-teal-400">
-                                            <option v-for="h in 24" :key="h" :value="String(h-1).padStart(2,'0')">{{ String(h-1).padStart(2,'0') }}</option>
-                                        </select>
-                                        <span class="text-gray-500">:</span>
-                                        <select v-model="day.endM" class="rounded border-gray-300 text-sm focus:border-teal-400 focus:ring-teal-400">
-                                            <option v-for="m in [0,15,30,45]" :key="m" :value="String(m).padStart(2,'0')">{{ String(m).padStart(2,'0') }}</option>
-                                        </select>
-                                    </template>
-                                    <span v-else class="ml-2 text-xs text-gray-400">— なし —</span>
+                                    <select v-model="day.startH"
+                                            @change="day.enabled = true"
+                                            class="rounded border-gray-300 text-sm focus:border-teal-400 focus:ring-teal-400">
+                                        <option v-for="h in 24" :key="h" :value="String(h-1).padStart(2,'0')">{{ String(h-1).padStart(2,'0') }}</option>
+                                    </select>
+                                    <span class="text-gray-500">:</span>
+                                    <select v-model="day.startM"
+                                            @change="day.enabled = true"
+                                            class="rounded border-gray-300 text-sm focus:border-teal-400 focus:ring-teal-400">
+                                        <option v-for="m in [0,15,30,45]" :key="m" :value="String(m).padStart(2,'0')">{{ String(m).padStart(2,'0') }}</option>
+                                    </select>
+                                </div>
+                            </td>
+                            <td class="py-2 px-2 text-center text-gray-400">〜</td>
+                            <td class="py-2">
+                                <div class="flex items-center gap-1">
+                                    <select v-model="day.endH"
+                                            @change="day.enabled = true"
+                                            class="rounded border-gray-300 text-sm focus:border-teal-400 focus:ring-teal-400">
+                                        <option v-for="h in 24" :key="h" :value="String(h-1).padStart(2,'0')">{{ String(h-1).padStart(2,'0') }}</option>
+                                    </select>
+                                    <span class="text-gray-500">:</span>
+                                    <select v-model="day.endM"
+                                            @change="day.enabled = true"
+                                            class="rounded border-gray-300 text-sm focus:border-teal-400 focus:ring-teal-400">
+                                        <option v-for="m in [0,15,30,45]" :key="m" :value="String(m).padStart(2,'0')">{{ String(m).padStart(2,'0') }}</option>
+                                    </select>
                                 </div>
                             </td>
                         </tr>
@@ -442,7 +457,7 @@ const dailyBreakMap = computed(() => {
 const showBreakModal = ref(false);
 const breakDays = ref([]);
 const savingBreak = ref(false);
-const batchBreakEnabled = ref('');
+const batchAllEnabled = ref(false);
 const batchStartH = ref('12');
 const batchStartM = ref('00');
 const batchEndH = ref('13');
@@ -479,16 +494,12 @@ function openBreakModal() {
         });
     }
     breakDays.value = days;
-    batchBreakEnabled.value = '';
+    batchAllEnabled.value = false;
     showBreakModal.value = true;
 }
 
-function applyBatchBreak() {
-    if (batchBreakEnabled.value === 'none') {
-        breakDays.value.forEach((d) => (d.enabled = false));
-        batchBreakEnabled.value = '';
-    }
-    // 'set' の場合は applyBatchBreakTime ボタンで適用
+function applyBatchAllEnabled() {
+    breakDays.value.forEach((d) => (d.enabled = batchAllEnabled.value));
 }
 
 function applyBatchBreakTime() {
@@ -499,7 +510,6 @@ function applyBatchBreakTime() {
         d.endH   = batchEndH.value;
         d.endM   = batchEndM.value;
     });
-    batchBreakEnabled.value = '';
 }
 
 async function saveWeekBreaks() {
