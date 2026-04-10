@@ -9,6 +9,7 @@ import { route } from 'ziggy-js';
 const props = defineProps({
     event: Object,
     hide_edit: { type: Boolean, default: false },
+    view_as_coordinator: { type: Boolean, default: false },
     coordinator_assignment: { type: Object, default: null },
     lunch_start: { type: String, default: null },
     lunch_end: { type: String, default: null },
@@ -154,15 +155,26 @@ const eventTypeLabel = computed(() => props.event?.event_item_type?.name ?? null
 
                 <!-- ボタン類 -->
                 <div class="flex flex-wrap items-center gap-2 border-t bg-gray-50 px-5 py-3">
-                    <Link v-if="!hide_edit"
-                          :href="route('events.edit', event.id)"
-                          class="inline-flex items-center gap-1.5 rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700">
-                        編集
-                    </Link>
-                    <button @click="confirmDelete"
-                            class="inline-flex items-center gap-1.5 rounded bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700">
-                        削除
-                    </button>
+                    <!-- Coordinator閲覧モード: 編集・削除はグレーアウト -->
+                    <template v-if="view_as_coordinator">
+                        <span class="inline-flex cursor-not-allowed items-center gap-1.5 rounded bg-gray-300 px-3 py-1.5 text-sm font-medium text-gray-500" title="Coordinator は編集できません">
+                            編集（閲覧のみ）
+                        </span>
+                        <span class="inline-flex cursor-not-allowed items-center gap-1.5 rounded bg-gray-300 px-3 py-1.5 text-sm font-medium text-gray-500" title="Coordinator は削除できません">
+                            削除（閲覧のみ）
+                        </span>
+                    </template>
+                    <template v-else>
+                        <Link v-if="!hide_edit"
+                              :href="route('events.edit', event.id)"
+                              class="inline-flex items-center gap-1.5 rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700">
+                            編集
+                        </Link>
+                        <button @click="confirmDelete"
+                                class="inline-flex items-center gap-1.5 rounded bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700">
+                            削除
+                        </button>
+                    </template>
                     <template v-if="event.project_job_assignment_id">
                         <button
                             @click="submitComplete"

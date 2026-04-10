@@ -90,7 +90,7 @@
                             <tr class="bg-gray-50">
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">発信者</th>
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">受信者</th>
-                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">締め切り</th>
+                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">作成日</th>
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">タイトル</th>
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">クライアント</th>
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">案件名</th>
@@ -108,7 +108,7 @@
                             >
                                 <td class="break-words border px-3 py-2 text-sm text-gray-700">{{ getSender(m) }}</td>
                                 <td class="break-words border px-3 py-2 text-sm text-gray-700">{{ getRecipients(m) }}</td>
-                                <td class="break-words whitespace-pre-line border px-3 py-2 text-sm text-gray-600">{{ getDeadline(m) }}</td>
+                                <td class="break-words whitespace-pre-line border px-3 py-2 text-sm text-gray-600">{{ getCreatedAt(m) }}</td>
                                 <td class="break-words border px-3 py-2 text-sm">{{ m.subject || (m.body && m.body.slice(0, 60)) }}</td>
                                 <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ getClientName(m) }}</td>
                                 <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ getProjectJobTitle(m) }}</td>
@@ -194,9 +194,8 @@ function formatDateLabel(dateStr) {
 }
 
 function getDateKey(m) {
+    // ジョブ作成日（依頼日）を基準にグルーピング
     return (
-        m.project_job_assignment?.desired_start_date ||
-        m.project_job_assignment?.desired_end_date ||
         (m.created_at ? String(m.created_at).split('T')[0] : null) ||
         ''
     );
@@ -330,9 +329,18 @@ async function rowClick(m, event) {
     const tag = event.target?.tagName?.toLowerCase() || '';
     if (tag === 'a' || tag === 'button' || event.target.closest?.('a,button')) return;
 
-    // Coordinator一覧からはメッセージ詳細（assignment-job詳細）へ直接遷移する。
-    // assignment-job-by-myself（events）との混同を防ぐため、events検索は行わない。
+    // デバッグ: クリックした行のデータを確認
+    console.log('[JobBox rowClick]', {
+        id: m.id,
+        subject: m.subject,
+        event_id: m.event_id,
+        project_job_assignment_id: m.project_job_assignment_id,
+        project_job_id: m.project_job_assignment?.project_job_id ?? m.project_job_assignment?.project_job?.id,
+        __type: m.__type,
+    });
+
     const url = getMessageLink(m);
+    console.log('[JobBox rowClick] → url:', url);
     if (url && url !== '#') router.visit(url, { preserveState: false });
 }
 
@@ -362,6 +370,18 @@ function getBackLink() {
 }
 
 function getMessageLink(m) {
+    // カレンダーイベントがあれば coordinator 専用 event 詳細へ（タブメニュー維持）
+    if (m.event_id) {
+        try {
+            return route('coordinator.events.show', { event: m.event_id });
+        } catch {}
+    }
+    // JAMなしの独自アサインは MyJobBox 詳細へ
+    if (m.__type === 'assignment') {
+        try {
+            return route('user.myjobbox.show', { assignment: m.project_job_assignment_id });
+        } catch {}
+    }
     let pjId = props.projectJob?.id;
     try {
         if (!pjId) pjId = m.project_job_assignment?.project_job?.id || m.project_job_assignment?.project_job_id || null;
@@ -394,16 +414,13 @@ function getRecipients(m) {
     }
 }
 
-function getDeadline(m) {
+function getCreatedAt(m) {
     try {
-        const date = m.project_job_assignment?.desired_end_date || null;
+        const date = m.created_at || null;
         if (!date) return '-';
         const parts = String(date).split('T')[0].split('-');
         if (parts.length !== 3) return String(date).split('T')[0];
-        const formatted = `${parts[0]}/${parts[1]}/${parts[2]}`;
-        const time = m.project_job_assignment?.start_time || m.project_job_assignment?.desired_time || '';
-        if (time) return `${formatted}\n${String(time).slice(0, 5)}`;
-        return formatted;
+        return `${parts[0]}/${parts[1]}/${parts[2]}`;
     } catch {
         return '-';
     }

@@ -148,6 +148,41 @@ class JobBoxController extends Controller
             // non-fatal
         }
 
+        // カレンダーイベントIDをメッセージに付加（行クリックで event 詳細へ遷移するため）
+        try {
+            $aidList = $messages->getCollection()
+                ->map(fn ($m) => $m->project_job_assignment_id)
+                ->filter()->unique()->values()->toArray();
+            if (!empty($aidList)) {
+                // 直接リンク
+                $directEventMap = DB::table('events')
+                    ->whereIn('project_job_assignment_id', $aidList)
+                    ->orderBy('starts_at')
+                    ->get(['id', 'project_job_assignment_id'])
+                    ->keyBy('project_job_assignment_id');
+                // supersede チェーン経由（ユーザーがマイジョブとして登録してカレンダー登録した場合）
+                $supersedeEventMap = DB::table('events')
+                    ->join('project_job_assignments as pja_self', 'events.project_job_assignment_id', '=', 'pja_self.id')
+                    ->whereIn('pja_self.supersedes_assignment_id', $aidList)
+                    ->orderBy('events.starts_at')
+                    ->get(['events.id as eid', 'pja_self.supersedes_assignment_id as original_aid'])
+                    ->keyBy('original_aid');
+                $messages->getCollection()->transform(function ($msg) use ($directEventMap, $supersedeEventMap) {
+                    $aid = $msg->project_job_assignment_id;
+                    if ($aid) {
+                        if (isset($directEventMap[$aid])) {
+                            $msg->event_id = $directEventMap[$aid]->id;
+                        } elseif (isset($supersedeEventMap[$aid])) {
+                            $msg->event_id = $supersedeEventMap[$aid]->eid;
+                        }
+                    }
+                    return $msg;
+                });
+            }
+        } catch (\Throwable $__e) {
+            // non-fatal
+        }
+
         $monthBase = JobAssignmentMessage::join('project_job_assignments', 'job_assignment_messages.project_job_assignment_id', '=', 'project_job_assignments.id')
             ->where('project_job_assignments.project_job_id', $projectJob->id);
 
@@ -236,6 +271,13 @@ class JobBoxController extends Controller
                             ->whereColumn('project_job_coordinators.project_job_id', 'project_jobs.id')
                             ->where('project_job_coordinators.user_id', $user->id);
                     });
+            })
+            // マイジョブで supersedes 済みの依頼ジョブは非表示
+            ->whereNotExists(function ($sub) {
+                $sub->from('project_job_assignments as pja_self')
+                    ->whereColumn('pja_self.supersedes_assignment_id', 'project_job_assignments.id')
+                    ->whereColumn('pja_self.user_id', 'project_job_assignments.user_id')
+                    ->whereColumn('pja_self.sender_id', 'pja_self.user_id');
             });
 
         if ($q) {
@@ -267,9 +309,173 @@ class JobBoxController extends Controller
         }
 
         // Ensure statusModel is loaded for each linked assignment
-        $messages = $base->with(['sender', 'message.recipients.user', 'message.fromUser', 'projectJobAssignment.projectJob.client', 'projectJobAssignment.statusModel', 'projectJobAssignment.user'])
-            ->paginate($usePeriodFilter ? 500 : 50)
-            ->appends(array_filter(['q' => $q, 'period' => $periodModel, 'sort' => $sort, 'dir' => $dir]));
+        $jamMessages = $base->with(['sender', 'message.recipients.user', 'message.fromUser', 'projectJobAssignment.projectJob.client', 'projectJobAssignment.statusModel', 'projectJobAssignment.user'])
+            ->limit(500)
+            ->get();
+
+        // カレンダーイベントIDをメッセージに付加（行クリックで event 詳細へ遷移するため）
+        try {
+            $aidList = $jamMessages
+                ->map(fn ($m) => $m->project_job_assignment_id)
+                ->filter()->unique()->values()->toArray();
+
+            \Illuminate\Support\Facades\Log::info('[JobBox.global] aidList', ['aids' => $aidList]);
+
+            if (!empty($aidList)) {
+                // ① 直接リンク: 依頼ジョブのアサインID → event
+                $directEventMap = DB::table('events')
+                    ->whereIn('project_job_assignment_id', $aidList)
+                    ->orderBy('starts_at')
+                    ->get(['id', 'project_job_assignment_id'])
+                    ->keyBy('project_job_assignment_id');
+
+                \Illuminate\Support\Facades\Log::info('[JobBox.global] directEventMap', $directEventMap->map(fn($e) => $e->id)->toArray());
+
+                // ② supersedes_assignment_id 経由
+                $supersedeEventMap = DB::table('events')
+                    ->join('project_job_assignments as pja_self', 'events.project_job_assignment_id', '=', 'pja_self.id')
+                    ->whereIn('pja_self.supersedes_assignment_id', $aidList)
+                    ->orderBy('events.starts_at')
+                    ->get(['events.id as eid', 'pja_self.supersedes_assignment_id as original_aid'])
+                    ->keyBy('original_aid');
+
+                \Illuminate\Support\Facades\Log::info('[JobBox.global] supersedeEventMap', $supersedeEventMap->map(fn($e) => $e->eid)->toArray());
+
+                // ③ 同ユーザー・同案件・同タイトルの自己割当（マイジョブ）が持つイベント
+                // supersedes_assignment_id が未設定でも同ユーザー・同案件・同タイトルなら紐付ける
+                $sameUserProjectEventMap = DB::table('events')
+                    ->join('project_job_assignments as pja_self', 'events.project_job_assignment_id', '=', 'pja_self.id')
+                    ->whereColumn('pja_self.sender_id', 'pja_self.user_id') // 自己割当
+                    ->join('project_job_assignments as pja_req', function ($join) use ($aidList) {
+                        $join->on('pja_req.user_id', '=', 'pja_self.user_id')
+                             ->on('pja_req.project_job_id', '=', 'pja_self.project_job_id')
+                             ->on('pja_req.title', '=', 'pja_self.title') // タイトル一致
+                             ->whereIn('pja_req.id', $aidList)
+                             ->whereColumn('pja_req.sender_id', '<>', 'pja_req.user_id'); // 依頼ジョブ
+                    })
+                    ->orderBy('events.starts_at')
+                    ->get(['events.id as eid', 'pja_req.id as original_aid'])
+                    ->keyBy('original_aid');
+
+                \Illuminate\Support\Facades\Log::info('[JobBox.global] sameUserProjectEventMap', $sameUserProjectEventMap->map(fn($e) => $e->eid)->toArray());
+
+                $jamMessages->transform(function ($msg) use ($directEventMap, $supersedeEventMap, $sameUserProjectEventMap) {
+                    $aid = $msg->project_job_assignment_id;
+                    if ($aid) {
+                        if (isset($directEventMap[$aid])) {
+                            $msg->event_id = $directEventMap[$aid]->id;
+                        } elseif (isset($supersedeEventMap[$aid])) {
+                            $msg->event_id = $supersedeEventMap[$aid]->eid;
+                        } elseif (isset($sameUserProjectEventMap[$aid])) {
+                            $msg->event_id = $sameUserProjectEventMap[$aid]->eid;
+                        }
+                    }
+                    return $msg;
+                });
+            }
+        } catch (\Throwable $__e) {
+            // non-fatal
+        }
+
+        // ── JAMなしジョブを追加 ──
+        // Coordinator が管理する案件（オーナー or サブCo）の
+        // job_assignment_messages に紐付かない ProjectJobAssignment を取得する
+        $extraItems = [];
+        try {
+            $ownQ = \App\Models\ProjectJobAssignment::with([
+                'projectJob.client',
+                'user',
+                'sender',
+                'statusModel',
+            ])
+                ->where(function ($qry) use ($user) {
+                    // 自分自身のジョブ
+                    $qry->where('user_id', $user->id)
+                        // 自分が送信者（Coordinator が依頼したがJAMなし）
+                        ->orWhere('sender_id', $user->id)
+                        // 自分がオーナーの案件の全ジョブ
+                        ->orWhereExists(function ($sub) use ($user) {
+                            $sub->from('project_jobs')
+                                ->whereColumn('project_jobs.id', 'project_job_assignments.project_job_id')
+                                ->where('project_jobs.user_id', $user->id);
+                        })
+                        // 自分がサブCoの案件の全ジョブ
+                        ->orWhereExists(function ($sub) use ($user) {
+                            $sub->from('project_job_coordinators')
+                                ->whereColumn('project_job_coordinators.project_job_id', 'project_job_assignments.project_job_id')
+                                ->where('project_job_coordinators.user_id', $user->id);
+                        });
+                })
+                ->whereNotExists(function ($sub) {
+                    $sub->from('job_assignment_messages')
+                        ->whereColumn('job_assignment_messages.project_job_assignment_id', 'project_job_assignments.id');
+                });
+
+            if ($q) {
+                $ownQ->where(function ($sub) use ($q) {
+                    $sub->where('title', 'like', "%{$q}%")
+                        ->orWhere('detail', 'like', "%{$q}%");
+                });
+            }
+            if ($usePeriodFilter && $periodStart && $periodEnd) {
+                $ownQ->where(function ($sub) use ($periodStart, $periodEnd) {
+                    $sub->whereBetween('desired_end_date', [$periodStart, $periodEnd])
+                        ->orWhereBetween('created_at', [$periodStart, $periodEnd]);
+                });
+            }
+
+            $ownList = $ownQ->orderBy('created_at', 'desc')->limit(300)->get();
+
+            \Illuminate\Support\Facades\Log::info('[JobBox.global] extraItems count', ['count' => $ownList->count(), 'ids' => $ownList->pluck('id')->toArray()]);
+
+            // イベントIDを取得
+            $ownAids = $ownList->pluck('id')->filter()->toArray();
+            $ownEventMap = collect();
+            if (!empty($ownAids)) {
+                $ownEventMap = DB::table('events')
+                    ->whereIn('project_job_assignment_id', $ownAids)
+                    ->whereNotNull('starts_at')
+                    ->orderBy('starts_at')
+                    ->get(['id', 'project_job_assignment_id'])
+                    ->keyBy('project_job_assignment_id');
+            }
+
+            // JAM 形式に変換してマージ用配列を作成
+            $extraItems = $ownList->map(function ($a) use ($ownEventMap, $user) {
+                return [
+                    'id'                        => 'a_' . $a->id,
+                    '__type'                    => 'assignment',
+                    'project_job_assignment_id' => $a->id,
+                    'subject'                   => $a->title,
+                    'body'                      => $a->detail,
+                    'created_at'                => $a->created_at ? $a->created_at->toISOString() : null,
+                    'sender_id'                 => $a->sender_id,
+                    'sender'                    => $a->sender
+                        ? ['id' => $a->sender->id, 'name' => $a->sender->name]
+                        : ($a->user ? ['id' => $a->user->id, 'name' => $a->user->name] : ['id' => $user->id, 'name' => $user->name]),
+                    'read_at'                   => $a->read_at ? $a->read_at->toISOString() : null,
+                    'completed'                 => (bool) $a->completed,
+                    'accepted'                  => (bool) $a->accepted,
+                    'scheduled'                 => (bool) $a->scheduled,
+                    'scheduled_at'              => $a->scheduled_at ? $a->scheduled_at->toISOString() : null,
+                    'message_id'                => null,
+                    'message'                   => null,
+                    'project_job_assignment'    => $a->toArray(),
+                    'event_id'                  => isset($ownEventMap[$a->id]) ? $ownEventMap[$a->id]->id : null,
+                ];
+            })->toArray();
+        } catch (\Throwable $__e) {
+            $extraItems = [];
+        }
+
+        // JAM records をプレーン配列に変換してマージ・ソート
+        $jamArray = $jamMessages->map(fn ($m) => $m->toArray())->toArray();
+        $messages = [
+            'data' => collect(array_merge($jamArray, $extraItems))
+                ->sortByDesc(fn ($m) => $m['created_at'] ?? '')
+                ->values()
+                ->toArray(),
+        ];
 
         // 締め切り日からの月リスト
         $monthsFromEndDate = JobAssignmentMessage::join('project_job_assignments', 'job_assignment_messages.project_job_assignment_id', '=', 'project_job_assignments.id')
@@ -309,6 +515,41 @@ class JobBoxController extends Controller
             ->pluck('ym');
 
         $monthValues = $monthsFromEndDate->merge($monthsFromCreated)->filter()->unique()->sort()->reverse()->values();
+
+        // JAMなしジョブ（管理案件全体）の月もドロップダウンに加える
+        try {
+            $ownNoJamBase = \App\Models\ProjectJobAssignment::where(function ($qry) use ($user) {
+                    $qry->where('user_id', $user->id)
+                        ->orWhere('sender_id', $user->id)
+                        ->orWhereExists(function ($sub) use ($user) {
+                            $sub->from('project_jobs')
+                                ->whereColumn('project_jobs.id', 'project_job_assignments.project_job_id')
+                                ->where('project_jobs.user_id', $user->id);
+                        })
+                        ->orWhereExists(function ($sub) use ($user) {
+                            $sub->from('project_job_coordinators')
+                                ->whereColumn('project_job_coordinators.project_job_id', 'project_job_assignments.project_job_id')
+                                ->where('project_job_coordinators.user_id', $user->id);
+                        });
+                })
+                ->whereNotExists(function ($sub) {
+                    $sub->from('job_assignment_messages')
+                        ->whereColumn('job_assignment_messages.project_job_assignment_id', 'project_job_assignments.id');
+                });
+            $monthsFromOwnEnd = (clone $ownNoJamBase)
+                ->whereNotNull('desired_end_date')
+                ->selectRaw("DATE_FORMAT(desired_end_date, '%Y-%m') as ym")
+                ->groupBy('ym')
+                ->pluck('ym');
+            $monthsFromOwnCreated = (clone $ownNoJamBase)
+                ->selectRaw("DATE_FORMAT(created_at, '%Y-%m') as ym")
+                ->groupBy('ym')
+                ->pluck('ym');
+            $monthValues = $monthValues->merge($monthsFromOwnEnd)->merge($monthsFromOwnCreated)
+                ->filter()->unique()->sort()->reverse()->values();
+        } catch (\Throwable $__e) {
+            // non-fatal
+        }
 
         $monthOptions = $monthValues
             ->filter()
@@ -375,7 +616,14 @@ class JobBoxController extends Controller
             ->where('project_job_assignments.user_id', $user->id)
             // 自己割当・自分の返信を除外: メッセージ送信者が自分自身のものは表示しない
             // (受信箱として機能させる：他者から送られたメッセージのみ表示)
-            ->where('job_assignment_messages.sender_id', '!=', $user->id);
+            ->where('job_assignment_messages.sender_id', '!=', $user->id)
+            // マイジョブで supersedes 済みの依頼ジョブは非表示
+            ->whereNotExists(function ($sub) {
+                $sub->from('project_job_assignments as pja_self')
+                    ->whereColumn('pja_self.supersedes_assignment_id', 'project_job_assignments.id')
+                    ->whereColumn('pja_self.user_id', 'project_job_assignments.user_id')
+                    ->whereColumn('pja_self.sender_id', 'pja_self.user_id');
+            });
 
         if ($q) {
             $base->where(function ($sub) use ($q) {

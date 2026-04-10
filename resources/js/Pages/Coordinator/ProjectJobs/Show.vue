@@ -225,7 +225,7 @@
                                                 <tr class="bg-gray-50">
                                                     <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">発信者</th>
                                                     <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">受信者</th>
-                                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">作業日</th>
+                                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">作業日/作成日</th>
                                                     <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">タイトル</th>
                                                     <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">ステータス</th>
                                                 </tr>
@@ -288,7 +288,7 @@
                                                 <tr class="bg-gray-50">
                                                     <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">発信者</th>
                                                     <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">受信者</th>
-                                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">作業日</th>
+                                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">作業日/作成日</th>
                                                     <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">タイトル</th>
                                                     <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">ステータス</th>
                                                 </tr>
@@ -690,9 +690,8 @@ const hideHistoryCompleted = ref(false);
 
 function historyGetDateKey(m) {
     if (m.event_starts_at) return String(m.event_starts_at).replace(' ', 'T').split('T')[0];
+    // イベントなしの場合は作成日でグルーピング
     return (
-        m.project_job_assignment?.desired_start_date ||
-        m.project_job_assignment?.desired_end_date ||
         (m.created_at ? String(m.created_at).split('T')[0] : null) ||
         ''
     );
@@ -805,8 +804,8 @@ function historyGetWorkDate(m) {
                 return `${formatted}\n${startTime}〜`;
             }
         }
-        // fallback: assignment の締め切り日
-        const date = m.project_job_assignment?.desired_end_date || null;
+        // fallback: ジョブ作成日
+        const date = m.created_at || null;
         if (!date) return '-';
         const parts = String(date).split('T')[0].split('-');
         if (parts.length !== 3) return String(date).split('T')[0];
@@ -865,7 +864,9 @@ function historyIsUnread(m) {
 function historyDeduplicate(arr) {
     const byAssign = new Map();
     for (const m of arr) {
-        const aid = m.project_job_assignment?.id ? String(m.project_job_assignment.id) : `noassign-${m.id}`;
+        // synth エントリは m.id=null だが project_job_assignment.id で一意に識別
+        const assignId = m.project_job_assignment?.id ?? m.project_job_assignment_id;
+        const aid = assignId ? `assign-${assignId}` : `noassign-${m.id ?? Math.random()}`;
         if (!byAssign.has(aid)) { byAssign.set(aid, m); continue; }
         const existing = byAssign.get(aid);
         const eCreated = existing?.created_at ? new Date(existing.created_at) : null;
@@ -941,7 +942,7 @@ function buildHistoryGroups(messages) {
 }
 
 const historyLinkedOpen = ref(true);
-const historyOtherOpen  = ref(false);
+const historyOtherOpen  = ref(true);
 
 const historyGroupsLinked = computed(() => {
     const raw = Array.isArray(page.props.jobHistory) ? page.props.jobHistory : [];
@@ -972,9 +973,9 @@ function historyRowClick(m, event) {
     if (tag === 'a' || tag === 'button' || event.target.closest?.('a,button')) return;
 
     try {
-        // カレンダーイベントがあればその詳細ページへ（作業時間等が確認できる）
+        // カレンダーイベントがあれば coordinator 専用詳細ページへ（タブメニュー維持）
         if (m.event_id) {
-            router.visit(route('events.show', { event: m.event_id }), { preserveState: false });
+            router.visit(route('coordinator.events.show', { event: m.event_id }), { preserveState: false });
             return;
         }
         const pjId = job.id;
@@ -986,7 +987,7 @@ function historyRowClick(m, event) {
             );
             return;
         }
-        // 進行表から登録された自己割当（m.id=null）はアサイン詳細へ
+        // 進行表から登録または独自ジョブ（m.id=null）はアサイン詳細へ
         const aid = m.project_job_assignment_id || m.project_job_assignment?.id;
         if (pjId && aid) {
             router.visit(

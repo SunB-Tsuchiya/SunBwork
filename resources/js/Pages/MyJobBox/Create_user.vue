@@ -6,6 +6,9 @@
                 <button @click="openModal" class="rounded border border-gray-300 bg-gray-50 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100">
                     過去データから流用
                 </button>
+                <button @click="openRequestModal" class="rounded border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-sm text-indigo-700 hover:bg-indigo-100">
+                    依頼ジョブとして登録
+                </button>
             </div>
             <div>
                 <AssignmentFormUser
@@ -155,6 +158,43 @@
                         >
                             キャンセル
                         </button>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
+
+        <!-- 依頼ジョブ選択モーダル -->
+        <Teleport to="body">
+            <div v-if="showRequestModal" class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 pt-16" @click.self="showRequestModal = false">
+                <div class="mx-4 w-full max-w-2xl rounded-lg bg-white shadow-xl">
+                    <div class="flex items-center justify-between border-b px-6 py-4">
+                        <h2 class="text-lg font-semibold text-indigo-800">依頼ジョブを選択</h2>
+                        <button @click="showRequestModal = false" class="text-gray-400 hover:text-gray-700">✕</button>
+                    </div>
+                    <div class="p-5">
+                        <p class="mb-4 text-sm text-gray-600">自分宛に依頼されたジョブを選択すると、このマイジョブが「依頼ジョブの対応済み登録」として扱われます。依頼ジョブは案件詳細から非表示になります。</p>
+                        <div v-if="requestLoading" class="py-8 text-center text-sm text-gray-500">読み込み中...</div>
+                        <div v-else-if="requestRecords.length === 0" class="py-8 text-center text-sm text-gray-500">未対応の依頼ジョブはありません</div>
+                        <div v-else class="max-h-80 overflow-y-auto rounded border border-gray-200">
+                            <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                <thead class="sticky top-0 bg-gray-50">
+                                    <tr>
+                                        <th class="px-3 py-2 text-left font-medium text-gray-600">依頼者</th>
+                                        <th class="px-3 py-2 text-left font-medium text-gray-600">案件</th>
+                                        <th class="px-3 py-2 text-left font-medium text-gray-600">タイトル</th>
+                                        <th class="px-3 py-2 text-left font-medium text-gray-600">締め切り</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 bg-white">
+                                    <tr v-for="rec in requestRecords" :key="rec.id" @click="applyRequestJob(rec)" class="cursor-pointer hover:bg-indigo-50">
+                                        <td class="px-3 py-2">{{ rec.sender_name }}</td>
+                                        <td class="max-w-[8rem] truncate px-3 py-2">{{ rec.project_job_name }}</td>
+                                        <td class="max-w-[10rem] truncate px-3 py-2 font-medium">{{ rec.title }}</td>
+                                        <td class="whitespace-nowrap px-3 py-2">{{ rec.desired_end_date ?? '-' }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -312,6 +352,51 @@ function applyAsNew() {
     formKey.value += 1;
     showContinueModal.value = false;
     pendingRecord.value = null;
+}
+
+// ── 依頼ジョブ選択モーダル（supersede）────────────────────────────────
+const showRequestModal = ref(false);
+const requestRecords = ref([]);
+const requestLoading = ref(false);
+
+function openRequestModal() {
+    showRequestModal.value = true;
+    fetchPendingRequests();
+}
+
+async function fetchPendingRequests() {
+    requestLoading.value = true;
+    try {
+        const currentProjectId = formAssignments.value[0]?.project_job_id ?? null;
+        const params = new URLSearchParams();
+        if (currentProjectId) params.set('project_job_id', currentProjectId);
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        const res = await fetch(route('user.myjobbox.pending_requests') + (params.toString() ? '?' + params.toString() : ''), {
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': csrf, Accept: 'application/json' },
+        });
+        if (res.ok) {
+            const data = await res.json();
+            requestRecords.value = data.records ?? [];
+        }
+    } catch (e) {
+        // ignore
+    } finally {
+        requestLoading.value = false;
+    }
+}
+
+function applyRequestJob(rec) {
+    formAssignments.value = [
+        {
+            project_job_id: rec.project_job_id,
+            title_suffix: rec.title ?? '',
+            desired_end_date: rec.desired_end_date ?? '',
+            supersedes_assignment_id: rec.id,
+        },
+    ];
+    formKey.value += 1;
+    showRequestModal.value = false;
 }
 </script>
 

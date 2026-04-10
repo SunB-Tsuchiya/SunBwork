@@ -8,6 +8,7 @@ use App\Models\ProjectJob;
 use App\Models\User;
 use Illuminate\Support\Arr;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class ProjectJobController extends Controller
@@ -321,24 +322,48 @@ class ProjectJobController extends Controller
             )->map(fn ($m) => (int) ($m['project_job_assignment_id'] ?? $m['project_job_assignment']['id'] ?? 0))
              ->filter()->unique()->toArray();
 
-            $missingIds = array_values(array_diff(
+            // ① 進行表リンク済みで jobHistory に未登録
+            $missingFromSheet = array_values(array_diff(
                 array_map('intval', $sheetLinkedAssignmentIds),
                 $existingAids
             ));
+
+            // ② 独自ジョブ（自己割当: sender_id = user_id）で jobHistory に未登録
+            //    進行表経由でカレンダーに登録したジョブはJAMを持たないためここで補完する
+            $selfAssignedIds = \App\Models\ProjectJobAssignment::where('project_job_id', $projectJob->id)
+                ->whereColumn('sender_id', 'user_id')
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->toArray();
+            $missingFromSelf = array_values(array_diff($selfAssignedIds, $existingAids));
+
+            $missingIds = array_values(array_unique(array_merge($missingFromSheet, $missingFromSelf)));
 
             if (!empty($missingIds)) {
                 $missings = \App\Models\ProjectJobAssignment::whereIn('id', $missingIds)
                     ->with(['user', 'statusModel'])
                     ->get();
 
-                $synths = $missings->map(function ($a) {
+                // synth 作成時に直接イベントを引く（後段の event 付加に依存しない）
+                $synthEventMap = DB::table('events')
+                    ->whereIn('project_job_assignment_id', $missingIds)
+                    ->whereNotNull('starts_at')
+                    ->orderBy('starts_at')
+                    ->get(['id', 'project_job_assignment_id', 'starts_at', 'ends_at'])
+                    ->keyBy('project_job_assignment_id');
+
+                $synths = $missings->map(function ($a) use ($synthEventMap) {
                     $sm = $a->statusModel;
+                    $ev = $synthEventMap[$a->id] ?? null;
                     return [
                         'id'                        => null,
+                        'event_id'                  => $ev ? $ev->id : null,
+                        'event_starts_at'           => $ev ? $ev->starts_at : null,
+                        'event_ends_at'             => $ev ? $ev->ends_at : null,
                         'project_job_assignment_id' => $a->id,
                         'subject'                   => $a->title,
                         'body'                      => null,
-                        'created_at'                => $a->created_at,
+                        'created_at'                => $a->created_at?->toISOString(),
                         'read_at'                   => $a->read_at,
                         'sender'                    => $a->user
                             ? ['id' => $a->user->id, 'name' => $a->user->name]
@@ -348,6 +373,7 @@ class ProjectJobController extends Controller
                             'id'               => $a->id,
                             'title'            => $a->title,
                             'user_id'          => $a->user_id,
+                            'sender_id'        => $a->sender_id,
                             'desired_end_date' => $a->desired_end_date?->format('Y-m-d'),
                             'start_time'       => $a->start_time,
                             'completed'        => (bool) $a->completed,
@@ -401,6 +427,54 @@ class ProjectJobController extends Controller
             } else {
                 $jobHistory = $jhArr;
             }
+        } catch (\Throwable $_) {
+            // non-fatal
+        }
+
+        // 自己割当と依頼割当の重複除外
+        // 優先度1: supersedes_assignment_id による明示的な紐付けがあれば依頼割当を除外
+        // 優先度2: 同一ユーザー・同一タイトルの自己割当がある場合も除外（タイトル一致 fallback）
+        try {
+            // ① 全エントリの assignment_id を収集し supersedes_assignment_id を一括取得
+            $allAids = collect((array) $jobHistory)
+                ->map(fn ($m) => (int) ($m['project_job_assignment_id'] ?? ($m['project_job_assignment']['id'] ?? 0)))
+                ->filter()->unique()->values()->toArray();
+
+            $supersededIds = [];
+            if (!empty($allAids)) {
+                $supersededIds = \App\Models\ProjectJobAssignment::whereIn('supersedes_assignment_id', $allAids)
+                    ->whereColumn('sender_id', 'user_id')
+                    ->pluck('supersedes_assignment_id')
+                    ->map(fn ($id) => (int) $id)
+                    ->unique()->values()->toArray();
+            }
+
+            // ② タイトル一致 fallback: 自己割当キーセット（user_id:title）を収集
+            $selfKeys = [];
+            foreach ((array) $jobHistory as $entry) {
+                $pja      = is_array($entry) ? ($entry['project_job_assignment'] ?? []) : [];
+                $uid      = (int) ($pja['user_id']   ?? 0);
+                $sid      = (int) ($pja['sender_id'] ?? 0);
+                $title    = mb_strtolower(trim((string) ($pja['title'] ?? $entry['subject'] ?? '')));
+                if ($uid && $sid && $uid === $sid && $title !== '') {
+                    $selfKeys["{$uid}:{$title}"] = true;
+                }
+            }
+
+            $jobHistory = array_values(array_filter((array) $jobHistory, function ($entry) use ($supersededIds, $selfKeys) {
+                $pja   = is_array($entry) ? ($entry['project_job_assignment'] ?? []) : [];
+                $uid   = (int) ($pja['user_id']   ?? 0);
+                $sid   = (int) ($pja['sender_id'] ?? 0);
+                $aid   = (int) ($pja['id'] ?? $entry['project_job_assignment_id'] ?? 0);
+                $title = mb_strtolower(trim((string) ($pja['title'] ?? $entry['subject'] ?? '')));
+                $isRequest = $uid && $sid && $uid !== $sid; // 依頼割当（sender≠user）
+                if (!$isRequest) return true;
+                // 優先度1: supersedes_assignment_id で明示的に置き換え済み
+                if ($aid && in_array($aid, $supersededIds, true)) return false;
+                // 優先度2: 同一ユーザー・同一タイトルの自己割当が存在（タイトル一致 fallback）
+                if ($uid && $title !== '' && isset($selfKeys["{$uid}:{$title}"])) return false;
+                return true;
+            }));
         } catch (\Throwable $_) {
             // non-fatal
         }

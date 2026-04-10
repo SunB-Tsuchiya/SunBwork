@@ -1,81 +1,57 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
+import AssignmentDetailCard from '@/Components/AssignmentDetailCard.vue';
+import { computed } from 'vue';
 import { route } from 'ziggy-js';
 
 const props = defineProps({ event: Object, diary_id: { type: [String, Number], default: null } });
 
-function backHref() {
-    // If diary_id was provided in the query, prefer linking back to that diary's interactions
-    if (props.diary_id) {
-        const diary = props.diary_id;
+const assignment = computed(() => props.event?.project_job_assignment ?? null);
 
-        // 1) If the browser referrer contains the prefixed diary (user came from /leader/diaryinteractions/...), use that
-        try {
-            const ref = typeof document !== 'undefined' && document.referrer ? document.referrer : '';
-            if (ref) {
-                try {
-                    const refUrl = new URL(ref, window.location.origin);
-                    const refParts = refUrl.pathname.split('/').filter(Boolean);
-                    const refPrefix =
-                        refParts.length && (refParts[0] === 'leader' || refParts[0] === 'admin' || refParts[0] === 'admin2') ? `/${refParts[0]}` : '';
-                    if (refPrefix) return `${refPrefix}/diaryinteractions/${diary}`;
-                } catch (e) {
-                    // ignore malformed referrer
-                }
-            }
-        } catch (e) {
-            // ignore
-        }
+const eventTypeLabel = computed(() => props.event?.event_item_type?.name ?? null);
 
-        // 2) Next, inspect current pathname for a prefix (if user opened a prefixed page)
-        try {
-            const p = typeof window !== 'undefined' && window.location && window.location.pathname ? window.location.pathname : '';
-            const parts = p.split('/').filter(Boolean);
-            const prefix = parts.length && (parts[0] === 'leader' || parts[0] === 'admin' || parts[0] === 'admin2') ? `/${parts[0]}` : '';
-            if (prefix) return `${prefix}/diaryinteractions/${diary}`;
-        } catch (e) {
-            // ignore
-        }
-
-        // 3) Try Ziggy route helper (may throw if route not available)
-        try {
-            return route('diaryinteractions.show', diary);
-        } catch (e) {
-            // fallthrough to global fallback
-        }
-
-        // 4) Final fallback: unprefixed canonical interactions index with diary as query
-        return `/diaryinteractions/interactions?diary=${encodeURIComponent(diary)}`;
-    }
-
-    // Fallback to the diary interactions index (not the calendar)
+function isEventCompleted() {
     try {
-        return route('diaryinteractions.index');
+        if (!props.event) return false;
+        if (props.event.title && String(props.event.title).indexOf('【完了】') === 0) return true;
+        if (assignment.value?.completed) return true;
+        const s = assignment.value?.status_model ?? assignment.value?.statusModel;
+        if (s?.key === 'completed' || String(s?.name || '').indexOf('完了') !== -1) return true;
+        return false;
     } catch (e) {
-        try {
-            const p = typeof window !== 'undefined' && window.location && window.location.pathname ? window.location.pathname : '';
-            const parts = p.split('/').filter(Boolean);
-            const prefix = parts.length && (parts[0] === 'leader' || parts[0] === 'admin' || parts[0] === 'admin2') ? `/${parts[0]}` : '';
-            // For prefixed admin/leader routes, the index is at /{prefix}/diaryinteractions
-            if (prefix) return `${prefix}/diaryinteractions`;
-            // For unprefixed, the canonical index route is /diaryinteractions/interactions
-            return '/diaryinteractions/interactions';
-        } catch (__e) {
-            return '/diaryinteractions/interactions';
-        }
+        return false;
     }
 }
 
 function formatJstDateTime(dateStr) {
     if (!dateStr) return '';
-    const d = new Date(dateStr);
-    d.setHours(d.getHours() + 9);
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    const hh = String(d.getHours()).padStart(2, '0');
-    const min = String(d.getMinutes()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+    const s = String(dateStr);
+    const m = s.match(/(\d{4}-\d{2}-\d{2})[T ]?(\d{2}:\d{2})/);
+    if (m) return `${m[1]} ${m[2]}`;
+    return s.replace('T', ' ').substring(0, 16);
+}
+
+function formatMins(mins) {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    if (h > 0 && m > 0) return `${h}時間${m}分`;
+    if (h > 0) return `${h}時間`;
+    return `${m}分`;
+}
+
+const interruptionMins = computed(() => props.event?.interruption_minutes ?? 0);
+
+function totalRecordedMins() {
+    const s = props.event?.start ?? props.event?.starts_at;
+    const e = props.event?.end ?? props.event?.ends_at;
+    if (!s || !e) return 0;
+    return Math.max(0, Math.round((new Date(e) - new Date(s)) / 60000));
+}
+
+function durationText() { return formatMins(totalRecordedMins()); }
+
+function actualDurationText() {
+    return formatMins(Math.max(0, totalRecordedMins() - interruptionMins.value));
 }
 
 function onBack() {
@@ -84,56 +60,95 @@ function onBack() {
             window.history.back();
             return;
         }
-    } catch (e) {
-        // ignore
-    }
-
+    } catch (e) { /* ignore */ }
     try {
         if (props.diary_id) {
-            const p = typeof window !== 'undefined' && window.location && window.location.pathname ? window.location.pathname : '';
-            // /members/leader/... のようなベースパス付きにも対応
+            const p = typeof window !== 'undefined' && window.location?.pathname ? window.location.pathname : '';
             const prefixMatch = p.match(/\/(leader|admin|admin2)(\/|$)/);
             const prefix = prefixMatch ? prefixMatch[1] : '';
             if (prefix) {
-                try {
-                    window.location.href = route(`${prefix}.diaryinteractions.show`, { diary: props.diary_id });
-                    return;
-                } catch (e) { /* fall through */ }
+                try { window.location.href = route(`${prefix}.diaryinteractions.show`, { diary: props.diary_id }); return; } catch (e) { /* fall through */ }
             }
-            try {
-                window.location.href = route('diaryinteractions.interactions.index');
-            } catch (e) { /* ignore */ }
+            try { window.location.href = route('diaryinteractions.interactions.index'); } catch (e) { /* ignore */ }
             return;
         }
-    } catch (e) {
-        // ignore
-    }
-
-    // Final fallback
+    } catch (e) { /* ignore */ }
     window.location.href = route('diaryinteractions.interactions.index');
 }
-
-// No delete/complete actions in interactions read-only view
 </script>
 
 <template>
     <AppLayout title="スケジュール（閲覧）">
-        <div class="rounded bg-white p-6 shadow">
-                    <h1 class="mb-4 text-2xl font-bold">スケジュール（閲覧） {{ props.event.title }}</h1>
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700">日時</label>
-                        <div class="mt-1 text-sm text-gray-900">
-                            開始: {{ formatJstDateTime(props.event.start) }}<br />
-                            終了: {{ formatJstDateTime(props.event.end) }}
+        <div class="mx-auto max-w-2xl space-y-4">
+
+            <!-- イベント情報カード -->
+            <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+                <!-- カードヘッダー -->
+                <div class="flex items-start justify-between gap-3 border-b bg-gray-50 px-5 py-4">
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-2">
+                            <span v-if="eventTypeLabel"
+                                  class="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-medium text-sky-700">
+                                {{ eventTypeLabel }}
+                            </span>
+                            <span v-if="isEventCompleted()"
+                                  class="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-semibold text-yellow-800">
+                                完了済み
+                            </span>
                         </div>
-                    </div>
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700">詳細</label>
-                        <div class="whitespace-pre-wrap text-sm text-gray-900">{{ props.event.description || '-' }}</div>
-                    </div>
-                    <div class="flex">
-                        <button type="button" class="rounded bg-gray-200 px-4 py-2 text-gray-700" @click.prevent="onBack">戻る</button>
+                        <h1 class="mt-1 text-xl font-bold text-gray-900">{{ event.title }}</h1>
                     </div>
                 </div>
+
+                <!-- 日時 -->
+                <div class="px-5 py-4">
+                    <h4 class="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">日時</h4>
+                    <div class="flex flex-wrap items-start gap-6">
+                        <div>
+                            <div class="text-xs text-gray-500">開始</div>
+                            <div class="mt-0.5 text-sm font-medium text-gray-900">{{ formatJstDateTime(event.start) }}</div>
+                        </div>
+                        <div class="mt-4 text-gray-300">→</div>
+                        <div>
+                            <div class="text-xs text-gray-500">終了</div>
+                            <div class="mt-0.5 text-sm font-medium text-gray-900">{{ formatJstDateTime(event.end) }}</div>
+                        </div>
+                        <div class="ml-auto text-right">
+                            <div class="text-xs text-gray-500">作業時間</div>
+                            <div class="mt-0.5 text-base font-bold text-indigo-700">{{ actualDurationText() }}</div>
+                            <div v-if="interruptionMins > 0" class="mt-1 space-y-0.5 text-xs text-gray-400">
+                                <div>記録 {{ durationText() }}</div>
+                                <div class="text-orange-600">中断 −{{ formatMins(interruptionMins) }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 中断の注記 -->
+                    <div v-if="interruptionMins > 0"
+                         class="mt-3 rounded border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-700">
+                        この予定は差し込み作業により合計 {{ formatMins(interruptionMins) }} 中断されました。
+                    </div>
+                </div>
+
+                <!-- 詳細テキスト（ジョブイベントでない場合のみ表示） -->
+                <div v-if="event.description && !assignment" class="border-t px-5 py-4">
+                    <h4 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">詳細</h4>
+                    <p class="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">{{ event.description }}</p>
+                </div>
+
+                <!-- ボタン類（読み取り専用：戻るのみ） -->
+                <div class="flex flex-wrap items-center gap-2 border-t bg-gray-50 px-5 py-3">
+                    <button type="button" @click.prevent="onBack"
+                            class="ml-auto inline-flex items-center gap-1.5 rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">
+                        戻る
+                    </button>
+                </div>
+            </div>
+
+            <!-- ジョブ割り当て詳細カード -->
+            <div v-if="assignment">
+                <AssignmentDetailCard :assignment="assignment" />
+            </div>
+
+        </div>
     </AppLayout>
 </template>

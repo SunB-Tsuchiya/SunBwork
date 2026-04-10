@@ -660,4 +660,43 @@ class MyProjectJobController extends Controller
             'projects' => $projects,
         ]);
     }
+
+    /**
+     * 自分宛の未対応依頼ジョブ一覧を返す（supersede 選択 UI 用）
+     * 未対応 = 対応するマイジョブ（supersedes_assignment_id = this.id）がまだ存在しない
+     *
+     * GET /myjobbox/pending-requests?project_job_id=X（省略可）
+     */
+    public function pendingRequests(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+        $projectJobId = $request->query('project_job_id');
+
+        $query = \App\Models\ProjectJobAssignment::where('user_id', $user->id)
+            ->where(function ($q) {
+                $q->whereColumn('sender_id', '!=', 'user_id')
+                  ->orWhereNull('sender_id');
+            })
+            // まだ superseded されていない（対応するマイジョブが存在しない）
+            ->whereDoesntHave('supersededBy')
+            ->with(['projectJob.client', 'sender']);
+
+        if ($projectJobId) {
+            $query->where('project_job_id', $projectJobId);
+        }
+
+        $records = $query->orderBy('created_at', 'desc')->limit(100)->get()
+            ->map(fn($a) => [
+                'id'               => $a->id,
+                'title'            => $a->title,
+                'project_job_id'   => $a->project_job_id,
+                'project_job_name' => $a->projectJob?->title ?? $a->projectJob?->name ?? '-',
+                'client_name'      => $a->projectJob?->client?->name ?? '-',
+                'sender_name'      => $a->sender?->name ?? '-',
+                'desired_end_date' => $a->desired_end_date?->format('Y-m-d'),
+                'completed'        => (bool) $a->completed,
+            ]);
+
+        return response()->json(['records' => $records]);
+    }
 }

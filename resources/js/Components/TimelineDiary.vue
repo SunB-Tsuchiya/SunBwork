@@ -1,6 +1,6 @@
 <template>
     <div>
-        <div ref="scrollWrapperRef" class="w-full overflow-x-auto rounded border bg-gray-50">
+        <div ref="scrollWrapperRef" class="w-full overflow-x-hidden rounded border bg-gray-50">
             <div ref="timelineContentRef" class="px-2 py-2">
                 <div class="flex items-center justify-between px-2">
                     <div ref="labelsRowRef" class="relative h-6 w-full text-xs text-gray-600">
@@ -31,7 +31,7 @@
                     </template>
                 </div>
 
-                <div ref="timelineRef" class="relative mt-2 border-t border-gray-200" style="height: calc(2.25rem * 1.25 + 0.875rem)" @click.stop="onBackgroundClick($event)">
+                <div ref="timelineRef" class="relative mt-2 border-t border-gray-200" :style="{ height: timelineHeight }" @click.stop="onBackgroundClick($event)">
                     <div class="pointer-events-none absolute inset-y-0 left-0 top-0 w-full">
                         <template v-for="h in hourLabels" :key="'hour-' + h">
                             <div
@@ -62,9 +62,9 @@
                     <template v-for="ev in localEvents" :key="ev.id">
                         <div
                             v-if="!ev.allDay && ev.start"
-                            class="absolute top-2 cursor-pointer overflow-hidden rounded px-2 py-1 text-xs text-white"
+                            class="absolute cursor-pointer overflow-hidden rounded px-2 py-1 text-xs text-white"
                             :title="ev.title"
-                            :style="getEventStyleWithOverrides(ev)"
+                            :style="{ ...getEventStyleWithOverrides(ev), top: getEventTop(ev) }"
                             @mousedown.prevent="editable ? startDrag(ev, $event) : null"
                             @click.stop.prevent="onEventClick(ev, $event)"
                         >
@@ -158,6 +158,43 @@ const usedPxPerMin = computed(() => {
     return pxPerMinuteRef.value;
 });
 
+// ── レーン割り当て（重複予定を上下に振り分け） ──────────────────────────────
+const EVENT_ROW_H = 44; // px: イベント高さ(36) + 行間(8)
+const TIMELINE_TOP_PAD = 8; // px
+
+const eventLanes = computed(() => {
+    const nonAllDay = localEvents.value.filter(e => !e.allDay && e.start);
+    const sorted = [...nonAllDay].sort((a, b) => new Date(a.start) - new Date(b.start));
+    const laneEndTimes = [];
+    const result = new Map();
+    for (const ev of sorted) {
+        const startMs = new Date(ev.start).getTime();
+        const endMs = new Date(ev.end || ev.start).getTime();
+        let lane = -1;
+        for (let i = 0; i < laneEndTimes.length; i++) {
+            if (laneEndTimes[i] <= startMs) { lane = i; break; }
+        }
+        if (lane === -1) lane = laneEndTimes.length;
+        laneEndTimes[lane] = endMs;
+        result.set(String(ev.id), lane);
+    }
+    return result;
+});
+
+const numLanes = computed(() => {
+    let max = 1;
+    eventLanes.value.forEach(lane => { if (lane + 1 > max) max = lane + 1; });
+    return max;
+});
+
+const timelineHeight = computed(() => `${TIMELINE_TOP_PAD + numLanes.value * EVENT_ROW_H + 8}px`);
+
+function getEventTop(ev) {
+    const lane = eventLanes.value.get(String(ev.id)) ?? 0;
+    return `${TIMELINE_TOP_PAD + lane * EVENT_ROW_H}px`;
+}
+// ──────────────────────────────────────────────────────────────────────────────
+
 const hourLabels = computed(() => {
     const labels = [];
     for (let h = startHourRef.value; h <= endHourRef.value; h++) labels.push(h);
@@ -212,6 +249,8 @@ function computeEventStyle(ev) {
             left: `${leftPx}px`,
             width: `${widthPx}px`,
             background: ev.color || '#2563eb',
+            border: '2px solid rgba(255,255,255,0.7)',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
             position: 'absolute',
             height: '2.25rem',
             lineHeight: '2.25rem',

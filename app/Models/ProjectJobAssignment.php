@@ -39,6 +39,7 @@ class ProjectJobAssignment extends Model
         'scheduled',
         'scheduled_at',
         'source_assignment_id',
+        'supersedes_assignment_id',
         'start_time',
         'subcontractor_id',
     ];
@@ -59,6 +60,7 @@ class ProjectJobAssignment extends Model
         'scheduled' => 'boolean',
         'scheduled_at' => 'datetime',
         'source_assignment_id' => 'integer',
+        'supersedes_assignment_id' => 'integer',
     ];
 
     protected $dates = [
@@ -149,6 +151,22 @@ class ProjectJobAssignment extends Model
     public function events()
     {
         return $this->hasMany(\App\Models\Event::class, 'project_job_assignment_id');
+    }
+
+    /**
+     * このマイジョブが置き換える依頼ジョブ（supersedes_assignment_id が指す先）
+     */
+    public function supersedesAssignment()
+    {
+        return $this->belongsTo(self::class, 'supersedes_assignment_id');
+    }
+
+    /**
+     * この依頼ジョブを置き換えたマイジョブ一覧（逆引き）
+     */
+    public function supersededBy()
+    {
+        return $this->hasMany(self::class, 'supersedes_assignment_id');
     }
 
     /**

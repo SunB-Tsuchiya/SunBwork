@@ -378,45 +378,11 @@ async function updateComment() {
                 <span v-if="!overtimeLabel && (workRecord.start_time || workRecord.end_time)" class="text-gray-400">残業なし</span>
             </div>
 
-            <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                <!-- 左列: 日報内容 + 既読 + コメント -->
-                <div class="flex flex-col gap-3">
-                    <!-- 日報本文（長い場合はスクロール） -->
-                    <div class="prose max-h-52 overflow-y-auto rounded border p-3 text-sm" v-html="props.diary.content"></div>
+            <div class="space-y-5">
+                <!-- 日報本文 -->
+                <div class="prose max-h-52 overflow-y-auto rounded border p-3 text-sm" v-html="props.diary.content"></div>
 
-                    <!-- 既読ユーザー -->
-                    <div v-if="readerNames.length" class="text-sm text-gray-600">
-                        <strong class="mr-1">既読:</strong>{{ readerNames.join(', ') }}
-                    </div>
-
-                    <!-- 保存済みコメント -->
-                    <div>
-                        <h3 class="mb-1 text-sm font-semibold text-gray-700">コメント</h3>
-                        <div v-if="!(props.diary.comments || []).length" class="text-sm text-gray-400">コメントはありません</div>
-                        <div
-                            v-for="(c, idx) in props.diary.comments || []"
-                            :key="c.id || idx"
-                            class="mb-1 flex items-start justify-between rounded border p-2"
-                        >
-                            <div class="text-sm text-gray-700">
-                                <strong>{{ c.user_name }}</strong>：
-                                <span class="whitespace-pre-wrap">{{ c.comment }}</span>
-                            </div>
-                            <div v-if="c.user_id === $page.props.auth?.user?.id" class="ml-3 flex shrink-0 gap-1">
-                                <button @click.prevent="editComment(c)" class="text-sm text-blue-600 hover:underline">編集</button>
-                                <button @click.prevent="deleteComment(c.id, idx)" class="text-sm text-red-600 hover:underline">削除</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- コメント入力 -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">コメント（任意）</label>
-                        <textarea v-model="comment" rows="2" class="mt-1 block w-full rounded border px-3 py-2 text-sm"></textarea>
-                    </div>
-                </div>
-
-                <!-- 右列: 当日の予定 -->
+                <!-- 当日の予定（全幅） -->
                 <div>
                     <label class="mb-2 block text-sm font-medium text-gray-700">当日の予定</label>
                     <TimelineDiary
@@ -427,6 +393,37 @@ async function updateComment() {
                         :editable="false"
                         @open-edit="onTimelineOpenEdit"
                     />
+                </div>
+
+                <!-- 既読ユーザー -->
+                <div v-if="readerNames.length" class="text-sm text-gray-600">
+                    <strong class="mr-1">既読:</strong>{{ readerNames.join(', ') }}
+                </div>
+
+                <!-- 保存済みコメント -->
+                <div>
+                    <h3 class="mb-1 text-sm font-semibold text-gray-700">コメント</h3>
+                    <div v-if="!(props.diary.comments || []).length" class="text-sm text-gray-400">コメントはありません</div>
+                    <div
+                        v-for="(c, idx) in props.diary.comments || []"
+                        :key="c.id || idx"
+                        class="mb-1 flex items-start justify-between rounded border p-2"
+                    >
+                        <div class="text-sm text-gray-700">
+                            <strong>{{ c.user_name }}</strong>：
+                            <span class="whitespace-pre-wrap">{{ c.comment }}</span>
+                        </div>
+                        <div v-if="c.user_id === $page.props.auth?.user?.id" class="ml-3 flex shrink-0 gap-1">
+                            <button @click.prevent="editComment(c)" class="text-sm text-blue-600 hover:underline">編集</button>
+                            <button @click.prevent="deleteComment(c.id, idx)" class="text-sm text-red-600 hover:underline">削除</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- コメント入力 -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">コメント（任意）</label>
+                    <textarea v-model="comment" rows="2" class="mt-1 block w-full rounded border px-3 py-2 text-sm"></textarea>
                 </div>
             </div>
 

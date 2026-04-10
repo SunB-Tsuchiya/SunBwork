@@ -653,6 +653,40 @@ class EventController extends Controller
     // イベント詳細表示
     public function show(Event $event)
     {
+        // 認可チェック: 他ユーザーのイベントをCoordinatorが見る場合
+        // → 案件のリーダー（user_id）またはサブCo（project_job_coordinators）のみ許可
+        $authUser = Auth::user();
+        if ($authUser && $event->user_id && (int) $event->user_id !== (int) $authUser->id) {
+            $role = $authUser->user_role ?? '';
+            if (! in_array($role, ['admin', 'superadmin', 'leader'])) {
+                $hasAccess = false;
+                try {
+                    if ($event->project_job_assignment_id) {
+                        $assignment = ProjectJobAssignment::withoutGlobalScopes()
+                            ->select('project_job_id')
+                            ->find($event->project_job_assignment_id);
+                        if ($assignment && $assignment->project_job_id) {
+                            $pjId = $assignment->project_job_id;
+                            $isOwner = DB::table('project_jobs')
+                                ->where('id', $pjId)
+                                ->where('user_id', $authUser->id)
+                                ->exists();
+                            $isSubCo = DB::table('project_job_coordinators')
+                                ->where('project_job_id', $pjId)
+                                ->where('user_id', $authUser->id)
+                                ->exists();
+                            $hasAccess = $isOwner || $isSubCo;
+                        }
+                    }
+                } catch (\Throwable $__e) {
+                    // non-fatal: テーブル未存在等
+                }
+                if (! $hasAccess) {
+                    abort(403, 'このイベントを閲覧する権限がありません。案件のリーダーまたはサブコーディネーターのみ閲覧できます。');
+                }
+            }
+        }
+
         // 添付ファイルも取得する場合はリレーションをロード
         $event->load(['attachments', 'eventItemType']);
         // if this event is linked to a project job assignment, eager-load that assignment with all lookup relations
@@ -726,6 +760,80 @@ class EventController extends Controller
             'event'                  => $event,
             'hide_edit'              => $hideEdit,
             'coordinator_assignment' => $coordinatorAssignmentInfo ?? null,
+            'lunch_start'            => $lunchStart,
+            'lunch_end'              => $lunchEnd,
+            'lunch_overlap_minutes'  => $lunchOverlapMinutes,
+        ]);
+    }
+
+    /**
+     * Coordinator 専用イベント詳細: show() と同じデータを返すが
+     * view_as_coordinator=true を渡し、タブメニューを coordinator に固定させる。
+     * 編集・削除ボタンは非表示（完了ボタンは有効）。
+     */
+    public function showForCoordinator(Event $event)
+    {
+        $authUser = Auth::user();
+        if (! $authUser) {
+            return redirect()->route('login');
+        }
+        // 認可チェック: 案件オーナー・サブCo・admin/superadmin/leader のみ
+        $allowed = in_array($authUser->user_role ?? '', ['admin', 'superadmin', 'leader', 'coordinator']);
+        if (! $allowed) {
+            abort(403);
+        }
+
+        $event->load(['attachments', 'eventItemType']);
+        if (Schema::hasColumn('events', 'project_job_assignment_id') && $event->project_job_assignment_id) {
+            $event->load([
+                'projectJobAssignment.projectJob.client',
+                'projectJobAssignment.workItemType',
+                'projectJobAssignment.size',
+                'projectJobAssignment.stage',
+                'projectJobAssignment.statusModel',
+                'projectJobAssignment.difficultyModel',
+                'projectJobAssignment.user',
+                'projectJobAssignment.sender',
+            ]);
+        }
+
+        // 休憩時間
+        $lunchStart = null;
+        $lunchEnd = null;
+        $lunchOverlapMinutes = 0;
+        try {
+            $breakInfo = null;
+            if ($event->user_id && $event->starts_at) {
+                $eventDate = Carbon::parse($event->starts_at)->toDateString();
+                $breakInfo = UserMonthlyBreak::breakForDate((int) $event->user_id, $eventDate);
+            }
+            if (!$breakInfo && $event->user_id) {
+                $userSetting = UserSetting::where('user_id', $event->user_id)->first();
+                if ($userSetting && $userSetting->lunch_start && $userSetting->lunch_end) {
+                    $breakInfo = ['start' => $userSetting->lunch_start, 'end' => $userSetting->lunch_end];
+                }
+            }
+            if ($breakInfo && $event->starts_at && $event->ends_at) {
+                $lunchStart   = $breakInfo['start'];
+                $lunchEnd     = $breakInfo['end'];
+                $evDate       = Carbon::parse($event->starts_at)->toDateString();
+                $lunchStartDt = Carbon::parse($evDate . ' ' . $lunchStart);
+                $lunchEndDt   = Carbon::parse($evDate . ' ' . $lunchEnd);
+                $evStart      = Carbon::parse($event->starts_at);
+                $evEnd        = Carbon::parse($event->ends_at);
+                $overlapStart = $evStart->gt($lunchStartDt) ? $evStart : $lunchStartDt;
+                $overlapEnd   = $evEnd->lt($lunchEndDt)   ? $evEnd   : $lunchEndDt;
+                $lunchOverlapMinutes = max(0, (int) $overlapStart->diffInMinutes($overlapEnd, false));
+            }
+        } catch (\Throwable $e) {
+            // non-fatal
+        }
+
+        return Inertia::render('Events/Show', [
+            'event'                  => $event,
+            'hide_edit'              => true,
+            'view_as_coordinator'    => true,
+            'coordinator_assignment' => null,
             'lunch_start'            => $lunchStart,
             'lunch_end'              => $lunchEnd,
             'lunch_overlap_minutes'  => $lunchOverlapMinutes,

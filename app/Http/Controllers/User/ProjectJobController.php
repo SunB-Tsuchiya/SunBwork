@@ -134,10 +134,11 @@ class ProjectJobController extends Controller
         }
 
         $validated = $request->validate([
-            'row_id'           => 'required|integer',
-            'col_key'          => 'required|string',
-            'title'            => 'required|string|max:255',
-            'desired_end_date' => 'nullable|date',
+            'row_id'                    => 'required|integer',
+            'col_key'                   => 'required|string',
+            'title'                     => 'required|string|max:255',
+            'desired_end_date'          => 'nullable|date',
+            'supersedes_assignment_id'  => 'nullable|exists:project_job_assignments,id',
         ]);
 
         // row が このシートに属することを確認
@@ -147,12 +148,13 @@ class ProjectJobController extends Controller
         $createdAssignment = null;
         DB::transaction(function () use ($validated, $projectJob, $sheet, $user, &$createdAssignment) {
             $assignment = ProjectJobAssignment::create([
-                'project_job_id'   => $projectJob->id,
-                'user_id'          => $user->id,
-                'sender_id'        => $user->id,  // 自己割当
-                'title'            => $validated['title'],
-                'desired_end_date' => $validated['desired_end_date'] ?? null,
-                'read_at'          => now(),
+                'project_job_id'              => $projectJob->id,
+                'user_id'                     => $user->id,
+                'sender_id'                   => $user->id,  // 自己割当
+                'title'                       => $validated['title'],
+                'desired_end_date'            => $validated['desired_end_date'] ?? null,
+                'supersedes_assignment_id'    => $validated['supersedes_assignment_id'] ?? null,
+                'read_at'                     => now(),
             ]);
 
             ProgressCell::updateOrCreate(

@@ -770,6 +770,105 @@ joblink セルに担当者が登録されると、**同グループ内の user �
 
 ---
 
+## 依頼ジョブとマイジョブの重複排除ルール（2026-04-10 実装）
+
+### 用語定義
+
+| 種別 | 判定条件 | 表示場所 |
+|------|----------|----------|
+| **依頼ジョブ** | `project_job_assignments.sender_id ≠ user_id`（Coordinatorが依頼） | JobBox / 案件詳細 jobHistory |
+| **マイジョブ** | `sender_id = user_id`（ユーザーが自己登録） | MyJobBox / 案件詳細 jobHistory |
+
+### 重複が発生するケース
+
+Coordinator が依頼ジョブを作成（A-req）→ ユーザーがカレンダー/進行表から同タイトルのマイジョブを自己登録（A-self）すると、案件詳細（`Coordinator/ProjectJobs/Show.vue`）の **jobHistory に両方が出る**。
+
+### 正式実装: `supersedes_assignment_id` FK（2026-04-10 実装済み）
+
+ユーザーがマイジョブを登録する際に「この依頼ジョブとして登録」を選択すると、マイジョブの `supersedes_assignment_id` に依頼ジョブの ID がセットされ、依頼ジョブが明示的に非表示になる。
+
+**DBスキーマ:**
+```
+project_job_assignments.supersedes_assignment_id  NULLABLE UNSIGNED BIGINT
+  → project_job_assignments.id 参照（自己参照FK、nullOnDelete）
+```
+
+**マイグレーション:** `2026_04_10_200001_add_supersedes_assignment_id_to_project_job_assignments.php`
+- SQLite（テスト環境）ではカラムのみ追加（外部キー制約なし・ガード済み）
+- さくら本番では `php artisan migrate` 必須
+
+**モデル（`ProjectJobAssignment.php`）:**
+- `$fillable` / `$casts` に `supersedes_assignment_id` 追加
+- `supersedesAssignment()` — belongsTo 自己参照（マイジョブ → 依頼ジョブ）
+- `supersededBy()` — hasMany 逆引き（依頼ジョブ → 置き換えたマイジョブ一覧）
+
+**APIエンドポイント:**
+- `GET /myjobbox/pending-requests?project_job_id=X` → `user.myjobbox.pending_requests`
+- コントローラ: `User/MyProjectJobController::pendingRequests()`
+- 自分宛の依頼ジョブで未 supersede のものを返す
+
+**UI（フロントエンド）:**
+- `Events/Create_Job.vue` と `MyJobBox/Create_user.vue` にヘッダー行「依頼ジョブとして登録」ボタン追加
+- クリック → `fetchPendingRequests()` → 選択モーダル表示
+- 選択すると `formAssignments[0].supersedes_assignment_id = rec.id` をセット
+
+**コントローラでの保存:**
+- `User/ProjectJobAssignmentController::store()` — `supersedes_assignment_id` をバリデーション・保存
+- `User/ProjectJobController::linkProgressCell()` — 同様に追加
+
+### ルール（重複排除）
+
+**「`supersedes_assignment_id` で明示的に置き換えられた依頼ジョブ、またはタイトル一致の依頼ジョブを非表示にする」**
+
+- `supersedes_assignment_id` による明示除外が優先度1（確実）
+- タイトル一致 fallback が優先度2（後方互換・移行期間対応）
+- 削除はしない（履歴として DB に残す）
+
+### 非表示ロジックの実装箇所
+
+| 画面 | 実装ファイル | 方法 |
+|------|-------------|------|
+| 案件詳細 jobHistory（Coordinator） | `Coordinator/ProjectJobController::show()` | PHP `array_filter` + superseded IDセット |
+| ユーザー受信 JobBox | `ProjectJobs/JobBoxController::index()` | SQL `whereNotExists` サブクエリ |
+| Coordinator グローバル JobBox | `ProjectJobs/JobBoxController::global()` | SQL `whereNotExists` サブクエリ |
+
+**`whereNotExists` パターン（JobBoxController で共通使用）:**
+```php
+->whereNotExists(function ($sub) {
+    $sub->from('project_job_assignments as pja_self')
+        ->whereColumn('pja_self.supersedes_assignment_id', 'project_job_assignments.id')
+        ->whereColumn('pja_self.user_id', 'project_job_assignments.user_id')
+        ->whereColumn('pja_self.sender_id', 'pja_self.user_id');
+})
+```
+
+**Coordinator `show()` の PHP ロジック（タイトル一致 fallback も含む）:**
+```php
+// ① supersedes_assignment_id による明示的除外IDセット
+$allAids = collect($jobHistory)->pluck('project_job_assignment.id')->filter()->all();
+$supersededIds = ProjectJobAssignment::whereIn('supersedes_assignment_id', $allAids)
+    ->whereColumn('sender_id', 'user_id')
+    ->pluck('supersedes_assignment_id')->map(fn($v) => (int)$v)->all();
+
+// ② タイトル一致 fallback（優先度2）
+$selfKeys = [];
+foreach ($jobHistory as $entry) { /* マイジョブのキーセット構築 */ }
+
+// ③ フィルタ
+$jobHistory = array_values(array_filter($jobHistory, function ($entry) use ($supersededIds, $selfKeys) {
+    $isRequest = $uid && $sid && $uid !== $sid;
+    if ($isRequest) {
+        if ($aid && in_array($aid, $supersededIds)) return false;  // 優先度1
+        if (isset($selfKeys["{$uid}:{$title}"])) return false;      // 優先度2
+    }
+    return true;
+}));
+```
+
+**注意:** `source_assignment_id`（続きジョブチェーン用）とは別カラム。混同しないこと。
+
+---
+
 ## マイジョブ 続きジョブ連動機能（2026-04-04 実装）
 
 ### 概要
