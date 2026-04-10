@@ -385,13 +385,14 @@ class ProjectJobController extends Controller
                     ->whereIn('project_job_assignment_id', $assignmentIds)
                     ->whereNotNull('starts_at')
                     ->orderBy('starts_at')
-                    ->get(['project_job_assignment_id', 'starts_at', 'ends_at'])
+                    ->get(['id', 'project_job_assignment_id', 'starts_at', 'ends_at'])
                     ->keyBy('project_job_assignment_id');
 
                 $jobHistory = array_map(function ($m) use ($eventsByAssignment) {
                     $aid = (int) ($m['project_job_assignment_id'] ?? $m['project_job_assignment']['id'] ?? 0);
                     if ($aid && isset($eventsByAssignment[$aid])) {
                         $ev = $eventsByAssignment[$aid];
+                        $m['event_id']        = $ev->id;
                         $m['event_starts_at'] = $ev->starts_at;
                         $m['event_ends_at']   = $ev->ends_at;
                     }

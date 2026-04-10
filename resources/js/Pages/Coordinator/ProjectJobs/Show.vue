@@ -972,11 +972,25 @@ function historyRowClick(m, event) {
     if (tag === 'a' || tag === 'button' || event.target.closest?.('a,button')) return;
 
     try {
+        // カレンダーイベントがあればその詳細ページへ（作業時間等が確認できる）
+        if (m.event_id) {
+            router.visit(route('events.show', { event: m.event_id }), { preserveState: false });
+            return;
+        }
         const pjId = job.id;
         const msgId = m.id;
         if (pjId && msgId) {
             router.visit(
                 route('coordinator.project_jobs.jobbox.show', { projectJob: pjId, message: msgId }) + '?from=project',
+                { preserveState: false },
+            );
+            return;
+        }
+        // 進行表から登録された自己割当（m.id=null）はアサイン詳細へ
+        const aid = m.project_job_assignment_id || m.project_job_assignment?.id;
+        if (pjId && aid) {
+            router.visit(
+                route('coordinator.project_jobs.assignments.show', { projectJob: pjId, assignment: aid }),
                 { preserveState: false },
             );
         }
