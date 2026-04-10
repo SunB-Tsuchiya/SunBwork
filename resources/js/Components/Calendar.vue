@@ -8,6 +8,9 @@
             <button @click="openScheduleModal" class="rounded border border-gray-400 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                 日程設定
             </button>
+            <button @click="openBreakModal" class="rounded border border-teal-400 bg-white px-4 py-2 text-sm text-teal-700 hover:bg-teal-50">
+                休憩設定
+            </button>
         </div>
         <FullCalendar ref="fullCalendarRef" :options="calendarOptions" />
         <!-- 予定作成モーダル -->
@@ -199,6 +202,96 @@
             </div>
         </div>
 
+        <!-- 週間休憩設定モーダル -->
+        <div v-if="showBreakModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
+                <h2 class="mb-1 text-lg font-bold">週間休憩設定</h2>
+                <p class="mb-3 text-xs text-gray-500">空白にするとデフォルト設定（{{ defaultBreak.start }}〜{{ defaultBreak.end }}）を使用します。</p>
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b-2 border-gray-300 text-xs text-gray-500">
+                            <th class="py-1 pr-3 text-left font-medium">日付</th>
+                            <th class="py-1 text-left font-medium" colspan="3">休憩時間</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- 全日一括変更 -->
+                        <tr class="border-b-2 border-gray-300 bg-gray-50">
+                            <td class="w-24 py-2 pr-3 font-bold text-gray-800">全日</td>
+                            <td class="py-2" colspan="3">
+                                <div class="flex items-center gap-1">
+                                    <select v-model="batchBreakEnabled"
+                                            @change="applyBatchBreak"
+                                            class="rounded border-gray-300 text-sm focus:border-teal-400 focus:ring-teal-400">
+                                        <option value="">— 一括選択 —</option>
+                                        <option value="none">休憩なし</option>
+                                        <option value="set">時間を設定</option>
+                                    </select>
+                                    <template v-if="batchBreakEnabled === 'set'">
+                                        <select v-model="batchStartH" class="rounded border-gray-300 text-sm">
+                                            <option v-for="h in 24" :key="h" :value="String(h-1).padStart(2,'0')">{{ String(h-1).padStart(2,'0') }}</option>
+                                        </select>
+                                        <span class="text-gray-500">:</span>
+                                        <select v-model="batchStartM" class="rounded border-gray-300 text-sm">
+                                            <option v-for="m in [0,15,30,45]" :key="m" :value="String(m).padStart(2,'0')">{{ String(m).padStart(2,'0') }}</option>
+                                        </select>
+                                        <span class="px-1 text-gray-500">〜</span>
+                                        <select v-model="batchEndH" class="rounded border-gray-300 text-sm">
+                                            <option v-for="h in 24" :key="h" :value="String(h-1).padStart(2,'0')">{{ String(h-1).padStart(2,'0') }}</option>
+                                        </select>
+                                        <span class="text-gray-500">:</span>
+                                        <select v-model="batchEndM" class="rounded border-gray-300 text-sm">
+                                            <option v-for="m in [0,15,30,45]" :key="m" :value="String(m).padStart(2,'0')">{{ String(m).padStart(2,'0') }}</option>
+                                        </select>
+                                        <button @click="applyBatchBreakTime"
+                                                class="ml-1 rounded bg-teal-600 px-2 py-1 text-xs text-white hover:bg-teal-700">
+                                            適用
+                                        </button>
+                                    </template>
+                                </div>
+                            </td>
+                        </tr>
+                        <!-- 日別 -->
+                        <tr v-for="day in breakDays" :key="day.date" class="border-b last:border-0">
+                            <td class="w-24 py-2 pr-3 font-medium text-gray-700">{{ day.label }}</td>
+                            <td class="py-2">
+                                <div class="flex items-center gap-1">
+                                    <input type="checkbox" v-model="day.enabled"
+                                           class="h-4 w-4 rounded border-gray-300 accent-teal-600"
+                                           :id="'brk-' + day.date" />
+                                    <template v-if="day.enabled">
+                                        <select v-model="day.startH" class="rounded border-gray-300 text-sm focus:border-teal-400 focus:ring-teal-400">
+                                            <option v-for="h in 24" :key="h" :value="String(h-1).padStart(2,'0')">{{ String(h-1).padStart(2,'0') }}</option>
+                                        </select>
+                                        <span class="text-gray-500">:</span>
+                                        <select v-model="day.startM" class="rounded border-gray-300 text-sm focus:border-teal-400 focus:ring-teal-400">
+                                            <option v-for="m in [0,15,30,45]" :key="m" :value="String(m).padStart(2,'0')">{{ String(m).padStart(2,'0') }}</option>
+                                        </select>
+                                        <span class="px-1 text-gray-500">〜</span>
+                                        <select v-model="day.endH" class="rounded border-gray-300 text-sm focus:border-teal-400 focus:ring-teal-400">
+                                            <option v-for="h in 24" :key="h" :value="String(h-1).padStart(2,'0')">{{ String(h-1).padStart(2,'0') }}</option>
+                                        </select>
+                                        <span class="text-gray-500">:</span>
+                                        <select v-model="day.endM" class="rounded border-gray-300 text-sm focus:border-teal-400 focus:ring-teal-400">
+                                            <option v-for="m in [0,15,30,45]" :key="m" :value="String(m).padStart(2,'0')">{{ String(m).padStart(2,'0') }}</option>
+                                        </select>
+                                    </template>
+                                    <span v-else class="ml-2 text-xs text-gray-400">— なし —</span>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="mt-5 flex justify-end gap-3">
+                    <button @click="showBreakModal = false" class="rounded bg-gray-200 px-4 py-2 text-sm">キャンセル</button>
+                    <button @click="saveWeekBreaks" :disabled="savingBreak"
+                            class="rounded bg-teal-600 px-4 py-2 text-sm text-white disabled:opacity-50">
+                        {{ savingBreak ? '保存中…' : '保存' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- schedule-specific UI removed — this Calendar is personal-only -->
     </div>
 </template>
@@ -245,6 +338,14 @@ const props = defineProps({
     dailyWorktypes: {
         type: Array,
         default: () => [],
+    },
+    dailyBreaks: {
+        type: Array,
+        default: () => [],
+    },
+    defaultBreak: {
+        type: Object,
+        default: () => ({ start: '12:00', end: '13:00' }),
     },
 });
 
@@ -326,6 +427,109 @@ const backgroundEvents = computed(() => {
     }
     return results;
 });
+
+// ---- 日ごと休憩マップ { 'YYYY-MM-DD': { start, end } }（ローカル更新可能） ----
+const localDailyBreaks = ref([...(props.dailyBreaks ?? [])]);
+const dailyBreakMap = computed(() => {
+    const map = {};
+    localDailyBreaks.value.forEach((d) => {
+        if (d.date) map[d.date] = { start: d.start, end: d.end };
+    });
+    return map;
+});
+
+// ---- 週間休憩設定モーダル ----
+const showBreakModal = ref(false);
+const breakDays = ref([]);
+const savingBreak = ref(false);
+const batchBreakEnabled = ref('');
+const batchStartH = ref('12');
+const batchStartM = ref('00');
+const batchEndH = ref('13');
+const batchEndM = ref('00');
+
+function parseHM(timeStr) {
+    if (!timeStr) return ['12', '00'];
+    const [h, m] = timeStr.split(':');
+    return [h ?? '12', m ?? '00'];
+}
+
+function openBreakModal() {
+    const refDate = viewStart.value ? new Date(viewStart.value) : new Date(selectedDate.value);
+    const monday = getMondayOfWeek(refDate);
+    const defStart = props.defaultBreak?.start ?? '12:00';
+    const defEnd   = props.defaultBreak?.end   ?? '13:00';
+    const [defSH, defSM] = parseHM(defStart);
+    const [defEH, defEM] = parseHM(defEnd);
+
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + i);
+        const dateStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        const saved = dailyBreakMap.value[dateStr];
+        const [sh, sm] = saved ? parseHM(saved.start) : [defSH, defSM];
+        const [eh, em] = saved ? parseHM(saved.end)   : [defEH, defEM];
+        days.push({
+            date: dateStr,
+            label: `${d.getMonth() + 1}/${d.getDate()}(${DAY_NAMES[i]})`,
+            enabled: saved !== undefined,
+            startH: sh, startM: sm,
+            endH:   eh, endM:   em,
+        });
+    }
+    breakDays.value = days;
+    batchBreakEnabled.value = '';
+    showBreakModal.value = true;
+}
+
+function applyBatchBreak() {
+    if (batchBreakEnabled.value === 'none') {
+        breakDays.value.forEach((d) => (d.enabled = false));
+        batchBreakEnabled.value = '';
+    }
+    // 'set' の場合は applyBatchBreakTime ボタンで適用
+}
+
+function applyBatchBreakTime() {
+    breakDays.value.forEach((d) => {
+        d.enabled = true;
+        d.startH = batchStartH.value;
+        d.startM = batchStartM.value;
+        d.endH   = batchEndH.value;
+        d.endM   = batchEndM.value;
+    });
+    batchBreakEnabled.value = '';
+}
+
+async function saveWeekBreaks() {
+    savingBreak.value = true;
+    try {
+        const days = breakDays.value.map((day) => ({
+            date:        day.date,
+            break_start: day.enabled ? `${day.startH}:${day.startM}` : null,
+            break_end:   day.enabled ? `${day.endH}:${day.endM}`   : null,
+        }));
+        await axios.post(route('user.daily_breaks.store'), { days });
+
+        // ローカル状態を更新
+        days.forEach((day) => {
+            const idx = localDailyBreaks.value.findIndex((d) => d.date === day.date);
+            if (!day.break_start) {
+                if (idx >= 0) localDailyBreaks.value.splice(idx, 1);
+            } else if (idx >= 0) {
+                localDailyBreaks.value.splice(idx, 1, { date: day.date, start: day.break_start, end: day.break_end });
+            } else {
+                localDailyBreaks.value.push({ date: day.date, start: day.break_start, end: day.break_end });
+            }
+        });
+        showBreakModal.value = false;
+    } catch {
+        alert('保存に失敗しました');
+    } finally {
+        savingBreak.value = false;
+    }
+}
 
 // ---- 週間日程設定モーダル ----
 const showScheduleModal = ref(false);

@@ -17,6 +17,8 @@ use Intervention\Image\ImageManager;
 use Inertia\Inertia;
 use App\Models\ProjectJobAssignment;
 use App\Models\ProjectJobAssignmentByMyself;
+use App\Models\UserMonthlyBreak;
+use App\Models\UserSetting;
 use App\Models\Message;
 use App\Models\MessageRecipient;
 use App\Events\MessageCreated;
@@ -684,11 +686,49 @@ class EventController extends Controller
                 }
             }
         }
+        // 休憩設定を取得し、イベント時間との重複分を計算
+        // 優先順: 日別設定（user_monthly_breaks） > グローバル設定（user_settings.lunch_start/lunch_end）
+        $lunchStart = null;
+        $lunchEnd = null;
+        $lunchOverlapMinutes = 0;
+        try {
+            $breakInfo = null;
+            if ($event->user_id && $event->starts_at) {
+                $eventDate = Carbon::parse($event->starts_at)->toDateString();
+                // 日別設定を優先
+                $breakInfo = UserMonthlyBreak::breakForDate((int) $event->user_id, $eventDate);
+            }
+            // 日別設定がなければグローバル設定にフォールバック
+            if (!$breakInfo && $event->user_id) {
+                $userSetting = UserSetting::where('user_id', $event->user_id)->first();
+                if ($userSetting && $userSetting->lunch_start && $userSetting->lunch_end) {
+                    $breakInfo = ['start' => $userSetting->lunch_start, 'end' => $userSetting->lunch_end];
+                }
+            }
+            if ($breakInfo && $event->starts_at && $event->ends_at) {
+                $lunchStart   = $breakInfo['start'];
+                $lunchEnd     = $breakInfo['end'];
+                $evDate       = Carbon::parse($event->starts_at)->toDateString();
+                $lunchStartDt = Carbon::parse($evDate . ' ' . $lunchStart);
+                $lunchEndDt   = Carbon::parse($evDate . ' ' . $lunchEnd);
+                $evStart      = Carbon::parse($event->starts_at);
+                $evEnd        = Carbon::parse($event->ends_at);
+                $overlapStart = $evStart->gt($lunchStartDt) ? $evStart : $lunchStartDt;
+                $overlapEnd   = $evEnd->lt($lunchEndDt)   ? $evEnd   : $lunchEndDt;
+                $lunchOverlapMinutes = max(0, (int) $overlapStart->diffInMinutes($overlapEnd, false));
+            }
+        } catch (\Throwable $e) {
+            // non-fatal
+        }
+
         $hideEdit = request()->query('hide_edit') ? true : false;
         return Inertia::render('Events/Show', [
-            'event' => $event,
-            'hide_edit' => $hideEdit,
+            'event'                  => $event,
+            'hide_edit'              => $hideEdit,
             'coordinator_assignment' => $coordinatorAssignmentInfo ?? null,
+            'lunch_start'            => $lunchStart,
+            'lunch_end'              => $lunchEnd,
+            'lunch_overlap_minutes'  => $lunchOverlapMinutes,
         ]);
     }
 

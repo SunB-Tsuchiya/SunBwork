@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Auth;
 use App\Models\Diary;
 use App\Models\Event;
 use App\Models\ProjectJobAssignment;
+use App\Models\UserMonthlyBreak;
 use App\Models\UserMonthlySchedule;
 use App\Models\Worktype;
 use Illuminate\Support\Facades\Schema;
@@ -101,6 +102,8 @@ class CalendarController extends Controller
         $defaultWorktype = null;
         $worktypes       = [];
         $dailyWorktypes  = [];
+        $dailyBreaks     = [];
+        $defaultBreak    = ['start' => '12:00', 'end' => '13:00'];
 
         if ($user) {
             // 会社の勤務形態一覧（company_id が null の SuperAdmin は全社分を取得）
@@ -161,6 +164,40 @@ class CalendarController extends Controller
                 \Illuminate\Support\Facades\Log::error('CalendarController dailyWorktypes error: ' . $e->getMessage());
                 $dailyWorktypes = [];
             }
+
+            // グローバル休憩設定（user_settings.lunch_start/lunch_end）
+            try {
+                $setting = $setting ?? $user->userSetting()->first();
+                if ($setting && $setting->lunch_start && $setting->lunch_end) {
+                    $defaultBreak = ['start' => $setting->lunch_start, 'end' => $setting->lunch_end];
+                }
+            } catch (\Throwable $e) {
+                // non-fatal
+            }
+
+            // 日ごと休憩設定（±3ヶ月）
+            try {
+                $fromYm = now()->subMonths(3)->format('Y-m');
+                $toYm   = now()->addMonths(3)->format('Y-m');
+                $dailyBreaks = [];
+                UserMonthlyBreak::where('user_id', $user->id)
+                    ->whereBetween('year_month', [$fromYm, $toYm])
+                    ->get(['year_month', 'schedule'])
+                    ->each(function ($mb) use (&$dailyBreaks) {
+                        foreach (($mb->schedule ?? []) as $dd => $entry) {
+                            if (!empty($entry['start']) && !empty($entry['end'])) {
+                                $dailyBreaks[] = [
+                                    'date'  => $mb->year_month . '-' . $dd,
+                                    'start' => $entry['start'],
+                                    'end'   => $entry['end'],
+                                ];
+                            }
+                        }
+                    });
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error('CalendarController dailyBreaks error: ' . $e->getMessage());
+                $dailyBreaks = [];
+            }
         }
 
         return Inertia::render('Calendar', [
@@ -172,6 +209,8 @@ class CalendarController extends Controller
             'defaultWorktype' => $defaultWorktype,
             'worktypes'       => $worktypes,
             'dailyWorktypes'  => $dailyWorktypes,
+            'dailyBreaks'     => $dailyBreaks,
+            'defaultBreak'    => $defaultBreak,
         ]);
     }
 }

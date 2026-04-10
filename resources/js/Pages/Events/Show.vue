@@ -2,13 +2,17 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import AssignmentDetailCard from '@/Components/AssignmentDetailCard.vue';
 import { Link, router } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
+import { ref } from 'vue';
 import { route } from 'ziggy-js';
 
 const props = defineProps({
     event: Object,
     hide_edit: { type: Boolean, default: false },
     coordinator_assignment: { type: Object, default: null },
+    lunch_start: { type: String, default: null },
+    lunch_end: { type: String, default: null },
+    lunch_overlap_minutes: { type: Number, default: 0 },
 });
 
 const showCompleteModal = ref(false);
@@ -36,16 +40,32 @@ function formatJstDateTime(dateStr) {
     return s.replace('T', ' ').substring(0, 16);
 }
 
-function durationText() {
-    const s = props.event?.start ?? props.event?.starts_at;
-    const e = props.event?.end ?? props.event?.ends_at;
-    if (!s || !e) return '';
-    const mins = Math.max(0, Math.round((new Date(e) - new Date(s)) / 60000));
+function formatMins(mins) {
     const h = Math.floor(mins / 60);
     const m = mins % 60;
     if (h > 0 && m > 0) return `${h}時間${m}分`;
     if (h > 0) return `${h}時間`;
     return `${m}分`;
+}
+
+function totalRecordedMins() {
+    const s = props.event?.start ?? props.event?.starts_at;
+    const e = props.event?.end ?? props.event?.ends_at;
+    if (!s || !e) return 0;
+    return Math.max(0, Math.round((new Date(e) - new Date(s)) / 60000));
+}
+
+function durationText() {
+    return formatMins(totalRecordedMins());
+}
+
+const interruptionMins = computed(() => props.event?.interruption_minutes ?? 0);
+const lunchMins = computed(() => props.lunch_overlap_minutes ?? 0);
+const hasDeductions = computed(() => lunchMins.value > 0 || interruptionMins.value > 0);
+
+function actualDurationText() {
+    const actual = Math.max(0, totalRecordedMins() - lunchMins.value - interruptionMins.value);
+    return formatMins(actual);
 }
 
 function confirmDelete() {
@@ -99,20 +119,30 @@ const eventTypeLabel = computed(() => props.event?.event_item_type?.name ?? null
                 <!-- 日時 -->
                 <div class="px-5 py-4">
                     <h4 class="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">日時</h4>
-                    <div class="flex flex-wrap items-center gap-6">
+                    <div class="flex flex-wrap items-start gap-6">
                         <div>
                             <div class="text-xs text-gray-500">開始</div>
                             <div class="mt-0.5 text-sm font-medium text-gray-900">{{ formatJstDateTime(event.start) }}</div>
                         </div>
-                        <div class="text-gray-300">→</div>
+                        <div class="mt-4 text-gray-300">→</div>
                         <div>
                             <div class="text-xs text-gray-500">終了</div>
                             <div class="mt-0.5 text-sm font-medium text-gray-900">{{ formatJstDateTime(event.end) }}</div>
                         </div>
-                        <div class="ml-auto">
+                        <div class="ml-auto text-right">
                             <div class="text-xs text-gray-500">作業時間</div>
-                            <div class="mt-0.5 text-base font-bold text-indigo-700">{{ durationText() }}</div>
+                            <div class="mt-0.5 text-base font-bold text-indigo-700">{{ actualDurationText() }}</div>
+                            <div v-if="hasDeductions" class="mt-1 space-y-0.5 text-xs text-gray-400">
+                                <div>記録 {{ durationText() }}</div>
+                                <div v-if="lunchMins > 0" class="text-amber-600">ランチ −{{ formatMins(lunchMins) }}（{{ lunch_start }}〜{{ lunch_end }}）</div>
+                                <div v-if="interruptionMins > 0" class="text-orange-600">中断 −{{ formatMins(interruptionMins) }}</div>
+                            </div>
                         </div>
+                    </div>
+                    <!-- 中断の注記 -->
+                    <div v-if="interruptionMins > 0"
+                         class="mt-3 rounded bg-orange-50 border border-orange-200 px-3 py-2 text-xs text-orange-700">
+                        この予定は差し込み作業により合計 {{ formatMins(interruptionMins) }} 中断されました。
                     </div>
                 </div>
 

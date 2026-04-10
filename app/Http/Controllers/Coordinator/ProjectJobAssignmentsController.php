@@ -912,7 +912,10 @@ class ProjectJobAssignmentsController extends Controller
     {
         $user = $request->user();
 
-        $ownedProjects = ProjectJob::where('user_id', $user->id)
+        $ownedProjects = ProjectJob::where(function ($q) use ($user) {
+                $q->where('user_id', $user->id)
+                  ->orWhereHas('coordinators', fn($q2) => $q2->where('users.id', $user->id));
+            })
             ->where(function ($q) {
                 $q->where('completed', false)->orWhereNull('completed');
             })

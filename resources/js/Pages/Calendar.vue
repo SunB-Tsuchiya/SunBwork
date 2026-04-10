@@ -35,6 +35,14 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    dailyBreaks: {
+        type: Array,
+        default: () => [],
+    },
+    defaultBreak: {
+        type: Object,
+        default: () => ({ start: '12:00', end: '13:00' }),
+    },
 });
 </script>
 
@@ -52,6 +60,8 @@ const props = defineProps({
                 :default-worktype="defaultWorktype"
                 :worktypes="worktypes"
                 :daily-worktypes="dailyWorktypes"
+                :daily-breaks="dailyBreaks"
+                :default-break="defaultBreak"
             />
         </div>
     </AppLayout>
