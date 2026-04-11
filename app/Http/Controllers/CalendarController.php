@@ -125,6 +125,7 @@ class CalendarController extends Controller
                 $descVal = $e->description ?? ($arr['description'] ?? null);
                 if (empty($descVal) && isset($arr['body'])) $descVal = $arr['body'];
                 $pjId = $arr['project_job_assignment_id'] ?? ($e->project_job_assignment_id ?? null);
+                $hasProgress = $pjId ? in_array((int)$pjId, $progressAssignmentIds, true) : false;
                 $isSelfAssigned = false;
                 if ($pjId) {
                     if (isset($assignmentSenders[$pjId])) {
@@ -132,7 +133,15 @@ class CalendarController extends Controller
                         $isSelfAssigned = $senderId !== null && $senderId === ($user ? $user->id : null);
                     }
                 }
-                
+
+                // color mapping: progress -> purple, self-assigned -> indigo, default -> green
+                $color = $arr['color'] ?? ($e->color ?? null);
+                if (empty($color)) {
+                    if ($hasProgress) $color = '#7C3AED';
+                    elseif ($isSelfAssigned) $color = '#4F46E5';
+                    else $color = '#059669';
+                }
+
                 return [
                     'id'                           => $e->id,
                     'title'                        => $e->title,
@@ -140,12 +149,12 @@ class CalendarController extends Controller
                     'end'                          => $endVal,
                     'allDay'                       => $arr['allDay'] ?? false,
                     'description'                  => $descVal,
-                    'color'                        => $arr['color'] ?? ($e->color ?? null),
+                    'color'                        => $color,
                     'project_job_assignment_id'    => $pjId,
                     'extendedProps'                => array_merge($arr['extendedProps'] ?? [], [
                         'project_job_assignment_id' => $pjId,
                         'description'               => $descVal,
-                        'has_progress_cell'         => $pjId ? in_array((int)$pjId, $progressAssignmentIds, true) : false,
+                        'has_progress_cell'         => $hasProgress,
                         'is_self_assigned'          => $isSelfAssigned,
                     ]),
                 ];
