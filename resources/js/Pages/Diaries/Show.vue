@@ -108,7 +108,7 @@ async function onTimelineUpdate(payload) {
             endMinute: payload.endMinute,
         });
         // refresh events
-        const resp = await axios.get('/events', { params: { date: payload.date, user_id: props.diary.user_id } });
+        const resp = await axios.get(route('events.index'), { params: { date: payload.date, user_id: props.diary.user_id } });
         events.value = (resp.data || []).map((e) => ({
             id: e.id ?? e.event_id ?? e._id ?? null,
             title: e.title || e.name || '(無題)',
@@ -662,7 +662,7 @@ onMounted(async () => {
         // pass only YYYY-MM-DD to backend using the app/JST-aware formatter so the diary's displayed date
         // (which may differ from the raw ISO UTC date) is used for server queries.
         const date = formatJstDate(props.diary.date);
-        const resp = await axios.get('/events', { params: { date, user_id: props.diary.user_id } });
+        const resp = await axios.get(route('events.index'), { params: { date, user_id: props.diary.user_id } });
         // normalize: ensure start/end are present and color fallback
         events.value = (resp.data || []).map((e) => ({
             id: e.id ?? e.event_id ?? e._id ?? null,
@@ -1110,7 +1110,7 @@ async function endDrag(e) {
             }, 500);
         } catch (e) {}
         // refresh events
-        const resp = await axios.get('/events', { params: { date, user_id: props.diary.user_id } });
+        const resp = await axios.get(route('events.index'), { params: { date, user_id: props.diary.user_id } });
         events.value = (resp.data || []).map((e) => ({
             id: e.id ?? e.event_id ?? e._id ?? null,
             title: e.title || e.name || '(無題)',

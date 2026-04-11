@@ -189,7 +189,7 @@ onMounted(async () => {
     try {
         const date = formatJstDate(props.diary.date);
         // include the diary owner's user_id so leaders/admins can fetch that user's events
-        const resp = await axios.get('/events', { params: { date, user_id: props.diary.user_id } });
+        const resp = await axios.get(route('events.index'), { params: { date, user_id: props.diary.user_id } });
         events.value = (resp.data || []).map((e) => ({
             id: e.id ?? e.event_id ?? e._id ?? null,
             title: e.title || e.name || '(無題)',
