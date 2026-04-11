@@ -177,14 +177,87 @@ class EventController extends Controller
             }
         }
         $events = $query->get();
-        // removed verbose debug logging for fetched events
 
-        // If the caller expects JSON (API clients) keep returning JSON. However
-        // Inertia Link navigations and normal browser requests expect an Inertia
-        // response. Detect that and render the Inertia page so SPA navigation
-        // works correctly when users click links from the frontend.
+        // For JSON clients (axios in the diary interactions view) enrich events
+        // with the same job/progress/self-assigned metadata and color mapping
+        // used by the calendar so the TimelineDiary can render matching colors.
         if ($request->wantsJson()) {
-            return response()->json($events);
+            try {
+                $assignmentIds = $events->pluck('project_job_assignment_id')->filter()->unique()->values()->all();
+
+                // detect progress-linked assignments
+                $progressAssignmentIds = [];
+                if (!empty($assignmentIds)) {
+                    try {
+                        $progressAssignmentIds = \App\Models\ProgressCell::whereIn('assignment_id', $assignmentIds)->pluck('assignment_id')->map(fn($v) => (int)$v)->all();
+                    } catch (\Throwable $__ex) {
+                        \Illuminate\Support\Facades\Log::warning('EventController: progressAssignmentIds lookup failed', ['error' => $__ex->getMessage()]);
+                    }
+                }
+
+                // load senders from canonical and by_myself assignments to detect self-assigned
+                $assignmentSenders = [];
+                if (!empty($assignmentIds)) {
+                    try {
+                        $senders = \App\Models\ProjectJobAssignment::whereIn('id', $assignmentIds)->pluck('sender_id', 'id')->map(fn($v) => $v === null ? null : (int)$v)->all();
+                    } catch (\Throwable $__ex) {
+                        $senders = [];
+                        \Illuminate\Support\Facades\Log::warning('EventController: assignment senders lookup failed', ['error' => $__ex->getMessage()]);
+                    }
+                    try {
+                        $bySenders = [];
+                        if (class_exists(\App\Models\ProjectJobAssignmentByMyself::class)) {
+                            $bySenders = \App\Models\ProjectJobAssignmentByMyself::whereIn('id', $assignmentIds)->pluck('sender_id', 'id')->map(fn($v) => $v === null ? null : (int)$v)->all();
+                        }
+                    } catch (\Throwable $__ex) {
+                        $bySenders = [];
+                        \Illuminate\Support\Facades\Log::warning('EventController: by_myself senders lookup failed', ['error' => $__ex->getMessage()]);
+                    }
+
+                    // preserve keys and let by_myself override canonical
+                    if (is_array($senders)) {
+                        foreach ($senders as $k => $v) $assignmentSenders[$k] = $v;
+                    }
+                    if (is_array($bySenders)) {
+                        foreach ($bySenders as $k => $v) $assignmentSenders[$k] = $v;
+                    }
+                    foreach ($assignmentSenders as $k => $v) {
+                        $assignmentSenders[$k] = $v === null ? null : (int)$v;
+                    }
+                }
+
+                $mapped = $events->map(function ($e) use ($progressAssignmentIds, $assignmentSenders, $baseUserId) {
+                    $arr = $e->toArray();
+                    $pjId = $arr['project_job_assignment_id'] ?? ($e->project_job_assignment_id ?? null);
+                    $hasProgress = $pjId ? in_array((int)$pjId, $progressAssignmentIds, true) : false;
+                    $isSelf = false;
+                    if ($pjId && isset($assignmentSenders[$pjId])) {
+                        $sender = $assignmentSenders[$pjId];
+                        $isSelf = $sender !== null && intval($sender) === intval($baseUserId);
+                    }
+
+                    // color mapping: progress -> purple, self-assigned -> indigo, default -> green
+                    $color = $arr['color'] ?? ($e->color ?? null);
+                    if (!$color) {
+                        if ($hasProgress) $color = '#7C3AED';
+                        elseif ($isSelf) $color = '#4F46E5';
+                        else $color = '#059669';
+                    }
+
+                    $arr['color'] = $color;
+                    $arr['extendedProps'] = array_merge($arr['extendedProps'] ?? [], [
+                        'project_job_assignment_id' => $pjId,
+                        'has_progress_cell' => $hasProgress,
+                        'is_self_assigned' => $isSelf,
+                    ]);
+                    return $arr;
+                })->values();
+
+                return response()->json($mapped);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('EventController: failed to enrich events for JSON response', ['error' => $e->getMessage()]);
+                return response()->json($events);
+            }
         }
 
         // Render the calendar index page (we don't have a dedicated Events/Index

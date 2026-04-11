@@ -71,6 +71,41 @@ class MyProjectJobController extends Controller
 
         $myAssignments = $baseAssignments->paginate($usePeriodFilter ? 500 : 50)->appends($appendParams);
 
+        // Attach a has_progress_cell attribute to each assignment for frontend classification.
+        try {
+            $myAssignments->getCollection()->transform(function ($item) {
+                $has = false;
+                try {
+                    if (\Illuminate\Support\Facades\Schema::hasTable('progress_cells')) {
+                        $has = \App\Models\ProgressCell::where('assignment_id', $item->id)->exists();
+                    }
+                } catch (\Throwable $_e) {
+                    $has = false;
+                }
+                // If not directly linked, check ancestor chain (source_assignment_id)
+                if (!$has) {
+                    $cur = $item;
+                    for ($i = 0; $i < 20 && $cur && empty($has); $i++) {
+                        if (empty($cur->source_assignment_id)) break;
+                        $parent = \App\Models\ProjectJobAssignment::find($cur->source_assignment_id);
+                        if (!$parent) break;
+                        try {
+                            if (\Illuminate\Support\Facades\Schema::hasTable('progress_cells')) {
+                                $has = \App\Models\ProgressCell::where('assignment_id', $parent->id)->exists();
+                            }
+                        } catch (\Throwable $_) {
+                            $has = false;
+                        }
+                        $cur = $parent;
+                    }
+                }
+                $item->setAttribute('has_progress_cell', (bool)$has);
+                return $item;
+            });
+        } catch (\Throwable $_exx) {
+            // ignore
+        }
+
         $monthValues = ProjectJobAssignmentByMyself::where('user_id', $user->id)
             ->selectRaw("DATE_FORMAT(COALESCE(desired_end_date, created_at), '%Y-%m') as ym")
             ->groupBy('ym')

@@ -8,9 +8,11 @@ use Illuminate\Support\Facades\Auth;
 use App\Models\Diary;
 use App\Models\Event;
 use App\Models\ProjectJobAssignment;
+use App\Models\ProjectJobAssignmentByMyself;
 use App\Models\UserMonthlyBreak;
 use App\Models\UserMonthlySchedule;
 use App\Models\Worktype;
+use App\Models\ProgressCell;
 use Illuminate\Support\Facades\Schema;
 
 class CalendarController extends Controller
@@ -53,7 +55,66 @@ class CalendarController extends Controller
                 $select[] = 'project_job_assignment_id';
             }
             $events = $eventQuery->get($select);
-            $events = $events->map(function ($e) {
+            // Determine which project_job_assignments referenced by events have progress cells
+            $assignmentIds = $events->pluck('project_job_assignment_id')->filter()->unique()->values()->all();
+            $progressAssignmentIds = [];
+            if (!empty($assignmentIds)) {
+                try {
+                    $progressAssignmentIds = ProgressCell::whereIn('assignment_id', $assignmentIds)->pluck('assignment_id')->map(fn($v) => (int)$v)->all();
+                } catch (\Throwable $ex) {
+                    \Illuminate\Support\Facades\Log::error('CalendarController progressAssignmentIds error: ' . $ex->getMessage());
+                }
+            }
+
+            // load basic assignment info (sender_id) to allow self-assigned detection
+            // include both canonical assignments and user-created (by_myself) assignments
+            $assignmentSenders = [];
+            if (!empty($assignmentIds)) {
+                $senders = [];
+                try {
+                    $senders = ProjectJobAssignment::whereIn('id', $assignmentIds)->pluck('sender_id', 'id')->map(fn($v) => $v === null ? null : (int)$v)->all();
+                } catch (\Throwable $ex) {
+                    \Illuminate\Support\Facades\Log::error('CalendarController assignmentSenders error: ' . $ex->getMessage());
+                }
+
+                // also check the by_myself table if present (user-created assignments)
+                $bySenders = [];
+                try {
+                    if (class_exists(\App\Models\ProjectJobAssignmentByMyself::class)) {
+                        $bySenders = ProjectJobAssignmentByMyself::whereIn('id', $assignmentIds)->pluck('sender_id', 'id')->map(fn($v) => $v === null ? null : (int)$v)->all();
+                    }
+                } catch (\Throwable $ex) {
+                    \Illuminate\Support\Facades\Log::error('CalendarController by_myself assignmentSenders error: ' . $ex->getMessage());
+                }
+
+                // merge—values from by_myself override canonical if present
+                // preserve assignment id keys (avoid array_merge which reindexes numeric keys)
+                $assignmentSenders = [];
+                if (is_array($senders)) {
+                    foreach ($senders as $k => $v) {
+                        $assignmentSenders[$k] = $v;
+                    }
+                }
+                if (is_array($bySenders)) {
+                    foreach ($bySenders as $k => $v) {
+                        // by_myself overrides canonical
+                        $assignmentSenders[$k] = $v;
+                    }
+                }
+            }
+                // $assignmentSenders already contains merged sender ids from canonical and by_myself tables.
+                // Ensure keys are preserved and values are cast to int (avoid array_map which reindexes keys).
+                if (!empty($assignmentSenders) && is_array($assignmentSenders)) {
+                    foreach ($assignmentSenders as $k => $v) {
+                        $assignmentSenders[$k] = $v === null ? null : (int)$v;
+                    }
+                } else {
+                    $assignmentSenders = [];
+                }
+
+            // controller start
+
+            $events = $events->map(function ($e) use ($progressAssignmentIds, $assignmentSenders, $user) {
                 $arr = $e->toArray();
                 $startVal = $e->start ?? ($arr['start'] ?? null);
                 if (empty($startVal) && isset($arr['starts_at'])) $startVal = $arr['starts_at'];
@@ -63,6 +124,15 @@ class CalendarController extends Controller
                 if (empty($endVal) && isset($arr['endsAt'])) $endVal = $arr['endsAt'];
                 $descVal = $e->description ?? ($arr['description'] ?? null);
                 if (empty($descVal) && isset($arr['body'])) $descVal = $arr['body'];
+                $pjId = $arr['project_job_assignment_id'] ?? ($e->project_job_assignment_id ?? null);
+                $isSelfAssigned = false;
+                if ($pjId) {
+                    if (isset($assignmentSenders[$pjId])) {
+                        $senderId = $assignmentSenders[$pjId];
+                        $isSelfAssigned = $senderId !== null && $senderId === ($user ? $user->id : null);
+                    }
+                }
+                
                 return [
                     'id'                           => $e->id,
                     'title'                        => $e->title,
@@ -71,10 +141,12 @@ class CalendarController extends Controller
                     'allDay'                       => $arr['allDay'] ?? false,
                     'description'                  => $descVal,
                     'color'                        => $arr['color'] ?? ($e->color ?? null),
-                    'project_job_assignment_id'    => $arr['project_job_assignment_id'] ?? ($e->project_job_assignment_id ?? null),
+                    'project_job_assignment_id'    => $pjId,
                     'extendedProps'                => array_merge($arr['extendedProps'] ?? [], [
-                        'project_job_assignment_id' => $arr['project_job_assignment_id'] ?? ($e->project_job_assignment_id ?? null),
+                        'project_job_assignment_id' => $pjId,
                         'description'               => $descVal,
+                        'has_progress_cell'         => $pjId ? in_array((int)$pjId, $progressAssignmentIds, true) : false,
+                        'is_self_assigned'          => $isSelfAssigned,
                     ]),
                 ];
             })->values();

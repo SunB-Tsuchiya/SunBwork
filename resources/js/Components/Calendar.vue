@@ -1,7 +1,7 @@
 <template>
     <div class="calendar-container">
-        <div class="mb-4 flex flex-wrap gap-2">
-            <button @click="openEventModal" class="rounded bg-blue-600 px-4 py-2 text-white">予定作成</button>
+            <div class="mb-4 flex flex-wrap gap-2">
+            <button @click="openEventModal" class="rounded bg-emerald-600 px-4 py-2 text-white">予定作成</button>
             <button @click="goToJobCreate" class="rounded bg-indigo-600 px-4 py-2 text-white">ジョブ作成（独自）</button>
             <button @click="openJobSheetModal" class="rounded bg-purple-600 px-4 py-2 text-white">ジョブ作成（進行表から）</button>
             <button @click="goToDiaryCreate" class="rounded bg-orange-500 px-4 py-2 text-white">{{ props.diaryLabel }}作成</button>
@@ -925,9 +925,12 @@ const baseEvents = ref([
 
         // Determine linkage id coming from server (canonical assignment id)
         const pjAssignmentId = event.extendedProps?.project_job_assignment_id ?? event.project_job_assignment_id ?? null;
+        const isProgressLinked = event.extendedProps?.has_progress_cell ?? false;
+        const isSelfAssigned = event.extendedProps?.is_self_assigned ?? false;
 
         // If linkage id is not present, treat as a 'personal unlinked' event — use a distinctive color
         if (!pjAssignmentId) {
+            try { console.debug('Calendar:event', { eventId: event.id, pjAssignmentId: pjAssignmentId, isProgressLinked: isProgressLinked, isSelfAssigned: isSelfAssigned, chosenColor: event.color ?? '#1fb6b3' }); } catch(e){}
             return {
                 title: event.title,
                 start: event.start,
@@ -943,12 +946,23 @@ const baseEvents = ref([
         }
 
         // default coloring path
+        const chosenColor = isCompleted
+                ? '#b58900'
+                : (isProgressLinked
+                    ? (event.color ?? '#7C3AED')
+                    : (isSelfAssigned
+                        ? (event.color ?? '#4F46E5') // indigo-600
+                        : (event.color ?? '#059669') // emerald-600 for personal events
+                    )
+                );
+        try { console.debug('Calendar:event', { eventId: event.id, pjAssignmentId: pjAssignmentId, isProgressLinked: isProgressLinked, isSelfAssigned: isSelfAssigned, chosenColor }); } catch(e){}
+
         return {
             title: event.title,
             start: event.start,
             end: event.end ?? undefined,
             allDay: event.allDay ?? false,
-            color: isCompleted ? '#b58900' : (event.color ?? `rgba(37,99,235,${alpha})`),
+            color: chosenColor,
             event_id: event.id,
             schedule_id: event.extendedProps?.schedule_id ?? event.schedule_id ?? undefined,
             description: event.description ?? event.extendedProps?.description ?? '',

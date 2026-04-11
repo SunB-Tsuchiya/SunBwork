@@ -108,7 +108,7 @@ async function onTimelineUpdate(payload) {
             endMinute: payload.endMinute,
         });
         // refresh events
-        const resp = await axios.get('/events', { params: { date: payload.date } });
+        const resp = await axios.get('/events', { params: { date: payload.date, user_id: props.diary.user_id } });
         events.value = (resp.data || []).map((e) => ({
             id: e.id ?? e.event_id ?? e._id ?? null,
             title: e.title || e.name || '(無題)',
@@ -662,7 +662,7 @@ onMounted(async () => {
         // pass only YYYY-MM-DD to backend using the app/JST-aware formatter so the diary's displayed date
         // (which may differ from the raw ISO UTC date) is used for server queries.
         const date = formatJstDate(props.diary.date);
-        const resp = await axios.get('/events', { params: { date } });
+        const resp = await axios.get('/events', { params: { date, user_id: props.diary.user_id } });
         // normalize: ensure start/end are present and color fallback
         events.value = (resp.data || []).map((e) => ({
             id: e.id ?? e.event_id ?? e._id ?? null,
@@ -1110,7 +1110,7 @@ async function endDrag(e) {
             }, 500);
         } catch (e) {}
         // refresh events
-        const resp = await axios.get('/events', { params: { date } });
+        const resp = await axios.get('/events', { params: { date, user_id: props.diary.user_id } });
         events.value = (resp.data || []).map((e) => ({
             id: e.id ?? e.event_id ?? e._id ?? null,
             title: e.title || e.name || '(無題)',
@@ -1166,8 +1166,8 @@ onUnmounted(() => {
                 <span v-if="!overtimeLabel && (workRecord.start_time || workRecord.end_time)" class="text-gray-400">残業なし</span>
             </div>
 
-            <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                <!-- 左列: 日報内容 + コメント + ボタン -->
+            <div class="grid grid-cols-1 gap-6">
+                <!-- 上から順: 日報内容 -->
                 <div class="flex flex-col gap-3">
                     <div class="prose max-h-52 overflow-y-auto rounded border p-3 text-sm">
                         <div v-html="sanitizedContent" @click="onBodyClick"></div>
@@ -1178,24 +1178,7 @@ onUnmounted(() => {
                         <strong class="mr-1">既読:</strong>{{ readerNames.join(', ') }}
                     </div>
 
-                    <!-- 保存されたコメント表示 -->
-                    <div>
-                        <h3 class="mb-1 text-sm font-semibold text-gray-700">コメント</h3>
-                        <div v-if="!(props.diary.comments || []).length" class="text-sm text-gray-400">コメントはありません</div>
-                        <div
-                            v-for="(c, idx) in props.diary.comments || []"
-                            :key="c.id || idx"
-                            class="mb-1 flex items-start justify-between rounded border p-2"
-                        >
-                            <div class="text-sm text-gray-700">
-                                <strong>{{ c.user_name }}</strong>：
-                                <span class="whitespace-pre-wrap">{{ c.comment }}</span>
-                            </div>
-                            <div v-if="c.user_id === $page.props.auth?.user?.id" class="ml-3 shrink-0">
-                                <button @click.prevent="deleteComment(c.id, idx)" class="text-sm text-red-600 hover:underline">削除</button>
-                            </div>
-                        </div>
-                    </div>
+                    
 
                     <div class="flex space-x-3">
                         <Link :href="editHref" class="rounded bg-blue-600 px-4 py-2 text-sm text-white">編集</Link>
@@ -1203,8 +1186,7 @@ onUnmounted(() => {
                         <button @click="back" class="rounded bg-gray-200 px-4 py-2 text-sm text-gray-700">戻る</button>
                     </div>
                 </div>
-
-                <!-- 右列: 当日の予定 -->
+                <!-- タイムライン（内容の下に表示） -->
                 <div>
                     <label class="mb-2 block text-sm font-medium text-gray-700">当日の予定</label>
                     <TimelineDiary
@@ -1218,10 +1200,29 @@ onUnmounted(() => {
                         @open-edit="onTimelineOpenEdit"
                     />
                 </div>
+                <!-- コメントはタイムラインの下に移動 -->
+                <div>
+                    <h3 class="mb-1 text-sm font-semibold text-gray-700">コメント</h3>
+                    <div v-if="!(props.diary.comments || []).length" class="text-sm text-gray-400">コメントはありません</div>
+                    <div
+                        v-for="(c, idx) in props.diary.comments || []"
+                        :key="c.id || idx"
+                        class="mb-1 flex items-start justify-between rounded border p-2"
+                    >
+                        <div class="text-sm text-gray-700">
+                            <strong>{{ c.user_name }}</strong>：
+                            <span class="whitespace-pre-wrap">{{ c.comment }}</span>
+                        </div>
+                        <div v-if="c.user_id === $page.props.auth?.user?.id" class="ml-3 shrink-0">
+                            <button @click.prevent="deleteComment(c.id, idx)" class="text-sm text-red-600 hover:underline">削除</button>
+                        </div>
+                    </div>
+                </div>
+
             </div>
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700">添付ファイル</label>
-                        <div v-if="attachmentsList && attachmentsList.length">
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700">添付ファイル</label>
+                <div v-if="attachmentsList && attachmentsList.length">
                             <ul class="mt-2 space-y-2">
                                 <li
                                     v-for="file in attachmentsList"

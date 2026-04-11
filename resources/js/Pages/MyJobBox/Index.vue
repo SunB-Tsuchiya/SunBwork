@@ -82,6 +82,7 @@
                             <col style="width: 25%">   <!-- タイトル -->
                             <col style="width: 160px"> <!-- クライアント -->
                             <col>                      <!-- 案件 -->
+                            <col style="width: 160px">  <!-- 種類 (幅を広げる) -->
                         </colgroup>
                         <thead>
                             <tr class="bg-gray-50">
@@ -89,6 +90,7 @@
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">タイトル</th>
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">クライアント</th>
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">案件</th>
+                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">種類</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -105,6 +107,14 @@
                                 </td>
                                 <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ getClientName(m) }}</td>
                                 <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ getProjectJobTitle(m) }}</td>
+                                <td class="break-words border px-3 py-2 text-sm">
+                                    <span
+                                        v-if="getAssignmentKind(m)"
+                                        class="inline-flex items-center rounded-full px-3 py-0.5 text-xs font-medium whitespace-nowrap"
+                                        :style="{ backgroundColor: getAssignmentKind(m).color, color: getAssignmentKind(m).textColor }">
+                                        {{ getAssignmentKind(m).label }}
+                                    </span>
+                                </td>
                             </tr>
                         </tbody>
                     </table>
@@ -314,6 +324,35 @@ function getProjectJobTitle(m) {
     try {
         return m.projectJob?.title || m.projectJob?.name || m.project_job?.title || m.project_job?.name || '-';
     } catch { return '-'; }
+}
+
+/**
+ * Determine assignment kind and badge color.
+ * - ジョブ（依頼）: supersedes_assignment_id がある（依頼を受けて作成した応答） -> 紫
+ * - ジョブ（独自）: sender_id === user_id -> インディゴ
+ * - 予定: その他（予定作成など） -> エメラルド
+ */
+function getAssignmentKind(m) {
+    try {
+        const userId = page.props.auth?.user?.id || null;
+        if (m.supersedes_assignment_id) {
+            return { label: 'ジョブ（依頼）', color: '#7C3AED', textColor: '#FFFFFF' };
+        }
+            // If linked to progress sheet, mark as progress-linked (優先)
+            if (m.has_progress_cell) {
+                return { label: 'ジョブ（進行）', color: '#7C3AED', textColor: '#FFFFFF' };
+            }
+            // sender_id may be present; compare to user or to m.user_id
+            const sender = m.sender_id ?? m.sender?.id ?? null;
+            const owner = m.user_id ?? m.user?.id ?? userId;
+            if (sender && owner && String(sender) === String(owner)) {
+                return { label: 'ジョブ（独自）', color: '#4F46E5', textColor: '#FFFFFF' };
+            }
+        // fallback to 予定
+        return { label: '予定', color: '#059669', textColor: '#FFFFFF' };
+    } catch (e) {
+        return { label: '予定', color: '#059669', textColor: '#FFFFFF' };
+    }
 }
 
 function getDateDisplay(m) {

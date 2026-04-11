@@ -4,59 +4,29 @@
 
 ---
 
-## Claude へのワークフロー指示
+## プロジェクト基本情報
 
-- Vue / JS ファイルを変更したら、必ず最後に `npm run build` を実行すること（許可済み）。
-- `npm run build` はプロジェクトルート（`/home/w229/SunBwork`）で実行する。
+- **スタック:** Laravel 11 / Vue 3 / Inertia.js / Vite / Tailwind CSS（SPA構成）
+- **開発体制:** 単独開発
+- **本番環境:** さくらレンタルサーバー（`https://sun-brain.co.jp/members`）
+- **APP_NAME:** `SB`（ブラウザタブ「ページ名 - SB」で表示。さくら本番 .env も同様）
+
+---
+
+## 作業ルール
+
+- **作業前に必ず関連コードを読む。** 既存の実装を確認してから変更・追加する
+- Vue / JS ファイルを変更したら必ず最後に `npm run build` を実行（許可済み）
+- `npm run build` はプロジェクトルート（`/home/tchirosb/SunBWork`）で実行
 - Artisan は必ずコンテナ内: `docker compose exec laravel bash -lc "php artisan ..."`
-- **Docker が使えない場合はホスト上の npm（node v24, npm v11）で直接 `npm run build` を実行する。**
+- Docker が使えない場合はホスト上の npm（node v24, npm v11）で直接ビルド
+- 設定変更後: `php artisan config:clear && php artisan cache:clear`
+- storage パーミッションエラー時: `docker compose exec -u root laravel bash -lc "chmod -R 777 storage bootstrap/cache && chown -R www-data:www-data storage bootstrap/cache"`
+- EACCES エラー時（Docker ビルド後に public/build が root 所有になる）: `sudo chown -R $USER:$USER public/build/ && sudo chmod -R 755 public/build/assets`
 
-### public/build/assets が root 所有になる問題
-
-Docker コンテナ内でビルドすると `public/build/assets/` が root 所有になり、次回のホストからの `npm run build` が `EACCES Permission denied` で失敗する。
-対処: `sudo chown -R $USER:$USER public/build/ && sudo chmod -R 755 public/build/assets`
-
-### ユーザーから「gitにアップ」「さくらにデプロイ」を求められたときの手順
-
-① `git status --short | grep -v "public/build"` で未コミット確認（Controller/Model/Migration/routes 漏れに注意）
-
-② routes/web.php 変更があれば Ziggy 再生成:
-
-```bash
-docker compose exec laravel bash -lc "php artisan ziggy:generate resources/js/ziggy.js"
-```
-
-③ さくら用ビルド（`.env` の VITE_APP_BASE_PATH は **2箇所** ある）:
-
-```bash
-sed -i 's/^VITE_APP_BASE_PATH=$/VITE_APP_BASE_PATH=\/members/' /home/w229/SunBwork/.env
-npm run build
-```
-
-④ コミット:
-
-```bash
-git add <変更ファイル> public/build/ resources/js/ziggy.js
-git commit -m "feat/fix/build: ..."
-```
-
-⑤ **コミット直後** に .env をローカル用に戻してローカルビルドも実行（コミット不要）:
-
-```bash
-sed -i 's/^VITE_APP_BASE_PATH=\/members$/VITE_APP_BASE_PATH=/' /home/w229/SunBwork/.env
-npm run build
-```
-
-> ⚠️ 重要: ⑤ を実行しないとローカル開発環境の .env が本番（さくら用）のままになり、次回の開発ビルドで `/members` ベースパスが適用され、ローカル環境が壊れます。必ずコミット直後に実行してください。
-
-⑥ ユーザーへ伝える:
-
-```
-【あなたの操作が必要です】
-1. git push origin main
-2. さくら SSH: cd ~/SunBWork && git pull && php artisan migrate && php artisan config:clear
-   ※ マイグレーションがない場合は migrate は省略可
-```
+**「git にアップ」「さくらにデプロイ」を求められたとき:**
+→ `z_instructions/DEPLOY_SAKURA.md` の手順に従う
+⚠️ **VITE_APP_BASE_PATH の切り替えを必ず行い、コミット後にローカル用（空）に戻すこと**
 
 ---
 
@@ -132,6 +102,33 @@ AppLayout.vue の `currentRouteContext` computed はルート名プレフィッ�
 複数ロール共有ページでは `routePrefix` computed（Vue）と `routePrefix()` メソッド（PHP）でロール別にルートを解決する。
 
 **Clients テーブルの注意:** DBカラムは `notes`。フォームフィールド名 `detail` との乖離に注意。
+
+---
+
+## 権限・ロール設計ルール
+
+**ロール階層:** SuperAdmin > Admin > Leader / Coordinator > **Clerk** > User
+
+**Clerk ロール（2026-04-02 追加）:**
+- `user_role = 'clerk'` / バッジカラー: 紫（`bg-purple-100 text-purple-800`）/ 表示名: 「事務・経理」
+- Coordinator と同等以上の権限（経理・事務機能へのアクセス）
+- `AdminUserController` のバリデーション `in:admin,leader,coordinator,clerk,user` に含まれる
+- CSV 一括登録でも `clerk` は有効（日本語: 「クラーク」で自動変換）
+- `UserTable.vue` / `Admin/Users/Index.vue` の `getAssignmentText()` / `getAssignmentBadgeClass()` 両方に定義が必要
+
+**Admin 権限フラグ（`admin_permissions`）:** `company_management` / `user_management` / `team_management` / `diary_management` / `client_management` / `workload_analysis` / `worktype_setting` / `work_record_management`
+
+**Leader 権限フラグ（`leader_permissions`）:** `client_management` / `diary_management` / `workload_analysis` / `workload_setting` / `work_record_management` / `dispatch_management` / `project_job_overview`
+
+**権限チェック Trait:** `ChecksAdminPermission` / `ChecksLeaderPermission`。レコードなしは全権限 ON。
+
+**Leader スコープ:** 部署リーダー（`team_type='department'`）→ 自部署全体 / ユニットリーダー → 自チームのみ / サブリーダー（`team_sub_leaders` ピボット）→ 担当チームのみ
+
+**タブ表示制御:** `HandleInertiaRequests` で `auth.adminPermissions` / `auth.leaderPermissions` を共有。`perm === null`（レコードなし）は全フラグ ON として扱う。
+
+**チーム管理・権限管理ページはフラグ制御対象外。**
+
+**SuperAdmin が Admin 権限設定ページにアクセスする場合は `'admin'` プレフィックスを返す（`'superadmin'` ではない）。**
 
 ---
 
@@ -284,22 +281,6 @@ Vue ページ: `CsvUpload.vue`（ファイル選択）→ `CsvPreview.vue`（確
 
 ---
 
-## 開発ワークフロー
-
-- 設定変更後: `php artisan config:clear && php artisan cache:clear`
-- storageパーミッションエラー時: `docker compose exec -u root laravel bash -lc "chmod -R 777 storage bootstrap/cache && chown -R www-data:www-data storage bootstrap/cache"`
-
-**ローカル .env 重要設定:**
-
-```env
-APP_URL=http://localhost:8000
-VITE_APP_BASE_PATH=          # 空にする（さくらの /members は不要）
-SESSION_SECURE_COOKIE=false
-SESSION_SAME_SITE=lax
-```
-
----
-
 ## CI（GitHub Actions）ルール
 
 - `.github/workflows/lint.yml`: PHP Pint + Prettier + ESLint
@@ -317,68 +298,43 @@ if (DB::getDriverName() === 'sqlite') return;
 
 ---
 
-## さくらレンタルサーバー デプロイ設定
+## さくらレンタルサーバー 設定と制約
+
+**デプロイ手順:** → `z_instructions/DEPLOY_SAKURA.md` を参照
 
 **サーバー構成:**
-
-- `~/SunBWork/` — Laravel ルート
-- `~/www/members/` — 公開ディレクトリ（`index.php` のパスは通常と異なる）
+- `~/SunBWork/` — Laravel ルート / `~/www/members/` — 公開ディレクトリ
 - `~/www/members/build/` — `~/SunBWork/public/build/` へのシンボリックリンク
 
-**本番 .env:**
+**本番 .env（重要設定）:**
+`APP_URL` / `ASSET_URL` = `https://sun-brain.co.jp/members` / `VITE_APP_BASE_PATH=/members` / `APP_DEBUG=false`
 
-```
-APP_URL=https://silverlamb759.sakura.ne.jp/members
-ASSET_URL=https://silverlamb759.sakura.ne.jp/members
-VITE_APP_BASE_PATH=/members
-APP_DEBUG=false
-```
+**制約:** `nano` 不可（`vi` を使う）/ `.htaccess` に `php_flag`/`php_value` 不可 / Reverb 不可 / さくら上の `sed -i` は BSD版のため `-i ''` が必要
 
-**制約:** `nano` 不可（`vi` を使う）/ `.htaccess` に `php_flag`/`php_value` 不可 / Reverb 不可 / `sed -i` は BSD版のため `-i ''` が必要
+**ローカル .env（重要設定）:**
+`APP_URL=http://localhost:8000` / `VITE_APP_BASE_PATH=`（空）/ `SESSION_SECURE_COOKIE=false` / `SESSION_SAME_SITE=lax`
 
-**デプロイ後:**
+**⚠️ さくら本番でのコーディング必須ルール:**
 
-```bash
-cd ~/SunBWork && git pull && php artisan migrate && php artisan config:clear && php artisan cache:clear
-```
-
-**⚠️ `php artisan migrate` を忘れると新機能が壊れる（実績あり）:**
-- 2026-03-28 の3マイグレーション（`user_settings` / `user_monthly_schedules`）を未実行でデプロイしたところ、カレンダーの勤務形態セレクトが空・シフト名が非表示になった
-- 症状: ローカルは正常 / さくらのみ壊れる / エラーは500ではなくページは表示されるが prop が空
-- 対処: `php artisan migrate` で解決
-
-**`sessions` テーブルなどで migrate エラー時:** tinker で migrations テーブルに手動 insert。
-
-**Vite ビルド:** `VITE_APP_BASE_PATH` が空なら `/build/assets/...`、`/members` なら `/members/build/assets/...`。`loadEnv` で読むこと（`process.env` では .env を読まない）。
-
-**ナビゲーションは必ず `route()` を使う（重要）:**
-さくら本番は `/members` ベースパスがあるため、JS 内でのパスをハードコードすると 404 になる。
-
+① **ナビゲーションは必ず `route()` を使う** — JS 内でパスをハードコードすると `/members` ベースパスで 404 になる
 ```js
-// NG: ハードコード（ローカルは動くが本番で 404）
+// NG
 window.location.href = `/events/${id}`;
-window.location.href = '/myjobbox';
-
-// OK: Ziggy の route() を使う（ベースパスを自動解決）
-window.location.href = route('events.show', { event: id });
-window.location.href = route('user.myjobbox.index');
-router.get(route('events.show', { event: id })); // Inertia 遷移が望ましい
+// OK
+router.get(route('events.show', { event: id }));  // Inertia 遷移推奨
+window.location.href = route('events.show', { event: id });  // try/catch 内も同様
 ```
 
-try/catch フォールバックも `route()` を使うこと。catch 内でも `window.location.href = route(...)` とする。
-
-**CSRF トークンは meta tag から取得する（重要）:**
-さくら本番では `XSRF-TOKEN` クッキーが発行されないため、`document.cookie.match(/XSRF-TOKEN=/)` を使う fetch リクエストは全て 419 エラーになる。
-
+② **CSRF トークンは meta tag から取得する** — さくらでは `XSRF-TOKEN` クッキーが発行されず 419 エラーになる
 ```js
-// NG: クッキー方式（さくらで 419）
+// NG
 const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
-headers: { 'X-XSRF-TOKEN': match ? decodeURIComponent(match[1]) : '' }
-
-// OK: meta tag 方式
+// OK
 const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' }
 ```
+
+③ **`php artisan migrate` を忘れると本番が壊れる** — ローカルは正常でも prop が空になるなど無音で壊れる（実績あり）
 
 ---
 
@@ -391,21 +347,6 @@ headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' }
 
 **本番必須 Seeder（主要）:**
 `CompanySeeder` / `DepartmentSeeder` / `AssignmentSeeder` / `TeamSeeder` / `WorkItemTypesSeeder` / `SizesSeeder` / `StagesSeeder` / `DifficultiesSeeder` / `StatusesSeeder` / `OtherClientProjectSeeder` 他
-
----
-
-## 詳細ドキュメント参照先
-
-- `z_instructions/CONSOLIDATED_01_layout_and_ui.md` - UI ルール詳細
-- `z_instructions/CONSOLIDATED_02_security_and_sessions.md` - セキュリティ・セッション
-- `z_instructions/CONSOLIDATED_03_auth_and_cors.md` - 認証・CORS
-- `z_instructions/CONSOLIDATED_04_ai_and_chat.md` - AI・チャット
-- `z_instructions/CONSOLIDATED_05_calendar_and_jobbox.md` - カレンダー・JobBox
-- `z_instructions/CONSOLIDATED_06_messages_and_files.md` - メッセージ・ファイル
-- `z_instructions/CONSOLIDATED_07_workload_and_handover.md` - ワークロード解析
-- `z_instructions/CONSOLIDATED_08_attachment.md` - 添付ファイル詳細
-
-> `z_instructions/backups/` 配下のファイルは読み飛ばす。
 
 ---
 
@@ -456,46 +397,9 @@ headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' }
 
 ## Admin/Users/Edit フォーム仕様
 
-`resources/js/Pages/Admin/Users/Edit.vue` は Create.vue と同等のフルフォームに拡張済み。
+Create.vue と同等のフルフォーム。フィールド: name / email / password / company_id / department_id / assignment_id / user_role / employment_type / position_title_id。
 
-**フィールド:** name / email / password（空=変更なし）/ password_confirmation / company_id / department_id / assignment_id / user_role / employment_type / position_title_id
-
-**computed:**
-- `selectedCompanyDepartments` — 選択会社の部署一覧
-- `availableAssignments` — 選択部署の担当一覧
-- `availablePositionTitles` — user_role に応じた役職一覧（admin/leader のみ表示）
-- `filteredRoleOptions` — 表示可能なロール選択肢
-
-**watch によるカスケードリセット:** company_id 変更 → department_id/assignment_id リセット / department_id 変更 → assignment_id リセット / user_role 変更 → position_title_id リセット
-
-**コントローラ (`Admin/UserController`):** `edit()` で companies（部署・担当付き）と positionTitles を取得して渡す。`update()` で全フィールド検証・更新・チーム同期。
-
----
-
-## 権限・ロール設計ルール
-
-**ロール階層:** SuperAdmin > Admin > Leader / Coordinator > **Clerk** > User
-
-**Clerk ロール（2026-04-02 追加）:**
-- `user_role = 'clerk'` / バッジカラー: 紫（`bg-purple-100 text-purple-800`）/ 表示名: 「事務・経理」
-- Coordinator と同等以上の権限（経理・事務機能へのアクセス）
-- `AdminUserController` のバリデーション `in:admin,leader,coordinator,clerk,user` に含まれる
-- CSV 一括登録でも `clerk` は有効（日本語: 「クラーク」で自動変換）
-- `UserTable.vue` / `Admin/Users/Index.vue` の `getAssignmentText()` / `getAssignmentBadgeClass()` 両方に定義が必要
-
-**Admin 権限フラグ（`admin_permissions`）:** `company_management` / `user_management` / `team_management` / `diary_management` / `client_management` / `workload_analysis` / `worktype_setting` / `work_record_management`
-
-**Leader 権限フラグ（`leader_permissions`）:** `client_management` / `diary_management` / `workload_analysis` / `workload_setting` / `work_record_management` / `dispatch_management` / `project_job_overview`
-
-**権限チェック Trait:** `ChecksAdminPermission` / `ChecksLeaderPermission`。レコードなしは全権限 ON。
-
-**Leader スコープ:** 部署リーダー（`team_type='department'`）→ 自部署全体 / ユニットリーダー → 自チームのみ / サブリーダー（`team_sub_leaders` ピボット）→ 担当チームのみ
-
-**タブ表示制御:** `HandleInertiaRequests` で `auth.adminPermissions` / `auth.leaderPermissions` を共有。`perm === null`（レコードなし）は全フラグ ON として扱う。
-
-**チーム管理・権限管理ページはフラグ制御対象外。**
-
-**SuperAdmin が Admin 権限設定ページにアクセスする場合は `'admin'` プレフィックスを返す（`'superadmin'` ではない）。**
+company_id → department_id → assignment_id のカスケードリセットあり。`Admin/UserController::edit()` で companies（部署・担当付き）と positionTitles を渡す。
 
 ---
 
@@ -512,18 +416,7 @@ headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' }
 
 **カレンダー連動:** 勤務形態名をヘッダーに表示 / 始業前グレー背景 / 夜勤モード / 初期スクロールは1時間前 / `scrollTimeReset: false`
 
-**依存マイグレーション（2026-03-28 追加）:** カレンダー日程設定機能は以下3つのマイグレーションがすべて実行済みである必要がある。未実行の場合、カレンダーページが無音で壊れ `worktypes` / `dailyWorktypes` が空になる（フロントのセレクトメニューが空・シフト名が非表示）。
-- `2026_03_28_200001_create_user_settings_table` → `user_settings`（デフォルト勤務形態・カレンダービュー）
-- `2026_03_28_200002_create_user_daily_worktypes_table` → 中間テーブル（次のマイグレーションで削除される）
-- `2026_03_28_200003_replace_daily_worktypes_with_monthly_schedules` → `user_monthly_schedules`（週間日程 JSON）
-
-**CalendarController の防御実装:** `worktypes` 取得 / `userSetting()` 取得 / `UserMonthlySchedule` 取得の3箇所を try/catch で囲み、テーブル未存在の場合でもページが壊れずログにエラーが出るようにしてある。問題発生時は `storage/logs/laravel.log` の `CalendarController` ログを確認すること。
-
-**未マイグレーション症状まとめ:**
-- カレンダー「日程設定」モーダルの勤務形態セレクトが空
-- カレンダー日付ヘッダーにシフト名が出ない
-- 始業前グレー背景が出ない
-→ 必ず `php artisan migrate` を実行すること
+**依存マイグレーション:** `user_settings` / `user_monthly_schedules` の2テーブルが未実行だとカレンダーの勤務形態セレクト・シフト名表示が無音で壊れる（ローカルは正常）。`php artisan migrate` を必ず実行。問題発生時は `storage/logs/laravel.log` の `CalendarController` ログを確認。
 
 ---
 
@@ -566,31 +459,13 @@ headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' }
 
 クライアント管理 → 案件一覧 → ジョブ一覧 → 案件カレンダー
 
-**クライアント管理を Leader から Coordinator に移管:**
-- `coordinator.clients.*` ルート追加（`ClientController` 共用）
-- `ClientController::routePrefix()` に `'coordinator' => 'coordinator'` 追加
-- `Clients/` 各 Vue（Index/Create/Edit/CsvUpload）の `routePrefix` computed を coordinator 対応
-- Leader タブからは削除していない（Leader も引き続き利用可）
+**クライアント管理:** Coordinator / Leader 両方からアクセス可（`ClientController` 共用、`routePrefix()` でロール別解決）。
 
-**クライアント削除・統合機能（2026-04-01 実装）:**
-- `destroy()` — `projectJobs()->count() > 0` の場合は削除不可。session に `clientDeleteError`（案件数・案件タイトル）を格納して redirect back
-- `HandleInertiaRequests::share()` に `clientDeleteError => session('clientDeleteError')` を追加済み
-- `Edit.vue` で `page.props.clientDeleteError` を watch → 2ステップモーダル表示
-  - Step1: エラー表示（案件一覧最大5件）→「統合先クライアントを選ぶ」ボタン
-  - Step2: `clients.json` からクライアント一覧を fetch してテーブル表示、行クリックで統合先選択 → `router.post(clients.merge)`
-- `merge(request)` — DB::transaction で `project_jobs.client_id` と `job_requests.client_id` を統合先に更新後、元レコード削除。同一会社チェックあり（superadmin は exempt）
-- `clientsJson()` — company スコープで名前検索して JSON 返却（元の coordinator インライン closure を統合）
+**クライアント削除:** 案件あり → 削除不可。`Edit.vue` の2ステップモーダルで統合先を選択 → `router.post(clients.merge)` で `project_jobs.client_id` / `job_requests.client_id` を一括更新後に元レコード削除。
 
-**クライアント登録時の重複チェック（2026-04-01 実装）:**
-- `checkDuplicate()` — 入力名を `normalizeClientName()` で正規化し、同社の全クライアントと比較
-- `normalizeClientName()` — 全角→半角 + 法人格17種（株式会社・有限会社等、前後両パターン）除去 + スペース/句読点除去 + 小文字化
-- ルート: `POST clients/check-duplicate` → `{admin|leader|coordinator}.clients.check_duplicate`（3グループ全て）
-- `Clients/Create.vue` の `submit()` でチェックを先行実行。重複あれば保存を**強制ブロック**し「名前を変更してください」モーダルのみ表示（「それでも登録」ボタンなし）
+**重複チェック（`checkDuplicate`）:** 登録前に `normalizeClientName()`（全角→半角・法人格除去・小文字化）で比較。重複あれば**強制ブロック**（「それでも登録」ボタンなし）。ルート: `{admin|leader|coordinator}.clients.check_duplicate`。
 
-**CoordinatorMiddleware 修正（2026-04-01）:**
-- `isLeader()` を allow-list から削除済み（Leader が `/coordinator/*` にアクセス不可になった）
-- Before: `!isCoordinator() && !isLeader() && !isAdmin() && !isSuperAdmin()`
-- After: `!isCoordinator() && !isAdmin() && !isSuperAdmin()`
+**CoordinatorMiddleware:** Leader は `/coordinator/*` にアクセス不可（`isLeader()` を allow-list から除外済み）。
 
 ---
 
@@ -626,13 +501,6 @@ headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' }
 - `UserManagementController`: 全メソッドから `requireLeaderPermission('user_management')` を削除（`getDeptTeam()` が認可ゲート）
 - 部署リーダーであれば権限フラグ不問でタブ最左端に表示・アクセス可
 - ユーザー一覧は `department_id` で自部署に絞り込み済み（変更なし）
-
----
-
-## APP_NAME
-
-`.env` の `APP_NAME=SB`（旧: Laravel）→ ブラウザタブ「ページ名 - SB」で表示。
-さくら本番 `.env` も同様に変更 + `php artisan config:clear` 必要。
 
 ---
 
@@ -749,16 +617,6 @@ joblink セルに担当者が登録されると、**同グループ内の user �
 
 **注意:** joblink セル内には担当者名を表示しない（user 型セルに出るため重複回避）。
 
-### User/ProgressSheets/Show.vue — users prop（2026-04-05 修正）
-
-`User/ProgressSheetController::show()` で `users` を取得して props に追加。
-`User/ProgressSheets/Show.vue` で `:users="[]"` → `:users="props.users"` に変更。
-これにより user 型セルの value_user_id がユーザー名に正しく解決される。
-
-**修正ファイル:**
-- `app/Http/Controllers/User/ProgressSheetController.php` — 案件メンバー・Co・オーナーを集めた `$users` を追加
-- `resources/js/Pages/User/ProgressSheets/Show.vue` — `users` prop を `defineProps` に追加し `ProgressTable` へ渡す
-
 ---
 
 ## project_jobs テーブルの注意事項（さくら本番）⚠️
@@ -832,38 +690,7 @@ project_job_assignments.supersedes_assignment_id  NULLABLE UNSIGNED BIGINT
 | ユーザー受信 JobBox | `ProjectJobs/JobBoxController::index()` | SQL `whereNotExists` サブクエリ |
 | Coordinator グローバル JobBox | `ProjectJobs/JobBoxController::global()` | SQL `whereNotExists` サブクエリ |
 
-**`whereNotExists` パターン（JobBoxController で共通使用）:**
-```php
-->whereNotExists(function ($sub) {
-    $sub->from('project_job_assignments as pja_self')
-        ->whereColumn('pja_self.supersedes_assignment_id', 'project_job_assignments.id')
-        ->whereColumn('pja_self.user_id', 'project_job_assignments.user_id')
-        ->whereColumn('pja_self.sender_id', 'pja_self.user_id');
-})
-```
-
-**Coordinator `show()` の PHP ロジック（タイトル一致 fallback も含む）:**
-```php
-// ① supersedes_assignment_id による明示的除外IDセット
-$allAids = collect($jobHistory)->pluck('project_job_assignment.id')->filter()->all();
-$supersededIds = ProjectJobAssignment::whereIn('supersedes_assignment_id', $allAids)
-    ->whereColumn('sender_id', 'user_id')
-    ->pluck('supersedes_assignment_id')->map(fn($v) => (int)$v)->all();
-
-// ② タイトル一致 fallback（優先度2）
-$selfKeys = [];
-foreach ($jobHistory as $entry) { /* マイジョブのキーセット構築 */ }
-
-// ③ フィルタ
-$jobHistory = array_values(array_filter($jobHistory, function ($entry) use ($supersededIds, $selfKeys) {
-    $isRequest = $uid && $sid && $uid !== $sid;
-    if ($isRequest) {
-        if ($aid && in_array($aid, $supersededIds)) return false;  // 優先度1
-        if (isset($selfKeys["{$uid}:{$title}"])) return false;      // 優先度2
-    }
-    return true;
-}));
-```
+**実装:** JobBoxController は SQL `whereNotExists` サブクエリ、Coordinator `show()` は PHP `array_filter`＋タイトル一致 fallback。詳細はコードを参照。
 
 **注意:** `source_assignment_id`（続きジョブチェーン用）とは別カラム。混同しないこと。
 
@@ -906,29 +733,15 @@ project_job_assignments.source_assignment_id  NULLABLE UNSIGNED BIGINT
 
 ルートから全子孫を BFS で収集して返す。`Show.vue` のチェーンパネルが呼び出す。
 
-### ProjectJobAssignmentController の重要な注意
+### ⚠️ sender_id の注意
 
-`store()` 内で `sender_id` の上書き処理に注意:
+`ProjectJobAssignmentController::store()` で `sender_id` をフォームから渡さない場合は認証ユーザーをデフォルトにすること（`$a['sender_id'] ?? $user->id`）。`null` になると `selfAssigned()` スコープに一致せず `completeAssignment` が 404 を返す。
 
-```php
-// NG（バグ）: フォームから sender_id が渡らない場合に null になる
-$createPayload['sender_id'] = $a['sender_id'] ?? null;
+### UI
 
-// 正解: フォームになければ認証ユーザーをデフォルトにする
-$createPayload['sender_id'] = $a['sender_id'] ?? ($user ? $user->id : null);
-```
-
-`sender_id = null` になると `ProjectJobAssignmentByMyself` のグローバルスコープ（`sender_id = user_id`）に一致せず、`completeAssignment` が 404 を返す。
-
-### UI の挙動
-
-- `MyJobBox/Index.vue`: `source_assignment_id` があれば `↩続き` バッジ（orange-100）を表示
-- `MyJobBox/Show.vue`: オレンジ色のチェーンパネルで元ジョブ・続きジョブへのリンクとシリーズ合計時間を表示
-- 進行表とのリンク: 元ジョブに紐づく `ProgressCell` は続きジョブ作成時には上書きされない（元セルのまま維持）
-
-### テスト
-
-`tests/Feature/ProgressSheetJobChainTest.php` に6件のテストを追加。すべて PASS 確認済み。
+- `MyJobBox/Index.vue`: `↩続き` バッジ（orange-100）
+- `MyJobBox/Show.vue`: チェーンパネルで元ジョブ・続きジョブリンク＋シリーズ合計時間
+- 元ジョブの `ProgressCell` は続きジョブ作成時に上書きされない
 
 ---
 
@@ -987,33 +800,11 @@ Coordinator がジョブを割り当てたとき、ユーザーが完了した�
 - 案件オーナー / サブCo / **チームメンバー**（`project_job_team_members`）/ Admin / **`project_job_assignments` に割り当て済み**
 - `show()` も同メソッドを使用（旧: assignment のみチェックしていた）
 
-### 通知バグ修正（2026-04-08）
+### ⚠️ 完了処理の注意
 
-**① `MyProjectJobController::completeAssignment()` の引数型バグ**
-
-- 旧: `ProjectJobAssignmentByMyself`（`sender_id = user_id` のグローバルスコープが適用）
-- Coordinator が別ユーザーに割り当てたジョブは `sender_id ≠ user_id` → **404** になり完了処理・通知が実行されなかった
-- 修正: 引数型を `ProjectJobAssignment` に変更。認可チェック `user_id !== $user->id` で保護は維持。
-
-**② ProgressSheetController::completeAssignment() に通知が欠落**
-
-- Coordinator が進行表から直接完了にした際に `notifyProgressCompleted` が呼ばれていなかった
-- 修正: `app/Http/Controllers/Coordinator/ProgressSheetController.php` の `completeAssignment()` に通知処理を追加。
-
-**③ 続きジョブチェーン越しの進行表通知が未発火**
-
-- 概要: 「続きジョブ」（`source_assignment_id` チェーン）が進行表セル (`ProgressCell`) と結びついているのはチェーンの途中（祖先）の assignment であり、カレンダーイベントに直接紐づく assignment 自体には ProgressCell がない場合がある。
-- 旧ロジック: `ProgressCell::where('assignment_id', $assignment->id)->exists()` のみチェック → ProgressCell なし → `notifyCompleted()` → 自己割当につきスキップ → **通知なし**
-- 修正内容: 直接チェックが `false` の場合、`source_assignment_id` を辿って祖先の ProgressCell の有無を確認（深さ最大 20）。見つかれば `notifyProgressCompleted` を呼ぶ。
-- 修正対象ファイル（同一ロジックを3箇所に適用）:
-  - `app/Http/Controllers/EventController.php`（カレンダーからの完了）
-  - `app/Http/Controllers/User/MyProjectJobController.php`（マイジョブBox からの完了）
-  - `app/Http/Controllers/ProjectJobs/JobBoxController.php`（受信JobBox からの完了）
-
-**④ 通知時刻の UTC→JST 変換（`resources/js/Pages/JobNotifications/Index.vue`）**
-
-- 旧: `String(dateStr).substring(11, 16)` で UTC 文字列をそのまま切り出し → 日本時間と 9 時間ずれて表示
-- 修正: `toJST()` ヘルパーで Date オブジェクトに変換し、`toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })` で表示。グループキー（日付）も同様に JST ベースに。
+- `completeAssignment()` の引数型は `ProjectJobAssignment`（`ProjectJobAssignmentByMyself` にすると Coordinator 割当ジョブが 404 になる）
+- 続きジョブ（`source_assignment_id` チェーン）の完了通知は祖先まで辿って `ProgressCell` の有無を確認する。`EventController` / `MyProjectJobController` / `JobBoxController` の3箇所に同一ロジックあり
+- 通知時刻は UTC→JST 変換が必要（`toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })`）
 
 ---
 
@@ -1039,3 +830,19 @@ Coordinator がジョブを割り当てたとき、ユーザーが完了した�
 - `assignmentEditHref` computed: `message.project_job_assignment.id` から `coordinator.project_jobs.assignments.edit` URLを生成
 - 旧: `jobbox.edit`（メッセージ本文の編集）→ 新: `assignments.edit`（アサイン内容の編集）
 - `isPrivilegedUser`（coordinator/leader/admin）であれば遷移可能
+
+---
+
+## 詳細ドキュメント参照先
+
+- `z_instructions/CONSOLIDATED_01_layout_and_ui.md` - UI ルール詳細
+- `z_instructions/CONSOLIDATED_02_security_and_sessions.md` - セキュリティ・セッション
+- `z_instructions/CONSOLIDATED_03_auth_and_cors.md` - 認証・CORS
+- `z_instructions/CONSOLIDATED_04_ai_and_chat.md` - AI・チャット
+- `z_instructions/CONSOLIDATED_05_calendar_and_jobbox.md` - カレンダー・JobBox
+- `z_instructions/CONSOLIDATED_06_messages_and_files.md` - メッセージ・ファイル
+- `z_instructions/CONSOLIDATED_07_workload_and_handover.md` - ワークロード解析
+- `z_instructions/CONSOLIDATED_08_attachment.md` - 添付ファイル詳細
+- `z_instructions/DEPLOY_SAKURA.md` - さくらデプロイ手順（詳細）
+
+> `z_instructions/backups/` 配下のファイルは読み飛ばす。
