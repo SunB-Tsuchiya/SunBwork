@@ -353,12 +353,81 @@
             </div>
         </div>
 
+        <!-- 作業日・時間スロット -->
+        <div v-if="props.showWorkSlots" class="mt-6 rounded border border-pink-100 bg-pink-50 p-4">
+            <div class="mb-3 flex items-center justify-between">
+                <h4 class="text-sm font-semibold text-pink-700">作業日・時間</h4>
+                <button
+                    type="button"
+                    @click="addWorkSlot"
+                    class="rounded bg-pink-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-pink-700"
+                >
+                    ＋ 追加
+                </button>
+            </div>
+            <div v-if="workSlots.length === 0" class="text-xs text-gray-400">
+                「＋ 追加」で作業日・時間を登録できます。
+            </div>
+            <div class="space-y-2">
+                <div
+                    v-for="(slot, idx) in workSlots"
+                    :key="idx"
+                    class="flex flex-wrap items-end gap-3 rounded border border-pink-200 bg-white p-3"
+                >
+                    <div>
+                        <label class="block text-xs text-gray-500">日付</label>
+                        <input
+                            v-model="slot.date"
+                            type="date"
+                            class="mt-1 rounded border-gray-300 text-sm shadow-sm focus:border-pink-500 focus:ring-pink-500"
+                        />
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500">開始</label>
+                        <div class="mt-1 flex items-center gap-1">
+                            <select v-model="slot.startHour" class="rounded border-gray-300 text-sm">
+                                <option v-for="h in SLOT_HOURS" :key="h" :value="h">{{ h }}</option>
+                            </select>
+                            <span class="text-gray-400">:</span>
+                            <select v-model="slot.startMinute" class="rounded border-gray-300 text-sm">
+                                <option v-for="m in SLOT_MINUTES" :key="m" :value="m">{{ m }}</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500">終了</label>
+                        <div class="mt-1 flex items-center gap-1">
+                            <select v-model="slot.endHour" class="rounded border-gray-300 text-sm">
+                                <option v-for="h in SLOT_HOURS" :key="h" :value="h">{{ h }}</option>
+                            </select>
+                            <span class="text-gray-400">:</span>
+                            <select v-model="slot.endMinute" class="rounded border-gray-300 text-sm">
+                                <option v-for="m in SLOT_MINUTES" :key="m" :value="m">{{ m }}</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="text-xs text-gray-500">{{ formatSlotDuration(slot) }}</div>
+                    <button
+                        type="button"
+                        @click="removeWorkSlot(idx)"
+                        class="ml-auto rounded bg-red-50 px-2 py-1 text-xs text-red-500 hover:bg-red-100"
+                    >
+                        削除
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <div class="flex gap-2" v-if="editMode">
             <template v-if="props.mode === 'coordinator'">
                 <!-- 新規作成のみ「ブロック追加」を表示 -->
                 <button v-if="!isEditMode" type="button" class="rounded bg-blue-600 px-4 py-2 text-white" @click="addBlock">ジョブブロックを追加</button>
-                <!-- 新規: 保存して送信 / 編集: 保存して再送信 + 送信せず保存 -->
-                <template v-if="isEditMode">
+                <!-- saveOnly モード: 保存ボタンのみ（送信なし） -->
+                <template v-if="props.saveOnly">
+                    <button type="button" class="rounded bg-pink-600 px-4 py-2 text-white" :disabled="saving" @click.prevent="save(false)">保存</button>
+                </template>
+                <!-- 通常モード: 新規: 保存して送信 / 編集: 保存して再送信 + 送信せず保存 -->
+                <template v-else-if="isEditMode">
                     <button type="button" class="rounded bg-green-600 px-4 py-2 text-white" :disabled="saving" @click.prevent="save(true)">保存して再送信</button>
                     <button type="button" class="rounded bg-gray-600 px-4 py-2 text-white" :disabled="saving" @click.prevent="save(false)">送信せず保存</button>
                 </template>
@@ -462,6 +531,15 @@ const props = defineProps({
     otherClientId: { type: [Number, String], default: null },
     otherProjectId: { type: [Number, String], default: null },
     event: { type: Object, default: null },
+    // 校正コーディネーターなど、coordinatorモードで別ルートへ投稿したいときに指定
+    storeOverrideUrl: { type: String, default: null },
+    // coordinatorモードで編集時に別ルート（PUT）へ送りたいときに指定
+    updateOverrideUrl: { type: String, default: null },
+    // 送信概念なしで「保存」ボタンのみ表示（校正管理者など）
+    saveOnly: { type: Boolean, default: false },
+    // 作業日・時間スロット表示
+    showWorkSlots:    { type: Boolean, default: false },
+    initialWorkSlots: { type: Array,   default: () => [] },
 });
 const page = usePage();
 
@@ -1688,6 +1766,44 @@ const saving = ref(false);
 // 編集モード判定: assignments[0] に id があれば既存レコードの編集
 const isEditMode = computed(() => !!(assignments.value[0]?.id));
 
+// ── 作業日・時間スロット ────────────────────────────────────
+const workSlots = ref(
+    props.initialWorkSlots.length > 0
+        ? props.initialWorkSlots.map(s => ({ ...s }))
+        : []
+);
+const SLOT_HOURS   = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
+const SLOT_MINUTES = ['00', '15', '30', '45'];
+
+function addWorkSlot() {
+    workSlots.value.push({ date: '', startHour: '09', startMinute: '00', endHour: '18', endMinute: '00' });
+}
+function removeWorkSlot(idx) {
+    workSlots.value.splice(idx, 1);
+}
+function formatSlotDuration(slot) {
+    const sh = Number(slot.startHour) * 60 + Number(slot.startMinute);
+    const eh = Number(slot.endHour)   * 60 + Number(slot.endMinute);
+    const mins = Math.max(0, eh - sh);
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    if (h > 0 && m > 0) return `${h}時間${m}分`;
+    if (h > 0) return `${h}時間`;
+    return `${m}分`;
+}
+function buildWorkSlotsPayload() {
+    if (!props.showWorkSlots) return undefined;
+    return workSlots.value
+        .filter(s => s.date)
+        .map(s => ({
+            date:        s.date,
+            startHour:   String(s.startHour).padStart(2, '0'),
+            startMinute: String(s.startMinute).padStart(2, '0'),
+            endHour:     String(s.endHour).padStart(2, '0'),
+            endMinute:   String(s.endMinute).padStart(2, '0'),
+        }));
+}
+
 async function save(sendImmediately = true) {
     if (!props.editMode) {
         return;
@@ -1732,6 +1848,19 @@ async function save(sendImmediately = true) {
             })),
         };
 
+        // work_slots を追加
+        const workSlotsData = buildWorkSlotsPayload();
+        if (workSlotsData !== undefined) payload.work_slots = workSlotsData;
+
+        // storeOverrideUrl が指定されている場合は、そのURLへ直接 POST して終了
+        if (props.storeOverrideUrl && !assignments.value[0]?.id) {
+            router.post(props.storeOverrideUrl, payload, {
+                onFinish: () => { saving.value = false; },
+                onError: () => { alert('保存に失敗しました'); },
+            });
+            return;
+        }
+
         const coordinatorProjectJobId =
             props.projectJob && props.projectJob.id ? props.projectJob.id : payload.assignments[0] ? payload.assignments[0].project_job_id : null;
 
@@ -1764,8 +1893,12 @@ async function save(sendImmediately = true) {
                 amounts_unit: a.amounts_unit || 'page',
                 send_immediately: sendImmediately,
             };
+            const wsd = buildWorkSlotsPayload();
+            if (wsd !== undefined) updatePayload.work_slots = wsd;
+            const updateUrl = props.updateOverrideUrl
+                ?? route('coordinator.project_jobs.assignments.update', { projectJob: coordinatorProjectJobId, assignment: existingId });
             router.put(
-                route('coordinator.project_jobs.assignments.update', { projectJob: coordinatorProjectJobId, assignment: existingId }),
+                updateUrl,
                 updatePayload,
                 {
                     onFinish: () => { saving.value = false; },

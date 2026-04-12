@@ -1,5 +1,8 @@
 <script setup>
-import { Link } from '@inertiajs/vue3';
+import { computed } from 'vue';
+import { Link, usePage } from '@inertiajs/vue3';
+const page = usePage();
+const isProofMember = computed(() => page.props.auth?.isProofMember ?? false);
 const props = defineProps({
     active: { type: String, default: '' },
 });
@@ -29,6 +32,19 @@ const tab = (key) => [
             </Link>
             <Link :href="route('calendar.index')" :class="tab('calendar')">
                 予定表
+            </Link>
+            <Link :href="route('proof.calendar')" :class="tab('proof_calendar')">
+                校正カレンダー
+            </Link>
+            <Link :href="route('proof.status')" :class="tab('proof_status')">
+                校正状況
+            </Link>
+            <Link
+                v-if="isProofMember"
+                :href="route('user.proof_jobs.index')"
+                :class="['rounded-md px-3 py-2 text-sm font-medium', active === 'proof_jobs' ? 'bg-pink-100 text-pink-700' : 'border border-pink-200 text-pink-600 hover:bg-pink-50 hover:text-pink-800']"
+            >
+                校正ジョブ
             </Link>
             <Link :href="route('user.settings.index')" :class="tab('settings')">
                 設定

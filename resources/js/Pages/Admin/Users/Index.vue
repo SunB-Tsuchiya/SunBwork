@@ -164,6 +164,8 @@ const getAssignmentBadgeClass = (assignment) => {
             return 'bg-orange-100 text-orange-800';
         case 'coordinator':
             return 'bg-green-100 text-green-800';
+        case 'proof_coordinator':
+            return 'bg-pink-100 text-pink-800';
         case 'clerk':
             return 'bg-purple-100 text-purple-800';
         case 'user':
@@ -183,6 +185,8 @@ const getAssignmentText = (assignment) => {
             return 'リーダー';
         case 'coordinator':
             return '進行管理';
+        case 'proof_coordinator':
+            return '校正コーディネーター';
         case 'clerk':
             return '事務・経理';
         case 'user':

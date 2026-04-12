@@ -287,11 +287,19 @@ class MyProjectJobController extends Controller
             // progress_cells テーブルが存在しない場合は無視
         }
 
+        $proofRequested = false;
+        try {
+            $proofRequested = \App\Models\ProofRequest::where('project_job_assignment_id', $assignment->id)
+                ->whereNotIn('status', ['completed'])
+                ->exists();
+        } catch (\Throwable $e) {}
+
         return Inertia::render('MyJobBox/Show', [
             'projectJob'              => $projectJob,
             'assignment'              => $assignment,
             'canDelete'               => $canDelete,
             'linkedProgressCellCount' => $linkedProgressCellCount,
+            'proofRequested'          => $proofRequested,
         ]);
     }
 

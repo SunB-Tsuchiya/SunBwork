@@ -335,6 +335,9 @@ function getProjectJobTitle(m) {
 function getAssignmentKind(m) {
     try {
         const userId = page.props.auth?.user?.id || null;
+        if (m.job_type === 'proof') {
+            return { label: '校正', color: '#DB2777', textColor: '#FFFFFF' };
+        }
         if (m.supersedes_assignment_id) {
             return { label: 'ジョブ（依頼）', color: '#7C3AED', textColor: '#FFFFFF' };
         }

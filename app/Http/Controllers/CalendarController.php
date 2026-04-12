@@ -87,6 +87,29 @@ class CalendarController extends Controller
                     \Illuminate\Support\Facades\Log::error('CalendarController by_myself assignmentSenders error: ' . $ex->getMessage());
                 }
 
+                // Also load assignment metadata (source_assignment_id / supersedes_assignment_id)
+                $assignmentFlags = [];
+                try {
+                    $metaRows = ProjectJobAssignment::whereIn('id', $assignmentIds)->get(['id', 'source_assignment_id', 'supersedes_assignment_id'])->keyBy('id')->toArray();
+                    foreach ($metaRows as $k => $r) {
+                        $assignmentFlags[$k] = [
+                            'has_source' => !empty($r['source_assignment_id']),
+                            'has_supersedes' => !empty($r['supersedes_assignment_id']),
+                        ];
+                    }
+                    if (class_exists(\App\Models\ProjectJobAssignmentByMyself::class)) {
+                        $metaBy = ProjectJobAssignmentByMyself::whereIn('id', $assignmentIds)->get(['id', 'source_assignment_id', 'supersedes_assignment_id'])->keyBy('id')->toArray();
+                        foreach ($metaBy as $k => $r) {
+                            $assignmentFlags[$k] = [
+                                'has_source' => !empty($r['source_assignment_id']),
+                                'has_supersedes' => !empty($r['supersedes_assignment_id']),
+                            ];
+                        }
+                    }
+                } catch (\Throwable $ex) {
+                    \Illuminate\Support\Facades\Log::error('CalendarController assignmentFlags error: ' . $ex->getMessage());
+                }
+
                 // merge—values from by_myself override canonical if present
                 // preserve assignment id keys (avoid array_merge which reindexes numeric keys)
                 $assignmentSenders = [];
@@ -102,6 +125,7 @@ class CalendarController extends Controller
                     }
                 }
             }
+                
                 // $assignmentSenders already contains merged sender ids from canonical and by_myself tables.
                 // Ensure keys are preserved and values are cast to int (avoid array_map which reindexes keys).
                 if (!empty($assignmentSenders) && is_array($assignmentSenders)) {
@@ -114,7 +138,7 @@ class CalendarController extends Controller
 
             // controller start
 
-            $events = $events->map(function ($e) use ($progressAssignmentIds, $assignmentSenders, $user) {
+            $events = $events->map(function ($e) use ($progressAssignmentIds, $assignmentSenders, $user, $assignmentFlags) {
                 $arr = $e->toArray();
                 $startVal = $e->start ?? ($arr['start'] ?? null);
                 if (empty($startVal) && isset($arr['starts_at'])) $startVal = $arr['starts_at'];
@@ -125,7 +149,14 @@ class CalendarController extends Controller
                 $descVal = $e->description ?? ($arr['description'] ?? null);
                 if (empty($descVal) && isset($arr['body'])) $descVal = $arr['body'];
                 $pjId = $arr['project_job_assignment_id'] ?? ($e->project_job_assignment_id ?? null);
-                $hasProgress = $pjId ? in_array((int)$pjId, $progressAssignmentIds, true) : false;
+                $hasProgress = false;
+                if ($pjId) {
+                    $hasProgress = in_array((int)$pjId, $progressAssignmentIds, true);
+                    // treat assignments with a source or supersedes link as progress-linked as well
+                    if (!$hasProgress && isset($assignmentFlags[$pjId])) {
+                        $hasProgress = !empty($assignmentFlags[$pjId]['has_source']) || !empty($assignmentFlags[$pjId]['has_supersedes']);
+                    }
+                }
                 $isSelfAssigned = false;
                 if ($pjId) {
                     if (isset($assignmentSenders[$pjId])) {
@@ -159,6 +190,8 @@ class CalendarController extends Controller
                     ]),
                 ];
             })->values();
+
+            
 
             $jobs = ProjectJobAssignment::where('user_id', $user->id)
                 ->where(function ($q) {

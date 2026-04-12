@@ -153,24 +153,51 @@
                         割当を見る (#{{ assignment.linked_assignment_id }})
                     </Link>
                 </div>
+
+                <!-- 校正依頼ボタン（完了済みは非表示） -->
+                <button
+                    v-if="!isAssignmentCompleted && !proofRequested"
+                    @click="showProofModal = true"
+                    class="rounded border border-pink-300 bg-pink-50 px-3 py-1.5 text-sm font-medium text-pink-700 hover:bg-pink-100"
+                >
+                    校正依頼
+                </button>
+                <span
+                    v-else-if="!isAssignmentCompleted && proofRequested"
+                    class="rounded border border-gray-300 bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-400 cursor-not-allowed"
+                >
+                    校正依頼済み
+                </span>
             </div>
         </div>
+
+        <ProofRequestModal
+            :show="showProofModal"
+            :initial-title="assignment?.title || ''"
+            :project-job-assignment-id="assignment?.id || null"
+            :project-job-id="projectJob?.id || null"
+            @close="showProofModal = false"
+        />
     </AppLayout>
 </template>
 
 <script setup>
 import AssignmentDetailCard from '@/Components/AssignmentDetailCard.vue';
+import ProofRequestModal from '@/Components/ProofRequestModal.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, ref } from 'vue';
 
-const { projectJob, assignment, canDelete, linkedProgressCellCount } = defineProps({
+const { projectJob, assignment, canDelete, linkedProgressCellCount, proofRequested } = defineProps({
     projectJob: Object,
     assignment: Object,
     canDelete: { type: Boolean, default: false },
     linkedProgressCellCount: { type: Number, default: 0 },
+    proofRequested: { type: Boolean, default: false },
 });
 const page = usePage();
+
+const showProofModal = ref(false);
 
 const isAssignee = computed(() => {
     try {

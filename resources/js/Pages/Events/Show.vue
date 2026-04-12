@@ -1,9 +1,9 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
 import AssignmentDetailCard from '@/Components/AssignmentDetailCard.vue';
+import ProofRequestModal from '@/Components/ProofRequestModal.vue';
 import { Link, router } from '@inertiajs/vue3';
-import { computed } from 'vue';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { route } from 'ziggy-js';
 
 const props = defineProps({
@@ -14,9 +14,11 @@ const props = defineProps({
     lunch_start: { type: String, default: null },
     lunch_end: { type: String, default: null },
     lunch_overlap_minutes: { type: Number, default: 0 },
+    proof_requested: { type: Boolean, default: false },
 });
 
 const showCompleteModal = ref(false);
+const showProofModal = ref(false);
 
 const assignment = computed(() => props.event?.project_job_assignment ?? null);
 
@@ -185,6 +187,21 @@ const eventTypeLabel = computed(() => props.event?.event_item_type?.name ?? null
                         >
                             {{ isEventCompleted() ? '完了済み' : '完了する' }}
                         </button>
+
+                        <!-- 校正依頼ボタン（完了済みは非表示） -->
+                        <button
+                            v-if="!isEventCompleted() && !props.proof_requested"
+                            @click="showProofModal = true"
+                            class="inline-flex items-center gap-1.5 rounded border border-pink-300 bg-pink-50 px-3 py-1.5 text-sm font-medium text-pink-700 hover:bg-pink-100"
+                        >
+                            校正依頼
+                        </button>
+                        <span
+                            v-else-if="!isEventCompleted() && props.proof_requested"
+                            class="inline-flex items-center gap-1.5 rounded border border-gray-300 bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-400 cursor-not-allowed"
+                        >
+                            校正依頼済み
+                        </span>
                     </template>
                     <button @click="$router?.back ? $router.back() : window.history.back()"
                             class="ml-auto inline-flex items-center gap-1.5 rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">
@@ -199,6 +216,15 @@ const eventTypeLabel = computed(() => props.event?.event_item_type?.name ?? null
             </div>
 
         </div>
+
+        <!-- 校正依頼モーダル -->
+        <ProofRequestModal
+            :show="showProofModal"
+            :initial-title="assignment?.title || event.title || ''"
+            :project-job-assignment-id="event.project_job_assignment_id || null"
+            :project-job-id="assignment?.project_job_id || null"
+            @close="showProofModal = false"
+        />
 
         <!-- Coordinator割当 完了確認モーダル -->
         <div v-if="showCompleteModal"

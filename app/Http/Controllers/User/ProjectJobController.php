@@ -358,14 +358,26 @@ class ProjectJobController extends Controller
             ->get(['id', 'name', 'sort_order'])
             ->map(fn ($s) => ['id' => $s->id, 'name' => $s->name, 'sort_order' => $s->sort_order]);
 
+        // 校正依頼済みのアサインメントIDセット（ボタン無効化用）
+        $requestedAssignmentIds = [];
+        try {
+            $requestedAssignmentIds = \App\Models\ProofRequest::where('project_job_id', $projectJob->id)
+                ->whereNotNull('project_job_assignment_id')
+                ->whereNotIn('status', ['completed'])
+                ->pluck('project_job_assignment_id')
+                ->map(fn ($id) => (int) $id)
+                ->toArray();
+        } catch (\Throwable $e) {}
+
         return Inertia::render('User/ProjectJobs/Show', [
-            'job'             => $projectJob,
-            'subCoordinators' => $subCoordinators,
-            'members'         => $members,
-            'hasSchedule'     => $hasSchedule,
-            'schedules'       => $schedules,
-            'jobHistory'      => $jobHistory,
-            'progressSheets'  => $progressSheets,
+            'job'                    => $projectJob,
+            'subCoordinators'        => $subCoordinators,
+            'members'                => $members,
+            'hasSchedule'            => $hasSchedule,
+            'schedules'              => $schedules,
+            'jobHistory'             => $jobHistory,
+            'progressSheets'         => $progressSheets,
+            'requestedAssignmentIds' => $requestedAssignmentIds,
         ]);
     }
 }

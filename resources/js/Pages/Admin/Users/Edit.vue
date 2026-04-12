@@ -39,11 +39,12 @@ const page = usePage();
 const currentUser = computed(() => page.props.auth?.user ?? page.props.user ?? null);
 
 const userRoleOptions = [
-    { value: 'admin',       label: '管理者',   description: '全ての機能にアクセス可能' },
-    { value: 'leader',      label: 'リーダー', description: 'コンテンツ管理とユーザー機能にアクセス可能' },
-    { value: 'coordinator', label: '進行管理', description: 'タスク管理とユーザー機能にアクセス可能' },
-    { value: 'clerk',       label: 'クラーク（経理・事務）', description: '経理・事務機能にアクセス可能' },
-    { value: 'user',        label: 'ユーザー', description: '基本機能のみアクセス可能' },
+    { value: 'admin',             label: '管理者',             description: '全ての機能にアクセス可能' },
+    { value: 'leader',            label: 'リーダー',           description: 'コンテンツ管理とユーザー機能にアクセス可能' },
+    { value: 'coordinator',       label: '進行管理',           description: 'タスク管理とユーザー機能にアクセス可能' },
+    { value: 'proof_coordinator', label: '校正コーディネーター', description: '校正依頼の受理・割り振り管理が可能' },
+    { value: 'clerk',             label: 'クラーク（経理・事務）', description: '経理・事務機能にアクセス可能' },
+    { value: 'user',              label: 'ユーザー',           description: '基本機能のみアクセス可能' },
 ];
 
 const filteredRoleOptions = computed(() => {

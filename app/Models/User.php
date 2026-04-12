@@ -140,6 +140,22 @@ class User extends Authenticatable
     }
 
     /**
+     * Check if user is proof coordinator (校正コーディネーター)
+     */
+    public function isProofCoordinator(): bool
+    {
+        return $this->user_role === 'proof_coordinator';
+    }
+
+    /**
+     * 校正員かどうか（担当コードが kousei）
+     */
+    public function isProofreader(): bool
+    {
+        return $this->assignment?->code === 'kousei';
+    }
+
+    /**
      * Check if user is clerk (経理・事務)
      */
     public function isClerk(): bool
@@ -184,6 +200,22 @@ class User extends Authenticatable
     public function dispatchProfile()
     {
         return $this->hasOne(\App\Models\DispatchProfile::class);
+    }
+
+    /**
+     * 自分が依頼した校正依頼
+     */
+    public function proofRequestsAsRequester()
+    {
+        return $this->hasMany(\App\Models\ProofRequest::class, 'requester_id');
+    }
+
+    /**
+     * 自分が担当する校正依頼（校正員として）
+     */
+    public function proofRequestsAsProofreader()
+    {
+        return $this->hasMany(\App\Models\ProofRequest::class, 'proofreader_id');
     }
 
     /**

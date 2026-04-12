@@ -42,6 +42,7 @@ class ProjectJobAssignment extends Model
         'supersedes_assignment_id',
         'start_time',
         'subcontractor_id',
+        'job_type',
     ];
 
     protected $casts = [

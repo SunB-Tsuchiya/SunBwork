@@ -486,6 +486,27 @@ class ProjectJobController extends Controller
             ->orderByDesc('updated_at')
             ->get(['id', 'name']);
 
+        // 校正依頼履歴
+        $proofHistory = [];
+        try {
+            $proofHistory = \App\Models\ProofRequest::with(['requester', 'proofreader', 'proofCoordinator'])
+                ->where('project_job_id', $projectJob->id)
+                ->orderBy('created_at', 'desc')
+                ->get()
+                ->map(fn ($pr) => [
+                    'id'               => $pr->id,
+                    'title'            => $pr->title,
+                    'status'           => $pr->status,
+                    'deadline'         => $pr->deadline?->toIso8601String(),
+                    'requester_name'   => $pr->requester?->name,
+                    'proofreader_name' => $pr->proofreader?->name,
+                    'coordinator_name' => $pr->proofCoordinator?->name,
+                    'created_at'       => $pr->created_at?->toIso8601String(),
+                ])->toArray();
+        } catch (\Throwable $_) {
+            $proofHistory = [];
+        }
+
         return Inertia::render('Coordinator/ProjectJobs/Show', [
             'job' => $projectJob,
             'subCoordinators' => $subCoordinators,
@@ -499,6 +520,7 @@ class ProjectJobController extends Controller
             'progressSheets' => $progressSheets,
             'sheetTemplates' => $sheetTemplates,
             'sheetLinkedAssignmentIds' => $sheetLinkedAssignmentIds,
+            'proofHistory' => $proofHistory,
         ]);
     }
 
