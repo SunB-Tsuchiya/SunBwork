@@ -689,6 +689,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     ->name('proof.')
     ->group(function () {
         Route::get('calendar', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'calendarPublic'])->name('calendar');
+        Route::get('calendar/data', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'calendarUserData'])->name('calendar.data');
         Route::get('status', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'statusPublic'])->name('status');
     });
 

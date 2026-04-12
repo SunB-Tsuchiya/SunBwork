@@ -11,6 +11,8 @@ use App\Models\ProjectJob;
 use App\Models\ProjectJobAssignment;
 use App\Models\User;
 use App\Services\JobNotificationService;
+use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -707,11 +709,14 @@ class ProofRequestController extends Controller
      */
     public function calendarPublic(): Response
     {
+        $user = Auth::user();
+        $date = now()->setTimezone('Asia/Tokyo')->toDateString();
+
         $events = ProofRequest::with(['proofreader', 'projectJob'])
             ->whereNotNull('deadline')
             ->whereIn('status', ['pending', 'assigned', 'in_progress'])
             ->get()
-            ->map(fn($r) => [
+            ->map(fn ($r) => [
                 'id'          => $r->id,
                 'title'       => $r->title,
                 'start'       => $r->deadline->toDateString(),
@@ -721,8 +726,125 @@ class ProofRequestController extends Controller
             ]);
 
         return Inertia::render('Proof/Calendar', [
-            'events' => $events,
+            'events'         => $events,
+            'dailySchedules' => $this->getUserSchedulesForDate($user->id, $date),
+            'currentDate'    => $date,
+            'currentUser'    => ['id' => $user->id, 'name' => $user->name],
         ]);
+    }
+
+    /**
+     * GET /proof/calendar/data
+     * ユーザー向け日別スケジュール（AJAX・日付切り替え用）
+     */
+    public function calendarUserData(Request $request): JsonResponse
+    {
+        $user = Auth::user();
+        $date = $request->query('date', now()->setTimezone('Asia/Tokyo')->toDateString());
+
+        return response()->json([
+            'schedules' => $this->getUserSchedulesForDate($user->id, $date),
+        ]);
+    }
+
+    // ──────────────────────────────────────────────────────
+    //  Private helpers
+    // ──────────────────────────────────────────────────────
+
+    /** ユーザー自身に割り振られた日別スケジュールを取得 */
+    private function getUserSchedulesForDate(int $userId, string $date): array
+    {
+        $dayStart = Carbon::parse($date . ' 00:00:00', 'Asia/Tokyo')->utc();
+        $dayEnd   = Carbon::parse($date . ' 23:59:59', 'Asia/Tokyo')->utc();
+
+        // ① ProofSchedule（手動登録）- 自分のみ
+        $manual = ProofSchedule::with(['proofRequest.projectJob'])
+            ->where('user_id', $userId)
+            ->where(function ($q) use ($dayStart, $dayEnd) {
+                $q->whereBetween('starts_at', [$dayStart, $dayEnd])
+                  ->orWhereBetween('ends_at', [$dayStart, $dayEnd])
+                  ->orWhere(function ($q2) use ($dayStart, $dayEnd) {
+                      $q2->where('starts_at', '<=', $dayStart)
+                         ->where('ends_at', '>=', $dayEnd);
+                  });
+            })
+            ->orderBy('starts_at')
+            ->get()
+            ->map(fn ($s) => [
+                'id'               => $s->id,
+                'proof_request_id' => $s->proof_request_id,
+                'user_id'          => $s->user_id,
+                'starts_at'        => $this->toUtcIso($s->getRawOriginal('starts_at')),
+                'ends_at'          => $this->toUtcIso($s->getRawOriginal('ends_at')),
+                'title'            => $s->proofRequest?->title ?? '—',
+                'job_title'        => $s->proofRequest?->projectJob?->title ?? null,
+                'status'           => $s->proofRequest?->status ?? null,
+                'deadline'         => $s->proofRequest
+                    ? $this->toUtcIso($s->proofRequest->getRawOriginal('deadline'))
+                    : null,
+            ])
+            ->toArray();
+
+        // ② Event（pja101経由）- 自分のみ
+        $manualIds = collect($manual)->pluck('proof_request_id')->filter()->unique();
+
+        $activeRequests = ProofRequest::with(['projectJob'])
+            ->whereIn('status', ['assigned', 'in_progress'])
+            ->where('proofreader_id', $userId)
+            ->whereNotIn('id', $manualIds)
+            ->get();
+
+        $fromEvents = [];
+        foreach ($activeRequests as $pr) {
+            if (! $pr->proof_coordinator_id) continue;
+
+            $coordAssignment = ProjectJobAssignment::where('project_job_id', $pr->project_job_id)
+                ->where('user_id', $userId)
+                ->where('sender_id', $pr->proof_coordinator_id)
+                ->latest()->first();
+            if (! $coordAssignment) continue;
+
+            $selfJob = ProjectJobAssignment::whereColumn('sender_id', 'user_id')
+                ->where('user_id', $userId)
+                ->where(function ($q) use ($coordAssignment) {
+                    $q->where('source_assignment_id', $coordAssignment->id)
+                      ->orWhere('supersedes_assignment_id', $coordAssignment->id);
+                })
+                ->latest()->first();
+            if (! $selfJob) continue;
+
+            $events = Event::where('project_job_assignment_id', $selfJob->id)
+                ->where(function ($q) use ($dayStart, $dayEnd) {
+                    $q->whereBetween('starts_at', [$dayStart, $dayEnd])
+                      ->orWhereBetween('ends_at', [$dayStart, $dayEnd]);
+                })
+                ->orderBy('starts_at')
+                ->get();
+
+            foreach ($events as $ev) {
+                $fromEvents[] = [
+                    'id'               => 'ev_' . $ev->id,
+                    'proof_request_id' => $pr->id,
+                    'user_id'          => $userId,
+                    'starts_at'        => $this->toUtcIso($ev->getRawOriginal('starts_at')),
+                    'ends_at'          => $this->toUtcIso($ev->getRawOriginal('ends_at')),
+                    'title'            => $pr->title,
+                    'job_title'        => $pr->projectJob?->title ?? null,
+                    'status'           => $pr->status,
+                    'deadline'         => $this->toUtcIso($pr->getRawOriginal('deadline')),
+                    'from_event'       => true,
+                ];
+            }
+        }
+
+        return array_merge($manual, $fromEvents);
+    }
+
+    private function toUtcIso(?string $raw): ?string
+    {
+        if (! $raw) return null;
+
+        return Carbon::createFromFormat('Y-m-d H:i:s', $raw, 'UTC')->toIso8601String();
     }
 
     /**

@@ -26,10 +26,11 @@ class CalendarController extends Controller
         $date = $request->query('date', now()->setTimezone('Asia/Tokyo')->toDateString());
 
         return Inertia::render('ProofCoordinator/Calendar', [
-            'members'    => $this->getMembers(),
-            'schedules'  => $this->getSchedulesForDate($date),
-            'unassigned' => $this->getUnassigned(),
-            'date'       => $date,
+            'members'     => $this->getMembers(),
+            'schedules'   => $this->getSchedulesForDate($date),
+            'unassigned'  => $this->getUnassigned(),
+            'date'        => $date,
+            'monthEvents' => $this->getMonthEvents(),
         ]);
     }
 
@@ -203,6 +204,23 @@ class CalendarController extends Controller
                 'status'         => $r->status,
                 'requester_name' => $r->requester?->name,
                 'job_title'      => $r->projectJob?->title,
+            ])
+            ->toArray();
+    }
+
+    private function getMonthEvents(): array
+    {
+        return ProofRequest::with(['proofreader', 'projectJob'])
+            ->whereNotNull('deadline')
+            ->get()
+            ->map(fn ($r) => [
+                'id'          => $r->id,
+                'title'       => $r->title,
+                'start'       => Carbon::parse($r->getRawOriginal('deadline'), 'UTC')
+                                    ->setTimezone('Asia/Tokyo')->toDateString(),
+                'status'      => $r->status,
+                'proofreader' => $r->proofreader?->name,
+                'job_title'   => $r->projectJob?->title,
             ])
             ->toArray();
     }
