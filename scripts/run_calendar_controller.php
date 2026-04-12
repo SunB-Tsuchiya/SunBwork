@@ -6,10 +6,7 @@ $httpKernel->bootstrap();
 
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
-$request = Request::create('/calendar','GET');
-$app->instance('request', $request);
-// ensure session store/request binding for Auth guard
-\Illuminate\Support\Facades\Auth::shouldUse('web');
+
 Auth::loginUsingId(31);
 $ctrl = new \App\Http\Controllers\CalendarController();
 try {

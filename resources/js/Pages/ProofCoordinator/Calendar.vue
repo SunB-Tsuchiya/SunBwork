@@ -3,16 +3,58 @@ import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { router } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import ProofCoordinatorNavigationTabs from '@/Components/Tabs/ProofCoordinatorNavigationTabs.vue';
+import FullCalendar from '@fullcalendar/vue3';
+import dayGridPlugin from '@fullcalendar/daygrid';
+import jaLocale from '@fullcalendar/core/locales/ja';
 
 // ─────────────────────────────────────────────────────────────────
 //  Props
 // ─────────────────────────────────────────────────────────────────
 const props = defineProps({
-    members:    { type: Array,  default: () => [] },
-    schedules:  { type: Array,  default: () => [] },
-    unassigned: { type: Array,  default: () => [] },
-    date:       { type: String, default: '' },
+    members:     { type: Array,  default: () => [] },
+    schedules:   { type: Array,  default: () => [] },
+    unassigned:  { type: Array,  default: () => [] },
+    date:        { type: String, default: '' },
+    monthEvents: { type: Array,  default: () => [] },
 });
+
+// ─────────────────────────────────────────────────────────────────
+//  表示モード
+// ─────────────────────────────────────────────────────────────────
+const viewMode = ref('day'); // 'day' | 'month'
+
+// 月ビュー用
+const STATUS_COLORS_HEX = {
+    pending:     '#9ca3af',
+    assigned:    '#3b82f6',
+    in_progress: '#f97316',
+    completed:   '#22c55e',
+};
+
+const calendarEvents = computed(() =>
+    props.monthEvents.map(e => ({
+        id:    String(e.id),
+        title: `${e.title}${e.proofreader ? ' (' + e.proofreader + ')' : ''}`,
+        start: e.start,
+        color: STATUS_COLORS_HEX[e.status] ?? '#9ca3af',
+        extendedProps: e,
+    }))
+);
+
+const calendarOptions = computed(() => ({
+    plugins:      [dayGridPlugin],
+    initialView:  'dayGridMonth',
+    locale:       jaLocale,
+    events:       calendarEvents.value,
+    headerToolbar: {
+        left:   'prev,next today',
+        center: 'title',
+        right:  '',
+    },
+    eventContent: (arg) => ({
+        html: `<div class="overflow-hidden text-ellipsis whitespace-nowrap px-1 text-xs">${arg.event.title}</div>`,
+    }),
+}));
 
 // ─────────────────────────────────────────────────────────────────
 //  定数
@@ -535,35 +577,64 @@ onUnmounted(() => {
 
             <!-- ─── ツールバー ──────────────────────────────────────── -->
             <div class="flex flex-wrap items-center gap-3 bg-white px-4 py-3 shadow-sm sm:px-6 lg:px-8">
-                <!-- 日付ナビ -->
-                <button @click="prevDay"
-                    class="rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50">
-                    ◀ 前日
-                </button>
-                <span class="min-w-[180px] text-center text-sm font-semibold text-gray-800">
-                    {{ displayDate }}
-                </span>
-                <button @click="nextDay"
-                    class="rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50">
-                    翌日 ▶
-                </button>
-                <input
-                    type="date"
-                    :value="currentDate"
-                    @change="onDatePickerChange"
-                    class="rounded border-gray-300 text-sm"
-                />
-
-                <div class="ml-auto flex items-center gap-2">
-                    <label class="flex cursor-pointer items-center gap-1.5 text-sm text-gray-600">
-                        <input type="checkbox" v-model="hideScheduled" class="rounded border-gray-300" />
-                        登録済みを非表示
-                    </label>
+                <!-- 表示切り替え -->
+                <div class="flex overflow-hidden rounded border border-gray-300 text-sm">
+                    <button
+                        @click="viewMode = 'day'"
+                        :class="viewMode === 'day' ? 'bg-pink-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'"
+                        class="px-4 py-1.5 font-medium transition-colors">
+                        日ごと
+                    </button>
+                    <button
+                        @click="viewMode = 'month'"
+                        :class="viewMode === 'month' ? 'bg-pink-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'"
+                        class="border-l border-gray-300 px-4 py-1.5 font-medium transition-colors">
+                        月ごと
+                    </button>
                 </div>
+
+                <!-- 日付ナビ（日ごとのみ） -->
+                <template v-if="viewMode === 'day'">
+                    <button @click="prevDay"
+                        class="rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50">
+                        ◀ 前日
+                    </button>
+                    <span class="min-w-[180px] text-center text-sm font-semibold text-gray-800">
+                        {{ displayDate }}
+                    </span>
+                    <button @click="nextDay"
+                        class="rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50">
+                        翌日 ▶
+                    </button>
+                    <input
+                        type="date"
+                        :value="currentDate"
+                        @change="onDatePickerChange"
+                        class="rounded border-gray-300 text-sm"
+                    />
+                    <div class="ml-auto flex items-center gap-2">
+                        <label class="flex cursor-pointer items-center gap-1.5 text-sm text-gray-600">
+                            <input type="checkbox" v-model="hideScheduled" class="rounded border-gray-300" />
+                            登録済みを非表示
+                        </label>
+                    </div>
+                </template>
             </div>
 
-            <!-- ─── タイムライン ───────────────────────────────────── -->
-            <div class="timeline-wrapper overflow-x-auto" style="user-select: none;">
+            <!-- ─── 月ビュー ──────────────────────────────────────── -->
+            <div v-if="viewMode === 'month'" class="bg-white px-4 pb-6 pt-4 sm:px-6 lg:px-8">
+                <!-- 凡例 -->
+                <div class="mb-4 flex flex-wrap gap-3 text-xs">
+                    <span class="flex items-center gap-1"><span class="inline-block h-3 w-3 rounded-full bg-gray-400"></span>依頼中</span>
+                    <span class="flex items-center gap-1"><span class="inline-block h-3 w-3 rounded-full bg-blue-500"></span>割り当て済み</span>
+                    <span class="flex items-center gap-1"><span class="inline-block h-3 w-3 rounded-full bg-orange-500"></span>校正中</span>
+                    <span class="flex items-center gap-1"><span class="inline-block h-3 w-3 rounded-full bg-green-500"></span>完了</span>
+                </div>
+                <FullCalendar :options="calendarOptions" />
+            </div>
+
+            <!-- ─── タイムライン（日ごと） ────────────────────────── -->
+            <div v-if="viewMode === 'day'" class="timeline-wrapper overflow-x-auto" style="user-select: none;">
                 <div :style="{ minWidth: (MEMBER_W + 700) + 'px' }">
 
                     <!-- 時刻ヘッダー -->
