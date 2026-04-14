@@ -45,7 +45,7 @@ const initEcho = () => {
             pusher.config.auth.headers = pusher.config.auth.headers || {};
 
             // prefer axios POST which respects axios.defaults.withCredentials
-            pusher.config.authorizer = function (channel, options) {
+            pusher.config.authorizer = function (channel, _options) {
                 return {
                     authorize: function (socketId, callback) {
                         const payload = {

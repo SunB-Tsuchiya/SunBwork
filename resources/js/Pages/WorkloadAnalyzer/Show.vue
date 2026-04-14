@@ -86,17 +86,6 @@ const combinedTotals = computed(() => {
     };
 });
 
-// computed score derived from totals (assigned + self)
-const computedScore = computed(() => {
-    const a = props.totals?.assigned || {};
-    const s = props.totals?.self || {};
-    return {
-        work_hours: Number(a.work_hours || 0) + Number(s.work_hours || 0),
-        desired_hours: Number(a.desired_hours || 0) + Number(s.desired_hours || 0),
-        total_items: Number(a.total_items || 0) + Number(s.total_items || 0),
-    };
-});
-
 // Combined per-stage totals: prefer server-provided stage_data if present,
 // otherwise distribute the combined pages across known stages evenly.
 const combinedStageTotals = computed(() => {
@@ -122,121 +111,6 @@ const combinedStageTotals = computed(() => {
     return out;
 });
 
-// Build difficulty rows aligned with difficulties/difficulty_labels and stage_difficulty_rows
-const difficultyRows = computed(() => {
-    const labels = props.difficulty_labels || [];
-    const difObjs = props.difficulties || [];
-    const rawRows = props.stage_difficulty_rows || [];
-    const out = [];
-
-    // If server provided difficulties objects with ids, prefer that ordering and mapping
-    if (difObjs && difObjs.length) {
-        for (let i = 0; i < difObjs.length; i++) {
-            const d = difObjs[i];
-            let values = [];
-            // If rawRows is an object keyed by difficulty id (assoc mapping from server)
-            if (rawRows && typeof rawRows === 'object' && !Array.isArray(rawRows) && rawRows.hasOwnProperty(d.id)) {
-                values = rawRows[d.id] || [];
-            }
-            // If rawRows is an ordered array and lengths match, use by index
-            else if (Array.isArray(rawRows) && rawRows.length === difObjs.length) {
-                values = rawRows[i] || [];
-            }
-            // If rawRows is array but possibly keyed by id indices (sparse), try find by id key
-            else if (Array.isArray(rawRows) && rawRows[d.id]) {
-                values = rawRows[d.id] || [];
-            }
-            // fallback: empty values and use difficulty_data
-            const total =
-                values && values.length
-                    ? values.reduce((a, b) => a + Number(b || 0), 0)
-                    : props.difficulty_data && props.difficulty_data[i]
-                      ? Number(props.difficulty_data[i])
-                      : 0;
-            out.push({ label: d.name || labels[i] || `(${i})`, values, total });
-        }
-        return out;
-    }
-
-    // fallback: use difficulty_labels and aligned rawRows by index
-    // If per-stage rows are missing but we have per-stage totals, distribute
-    // the difficulty total across stages proportionally so the table aligns
-    // visually with the stage columns instead of showing a single colspan cell.
-    const stageTotals = (combinedStageTotals.value || []).map((v) => Number(v || 0));
-    const totalStageSum = stageTotals.reduce((a, b) => a + b, 0);
-
-    for (let i = 0; i < labels.length; i++) {
-        let values = Array.isArray(rawRows) ? rawRows[i] || [] : [];
-        let total = 0;
-
-        if (values && values.length) {
-            total = values.reduce((a, b) => a + Number(b || 0), 0);
-        } else if (props.difficulty_data && typeof props.difficulty_data[i] !== 'undefined') {
-            total = Number(props.difficulty_data[i] || 0);
-
-            // Distribute across stages proportionally if we have stage totals
-            if (stageTotals.length > 0 && totalStageSum > 0) {
-                values = stageTotals.map((st) => {
-                    // proportion of this stage
-                    const frac = st / totalStageSum;
-                    return Math.round(total * frac);
-                });
-
-                // Fix rounding to ensure sum(values) === total
-                const sumVals = values.reduce((a, b) => a + b, 0);
-                const diff = total - sumVals;
-                if (diff !== 0) {
-                    // add the remainder to the largest stage (or first non-zero)
-                    let idx = 0;
-                    let maxVal = values[0] || 0;
-                    for (let j = 1; j < values.length; j++) {
-                        if ((values[j] || 0) > maxVal) {
-                            maxVal = values[j];
-                            idx = j;
-                        }
-                    }
-                    values[idx] = (values[idx] || 0) + diff;
-                }
-            }
-        }
-
-        out.push({ label: labels[i], values, total });
-    }
-    return out;
-});
-
-// Column sums by stage (useful for bottom row)
-const stageColumnSums = computed(() => {
-    const cols = (props.stage_labels || []).length;
-    const rows = props.stage_difficulty_rows || [];
-    // If there are no per-stage difficulty rows, fallback to stage_data which holds per-stage totals
-    // compute sums from rows if possible
-    let sumsFromRows = Array.from({ length: cols }, () => 0);
-    let haveRows = Array.isArray(rows) && rows.length > 0;
-    if (haveRows) {
-        try {
-            for (const r of rows) {
-                for (let i = 0; i < cols; i++) {
-                    sumsFromRows[i] += Number((r || [])[i] || 0);
-                }
-            }
-        } catch (e) {
-            haveRows = false;
-            sumsFromRows = Array.from({ length: cols }, () => 0);
-        }
-    }
-
-    // totals for comparison
-    const totalFromRows = sumsFromRows.reduce((a, b) => a + Number(b || 0), 0);
-    const totalStageData = (props.stage_data || []).reduce((a, b) => a + Number(b || 0), 0);
-
-    // If row-derived totals mismatch stage_data totals (and stage_data has positive total), prefer stage_data
-    if (!haveRows || (totalStageData > 0 && Math.abs(totalFromRows - totalStageData) > 0)) {
-        return (props.stage_data || []).map((v) => Number(v || 0));
-    }
-
-    return sumsFromRows;
-});
 // chart refs for summary section
 const radarChartRef = ref(null);
 const rankingChartRef = ref(null);
@@ -281,9 +155,6 @@ const deviationColorClass = computed(() => {
     if (v >= 40) return 'text-yellow-600';
     return 'text-red-600';
 });
-
-// overtime total points (from server, raw)
-const totalOvertimePoints = computed(() => Number(props.total_overtime_points || 0));
 
 // Percentile-based overall score (0–600) — fair cross-category comparison
 const overallPoints = computed(() => Number(props.percentile_scores?.overall || 0));
@@ -438,8 +309,8 @@ const buildOvertimeChart = () => {
 };
 
 onMounted(() => {
-    try { buildSummaryCharts(); } catch (e) { /* ignore */ }
-    try { buildOvertimeChart(); } catch (e) { /* ignore */ }
+    try { buildSummaryCharts(); } catch { /* ignore */ }
+    try { buildOvertimeChart(); } catch { /* ignore */ }
 });
 </script>
 

@@ -288,10 +288,6 @@ function applyGroupEdit() {
     showGroupEditModal.value = false;
 }
 
-function groupLabel(key) {
-    if (!groupConfig.value) return String(key ?? 'グループなし');
-    return groupConfig.value.labels[key] ?? (key !== null ? String(key) : 'グループなし');
-}
 // ---------------------------------
 
 const { showToast, showValidationErrors } = useToasts();

@@ -47,7 +47,7 @@ import { onBeforeUnmount, onMounted, useSlots, ref as vueRef, watch } from 'vue'
 
 const page = usePage();
 // shared toast API (shared composable)
-const { showToast } = useToasts();
+useToasts();
 // Keep `user` available for templates (many pages pass a `user` prop).
 // Use `authUser` for realtime subscriptions to avoid subscribing to the
 // resource being viewed when it's not the logged-in user.
@@ -61,13 +61,11 @@ try {
     provide('authUser', authUser);
     provide('user', user);
     // Provide without verbose debug logging in production
-} catch (e) {
+} catch {
     // provide may fail in some SSR or test contexts; non-fatal
 }
 // Use unread_messages_count as the single notification source; job_requests are being
 // migrated to Messages so we stop subscribing to jobrequests channel here.
-const inboxCount = vueRef(0); // legacy placeholder
-const inboxToast = vueRef('');
 const unreadMessages = vueRef(page.props.user?.unread_messages_count || 0);
 // job-specific unread count provided by server when available
 const unreadJobMessages = vueRef(page.props.user?.unread_job_messages_count || 0);
@@ -91,38 +89,6 @@ watch(
         unreadJobMessages.value = v || 0;
     },
 );
-// compute a safe href for the Job link to avoid complex inline ternaries in template
-const jobLink = computed(() => {
-    try {
-        // Prefer the named Ziggy route for the JobBox index if available
-        if (typeof route === 'function' && route().has && route().has('coordinator.jobbox')) {
-            try {
-                return route('coordinator.jobbox');
-            } catch (e) {
-                // ignore and fall back to literal path
-            }
-        }
-
-        // Fallback to a literal path that maps to Pages/JobBox/Index.vue in the SPA router
-        return '/coordinator/jobbox';
-    } catch (e) {
-        // final fallback
-    }
-
-    try {
-        return route('dashboard');
-    } catch (e) {
-        return '#';
-    }
-});
-// handle job link clicks with error trapping so we can surface the actual exception
-const handleJobClick = (e) => {
-    try {
-        // Let the browser handle the actual navigation (do not prevent default)
-    } catch (err) {
-        // swallow errors to avoid unwinding Vue native handler
-    }
-};
 let echoChannel = null;
 
 onMounted(() => {
@@ -148,7 +114,7 @@ onMounted(() => {
                         unreadMessages.value = Math.max(0, (unreadMessages.value || 0) - 1);
                         window.dispatchEvent(new CustomEvent('message:read', { detail: { message_id: e.message_id } }));
                     }
-                } catch (err) {}
+                } catch {}
             });
 
             // job-specific channel: separate unread counter and events
@@ -162,18 +128,18 @@ onMounted(() => {
                     // include jam id or job_assignment_message_id when present so clients can dedupe
                     const jid = e.job_assignment_message_id || e.message_id || (e.jam && e.jam.id) || null;
                     window.dispatchEvent(new CustomEvent('message:received', { detail: { message: msg, id: jid, origin: 'job' } }));
-                } catch (err) {
+                } catch {
                     // non-fatal
                 }
             });
-            window.Echo.private('jobmessages.' + authUser.id).listen('JobMessageRead', (e) => {
+            window.Echo.private('jobmessages.' + authUser.id).listen('JobMessageRead', () => {
                 try {
                     unreadJobMessages.value = Math.max(0, (unreadJobMessages.value || 0) - 1);
-                } catch (err) {}
+                } catch {}
             });
             // AssignmentStatusToast is handled centrally by ToastUnified.vue (subscribe to "toasts" channel)
         }
-    } catch (err) {
+    } catch {
         // Echo subscribe failed (non-fatal)
     }
 });
@@ -185,10 +151,9 @@ onBeforeUnmount(() => {
             window.Echo.leavePrivate('messages.' + authUser.id);
             echoChannel = null;
         }
-    } catch (err) {}
+    } catch {}
 });
 const slots = useSlots();
-const hasTabsSlot = !!slots.tabs;
 // Debug logs removed for production
 
 // Determine an "active" key for top tabs based on current route name
@@ -212,7 +177,7 @@ const getTopTabActive = () => {
         if (r.includes('user.jobbox')) return 'jobbox';
         if (r.includes('profile')) return 'profile';
         return '';
-    } catch (e) {
+    } catch {
         return '';
     }
 };
@@ -256,7 +221,7 @@ const computeCoordinatorActive = () => {
         // explicit project_jobs routes (index/show/create/edit) → projects tab
         if (r.match(/^coordinator\.project_jobs\.(index|show|create|edit|store|update|destroy|complete)$/)) return 'projects';
         return '';
-    } catch (e) {
+    } catch {
         return '';
     }
 };
@@ -276,7 +241,7 @@ const currentRouteContext = computed(() => {
         // user.project_jobs.* / user.jobbox.* は user エリア
         // それ以外の user.* も user エリア
         return 'user';
-    } catch (e) {
+    } catch {
         return page.props.auth?.user?.user_role || 'user';
     }
 });

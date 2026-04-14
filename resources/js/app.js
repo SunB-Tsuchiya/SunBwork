@@ -20,7 +20,7 @@ const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
         if (window.axios) {
             await window.axios.get('/sanctum/csrf-cookie');
         }
-    } catch (e) {
+    } catch {
         // ignore - we'll still mount the app even if CSRF fetch fails
     }
 
