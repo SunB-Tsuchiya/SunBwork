@@ -6,6 +6,7 @@ use App\Models\AdminPermission;
 use App\Models\AnnouncementRecipient;
 use App\Models\JobNotification;
 use App\Models\LeaderPermission;
+use App\Models\ProofTeamMember;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -89,6 +90,10 @@ class HandleInertiaRequests extends Middleware
                 'leaderPermissions' => $request->user()?->isLeader()
                     ? LeaderPermission::where('user_id', $request->user()->id)->first()
                     : null,
+                // 校正チームメンバーフラグ
+                'isProofMember' => $request->user()
+                    ? ProofTeamMember::where('user_id', $request->user()->id)->exists()
+                    : false,
             ],
         ];
     }

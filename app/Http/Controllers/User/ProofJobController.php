@@ -1,0 +1,234 @@
+<?php
+
+namespace App\Http\Controllers\User;
+
+use App\Http\Controllers\Controller;
+use App\Models\Event;
+use App\Models\ProofRequest;
+use App\Models\ProofSchedule;
+use App\Models\ProjectJobAssignment;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Inertia\Inertia;
+use Inertia\Response;
+
+class ProofJobController extends Controller
+{
+    // ──────────────────────────────────────────────────────
+    //  一覧
+    // ──────────────────────────────────────────────────────
+    public function index(): Response
+    {
+        $user = Auth::user();
+
+        $proofRequests = ProofRequest::with(['requester', 'projectJob'])
+            ->where('proofreader_id', $user->id)
+            ->whereIn('status', ['assigned', 'in_progress', 'completed'])
+            ->orderByRaw("FIELD(status, 'in_progress', 'assigned', 'completed')")
+            ->orderBy('deadline')
+            ->get()
+            ->map(function ($pr) {
+                $pja100 = ProjectJobAssignment::where('project_job_id', $pr->project_job_id)
+                    ->where('user_id', $pr->proofreader_id)
+                    ->where('sender_id', $pr->proof_coordinator_id)
+                    ->latest()->first();
+
+                $pja101 = null;
+                $workSlots = [];
+                if ($pja100) {
+                    $pja101 = ProjectJobAssignment::whereColumn('sender_id', 'user_id')
+                        ->where(function ($q) use ($pja100) {
+                            $q->where('source_assignment_id', $pja100->id)
+                              ->orWhere('supersedes_assignment_id', $pja100->id);
+                        })->latest()->first();
+
+                    if ($pja101) {
+                        $workSlots = Event::where('project_job_assignment_id', $pja101->id)
+                            ->orderBy('starts_at')
+                            ->get()
+                            ->map(fn ($ev) => [
+                                'date'      => $ev->date ?? substr($ev->start, 0, 10),
+                                'startTime' => substr($ev->start, 11, 5),
+                                'endTime'   => substr($ev->end, 11, 5),
+                            ])->toArray();
+                    }
+                }
+
+                return [
+                    'id'             => $pr->id,
+                    'title'          => $pr->title,
+                    'status'         => $pr->status,
+                    'deadline'       => $pr->deadline?->toIso8601String(),
+                    'requester_name' => $pr->requester?->name,
+                    'job_title'      => $pr->projectJob?->title,
+                    'is_set'         => $pja101 !== null,
+                    'work_slots'     => $workSlots,
+                ];
+            })->toArray();
+
+        return Inertia::render('User/ProofJobs/Index', [
+            'proofRequests' => $proofRequests,
+        ]);
+    }
+
+    // ──────────────────────────────────────────────────────
+    //  セットページ（フォーム表示）
+    // ──────────────────────────────────────────────────────
+    public function setPage(ProofRequest $proofRequest): Response
+    {
+        $user = Auth::user();
+        abort_if($proofRequest->proofreader_id !== $user->id, 403);
+
+        // pja100 を取得
+        $pja100 = ProjectJobAssignment::with(['projectJob', 'user', 'statusModel'])
+            ->where('project_job_id', $proofRequest->project_job_id)
+            ->where('user_id', $proofRequest->proofreader_id)
+            ->where('sender_id', $proofRequest->proof_coordinator_id)
+            ->latest()->first();
+
+        // 既存の作業スロット取得
+        $existingSlots = [];
+        if ($pja100) {
+            $pja101 = ProjectJobAssignment::whereColumn('sender_id', 'user_id')
+                ->where(function ($q) use ($pja100) {
+                    $q->where('source_assignment_id', $pja100->id)
+                      ->orWhere('supersedes_assignment_id', $pja100->id);
+                })->latest()->first();
+
+            if ($pja101) {
+                $existingSlots = Event::where('project_job_assignment_id', $pja101->id)
+                    ->orderBy('starts_at')
+                    ->get()
+                    ->map(fn ($ev) => [
+                        'date'        => $ev->date ?? substr($ev->start, 0, 10),
+                        'startHour'   => substr($ev->start, 11, 2),
+                        'startMinute' => substr($ev->start, 14, 2),
+                        'endHour'     => substr($ev->end, 11, 2),
+                        'endMinute'   => substr($ev->end, 14, 2),
+                    ])->toArray();
+            }
+        }
+
+        $types        = \App\Models\WorkItemType::orderBy('sort_order')->get(['id', 'name', 'group']);
+        $sizes        = \App\Models\Size::orderBy('sort_order')->get(['id', 'name', 'group']);
+        $stages       = \App\Models\Stage::orderBy('sort_order')->get(['id', 'name']);
+        $statuses     = \App\Models\Status::orderBy('sort_order')->get(['id', 'name', 'key']);
+        $difficulties = \App\Models\Difficulty::orderBy('sort_order')->get(['id', 'name']);
+        $companies    = \App\Models\Company::orderBy('name')->get(['id', 'name']);
+
+        return Inertia::render('User/ProofJobs/Set', [
+            'proofRequest' => [
+                'id'          => $proofRequest->id,
+                'title'       => $proofRequest->title,
+                'deadline'    => $proofRequest->deadline?->toIso8601String(),
+                'status'      => $proofRequest->status,
+                'note'        => $proofRequest->note,
+                'requester'   => $proofRequest->requester,
+                'project_job' => $proofRequest->projectJob,
+            ],
+            'assignment'        => $pja100,
+            'projectJob'        => $pja100?->projectJob,
+            'members'           => [['id' => $user->id, 'name' => $user->name]],
+            'assignments_data'  => $pja100 ? [$pja100->toArray()] : [],
+            'existingSlots'     => $existingSlots,
+            'types'             => $types,
+            'sizes'             => $sizes,
+            'stages'            => $stages,
+            'statuses'          => $statuses,
+            'difficulties'      => $difficulties,
+            'companies'         => $companies,
+            'user_role'         => $user->user_role,
+            'user_company_id'   => $user->company_id,
+            'user_department_id' => $user->department_id,
+        ]);
+    }
+
+    // ──────────────────────────────────────────────────────
+    //  セット保存
+    // ──────────────────────────────────────────────────────
+    public function set(Request $request, ProofRequest $proofRequest)
+    {
+        $user = Auth::user();
+        abort_if($proofRequest->proofreader_id !== $user->id, 403);
+
+        $slots = $request->input('work_slots', []);
+
+        $pja100 = ProjectJobAssignment::where('project_job_id', $proofRequest->project_job_id)
+            ->where('user_id', $proofRequest->proofreader_id)
+            ->where('sender_id', $proofRequest->proof_coordinator_id)
+            ->latest()->first();
+
+        if (! $pja100) {
+            return back()->with('error', '割り当て情報が見つかりません。');
+        }
+
+        // pja101 取得または作成
+        $pja101 = ProjectJobAssignment::whereColumn('sender_id', 'user_id')
+            ->where(function ($q) use ($pja100) {
+                $q->where('source_assignment_id', $pja100->id)
+                  ->orWhere('supersedes_assignment_id', $pja100->id);
+            })->latest()->first();
+
+        if (! $pja101) {
+            $pja101 = ProjectJobAssignment::create([
+                'project_job_id'       => $proofRequest->project_job_id,
+                'user_id'              => $user->id,
+                'sender_id'            => $user->id,
+                'source_assignment_id' => $pja100->id,
+                'job_type'             => 'proof',
+                'title'                => $proofRequest->title,
+                'scheduled'            => ! empty($slots),
+                'scheduled_at'         => ! empty($slots) ? now() : null,
+            ]);
+        } else {
+            $pja101->update([
+                'scheduled'    => ! empty($slots),
+                'scheduled_at' => ! empty($slots) ? now() : $pja101->scheduled_at,
+            ]);
+        }
+
+        // 既存イベント・ProofSchedule 削除 → 再作成
+        Event::where('project_job_assignment_id', $pja101->id)->delete();
+        ProofSchedule::where('proof_request_id', $proofRequest->id)
+            ->where('user_id', $user->id)
+            ->delete();
+
+        foreach ($slots as $slot) {
+            if (empty($slot['date'])) continue;
+
+            $date = $slot['date'];
+            $sH   = str_pad($slot['startHour'],   2, '0', STR_PAD_LEFT);
+            $sM   = str_pad($slot['startMinute'], 2, '0', STR_PAD_LEFT);
+            $eH   = str_pad($slot['endHour'],     2, '0', STR_PAD_LEFT);
+            $eM   = str_pad($slot['endMinute'],   2, '0', STR_PAD_LEFT);
+
+            $startsAt = \Carbon\Carbon::parse("{$date} {$sH}:{$sM}:00", 'Asia/Tokyo')->utc();
+            $endsAt   = \Carbon\Carbon::parse("{$date} {$eH}:{$eM}:00", 'Asia/Tokyo')->utc();
+
+            Event::create([
+                'user_id'                   => $user->id,
+                'project_job_assignment_id' => $pja101->id,
+                'date'                      => $date,
+                'start'                     => "{$date} {$sH}:{$sM}:00",
+                'end'                       => "{$date} {$eH}:{$eM}:00",
+                'starts_at'                 => $startsAt,
+                'ends_at'                   => $endsAt,
+                'title'                     => $proofRequest->title,
+            ]);
+
+            ProofSchedule::create([
+                'proof_request_id' => $proofRequest->id,
+                'user_id'          => $user->id,
+                'starts_at'        => $startsAt,
+                'ends_at'          => $endsAt,
+            ]);
+        }
+
+        if ($proofRequest->status === 'assigned' && ! empty($slots)) {
+            $proofRequest->update(['status' => 'in_progress']);
+        }
+
+        return redirect()->route('user.proof_jobs.index')
+            ->with('success', '校正をセットしました。');
+    }
+}

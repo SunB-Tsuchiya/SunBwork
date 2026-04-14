@@ -203,13 +203,39 @@
                         >
                     </div>
                 </section>
+
+                <!-- ── 校正依頼セクション ──────────────────────── -->
+                <section class="py-5">
+                    <div class="mb-3 flex flex-wrap items-center gap-4">
+                        <h3 class="font-semibold text-gray-800">校正依頼</h3>
+                        <button
+                            v-if="!job.completed"
+                            @click="openProofModal(null)"
+                            class="rounded border border-pink-300 bg-pink-50 px-3 py-1.5 text-sm font-medium text-pink-700 hover:bg-pink-100"
+                        >
+                            + 校正依頼を送る
+                        </button>
+                    </div>
+                    <p class="text-sm text-gray-400">
+                        この案件に関する校正は「校正状況」タブから確認できます。
+                    </p>
+                </section>
             </div>
             <!-- /divide-y -->
         </div>
+
+        <ProofRequestModal
+            :show="showProofModal"
+            :initial-title="proofTargetAssignment?.title || job.title || ''"
+            :project-job-assignment-id="proofTargetAssignment?.id || null"
+            :project-job-id="job.id || null"
+            @close="showProofModal = false"
+        />
     </AppLayout>
 </template>
 
 <script setup>
+import ProofRequestModal from '@/Components/ProofRequestModal.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { router, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
@@ -217,6 +243,14 @@ import { route } from 'ziggy-js';
 
 const page = usePage();
 const job = page.props.job || {};
+
+const showProofModal = ref(false);
+const proofTargetAssignment = ref(null);
+
+function openProofModal(assignment = null) {
+    proofTargetAssignment.value = assignment;
+    showProofModal.value = true;
+}
 const schedules = computed(() => (Array.isArray(page.props.schedules) ? page.props.schedules : []));
 const members = page.props.members || [];
 const hasMembers = computed(() => Array.isArray(members) && members.length > 0);

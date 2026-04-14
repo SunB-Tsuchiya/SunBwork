@@ -189,7 +189,7 @@ onMounted(async () => {
     try {
         const date = formatJstDate(props.diary.date);
         // include the diary owner's user_id so leaders/admins can fetch that user's events
-        const resp = await axios.get('/events', { params: { date, user_id: props.diary.user_id } });
+        const resp = await axios.get(route('events.index'), { params: { date, user_id: props.diary.user_id } });
         events.value = (resp.data || []).map((e) => ({
             id: e.id ?? e.event_id ?? e._id ?? null,
             title: e.title || e.name || '(無題)',
@@ -380,7 +380,7 @@ async function updateComment() {
 
             <div class="space-y-5">
                 <!-- 日報本文 -->
-                <div class="prose max-h-52 overflow-y-auto rounded border p-3 text-sm" v-html="props.diary.content"></div>
+                <div class="max-h-52 overflow-y-auto rounded border p-3 text-sm diary-content mx-auto" v-html="props.diary.content"></div>
 
                 <!-- 当日の予定（全幅） -->
                 <div>
@@ -462,3 +462,20 @@ async function updateComment() {
         </div>
     </AppLayout>
 </template>
+
+<style scoped>
+/* 日報本文の幅とタイポグラフィ調整 */
+.diary-content {
+    width: 80%;
+}
+.diary-content p {
+    /* 段落間 margin は 1.5em */
+    margin-bottom: 1.5em;
+    /* 行間を狭める（デフォルトより詰める）*/
+    line-height: 1.25;
+}
+.diary-content * {
+    /* 子要素の行間も調整して統一感を出す */
+    line-height: 1.25;
+}
+</style>

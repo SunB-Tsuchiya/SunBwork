@@ -105,6 +105,7 @@ const props = defineProps({
     endHour: { type: Number, default: 20 },
     editable: { type: Boolean, default: true },
     pxPerMinute: { type: Number, default: 1.5 },
+    laneToleranceMinutes: { type: Number, default: 5 },
 });
 
 const emit = defineEmits(['update:events', 'open-create', 'open-edit']);
@@ -167,12 +168,13 @@ const eventLanes = computed(() => {
     const sorted = [...nonAllDay].sort((a, b) => new Date(a.start) - new Date(b.start));
     const laneEndTimes = [];
     const result = new Map();
+    const toleranceMs = (props.laneToleranceMinutes || 0) * 60 * 1000;
     for (const ev of sorted) {
         const startMs = new Date(ev.start).getTime();
         const endMs = new Date(ev.end || ev.start).getTime();
         let lane = -1;
         for (let i = 0; i < laneEndTimes.length; i++) {
-            if (laneEndTimes[i] <= startMs) { lane = i; break; }
+            if (laneEndTimes[i] + toleranceMs <= startMs) { lane = i; break; }
         }
         if (lane === -1) lane = laneEndTimes.length;
         laneEndTimes[lane] = endMs;

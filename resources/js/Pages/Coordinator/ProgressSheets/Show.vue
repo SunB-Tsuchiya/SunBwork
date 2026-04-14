@@ -68,6 +68,16 @@
         >
           変更を保存 ({{ pendingCells.length }})
         </button>
+
+        <!-- 校正依頼ボタン -->
+        <button
+          v-if="!projectJob.completed"
+          type="button"
+          class="rounded border border-pink-300 bg-pink-50 px-3 py-1.5 text-sm font-medium text-pink-700 hover:bg-pink-100"
+          @click="showProofModal = true"
+        >
+          校正依頼
+        </button>
       </div>
 
       <!-- ── 編集モード：行管理 + 列ツリー ──────────────── -->
@@ -449,6 +459,13 @@
       </div>
     </div>
 
+    <ProofRequestModal
+      :show="showProofModal"
+      :initial-title="proofTargetAssignment?.title || projectJob?.title || ''"
+      :project-job-assignment-id="proofTargetAssignment?.id || null"
+      :project-job-id="projectJob?.id || null"
+      @close="showProofModal = false; proofTargetAssignment = null"
+    />
   </AppLayout>
 </template>
 
@@ -458,6 +475,7 @@ import { Link, router, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import ProgressTable from '@/Components/ProgressTable.vue';
 import ColumnTreeEditor from '@/Components/ColumnTreeEditor.vue';
+import ProofRequestModal from '@/Components/ProofRequestModal.vue';
 
 const props = defineProps({
   sheet: Object,
@@ -501,6 +519,8 @@ onUnmounted(() => {
 const editMode = ref(props.canEdit && (props.sheet.column_config?.length ?? 0) === 0);
 const localSheetName = ref(props.sheet.name ?? '');
 const showRegisterModal = ref(false);
+const showProofModal = ref(false);
+const proofTargetAssignment = ref(null);
 const registerTemplateName = ref('');
 const newRowLabel = ref('');
 const importText = ref('');

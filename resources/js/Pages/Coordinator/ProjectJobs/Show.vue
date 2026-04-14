@@ -379,6 +379,40 @@
                     <p v-else class="text-sm text-gray-400">進行管理表なし</p>
                 </section>
 
+                <!-- 校正依頼履歴 -->
+                <section v-if="(page.props.proofHistory || []).length > 0" class="py-4">
+                    <h3 class="mb-3 text-sm font-semibold text-gray-700">校正依頼履歴</h3>
+                    <table class="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">タイトル</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">校正者</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">締め切り</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">ステータス</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200 bg-white">
+                            <tr v-for="pr in (page.props.proofHistory || [])" :key="pr.id" class="hover:bg-gray-50">
+                                <td class="px-3 py-2 font-medium text-gray-900">{{ pr.title }}</td>
+                                <td class="px-3 py-2 text-gray-600">{{ pr.proofreader_name ?? '—' }}</td>
+                                <td class="px-3 py-2 text-gray-500 whitespace-nowrap">
+                                    {{ pr.deadline ? new Date(pr.deadline).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: 'numeric', day: 'numeric' }) : '—' }}
+                                </td>
+                                <td class="px-3 py-2">
+                                    <span :class="{
+                                        'bg-gray-100 text-gray-700':     pr.status === 'pending',
+                                        'bg-blue-100 text-blue-800':     pr.status === 'assigned',
+                                        'bg-pink-100 text-pink-800':     pr.status === 'in_progress',
+                                        'bg-yellow-100 text-yellow-800': pr.status === 'completed',
+                                    }" class="rounded-full px-2 py-0.5 text-xs font-semibold">
+                                        {{ { pending: '受理待ち', assigned: '割り当て済み', in_progress: '校正中', completed: '完了' }[pr.status] ?? pr.status }}
+                                    </span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </section>
+
             </div><!-- /divide-y -->
         </div>
     </AppLayout>

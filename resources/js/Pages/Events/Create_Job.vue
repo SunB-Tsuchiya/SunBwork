@@ -166,6 +166,10 @@ watch(showModal, (val) => {
     }
 });
 
+function fmt(val) {
+    return val ?? '-';
+}
+
 async function fetchClientsOnly() {
     try {
         const res = await fetch(route('user.myjobbox.past_data') + '?mode=project&hide_completed=0', {

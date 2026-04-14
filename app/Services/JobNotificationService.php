@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\JobNotification;
 use App\Models\ProjectJob;
 use App\Models\ProjectJobAssignment;
+use App\Models\ProofRequest;
 use App\Models\User;
 use Illuminate\Support\Facades\Log;
 
@@ -174,6 +175,74 @@ class JobNotificationService
             }
         } catch (\Throwable $e) {
             Log::warning('JobNotification create failed (progress_completed)', ['error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * ⑤ 校正依頼通知
+     * proof_coordinator ロールの全ユーザーへ:
+     * 「〇〇さんから「タイトル」の校正依頼が届きました」
+     */
+    public static function notifyProofRequested(User $requester, ProofRequest $proofRequest): void
+    {
+        try {
+            $proofCoordinators = User::where('user_role', 'proof_coordinator')->get();
+            foreach ($proofCoordinators as $pc) {
+                JobNotification::create([
+                    'type'           => 'proof_requested',
+                    'sender_id'      => $requester->id,
+                    'recipient_id'   => $pc->id,
+                    'project_job_id' => $proofRequest->project_job_id,
+                    'assignment_id'  => $proofRequest->project_job_assignment_id,
+                    'message'        => "{$requester->name}さんから「{$proofRequest->title}」の校正依頼が届きました",
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('JobNotification create failed (proof_requested)', ['error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * ⑥ 校正員割り当て通知（PCあり校正員へ）
+     * 「「タイトル」の校正が割り当てられました」
+     */
+    public static function notifyProofAssigned(User $proofCoordinator, ProofRequest $proofRequest): void
+    {
+        if (! $proofRequest->proofreader_id) {
+            return;
+        }
+
+        try {
+            JobNotification::create([
+                'type'           => 'proof_assigned',
+                'sender_id'      => $proofCoordinator->id,
+                'recipient_id'   => $proofRequest->proofreader_id,
+                'project_job_id' => $proofRequest->project_job_id,
+                'assignment_id'  => $proofRequest->project_job_assignment_id,
+                'message'        => "「{$proofRequest->title}」の校正が割り当てられました",
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('JobNotification create failed (proof_assigned)', ['error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * ⑦ 校正完了通知（依頼者へ）
+     * 「「タイトル」の校正が完了しました」
+     */
+    public static function notifyProofCompleted(User $completedBy, ProofRequest $proofRequest): void
+    {
+        try {
+            JobNotification::create([
+                'type'           => 'proof_completed',
+                'sender_id'      => $completedBy->id,
+                'recipient_id'   => $proofRequest->requester_id,
+                'project_job_id' => $proofRequest->project_job_id,
+                'assignment_id'  => $proofRequest->project_job_assignment_id,
+                'message'        => "「{$proofRequest->title}」の校正が完了しました",
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('JobNotification create failed (proof_completed)', ['error' => $e->getMessage()]);
         }
     }
 }

@@ -8,6 +8,7 @@ import AdminNavigationTabs from '@/Components/Tabs/AdminNavigationTabs.vue';
 import ClerkNavigationTabs from '@/Components/Tabs/ClerkNavigationTabs.vue';
 import CoordinatorNavigationTabs from '@/Components/Tabs/CoordinatorNavigationTabs.vue';
 import LeaderNavigationTabs from '@/Components/Tabs/LeaderNavigationTabs.vue';
+import ProofCoordinatorNavigationTabs from '@/Components/Tabs/ProofCoordinatorNavigationTabs.vue';
 import SuperAdminNavigationTabs from '@/Components/Tabs/SuperAdminNavigationTabs.vue';
 import UserNavigationTabs from '@/Components/Tabs/UserNavigationTabs.vue';
 import ToastUnified from '@/Components/ToastUnified.vue';
@@ -46,7 +47,7 @@ import { onBeforeUnmount, onMounted, useSlots, ref as vueRef, watch } from 'vue'
 
 const page = usePage();
 // shared toast API (shared composable)
-const { showToast } = useToasts();
+useToasts();
 // Keep `user` available for templates (many pages pass a `user` prop).
 // Use `authUser` for realtime subscriptions to avoid subscribing to the
 // resource being viewed when it's not the logged-in user.
@@ -60,13 +61,11 @@ try {
     provide('authUser', authUser);
     provide('user', user);
     // Provide without verbose debug logging in production
-} catch (e) {
+} catch {
     // provide may fail in some SSR or test contexts; non-fatal
 }
 // Use unread_messages_count as the single notification source; job_requests are being
 // migrated to Messages so we stop subscribing to jobrequests channel here.
-const inboxCount = vueRef(0); // legacy placeholder
-const inboxToast = vueRef('');
 const unreadMessages = vueRef(page.props.user?.unread_messages_count || 0);
 // job-specific unread count provided by server when available
 const unreadJobMessages = vueRef(page.props.user?.unread_job_messages_count || 0);
@@ -90,38 +89,6 @@ watch(
         unreadJobMessages.value = v || 0;
     },
 );
-// compute a safe href for the Job link to avoid complex inline ternaries in template
-const jobLink = computed(() => {
-    try {
-        // Prefer the named Ziggy route for the JobBox index if available
-        if (typeof route === 'function' && route().has && route().has('coordinator.jobbox')) {
-            try {
-                return route('coordinator.jobbox');
-            } catch (e) {
-                // ignore and fall back to literal path
-            }
-        }
-
-        // Fallback to a literal path that maps to Pages/JobBox/Index.vue in the SPA router
-        return '/coordinator/jobbox';
-    } catch (e) {
-        // final fallback
-    }
-
-    try {
-        return route('dashboard');
-    } catch (e) {
-        return '#';
-    }
-});
-// handle job link clicks with error trapping so we can surface the actual exception
-const handleJobClick = (e) => {
-    try {
-        // Let the browser handle the actual navigation (do not prevent default)
-    } catch (err) {
-        // swallow errors to avoid unwinding Vue native handler
-    }
-};
 let echoChannel = null;
 
 onMounted(() => {
@@ -147,7 +114,7 @@ onMounted(() => {
                         unreadMessages.value = Math.max(0, (unreadMessages.value || 0) - 1);
                         window.dispatchEvent(new CustomEvent('message:read', { detail: { message_id: e.message_id } }));
                     }
-                } catch (err) {}
+                } catch {}
             });
 
             // job-specific channel: separate unread counter and events
@@ -161,18 +128,18 @@ onMounted(() => {
                     // include jam id or job_assignment_message_id when present so clients can dedupe
                     const jid = e.job_assignment_message_id || e.message_id || (e.jam && e.jam.id) || null;
                     window.dispatchEvent(new CustomEvent('message:received', { detail: { message: msg, id: jid, origin: 'job' } }));
-                } catch (err) {
+                } catch {
                     // non-fatal
                 }
             });
-            window.Echo.private('jobmessages.' + authUser.id).listen('JobMessageRead', (e) => {
+            window.Echo.private('jobmessages.' + authUser.id).listen('JobMessageRead', () => {
                 try {
                     unreadJobMessages.value = Math.max(0, (unreadJobMessages.value || 0) - 1);
-                } catch (err) {}
+                } catch {}
             });
             // AssignmentStatusToast is handled centrally by ToastUnified.vue (subscribe to "toasts" channel)
         }
-    } catch (err) {
+    } catch {
         // Echo subscribe failed (non-fatal)
     }
 });
@@ -184,10 +151,9 @@ onBeforeUnmount(() => {
             window.Echo.leavePrivate('messages.' + authUser.id);
             echoChannel = null;
         }
-    } catch (err) {}
+    } catch {}
 });
 const slots = useSlots();
-const hasTabsSlot = !!slots.tabs;
 // Debug logs removed for production
 
 // Determine an "active" key for top tabs based on current route name
@@ -211,7 +177,7 @@ const getTopTabActive = () => {
         if (r.includes('user.jobbox')) return 'jobbox';
         if (r.includes('profile')) return 'profile';
         return '';
-    } catch (e) {
+    } catch {
         return '';
     }
 };
@@ -222,17 +188,19 @@ function roleNavClass(role) {
         superadmin:  'bg-yellow-500 text-white font-semibold',
         admin:       'bg-red-500 text-white font-semibold',
         leader:      'bg-orange-500 text-white font-semibold',
-        clerk:       'bg-purple-600 text-white font-semibold',
-        coordinator: 'bg-green-600 text-white font-semibold',
-        user:        'bg-blue-500 text-white font-semibold',
+        clerk:             'bg-purple-600 text-white font-semibold',
+        coordinator:       'bg-green-600 text-white font-semibold',
+        proof_coordinator: 'bg-pink-600 text-white font-semibold',
+        user:              'bg-blue-500 text-white font-semibold',
     };
     const inactiveMap = {
-        superadmin:  'text-yellow-600 hover:text-yellow-800',
-        admin:       'text-red-600 hover:text-red-800',
-        leader:      'text-orange-600 hover:text-orange-800',
-        clerk:       'text-purple-600 hover:text-purple-800',
-        coordinator: 'text-green-600 hover:text-green-800',
-        user:        'text-blue-600 hover:text-blue-800',
+        superadmin:        'text-yellow-600 hover:text-yellow-800',
+        admin:             'text-red-600 hover:text-red-800',
+        leader:            'text-orange-600 hover:text-orange-800',
+        clerk:             'text-purple-600 hover:text-purple-800',
+        coordinator:       'text-green-600 hover:text-green-800',
+        proof_coordinator: 'text-pink-600 hover:text-pink-800',
+        user:              'text-blue-600 hover:text-blue-800',
     };
     return `${base} ${currentRouteContext.value === role ? activeMap[role] : inactiveMap[role]}`;
 }
@@ -253,7 +221,7 @@ const computeCoordinatorActive = () => {
         // explicit project_jobs routes (index/show/create/edit) → projects tab
         if (r.match(/^coordinator\.project_jobs\.(index|show|create|edit|store|update|destroy|complete)$/)) return 'projects';
         return '';
-    } catch (e) {
+    } catch {
         return '';
     }
 };
@@ -268,11 +236,12 @@ const currentRouteContext = computed(() => {
         if (r.startsWith('admin.')) return 'admin';
         if (r.startsWith('leader.') || r.startsWith('workload_setting.')) return 'leader';
         if (r.startsWith('coordinator.')) return 'coordinator';
+        if (r.startsWith('proof_coordinator.')) return 'proof_coordinator';
         if (r.startsWith('clerk.')) return 'clerk';
         // user.project_jobs.* / user.jobbox.* は user エリア
         // それ以外の user.* も user エリア
         return 'user';
-    } catch (e) {
+    } catch {
         return page.props.auth?.user?.user_role || 'user';
     }
 });
@@ -439,6 +408,7 @@ const currentRouteContext = computed(() => {
                             <Link :href="route('leader.dashboard')" :class="roleNavClass('leader')">Leader</Link>
                             <Link :href="route('clerk.dashboard')" :class="roleNavClass('clerk')">Clerk</Link>
                             <Link :href="route('coordinator.dashboard')" :class="roleNavClass('coordinator')">Coordinator</Link>
+                            <Link :href="route('proof_coordinator.dashboard')" :class="roleNavClass('proof_coordinator')">Proof Admin</Link>
                             <Link :href="route('user.dashboard')" :class="roleNavClass('user')">User</Link>
                         </template>
 
@@ -448,10 +418,11 @@ const currentRouteContext = computed(() => {
                             <Link :href="route('leader.dashboard')" :class="roleNavClass('leader')">Leader</Link>
                             <Link :href="route('clerk.dashboard')" :class="roleNavClass('clerk')">Clerk</Link>
                             <Link :href="route('coordinator.dashboard')" :class="roleNavClass('coordinator')">Coordinator</Link>
+                            <Link :href="route('proof_coordinator.dashboard')" :class="roleNavClass('proof_coordinator')">Proof Admin</Link>
                             <Link :href="route('user.dashboard')" :class="roleNavClass('user')">User</Link>
                         </template>
 
-                        <!-- Leader用ナビゲーション（部署リーダーはClerkも表示） -->
+                        <!-- Leader用ナビゲーション（部署リーダーはClerk/ProofCoordinator も表示） -->
                         <template v-else-if="$page.props.auth.user.user_role === 'leader'">
                             <Link :href="route('leader.dashboard')" :class="roleNavClass('leader')">Leader</Link>
                             <Link
@@ -459,6 +430,11 @@ const currentRouteContext = computed(() => {
                                 :href="route('clerk.dashboard')"
                                 :class="roleNavClass('clerk')"
                             >Clerk</Link>
+                            <Link
+                                v-if="$page.props.auth.user.isDepartmentLeader"
+                                :href="route('proof_coordinator.dashboard')"
+                                :class="roleNavClass('proof_coordinator')"
+                            >Proof Admin</Link>
                             <Link :href="route('coordinator.dashboard')" :class="roleNavClass('coordinator')">Coordinator</Link>
                             <Link :href="route('user.dashboard')" :class="roleNavClass('user')">User</Link>
                         </template>
@@ -473,6 +449,12 @@ const currentRouteContext = computed(() => {
                         <!-- Coordinator用ナビゲーション -->
                         <template v-else-if="$page.props.auth.user.user_role === 'coordinator'">
                             <Link :href="route('coordinator.dashboard')" :class="roleNavClass('coordinator')">Coordinator</Link>
+                            <Link :href="route('user.dashboard')" :class="roleNavClass('user')">User</Link>
+                        </template>
+
+                        <!-- ProofCoordinator用ナビゲーション -->
+                        <template v-else-if="$page.props.auth.user.user_role === 'proof_coordinator'">
+                            <Link :href="route('proof_coordinator.dashboard')" :class="roleNavClass('proof_coordinator')">Proof Admin</Link>
                             <Link :href="route('user.dashboard')" :class="roleNavClass('user')">User</Link>
                         </template>
 
@@ -626,6 +608,25 @@ const currentRouteContext = computed(() => {
                             </ResponsiveNavLink>
                             <ResponsiveNavLink :href="route('workload_setting.index')" :active="route().current('workload_setting.*')">
                                 <span class="text-orange-600">作業項目設定</span>
+                            </ResponsiveNavLink>
+                        </template>
+
+                        <!-- ProofCoordinator sub-tabs -->
+                        <template v-else-if="currentRouteContext === 'proof_coordinator'">
+                            <ResponsiveNavLink :href="route('proof_coordinator.inbox')" :active="route().current('proof_coordinator.inbox')">
+                                <span class="text-pink-600">校正依頼受信</span>
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('proof_coordinator.assignments')" :active="route().current('proof_coordinator.assignments')">
+                                <span class="text-pink-600">割り振り管理</span>
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('proof_coordinator.calendar')" :active="route().current('proof_coordinator.calendar')">
+                                <span class="text-pink-600">校正カレンダー</span>
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('proof_coordinator.workload')" :active="route().current('proof_coordinator.workload')">
+                                <span class="text-pink-600">校正員作業量</span>
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('proof_coordinator.history')" :active="route().current('proof_coordinator.history')">
+                                <span class="text-pink-600">案件校正履歴</span>
                             </ResponsiveNavLink>
                         </template>
 
@@ -792,6 +793,7 @@ const currentRouteContext = computed(() => {
                                 <AdminNavigationTabs v-else-if="currentRouteContext === 'admin'" :active="getTopTabActive()" />
                                 <LeaderNavigationTabs v-else-if="currentRouteContext === 'leader'" :active="getTopTabActive()" />
                                 <ClerkNavigationTabs v-else-if="currentRouteContext === 'clerk'" :active="getTopTabActive()" />
+                                <ProofCoordinatorNavigationTabs v-else-if="currentRouteContext === 'proof_coordinator'" />
                                 <CoordinatorNavigationTabs
                                     v-else-if="currentRouteContext === 'coordinator'"
                                     :projectJob="page.props.projectJob"

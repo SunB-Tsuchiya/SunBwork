@@ -177,22 +177,163 @@ class EventController extends Controller
             }
         }
         $events = $query->get();
-        // removed verbose debug logging for fetched events
 
-        // If the caller expects JSON (API clients) keep returning JSON. However
-        // Inertia Link navigations and normal browser requests expect an Inertia
-        // response. Detect that and render the Inertia page so SPA navigation
-        // works correctly when users click links from the frontend.
+        // For JSON clients (axios in the diary interactions view) enrich events
+        // with the same job/progress/self-assigned metadata and color mapping
+        // used by the calendar so the TimelineDiary can render matching colors.
         if ($request->wantsJson()) {
-            return response()->json($events);
+            try {
+                $assignmentIds = $events->pluck('project_job_assignment_id')->filter()->unique()->values()->all();
+
+                // detect progress-linked assignments
+                $progressAssignmentIds = [];
+                if (!empty($assignmentIds)) {
+                    try {
+                        $progressAssignmentIds = \App\Models\ProgressCell::whereIn('assignment_id', $assignmentIds)->pluck('assignment_id')->map(fn($v) => (int)$v)->all();
+                    } catch (\Throwable $__ex) {
+                        \Illuminate\Support\Facades\Log::warning('EventController: progressAssignmentIds lookup failed', ['error' => $__ex->getMessage()]);
+                    }
+                }
+
+                // load senders from canonical and by_myself assignments to detect self-assigned
+                $assignmentSenders = [];
+                if (!empty($assignmentIds)) {
+                    try {
+                        $senders = \App\Models\ProjectJobAssignment::whereIn('id', $assignmentIds)->pluck('sender_id', 'id')->map(fn($v) => $v === null ? null : (int)$v)->all();
+                    } catch (\Throwable $__ex) {
+                        $senders = [];
+                        \Illuminate\Support\Facades\Log::warning('EventController: assignment senders lookup failed', ['error' => $__ex->getMessage()]);
+                    }
+                    try {
+                        $bySenders = [];
+                        if (class_exists(\App\Models\ProjectJobAssignmentByMyself::class)) {
+                            $bySenders = \App\Models\ProjectJobAssignmentByMyself::whereIn('id', $assignmentIds)->pluck('sender_id', 'id')->map(fn($v) => $v === null ? null : (int)$v)->all();
+                        }
+                    } catch (\Throwable $__ex) {
+                        $bySenders = [];
+                        \Illuminate\Support\Facades\Log::warning('EventController: by_myself senders lookup failed', ['error' => $__ex->getMessage()]);
+                    }
+
+                    // preserve keys and let by_myself override canonical
+                    if (is_array($senders)) {
+                        foreach ($senders as $k => $v) $assignmentSenders[$k] = $v;
+                    }
+                    if (is_array($bySenders)) {
+                        foreach ($bySenders as $k => $v) $assignmentSenders[$k] = $v;
+                    }
+                    foreach ($assignmentSenders as $k => $v) {
+                        $assignmentSenders[$k] = $v === null ? null : (int)$v;
+                    }
+                }
+
+                $mapped = $events->map(function ($e) use ($progressAssignmentIds, $assignmentSenders, $baseUserId) {
+                    $arr = $e->toArray();
+                    $pjId = $arr['project_job_assignment_id'] ?? ($e->project_job_assignment_id ?? null);
+                    $hasProgress = $pjId ? in_array((int)$pjId, $progressAssignmentIds, true) : false;
+                    $isSelf = false;
+                    if ($pjId && isset($assignmentSenders[$pjId])) {
+                        $sender = $assignmentSenders[$pjId];
+                        $isSelf = $sender !== null && intval($sender) === intval($baseUserId);
+                    }
+
+                    // color mapping: progress -> purple, self-assigned -> indigo, default -> green
+                    $color = $arr['color'] ?? ($e->color ?? null);
+                    if (!$color) {
+                        if ($hasProgress) $color = '#7C3AED';
+                        elseif ($isSelf) $color = '#4F46E5';
+                        else $color = '#059669';
+                    }
+
+                    $arr['color'] = $color;
+                    $arr['extendedProps'] = array_merge($arr['extendedProps'] ?? [], [
+                        'project_job_assignment_id' => $pjId,
+                        'has_progress_cell' => $hasProgress,
+                        'is_self_assigned' => $isSelf,
+                    ]);
+                    return $arr;
+                })->values();
+
+                return response()->json($mapped);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('EventController: failed to enrich events for JSON response', ['error' => $e->getMessage()]);
+                return response()->json($events);
+            }
         }
 
-        // Render the calendar index page (we don't have a dedicated Events/Index
-        // SPA page). The calendar page accepts events and will show the user's
-        // events. This keeps Link navigation working while API clients still
-        // receive JSON.
+        // For Inertia page rendering, enrich events with the same job/progress/self-assigned
+        // metadata so the Calendar component can pick correct colors without an extra JSON call.
+        $mappedForInertia = $events;
+        try {
+            $assignmentIds = $events->pluck('project_job_assignment_id')->filter()->unique()->values()->all();
+
+            $progressAssignmentIds = [];
+            if (!empty($assignmentIds)) {
+                try {
+                    $progressAssignmentIds = \App\Models\ProgressCell::whereIn('assignment_id', $assignmentIds)->pluck('assignment_id')->map(fn($v) => (int)$v)->all();
+                } catch (\Throwable $__ex) {
+                    \Illuminate\Support\Facades\Log::warning('EventController: progressAssignmentIds lookup failed (inertia)', ['error' => $__ex->getMessage()]);
+                }
+            }
+
+            $assignmentSenders = [];
+            if (!empty($assignmentIds)) {
+                try {
+                    $senders = \App\Models\ProjectJobAssignment::whereIn('id', $assignmentIds)->pluck('sender_id', 'id')->map(fn($v) => $v === null ? null : (int)$v)->all();
+                } catch (\Throwable $__ex) {
+                    $senders = [];
+                    \Illuminate\Support\Facades\Log::warning('EventController: assignment senders lookup failed (inertia)', ['error' => $__ex->getMessage()]);
+                }
+                try {
+                    $bySenders = [];
+                    if (class_exists(\App\Models\ProjectJobAssignmentByMyself::class)) {
+                        $bySenders = \App\Models\ProjectJobAssignmentByMyself::whereIn('id', $assignmentIds)->pluck('sender_id', 'id')->map(fn($v) => $v === null ? null : (int)$v)->all();
+                    }
+                } catch (\Throwable $__ex) {
+                    $bySenders = [];
+                    \Illuminate\Support\Facades\Log::warning('EventController: by_myself senders lookup failed (inertia)', ['error' => $__ex->getMessage()]);
+                }
+
+                if (is_array($senders)) {
+                    foreach ($senders as $k => $v) $assignmentSenders[$k] = $v;
+                }
+                if (is_array($bySenders)) {
+                    foreach ($bySenders as $k => $v) $assignmentSenders[$k] = $v;
+                }
+                foreach ($assignmentSenders as $k => $v) {
+                    $assignmentSenders[$k] = $v === null ? null : (int)$v;
+                }
+            }
+
+            $mappedForInertia = $events->map(function ($e) use ($progressAssignmentIds, $assignmentSenders, $baseUserId) {
+                $arr = $e->toArray();
+                $pjId = $arr['project_job_assignment_id'] ?? ($e->project_job_assignment_id ?? null);
+                $hasProgress = $pjId ? in_array((int)$pjId, $progressAssignmentIds, true) : false;
+                $isSelf = false;
+                if ($pjId && isset($assignmentSenders[$pjId])) {
+                    $sender = $assignmentSenders[$pjId];
+                    $isSelf = $sender !== null && intval($sender) === intval($baseUserId);
+                }
+
+                $arr['extendedProps'] = array_merge($arr['extendedProps'] ?? [], [
+                    'project_job_assignment_id' => $pjId,
+                    'has_progress_cell' => $hasProgress,
+                    'is_self_assigned' => $isSelf,
+                ]);
+
+                // keep color if present, otherwise leave to frontend mapping
+                if (!isset($arr['color']) && !isset($arr['color'])) {
+                    // no-op; frontend will choose based on extendedProps
+                }
+
+                return $arr;
+            })->values();
+        } catch (\Throwable $__e) {
+            \Illuminate\Support\Facades\Log::warning('EventController: failed to enrich events for Inertia render', ['error' => $__e->getMessage()]);
+            $mappedForInertia = $events;
+        }
+
         return Inertia::render('Calendar/Index', [
-            'events' => $events,
+            'events' => $mappedForInertia,
             'date' => $date,
             'user_id' => $baseUserId,
             'jobs' => [],
@@ -507,6 +648,9 @@ class EventController extends Controller
             }
         }
 
+        // proof_schedule 自動連動
+        $this->syncProofScheduleFromEvent($event);
+
         return redirect()->route('calendar.index');
     }
 
@@ -609,6 +753,9 @@ class EventController extends Controller
                 }
             }
         }
+        // proof_schedule 自動連動
+        $this->syncProofScheduleFromEvent($event);
+
         return redirect()->back()->with('success', 'イベントを更新しました。');
     }
 
@@ -628,6 +775,13 @@ class EventController extends Controller
         try {
             if (Schema::hasColumn('events', 'project_job_assignment_id')) {
                 $assignmentIdToCheck = $event->project_job_assignment_id;
+            }
+        } catch (\Throwable $e) { /* ignore */ }
+
+        // proof_schedule 連動削除（event_id で紐づいているものを消す）
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('proof_schedules')) {
+                \App\Models\ProofSchedule::where('event_id', $event->id)->delete();
             }
         } catch (\Throwable $e) { /* ignore */ }
 
@@ -755,6 +909,15 @@ class EventController extends Controller
             // non-fatal
         }
 
+        $proofRequested = false;
+        try {
+            if ($event->project_job_assignment_id) {
+                $proofRequested = \App\Models\ProofRequest::where('project_job_assignment_id', $event->project_job_assignment_id)
+                    ->whereNotIn('status', ['completed'])
+                    ->exists();
+            }
+        } catch (\Throwable $e) {}
+
         $hideEdit = request()->query('hide_edit') ? true : false;
         return Inertia::render('Events/Show', [
             'event'                  => $event,
@@ -763,6 +926,7 @@ class EventController extends Controller
             'lunch_start'            => $lunchStart,
             'lunch_end'              => $lunchEnd,
             'lunch_overlap_minutes'  => $lunchOverlapMinutes,
+            'proof_requested'        => $proofRequested,
         ]);
     }
 
@@ -1288,8 +1452,11 @@ class EventController extends Controller
                     'work_item_type_id' => $assignment->work_item_type_id ?? null,
                     'size_id' => $assignment->size_id ?? null,
                     'stage_id' => $assignment->stage_id ?? null,
-                    'amounts' => null, // intentionally empty: record daily work separately
-                    'amounts_unit' => 'page',
+                    // If this page was opened from JobBox (source_job_assignment_id present),
+                    // prefill amounts from the coordinator assignment so the recipient sees quantity.
+                    // Otherwise keep amounts empty (daily work recorded separately).
+                    'amounts' => $sourceJobAssignmentId ? ($assignment->amounts ?? null) : null,
+                    'amounts_unit' => $sourceJobAssignmentId ? ($assignment->amounts_unit ?? 'page') : 'page',
                 ]];
             }
         }
@@ -1712,5 +1879,47 @@ class EventController extends Controller
             Log::error('EventController::edit failed', ['error' => $e->getMessage()]);
         }
         return Inertia::render('Events/Edit', ['event' => $event]);
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    //  proof_schedule 自動連動ヘルパー
+    //  event が proof_request に紐づく assignment を持つ場合、
+    //  proof_schedules に upsert する
+    // ──────────────────────────────────────────────────────────────────
+    private function syncProofScheduleFromEvent(Event $event): void
+    {
+        try {
+            if (! Schema::hasTable('proof_schedules') || ! Schema::hasTable('proof_requests')) {
+                return;
+            }
+            if (! $event->project_job_assignment_id || ! $event->starts_at || ! $event->ends_at) {
+                return;
+            }
+
+            $proofRequest = \App\Models\ProofRequest::where('project_job_assignment_id', $event->project_job_assignment_id)
+                ->whereNotIn('status', ['completed'])
+                ->first();
+
+            if (! $proofRequest) {
+                return;
+            }
+
+            \App\Models\ProofSchedule::updateOrCreate(
+                [
+                    'proof_request_id' => $proofRequest->id,
+                    'user_id'          => $event->user_id,
+                    'event_id'         => $event->id,
+                ],
+                [
+                    'starts_at' => $event->starts_at,
+                    'ends_at'   => $event->ends_at,
+                ]
+            );
+        } catch (\Throwable $e) {
+            Log::warning('EventController: syncProofScheduleFromEvent failed', [
+                'error'    => $e->getMessage(),
+                'event_id' => $event->id ?? null,
+            ]);
+        }
     }
 }

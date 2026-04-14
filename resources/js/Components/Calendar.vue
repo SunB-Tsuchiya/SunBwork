@@ -1,7 +1,7 @@
 <template>
     <div class="calendar-container">
-        <div class="mb-4 flex flex-wrap gap-2">
-            <button @click="openEventModal" class="rounded bg-blue-600 px-4 py-2 text-white">予定作成</button>
+            <div class="mb-4 flex flex-wrap gap-2">
+            <button @click="openEventModal" class="rounded bg-emerald-600 px-4 py-2 text-white">予定作成</button>
             <button @click="goToJobCreate" class="rounded bg-indigo-600 px-4 py-2 text-white">ジョブ作成（独自）</button>
             <button @click="openJobSheetModal" class="rounded bg-purple-600 px-4 py-2 text-white">ジョブ作成（進行表から）</button>
             <button @click="goToDiaryCreate" class="rounded bg-orange-500 px-4 py-2 text-white">{{ props.diaryLabel }}作成</button>
@@ -77,9 +77,16 @@
             <div class="w-full max-w-xs rounded-lg bg-white p-6 text-center shadow-lg">
                 <h2 class="mb-4 text-lg font-bold">{{ selectedDate }} の操作</h2>
                 <div class="flex flex-col gap-4">
-                    <button @click="openEventModalFromSelect" class="rounded bg-blue-600 px-4 py-2 text-white">予定作成</button>
+                    <button @click="openEventModalFromSelect" class="rounded bg-emerald-600 px-4 py-2 text-white">予定作成</button>
                     <button @click="goToJobCreate" class="rounded bg-indigo-600 px-4 py-2 text-white">ジョブ作成（独自）</button>
                     <button @click="openJobSheetModal" class="rounded bg-purple-600 px-4 py-2 text-white">ジョブ作成（進行表から）</button>
+                    <button
+                        v-if="isProofMember"
+                        @click="showSelectModal = false; router.get(route('user.proof_jobs.index'))"
+                        class="rounded bg-pink-600 px-4 py-2 text-white"
+                    >
+                        校正をセット →
+                    </button>
 
                     <button v-if="selectedScheduleId === null" @click="goToDiaryCreateFromSelect" class="rounded bg-orange-500 px-4 py-2 text-white">
                         日報作成
@@ -204,7 +211,7 @@
 
         <!-- 週間休憩設定モーダル -->
         <div v-if="showBreakModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-            <div class="w-full max-w-2xl rounded-lg bg-white p-6 shadow-lg">
+            <div class="w-full max-w-lg rounded-lg bg-white p-6 shadow-lg">
                 <h2 class="mb-1 text-lg font-bold">週間休憩設定</h2>
                 <p class="mb-3 text-xs text-gray-500">チェックを入れた日に休憩時間が適用されます。時間を変更するとチェックが自動で入ります。</p>
                 <table class="w-full text-sm">
@@ -212,9 +219,8 @@
                         <tr class="border-b-2 border-gray-300 bg-gray-100 text-xs text-gray-600">
                             <th class="py-2 pl-1 pr-3 text-left font-medium">日付</th>
                             <th class="py-2 w-10 text-center font-medium">有効</th>
-                            <th class="py-2 text-left font-medium">開始</th>
-                            <th class="py-2 px-2 text-center font-medium">〜</th>
-                            <th class="py-2 text-left font-medium">終了</th>
+                            <th class="py-2 pr-8 text-left font-medium">開始</th>
+                            <th class="py-2 pl-8 text-left font-medium">終了</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -226,7 +232,7 @@
                                        @change="applyBatchAllEnabled"
                                        class="h-4 w-4 rounded border-gray-300 accent-teal-600" />
                             </td>
-                            <td class="py-2">
+                            <td class="py-2 pr-8">
                                 <div class="flex items-center gap-1">
                                     <select v-model="batchStartH" @change="applyBatchBreakTime"
                                             class="rounded border-gray-300 text-sm focus:border-teal-400 focus:ring-teal-400">
@@ -239,8 +245,7 @@
                                     </select>
                                 </div>
                             </td>
-                            <td class="py-2 px-2 text-center text-gray-400">〜</td>
-                            <td class="py-2">
+                            <td class="py-2 pl-8">
                                 <div class="flex items-center gap-1">
                                     <select v-model="batchEndH" @change="applyBatchBreakTime"
                                             class="rounded border-gray-300 text-sm focus:border-teal-400 focus:ring-teal-400">
@@ -263,7 +268,7 @@
                                 <input type="checkbox" v-model="day.enabled"
                                        class="h-4 w-4 rounded border-gray-300 accent-teal-600" />
                             </td>
-                            <td class="py-2">
+                            <td class="py-2 pr-8">
                                 <div class="flex items-center gap-1">
                                     <select v-model="day.startH"
                                             @change="day.enabled = true"
@@ -278,8 +283,7 @@
                                     </select>
                                 </div>
                             </td>
-                            <td class="py-2 px-2 text-center text-gray-400">〜</td>
-                            <td class="py-2">
+                            <td class="py-2 pl-8">
                                 <div class="flex items-center gap-1">
                                     <select v-model="day.endH"
                                             @change="day.enabled = true"
@@ -316,7 +320,7 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import FullCalendar from '@fullcalendar/vue3';
-import { router } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
@@ -363,6 +367,9 @@ const props = defineProps({
         default: () => ({ start: '12:00', end: '13:00' }),
     },
 });
+
+const page = usePage();
+const isProofMember = computed(() => page.props.auth?.isProofMember ?? false);
 
 // 日ごとの勤務形態マップ { 'YYYY-MM-DD': worktype_id }（ローカル更新可能）
 const localDailyWorktypes = ref([...(props.dailyWorktypes ?? [])]);
@@ -925,6 +932,8 @@ const baseEvents = ref([
 
         // Determine linkage id coming from server (canonical assignment id)
         const pjAssignmentId = event.extendedProps?.project_job_assignment_id ?? event.project_job_assignment_id ?? null;
+        const isProgressLinked = event.extendedProps?.has_progress_cell ?? false;
+        const isSelfAssigned = event.extendedProps?.is_self_assigned ?? false;
 
         // If linkage id is not present, treat as a 'personal unlinked' event — use a distinctive color
         if (!pjAssignmentId) {
@@ -943,12 +952,22 @@ const baseEvents = ref([
         }
 
         // default coloring path
+        const chosenColor = isCompleted
+                ? '#b58900'
+                : (isProgressLinked
+                    ? (event.color ?? '#7C3AED')
+                    : (isSelfAssigned
+                        ? (event.color ?? '#4F46E5')
+                        : (event.color ?? '#059669')
+                    )
+                );
+
         return {
             title: event.title,
             start: event.start,
             end: event.end ?? undefined,
             allDay: event.allDay ?? false,
-            color: isCompleted ? '#b58900' : (event.color ?? `rgba(37,99,235,${alpha})`),
+            color: chosenColor,
             event_id: event.id,
             schedule_id: event.extendedProps?.schedule_id ?? event.schedule_id ?? undefined,
             description: event.description ?? event.extendedProps?.description ?? '',
@@ -956,6 +975,30 @@ const baseEvents = ref([
     }),
     // Assigned jobs display removed per UX request: do not include props.jobs in calendar events
 ]);
+// debug: log incoming props.events and processed baseEvents
+onMounted(() => {
+    try {
+        console.log('Calendar: initial props.events', props.events);
+    } catch (e) {}
+});
+watch(
+    () => props.events,
+    (v) => {
+        try {
+            console.log('Calendar: props.events changed', v);
+        } catch (e) {}
+    },
+    { immediate: true }
+);
+watch(
+    baseEvents,
+    (v) => {
+        try {
+            console.log('Calendar: processed baseEvents', v);
+        } catch (e) {}
+    },
+    { immediate: true }
+);
 
 // 通常イベント + 始業前背景イベントを結合
 const allEvents = computed(() => [...baseEvents.value, ...backgroundEvents.value]);

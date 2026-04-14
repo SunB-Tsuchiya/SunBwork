@@ -102,6 +102,11 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::get('/user/project-jobs', [App\Http\Controllers\User\ProjectJobController::class, 'index'])->name('user.project_jobs.index');
     Route::get('/user/project-jobs/{projectJob}', [App\Http\Controllers\User\ProjectJobController::class, 'show'])->name('user.project_jobs.show');
 
+    // 校正ジョブ（ユーザー）
+    Route::get('/user/proof-jobs', [\App\Http\Controllers\User\ProofJobController::class, 'index'])->name('user.proof_jobs.index');
+    Route::get('/user/proof-jobs/{proofRequest}/set', [\App\Http\Controllers\User\ProofJobController::class, 'setPage'])->name('user.proof_jobs.set_page');
+    Route::post('/user/proof-jobs/{proofRequest}/set', [\App\Http\Controllers\User\ProofJobController::class, 'set'])->name('user.proof_jobs.set');
+
     // ユーザー設定
     Route::get('/user/settings',      [App\Http\Controllers\User\UserSettingController::class, 'index'])->name('user.settings.index');
     Route::get('/user/settings/edit', [App\Http\Controllers\User\UserSettingController::class, 'edit'])->name('user.settings.edit');
@@ -646,6 +651,59 @@ Route::get('/debug/create', function () {
 })->name('debug.create');
 
 // (temporary debug routes removed)
+
+// =====================================================
+// ProofCoordinator Routes（校正窓口 / Admin / SuperAdmin / 部署Leader）
+// =====================================================
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'proof_coordinator'])
+    ->prefix('proof-coordinator')
+    ->name('proof_coordinator.')
+    ->group(function () {
+        Route::get('dashboard', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'inbox'])->name('dashboard');
+        Route::get('inbox', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'inbox'])->name('inbox');
+        Route::get('inbox/{proofRequest}/assign', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'assignPage'])->name('inbox.assign_page');
+        Route::post('inbox/{proofRequest}/assign', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'assignStore'])->name('inbox.assign_store');
+        Route::post('inbox/{proofRequest}/accept', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'accept'])->name('inbox.accept');
+        Route::get('assignments', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'assignments'])->name('assignments');
+        Route::get('assignments/{proofRequest}', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'show'])->name('assignments.show');
+        Route::get('assignments/{proofRequest}/edit', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'edit'])->name('assignments.edit');
+        Route::put('assignments/{proofRequest}/assignment', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'assignmentUpdate'])->name('assignments.assignment_update');
+        Route::put('assignments/{proofRequest}/assign', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'assign'])->name('assignments.assign');
+        Route::put('assignments/{proofRequest}/start', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'start'])->name('assignments.start');
+        Route::put('assignments/{proofRequest}/complete', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'complete'])->name('assignments.complete');
+        Route::get('calendar', [\App\Http\Controllers\ProofCoordinator\CalendarController::class, 'index'])->name('calendar');
+        Route::get('calendar/data', [\App\Http\Controllers\ProofCoordinator\CalendarController::class, 'data'])->name('calendar.data');
+        Route::post('schedules', [\App\Http\Controllers\ProofCoordinator\CalendarController::class, 'store'])->name('schedules.store');
+        Route::put('schedules/{proofSchedule}', [\App\Http\Controllers\ProofCoordinator\CalendarController::class, 'update'])->name('schedules.update');
+        Route::delete('schedules/{proofSchedule}', [\App\Http\Controllers\ProofCoordinator\CalendarController::class, 'destroy'])->name('schedules.destroy');
+        Route::get('workload', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'workload'])->name('workload');
+        Route::get('history', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'history'])->name('history');
+        Route::get('team', [\App\Http\Controllers\ProofCoordinator\ProofTeamController::class, 'index'])->name('team.index');
+        Route::post('team', [\App\Http\Controllers\ProofCoordinator\ProofTeamController::class, 'store'])->name('team.store');
+        Route::delete('team/{proofTeamMember}', [\App\Http\Controllers\ProofCoordinator\ProofTeamController::class, 'destroy'])->name('team.destroy');
+        // 単発派遣管理
+        Route::post('dispatchers/check-duplicate', [\App\Http\Controllers\ProofCoordinator\ProofDispatcherController::class, 'checkDuplicate'])->name('dispatchers.check_duplicate');
+        Route::put('dispatchers/{dispatcher}/toggle', [\App\Http\Controllers\ProofCoordinator\ProofDispatcherController::class, 'toggle'])->name('dispatchers.toggle');
+        Route::resource('dispatchers', \App\Http\Controllers\ProofCoordinator\ProofDispatcherController::class)
+            ->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy']);
+    });
+
+// 全ロール共通（読み取り専用）
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified'])
+    ->prefix('proof')
+    ->name('proof.')
+    ->group(function () {
+        Route::get('calendar', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'calendarPublic'])->name('calendar');
+        Route::get('calendar/data', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'calendarUserData'])->name('calendar.data');
+        Route::get('status', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'statusPublic'])->name('status');
+    });
+
+// 校正依頼作成・削除（全ロール）
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified'])
+    ->group(function () {
+        Route::post('proof-requests', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'store'])->name('proof_requests.store');
+        Route::delete('proof-requests/{proofRequest}', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'destroy'])->name('proof_requests.destroy');
+    });
 
 // --- デバッグ用API/認証チェックページ ---
 // /debug/api でAPI/認証の動作確認ができるVueページ（resources/js/Debug/ApiDebug.vue）
