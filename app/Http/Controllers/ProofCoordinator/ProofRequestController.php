@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\ProofRequest;
 use App\Models\ProofSchedule;
+use App\Models\ProofDispatcher;
 use App\Models\ProofTeamMember;
 use App\Models\ProjectJob;
 use App\Models\ProjectJobAssignment;
@@ -62,6 +63,8 @@ class ProofRequestController extends Controller
                 'assignment_name'       => $u->assignment?->name,
                 'employment_type'       => $u->employment_type ?? 'regular',
                 'employment_type_label' => $u->employmentTypeLabel(),
+                'is_dispatcher'         => false,
+                'dispatcher_id'         => null,
             ]);
 
         // ルックアップリスト
@@ -72,6 +75,22 @@ class ProofRequestController extends Controller
         $difficulties = \App\Models\Difficulty::orderBy('sort_order')->get(['id', 'name']);
 
         $user = Auth::user();
+
+        // 単発派遣（is_active=true）を members に追加
+        $dispatchers = ProofDispatcher::active()
+            ->when($user->user_role !== 'superadmin', fn ($q) => $q->forCompany($user->company_id))
+            ->orderBy('name')
+            ->get()
+            ->map(fn ($d) => [
+                'id'                    => 'dp_' . $d->id,
+                'name'                  => $d->name,
+                'assignment_name'       => '単発派遣',
+                'employment_type'       => 'proof_dispatcher',
+                'employment_type_label' => '単発派遣',
+                'is_dispatcher'         => true,
+                'dispatcher_id'         => $d->id,
+            ]);
+        $members = $members->concat($dispatchers);
 
         // ソース割当（依頼者のマイジョブ）から prefill を構築
         // 担当者（user_id）と作業開始時刻（desired_time）以外はすべて引き継ぐ
@@ -131,59 +150,69 @@ class ProofRequestController extends Controller
         }
 
         $data = $request->validate([
-            'assignments'                     => 'required|array|min:1',
-            'assignments.*.title'             => 'required|string|max:255',
-            'assignments.*.detail'            => 'nullable|string',
-            'assignments.*.user_id'           => 'required|exists:users,id',
-            'assignments.*.project_job_id'    => 'nullable|exists:project_jobs,id',
-            'assignments.*.difficulty_id'     => 'nullable|exists:difficulties,id',
-            'assignments.*.desired_end_date'  => 'nullable|date',
-            'assignments.*.desired_time'      => 'nullable|date_format:H:i',
-            'assignments.*.estimated_hours'   => 'nullable|numeric|min:0',
-            'assignments.*.work_item_type_id' => 'nullable|exists:work_item_types,id',
-            'assignments.*.size_id'           => 'nullable|exists:sizes,id',
-            'assignments.*.stage_id'          => 'nullable|exists:stages,id',
-            'assignments.*.company_id'        => 'nullable|exists:companies,id',
-            'assignments.*.department_id'     => 'nullable|exists:departments,id',
-            'assignments.*.amounts'           => 'nullable|integer|min:0',
-            'assignments.*.amounts_unit'      => 'nullable|string|in:page,file',
-            'assignments.*.sender_id'         => 'nullable|exists:users,id',
+            'assignments'                          => 'required|array|min:1',
+            'assignments.*.title'                  => 'required|string|max:255',
+            'assignments.*.detail'                 => 'nullable|string',
+            'assignments.*.user_id'                => 'nullable|exists:users,id',
+            'assignments.*.proof_dispatcher_id'    => 'nullable|exists:proof_dispatchers,id',
+            'assignments.*.project_job_id'         => 'nullable|exists:project_jobs,id',
+            'assignments.*.difficulty_id'          => 'nullable|exists:difficulties,id',
+            'assignments.*.desired_end_date'       => 'nullable|date',
+            'assignments.*.desired_time'           => 'nullable|date_format:H:i',
+            'assignments.*.estimated_hours'        => 'nullable|numeric|min:0',
+            'assignments.*.work_item_type_id'      => 'nullable|exists:work_item_types,id',
+            'assignments.*.size_id'                => 'nullable|exists:sizes,id',
+            'assignments.*.stage_id'               => 'nullable|exists:stages,id',
+            'assignments.*.company_id'             => 'nullable|exists:companies,id',
+            'assignments.*.department_id'          => 'nullable|exists:departments,id',
+            'assignments.*.amounts'                => 'nullable|integer|min:0',
+            'assignments.*.amounts_unit'           => 'nullable|string|in:page,file',
+            'assignments.*.sender_id'              => 'nullable|exists:users,id',
         ]);
 
         $a = $data['assignments'][0];
         $senderUser = Auth::user();
 
-        DB::transaction(function () use ($a, $proofRequest, $senderUser) {
+        // 単発派遣が選択されている場合: user_id = coordinator 自身、proof_dispatcher_id を保存
+        $isDispatcher   = ! empty($a['proof_dispatcher_id']);
+        $assigneeUserId = $isDispatcher ? $senderUser->id : ($a['user_id'] ?? $senderUser->id);
+        $dispatcherId   = $isDispatcher ? $a['proof_dispatcher_id'] : null;
+
+        DB::transaction(function () use ($a, $proofRequest, $senderUser, $assigneeUserId, $dispatcherId, $isDispatcher) {
             // ジョブ割当を作成（校正管理者 = sender）
             $assignment = \App\Models\ProjectJobAssignment::create([
-                'project_job_id'    => $proofRequest->project_job_id,
-                'user_id'           => $a['user_id'],
-                'sender_id'         => $senderUser->id,
-                'title'             => $a['title'],
-                'detail'            => $a['detail'] ?? null,
-                'difficulty_id'     => $a['difficulty_id'] ?? null,
-                'desired_end_date'  => $a['desired_end_date'] ?? null,
-                'desired_time'      => $a['desired_time'] ?? null,
-                'estimated_hours'   => $a['estimated_hours'] ?? null,
-                'work_item_type_id' => $a['work_item_type_id'] ?? null,
-                'size_id'           => $a['size_id'] ?? null,
-                'stage_id'          => $a['stage_id'] ?? null,
-                'company_id'        => $a['company_id'] ?? null,
-                'department_id'     => $a['department_id'] ?? null,
-                'amounts'           => $a['amounts'] ?? null,
-                'amounts_unit'      => $a['amounts_unit'] ?? null,
-                'status_id'         => 1,
+                'project_job_id'      => $proofRequest->project_job_id,
+                'user_id'             => $assigneeUserId,
+                'sender_id'           => $senderUser->id,
+                'proof_dispatcher_id' => $dispatcherId,
+                'title'               => $a['title'],
+                'detail'              => $a['detail'] ?? null,
+                'difficulty_id'       => $a['difficulty_id'] ?? null,
+                'desired_end_date'    => $a['desired_end_date'] ?? null,
+                'desired_time'        => $a['desired_time'] ?? null,
+                'estimated_hours'     => $a['estimated_hours'] ?? null,
+                'work_item_type_id'   => $a['work_item_type_id'] ?? null,
+                'size_id'             => $a['size_id'] ?? null,
+                'stage_id'            => $a['stage_id'] ?? null,
+                'company_id'          => $a['company_id'] ?? null,
+                'department_id'       => $a['department_id'] ?? null,
+                'amounts'             => $a['amounts'] ?? null,
+                'amounts_unit'        => $a['amounts_unit'] ?? null,
+                'status_id'           => 1,
             ]);
 
             // 校正依頼を受理済みに更新
+            // 単発派遣の場合 proofreader_id は coordinator 自身（通知は不要）
             $proofRequest->update([
                 'proof_coordinator_id' => $senderUser->id,
-                'proofreader_id'       => $a['user_id'],
+                'proofreader_id'       => $isDispatcher ? null : $assigneeUserId,
                 'status'               => 'assigned',
             ]);
 
-            // 校正員への通知（既存の notifyProofAssigned を流用）
-            JobNotificationService::notifyProofAssigned($senderUser, $proofRequest->fresh());
+            // 校正員への通知（単発派遣の場合はスキップ）
+            if (! $isDispatcher) {
+                JobNotificationService::notifyProofAssigned($senderUser, $proofRequest->fresh());
+            }
         });
 
         // work_slots 処理
@@ -249,6 +278,8 @@ class ProofRequestController extends Controller
                 'assignment_name'       => $u->assignment?->name,
                 'employment_type'       => $u->employment_type ?? 'regular',
                 'employment_type_label' => $u->employmentTypeLabel(),
+                'is_dispatcher'         => false,
+                'dispatcher_id'         => null,
             ]);
 
         $types        = \App\Models\WorkItemType::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group', 'company_id', 'department_id']);
@@ -258,6 +289,22 @@ class ProofRequestController extends Controller
         $difficulties = \App\Models\Difficulty::orderBy('sort_order')->get(['id', 'name']);
 
         $user = Auth::user();
+
+        // 単発派遣（is_active=true）を members に追加
+        $dispatchers = ProofDispatcher::active()
+            ->when($user->user_role !== 'superadmin', fn ($q) => $q->forCompany($user->company_id))
+            ->orderBy('name')
+            ->get()
+            ->map(fn ($d) => [
+                'id'                    => 'dp_' . $d->id,
+                'name'                  => $d->name,
+                'assignment_name'       => '単発派遣',
+                'employment_type'       => 'proof_dispatcher',
+                'employment_type_label' => '単発派遣',
+                'is_dispatcher'         => true,
+                'dispatcher_id'         => $d->id,
+            ]);
+        $members = $members->concat($dispatchers);
 
         // 既存割当をフォーム用の形式に変換
         $assignmentData = $assignment ? [

@@ -42,6 +42,9 @@ const tab = (key) => [
             <Link :href="route('proof_coordinator.team.index')" :class="tab('team')">
                 校正チーム管理
             </Link>
+            <Link :href="route('proof_coordinator.dispatchers.index')" :class="tab('dispatchers')">
+                単発派遣管理
+            </Link>
         </nav>
     </div>
 </template>

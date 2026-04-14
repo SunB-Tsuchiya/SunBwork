@@ -681,6 +681,11 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('team', [\App\Http\Controllers\ProofCoordinator\ProofTeamController::class, 'index'])->name('team.index');
         Route::post('team', [\App\Http\Controllers\ProofCoordinator\ProofTeamController::class, 'store'])->name('team.store');
         Route::delete('team/{proofTeamMember}', [\App\Http\Controllers\ProofCoordinator\ProofTeamController::class, 'destroy'])->name('team.destroy');
+        // 単発派遣管理
+        Route::post('dispatchers/check-duplicate', [\App\Http\Controllers\ProofCoordinator\ProofDispatcherController::class, 'checkDuplicate'])->name('dispatchers.check_duplicate');
+        Route::put('dispatchers/{dispatcher}/toggle', [\App\Http\Controllers\ProofCoordinator\ProofDispatcherController::class, 'toggle'])->name('dispatchers.toggle');
+        Route::resource('dispatchers', \App\Http\Controllers\ProofCoordinator\ProofDispatcherController::class)
+            ->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy']);
     });
 
 // 全ロール共通（読み取り専用）

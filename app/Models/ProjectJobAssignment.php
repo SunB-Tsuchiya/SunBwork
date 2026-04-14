@@ -42,6 +42,7 @@ class ProjectJobAssignment extends Model
         'supersedes_assignment_id',
         'start_time',
         'subcontractor_id',
+        'proof_dispatcher_id',
         'job_type',
     ];
 
@@ -152,6 +153,11 @@ class ProjectJobAssignment extends Model
     public function events()
     {
         return $this->hasMany(\App\Models\Event::class, 'project_job_assignment_id');
+    }
+
+    public function proofDispatcher()
+    {
+        return $this->belongsTo(ProofDispatcher::class, 'proof_dispatcher_id');
     }
 
     /**

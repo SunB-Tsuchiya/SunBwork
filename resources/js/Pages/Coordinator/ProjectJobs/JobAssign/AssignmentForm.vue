@@ -69,7 +69,7 @@
                     <option value="">未指定</option>
                     <option v-for="m in props.members || members" :key="m.id" :value="m.id">
                         {{ m.name }}{{ m.assignment_name ? '（' + m.assignment_name + '）' : '' }}
-                        {{ ['dispatch','outsource','contract'].includes(m.employment_type) ? '【' + m.employment_type_label + '】' : '' }}
+                        {{ m.employment_type === 'proof_dispatcher' ? '【単発派遣】' : ['dispatch','outsource','contract'].includes(m.employment_type) ? '【' + m.employment_type_label + '】' : '' }}
                     </option>
                 </select>
                 <!-- 選択後の雇用形態バッジ（派遣・業務委託のみ表示） -->
@@ -1822,30 +1822,37 @@ async function save(sendImmediately = true) {
 
         const payload = {
             send_immediately: true,
-            assignments: assignments.value.map((a) => ({
-                title: assembleTitleCoord(a),
-                detail: a.detail || '',
-                user_id: a.user_id || (effectiveAuthUser() ? effectiveAuthUser().id : null),
-                sender_id: effectiveAuthUser() ? effectiveAuthUser().id : null,
-                project_job_id: a.project_job_id || null,
-                company_id: a.company_id || null,
-                department_id: a.department_id || null,
-                difficulty_id: a.difficulty_id ? Number(a.difficulty_id) : null,
-                desired_start_date: a.desired_start_date || null,
-                desired_end_date: a.desired_end_date || null,
-                start_time: String(a.start_time_hour || '00').padStart(2, '0') + ':' + String(a.start_time_min || '00').padStart(2, '0'),
-                desired_time: String(a.desired_time_hour || '00').padStart(2, '0') + ':' + String(a.desired_time_min || '00').padStart(2, '0'),
-                estimated_hours: a.estimated_hours || null,
-                work_item_type_id: a.work_item_type_id || null,
-                size_id: a.size_id || null,
-                stage_id: a.stage_id || null,
-                status_id: 1,
-                amounts: typeof a.amounts === 'number' ? a.amounts : Number(a.amounts) || 0,
-                amounts_unit: a.amounts_unit || 'page',
-                _progress_sheet_id: a._progress_sheet_id ?? null,
-                _row_id: a._row_id ?? null,
-                _col_key: a._col_key ?? null,
-            })),
+            assignments: assignments.value.map((a) => {
+                const rawUserId = a.user_id;
+                const isDispatcher = typeof rawUserId === 'string' && rawUserId.startsWith('dp_');
+                const dispatcherId = isDispatcher ? Number(rawUserId.replace('dp_', '')) : null;
+                const resolvedUserId = isDispatcher ? null : (rawUserId || (effectiveAuthUser() ? effectiveAuthUser().id : null));
+                return {
+                    title: assembleTitleCoord(a),
+                    detail: a.detail || '',
+                    user_id: resolvedUserId,
+                    proof_dispatcher_id: dispatcherId,
+                    sender_id: effectiveAuthUser() ? effectiveAuthUser().id : null,
+                    project_job_id: a.project_job_id || null,
+                    company_id: a.company_id || null,
+                    department_id: a.department_id || null,
+                    difficulty_id: a.difficulty_id ? Number(a.difficulty_id) : null,
+                    desired_start_date: a.desired_start_date || null,
+                    desired_end_date: a.desired_end_date || null,
+                    start_time: String(a.start_time_hour || '00').padStart(2, '0') + ':' + String(a.start_time_min || '00').padStart(2, '0'),
+                    desired_time: String(a.desired_time_hour || '00').padStart(2, '0') + ':' + String(a.desired_time_min || '00').padStart(2, '0'),
+                    estimated_hours: a.estimated_hours || null,
+                    work_item_type_id: a.work_item_type_id || null,
+                    size_id: a.size_id || null,
+                    stage_id: a.stage_id || null,
+                    status_id: 1,
+                    amounts: typeof a.amounts === 'number' ? a.amounts : Number(a.amounts) || 0,
+                    amounts_unit: a.amounts_unit || 'page',
+                    _progress_sheet_id: a._progress_sheet_id ?? null,
+                    _row_id: a._row_id ?? null,
+                    _col_key: a._col_key ?? null,
+                };
+            }),
         };
 
         // work_slots を追加
