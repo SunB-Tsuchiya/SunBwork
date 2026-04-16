@@ -901,6 +901,34 @@ const historyOtherCount = computed(() => {
     return historyDeduplicate(raw).filter((m) => !isSheetLinked(m)).length;
 });
 
+function historyGetWorkDate(m) {
+    try {
+        if (m.event_starts_at) {
+            const norm = String(m.event_starts_at).replace(' ', 'T');
+            const dateStr = norm.split('T')[0];
+            const parts = dateStr.split('-');
+            if (parts.length === 3) {
+                const formatted = `${parts[0]}/${parts[1]}/${parts[2]}`;
+                const d = new Date(norm);
+                const startTime = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+                if (m.event_ends_at) {
+                    const e = new Date(String(m.event_ends_at).replace(' ', 'T'));
+                    const endTime = `${String(e.getHours()).padStart(2, '0')}:${String(e.getMinutes()).padStart(2, '0')}`;
+                    return `${formatted}\n${startTime}〜${endTime}`;
+                }
+                return `${formatted}\n${startTime}〜`;
+            }
+        }
+        const date = m.project_job_assignment?.desired_end_date || null;
+        if (!date) return '-';
+        const parts = String(date).split('T')[0].split('-');
+        if (parts.length !== 3) return String(date).split('T')[0];
+        return `${parts[0]}/${parts[1]}/${parts[2]}`;
+    } catch {
+        return '-';
+    }
+}
+
 function historyGetSender(m) {
     try {
         return m.sender?.name || m.message?.fromUser?.name || '-';
