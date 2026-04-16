@@ -73,6 +73,7 @@ function isImageType(type) { return IMAGE_TYPES.includes(type) }
 
 function filesForType(type) {
     return (props.fileInfo?.files ?? []).filter(f => {
+        if (f.type) return f.type === type
         const ext = f.ext ?? f.name?.split('.').pop()?.toLowerCase() ?? ''
         return guessType(ext) === type
     })

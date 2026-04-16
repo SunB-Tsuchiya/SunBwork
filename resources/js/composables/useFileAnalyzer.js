@@ -541,6 +541,7 @@ export function useFileAnalyzer() {
             files: results.value.map(f => ({
                 name: f.name,
                 ext: f.ext,
+                type: f.type,
                 size: f.size,
                 pages: f.pages,
                 doc_size: f.doc_size,

@@ -901,6 +901,28 @@ const historyOtherCount = computed(() => {
     return historyDeduplicate(raw).filter((m) => !isSheetLinked(m)).length;
 });
 
+function historyGetSender(m) {
+    try {
+        return m.sender?.name || m.message?.fromUser?.name || '-';
+    } catch {
+        return '-';
+    }
+}
+
+function historyGetRecipients(m) {
+    try {
+        const recs = m.message && Array.isArray(m.message.recipients) ? m.message.recipients : [];
+        if (recs.length) {
+            const names = recs.map((r) => r.user?.name || r.name || null).filter(Boolean);
+            if (names.length) return names.join(', ');
+        }
+        if (m.project_job_assignment?.user?.name) return m.project_job_assignment.user.name;
+        return '-';
+    } catch {
+        return '-';
+    }
+}
+
 function historyRowClick(m, event) {
     const tag = event.target?.tagName?.toLowerCase() || '';
     if (tag === 'a' || tag === 'button' || event.target.closest?.('a,button')) return;
