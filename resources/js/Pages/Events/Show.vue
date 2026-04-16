@@ -1,6 +1,7 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
 import AssignmentDetailCard from '@/Components/AssignmentDetailCard.vue';
+import FileInfoDisplay from '@/Components/FileInfoDisplay.vue';
 import ProofRequestModal from '@/Components/ProofRequestModal.vue';
 import { Link, router } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
@@ -137,7 +138,7 @@ const eventTypeLabel = computed(() => props.event?.event_item_type?.name ?? null
                             <div class="mt-0.5 text-base font-bold text-indigo-700">{{ actualDurationText() }}</div>
                             <div v-if="hasDeductions" class="mt-1 space-y-0.5 text-xs text-gray-400">
                                 <div>記録 {{ durationText() }}</div>
-                                <div v-if="lunchMins > 0" class="text-amber-600">ランチ −{{ formatMins(lunchMins) }}（{{ lunch_start }}〜{{ lunch_end }}）</div>
+                                <div v-if="lunchMins > 0" class="text-amber-600">休憩 −{{ formatMins(lunchMins) }}（{{ lunch_start }}〜{{ lunch_end }}）</div>
                                 <div v-if="interruptionMins > 0" class="text-orange-600">中断 −{{ formatMins(interruptionMins) }}</div>
                             </div>
                         </div>
@@ -213,6 +214,11 @@ const eventTypeLabel = computed(() => props.event?.event_item_type?.name ?? null
             <!-- ジョブ割り当て詳細カード -->
             <div v-if="assignment">
                 <AssignmentDetailCard :assignment="assignment" />
+            </div>
+
+            <!-- ファイル一覧（file_info がある場合） -->
+            <div v-if="assignment?.file_info" class="mt-4">
+                <FileInfoDisplay :fileInfo="assignment.file_info" />
             </div>
 
         </div>

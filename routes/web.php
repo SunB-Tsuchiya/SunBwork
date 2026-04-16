@@ -543,6 +543,9 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         // Project job assignment (JobAssign)
         Route::get('project_jobs/{projectJob}/assignments',[App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'index'])->name('project_jobs.assignments.index');
         Route::get('project_jobs/{projectJob}/assignments/create', [App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'create'])->name('project_jobs.assignments.create');
+        // 複合ジョブ作成（static routeは {assignment} より前に定義する）
+        Route::get('project_jobs/{projectJob}/assignments/composite/create', [App\Http\Controllers\Coordinator\CompositeJobAssignmentController::class, 'create'])->name('project_jobs.assignments.composite.create');
+        Route::post('project_jobs/{projectJob}/assignments/composite', [App\Http\Controllers\Coordinator\CompositeJobAssignmentController::class, 'store'])->name('project_jobs.assignments.composite.store');
         Route::get('project_jobs/{projectJob}/assignments/{assignment}/edit', [App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'edit'])->name('project_jobs.assignments.edit');
         // Show (read-only) view for a single assignment
         Route::get('project_jobs/{projectJob}/assignments/{assignment}', [App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'show'])->name('project_jobs.assignments.show');

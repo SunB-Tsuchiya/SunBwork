@@ -226,7 +226,14 @@ class EventController extends Controller
                     }
                 }
 
-                $mapped = $events->map(function ($e) use ($progressAssignmentIds, $assignmentSenders, $baseUserId) {
+                // 休憩設定をユーザー分まとめて取得（日別設定 → グローバル設定の優先順）
+                $userLunchSettingForIndex = null;
+                try {
+                    $userLunchSettingForIndex = \App\Models\UserSetting::where('user_id', $baseUserId)->first();
+                } catch (\Throwable $_) {}
+                $lunchBreakCache = []; // date => breakInfo|null
+
+                $mapped = $events->map(function ($e) use ($progressAssignmentIds, $assignmentSenders, $baseUserId, $userLunchSettingForIndex, &$lunchBreakCache) {
                     $arr = $e->toArray();
                     $pjId = $arr['project_job_assignment_id'] ?? ($e->project_job_assignment_id ?? null);
                     $hasProgress = $pjId ? in_array((int)$pjId, $progressAssignmentIds, true) : false;
@@ -250,6 +257,41 @@ class EventController extends Controller
                         'has_progress_cell' => $hasProgress,
                         'is_self_assigned' => $isSelf,
                     ]);
+
+                    // ランチ休憩の重複分を計算して付与
+                    $lunchOverlapMinutes = 0;
+                    try {
+                        $startsAt = $e->starts_at ?? $e->start ?? null;
+                        $endsAt   = $e->ends_at   ?? $e->end   ?? null;
+                        if ($startsAt && $endsAt) {
+                            $evDate = \Carbon\Carbon::parse($startsAt)->toDateString();
+                            if (!array_key_exists($evDate, $lunchBreakCache)) {
+                                $breakInfo = null;
+                                try {
+                                    $breakInfo = \App\Models\UserMonthlyBreak::breakForDate((int)$baseUserId, $evDate);
+                                } catch (\Throwable $_) {}
+                                if (!$breakInfo) {
+                                    // レコード未存在の場合はDBカラムのデフォルト値（12:00〜13:00）を使用
+                                    $lunchS = $userLunchSettingForIndex?->lunch_start ?: '12:00';
+                                    $lunchE = $userLunchSettingForIndex?->lunch_end   ?: '13:00';
+                                    $breakInfo = ['start' => $lunchS, 'end' => $lunchE];
+                                }
+                                $lunchBreakCache[$evDate] = $breakInfo;
+                            }
+                            $breakInfo = $lunchBreakCache[$evDate];
+                            if ($breakInfo) {
+                                $lunchStartDt = \Carbon\Carbon::parse($evDate . ' ' . $breakInfo['start']);
+                                $lunchEndDt   = \Carbon\Carbon::parse($evDate . ' ' . $breakInfo['end']);
+                                $evStart      = \Carbon\Carbon::parse($startsAt);
+                                $evEnd        = \Carbon\Carbon::parse($endsAt);
+                                $overlapStart = $evStart->gt($lunchStartDt) ? $evStart : $lunchStartDt;
+                                $overlapEnd   = $evEnd->lt($lunchEndDt)    ? $evEnd   : $lunchEndDt;
+                                $lunchOverlapMinutes = max(0, (int)$overlapStart->diffInMinutes($overlapEnd, false));
+                            }
+                        }
+                    } catch (\Throwable $_) {}
+                    $arr['lunch_overlap_minutes'] = $lunchOverlapMinutes;
+
                     return $arr;
                 })->values();
 
@@ -887,11 +929,12 @@ class EventController extends Controller
                 $breakInfo = UserMonthlyBreak::breakForDate((int) $event->user_id, $eventDate);
             }
             // 日別設定がなければグローバル設定にフォールバック
+            // レコード自体が存在しない場合はDBカラムのデフォルト値（12:00〜13:00）を使用する
             if (!$breakInfo && $event->user_id) {
                 $userSetting = UserSetting::where('user_id', $event->user_id)->first();
-                if ($userSetting && $userSetting->lunch_start && $userSetting->lunch_end) {
-                    $breakInfo = ['start' => $userSetting->lunch_start, 'end' => $userSetting->lunch_end];
-                }
+                $lunchS = $userSetting?->lunch_start ?: '12:00';
+                $lunchE = $userSetting?->lunch_end   ?: '13:00';
+                $breakInfo = ['start' => $lunchS, 'end' => $lunchE];
             }
             if ($breakInfo && $event->starts_at && $event->ends_at) {
                 $lunchStart   = $breakInfo['start'];
@@ -973,9 +1016,9 @@ class EventController extends Controller
             }
             if (!$breakInfo && $event->user_id) {
                 $userSetting = UserSetting::where('user_id', $event->user_id)->first();
-                if ($userSetting && $userSetting->lunch_start && $userSetting->lunch_end) {
-                    $breakInfo = ['start' => $userSetting->lunch_start, 'end' => $userSetting->lunch_end];
-                }
+                $lunchS = $userSetting?->lunch_start ?: '12:00';
+                $lunchE = $userSetting?->lunch_end   ?: '13:00';
+                $breakInfo = ['start' => $lunchS, 'end' => $lunchE];
             }
             if ($breakInfo && $event->starts_at && $event->ends_at) {
                 $lunchStart   = $breakInfo['start'];

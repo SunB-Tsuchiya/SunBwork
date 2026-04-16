@@ -108,13 +108,65 @@ class ProjectJobAssignmentUserController extends Controller
         // Build a single prefill assignment object for the form using query params and optional job source
         if ($sourceAssignment) {
             // Coordinator 割当から prefill を構築（JobBox/Show からの「マイジョブとして登録」）
+            // 複合ジョブの場合は file_info からページ数・ファイル数を amounts に自動設定
+            $sourceAmounts = null;
+            $sourceAmountsUnit = 'page';
+            $estimatedSizeId = null;
+
+            if (!empty($sourceAssignment->file_info)) {
+                $fi = is_array($sourceAssignment->file_info) ? $sourceAssignment->file_info : json_decode($sourceAssignment->file_info, true);
+                if ($fi) {
+                    // ページ数・ファイル数を amounts に自動設定
+                    $totalPages = $fi['total_pages'] ?? 0;
+                    $totalFiles = $fi['total_files'] ?? 0;
+                    if ($totalPages > 0) {
+                        $sourceAmounts = $totalPages;
+                        $sourceAmountsUnit = 'page';
+                    } elseif ($totalFiles > 0) {
+                        $sourceAmounts = $totalFiles;
+                        $sourceAmountsUnit = 'file';
+                    }
+
+                    // ページ型ファイル（PDF・Word・AI・EPS）のサイズ推定
+                    // 全ファイルが同一 doc_size の場合のみ Size レコードにマッチング
+                    if (empty($sourceAssignment->size_id) && !empty($fi['files'])) {
+                        $pageExts = ['pdf', 'ai', 'docx', 'doc', 'eps'];
+                        $pageFiles = array_filter($fi['files'], fn($f) =>
+                            in_array(strtolower($f['ext'] ?? ''), $pageExts)
+                        );
+                        $allFiles = $fi['files'];
+
+                        // 「PDFやWordのみ」= 全ファイルがページ型、または全ページ型ファイルが同一サイズ
+                        $onlyPageType = !empty($pageFiles) && count($pageFiles) === count($allFiles);
+                        if (!empty($pageFiles)) {
+                            $docSizes = array_unique(array_filter(
+                                array_map(fn($f) => $f['doc_size'] ?? null, $pageFiles)
+                            ));
+                            // 全ページ型ファイルが同一サイズ（かつPDFのみ or サイズ差異なし）
+                            if (count($docSizes) === 1 && ($onlyPageType || true)) {
+                                $docSize = reset($docSizes);
+                                // "B5(JIS)" → "B5"、"A4" → "A4" のように括弧内を除去してマッチング
+                                $baseName = preg_replace('/\s*\([^)]*\)\s*$/', '', $docSize);
+                                try {
+                                    $sizeRecord = \App\Models\Size::where('name', $baseName)
+                                        ->orWhere('name', $docSize)
+                                        ->orderByRaw('CASE WHEN name = ? THEN 0 ELSE 1 END', [$baseName])
+                                        ->first();
+                                    if ($sizeRecord) $estimatedSizeId = $sizeRecord->id;
+                                } catch (\Throwable $__e) {}
+                            }
+                        }
+                    }
+                }
+            }
+
             $prefill = [
                 'project_job_id' => $sourceAssignment->project_job_id,
                 '_client_id' => $sourceAssignment->projectJob?->client?->id ?? ($request->query('_client_id') ?: ''),
                 'title_suffix' => $sourceAssignment->title ?? $request->query('title') ?? '',
                 'detail' => $sourceAssignment->detail ?? '',
                 'work_item_type_id' => $sourceAssignment->work_item_type_id ?? null,
-                'size_id' => $sourceAssignment->size_id ?? null,
+                'size_id' => $sourceAssignment->size_id ?? $estimatedSizeId,
                 'stage_id' => $sourceAssignment->stage_id ?? null,
                 'difficulty_id' => $sourceAssignment->difficulty_id ?? null,
                 'desired_end_date' => $sourceAssignment->desired_end_date
@@ -123,8 +175,13 @@ class ProjectJobAssignmentUserController extends Controller
                 'desired_time' => $sourceAssignment->desired_time ?? null,
                 'estimated_hours' => $sourceAssignment->estimated_hours ?? ($request->query('estimated_hours') ?: null),
                 'sender_id' => $user ? $user->id : null,
-                'amounts' => null,
+                'amounts' => $sourceAmounts,
+                'amounts_unit' => $sourceAmountsUnit,
                 'status_id' => null,
+                // ファイル情報を引き継ぐ（表示・保存用）
+                'file_info' => $sourceAssignment->file_info ?? null,
+                // 依頼ジョブをマイジョブで置き換えたことを記録（coordinator jobbox の非表示フィルタに使用）
+                'supersedes_assignment_id' => (int) $sourceJobAssignmentId,
             ];
         } else {
             $prefill = [
@@ -156,6 +213,9 @@ class ProjectJobAssignmentUserController extends Controller
             'difficulties' => $difficulties,
             // supply assignments array so AssignmentForm_user will prefill
             'assignments' => [$prefill],
+            // 複合ジョブ由来の場合、ファイル情報を別途渡してUIに表示
+            'source_job_type' => $sourceAssignment?->job_type ?? null,
+            'source_file_info' => $sourceAssignment?->file_info ?? null,
         ];
 
         // source_job_assignment_id がある場合（JobBox/Show からの独立ジョブ作成）→ MyJobBox/Create_user

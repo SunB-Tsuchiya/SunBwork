@@ -2,14 +2,18 @@
     <AppLayout title="ジョブ作成">
         <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
             <div class="mb-4 flex items-center justify-between">
-                <h1 class="text-2xl font-bold">ジョブ作成（独自）</h1>
-                <button @click="openModal" class="rounded border border-gray-300 bg-gray-50 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100">
+                <h1 class="text-2xl font-bold">
+                    <template v-if="hasSourceJob">依頼されたジョブをマイジョブとして登録</template>
+                    <template v-else>ジョブ作成（独自）</template>
+                </h1>
+                <button v-if="!hasSourceJob" @click="openModal" class="rounded border border-gray-300 bg-gray-50 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100">
                     過去データから流用
                 </button>
-                <button @click="openRequestModal" class="rounded border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-sm text-indigo-700 hover:bg-indigo-100">
+                <button v-if="!hasSourceJob" @click="openRequestModal" class="rounded border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-sm text-indigo-700 hover:bg-indigo-100">
                     依頼ジョブとして登録
                 </button>
             </div>
+
             <div>
                 <AssignmentFormUser
                     mode="user"
@@ -24,6 +28,14 @@
                     :user-clients="userClients"
                     :user-projects="userProjects"
                 />
+            </div>
+
+            <!-- 依頼ジョブ由来: ファイル一覧（file_info があれば常に表示） -->
+            <div v-if="sourceFileInfo" class="mt-5">
+                <div class="mb-2 rounded border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-700">
+                    コーディネーターから送られたジョブのファイル情報です。ページ数・ファイル数は自動的に反映されています。
+                </div>
+                <FileInfoDisplay :fileInfo="sourceFileInfo" />
             </div>
         </div>
 
@@ -205,6 +217,7 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
 import AssignmentFormUser from '@/Pages/Coordinator/ProjectJobs/JobAssign/AssignmentForm.vue';
+import FileInfoDisplay from '@/Components/FileInfoDisplay.vue';
 import { usePage } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 
@@ -214,6 +227,10 @@ const members = page.props.members || [];
 const userClients = page.props.userClients || [];
 const userProjects = page.props.userProjects || [];
 const defaultUserId = page.props.auth && page.props.auth.user ? page.props.auth.user.id : null;
+
+// 依頼ジョブ由来かどうか（source_file_info または source_job_type があれば）
+const hasSourceJob = !!(page.props.source_file_info || page.props.source_job_type);
+const sourceFileInfo = page.props.source_file_info ?? null;
 
 const formAssignments = ref(page.props.assignments || []);
 const formKey = ref(0);

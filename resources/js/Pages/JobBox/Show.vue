@@ -67,6 +67,11 @@
             <!-- ジョブ割り当て詳細カード -->
             <AssignmentDetailCard :assignment="assignment" />
 
+            <!-- ファイル一覧（file_info があれば常に表示） -->
+            <div v-if="assignment.file_info" class="mt-2">
+                <FileInfoDisplay :fileInfo="assignment.file_info" />
+            </div>
+
         </div>
     </AppLayout>
 </template>
@@ -74,6 +79,7 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
 import AssignmentDetailCard from '@/Components/AssignmentDetailCard.vue';
+import FileInfoDisplay from '@/Components/FileInfoDisplay.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, ref } from 'vue';
 import { route } from 'ziggy-js';

@@ -44,6 +44,7 @@ class ProjectJobAssignment extends Model
         'subcontractor_id',
         'proof_dispatcher_id',
         'job_type',
+        'file_info',
     ];
 
     protected $casts = [
@@ -63,6 +64,7 @@ class ProjectJobAssignment extends Model
         'scheduled_at' => 'datetime',
         'source_assignment_id' => 'integer',
         'supersedes_assignment_id' => 'integer',
+        'file_info' => 'array',
     ];
 
     protected $dates = [
@@ -153,6 +155,11 @@ class ProjectJobAssignment extends Model
     public function events()
     {
         return $this->hasMany(\App\Models\Event::class, 'project_job_assignment_id');
+    }
+
+    public function fileStats()
+    {
+        return $this->hasOne(\App\Models\AssignmentFileStat::class, 'project_job_assignment_id');
     }
 
     public function proofDispatcher()

@@ -8,6 +8,11 @@
             <!-- ジョブ割り当て詳細カード -->
             <AssignmentDetailCard :assignment="assignment" />
 
+            <!-- ファイル一覧（file_info があれば常に表示） -->
+            <div v-if="assignment.file_info" class="mt-2">
+                <FileInfoDisplay :fileInfo="assignment.file_info" />
+            </div>
+
             <!-- セットされた予定セクション -->
             <div v-if="showScheduledSection" class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
                 <div class="border-b bg-gray-50 px-5 py-3">
@@ -22,8 +27,8 @@
                                 <th class="pb-2 text-left font-medium">開始</th>
                                 <th class="pb-2 text-left font-medium">終了</th>
                                 <th class="pb-2 text-left font-medium">作業時間合計</th>
-                                <th v-if="hasInterruptions" class="pb-2 text-left font-medium text-orange-600">中断時間</th>
-                                <th v-if="hasInterruptions" class="pb-2 text-left font-medium text-blue-700">実作業時間</th>
+                                <th v-if="hasDeductions" class="pb-2 text-left font-medium text-orange-600">控除時間</th>
+                                <th v-if="hasDeductions" class="pb-2 text-left font-medium text-blue-700">実作業時間</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
@@ -31,28 +36,36 @@
                                 <td class="py-2 text-gray-900">{{ ev.dateStr }}</td>
                                 <td class="py-2 text-gray-900">{{ ev.startTime }}</td>
                                 <td class="py-2 text-gray-900">{{ ev.endTime }}</td>
-                                <td class="py-2" :class="ev.interruptionMinutes > 0 ? 'text-gray-400 line-through' : 'text-gray-900'">
+                                <td class="py-2" :class="(ev.interruptionMinutes > 0 || ev.lunchMinutes > 0) ? 'text-gray-400 line-through' : 'text-gray-900'">
                                     {{ formatDurationFromMinutes(ev.minutes) }}
                                 </td>
-                                <td v-if="hasInterruptions" class="py-2 text-orange-600">
-                                    {{ ev.interruptionMinutes > 0 ? '−' + formatDurationFromMinutes(ev.interruptionMinutes) : '—' }}
+                                <td v-if="hasDeductions" class="py-2 text-orange-600">
+                                    <template v-if="ev.interruptionMinutes > 0 || ev.lunchMinutes > 0">
+                                        −{{ formatDurationFromMinutes(ev.interruptionMinutes + ev.lunchMinutes) }}
+                                        <span v-if="ev.lunchMinutes > 0 && ev.interruptionMinutes > 0" class="ml-1 text-xs text-gray-400">（中断＋休憩）</span>
+                                        <span v-else-if="ev.lunchMinutes > 0" class="ml-1 text-xs text-amber-600">（休憩）</span>
+                                    </template>
+                                    <template v-else>—</template>
                                 </td>
-                                <td v-if="hasInterruptions" class="py-2 font-bold text-blue-700">
+                                <td v-if="hasDeductions" class="py-2 font-bold text-blue-700">
                                     {{ formatDurationFromMinutes(ev.actualMinutes) }}
                                 </td>
                             </tr>
                         </tbody>
-                        <tfoot v-if="hasInterruptions">
+                        <tfoot v-if="hasDeductions">
                             <tr class="border-t bg-gray-50">
                                 <td colspan="3" class="py-2 pr-2 text-right text-xs text-gray-500">合計実作業時間：</td>
                                 <td class="py-2 text-xs text-gray-400 line-through">{{ formatDurationFromMinutes(totalMinutes) }}</td>
-                                <td class="py-2 text-xs text-orange-600">−{{ formatDurationFromMinutes(totalInterruptionMinutes) }}</td>
+                                <td class="py-2 text-xs text-orange-600">−{{ formatDurationFromMinutes(totalInterruptionMinutes + totalLunchMinutes) }}</td>
                                 <td class="py-2 text-sm font-bold text-blue-700">{{ formatDurationFromMinutes(totalActualMinutes) }}</td>
                             </tr>
                         </tfoot>
                     </table>
                     <p v-if="hasInterruptions" class="mt-2 text-xs text-gray-500">
                         ※ 差し込み作業が発生したため、中断時間を実作業時間から除外しています。
+                    </p>
+                    <p v-if="hasLunch" class="mt-1 text-xs text-gray-500">
+                        ※ 休憩時間が作業時間と重複しているため、該当分を実作業時間から除外しています。
                     </p>
                 </div>
             </div>
@@ -183,6 +196,7 @@
 
 <script setup>
 import AssignmentDetailCard from '@/Components/AssignmentDetailCard.vue';
+import FileInfoDisplay from '@/Components/FileInfoDisplay.vue';
 import ProofRequestModal from '@/Components/ProofRequestModal.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
@@ -353,14 +367,18 @@ const formattedEvents = computed(() => {
         const endTime = end ? end.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : '';
         const minutes = start && end ? Math.max(0, Math.round((end - start) / 60000)) : 0;
         const interruptionMinutes = e.interruption_minutes ?? 0;
-        const actualMinutes = Math.max(0, minutes - interruptionMinutes);
-        return { ...e, dateStr, startTime, endTime, minutes, interruptionMinutes, actualMinutes };
+        const lunchMinutes = e.lunch_overlap_minutes ?? 0;
+        const actualMinutes = Math.max(0, minutes - interruptionMinutes - lunchMinutes);
+        return { ...e, dateStr, startTime, endTime, minutes, interruptionMinutes, lunchMinutes, actualMinutes };
     });
 });
 
 const hasInterruptions = computed(() => formattedEvents.value.some((e) => e.interruptionMinutes > 0));
+const hasLunch = computed(() => formattedEvents.value.some((e) => e.lunchMinutes > 0));
+const hasDeductions = computed(() => hasInterruptions.value || hasLunch.value);
 const totalMinutes = computed(() => formattedEvents.value.reduce((sum, e) => sum + e.minutes, 0));
 const totalInterruptionMinutes = computed(() => formattedEvents.value.reduce((sum, e) => sum + e.interruptionMinutes, 0));
+const totalLunchMinutes = computed(() => formattedEvents.value.reduce((sum, e) => sum + e.lunchMinutes, 0));
 const totalActualMinutes = computed(() => formattedEvents.value.reduce((sum, e) => sum + e.actualMinutes, 0));
 
 // ---- チェーン関連 computed ----
@@ -376,8 +394,9 @@ function formatSeriesEvent(e) {
     const end = rawEnd ? new Date(rawEnd) : null;
     const minutes = start && end ? Math.max(0, Math.round((end - start) / 60000)) : 0;
     const interruptionMinutes = e.interruption_minutes ?? 0;
-    const actualMinutes = Math.max(0, minutes - interruptionMinutes);
-    return { minutes, interruptionMinutes, actualMinutes };
+    const lunchMinutes = e.lunch_overlap_minutes ?? 0;
+    const actualMinutes = Math.max(0, minutes - interruptionMinutes - lunchMinutes);
+    return { minutes, interruptionMinutes, lunchMinutes, actualMinutes };
 }
 const seriesTotalMinutes = computed(() => {
     const ownTotal = totalActualMinutes.value || totalMinutes.value;

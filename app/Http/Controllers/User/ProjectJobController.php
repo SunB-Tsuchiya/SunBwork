@@ -318,6 +318,66 @@ class ProjectJobController extends Controller
             ]);
         }
 
+        // 自己割当（sender_id = user_id）で jobHistory 未収録のものを synthetic エントリとして追加
+        try {
+            $jhArr2 = $jobHistory instanceof \Illuminate\Support\Collection ? $jobHistory->toArray() : (array) $jobHistory;
+            $coveredAids = collect($jhArr2)
+                ->map(fn ($m) => (int) ($m['project_job_assignment_id'] ?? $m['project_job_assignment']['id'] ?? 0))
+                ->filter()->unique()->toArray();
+
+            $selfAssigned = ProjectJobAssignment::where('project_job_id', $projectJob->id)
+                ->where('user_id', $user->id)
+                ->whereColumn('sender_id', 'user_id')   // 自己割当のみ
+                ->whereNotIn('id', $coveredAids)
+                ->with(['user', 'statusModel'])
+                ->get();
+
+            if ($selfAssigned->isNotEmpty()) {
+                $selfSynths = $selfAssigned->map(function ($a) {
+                    $sm = $a->statusModel;
+                    return [
+                        'id'                        => null,
+                        'project_job_assignment_id' => $a->id,
+                        'subject'                   => $a->title,
+                        'body'                      => null,
+                        'created_at'                => $a->created_at,
+                        'read_at'                   => $a->read_at,
+                        'sender'                    => $a->user
+                            ? ['id' => $a->user->id, 'name' => $a->user->name]
+                            : null,
+                        'message'                   => null,
+                        'project_job_assignment'    => [
+                            'id'               => $a->id,
+                            'title'            => $a->title,
+                            'user_id'          => $a->user_id,
+                            'desired_end_date' => $a->desired_end_date?->format('Y-m-d'),
+                            'start_time'       => $a->start_time,
+                            'completed'        => (bool) $a->completed,
+                            'scheduled'        => (bool) ($a->scheduled ?? false),
+                            'scheduled_at'     => $a->scheduled_at,
+                            'read_at'          => $a->read_at,
+                            'status'           => $sm
+                                ? ['id' => $sm->id, 'key' => $sm->key ?? $sm->slug ?? null, 'name' => $sm->name]
+                                : null,
+                            'user'             => $a->user
+                                ? ['id' => $a->user->id, 'name' => $a->user->name]
+                                : null,
+                        ],
+                    ];
+                })->toArray();
+
+                $jobHistory = array_merge(
+                    $jobHistory instanceof \Illuminate\Support\Collection ? $jobHistory->toArray() : (array) $jobHistory,
+                    $selfSynths
+                );
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Failed to add self-assigned synthetic jobHistory entries', [
+                'error'          => $e->getMessage(),
+                'project_job_id' => $projectJob->id,
+            ]);
+        }
+
         // jobHistory の各エントリにカレンダーイベント情報を付加（作業日表示用）
         try {
             $jhArr = $jobHistory instanceof \Illuminate\Support\Collection ? $jobHistory->toArray() : (array) $jobHistory;

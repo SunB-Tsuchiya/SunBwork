@@ -41,6 +41,148 @@
             <label class="mb-1 mt-2 block font-semibold">概要</label>
             <textarea v-model="block.detail" :disabled="!editMode" class="w-full rounded border px-3 py-2" rows="3"></textarea>
 
+            <!-- 作業ファイル情報 -->
+            <template v-if="props.mode === 'coordinator' || props.mode === 'user'">
+                <div class="mt-3 rounded border border-blue-200 bg-blue-50 p-3">
+                    <h3 class="mb-2 text-sm font-semibold text-blue-800">作業ファイル情報</h3>
+
+                    <!-- 既存 file_info の表示（閲覧時） -->
+                    <div v-if="!editMode && block.file_info" class="text-sm text-gray-700">
+                        合計: {{ block.file_info.total_files }}ファイル
+                        <template v-if="block.file_info.total_pages"> / {{ block.file_info.total_pages }}ページ</template>
+                        <span class="ml-2 text-xs text-gray-400">（詳細はショー画面で確認できます）</span>
+                    </div>
+                    <div v-else-if="!editMode && !block.file_info" class="text-xs text-gray-400">ファイル情報なし</div>
+
+                    <!-- 編集時のファイルアップロードUI -->
+                    <template v-if="editMode">
+                        <!-- 既存データがある場合の案内 -->
+                        <div v-if="block.file_info && fa(idx).results.value.length === 0" class="mb-2 rounded border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
+                            現在: {{ block.file_info.total_files }}ファイル
+                            <template v-if="block.file_info.total_pages"> / {{ block.file_info.total_pages }}ページ</template>
+                            — 再アップロードすると更新されます
+                        </div>
+
+                        <!-- 対応形式 -->
+                        <details class="mb-2 text-xs text-gray-500">
+                            <summary class="cursor-pointer hover:text-gray-700">対応ファイル形式</summary>
+                            <div class="mt-1 rounded border bg-white p-2">
+                                <div class="mb-1 font-semibold text-green-700">自動取得できる形式</div>
+                                <div class="grid grid-cols-2 gap-x-4 gap-y-0.5">
+                                    <div v-for="s in SUPPORTED_TYPES" :key="s.ext">
+                                        <span class="font-mono font-semibold">{{ s.ext }}</span>
+                                        <span class="text-gray-500"> — {{ s.info }}</span>
+                                    </div>
+                                </div>
+                                <div class="mt-1 border-t pt-1">
+                                    <div class="mb-0.5 font-semibold text-red-600">自動除外される形式</div>
+                                    <div v-for="u in UNSUPPORTED_NOTICE" :key="u.ext" class="text-red-600">
+                                        <span class="font-mono font-semibold">{{ u.ext }}</span>
+                                        <span class="text-gray-500"> — {{ u.reason }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </details>
+
+                        <!-- ドロップゾーン -->
+                        <div
+                            class="flex min-h-[80px] cursor-pointer flex-col items-center justify-center rounded border-2 border-dashed border-blue-300 bg-white px-4 py-4 text-center transition hover:border-blue-500 hover:bg-blue-50"
+                            @dragover.prevent
+                            @drop.prevent="onFileDrop($event, idx)"
+                            @click="triggerFileInput(idx)"
+                        >
+                            <p class="mb-2 text-xs text-gray-600">ここにファイル・フォルダをドラッグ＆ドロップ</p>
+                            <div class="flex gap-2">
+                                <button type="button" class="rounded border border-gray-300 bg-gray-50 px-2 py-1 text-xs text-gray-700 hover:bg-gray-100" @click.stop="triggerFolderInput(idx)">
+                                    フォルダを選択
+                                </button>
+                                <button type="button" class="rounded border border-gray-300 bg-gray-50 px-2 py-1 text-xs text-gray-700 hover:bg-gray-100" @click.stop="triggerFileInput(idx)">
+                                    ファイルを選択
+                                </button>
+                            </div>
+                        </div>
+                        <input :ref="el => { if(el) fileInputRefs[idx] = el }" type="file" multiple class="hidden" @change="onFileInputChange($event, idx)" />
+                        <input :ref="el => { if(el) folderInputRefs[idx] = el }" type="file" multiple webkitdirectory class="hidden" @change="onFileInputChange($event, idx)" />
+
+                        <!-- 対応外ファイル -->
+                        <div v-if="fa(idx).rejectedFiles.value.length > 0" class="mt-2 rounded border border-red-200 bg-red-50 p-2">
+                            <div class="mb-1 flex items-center justify-between">
+                                <span class="text-xs font-semibold text-red-700">除外ファイル（{{ fa(idx).rejectedFiles.value.length }}件）</span>
+                                <button type="button" class="text-xs text-red-400 hover:text-red-600" @click="fa(idx).clearRejected()">閉じる</button>
+                            </div>
+                            <ul class="max-h-24 overflow-y-auto text-xs text-red-700">
+                                <li v-for="(f, fi) in fa(idx).rejectedFiles.value" :key="fi" class="border-b border-red-100 py-0.5 last:border-0">
+                                    <span class="font-medium">{{ f.name }}</span> — {{ f.reason }}
+                                </li>
+                            </ul>
+                        </div>
+
+                        <!-- 解析中 -->
+                        <div v-if="fa(idx).analyzing.value" class="mt-2 flex items-center gap-2 text-xs text-blue-600">
+                            <svg class="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                            </svg>
+                            解析中...
+                        </div>
+
+                        <!-- ファイル一覧 -->
+                        <template v-if="fa(idx).results.value.length > 0">
+                            <div class="mt-2 flex justify-end">
+                                <button type="button" class="text-xs text-red-500 hover:underline" @click="fa(idx).clearFiles(); block.file_info = null;">すべて削除</button>
+                            </div>
+                            <div v-for="group in fa(idx).grouped.value" :key="group.type" class="mt-2">
+                                <div class="mb-1 text-xs font-semibold text-gray-700">
+                                    {{ group.label }}（{{ group.files.length }}ファイル
+                                    <template v-if="group.totalPages"> / {{ group.totalPages }}ページ</template>）
+                                </div>
+                                <table class="w-full text-xs">
+                                    <thead>
+                                        <tr class="bg-gray-100 text-left">
+                                            <th class="px-2 py-1">ファイル名</th>
+                                            <template v-if="group.columns === 'page'">
+                                                <th class="px-2 py-1">ページ数</th>
+                                                <th class="px-2 py-1">サイズ</th>
+                                            </template>
+                                            <template v-else-if="group.columns === 'image'">
+                                                <th class="px-2 py-1">幅×高さ</th>
+                                                <th class="px-2 py-1">カラー</th>
+                                            </template>
+                                            <th class="px-2 py-1 text-right">削除</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="(file, fi) in group.files" :key="fi" class="border-b border-gray-100">
+                                            <td class="px-2 py-1">
+                                                <span v-if="file.analyzing" class="inline-block h-3 w-3 animate-spin rounded-full border-2 border-blue-400 border-t-transparent"></span>
+                                                <span v-else>{{ file.name }}</span>
+                                            </td>
+                                            <template v-if="group.columns === 'page'">
+                                                <td class="px-2 py-1">{{ file.pages != null ? file.pages + 'p' : '-' }}</td>
+                                                <td class="px-2 py-1">{{ file.doc_size ?? '-' }}</td>
+                                            </template>
+                                            <template v-else-if="group.columns === 'image'">
+                                                <td class="px-2 py-1">{{ file.width && file.height ? `${file.width}×${file.height}` : '-' }}</td>
+                                                <td class="px-2 py-1">{{ file.extra ?? '-' }}</td>
+                                            </template>
+                                            <td class="px-2 py-1 text-right">
+                                                <button type="button" class="text-red-400 hover:text-red-600" @click="fa(idx).removeByGroupIndex(group.type, fi)">✕</button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <!-- 合計 -->
+                            <div class="mt-2 rounded border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-900">
+                                合計: {{ fa(idx).summary.value.totalFiles }}ファイル
+                                <template v-if="fa(idx).summary.value.totalPages"> / {{ fa(idx).summary.value.totalPages }}ページ</template>
+                                / {{ fa(idx).summary.value.totalSizeLabel }}
+                            </div>
+                        </template>
+                    </template>
+                </div>
+            </template>
+
             <!-- 割当ユーザー（概要直下に移動） -->
             <label class="mb-1 mt-3 block font-semibold">割当ユーザー</label>
             <div v-if="!editMode" class="mt-1 flex items-center gap-2 rounded border bg-gray-50 px-3 py-2 text-sm">
@@ -512,6 +654,7 @@
 <script setup>
 import SelectionModal from '@/Components/SelectionModal.vue';
 import useToasts from '@/Composables/useToasts';
+import { useFileAnalyzer, SUPPORTED_TYPES, UNSUPPORTED_NOTICE } from '@/composables/useFileAnalyzer';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, inject, onMounted, ref, watch } from 'vue';
 
@@ -589,7 +732,8 @@ const debugStr = computed(() => {
 });
 
 // Inline event editor state (user mode)
-const workDate = ref('');
+const _today = new Date();
+const workDate = ref(`${_today.getFullYear()}-${String(_today.getMonth() + 1).padStart(2, '0')}-${String(_today.getDate()).padStart(2, '0')}`); // 今日の日付をデフォルトに (YYYY-MM-DD)
 const startTimeHour = ref('09');
 const startTimeMin = ref('00');
 const endTimeHour = ref('10');
@@ -810,6 +954,7 @@ function normalizeAssignment(a) {
             _progress_sheet_id: a._progress_sheet_id ?? null,
             _row_id: a._row_id ?? null,
             _col_key: a._col_key ?? null,
+            file_info: a.file_info ?? null,
         };
     } else {
         return {
@@ -851,6 +996,8 @@ function normalizeAssignment(a) {
             _medium_filter: a._medium_filter ?? '',
             _type_filter: a._type_filter ?? '',
             source_assignment_id: a.source_assignment_id || null,
+            supersedes_assignment_id: a.supersedes_assignment_id || null,
+            file_info: a.file_info ?? null,
             _locked_client: a._locked_client || false,
             _locked_project: a._locked_project || false,
             _locked_stage: a._locked_stage || false,
@@ -1585,6 +1732,7 @@ function addBlock() {
         _type_filter: '',
         _medium_filter: 'paper',
         size_id: props.projectJob?.size_id ? String(props.projectJob.size_id) : null,
+        file_info: null,
     });
 }
 
@@ -1761,6 +1909,51 @@ function authDepartmentName() {
     return departmentNameFromId(null);
 }
 
+// ── ファイルアナライザー（ブロックごとに独立したインスタンス） ────────────────
+// 最大10ブロックまで対応（通常1〜3ブロック）
+const MAX_FILE_BLOCKS = 10;
+const fileAnalyzers = Array.from({ length: MAX_FILE_BLOCKS }, () => useFileAnalyzer());
+function fa(idx) { return fileAnalyzers[Math.min(idx, MAX_FILE_BLOCKS - 1)]; }
+
+const fileInputRefs   = {};
+const folderInputRefs = {};
+
+function triggerFileInput(idx)   { fileInputRefs[idx]?.click(); }
+function triggerFolderInput(idx) { folderInputRefs[idx]?.click(); }
+function onFileInputChange(e, idx) {
+    fa(idx).analyzeFiles(e.target.files);
+    e.target.value = '';
+}
+function onFileDrop(e, idx) { fa(idx).analyzeFiles(e.dataTransfer.files); }
+
+// ファイル解析完了後に amounts / size_id を自動更新
+fileAnalyzers.forEach((analyzer, idx) => {
+    watch(analyzer.summary, (s) => {
+        const block = assignments.value[idx];
+        if (!block || s.totalFiles === 0) return;
+        block.amounts      = s.totalPages > 0 ? s.totalPages : s.totalFiles;
+        block.amounts_unit = s.totalPages > 0 ? 'page' : 'file';
+        block.file_info    = analyzer.buildFileInfo();
+
+        // size_id 自動検出（案件固定・進行表ロックがない場合のみ）
+        if (!projectJobSizeId.value && !block._locked_size) {
+            const files = block.file_info?.files ?? [];
+            const sizeCounts = {};
+            files.forEach((f) => {
+                if (f.doc_size) sizeCounts[f.doc_size] = (sizeCounts[f.doc_size] ?? 0) + 1;
+            });
+            const topSize = Object.entries(sizeCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+            if (topSize) {
+                const sizeList = page.props.sizes ?? [];
+                const matched =
+                    sizeList.find((sz) => sz.name === topSize) ??
+                    sizeList.find((sz) => sz.name.startsWith(topSize) || topSize.startsWith(sz.name));
+                if (matched) block.size_id = String(matched.id);
+            }
+        }
+    });
+});
+
 const saving = ref(false);
 
 // 編集モード判定: assignments[0] に id があれば既存レコードの編集
@@ -1848,6 +2041,7 @@ async function save(sendImmediately = true) {
                     status_id: 1,
                     amounts: typeof a.amounts === 'number' ? a.amounts : Number(a.amounts) || 0,
                     amounts_unit: a.amounts_unit || 'page',
+                    file_info: a.file_info ? JSON.stringify(a.file_info) : null,
                     _progress_sheet_id: a._progress_sheet_id ?? null,
                     _row_id: a._row_id ?? null,
                     _col_key: a._col_key ?? null,
@@ -1898,6 +2092,7 @@ async function save(sendImmediately = true) {
                 status_id: a.status_id || null,
                 amounts: typeof a.amounts === 'number' ? a.amounts : Number(a.amounts) || 0,
                 amounts_unit: a.amounts_unit || 'page',
+                file_info: a.file_info ? JSON.stringify(a.file_info) : null,
                 send_immediately: sendImmediately,
             };
             const wsd = buildWorkSlotsPayload();
@@ -2007,6 +2202,8 @@ async function save(sendImmediately = true) {
                 amounts: typeof a.amounts === 'number' ? a.amounts : Number(a.amounts) || 0,
                 amounts_unit: a.amounts_unit || 'page',
                 source_assignment_id: a.source_assignment_id || null,
+                supersedes_assignment_id: a.supersedes_assignment_id || null,
+                file_info: a.file_info ?? null,
                 _progress_sheet_id: a._progress_sheet_id ?? null,
                 _row_id: a._row_id ?? null,
                 _col_key: a._col_key ?? null,

@@ -37,7 +37,9 @@ class ProjectJobAssignmentsController extends Controller
 
         // base query
         // include statusModel so we can return a canonical status object in the API payload
-        $query = $projectJob->projectJobAssignments()->with(['user', 'statusModel']);
+        // マイジョブに置き換えられた依頼ジョブは除外（supersededBy が存在するものは非表示）
+        $query = $projectJob->projectJobAssignments()->with(['user', 'statusModel'])
+            ->whereDoesntHave('supersededBy');
 
         // search
         $q = $request->query('q', null);
@@ -347,6 +349,8 @@ class ProjectJobAssignmentsController extends Controller
             'status_label' => $statusLabel,
             'amounts' => $a->amounts ?? null,
             'amounts_unit' => $a->amounts_unit ?? null,
+            'job_type' => $a->job_type ?? null,
+            'file_info' => $a->file_info ?? null,
         ];
 
         // build difficulties list
@@ -488,6 +492,8 @@ class ProjectJobAssignmentsController extends Controller
             'amounts' => $a->amounts ?? null,
             'amounts_unit' => $a->amounts_unit ?? null,
             'user' => $userInfo,
+            'job_type' => $a->job_type ?? null,
+            'file_info' => $a->file_info ?? null,
         ];
 
         // build difficulties list
@@ -543,6 +549,7 @@ class ProjectJobAssignmentsController extends Controller
             'amounts' => 'nullable|integer|min:0',
             'amounts_unit' => 'nullable|string|in:page,file',
             'send_immediately' => 'nullable|boolean',
+            'file_info' => 'nullable|string',
         ]);
 
         $sendImmediately = $request->boolean('send_immediately', false);
@@ -580,6 +587,9 @@ class ProjectJobAssignmentsController extends Controller
             'department_id' => $data['department_id'] ?? null,
             'amounts' => $data['amounts'] ?? null,
             'amounts_unit' => $data['amounts_unit'] ?? null,
+            'file_info' => isset($data['file_info']) && $data['file_info']
+                ? json_decode($data['file_info'], true)
+                : ($assignment->file_info ?? null),
         ];
 
         // (debug logs removed)
@@ -587,6 +597,11 @@ class ProjectJobAssignmentsController extends Controller
         // legacy difficulty string column removed from update payload
 
         $assignment->update($updateData);
+
+        // assignment_file_stats に upsert
+        if (!empty($updateData['file_info']) && is_array($updateData['file_info'])) {
+            \App\Models\AssignmentFileStat::upsertFromFileInfo($assignment->id, $updateData['file_info']);
+        }
 
         // 保存して再送信: 既存の JobAssignmentMessage を削除し、最新内容で再作成
         if ($sendImmediately && !empty($updateData['user_id'])) {
@@ -675,6 +690,7 @@ class ProjectJobAssignmentsController extends Controller
             'assignments.*._progress_sheet_id' => 'nullable|integer',
             'assignments.*._row_id' => 'nullable|integer',
             'assignments.*._col_key' => 'nullable|string|max:64',
+            'assignments.*.file_info' => 'nullable|string',
         ]);
 
         $sendImmediately = $request->boolean('send_immediately', false);
@@ -719,6 +735,10 @@ class ProjectJobAssignmentsController extends Controller
                     // amounts fields
                     'amounts' => $a['amounts'] ?? null,
                     'amounts_unit' => $a['amounts_unit'] ?? null,
+                    // file info
+                    'file_info' => isset($a['file_info']) && $a['file_info']
+                        ? json_decode($a['file_info'], true)
+                        : null,
                 ];
 
                 // legacy difficulty string column removed from create payload
@@ -726,6 +746,11 @@ class ProjectJobAssignmentsController extends Controller
                 // (debug logs removed)
 
                 $assignment = ProjectJobAssignment::create($createData);
+
+                // assignment_file_stats に upsert
+                if (!empty($createData['file_info']) && is_array($createData['file_info'])) {
+                    \App\Models\AssignmentFileStat::upsertFromFileInfo($assignment->id, $createData['file_info']);
+                }
 
                 // ジョブ通知（受信者と案件リーダー・副リーダーへ）
                 if (!empty($createData['user_id']) && $senderUser) {

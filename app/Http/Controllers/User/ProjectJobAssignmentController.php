@@ -45,6 +45,7 @@ class ProjectJobAssignmentController extends Controller
             'assignments.*.sender_id' => 'nullable|exists:users,id',
             'assignments.*.source_assignment_id' => 'nullable|exists:project_job_assignments,id',
             'assignments.*.supersedes_assignment_id' => 'nullable|exists:project_job_assignments,id',
+            'assignments.*.file_info' => 'nullable',
             'assignments.*._progress_sheet_id' => 'nullable|integer',
             'assignments.*._row_id' => 'nullable|integer',
             'assignments.*._col_key' => 'nullable|string|max:64',
@@ -83,6 +84,9 @@ class ProjectJobAssignmentController extends Controller
                     'department_id' => $a['department_id'] ?? null,
                     'amounts' => $a['amounts'] ?? null,
                     'amounts_unit' => $a['amounts_unit'] ?? null,
+                    'file_info' => !empty($a['file_info'])
+                        ? (is_array($a['file_info']) ? $a['file_info'] : json_decode($a['file_info'], true))
+                        : null,
                 ];
 
                 // legacy difficulty string column removed from payload

@@ -273,9 +273,19 @@ class JobBoxController extends Controller
                     });
             })
             // マイジョブで supersedes 済みの依頼ジョブは非表示
+            // ① supersedes_assignment_id で直接指定（新規フロー）
+            // ② フォールバック: 同ユーザー・同案件・同タイトルの自己割当が別レコードとして存在する（既存データ対応）
             ->whereNotExists(function ($sub) {
                 $sub->from('project_job_assignments as pja_self')
-                    ->whereColumn('pja_self.supersedes_assignment_id', 'project_job_assignments.id')
+                    ->where(function ($q) {
+                        $q->whereColumn('pja_self.supersedes_assignment_id', 'project_job_assignments.id')
+                          ->orWhere(function ($q2) {
+                              // 自己一致（pja_self が同一レコード）を防ぐため id が異なる条件を付ける
+                              $q2->whereColumn('pja_self.title', 'project_job_assignments.title')
+                                 ->whereColumn('pja_self.project_job_id', 'project_job_assignments.project_job_id')
+                                 ->whereColumn('pja_self.id', '<>', 'project_job_assignments.id');
+                          });
+                    })
                     ->whereColumn('pja_self.user_id', 'project_job_assignments.user_id')
                     ->whereColumn('pja_self.sender_id', 'pja_self.user_id');
             });
