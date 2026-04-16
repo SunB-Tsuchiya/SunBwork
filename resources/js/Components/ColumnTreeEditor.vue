@@ -194,10 +194,6 @@ const GROUP_LABELS = { paper: '紙媒体', digital: 'デジタル', web: 'Web', 
 
 const LABEL_SELECT_TYPES = ['stage', 'size', 'assignment', 'workItemType'];
 
-function isLabelSelect(node) {
-  return LABEL_SELECT_TYPES.includes(node.type);
-}
-
 function labelSelectOptions(node) {
   if (node.type === 'stage') return props.stages;
   if (node.type === 'assignment') return props.assignments;

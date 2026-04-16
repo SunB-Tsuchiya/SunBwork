@@ -319,7 +319,7 @@ const worktimeDuration = computed(() => {
   if (!s || !e) return '';
   const [sh, sm] = s.split(':').map(Number);
   const [eh, em] = e.split(':').map(Number);
-  let totalMin = (eh * 60 + em) - (sh * 60 + sm);
+  const totalMin = (eh * 60 + em) - (sh * 60 + sm);
   if (totalMin <= 0) return '';
   const h = Math.floor(totalMin / 60);
   const m = totalMin % 60;

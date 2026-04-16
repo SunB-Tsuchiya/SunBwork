@@ -257,7 +257,7 @@ const displayGroups = computed(() => {
         grouped.get(key).push(j);
     }
 
-    let sortedKeys = Array.from(grouped.keys());
+    const sortedKeys = Array.from(grouped.keys());
     if (viewMode.value === 'date') {
         sortedKeys.sort((a, b) => {
             if (!a) return 1;

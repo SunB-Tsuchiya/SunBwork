@@ -14,7 +14,7 @@ export default defineConfigWithVueTs(
             'vue/multi-word-component-names': 'off',
             '@typescript-eslint/no-explicit-any': 'off',
             'vue/block-lang': 'off',
-            '@typescript-eslint/no-unused-vars': 'warn',
+            '@typescript-eslint/no-unused-vars': ['warn', { caughtErrors: 'none', argsIgnorePattern: '^_' }],
             'vue/no-mutating-props': 'off',
             '@typescript-eslint/no-unused-expressions': 'off',
         },

@@ -105,10 +105,6 @@ const amounts = computed(() => {
 });
 
 const completedBadge = computed(() => props.assignment.completed);
-const scheduledBadge = computed(() => {
-    if (props.assignment.completed) return false;
-    return props.assignment.scheduled || props.assignment.scheduled_at;
-});
 </script>
 
 <template>

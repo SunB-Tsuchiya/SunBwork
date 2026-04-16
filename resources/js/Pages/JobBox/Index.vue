@@ -297,7 +297,7 @@ const displayGroups = computed(() => {
     }
 
     // グループ順ソート
-    let sortedKeys = Array.from(grouped.keys());
+    const sortedKeys = Array.from(grouped.keys());
     if (viewMode.value === 'date') {
         // 日付降順
         sortedKeys.sort((a, b) => {

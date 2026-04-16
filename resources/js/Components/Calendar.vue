@@ -650,24 +650,6 @@ const endHourSelectRef = ref(null);
 // Reference to FullCalendar component so we can programmatically navigate to dates
 const fullCalendarRef = ref(null);
 
-function goToAssignedJobs() {
-    try {
-        // Prefer named Ziggy route for JobBox index if available
-        if (typeof route === 'function' && route().has && route().has('coordinator.jobbox')) {
-            try {
-                router.get(route('coordinator.jobbox'));
-                return;
-            } catch (e) {
-                // fallthrough to fallback
-            }
-        }
-    } catch (err) {
-        // ignore
-    }
-    // fallback literal path
-    router.get(route('coordinator.jobbox'));
-}
-
 onMounted(() => {
     nextTick(() => {
         const now = new Date();
@@ -911,22 +893,7 @@ const baseEvents = ref([
         };
     }),
     // 予定（青）
-    ...(props.events ?? []).map((event, idx, arr) => {
-        // 重複数をカウント
-        let overlapCount = 0;
-        if (event.start && event.end) {
-            const evStart = new Date(event.start).getTime();
-            const evEnd = new Date(event.end).getTime();
-            overlapCount = arr.filter((ev, i) => {
-                if (i === idx) return false;
-                if (!ev.start || !ev.end) return false;
-                const s = new Date(ev.start).getTime();
-                const e = new Date(ev.end).getTime();
-                return evStart < e && evEnd > s;
-            }).length;
-        }
-        // 透明度計算（最大0.2まで薄くする）
-        const alpha = Math.max(1 - overlapCount * 0.2, 0.2);
+    ...(props.events ?? []).map((event) => {
         // If title starts with completion prefix, use dark yellow color
         const isCompleted = typeof event.title === 'string' && event.title.indexOf('【完了】') === 0;
 
@@ -975,35 +942,10 @@ const baseEvents = ref([
     }),
     // Assigned jobs display removed per UX request: do not include props.jobs in calendar events
 ]);
-// debug: log incoming props.events and processed baseEvents
-onMounted(() => {
-    try {
-        console.log('Calendar: initial props.events', props.events);
-    } catch (e) {}
-});
-watch(
-    () => props.events,
-    (v) => {
-        try {
-            console.log('Calendar: props.events changed', v);
-        } catch (e) {}
-    },
-    { immediate: true }
-);
-watch(
-    baseEvents,
-    (v) => {
-        try {
-            console.log('Calendar: processed baseEvents', v);
-        } catch (e) {}
-    },
-    { immediate: true }
-);
+
 
 // 通常イベント + 始業前背景イベントを結合
 const allEvents = computed(() => [...baseEvents.value, ...backgroundEvents.value]);
-
-// debug logs removed after investigation
 
 const calendarOptions = computed(() => ({
     plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],
@@ -1108,44 +1050,6 @@ const calendarOptions = computed(() => ({
         }
         if (confirm(confirmMessage)) {
             try {
-                // バリデーション用: タイトル・説明が空やタグのみの場合はダミー値をセット
-                function stripTags(str) {
-                    return str ? str.replace(/<[^>]*>?/gm, '') : '';
-                }
-                const safeTitle = info.event.title && stripTags(info.event.title).trim() !== '' ? info.event.title : 'タイトル未設定';
-                const safeDescription =
-                    info.event.extendedProps.description && stripTags(info.event.extendedProps.description).trim() !== ''
-                        ? info.event.extendedProps.description
-                        : '内容未設定';
-                // Build a safe log payload depending on allDay or timed event
-                let logPayload = {};
-                if (info.event.allDay) {
-                    logPayload = {
-                        start_date: displayStart,
-                        end_date: displayEndInclusive || displayStart,
-                        title: safeTitle,
-                        description: safeDescription,
-                    };
-                } else {
-                    // compute time parts for timed events
-                    const startDateObj2 = new Date(newStart);
-                    const endDateObj2 = new Date(newEnd);
-                    const date2 = startDateObj2.toISOString().slice(0, 10);
-                    const startHour2 = String(startDateObj2.getHours()).padStart(2, '0');
-                    const startMinute2 = String(startDateObj2.getMinutes()).padStart(2, '0');
-                    const endHour2 = String(endDateObj2.getHours()).padStart(2, '0');
-                    const endMinute2 = String(endDateObj2.getMinutes()).padStart(2, '0');
-                    logPayload = {
-                        date: date2,
-                        startHour: startHour2,
-                        startMinute: startMinute2,
-                        endHour: endHour2,
-                        endMinute: endMinute2,
-                        title: safeTitle,
-                        description: safeDescription,
-                    };
-                }
-                // eventResize payload log removed
                 // update personal event via events endpoint
                 await axios.put(`/events/${info.event.extendedProps.event_id}/calendar`, {
                     date: displayStart,
@@ -1192,12 +1096,6 @@ const calendarOptions = computed(() => ({
                         (info.event._def && info.event._def.publicId) ||
                         null;
                     if (evId) {
-                        // debug: print the derived id and fallback URL so developer can inspect in browser console
-                        console.debug('Calendar: navigating to event show', {
-                            evId,
-                            fallback: `/events/${evId}`,
-                            extendedProps: info.event.extendedProps,
-                        });
                         try {
                             router.get(route('events.show', { event: evId }));
                         } catch (e) {
@@ -1287,11 +1185,6 @@ const calendarOptions = computed(() => ({
                     (info.event._def && info.event._def.publicId) ||
                     null;
                 if (evId) {
-                    // console.debug('Calendar: navigating to event show (non-allDay)', {
-                    //     evId,
-                    //     fallback: `/events/${evId}`,
-                    //     extendedProps: info.event.extendedProps,
-                    // });
                     try {
                         router.get(route('events.show', { event: evId }));
                     } catch (e) {
@@ -1300,7 +1193,7 @@ const calendarOptions = computed(() => ({
                 }
             }
             // project schedule clicks not handled by personal calendar
-        } catch (err) {
+        } catch {
             // swallow errors to avoid breaking the calendar UI
         }
     },
@@ -1321,49 +1214,12 @@ watch(
                     api.gotoDate(newDate);
                 }
             }
-        } catch (e) {
+        } catch {
             // swallow errors to avoid breaking UI
-            console.debug('Calendar: gotoDate failed', e);
         }
     },
     { immediate: true },
 );
-
-function goToScheduleShowFromAction() {
-    if (!selectedScheduleForAction.value) return;
-    showScheduleActionModal.value = false;
-    router.get(route('coordinator.project_schedules.show', { project_schedule: selectedScheduleForAction.value }));
-}
-
-function openMemoModalFromAction() {
-    if (!selectedScheduleForAction.value) return;
-    selectedScheduleIdForMemo.value = selectedScheduleForAction.value;
-    showScheduleActionModal.value = false;
-    showMemoModal.value = true;
-}
-
-async function submitScheduleMemo() {
-    if (!selectedScheduleIdForMemo.value) {
-        alert('スケジュールが選択されていません');
-        return;
-    }
-    if (!memoBody.value || memoBody.value.trim() === '') {
-        alert('メモの内容を入力してください');
-        return;
-    }
-    try {
-        await axios.post(route('coordinator.project_schedule_comments.store', { project_schedule: selectedScheduleIdForMemo.value }), {
-            body: memoBody.value,
-        });
-        showMemoModal.value = false;
-        memoBody.value = '';
-        // Optional: navigate back to schedule show to reflect new comment
-        router.get(route('coordinator.project_schedules.show', { project_schedule: selectedScheduleIdForMemo.value }));
-    } catch (e) {
-        console.error('submitScheduleMemo error', e);
-        alert('メモの保存に失敗しました');
-    }
-}
 
 const submitEvent = async () => {
     const start = `${form.value.date} ${form.value.startHour}:${form.value.startMinute}:00`;

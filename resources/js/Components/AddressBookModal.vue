@@ -30,7 +30,6 @@
 import axios from 'axios';
 import { ref, watch } from 'vue';
 const props = defineProps({ show: Boolean, companyId: [Number, null] });
-const emit = defineEmits(['close', 'select']);
 const query = ref('');
 const users = ref([]);
 

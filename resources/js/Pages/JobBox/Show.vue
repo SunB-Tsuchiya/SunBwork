@@ -491,7 +491,7 @@ function submitComplete() {
 
 function getSetHref() {
     try {
-        if (linkedAssignmentId && linkedAssignmentId.value) {
+        if (linkedAssignmentId.value && linkedAssignmentId.value) {
             const jid = String(linkedAssignmentId.value);
             const fallback = '/project_jobs/assignments/edit-user?job=' + encodeURIComponent(jid);
             try {

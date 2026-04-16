@@ -383,7 +383,7 @@ function getGroupLabel(key) {
 // ===== 表示データ =====
 
 const displayGroups = computed(() => {
-    let assignments = Array.isArray(localAssignments.value) ? localAssignments.value : [];
+    const assignments = Array.isArray(localAssignments.value) ? localAssignments.value : [];
 
     const grouped = new Map();
     for (const m of assignments) {
@@ -405,7 +405,7 @@ const displayGroups = computed(() => {
         }
     }
 
-    let sortedKeys = Array.from(grouped.keys());
+    const sortedKeys = Array.from(grouped.keys());
     if (viewMode.value === 'date') {
         sortedKeys.sort((a, b) => {
             if (!a) return 1;
