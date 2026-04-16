@@ -216,10 +216,6 @@ function shiftRight() {
     startHourRef.value = newEnd - windowHours;
 }
 
-function pad2(n) {
-    return String(n).padStart(2, '0');
-}
-
 function computeEventStyle(ev) {
     try {
         const baselineHour = startHourRef.value;
@@ -344,25 +340,6 @@ function onBackgroundClick(e) {
     emit('open-create', { minuteOffset });
 }
 
-function computeSnappedMinuteFromClientX(clientX) {
-    const contentEl = timelineContentRef.value && timelineContentRef.value ? timelineContentRef.value : null;
-    const scrollWrap = scrollWrapperRef.value && scrollWrapperRef.value ? scrollWrapperRef.value : null;
-    const container = contentEl;
-    if (!container || !container.getBoundingClientRect) return null;
-    const rect = container.getBoundingClientRect();
-    const contentLeft = timelineContentRef.value && timelineContentRef.value ? timelineContentRef.value.getBoundingClientRect().left : rect.left;
-    const scrollLeft = scrollWrap ? scrollWrap.scrollLeft || 0 : container.scrollLeft || 0;
-    const clickX = clientX - contentLeft + scrollLeft;
-    const measuredPxPerMin =
-        timelineContentRef.value && timelineContentRef.value && windowMinutes.value > 0 ? timelineContentRef.value.clientWidth / windowMinutes.value : null;
-    const pxPerMin = measuredPxPerMin || pxPerMinuteRef.value;
-    const rawMin = startHourRef.value * 60 + clickX / pxPerMin;
-    const hourPart = Math.floor(rawMin / 60);
-    const minsPastHour = Math.floor(rawMin % 60);
-    const snappedMins = minsPastHour < 30 ? 0 : 30;
-    return hourPart * 60 + snappedMins;
-}
-
 function startDrag(ev, mouseEvent) {
     mouseEvent.preventDefault();
     dragging.value = true;
@@ -434,7 +411,7 @@ function onDocumentMouseMove(e) {
     }
 }
 
-async function endDrag(e) {
+async function endDrag(_e) {
     if (!dragging.value && !resizeMode.value) {
         dragging.value = false;
         draggingEventId.value = null;

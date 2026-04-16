@@ -189,25 +189,6 @@ function clearSearch() {
     search();
 }
 
-function gotoCreate() {
-    if (!createUrl) return;
-    router.visit(createUrl, { preserveState: false });
-}
-
-function deleteAssignment(a) {
-    if (!confirm('この割当を本当に削除しますか？この操作は取り消せません。')) return;
-    router.delete(route('coordinator.project_jobs.assignments.destroy', { projectJob: projectJob.id, assignment: a.id }), {
-        onSuccess: () => {
-            // refresh the page data
-            router.reload();
-        },
-        onError: (errors) => {
-            console.error('deleteAssignment error', errors);
-            alert('削除に失敗しました。詳細はコンソールを確認してください。');
-        },
-    });
-}
-
 function formatTime(t) {
     if (!t) return '';
     // t may be '09:00:00' or '09:00' or '09:00:00.000000Z'

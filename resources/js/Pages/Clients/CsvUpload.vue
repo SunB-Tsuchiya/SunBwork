@@ -6,7 +6,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, useForm, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 
-const props = defineProps({
+defineProps({
     companies: { type: Array, default: () => [] },
 });
 

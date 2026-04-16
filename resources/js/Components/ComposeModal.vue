@@ -46,7 +46,7 @@
 <script setup>
 import axios from 'axios';
 import { ref } from 'vue';
-const props = defineProps({ show: Boolean });
+defineProps({ show: Boolean });
 const emit = defineEmits(['close', 'sent']);
 const to = ref([]);
 const query = ref('');

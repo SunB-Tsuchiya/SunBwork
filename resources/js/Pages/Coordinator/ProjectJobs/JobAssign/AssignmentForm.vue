@@ -142,11 +142,16 @@
                                             <th class="px-2 py-1">ファイル名</th>
                                             <template v-if="group.columns === 'page'">
                                                 <th class="px-2 py-1">ページ数</th>
-                                                <th class="px-2 py-1">サイズ</th>
+                                                <th class="px-2 py-1">用紙サイズ</th>
+                                                <th class="px-2 py-1 text-right">容量</th>
                                             </template>
                                             <template v-else-if="group.columns === 'image'">
                                                 <th class="px-2 py-1">幅×高さ</th>
                                                 <th class="px-2 py-1">カラー</th>
+                                                <th class="px-2 py-1 text-right">容量</th>
+                                            </template>
+                                            <template v-else-if="group.columns === 'size'">
+                                                <th class="px-2 py-1">容量</th>
                                             </template>
                                             <th class="px-2 py-1 text-right">削除</th>
                                         </tr>
@@ -160,10 +165,15 @@
                                             <template v-if="group.columns === 'page'">
                                                 <td class="px-2 py-1">{{ file.pages != null ? file.pages + 'p' : '-' }}</td>
                                                 <td class="px-2 py-1">{{ file.doc_size ?? '-' }}</td>
+                                                <td class="px-2 py-1 text-right text-gray-500">{{ fa(idx).formatSize(file.size) }}</td>
                                             </template>
                                             <template v-else-if="group.columns === 'image'">
                                                 <td class="px-2 py-1">{{ file.width && file.height ? `${file.width}×${file.height}` : '-' }}</td>
                                                 <td class="px-2 py-1">{{ file.extra ?? '-' }}</td>
+                                                <td class="px-2 py-1 text-right text-gray-500">{{ fa(idx).formatSize(file.size) }}</td>
+                                            </template>
+                                            <template v-else-if="group.columns === 'size'">
+                                                <td class="px-2 py-1">{{ fa(idx).formatSize(file.size) }}</td>
                                             </template>
                                             <td class="px-2 py-1 text-right">
                                                 <button type="button" class="text-red-400 hover:text-red-600" @click="fa(idx).removeByGroupIndex(group.type, fi)">✕</button>
@@ -701,35 +711,6 @@ function effectiveAuthUser() {
     );
 }
 
-// Debug UI state (user mode)
-const showDebug = ref(false);
-const debugStr = computed(() => {
-    try {
-        return JSON.stringify(
-            {
-                injectedAuthUser: injectedAuthUser || null,
-                injectedUser: injectedUser || null,
-                effectiveAuthUser: effectiveAuthUser(),
-                pagePropsAuthUser: page.props && page.props.auth ? page.props.auth.user : null,
-                pagePropsUser: page.props ? page.props.user : null,
-                pagePropsCompany: page.props ? page.props.company : null,
-                pagePropsDepartment: page.props ? page.props.department : null,
-                types_count: Array.isArray(page.props?.types) ? page.props.types.length : 0,
-                sizes_count: Array.isArray(page.props?.sizes) ? page.props.sizes.length : 0,
-                stages_count: Array.isArray(page.props?.stages) ? page.props.stages.length : 0,
-                statuses_count: Array.isArray(page.props?.statuses) ? page.props.statuses.length : 0,
-                types_sample: Array.isArray(page.props?.types) && page.props.types.length ? page.props.types.slice(0, 3) : [],
-                sizes_sample: Array.isArray(page.props?.sizes) && page.props.sizes.length ? page.props.sizes.slice(0, 3) : [],
-                stages_sample: Array.isArray(page.props?.stages) && page.props.stages.length ? page.props.stages.slice(0, 3) : [],
-                statuses_sample: Array.isArray(page.props?.statuses) && page.props.statuses.length ? page.props.statuses.slice(0, 3) : [],
-            },
-            null,
-            2,
-        );
-    } catch (e) {
-        return String(e);
-    }
-});
 
 // Inline event editor state (user mode)
 const _today = new Date();
@@ -1162,7 +1143,7 @@ if (props.mode === 'coordinator') {
 
 const showSelector = ref(false);
 const selectorTargetIndex = ref(null);
-const { toasts, showToast, dismissToast, toastClass } = useToasts();
+const { toasts, dismissToast, toastClass } = useToasts();
 
 onMounted(() => {
     if (props.mode === 'coordinator') {
@@ -1208,7 +1189,7 @@ watch(
         pageAuthUser: page.props && page.props.auth ? page.props.auth.user : null,
         pageUser: page.props ? page.props.user : null,
     }),
-    (val) => {},
+    (_val) => {},
     { deep: true },
 );
 
@@ -1924,15 +1905,80 @@ function onFileInputChange(e, idx) {
     fa(idx).analyzeFiles(e.target.files);
     e.target.value = '';
 }
-function onFileDrop(e, idx) { fa(idx).analyzeFiles(e.dataTransfer.files); }
+// readEntries は最大100件ずつ返すため全件取得するまで繰り返す
+async function readAllEntries(reader) {
+    const all = [];
+    while (true) {
+        const batch = await new Promise((resolve) => reader.readEntries(resolve, () => resolve([])));
+        if (batch.length === 0) break;
+        all.push(...batch);
+    }
+    return all;
+}
+
+async function onFileDrop(e, idx) {
+    const items = e.dataTransfer?.items;
+
+    // DataTransferItems が使えない場合（古いブラウザ）は従来通り
+    if (!items || items.length === 0) {
+        fa(idx).analyzeFiles(e.dataTransfer.files);
+        return;
+    }
+
+    // フォルダが含まれているか確認
+    const entries = Array.from(items).map(item => item.webkitGetAsEntry?.()).filter(Boolean);
+    const hasFolder = entries.some(entry => entry.isDirectory);
+
+    if (!hasFolder) {
+        // ファイルのみ → 従来通り
+        fa(idx).analyzeFiles(e.dataTransfer.files);
+        return;
+    }
+
+    // フォルダが含まれる場合：中のファイルを展開
+    const collectedFiles = [];
+    let hasNestedFolder = false;
+
+    for (const entry of entries) {
+        if (entry.isFile) {
+            const file = await new Promise(resolve => entry.file(resolve));
+            collectedFiles.push(file);
+        } else if (entry.isDirectory) {
+            const reader = entry.createReader();
+            const children = await readAllEntries(reader);
+            for (const child of children) {
+                if (child.isDirectory) {
+                    hasNestedFolder = true;
+                    break;
+                }
+                const file = await new Promise(resolve => child.file(resolve));
+                collectedFiles.push(file);
+            }
+            if (hasNestedFolder) break;
+        }
+    }
+
+    if (hasNestedFolder) {
+        alert('フォルダ内にサブフォルダが含まれているためアップロードできません。\nフォルダ内のファイルのみを直接ドロップするか、「ファイルを選択」ボタンをご利用ください。');
+        return;
+    }
+
+    if (collectedFiles.length > 0) {
+        fa(idx).analyzeFiles(collectedFiles);
+    }
+}
 
 // ファイル解析完了後に amounts / size_id を自動更新
 fileAnalyzers.forEach((analyzer, idx) => {
     watch(analyzer.summary, (s) => {
         const block = assignments.value[idx];
         if (!block || s.totalFiles === 0) return;
-        block.amounts      = s.totalPages > 0 ? s.totalPages : s.totalFiles;
-        block.amounts_unit = s.totalPages > 0 ? 'page' : 'file';
+        // すべてのファイルにページ数が取得できた場合のみ 'page' 単位を使う
+        // xlsx/html/psd/image など pages=null のファイルが混ざった場合はファイル数に切り替える
+        const allHavePages = analyzer.results.value.length > 0 &&
+            analyzer.results.value.every(f => f.pages != null);
+        block.amounts      = allHavePages ? s.totalPages : s.totalFiles;
+        block.amounts_unit = allHavePages ? 'page' : 'file';
         block.file_info    = analyzer.buildFileInfo();
 
         // size_id 自動検出（案件固定・進行表ロックがない場合のみ）

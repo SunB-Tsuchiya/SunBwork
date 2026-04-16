@@ -67,7 +67,6 @@ const clearAll = () => {
 
 const submit = () => {
     errors.value = {};
-    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
     router.post(route('clerk.announcements.store'), form.value, {
         onError: (e) => { errors.value = e; },
     });

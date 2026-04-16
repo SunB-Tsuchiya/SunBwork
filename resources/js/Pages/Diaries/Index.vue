@@ -45,21 +45,6 @@ function pageRoute(n) {
     }
 }
 
-const deleteDiary = (id) => {
-    if (confirm('この日報を削除してよろしいですか？')) {
-        Inertia.delete(route('diaries.destroy', id));
-    }
-};
-
-function formatJapaneseDate(dateStr) {
-    const d = new Date(dateStr);
-    return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
-}
-
-function handleDateSelect(dateStr) {
-    showCalendar.value = false;
-}
-
 function goToPage(n) {
     // Use Inertia.get with pageRoute so current selectedDays is included
     Inertia.get(pageRoute(n));

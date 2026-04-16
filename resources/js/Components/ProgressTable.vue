@@ -135,7 +135,7 @@
 </template>
 
 <script setup>
-import { computed, ref, reactive } from 'vue';
+import { computed, reactive } from 'vue';
 import ProgressCell from '@/Components/ProgressCell.vue';
 
 const props = defineProps({

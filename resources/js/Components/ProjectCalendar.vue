@@ -277,14 +277,7 @@ const props = defineProps({
     diaryLabel: { type: String, default: 'メモ' },
 });
 
-const showModal = ref(false);
-const form = ref({ title: '', description: '', startHour: '09', startMinute: '00', endHour: '10', endMinute: '00', date: '' });
-const today = new Date();
-const yyyy = today.getFullYear();
-const mm = String(today.getMonth() + 1).padStart(2, '0');
-const dd = String(today.getDate()).padStart(2, '0');
 const selectedDate = ref(`${yyyy}-${mm}-${dd}`);
-const selectedScheduleId = ref(null);
 // schedule action UI
 const showScheduleActionModal = ref(false);
 const selectedScheduleForAction = ref(null);
@@ -300,8 +293,6 @@ const editingCommentDate = ref('');
 const editingCommentAuthor = ref(null);
 
 const startHourSelectRef = ref(null);
-const endHourSelectRef = ref(null);
-const memoDateRef = ref(null);
 
 // schedule show/edit modal state
 const showScheduleShowModal = ref(false);
@@ -333,7 +324,7 @@ const userProps = computed(() => {
     }
     return {};
 });
-const scheduleCanEdit = (id) => {
+const scheduleCanEdit = (_id) => {
     const u = userProps.value || {};
     // Support multiple shapes: functions, boolean flags, and role string
     try {
@@ -480,42 +471,12 @@ function openEventModal() {
     simpleEventMemo.value = '';
     showSimpleEventModal.value = true;
 }
-function openEventModalFromSelect() {
-    router.get(route('events.create', { date: selectedDate.value }));
-}
 function goToDiaryCreate() {
     // トップの「メモ作成」は今日の日付でモーダルを開く
     memoDate.value = `${yyyy}-${mm}-${dd}`;
     selectedScheduleIdForMemo.value = null;
     memoBody.value = '';
     showMemoModal.value = true;
-}
-function handleDateSelect(selectionInfo) {
-    const dateStr = selectionInfo.startStr.split('T')[0];
-    selectedDate.value = dateStr;
-    // project_job 経由のカレンダーでは予定作成モーダルを開く
-    if (props.project) {
-        simpleEventTitle.value = '';
-        simpleEventIsRange.value = false;
-        simpleEventStartDate.value = dateStr;
-        simpleEventEndDate.value = dateStr;
-        simpleEventMemo.value = '';
-        showSimpleEventModal.value = true;
-        return;
-    }
-    // それ以外はメモモーダルを開く
-    memoDate.value = dateStr;
-    selectedScheduleIdForMemo.value = null;
-    memoBody.value = '';
-    showMemoModal.value = true;
-}
-function goToScheduleMemoCreate(scheduleId) {
-    // open schedule memo creation page as fallback (not modal)
-    router.get(route('coordinator.project_schedule_comments.create', { project_schedule: scheduleId }));
-}
-
-function focusMemoDate() {
-    if (memoDateRef.value) memoDateRef.value.showPicker ? memoDateRef.value.showPicker() : memoDateRef.value.focus();
 }
 
 // local memos created client-side to show immediately and merge with server props
@@ -763,7 +724,6 @@ watch(
     plainCalendarEvents,
     (events) => {
         try {
-            const api = calendarRef.value && calendarRef.value.getApi ? calendarRef.value.getApi() : null;
             // If API not ready, retry a few times with a short delay to allow FullCalendar to initialize
             const tryInject = (attempt = 0) => {
                 try {
@@ -808,10 +768,8 @@ watch(
 // watch calendarEvents for debugging - logs initial and subsequent values
 watch(
     calendarEvents,
-    (val) => {
+    (_val) => {
         try {
-            const count = Array.isArray(val) ? val.length : 0;
-            const api = calendarRef.value && calendarRef.value.getApi ? calendarRef.value.getApi() : null;
             // no-op: rely on FullCalendar's eventsSet and :events binding
         } catch (e) {
             // ProjectCalendar calendarEvents watch error debug suppressed
@@ -886,37 +844,6 @@ const calendarOptions = computed(() => ({
                 } catch (e) {}
                 function stripTags(str) {
                     return str ? str.replace(/<[^>]*>?/gm, '') : '';
-                }
-                const safeTitle = info.event.title && stripTags(info.event.title).trim() !== '' ? info.event.title : 'タイトル未設定';
-                const safeDescription =
-                    info.event.extendedProps.description && stripTags(info.event.extendedProps.description).trim() !== ''
-                        ? info.event.extendedProps.description
-                        : '内容未設定';
-                let logPayload = {};
-                if (info.event.allDay) {
-                    logPayload = {
-                        start_date: displayStart,
-                        end_date: displayEndInclusive || displayStart,
-                        title: safeTitle,
-                        description: safeDescription,
-                    };
-                } else {
-                    const startDateObj2 = new Date(newStart);
-                    const endDateObj2 = new Date(newEnd);
-                    const date2 = startDateObj2.toISOString().slice(0, 10);
-                    const startHour2 = String(startDateObj2.getHours()).padStart(2, '0');
-                    const startMinute2 = String(startDateObj2.getMinutes()).padStart(2, '0');
-                    const endHour2 = String(endDateObj2.getHours()).padStart(2, '0');
-                    const endMinute2 = String(endDateObj2.getMinutes()).padStart(2, '0');
-                    logPayload = {
-                        date: date2,
-                        startHour: startHour2,
-                        startMinute: startMinute2,
-                        endHour: endHour2,
-                        endMinute: endMinute2,
-                        title: safeTitle,
-                        description: safeDescription,
-                    };
                 }
                 // Prefer project schedule update when this event is part of a project
                 const ev = info.event;
@@ -1296,7 +1223,7 @@ function openScheduleShowModal(event) {
     // If description missing, attempt to find a matching schedule object with description
     if (!scheduleShowData.value.description) {
         try {
-            const findInList = (list, listName = '') => {
+            const findInList = (list, _listName = '') => {
                 if (!Array.isArray(list)) return null;
                 const wantId = scheduleShowData.value.id ? String(scheduleShowData.value.id) : null;
                 const wantTitle = (scheduleShowData.value.title || '').toLowerCase().trim();
@@ -1663,7 +1590,7 @@ async function deleteSchedule() {
         const id = scheduleShowData.value.id;
         if (!id) throw new Error('Schedule id missing');
         const url = route('coordinator.project_schedules.destroy', { project_schedule: id });
-        const resp = await axios.delete(url);
+        await axios.delete(url);
         // mark as deleted in localCalendarEntries (or remove)
         const idx = localCalendarEntries.value.findIndex((x) => String(x.id) === String(id));
         if (idx !== -1) {
@@ -1950,24 +1877,6 @@ async function submitSimpleEvent() {
         alert('予定の作成に失敗しました');
     }
 }
-
-const submitEvent = async () => {
-    const start = `${form.value.date} ${form.value.startHour}:${form.value.startMinute}:00`;
-    const end = `${form.value.date} ${form.value.endHour}:${form.value.endMinute}:00`;
-    try {
-        await axios.post('/events', { title: form.value.title, description: form.value.description, start, end });
-        showModal.value = false;
-        // Refresh via Inertia to obtain server-authoritative events
-        router.reload();
-    } catch (e) {
-        if (e.response && e.response.data && e.response.data.errors) {
-            const messages = Object.values(e.response.data.errors).flat().join('\n');
-            alert('登録に失敗しました:\n' + messages);
-        } else {
-            alert('登録に失敗しました');
-        }
-    }
-};
 </script>
 
 <style scoped>

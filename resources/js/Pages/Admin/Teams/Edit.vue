@@ -8,13 +8,12 @@ import TextInput from '@/Components/TextInput.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import EditForUnits from '@/Pages/Admin/Teams/EditForUnits.vue';
 import { useForm, usePage } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 
 const page = usePage();
 const team = page.props.team;
 const companies = page.props.companies || [];
 const departments = page.props.departments || [];
-const roles = page.props.roles || [];
 
 // 変更: leader_user (person) と description をフォームに追加
 const form = useForm({

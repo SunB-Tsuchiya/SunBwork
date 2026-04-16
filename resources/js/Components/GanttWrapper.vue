@@ -96,7 +96,6 @@ onMounted(async () => {
     };
 
     // safe progress handlers (monkey-patch) — will intercept progress handle events and run a guarded implementation
-    let _cleanupProgressHandlers = null;
     let _todayClickCleanup = null;
     function installSafeProgressHandlers(chart) {
         const svg = chart.$svg;
@@ -235,7 +234,7 @@ onMounted(async () => {
             } catch (e) {}
         };
 
-        const onMouseUp = (e) => {
+        const onMouseUp = (_e) => {
             // handle progress drag finish
             if (dragging || active) {
                 dragging = false;
@@ -307,8 +306,8 @@ onMounted(async () => {
     gantt = new Gantt(ganttEl.value, currentTasks.value, ganttOptions);
     // install safe progress handlers and remember cleanup
     try {
-        _cleanupProgressHandlers = installSafeProgressHandlers(gantt);
-    } catch (e) {}
+        installSafeProgressHandlers(gantt);
+    } catch (_e) {}
     // helper to center today in the visible viewport
     const centerToday = () => {
         try {

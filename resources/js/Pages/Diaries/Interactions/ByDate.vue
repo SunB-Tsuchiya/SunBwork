@@ -24,18 +24,11 @@ const props = defineProps({
     pageTitle: { type: String, default: '日報（日付別）' },
     headerTitle: { type: String, default: '日報（日付別）' },
 });
-const selectedDate = ref(props.date || null);
 
 // whether server requested unread-only
 const serverUnread = computed(() =>
     Boolean(props.filters && (props.filters.unread === 1 || props.filters.unread === '1' || props.filters.unread === true)),
 );
-
-function routeForIndex(date) {
-    const prefix = props.routePrefix || 'diaries';
-    if (prefix === 'diaries') return 'diaryinteractions.interactions.index';
-    return `${prefix}.diaryinteractions.index`;
-}
 
 function markReadAllRoute() {
     const prefix = props.routePrefix || 'diaries';
@@ -51,8 +44,8 @@ const displayedUnread = computed(() => Boolean(clientUnread.value));
 // keep local state in sync when server props change (navigations)
 watch(
     () => serverUnread.value,
-    (v) => {
-        clientUnread.value = v;
+    (_v) => {
+        clientUnread.value = _v;
     },
 );
 
@@ -80,7 +73,7 @@ function navigateWithParams(date, unreadVal) {
     Inertia.get(url, params);
 }
 
-async function toggleUnread(event, date) {
+async function toggleUnread(event, _date) {
     // flip local state immediately for instant UI feedback
     clientUnread.value = !clientUnread.value;
 

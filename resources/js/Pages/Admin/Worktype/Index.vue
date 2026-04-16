@@ -3,7 +3,7 @@ import AdminNavigationTabs from '@/Components/Tabs/AdminNavigationTabs.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link } from '@inertiajs/vue3';
 
-const props = defineProps({
+defineProps({
     worktypes:     { type: Array,   default: () => [] },
     groups:        { type: Array,   default: null },
     is_superadmin: { type: Boolean, default: false },

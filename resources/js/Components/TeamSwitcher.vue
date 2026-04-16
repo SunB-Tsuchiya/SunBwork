@@ -138,7 +138,7 @@
 import Dropdown from '@/Components/Dropdown.vue';
 import { router } from '@inertiajs/vue3';
 
-const props = defineProps({
+defineProps({
     user: {
         type: Object,
         required: true,

@@ -181,17 +181,17 @@ function startAttachmentPolling() {
     });
 }
 
-watch(localMessage, (nv, ov) => {}, { deep: true });
+watch(localMessage, (_nv, _ov) => {}, { deep: true });
 // Watch the body field specifically to catch the exact moment it changes/clears
 watch(
     () => localMessage.value?.body,
-    (nv, ov) => {},
+    (_nv, _ov) => {},
     { immediate: true },
 );
 // Watch the incoming prop 'message' to see if parent/Inertia overwrites it
 watch(
     () => message?.body,
-    (nv, ov) => {},
+    (_nv, _ov) => {},
     { immediate: true },
 );
 

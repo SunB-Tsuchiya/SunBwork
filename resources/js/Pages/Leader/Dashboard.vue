@@ -2,8 +2,6 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 // Leader tabs remain per-page
 
-const props = defineProps({});
-
 // ユーザー情報はinertiaのpropsから取得する
 import { usePage } from '@inertiajs/vue3';
 const page = usePage();

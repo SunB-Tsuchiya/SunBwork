@@ -2,18 +2,8 @@
 import DialogModal from '@/Components/DialogModal.vue';
 import UserTable from '@/Components/UserTable.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Link, router, usePage } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
-// ユーザー削除処理
-function deleteUser(id) {
-    if (confirm('本当にこのユーザーを削除しますか？')) {
-        router.delete(route('admin.users.destroy', id), {
-            onSuccess: () => {
-                router.visit(route('admin.users.index'));
-            },
-        });
-    }
-}
 
 // 検索用モーダル状態
 const showSearchModal = ref(false);
@@ -57,15 +47,6 @@ const filteredUsers = computed(() => {
 // ソート状態
 const sortKey = ref('id');
 const sortDesc = ref(false);
-
-const changeSort = (key) => {
-    if (sortKey.value === key) {
-        sortDesc.value = !sortDesc.value;
-    } else {
-        sortKey.value = key;
-        sortDesc.value = false;
-    }
-};
 
 // フィルタ済みのユーザーをソートして返す
 const sortedUsers = computed(() => {
@@ -152,27 +133,6 @@ const getDepartmentName = (department_id) => {
 const getAssignmentName = (assignment_id) => {
     const assignment = props.assignments.find((r) => r.id === assignment_id);
     return assignment ? assignment.name : '';
-};
-
-const getAssignmentBadgeClass = (assignment) => {
-    switch (assignment) {
-        case 'superadmin':
-            return 'bg-yellow-100 text-yellow-800';
-        case 'admin':
-            return 'bg-red-100 text-red-800';
-        case 'leader':
-            return 'bg-orange-100 text-orange-800';
-        case 'coordinator':
-            return 'bg-green-100 text-green-800';
-        case 'proof_coordinator':
-            return 'bg-pink-100 text-pink-800';
-        case 'clerk':
-            return 'bg-purple-100 text-purple-800';
-        case 'user':
-            return 'bg-blue-100 text-blue-800';
-        default:
-            return 'bg-gray-100 text-gray-800';
-    }
 };
 
 const getAssignmentText = (assignment) => {

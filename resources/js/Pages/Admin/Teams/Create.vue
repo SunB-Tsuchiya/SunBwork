@@ -9,8 +9,6 @@ const props = page.props;
 const companies = ref(props.companies || []);
 const departments = ref(props.departments || []);
 const users = ref(props.users || []); // all users for company (used to derive department members)
-// props.leaders may be provided, but compute leader options from users to ensure roles are correct
-const leaders = ref(props.leaders || []); // optional precomputed leaders
 
 // Leader options: superadmin, admin, leader (optionally scoped by selected company)
 const leaderOptions = computed(() => {

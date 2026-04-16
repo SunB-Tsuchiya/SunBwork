@@ -172,15 +172,6 @@ async function processAndInsertFile(file) {
     }
 }
 
-function fileToDataURL(file) {
-    return new Promise((res, rej) => {
-        const r = new FileReader();
-        r.onload = () => res(r.result);
-        r.onerror = rej;
-        r.readAsDataURL(file);
-    });
-}
-
 async function pollAttachmentAndReplace(id, placeholder) {
     const maxAttempts = 30; // e.g., 30*2s = 60s
     let attempt = 0;
@@ -195,7 +186,6 @@ async function pollAttachmentAndReplace(id, placeholder) {
                 const thumb = r.data.thumb_url || null;
                 const preview = r.data.preview || null;
                 // find placeholder text position
-                const contents = editorInstance.getContents();
                 const plain = editorInstance.getText();
                 const idx = plain.indexOf(placeholder);
                 if (idx >= 0) {
@@ -359,14 +349,6 @@ watch(
         content.value = val;
     },
 );
-
-function stripHtml(html) {
-    if (!html) return '';
-    return html
-        .replace(/<[^>]+>/g, '')
-        .replace(/&nbsp;/g, ' ')
-        .replace(/&amp;/g, '&');
-}
 
 // ===== 過去データから流用 =====
 const showPastModal = ref(false);

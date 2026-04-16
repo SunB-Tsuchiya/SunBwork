@@ -151,15 +151,13 @@
 import useToasts from '@/Composables/useToasts';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 
 const props = defineProps({ projectJob: Object, messages: Object });
 const page = usePage();
 page.props.q_model = page.props.q || '';
 page.props.period_model = page.props.period ?? '';
 const monthOptions = computed(() => (Array.isArray(page.props.monthOptions) ? page.props.monthOptions : []));
-
-const sortState = reactive({ sort: page.props.sort || null, dir: page.props.dir || 'desc' });
 
 // 完了非表示フラグ（デフォルト：完了を隠す）
 const hideCompleted = ref(true);
@@ -173,11 +171,6 @@ const viewModes = [
 ];
 
 // ===== ユーティリティ =====
-
-function isSentByMe(m) {
-    const authId = page.props.auth?.user?.id;
-    return authId && m.sender?.id && authId === m.sender.id;
-}
 
 function formatDateLabel(dateStr) {
     if (!dateStr) return '日付なし';

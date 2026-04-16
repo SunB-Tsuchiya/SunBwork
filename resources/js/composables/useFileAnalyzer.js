@@ -25,7 +25,6 @@ const PAPER_SIZES = [
 const TOLERANCE_MM = 3
 
 function matchPaperSize(wMm, hMm) {
-    // 縦横どちらでも一致させる
     for (const ps of PAPER_SIZES) {
         const wOk = Math.abs(wMm - ps.w) <= TOLERANCE_MM || Math.abs(wMm - ps.h) <= TOLERANCE_MM
         const hOk = Math.abs(hMm - ps.h) <= TOLERANCE_MM || Math.abs(hMm - ps.w) <= TOLERANCE_MM
@@ -36,11 +35,71 @@ function matchPaperSize(wMm, hMm) {
 
 function ptToMm(pt) { return pt * 25.4 / 72 }
 function twipsToMm(twips) { return twips * 25.4 / 1440 }
-function formatSize(bytes) {
+export function formatSize(bytes) {
     if (bytes >= 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + 'MB'
     if (bytes >= 1024) return (bytes / 1024).toFixed(0) + 'KB'
     return bytes + 'B'
 }
+
+// ============================================================
+// ファイル種別定義テーブル（1箇所で管理）
+//
+// columns : 'page'  → ページ数 + ドキュメントサイズ列
+//           'image' → 幅×高さ + カラー列
+//           'size'  → 容量のみ列（ページ取得不可 → ファイル数カウント）
+//           'other' → 列なし（rejected のみ）
+// rejected: true  → アップロード不可（除外リストへ）
+// ext_label: SUPPORTED_TYPES 表示用の拡張子文字列
+// info     : SUPPORTED_TYPES 表示用の説明（null = 非表示）
+// order    : grouped 表示順
+// ============================================================
+const FILE_TYPE_DEFS = {
+    // ── ページ系（Adobe / ドキュメント） ──────────────────────
+    pdf:         { order:  1, label: 'PDF',                      columns: 'page',  rejected: false, ext_label: '.pdf',                          info: 'ページ数・ドキュメントサイズ' },
+    ai:          { order:  2, label: 'Illustrator (AI)',          columns: 'page',  rejected: false, ext_label: '.ai',                           info: 'ページ数・ドキュメントサイズ' },
+    indd:        { order:  3, label: 'InDesign (INDD)',           columns: 'page',  rejected: false, ext_label: '.indd',                         info: 'ページ数（CS4以降）/ 不明時は容量' },
+    indd_legacy: { order:  4, label: 'InDesign (旧形式)',         columns: 'page',  rejected: false, ext_label: null,                            info: null }, // 内部区別のみ・表示しない
+    idml:        { order:  5, label: 'InDesign (IDML)',           columns: 'page',  rejected: false, ext_label: '.idml',                         info: 'ページ数・ドキュメントサイズ' },
+    docx:        { order:  6, label: 'Word (DOCX/DOC)',           columns: 'page',  rejected: false, ext_label: '.docx / .doc',                  info: 'ページ数・ドキュメントサイズ' },
+    pptx:        { order:  7, label: 'PowerPoint (PPTX/PPT)',     columns: 'page',  rejected: false, ext_label: '.pptx / .ppt',                  info: 'スライド数' },
+    eps:         { order:  8, label: 'EPS',                       columns: 'page',  rejected: false, ext_label: '.eps',                          info: 'ドキュメントサイズ（BoundingBox）' },
+    // ── 容量のみ（ファイル数カウント） ──────────────────────────
+    xlsx:        { order:  9, label: 'Excel (XLSX/XLS)',          columns: 'size',  rejected: false, ext_label: '.xlsx / .xls',                  info: '容量（ファイル数カウント）' },
+    svg:         { order: 10, label: 'SVG',                       columns: 'size',  rejected: false, ext_label: '.svg',                          info: '容量（ファイル数カウント）' },
+    html:        { order: 11, label: 'HTML',                      columns: 'size',  rejected: false, ext_label: '.html / .htm',                  info: '容量（ファイル数カウント）' },
+    font:        { order: 12, label: 'フォント',                   columns: 'size',  rejected: false, ext_label: '.otf / .ttf / .woff / .woff2',  info: '容量（ファイル数カウント）' },
+    raw:         { order: 13, label: 'RAWデータ',                  columns: 'size',  rejected: false, ext_label: '.arw / .nef / .cr2 / .dng 等',  info: '容量（ファイル数カウント）' },
+    video:       { order: 14, label: '動画',                      columns: 'size',  rejected: false, ext_label: '.mp4 / .mov / .avi 等',          info: '容量（ファイル数カウント）' },
+    // ── 画像（幅×高さ） ──────────────────────────────────────
+    psd:         { order: 15, label: 'Photoshop (PSD)',           columns: 'image', rejected: false, ext_label: '.psd / .psb',                   info: '幅×高さ・カラーモード' },
+    image:       { order: 16, label: '画像',                      columns: 'image', rejected: false, ext_label: '.jpg / .png / .tiff / .gif 等', info: '幅×高さ' },
+    // ── コード / テキスト ──────────────────────────────────────
+    // Web スタイル: css scss sass less
+    // JavaScript 系: js mjs cjs jsx
+    // TypeScript 系: ts mts cts tsx
+    // フレームワーク: vue svelte astro
+    // サーバーサイド: php rb py pyw go rs java cs swift kt
+    // システム: c cpp h hpp m mm sh bash zsh fish ps1 bat cmd
+    // データ / 設定: json json5 jsonc yaml yml toml ini env conf cfg
+    // マークアップ / 文書: xml md mdx rst txt csv
+    // DB / インフラ: sql graphql gql dockerfile tf
+    code:        { order: 17, label: 'コード / テキスト',          columns: 'size',  rejected: false, ext_label: '.css / .js / .ts / .vue / .php / .py 等', info: '容量（ファイル数カウント）' },
+    // ── 対応外（除外） ────────────────────────────────────────
+    zip:         { order: 99, label: 'ZIP / その他',              columns: 'other', rejected: true,  ext_label: '.zip / その他',                  info: null, unsupported_reason: 'ファイル情報を読み取れない形式' },
+    other:       { order: 99, label: 'その他',                    columns: 'other', rejected: true,  ext_label: null,                            info: null, unsupported_reason: 'ファイル情報を読み取れない形式' },
+}
+
+// テーブルから各定数を自動生成
+const REJECTED_TYPES = Object.entries(FILE_TYPE_DEFS).filter(([, v]) => v.rejected).map(([k]) => k)
+
+export const SUPPORTED_TYPES = Object.entries(FILE_TYPE_DEFS)
+    .filter(([, v]) => !v.rejected && v.ext_label && v.info)
+    .sort((a, b) => a[1].order - b[1].order)
+    .map(([, v]) => ({ ext: v.ext_label, info: v.info }))
+
+export const UNSUPPORTED_NOTICE = Object.entries(FILE_TYPE_DEFS)
+    .filter(([, v]) => v.rejected && v.unsupported_reason && v.ext_label)
+    .map(([, v]) => ({ ext: v.ext_label, reason: v.unsupported_reason }))
 
 // ---- ファイル種別判定 ----
 async function detectType(file) {
@@ -56,23 +115,62 @@ async function detectType(file) {
         if (magic4 === 'PK\x03\x04') {
             // ZIP系 → 拡張子で分岐
             if (ext === 'indd') return 'indd'
+            if (ext === 'idml') return 'idml'
             if (ext === 'docx' || ext === 'doc') return 'docx'
+            if (ext === 'pptx' || ext === 'ppt') return 'pptx'
+            if (['xlsx', 'xls', 'xlsm'].includes(ext)) return 'xlsx'
             if (ext === 'ai') return 'ai'
             return 'zip'
         }
         if (magic2 === '%!') return 'eps'
         // 旧式INDD（マジックバイト）
         if (bytes[0] === 0x06 && bytes[1] === 0x06 && bytes[2] === 0xED && bytes[3] === 0xE0) return 'indd_legacy'
+        // SVG（テキスト先頭に <svg または <?xml）
+        const head = String.fromCharCode(...bytes)
+        if (head.startsWith('<?xm') || head.startsWith('<svg')) {
+            if (ext === 'svg') return 'svg'
+        }
     } catch (_) {}
 
     // フォールバック：拡張子
     if (ext === 'pdf') return 'pdf'
     if (ext === 'ai') return 'ai'
     if (ext === 'indd') return 'indd_legacy'
+    if (ext === 'idml') return 'idml'
     if (ext === 'docx' || ext === 'doc') return 'docx'
+    if (ext === 'pptx' || ext === 'ppt') return 'pptx'
+    if (['xlsx', 'xls', 'xlsm'].includes(ext)) return 'xlsx'
+    if (ext === 'svg') return 'svg'
+    if (['html', 'htm'].includes(ext)) return 'html'
+    if (['otf', 'ttf', 'woff', 'woff2', 'eot'].includes(ext)) return 'font'
+    if (['arw', 'nef', 'cr2', 'cr3', 'dng', 'raf', 'orf', 'rw2', 'raw'].includes(ext)) return 'raw'
+    if (['mp4', 'mov', 'avi', 'mkv', 'wmv', 'flv', 'm4v', 'webm', 'mts', 'm2ts'].includes(ext)) return 'video'
     if (['psd', 'psb'].includes(ext)) return 'psd'
-    if (['jpg', 'jpeg', 'png', 'gif', 'tiff', 'tif', 'bmp', 'webp'].includes(ext)) return 'image'
+    if (['jpg', 'jpeg', 'png', 'gif', 'tiff', 'tif', 'bmp', 'webp', 'ico', 'heic', 'heif'].includes(ext)) return 'image'
     if (ext === 'eps') return 'eps'
+    if ([
+        // Web スタイル
+        'css', 'scss', 'sass', 'less',
+        // JavaScript 系
+        'js', 'mjs', 'cjs', 'jsx',
+        // TypeScript 系
+        'ts', 'mts', 'cts', 'tsx',
+        // フレームワーク
+        'vue', 'svelte', 'astro',
+        // サーバーサイド
+        'php', 'rb', 'py', 'pyw', 'go', 'rs', 'java', 'cs', 'swift', 'kt', 'kts',
+        // システム / スクリプト
+        'c', 'cpp', 'cc', 'cxx', 'h', 'hpp', 'hxx', 'm', 'mm',
+        'sh', 'bash', 'zsh', 'fish', 'ps1', 'bat', 'cmd',
+        // データ / 設定
+        'json', 'json5', 'jsonc', 'yaml', 'yml', 'toml', 'ini', 'env', 'conf', 'cfg', 'properties',
+        // マークアップ / 文書
+        'xml', 'md', 'mdx', 'rst', 'txt', 'csv', 'tsv',
+        // DB / インフラ
+        'sql', 'graphql', 'gql', 'dockerfile', 'tf', 'tfvars', 'hcl',
+        // その他ビルド設定
+        'lock', 'gitignore', 'editorconfig', 'prettierrc', 'eslintrc',
+    ].includes(ext)) return 'code'
     return 'other'
 }
 
@@ -95,7 +193,6 @@ async function analyzeDocx(file) {
     const buf = await file.arrayBuffer()
     const zip = await JSZip.loadAsync(buf)
 
-    // ページ数: docProps/app.xml の Pages 要素
     let pages = null
     try {
         const appXml = await zip.file('docProps/app.xml')?.async('string')
@@ -105,15 +202,39 @@ async function analyzeDocx(file) {
         }
     } catch (_) {}
 
-    // ドキュメントサイズ: word/document.xml の w:pgSz
     let docSize = null
     try {
         const docXml = await zip.file('word/document.xml')?.async('string')
         if (docXml) {
             const m = docXml.match(/<w:pgSz[^>]+w:w="(\d+)"[^>]+w:h="(\d+)"/)
             if (m) {
-                const wMm = twipsToMm(parseInt(m[1]))
-                const hMm = twipsToMm(parseInt(m[2]))
+                docSize = matchPaperSize(twipsToMm(parseInt(m[1])), twipsToMm(parseInt(m[2])))
+            }
+        }
+    } catch (_) {}
+
+    return { pages, doc_size: docSize }
+}
+
+// ---- PPTX 解析（JSZip） ----
+async function analyzePptx(file) {
+    const buf = await file.arrayBuffer()
+    const zip = await JSZip.loadAsync(buf)
+
+    // スライド数: ppt/slides/slide*.xml のファイル数
+    const slides = Object.keys(zip.files).filter(n => /^ppt\/slides\/slide\d+\.xml$/.test(n))
+    const pages = slides.length || null
+
+    // スライドサイズ: ppt/presentation.xml の p:sldSz
+    let docSize = null
+    try {
+        const presXml = await zip.file('ppt/presentation.xml')?.async('string')
+        if (presXml) {
+            // cx/cy は EMU (English Metric Units): 1mm = 914400/25.4 ≒ 36000 EMU
+            const m = presXml.match(/<p:sldSz[^>]+cx="(\d+)"[^>]+cy="(\d+)"/)
+            if (m) {
+                const wMm = parseInt(m[1]) / 914400 * 25.4
+                const hMm = parseInt(m[2]) / 914400 * 25.4
                 docSize = matchPaperSize(wMm, hMm)
             }
         }
@@ -132,11 +253,9 @@ async function analyzeIndd(file) {
     try {
         const designMap = await zip.file('designmap.xml')?.async('string')
         if (designMap) {
-            // ページ数: MasterSpread/Spread の Page 要素を数える
             const pageMatches = designMap.match(/<Page\s/g)
             if (pageMatches) pages = pageMatches.length
 
-            // ドキュメントサイズ: DocumentPreferences の PageWidth/PageHeight
             const wMatch = designMap.match(/PageWidth="([0-9.]+)"/)
             const hMatch = designMap.match(/PageHeight="([0-9.]+)"/)
             if (wMatch && hMatch) {
@@ -148,6 +267,41 @@ async function analyzeIndd(file) {
     return { pages, doc_size: docSize }
 }
 
+// ---- IDML 解析（JSZip） ----
+async function analyzeIdml(file) {
+    const buf = await file.arrayBuffer()
+    const zip = await JSZip.loadAsync(buf)
+
+    let pages = 0
+    let docSize = null
+    try {
+        // Spreads/ フォルダ内の各スプレッドXMLにある <Page 要素を数える
+        const spreadKeys = Object.keys(zip.files).filter(n => n.startsWith('Spreads/') && n.endsWith('.xml'))
+        for (const key of spreadKeys) {
+            const xml = await zip.file(key)?.async('string')
+            if (xml) {
+                const m = xml.match(/<Page\s/g)
+                if (m) pages += m.length
+                // 最初のスプレッドからページサイズを取得
+                if (!docSize) {
+                    // GeometricBounds="y1 x1 y2 x2" (pt)
+                    const boundsM = xml.match(/<Page[^>]+GeometricBounds="([^"]+)"/)
+                    if (boundsM) {
+                        const parts = boundsM[1].split(/\s+/).map(parseFloat)
+                        if (parts.length === 4) {
+                            const hPt = parts[2] - parts[0]
+                            const wPt = parts[3] - parts[1]
+                            docSize = matchPaperSize(ptToMm(wPt), ptToMm(hPt))
+                        }
+                    }
+                }
+            }
+        }
+    } catch (_) {}
+
+    return { pages: pages || null, doc_size: docSize }
+}
+
 // ---- PSD ヘッダー直読み ----
 async function analyzePsd(file) {
     const buf = await file.slice(0, 26).arrayBuffer()
@@ -157,11 +311,7 @@ async function analyzePsd(file) {
     const width = view.getUint32(18)
     const bitDepth = view.getUint16(22)
     const colorMode = colorModeMap[view.getUint16(24)] ?? `mode${view.getUint16(24)}`
-    return {
-        width,
-        height,
-        extra: `${colorMode} ${bitDepth}bit`,
-    }
+    return { width, height, extra: `${colorMode} ${bitDepth}bit` }
 }
 
 // ---- 画像（JPG/PNG等）解析 ----
@@ -191,37 +341,6 @@ async function analyzeEps(file) {
     return { doc_size: matchPaperSize(ptToMm(wPt), ptToMm(hPt)) }
 }
 
-// ---- グループ分け定義 ----
-const GROUP_DEFS = {
-    pdf:         { label: 'PDF',        columns: 'page' },
-    ai:          { label: 'Illustrator (AI)', columns: 'page' },
-    indd:        { label: 'InDesign (INDD)',  columns: 'page' },
-    indd_legacy: { label: 'InDesign (旧形式)', columns: 'page' },
-    docx:        { label: 'Word (DOCX)',      columns: 'page' },
-    eps:         { label: 'EPS',              columns: 'page' },
-    psd:         { label: 'Photoshop (PSD)',  columns: 'image' },
-    image:       { label: '画像',             columns: 'image' },
-    other:       { label: 'その他',           columns: 'other' },
-}
-
-// ---- 対応外ファイル定義 ----
-// これらの種別はページ数・サイズの自動取得が不可能なため弾く
-const REJECTED_TYPES = ['indd', 'indd_legacy', 'other', 'zip']
-
-export const UNSUPPORTED_NOTICE = [
-    { ext: '.indd',        reason: 'InDesignバイナリ形式のためページ数・サイズ取得不可' },
-    { ext: '.zip / その他', reason: 'ファイル情報を読み取れない形式' },
-]
-
-export const SUPPORTED_TYPES = [
-    { ext: '.pdf',              info: 'ページ数・ドキュメントサイズ' },
-    { ext: '.ai',               info: 'ページ数・ドキュメントサイズ' },
-    { ext: '.docx',             info: 'ページ数・ドキュメントサイズ' },
-    { ext: '.psd / .psb',       info: '幅×高さ・カラーモード' },
-    { ext: '.jpg / .png / .tiff / .gif', info: '幅×高さ' },
-    { ext: '.eps',              info: 'ドキュメントサイズ（BoundingBox）' },
-]
-
 // ============================================================
 // メインコンポーザブル
 // ============================================================
@@ -235,11 +354,13 @@ export function useFileAnalyzer() {
         const map = {}
         for (const f of results.value) {
             const key = f.type
+            const def = FILE_TYPE_DEFS[key]
             if (!map[key]) {
                 map[key] = {
                     type: key,
-                    label: GROUP_DEFS[key]?.label ?? key,
-                    columns: GROUP_DEFS[key]?.columns ?? 'other',
+                    label: def?.label ?? key,
+                    columns: def?.columns ?? 'other',
+                    order: def?.order ?? 99,
                     files: [],
                     totalSize: 0,
                     totalPages: 0,
@@ -249,9 +370,7 @@ export function useFileAnalyzer() {
             map[key].totalSize += f.size
             if (f.pages) map[key].totalPages += f.pages
         }
-        // 表示順を固定
-        const order = ['pdf', 'ai', 'indd', 'indd_legacy', 'docx', 'eps', 'psd', 'image', 'other']
-        return order.filter(k => map[k]).map(k => map[k])
+        return Object.values(map).sort((a, b) => a.order - b.order)
     })
 
     const summary = computed(() => {
@@ -266,7 +385,6 @@ export function useFileAnalyzer() {
 
         const files = Array.from(fileList)
 
-        // 50件制限（対応ファイルのみカウント。事前に種別判定できないため全件でチェック）
         if (files.length > 50) {
             alert(`一度に読み込めるファイルは50件までです。${files.length}件選択されています。50件以内に絞ってください。`)
             return
@@ -274,23 +392,27 @@ export function useFileAnalyzer() {
 
         analyzing.value = true
 
-        // ---- 先に種別を判定して対応外を弾く ----
+        // ---- 重複チェック・種別判定・対応外を弾く ----
         const supported = []
         const newRejected = []
         for (const file of files) {
             const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
+
+            // 重複チェック: 名前とサイズが一致するファイルが既に登録済みなら除外
+            const isDuplicate = results.value.some(r => r.name === file.name && r.size === file.size)
+            if (isDuplicate) {
+                newRejected.push({ name: file.name, ext, reason: '名前とサイズが一致したため同一ファイルと判断しました' })
+                continue
+            }
+
             const type = await detectType(file)
             if (REJECTED_TYPES.includes(type)) {
-                const reason = type === 'indd' || type === 'indd_legacy'
-                    ? 'INDDバイナリ形式（ページ数・サイズ取得不可）'
-                    : '対応外形式'
-                newRejected.push({ name: file.name, ext, reason })
+                newRejected.push({ name: file.name, ext, reason: '対応外形式' })
             } else {
                 supported.push(file)
             }
         }
 
-        // 対応外ファイルをリストに追加
         rejectedFiles.value.push(...newRejected)
 
         if (supported.length === 0) {
@@ -323,21 +445,26 @@ export function useFileAnalyzer() {
                 const type = await detectType(file)
                 let meta = {}
 
-                // 100MB超はスキップ
-                if (file.size > 100 * 1024 * 1024) {
-                    meta = {}
-                } else if (type === 'pdf' || type === 'ai') {
-                    meta = await analyzePdf(file)
-                } else if (type === 'docx') {
-                    meta = await analyzeDocx(file)
-                } else if (type === 'indd') {
-                    meta = await analyzeIndd(file)
-                } else if (type === 'psd') {
-                    meta = await analyzePsd(file)
-                } else if (type === 'image') {
-                    meta = await analyzeImage(file)
-                } else if (type === 'eps') {
-                    meta = await analyzeEps(file)
+                // 100MB超はスキップ（容量のみ記録）
+                if (file.size <= 100 * 1024 * 1024) {
+                    if (type === 'pdf' || type === 'ai') {
+                        meta = await analyzePdf(file)
+                    } else if (type === 'docx') {
+                        meta = await analyzeDocx(file)
+                    } else if (type === 'pptx') {
+                        meta = await analyzePptx(file)
+                    } else if (type === 'indd') {
+                        meta = await analyzeIndd(file)
+                    } else if (type === 'idml') {
+                        meta = await analyzeIdml(file)
+                    } else if (type === 'psd') {
+                        meta = await analyzePsd(file)
+                    } else if (type === 'image') {
+                        meta = await analyzeImage(file)
+                    } else if (type === 'eps') {
+                        meta = await analyzeEps(file)
+                    }
+                    // xlsx / svg / html / font / raw / video / indd_legacy → meta = {} (容量のみ)
                 }
 
                 results.value[idx] = {
@@ -356,11 +483,6 @@ export function useFileAnalyzer() {
         }
 
         analyzing.value = false
-    }
-
-    function removeFile(index) {
-        // grouped内のindexではなく results全体のindexで削除
-        results.value.splice(index, 1)
     }
 
     function removeByGroupIndex(type, localIndex) {
@@ -392,7 +514,6 @@ export function useFileAnalyzer() {
         const totalPages = summary.value.totalPages
         const totalBytes = summary.value.totalBytes
 
-        // groups集計
         const groups = {}
         for (const g of grouped.value) {
             groups[g.type] = {
@@ -403,12 +524,11 @@ export function useFileAnalyzer() {
             }
         }
 
-        // サマリー文字列
         const summaryParts = grouped.value
             .filter(g => g.columns === 'page' && g.files.length > 0)
             .map(g => `${g.label}×${g.files.length}${g.totalPages ? `(${g.totalPages}p)` : ''}`)
         const imageParts = grouped.value
-            .filter(g => g.columns === 'image' && g.files.length > 0)
+            .filter(g => (g.columns === 'image' || g.columns === 'size') && g.files.length > 0)
             .map(g => `${g.label}×${g.files.length}`)
         const summaryStr = [...summaryParts, ...imageParts].join(' / ')
 

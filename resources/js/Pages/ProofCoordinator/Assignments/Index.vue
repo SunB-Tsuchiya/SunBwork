@@ -4,7 +4,7 @@ import ProofCoordinatorNavigationTabs from '@/Components/Tabs/ProofCoordinatorNa
 import { router } from '@inertiajs/vue3';
 import { ref } from 'vue';
 
-const props = defineProps({
+defineProps({
     proofRequests: { type: Array, default: () => [] },
     proofreaders:  { type: Array, default: () => [] },
 });

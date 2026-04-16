@@ -267,10 +267,6 @@ async function handleDrop(e) {
     }
 }
 
-function handleDragOver(e) {
-    e.dataTransfer.dropEffect = 'copy';
-}
-
 const submit = () => {
     console.debug('Diary Edit: submit called');
     try {
@@ -313,7 +309,7 @@ const submit = () => {
         } catch (e) {}
         axios
             .post(url, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
-            .then((res) => {
+            .then((_res) => {
                 try {
                     showToast('更新しました', 'success', 1500);
                 } catch (e) {}

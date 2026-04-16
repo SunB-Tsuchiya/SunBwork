@@ -2,7 +2,7 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 // tabs are rendered centrally in AppLayout.vue
 
-const props = defineProps({
+defineProps({
     available_teams: {
         type: Array,
         default: () => [],

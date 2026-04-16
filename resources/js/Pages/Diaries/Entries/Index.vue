@@ -16,7 +16,6 @@ function formatDate(d) {
 }
 
 const props = defineProps({ departments: Array, date: String });
-const selectedDate = ref(props.date || null);
 
 // compute grouped diaries by date (newest first). props.departments is an array of groups with diaries
 const groupedByDate = computed(() => {

@@ -1,7 +1,7 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, usePage } from '@inertiajs/vue3';
-const props = defineProps({ settings: Object });
+defineProps({ settings: Object });
 const page = usePage();
 const user = page.props.user;
 </script>

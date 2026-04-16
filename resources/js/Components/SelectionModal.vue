@@ -1,5 +1,4 @@
 <script setup>
-import { usePage } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 const props = defineProps({
     show: { type: Boolean, default: false },
@@ -22,8 +21,6 @@ const form = ref({
     stage_id: '',
     status_id: '',
 });
-
-const page = usePage();
 
 // determine if company/department should be changeable according to role
 const companyDisabled = computed(() => {

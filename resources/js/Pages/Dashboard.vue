@@ -4,7 +4,7 @@ import Calendar from '@/Components/Calendar.vue';
 import UserNavigationTabs from '@/Components/Tabs/UserNavigationTabs.vue';
 // User tabs remain per-page
 
-const props = defineProps({
+defineProps({
     diaries: {
         type: Array,
         default: () => [],

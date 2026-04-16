@@ -73,6 +73,14 @@ const hours = computed(() =>
     Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => START_HOUR + i)
 );
 
+const filteredHoursForLines = computed(() =>
+    hours.value.filter(h => h > START_HOUR)
+);
+
+const filteredHoursFor30Mins = computed(() =>
+    hours.value.filter(h => h < END_HOUR)
+);
+
 const displayDate = computed(() => {
     const d = new Date(currentDate.value + 'T00:00:00');
     const days = ['日', '月', '火', '水', '木', '金', '土'];
@@ -274,14 +282,12 @@ onUnmounted(() => {
                             <!-- タイムライン領域 -->
                             <div class="relative flex-1">
                                 <!-- グリッド縦線 -->
-                                <div v-for="h in hours" :key="h"
-                                     v-if="h > START_HOUR"
+                                <div v-for="h in filteredHoursForLines" :key="h"
                                      class="pointer-events-none absolute top-0 h-full w-px bg-gray-100"
                                      :style="{ left: ((h - START_HOUR) * 60 / TOTAL_MINS * 100) + '%' }">
                                 </div>
                                 <!-- 30分グリッド -->
-                                <div v-for="h in hours" :key="'h30-' + h"
-                                     v-if="h < END_HOUR"
+                                <div v-for="h in filteredHoursFor30Mins" :key="'h30-' + h"
                                      class="pointer-events-none absolute top-0 h-full w-px bg-gray-100/60"
                                      :style="{ left: (((h - START_HOUR) * 60 + 30) / TOTAL_MINS * 100) + '%' }">
                                 </div>

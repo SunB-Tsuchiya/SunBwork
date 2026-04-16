@@ -3,7 +3,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import UserNavigationTabs from '@/Components/Tabs/UserNavigationTabs.vue';
 import { Link } from '@inertiajs/vue3';
 
-const props = defineProps({
+defineProps({
     setting: { type: Object, default: null },
 });
 

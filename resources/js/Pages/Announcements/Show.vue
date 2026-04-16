@@ -2,7 +2,7 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link } from '@inertiajs/vue3';
 
-const props = defineProps({
+defineProps({
     recipient: Object,
 });
 

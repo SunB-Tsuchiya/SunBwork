@@ -3,7 +3,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { Inertia } from '@inertiajs/inertia';
 import { Head, usePage } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
-const props = defineProps({
+defineProps({
     // 期待する props: companies: [{ id, name, departments: [{ id, name, teams: [{ id, name, members: [{ id, name }] }] }] }]
     companies: { type: Array, default: () => [] },
 });

@@ -47,19 +47,7 @@ const searchTerm = ref(props.filters && props.filters.q ? props.filters.q : '');
 const internalPage = ref(1);
 const unreadOnly = ref(false); // client-side toggle
 
-const serverUnread = computed(() => {
-    if (!props.serverMode) return false;
-    return Boolean(props.filters && (props.filters.unread === 1 || props.filters.unread === '1' || props.filters.unread === true));
-});
-
 // compute correct named routes depending on routePrefix
-const indexRouteName = computed(() => {
-    const p = props.routePrefix || 'diaries';
-    if (props.useInteractionRoutes) {
-        return p === 'diaries' ? 'diaryinteractions.index' : `${p}.diaryinteractions.index`;
-    }
-    return p === 'diaries' ? 'diaries.index' : `${p}.diaries.index`;
-});
 
 const showRouteName = computed(() => {
     const p = props.routePrefix || 'diaries';
@@ -129,10 +117,6 @@ const filtered = computed(() => {
 // sorting state: key can be 'id', 'name', 'dept', 'read'
 const sortKey = ref(null);
 const sortDir = ref(1); // 1 = asc, -1 = desc
-
-// expose simple getters for template convenience
-const sortKeyRef = computed(() => sortKey.value);
-const sortDirRef = computed(() => sortDir.value);
 
 function setSort(key) {
     if (sortKey.value === key) {

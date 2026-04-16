@@ -3,7 +3,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
-const props = defineProps({ client: Object });
+defineProps({ client: Object });
 
 const page = usePage();
 const routePrefix = computed(() => {

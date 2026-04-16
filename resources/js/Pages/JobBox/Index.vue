@@ -152,15 +152,13 @@
 import useToasts from '@/Composables/useToasts';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 
 const props = defineProps({ projectJob: Object, messages: Object, routeContext: { type: String, default: 'coordinator' } });
 const page = usePage();
 page.props.q_model = page.props.q || '';
 page.props.period_model = page.props.period ?? '';
 const monthOptions = computed(() => (Array.isArray(page.props.monthOptions) ? page.props.monthOptions : []));
-
-const sortState = reactive({ sort: page.props.sort || null, dir: page.props.dir || 'desc' });
 
 // 完了非表示フラグ（デフォルト：完了を隠す）
 const hideCompleted = ref(true);
@@ -174,11 +172,6 @@ const viewModes = [
 ];
 
 // ===== ユーティリティ =====
-
-function isSentByMe(m) {
-    const authId = page.props.auth?.user?.id;
-    return authId && m.sender?.id && authId === m.sender.id;
-}
 
 function formatDateLabel(dateStr) {
     if (!dateStr) return '日付なし';
@@ -201,12 +194,6 @@ function getDateKey(m) {
         (m.created_at ? String(m.created_at).split('T')[0] : null) ||
         ''
     );
-}
-
-function getStartTime(m) {
-    const t = m.project_job_assignment?.start_time || m.project_job_assignment?.desired_time || '';
-    if (!t) return '-';
-    return String(t).slice(0, 5);
 }
 
 function getTimeKey(m) {
@@ -328,24 +315,6 @@ const hiddenCompletedCount = computed(() => {
 
 // ===== 既存ロジック（変更なし） =====
 
-function deleteMessage(m) {
-    if (!confirm('このメッセージを本当に削除しますか？この操作は取り消せません。')) return;
-    router.delete(route('coordinator.project_jobs.jobbox.destroy', { projectJob: props.projectJob?.id, message: m.id }), {
-        onSuccess: () => router.reload(),
-        onError: () => alert('削除に失敗しました。'),
-    });
-}
-
-function formatDate(d) {
-    if (!d) return '-';
-    return String(d).split('T')[0];
-}
-
-function goto(url) {
-    if (!url) return;
-    router.visit(url, { preserveState: false });
-}
-
 function rowClick(m, event) {
     const tag = event.target?.tagName?.toLowerCase() || '';
     if (tag === 'a' || tag === 'button' || event.target.closest?.('a,button')) return;
@@ -428,27 +397,6 @@ function getDeadline(m) {
         const time = m.project_job_assignment?.start_time || m.project_job_assignment?.desired_time || '';
         if (time) return `${formatted}\n${String(time).slice(0, 5)}`;
         return formatted;
-    } catch {
-        return '-';
-    }
-}
-
-function getCounterparty(m) {
-    try {
-        const authId = page.props.auth.user?.id;
-        const isSender = authId && m.sender?.id && authId === m.sender.id;
-        if (isSender) {
-            const recs = m.message && Array.isArray(m.message.recipients) ? m.message.recipients : [];
-            if (recs.length) {
-                const names = recs.map((r) => r.user?.name || r.name || r.email || null).filter(Boolean);
-                if (names.length) return names.join(', ');
-            }
-            if (m.project_job_assignment?.user?.name) return m.project_job_assignment.user.name;
-            return '-';
-        }
-        if (m.message?.fromUser?.name) return m.message.fromUser.name;
-        if (m.sender?.name) return m.sender.name;
-        return '-';
     } catch {
         return '-';
     }

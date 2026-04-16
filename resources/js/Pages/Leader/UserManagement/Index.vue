@@ -2,7 +2,7 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import LeaderNavigationTabs from '@/Components/Tabs/LeaderNavigationTabs.vue';
 import { Link, router } from '@inertiajs/vue3';
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 
 const props = defineProps({
     users:       { type: Array, default: () => [] },

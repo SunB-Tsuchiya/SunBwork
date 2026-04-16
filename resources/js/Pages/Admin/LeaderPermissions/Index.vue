@@ -2,7 +2,7 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link } from '@inertiajs/vue3';
 
-const props = defineProps({
+defineProps({
     leaders:    { type: Array,  default: () => [] },
     indexRoute: { type: String, default: 'admin.leader_permissions.index' },
     editRoute:  { type: String, default: 'admin.leader_permissions.edit' },

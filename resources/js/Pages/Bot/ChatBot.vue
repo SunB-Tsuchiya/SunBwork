@@ -162,23 +162,8 @@ function sanitizeUrl(u) {
     }
 }
 
-function getCookie(name) {
-    if (typeof document === 'undefined') return null;
-    const match = document.cookie.split('; ').find((row) => row.startsWith(name + '='));
-    if (!match) return null;
-    return decodeURIComponent(match.split('=')[1] || '');
-}
-
 function getXsrfToken() {
     return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-}
-
-// Ensure a local path has a leading slash when used in hrefs
-function ensureLeadingSlashIfLocal(u) {
-    if (!u || typeof u !== 'string') return u;
-    const s = u.trim();
-    if (s.startsWith('http://') || s.startsWith('https://') || s.startsWith('blob:') || s.startsWith('data:')) return s;
-    return s.startsWith('/') ? s : '/' + s;
 }
 
 function isUrlString(s) {
@@ -306,7 +291,7 @@ function onFileInputChange(e) {
     selectedFiles.value = accepted;
 }
 
-watch(selectedFiles, (val) => {
+watch(selectedFiles, (_val) => {
     // Debug logging removed
 });
 
@@ -770,7 +755,7 @@ async function startNewConversation() {
     uploadedFiles.value = [];
 }
 
-function handleBeforeUnload(e) {
+function handleBeforeUnload(_e) {
     // try to save conversation on unload. sendBeacon cannot set headers, so include CSRF token as query param when present.
     try {
         const payload = {

@@ -25,75 +25,9 @@ const goEdit = () => {
     router.visit(route('admin.teams.edit', { team: currentTeam.value.id }));
 };
 
-// delete user action (same as admin users index)
-function deleteUser(id) {
-    if (confirm('本当にこのユーザーを削除しますか？')) {
-        router.delete(route('admin.users.destroy', id), {
-            onSuccess: () => {
-                router.visit(route('admin.teams.show', currentTeam.value.id));
-            },
-        });
-    }
-}
-
 // table helpers
 const departments = computed(() => page.props.departments || []);
 const assignments = computed(() => page.props.assignments || []);
-
-const getDepartmentName = (department_id) => {
-    if (!departments.value) return '';
-    const department = departments.value.find((d) => d.id === department_id);
-    return department ? department.name : '';
-};
-
-const getAssignmentName = (assignment_id) => {
-    const assignment = assignments.value.find((r) => r.id === assignment_id);
-    return assignment ? assignment.name : '';
-};
-
-const getAssignmentBadgeClass = (assignment) => {
-    switch (assignment) {
-        case 'admin':
-            return 'bg-red-100 text-red-800';
-        case 'leader':
-            return 'bg-orange-100 text-orange-800';
-        case 'coordinator':
-            return 'bg-blue-100 text-blue-800';
-        case 'user':
-            return 'bg-green-100 text-blue-800';
-        default:
-            return 'bg-gray-100 text-gray-800';
-    }
-};
-
-const getAssignmentText = (assignment) => {
-    switch (assignment) {
-        case 'admin':
-            return '管理者';
-        case 'leader':
-            return 'リーダー';
-        case 'coordinator':
-            return '進行管理';
-        case 'user':
-            return 'ユーザー';
-        default:
-            return '不明';
-    }
-};
-
-// sorting
-const sortKey = ref('id');
-const sortDesc = ref(false);
-const changeSort = (key) => {
-    if (sortKey.value === key) {
-        sortDesc.value = !sortDesc.value;
-    } else {
-        sortKey.value = key;
-        sortDesc.value = false;
-    }
-};
-
-const membersList = computed(() => (Array.isArray(currentTeam.value.users) ? [...currentTeam.value.users] : []));
 
 // 追加：ISO文字列を "YYYY年MM月DD日 HH時mm分ss秒" に整形するヘルパー
 const formatDate = (iso) => {
@@ -103,42 +37,6 @@ const formatDate = (iso) => {
     const pad = (n) => String(n).padStart(2, '0');
     return `${d.getFullYear()}年${pad(d.getMonth() + 1)}月${pad(d.getDate())}日 ${pad(d.getHours())}時${pad(d.getMinutes())}分${pad(d.getSeconds())}秒`;
 };
-const sortedUsers = computed(() => {
-    const list = membersList.value;
-    if (!sortKey.value) return list;
-    list.sort((a, b) => {
-        let va;
-        let vb;
-        const key = sortKey.value;
-        if (key === 'department_id') {
-            va = getDepartmentName(a.department_id);
-            vb = getDepartmentName(b.department_id);
-        } else if (key === 'assignment_id') {
-            va = getAssignmentName(a.assignment_id);
-            vb = getAssignmentName(b.assignment_id);
-        } else if (key === 'user_role') {
-            va = getAssignmentText(a.user_role);
-            vb = getAssignmentText(b.user_role);
-        } else {
-            va = a[key];
-            vb = b[key];
-        }
-
-        if (va === null || va === undefined) va = '';
-        if (vb === null || vb === undefined) vb = '';
-        const numA = Number(va);
-        const numB = Number(vb);
-        if (!isNaN(numA) && !isNaN(numB)) {
-            return sortDesc.value ? numB - numA : numA - numB;
-        }
-        va = String(va).toLowerCase();
-        vb = String(vb).toLowerCase();
-        if (va < vb) return sortDesc.value ? 1 : -1;
-        if (va > vb) return sortDesc.value ? -1 : 1;
-        return 0;
-    });
-    return list;
-});
 
 // compute leader display name from team.leader_id or leader_user relation if present
 const leaderName = computed(() => {

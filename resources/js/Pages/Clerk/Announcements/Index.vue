@@ -3,7 +3,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import ClerkNavigationTabs from '@/Components/Tabs/ClerkNavigationTabs.vue';
 import { Link, router } from '@inertiajs/vue3';
 
-const props = defineProps({
+defineProps({
     announcements: Array,
 });
 

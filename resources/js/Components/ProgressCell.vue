@@ -338,12 +338,6 @@ function onWorktimeChange(which, val) {
 // ── ステージ / サイズ / 作業分担 / 作業種別 ──────────────────────────
 const GROUP_LABELS = { paper: '紙媒体', digital: 'デジタル', web: 'Web', other: 'その他', dtp: 'DTP・組版', proof: '校正', design: 'デザイン', common: '共通' };
 
-const assignmentUserName = computed(() => {
-  const uid = props.cell?.assignment_user_id;
-  if (!uid) return null;
-  return props.users.find((u) => String(u.id) === String(uid))?.name ?? null;
-});
-
 const lockedUserName = computed(() => {
   if (!props.lockedUserId) return null;
   return props.users.find((u) => String(u.id) === String(props.lockedUserId))?.name ?? String(props.lockedUserId);

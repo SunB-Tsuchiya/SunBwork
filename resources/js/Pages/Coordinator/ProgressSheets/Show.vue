@@ -1166,7 +1166,6 @@ function onEditRow(row) {
 // ── セル更新 ──
 function onCellUpdate(payload) {
   // ローカルに即時反映
-  const key = `${payload.row_id}_${payload.col_key}`;
   const existing = localCells.value.find((c) => c.row_id === payload.row_id && c.col_key === payload.col_key);
   const fieldMap = { text: 'value_text', date: 'value_date', bool: 'value_bool', user: 'value_user_id', subcontractor: 'value_subcontractor_id' };
   const field = fieldMap[payload.value_type];

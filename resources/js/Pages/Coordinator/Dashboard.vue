@@ -2,7 +2,7 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 // Coordinator tabs remain per-page
 
-const props = defineProps({});
+defineProps({});
 
 // ユーザー情報はinertiaのpropsから取得する
 import { usePage } from '@inertiajs/vue3';

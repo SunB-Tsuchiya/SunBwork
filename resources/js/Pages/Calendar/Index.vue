@@ -2,7 +2,7 @@
 import Calendar from '@/Components/Calendar.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 
-const props = defineProps({
+defineProps({
     user: {
         type: Object,
         required: false,

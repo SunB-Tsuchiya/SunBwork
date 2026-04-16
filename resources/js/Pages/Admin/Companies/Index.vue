@@ -2,7 +2,7 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router } from '@inertiajs/vue3';
 
-const props = defineProps({
+defineProps({
     companies: {
         type: Array,
         required: true,

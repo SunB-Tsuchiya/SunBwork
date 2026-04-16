@@ -21,7 +21,7 @@ const selectedAssignmentId = ref('');
 const selectedMemberIds = ref(currentUser ? [currentUser.id] : []);
 const errors = ref({});
 
-watch(roomType, (val) => {
+watch(roomType, (_val) => {
     name.value = '';
     selectedMemberIds.value = currentUser ? [currentUser.id] : [];
 });

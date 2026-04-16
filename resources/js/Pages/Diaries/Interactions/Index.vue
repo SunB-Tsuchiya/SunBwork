@@ -26,7 +26,6 @@ const props = defineProps({
     pageTitle: { type: String, default: '日報一覧' },
     headerTitle: { type: String, default: '日報一覧' },
 });
-const selectedDate = ref(props.date || null);
 
 // For index view we intentionally remove any `unread` flag before passing filters
 // to DiaryTable so the index's table does not behave as an unread-only view.
@@ -63,14 +62,6 @@ const groupedByDate = computed(() => {
         });
     return ordered;
 });
-
-function routeForIndex(date) {
-    // Build the correct route name for the interactions index depending on prefix
-    const prefix = props.routePrefix || 'diaries';
-    if (prefix === 'diaries') return 'diaryinteractions.interactions.index';
-    // admin/leader routes use names like 'admin.diaryinteractions.index'
-    return `${prefix}.diaryinteractions.index`;
-}
 
 // pagination helpers using props.meta provided by controller
 const currentPage = computed(() => (props.meta && props.meta.current_page ? props.meta.current_page : 1));

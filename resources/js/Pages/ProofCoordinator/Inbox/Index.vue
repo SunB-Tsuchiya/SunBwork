@@ -3,7 +3,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import ProofCoordinatorNavigationTabs from '@/Components/Tabs/ProofCoordinatorNavigationTabs.vue';
 import { Link } from '@inertiajs/vue3';
 
-const props = defineProps({
+defineProps({
     proofRequests: { type: Array, default: () => [] },
 });
 

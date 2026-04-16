@@ -2,7 +2,7 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link } from '@inertiajs/vue3';
 
-const props = defineProps({
+defineProps({
     admins:     { type: Array,  default: () => [] },
     indexRoute: { type: String, default: 'superadmin.admin_permissions.index' },
     editRoute:  { type: String, default: 'superadmin.admin_permissions.edit' },

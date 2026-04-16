@@ -2,9 +2,8 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import ProofCoordinatorNavigationTabs from '@/Components/Tabs/ProofCoordinatorNavigationTabs.vue';
 import { useForm, router } from '@inertiajs/vue3';
-import { ref } from 'vue';
 
-const props = defineProps({
+defineProps({
     members:    { type: Array, default: () => [] },
     candidates: { type: Array, default: () => [] },
 });
