@@ -9,6 +9,8 @@ use Inertia\Inertia;
 use App\Models\Diary;
 use App\Models\Event;
 use App\Models\ProjectJobAssignment;
+use App\Models\ProjectJobAssignmentByMyself;
+use App\Models\ProgressCell;
 use App\Models\UserMonthlySchedule;
 use App\Models\Worktype;
 use Illuminate\Support\Facades\Schema;
@@ -112,12 +114,59 @@ class DashboardController extends Controller
             foreach (['ends_at', 'end', 'body', 'description', 'project_job_assignment_id'] as $col) {
                 if (Schema::hasColumn('events', $col)) $select[] = $col;
             }
-            $events = $eventQuery->get($select)->map(function ($e) {
+            $rawEvents = $eventQuery->get($select);
+
+            // CalendarController と同じ色判定ロジック: is_self_assigned / has_progress_cell を付与
+            $assignmentIds = $rawEvents->pluck('project_job_assignment_id')->filter()->unique()->values()->all();
+            $progressAssignmentIds = [];
+            $assignmentSenders = [];
+            if (!empty($assignmentIds)) {
+                try {
+                    $progressAssignmentIds = ProgressCell::whereIn('assignment_id', $assignmentIds)
+                        ->pluck('assignment_id')->map(fn($v) => (int)$v)->all();
+                } catch (\Throwable $ex) {
+                    Log::error('DashboardController progressAssignmentIds error: ' . $ex->getMessage());
+                }
+                try {
+                    $senders = ProjectJobAssignment::whereIn('id', $assignmentIds)
+                        ->pluck('sender_id', 'id')->map(fn($v) => $v === null ? null : (int)$v)->all();
+                } catch (\Throwable $ex) {
+                    $senders = [];
+                }
+                try {
+                    $bySenders = [];
+                    if (class_exists(ProjectJobAssignmentByMyself::class)) {
+                        $bySenders = ProjectJobAssignmentByMyself::whereIn('id', $assignmentIds)
+                            ->pluck('sender_id', 'id')->map(fn($v) => $v === null ? null : (int)$v)->all();
+                    }
+                } catch (\Throwable $ex) {
+                    $bySenders = [];
+                }
+                foreach ($senders as $k => $v) $assignmentSenders[$k] = $v;
+                foreach ($bySenders as $k => $v) $assignmentSenders[$k] = $v;
+                foreach ($assignmentSenders as $k => $v) {
+                    $assignmentSenders[$k] = $v === null ? null : (int)$v;
+                }
+            }
+
+            $events = $rawEvents->map(function ($e) use ($progressAssignmentIds, $assignmentSenders, $user) {
                 $arr = $e->toArray();
                 $startVal = $e->start ?? $arr['start'] ?? $arr['starts_at'] ?? $arr['startsAt'] ?? null;
                 $endVal   = $e->end   ?? $arr['end']   ?? $arr['ends_at']   ?? $arr['endsAt']   ?? null;
                 $descVal  = $e->description ?? $arr['description'] ?? $arr['body'] ?? null;
                 $pjaId    = $arr['project_job_assignment_id'] ?? ($e->project_job_assignment_id ?? null);
+                $hasProgress = $pjaId ? in_array((int)$pjaId, $progressAssignmentIds, true) : false;
+                $isSelfAssigned = false;
+                if ($pjaId && isset($assignmentSenders[$pjaId])) {
+                    $senderId = $assignmentSenders[$pjaId];
+                    $isSelfAssigned = $senderId !== null && $senderId === ($user ? $user->id : null);
+                }
+                $color = $arr['color'] ?? ($e->color ?? null);
+                if (empty($color)) {
+                    if ($hasProgress) $color = '#7C3AED';
+                    elseif ($isSelfAssigned) $color = '#4F46E5';
+                    else $color = '#059669';
+                }
                 return [
                     'id'                         => $e->id,
                     'title'                      => $e->title,
@@ -125,11 +174,13 @@ class DashboardController extends Controller
                     'end'                        => $endVal,
                     'allDay'                     => $arr['allDay'] ?? false,
                     'description'                => $descVal,
-                    'color'                      => $arr['color'] ?? ($e->color ?? null),
+                    'color'                      => $color,
                     'project_job_assignment_id'  => $pjaId,
                     'extendedProps'              => array_merge($arr['extendedProps'] ?? [], [
                         'project_job_assignment_id' => $pjaId,
                         'description'               => $descVal,
+                        'has_progress_cell'          => $hasProgress,
+                        'is_self_assigned'           => $isSelfAssigned,
                     ]),
                 ];
             })->values();
