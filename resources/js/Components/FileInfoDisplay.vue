@@ -54,40 +54,77 @@ const props = defineProps({
 })
 
 const GROUP_LABELS = {
-    pdf: 'PDF',
-    ai: 'Illustrator (AI)',
-    indd: 'InDesign (INDD)',
+    pdf:         'PDF',
+    ai:          'Illustrator (AI)',
+    indd:        'InDesign (INDD)',
     indd_legacy: 'InDesign (旧形式)',
-    docx: 'Word (DOCX)',
-    eps: 'EPS',
-    psd: 'Photoshop (PSD)',
-    image: '画像',
-    other: 'その他',
+    idml:        'InDesign (IDML)',
+    docx:        'Word (DOCX)',
+    pptx:        'PowerPoint (PPTX)',
+    eps:         'EPS',
+    xlsx:        'Excel (XLSX)',
+    svg:         'SVG',
+    html:        'HTML',
+    font:        'フォント',
+    raw:         'RAWデータ',
+    video:       '動画',
+    psd:         'Photoshop (PSD)',
+    image:       '画像',
+    code:        'コード / テキスト',
+    other:       'その他',
 }
-const PAGE_TYPES  = ['pdf', 'ai', 'indd', 'indd_legacy', 'docx', 'eps']
+const PAGE_TYPES  = ['pdf', 'ai', 'indd', 'indd_legacy', 'idml', 'docx', 'pptx', 'eps']
 const IMAGE_TYPES = ['psd', 'image']
 
 function groupLabel(type) { return GROUP_LABELS[type] ?? type }
 function isPageType(type)  { return PAGE_TYPES.includes(type) }
 function isImageType(type) { return IMAGE_TYPES.includes(type) }
 
+// ext → 可能なtype一覧（inddはCS4+/legacyどちらにも対応）
+const CODE_EXTS = [
+    'css','scss','sass','less',
+    'js','mjs','cjs','jsx',
+    'ts','mts','cts','tsx',
+    'vue','svelte','astro',
+    'php','rb','py','pyw','go','rs','java','cs','swift','kt','kts',
+    'c','cpp','cc','cxx','h','hpp','hxx','m','mm',
+    'sh','bash','zsh','fish','ps1','bat','cmd',
+    'json','json5','jsonc','yaml','yml','toml','ini','env','conf','cfg','properties',
+    'xml','md','mdx','rst','txt','csv','tsv',
+    'sql','graphql','gql','dockerfile','tf','tfvars','hcl',
+    'lock','gitignore','editorconfig','prettierrc','eslintrc',
+]
+const EXT_TYPE_MAP = {
+    pdf:  ['pdf'],
+    ai:   ['ai'],
+    indd: ['indd', 'indd_legacy'],   // マジックバイトで判別できないため両候補
+    idml: ['idml'],
+    docx: ['docx'], doc: ['docx'],
+    pptx: ['pptx'], ppt: ['pptx'],
+    eps:  ['eps'],
+    xlsx: ['xlsx'], xls: ['xlsx'], xlsm: ['xlsx'],
+    svg:  ['svg'],
+    html: ['html'], htm: ['html'],
+    otf:  ['font'], ttf: ['font'], woff: ['font'], woff2: ['font'], eot: ['font'],
+    arw:  ['raw'], nef: ['raw'], cr2: ['raw'], cr3: ['raw'], dng: ['raw'],
+    raf:  ['raw'], orf: ['raw'], rw2: ['raw'], raw: ['raw'],
+    mp4:  ['video'], mov: ['video'], avi: ['video'], mkv: ['video'],
+    wmv:  ['video'], flv: ['video'], m4v: ['video'], webm: ['video'],
+    psd:  ['psd'], psb: ['psd'],
+    jpg:  ['image'], jpeg: ['image'], png: ['image'], gif: ['image'],
+    tiff: ['image'], tif: ['image'], bmp: ['image'], webp: ['image'],
+    ico:  ['image'], heic: ['image'], heif: ['image'],
+    ...Object.fromEntries(CODE_EXTS.map(e => [e, ['code']])),
+    // video entries after spread to prevent mts being overwritten by CODE_EXTS
+    mts:  ['video'], m2ts: ['video'],
+}
+
 function filesForType(type) {
     return (props.fileInfo?.files ?? []).filter(f => {
         if (f.type) return f.type === type
         const ext = f.ext ?? f.name?.split('.').pop()?.toLowerCase() ?? ''
-        return guessType(ext) === type
+        return (EXT_TYPE_MAP[ext] ?? ['other']).includes(type)
     })
-}
-
-function guessType(ext) {
-    if (ext === 'pdf') return 'pdf'
-    if (ext === 'ai') return 'ai'
-    if (ext === 'indd') return 'indd_legacy'
-    if (['docx', 'doc'].includes(ext)) return 'docx'
-    if (['psd', 'psb'].includes(ext)) return 'psd'
-    if (['jpg', 'jpeg', 'png', 'gif', 'tiff', 'tif'].includes(ext)) return 'image'
-    if (ext === 'eps') return 'eps'
-    return 'other'
 }
 
 function formatBytes(bytes) {
