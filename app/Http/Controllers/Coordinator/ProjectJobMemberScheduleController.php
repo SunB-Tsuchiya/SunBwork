@@ -106,8 +106,8 @@ class ProjectJobMemberScheduleController extends Controller
         }
 
         $memberIds = array_column($members, 'id');
-        $dayStart  = Carbon::parse($date . ' 00:00:00', 'Asia/Tokyo')->utc();
-        $dayEnd    = Carbon::parse($date . ' 23:59:59', 'Asia/Tokyo')->utc();
+        $dayStart  = $date . ' 00:00:00';
+        $dayEnd    = $date . ' 23:59:59';
 
         // この案件に属する Assignment IDを一括取得
         $jobAssignmentIds = ProjectJobAssignment::where('project_job_id', $projectJob->id)
@@ -195,7 +195,7 @@ class ProjectJobMemberScheduleController extends Controller
             return null;
         }
         try {
-            return Carbon::parse($raw, 'UTC')->toIso8601String();
+            return Carbon::parse($raw, 'Asia/Tokyo')->toIso8601String();
         } catch (\Throwable) {
             return $raw;
         }
