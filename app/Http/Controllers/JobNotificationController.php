@@ -37,6 +37,21 @@ class JobNotificationController extends Controller
         ]);
     }
 
+    public function markRead(Request $request, JobNotification $jobNotification)
+    {
+        $user = $request->user();
+
+        if ($jobNotification->recipient_id !== $user->id) {
+            abort(403);
+        }
+
+        if (is_null($jobNotification->read_at)) {
+            $jobNotification->update(['read_at' => now()]);
+        }
+
+        return response()->json(['ok' => true]);
+    }
+
     public function show(Request $request, JobNotification $jobNotification)
     {
         $user = $request->user();

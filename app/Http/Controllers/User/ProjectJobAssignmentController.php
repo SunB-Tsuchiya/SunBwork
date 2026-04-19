@@ -141,8 +141,8 @@ class ProjectJobAssignmentController extends Controller
                     }
                 }
 
-                // 進行表セルリンク: _progress_sheet_id / _row_id / _col_key が渡された場合
-                if (!empty($a['_progress_sheet_id']) && !empty($a['_row_id']) && !empty($a['_col_key'])) {
+                // 進行表セルリンク: _row_id と _col_key が渡された場合（_progress_sheet_id は任意）
+                if (!empty($a['_row_id']) && !empty($a['_col_key'])) {
                     try {
                         ProgressCell::updateOrCreate(
                             ['row_id' => (int)$a['_row_id'], 'col_key' => (string)$a['_col_key']],

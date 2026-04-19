@@ -95,13 +95,16 @@ class ProofRequestController extends Controller
 
         // ソース割当（依頼者のマイジョブ）から prefill を構築
         // 担当者（user_id）と作業開始時刻（desired_time）以外はすべて引き継ぐ
-        // ジョブ名はソースタイトル + "_校正"
+        // ジョブ名: 末尾が「-組版」なら「-校正」に置換、それ以外は「-校正」をハイフンで付加
         $src = $proofRequest->projectJobAssignment;
         $baseTitle = $src?->title ?? $proofRequest->title;
+        $proofTitle = preg_match('/-組版$/u', $baseTitle)
+            ? preg_replace('/-組版$/u', '-校正', $baseTitle)
+            : $baseTitle . '-校正';
         $prefill = [
             'project_job_id'    => $proofRequest->project_job_id,
             '_client_id'        => $proofRequest->projectJob?->client?->id ?? '',
-            'title'             => $baseTitle . '_校正',
+            'title'             => $proofTitle,
             'detail'            => $src?->detail ?? '',
             'work_item_type_id' => $src?->work_item_type_id ?? null,
             'size_id'           => $src?->size_id ?? null,
@@ -185,6 +188,7 @@ class ProofRequestController extends Controller
                 'project_job_id'      => $proofRequest->project_job_id,
                 'user_id'             => $assigneeUserId,
                 'sender_id'           => $senderUser->id,
+                'job_type'            => 'proof',
                 'proof_dispatcher_id' => $dispatcherId,
                 'title'               => $a['title'],
                 'detail'              => $a['detail'] ?? null,
@@ -203,32 +207,55 @@ class ProofRequestController extends Controller
             ]);
 
             // 進行表セルとの双方向紐づけ
-            // ProofRequest.proof_cell_id が設定されている場合（進行表の校正セルから依頼された）
             if ($proofRequest->proof_cell_id) {
-                // pja100（校正ジョブ）に校正セルを紐づけ
+                // proof_cell_id が設定済みの場合（進行表の校正セルから依頼された）
                 $assignment->update(['progress_cell_id' => $proofRequest->proof_cell_id]);
-                // 校正セルに proof_assignment_id を設定
                 \App\Models\ProgressCell::where('id', $proofRequest->proof_cell_id)
-                    ->update(['proof_assignment_id' => $assignment->id]);
+                    ->update([
+                        'proof_assignment_id' => $assignment->id,
+                        'value_user_id'       => $assigneeUserId,
+                    ]);
+            } elseif ($proofRequest->project_job_assignment_id) {
+                // proof_cell_id が未設定の場合：pja_operatorの組版セルから校正セルを自動検索・作成
+                $kumihanCell = \App\Models\ProgressCell::where('assignment_id', $proofRequest->project_job_assignment_id)->first();
+                if ($kumihanCell && preg_match('/^(.+)_kumihan_toroku$/', $kumihanCell->col_key, $m)) {
+                    $roundPrefix = $m[1];
+                    $rowId       = $kumihanCell->row_id;
+
+                    // round{N}_kosei_tanto（proof_user）セルを作成/取得して紐づけ
+                    $koseiTantoCell = \App\Models\ProgressCell::firstOrCreate(
+                        ['row_id' => $rowId, 'col_key' => $roundPrefix . '_kosei_tanto']
+                    );
+                    $koseiTantoCell->update([
+                        'proof_assignment_id' => $assignment->id,
+                        'value_user_id'       => $assigneeUserId,
+                    ]);
+
+                    // round{N}_kosei_toroku（joblink）セルを作成/取得して assignment_id を設定
+                    $koseiTorokuCell = \App\Models\ProgressCell::firstOrCreate(
+                        ['row_id' => $rowId, 'col_key' => $roundPrefix . '_kosei_toroku']
+                    );
+                    $koseiTorokuCell->update(['assignment_id' => $assignment->id]);
+
+                    // pja100 と校正セルを紐づけ
+                    $assignment->update(['progress_cell_id' => $koseiTantoCell->id]);
+
+                    // ProofRequest.proof_cell_id を kosei_tanto セルに更新
+                    $proofRequest->proof_cell_id = $koseiTantoCell->id;
+                    $proofRequest->save();
+                }
             }
 
             // pja_operator（元の組版ジョブ）に progress_cell_id が未設定の場合、
-            // 同一行の組版セルを探して自動設定する
+            // 同一行の kumihan_toroku セルを自動設定する
             if ($proofRequest->project_job_assignment_id) {
                 $pjaOperator = ProjectJobAssignment::find($proofRequest->project_job_assignment_id);
                 if ($pjaOperator && ! $pjaOperator->progress_cell_id) {
-                    // 組版セル = 同一行で cell_type が typesetting_register のセル
-                    if ($proofRequest->proof_cell_id) {
-                        $proofCell = \App\Models\ProgressCell::find($proofRequest->proof_cell_id);
-                        if ($proofCell) {
-                            $typeCell = \App\Models\ProgressCell::where('row_id', $proofCell->row_id)
-                                ->where('cell_type', 'typesetting_register')
-                                ->whereNotNull('assignment_id')
-                                ->first();
-                            if ($typeCell) {
-                                $pjaOperator->update(['progress_cell_id' => $typeCell->id]);
-                            }
-                        }
+                    $kumihanCellForOp = \App\Models\ProgressCell::where('assignment_id', $pjaOperator->id)
+                        ->whereNotNull('col_key')
+                        ->first();
+                    if ($kumihanCellForOp) {
+                        $pjaOperator->update(['progress_cell_id' => $kumihanCellForOp->id]);
                     }
                 }
             }
@@ -501,6 +528,63 @@ class ProofRequestController extends Controller
     }
 
     /**
+     * DELETE /proof-coordinator/assignments/{proofRequest}/events/{event}
+     * 校正コーディネーターが管理する作業時間（Event）を削除する。
+     * 当該 ProofRequest のアサインチェーンに属するイベントのみ許可する。
+     */
+    public function destroyEvent(ProofRequest $proofRequest, Event $event): JsonResponse
+    {
+        // この ProofRequest に紐づく pja100 を取得
+        $pja100 = null;
+        if ($proofRequest->proofreader_id && $proofRequest->proof_coordinator_id) {
+            $pja100 = ProjectJobAssignment::where('project_job_id', $proofRequest->project_job_id)
+                ->where('user_id', $proofRequest->proofreader_id)
+                ->where('sender_id', $proofRequest->proof_coordinator_id)
+                ->latest()
+                ->first();
+        }
+
+        if (! $pja100) {
+            abort(404);
+        }
+
+        // pja100 および pja100 を源とする自己割当ジョブの ID セットを構築
+        $linkedIds = collect([$pja100->id]);
+        $linked = ProjectJobAssignment::whereColumn('sender_id', 'user_id')
+            ->where(function ($q) use ($pja100) {
+                $q->where('coordinator_assignment_id', $pja100->id)
+                  ->orWhere('supersedes_assignment_id', $pja100->id);
+            })->pluck('id');
+        $linkedIds = $linkedIds->merge($linked)->unique()->values()->all();
+
+        if (! in_array($event->project_job_assignment_id, $linkedIds, false)) {
+            abort(403, 'この作業時間の削除権限がありません。');
+        }
+
+        // 紐づく ProofSchedule を削除
+        ProofSchedule::where('event_id', $event->id)->delete();
+        $rawStart = $event->getRawOriginal('starts_at');
+        $rawEnd   = $event->getRawOriginal('ends_at');
+        if ($event->user_id && $rawStart && $rawEnd) {
+            ProofSchedule::where('user_id', $event->user_id)
+                ->where('starts_at', $rawStart)
+                ->where('ends_at', $rawEnd)
+                ->whereNull('event_id')
+                ->delete();
+        }
+
+        $deletedAssignmentId = $event->project_job_assignment_id;
+        $event->delete();
+
+        // 校正スロット（pja101）の最後のイベント削除時: pja101/pja100 削除 + ProofRequest を pending に戻す
+        if ($deletedAssignmentId) {
+            \App\Services\ProofJobRollbackService::rollbackIfNoEvents($deletedAssignmentId);
+        }
+
+        return response()->json(['ok' => true]);
+    }
+
+    /**
      * GET /proof-coordinator/assignments/{proofRequest}
      * 校正依頼の詳細（マイジョブ Show と同等）
      */
@@ -659,6 +743,15 @@ class ProofRequestController extends Controller
                 ->update(['proof_completed_at' => now()]);
         }
 
+        // pja100（校正割当ジョブ）を完了にする → 進行表の proof_user セルに反映
+        if ($proofRequest->proofreader_id && $proofRequest->proof_coordinator_id) {
+            ProjectJobAssignment::where('project_job_id', $proofRequest->project_job_id)
+                ->where('user_id', $proofRequest->proofreader_id)
+                ->where('sender_id', $proofRequest->proof_coordinator_id)
+                ->whereColumn('sender_id', '!=', 'user_id')
+                ->update(['completed' => true]);
+        }
+
         // 依頼者への完了通知
         JobNotificationService::notifyProofCompleted(Auth::user(), $proofRequest->fresh());
 
@@ -744,11 +837,36 @@ class ProofRequestController extends Controller
             });
         }
 
+        // 年月フィルター（YYYY-MM）
+        if ($period = $request->input('period')) {
+            $query->whereRaw("DATE_FORMAT(created_at, '%Y-%m') = ?", [$period]);
+        }
+
+        // 完了を非表示
+        if ($request->boolean('hide_completed')) {
+            $query->where('status', '!=', 'completed');
+        }
+
         $requests = $query->paginate(30)->withQueryString();
 
+        // 年月セレクター用オプション
+        $monthOptions = ProofRequest::selectRaw("DATE_FORMAT(created_at, '%Y-%m') as value")
+            ->groupByRaw("DATE_FORMAT(created_at, '%Y-%m')")
+            ->orderByRaw("DATE_FORMAT(created_at, '%Y-%m') DESC")
+            ->pluck('value')
+            ->map(fn($m) => [
+                'value' => $m,
+                'label' => sprintf('%d年%d月', (int) explode('-', $m)[0], (int) explode('-', $m)[1]),
+            ])
+            ->values()
+            ->toArray();
+
         return Inertia::render('ProofCoordinator/History/Index', [
-            'proofRequests' => $requests,
-            'search'        => $request->input('search', ''),
+            'proofRequests'  => $requests,
+            'search'         => $request->input('search', ''),
+            'period'         => $request->input('period', ''),
+            'hideCompleted'  => $request->boolean('hide_completed'),
+            'monthOptions'   => $monthOptions,
         ]);
     }
 

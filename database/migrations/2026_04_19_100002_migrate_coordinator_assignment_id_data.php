@@ -16,14 +16,17 @@ return new class extends Migration
     {
         // 自己割当（sender_id = user_id）かつ source_assignment_id が
         // Coordinator 割当（sender_id ≠ user_id）を指しているレコードを移行
+        // SQLite は UPDATE...JOIN 非対応のためサブクエリ方式で統一
         DB::statement('
-            UPDATE project_job_assignments AS a
-            JOIN project_job_assignments AS src ON src.id = a.source_assignment_id
-            SET a.coordinator_assignment_id = a.source_assignment_id,
-                a.source_assignment_id      = NULL
-            WHERE a.sender_id = a.user_id
-              AND a.source_assignment_id IS NOT NULL
-              AND src.sender_id != src.user_id
+            UPDATE project_job_assignments
+            SET coordinator_assignment_id = source_assignment_id,
+                source_assignment_id      = NULL
+            WHERE sender_id = user_id
+              AND source_assignment_id IS NOT NULL
+              AND source_assignment_id IN (
+                  SELECT id FROM project_job_assignments
+                  WHERE sender_id != user_id
+              )
         ');
     }
 
@@ -31,13 +34,15 @@ return new class extends Migration
     {
         // 逆方向: coordinator_assignment_id → source_assignment_id に戻す
         DB::statement('
-            UPDATE project_job_assignments AS a
-            JOIN project_job_assignments AS src ON src.id = a.coordinator_assignment_id
-            SET a.source_assignment_id      = a.coordinator_assignment_id,
-                a.coordinator_assignment_id = NULL
-            WHERE a.sender_id = a.user_id
-              AND a.coordinator_assignment_id IS NOT NULL
-              AND src.sender_id != src.user_id
+            UPDATE project_job_assignments
+            SET source_assignment_id      = coordinator_assignment_id,
+                coordinator_assignment_id = NULL
+            WHERE sender_id = user_id
+              AND coordinator_assignment_id IS NOT NULL
+              AND coordinator_assignment_id IN (
+                  SELECT id FROM project_job_assignments
+                  WHERE sender_id != user_id
+              )
         ');
     }
 };

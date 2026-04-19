@@ -9,8 +9,46 @@ const props = defineProps({
     filters: Object,
 });
 
-const viewMode     = ref(props.filters?.group === 'month' ? 'month' : 'day');
-const selectedDays = ref(props.filters?.days ?? 30);
+// ---- ホバー既読 ----
+const localNotifications = ref((props.notifications || []).map(n => ({ ...n })));
+
+const hoverTimers = {};
+
+function onMouseEnter(n) {
+    if (n.read_at) return;
+    hoverTimers[n.id] = setTimeout(() => {
+        markReadHover(n);
+    }, 500);
+}
+
+function onMouseLeave(n) {
+    clearTimeout(hoverTimers[n.id]);
+    delete hoverTimers[n.id];
+}
+
+function markReadHover(n) {
+    const found = localNotifications.value.find(x => x.id === n.id);
+    if (!found || found.read_at) return;
+
+    const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    fetch(route('job-notifications.markRead', { jobNotification: n.id }), {
+        method: 'POST',
+        headers: {
+            'X-CSRF-TOKEN': token,
+            'Accept': 'application/json',
+        },
+        credentials: 'same-origin',
+    }).then(res => {
+        if (res.ok) {
+            found.read_at = new Date().toISOString();
+        }
+    }).catch(() => {});
+}
+// ---- /ホバー既読 ----
+
+const viewMode      = ref(props.filters?.group === 'month' ? 'month' : 'day');
+const selectedDays  = ref(props.filters?.days ?? 30);
+const unreadOnly    = ref(false);
 
 function applyFilters() {
     router.get(route('job-notifications.index'), {
@@ -21,7 +59,10 @@ function applyFilters() {
 
 const groupedNotifications = computed(() => {
     const map = {};
-    (props.notifications || []).forEach((n) => {
+    const source = unreadOnly.value
+        ? (localNotifications.value || []).filter(n => !n.read_at)
+        : (localNotifications.value || []);
+    source.forEach((n) => {
         let raw = '不明';
         if (n.created_at) {
             const d = toJST(n.created_at);
@@ -54,7 +95,10 @@ function formatGroupKey(key) {
 function toJST(dateStr) {
     if (!dateStr) return null;
     try {
-        return new Date(String(dateStr).replace(' ', 'T').replace(/\+.*$/, '') + 'Z');
+        // 末尾の Z や +offset を除去してから Z を付与（二重 Z を防ぐ）
+        const normalized = String(dateStr).replace(' ', 'T').replace(/[Zz]$|[+\-]\d{2}:\d{2}$/, '') + 'Z';
+        const d = new Date(normalized);
+        return isNaN(d.getTime()) ? null : d;
     } catch {
         return null;
     }
@@ -106,6 +150,14 @@ function typeMeta(type) {
                         </select>
 
                         <button
+                            @click="unreadOnly = !unreadOnly"
+                            class="rounded border px-3 py-1 text-xs transition"
+                            :class="unreadOnly ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'"
+                        >
+                            未読のみ
+                        </button>
+
+                        <button
                             @click="applyFilters"
                             class="rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-700"
                         >
@@ -115,8 +167,13 @@ function typeMeta(type) {
                 </div>
             </div>
 
+            <!-- 注意書き -->
+            <div class="border-b bg-blue-50 px-6 py-2 text-xs text-blue-600">
+                ※ 通知の上にマウスを0.5秒ホバーすると自動で既読になります。
+            </div>
+
             <!-- 通知リスト（グループ別） -->
-            <div v-if="notifications && notifications.length > 0">
+            <div v-if="localNotifications.length > 0">
                 <div
                     v-for="(list, groupKey) in groupedNotifications"
                     :key="groupKey"
@@ -129,7 +186,12 @@ function typeMeta(type) {
 
                     <!-- 通知行 -->
                     <ul class="divide-y divide-gray-100">
-                        <li v-for="n in list" :key="n.id">
+                        <li
+                            v-for="n in list"
+                            :key="n.id"
+                            @mouseenter="onMouseEnter(n)"
+                            @mouseleave="onMouseLeave(n)"
+                        >
                             <Link
                                 :href="route('job-notifications.show', { jobNotification: n.id })"
                                 class="flex items-start gap-3 px-6 py-3 hover:bg-gray-50"

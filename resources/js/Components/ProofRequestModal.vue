@@ -31,8 +31,12 @@ const minutes = [0, 15, 30, 45];
 // モーダルが開くたびに初期値をセット
 watch(() => props.show, (val) => {
     if (val) {
+        const t = props.initialTitle;
+        const proofTitle = t
+            ? (t.endsWith('_組版') ? t.replace(/_組版$/, '_校正') : t + '_校正')
+            : '';
         form.value = {
-            title:                     props.initialTitle ? props.initialTitle + '_校正' : '',
+            title:                     proofTitle,
             deadline_date:             '',
             deadline_hour:             17,
             deadline_minute:           30,
@@ -88,7 +92,7 @@ function submit() {
                             v-model="form.title"
                             type="text"
                             class="mt-1 w-full rounded border-gray-300 text-sm"
-                            placeholder="例: クライアント案件_校正"
+                            placeholder="例: クライアント案件-校正"
                         />
                     </div>
 

@@ -100,15 +100,7 @@
   <td v-else-if="colDef.type === 'proof_user'" class="border border-gray-200 px-2 py-1 align-middle min-w-[130px]">
     <!-- 校正管理経由で依頼済みの場合（ロック表示） -->
     <template v-if="cell.proof_assignment_id">
-      <div class="flex flex-col gap-0.5">
-        <span class="rounded bg-pink-100 px-1.5 py-0.5 text-xs font-medium text-pink-700">校正管理経由</span>
-        <span class="text-xs text-gray-600 truncate">{{ cell.proof_assignment_title ?? '依頼済み' }}</span>
-        <span
-          v-if="cell.proof_assignment_completed"
-          class="rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700"
-        >✓ 完了</span>
-        <span v-else class="rounded bg-yellow-100 px-1.5 py-0.5 text-xs text-yellow-700">作業中</span>
-      </div>
+      <span class="rounded bg-pink-100 px-1.5 py-0.5 text-xs font-medium text-pink-700">校正管理経由</span>
     </template>
     <!-- 編集可能（未依頼 or 直接割当） -->
     <template v-else-if="canEdit">
@@ -144,11 +136,6 @@
         @click="emit('job-link-open', { rowId, colKey: colDef.key })"
       >＋ 登録</button>
       <div v-else class="flex flex-col items-center gap-0.5">
-        <!-- 校了バッジ（proof_completed_at が設定されている場合） -->
-        <span
-          v-if="cell.assignment_proof_completed"
-          class="rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700"
-        >校了</span>
         <!-- 完了バッジ or 登録済バッジ -->
         <span
           v-if="cell.assignment_completed"
@@ -168,23 +155,12 @@
           class="mt-0.5 rounded bg-indigo-100 px-2 py-0.5 text-xs text-indigo-700 hover:bg-indigo-200"
           @click="emit('complete-assignment', { assignmentId: cell.assignment_id, rowId, colKey: colDef.key })"
         >完了にする</button>
-        <!-- 校了にする：canEdit（Coordinator）向け -->
-        <button
-          v-if="canEdit && !cell.assignment_proof_completed"
-          type="button"
-          class="mt-0.5 rounded bg-green-100 px-2 py-0.5 text-xs text-green-700 hover:bg-green-200"
-          @click="emit('proof-direct-complete', { assignmentId: cell.assignment_id, rowId, colKey: colDef.key })"
-        >校了にする</button>
+
       </div>
     </template>
     <template v-else>
       <!-- 閲覧のみ -->
       <div v-if="cell.assignment_id" class="flex flex-col items-center gap-0.5">
-        <!-- 校了バッジ -->
-        <span
-          v-if="cell.assignment_proof_completed"
-          class="rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700"
-        >校了</span>
         <span
           v-if="cell.assignment_completed"
           class="rounded bg-yellow-100 px-1.5 py-0.5 text-xs font-medium text-yellow-800"

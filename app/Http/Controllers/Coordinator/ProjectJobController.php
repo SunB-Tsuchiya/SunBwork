@@ -486,6 +486,9 @@ class ProjectJobController extends Controller
             ->orderByDesc('updated_at')
             ->get(['id', 'name']);
 
+        // ステージ一覧（組版・校正セット方式モーダル用）
+        $stages = \App\Models\Stage::orderBy('sort_order')->orderBy('id')->get(['id', 'name', 'sort_order']);
+
         // 校正依頼履歴
         $proofHistory = [];
         try {
@@ -519,6 +522,7 @@ class ProjectJobController extends Controller
             'jobHistory' => $jobHistory,
             'progressSheets' => $progressSheets,
             'sheetTemplates' => $sheetTemplates,
+            'stages' => $stages,
             'sheetLinkedAssignmentIds' => $sheetLinkedAssignmentIds,
             'proofHistory' => $proofHistory,
         ]);

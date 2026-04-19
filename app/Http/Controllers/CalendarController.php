@@ -188,10 +188,11 @@ class CalendarController extends Controller
                     }
                 }
 
-                // color mapping: progress -> purple, self-assigned -> indigo, default -> green
+                // color mapping: progress -> purple, proof -> pink, self-assigned -> indigo, default -> green
                 $color = $arr['color'] ?? ($e->color ?? null);
                 if (empty($color)) {
                     if ($hasProgress) $color = '#7C3AED';
+                    elseif ($isProofEvent) $color = '#DB2777';
                     elseif ($isSelfAssigned) $color = '#4F46E5';
                     else $color = '#059669';
                 }

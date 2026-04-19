@@ -502,6 +502,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     ->name('job-notifications.')
     ->group(function () {
         Route::get('/', [\App\Http\Controllers\JobNotificationController::class, 'index'])->name('index');
+        Route::post('/{jobNotification}/read', [\App\Http\Controllers\JobNotificationController::class, 'markRead'])->name('markRead');
         Route::get('/{jobNotification}', [\App\Http\Controllers\JobNotificationController::class, 'show'])->name('show');
     });
 
@@ -679,6 +680,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('assignments/{proofRequest}', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'show'])->name('assignments.show');
         Route::get('assignments/{proofRequest}/edit', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'edit'])->name('assignments.edit');
         Route::put('assignments/{proofRequest}/assignment', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'assignmentUpdate'])->name('assignments.assignment_update');
+        Route::delete('assignments/{proofRequest}/events/{event}', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'destroyEvent'])->name('assignments.event_destroy');
         Route::put('assignments/{proofRequest}/assign', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'assign'])->name('assignments.assign');
         Route::put('assignments/{proofRequest}/start', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'start'])->name('assignments.start');
         Route::put('assignments/{proofRequest}/complete', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'complete'])->name('assignments.complete');
@@ -692,6 +694,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('history', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'history'])->name('history');
         Route::get('team', [\App\Http\Controllers\ProofCoordinator\ProofTeamController::class, 'index'])->name('team.index');
         Route::post('team', [\App\Http\Controllers\ProofCoordinator\ProofTeamController::class, 'store'])->name('team.store');
+        Route::post('team/reorder', [\App\Http\Controllers\ProofCoordinator\ProofTeamController::class, 'reorder'])->name('team.reorder');
         Route::delete('team/{proofTeamMember}', [\App\Http\Controllers\ProofCoordinator\ProofTeamController::class, 'destroy'])->name('team.destroy');
         // 単発派遣管理
         Route::post('dispatchers/check-duplicate', [\App\Http\Controllers\ProofCoordinator\ProofDispatcherController::class, 'checkDuplicate'])->name('dispatchers.check_duplicate');

@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ProofTeamMember extends Model
 {
-    protected $fillable = ['user_id'];
+    protected $fillable = ['user_id', 'sort_order'];
 
     public function user(): BelongsTo
     {

@@ -104,7 +104,7 @@
                                 <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ getDateDisplay(m) }}</td>
                                 <td class="break-words border px-3 py-2 text-sm">
                                     <span v-if="m.source_assignment_id" class="mr-1 inline-flex items-center rounded-full bg-orange-100 px-1.5 py-0.5 text-xs font-medium text-orange-700">↩続き</span>
-                                    <span v-if="m.proof_completed_at" class="mr-1 inline-flex items-center rounded-full bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">校了</span>{{ m.title || '-' }}
+                                    <span v-if="m.proof_completed_at" class="mr-1 inline-flex items-center rounded-full bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">校正済</span>{{ m.title || '-' }}
                                 </td>
                                 <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ getClientName(m) }}</td>
                                 <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ getProjectJobTitle(m) }}</td>

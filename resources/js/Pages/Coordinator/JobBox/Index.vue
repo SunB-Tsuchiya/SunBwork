@@ -79,12 +79,11 @@
                         <colgroup>
                             <col style="width: 100px"> <!-- 発信者 -->
                             <col style="width: 100px"> <!-- 受信者 -->
-                            <col style="width: 140px"> <!-- 締め切り -->
-                            <col style="width: 15%">   <!-- タイトル -->
-                            <col style="width: 130px"> <!-- クライアント -->
-                            <col style="width: 160px"> <!-- 案件名 -->
-                            <col style="width: 56px">  <!-- 既読 -->
-                            <col style="width: 88px">  <!-- ステータス -->
+                            <col style="width: 120px"> <!-- 作成日 -->
+                            <col>                      <!-- タイトル（残り全幅） -->
+                            <col style="width: 120px"> <!-- クライアント -->
+                            <col style="width: 150px"> <!-- 案件名 -->
+                            <col style="width: 74px">  <!-- ステータス -->
                         </colgroup>
                         <thead>
                             <tr class="bg-gray-50">
@@ -94,7 +93,6 @@
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">タイトル</th>
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">クライアント</th>
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">案件名</th>
-                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">既読</th>
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">ステータス</th>
                             </tr>
                         </thead>
@@ -113,18 +111,10 @@
                                 <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ getClientName(m) }}</td>
                                 <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ getProjectJobTitle(m) }}</td>
                                 <td class="border px-3 py-2">
-                                    <template v-if="isUnread(m)">
-                                        <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">未読</span>
-                                    </template>
-                                    <template v-else>
-                                        <span class="text-xs text-gray-500">既読</span>
-                                    </template>
-                                </td>
-                                <td class="border px-3 py-2">
                                     <span
-                                        :class="statusBadgeClass(getAssignmentStatus(m))"
+                                        :class="statusBadgeClass(getUnifiedStatus(m))"
                                         class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-                                    >{{ getAssignmentStatus(m) }}</span>
+                                    >{{ getUnifiedStatus(m) }}</span>
                                 </td>
                             </tr>
                         </tbody>
@@ -242,7 +232,7 @@ const displayGroups = computed(() => {
     let messages = Array.isArray(localMessages.value) ? [...localMessages.value] : [];
 
     if (hideCompleted.value) {
-        messages = messages.filter((m) => getAssignmentStatus(m) !== '完了');
+        messages = messages.filter((m) => getUnifiedStatus(m) !== '完了');
     }
 
     const grouped = new Map();
@@ -295,7 +285,7 @@ const totalDisplayCount = computed(() => displayGroups.value.reduce((sum, g) => 
 const hiddenCompletedCount = computed(() => {
     if (!hideCompleted.value) return 0;
     const all = Array.isArray(localMessages.value) ? [...localMessages.value] : [];
-    return all.filter((m) => getAssignmentStatus(m) === '完了').length;
+    return all.filter((m) => getUnifiedStatus(m) === '完了').length;
 });
 
 // ===== アクション =====
@@ -448,41 +438,41 @@ function getCounterparty(m) {
     }
 }
 
-function getAssignmentStatus(m) {
+function getUnifiedStatus(m) {
     try {
         const jam = m || {};
         const assignment = m.project_job_assignment || {};
-        const statusKey = assignment.status?.key || jam.status?.key || null;
-        if (statusKey) {
-            switch (statusKey) {
-                case 'completed': return '完了';
-                case 'scheduled': return 'セット済';
-                case 'confirmed': return '確認済';
-                case 'received':
-                case 'order':
-                case 'in_progress': return '受信済';
-                default: break;
-            }
-        }
-        if (Boolean(jam.completed) || Boolean(assignment.completed)) return '完了';
-        if (Boolean(jam.scheduled) || Boolean(assignment.scheduled) || Boolean(assignment.scheduled_at)) return 'セット済';
+        // status_model は Laravel が statusModel リレーションを snake_case 化したキー
+        const statusKey =
+            assignment.status_model?.key ||
+            assignment.status?.key ||
+            jam.status_model?.key ||
+            jam.status?.key ||
+            null;
+
+        // 優先順位: 完了 > セット済み > 確認済み > 未読
+        if (statusKey === 'completed' || Boolean(jam.completed) || Boolean(assignment.completed)) return '完了';
+        if (statusKey === 'scheduled' || Boolean(jam.scheduled) || Boolean(assignment.scheduled) || Boolean(assignment.scheduled_at)) return 'セット';
         const readAt = jam.read_at || assignment.read_at || null;
-        if (readAt) return Boolean(jam.accepted) || Boolean(assignment.accepted) ? '確認済' : '既読済';
-        if (Boolean(jam.accepted) || Boolean(assignment.accepted)) return '受信済';
-        return '-';
+        if (statusKey === 'confirmed' || readAt || Boolean(jam.accepted) || Boolean(assignment.accepted)) return '確認済み';
+        return '未読';
     } catch {
-        return '-';
+        return '未読';
     }
+}
+
+// 旧関数を getUnifiedStatus へ委譲（外部参照が残っている場合のため）
+function getAssignmentStatus(m) {
+    return getUnifiedStatus(m);
 }
 
 function statusBadgeClass(status) {
     switch (status) {
-        case '完了': return 'bg-yellow-100 text-yellow-800';
-        case 'セット済': return 'bg-blue-100 text-blue-800';
-        case '確認済': return 'bg-green-100 text-green-800';
-        case '受信済': return 'bg-indigo-100 text-indigo-800';
-        case '既読済': return 'bg-gray-100 text-gray-700';
-        default: return 'bg-gray-100 text-gray-700';
+        case '完了':     return 'bg-yellow-100 text-yellow-800';
+        case 'セット': return 'bg-blue-100 text-blue-800';
+        case '確認済み':  return 'bg-green-100 text-green-800';
+        case '未読':     return 'bg-red-100 text-red-800';
+        default:         return 'bg-gray-100 text-gray-700';
     }
 }
 

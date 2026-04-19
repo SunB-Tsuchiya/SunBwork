@@ -96,10 +96,11 @@ class EventController extends Controller
         $start = $validated['date'] . ' ' . $validated['startHour'] . ':' . $validated['startMinute'] . ':00';
         $end   = $validated['date'] . ' ' . $validated['endHour']   . ':' . $validated['endMinute']   . ':00';
 
-        $event->start     = $start;
-        $event->end       = $end;
-        $event->starts_at = Carbon::parse($start, 'Asia/Tokyo')->utc();
-        $event->ends_at   = Carbon::parse($end,   'Asia/Tokyo')->utc();
+        // setStart/EndAttribute が $start/$end の JST 文字列を attributes['starts_at'/'ends_at'] に
+        // そのまま格納する（EventController::store() と同じ方式）。
+        // UTC 変換を行うと events テーブル全体で格納方式が不整合になるため除去する。
+        $event->start = $start;
+        $event->end   = $end;
         $event->save();
 
         // proof_schedule 自動連動
@@ -202,9 +203,16 @@ class EventController extends Controller
 
                 // load senders from canonical and by_myself assignments to detect self-assigned
                 $assignmentSenders = [];
+                // coordinator_assignment_id が設定されている assignment は、見た目は自己割当でも
+                // コーディネーターに依頼されたジョブ（校正スケジュール等）なのでグリーン表示にする
+                $assignmentCoordinatorIds = []; // assignment_id => coordinator_assignment_id|null
                 if (!empty($assignmentIds)) {
                     try {
-                        $senders = \App\Models\ProjectJobAssignment::whereIn('id', $assignmentIds)->pluck('sender_id', 'id')->map(fn($v) => $v === null ? null : (int)$v)->all();
+                        $rows = \App\Models\ProjectJobAssignment::whereIn('id', $assignmentIds)
+                            ->get(['id', 'sender_id', 'coordinator_assignment_id']);
+                        $senders    = $rows->pluck('sender_id', 'id')->map(fn($v) => $v === null ? null : (int)$v)->all();
+                        $coordIds   = $rows->pluck('coordinator_assignment_id', 'id')->all();
+                        $assignmentCoordinatorIds = $coordIds;
                     } catch (\Throwable $__ex) {
                         $senders = [];
                         \Illuminate\Support\Facades\Log::warning('EventController: assignment senders lookup failed', ['error' => $__ex->getMessage()]);
@@ -238,7 +246,7 @@ class EventController extends Controller
                 } catch (\Throwable $_) {}
                 $lunchBreakCache = []; // date => breakInfo|null
 
-                $mapped = $events->map(function ($e) use ($progressAssignmentIds, $assignmentSenders, $baseUserId, $userLunchSettingForIndex, &$lunchBreakCache) {
+                $mapped = $events->map(function ($e) use ($progressAssignmentIds, $assignmentSenders, $assignmentCoordinatorIds, $baseUserId, $userLunchSettingForIndex, &$lunchBreakCache) {
                     $arr = $e->toArray();
                     $pjId = $arr['project_job_assignment_id'] ?? ($e->project_job_assignment_id ?? null);
                     $hasProgress = $pjId ? in_array((int)$pjId, $progressAssignmentIds, true) : false;
@@ -246,12 +254,19 @@ class EventController extends Controller
                     if ($pjId && isset($assignmentSenders[$pjId])) {
                         $sender = $assignmentSenders[$pjId];
                         $isSelf = $sender !== null && intval($sender) === intval($baseUserId);
+                        // coordinator_assignment_id が設定されている場合は依頼されたジョブ扱い
+                        // （校正スケジュールから自動作成された pja101 等）
+                        if ($isSelf && !empty($assignmentCoordinatorIds[$pjId])) {
+                            $isSelf = false;
+                        }
                     }
 
-                    // color mapping: progress -> purple, self-assigned -> indigo, default -> green
+                    // color mapping: progress -> purple, proof -> pink, self-assigned -> indigo, default -> green
                     $color = $arr['color'] ?? ($e->color ?? null);
                     if (!$color) {
+                        $isProofAssignment = $pjId && !empty($assignmentCoordinatorIds[$pjId]);
                         if ($hasProgress) $color = '#7C3AED';
+                        elseif ($isProofAssignment) $color = '#DB2777';
                         elseif ($isSelf) $color = '#4F46E5';
                         else $color = '#059669';
                     }
@@ -323,9 +338,13 @@ class EventController extends Controller
             }
 
             $assignmentSenders = [];
+            $assignmentCoordinatorIds = []; // assignment_id => coordinator_assignment_id|null
             if (!empty($assignmentIds)) {
                 try {
-                    $senders = \App\Models\ProjectJobAssignment::whereIn('id', $assignmentIds)->pluck('sender_id', 'id')->map(fn($v) => $v === null ? null : (int)$v)->all();
+                    $rows = \App\Models\ProjectJobAssignment::whereIn('id', $assignmentIds)
+                        ->get(['id', 'sender_id', 'coordinator_assignment_id']);
+                    $senders  = $rows->pluck('sender_id', 'id')->map(fn($v) => $v === null ? null : (int)$v)->all();
+                    $assignmentCoordinatorIds = $rows->pluck('coordinator_assignment_id', 'id')->all();
                 } catch (\Throwable $__ex) {
                     $senders = [];
                     \Illuminate\Support\Facades\Log::warning('EventController: assignment senders lookup failed (inertia)', ['error' => $__ex->getMessage()]);
@@ -351,7 +370,7 @@ class EventController extends Controller
                 }
             }
 
-            $mappedForInertia = $events->map(function ($e) use ($progressAssignmentIds, $assignmentSenders, $baseUserId) {
+            $mappedForInertia = $events->map(function ($e) use ($progressAssignmentIds, $assignmentSenders, $assignmentCoordinatorIds, $baseUserId) {
                 $arr = $e->toArray();
                 $pjId = $arr['project_job_assignment_id'] ?? ($e->project_job_assignment_id ?? null);
                 $hasProgress = $pjId ? in_array((int)$pjId, $progressAssignmentIds, true) : false;
@@ -359,6 +378,10 @@ class EventController extends Controller
                 if ($pjId && isset($assignmentSenders[$pjId])) {
                     $sender = $assignmentSenders[$pjId];
                     $isSelf = $sender !== null && intval($sender) === intval($baseUserId);
+                    // coordinator_assignment_id が設定されている場合は依頼されたジョブ扱い
+                    if ($isSelf && !empty($assignmentCoordinatorIds[$pjId])) {
+                        $isSelf = false;
+                    }
                 }
 
                 $arr['extendedProps'] = array_merge($arr['extendedProps'] ?? [], [
@@ -865,6 +888,11 @@ class EventController extends Controller
                         ->update(['assignment_id' => null]);
                 }
             } catch (\Throwable $e) { /* ignore */ }
+
+            // 校正スロット（pja101）の最後のイベント削除時: pja101/pja100 削除 + ProofRequest を pending に戻す
+            try {
+                \App\Services\ProofJobRollbackService::rollbackIfNoEvents($assignmentIdToCheck);
+            } catch (\Throwable $e) { /* ignore */ }
         }
 
         // If this request came from Inertia, return a redirect (Inertia expects a redirect/Inertia response).
@@ -1192,6 +1220,43 @@ class EventController extends Controller
                     $parent->save();
                 }
                 $current = $parent;
+            }
+
+            // 校正ジョブ（pja101: job_type='proof' の自己割当）が完了になった場合、
+            // 対応する ProofRequest を自動完了し、pja_operator に proof_completed_at を設定する
+            if (!empty($assignment->job_type) && $assignment->job_type === 'proof' && !empty($assignment->coordinator_assignment_id)) {
+                try {
+                    $pja100 = \App\Models\ProjectJobAssignment::find($assignment->coordinator_assignment_id);
+                    if ($pja100) {
+                        $proofRequest = \App\Models\ProofRequest::where('project_job_id', $pja100->project_job_id)
+                            ->where('proofreader_id', $pja100->user_id)
+                            ->where('proof_coordinator_id', $pja100->sender_id)
+                            ->whereIn('status', ['assigned', 'in_progress'])
+                            ->latest()
+                            ->first();
+                        if ($proofRequest) {
+                            $proofRequest->update([
+                                'status'       => 'completed',
+                                'completed_at' => now(),
+                            ]);
+                            if ($proofRequest->project_job_assignment_id) {
+                                \App\Models\ProjectJobAssignment::where('id', $proofRequest->project_job_assignment_id)
+                                    ->whereNull('proof_completed_at')
+                                    ->update(['proof_completed_at' => now()]);
+                            }
+                            // pja100 を completed にする → 進行表の proof_user セルに反映
+                            $pja100->completed = true;
+                            $pja100->save();
+                            Log::info('EventController: proof job completed → ProofRequest completed + proof_completed_at set', [
+                                'pja_id'           => $assignment->id,
+                                'proof_request_id' => $proofRequest->id,
+                                'pja_operator_id'  => $proofRequest->project_job_assignment_id,
+                            ]);
+                        }
+                    }
+                } catch (\Throwable $__eProof) {
+                    Log::warning('EventController: failed to complete ProofRequest on proof job completion', ['error' => $__eProof->getMessage()]);
+                }
             }
 
             // ── Coordinator の project_job_assignments を完了にする（ユーザーが承認した場合のみ）──
@@ -1536,7 +1601,23 @@ class EventController extends Controller
                     // Otherwise keep amounts empty (daily work recorded separately).
                     'amounts' => $sourceJobAssignmentId ? ($assignment->amounts ?? null) : null,
                     'amounts_unit' => $sourceJobAssignmentId ? ($assignment->amounts_unit ?? 'page') : 'page',
+                    // JobBox/Show から「マイジョブとして登録」で来た場合は依頼ジョブを supersede
+                    'supersedes_assignment_id' => $sourceJobAssignmentId ? (int)$sourceJobAssignmentId : null,
                 ]];
+
+                // 進行表セル情報を取得して prefill に追加（依頼ジョブが進行表と紐づいている場合）
+                if ($sourceJobAssignmentId) {
+                    try {
+                        $progressCellForJob = \App\Models\ProgressCell::where('assignment_id', $assignment->id)->first();
+                        if ($progressCellForJob) {
+                            $jobAssignments[0]['_progress_sheet_id'] = $progressCellForJob->progress_sheet_id ?? null;
+                            $jobAssignments[0]['_row_id'] = $progressCellForJob->row_id ?? null;
+                            $jobAssignments[0]['_col_key'] = $progressCellForJob->col_key ?? null;
+                        }
+                    } catch (\Throwable $__e) {
+                        // non-fatal: continue without progress cell info
+                    }
+                }
             }
         }
 

@@ -201,7 +201,8 @@ const eventTypeLabel = computed(() => props.event?.event_item_type?.name ?? null
                             {{ isEventCompleted() ? '完了済み' : '完了する' }}
                         </button>
 
-                        <!-- 校正依頼ボタン（完了済みは非表示） -->
+                        <!-- 校正依頼ボタン（完了済みまたは校正ジョブは非表示） -->
+                        <template v-if="assignment?.job_type !== 'proof'">
                         <button
                             v-if="!isEventCompleted() && !props.proof_requested"
                             @click="showProofModal = true"
@@ -215,6 +216,7 @@ const eventTypeLabel = computed(() => props.event?.event_item_type?.name ?? null
                         >
                             校正依頼済み
                         </span>
+                        </template>
                     </template>
                     <button @click="$router?.back ? $router.back() : window.history.back()"
                             class="ml-auto inline-flex items-center gap-1.5 rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">

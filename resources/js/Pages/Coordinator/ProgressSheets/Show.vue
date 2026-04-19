@@ -79,15 +79,6 @@
           変更を保存 ({{ pendingCells.length }})
         </button>
 
-        <!-- 校正依頼ボタン -->
-        <button
-          v-if="!projectJob.completed"
-          type="button"
-          class="rounded border border-pink-300 bg-pink-50 px-3 py-1.5 text-sm font-medium text-pink-700 hover:bg-pink-100"
-          @click="showProofModal = true"
-        >
-          校正依頼
-        </button>
       </div>
 
       <!-- ── 編集モード：行管理 + 列ツリー ──────────────── -->
@@ -726,8 +717,8 @@ function buildJobTitle(rowId, colKey) {
   const parentRow = row?.parent_id ? localRows.value.find((r) => r.id === row.parent_id) : null;
   const breadcrumb = findBreadcrumb(localColumnConfig.value, colKey); // [top, ..., leaf]
   const parentPath = breadcrumb ? breadcrumb.slice(0, -1) : []; // leafを除く親グループパス
-  const rowPart = [parentRow?.label, row?.label].filter(Boolean).join('ー');
-  const colPart = parentPath.filter(Boolean).join('ー');
+  const rowPart = [parentRow?.label, row?.label].filter(Boolean).join('_');
+  const colPart = parentPath.filter(Boolean).join('_');
   return [rowPart, colPart].filter(Boolean).join('_');
 }
 
@@ -949,7 +940,19 @@ function onProofRequestOpen({ rowId, colKey }) {
   // proof_user セルの id を特定して ProofRequestModal に渡す
   const cell = localCells.value.find((c) => c.row_id === rowId && c.col_key === colKey);
   proofTargetCellId.value = cell?.id ?? null;
-  proofTargetAssignment.value = null;
+
+  // colKey が "{prefix}_kosei_tanto" の場合、同じ行の "{prefix}_kumihan_toroku" セルから
+  // pja_operator の id とタイトルを取得して ProofRequestModal に渡す
+  const kumiTorokuKey = colKey.replace(/_kosei_tanto$/, '_kumihan_toroku');
+  if (kumiTorokuKey !== colKey) {
+    const kumiCell = localCells.value.find((c) => c.row_id === rowId && c.col_key === kumiTorokuKey);
+    proofTargetAssignment.value = kumiCell?.assignment_id
+      ? { id: kumiCell.assignment_id, title: kumiCell.assignment_title ?? '' }
+      : null;
+  } else {
+    proofTargetAssignment.value = null;
+  }
+
   showProofModal.value = true;
 }
 

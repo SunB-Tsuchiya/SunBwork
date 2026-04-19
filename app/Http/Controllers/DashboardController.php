@@ -119,6 +119,7 @@ class DashboardController extends Controller
             // CalendarController と同じ色判定ロジック: is_self_assigned / has_progress_cell を付与
             $assignmentIds = $rawEvents->pluck('project_job_assignment_id')->filter()->unique()->values()->all();
             $progressAssignmentIds = [];
+            $proofAssignmentIds = [];
             $assignmentSenders = [];
             if (!empty($assignmentIds)) {
                 try {
@@ -126,6 +127,13 @@ class DashboardController extends Controller
                         ->pluck('assignment_id')->map(fn($v) => (int)$v)->all();
                 } catch (\Throwable $ex) {
                     Log::error('DashboardController progressAssignmentIds error: ' . $ex->getMessage());
+                }
+                try {
+                    $proofAssignmentIds = ProjectJobAssignment::whereIn('id', $assignmentIds)
+                        ->where('job_type', 'proof')
+                        ->pluck('id')->map(fn($v) => (int)$v)->all();
+                } catch (\Throwable $ex) {
+                    Log::error('DashboardController proofAssignmentIds error: ' . $ex->getMessage());
                 }
                 try {
                     $senders = ProjectJobAssignment::whereIn('id', $assignmentIds)
@@ -149,21 +157,48 @@ class DashboardController extends Controller
                 }
             }
 
-            $events = $rawEvents->map(function ($e) use ($progressAssignmentIds, $assignmentSenders, $user) {
+            // 校正ジョブ（pja101: source_assignment_id または coordinator_assignment_id が設定）は
+            // 自己割当でなく依頼ジョブとして扱い、紫色表示にする
+            $assignmentFlags = [];
+            if (!empty($assignmentIds)) {
+                try {
+                    $metaRows = ProjectJobAssignment::whereIn('id', $assignmentIds)
+                        ->get(['id', 'source_assignment_id', 'coordinator_assignment_id'])
+                        ->keyBy('id')
+                        ->toArray();
+                    foreach ($metaRows as $k => $r) {
+                        $assignmentFlags[$k] = [
+                            'has_source'      => !empty($r['source_assignment_id']),
+                            'has_coordinator' => !empty($r['coordinator_assignment_id']),
+                        ];
+                    }
+                } catch (\Throwable $ex) {
+                    Log::error('DashboardController assignmentFlags error: ' . $ex->getMessage());
+                }
+            }
+
+            $events = $rawEvents->map(function ($e) use ($progressAssignmentIds, $proofAssignmentIds, $assignmentSenders, $user, $assignmentFlags) {
                 $arr = $e->toArray();
                 $startVal = $e->start ?? $arr['start'] ?? $arr['starts_at'] ?? $arr['startsAt'] ?? null;
                 $endVal   = $e->end   ?? $arr['end']   ?? $arr['ends_at']   ?? $arr['endsAt']   ?? null;
                 $descVal  = $e->description ?? $arr['description'] ?? $arr['body'] ?? null;
                 $pjaId    = $arr['project_job_assignment_id'] ?? ($e->project_job_assignment_id ?? null);
                 $hasProgress = $pjaId ? in_array((int)$pjaId, $progressAssignmentIds, true) : false;
+                // source_assignment_id / coordinator_assignment_id ありのジョブ（pja101等）は紫色表示
+                if (!$hasProgress && $pjaId && isset($assignmentFlags[$pjaId])) {
+                    $hasProgress = !empty($assignmentFlags[$pjaId]['has_source'])
+                                || !empty($assignmentFlags[$pjaId]['has_coordinator']);
+                }
                 $isSelfAssigned = false;
                 if ($pjaId && isset($assignmentSenders[$pjaId])) {
                     $senderId = $assignmentSenders[$pjaId];
                     $isSelfAssigned = $senderId !== null && $senderId === ($user ? $user->id : null);
                 }
+                $isProofJob = $pjaId ? in_array((int)$pjaId, $proofAssignmentIds ?? [], true) : false;
                 $color = $arr['color'] ?? ($e->color ?? null);
                 if (empty($color)) {
                     if ($hasProgress) $color = '#7C3AED';
+                    elseif ($isProofJob) $color = '#DB2777';
                     elseif ($isSelfAssigned) $color = '#4F46E5';
                     else $color = '#059669';
                 }

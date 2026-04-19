@@ -127,6 +127,40 @@ function formatDuration(ev) {
     if (h > 0) return `${h}時間`;
     return `${m}分`;
 }
+
+async function deleteEvent(ev) {
+    if (!confirm('この作業時間を削除しますか？\n（紐づく校正スケジュールも削除されます）')) return;
+    ev.saving = true;
+    ev.error  = null;
+    try {
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        const res  = await fetch(
+            route('proof_coordinator.assignments.event_destroy', {
+                proofRequest: props.proofRequest.id,
+                event:        ev.id,
+            }),
+            {
+                method:      'DELETE',
+                credentials: 'same-origin',
+                headers: {
+                    'X-CSRF-TOKEN':     csrf,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            }
+        );
+        if (res.ok) {
+            // ローカルリストから除去
+            const idx = localEvents.value.findIndex(e => e.id === ev.id);
+            if (idx !== -1) localEvents.value.splice(idx, 1);
+        } else {
+            ev.error = '削除に失敗しました';
+        }
+    } catch (_) {
+        ev.error = '削除に失敗しました';
+    } finally {
+        ev.saving = false;
+    }
+}
 </script>
 
 <template>
@@ -234,7 +268,7 @@ function formatDuration(ev) {
                             <div class="text-sm text-gray-500">
                                 {{ formatDuration(ev) }}
                             </div>
-                            <!-- 保存ボタン -->
+                            <!-- 保存・削除ボタン -->
                             <div class="ml-auto flex items-center gap-2">
                                 <span v-if="ev.error"  class="text-xs text-red-600">{{ ev.error }}</span>
                                 <span v-if="ev.saved"  class="text-xs text-green-600">保存しました</span>
@@ -245,6 +279,14 @@ function formatDuration(ev) {
                                     class="rounded bg-pink-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-pink-700 disabled:opacity-50"
                                 >
                                     {{ ev.saving ? '保存中…' : '保存' }}
+                                </button>
+                                <button
+                                    type="button"
+                                    @click="deleteEvent(ev)"
+                                    :disabled="ev.saving"
+                                    class="rounded bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-200 disabled:opacity-50"
+                                >
+                                    削除
                                 </button>
                             </div>
                         </div>

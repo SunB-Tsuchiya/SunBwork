@@ -42,9 +42,17 @@
 
                     <template v-if="isAssignee">
                         <!-- 進行表から依頼されたジョブ → events.create_job へ、独立ジョブ → マイジョブ作成フォームへ -->
-                        <Link :href="myJobBoxHref" class="inline-flex items-center gap-1.5 rounded bg-blue-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-600">
+                        <Link
+                            v-if="!assignment.is_registered"
+                            :href="myJobBoxHref"
+                            class="inline-flex items-center gap-1.5 rounded bg-blue-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-600"
+                        >
                             {{ assignment.progress_cell_id ? 'ジョブをセット（進行表から）' : 'マイジョブとして登録' }}
                         </Link>
+                        <span
+                            v-else
+                            class="inline-flex items-center gap-1.5 rounded bg-gray-400 px-3 py-1.5 text-sm font-medium text-white cursor-not-allowed"
+                        >登録済み</span>
                         <!-- assignment-job（Coordinator依頼）の完了。
                              directly project_job_assignments を更新し、Coordinatorの一覧に反映される -->
                         <button
@@ -375,6 +383,10 @@ const myJobBoxHref = computed(() => {
 
     if (assignment.progress_cell_id) {
         // 進行表から依頼されたジョブ → events.create_job へ（日付なし、カレンダーで選択）
+        // 進行表セルの row_id/col_key を渡して登録後に進行表と連動させる
+        if (assignment.progress_row_id) params.set('row_id', String(assignment.progress_row_id));
+        if (assignment.progress_col_key) params.set('col_key', assignment.progress_col_key);
+        if (assignment.progress_sheet_id) params.set('progress_sheet_id', String(assignment.progress_sheet_id));
         const base = safeRoute('events.create_job', {}, '/events/create-job');
         return base + '?' + query;
     } else {

@@ -59,7 +59,13 @@
                         <span class="ml-2 text-xs font-normal text-gray-500">{{ group.items.length }} 件</span>
                     </div>
 
-                    <table class="min-w-full border">
+                    <table class="w-full table-fixed border">
+                        <colgroup>
+                            <col class="w-28" />
+                            <col />
+                            <col class="w-44" />
+                            <col class="w-24" />
+                        </colgroup>
                         <thead>
                             <tr class="bg-gray-50">
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">
@@ -91,7 +97,6 @@
                                         class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
                                     >{{ job.completed ? '完了' : '進行中' }}</span>
                                 </td>
-
                             </tr>
                         </tbody>
                     </table>

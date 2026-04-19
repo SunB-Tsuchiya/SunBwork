@@ -64,11 +64,13 @@ class CalendarController extends Controller
                 ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])
                 ->toArray();
         } else {
-            $teamUserIds = ProofTeamMember::pluck('user_id');
-            $members = User::whereIn('id', $teamUserIds)
-                ->orderBy('name')
-                ->get(['id', 'name'])
-                ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])
+            $members = ProofTeamMember::with('user:id,name')
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->get()
+                ->filter(fn ($m) => $m->user !== null)
+                ->map(fn ($m) => ['id' => $m->user->id, 'name' => $m->user->name])
+                ->values()
                 ->toArray();
         }
 
@@ -126,8 +128,10 @@ class CalendarController extends Controller
             return [
                 'id'        => $e->id,
                 'user_id'   => $e->user_id,
-                'starts_at' => $this->toUtcIso($e->getRawOriginal('starts_at')),
-                'ends_at'   => $this->toUtcIso($e->getRawOriginal('ends_at')),
+                // events.starts_at は JST 文字列格納（EventController::store() の方式）。
+                // datetime キャスト(Asia/Tokyo)が JST と正しく解釈するため ->utc() で真の UTC を得る。
+                'starts_at' => $e->starts_at ? $e->starts_at->utc()->toIso8601String() : null,
+                'ends_at'   => $e->ends_at   ? $e->ends_at->utc()->toIso8601String()   : null,
                 'color'     => $color,
             ];
         })->all();
@@ -185,15 +189,18 @@ class CalendarController extends Controller
         if ($proofSchedule->event_id) {
             $event = Event::find($proofSchedule->event_id);
             if ($event) {
-                $startsAt = \Carbon\Carbon::parse($proofSchedule->starts_at);
-                $endsAt   = \Carbon\Carbon::parse($proofSchedule->ends_at);
-                $jstStart = $startsAt->copy()->setTimezone('Asia/Tokyo');
+                // ProofSchedule.starts_at は DATETIME カラムで UTC 格納。
+                // datetime キャストは PHP tz(Asia/Tokyo) で解釈するため UTC 値を JST と誤認識する。
+                // getRawOriginal() で UTC 文字列を取得し、正しく JST に変換する。
+                $rawStart = $proofSchedule->getRawOriginal('starts_at');
+                $rawEnd   = $proofSchedule->getRawOriginal('ends_at');
+                $jstStart = Carbon::createFromFormat('Y-m-d H:i:s', $rawStart, 'UTC')->setTimezone('Asia/Tokyo');
+                $jstEnd   = Carbon::createFromFormat('Y-m-d H:i:s', $rawEnd,   'UTC')->setTimezone('Asia/Tokyo');
                 $event->update([
-                    'date'      => $jstStart->toDateString(),
-                    'start'     => $jstStart->format('Y-m-d H:i:s'),
-                    'end'       => $endsAt->copy()->setTimezone('Asia/Tokyo')->format('Y-m-d H:i:s'),
-                    'starts_at' => $startsAt,
-                    'ends_at'   => $endsAt,
+                    'date'  => $jstStart->toDateString(),
+                    'start' => $jstStart->format('Y-m-d H:i:s'),
+                    'end'   => $jstEnd->format('Y-m-d H:i:s'),
+                    // starts_at/ends_at は setStart/EndAttribute ミューテータ経由で自動設定
                 ]);
             }
         } else {
@@ -214,11 +221,20 @@ class CalendarController extends Controller
     public function destroy(ProofSchedule $proofSchedule): JsonResponse
     {
         // 対応する Event も削除
+        $eventAssignmentId = null;
         if ($proofSchedule->event_id) {
-            Event::find($proofSchedule->event_id)?->delete();
+            $ev = Event::find($proofSchedule->event_id);
+            $eventAssignmentId = $ev?->project_job_assignment_id;
+            $ev?->delete();
         }
 
         $proofSchedule->delete();
+
+        // 校正スロット（pja101）の最後のイベント削除時: pja101/pja100 削除 + ProofRequest を pending に戻す
+        if ($eventAssignmentId) {
+            \App\Services\ProofJobRollbackService::rollbackIfNoEvents($eventAssignmentId);
+        }
+
         return response()->json(['ok' => true]);
     }
 
@@ -228,11 +244,13 @@ class CalendarController extends Controller
 
     private function getMembers(): array
     {
-        $teamUserIds = ProofTeamMember::pluck('user_id');
-        return User::whereIn('id', $teamUserIds)
-            ->orderBy('name')
+        return ProofTeamMember::with('user:id,name')
+            ->orderBy('sort_order')
+            ->orderBy('id')
             ->get()
-            ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])
+            ->filter(fn ($m) => $m->user !== null)
+            ->map(fn ($m) => ['id' => $m->user->id, 'name' => $m->user->name])
+            ->values()
             ->toArray();
     }
 
@@ -298,12 +316,15 @@ class CalendarController extends Controller
                 ->get();
 
             foreach ($events as $ev) {
+                // events.starts_at は TIMESTAMP カラムで EventController::store() が JST を
+                // UTC として格納するため、datetime キャスト（Asia/Tokyo 解釈）経由で正しい
+                // UTC に変換する。getRawOriginal + toUtcIso では 9 時間ずれが生じる。
                 $fromEvents[] = [
                     'id'               => 'ev_' . $ev->id,
                     'proof_request_id' => $pr->id,
                     'user_id'          => $selfJob->user_id,
-                    'starts_at'        => $this->toUtcIso($ev->getRawOriginal('starts_at')),
-                    'ends_at'          => $this->toUtcIso($ev->getRawOriginal('ends_at')),
+                    'starts_at'        => $ev->starts_at ? $ev->starts_at->utc()->toIso8601String() : null,
+                    'ends_at'          => $ev->ends_at   ? $ev->ends_at->utc()->toIso8601String()   : null,
                     'title'            => $pr->title,
                     'job_title'        => $pr->projectJob?->title ?? null,
                     'status'           => $pr->status,
@@ -414,18 +435,21 @@ class CalendarController extends Controller
             ]);
         }
 
-        $startsAt = \Carbon\Carbon::parse($schedule->starts_at);
-        $endsAt   = \Carbon\Carbon::parse($schedule->ends_at);
-        $jstStart = $startsAt->copy()->setTimezone('Asia/Tokyo');
+        // ProofSchedule.starts_at は DATETIME カラムで UTC を格納している。
+        // $schedule->starts_at の datetime キャストは PHP タイムゾーン (Asia/Tokyo) で解釈するため
+        // UTC 格納値を JST と誤認識する。getRawOriginal() で正しい UTC 文字列を取得し JST に変換する。
+        $rawStart = $schedule->getRawOriginal('starts_at');
+        $rawEnd   = $schedule->getRawOriginal('ends_at');
+        $jstStart = Carbon::createFromFormat('Y-m-d H:i:s', $rawStart, 'UTC')->setTimezone('Asia/Tokyo');
+        $jstEnd   = Carbon::createFromFormat('Y-m-d H:i:s', $rawEnd,   'UTC')->setTimezone('Asia/Tokyo');
 
         return Event::create([
             'user_id'                   => $proofRequest->proofreader_id,
             'project_job_assignment_id' => $pja101->id,
             'date'                      => $jstStart->toDateString(),
             'start'                     => $jstStart->format('Y-m-d H:i:s'),
-            'end'                       => $endsAt->copy()->setTimezone('Asia/Tokyo')->format('Y-m-d H:i:s'),
-            'starts_at'                 => $startsAt,
-            'ends_at'                   => $endsAt,
+            'end'                       => $jstEnd->format('Y-m-d H:i:s'),
+            // starts_at/ends_at は setStart/EndAttribute ミューテータ経由で自動設定される
             'title'                     => $proofRequest->title,
         ]);
     }

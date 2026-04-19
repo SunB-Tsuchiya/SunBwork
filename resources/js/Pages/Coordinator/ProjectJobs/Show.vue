@@ -12,10 +12,11 @@
             </h2>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <!-- ── スティッキーヘッダー ──────────────────────────── -->
+        <div class="sticky top-0 z-20 rounded-t bg-white px-6 pt-6 pb-0 shadow-md">
 
             <!-- ── タイトル行 ──────────────────────────────────── -->
-            <div class="mb-6 flex flex-wrap items-start gap-5">
+            <div class="mb-4 flex flex-wrap items-start gap-5">
                 <!-- 左：クライアント / 案件名 / サブ情報 -->
                 <div>
                     <p class="text-sm font-medium text-gray-400">
@@ -99,16 +100,36 @@
                 </div>
             </div>
 
-            <!-- ── 詳細メモ（あれば表示） ─────────────────────── -->
+            <!-- ── タブバー ──────────────────────────────────────── -->
+            <div class="mt-2 flex gap-1 border-b border-gray-200">
+                <button
+                    v-for="tab in tabs"
+                    :key="tab.key"
+                    type="button"
+                    :class="[
+                        'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
+                        activeTab === tab.key
+                            ? 'border-indigo-500 text-indigo-700'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
+                    ]"
+                    @click="activeTab = tab.key"
+                >{{ tab.label }}</button>
+            </div>
+        </div><!-- /sticky header -->
+
+        <!-- ── タブコンテンツ ─────────────────────────────────── -->
+        <div class="rounded-b bg-white px-6 pb-6 shadow-md">
+
+            <!-- 詳細メモ（概要タブのみ） -->
             <div
-                v-if="job.detail"
-                class="mb-6 whitespace-pre-wrap rounded border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700"
+                v-if="activeTab === 'overview' && job.detail"
+                class="mt-4 whitespace-pre-wrap rounded border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700"
             >{{ typeof job.detail === 'string' ? job.detail : JSON.stringify(job.detail) }}</div>
 
             <div class="divide-y divide-gray-100">
 
                 <!-- ── スケジュールセクション ──────────────────── -->
-                <section class="py-5">
+                <section v-show="activeTab === 'overview'" class="py-5">
                     <div class="mb-3 flex items-center gap-4">
                         <h3 class="font-semibold text-gray-800">スケジュール</h3>
                         <div class="flex gap-2">
@@ -155,7 +176,7 @@
                 </section>
 
                 <!-- ── メンバーセクション ──────────────────────── -->
-                <section class="py-5">
+                <section v-show="activeTab === 'overview'" class="py-5">
                     <div class="mb-3 flex items-center gap-4">
                         <h3 class="font-semibold text-gray-800">メンバー</h3>
                         <button
@@ -225,7 +246,7 @@
                 </section>
 
                 <!-- ── 進行管理表セクション ──────────────────── -->
-                <section class="py-5">
+                <section v-show="activeTab === 'progress'" class="py-5">
                     <div class="mb-3 flex items-center gap-4">
                         <h3 class="font-semibold text-gray-800">進行管理表</h3>
                         <button
@@ -280,7 +301,7 @@
                 </section>
 
                 <!-- ── ジョブ履歴セクション ───────────────────── -->
-                <section class="py-5">
+                <section v-show="activeTab === 'history'" class="py-5">
                     <div class="mb-3 flex flex-wrap items-center gap-4">
                         <button
                             type="button"
@@ -439,7 +460,7 @@
                 </section>
 
                 <!-- 校正依頼履歴 -->
-                <section v-if="(page.props.proofHistory || []).length > 0" class="py-4">
+                <section v-show="activeTab === 'history'" v-if="(page.props.proofHistory || []).length > 0" class="py-4">
                     <h3 class="mb-3 text-sm font-semibold text-gray-700">校正依頼履歴</h3>
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
                         <thead class="bg-gray-50">
@@ -473,7 +494,7 @@
                 </section>
 
             </div><!-- /divide-y -->
-        </div>
+        </div><!-- /tab content -->
     </AppLayout>
 
     <!-- ── 進行管理表 新規作成モーダル ──── -->
@@ -534,12 +555,14 @@
                 <div class="mt-3 space-y-2">
                     <div v-for="(round, idx) in newSheetRounds" :key="idx" class="flex items-center gap-2">
                         <span class="w-12 flex-shrink-0 text-xs text-gray-500">第{{ idx + 1 }}校</span>
-                        <input
-                            v-model="round.label"
-                            type="text"
+                        <select
+                            v-model="round.stage_id"
                             class="flex-1 rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-indigo-400 focus:outline-none"
-                            :placeholder="idx === 0 ? '初校' : idx === 1 ? '再校' : '三校'"
-                        />
+                            @change="round.stage_name = stageNameById(round.stage_id)"
+                        >
+                            <option :value="null">— ステージを選択 —</option>
+                            <option v-for="s in availableStages" :key="s.id" :value="s.id">{{ s.name }}</option>
+                        </select>
                         <button
                             v-if="newSheetRounds.length > 1"
                             type="button"
@@ -550,7 +573,7 @@
                     <button
                         type="button"
                         class="text-xs font-medium text-indigo-600 hover:underline"
-                        @click="newSheetRounds.push({ label: '' })"
+                        @click="addNextRound"
                     >＋ 校を追加</button>
                 </div>
                 <p class="mt-2 text-xs text-gray-400">各校に「組版担当・登録欄 + 校正担当・登録欄」が自動生成されます。</p>
@@ -618,11 +641,19 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 
 const page = usePage();
 const job  = page.props.job || {};
 const schedules = computed(() => Array.isArray(page.props.schedules) ? page.props.schedules : []);
+
+// ── タブ定義 ─────────────────────────────────────────────────────────────
+const tabs = [
+    { key: 'overview',  label: '概要・メンバー' },
+    { key: 'progress',  label: '進行管理表' },
+    { key: 'history',   label: 'ジョブ履歴' },
+];
+const activeTab = ref('overview');
 
 // hasSchedule flag (server-side or derived)
 const serverHasSchedule = page.props.hasSchedule;
@@ -819,16 +850,59 @@ const showCreateSheetModal = ref(false);
 const newSheetName = ref('');
 const newSheetTemplateId = ref(null);
 const newSheetUseV2 = ref(false);
-const newSheetRounds = ref([{ label: '初校' }]);
+
+// stages（進行表セット方式モーダル用）
+const availableStages = computed(() => {
+    const s = page.props.stages;
+    return Array.isArray(s) ? s : [];
+});
+
+function stageNameById(stageId) {
+    if (!stageId) return '';
+    const s = availableStages.value.find((x) => x.id === stageId || String(x.id) === String(stageId));
+    return s ? s.name : '';
+}
+
+// 初期値: sort_order 最小（初校）
+const firstStage = computed(() => availableStages.value[0] ?? null);
+const newSheetRounds = ref([{ stage_id: null, stage_name: '' }]);
+
+// モーダルが開いた時点で stages が揃っていれば初期値をセット
+watch(showCreateSheetModal, (open) => {
+    if (open && firstStage.value && newSheetRounds.value.length === 1 && !newSheetRounds.value[0].stage_id) {
+        newSheetRounds.value[0].stage_id = firstStage.value.id;
+        newSheetRounds.value[0].stage_name = firstStage.value.name;
+    }
+});
+
+/** 次の sort_order を持つステージを追加する */
+function addNextRound() {
+    const stages = availableStages.value;
+    if (!stages.length) {
+        newSheetRounds.value.push({ stage_id: null, stage_name: '' });
+        return;
+    }
+    // 最後に選ばれているステージの sort_order を取得
+    const lastRound = newSheetRounds.value[newSheetRounds.value.length - 1];
+    const lastStage = stages.find((s) => s.id === lastRound.stage_id || String(s.id) === String(lastRound.stage_id));
+    const lastOrder = lastStage ? (lastStage.sort_order ?? 0) : -1;
+    // 次の sort_order を持つステージを探す
+    const nextStage = stages.find((s) => (s.sort_order ?? 0) > lastOrder);
+    newSheetRounds.value.push({
+        stage_id: nextStage ? nextStage.id : null,
+        stage_name: nextStage ? nextStage.name : '',
+    });
+}
 
 function buildV2ColumnConfig(rounds) {
     return rounds
-        .filter((r) => r.label.trim())
+        .filter((r) => r.stage_name || r.stage_id)
         .map((round, idx) => {
+            const label = round.stage_name || stageNameById(round.stage_id) || ('第' + (idx + 1) + '校');
             const key = 'round' + (idx + 1);
             return {
                 key,
-                label: round.label.trim(),
+                label,
                 type: 'text',
                 children: [
                     {
@@ -863,13 +937,20 @@ function createSheet() {
     if (newSheetUseV2.value) {
         const config = buildV2ColumnConfig(newSheetRounds.value);
         if (config.length === 0) {
-            alert('少なくとも1つの校を入力してください。');
+            alert('少なくとも1つのステージを選択してください。');
             return;
         }
         router.post(
             route('coordinator.project_jobs.progress_sheets.store', { projectJob: job.id }),
             { name, column_config: config },
-            { onSuccess: () => { showCreateSheetModal.value = false; newSheetName.value = ''; newSheetUseV2.value = false; newSheetRounds.value = [{ label: '初校' }]; } },
+            {
+                onSuccess: () => {
+                    showCreateSheetModal.value = false;
+                    newSheetName.value = '';
+                    newSheetUseV2.value = false;
+                    newSheetRounds.value = [{ stage_id: firstStage.value?.id ?? null, stage_name: firstStage.value?.name ?? '' }];
+                },
+            },
         );
     } else {
         router.post(

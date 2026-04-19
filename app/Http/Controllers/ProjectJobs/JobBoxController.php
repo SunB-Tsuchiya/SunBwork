@@ -855,9 +855,22 @@ class JobBoxController extends Controller
                     $progressCell = \App\Models\ProgressCell::where('assignment_id', $a->id)->first();
                     $a->progress_cell_id = $progressCell ? $progressCell->id : null;
                     $a->progress_sheet_id = $progressCell ? $progressCell->progress_sheet_id : null;
+                    $a->progress_row_id = $progressCell ? $progressCell->row_id : null;
+                    $a->progress_col_key = $progressCell ? $progressCell->col_key : null;
                 } catch (\Throwable $__e) {
                     $a->progress_cell_id = null;
                     $a->progress_sheet_id = null;
+                    $a->progress_row_id = null;
+                    $a->progress_col_key = null;
+                }
+
+                // ユーザーがすでにマイジョブとして登録済みかチェック（supersedes_assignment_id で紐づく自己割当の存在確認）
+                try {
+                    $a->is_registered = \App\Models\ProjectJobAssignment::where('supersedes_assignment_id', $a->id)
+                        ->whereColumn('sender_id', 'user_id')
+                        ->exists();
+                } catch (\Throwable $__e) {
+                    $a->is_registered = false;
                 }
             }
         } catch (\Throwable $__e) {

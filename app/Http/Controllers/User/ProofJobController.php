@@ -160,6 +160,15 @@ class ProofJobController extends Controller
                 ->update(['proof_completed_at' => now()]);
         }
 
+        // pja100（校正割当ジョブ）を完了にする → 進行表の proof_user セルに反映
+        if ($proofRequest->proofreader_id && $proofRequest->proof_coordinator_id) {
+            ProjectJobAssignment::where('project_job_id', $proofRequest->project_job_id)
+                ->where('user_id', $proofRequest->proofreader_id)
+                ->where('sender_id', $proofRequest->proof_coordinator_id)
+                ->whereColumn('sender_id', '!=', 'user_id')
+                ->update(['completed' => true]);
+        }
+
         // 依頼者（requester）に完了通知
         \App\Services\JobNotificationService::notifyProofCompleted($user, $proofRequest->fresh());
 

@@ -19,8 +19,6 @@ class ProjectJobAssignmentsController extends Controller
 {
     public function index(Request $request, ProjectJob $projectJob)
     {
-        // pagination and sorting
-        $perPage = 15;
         $allowedSorts = [
             'title',
             'user', // special-case: users.name
@@ -30,19 +28,32 @@ class ProjectJobAssignmentsController extends Controller
             'created_at',
         ];
 
-        $sortBy = $request->query('sort_by', 'created_at');
+        $sortBy  = $request->query('sort_by', 'created_at');
         $sortDir = strtolower($request->query('sort_dir', 'desc')) === 'asc' ? 'asc' : 'desc';
         if (!in_array($sortBy, $allowedSorts)) {
             $sortBy = 'created_at';
         }
 
-        // base query
-        // include statusModel so we can return a canonical status object in the API payload
-        // マイジョブに置き換えられた依頼ジョブは除外（supersededBy が存在するものは非表示）
+        // 年月フィルター
+        $period      = $request->query('period', '');
+        $periodStart = null;
+        $periodEnd   = null;
+        if ($period && $period !== 'all') {
+            try {
+                $periodStart = Carbon::createFromFormat('Y-m', $period)->startOfMonth();
+                $periodEnd   = Carbon::createFromFormat('Y-m', $period)->endOfMonth();
+            } catch (\Throwable $e) {
+                $period = '';
+            }
+        }
+
+        $hideCompleted = $request->boolean('hide_completed');
+
+        // base query（マイジョブに置き換えられた依頼ジョブは除外）
         $query = $projectJob->projectJobAssignments()->with(['user', 'statusModel'])
             ->whereDoesntHave('supersededBy');
 
-        // search
+        // 検索
         $q = $request->query('q', null);
         if ($q) {
             $query = $query->where(function ($sub) use ($q) {
@@ -53,9 +64,23 @@ class ProjectJobAssignmentsController extends Controller
             });
         }
 
-        // apply sorting
+        // 年月フィルター
+        if ($periodStart && $periodEnd) {
+            $query->where(function ($sub) use ($periodStart, $periodEnd) {
+                $sub->whereBetween('project_job_assignments.desired_end_date', [$periodStart, $periodEnd])
+                    ->orWhereBetween('project_job_assignments.created_at', [$periodStart, $periodEnd]);
+            });
+        }
+
+        // 完了非表示
+        if ($hideCompleted) {
+            $query->where(function ($sub) {
+                $sub->where('completed', false)->orWhereNull('completed');
+            });
+        }
+
+        // ソート
         if ($sortBy === 'user') {
-            // sort by user name
             $query = $query->leftJoin('users', 'project_job_assignments.user_id', '=', 'users.id')
                 ->select('project_job_assignments.*')
                 ->orderBy('users.name', $sortDir);
@@ -63,44 +88,45 @@ class ProjectJobAssignmentsController extends Controller
             if (Schema::hasColumn('project_job_assignments', $sortBy)) {
                 $query = $query->orderBy('project_job_assignments.' . $sortBy, $sortDir);
             } else {
-                // fallback
                 $query = $query->orderBy('project_job_assignments.created_at', 'desc');
             }
         }
 
-        $paginator = $query->paginate($perPage)->withQueryString();
+        $list = $query->limit(500)->get();
 
         // transform items
-        $paginator->getCollection()->transform(function ($a) {
-            // build canonical status object when relationship is available
+        $assignments = $list->map(function ($a) {
             $statusObj = null;
             if (isset($a->statusModel) && $a->statusModel) {
                 $statusObj = [
-                    'id' => $a->statusModel->id,
-                    // 'key' column may not exist on very old installs; fall back to slug
+                    'id'  => $a->statusModel->id,
                     'key' => $a->statusModel->key ?? $a->statusModel->slug ?? null,
                     'name' => $a->statusModel->name,
                 ];
             }
 
             return [
-                'id' => $a->id,
-                'project_job_id' => $a->project_job_id,
-                'user_id' => $a->user_id,
-                'title' => $a->title,
-                'detail' => $a->detail,
-                'difficulty_id' => $a->difficulty_id ?? null,
-                'difficulty_label' => $a->difficultyModel?->name ?? null,
-                'desired_start_date' => $a->desired_start_date ? $a->desired_start_date->format('Y-m-d') : null,
-                'desired_end_date' => $a->desired_end_date ? $a->desired_end_date->format('Y-m-d') : null,
-                'desired_time' => $a->desired_time,
-                'estimated_hours' => isset($a->estimated_hours) ? (float) $a->estimated_hours : null,
-                'assigned' => (bool) $a->assigned,
-                'accepted' => (bool) $a->accepted,
-                'completed' => (bool) ($a->completed ?? false),
-                // keep status_id for backward compatibility
-                'status_id' => $a->status_id ?? null,
-                'status' => $statusObj,
+                'id'                  => $a->id,
+                'project_job_id'      => $a->project_job_id,
+                'user_id'             => $a->user_id,
+                'title'               => $a->title,
+                'detail'              => $a->detail,
+                'difficulty_id'       => $a->difficulty_id ?? null,
+                'difficulty_label'    => $a->difficultyModel?->name ?? null,
+                'desired_start_date'  => $a->desired_start_date ? $a->desired_start_date->format('Y-m-d') : null,
+                'desired_end_date'    => $a->desired_end_date ? $a->desired_end_date->format('Y-m-d') : null,
+                'desired_time'        => $a->desired_time,
+                'estimated_hours'     => isset($a->estimated_hours) ? (float) $a->estimated_hours : null,
+                'assigned'            => (bool) $a->assigned,
+                'accepted'            => (bool) $a->accepted,
+                'completed'           => (bool) ($a->completed ?? false),
+                'scheduled'           => (bool) ($a->scheduled ?? false),
+                'scheduled_at'        => $a->scheduled_at ? $a->scheduled_at->toISOString() : null,
+                'read_at'             => $a->read_at ? $a->read_at->toISOString() : null,
+                'status_id'           => $a->status_id ?? null,
+                'status_model'        => $statusObj,
+                'created_at'          => $a->created_at ? $a->created_at->toISOString() : null,
+                'proof_completed_at'  => $a->proof_completed_at ? $a->proof_completed_at->toISOString() : null,
                 'user' => $a->user ? [
                     'id'                    => $a->user->id,
                     'name'                  => $a->user->name,
@@ -108,19 +134,44 @@ class ProjectJobAssignmentsController extends Controller
                     'employment_type_label' => $a->user->employmentTypeLabel(),
                 ] : null,
             ];
-        });
+        })->values()->toArray();
 
-        // ensure client relation is available to the page so we can display client.name
+        // 年月セレクター用オプション
+        $monthOptions = $projectJob->projectJobAssignments()
+            ->whereDoesntHave('supersededBy')
+            ->where(function ($q2) {
+                $q2->whereNotNull('desired_end_date')->orWhereNotNull('created_at');
+            })
+            ->selectRaw("DATE_FORMAT(COALESCE(desired_end_date, created_at), '%Y-%m') as ym")
+            ->groupBy('ym')
+            ->orderByRaw("DATE_FORMAT(COALESCE(desired_end_date, created_at), '%Y-%m') DESC")
+            ->pluck('ym')
+            ->filter()
+            ->unique()
+            ->map(function ($ym) {
+                try {
+                    $label = Carbon::createFromFormat('Y-m', $ym)->format('Y年n月');
+                } catch (\Throwable $e) {
+                    $label = $ym;
+                }
+                return ['value' => $ym, 'label' => $label];
+            })
+            ->values()
+            ->toArray();
+
         if (method_exists($projectJob, 'load')) {
             $projectJob->load('client');
         }
 
         return Inertia::render('Coordinator/ProjectJobs/JobAssign/Index', [
-            'projectJob' => $projectJob,
-            'assignments' => $paginator,
-            'sort_by' => $sortBy,
-            'sort_dir' => $sortDir,
-            'q' => $q,
+            'projectJob'    => $projectJob,
+            'assignments'   => $assignments,
+            'sort_by'       => $sortBy,
+            'sort_dir'      => $sortDir,
+            'q'             => $q,
+            'period'        => $period,
+            'hideCompleted' => $hideCompleted,
+            'monthOptions'  => $monthOptions,
         ]);
     }
 
