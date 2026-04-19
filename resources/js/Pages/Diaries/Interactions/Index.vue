@@ -92,6 +92,12 @@ function applyFilters() {
     Inertia.get(route(routeForIndex(), params));
 }
 
+function routeForIndex() {
+    const prefix = props.routePrefix || 'diaries';
+    if (prefix === 'diaries') return 'diaryinteractions.index';
+    return `${prefix}.diaryinteractions.index`;
+}
+
 function markReadAllRoute() {
     const prefix = props.routePrefix || 'diaries';
     if (prefix === 'diaries') return 'diaryinteractions.mark_read_all';
@@ -130,7 +136,7 @@ function markReadAllRoute() {
                     <h3 class="flex items-center gap-2 text-lg font-bold">
                         <span>{{ formatDate(date) }}</span>
                         <Link
-                            :href="route(routeForIndex(date), { date: date })"
+                            :href="route(routeForIndex(), { date: date })"
                             class="inline-flex items-center rounded border bg-white px-2 py-1 text-xs hover:bg-gray-50"
                             aria-label="日付別表示へ"
                         >
