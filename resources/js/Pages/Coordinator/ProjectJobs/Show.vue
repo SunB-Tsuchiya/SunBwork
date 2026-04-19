@@ -493,14 +493,68 @@
                 placeholder="例: 本文用"
             />
 
-            <label class="mt-3 block text-sm font-medium text-gray-700">テンプレート（任意）</label>
-            <select
-                v-model="newSheetTemplateId"
-                class="mt-1 w-full rounded border border-gray-300 px-2 py-2 text-sm focus:border-indigo-400 focus:outline-none"
-            >
-                <option :value="null">— 使用しない —</option>
-                <option v-for="t in sheetTemplates" :key="t.id" :value="t.id">{{ t.name }}</option>
-            </select>
+            <!-- 作成方式の選択 -->
+            <div class="mt-4 space-y-2">
+                <label class="flex cursor-pointer items-center gap-2 rounded border px-3 py-2 text-sm"
+                    :class="!newSheetUseV2 ? 'border-indigo-300 bg-indigo-50' : 'border-gray-200 hover:bg-gray-50'"
+                    @click="newSheetUseV2 = false"
+                >
+                    <input type="radio" :checked="!newSheetUseV2" class="h-4 w-4 text-indigo-600" />
+                    <div>
+                        <div class="font-medium text-gray-700">テンプレートから作成</div>
+                        <div class="text-xs text-gray-400">保存済みテンプレートまたは空のシートで作成</div>
+                    </div>
+                </label>
+                <label class="flex cursor-pointer items-center gap-2 rounded border px-3 py-2 text-sm"
+                    :class="newSheetUseV2 ? 'border-indigo-300 bg-indigo-50' : 'border-gray-200 hover:bg-gray-50'"
+                    @click="newSheetUseV2 = true"
+                >
+                    <input type="radio" :checked="newSheetUseV2" class="h-4 w-4 text-indigo-600" />
+                    <div>
+                        <div class="font-medium text-gray-700">組版・校正セット方式で作成</div>
+                        <div class="text-xs text-gray-400">組版担当+登録欄・校正担当+登録欄のペアを校ごとに自動生成</div>
+                    </div>
+                </label>
+            </div>
+
+            <!-- テンプレートから作成の場合 -->
+            <template v-if="!newSheetUseV2">
+                <label class="mt-3 block text-sm font-medium text-gray-700">テンプレート（任意）</label>
+                <select
+                    v-model="newSheetTemplateId"
+                    class="mt-1 w-full rounded border border-gray-300 px-2 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+                >
+                    <option :value="null">— 使用しない —</option>
+                    <option v-for="t in sheetTemplates" :key="t.id" :value="t.id">{{ t.name }}</option>
+                </select>
+            </template>
+
+            <!-- セット方式の場合：校の入力 -->
+            <template v-else>
+                <div class="mt-3 space-y-2">
+                    <div v-for="(round, idx) in newSheetRounds" :key="idx" class="flex items-center gap-2">
+                        <span class="w-12 flex-shrink-0 text-xs text-gray-500">第{{ idx + 1 }}校</span>
+                        <input
+                            v-model="round.label"
+                            type="text"
+                            class="flex-1 rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-indigo-400 focus:outline-none"
+                            :placeholder="idx === 0 ? '初校' : idx === 1 ? '再校' : '三校'"
+                        />
+                        <button
+                            v-if="newSheetRounds.length > 1"
+                            type="button"
+                            class="text-xs text-red-400 hover:text-red-600"
+                            @click="newSheetRounds.splice(idx, 1)"
+                        >✕</button>
+                    </div>
+                    <button
+                        type="button"
+                        class="text-xs font-medium text-indigo-600 hover:underline"
+                        @click="newSheetRounds.push({ label: '' })"
+                    >＋ 校を追加</button>
+                </div>
+                <p class="mt-2 text-xs text-gray-400">各校に「組版担当・登録欄 + 校正担当・登録欄」が自動生成されます。</p>
+            </template>
 
             <div class="mt-5 flex justify-end gap-3">
                 <button
@@ -764,6 +818,41 @@ const sheetTemplates = computed(() => Array.isArray(page.props.sheetTemplates) ?
 const showCreateSheetModal = ref(false);
 const newSheetName = ref('');
 const newSheetTemplateId = ref(null);
+const newSheetUseV2 = ref(false);
+const newSheetRounds = ref([{ label: '初校' }]);
+
+function buildV2ColumnConfig(rounds) {
+    return rounds
+        .filter((r) => r.label.trim())
+        .map((round, idx) => {
+            const key = 'round' + (idx + 1);
+            return {
+                key,
+                label: round.label.trim(),
+                type: 'text',
+                children: [
+                    {
+                        key: key + '_kumihan',
+                        label: '組版',
+                        type: 'text',
+                        children: [
+                            { key: key + '_kumihan_tanto',  label: '担当',   type: 'user' },
+                            { key: key + '_kumihan_toroku', label: '登録欄', type: 'joblink' },
+                        ],
+                    },
+                    {
+                        key: key + '_kosei',
+                        label: '校正',
+                        type: 'text',
+                        children: [
+                            { key: key + '_kosei_tanto',  label: '担当',   type: 'proof_user' },
+                            { key: key + '_kosei_toroku', label: '登録欄', type: 'joblink' },
+                        ],
+                    },
+                ],
+            };
+        });
+}
 
 function createSheet() {
     const name = newSheetName.value.trim();
@@ -771,10 +860,24 @@ function createSheet() {
         alert('シート名を入力してください。');
         return;
     }
-    router.post(
-        route('coordinator.project_jobs.progress_sheets.store', { projectJob: job.id }),
-        { name, template_id: newSheetTemplateId.value ?? null },
-    );
+    if (newSheetUseV2.value) {
+        const config = buildV2ColumnConfig(newSheetRounds.value);
+        if (config.length === 0) {
+            alert('少なくとも1つの校を入力してください。');
+            return;
+        }
+        router.post(
+            route('coordinator.project_jobs.progress_sheets.store', { projectJob: job.id }),
+            { name, column_config: config },
+            { onSuccess: () => { showCreateSheetModal.value = false; newSheetName.value = ''; newSheetUseV2.value = false; newSheetRounds.value = [{ label: '初校' }]; } },
+        );
+    } else {
+        router.post(
+            route('coordinator.project_jobs.progress_sheets.store', { projectJob: job.id }),
+            { name, template_id: newSheetTemplateId.value ?? null },
+            { onSuccess: () => { showCreateSheetModal.value = false; newSheetName.value = ''; newSheetTemplateId.value = null; } },
+        );
+    }
 }
 
 // ── 進行管理表 並び順モーダル ──────────────────────────────────────────────
