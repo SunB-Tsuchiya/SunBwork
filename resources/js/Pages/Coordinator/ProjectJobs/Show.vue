@@ -175,16 +175,80 @@
                     <p v-else class="text-sm text-gray-400">メンバー未登録</p>
                 </section>
 
+                <!-- ── 進行管理表セクション ──────────────────── -->
+                <section class="py-5">
+                    <div class="mb-3 flex items-center gap-4">
+                        <h3 class="font-semibold text-gray-800">進行管理表</h3>
+                        <button
+                            type="button"
+                            class="rounded border border-indigo-300 px-3 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
+                            @click="showCreateSheetModal = true"
+                        >
+                            新規作成
+                        </button>
+                        <button
+                            v-if="progressSheets.length > 1"
+                            type="button"
+                            class="rounded border border-gray-300 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                            @click="openReorderModal"
+                        >
+                            順序を変更
+                        </button>
+                        <Link
+                            :href="route('coordinator.progress_templates.index')"
+                            class="text-xs text-gray-500 hover:underline"
+                        >
+                            テンプレート管理
+                        </Link>
+                    </div>
+
+                    <div v-if="progressSheets.length > 0" class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">シート名</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">作成日</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200 bg-white">
+                                <tr v-for="ps in progressSheets" :key="ps.id" class="hover:bg-gray-50">
+                                    <td class="px-4 py-2 text-sm font-medium text-gray-900">{{ ps.name }}</td>
+                                    <td class="px-4 py-2 text-sm text-gray-500">{{ ps.created_at }}</td>
+                                    <td class="px-4 py-2">
+                                        <Link
+                                            :href="route('coordinator.progress_sheets.show', { sheet: ps.id })"
+                                            class="rounded bg-indigo-600 px-3 py-1 text-xs font-medium text-white hover:bg-indigo-700"
+                                        >
+                                            開く
+                                        </Link>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p v-else class="text-sm text-gray-400">進行管理表なし</p>
+                </section>
+
                 <!-- ── ジョブ履歴セクション ───────────────────── -->
                 <section class="py-5">
                     <div class="mb-3 flex flex-wrap items-center gap-4">
-                        <h3 class="font-semibold text-gray-800">ジョブ履歴</h3>
-                        <label class="flex cursor-pointer items-center gap-1.5 text-sm text-gray-600 select-none">
+                        <button
+                            type="button"
+                            class="flex items-center gap-1 font-semibold text-gray-800 hover:text-gray-600"
+                            @click="historyOpen = !historyOpen"
+                        >
+                            <span>{{ historyOpen ? '▼' : '▶' }}</span>
+                            <span>ジョブ履歴</span>
+                            <span class="ml-1 text-xs font-normal text-gray-400">{{ historyDisplayCount }}件</span>
+                        </button>
+                        <label v-if="historyOpen" class="flex cursor-pointer items-center gap-1.5 text-sm text-gray-600 select-none">
                             <input type="checkbox" v-model="hideHistoryCompleted" class="h-4 w-4 rounded border-gray-300" />
                             完了を表示しない
                         </label>
                     </div>
 
+                    <template v-if="historyOpen">
                     <div v-if="historyDisplayCount === 0 && historyHiddenCount === 0" class="text-sm text-gray-400">
                         {{ (page.props.jobHistory || []).length === 0 ? 'ジョブ履歴なし' : '表示するデータがありません。' }}
                     </div>
@@ -322,61 +386,7 @@
                         表示中 {{ historyDisplayCount }} 件
                         <span v-if="hideHistoryCompleted && historyHiddenCount > 0" class="ml-2 text-xs text-gray-400">（完了 {{ historyHiddenCount }} 件を非表示）</span>
                     </div>
-                </section>
-
-                <!-- ── 進行管理表セクション ──────────────────── -->
-                <section class="py-5">
-                    <div class="mb-3 flex items-center gap-4">
-                        <h3 class="font-semibold text-gray-800">進行管理表</h3>
-                        <button
-                            type="button"
-                            class="rounded border border-indigo-300 px-3 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
-                            @click="showCreateSheetModal = true"
-                        >
-                            新規作成
-                        </button>
-                        <button
-                            v-if="progressSheets.length > 1"
-                            type="button"
-                            class="rounded border border-gray-300 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
-                            @click="openReorderModal"
-                        >
-                            順序を変更
-                        </button>
-                        <Link
-                            :href="route('coordinator.progress_templates.index')"
-                            class="text-xs text-gray-500 hover:underline"
-                        >
-                            テンプレート管理
-                        </Link>
-                    </div>
-
-                    <div v-if="progressSheets.length > 0" class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">シート名</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">作成日</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">操作</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-200 bg-white">
-                                <tr v-for="ps in progressSheets" :key="ps.id" class="hover:bg-gray-50">
-                                    <td class="px-4 py-2 text-sm font-medium text-gray-900">{{ ps.name }}</td>
-                                    <td class="px-4 py-2 text-sm text-gray-500">{{ ps.created_at }}</td>
-                                    <td class="px-4 py-2">
-                                        <Link
-                                            :href="route('coordinator.progress_sheets.show', { sheet: ps.id })"
-                                            class="rounded bg-indigo-600 px-3 py-1 text-xs font-medium text-white hover:bg-indigo-700"
-                                        >
-                                            開く
-                                        </Link>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <p v-else class="text-sm text-gray-400">進行管理表なし</p>
+                    </template><!-- /historyOpen -->
                 </section>
 
                 <!-- 校正依頼履歴 -->
@@ -874,6 +884,7 @@ function buildHistoryGroups(messages) {
     return sortedKeys.map((key) => ({ key, label: historyFormatDateLabel(key), items: grouped.get(key) }));
 }
 
+const historyOpen       = ref(false);
 const historyLinkedOpen = ref(true);
 const historyOtherOpen  = ref(true);
 

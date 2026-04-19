@@ -38,7 +38,7 @@ class ProofJobController extends Controller
                 if ($pja100) {
                     $pja101 = ProjectJobAssignment::whereColumn('sender_id', 'user_id')
                         ->where(function ($q) use ($pja100) {
-                            $q->where('source_assignment_id', $pja100->id)
+                            $q->where('coordinator_assignment_id', $pja100->id)
                               ->orWhere('supersedes_assignment_id', $pja100->id);
                         })->latest()->first();
 
@@ -47,9 +47,9 @@ class ProofJobController extends Controller
                             ->orderBy('starts_at')
                             ->get()
                             ->map(fn ($ev) => [
-                                'date'      => $ev->date ?? substr($ev->start, 0, 10),
-                                'startTime' => substr($ev->start, 11, 5),
-                                'endTime'   => substr($ev->end, 11, 5),
+                                'date'      => $ev->starts_at->timezone('Asia/Tokyo')->toDateString(),
+                                'startTime' => $ev->starts_at->timezone('Asia/Tokyo')->format('H:i'),
+                                'endTime'   => $ev->ends_at->timezone('Asia/Tokyo')->format('H:i'),
                             ])->toArray();
                     }
                 }
@@ -72,6 +72,102 @@ class ProofJobController extends Controller
     }
 
     // ──────────────────────────────────────────────────────
+    //  詳細
+    // ──────────────────────────────────────────────────────
+    public function show(ProofRequest $proofRequest): Response
+    {
+        $user = Auth::user();
+        abort_if($proofRequest->proofreader_id !== $user->id, 403);
+
+        $proofRequest->load(['requester', 'proofCoordinator', 'projectJob.client']);
+
+        // pja100 取得
+        $pja100 = ProjectJobAssignment::with([
+            'user', 'sender', 'projectJob.client',
+            'statusModel', 'workItemType', 'size', 'stage', 'difficultyModel',
+        ])
+            ->where('project_job_id', $proofRequest->project_job_id)
+            ->where('user_id', $proofRequest->proofreader_id)
+            ->where('sender_id', $proofRequest->proof_coordinator_id)
+            ->latest()->first();
+
+        // pja101 取得
+        $pja101 = null;
+        if ($pja100) {
+            $pja101 = ProjectJobAssignment::with([
+                'user', 'sender', 'projectJob.client',
+                'statusModel', 'workItemType', 'size', 'stage', 'difficultyModel',
+            ])
+                ->whereColumn('sender_id', 'user_id')
+                ->where(function ($q) use ($pja100) {
+                    $q->where('coordinator_assignment_id', $pja100->id)
+                      ->orWhere('supersedes_assignment_id', $pja100->id);
+                })->latest()->first();
+        }
+
+        // 作業イベント取得（pja101 のイベント）
+        $events = [];
+        if ($pja101) {
+            $events = Event::where('project_job_assignment_id', $pja101->id)
+                ->orderBy('starts_at')
+                ->get()
+                ->toArray();
+        }
+
+        // ProofRequest が完了済みか
+        $isCompleted = $proofRequest->status === 'completed';
+
+        return Inertia::render('User/ProofJobs/Show', [
+            'proofRequest' => [
+                'id'              => $proofRequest->id,
+                'title'           => $proofRequest->title,
+                'status'          => $proofRequest->status,
+                'deadline'        => $proofRequest->deadline?->toIso8601String(),
+                'note'            => $proofRequest->note,
+                'requester_name'  => $proofRequest->requester?->name,
+                'coordinator_name'=> $proofRequest->proofCoordinator?->name,
+                'job_title'       => $proofRequest->projectJob?->title,
+                'is_completed'    => $isCompleted,
+            ],
+            'pja100'     => $pja100,
+            'assignment' => $pja101,   // MyJobBox/Show.vue と同じ prop 名
+            'projectJob' => $pja100?->projectJob,
+            'events'     => $events,
+        ]);
+    }
+
+    // ──────────────────────────────────────────────────────
+    //  完了
+    // ──────────────────────────────────────────────────────
+    public function complete(ProofRequest $proofRequest)
+    {
+        $user = Auth::user();
+        abort_if($proofRequest->proofreader_id !== $user->id, 403);
+
+        if ($proofRequest->status === 'completed') {
+            return back()->with('error', 'この校正依頼はすでに完了済みです。');
+        }
+
+        $proofRequest->update([
+            'status'       => 'completed',
+            'completed_at' => now(),
+        ]);
+
+        // 元ジョブ（pja_operator）に校正済みマークを付与
+        if ($proofRequest->project_job_assignment_id) {
+            ProjectJobAssignment::where('id', $proofRequest->project_job_assignment_id)
+                ->whereNull('proof_completed_at')
+                ->update(['proof_completed_at' => now()]);
+        }
+
+        // 依頼者（requester）に完了通知
+        \App\Services\JobNotificationService::notifyProofCompleted($user, $proofRequest->fresh());
+
+        return redirect()->route('user.proof_jobs.index')
+            ->with('success', '校正が完了しました。依頼者に通知しました。');
+    }
+
+    // ──────────────────────────────────────────────────────
     //  セットページ（フォーム表示）
     // ──────────────────────────────────────────────────────
     public function setPage(ProofRequest $proofRequest): Response
@@ -91,7 +187,7 @@ class ProofJobController extends Controller
         if ($pja100) {
             $pja101 = ProjectJobAssignment::whereColumn('sender_id', 'user_id')
                 ->where(function ($q) use ($pja100) {
-                    $q->where('source_assignment_id', $pja100->id)
+                    $q->where('coordinator_assignment_id', $pja100->id)
                       ->orWhere('supersedes_assignment_id', $pja100->id);
                 })->latest()->first();
 
@@ -100,11 +196,11 @@ class ProofJobController extends Controller
                     ->orderBy('starts_at')
                     ->get()
                     ->map(fn ($ev) => [
-                        'date'        => $ev->date ?? substr($ev->start, 0, 10),
-                        'startHour'   => substr($ev->start, 11, 2),
-                        'startMinute' => substr($ev->start, 14, 2),
-                        'endHour'     => substr($ev->end, 11, 2),
-                        'endMinute'   => substr($ev->end, 14, 2),
+                        'date'        => $ev->starts_at->timezone('Asia/Tokyo')->toDateString(),
+                        'startHour'   => $ev->starts_at->timezone('Asia/Tokyo')->format('H'),
+                        'startMinute' => $ev->starts_at->timezone('Asia/Tokyo')->format('i'),
+                        'endHour'     => $ev->ends_at->timezone('Asia/Tokyo')->format('H'),
+                        'endMinute'   => $ev->ends_at->timezone('Asia/Tokyo')->format('i'),
                     ])->toArray();
             }
         }
@@ -165,17 +261,17 @@ class ProofJobController extends Controller
         // pja101 取得または作成
         $pja101 = ProjectJobAssignment::whereColumn('sender_id', 'user_id')
             ->where(function ($q) use ($pja100) {
-                $q->where('source_assignment_id', $pja100->id)
+                $q->where('coordinator_assignment_id', $pja100->id)
                   ->orWhere('supersedes_assignment_id', $pja100->id);
             })->latest()->first();
 
         if (! $pja101) {
             $pja101 = ProjectJobAssignment::create([
-                'project_job_id'       => $proofRequest->project_job_id,
-                'user_id'              => $user->id,
-                'sender_id'            => $user->id,
-                'source_assignment_id' => $pja100->id,
-                'job_type'             => 'proof',
+                'project_job_id'            => $proofRequest->project_job_id,
+                'user_id'                   => $user->id,
+                'sender_id'                 => $user->id,
+                'coordinator_assignment_id' => $pja100->id,
+                'job_type'                  => 'proof',
                 'title'                => $proofRequest->title,
                 'scheduled'            => ! empty($slots),
                 'scheduled_at'         => ! empty($slots) ? now() : null,
@@ -205,7 +301,7 @@ class ProofJobController extends Controller
             $startsAt = \Carbon\Carbon::parse("{$date} {$sH}:{$sM}:00", 'Asia/Tokyo')->utc();
             $endsAt   = \Carbon\Carbon::parse("{$date} {$eH}:{$eM}:00", 'Asia/Tokyo')->utc();
 
-            Event::create([
+            $ev = Event::create([
                 'user_id'                   => $user->id,
                 'project_job_assignment_id' => $pja101->id,
                 'date'                      => $date,
@@ -221,6 +317,7 @@ class ProofJobController extends Controller
                 'user_id'          => $user->id,
                 'starts_at'        => $startsAt,
                 'ends_at'          => $endsAt,
+                'event_id'         => $ev->id,
             ]);
         }
 

@@ -103,7 +103,8 @@
                             >
                                 <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ getDateDisplay(m) }}</td>
                                 <td class="break-words border px-3 py-2 text-sm">
-                                    <span v-if="m.source_assignment_id" class="mr-1 inline-flex items-center rounded-full bg-orange-100 px-1.5 py-0.5 text-xs font-medium text-orange-700">↩続き</span>{{ m.title || '-' }}
+                                    <span v-if="m.source_assignment_id" class="mr-1 inline-flex items-center rounded-full bg-orange-100 px-1.5 py-0.5 text-xs font-medium text-orange-700">↩続き</span>
+                                    <span v-if="m.proof_completed_at" class="mr-1 inline-flex items-center rounded-full bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">校了</span>{{ m.title || '-' }}
                                 </td>
                                 <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ getClientName(m) }}</td>
                                 <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ getProjectJobTitle(m) }}</td>
@@ -273,20 +274,42 @@ function formatDateLabel(dateStr) {
     }
 }
 
-function getDateKey(m) {
-    // desired_at is a datetime field; extract date part
-    const da = m.desired_at ? String(m.desired_at).split('T')[0].split(' ')[0] : null;
-    const de = m.desired_end_date ? String(m.desired_end_date).split('T')[0] : null;
-    const firstEvent = getFirstEvent(m);
-    const ev = firstEvent ? String(firstEvent.start || firstEvent.starts_at || '').split('T')[0] : null;
-    return da || de || ev || (m.created_at ? String(m.created_at).split('T')[0] : '') || '';
+// UTC ISO 文字列（例 "2026-04-18T06:00:00+00:00"）を JST の {date, time} に変換
+function toJST(s) {
+    if (!s) return null;
+    try {
+        const d = new Date(s);
+        if (isNaN(d.getTime())) return null;
+        const fmt = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'Asia/Tokyo',
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', hour12: false,
+        });
+        const parts = Object.fromEntries(fmt.formatToParts(d).map(({ type, value }) => [type, value]));
+        return { date: `${parts.year}-${parts.month}-${parts.day}`, time: `${parts.hour}:${parts.minute}` };
+    } catch { return null; }
 }
 
-function getStartTime(m) {
+function getDateKey(m) {
+    const da = m.desired_at ? String(m.desired_at).split('T')[0].split(' ')[0] : null;
+    const de = m.desired_end_date ? String(m.desired_end_date).split('T')[0] : null;
+    if (m.event_date_jst) return da || de || m.event_date_jst;
     const firstEvent = getFirstEvent(m);
     if (firstEvent) {
         const s = firstEvent.start || firstEvent.starts_at || '';
-        if (s.includes('T')) return s.split('T')[1]?.slice(0, 5) || '-';
+        const jst = toJST(s);
+        if (jst) return da || de || jst.date || '';
+    }
+    return da || de || (m.created_at ? String(m.created_at).split('T')[0] : '') || '';
+}
+
+function getStartTime(m) {
+    if (m.event_start_jst) return m.event_start_jst;
+    const firstEvent = getFirstEvent(m);
+    if (firstEvent) {
+        const s = firstEvent.start || firstEvent.starts_at || '';
+        const jst = toJST(s);
+        if (jst) return jst.time;
         if (s.includes(' ')) return s.split(' ')[1]?.slice(0, 5) || '-';
     }
     const t = m.desired_time || '';
@@ -295,10 +318,12 @@ function getStartTime(m) {
 }
 
 function getTimeKey(m) {
+    if (m.event_start_jst) return m.event_start_jst;
     const firstEvent = getFirstEvent(m);
     if (firstEvent) {
         const s = firstEvent.start || firstEvent.starts_at || '';
-        if (s.includes('T')) return s.split('T')[1]?.slice(0, 5) || '00:00';
+        const jst = toJST(s);
+        if (jst) return jst.time;
         if (s.includes(' ')) return s.split(' ')[1]?.slice(0, 5) || '00:00';
     }
     return m.desired_time ? String(m.desired_time).slice(0, 5) : '00:00';

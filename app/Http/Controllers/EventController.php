@@ -92,13 +92,18 @@ class EventController extends Controller
             'endMinute' => ['required', 'regex:/^\\d{2}$/'],
         ]);
 
-        // 日付と時刻を結合
+        // 日付と時刻を結合（JST）
         $start = $validated['date'] . ' ' . $validated['startHour'] . ':' . $validated['startMinute'] . ':00';
-        $end = $validated['date'] . ' ' . $validated['endHour'] . ':' . $validated['endMinute'] . ':00';
+        $end   = $validated['date'] . ' ' . $validated['endHour']   . ':' . $validated['endMinute']   . ':00';
 
-        $event->start = $start;
-        $event->end = $end;
+        $event->start     = $start;
+        $event->end       = $end;
+        $event->starts_at = Carbon::parse($start, 'Asia/Tokyo')->utc();
+        $event->ends_at   = Carbon::parse($end,   'Asia/Tokyo')->utc();
         $event->save();
+
+        // proof_schedule 自動連動
+        $this->syncProofScheduleFromEvent($event);
 
         return response()->json(['message' => 'Event time updated successfully.']);
     }
@@ -452,6 +457,18 @@ class EventController extends Controller
             // ignore environment/schema checks
         }
         $event->save();
+
+        // own_interruption_minutes: 新しいイベント自体が「長い（差し込まれた）側」の場合に設定される重複時間
+        // Create.vue で「新しいイベント >= 既存イベント」と判定されたときに送られる
+        try {
+            $ownInterruptionMins = (int) $request->input('own_interruption_minutes', 0);
+            if ($ownInterruptionMins > 0 && Schema::hasColumn('events', 'interruption_minutes')) {
+                $event->interruption_minutes = ($event->interruption_minutes ?? 0) + $ownInterruptionMins;
+                $event->save();
+            }
+        } catch (\Throwable $__e) {
+            Log::warning('EventController: failed to set own_interruption_minutes', ['error' => $__e->getMessage()]);
+        }
 
         // 中断イベントの interruption_minutes を更新（差し込み作業による中断時間を記録）
         $interruptedEventIds = $request->input('interrupted_event_ids', []);
@@ -820,10 +837,21 @@ class EventController extends Controller
             }
         } catch (\Throwable $e) { /* ignore */ }
 
-        // proof_schedule 連動削除（event_id で紐づいているものを消す）
+        // proof_schedule 連動削除
         try {
             if (\Illuminate\Support\Facades\Schema::hasTable('proof_schedules')) {
+                // ① event_id で直接紐づいているものを削除
                 \App\Models\ProofSchedule::where('event_id', $event->id)->delete();
+                // ② フォールバック: event_id 未設定でも user_id + starts_at + ends_at が一致するものを削除
+                $rawStart = $event->getRawOriginal('starts_at');
+                $rawEnd   = $event->getRawOriginal('ends_at');
+                if ($event->user_id && $rawStart && $rawEnd) {
+                    \App\Models\ProofSchedule::where('user_id', $event->user_id)
+                        ->where('starts_at', $rawStart)
+                        ->where('ends_at', $rawEnd)
+                        ->whereNull('event_id')
+                        ->delete();
+                }
             }
         } catch (\Throwable $e) { /* ignore */ }
 
@@ -916,6 +944,10 @@ class EventController extends Controller
                 }
             }
         }
+        // JST 時刻を正確に取得（proof イベントは UTC 保存、一般は JST 保存）
+        $evStartJst = $this->resolveEventJstCarbon($event, 'starts_at');
+        $evEndJst   = $this->resolveEventJstCarbon($event, 'ends_at');
+
         // 休憩設定を取得し、イベント時間との重複分を計算
         // 優先順: 日別設定（user_monthly_breaks） > グローバル設定（user_settings.lunch_start/lunch_end）
         $lunchStart = null;
@@ -923,8 +955,8 @@ class EventController extends Controller
         $lunchOverlapMinutes = 0;
         try {
             $breakInfo = null;
-            if ($event->user_id && $event->starts_at) {
-                $eventDate = Carbon::parse($event->starts_at)->toDateString();
+            if ($event->user_id && $evStartJst) {
+                $eventDate = $evStartJst->toDateString();
                 // 日別設定を優先
                 $breakInfo = UserMonthlyBreak::breakForDate((int) $event->user_id, $eventDate);
             }
@@ -936,16 +968,14 @@ class EventController extends Controller
                 $lunchE = $userSetting?->lunch_end   ?: '13:00';
                 $breakInfo = ['start' => $lunchS, 'end' => $lunchE];
             }
-            if ($breakInfo && $event->starts_at && $event->ends_at) {
+            if ($breakInfo && $evStartJst && $evEndJst) {
                 $lunchStart   = $breakInfo['start'];
                 $lunchEnd     = $breakInfo['end'];
-                $evDate       = Carbon::parse($event->starts_at)->toDateString();
+                $evDate       = $evStartJst->toDateString();
                 $lunchStartDt = Carbon::parse($evDate . ' ' . $lunchStart);
                 $lunchEndDt   = Carbon::parse($evDate . ' ' . $lunchEnd);
-                $evStart      = Carbon::parse($event->starts_at);
-                $evEnd        = Carbon::parse($event->ends_at);
-                $overlapStart = $evStart->gt($lunchStartDt) ? $evStart : $lunchStartDt;
-                $overlapEnd   = $evEnd->lt($lunchEndDt)   ? $evEnd   : $lunchEndDt;
+                $overlapStart = $evStartJst->gt($lunchStartDt) ? $evStartJst : $lunchStartDt;
+                $overlapEnd   = $evEndJst->lt($lunchEndDt)   ? $evEndJst   : $lunchEndDt;
                 $lunchOverlapMinutes = max(0, (int) $overlapStart->diffInMinutes($overlapEnd, false));
             }
         } catch (\Throwable $e) {
@@ -964,6 +994,8 @@ class EventController extends Controller
         $hideEdit = request()->query('hide_edit') ? true : false;
         return Inertia::render('Events/Show', [
             'event'                  => $event,
+            'jst_start'              => $evStartJst?->format('Y-m-d H:i'),
+            'jst_end'                => $evEndJst?->format('Y-m-d H:i'),
             'hide_edit'              => $hideEdit,
             'coordinator_assignment' => $coordinatorAssignmentInfo ?? null,
             'lunch_start'            => $lunchStart,
@@ -1004,14 +1036,18 @@ class EventController extends Controller
             ]);
         }
 
+        // JST 時刻を正確に取得
+        $evStartJst = $this->resolveEventJstCarbon($event, 'starts_at');
+        $evEndJst   = $this->resolveEventJstCarbon($event, 'ends_at');
+
         // 休憩時間
         $lunchStart = null;
         $lunchEnd = null;
         $lunchOverlapMinutes = 0;
         try {
             $breakInfo = null;
-            if ($event->user_id && $event->starts_at) {
-                $eventDate = Carbon::parse($event->starts_at)->toDateString();
+            if ($event->user_id && $evStartJst) {
+                $eventDate = $evStartJst->toDateString();
                 $breakInfo = UserMonthlyBreak::breakForDate((int) $event->user_id, $eventDate);
             }
             if (!$breakInfo && $event->user_id) {
@@ -1020,16 +1056,14 @@ class EventController extends Controller
                 $lunchE = $userSetting?->lunch_end   ?: '13:00';
                 $breakInfo = ['start' => $lunchS, 'end' => $lunchE];
             }
-            if ($breakInfo && $event->starts_at && $event->ends_at) {
+            if ($breakInfo && $evStartJst && $evEndJst) {
                 $lunchStart   = $breakInfo['start'];
                 $lunchEnd     = $breakInfo['end'];
-                $evDate       = Carbon::parse($event->starts_at)->toDateString();
+                $evDate       = $evStartJst->toDateString();
                 $lunchStartDt = Carbon::parse($evDate . ' ' . $lunchStart);
                 $lunchEndDt   = Carbon::parse($evDate . ' ' . $lunchEnd);
-                $evStart      = Carbon::parse($event->starts_at);
-                $evEnd        = Carbon::parse($event->ends_at);
-                $overlapStart = $evStart->gt($lunchStartDt) ? $evStart : $lunchStartDt;
-                $overlapEnd   = $evEnd->lt($lunchEndDt)   ? $evEnd   : $lunchEndDt;
+                $overlapStart = $evStartJst->gt($lunchStartDt) ? $evStartJst : $lunchStartDt;
+                $overlapEnd   = $evEndJst->lt($lunchEndDt)   ? $evEndJst   : $lunchEndDt;
                 $lunchOverlapMinutes = max(0, (int) $overlapStart->diffInMinutes($overlapEnd, false));
             }
         } catch (\Throwable $e) {
@@ -1038,6 +1072,8 @@ class EventController extends Controller
 
         return Inertia::render('Events/Show', [
             'event'                  => $event,
+            'jst_start'              => $evStartJst?->format('Y-m-d H:i'),
+            'jst_end'                => $evEndJst?->format('Y-m-d H:i'),
             'hide_edit'              => true,
             'view_as_coordinator'    => true,
             'coordinator_assignment' => null,
@@ -1480,7 +1516,7 @@ class EventController extends Controller
                 // Build assignments prefill with IDs for dropdowns, amounts intentionally null
                 $jobAssignments = [[
                     'id' => null,
-                    'source_assignment_id' => $assignment->id, // coordinator assignment FK
+                    'coordinator_assignment_id' => $assignment->id,
                     'project_job_id' => $assignment->project_job_id,
                     '_client_id' => $assignment->projectJob?->client?->id ?? '',
                     'title_suffix' => $assignment->title ?? '',
@@ -1939,9 +1975,25 @@ class EventController extends Controller
                 return;
             }
 
+            // ① pja_operator 直結の場合（ProofRequest.project_job_assignment_id = pja_operator.id）
             $proofRequest = \App\Models\ProofRequest::where('project_job_assignment_id', $event->project_job_assignment_id)
                 ->whereNotIn('status', ['completed'])
                 ->first();
+
+            // ② pja101（自己割当の校正スロット）経由の場合
+            //    event.project_job_assignment_id = pja101.id
+            //    pja101.coordinator_assignment_id = pja100.id
+            //    → project_job_id + proofreader_id で ProofRequest を特定
+            if (! $proofRequest) {
+                $pja = \App\Models\ProjectJobAssignment::find($event->project_job_assignment_id);
+                if ($pja && $pja->job_type === 'proof' && $pja->sender_id === $pja->user_id) {
+                    $proofRequest = \App\Models\ProofRequest::where('project_job_id', $pja->project_job_id)
+                        ->where('proofreader_id', $pja->user_id)
+                        ->whereNotIn('status', ['completed'])
+                        ->latest()
+                        ->first();
+                }
+            }
 
             if (! $proofRequest) {
                 return;
@@ -1964,5 +2016,19 @@ class EventController extends Controller
                 'event_id' => $event->id ?? null,
             ]);
         }
+    }
+
+    /**
+     * イベントの starts_at / ends_at を JST Carbon として返す。
+     * proof ジョブのイベントは UTC 保存、一般イベントは JST 保存のため
+     * job_type を見て元タイムゾーンを切り替える。
+     */
+    private function resolveEventJstCarbon(Event $event, string $field): ?\Carbon\Carbon
+    {
+        $raw = $event->getRawOriginal($field);
+        if (! $raw) return null;
+        $isProof = ($event->projectJobAssignment?->job_type ?? null) === 'proof';
+        return Carbon::createFromFormat('Y-m-d H:i:s', $raw, $isProof ? 'UTC' : 'Asia/Tokyo')
+                     ->setTimezone('Asia/Tokyo');
     }
 }

@@ -104,8 +104,10 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
 
     // 校正ジョブ（ユーザー）
     Route::get('/user/proof-jobs', [\App\Http\Controllers\User\ProofJobController::class, 'index'])->name('user.proof_jobs.index');
+    Route::get('/user/proof-jobs/{proofRequest}', [\App\Http\Controllers\User\ProofJobController::class, 'show'])->name('user.proof_jobs.show');
     Route::get('/user/proof-jobs/{proofRequest}/set', [\App\Http\Controllers\User\ProofJobController::class, 'setPage'])->name('user.proof_jobs.set_page');
     Route::post('/user/proof-jobs/{proofRequest}/set', [\App\Http\Controllers\User\ProofJobController::class, 'set'])->name('user.proof_jobs.set');
+    Route::post('/user/proof-jobs/{proofRequest}/complete', [\App\Http\Controllers\User\ProofJobController::class, 'complete'])->name('user.proof_jobs.complete');
 
     // ユーザー設定
     Route::get('/user/settings',      [App\Http\Controllers\User\UserSettingController::class, 'index'])->name('user.settings.index');
@@ -639,6 +641,9 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         // ── アサインメント完了管理（管理者用）─────────────────────
         Route::post('progress-sheets/assignments/{assignment}/complete', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'completeAssignment'])->name('progress_sheets.assignments.complete');
         Route::post('progress-sheets/assignments/{assignment}/uncomplete', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'uncompleteAssignment'])->name('progress_sheets.assignments.uncomplete');
+        Route::post('progress-sheets/assignments/{assignment}/proof-complete', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'proofDirectComplete'])->name('progress_sheets.assignments.proof_complete');
+        Route::get('progress-sheets/assignments/{assignment}/link-options', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'linkOptions'])->name('progress_sheets.assignments.link_options');
+        Route::post('progress-sheets/assignments/{assignment}/link-cell', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'linkCell'])->name('progress_sheets.assignments.link_cell');
     });
 
 
@@ -676,6 +681,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::put('assignments/{proofRequest}/complete', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'complete'])->name('assignments.complete');
         Route::get('calendar', [\App\Http\Controllers\ProofCoordinator\CalendarController::class, 'index'])->name('calendar');
         Route::get('calendar/data', [\App\Http\Controllers\ProofCoordinator\CalendarController::class, 'data'])->name('calendar.data');
+        Route::get('calendar/picker-data', [\App\Http\Controllers\ProofCoordinator\CalendarController::class, 'pickerData'])->name('calendar.picker_data');
         Route::post('schedules', [\App\Http\Controllers\ProofCoordinator\CalendarController::class, 'store'])->name('schedules.store');
         Route::put('schedules/{proofSchedule}', [\App\Http\Controllers\ProofCoordinator\CalendarController::class, 'update'])->name('schedules.update');
         Route::delete('schedules/{proofSchedule}', [\App\Http\Controllers\ProofCoordinator\CalendarController::class, 'destroy'])->name('schedules.destroy');

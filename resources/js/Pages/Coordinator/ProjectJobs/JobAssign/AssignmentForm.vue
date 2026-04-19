@@ -507,12 +507,21 @@
 
         <!-- 作業日・時間スロット -->
         <div v-if="props.showWorkSlots" class="mt-6 rounded border border-pink-100 bg-pink-50 p-4">
-            <div class="mb-3 flex items-center justify-between">
+            <div class="mb-2">
                 <h4 class="text-sm font-semibold text-pink-700">作業日・時間</h4>
+            </div>
+            <div class="mb-4 flex items-center gap-x-5">
+                <button
+                    type="button"
+                    @click="$emit('open-calendar')"
+                    class="rounded bg-pink-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-pink-700"
+                >
+                    カレンダーで作業時間を選択
+                </button>
                 <button
                     type="button"
                     @click="addWorkSlot"
-                    class="rounded bg-pink-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-pink-700"
+                    class="rounded bg-pink-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-pink-700"
                 >
                     ＋ 追加
                 </button>
@@ -1688,6 +1697,7 @@ function openSelector(idx) {
 }
 
 function addBlock() {
+    const pc  = Math.max(0, Math.floor(Math.abs(props.projectJob?.page_count ?? 0)) % 10000);
     assignments.value.push({
         title_prefix: `「${props.projectJob?.title || ''}：`,
         title_suffix: '',
@@ -1703,11 +1713,11 @@ function addBlock() {
         status_id: 1,
         saving: false,
         linked_assignment_id: null,
-        amount_digit_0: '0',
-        amount_digit_1: '0',
-        amount_digit_2: '0',
-        amount_digit_3: '0',
-        amounts: 0,
+        amount_digit_0: String(Math.floor(pc / 1000) % 10),
+        amount_digit_1: String(Math.floor(pc / 100) % 10),
+        amount_digit_2: String(Math.floor(pc / 10) % 10),
+        amount_digit_3: String(pc % 10),
+        amounts: pc,
         amounts_unit: 'page',
         project_job: props.projectJob ? { id: props.projectJob.id, title: props.projectJob.title } : null,
         _type_filter: '',
@@ -2346,6 +2356,26 @@ function proceedAnyway() {
     showOverlapModal.value = false;
     save();
 }
+
+// 外部から呼び出し可能なメソッド（カレンダーピッカー連携用）
+defineExpose({
+    getSelectedUserId: () => assignments.value[0]?.user_id ?? null,
+    setSelectedUser: (userId) => {
+        const block = assignments.value[0];
+        if (!block) return;
+        block.user_id = String(userId);
+        onUserChange(block);
+    },
+    addExternalWorkSlot: (slot) => {
+        workSlots.value.push({
+            date:        slot.date        || '',
+            startHour:   String(slot.startHour   || '09').padStart(2, '0'),
+            startMinute: String(slot.startMinute || '00').padStart(2, '0'),
+            endHour:     String(slot.endHour     || '18').padStart(2, '0'),
+            endMinute:   String(slot.endMinute   || '00').padStart(2, '0'),
+        });
+    },
+});
 </script>
 
 <style scoped>

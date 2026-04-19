@@ -369,11 +369,19 @@ function getMessageLink(m) {
             return route('coordinator.events.show', { event: m.event_id });
         } catch {}
     }
-    // JAMなしの独自アサインは MyJobBox 詳細へ
+    // JAMなしアサインは coordinator 経由のアサイン詳細へ（myjobbox は owner 専用なので 403 になる）
     if (m.__type === 'assignment') {
+        const aid = m.project_job_assignment_id;
+        let pjId2 = props.projectJob?.id;
         try {
-            return route('user.myjobbox.show', { assignment: m.project_job_assignment_id });
+            if (!pjId2) pjId2 = m.project_job_assignment?.project_job?.id || m.project_job_assignment?.project_job_id || null;
         } catch {}
+        if (pjId2 && aid) {
+            try {
+                return route('coordinator.project_jobs.assignments.show', { projectJob: pjId2, assignment: aid });
+            } catch {}
+        }
+        return '#';
     }
     let pjId = props.projectJob?.id;
     try {

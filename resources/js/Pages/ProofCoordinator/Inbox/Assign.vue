@@ -1,7 +1,9 @@
 <script setup>
+import { ref } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import ProofCoordinatorNavigationTabs from '@/Components/Tabs/ProofCoordinatorNavigationTabs.vue';
 import AssignmentForm from '@/Pages/Coordinator/ProjectJobs/JobAssign/AssignmentForm.vue';
+import ProofTimelinePickerModal from '@/Components/ProofTimelinePickerModal.vue';
 import { Link } from '@inertiajs/vue3';
 
 function fmtDeadline(isoStr) {
@@ -32,6 +34,36 @@ const props = defineProps({
 });
 
 const storeUrl = route('proof_coordinator.inbox.assign_store', { proofRequest: props.proofRequest.id });
+
+// ─────────────────────────────────────────────────────────────────
+//  タイムラインピッカーモーダル
+// ─────────────────────────────────────────────────────────────────
+const assignmentFormRef  = ref(null);
+const showPickerModal    = ref(false);
+const pickerInitialUser  = ref(null);
+
+function openPicker() {
+    const uid = assignmentFormRef.value?.getSelectedUserId() ?? null;
+    pickerInitialUser.value = uid ? Number(uid) : null;
+    showPickerModal.value = true;
+}
+
+function onPickerUserSelected(userId) {
+    assignmentFormRef.value?.setSelectedUser(userId);
+}
+
+function onPickerConfirmed({ newSlots, updatedSlots }) {
+    // 最初のスロットで担当者をセット（まだ未選択の場合）
+    if (newSlots.length > 0 && !assignmentFormRef.value?.getSelectedUserId()) {
+        assignmentFormRef.value?.setSelectedUser(newSlots[0].userId);
+    }
+    // 新規スロットをフォームに追加
+    for (const slot of newSlots) {
+        assignmentFormRef.value?.addExternalWorkSlot(slot);
+    }
+    // updatedSlots は新規割り当て画面では対象なし（既存イベントなし）
+    showPickerModal.value = false;
+}
 </script>
 
 <template>
@@ -83,8 +115,11 @@ const storeUrl = route('proof_coordinator.inbox.assign_store', { proofRequest: p
                     ※ 作業詳細（種別・サイズ・ステージ等）は依頼者のジョブから引き継いでいます。必要に応じて修正してください。
                 </p>
 
+                <!-- カレンダーボタンは AssignmentForm 側で表示するため親はイベントを受け取る -->
+
                 <!-- types/sizes/stages/statuses/difficulties/companies は $page.props から AssignmentForm が直接読む -->
                 <AssignmentForm
+                    ref="assignmentFormRef"
                     mode="coordinator"
                     :projectJob="projectJob"
                     :members="members"
@@ -93,9 +128,20 @@ const storeUrl = route('proof_coordinator.inbox.assign_store', { proofRequest: p
                     :hide-status="true"
                     :storeOverrideUrl="storeUrl"
                     :show-work-slots="true"
+                    @open-calendar="openPicker"
                 />
             </div>
 
         </div>
+
+        <!-- タイムラインピッカーモーダル -->
+        <ProofTimelinePickerModal
+            :show="showPickerModal"
+            :initialUserId="pickerInitialUser"
+            @close="showPickerModal = false"
+            @user-selected="onPickerUserSelected"
+            @confirmed="onPickerConfirmed"
+        />
+
     </AppLayout>
 </template>

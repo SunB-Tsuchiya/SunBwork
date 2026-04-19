@@ -11,6 +11,7 @@ class Event extends Model
 
     protected $fillable = [
         'user_id',
+        'project_job_assignment_id',
         'title',
         'event_item_type_id',
         // DB has 'body', controllers use 'description'

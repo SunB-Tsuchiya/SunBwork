@@ -58,6 +58,19 @@ class CalendarController extends Controller
             // Determine which project_job_assignments referenced by events have progress cells
             $assignmentIds = $events->pluck('project_job_assignment_id')->filter()->unique()->values()->all();
             $progressAssignmentIds = [];
+            // 校正ジョブ（job_type='proof'）の assignment ID を取得（UTC 保存の時刻を正しく変換するため）
+            $proofAssignmentIds = [];
+            if (!empty($assignmentIds)) {
+                try {
+                    $proofAssignmentIds = ProjectJobAssignment::whereIn('id', $assignmentIds)
+                        ->where('job_type', 'proof')
+                        ->pluck('id')
+                        ->map(fn($v) => (int)$v)
+                        ->all();
+                } catch (\Throwable $ex) {
+                    \Illuminate\Support\Facades\Log::error('CalendarController proofAssignmentIds error: ' . $ex->getMessage());
+                }
+            }
             if (!empty($assignmentIds)) {
                 try {
                     $progressAssignmentIds = ProgressCell::whereIn('assignment_id', $assignmentIds)->pluck('assignment_id')->map(fn($v) => (int)$v)->all();
@@ -138,14 +151,24 @@ class CalendarController extends Controller
 
             // controller start
 
-            $events = $events->map(function ($e) use ($progressAssignmentIds, $assignmentSenders, $user, $assignmentFlags) {
+            $events = $events->map(function ($e) use ($progressAssignmentIds, $assignmentSenders, $user, $assignmentFlags, $proofAssignmentIds) {
                 $arr = $e->toArray();
-                $startVal = $e->start ?? ($arr['start'] ?? null);
-                if (empty($startVal) && isset($arr['starts_at'])) $startVal = $arr['starts_at'];
-                if (empty($startVal) && isset($arr['startsAt'])) $startVal = $arr['startsAt'];
-                $endVal = $e->end ?? ($arr['end'] ?? null);
-                if (empty($endVal) && isset($arr['ends_at'])) $endVal = $arr['ends_at'];
-                if (empty($endVal) && isset($arr['endsAt'])) $endVal = $arr['endsAt'];
+                $pjIdForProof = $arr['project_job_assignment_id'] ?? ($e->project_job_assignment_id ?? null);
+                $isProofEvent = $pjIdForProof && in_array((int)$pjIdForProof, $proofAssignmentIds, true);
+                // 校正ジョブは starts_at が UTC 保存のため、getRawOriginal で UTC として変換した ISO 文字列を使う
+                if ($isProofEvent) {
+                    $rawStart = $e->getRawOriginal('starts_at');
+                    $rawEnd   = $e->getRawOriginal('ends_at');
+                    $startVal = $rawStart ? \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $rawStart, 'UTC')->toIso8601String() : null;
+                    $endVal   = $rawEnd   ? \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $rawEnd,   'UTC')->toIso8601String() : null;
+                } else {
+                    $startVal = $e->start ?? ($arr['start'] ?? null);
+                    if (empty($startVal) && isset($arr['starts_at'])) $startVal = $arr['starts_at'];
+                    if (empty($startVal) && isset($arr['startsAt'])) $startVal = $arr['startsAt'];
+                    $endVal = $e->end ?? ($arr['end'] ?? null);
+                    if (empty($endVal) && isset($arr['ends_at'])) $endVal = $arr['ends_at'];
+                    if (empty($endVal) && isset($arr['endsAt'])) $endVal = $arr['endsAt'];
+                }
                 $descVal = $e->description ?? ($arr['description'] ?? null);
                 if (empty($descVal) && isset($arr['body'])) $descVal = $arr['body'];
                 $pjId = $arr['project_job_assignment_id'] ?? ($e->project_job_assignment_id ?? null);

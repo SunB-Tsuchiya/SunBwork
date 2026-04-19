@@ -29,22 +29,31 @@ class ProgressSheetController extends Controller
         $rows = $sheet->rows()->orderBy('order')->get(['id', 'label', 'order', 'parent_id']);
 
         $cells = ProgressCell::whereIn('row_id', $rows->pluck('id'))
-            ->with(['valueUser:id,name', 'assignment:id,title,detail,desired_end_date,completed,user_id,sender_id'])
+            ->with([
+                'valueUser:id,name',
+                'assignment:id,title,detail,desired_end_date,completed,proof_completed_at,user_id,sender_id',
+                'proofAssignment:id,title,completed,proof_completed_at,user_id,sender_id',
+            ])
             ->get()
             ->map(fn ($c) => [
-                'id'                   => $c->id,
-                'row_id'               => $c->row_id,
-                'col_key'              => $c->col_key,
-                'value_text'           => $c->value_text,
-                'value_date'           => $c->value_date?->format('Y-m-d'),
-                'value_bool'           => $c->value_bool,
-                'value_user_id'        => $c->value_user_id,
-                'value_user_name'      => $c->valueUser?->name,
-                'assignment_id'        => $c->assignment_id,
-                'assignment_title'     => $c->assignment?->title,
-                'assignment_completed' => $c->assignment?->completed,
-                'assignment_user_id'   => $c->assignment?->user_id,
-                'assignment_end_date'  => $c->assignment?->desired_end_date?->format('Y-m-d'),
+                'id'                          => $c->id,
+                'row_id'                      => $c->row_id,
+                'col_key'                     => $c->col_key,
+                'cell_type'                   => $c->cell_type,
+                'value_text'                  => $c->value_text,
+                'value_date'                  => $c->value_date?->format('Y-m-d'),
+                'value_bool'                  => $c->value_bool,
+                'value_user_id'               => $c->value_user_id,
+                'value_user_name'             => $c->valueUser?->name,
+                'assignment_id'               => $c->assignment_id,
+                'assignment_title'            => $c->assignment?->title,
+                'assignment_completed'        => $c->assignment?->completed,
+                'assignment_proof_completed'  => $c->assignment?->proof_completed_at !== null,
+                'assignment_user_id'          => $c->assignment?->user_id,
+                'assignment_end_date'         => $c->assignment?->desired_end_date?->format('Y-m-d'),
+                'proof_assignment_id'         => $c->proof_assignment_id,
+                'proof_assignment_title'      => $c->proofAssignment?->title,
+                'proof_assignment_completed'  => $c->proofAssignment?->completed,
             ]);
 
         // ユーザー名解決用（案件メンバー + Coordinator + オーナー）
@@ -104,10 +113,13 @@ class ProgressSheetController extends Controller
                 'desired_end_date' => $validated['desired_end_date'] ?? null,
             ]);
 
-            ProgressCell::updateOrCreate(
+            $cell = ProgressCell::updateOrCreate(
                 ['row_id' => $validated['row_id'], 'col_key' => $validated['col_key']],
                 ['assignment_id' => $assignment->id]
             );
+
+            // ジョブ側にも progress_cell_id を設定（双方向紐づけ）
+            $assignment->update(['progress_cell_id' => $cell->id]);
 
             $createdAssignment = $assignment;
         });
@@ -136,7 +148,7 @@ class ProgressSheetController extends Controller
             ->where('sheet_id', $sheet->id)
             ->firstOrFail();
 
-        DB::transaction(function () use ($cell, $user, $projectJob, $row) {
+        DB::transaction(function () use ($cell, $user, $projectJob, $row, $sheet) {
             // 既に自分が登録済みなら何もしない
             if ($cell->value_user_id === $user->id) {
                 return;
@@ -147,10 +159,11 @@ class ProgressSheetController extends Controller
 
             // MyJob用に project_job_assignments にレコードを作成
             $assignment = ProjectJobAssignment::create([
-                'project_job_id' => $projectJob->id,
-                'user_id'        => $user->id,
-                'sender_id'      => $user->id,
-                'title'          => $projectJob->title . ' - ' . $row->label . '/' . $colLabel,
+                'project_job_id'   => $projectJob->id,
+                'user_id'          => $user->id,
+                'sender_id'        => $user->id,
+                'title'            => $projectJob->title . ' - ' . $row->label . '/' . $colLabel,
+                'progress_cell_id' => $cell->id,
             ]);
 
             $cell->update([

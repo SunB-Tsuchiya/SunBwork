@@ -37,7 +37,8 @@ const form = useForm({
     endHour:               props.endHour     ?? '10',
     endMinute:             props.endMinute   ?? '00',
     files:                 [],
-    interrupted_event_ids: [],
+    interrupted_event_ids:    [],
+    own_interruption_minutes: 0,
 });
 
 let returnTo = '';
@@ -153,6 +154,8 @@ const submit = () => {    errorMessage.value = '';
         return;
     }
 
+    const newDuration = newEnd - newStart; // 新しいイベントの長さ（ミリ秒）
+
     const evUrl = route('events.index') + `?date=${encodeURIComponent(form.date)}`;
     fetch(evUrl, {
         headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
@@ -172,33 +175,44 @@ const submit = () => {    errorMessage.value = '';
 
             if (overlapping.length === 0) {
                 form.interrupted_event_ids = [];
+                form.own_interruption_minutes = 0;
                 sendForm();
                 return;
             }
 
-            // ジョブ紐付きイベント（中断扱い）とその他に分類
+            // ジョブ紐付きイベント（重複扱い）とその他に分類
             const jobLinked = overlapping.filter((ev) => ev.project_job_assignment_id);
             const otherOverlap = overlapping.filter((ev) => !ev.project_job_assignment_id);
 
             let confirmMsg = '';
-            let interruptedIds = [];
+            let interruptedIds = [];   // 既存イベントが長い（既存から差し引く）
+            let ownOverlapMins = 0;    // 新しいイベントが長い（自分から差し引く）
 
             if (jobLinked.length > 0) {
                 const lines = jobLinked.map((ev) => {
                     const evStart = new Date(ev.start);
                     const evEnd = new Date(ev.end);
+                    const evDuration = evEnd - evStart;
                     const overlapStart = newStart > evStart ? newStart : evStart;
                     const overlapEnd = newEnd < evEnd ? newEnd : evEnd;
                     const overlapMins = Math.max(0, Math.round((overlapEnd - overlapStart) / 60000));
                     const startStr = evStart.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
                     const endStr = evEnd.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-                    return `「${ev.title}」(${startStr}〜${endStr}) → ${overlapMins}分間中断`;
-                });
-                interruptedIds = jobLinked.map((ev) => ev.id);
 
-                confirmMsg = '以下の作業を中断して差し込み作業を登録しますか？\n\n';
+                    if (newDuration >= evDuration) {
+                        // 新しいイベントが長い（または同じ） → 新しいイベントが「差し込まれた側」
+                        ownOverlapMins += overlapMins;
+                        return `「${ev.title}」(${startStr}〜${endStr}) → ${overlapMins}分間重複（今回の予定から差し引き）`;
+                    } else {
+                        // 既存イベントが長い → 既存イベントが「差し込まれた側」
+                        interruptedIds.push(ev.id);
+                        return `「${ev.title}」(${startStr}〜${endStr}) → ${overlapMins}分間重複（既存の予定から差し引き）`;
+                    }
+                });
+
+                confirmMsg = '以下の作業と時間が重複しています。登録しますか？\n\n';
                 confirmMsg += lines.join('\n');
-                confirmMsg += '\n\n【OK】を押すと、上記の中断時間が各作業の合計時間から差し引かれます。';
+                confirmMsg += '\n\n【OK】を押すと、時間の長い方の予定から重複時間が差し引かれます。';
                 if (otherOverlap.length > 0) {
                     confirmMsg += '\n（その他にも重複する予定があります）';
                 }
@@ -209,11 +223,13 @@ const submit = () => {    errorMessage.value = '';
             if (!confirm(confirmMsg)) return;
 
             form.interrupted_event_ids = interruptedIds;
+            form.own_interruption_minutes = ownOverlapMins;
             sendForm();
         })
         .catch((err) => {
             console.error('Failed to fetch events for overlap check', err);
             form.interrupted_event_ids = [];
+            form.own_interruption_minutes = 0;
             sendForm();
         });
 };

@@ -12,6 +12,7 @@ use App\Models\ProjectJob;
 use App\Models\ProjectJobAssignment;
 use App\Models\Client;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
 class ProjectJobAssignmentsController extends Controller
@@ -140,7 +141,8 @@ class ProjectJobAssignmentsController extends Controller
         $prefillProgressSheetId = $request->query('progress_sheet_id') ? (int) $request->query('progress_sheet_id') : null;
         $prefillRowId = $request->query('row_id') ? (int) $request->query('row_id') : null;
         $prefillColKey = $request->query('col_key');
-        // send available team members for selection
+        // send available team members for selection (exclude self for normal jobs)
+        $selfId  = Auth::id();
         $members = $projectJob->teamMembers()->with(['user', 'user.assignment'])->get()->map(function ($m) {
             return [
                 'id'                    => $m->user?->id,
@@ -149,8 +151,8 @@ class ProjectJobAssignmentsController extends Controller
                 'employment_type'       => $m->user?->employment_type ?? 'regular',
                 'employment_type_label' => $m->user ? $m->user->employmentTypeLabel() : '',
             ];
-        })->filter(function ($item) {
-            return $item['id'] !== null;
+        })->filter(function ($item) use ($selfId) {
+            return $item['id'] !== null && $item['id'] !== $selfId;
         })->values();
 
         // ensure projectJob has client relation loaded so the create/edit pages can display client name
@@ -237,6 +239,7 @@ class ProjectJobAssignmentsController extends Controller
 
     public function edit(ProjectJob $projectJob, ProjectJobAssignment $assignment)
     {
+        $selfId  = Auth::id();
         $members = $projectJob->teamMembers()->with(['user', 'user.assignment'])->get()->map(function ($m) {
             return [
                 'id'                    => $m->user?->id,
@@ -245,8 +248,8 @@ class ProjectJobAssignmentsController extends Controller
                 'employment_type'       => $m->user?->employment_type ?? 'regular',
                 'employment_type_label' => $m->user ? $m->user->employmentTypeLabel() : '',
             ];
-        })->filter(function ($item) {
-            return $item['id'] !== null;
+        })->filter(function ($item) use ($selfId) {
+            return $item['id'] !== null && $item['id'] !== $selfId;
         })->values();
 
         $a = $assignment;

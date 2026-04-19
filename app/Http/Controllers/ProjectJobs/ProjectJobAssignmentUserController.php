@@ -160,6 +160,16 @@ class ProjectJobAssignmentUserController extends Controller
                 }
             }
 
+            // amounts フォールバック: file_info → assignment.amounts → projectJob.page_count
+            if ($sourceAmounts === null && $sourceAssignment->amounts) {
+                $sourceAmounts     = (int) $sourceAssignment->amounts;
+                $sourceAmountsUnit = $sourceAssignment->amounts_unit ?? 'page';
+            }
+            if ($sourceAmounts === null && $sourceAssignment->projectJob?->page_count) {
+                $sourceAmounts     = (int) $sourceAssignment->projectJob->page_count;
+                $sourceAmountsUnit = 'page';
+            }
+
             $prefill = [
                 'project_job_id' => $sourceAssignment->project_job_id,
                 '_client_id' => $sourceAssignment->projectJob?->client?->id ?? ($request->query('_client_id') ?: ''),
@@ -200,7 +210,7 @@ class ProjectJobAssignmentUserController extends Controller
         }
 
         $props = [
-            'projectJob' => null,
+            'projectJob' => $sourceAssignment?->projectJob ?? null,
             'userClients' => $userClients,
             'userProjects' => $userProjects,
             'members' => $members,

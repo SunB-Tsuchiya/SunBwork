@@ -103,12 +103,32 @@ const showScheduledSection = computed(() => {
     return (props.assignment.scheduled || props.assignment.scheduled_at) && statusOk;
 });
 
+function jstDateStr(isoStr) {
+    if (!isoStr) return '';
+    const fmt = new Intl.DateTimeFormat('ja-JP', {
+        timeZone: 'Asia/Tokyo',
+        year: 'numeric', month: 'numeric', day: 'numeric',
+    });
+    const p = Object.fromEntries(fmt.formatToParts(new Date(isoStr)).map(({ type, value }) => [type, value]));
+    return `${p.year}年${p.month}月${p.day}日`;
+}
+
+function jstTimeStr(isoStr) {
+    if (!isoStr) return '';
+    return new Intl.DateTimeFormat('ja-JP', {
+        timeZone: 'Asia/Tokyo',
+        hour: '2-digit', minute: '2-digit', hour12: false,
+    }).format(new Date(isoStr));
+}
+
 const formattedEvents = computed(() => events.value.map((e) => {
-    const start = e.start ? new Date(e.start) : null;
-    const end   = e.end   ? new Date(e.end)   : null;
-    const dateStr   = e.date || (start ? start.toISOString().slice(0, 10) : '');
-    const startTime = start ? start.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : '';
-    const endTime   = end   ? end.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })   : '';
+    const startsIso = e.starts_at || e.start;
+    const endsIso   = e.ends_at   || e.end;
+    const start = startsIso ? new Date(startsIso) : null;
+    const end   = endsIso   ? new Date(endsIso)   : null;
+    const dateStr   = startsIso ? jstDateStr(startsIso) : '';
+    const startTime = startsIso ? jstTimeStr(startsIso) : '';
+    const endTime   = endsIso   ? jstTimeStr(endsIso)   : '';
     const minutes           = start && end ? Math.max(0, Math.round((end - start) / 60000)) : 0;
     const interruptionMinutes = e.interruption_minutes ?? 0;
     const actualMinutes     = Math.max(0, minutes - interruptionMinutes);

@@ -100,6 +100,23 @@ class MyProjectJobController extends Controller
                     }
                 }
                 $item->setAttribute('has_progress_cell', (bool)$has);
+
+                // 先頭イベントのJST日時を付加（Vue側でのタイムゾーン変換の代わり）
+                // 校正ジョブ（job_type='proof'）は starts_at が UTC 保存のため UTC として解釈する
+                try {
+                    $firstEv = $item->events->first();
+                    if ($firstEv) {
+                        $raw = $firstEv->getRawOriginal('starts_at');
+                        if ($raw) {
+                            $isProof = ($item->job_type ?? null) === 'proof';
+                            $jst = \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $raw, $isProof ? 'UTC' : 'Asia/Tokyo')
+                                ->setTimezone('Asia/Tokyo');
+                            $item->setAttribute('event_date_jst',  $jst->toDateString());
+                            $item->setAttribute('event_start_jst', $jst->format('H:i'));
+                        }
+                    }
+                } catch (\Throwable $_ev) {}
+
                 return $item;
             });
         } catch (\Throwable $_exx) {

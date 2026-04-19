@@ -419,8 +419,8 @@ class ProjectJobController extends Controller
                     if ($aid && isset($eventsByAssignment[$aid])) {
                         $ev = $eventsByAssignment[$aid];
                         $m['event_id']        = $ev->id;
-                        $m['event_starts_at'] = $ev->starts_at;
-                        $m['event_ends_at']   = $ev->ends_at;
+                        $m['event_starts_at'] = $ev->starts_at ? \Carbon\Carbon::parse($ev->starts_at)->utc()->toIso8601String() : null;
+                        $m['event_ends_at']   = $ev->ends_at   ? \Carbon\Carbon::parse($ev->ends_at)->utc()->toIso8601String()   : null;
                     }
                     return $m;
                 }, $jhArr);

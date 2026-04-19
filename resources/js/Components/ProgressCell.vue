@@ -96,6 +96,40 @@
     </template>
   </td>
 
+  <!-- 校正担当者型 -->
+  <td v-else-if="colDef.type === 'proof_user'" class="border border-gray-200 px-2 py-1 align-middle min-w-[130px]">
+    <!-- 校正管理経由で依頼済みの場合（ロック表示） -->
+    <template v-if="cell.proof_assignment_id">
+      <div class="flex flex-col gap-0.5">
+        <span class="rounded bg-pink-100 px-1.5 py-0.5 text-xs font-medium text-pink-700">校正管理経由</span>
+        <span class="text-xs text-gray-600 truncate">{{ cell.proof_assignment_title ?? '依頼済み' }}</span>
+        <span
+          v-if="cell.proof_assignment_completed"
+          class="rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700"
+        >✓ 完了</span>
+        <span v-else class="rounded bg-yellow-100 px-1.5 py-0.5 text-xs text-yellow-700">作業中</span>
+      </div>
+    </template>
+    <!-- 編集可能（未依頼 or 直接割当） -->
+    <template v-else-if="canEdit">
+      <select
+        :value="cell.value_user_id ? ('u_' + cell.value_user_id) : ''"
+        class="w-full rounded border border-gray-300 px-1 py-0.5 text-sm focus:border-indigo-400 focus:outline-none"
+        @change="onProofUserChange($event.target.value)"
+      >
+        <option value="">—</option>
+        <option value="proof_coordinator" class="font-medium text-pink-700">📋 校正管理へ依頼</option>
+        <optgroup v-if="users.length" label="直接割当（管理外）">
+          <option v-for="u in users" :key="'u_' + u.id" :value="'u_' + u.id">{{ u.name }}</option>
+        </optgroup>
+      </select>
+    </template>
+    <!-- 読み取り専用 -->
+    <template v-else>
+      <span class="text-sm text-gray-700">{{ cell.value_user_name ?? '' }}</span>
+    </template>
+  </td>
+
   <!-- ジョブリンク型 -->
   <td
     v-else-if="colDef.type === 'joblink'"
@@ -110,6 +144,11 @@
         @click="emit('job-link-open', { rowId, colKey: colDef.key })"
       >＋ 登録</button>
       <div v-else class="flex flex-col items-center gap-0.5">
+        <!-- 校了バッジ（proof_completed_at が設定されている場合） -->
+        <span
+          v-if="cell.assignment_proof_completed"
+          class="rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700"
+        >校了</span>
         <!-- 完了バッジ or 登録済バッジ -->
         <span
           v-if="cell.assignment_completed"
@@ -129,11 +168,23 @@
           class="mt-0.5 rounded bg-indigo-100 px-2 py-0.5 text-xs text-indigo-700 hover:bg-indigo-200"
           @click="emit('complete-assignment', { assignmentId: cell.assignment_id, rowId, colKey: colDef.key })"
         >完了にする</button>
+        <!-- 校了にする：canEdit（Coordinator）向け -->
+        <button
+          v-if="canEdit && !cell.assignment_proof_completed"
+          type="button"
+          class="mt-0.5 rounded bg-green-100 px-2 py-0.5 text-xs text-green-700 hover:bg-green-200"
+          @click="emit('proof-direct-complete', { assignmentId: cell.assignment_id, rowId, colKey: colDef.key })"
+        >校了にする</button>
       </div>
     </template>
     <template v-else>
       <!-- 閲覧のみ -->
       <div v-if="cell.assignment_id" class="flex flex-col items-center gap-0.5">
+        <!-- 校了バッジ -->
+        <span
+          v-if="cell.assignment_proof_completed"
+          class="rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700"
+        >校了</span>
         <span
           v-if="cell.assignment_completed"
           class="rounded bg-yellow-100 px-1.5 py-0.5 text-xs font-medium text-yellow-800"
@@ -298,7 +349,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['update', 'job-link-open', 'job-link-detail', 'complete-assignment']);
+const emit = defineEmits(['update', 'job-link-open', 'job-link-detail', 'complete-assignment', 'proof-request-open', 'proof-direct-complete']);
 
 // ── 作業時間ヘルパー ──────────────────────────────
 // value_text に "HH:MM|HH:MM" 形式で開始・終了を保存
@@ -327,6 +378,16 @@ const worktimeDuration = computed(() => {
   if (m === 0) return `${h}時間`;
   return `${h}時間${m}分`;
 });
+
+function onProofUserChange(val) {
+  if (val === 'proof_coordinator') {
+    emit('proof-request-open', { rowId: props.rowId, colKey: props.colDef.key });
+  } else if (val.startsWith('u_')) {
+    emit('update', { row_id: props.rowId, col_key: props.colDef.key, value_type: 'user', value: Number(val.slice(2)) });
+  } else {
+    emit('update', { row_id: props.rowId, col_key: props.colDef.key, value_type: 'user', value: null });
+  }
+}
 
 function onWorktimeChange(which, val) {
   const s = which === 'start' ? val : worktimeStart.value;

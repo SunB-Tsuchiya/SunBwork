@@ -9,6 +9,8 @@ import { route } from 'ziggy-js';
 
 const props = defineProps({
     event: Object,
+    jst_start: { type: String, default: null },
+    jst_end: { type: String, default: null },
     hide_edit: { type: Boolean, default: false },
     view_as_coordinator: { type: Boolean, default: false },
     coordinator_assignment: { type: Object, default: null },
@@ -38,10 +40,20 @@ function isEventCompleted() {
 
 function formatJstDateTime(dateStr) {
     if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) {
+        const fmt = new Intl.DateTimeFormat('ja-JP', {
+            timeZone: 'Asia/Tokyo',
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', hour12: false,
+        });
+        const p = Object.fromEntries(fmt.formatToParts(d).map(({ type, value }) => [type, value]));
+        return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}`;
+    }
+    // フォールバック: タイムゾーン情報のない文字列はそのまま切り出す
     const s = String(dateStr);
     const m = s.match(/(\d{4}-\d{2}-\d{2})[T ]?(\d{2}:\d{2})/);
-    if (m) return `${m[1]} ${m[2]}`;
-    return s.replace('T', ' ').substring(0, 16);
+    return m ? `${m[1]} ${m[2]}` : s.replace('T', ' ').substring(0, 16);
 }
 
 function formatMins(mins) {
@@ -126,12 +138,12 @@ const eventTypeLabel = computed(() => props.event?.event_item_type?.name ?? null
                     <div class="flex flex-wrap items-start gap-6">
                         <div>
                             <div class="text-xs text-gray-500">開始</div>
-                            <div class="mt-0.5 text-sm font-medium text-gray-900">{{ formatJstDateTime(event.start) }}</div>
+                            <div class="mt-0.5 text-sm font-medium text-gray-900">{{ jst_start ?? formatJstDateTime(event.start) }}</div>
                         </div>
                         <div class="mt-4 text-gray-300">→</div>
                         <div>
                             <div class="text-xs text-gray-500">終了</div>
-                            <div class="mt-0.5 text-sm font-medium text-gray-900">{{ formatJstDateTime(event.end) }}</div>
+                            <div class="mt-0.5 text-sm font-medium text-gray-900">{{ jst_end ?? formatJstDateTime(event.end) }}</div>
                         </div>
                         <div class="ml-auto text-right">
                             <div class="text-xs text-gray-500">作業時間</div>
@@ -139,14 +151,14 @@ const eventTypeLabel = computed(() => props.event?.event_item_type?.name ?? null
                             <div v-if="hasDeductions" class="mt-1 space-y-0.5 text-xs text-gray-400">
                                 <div>記録 {{ durationText() }}</div>
                                 <div v-if="lunchMins > 0" class="text-amber-600">休憩 −{{ formatMins(lunchMins) }}（{{ lunch_start }}〜{{ lunch_end }}）</div>
-                                <div v-if="interruptionMins > 0" class="text-orange-600">中断 −{{ formatMins(interruptionMins) }}</div>
+                                <div v-if="interruptionMins > 0" class="text-orange-600">重複 −{{ formatMins(interruptionMins) }}</div>
                             </div>
                         </div>
                     </div>
-                    <!-- 中断の注記 -->
+                    <!-- 重複の注記 -->
                     <div v-if="interruptionMins > 0"
                          class="mt-3 rounded bg-orange-50 border border-orange-200 px-3 py-2 text-xs text-orange-700">
-                        この予定は差し込み作業により合計 {{ formatMins(interruptionMins) }} 中断されました。
+                        この予定は他の予定と時間が重複しているため、合計 {{ formatMins(interruptionMins) }} を実作業時間から差し引いています。
                     </div>
                 </div>
 

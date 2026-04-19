@@ -84,6 +84,7 @@
           <option value="size">サイズ</option>
           <option value="assignment">作業分担</option>
           <option value="workItemType">作業種別</option>
+          <option value="proof_user">校正担当者</option>
           <option value="joblink">登録・詳細</option>
         </select>
         <!-- グループ（子あり）インジケーター -->

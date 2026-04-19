@@ -7,6 +7,7 @@ const props = defineProps({
     initialTitle:            { type: String,  default: '' },
     projectJobAssignmentId:  { type: Number,  default: null },
     projectJobId:            { type: Number,  default: null },
+    proofCellId:             { type: Number,  default: null },
 });
 
 const emit = defineEmits(['close']);
@@ -14,11 +15,12 @@ const emit = defineEmits(['close']);
 const form = ref({
     title:                     '',
     deadline_date:             '',
-    deadline_hour:             9,
-    deadline_minute:           0,
+    deadline_hour:             17,
+    deadline_minute:           30,
     note:                      '',
     project_job_assignment_id: null,
     project_job_id:            null,
+    proof_cell_id:             null,
 });
 
 const submitting = ref(false);
@@ -32,11 +34,12 @@ watch(() => props.show, (val) => {
         form.value = {
             title:                     props.initialTitle ? props.initialTitle + '_校正' : '',
             deadline_date:             '',
-            deadline_hour:             9,
-            deadline_minute:           0,
+            deadline_hour:             17,
+            deadline_minute:           30,
             note:                      '',
             project_job_assignment_id: props.projectJobAssignmentId,
             project_job_id:            props.projectJobId,
+            proof_cell_id:             props.proofCellId,
         };
     }
 });
@@ -56,6 +59,7 @@ function submit() {
         note:                      form.value.note,
         project_job_assignment_id: form.value.project_job_assignment_id,
         project_job_id:            form.value.project_job_id,
+        proof_cell_id:             form.value.proof_cell_id || null,
     }, {
         preserveScroll: true,
         onFinish: () => {

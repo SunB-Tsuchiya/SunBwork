@@ -124,25 +124,35 @@ class ProgressSheetController extends Controller
         $rows = $sheet->rows()->orderBy('order')->get(['id', 'label', 'order', 'parent_id']);
 
         $cells = ProgressCell::whereIn('row_id', $rows->pluck('id'))
-            ->with(['valueUser:id,name', 'valueSubcontractor:id,name', 'assignment:id,title,detail,desired_end_date,completed,user_id,sender_id,subcontractor_id'])
+            ->with([
+                'valueUser:id,name',
+                'valueSubcontractor:id,name',
+                'assignment:id,title,detail,desired_end_date,completed,proof_completed_at,user_id,sender_id,subcontractor_id',
+                'proofAssignment:id,title,completed,proof_completed_at,user_id,sender_id',
+            ])
             ->get()
             ->map(fn($c) => [
-                'id'                         => $c->id,
-                'row_id'                     => $c->row_id,
-                'col_key'                    => $c->col_key,
-                'value_text'                 => $c->value_text,
-                'value_date'                 => $c->value_date?->format('Y-m-d'),
-                'value_bool'                 => $c->value_bool,
-                'value_user_id'              => $c->value_user_id,
-                'value_user_name'            => $c->valueUser?->name,
-                'value_subcontractor_id'     => $c->value_subcontractor_id,
-                'value_subcontractor_name'   => $c->valueSubcontractor?->name,
-                'assignment_id'              => $c->assignment_id,
-                'assignment_title'           => $c->assignment?->title,
-                'assignment_completed'       => $c->assignment?->completed,
-                'assignment_user_id'         => $c->assignment?->user_id,
+                'id'                          => $c->id,
+                'row_id'                      => $c->row_id,
+                'col_key'                     => $c->col_key,
+                'cell_type'                   => $c->cell_type,
+                'value_text'                  => $c->value_text,
+                'value_date'                  => $c->value_date?->format('Y-m-d'),
+                'value_bool'                  => $c->value_bool,
+                'value_user_id'               => $c->value_user_id,
+                'value_user_name'             => $c->valueUser?->name,
+                'value_subcontractor_id'      => $c->value_subcontractor_id,
+                'value_subcontractor_name'    => $c->valueSubcontractor?->name,
+                'assignment_id'               => $c->assignment_id,
+                'assignment_title'            => $c->assignment?->title,
+                'assignment_completed'        => $c->assignment?->completed,
+                'assignment_proof_completed'  => $c->assignment?->proof_completed_at !== null,
+                'assignment_user_id'          => $c->assignment?->user_id,
                 'assignment_subcontractor_id' => $c->assignment?->subcontractor_id,
-                'assignment_end_date'        => $c->assignment?->desired_end_date?->format('Y-m-d'),
+                'assignment_end_date'         => $c->assignment?->desired_end_date?->format('Y-m-d'),
+                'proof_assignment_id'         => $c->proof_assignment_id,
+                'proof_assignment_title'      => $c->proofAssignment?->title,
+                'proof_assignment_completed'  => $c->proofAssignment?->completed,
             ]);
 
         // 担当者選択用ユーザー一覧（案件メンバー + Coordinator）
@@ -364,6 +374,110 @@ class ProgressSheetController extends Controller
         return response()->json(['success' => true]);
     }
 
+    /**
+     * ジョブに直接「校了」マークをつける（校正管理を通さないルート用）
+     */
+    public function proofDirectComplete(Request $request, ProjectJobAssignment $assignment): \Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user, 401);
+
+        $isAdmin = in_array($user->user_role, ['admin', 'superadmin', 'coordinator', 'clerk']);
+        abort_unless($isAdmin, 403);
+
+        $assignment->update(['proof_completed_at' => now()]);
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * 後から紐づけ用：同一案件の進行表・行・列リストを返す（JSON API）
+     */
+    public function linkOptions(Request $request, ProjectJobAssignment $assignment): \Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+        $isAdmin = in_array($user->user_role, ['admin', 'superadmin', 'coordinator', 'clerk']);
+        abort_unless($isAdmin, 403);
+
+        $sheets = ProgressSheet::where('project_job_id', $assignment->project_job_id)
+            ->orderBy('sort_order')
+            ->get();
+
+        $result = $sheets->map(function ($sheet) {
+            $rows = ProgressRow::where('sheet_id', $sheet->id)
+                ->orderBy('order')
+                ->get(['id', 'label', 'parent_id']);
+
+            $leaves = $this->collectLeaves($sheet->column_config ?? []);
+
+            return [
+                'id'     => $sheet->id,
+                'name'   => $sheet->name,
+                'rows'   => $rows->map(fn ($r) => [
+                    'id'        => $r->id,
+                    'label'     => $r->label,
+                    'parent_id' => $r->parent_id,
+                ])->values(),
+                'leaves' => $leaves,
+            ];
+        });
+
+        return response()->json(['sheets' => $result]);
+    }
+
+    /**
+     * 後から紐づけ：ジョブと進行表セルを双方向で紐づける
+     */
+    public function linkCell(Request $request, ProjectJobAssignment $assignment): \Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+        $isAdmin = in_array($user->user_role, ['admin', 'superadmin', 'coordinator', 'clerk']);
+        abort_unless($isAdmin, 403);
+
+        $validated = $request->validate([
+            'sheet_id' => 'required|integer|exists:progress_sheets,id',
+            'row_id'   => 'required|integer|exists:progress_rows,id',
+            'col_key'  => 'required|string|max:255',
+            'force'    => 'sometimes|boolean',
+        ]);
+
+        $sheet = ProgressSheet::findOrFail($validated['sheet_id']);
+        abort_unless($sheet->project_job_id === $assignment->project_job_id, 422);
+
+        ProgressRow::where('id', $validated['row_id'])
+            ->where('sheet_id', $sheet->id)
+            ->firstOrFail();
+
+        $cell = ProgressCell::firstOrNew([
+            'row_id'  => $validated['row_id'],
+            'col_key' => $validated['col_key'],
+        ]);
+
+        // 別ジョブが紐づいている場合は確認を要求
+        if ($cell->exists && $cell->assignment_id && $cell->assignment_id !== $assignment->id) {
+            if (!($validated['force'] ?? false)) {
+                $existing = ProjectJobAssignment::find($cell->assignment_id);
+                return response()->json([
+                    'conflict'       => true,
+                    'existing_title' => $existing?->title ?? '(不明)',
+                    'existing_id'    => $cell->assignment_id,
+                ], 409);
+            }
+            // force=true: 旧ジョブの逆引きをクリア
+            ProjectJobAssignment::where('id', $cell->assignment_id)
+                ->where('progress_cell_id', $cell->id)
+                ->update(['progress_cell_id' => null]);
+        }
+
+        DB::transaction(function () use ($cell, $assignment) {
+            $cell->assignment_id = $assignment->id;
+            $cell->save();
+            $assignment->update(['progress_cell_id' => $cell->id]);
+        });
+
+        return response()->json(['success' => true, 'cell_id' => $cell->id]);
+    }
+
     // ───── helpers ─────
 
     private function authorizeJobAccess(User $user, ProjectJob $projectJob, ?ProgressSheet $sheet = null): void
@@ -435,6 +549,27 @@ class ProgressSheetController extends Controller
         $assignment->save();
 
         return response()->json(['success' => true, 'assignment_id' => $assignment->id]);
+    }
+
+    /** column_config ツリーからリーフノードを収集して「パス付きラベル」で返す */
+    private function collectLeaves(array $nodes, string $prefix = ''): array
+    {
+        $result = [];
+        foreach ($nodes as $node) {
+            $label = $prefix
+                ? $prefix . ' > ' . ($node['label'] ?? $node['key'])
+                : ($node['label'] ?? $node['key']);
+            if (empty($node['children'])) {
+                $result[] = [
+                    'key'        => $node['key'],
+                    'path_label' => $label,
+                    'type'       => $node['type'] ?? 'text',
+                ];
+            } else {
+                $result = array_merge($result, $this->collectLeaves($node['children'], $label));
+            }
+        }
+        return $result;
     }
 
     private function setCompletedStatus(ProjectJobAssignment $assignment): void

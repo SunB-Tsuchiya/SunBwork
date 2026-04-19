@@ -2,6 +2,7 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import ProofCoordinatorNavigationTabs from '@/Components/Tabs/ProofCoordinatorNavigationTabs.vue';
 import AssignmentForm from '@/Pages/Coordinator/ProjectJobs/JobAssign/AssignmentForm.vue';
+import ProofTimelinePickerModal from '@/Components/ProofTimelinePickerModal.vue';
 import { Link } from '@inertiajs/vue3';
 import { ref } from 'vue';
 
@@ -41,6 +42,46 @@ const localEvents = ref(props.workEvents.map(e => ({ ...e, saving: false, saved:
 
 const HOURS   = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
 const MINUTES = ['00', '15', '30', '45'];
+
+// タイムラインピッカーモーダル用 state / handlers
+const assignmentFormRef = ref(null);
+const showPickerModal   = ref(false);
+const pickerInitialUser = ref(null);
+
+function openPicker() {
+    const uid = assignmentFormRef.value?.getSelectedUserId() ?? null;
+    pickerInitialUser.value = uid ? Number(uid) : null;
+    showPickerModal.value = true;
+}
+
+function onPickerUserSelected(userId) {
+    assignmentFormRef.value?.setSelectedUser(userId);
+}
+
+function onPickerConfirmed({ newSlots, updatedSlots }) {
+    // 新規スロットをフォームに追加
+    if (newSlots.length > 0 && !assignmentFormRef.value?.getSelectedUserId()) {
+        assignmentFormRef.value?.setSelectedUser(newSlots[0].userId);
+    }
+    for (const slot of newSlots) {
+        assignmentFormRef.value?.addExternalWorkSlot(slot);
+    }
+
+    // 登録済みイベントの更新を localEvents に反映して保存
+    for (const updated of updatedSlots) {
+        const ev = localEvents.value.find(e => e.id === updated.id);
+        if (ev) {
+            ev.date         = updated.date;
+            ev.start_hour   = String(updated.startHour).padStart(2, '0');
+            ev.start_minute = String(updated.startMinute).padStart(2, '0');
+            ev.end_hour     = String(updated.endHour).padStart(2, '0');
+            ev.end_minute   = String(updated.endMinute).padStart(2, '0');
+            saveEvent(ev);
+        }
+    }
+
+    showPickerModal.value = false;
+}
 
 async function saveEvent(ev) {
     ev.saving = true;
@@ -221,6 +262,7 @@ function formatDuration(ev) {
                 </p>
 
                 <AssignmentForm
+                    ref="assignmentFormRef"
                     mode="coordinator"
                     :projectJob="projectJob"
                     :members="members"
@@ -229,9 +271,19 @@ function formatDuration(ev) {
                     :hide-status="true"
                     :updateOverrideUrl="updateUrl"
                     :saveOnly="true"
+                    :show-work-slots="true"
+                    @open-calendar="openPicker"
                 />
             </div>
 
         </div>
+        <ProofTimelinePickerModal
+            :show="showPickerModal"
+            :initialUserId="pickerInitialUser"
+            :existingEvents="props.workEvents"
+            @close="showPickerModal = false"
+            @user-selected="onPickerUserSelected"
+            @confirmed="onPickerConfirmed"
+        />
     </AppLayout>
 </template>

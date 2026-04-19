@@ -40,11 +40,14 @@ class ProjectJobAssignment extends Model
         'scheduled_at',
         'source_assignment_id',
         'supersedes_assignment_id',
+        'coordinator_assignment_id',
         'start_time',
         'subcontractor_id',
         'proof_dispatcher_id',
         'job_type',
         'file_info',
+        'proof_completed_at',
+        'progress_cell_id',
     ];
 
     protected $casts = [
@@ -64,7 +67,10 @@ class ProjectJobAssignment extends Model
         'scheduled_at' => 'datetime',
         'source_assignment_id' => 'integer',
         'supersedes_assignment_id' => 'integer',
+        'coordinator_assignment_id' => 'integer',
         'file_info' => 'array',
+        'proof_completed_at' => 'datetime',
+        'progress_cell_id' => 'integer',
     ];
 
     protected $dates = [
@@ -165,6 +171,39 @@ class ProjectJobAssignment extends Model
     public function proofDispatcher()
     {
         return $this->belongsTo(ProofDispatcher::class, 'proof_dispatcher_id');
+    }
+
+    /**
+     * 紐づいている進行管理表セル
+     */
+    public function progressCell()
+    {
+        return $this->belongsTo(ProgressCell::class, 'progress_cell_id');
+    }
+
+    /**
+     * 校正済みかどうか
+     */
+    public function getIsProofCompletedAttribute(): bool
+    {
+        return $this->proof_completed_at !== null;
+    }
+
+    /**
+     * Coordinator→User リンク（pja100→pja101）の pja100 側
+     * 校正ジョブや JobBox「予定をセット」で自動作成される pja101 が pja100 を指す
+     */
+    public function coordinatorAssignment()
+    {
+        return $this->belongsTo(self::class, 'coordinator_assignment_id');
+    }
+
+    /**
+     * この Coordinator 割当（pja100）に紐づくユーザー側割当（pja101）一覧
+     */
+    public function linkedUserAssignments()
+    {
+        return $this->hasMany(self::class, 'coordinator_assignment_id');
     }
 
     /**

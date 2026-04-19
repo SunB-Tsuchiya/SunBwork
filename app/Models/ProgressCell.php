@@ -15,6 +15,8 @@ class ProgressCell extends Model
         'value_user_id',
         'value_subcontractor_id',
         'assignment_id',
+        'proof_assignment_id',
+        'cell_type',
     ];
 
     protected $casts = [
@@ -40,5 +42,10 @@ class ProgressCell extends Model
     public function assignment()
     {
         return $this->belongsTo(ProjectJobAssignment::class, 'assignment_id');
+    }
+
+    public function proofAssignment()
+    {
+        return $this->belongsTo(ProjectJobAssignment::class, 'proof_assignment_id');
     }
 }

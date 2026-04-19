@@ -59,7 +59,11 @@ function fmtDeadline(isoStr) {
                 </thead>
                 <tbody class="divide-y divide-gray-200">
                     <tr v-for="pr in proofRequests" :key="pr.id" class="hover:bg-gray-50">
-                        <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ pr.title }}</td>
+                        <td class="px-4 py-3 text-sm font-medium text-gray-900">
+                            <Link :href="route('user.proof_jobs.show', { proofRequest: pr.id })" class="text-pink-700 hover:underline">
+                                {{ pr.title }}
+                            </Link>
+                        </td>
                         <td class="px-4 py-3 text-sm text-gray-500">{{ pr.job_title ?? '—' }}</td>
                         <td class="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{{ fmtDeadline(pr.deadline) }}</td>
                         <td class="px-4 py-3">

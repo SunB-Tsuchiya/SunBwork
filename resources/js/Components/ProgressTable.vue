@@ -125,6 +125,8 @@
                 @job-link-open="emit('job-link-open', $event)"
                 @job-link-detail="emit('job-link-detail', $event)"
                 @complete-assignment="emit('complete-assignment', $event)"
+                @proof-request-open="emit('proof-request-open', $event)"
+                @proof-direct-complete="emit('proof-direct-complete', $event)"
               />
             </template>
           </tr>
@@ -154,7 +156,7 @@ const props = defineProps({
   authUserId: { type: [Number, String, null], default: null },
 });
 
-const emit = defineEmits(['cell-update', 'edit-row', 'delete-row', 'job-link-open', 'job-link-detail', 'complete-assignment']);
+const emit = defineEmits(['cell-update', 'edit-row', 'delete-row', 'job-link-open', 'job-link-detail', 'complete-assignment', 'proof-request-open', 'proof-direct-complete']);
 
 // ── 行ツリー展開（parent_id を使って表示順に並べる） ────────
 const displayRows = computed(() => {

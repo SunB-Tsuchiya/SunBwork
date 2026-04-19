@@ -17,6 +17,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -109,8 +110,8 @@ class ProofRequestController extends Controller
             'estimated_hours'   => $src?->estimated_hours ?? null,
             'amounts'           => $src?->amounts ?? null,
             'amounts_unit'      => $src?->amounts_unit ?? 'page',
-            'desired_end_date'  => $src?->desired_end_date
-                ? (is_string($src->desired_end_date) ? $src->desired_end_date : $src->desired_end_date->format('Y-m-d'))
+            'desired_end_date'  => $proofRequest->deadline
+                ? (is_string($proofRequest->deadline) ? substr($proofRequest->deadline, 0, 10) : $proofRequest->deadline->format('Y-m-d'))
                 : null,
             // department_id をセットすることで hasDepartment() が true になりドロップダウンが有効になる
             'company_id'        => $user->company_id,
@@ -200,6 +201,37 @@ class ProofRequestController extends Controller
                 'amounts_unit'        => $a['amounts_unit'] ?? null,
                 'status_id'           => 1,
             ]);
+
+            // 進行表セルとの双方向紐づけ
+            // ProofRequest.proof_cell_id が設定されている場合（進行表の校正セルから依頼された）
+            if ($proofRequest->proof_cell_id) {
+                // pja100（校正ジョブ）に校正セルを紐づけ
+                $assignment->update(['progress_cell_id' => $proofRequest->proof_cell_id]);
+                // 校正セルに proof_assignment_id を設定
+                \App\Models\ProgressCell::where('id', $proofRequest->proof_cell_id)
+                    ->update(['proof_assignment_id' => $assignment->id]);
+            }
+
+            // pja_operator（元の組版ジョブ）に progress_cell_id が未設定の場合、
+            // 同一行の組版セルを探して自動設定する
+            if ($proofRequest->project_job_assignment_id) {
+                $pjaOperator = ProjectJobAssignment::find($proofRequest->project_job_assignment_id);
+                if ($pjaOperator && ! $pjaOperator->progress_cell_id) {
+                    // 組版セル = 同一行で cell_type が typesetting_register のセル
+                    if ($proofRequest->proof_cell_id) {
+                        $proofCell = \App\Models\ProgressCell::find($proofRequest->proof_cell_id);
+                        if ($proofCell) {
+                            $typeCell = \App\Models\ProgressCell::where('row_id', $proofCell->row_id)
+                                ->where('cell_type', 'typesetting_register')
+                                ->whereNotNull('assignment_id')
+                                ->first();
+                            if ($typeCell) {
+                                $pjaOperator->update(['progress_cell_id' => $typeCell->id]);
+                            }
+                        }
+                    }
+                }
+            }
 
             // 校正依頼を受理済みに更新
             // 単発派遣の場合 proofreader_id は coordinator 自身（通知は不要）
@@ -331,7 +363,7 @@ class ProofRequestController extends Controller
         ] : null;
 
         // 割当ジョブに紐づくイベント（作業時間）を取得
-        // 校正員は pja100 を直接使わず source_assignment_id=pja100.id のマイジョブ（pja101）を作って
+        // 校正員は pja100 を直接使わず coordinator_assignment_id=pja100.id のマイジョブ（pja101）を作って
         // そちらに events を登録するため、連動するジョブの assignment_id も対象に含める
         $events = [];
         if ($assignment) {
@@ -340,7 +372,7 @@ class ProofRequestController extends Controller
 
             $linked = ProjectJobAssignment::whereColumn('sender_id', 'user_id')
                 ->where(function ($q) use ($assignment) {
-                    $q->where('source_assignment_id', $assignment->id)
+                    $q->where('coordinator_assignment_id', $assignment->id)
                       ->orWhere('supersedes_assignment_id', $assignment->id);
                 })
                 ->pluck('id');
@@ -350,15 +382,23 @@ class ProofRequestController extends Controller
             $events = Event::whereIn('project_job_assignment_id', $linkedIds)
                 ->orderBy('starts_at')
                 ->get()
-                ->map(fn($e) => [
-                    'id'                   => $e->id,
-                    'date'                 => $e->starts_at ? $e->starts_at->setTimezone('Asia/Tokyo')->toDateString() : null,
-                    'start_hour'           => $e->starts_at ? $e->starts_at->setTimezone('Asia/Tokyo')->format('H') : '00',
-                    'start_minute'         => $e->starts_at ? $e->starts_at->setTimezone('Asia/Tokyo')->format('i') : '00',
-                    'end_hour'             => $e->ends_at   ? $e->ends_at->setTimezone('Asia/Tokyo')->format('H')   : '00',
-                    'end_minute'           => $e->ends_at   ? $e->ends_at->setTimezone('Asia/Tokyo')->format('i')   : '00',
-                    'interruption_minutes' => $e->interruption_minutes ?? 0,
-                ])
+                ->map(function ($e) {
+                    $tz       = 'Asia/Tokyo';
+                    $rawStart = $e->getRawOriginal('starts_at');
+                    $rawEnd   = $e->getRawOriginal('ends_at');
+                    $start    = $rawStart ? Carbon::createFromFormat('Y-m-d H:i:s', $rawStart, 'UTC')->setTimezone($tz) : null;
+                    $end      = $rawEnd   ? Carbon::createFromFormat('Y-m-d H:i:s', $rawEnd,   'UTC')->setTimezone($tz) : null;
+                    return [
+                        'id'                   => $e->id,
+                        'user_id'              => $e->user_id,
+                        'date'                 => $start ? $start->toDateString() : null,
+                        'start_hour'           => $start ? $start->format('H') : '00',
+                        'start_minute'         => $start ? $start->format('i') : '00',
+                        'end_hour'             => $end   ? $end->format('H')   : '00',
+                        'end_minute'           => $end   ? $end->format('i')   : '00',
+                        'interruption_minutes' => $e->interruption_minutes ?? 0,
+                    ];
+                })
                 ->all();
         }
 
@@ -367,7 +407,7 @@ class ProofRequestController extends Controller
         if ($assignment) {
             $userHasSetSchedule = ProjectJobAssignment::whereColumn('sender_id', 'user_id')
                 ->where(function ($q) use ($assignment) {
-                    $q->where('source_assignment_id', $assignment->id)
+                    $q->where('coordinator_assignment_id', $assignment->id)
                       ->orWhere('supersedes_assignment_id', $assignment->id);
                 })
                 ->exists();
@@ -499,7 +539,7 @@ class ProofRequestController extends Controller
         if ($assignment) {
             $selfJob = ProjectJobAssignment::whereColumn('sender_id', 'user_id')
                 ->where(function ($q) use ($assignment) {
-                    $q->where('source_assignment_id', $assignment->id)
+                    $q->where('coordinator_assignment_id', $assignment->id)
                       ->orWhere('supersedes_assignment_id', $assignment->id);
                 })
                 ->latest()
@@ -511,11 +551,17 @@ class ProofRequestController extends Controller
                 $workSlots = Event::where('project_job_assignment_id', $selfJob->id)
                     ->orderBy('starts_at')
                     ->get()
-                    ->map(fn($e) => [
-                        'date'  => $e->starts_at ? $e->starts_at->setTimezone($tz)->format('Y年n月j日') : null,
-                        'start' => $e->starts_at ? $e->starts_at->setTimezone($tz)->format('H:i') : null,
-                        'end'   => $e->ends_at   ? $e->ends_at->setTimezone($tz)->format('H:i')   : null,
-                    ])
+                    ->map(function ($e) use ($tz) {
+                        $rawStart = $e->getRawOriginal('starts_at');
+                        $rawEnd   = $e->getRawOriginal('ends_at');
+                        $start    = $rawStart ? Carbon::createFromFormat('Y-m-d H:i:s', $rawStart, 'UTC')->setTimezone($tz) : null;
+                        $end      = $rawEnd   ? Carbon::createFromFormat('Y-m-d H:i:s', $rawEnd,   'UTC')->setTimezone($tz) : null;
+                        return [
+                            'date'  => $start ? $start->format('Y年n月j日') : null,
+                            'start' => $start ? $start->format('H:i') : null,
+                            'end'   => $end   ? $end->format('H:i')   : null,
+                        ];
+                    })
                     ->all();
 
                 $proofreaderSchedule = [
@@ -605,6 +651,13 @@ class ProofRequestController extends Controller
             'status'       => 'completed',
             'completed_at' => now(),
         ]);
+
+        // 元ジョブ（pja_operator）に校正済みマークを付与
+        if ($proofRequest->project_job_assignment_id) {
+            ProjectJobAssignment::where('id', $proofRequest->project_job_assignment_id)
+                ->whereNull('proof_completed_at')
+                ->update(['proof_completed_at' => now()]);
+        }
 
         // 依頼者への完了通知
         JobNotificationService::notifyProofCompleted(Auth::user(), $proofRequest->fresh());
@@ -715,7 +768,16 @@ class ProofRequestController extends Controller
             'title'                     => ['required', 'string', 'max:255'],
             'deadline'                  => ['required', 'date'],
             'note'                      => ['nullable', 'string', 'max:1000'],
+            'proof_cell_id'             => ['nullable', 'exists:progress_cells,id'],
         ]);
+
+        // 日付のみ（時間なし）で送信された場合は 17:30 JST をデフォルトにする
+        $rawDeadline = $request->input('deadline');
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $rawDeadline)) {
+            $data['deadline'] = Carbon::createFromFormat('Y-m-d H:i', $rawDeadline . ' 17:30', 'Asia/Tokyo')
+                ->utc()
+                ->format('Y-m-d H:i:s');
+        }
 
         $proofRequest = ProofRequest::create([
             ...$data,
@@ -854,7 +916,7 @@ class ProofRequestController extends Controller
             $selfJob = ProjectJobAssignment::whereColumn('sender_id', 'user_id')
                 ->where('user_id', $userId)
                 ->where(function ($q) use ($coordAssignment) {
-                    $q->where('source_assignment_id', $coordAssignment->id)
+                    $q->where('coordinator_assignment_id', $coordAssignment->id)
                       ->orWhere('supersedes_assignment_id', $coordAssignment->id);
                 })
                 ->latest()->first();
@@ -931,6 +993,13 @@ class ProofRequestController extends Controller
     {
         if (empty($slots)) return;
 
+        // Debug: log incoming slots for troubleshooting timezone/offset issues
+        try {
+            Log::info('saveWorkSlots invoked', ['proof_request_id' => $proofRequest->id ?? null, 'replace' => $replace, 'slots' => $slots]);
+        } catch (\Throwable $__logE) {
+            // ignore logging errors
+        }
+
         if ($replace) {
             ProofSchedule::where('proof_request_id', $proofRequest->id)->delete();
         }
@@ -945,17 +1014,17 @@ class ProofRequestController extends Controller
         if ($pja100) {
             $pja101 = ProjectJobAssignment::whereColumn('sender_id', 'user_id')
                 ->where(function ($q) use ($pja100) {
-                    $q->where('source_assignment_id', $pja100->id)
+                    $q->where('coordinator_assignment_id', $pja100->id)
                       ->orWhere('supersedes_assignment_id', $pja100->id);
                 })->latest()->first();
 
             if (! $pja101 && $proofRequest->proofreader_id) {
                 $pja101 = ProjectJobAssignment::create([
-                    'project_job_id'       => $proofRequest->project_job_id,
-                    'user_id'              => $proofRequest->proofreader_id,
-                    'sender_id'            => $proofRequest->proofreader_id,
-                    'source_assignment_id' => $pja100->id,
-                    'job_type'             => 'proof',
+                    'project_job_id'            => $proofRequest->project_job_id,
+                    'user_id'                   => $proofRequest->proofreader_id,
+                    'sender_id'                 => $proofRequest->proofreader_id,
+                    'coordinator_assignment_id' => $pja100->id,
+                    'job_type'                  => 'proof',
                     'title'                => $proofRequest->title,
                     'scheduled'            => true,
                     'scheduled_at'         => now(),
@@ -979,24 +1048,38 @@ class ProofRequestController extends Controller
             $startsAt = \Carbon\Carbon::parse("{$date} {$sH}:{$sM}:00", 'Asia/Tokyo')->utc();
             $endsAt   = \Carbon\Carbon::parse("{$date} {$eH}:{$eM}:00", 'Asia/Tokyo')->utc();
 
-            ProofSchedule::create([
-                'proof_request_id' => $proofRequest->id,
-                'user_id'          => $proofRequest->proofreader_id,
-                'starts_at'        => $startsAt,
-                'ends_at'          => $endsAt,
-            ]);
+            try {
+                Log::info('saveWorkSlots computed times', ['date' => $date, 'start_local' => "{$date} {$sH}:{$sM}:00", 'end_local' => "{$date} {$eH}:{$eM}:00", 'starts_at_utc' => $startsAt->toDateTimeString(), 'ends_at_utc' => $endsAt->toDateTimeString(), 'pja100_id' => $pja100->id ?? null]);
+            } catch (\Throwable $__logE) {}
+
+            try {
+                $ps = ProofSchedule::create([
+                    'proof_request_id' => $proofRequest->id,
+                    'user_id'          => $proofRequest->proofreader_id,
+                    'starts_at'        => $startsAt,
+                    'ends_at'          => $endsAt,
+                ]);
+                Log::info('saveWorkSlots created ProofSchedule', ['proof_schedule_id' => $ps->id ?? null, 'proof_request_id' => $proofRequest->id, 'user_id' => $proofRequest->proofreader_id]);
+            } catch (\Throwable $__e) {
+                Log::warning('saveWorkSlots: failed to create ProofSchedule', ['error' => $__e->getMessage(), 'proof_request_id' => $proofRequest->id]);
+            }
 
             if ($pja101) {
-                Event::create([
-                    'user_id'                   => $proofRequest->proofreader_id,
-                    'project_job_assignment_id' => $pja101->id,
-                    'date'                      => $date,
-                    'start'                     => "{$date} {$sH}:{$sM}:00",
-                    'end'                       => "{$date} {$eH}:{$eM}:00",
-                    'starts_at'                 => $startsAt,
-                    'ends_at'                   => $endsAt,
-                    'title'                     => $proofRequest->title,
-                ]);
+                try {
+                    $ev = Event::create([
+                        'user_id'                   => $proofRequest->proofreader_id,
+                        'project_job_assignment_id' => $pja101->id,
+                        'date'                      => $date,
+                        'start'                     => "{$date} {$sH}:{$sM}:00",
+                        'end'                       => "{$date} {$eH}:{$eM}:00",
+                        'starts_at'                 => $startsAt,
+                        'ends_at'                   => $endsAt,
+                        'title'                     => $proofRequest->title,
+                    ]);
+                    Log::info('saveWorkSlots created Event', ['event_id' => $ev->id ?? null, 'pja101_id' => $pja101->id, 'project_job_assignment_id' => $pja101->id]);
+                } catch (\Throwable $__e) {
+                    Log::warning('saveWorkSlots: failed to create Event', ['error' => $__e->getMessage(), 'pja101_id' => $pja101->id ?? null]);
+                }
             }
         }
     }

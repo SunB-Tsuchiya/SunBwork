@@ -49,6 +49,98 @@ class CalendarController extends Controller
     }
 
     // ──────────────────────────────────────────────────────
+    //  タイムラインピッカー用データ（アサインページ向け）
+    // ──────────────────────────────────────────────────────
+
+    public function pickerData(Request $request): JsonResponse
+    {
+        $date   = $request->query('date', now()->setTimezone('Asia/Tokyo')->toDateString());
+        $userId = $request->query('user_id');
+
+        // メンバー一覧（user_id 指定なら1人、なければ校正チーム全員）
+        if ($userId) {
+            $members = User::where('id', $userId)
+                ->get(['id', 'name'])
+                ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])
+                ->toArray();
+        } else {
+            $teamUserIds = ProofTeamMember::pluck('user_id');
+            $members = User::whereIn('id', $teamUserIds)
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])
+                ->toArray();
+        }
+
+        // 既存 ProofSchedule（日付フィルタ済み）
+        $schedules = $this->getSchedulesForDate($date);
+        if ($userId) {
+            $schedules = array_values(
+                array_filter($schedules, fn ($s) => (string) ($s['user_id'] ?? '') === (string) $userId)
+            );
+        }
+
+        // 通常イベント（コンテキスト表示用 — 色のみ、タイトルなし）
+        $memberIds = array_column($members, 'id');
+        $dayStart  = Carbon::parse($date . ' 00:00:00', 'Asia/Tokyo')->utc();
+        $dayEnd    = Carbon::parse($date . ' 23:59:59', 'Asia/Tokyo')->utc();
+
+        $eventModels = Event::whereIn('user_id', $memberIds)
+            ->where(function ($q) use ($dayStart, $dayEnd) {
+                $q->whereBetween('starts_at', [$dayStart, $dayEnd])
+                  ->orWhereBetween('ends_at',   [$dayStart, $dayEnd])
+                  ->orWhere(fn ($q2) => $q2->where('starts_at', '<=', $dayStart)->where('ends_at', '>=', $dayEnd));
+            })
+            ->get();
+
+        // pja ID を一括取得してN+1回避
+        $pjaIds = $eventModels->pluck('project_job_assignment_id')->filter()->unique()->values()->all();
+
+        $senderMap = $pjaIds
+            ? ProjectJobAssignment::whereIn('id', $pjaIds)->pluck('sender_id', 'id')->toArray()
+            : [];
+
+        $progressLinkedIds = $pjaIds
+            ? \App\Models\ProgressCell::whereIn('assignment_id', $pjaIds)
+                ->pluck('assignment_id')
+                ->map(fn ($v) => (int) $v)
+                ->all()
+            : [];
+
+        $contextEvents = $eventModels->map(function ($e) use ($senderMap, $progressLinkedIds) {
+            $pjaId = $e->project_job_assignment_id;
+            if (! $pjaId) {
+                $color = '#1fb6b3'; // 予定（ティール）
+            } elseif (in_array((int) $pjaId, $progressLinkedIds, true)) {
+                $color = '#7C3AED'; // 進行表から（紫）
+            } elseif (
+                isset($senderMap[$pjaId]) &&
+                $senderMap[$pjaId] !== null &&
+                (int) $senderMap[$pjaId] === (int) $e->user_id
+            ) {
+                $color = '#4F46E5'; // 独自（インディゴ）
+            } else {
+                $color = '#059669'; // Coordinator割当（グリーン）
+            }
+
+            return [
+                'id'        => $e->id,
+                'user_id'   => $e->user_id,
+                'starts_at' => $this->toUtcIso($e->getRawOriginal('starts_at')),
+                'ends_at'   => $this->toUtcIso($e->getRawOriginal('ends_at')),
+                'color'     => $color,
+            ];
+        })->all();
+
+        return response()->json([
+            'members'   => $members,
+            'schedules' => $schedules,
+            'events'    => $contextEvents,
+            'date'      => $date,
+        ]);
+    }
+
+    // ──────────────────────────────────────────────────────
     //  スケジュール作成
     // ──────────────────────────────────────────────────────
 
@@ -63,6 +155,13 @@ class CalendarController extends Controller
 
         $schedule = ProofSchedule::create($data);
         $schedule->load(['proofRequest.projectJob', 'user']);
+
+        // ユーザーの Event にも反映
+        $event = $this->syncEventFromSchedule($schedule);
+        if ($event) {
+            $schedule->update(['event_id' => $event->id]);
+            $schedule->event_id = $event->id;
+        }
 
         return response()->json($this->formatSchedule($schedule), 201);
     }
@@ -82,6 +181,29 @@ class CalendarController extends Controller
         $proofSchedule->update($data);
         $proofSchedule->load(['proofRequest.projectJob', 'user']);
 
+        // 対応する Event を更新（event_id が紐づいていれば）
+        if ($proofSchedule->event_id) {
+            $event = Event::find($proofSchedule->event_id);
+            if ($event) {
+                $startsAt = \Carbon\Carbon::parse($proofSchedule->starts_at);
+                $endsAt   = \Carbon\Carbon::parse($proofSchedule->ends_at);
+                $jstStart = $startsAt->copy()->setTimezone('Asia/Tokyo');
+                $event->update([
+                    'date'      => $jstStart->toDateString(),
+                    'start'     => $jstStart->format('Y-m-d H:i:s'),
+                    'end'       => $endsAt->copy()->setTimezone('Asia/Tokyo')->format('Y-m-d H:i:s'),
+                    'starts_at' => $startsAt,
+                    'ends_at'   => $endsAt,
+                ]);
+            }
+        } else {
+            // event_id が未設定の場合は新規作成を試みる
+            $event = $this->syncEventFromSchedule($proofSchedule);
+            if ($event) {
+                $proofSchedule->update(['event_id' => $event->id]);
+            }
+        }
+
         return response()->json($this->formatSchedule($proofSchedule));
     }
 
@@ -91,6 +213,11 @@ class CalendarController extends Controller
 
     public function destroy(ProofSchedule $proofSchedule): JsonResponse
     {
+        // 対応する Event も削除
+        if ($proofSchedule->event_id) {
+            Event::find($proofSchedule->event_id)?->delete();
+        }
+
         $proofSchedule->delete();
         return response()->json(['ok' => true]);
     }
@@ -154,7 +281,7 @@ class CalendarController extends Controller
             // 自己割当（pja101）を特定
             $selfJob = ProjectJobAssignment::whereColumn('sender_id', 'user_id')
                 ->where(function ($q) use ($coordAssignment) {
-                    $q->where('source_assignment_id', $coordAssignment->id)
+                    $q->where('coordinator_assignment_id', $coordAssignment->id)
                       ->orWhere('supersedes_assignment_id', $coordAssignment->id);
                 })
                 ->latest()
@@ -247,5 +374,59 @@ class CalendarController extends Controller
             'user_name'        => $s->user?->name ?? '—',
             'event_id'         => $s->event_id,
         ];
+    }
+
+    /**
+     * ProofSchedule からユーザーの Event を作成 or 返す
+     * pja100 → pja101（なければ作成）→ Event::create
+     */
+    private function syncEventFromSchedule(ProofSchedule $schedule): ?Event
+    {
+        $proofRequest = ProofRequest::find($schedule->proof_request_id);
+        if (! $proofRequest || ! $proofRequest->proofreader_id || ! $proofRequest->proof_coordinator_id) {
+            return null;
+        }
+
+        $pja100 = ProjectJobAssignment::where('project_job_id', $proofRequest->project_job_id)
+            ->where('user_id', $proofRequest->proofreader_id)
+            ->where('sender_id', $proofRequest->proof_coordinator_id)
+            ->latest()->first();
+
+        if (! $pja100) return null;
+
+        // pja101 を取得または作成
+        $pja101 = ProjectJobAssignment::whereColumn('sender_id', 'user_id')
+            ->where(function ($q) use ($pja100) {
+                $q->where('coordinator_assignment_id', $pja100->id)
+                  ->orWhere('supersedes_assignment_id', $pja100->id);
+            })->latest()->first();
+
+        if (! $pja101) {
+            $pja101 = ProjectJobAssignment::create([
+                'project_job_id'            => $proofRequest->project_job_id,
+                'user_id'                   => $proofRequest->proofreader_id,
+                'sender_id'                 => $proofRequest->proofreader_id,
+                'coordinator_assignment_id' => $pja100->id,
+                'job_type'                  => 'proof',
+                'title'                => $proofRequest->title,
+                'scheduled'            => true,
+                'scheduled_at'         => now(),
+            ]);
+        }
+
+        $startsAt = \Carbon\Carbon::parse($schedule->starts_at);
+        $endsAt   = \Carbon\Carbon::parse($schedule->ends_at);
+        $jstStart = $startsAt->copy()->setTimezone('Asia/Tokyo');
+
+        return Event::create([
+            'user_id'                   => $proofRequest->proofreader_id,
+            'project_job_assignment_id' => $pja101->id,
+            'date'                      => $jstStart->toDateString(),
+            'start'                     => $jstStart->format('Y-m-d H:i:s'),
+            'end'                       => $endsAt->copy()->setTimezone('Asia/Tokyo')->format('Y-m-d H:i:s'),
+            'starts_at'                 => $startsAt,
+            'ends_at'                   => $endsAt,
+            'title'                     => $proofRequest->title,
+        ]);
     }
 }

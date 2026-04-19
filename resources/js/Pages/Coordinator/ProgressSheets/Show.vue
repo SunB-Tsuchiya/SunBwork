@@ -49,6 +49,16 @@
             テンプレートとして登録
           </button>
 
+          <!-- セット方式で初期化 -->
+          <button
+            v-if="!editMode"
+            type="button"
+            class="rounded border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
+            @click="v2InitRounds = [{ label: '初校' }]; showV2InitModal = true"
+          >
+            セット方式で初期化
+          </button>
+
           <!-- シート削除 -->
           <button
             type="button"
@@ -292,6 +302,8 @@
           @job-link-open="openJobLinkModal"
           @job-link-detail="openJobLinkDetail"
           @complete-assignment="onCompleteAssignmentFromCell"
+          @proof-request-open="onProofRequestOpen"
+          @proof-direct-complete="onProofDirectComplete"
         />
       </div>
     </div>
@@ -459,12 +471,62 @@
       </div>
     </div>
 
+    <!-- ── セット方式 初期化モーダル ────────────────────── -->
+    <div
+      v-if="showV2InitModal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      @click.self="showV2InitModal = false"
+    >
+      <div class="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
+        <h3 class="mb-2 text-lg font-semibold text-gray-800">セット方式で初期化</h3>
+        <p class="mb-3 text-xs text-gray-500">
+          「組版担当・登録欄 + 校正担当・登録欄」のペアが校ごとに生成されます。<br />
+          <span class="font-medium text-orange-600">※ 既存の列定義は上書きされます。</span>
+        </p>
+        <div class="space-y-2">
+          <div v-for="(round, idx) in v2InitRounds" :key="idx" class="flex items-center gap-2">
+            <span class="w-12 flex-shrink-0 text-xs text-gray-500">第{{ idx + 1 }}校</span>
+            <input
+              v-model="round.label"
+              type="text"
+              class="flex-1 rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-indigo-400 focus:outline-none"
+              :placeholder="idx === 0 ? '初校' : idx === 1 ? '再校' : '三校'"
+            />
+            <button
+              v-if="v2InitRounds.length > 1"
+              type="button"
+              class="text-xs text-red-400 hover:text-red-600"
+              @click="v2InitRounds.splice(idx, 1)"
+            >✕</button>
+          </div>
+          <button
+            type="button"
+            class="text-xs font-medium text-indigo-600 hover:underline"
+            @click="v2InitRounds.push({ label: '' })"
+          >＋ 校を追加</button>
+        </div>
+        <div class="mt-5 flex justify-end gap-3">
+          <button
+            type="button"
+            class="rounded border border-gray-300 px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+            @click="showV2InitModal = false"
+          >キャンセル</button>
+          <button
+            type="button"
+            class="rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
+            @click="applyV2Init"
+          >適用</button>
+        </div>
+      </div>
+    </div>
+
     <ProofRequestModal
       :show="showProofModal"
       :initial-title="proofTargetAssignment?.title || projectJob?.title || ''"
       :project-job-assignment-id="proofTargetAssignment?.id || null"
       :project-job-id="projectJob?.id || null"
-      @close="showProofModal = false; proofTargetAssignment = null"
+      :proof-cell-id="proofTargetCellId"
+      @close="showProofModal = false; proofTargetAssignment = null; proofTargetCellId = null"
     />
   </AppLayout>
 </template>
@@ -519,8 +581,11 @@ onUnmounted(() => {
 const editMode = ref(props.canEdit && (props.sheet.column_config?.length ?? 0) === 0);
 const localSheetName = ref(props.sheet.name ?? '');
 const showRegisterModal = ref(false);
+const showV2InitModal = ref(false);
+const v2InitRounds = ref([{ label: '初校' }]);
 const showProofModal = ref(false);
 const proofTargetAssignment = ref(null);
+const proofTargetCellId = ref(null);
 const registerTemplateName = ref('');
 const newRowLabel = ref('');
 const importText = ref('');
@@ -879,6 +944,35 @@ async function onCompleteAssignmentFromCell({ assignmentId }) {
   } catch { /* ignore */ }
 }
 
+/** 進行表の proof_user セルから「校正管理へ依頼」選択時 */
+function onProofRequestOpen({ rowId, colKey }) {
+  // proof_user セルの id を特定して ProofRequestModal に渡す
+  const cell = localCells.value.find((c) => c.row_id === rowId && c.col_key === colKey);
+  proofTargetCellId.value = cell?.id ?? null;
+  proofTargetAssignment.value = null;
+  showProofModal.value = true;
+}
+
+/** joblink セルの「校了にする」ボタン */
+async function onProofDirectComplete({ assignmentId }) {
+  if (!assignmentId) return;
+  try {
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    const res = await fetch(route('coordinator.progress_sheets.assignments.proof_complete', { assignment: assignmentId }), {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+    });
+    if (res.ok) {
+      // ローカルセルの assignment_proof_completed を更新
+      const idx = localCells.value.findIndex((c) => c.assignment_id === assignmentId);
+      if (idx >= 0) {
+        localCells.value.splice(idx, 1, { ...localCells.value[idx], assignment_proof_completed: true });
+      }
+    }
+  } catch { /* ignore */ }
+}
+
 // ローカルコピー
 const localColumnConfig = ref(JSON.parse(JSON.stringify(props.sheet.column_config ?? [])));
 const localRows = ref(props.rows.map((r) => ({ ...r })));
@@ -922,6 +1016,55 @@ function saveColumnConfig() {
       preserveScroll: true,
       onSuccess: () => { editMode.value = false; },
     }
+  );
+}
+
+function generateV2ColumnConfig(rounds) {
+  return rounds
+    .filter((r) => r.label.trim())
+    .map((round, idx) => {
+      const key = 'round' + (idx + 1);
+      return {
+        key,
+        label: round.label.trim(),
+        type: 'text',
+        children: [
+          {
+            key: key + '_kumihan',
+            label: '組版',
+            type: 'text',
+            children: [
+              { key: key + '_kumihan_tanto',  label: '担当',   type: 'user' },
+              { key: key + '_kumihan_toroku', label: '登録欄', type: 'joblink' },
+            ],
+          },
+          {
+            key: key + '_kosei',
+            label: '校正',
+            type: 'text',
+            children: [
+              { key: key + '_kosei_tanto',  label: '担当',   type: 'proof_user' },
+              { key: key + '_kosei_toroku', label: '登録欄', type: 'joblink' },
+            ],
+          },
+        ],
+      };
+    });
+}
+
+function applyV2Init() {
+  const config = generateV2ColumnConfig(v2InitRounds.value);
+  if (config.length === 0) {
+    alert('少なくとも1つの校を入力してください。');
+    return;
+  }
+  localColumnConfig.value = config;
+  showV2InitModal.value = false;
+  editMode.value = false;
+  router.put(
+    route('coordinator.progress_sheets.update', { sheet: props.sheet.id }),
+    { name: localSheetName.value, column_config: config },
+    { preserveScroll: true }
   );
 }
 

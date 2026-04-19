@@ -142,7 +142,7 @@
 
                     <Link
                         v-else-if="!(assignment.scheduled || assignment.scheduled_at)"
-                        :href="typeof route === 'function' ? route('events.create', { job: assignment.id }) : `/events/create?job=${assignment.id}`"
+                        :href="typeof route === 'function' ? route('events.create_job', { job: assignment.id }) : `/events/create-job?job=${assignment.id}`"
                         class="inline-flex items-center rounded bg-blue-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-600"
                     >
                         予定をセット
@@ -175,6 +175,15 @@
                 >
                     校正依頼
                 </button>
+
+                <!-- 進行表に紐づける（Coordinator/Admin のみ） -->
+                <button
+                    v-if="canLinkCell && assignment?.id"
+                    @click="showLinkCellModal = true"
+                    class="rounded border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
+                >
+                    進行表に紐づける
+                </button>
                 <span
                     v-else-if="!isAssignmentCompleted && proofRequested"
                     class="rounded border border-gray-300 bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-400 cursor-not-allowed"
@@ -191,12 +200,20 @@
             :project-job-id="projectJob?.id || null"
             @close="showProofModal = false"
         />
+
+        <LinkProgressCellModal
+            :show="showLinkCellModal"
+            :assignment-id="assignment?.id ?? null"
+            @close="showLinkCellModal = false"
+            @linked="showLinkCellModal = false"
+        />
     </AppLayout>
 </template>
 
 <script setup>
 import AssignmentDetailCard from '@/Components/AssignmentDetailCard.vue';
 import FileInfoDisplay from '@/Components/FileInfoDisplay.vue';
+import LinkProgressCellModal from '@/Components/LinkProgressCellModal.vue';
 import ProofRequestModal from '@/Components/ProofRequestModal.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
@@ -212,6 +229,12 @@ const { projectJob, assignment, canDelete, linkedProgressCellCount, proofRequest
 const page = usePage();
 
 const showProofModal = ref(false);
+const showLinkCellModal = ref(false);
+
+// coordinator / admin のみ紐づけボタンを表示
+const canLinkCell = computed(() =>
+    ['admin', 'superadmin', 'coordinator', 'clerk'].includes(page.props.auth?.user?.user_role ?? '')
+);
 
 const isAssignee = computed(() => {
     try {

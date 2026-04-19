@@ -40,10 +40,7 @@
                             <th class="cursor-pointer border px-4 py-2" @click.prevent="changeSort('estimated_hours')">
                                 見積時間 <SortIcon :active="sortBy === 'estimated_hours'" :dir="sortDir" />
                             </th>
-                            <th class="border px-4 py-2">依頼</th>
-                            <th class="cursor-pointer border px-4 py-2" @click.prevent="changeSort('assigned')">
-                                Status <SortIcon :active="sortBy === 'assigned'" :dir="sortDir" />
-                            </th>
+                            <!-- 依頼・ステータス列は非表示化 -->
                         </tr>
                     </thead>
                     <tbody>
@@ -52,7 +49,9 @@
                                 {{ formatDate(a.created_at) }}
                             </td>
                             <td class="border px-4 py-2">
-                                <div class="font-semibold">{{ a.title }}</div>
+                                <div class="font-semibold">
+                                    <span v-if="a.proof_completed_at" class="mr-1 inline-flex items-center rounded-full bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">校了</span>{{ a.title }}
+                                </div>
                                 <div class="text-sm text-gray-600">{{ projectJob.client?.name || '-' }}</div>
                             </td>
                             <td class="border px-4 py-2">
@@ -74,16 +73,7 @@
                                 </span>
                             </td>
                             <td class="border px-4 py-2">{{ formatEstimatedHours(a.estimated_hours) }}</td>
-                            <td class="border px-4 py-2">
-                                <button
-                                    :disabled="a.assigned"
-                                    @click.stop.prevent="sendRequest(a)"
-                                    :class="['rounded px-3 py-1 text-white', a.assigned ? 'cursor-not-allowed bg-gray-400' : 'bg-blue-500']"
-                                >
-                                    {{ a.assigned ? '発信済み' : '発信' }}
-                                </button>
-                            </td>
-                            <td class="border px-4 py-2">{{ statusText(a) }}</td>
+                            <!-- 依頼・ステータス列は非表示 -->
                         </tr>
                     </tbody>
                 </table>
