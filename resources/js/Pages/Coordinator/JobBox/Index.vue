@@ -453,6 +453,14 @@ function getUnifiedStatus(m) {
         // 優先順位: 完了 > セット済み > 確認済み > 未読
         if (statusKey === 'completed' || Boolean(jam.completed) || Boolean(assignment.completed)) return '完了';
         if (statusKey === 'scheduled' || Boolean(jam.scheduled) || Boolean(assignment.scheduled) || Boolean(assignment.scheduled_at)) return 'セット';
+        
+        // 独自ジョブ（自分で自分に振るジョブ）の場合は「セット」として扱う
+        const senderId = jam.sender_id || assignment.sender_id;
+        const userId = assignment.user_id;
+        if (senderId && userId && Number(senderId) === Number(userId)) {
+            return 'セット';
+        }
+        
         const readAt = jam.read_at || assignment.read_at || null;
         if (statusKey === 'confirmed' || readAt || Boolean(jam.accepted) || Boolean(assignment.accepted)) return '確認済み';
         return '未読';
