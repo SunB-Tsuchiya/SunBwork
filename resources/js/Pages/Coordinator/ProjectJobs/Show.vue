@@ -49,6 +49,11 @@
                     >編集</button>
                     <button
                         type="button"
+                        class="rounded bg-cyan-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-cyan-700"
+                        @click="goMemberSchedule"
+                    >メンバー予定表</button>
+                    <button
+                        type="button"
                         :class="job.completed
                             ? 'rounded bg-gray-300 px-4 py-1.5 text-sm font-medium text-gray-400 cursor-not-allowed'
                             : 'rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700'"
@@ -160,19 +165,63 @@
                         >{{ hasMembers ? '編集' : '登録' }}</button>
                     </div>
 
-                    <div v-if="hasMembers" class="flex flex-wrap gap-2">
-                        <div
-                            v-for="m in members"
-                            :key="m.id"
-                            class="flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm"
-                        >
-                            <span class="inline-block h-2 w-2 rounded-full bg-green-400"></span>
-                            <span class="font-medium text-gray-800">
-                                {{ m.user ? m.user.name : '（ユーザー情報なし）' }}
+                    <div class="space-y-2">
+                        <!-- リーダー -->
+                        <div v-if="job.user" class="flex items-center gap-2 text-sm">
+                            <span class="w-24 shrink-0 text-xs font-semibold text-yellow-700">リーダー</span>
+                            <span class="flex items-center gap-1.5 rounded-full border border-yellow-200 bg-yellow-50 px-3 py-1 text-sm font-medium text-gray-800">
+                                <span class="inline-block h-2 w-2 rounded-full bg-yellow-400"></span>
+                                {{ job.user.name }}
                             </span>
                         </div>
+
+                        <!-- サブリーダー（副Coordinator） -->
+                        <div v-if="subCoordinators.length > 0" class="flex items-start gap-2 text-sm">
+                            <span class="w-24 shrink-0 text-xs font-semibold text-orange-700">サブリーダー</span>
+                            <div class="flex flex-wrap gap-2">
+                                <span
+                                    v-for="c in subCoordinators"
+                                    :key="c.id"
+                                    class="flex items-center gap-1.5 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-sm font-medium text-gray-800"
+                                >
+                                    <span class="inline-block h-2 w-2 rounded-full bg-orange-400"></span>
+                                    {{ c.name }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Coordinator メンバー -->
+                        <div v-if="coordinatorMembers.length > 0" class="flex items-start gap-2 text-sm">
+                            <span class="w-24 shrink-0 text-xs font-semibold text-indigo-700">Coordinator</span>
+                            <div class="flex flex-wrap gap-2">
+                                <span
+                                    v-for="m in coordinatorMembers"
+                                    :key="m.id"
+                                    class="flex items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-sm font-medium text-gray-800"
+                                >
+                                    <span class="inline-block h-2 w-2 rounded-full bg-indigo-400"></span>
+                                    {{ m.user ? m.user.name : '（ユーザー情報なし）' }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- User メンバー -->
+                        <div v-if="userMembers.length > 0" class="flex items-start gap-2 text-sm">
+                            <span class="w-24 shrink-0 text-xs font-semibold text-green-700">User</span>
+                            <div class="flex flex-wrap gap-2">
+                                <span
+                                    v-for="m in userMembers"
+                                    :key="m.id"
+                                    class="flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-sm font-medium text-gray-800"
+                                >
+                                    <span class="inline-block h-2 w-2 rounded-full bg-green-400"></span>
+                                    {{ m.user ? m.user.name : '（ユーザー情報なし）' }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <p v-if="!job.user && !subCoordinators.length && !coordinatorMembers.length && !userMembers.length" class="text-sm text-gray-400">メンバー未登録</p>
                     </div>
-                    <p v-else class="text-sm text-gray-400">メンバー未登録</p>
                 </section>
 
                 <!-- ── 進行管理表セクション ──────────────────── -->
@@ -539,6 +588,28 @@ const members   = page.props.members || [];
 const hasMembers = computed(() => Array.isArray(members) && members.length > 0);
 const subCoordinators = computed(() => page.props.subCoordinators || []);
 
+// リーダー・サブリーダーを除いた通常メンバー
+const regularMembers = computed(() => {
+    const leaderUserId   = job.user_id ?? null;
+    const subCoIds       = new Set(subCoordinators.value.map(c => c.id));
+    return members.filter(m => {
+        if (!m.user) return true;
+        if (leaderUserId && m.user.id === leaderUserId) return false;
+        if (subCoIds.has(m.user.id)) return false;
+        return true;
+    });
+});
+
+// coordinator ロールのメンバー（リーダー・サブリーダーを除く）
+const coordinatorMembers = computed(() =>
+    regularMembers.value.filter(m => m.user?.user_role === 'coordinator' || m.user?.user_role === 'clerk')
+);
+
+// user ロールのメンバー（coordinator以外）
+const userMembers = computed(() =>
+    regularMembers.value.filter(m => m.user?.user_role !== 'coordinator' && m.user?.user_role !== 'clerk')
+);
+
 // Confirm prompt after initial creation
 onMounted(() => {
     const flags        = page.props.registerFlags || [];
@@ -553,6 +624,17 @@ onMounted(() => {
 });
 
 // ── Navigation helpers ────────────────────────────────────────────────────
+function goMemberSchedule() {
+    const authUser = page.props.auth?.user;
+    const isLeader = authUser && (job.user_id === authUser.id);
+    const isSubCo  = authUser && subCoordinators.value.some(c => c.id === authUser.id);
+    if (!isLeader && !isSubCo) {
+        alert('このページはリーダーと副リーダーのみ閲覧できます。');
+        return;
+    }
+    router.visit(route('coordinator.project_jobs.member_schedule', { projectJob: job.id }));
+}
+
 function goSchedule() {
     const id = job.id;
     if (id) router.visit(route('coordinator.project_jobs.schedule', { projectJob: id }));
