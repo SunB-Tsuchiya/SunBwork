@@ -17,6 +17,8 @@ return new class extends Migration
         // 自己割当（sender_id = user_id）かつ source_assignment_id が
         // Coordinator 割当（sender_id ≠ user_id）を指しているレコードを移行
         // SQLite は UPDATE...JOIN 非対応のためサブクエリ方式で統一
+        // MySQL では UPDATE対象テーブルをサブクエリのFROMに直接使えないため
+        // 二重サブクエリでラップして回避（derived table trick）
         DB::statement('
             UPDATE project_job_assignments
             SET coordinator_assignment_id = source_assignment_id,
@@ -24,8 +26,10 @@ return new class extends Migration
             WHERE sender_id = user_id
               AND source_assignment_id IS NOT NULL
               AND source_assignment_id IN (
-                  SELECT id FROM project_job_assignments
-                  WHERE sender_id != user_id
+                  SELECT id FROM (
+                      SELECT id FROM project_job_assignments
+                      WHERE sender_id != user_id
+                  ) AS _coordinator_ids
               )
         ');
     }
@@ -40,8 +44,10 @@ return new class extends Migration
             WHERE sender_id = user_id
               AND coordinator_assignment_id IS NOT NULL
               AND coordinator_assignment_id IN (
-                  SELECT id FROM project_job_assignments
-                  WHERE sender_id != user_id
+                  SELECT id FROM (
+                      SELECT id FROM project_job_assignments
+                      WHERE sender_id != user_id
+                  ) AS _coordinator_ids
               )
         ');
     }

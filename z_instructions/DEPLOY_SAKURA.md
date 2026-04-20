@@ -90,13 +90,14 @@ npm run build
 ---
 
 ## 6. ユーザーへ伝えるメッセージ（コピペ用）
+### sshの指示は可能ならワンライナーで表示。
 
 ```
 【あなたの操作が必要です】
 
 1. git push origin main
 
-2. さくら SSH でデプロイ:
+2. さくら SSH でデプロイ:　できればワインラインで。
    cd ~/SunBWork
    git pull
    php artisan migrate          ← マイグレーションがない場合は省略可

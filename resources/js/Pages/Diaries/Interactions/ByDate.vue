@@ -30,6 +30,12 @@ const serverUnread = computed(() =>
     Boolean(props.filters && (props.filters.unread === 1 || props.filters.unread === '1' || props.filters.unread === true)),
 );
 
+function routeForIndex(date) {
+    const prefix = props.routePrefix || 'diaries';
+    if (prefix === 'diaries') return 'diaryinteractions.interactions.index';
+    return `${prefix}.diaryinteractions.index`;
+}
+
 function markReadAllRoute() {
     const prefix = props.routePrefix || 'diaries';
     if (prefix === 'diaries') return 'diaryinteractions.mark_read_all';
