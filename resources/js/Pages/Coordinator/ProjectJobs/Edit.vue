@@ -259,7 +259,18 @@ async function uncomplete() {
     }
 }
 function goSchedule() {
-    router.visit(route('coordinator.project_jobs.schedule', { projectJob: props.job.id }));
+    // プロジェクトIDの存在確認とエラーハンドリングを追加
+    if (!props.job?.id) {
+        alert('プロジェクトIDが取得できません');
+        return;
+    }
+    
+    try {
+        router.visit(route('coordinator.project_schedules.calendar', { project_job_id: props.job.id }));
+    } catch (error) {
+        console.error('スケジュール画面への遷移でエラーが発生しました:', error);
+        alert('スケジュール画面への遷移でエラーが発生しました');
+    }
 }
 function goProjectTeammember() {
     // If this job already has teammember info, pass selected_user_ids so the Create page

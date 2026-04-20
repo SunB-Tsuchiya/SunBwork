@@ -136,14 +136,8 @@
                             <button
                                 type="button"
                                 class="rounded border border-blue-300 px-3 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50"
-                                @click="goSchedule"
-                            >{{ hasScheduleFlag ? '編集' : '登録' }}</button>
-                            <button
-                                v-if="schedules.length > 0"
-                                type="button"
-                                class="rounded border border-gray-300 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
                                 @click="goScheduleCalendar"
-                            >カレンダー</button>
+                            >{{ hasScheduleFlag ? 'カレンダーで編集' : 'カレンダーで登録' }}</button>
                         </div>
                     </div>
 
@@ -517,16 +511,6 @@
             <!-- 作成方式の選択 -->
             <div class="mt-4 space-y-2">
                 <label class="flex cursor-pointer items-center gap-2 rounded border px-3 py-2 text-sm"
-                    :class="!newSheetUseV2 ? 'border-indigo-300 bg-indigo-50' : 'border-gray-200 hover:bg-gray-50'"
-                    @click="newSheetUseV2 = false"
-                >
-                    <input type="radio" :checked="!newSheetUseV2" class="h-4 w-4 text-indigo-600" />
-                    <div>
-                        <div class="font-medium text-gray-700">テンプレートから作成</div>
-                        <div class="text-xs text-gray-400">保存済みテンプレートまたは空のシートで作成</div>
-                    </div>
-                </label>
-                <label class="flex cursor-pointer items-center gap-2 rounded border px-3 py-2 text-sm"
                     :class="newSheetUseV2 ? 'border-indigo-300 bg-indigo-50' : 'border-gray-200 hover:bg-gray-50'"
                     @click="newSheetUseV2 = true"
                 >
@@ -534,6 +518,16 @@
                     <div>
                         <div class="font-medium text-gray-700">組版・校正セット方式で作成</div>
                         <div class="text-xs text-gray-400">組版担当+登録欄・校正担当+登録欄のペアを校ごとに自動生成</div>
+                    </div>
+                </label>
+                <label class="flex cursor-pointer items-center gap-2 rounded border px-3 py-2 text-sm"
+                    :class="!newSheetUseV2 ? 'border-indigo-300 bg-indigo-50' : 'border-gray-200 hover:bg-gray-50'"
+                    @click="newSheetUseV2 = false"
+                >
+                    <input type="radio" :checked="!newSheetUseV2" class="h-4 w-4 text-indigo-600" />
+                    <div>
+                        <div class="font-medium text-gray-700">テンプレートから作成</div>
+                        <div class="text-xs text-gray-400">保存済みテンプレートまたは空のシートで作成</div>
                     </div>
                 </label>
             </div>
@@ -849,7 +843,7 @@ const sheetTemplates = computed(() => Array.isArray(page.props.sheetTemplates) ?
 const showCreateSheetModal = ref(false);
 const newSheetName = ref('');
 const newSheetTemplateId = ref(null);
-const newSheetUseV2 = ref(false);
+const newSheetUseV2 = ref(true);
 
 // stages（進行表セット方式モーダル用）
 const availableStages = computed(() => {

@@ -277,14 +277,23 @@ const props = defineProps({
     diaryLabel: { type: String, default: 'メモ' },
 });
 
-const selectedDate = ref(`${yyyy}-${mm}-${dd}`);
+// 今日の日付を取得する関数
+const getTodayString = () => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+};
+
+const selectedDate = ref(getTodayString());
 // schedule action UI
 const showScheduleActionModal = ref(false);
 const selectedScheduleForAction = ref(null);
 const showMemoModal = ref(false);
 const selectedScheduleIdForMemo = ref(null);
 const memoBody = ref('');
-const memoDate = ref(`${yyyy}-${mm}-${dd}`);
+const memoDate = ref(getTodayString());
 
 const showEditModal = ref(false);
 const editingCommentId = ref(null);
@@ -403,8 +412,8 @@ const commentCanEdit = (memo) => {
 const showSimpleEventModal = ref(false);
 const simpleEventTitle = ref('');
 const simpleEventIsRange = ref(false);
-const simpleEventStartDate = ref(`${yyyy}-${mm}-${dd}`);
-const simpleEventEndDate = ref(`${yyyy}-${mm}-${dd}`);
+const simpleEventStartDate = ref(getTodayString());
+const simpleEventEndDate = ref(getTodayString());
 const simpleEventMemo = ref('');
 const simpleEventLabel = ref('');
 const simpleEventLabelChoices = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#6b7280'];
@@ -466,14 +475,14 @@ function openEventModal() {
     simpleEventTitle.value = '';
     // initialize range state and dates
     simpleEventIsRange.value = false;
-    simpleEventStartDate.value = selectedDate.value || `${yyyy}-${mm}-${dd}`;
+    simpleEventStartDate.value = selectedDate.value || getTodayString();
     simpleEventEndDate.value = simpleEventStartDate.value;
     simpleEventMemo.value = '';
     showSimpleEventModal.value = true;
 }
 function goToDiaryCreate() {
     // トップの「メモ作成」は今日の日付でモーダルを開く
-    memoDate.value = `${yyyy}-${mm}-${dd}`;
+    memoDate.value = getTodayString();
     selectedScheduleIdForMemo.value = null;
     memoBody.value = '';
     showMemoModal.value = true;
@@ -1128,6 +1137,14 @@ const calendarOptions = computed(() => ({
     },
     select: handleDateSelect,
 }));
+
+// 日付選択ハンドラー関数を定義
+function handleDateSelect(selectInfo) {
+    // 選択された日付を設定
+    selectedDate.value = selectInfo.startStr;
+    // 予定作成モーダルを開く
+    openEventModal();
+}
 
 function goToScheduleShowFromAction() {
     if (!selectedScheduleForAction.value) return;
@@ -1823,11 +1840,32 @@ async function submitSimpleEvent() {
         };
         // Basic client-side validation for required project_job_id
         if (!payload.project_job_id) {
-            alert('プロジェクト（job）が指定されていません');
+            // URLパラメータからproject_job_idを取得する場合も対応
+            try {
+                const params = new URLSearchParams(window.location.search);
+                const urlProjectId = params.get('project_job_id');
+                if (urlProjectId) {
+                    payload.project_job_id = parseInt(urlProjectId);
+                }
+            } catch (e) {
+                console.warn('パラメータ取得エラー:', e);
+            }
+        }
+        
+        if (!payload.project_job_id) {
+            alert('プロジェクト（job）が指定されていません。プロジェクト詳細画面からアクセスしてください。');
             return;
         }
         const resp = await axios.post(route('coordinator.project_schedules.store'), payload);
+        
+        // 成功時の処理
         showSimpleEventModal.value = false;
+        
+        // フォームをリセット
+        simpleEventTitle.value = '';
+        simpleEventMemo.value = '';
+        simpleEventLabel.value = '';
+        simpleEventIsRange.value = false;
         if (resp && resp.data && resp.data.schedule) {
             // push the returned schedule into localCalendarEntries so calendar shows it immediately
             const sched = resp.data.schedule;
@@ -1874,7 +1912,18 @@ async function submitSimpleEvent() {
         }
     } catch (e) {
         console.error('submitSimpleEvent error', e);
-        alert('予定の作成に失敗しました');
+        let errorMessage = '予定の作成に失敗しました';
+        
+        if (e.response && e.response.data) {
+            if (e.response.data.errors) {
+                const messages = Object.values(e.response.data.errors).flat().join('\n');
+                errorMessage += ':\n' + messages;
+            } else if (e.response.data.message) {
+                errorMessage += ': ' + e.response.data.message;
+            }
+        }
+        
+        alert(errorMessage);
     }
 }
 </script>

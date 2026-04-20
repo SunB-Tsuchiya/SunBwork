@@ -627,10 +627,13 @@ const clickedEndMinute = ref(null);
 
 // カレンダーで選択中の日付（初期値は今日）
 const today = new Date();
-const yyyy = today.getFullYear();
-const mm = String(today.getMonth() + 1).padStart(2, '0');
-const dd = String(today.getDate()).padStart(2, '0');
-const selectedDate = ref(`${yyyy}-${mm}-${dd}`);
+const getTodayString = () => {
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+};
+const selectedDate = ref(getTodayString());
 // If the page was opened with a ?date=YYYY-MM-DD query (or Inertia supplied it in the URL),
 // prefer that as the initial selected date so links like "予定を編集" focus the correct day.
 try {
@@ -875,7 +878,7 @@ function handleTimeSlotClick(info) {
 
 // 日報がある日をイベントとして表示（タイトルは●アイコン）
 // Merge diaries, events, and assigned jobs into FullCalendar events
-const baseEvents = ref([
+const baseEvents = computed(() => [
     // 日報（オレンジ）
     ...props.diaries.map((diary) => {
         // UTC→JST(+9h)変換

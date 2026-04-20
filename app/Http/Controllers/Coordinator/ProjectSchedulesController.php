@@ -36,10 +36,17 @@ class ProjectSchedulesController extends Controller
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'start_date' => 'nullable|date',
-            'end_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
             'color' => 'nullable|string|max:32',
+            'progress' => 'nullable|integer|min:0|max:100',
         ]);
-        $schedule = ProjectSchedule::create($data + ['created_by' => $request->user()->id]);
+        
+        // Ensure default values
+        $data['progress'] = $data['progress'] ?? 0;
+        $data['created_by'] = $request->user()->id;
+        
+        $schedule = ProjectSchedule::create($data);
+        
         if ($request->wantsJson() || $request->ajax()) {
             return response()->json(['status' => 'ok', 'schedule' => $schedule]);
         }
