@@ -191,7 +191,13 @@ class ClientController extends Controller
         }
 
         if ($request->filled('name')) {
-            $query->where('name', 'like', '%' . $request->name . '%');
+            $searchName = $request->name;
+            $query->where('name', 'like', '%' . $searchName . '%');
+        }
+
+        // 結果数制限（オートコンプリート用）
+        if ($request->filled('limit')) {
+            $query->limit((int) $request->limit);
         }
 
         return response()->json($query->orderBy('name')->get());
@@ -339,6 +345,39 @@ class ClientController extends Controller
             'coordinator'         => 'coordinator',
             default               => 'leader',
         };
+    }
+
+    /**
+     * クライアントの直近案件設定を返す（案件作成フォームのプリセット用）
+     * GET coordinator/clients/{client}/last-job-config
+     */
+    public function lastJobConfig(Client $client)
+    {
+        $lastJob = \App\Models\ProjectJob::where('client_id', $client->id)
+            ->with(['user', 'teamMembers.user', 'coordinators', 'size'])
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        if (!$lastJob) {
+            return response()->json(null);
+        }
+
+        return response()->json([
+            'job_title'             => $lastJob->title,
+            'job_created_at'        => $lastJob->created_at?->format('Y年n月'),
+            'user_id'               => $lastJob->user_id,
+            'user_name'             => $lastJob->user?->name,
+            'sub_coordinator_ids'   => $lastJob->coordinators->pluck('id')->values(),
+            'sub_coordinator_names' => $lastJob->coordinators->pluck('name')->values(),
+            'size_id'               => $lastJob->size_id,
+            'size_name'             => $lastJob->size?->name,
+            'page_count'            => $lastJob->page_count,
+            'detail'                => $lastJob->detail,
+            'team_members'          => $lastJob->teamMembers->map(fn($m) => [
+                'user_id'   => $m->user_id,
+                'user_name' => $m->user?->name,
+            ])->values(),
+        ]);
     }
 
     /** サンプルCSVダウンロード */

@@ -35,11 +35,26 @@
 
             <label class="mb-1 mt-2 block font-semibold">ジョブ名</label>
             <div>
-                <input v-model="block.title_suffix" :disabled="!editMode" type="text" class="w-full rounded border px-3 py-2" />
+                <input v-model="block.title_suffix" :disabled="!editMode" type="text" 
+                       :class="['w-full rounded border px-3 py-2', 
+                               getFieldError('assignments.0.title') || getFieldError('title') ? 'border-red-500 bg-red-50' : '']" />
+                <div v-if="getFieldError('assignments.0.title') || getFieldError('title')" 
+                     class="mt-1 text-sm text-red-600">
+                    {{ getFieldError('assignments.0.title') || getFieldError('title') }}
+                </div>
             </div>
 
             <label class="mb-1 mt-2 block font-semibold">概要</label>
-            <textarea v-model="block.detail" :disabled="!editMode" class="w-full rounded border px-3 py-2" rows="3"></textarea>
+            <div>
+                <textarea v-model="block.detail" :disabled="!editMode" 
+                         :class="['w-full rounded border px-3 py-2',
+                                 getFieldError('assignments.0.detail') || getFieldError('detail') ? 'border-red-500 bg-red-50' : '']"
+                         rows="3"></textarea>
+                <div v-if="getFieldError('assignments.0.detail') || getFieldError('detail')" 
+                     class="mt-1 text-sm text-red-600">
+                    {{ getFieldError('assignments.0.detail') || getFieldError('detail') }}
+                </div>
+            </div>
 
             <!-- 作業ファイル情報 -->
             <template v-if="props.mode === 'coordinator' || props.mode === 'user'">
@@ -405,21 +420,33 @@
                             v-model="block.desired_end_date"
                             :min="minEndDate(idx)"
                             type="date"
-                            class="rounded border px-3 py-2"
+                            :class="['rounded border px-3 py-2',
+                                    getFieldError('assignments.0.desired_end_date') || getFieldError('desired_end_date') ? 'border-red-500 bg-red-50' : '']"
                             @change="onEndDateChange(idx)"
                             :disabled="!editMode"
                         />
                         <select
                             v-model="block.desired_time_hour"
                             :disabled="!editMode"
-                            class="w-20 rounded border px-3 py-2"
+                            :class="['w-20 rounded border px-3 py-2',
+                                    getFieldError('assignments.0.desired_time') || getFieldError('desired_time') ? 'border-red-500 bg-red-50' : '']"
                             @change="onHourChange(idx)"
                         >
                             <option v-for="h in availableHours(idx)" :key="h" :value="h">{{ h }}</option>
                         </select>
-                        <select v-model="block.desired_time_min" :disabled="!editMode" class="w-20 rounded border px-3 py-2">
+                        <select v-model="block.desired_time_min" :disabled="!editMode" 
+                               :class="['w-20 rounded border px-3 py-2',
+                                       getFieldError('assignments.0.desired_time') || getFieldError('desired_time') ? 'border-red-500 bg-red-50' : '']">
                             <option v-for="m in availableMins(idx, block.desired_time_hour)" :key="m" :value="m">{{ m }}</option>
                         </select>
+                    </div>
+                    <div v-if="getFieldError('assignments.0.desired_end_date') || getFieldError('desired_end_date')" 
+                         class="mt-1 text-sm text-red-600">
+                        {{ getFieldError('assignments.0.desired_end_date') || getFieldError('desired_end_date') }}
+                    </div>
+                    <div v-if="getFieldError('assignments.0.desired_time') || getFieldError('desired_time')" 
+                         class="mt-1 text-sm text-red-600">
+                        {{ getFieldError('assignments.0.desired_time') || getFieldError('desired_time') }}
                     </div>
                 </div>
             </div>
@@ -711,6 +738,9 @@ const projectJobSizeId = computed(() => props.projectJob?.size_id ? String(props
 const injectedAuthUser = inject('authUser', null);
 const injectedUser = inject('user', null);
 
+// バリデーションエラー状態管理
+const validationErrors = ref({});
+
 function effectiveAuthUser() {
     return (
         injectedAuthUser ||
@@ -724,8 +754,8 @@ function effectiveAuthUser() {
 // Inline event editor state (user mode)
 const _today = new Date();
 const workDate = ref(`${_today.getFullYear()}-${String(_today.getMonth() + 1).padStart(2, '0')}-${String(_today.getDate()).padStart(2, '0')}`); // 今日の日付をデフォルトに (YYYY-MM-DD)
-const startTimeHour = ref('09');
-const startTimeMin = ref('00');
+const startTimeHour = ref('17');
+const startTimeMin = ref('30');
 const endTimeHour = ref('10');
 const endTimeMin = ref('00');
 
@@ -759,6 +789,77 @@ function makeLabel(kind, id) {
     if (!Array.isArray(list)) return null;
     const found = list.find((x) => String(x.id) === String(id));
     return found ? `${kind.replace(/s$/, '')}: ${found.name}` : null;
+}
+
+// エラーハンドル関数：バリデーションエラーを詳細表示
+function handleSaveError(errors) {
+    console.error('保存エラー:', errors);
+    
+    // 前のエラーをクリア
+    validationErrors.value = {};
+    
+    // エラーオブジェクトが存在する場合、詳細を表示
+    if (errors && typeof errors === 'object') {
+        const errorMessages = [];
+        
+        // エラー状態を更新
+        validationErrors.value = errors;
+        
+        // すべてのエラーフィールドを確認
+        Object.keys(errors).forEach(field => {
+            const fieldErrors = Array.isArray(errors[field]) ? errors[field] : [errors[field]];
+            fieldErrors.forEach(message => {
+                // フィールド名を日本語に変換
+                const fieldLabel = getFieldLabel(field);
+                errorMessages.push(`${fieldLabel}: ${message}`);
+            });
+        });
+        
+        if (errorMessages.length > 0) {
+            alert(`保存に失敗しました:\n\n${errorMessages.join('\n')}`);
+            return;
+        }
+    }
+    
+    // フォールバック：詳細なエラー情報がない場合
+    alert('保存に失敗しました。入力内容を確認してください。');
+}
+
+// フィールド名を日本語ラベルに変換
+function getFieldLabel(fieldName) {
+    const labels = {
+        'assignments.0.title': 'タイトル',
+        'assignments.0.user_id': '担当者',
+        'assignments.0.desired_end_date': '締め切り日',
+        'assignments.0.desired_time': '締め切り時間',
+        'assignments.0.estimated_hours': '見積もり時間',
+        'assignments.0.work_item_type_id': '作業種別',
+        'assignments.0.size_id': 'サイズ',
+        'assignments.0.stage_id': '工程',
+        'assignments.0.difficulty': '難易度',
+        'assignments.0.detail': '詳細',
+        'title': 'タイトル',
+        'user_id': '担当者',
+        'desired_end_date': '締め切り日',
+        'desired_time': '締め切り時間',
+        'estimated_hours': '見積もり時間',
+        'work_item_type_id': '作業種別',
+        'size_id': 'サイズ',
+        'stage_id': '工程',
+        'difficulty': '難易度',
+        'detail': '詳細',
+    };
+    return labels[fieldName] || fieldName;
+}
+
+// フィールドエラー取得関数
+function getFieldError(fieldName) {
+    return validationErrors.value[fieldName] ? validationErrors.value[fieldName][0] : null;
+}
+
+// エラークリア関数
+function clearValidationErrors() {
+    validationErrors.value = {};
 }
 
 // Event overlap checking function
@@ -917,9 +1018,9 @@ function normalizeAssignment(a) {
             difficulty: a.difficulty || resolveDifficultySlug(a.difficulty_id),
             difficulty_id: a.difficulty_id != null ? Number(a.difficulty_id) : resolveDifficultyId(a.difficulty),
             desired_start_date: a.desired_start_date || a.desired_date || '',
-            desired_end_date: a.desired_end_date || '',
-            desired_time_hour: a.desired_time ? a.desired_time.split(':')[0] || '09' : a.desired_time_hour || '09',
-            desired_time_min: a.desired_time ? a.desired_time.split(':')[1] || '00' : a.desired_time_min || '00',
+            desired_end_date: a.desired_end_date || new Date().toISOString().split('T')[0],
+            desired_time_hour: a.desired_time ? a.desired_time.split(':')[0] || '17' : a.desired_time_hour || '17',
+            desired_time_min: a.desired_time ? a.desired_time.split(':')[1] || '30' : a.desired_time_min || '30',
             estimated_hours: a.estimated_hours !== undefined && a.estimated_hours !== null ? a.estimated_hours : '',
             user_id: a.user_id || (a.user ? a.user.id : '') || '',
             work_item_type_id: a.work_item_type_id != null ? String(a.work_item_type_id) : null,
@@ -967,15 +1068,15 @@ function normalizeAssignment(a) {
             difficulty: a.difficulty || resolveDifficultySlug(a.difficulty_id),
             difficulty_id: a.difficulty_id != null ? Number(a.difficulty_id) : resolveDifficultyId(a.difficulty),
             desired_start_date: a.desired_start_date || a.desired_date || '',
-            desired_end_date: a.desired_end_date || '',
-            desired_time_hour: a.desired_time ? a.desired_time.split(':')[0] || '09' : a.desired_time_hour || '09',
-            desired_time_min: a.desired_time ? a.desired_time.split(':')[1] || '00' : a.desired_time_min || '00',
+            desired_end_date: a.desired_end_date || new Date().toISOString().split('T')[0],
+            desired_time_hour: a.desired_time ? a.desired_time.split(':')[0] || '17' : a.desired_time_hour || '17',
+            desired_time_min: a.desired_time ? a.desired_time.split(':')[1] || '30' : a.desired_time_min || '30',
             start_time_hour: a.start_time
-                ? a.start_time.split(':')[0] || '09'
-                : a.start_time_hour || (a.desired_time ? a.desired_time.split(':')[0] : '09'),
+                ? a.start_time.split(':')[0] || '17'
+                : a.start_time_hour || (a.desired_time ? a.desired_time.split(':')[0] : '17'),
             start_time_min: a.start_time
-                ? a.start_time.split(':')[1] || '00'
-                : a.start_time_min || (a.desired_time ? a.desired_time.split(':')[1] : '00'),
+                ? a.start_time.split(':')[1] || '30'
+                : a.start_time_min || (a.desired_time ? a.desired_time.split(':')[1] : '30'),
             estimated_hours: a.estimated_hours !== undefined && a.estimated_hours !== null ? a.estimated_hours : '',
             work_item_type_id: a.work_item_type_id != null ? String(a.work_item_type_id) : null,
             size_id: a.size_id != null ? String(a.size_id) : (props.projectJob?.size_id ? String(props.projectJob.size_id) : null),
@@ -1122,11 +1223,11 @@ if (props.mode === 'coordinator') {
             }
         }
         if (a.desired_start_date === undefined) a.desired_start_date = a.desired_start_date || '';
-        if (a.desired_end_date === undefined) a.desired_end_date = a.desired_end_date || '';
-        if (a.desired_time_hour === undefined) a.desired_time_hour = a.desired_time_hour || '09';
-        if (a.desired_time_min === undefined) a.desired_time_min = a.desired_time_min || '00';
-        if (a.start_time_hour === undefined) a.start_time_hour = a.start_time_hour || a.desired_time_hour || '09';
-        if (a.start_time_min === undefined) a.start_time_min = a.start_time_min || a.desired_time_min || '00';
+        if (a.desired_end_date === undefined) a.desired_end_date = a.desired_end_date || new Date().toISOString().split('T')[0];
+        if (a.desired_time_hour === undefined) a.desired_time_hour = a.desired_time_hour || '17';
+        if (a.desired_time_min === undefined) a.desired_time_min = a.desired_time_min || '30';
+        if (a.start_time_hour === undefined) a.start_time_hour = a.start_time_hour || a.desired_time_hour || '17';
+        if (a.start_time_min === undefined) a.start_time_min = a.start_time_min || a.desired_time_min || '30';
         if (a.estimated_hours === undefined) a.estimated_hours = a.estimated_hours || '';
         if (a.amount_digit_0 === undefined) a.amount_digit_0 = a.amounts ? String(Math.floor(a.amounts / 1000) % 10) : '0';
         if (a.amount_digit_1 === undefined) a.amount_digit_1 = a.amounts ? String(Math.floor(a.amounts / 100) % 10) : '0';
@@ -1171,19 +1272,19 @@ onMounted(() => {
             workDate.value = s.date || (assignments.value[0] ? assignments.value[0].desired_start_date || '' : '');
             if (s.time) {
                 const [sh, sm] = String(s.time).split(':');
-                startTimeHour.value = sh || '09';
-                startTimeMin.value = sm || '00';
+                startTimeHour.value = sh || '17';
+                startTimeMin.value = sm || '30';
             } else if (assignments.value[0]) {
-                startTimeHour.value = assignments.value[0].start_time_hour || '09';
-                startTimeMin.value = assignments.value[0].start_time_min || '00';
+                startTimeHour.value = assignments.value[0].start_time_hour || '17';
+                startTimeMin.value = assignments.value[0].start_time_min || '30';
             }
             if (e.time) {
                 const [eh, em] = String(e.time).split(':');
                 endTimeHour.value = eh || startTimeHour.value || '10';
                 endTimeMin.value = em || startTimeMin.value || '00';
             } else if (assignments.value[0]) {
-                endTimeHour.value = assignments.value[0].desired_time_hour || startTimeHour.value || '10';
-                endTimeMin.value = assignments.value[0].desired_time_min || startTimeMin.value || '00';
+                endTimeHour.value = assignments.value[0].desired_time_hour || startTimeHour.value || '17';
+                endTimeMin.value = assignments.value[0].desired_time_min || startTimeMin.value || '30';
             }
         }
     }
@@ -1298,9 +1399,9 @@ function onSelected(payload) {
             title_suffix: payload.size_id ? `サイズ: ${payload.size_id}` : '',
             detail: '',
             difficulty: 'normal',
-            desired_date: '',
-            desired_time_hour: '09',
-            desired_time_min: '00',
+            desired_date: new Date().toISOString().split('T')[0],
+            desired_time_hour: '17',
+            desired_time_min: '30',
             estimated_hours: '',
             user_id: '',
             work_item_type_id: payload.work_item_type_id,
@@ -1703,9 +1804,9 @@ function addBlock() {
         title_suffix: '',
         detail: '',
         difficulty: 'normal',
-        desired_date: '',
-        desired_time_hour: '09',
-        desired_time_min: '00',
+        desired_date: new Date().toISOString().split('T')[0],
+        desired_time_hour: '17',
+        desired_time_min: '30',
         estimated_hours: '',
         user_id: props.defaultUserId || '',
         company_id: effectiveAuthUser() ? effectiveAuthUser().company_id : null,
@@ -2058,6 +2159,9 @@ async function save(sendImmediately = true) {
         return;
     }
 
+    // バリデーションエラーをクリア
+    clearValidationErrors();
+
     if (props.mode === 'coordinator') {
         saving.value = true;
 
@@ -2113,7 +2217,7 @@ async function save(sendImmediately = true) {
         if (props.storeOverrideUrl && !assignments.value[0]?.id) {
             router.post(props.storeOverrideUrl, payload, {
                 onFinish: () => { saving.value = false; },
-                onError: () => { alert('保存に失敗しました'); },
+                onError: handleSaveError,
             });
             return;
         }
@@ -2160,7 +2264,7 @@ async function save(sendImmediately = true) {
                 updatePayload,
                 {
                     onFinish: () => { saving.value = false; },
-                    onError: () => { alert('保存に失敗しました'); },
+                    onError: handleSaveError,
                 }
             );
         } else {
@@ -2169,7 +2273,7 @@ async function save(sendImmediately = true) {
                 payload,
                 {
                     onFinish: () => { saving.value = false; },
-                    onError: () => { alert('保存に失敗しました'); },
+                    onError: handleSaveError,
                 }
             );
         }
@@ -2280,7 +2384,7 @@ async function save(sendImmediately = true) {
                         payload.assignments[0],
                         {
                             onFinish: () => { saving.value = false; },
-                            onError: () => { alert('保存に失敗しました'); },
+                            onError: handleSaveError,
                         }
                     );
                     return;
@@ -2290,7 +2394,7 @@ async function save(sendImmediately = true) {
                         payload.assignments[0],
                         {
                             onFinish: () => { saving.value = false; },
-                            onError: () => { alert('保存に失敗しました'); },
+                            onError: handleSaveError,
                         }
                     );
                     return;
@@ -2313,7 +2417,7 @@ async function save(sendImmediately = true) {
                     payload,
                     {
                         onFinish: () => { saving.value = false; },
-                        onError: () => { alert('保存に失敗しました'); },
+                        onError: handleSaveError,
                     }
                 );
                 return;
@@ -2338,7 +2442,7 @@ async function save(sendImmediately = true) {
             payload,
             {
                 onFinish: () => { saving.value = false; },
-                onError: () => { alert('保存に失敗しました'); },
+                onError: handleSaveError,
             }
         );
     }

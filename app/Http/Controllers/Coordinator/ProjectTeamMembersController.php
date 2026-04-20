@@ -82,7 +82,7 @@ class ProjectTeamMembersController extends Controller
                 if ($projectJob->user) {
                     $leaderDepartmentId = $projectJob->user->department_id;
                 }
-                // リーダーとサブCoordinatorを初期チェック済みにする
+                // リーダーとサブリーダーを初期チェック済みにする
                 $preCheckedIds = array_values(array_filter(array_unique(array_merge(
                     [$projectJob->user_id],
                     $projectJob->coordinators->pluck('id')->toArray()

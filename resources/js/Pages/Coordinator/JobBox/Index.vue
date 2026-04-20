@@ -450,15 +450,15 @@ function getUnifiedStatus(m) {
             jam.status?.key ||
             null;
 
-        // 優先順位: 完了 > セット済み > 確認済み > 未読
+        // 優先順位: 完了 > 進行中 > 確認済み > 未読
         if (statusKey === 'completed' || Boolean(jam.completed) || Boolean(assignment.completed)) return '完了';
-        if (statusKey === 'scheduled' || Boolean(jam.scheduled) || Boolean(assignment.scheduled) || Boolean(assignment.scheduled_at)) return 'セット';
+        if (statusKey === 'scheduled' || Boolean(jam.scheduled) || Boolean(assignment.scheduled) || Boolean(assignment.scheduled_at)) return '進行中';
         
-        // 独自ジョブ（自分で自分に振るジョブ）の場合は「セット」として扱う
+        // 独自ジョブ（自分で自分に振るジョブ）の場合は「進行中」として扱う
         const senderId = jam.sender_id || assignment.sender_id;
         const userId = assignment.user_id;
         if (senderId && userId && Number(senderId) === Number(userId)) {
-            return 'セット';
+            return '進行中';
         }
         
         const readAt = jam.read_at || assignment.read_at || null;
@@ -477,7 +477,7 @@ function getAssignmentStatus(m) {
 function statusBadgeClass(status) {
     switch (status) {
         case '完了':     return 'bg-yellow-100 text-yellow-800';
-        case 'セット': return 'bg-blue-100 text-blue-800';
+        case '進行中': return 'bg-blue-100 text-blue-800';
         case '確認済み':  return 'bg-green-100 text-green-800';
         case '未読':     return 'bg-red-100 text-red-800';
         default:         return 'bg-gray-100 text-gray-700';

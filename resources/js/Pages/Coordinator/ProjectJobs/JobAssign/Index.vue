@@ -214,7 +214,7 @@ function getDateKey(a) {
 function getStatus(a) {
     const statusKey = a.status_model?.key ?? a.status?.key ?? null;
     if (statusKey === 'completed' || Boolean(a.completed)) return '完了';
-    if (statusKey === 'scheduled'  || Boolean(a.scheduled) || Boolean(a.scheduled_at)) return 'セット';
+    if (statusKey === 'scheduled'  || Boolean(a.scheduled) || Boolean(a.scheduled_at)) return '進行中';
     if (statusKey === 'confirmed'  || a.read_at || Boolean(a.accepted)) return '確認済み';
     return '未読';
 }
@@ -222,7 +222,7 @@ function getStatus(a) {
 function statusBadgeClass(status) {
     switch (status) {
         case '完了':    return 'bg-yellow-100 text-yellow-800';
-        case 'セット':  return 'bg-blue-100 text-blue-800';
+        case '進行中':  return 'bg-blue-100 text-blue-800';
         case '確認済み': return 'bg-green-100 text-green-800';
         case '未読':    return 'bg-red-100 text-red-800';
         default:        return 'bg-gray-100 text-gray-700';

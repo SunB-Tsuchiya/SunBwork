@@ -50,6 +50,11 @@
                     >編集</button>
                     <button
                         type="button"
+                        class="rounded border border-blue-400 px-4 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-50"
+                        @click="cloneJob"
+                    >この案件を複製する</button>
+                    <button
+                        type="button"
                         class="rounded bg-cyan-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-cyan-700"
                         @click="goMemberSchedule"
                     >メンバー予定表</button>
@@ -742,6 +747,13 @@ function editMembers() {
     router.visit(url);
 }
 
+function cloneJob() {
+    const id = job.id;
+    if (!id) return;
+    if (!confirm('この案件をもとに新規案件を作成します。\nチームメンバーも引き継がれます。\nよいですか？')) return;
+    router.post(route('coordinator.project_jobs.clone', { projectJob: id }));
+}
+
 function goEdit() {
     const id = job.id;
     if (id) router.visit(route('coordinator.project_jobs.edit', { projectJob: id }));
@@ -1033,7 +1045,7 @@ function historyGetStatus(m) {
         if (statusKey) {
             switch (statusKey) {
                 case 'completed':  return '完了';
-                case 'scheduled':  return 'セット済';
+                case 'scheduled':  return '進行中';
                 case 'confirmed':  return '確認済';
                 case 'received':
                 case 'order':
@@ -1042,7 +1054,7 @@ function historyGetStatus(m) {
             }
         }
         if (Boolean(jam.completed) || Boolean(assignment.completed)) return '完了';
-        if (Boolean(jam.scheduled) || Boolean(assignment.scheduled) || Boolean(assignment.scheduled_at)) return 'セット済';
+        if (Boolean(jam.scheduled) || Boolean(assignment.scheduled) || Boolean(assignment.scheduled_at)) return '進行中';
         const readAt = jam.read_at || assignment.read_at || null;
         if (readAt) return Boolean(jam.accepted) || Boolean(assignment.accepted) ? '確認済' : '既読済';
         if (Boolean(jam.accepted) || Boolean(assignment.accepted)) return '受信済';
@@ -1055,7 +1067,7 @@ function historyGetStatus(m) {
 function statusBadgeClass(status) {
     switch (status) {
         case '完了':    return 'bg-yellow-100 text-yellow-800';
-        case 'セット済': return 'bg-blue-100 text-blue-800';
+        case '進行中': return 'bg-blue-100 text-blue-800';
         case '確認済':  return 'bg-green-100 text-green-800';
         case '受信済':  return 'bg-indigo-100 text-indigo-800';
         case '既読済':  return 'bg-gray-100 text-gray-700';

@@ -14,6 +14,76 @@
         <div class="rounded bg-white p-6 shadow">
             <h1 class="mb-6 text-2xl font-bold">プロジェクトジョブ作成</h1>
             <form @submit.prevent="submit">
+                <!-- クライアント選択（一番最初） -->
+                <div class="mb-4">
+                    <label class="mb-1 block font-semibold">クライアント</label>
+                    <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-1">
+                            <label class="text-sm">ID:</label>
+                            <input 
+                                v-model="form.client_id" 
+                                type="number" 
+                                class="w-20 rounded border px-3 py-2"
+                                placeholder="ID"
+                                @input="onClientIdChange"
+                                :disabled="isLoadingClientById" />
+                            <div v-if="isLoadingClientById" class="text-xs text-blue-600">読込中...</div>
+                        </div>
+                        
+                        <div class="relative flex-1">
+                            <input 
+                                v-model="form.client_name" 
+                                type="text" 
+                                class="w-full rounded border px-3 py-2"
+                                placeholder="名前を入力（オートコンプリート）"
+                                @input="onClientNameInput"
+                                @keydown="onClientNameKeydown"
+                                @blur="onClientNameBlur" />
+                            
+                            <!-- オートコンプリート候補リスト -->
+                            <div v-if="showNameSuggestions && clientNameSuggestions.length > 0"
+                                 class="absolute top-full z-50 mt-1 w-full rounded border border-gray-300 bg-white shadow-lg max-h-60 overflow-y-auto">
+                                <div v-for="(client, index) in clientNameSuggestions"
+                                     :key="client.id"
+                                     class="cursor-pointer px-3 py-2 text-sm hover:bg-blue-50"
+                                     :class="{ 'bg-blue-100': index === selectedSuggestionIndex }"
+                                     @click="selectClientFromSuggestion(client)">
+                                    <div class="flex items-center justify-between">
+                                        <span class="font-medium">{{ client.name }}</span>
+                                        <span class="text-xs text-gray-500">ID: {{ client.id }}</span>
+                                    </div>
+                                    <div v-if="client.is_dormant" class="text-xs text-red-500">※ 休眠中</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button type="button" 
+                                class="rounded bg-blue-100 px-3 py-2 text-blue-700 hover:bg-blue-200" 
+                                @click="openClientModal">詳細検索</button>
+                    </div>
+                    <div v-if="form.errors.client_id" class="mt-1 text-sm text-red-600">{{ form.errors.client_id }}</div>
+                </div>
+
+                <!-- クライアントプリセットバナー -->
+                <div v-if="showPresetBanner && lastJobConfig"
+                     class="mb-4 rounded border border-blue-300 bg-blue-50 px-4 py-3 text-sm">
+                    <p class="font-semibold text-blue-800">前回の設定を引き継ぎますか？</p>
+                    <p class="mt-1 text-blue-700">
+                        （{{ lastJobConfig.job_created_at }}「{{ lastJobConfig.job_title }}」より）
+                        リーダー: {{ lastJobConfig.user_name }}、
+                        サイズ: {{ lastJobConfig.size_name || 'なし' }}、
+                        メンバー: {{ lastJobConfig.team_members?.length || 0 }} 名
+                    </p>
+                    <div class="mt-2 flex gap-2">
+                        <button type="button"
+                                class="rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-700"
+                                @click="applyPreset">引き継ぐ</button>
+                        <button type="button"
+                                class="rounded border border-gray-300 px-3 py-1 text-xs text-gray-600 hover:bg-gray-50"
+                                @click="showPresetBanner = false">今回は引き継がない</button>
+                    </div>
+                </div>
+
                 <div class="mb-4">
                     <label class="mb-1 block font-semibold">伝票番号</label>
                     <input
@@ -41,7 +111,7 @@
                     <div v-if="form.errors.user_id" class="mt-1 text-sm text-red-600">{{ form.errors.user_id }}</div>
                 </div>
                 <div class="mb-4">
-                    <label class="mb-1 block font-semibold">サブCoordinator（複数可）</label>
+                    <label class="mb-1 block font-semibold">サブリーダー（複数可）</label>
                     <div class="rounded border px-3 py-2 max-h-40 overflow-y-auto space-y-1">
                         <template v-for="c in subCandidates" :key="c.id">
                             <label class="flex items-center gap-2 cursor-pointer">
@@ -52,15 +122,6 @@
                         <p v-if="subCandidates.length === 0" class="text-sm text-gray-400">候補なし</p>
                     </div>
                     <div v-if="form.errors.sub_coordinator_ids" class="mt-1 text-sm text-red-600">{{ form.errors.sub_coordinator_ids }}</div>
-                </div>
-                <div class="mb-4">
-                    <label class="mb-1 block font-semibold">クライアント</label>
-                    <div class="flex items-center gap-2">
-                        ID:<input v-model="form.client_id" type="number" class="w-16 rounded border bg-gray-100 px-3 py-2" readonly />
-                        <input v-model="form.client_name" type="text" class="w-60 rounded border bg-gray-100 px-3 py-2" readonly />
-                        <button type="button" class="rounded bg-blue-100 px-3 py-2 text-blue-700" @click="openClientModal">検索</button>
-                    </div>
-                    <div v-if="form.errors.client_id" class="mt-1 text-sm text-red-600">{{ form.errors.client_id }}</div>
                 </div>
                 <div class="mb-4">
                     <label class="mb-1 block font-semibold">サイズ</label>
@@ -105,6 +166,31 @@
                     <label class="mb-1 block font-semibold">詳細</label>
                     <textarea v-model="form.detail" class="w-full rounded border px-3 py-2" rows="3"></textarea>
                     <div v-if="form.errors.detail" class="mt-1 text-sm text-red-600">{{ form.errors.detail }}</div>
+                </div>
+
+                <!-- チームメンバー選択 -->
+                <div class="mb-6">
+                    <h3 class="mb-3 font-semibold text-gray-700">チームメンバー</h3>
+                    <div class="mb-3 flex flex-wrap gap-2">
+                        <span
+                            v-for="(m, i) in form.team_members"
+                            :key="m.user_id"
+                            class="flex items-center gap-1 rounded-full bg-blue-100 px-3 py-1 text-sm text-blue-700"
+                        >
+                            {{ m.user_name }}
+                            <button type="button" class="ml-1 text-blue-400 hover:text-red-500" @click="removeMember(i)">×</button>
+                        </span>
+                        <span v-if="form.team_members.length === 0" class="text-sm text-gray-400">メンバー未設定</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" 
+                                class="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                                @click="openMemberModal">
+                            メンバーを選択
+                        </button>
+                        <span class="text-sm text-gray-500">{{ form.team_members.length }}人選択中</span>
+                    </div>
+                    <div v-if="form.errors.team_members" class="mt-1 text-sm text-red-600">{{ form.errors.team_members }}</div>
                 </div>
 
                 <!-- メンバー・スケジュール登録は後続ステップで実装 -->
@@ -213,6 +299,124 @@
                 </div>
             </template>
         </DialogModal>
+
+        <!-- チームメンバー選択モーダル -->
+        <DialogModal :show="showMemberModal" @close="closeMemberModal">
+            <template #title>
+                チームメンバー選択
+            </template>
+            
+            <template #content>
+                <!-- フィルター -->
+                <div class="mb-4 flex items-center gap-4">
+                    <div class="flex-1">
+                        <label class="mb-1 block text-sm font-medium">部署</label>
+                        <select v-model="selectedDepartmentId" 
+                                class="w-full rounded border px-3 py-2 text-sm">
+                            <option value="">-- 全部署 --</option>
+                            <option v-for="dept in departments" 
+                                    :key="dept.id" 
+                                    :value="String(dept.id)">
+                                {{ dept.name }}
+                            </option>
+                        </select>
+                    </div>
+                    <div class="flex-1">
+                        <label class="mb-1 block text-sm font-medium">担当</label>
+                        <select v-model="selectedAssignmentId" 
+                                class="w-full rounded border px-3 py-2 text-sm"
+                                :disabled="!selectedDepartmentId">
+                            <option value="">-- 全担当 --</option>
+                            <option v-for="assignment in filteredAssignments" 
+                                    :key="assignment.id" 
+                                    :value="String(assignment.id)">
+                                {{ assignment.name }}
+                            </option>
+                        </select>
+                    </div>
+                    <div class="flex items-end">
+                        <button type="button" 
+                                class="rounded bg-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-400"
+                                @click="clearMemberFilters">
+                            クリア
+                        </button>
+                    </div>
+                </div>
+
+                <!-- メンバー一覧テーブル -->
+                <div class="max-h-96 overflow-y-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="sticky top-0 bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                                    <input type="checkbox" 
+                                           :checked="allChecked" 
+                                           @change="toggleAllMembers" />
+                                </th>
+                                <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">名前</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">部署</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">担当</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200 bg-white">
+                            <tr v-for="member in filteredMembers"
+                                :key="member.id"
+                                class="hover:bg-gray-50 cursor-pointer"
+                                :class="{ 'bg-blue-50': selectedMemberIds.includes(member.id) }"
+                                @click="toggleMember(member.id)">
+                                <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-500" @click.stop>
+                                    <input type="checkbox" 
+                                           :value="member.id" 
+                                           v-model="selectedMemberIds" />
+                                </td>
+                                <td class="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">
+                                    {{ member.name }}
+                                </td>
+                                <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
+                                    {{ getDepartmentName(member.department_id) }}
+                                </td>
+                                <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
+                                    <span :class="getAssignmentBadgeClass(getAssignmentName(member.assignment_id))"
+                                          class="inline-flex rounded-full px-2 py-1 text-xs font-semibold">
+                                        {{ getAssignmentName(member.assignment_id) }}
+                                    </span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div v-if="filteredMembers.length === 0" class="py-8 text-center text-gray-500">
+                        該当するメンバーがいません
+                    </div>
+                </div>
+
+                <div v-if="selectedMemberIds.length > 0" class="mt-4 rounded bg-blue-50 p-3">
+                    <div class="text-sm font-medium text-blue-700">
+                        {{ selectedMemberIds.length }}人選択中
+                    </div>
+                    <div class="mt-1 flex flex-wrap gap-1">
+                        <span v-for="memberId in selectedMemberIds" 
+                              :key="memberId"
+                              class="inline-flex rounded bg-blue-100 px-2 py-1 text-xs text-blue-700">
+                            {{ members.find(m => m.id === memberId)?.name }}
+                        </span>
+                    </div>
+                </div>
+            </template>
+
+            <template #footer>
+                <button type="button" 
+                        class="mr-3 rounded border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        @click="closeMemberModal">
+                    キャンセル
+                </button>
+                <button type="button" 
+                        class="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+                        :disabled="selectedMemberIds.length === 0"
+                        @click="addSelectedMembers">
+                    追加 ({{ selectedMemberIds.length }}人)
+                </button>
+            </template>
+        </DialogModal>
     </AppLayout>
 </template>
 
@@ -225,6 +429,9 @@ import { computed, ref, watch } from 'vue';
 const props = defineProps({
     coordinatorCandidates: { type: Array, default: () => [] },
     sizes: { type: Array, default: () => [] },
+    departments: { type: Array, default: () => [] },
+    assignments: { type: Array, default: () => [] },
+    members: { type: Array, default: () => [] },
 });
 
 const page = usePage();
@@ -238,8 +445,7 @@ const form = useForm({
     size_id: '',
     page_count: '',
     detail: '',
-    teammember: null,
-    schedule: null,
+    team_members: [], // チームメンバー選択用
 });
 
 // リーダーとして選択中のユーザーを除いたサブCo候補
@@ -309,6 +515,19 @@ const clientSearch = ref({ id: '', name: '' });
 const clientSearchResult = ref(null);
 const clientList = ref([]);
 
+// オートコンプリート用
+const clientNameSuggestions = ref([]);
+const showNameSuggestions = ref(false);
+const isLoadingClientById = ref(false);
+const selectedSuggestionIndex = ref(-1);
+let searchTimeout = null;
+
+// チームメンバー選択モーダル用
+const showMemberModal = ref(false);
+const selectedDepartmentId = ref('');
+const selectedAssignmentId = ref('');
+const selectedMemberIds = ref([]);
+
 // clientSearchModeが'list'になったら自動で一覧モーダルを開く
 watch(clientSearchMode, (val) => {
     if (val === 'list') {
@@ -362,11 +581,195 @@ function searchClientByName() {
             clientSearchResult.value = data && data.length ? data[0] : null;
         });
 }
-function selectClient(client) {
+const showPresetBanner = ref(false);
+const lastJobConfig = ref(null);
+
+async function selectClient(client) {
     form.client_id = client.id;
     form.client_name = client.name;
     closeClientModal();
     closeClientListModal();
+
+    // 共通のプリセット取得関数を使用
+    await loadClientPreset(client);
+}
+
+function applyPreset() {
+    const c = lastJobConfig.value;
+    if (!c) return;
+    
+    // 案件タイトルに「ーコピー」を追加
+    if (c.job_title) form.title = c.job_title + 'ーコピー';
+    
+    // 伝票番号は空欄（ユニーク性のため）
+    form.jobcode = '';
+    
+    // その他は全部引き継ぐ
+    if (c.user_id)             form.user_id = c.user_id;
+    if (c.sub_coordinator_ids) form.sub_coordinator_ids = [...c.sub_coordinator_ids];
+    if (c.size_id)             form.size_id = c.size_id;
+    if (c.page_count)          form.page_count = c.page_count;
+    if (c.detail)              form.detail = c.detail;
+    
+    // チームメンバーも引き継ぐ
+    if (c.team_members && Array.isArray(c.team_members)) {
+        form.team_members = [...c.team_members];
+    }
+    
+    // プリセット適用後に、リーダー・サブリーダーがチームメンバーに含まれているか確認し、追加
+    if (form.user_id) {
+        addUserToTeamMembers(form.user_id);
+    }
+    if (form.sub_coordinator_ids && Array.isArray(form.sub_coordinator_ids)) {
+        form.sub_coordinator_ids.forEach(userId => {
+            addUserToTeamMembers(userId);
+        });
+    }
+    
+    showPresetBanner.value = false;
+}
+
+// ID入力時の名前自動取得
+async function onClientIdChange() {
+    const clientId = form.client_id;
+    if (!clientId || clientId === '') {
+        form.client_name = '';
+        return;
+    }
+    
+    isLoadingClientById.value = true;
+    try {
+        const res = await fetch(
+            route('coordinator.clients.json') + '?id=' + encodeURIComponent(clientId),
+            { headers: { Accept: 'application/json' }, credentials: 'same-origin' }
+        );
+        if (res.ok) {
+            const client = await res.json();
+            if (client) {
+                form.client_name = client.name;
+                // プリセット取得も実行
+                await loadClientPreset(client);
+            } else {
+                form.client_name = '';
+            }
+        } else {
+            form.client_name = '';
+        }
+    } catch (error) {
+        console.error('クライアント取得エラー:', error);
+        form.client_name = '';
+    } finally {
+        isLoadingClientById.value = false;
+    }
+}
+
+// 名前入力時のオートコンプリート
+function onClientNameInput() {
+    const searchTerm = form.client_name;
+    
+    // 検索をクリア
+    if (searchTimeout) {
+        clearTimeout(searchTimeout);
+    }
+    
+    if (!searchTerm || searchTerm.length < 1) {
+        clientNameSuggestions.value = [];
+        showNameSuggestions.value = false;
+        return;
+    }
+    
+    // デバウンス（300ms後に検索実行）
+    searchTimeout = setTimeout(async () => {
+        try {
+            const res = await fetch(
+                route('coordinator.clients.json') + '?name=' + encodeURIComponent(searchTerm) + '&limit=10',
+                { headers: { Accept: 'application/json' }, credentials: 'same-origin' }
+            );
+            if (res.ok) {
+                const clients = await res.json();
+                clientNameSuggestions.value = Array.isArray(clients) ? clients : [];
+                showNameSuggestions.value = clients.length > 0;
+                selectedSuggestionIndex.value = -1;
+            }
+        } catch (error) {
+            console.error('クライアント検索エラー:', error);
+            clientNameSuggestions.value = [];
+            showNameSuggestions.value = false;
+        }
+    }, 300);
+}
+
+// キーボード操作
+function onClientNameKeydown(event) {
+    if (!showNameSuggestions.value || clientNameSuggestions.value.length === 0) {
+        return;
+    }
+    
+    switch (event.key) {
+        case 'ArrowDown':
+            event.preventDefault();
+            selectedSuggestionIndex.value = Math.min(
+                selectedSuggestionIndex.value + 1,
+                clientNameSuggestions.value.length - 1
+            );
+            break;
+        case 'ArrowUp':
+            event.preventDefault();
+            selectedSuggestionIndex.value = Math.max(
+                selectedSuggestionIndex.value - 1,
+                -1
+            );
+            break;
+        case 'Enter':
+            event.preventDefault();
+            if (selectedSuggestionIndex.value >= 0) {
+                selectClientFromSuggestion(clientNameSuggestions.value[selectedSuggestionIndex.value]);
+            }
+            break;
+        case 'Escape':
+            showNameSuggestions.value = false;
+            selectedSuggestionIndex.value = -1;
+            break;
+    }
+}
+
+// 候補選択
+async function selectClientFromSuggestion(client) {
+    form.client_id = client.id;
+    form.client_name = client.name;
+    showNameSuggestions.value = false;
+    selectedSuggestionIndex.value = -1;
+    
+    // プリセット取得
+    await loadClientPreset(client);
+}
+
+// プリセット取得の共通化
+async function loadClientPreset(client) {
+    showPresetBanner.value = false;
+    lastJobConfig.value = null;
+    try {
+        const res = await fetch(
+            route('coordinator.clients.last_job_config', { client: client.id }),
+            { headers: { Accept: 'application/json' }, credentials: 'same-origin' },
+        );
+        if (res.ok) {
+            const config = await res.json();
+            if (config) {
+                lastJobConfig.value = config;
+                showPresetBanner.value = true;
+            }
+        }
+    } catch { /* ignore */ }
+}
+
+// フォーカスアウト時に候補を非表示
+function onClientNameBlur() {
+    // 少し遅延させて、候補クリック時間を確保
+    setTimeout(() => {
+        showNameSuggestions.value = false;
+        selectedSuggestionIndex.value = -1;
+    }, 200);
 }
 
 // エラー項目の日本語ラベル
@@ -389,6 +792,196 @@ const isCheckingDuplicate = ref(false);
 
 function closeDuplicateModal() {
     showDuplicateModal.value = false;
+}
+
+// ===== リーダー・サブリーダー自動追加機能 =====
+// チームメンバーに自動追加するヘルパー関数
+function addUserToTeamMembers(userId) {
+    if (!userId) return;
+    
+    // 既に存在するかチェック
+    const exists = form.team_members.some(member => member.user_id === userId);
+    if (exists) return;
+    
+    // ユーザー情報を取得して追加
+    const user = props.members.find(m => m.id === userId);
+    if (user) {
+        form.team_members.push({
+            user_id: user.id,
+            user_name: user.name
+        });
+    }
+}
+
+function removeUserFromTeamMembers(userId) {
+    if (!userId) return;
+    const index = form.team_members.findIndex(member => member.user_id === userId);
+    if (index > -1) {
+        form.team_members.splice(index, 1);
+    }
+}
+
+// リーダー変更を監視
+watch(() => form.user_id, (newUserId, oldUserId) => {
+    // 古いリーダーをチームメンバーから削除（サブリーダーでない場合）
+    if (oldUserId && !form.sub_coordinator_ids.includes(oldUserId)) {
+        removeUserFromTeamMembers(oldUserId);
+    }
+    
+    // 新しいリーダーをチームメンバーに追加
+    if (newUserId) {
+        addUserToTeamMembers(newUserId);
+    }
+});
+
+// サブリーダー変更を監視
+watch(() => form.sub_coordinator_ids, (newSubIds, oldSubIds) => {
+    const oldIds = oldSubIds || [];
+    const newIds = newSubIds || [];
+    
+    // 削除されたサブリーダーをチームメンバーから削除（リーダーでない場合）
+    oldIds.forEach(userId => {
+        if (!newIds.includes(userId) && userId !== form.user_id) {
+            removeUserFromTeamMembers(userId);
+        }
+    });
+    
+    // 追加されたサブリーダーをチームメンバーに追加
+    newIds.forEach(userId => {
+        addUserToTeamMembers(userId);
+    });
+}, { deep: true });
+
+// ===== チームメンバー選択機能 =====
+// チームメンバー選択モーダル用 computed
+const filteredAssignments = computed(() => {
+    if (!selectedDepartmentId.value) return [];
+    return props.assignments.filter(assignment => 
+        props.members.some(member => 
+            member.department_id == selectedDepartmentId.value && 
+            member.assignment_id == assignment.id
+        )
+    );
+});
+
+const filteredMembers = computed(() => {
+    let filtered = props.members;
+    
+    if (selectedDepartmentId.value) {
+        filtered = filtered.filter(m => m.department_id == selectedDepartmentId.value);
+    }
+    
+    if (selectedAssignmentId.value) {
+        filtered = filtered.filter(m => m.assignment_id == selectedAssignmentId.value);
+    }
+    
+    return filtered;
+});
+
+const allChecked = computed(() => {
+    return filteredMembers.value.length > 0 && 
+           filteredMembers.value.every(member => selectedMemberIds.value.includes(member.id));
+});
+
+// チームメンバー選択モーダル メソッド
+function openMemberModal() {
+    // リーダーとサブリーダーを初期選択状態にする
+    const initialIds = [];
+    
+    // リーダー（user_id）を追加
+    if (form.user_id) {
+        initialIds.push(form.user_id);
+    }
+    
+    // サブリーダー（sub_coordinator_ids）を追加
+    if (Array.isArray(form.sub_coordinator_ids)) {
+        initialIds.push(...form.sub_coordinator_ids);
+    }
+    
+    // 既存のチームメンバーも選択状態にする
+    form.team_members.forEach(member => {
+        if (!initialIds.includes(member.user_id)) {
+            initialIds.push(member.user_id);
+        }
+    });
+    
+    selectedMemberIds.value = initialIds;
+    showMemberModal.value = true;
+}
+
+function closeMemberModal() {
+    showMemberModal.value = false;
+    selectedDepartmentId.value = '';
+    selectedAssignmentId.value = '';
+    selectedMemberIds.value = [];
+}
+
+function addSelectedMembers() {
+    form.team_members = [];
+    selectedMemberIds.value.forEach(memberId => {
+        const member = props.members.find(m => m.id === memberId);
+        if (member) {
+            form.team_members.push({
+                user_id: member.id,
+                user_name: member.name
+            });
+        }
+    });
+    closeMemberModal();
+}
+
+function removeMember(index) {
+    form.team_members.splice(index, 1);
+}
+
+function toggleMember(memberId) {
+    const index = selectedMemberIds.value.indexOf(memberId);
+    if (index > -1) {
+        selectedMemberIds.value.splice(index, 1);
+    } else {
+        selectedMemberIds.value.push(memberId);
+    }
+}
+
+function toggleAllMembers() {
+    if (allChecked.value) {
+        selectedMemberIds.value = selectedMemberIds.value.filter(id => 
+            !filteredMembers.value.some(member => member.id === id)
+        );
+    } else {
+        filteredMembers.value.forEach(member => {
+            if (!selectedMemberIds.value.includes(member.id)) {
+                selectedMemberIds.value.push(member.id);
+            }
+        });
+    }
+}
+
+function clearMemberFilters() {
+    selectedDepartmentId.value = '';
+    selectedAssignmentId.value = '';
+}
+
+function getDepartmentName(departmentId) {
+    const dept = props.departments.find(d => d.id === departmentId);
+    return dept ? dept.name : '';
+}
+
+function getAssignmentName(assignmentId) {
+    const assignment = props.assignments.find(a => a.id === assignmentId);
+    return assignment ? assignment.name : '';
+}
+
+function getAssignmentBadgeClass(assignmentName) {
+    const colorMap = {
+        '進行': 'bg-blue-100 text-blue-800',
+        '営業': 'bg-green-100 text-green-800',
+        '校正': 'bg-yellow-100 text-yellow-800',
+        'DTP': 'bg-purple-100 text-purple-800',
+        '製版': 'bg-red-100 text-red-800',
+        '印刷': 'bg-gray-100 text-gray-800',
+    };
+    return colorMap[assignmentName] || 'bg-gray-100 text-gray-800';
 }
 
 async function submit() {

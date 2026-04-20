@@ -90,6 +90,45 @@ class ProjectJobController extends Controller
             ->get(['id', 'name']);
     }
 
+    public function clone(Request $request, ProjectJob $projectJob)
+    {
+        $user = $request->user();
+        if (!$this->isJobCoordinator($projectJob, $user)) {
+            abort(403);
+        }
+
+        $newJob = null;
+        DB::transaction(function () use ($projectJob, &$newJob) {
+            $data = $projectJob->only([
+                'user_id', 'client_id', 'size_id', 'page_count', 'detail',
+            ]);
+            $data['title']   = 'コピー - ' . $projectJob->title;
+            $data['jobcode'] = null;
+            Arr::pull($data, 'schedule'); // さくら本番: project_jobs.schedule カラムなし
+
+            $newJob = ProjectJob::create($data);
+
+            // サブCo 複製
+            $subIds  = $projectJob->coordinators()->pluck('users.id')->toArray();
+            $syncIds = array_values(array_filter($subIds, fn($id) => $id != $newJob->user_id));
+            if (!empty($syncIds)) {
+                $newJob->coordinators()->sync($syncIds);
+            }
+
+            // チームメンバー複製
+            foreach ($projectJob->teamMembers as $member) {
+                \App\Models\ProjectTeamMember::create([
+                    'project_job_id' => $newJob->id,
+                    'user_id'        => $member->user_id,
+                ]);
+            }
+        });
+
+        return redirect()
+            ->route('coordinator.project_jobs.edit', $newJob->id)
+            ->with('success', '案件を複製しました。タイトル・伝票番号・クライアントを確認・修正してください。');
+    }
+
     public function complete(Request $request, ProjectJob $projectJob)
     {
         $user = $request->user();
@@ -115,9 +154,18 @@ class ProjectJobController extends Controller
     public function create()
     {
         $sizes = \App\Models\Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group']);
+        
+        // チームメンバー選択モーダル用のデータ
+        $departments = \App\Models\Department::all();
+        $assignments = \App\Models\Assignment::all();
+        $members = \App\Models\User::orderBy('name')->with(['department', 'assignment'])->get();
+        
         return Inertia::render('Coordinator/ProjectJobs/Create', [
             'coordinatorCandidates' => $this->coordinatorCandidates(),
             'sizes' => $sizes,
+            'departments' => $departments,
+            'assignments' => $assignments,
+            'members' => $members,
         ]);
     }
 
@@ -134,9 +182,13 @@ class ProjectJobController extends Controller
                 'detail'              => 'nullable|string',
                 'sub_coordinator_ids' => 'nullable|array',
                 'sub_coordinator_ids.*' => 'exists:users,id',
+                'team_members'        => 'nullable|array',
+                'team_members.*.user_id' => 'required|integer|exists:users,id',
             ]);
 
             $subIds = Arr::pull($data, 'sub_coordinator_ids', []);
+            $teamMembers = Arr::pull($data, 'team_members', []);
+            
             $job = ProjectJob::create($data);
 
             // リーダー自身はピボットに入れない（重複回避）
@@ -145,9 +197,15 @@ class ProjectJobController extends Controller
                 $job->coordinators()->sync($syncIds);
             }
 
-            return redirect()->route('coordinator.project_jobs.show', $job->id)
-                ->with('jobid', $job->id)
-                ->with('register_flags', ['teammember', 'schedule']);
+            // チームメンバーの作成
+            foreach ($teamMembers as $member) {
+                \App\Models\ProjectTeamMember::create([
+                    'project_job_id' => $job->id,
+                    'user_id' => (int) $member['user_id'],
+                ]);
+            }
+
+            return redirect()->route('coordinator.project_jobs.show', $job->id);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return redirect()->back()
                 ->withErrors($e->validator)

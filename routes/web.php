@@ -524,6 +524,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         // クライアント検索JSON（案件作成モーダル用・統合先選択用）
         Route::get('clients/json', [App\Http\Controllers\ClientController::class, 'clientsJson'])->name('clients.json');
         Route::post('clients/check-duplicate', [App\Http\Controllers\ClientController::class, 'checkDuplicate'])->name('clients.check_duplicate');
+        Route::get('clients/{client}/last-job-config', [App\Http\Controllers\ClientController::class, 'lastJobConfig'])->name('clients.last_job_config');
         Route::post('clients/{client}/merge', [App\Http\Controllers\ClientController::class, 'merge'])->name('clients.merge');
         Route::post('clients/{client}/dormant', [App\Http\Controllers\ClientController::class, 'dormant'])->name('clients.dormant');
         Route::resource('clients', App\Http\Controllers\ClientController::class)->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
@@ -531,6 +532,16 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         // Project_job CRUD
         Route::get('project_jobs', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'index'])->name('project_jobs.index');
         Route::get('project_jobs/create', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'create'])->name('project_jobs.create');
+        // 案件一括作成（静的パスなので {projectJob} より前に定義）
+        Route::get('project-jobs/bulk-create', [App\Http\Controllers\Coordinator\BulkProjectJobController::class, 'index'])->name('project_jobs.bulk_create.index');
+        Route::get('project-jobs/bulk-create/sample', [App\Http\Controllers\Coordinator\BulkProjectJobController::class, 'downloadSample'])->name('project_jobs.bulk_create.sample');
+        Route::post('project-jobs/bulk-create/preview', [App\Http\Controllers\Coordinator\BulkProjectJobController::class, 'preview'])->name('project_jobs.bulk_create.preview');
+        Route::post('project-jobs/bulk-create/store', [App\Http\Controllers\Coordinator\BulkProjectJobController::class, 'store'])->name('project_jobs.bulk_create.store');
+        // 案件テンプレートCRUD（静的パスなので {projectJob} より前に定義）
+        Route::get('project-job-templates', [App\Http\Controllers\Coordinator\ProjectJobTemplateController::class, 'index'])->name('project_job_templates.index');
+        Route::post('project-job-templates', [App\Http\Controllers\Coordinator\ProjectJobTemplateController::class, 'store'])->name('project_job_templates.store');
+        Route::put('project-job-templates/{template}', [App\Http\Controllers\Coordinator\ProjectJobTemplateController::class, 'update'])->name('project_job_templates.update');
+        Route::delete('project-job-templates/{template}', [App\Http\Controllers\Coordinator\ProjectJobTemplateController::class, 'destroy'])->name('project_job_templates.destroy');
         // Static assignment routes must come before {projectJob} parameterized routes
         Route::get('project_jobs/past-assignments', [App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'pastData'])->name('project_jobs.past_assignments');
         Route::get('project_jobs/assignment-select', [App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'selectProject'])->name('project_jobs.assignment_select');
@@ -539,6 +550,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('project_jobs', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'store'])->name('project_jobs.store');
         Route::post('project_jobs/{projectJob}/complete', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'complete'])->name('project_jobs.complete');
         Route::post('project_jobs/{projectJob}/uncomplete', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'uncomplete'])->name('project_jobs.uncomplete');
+        Route::post('project_jobs/{projectJob}/clone', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'clone'])->name('project_jobs.clone');
         // メンバー予定表（静的サブパスなので {projectJob} の前に定義）
         Route::get('project_jobs/{projectJob}/member-schedule', [App\Http\Controllers\Coordinator\ProjectJobMemberScheduleController::class, 'index'])->name('project_jobs.member_schedule');
         Route::get('project_jobs/{projectJob}/member-schedule/data', [App\Http\Controllers\Coordinator\ProjectJobMemberScheduleController::class, 'data'])->name('project_jobs.member_schedule.data');
