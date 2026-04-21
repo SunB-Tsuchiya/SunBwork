@@ -73,29 +73,66 @@
             <!-- チェーン（続きジョブ）パネル -->
             <div v-if="hasChain" class="overflow-hidden rounded-lg border border-orange-200 bg-orange-50 shadow-sm">
                 <div class="border-b border-orange-200 bg-orange-100 px-5 py-3">
-                    <h3 class="text-sm font-semibold text-orange-800">↩ 続きジョブ チェーン</h3>
+                    <h3 class="text-sm font-semibold text-orange-800">↩ 続きジョブ シリーズ（{{ chainItems.length }}件）</h3>
                 </div>
-                <div class="divide-y divide-orange-100 px-5 py-3">
-                    <!-- 元ジョブへのリンク -->
-                    <div v-if="sourceItem" class="flex items-center gap-3 py-2">
-                        <span class="w-16 shrink-0 text-xs font-medium text-orange-600">元ジョブ↑</span>
-                        <button @click="goChainItem(sourceItem)" class="text-left text-sm text-blue-700 underline hover:text-blue-900">
-                            {{ sourceItem.title }}
-                        </button>
-                        <span v-if="sourceItem.completed" class="ml-auto rounded-full bg-yellow-100 px-2 py-0.5 text-xs text-yellow-800">完了</span>
+                <div class="divide-y divide-orange-100 px-5 py-2">
+                    <div v-for="(item, idx) in chainItems" :key="item.id"
+                         class="flex items-start gap-3 py-2.5"
+                         :class="item.id === assignment?.id ? '-mx-5 bg-orange-100 px-5' : ''">
+                        <!-- 番号 -->
+                        <span class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+                              :class="item.id === assignment?.id ? 'bg-orange-600 text-white' : 'bg-orange-200 text-orange-700'">
+                            {{ idx + 1 }}
+                        </span>
+                        <!-- タイトルと時間 -->
+                        <div class="min-w-0 flex-1">
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                <button v-if="item.id !== assignment?.id"
+                                        @click="goChainItem(item)"
+                                        class="text-left text-sm text-blue-700 underline hover:text-blue-900">
+                                    {{ item.title }}
+                                </button>
+                                <span v-else class="text-sm font-medium text-gray-900">{{ item.title }}</span>
+                                <span v-if="item.id === assignment?.id"
+                                      class="rounded-full bg-orange-600 px-1.5 py-0.5 text-xs text-white">現在</span>
+                                <span v-if="item.completed"
+                                      class="rounded-full bg-yellow-100 px-1.5 py-0.5 text-xs text-yellow-800">完了</span>
+                            </div>
+                            <!-- 現在のアサインメントのイベント -->
+                            <div v-if="item.id === assignment?.id">
+                                <div v-if="formattedEvents.length" class="mt-1 space-y-0.5">
+                                    <div v-for="ev in formattedEvents" :key="ev.id" class="text-xs text-gray-500">
+                                        {{ ev.dateStr }} {{ ev.startTime }}〜{{ ev.endTime }}
+                                        <span class="ml-1 font-medium text-gray-700">{{ formatDurationFromMinutes(ev.actualMinutes) }}</span>
+                                    </div>
+                                </div>
+                                <div v-else class="mt-0.5 text-xs text-gray-400">（予定未セット）</div>
+                            </div>
+                            <!-- 他のアサインメントのイベント -->
+                            <div v-else>
+                                <div v-if="eventsForPja(item.id).length" class="mt-1 space-y-0.5">
+                                    <div v-for="ev in eventsForPja(item.id)" :key="ev.id" class="text-xs text-gray-500">
+                                        {{ ev.dateStr }} {{ ev.startTime }}〜{{ ev.endTime }}
+                                        <span class="ml-1 font-medium text-gray-700">{{ formatDurationFromMinutes(ev.actualMinutes) }}</span>
+                                    </div>
+                                </div>
+                                <div v-else class="mt-0.5 text-xs text-gray-400">（予定未セット）</div>
+                            </div>
+                        </div>
+                        <!-- 合計時間 -->
+                        <div class="shrink-0 text-right">
+                            <span class="text-sm font-bold"
+                                  :class="(item.id === assignment?.id ? totalActualMinutes : seriesMinutesForPja(item.id)) > 0 ? 'text-indigo-700' : 'text-gray-300'">
+                                {{ item.id === assignment?.id
+                                    ? (totalActualMinutes > 0 ? formatDurationFromMinutes(totalActualMinutes) : '-')
+                                    : (seriesMinutesForPja(item.id) > 0 ? formatDurationFromMinutes(seriesMinutesForPja(item.id)) : '-') }}
+                            </span>
+                        </div>
                     </div>
-                    <!-- 続きジョブリスト -->
-                    <div v-for="cont in continuationItems" :key="cont.id" class="flex items-center gap-3 py-2">
-                        <span class="w-16 shrink-0 text-xs font-medium text-orange-600">続き↓</span>
-                        <button @click="goChainItem(cont)" class="text-left text-sm text-blue-700 underline hover:text-blue-900">
-                            {{ cont.title }}
-                        </button>
-                        <span v-if="cont.completed" class="ml-auto rounded-full bg-yellow-100 px-2 py-0.5 text-xs text-yellow-800">完了</span>
-                    </div>
-                    <!-- シリーズ合計時間 -->
-                    <div v-if="seriesTotalMinutes > 0" class="flex items-center gap-3 py-2">
-                        <span class="w-16 shrink-0 text-xs font-medium text-orange-600">合計</span>
-                        <span class="text-sm font-bold text-orange-800">シリーズ全体: {{ formatDurationFromMinutes(seriesTotalMinutes) }}</span>
+                    <!-- シリーズ合計 -->
+                    <div v-if="seriesTotalMinutes > 0" class="flex items-center justify-between py-2.5">
+                        <span class="text-sm font-semibold text-orange-800">シリーズ合計</span>
+                        <span class="text-base font-bold text-orange-800">{{ formatDurationFromMinutes(seriesTotalMinutes) }}</span>
                     </div>
                 </div>
             </div>
@@ -429,6 +466,29 @@ const seriesTotalMinutes = computed(() => {
     }, 0);
     return ownTotal + otherTotal;
 });
+
+function eventsForPja(pjaId) {
+    return seriesEvents.value
+        .filter((e) => String(e.project_job_assignment_id) === String(pjaId))
+        .map((e) => {
+            const rawStart = e.start ?? e.starts_at ?? null;
+            const rawEnd = e.end ?? e.ends_at ?? null;
+            const start = rawStart ? new Date(rawStart) : null;
+            const end = rawEnd ? new Date(rawEnd) : null;
+            const dateStr = e.date || (start ? start.toISOString().slice(0, 10) : '');
+            const startTime = start ? start.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : '';
+            const endTime = end ? end.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : '';
+            const minutes = start && end ? Math.max(0, Math.round((end - start) / 60000)) : 0;
+            const interruptionMinutes = e.interruption_minutes ?? 0;
+            const lunchMinutes = e.lunch_overlap_minutes ?? 0;
+            const actualMinutes = Math.max(0, minutes - interruptionMinutes - lunchMinutes);
+            return { id: e.id, dateStr, startTime, endTime, minutes, actualMinutes };
+        });
+}
+
+function seriesMinutesForPja(pjaId) {
+    return eventsForPja(pjaId).reduce((sum, ev) => sum + (ev.actualMinutes || ev.minutes), 0);
+}
 
 function goChainItem(item) {
     try {

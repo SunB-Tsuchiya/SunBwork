@@ -65,6 +65,11 @@ function formatMins(mins) {
     return `${m}分`;
 }
 
+function formatEvDate(dateStr) {
+    const m = String(dateStr).match(/\d{4}-(\d{2})-(\d{2})/);
+    return m ? `${parseInt(m[1])}/${parseInt(m[2])}` : dateStr;
+}
+
 function totalRecordedMins() {
     const s = props.event?.start ?? props.event?.starts_at;
     const e = props.event?.end ?? props.event?.ends_at;
@@ -249,7 +254,7 @@ const eventTypeLabel = computed(() => props.event?.event_item_type?.name ?? null
                                      class="text-xs text-gray-500">
                                     <a :href="route('events.show', ev.id)"
                                        class="text-blue-600 hover:underline">
-                                        {{ ev.date }}
+                                        {{ formatEvDate(ev.date) }}
                                     </a>
                                     {{ ev.start }}〜{{ ev.end }}
                                     <span class="ml-1 font-medium text-gray-700">{{ formatMins(ev.minutes) }}</span>
