@@ -428,20 +428,21 @@ class ProjectJobController extends Controller
                             : null,
                         'message'                   => null,
                         'project_job_assignment'    => [
-                            'id'               => $a->id,
-                            'title'            => $a->title,
-                            'user_id'          => $a->user_id,
-                            'sender_id'        => $a->sender_id,
-                            'desired_end_date' => $a->desired_end_date?->format('Y-m-d'),
-                            'start_time'       => $a->start_time,
-                            'completed'        => (bool) $a->completed,
-                            'scheduled'        => (bool) ($a->scheduled ?? false),
-                            'scheduled_at'     => $a->scheduled_at,
-                            'read_at'          => $a->read_at,
-                            'status'           => $sm
+                            'id'                   => $a->id,
+                            'title'                => $a->title,
+                            'user_id'              => $a->user_id,
+                            'sender_id'            => $a->sender_id,
+                            'source_assignment_id' => $a->source_assignment_id,
+                            'desired_end_date'     => $a->desired_end_date?->format('Y-m-d'),
+                            'start_time'           => $a->start_time,
+                            'completed'            => (bool) $a->completed,
+                            'scheduled'            => (bool) ($a->scheduled ?? false),
+                            'scheduled_at'         => $a->scheduled_at,
+                            'read_at'              => $a->read_at,
+                            'status'               => $sm
                                 ? ['id' => $sm->id, 'key' => $sm->key ?? $sm->slug ?? null, 'name' => $sm->name]
                                 : null,
-                            'user'             => $a->user
+                            'user'                 => $a->user
                                 ? ['id' => $a->user->id, 'name' => $a->user->name]
                                 : null,
                         ],
@@ -465,20 +466,40 @@ class ProjectJobController extends Controller
                 ->filter()->unique()->values()->toArray();
 
             if (!empty($assignmentIds)) {
-                $eventsByAssignment = DB::table('events')
+                $eventGroupsByAssignment = DB::table('events')
                     ->whereIn('project_job_assignment_id', $assignmentIds)
                     ->whereNotNull('starts_at')
                     ->orderBy('starts_at')
-                    ->get(['id', 'project_job_assignment_id', 'starts_at', 'ends_at'])
-                    ->keyBy('project_job_assignment_id');
+                    ->get(['id', 'project_job_assignment_id', 'starts_at', 'ends_at', 'interruption_minutes'])
+                    ->groupBy('project_job_assignment_id');
 
-                $jobHistory = array_map(function ($m) use ($eventsByAssignment) {
+                $jobHistory = array_map(function ($m) use ($eventGroupsByAssignment) {
                     $aid = (int) ($m['project_job_assignment_id'] ?? $m['project_job_assignment']['id'] ?? 0);
-                    if ($aid && isset($eventsByAssignment[$aid])) {
-                        $ev = $eventsByAssignment[$aid];
-                        $m['event_id']        = $ev->id;
-                        $m['event_starts_at'] = $ev->starts_at ? \Carbon\Carbon::parse($ev->starts_at)->utc()->toIso8601String() : null;
-                        $m['event_ends_at']   = $ev->ends_at   ? \Carbon\Carbon::parse($ev->ends_at)->utc()->toIso8601String()   : null;
+                    if ($aid && $eventGroupsByAssignment->has($aid)) {
+                        $evs = $eventGroupsByAssignment->get($aid);
+                        $first = $evs->first();
+                        // backward compat: keep first event fields
+                        $m['event_id']        = $first->id;
+                        $m['event_starts_at'] = $first->starts_at ? \Carbon\Carbon::parse($first->starts_at)->setTimezone('Asia/Tokyo')->toIso8601String() : null;
+                        $m['event_ends_at']   = $first->ends_at   ? \Carbon\Carbon::parse($first->ends_at)->setTimezone('Asia/Tokyo')->toIso8601String()   : null;
+                        // all events for this assignment
+                        $m['all_events'] = $evs->map(function ($ev) {
+                            $s = $ev->starts_at ? \Carbon\Carbon::parse($ev->starts_at)->setTimezone('Asia/Tokyo') : null;
+                            $e = $ev->ends_at   ? \Carbon\Carbon::parse($ev->ends_at)->setTimezone('Asia/Tokyo')   : null;
+                            $totalMins = ($s && $e) ? max(0, (int) $s->diffInMinutes($e, false)) : 0;
+                            $interrupt = (int) ($ev->interruption_minutes ?? 0);
+                            return [
+                                'id'      => $ev->id,
+                                'date'    => $s ? $s->toDateString() : null,
+                                'start'   => $s ? $s->format('H:i') : null,
+                                'end'     => $e ? $e->format('H:i') : null,
+                                'minutes' => max(0, $totalMins - $interrupt),
+                            ];
+                        })->values()->toArray();
+                        $m['total_minutes'] = array_sum(array_column($m['all_events'], 'minutes'));
+                    } else {
+                        $m['all_events']    = [];
+                        $m['total_minutes'] = 0;
                     }
                     return $m;
                 }, $jhArr);

@@ -1067,14 +1067,14 @@ class EventController extends Controller
 
                         // 各アサインメントのイベントを一括取得
                         $allEvents = \App\Models\Event::whereIn('project_job_assignment_id', $allIds->toArray())
-                            ->select(['id', 'project_job_assignment_id', 'start', 'end', 'starts_at', 'ends_at', 'interruption_minutes'])
+                            ->select(['id', 'project_job_assignment_id', 'starts_at', 'ends_at', 'interruption_minutes'])
                             ->get()
                             ->groupBy('project_job_assignment_id');
 
                         // 休憩計算ヘルパー: 単一イベントの実作業分数を返す
                         $calcActualMins = function ($ev, $breakInfo) {
-                            $rawS = $ev->starts_at ?? $ev->start ?? null;
-                            $rawE = $ev->ends_at   ?? $ev->end   ?? null;
+                            $rawS = $ev->starts_at ?? null;
+                            $rawE = $ev->ends_at   ?? null;
                             if (!$rawS || !$rawE) return 0;
                             $evS = Carbon::parse($rawS);
                             $evE = Carbon::parse($rawE);
@@ -1111,8 +1111,8 @@ class EventController extends Controller
                             foreach ($cpjaEvents as $ev) {
                                 $mins = $calcActualMins($ev, $breakInfoForUser);
                                 $pjaMins += $mins;
-                                $rawS = $ev->starts_at ?? $ev->start ?? null;
-                                $rawE = $ev->ends_at   ?? $ev->end   ?? null;
+                                $rawS = $ev->starts_at ?? null;
+                                $rawE = $ev->ends_at   ?? null;
                                 $evList[] = [
                                     'id'       => $ev->id,
                                     'date'     => $rawS ? Carbon::parse($rawS)->setTimezone('Asia/Tokyo')->toDateString() : null,

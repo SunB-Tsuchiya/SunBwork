@@ -68,6 +68,55 @@
                     表示するデータがありません。
                 </div>
 
+                <!-- ── 続きジョブ シリーズパネル ── -->
+                <div v-if="chainGroups.length > 0" class="mb-5 space-y-3">
+                    <div v-for="(chain, ci) in chainGroups" :key="ci"
+                         class="overflow-hidden rounded-lg border border-orange-200 bg-orange-50 shadow-sm">
+                        <div class="border-b border-orange-200 bg-orange-100 px-4 py-2">
+                            <span class="text-sm font-semibold text-orange-800">↩ 続きジョブ シリーズ（{{ chain.length }}件）</span>
+                        </div>
+                        <div class="divide-y divide-orange-100 px-4 py-1">
+                            <div v-for="(m, idx) in chain" :key="m.project_job_assignment?.id ?? idx"
+                                 class="flex items-start gap-3 py-2.5">
+                                <span class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-orange-200 text-xs font-bold text-orange-700">
+                                    {{ idx + 1 }}
+                                </span>
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex flex-wrap items-center gap-1.5">
+                                        <button @click="rowClick(m, $event)"
+                                                class="text-left text-sm font-medium text-blue-700 underline hover:text-blue-900">
+                                            {{ m.subject || m.project_job_assignment?.title }}
+                                        </button>
+                                        <span class="text-xs text-gray-500">{{ getRecipients(m) }}</span>
+                                        <span v-if="m.project_job_assignment?.completed"
+                                              class="rounded-full bg-yellow-100 px-1.5 py-0.5 text-xs text-yellow-800">完了</span>
+                                    </div>
+                                    <div v-if="m.all_events && m.all_events.length" class="mt-1 space-y-0.5">
+                                        <div v-for="ev in m.all_events" :key="ev.id" class="text-xs text-gray-500">
+                                            {{ chainFormatEvDate(ev.date) }}
+                                            {{ ev.start }}〜{{ ev.end }}
+                                            <span class="ml-1 font-medium text-gray-700">{{ chainFormatMins(ev.minutes) }}</span>
+                                        </div>
+                                    </div>
+                                    <div v-else class="mt-0.5 text-xs text-gray-400">（予定未セット）</div>
+                                </div>
+                                <div class="shrink-0 text-right">
+                                    <span class="text-sm font-bold"
+                                          :class="m.total_minutes > 0 ? 'text-indigo-700' : 'text-gray-300'">
+                                        {{ m.total_minutes > 0 ? chainFormatMins(m.total_minutes) : '-' }}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between py-2">
+                                <span class="text-sm font-semibold text-orange-800">シリーズ合計</span>
+                                <span class="text-base font-bold text-orange-800">
+                                    {{ chainFormatMins(chain.reduce((s, m) => s + (m.total_minutes || 0), 0)) }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <template v-for="group in displayGroups" :key="group.key">
                     <!-- グループヘッダー -->
                     <div class="mt-4 rounded bg-gray-100 px-4 py-1.5 text-sm font-semibold text-gray-700 first:mt-0">
@@ -562,6 +611,72 @@ onMounted(() => {
             } catch {}
         });
     } catch {}
+});
+
+// ── 続きジョブ チェーングループ ──────────────────────────────────────────
+
+function chainFormatMins(mins) {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    if (h > 0 && m > 0) return `${h}時間${m}分`;
+    if (h > 0) return `${h}時間`;
+    return `${m}分`;
+}
+
+function chainFormatEvDate(dateStr) {
+    const match = String(dateStr || '').match(/\d{4}-(\d{2})-(\d{2})/);
+    return match ? `${parseInt(match[1])}/${parseInt(match[2])}` : (dateStr || '');
+}
+
+const chainGroups = computed(() => {
+    const all = Array.isArray(localMessages.value) ? [...localMessages.value] : [];
+
+    // assignment_id -> entry
+    const byId = new Map();
+    for (const m of all) {
+        const aid = String(m.project_job_assignment?.id ?? m.project_job_assignment_id ?? '');
+        if (aid) byId.set(aid, m);
+    }
+
+    const chains = [];
+    const visited = new Set();
+
+    for (const m of all) {
+        const aid = String(m.project_job_assignment?.id ?? m.project_job_assignment_id ?? '');
+        if (!aid || visited.has(aid)) continue;
+
+        // ルートをたどる
+        let rootEntry = m;
+        for (let i = 0; i < 20; i++) {
+            const srcId = String(rootEntry.project_job_assignment?.source_assignment_id ?? '');
+            if (!srcId || !byId.has(srcId)) break;
+            rootEntry = byId.get(srcId);
+        }
+        const rootId = String(rootEntry.project_job_assignment?.id ?? rootEntry.project_job_assignment_id ?? '');
+        if (visited.has(rootId)) continue;
+
+        // BFS で子孫を収集
+        const items = [];
+        const queue = [rootId];
+        while (queue.length > 0) {
+            const cur = queue.shift();
+            if (visited.has(cur)) continue;
+            visited.add(cur);
+            const entry = byId.get(cur);
+            if (entry) {
+                items.push(entry);
+                for (const m2 of all) {
+                    const m2id  = String(m2.project_job_assignment?.id ?? m2.project_job_assignment_id ?? '');
+                    const m2src = String(m2.project_job_assignment?.source_assignment_id ?? '');
+                    if (m2src === cur && !visited.has(m2id)) queue.push(m2id);
+                }
+            }
+        }
+
+        if (items.length > 1) chains.push(items);
+    }
+
+    return chains;
 });
 </script>
 

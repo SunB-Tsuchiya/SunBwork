@@ -480,12 +480,67 @@ class JobBoxController extends Controller
 
         // JAM records をプレーン配列に変換してマージ・ソート
         $jamArray = $jamMessages->map(fn ($m) => $m->toArray())->toArray();
-        $messages = [
-            'data' => collect(array_merge($jamArray, $extraItems))
-                ->sortByDesc(fn ($m) => $m['created_at'] ?? '')
-                ->values()
-                ->toArray(),
-        ];
+        $merged = collect(array_merge($jamArray, $extraItems))
+            ->sortByDesc(fn ($m) => $m['created_at'] ?? '')
+            ->values()
+            ->toArray();
+
+        // all_events / total_minutes / source_assignment_id をエントリに付加
+        try {
+            $allAids = collect($merged)
+                ->map(fn ($m) => (int) ($m['project_job_assignment_id'] ?? $m['project_job_assignment']['id'] ?? 0))
+                ->filter()->unique()->values()->toArray();
+
+            if (!empty($allAids)) {
+                // source_assignment_id を一括取得
+                $sourceMap = \App\Models\ProjectJobAssignment::whereIn('id', $allAids)
+                    ->pluck('source_assignment_id', 'id');
+
+                // 全イベントを groupBy で取得
+                $allEventsGrouped = DB::table('events')
+                    ->whereIn('project_job_assignment_id', $allAids)
+                    ->whereNotNull('starts_at')
+                    ->orderBy('starts_at')
+                    ->get(['id', 'project_job_assignment_id', 'starts_at', 'ends_at', 'interruption_minutes'])
+                    ->groupBy('project_job_assignment_id');
+
+                $merged = array_map(function ($m) use ($sourceMap, $allEventsGrouped) {
+                    $aid = (int) ($m['project_job_assignment_id'] ?? $m['project_job_assignment']['id'] ?? 0);
+                    // source_assignment_id を project_job_assignment に埋め込む
+                    if ($aid && isset($sourceMap[$aid])) {
+                        if (isset($m['project_job_assignment']) && is_array($m['project_job_assignment'])) {
+                            $m['project_job_assignment']['source_assignment_id'] = $sourceMap[$aid];
+                        }
+                    }
+                    // all_events / total_minutes
+                    if ($aid && $allEventsGrouped->has($aid)) {
+                        $evs = $allEventsGrouped->get($aid);
+                        $m['all_events'] = $evs->map(function ($ev) {
+                            $s = $ev->starts_at ? \Carbon\Carbon::parse($ev->starts_at)->setTimezone('Asia/Tokyo') : null;
+                            $e = $ev->ends_at   ? \Carbon\Carbon::parse($ev->ends_at)->setTimezone('Asia/Tokyo')   : null;
+                            $totalMins = ($s && $e) ? max(0, (int) $s->diffInMinutes($e, false)) : 0;
+                            $interrupt = (int) ($ev->interruption_minutes ?? 0);
+                            return [
+                                'id'      => $ev->id,
+                                'date'    => $s ? $s->toDateString() : null,
+                                'start'   => $s ? $s->format('H:i') : null,
+                                'end'     => $e ? $e->format('H:i') : null,
+                                'minutes' => max(0, $totalMins - $interrupt),
+                            ];
+                        })->values()->toArray();
+                        $m['total_minutes'] = array_sum(array_column($m['all_events'], 'minutes'));
+                    } else {
+                        $m['all_events']    = [];
+                        $m['total_minutes'] = 0;
+                    }
+                    return $m;
+                }, $merged);
+            }
+        } catch (\Throwable $__e) {
+            // non-fatal
+        }
+
+        $messages = ['data' => array_values($merged)];
 
         // 締め切り日からの月リスト
         $monthsFromEndDate = JobAssignmentMessage::join('project_job_assignments', 'job_assignment_messages.project_job_assignment_id', '=', 'project_job_assignments.id')

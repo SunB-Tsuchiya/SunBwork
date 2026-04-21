@@ -323,6 +323,60 @@
                     </div>
                     <template v-else>
 
+                        <!-- ── 続きジョブ シリーズパネル ── -->
+                        <div v-if="historyChainGroups.length > 0" class="mb-5 space-y-3">
+                            <div v-for="(chain, ci) in historyChainGroups" :key="ci"
+                                 class="overflow-hidden rounded-lg border border-orange-200 bg-orange-50 shadow-sm">
+                                <div class="border-b border-orange-200 bg-orange-100 px-4 py-2">
+                                    <span class="text-sm font-semibold text-orange-800">↩ 続きジョブ シリーズ（{{ chain.length }}件）</span>
+                                </div>
+                                <div class="divide-y divide-orange-100 px-4 py-1">
+                                    <div v-for="(m, idx) in chain" :key="m.project_job_assignment?.id"
+                                         class="flex items-start gap-3 py-2.5">
+                                        <!-- 番号 -->
+                                        <span class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-orange-200 text-xs font-bold text-orange-700">
+                                            {{ idx + 1 }}
+                                        </span>
+                                        <!-- タイトルとイベント -->
+                                        <div class="min-w-0 flex-1">
+                                            <div class="flex flex-wrap items-center gap-1.5">
+                                                <button @click="historyRowClick(m, $event)"
+                                                        class="text-left text-sm font-medium text-blue-700 underline hover:text-blue-900">
+                                                    {{ m.subject || m.project_job_assignment?.title }}
+                                                </button>
+                                                <span class="text-xs text-gray-500">{{ historyGetRecipients(m) }}</span>
+                                                <span v-if="m.project_job_assignment?.completed"
+                                                      class="rounded-full bg-yellow-100 px-1.5 py-0.5 text-xs text-yellow-800">完了</span>
+                                            </div>
+                                            <!-- イベント一覧 -->
+                                            <div v-if="m.all_events && m.all_events.length" class="mt-1 space-y-0.5">
+                                                <div v-for="ev in m.all_events" :key="ev.id" class="text-xs text-gray-500">
+                                                    {{ historyFormatEvDate(ev.date) }}
+                                                    {{ ev.start }}〜{{ ev.end }}
+                                                    <span class="ml-1 font-medium text-gray-700">{{ historyFormatMins(ev.minutes) }}</span>
+                                                </div>
+                                            </div>
+                                            <div v-else class="mt-0.5 text-xs text-gray-400">（予定未セット）</div>
+                                        </div>
+                                        <!-- 合計時間 -->
+                                        <div class="shrink-0 text-right">
+                                            <span class="text-sm font-bold"
+                                                  :class="m.total_minutes > 0 ? 'text-indigo-700' : 'text-gray-300'">
+                                                {{ m.total_minutes > 0 ? historyFormatMins(m.total_minutes) : '-' }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <!-- チェーン合計 -->
+                                    <div class="flex items-center justify-between py-2">
+                                        <span class="text-sm font-semibold text-orange-800">シリーズ合計</span>
+                                        <span class="text-base font-bold text-orange-800">
+                                            {{ historyFormatMins(chain.reduce((s, m) => s + (m.total_minutes || 0), 0)) }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- ── 進行表に関連するジョブ ── -->
                         <div class="mb-4">
                             <button
@@ -1003,6 +1057,72 @@ function saveSheetOrder() {
 // ── ジョブ履歴 ────────────────────────────────────────────────────────────
 
 const hideHistoryCompleted = ref(false);
+
+function historyFormatMins(mins) {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    if (h > 0 && m > 0) return `${h}時間${m}分`;
+    if (h > 0) return `${h}時間`;
+    return `${m}分`;
+}
+
+function historyFormatEvDate(dateStr) {
+    const match = String(dateStr || '').match(/\d{4}-(\d{2})-(\d{2})/);
+    return match ? `${parseInt(match[1])}/${parseInt(match[2])}` : (dateStr || '');
+}
+
+// 続きジョブ チェーングループ（2件以上のチェーンのみ）
+const historyChainGroups = computed(() => {
+    const raw = Array.isArray(page.props.jobHistory) ? page.props.jobHistory : [];
+    const deduped = historyDeduplicate(raw);
+
+    // assignment_id -> entry
+    const byId = new Map();
+    for (const m of deduped) {
+        const aid = String(m.project_job_assignment?.id ?? m.project_job_assignment_id ?? '');
+        if (aid) byId.set(aid, m);
+    }
+
+    const chains = [];
+    const visited = new Set();
+
+    for (const m of deduped) {
+        const aid = String(m.project_job_assignment?.id ?? m.project_job_assignment_id ?? '');
+        if (!aid || visited.has(aid)) continue;
+
+        // ルートをたどる
+        let rootEntry = m;
+        for (let i = 0; i < 20; i++) {
+            const srcId = String(rootEntry.project_job_assignment?.source_assignment_id ?? '');
+            if (!srcId || !byId.has(srcId)) break;
+            rootEntry = byId.get(srcId);
+        }
+        const rootId = String(rootEntry.project_job_assignment?.id ?? rootEntry.project_job_assignment_id ?? '');
+        if (visited.has(rootId)) continue;
+
+        // BFS で子孫を収集
+        const items = [];
+        const queue = [rootId];
+        while (queue.length > 0) {
+            const cur = queue.shift();
+            if (visited.has(cur)) continue;
+            visited.add(cur);
+            const entry = byId.get(cur);
+            if (entry) {
+                items.push(entry);
+                for (const m2 of deduped) {
+                    const m2id  = String(m2.project_job_assignment?.id ?? m2.project_job_assignment_id ?? '');
+                    const m2src = String(m2.project_job_assignment?.source_assignment_id ?? '');
+                    if (m2src === cur && !visited.has(m2id)) queue.push(m2id);
+                }
+            }
+        }
+
+        if (items.length > 1) chains.push(items);
+    }
+
+    return chains;
+});
 
 function historyGetDateKey(m) {
     if (m.event_starts_at) return String(m.event_starts_at).replace(' ', 'T').split('T')[0];
