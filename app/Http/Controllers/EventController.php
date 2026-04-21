@@ -1032,117 +1032,7 @@ class EventController extends Controller
             }
         } catch (\Throwable $e) {}
 
-        // 続きジョブ チェーン情報: pja が source_assignment_id チェーンを持つ場合、
-        // シリーズ全体のアサインメントとそれぞれのイベントを取得して合算する
-        $chainSeries = null;
-        try {
-            $currentPjaId = $event->project_job_assignment_id ?? null;
-            if ($currentPjaId) {
-                $pja = ProjectJobAssignment::find($currentPjaId);
-                if ($pja) {
-                    // ルートをたどる
-                    $root = $pja;
-                    for ($i = 0; $i < 20; $i++) {
-                        if (empty($root->source_assignment_id)) break;
-                        $parent = ProjectJobAssignment::find($root->source_assignment_id);
-                        if (!$parent) break;
-                        $root = $parent;
-                    }
-                    // ルートから全子孫を BFS で収集
-                    $allIds = collect([$root->id]);
-                    $toProcess = collect([$root->id]);
-                    for ($i = 0; $i < 20 && $toProcess->isNotEmpty(); $i++) {
-                        $children = ProjectJobAssignment::whereIn('source_assignment_id', $toProcess->toArray())->pluck('id');
-                        $children->each(fn($id) => $allIds->push($id));
-                        $toProcess = $children;
-                    }
-                    $allIds = $allIds->unique()->values();
-
-                    // チェーンが2件以上の場合のみ付加
-                    if ($allIds->count() > 1) {
-                        $chainPjas = ProjectJobAssignment::whereIn('id', $allIds->toArray())
-                            ->select(['id', 'title', 'source_assignment_id', 'completed', 'desired_end_date', 'user_id'])
-                            ->orderBy('created_at')
-                            ->get();
-
-                        // 各アサインメントのイベントを一括取得
-                        $allEvents = \App\Models\Event::whereIn('project_job_assignment_id', $allIds->toArray())
-                            ->select(['id', 'project_job_assignment_id', 'starts_at', 'ends_at', 'interruption_minutes'])
-                            ->get()
-                            ->groupBy('project_job_assignment_id');
-
-                        // 休憩計算ヘルパー: 単一イベントの実作業分数を返す
-                        $calcActualMins = function ($ev, $breakInfo) {
-                            $rawS = $ev->starts_at ?? null;
-                            $rawE = $ev->ends_at   ?? null;
-                            if (!$rawS || !$rawE) return 0;
-                            $evS = Carbon::parse($rawS);
-                            $evE = Carbon::parse($rawE);
-                            $total = max(0, (int) $evS->diffInMinutes($evE, false));
-                            $interrupt = (int) ($ev->interruption_minutes ?? 0);
-                            $lunch = 0;
-                            if ($breakInfo) {
-                                $date = $evS->toDateString();
-                                $ls = Carbon::parse($date . ' ' . $breakInfo['start']);
-                                $le = Carbon::parse($date . ' ' . $breakInfo['end']);
-                                $os = $evS->gt($ls) ? $evS : $ls;
-                                $oe = $evE->lt($le) ? $evE : $le;
-                                $lunch = max(0, (int) $os->diffInMinutes($oe, false));
-                            }
-                            return max(0, $total - $interrupt - $lunch);
-                        };
-
-                        $seriesItems = [];
-                        $seriesTotalMinutes = 0;
-                        foreach ($chainPjas as $cpja) {
-                            $cpjaEvents = $allEvents->get($cpja->id, collect());
-                            // 休憩設定取得（初回のみ）
-                            $breakInfoForUser = null;
-                            try {
-                                $userSetting = UserSetting::where('user_id', $cpja->user_id)->first();
-                                $breakInfoForUser = [
-                                    'start' => $userSetting?->lunch_start ?: '12:00',
-                                    'end'   => $userSetting?->lunch_end   ?: '13:00',
-                                ];
-                            } catch (\Throwable $__e) {}
-
-                            $pjaMins = 0;
-                            $evList = [];
-                            foreach ($cpjaEvents as $ev) {
-                                $mins = $calcActualMins($ev, $breakInfoForUser);
-                                $pjaMins += $mins;
-                                $rawS = $ev->starts_at ?? null;
-                                $rawE = $ev->ends_at   ?? null;
-                                $evList[] = [
-                                    'id'       => $ev->id,
-                                    'date'     => $rawS ? Carbon::parse($rawS)->setTimezone('Asia/Tokyo')->toDateString() : null,
-                                    'start'    => $rawS ? Carbon::parse($rawS)->setTimezone('Asia/Tokyo')->format('H:i') : null,
-                                    'end'      => $rawE ? Carbon::parse($rawE)->setTimezone('Asia/Tokyo')->format('H:i') : null,
-                                    'minutes'  => $mins,
-                                ];
-                            }
-                            $seriesTotalMinutes += $pjaMins;
-                            $seriesItems[] = [
-                                'assignment_id'       => $cpja->id,
-                                'title'               => $cpja->title,
-                                'completed'           => (bool) ($cpja->completed ?? false),
-                                'is_current'          => $cpja->id === $currentPjaId,
-                                'source_assignment_id'=> $cpja->source_assignment_id,
-                                'minutes'             => $pjaMins,
-                                'events'              => $evList,
-                            ];
-                        }
-
-                        $chainSeries = [
-                            'items'         => $seriesItems,
-                            'total_minutes' => $seriesTotalMinutes,
-                        ];
-                    }
-                }
-            }
-        } catch (\Throwable $__e) {
-            \Illuminate\Support\Facades\Log::warning('EventController::show: chain calculation failed', ['error' => $__e->getMessage()]);
-        }
+        $chainSeries = $this->computeChainSeries($event);
 
         $hideEdit = request()->query('hide_edit') ? true : false;
         return Inertia::render('Events/Show', [
@@ -1224,6 +1114,8 @@ class EventController extends Controller
             // non-fatal
         }
 
+        $chainSeries = $this->computeChainSeries($event);
+
         return Inertia::render('Events/Show', [
             'event'                  => $event,
             'jst_start'              => $evStartJst?->format('Y-m-d H:i'),
@@ -1234,7 +1126,122 @@ class EventController extends Controller
             'lunch_start'            => $lunchStart,
             'lunch_end'              => $lunchEnd,
             'lunch_overlap_minutes'  => $lunchOverlapMinutes,
+            'chain_series'           => $chainSeries,
         ]);
+    }
+
+    /**
+     * イベントに紐づく続きジョブチェーン情報を計算して返す共通メソッド。
+     * show() / showForCoordinator() 両方で使用する。
+     */
+    private function computeChainSeries(Event $event): ?array
+    {
+        $chainSeries = null;
+        try {
+            $currentPjaId = $event->project_job_assignment_id ?? null;
+            if ($currentPjaId) {
+                $pja = ProjectJobAssignment::find($currentPjaId);
+                if ($pja) {
+                    // ルートをたどる
+                    $root = $pja;
+                    for ($i = 0; $i < 20; $i++) {
+                        if (empty($root->source_assignment_id)) break;
+                        $parent = ProjectJobAssignment::find($root->source_assignment_id);
+                        if (!$parent) break;
+                        $root = $parent;
+                    }
+                    // ルートから全子孫を BFS で収集
+                    $allIds = collect([$root->id]);
+                    $toProcess = collect([$root->id]);
+                    for ($i = 0; $i < 20 && $toProcess->isNotEmpty(); $i++) {
+                        $children = ProjectJobAssignment::whereIn('source_assignment_id', $toProcess->toArray())->pluck('id');
+                        $children->each(fn($id) => $allIds->push($id));
+                        $toProcess = $children;
+                    }
+                    $allIds = $allIds->unique()->values();
+
+                    // チェーンが2件以上の場合のみ付加
+                    if ($allIds->count() > 1) {
+                        $chainPjas = ProjectJobAssignment::whereIn('id', $allIds->toArray())
+                            ->select(['id', 'title', 'source_assignment_id', 'completed', 'desired_end_date', 'user_id'])
+                            ->orderBy('created_at')
+                            ->get();
+
+                        $allEvents = \App\Models\Event::whereIn('project_job_assignment_id', $allIds->toArray())
+                            ->select(['id', 'project_job_assignment_id', 'starts_at', 'ends_at', 'interruption_minutes'])
+                            ->get()
+                            ->groupBy('project_job_assignment_id');
+
+                        $calcActualMins = function ($ev, $breakInfo) {
+                            $rawS = $ev->starts_at ?? null;
+                            $rawE = $ev->ends_at   ?? null;
+                            if (!$rawS || !$rawE) return 0;
+                            $evS = Carbon::parse($rawS);
+                            $evE = Carbon::parse($rawE);
+                            $total = max(0, (int) $evS->diffInMinutes($evE, false));
+                            $interrupt = (int) ($ev->interruption_minutes ?? 0);
+                            $lunch = 0;
+                            if ($breakInfo) {
+                                $date = $evS->toDateString();
+                                $ls = Carbon::parse($date . ' ' . $breakInfo['start']);
+                                $le = Carbon::parse($date . ' ' . $breakInfo['end']);
+                                $os = $evS->gt($ls) ? $evS : $ls;
+                                $oe = $evE->lt($le) ? $evE : $le;
+                                $lunch = max(0, (int) $os->diffInMinutes($oe, false));
+                            }
+                            return max(0, $total - $interrupt - $lunch);
+                        };
+
+                        $seriesItems = [];
+                        $seriesTotalMinutes = 0;
+                        foreach ($chainPjas as $cpja) {
+                            $cpjaEvents = $allEvents->get($cpja->id, collect());
+                            $breakInfoForUser = null;
+                            try {
+                                $userSetting = UserSetting::where('user_id', $cpja->user_id)->first();
+                                $breakInfoForUser = [
+                                    'start' => $userSetting?->lunch_start ?: '12:00',
+                                    'end'   => $userSetting?->lunch_end   ?: '13:00',
+                                ];
+                            } catch (\Throwable $__e) {}
+
+                            $pjaMins = 0;
+                            $evList = [];
+                            foreach ($cpjaEvents as $ev) {
+                                $mins = $calcActualMins($ev, $breakInfoForUser);
+                                $pjaMins += $mins;
+                                $rawS = $ev->starts_at ?? null;
+                                $rawE = $ev->ends_at   ?? null;
+                                $evList[] = [
+                                    'id'      => $ev->id,
+                                    'date'    => $rawS ? Carbon::parse($rawS)->setTimezone('Asia/Tokyo')->toDateString() : null,
+                                    'start'   => $rawS ? Carbon::parse($rawS)->setTimezone('Asia/Tokyo')->format('H:i') : null,
+                                    'end'     => $rawE ? Carbon::parse($rawE)->setTimezone('Asia/Tokyo')->format('H:i') : null,
+                                    'minutes' => $mins,
+                                ];
+                            }
+                            $seriesTotalMinutes += $pjaMins;
+                            $seriesItems[] = [
+                                'assignment_id'        => $cpja->id,
+                                'title'                => $cpja->title,
+                                'completed'            => (bool) ($cpja->completed ?? false),
+                                'is_current'           => $cpja->id === $currentPjaId,
+                                'source_assignment_id' => $cpja->source_assignment_id,
+                                'minutes'              => $pjaMins,
+                                'events'               => $evList,
+                            ];
+                        }
+                        $chainSeries = [
+                            'items'         => $seriesItems,
+                            'total_minutes' => $seriesTotalMinutes,
+                        ];
+                    }
+                }
+            }
+        } catch (\Throwable $__e) {
+            \Illuminate\Support\Facades\Log::warning('EventController: chain calculation failed', ['error' => $__e->getMessage()]);
+        }
+        return $chainSeries;
     }
 
     /**

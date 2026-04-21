@@ -1281,20 +1281,33 @@ function sortWithChainHistoryMsg(items) {
         const id = msgId(item);
         if (visited.has(id)) return;
         visited.add(id);
-        result.push({ ...item, __chain_depth: depth });
+        // グループをまたぐ続きジョブは既存の__chain_depthを尊重（グループ内rootでも depth>0の場合あり）
+        const finalDepth = (depth === 0 && (item.__chain_depth ?? 0) > 0) ? item.__chain_depth : depth;
+        result.push({ ...item, __chain_depth: finalDepth });
         const children = items.filter((m) => msgSrc(m) === id);
-        for (const child of children) appendWithChildren(child, depth + 1);
+        for (const child of children) appendWithChildren(child, finalDepth + 1);
     }
     for (const root of roots) appendWithChildren(root, 0);
     for (const m of items) {
-        if (!visited.has(msgId(m))) result.push({ ...m, __chain_depth: 0 });
+        if (!visited.has(msgId(m))) result.push({ ...m, __chain_depth: m.__chain_depth ?? 0 });
     }
     return result;
 }
 
 function buildHistoryGroups(messages) {
-    const grouped = new Map();
+    // グローバルIDマップで続きジョブのdepthを事前計算（グループをまたいでも機能）
+    const globalByPjaId = new Map();
     for (const m of messages) {
+        const id = String(m.project_job_assignment?.id ?? m.project_job_assignment_id ?? '');
+        if (id) globalByPjaId.set(id, m);
+    }
+    const withGlobalDepth = messages.map((m) => {
+        const srcId = String(m.project_job_assignment?.source_assignment_id ?? '');
+        return { ...m, __chain_depth: (srcId && globalByPjaId.has(srcId)) ? 1 : 0 };
+    });
+
+    const grouped = new Map();
+    for (const m of withGlobalDepth) {
         const key = historyGetDateKey(m);
         if (!grouped.has(key)) grouped.set(key, []);
         grouped.get(key).push(m);
