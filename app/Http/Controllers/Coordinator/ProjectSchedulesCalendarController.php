@@ -31,8 +31,9 @@ class ProjectSchedulesCalendarController extends Controller
                     'id' => $s->id,
                     'name' => $s->name ?? null,
                     'description' => $s->description ?? null,
-                    'start_date' => $s->start_date ?? null,
-                    'end_date' => $s->end_date ?? null,
+                    // Carbon を直接渡すと UTC ISO シリアライズされ JST がずれるため toDateString() で文字列化
+                    'start_date' => $s->start_date ? $s->start_date->toDateString() : null,
+                    'end_date' => $s->end_date ? $s->end_date->toDateString() : null,
                     'progress' => $s->progress ?? null,
                     'project_job_id' => $s->project_job_id ?? null,
                     'color' => $s->color ?? null,
@@ -146,9 +147,18 @@ class ProjectSchedulesCalendarController extends Controller
         if (array_key_exists('progress', $data)) $project_schedule->progress = $data['progress'];
 
         $project_schedule->save();
-        // Ensure we return the latest state (including casts / defaults) after save
         $project_schedule->refresh();
 
-        return response()->json(['ok' => true, 'schedule' => $project_schedule]);
+        // Carbon を直接渡すと UTC ISO シリアライズで JST がずれるため toDateString() で返す
+        return response()->json(['ok' => true, 'schedule' => [
+            'id' => $project_schedule->id,
+            'name' => $project_schedule->name,
+            'description' => $project_schedule->description,
+            'start_date' => $project_schedule->start_date ? $project_schedule->start_date->toDateString() : null,
+            'end_date' => $project_schedule->end_date ? $project_schedule->end_date->toDateString() : null,
+            'color' => $project_schedule->color,
+            'progress' => $project_schedule->progress,
+            'project_job_id' => $project_schedule->project_job_id,
+        ]]);
     }
 }

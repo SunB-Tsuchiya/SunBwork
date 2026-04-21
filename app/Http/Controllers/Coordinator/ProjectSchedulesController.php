@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\ProjectSchedule;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class ProjectSchedulesController extends Controller
 {
@@ -78,9 +79,18 @@ class ProjectSchedulesController extends Controller
             'updated_by' => $request->user()->id,
         ]);
         $projectSchedule->save();
-        // return fresh model to ensure casts/defaults and recently updated fields are present
         $projectSchedule->refresh();
-        return response()->json(['status' => 'ok', 'schedule' => $projectSchedule]);
+        // Carbon を直接渡すと UTC ISO シリアライズで JST がずれるため toDateString() で返す
+        return response()->json(['status' => 'ok', 'schedule' => [
+            'id' => $projectSchedule->id,
+            'name' => $projectSchedule->name,
+            'description' => $projectSchedule->description,
+            'start_date' => $projectSchedule->start_date ? $projectSchedule->start_date->toDateString() : null,
+            'end_date' => $projectSchedule->end_date ? $projectSchedule->end_date->toDateString() : null,
+            'color' => $projectSchedule->color,
+            'progress' => $projectSchedule->progress,
+            'project_job_id' => $projectSchedule->project_job_id,
+        ]]);
     }
 
     public function destroy(Request $request, ProjectSchedule $projectSchedule)
@@ -117,5 +127,143 @@ class ProjectSchedulesController extends Controller
         });
 
         return response()->json(['status' => 'ok']);
+    }
+
+    /**
+     * CSV エクスポート: project_job_id のスケジュールをCSVでダウンロード
+     */
+    public function csvExport(Request $request)
+    {
+        $projectJobId = $request->query('project_job_id');
+        if (!$projectJobId) {
+            abort(400, 'project_job_id is required');
+        }
+
+        $schedules = ProjectSchedule::where('project_job_id', $projectJobId)
+            ->orderBy('start_date')
+            ->get(['id', 'name', 'start_date', 'end_date', 'description', 'color', 'progress']);
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="schedules_' . $projectJobId . '.csv"',
+        ];
+
+        $callback = function () use ($schedules) {
+            $handle = fopen('php://output', 'w');
+            // BOM for Excel
+            fputs($handle, "\xEF\xBB\xBF");
+            // Header row
+            fputcsv($handle, ['イベント名', '開始日', '終了日', 'メモ', '色', '進捗(%)']);
+            foreach ($schedules as $s) {
+                fputcsv($handle, [
+                    $s->name ?? '',
+                    $s->start_date ?? '',
+                    $s->end_date ?? '',
+                    $s->description ?? '',
+                    $s->color ?? '',
+                    $s->progress ?? 0,
+                ]);
+            }
+            fclose($handle);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    /**
+     * CSV インポート: CSVファイルからスケジュールを一括登録
+     */
+    public function csvImport(Request $request)
+    {
+        $request->validate([
+            'project_job_id' => 'required|exists:project_jobs,id',
+            'file' => 'required|file|mimes:csv,txt|max:2048',
+        ]);
+
+        $projectJobId = $request->input('project_job_id');
+        $file = $request->file('file');
+
+        $handle = fopen($file->getRealPath(), 'r');
+        if ($handle === false) {
+            return response()->json(['status' => 'error', 'message' => 'ファイルを開けませんでした'], 422);
+        }
+
+        // BOM スキップ
+        $bom = fread($handle, 3);
+        if ($bom !== "\xEF\xBB\xBF") {
+            fseek($handle, 0);
+        }
+
+        // ヘッダー行をスキップ
+        fgetcsv($handle);
+
+        $errors = [];
+        $created = 0;
+        $row = 2;
+
+        DB::beginTransaction();
+        try {
+            while (($line = fgetcsv($handle)) !== false) {
+                if (count($line) < 2) {
+                    $row++;
+                    continue;
+                }
+                [$name, $startDate, $endDate, $description, $color, $progress] = array_pad($line, 6, null);
+
+                $name = trim($name ?? '');
+                if ($name === '') {
+                    $errors[] = "{$row}行目: イベント名が空です";
+                    $row++;
+                    continue;
+                }
+
+                // 日付バリデーション
+                $startDate = trim($startDate ?? '');
+                $endDate = trim($endDate ?? '');
+                if ($startDate && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $startDate)) {
+                    $errors[] = "{$row}行目: 開始日の形式が不正です（YYYY-MM-DD）";
+                    $row++;
+                    continue;
+                }
+                if ($endDate && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $endDate)) {
+                    $errors[] = "{$row}行目: 終了日の形式が不正です（YYYY-MM-DD）";
+                    $row++;
+                    continue;
+                }
+
+                $color = trim($color ?? '');
+                if ($color && !preg_match('/^#[0-9a-fA-F]{6}$/', $color)) {
+                    $color = null;
+                }
+                $progress = is_numeric(trim($progress ?? '')) ? (int) trim($progress) : 0;
+                $progress = max(0, min(100, $progress));
+
+                ProjectSchedule::create([
+                    'project_job_id' => $projectJobId,
+                    'name' => $name,
+                    'start_date' => $startDate ?: null,
+                    'end_date' => $endDate ?: null,
+                    'description' => trim($description ?? ''),
+                    'color' => $color ?: null,
+                    'progress' => $progress,
+                    'created_by' => $request->user()->id,
+                ]);
+                $created++;
+                $row++;
+            }
+            fclose($handle);
+
+            if (!empty($errors)) {
+                DB::rollBack();
+                return response()->json(['status' => 'error', 'errors' => $errors], 422);
+            }
+
+            DB::commit();
+            return response()->json(['status' => 'ok', 'created' => $created]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            fclose($handle);
+            return response()->json(['status' => 'error', 'message' => 'インポートに失敗しました: ' . $e->getMessage()], 500);
+        }
     }
 }

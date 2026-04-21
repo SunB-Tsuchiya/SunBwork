@@ -44,4 +44,31 @@ class ProjectSchedulePolicy
 
         return false;
     }
+
+    /**
+     * Determine whether the user can delete the project schedule.
+     */
+    public function delete(User $user, ProjectSchedule $projectSchedule)
+    {
+        if (method_exists($user, 'isCoordinator') && $user->isCoordinator()) {
+            return true;
+        }
+        if (method_exists($user, 'isAdmin') && $user->isAdmin()) {
+            return true;
+        }
+        if (method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin()) {
+            return true;
+        }
+        if (method_exists($user, 'isLeader') && $user->isLeader()) {
+            return true;
+        }
+
+        if ($projectSchedule->project_job_id) {
+            return \App\Models\ProjectTeamMember::where('project_job_id', $projectSchedule->project_job_id)
+                ->where('user_id', $user->id)
+                ->exists();
+        }
+
+        return false;
+    }
 }

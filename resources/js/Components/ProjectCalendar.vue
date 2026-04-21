@@ -13,8 +13,34 @@
 
             <button @click="openEventModal" class="rounded bg-blue-600 px-4 py-2 text-white">予定作成</button>
             <button @click="goToDiaryCreate" class="rounded bg-orange-500 px-4 py-2 text-white">メモ作成</button>
+
+            <!-- CSV操作（案件に紐付いたカレンダーのみ表示） -->
+            <template v-if="props.project">
+                <button @click="handleCsvExport" class="rounded border border-green-600 px-4 py-2 text-green-700 hover:bg-green-50">
+                    CSV出力
+                </button>
+                <button @click="openCsvImportModal" class="rounded border border-indigo-600 px-4 py-2 text-indigo-700 hover:bg-indigo-50">
+                    CSV取込
+                </button>
+            </template>
         </div>
         <FullCalendar ref="calendarRef" :options="calendarOptions" :events="plainCalendarEvents" />
+
+        <!-- ホバーポップアップ -->
+        <Teleport to="body">
+            <div
+                v-if="hoverPopup.show"
+                class="pointer-events-none fixed z-[9999] max-w-xs rounded-lg border border-gray-200 bg-white p-3 text-sm shadow-lg"
+                :style="{ left: hoverPopup.x + 'px', top: hoverPopup.y + 'px' }"
+            >
+                <div class="mb-1 font-bold text-gray-800">{{ hoverPopup.title }}</div>
+                <div class="mb-1 text-xs text-gray-500">
+                    {{ hoverPopup.startDate }}
+                    <template v-if="hoverPopup.endDate && hoverPopup.endDate !== hoverPopup.startDate"> 〜 {{ hoverPopup.endDate }}</template>
+                </div>
+                <div v-if="hoverPopup.description" class="whitespace-pre-wrap text-gray-700">{{ hoverPopup.description }}</div>
+            </div>
+        </Teleport>
 
         <!-- 日付クリックは直接メモモーダルを開く（select modal を廃止） -->
 
@@ -103,26 +129,14 @@
                     <input type="text" v-model="simpleEventTitle" class="w-full rounded border p-2" />
                 </div>
                 <div class="mb-2">
-                    <label class="block text-sm font-medium">日付</label>
-                    <div class="mt-1 flex items-center gap-3">
-                        <label class="flex items-center gap-2 text-sm">
-                            <input type="checkbox" v-model="simpleEventIsRange" />
-                            <span>範囲を指定</span>
-                        </label>
-                    </div>
-                    <div class="mt-2 grid grid-cols-2 gap-2">
+                    <div class="grid grid-cols-2 gap-2">
                         <div>
-                            <label class="block text-xs text-gray-600">開始</label>
+                            <label class="block text-sm font-medium">開始日</label>
                             <input type="date" v-model="simpleEventStartDate" class="w-full rounded border p-2" />
                         </div>
                         <div>
-                            <label class="block text-xs text-gray-600">終了</label>
-                            <input
-                                type="date"
-                                v-model="simpleEventEndDate"
-                                :disabled="!simpleEventIsRange"
-                                :class="['w-full rounded border p-2', !simpleEventIsRange ? 'opacity-50' : '']"
-                            />
+                            <label class="block text-sm font-medium">終了日</label>
+                            <input type="date" v-model="simpleEventEndDate" :min="simpleEventStartDate" class="w-full rounded border p-2" />
                         </div>
                     </div>
                 </div>
@@ -255,13 +269,50 @@
                 </div>
             </div>
         </div>
+
+        <!-- CSV インポートモーダル -->
+        <div v-if="showCsvImportModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div class="w-full max-w-lg rounded-lg bg-white p-6 shadow-lg">
+                <h2 class="mb-4 text-lg font-bold">CSVインポート</h2>
+                <div class="mb-4 rounded bg-gray-50 p-3 text-sm text-gray-600">
+                    <p class="font-medium mb-1">CSVファイルのフォーマット（1行目はヘッダー行）：</p>
+                    <code class="block text-xs bg-gray-100 p-2 rounded">イベント名,開始日(YYYY-MM-DD),終了日(YYYY-MM-DD),メモ,色(#hex),進捗(%)</code>
+                    <p class="mt-1 text-xs text-gray-500">※ 終了日・メモ・色・進捗は省略可</p>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-1">CSVファイルを選択</label>
+                    <input
+                        type="file"
+                        accept=".csv,text/csv"
+                        @change="onCsvFileChange"
+                        class="block w-full text-sm text-gray-500 file:mr-4 file:rounded file:border-0 file:bg-indigo-50 file:px-4 file:py-2 file:text-indigo-700"
+                    />
+                </div>
+                <div v-if="csvImportErrors.length > 0" class="mb-4 rounded border border-red-300 bg-red-50 p-3">
+                    <p class="text-sm font-medium text-red-700 mb-1">エラーがあります（全行キャンセルされます）：</p>
+                    <ul class="text-sm text-red-600 list-disc pl-4">
+                        <li v-for="err in csvImportErrors" :key="err">{{ err }}</li>
+                    </ul>
+                </div>
+                <div class="mt-4 flex justify-end gap-2">
+                    <button type="button" @click="showCsvImportModal = false" class="rounded bg-gray-300 px-4 py-2">キャンセル</button>
+                    <button
+                        type="button"
+                        @click="submitCsvImport"
+                        :disabled="csvImportLoading"
+                        class="rounded bg-indigo-600 px-4 py-2 text-white disabled:opacity-50"
+                    >
+                        {{ csvImportLoading ? '取込中...' : 'インポート実行' }}
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
 <script setup>
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import timeGridPlugin from '@fullcalendar/timegrid';
 import FullCalendar from '@fullcalendar/vue3';
 import { router, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
@@ -286,7 +337,38 @@ const getTodayString = () => {
     return `${yyyy}-${mm}-${dd}`;
 };
 
+// ---------- 日付ユーティリティ（UTC変換なし・ローカル時刻基準）----------
+// inclusive な YYYY-MM-DD 文字列を FullCalendar 用 exclusive（翌日）に変換
+const addOneDay = (dateStr) => {
+    if (!dateStr) return null;
+    const s = String(dateStr).split('T')[0];
+    const [y, m, d] = s.split('-').map(Number);
+    if (!y) return null;
+    const dt = new Date(y, m - 1, d);
+    dt.setDate(dt.getDate() + 1);
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+};
+// exclusive を inclusive に（FullCalendar の endStr → DB 保存値）
+const subOneDay = (dateStr) => {
+    if (!dateStr) return null;
+    const s = String(dateStr).split('T')[0];
+    const [y, m, d] = s.split('-').map(Number);
+    if (!y) return null;
+    const dt = new Date(y, m - 1, d);
+    dt.setDate(dt.getDate() - 1);
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+};
+// Date オブジェクト → ローカル YYYY-MM-DD 文字列
+const localDay = (d) => {
+    if (!d) return null;
+    const dt = d instanceof Date ? d : new Date(d);
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+};
+// -----------------------------------------------------------------------
+
 const selectedDate = ref(getTodayString());
+// ホバーポップアップ
+const hoverPopup = ref({ show: false, x: 0, y: 0, title: '', startDate: '', endDate: '', description: '' });
 // schedule action UI
 const showScheduleActionModal = ref(false);
 const selectedScheduleForAction = ref(null);
@@ -470,14 +552,14 @@ onMounted(() => {
     });
 });
 
-function openEventModal() {
-    // Open simple event modal (no time selection)
+function openEventModal(startDate = null, endDate = null) {
     simpleEventTitle.value = '';
-    // initialize range state and dates
-    simpleEventIsRange.value = false;
-    simpleEventStartDate.value = selectedDate.value || getTodayString();
-    simpleEventEndDate.value = simpleEventStartDate.value;
     simpleEventMemo.value = '';
+    const start = startDate || selectedDate.value || getTodayString();
+    simpleEventStartDate.value = start;
+    simpleEventEndDate.value = endDate || start;
+    // 開始と終了が異なる場合は自動的に範囲モードON
+    simpleEventIsRange.value = !!(endDate && endDate !== start);
     showSimpleEventModal.value = true;
 }
 function goToDiaryCreate() {
@@ -578,15 +660,9 @@ const calendarEvents = computed(() => {
             };
             const startDateOnly = fmt(s.start_date);
             let endDateOnly = s.end_date ? fmt(s.end_date) : undefined;
-            // FullCalendar treats allDay end as exclusive; add one day if end exists
+            // FullCalendar treats allDay end as exclusive; add one day (ローカル日付加算でUTCズレ回避)
             if (endDateOnly) {
-                try {
-                    const d = new Date(endDateOnly);
-                    d.setDate(d.getDate() + 1);
-                    endDateOnly = d.toISOString().split('T')[0];
-                } catch (e) {
-                    // leave as-is
-                }
+                endDateOnly = addOneDay(endDateOnly);
             }
             const schedColor = s.color ?? '#3b82f6';
             list.push({
@@ -686,7 +762,8 @@ const calendarEvents = computed(() => {
             id: e.id ?? e.event_id ?? undefined,
             title: e.name ?? e.title ?? '',
             start: e.start_date ?? e.start ?? e.date,
-            end: e.end_date ?? e.end ?? undefined,
+            // FullCalendar は end を exclusive で扱う → DB の inclusive end_date に +1日
+            end: addOneDay(e.end_date ?? e.end) ?? undefined,
             allDay: true,
             color: e.color ?? '#3b82f6',
             backgroundColor: e.color ?? '#3b82f6',
@@ -789,258 +866,136 @@ watch(
 
 // Modify calendarOptions to attach eventDidMount for native tooltip
 const calendarOptions = computed(() => ({
-    plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],
-    // Use merged calendarEvents (server+comments+memos+local) to decide view
-    initialView:
-        calendarEvents.value && calendarEvents.value.length > 0 && calendarEvents.value.every((ev) => ev.allDay) ? 'dayGridMonth' : 'timeGridWeek',
+    plugins: [dayGridPlugin, interactionPlugin],
+    initialView: 'dayGridMonth',
     locale: 'ja',
-    headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek' },
+    headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth' },
     selectable: true,
-    slotMinTime: '07:00:00',
-    slotMaxTime: '24:00:00',
     firstDay: 1,
     weekText: '\u9031',
     dayHeaderFormat: { weekday: 'short' },
-    slotDuration: '00:15:00',
-    slotLabelInterval: '00:30:00',
-    slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
     height: 'auto',
     editable: true,
     eventDurationEditable: true,
     eventResizableFromStart: true,
+    eventDrop: async function (info) {
+        const ev = info.event;
+        const fmtLocal = (d) => {
+            if (!d) return null;
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        };
+        const newStart = ev.start ? fmtLocal(ev.start) : null;
+        // allDay の end は exclusive なので -1日して inclusive に
+        let newEnd = null;
+        if (ev.end) {
+            const d = new Date(ev.end);
+            d.setDate(d.getDate() - 1);
+            newEnd = fmtLocal(d);
+        }
+
+        const id =
+            ev.extendedProps?.schedule_id ||
+            ev.extendedProps?.project_schedule_id ||
+            ev.extendedProps?.event_id ||
+            ev.id ||
+            null;
+
+        if (!id) {
+            alert('スケジュールIDが取得できないため移動を保存できませんでした');
+            info.revert();
+            return;
+        }
+
+        // memo / comment は移動不可
+        if (String(id).startsWith('memo') || String(id).startsWith('comment')) {
+            info.revert();
+            return;
+        }
+
+        try {
+            const url = route('coordinator.project_schedules.update', { project_schedule: id });
+            await axios.patch(url, {
+                start_date: newStart,
+                end_date: newEnd || newStart,
+            });
+            // localCalendarEntries を更新して computed が最新を返すように
+            const idx = localCalendarEntries.value.findIndex((x) => String(x.id) === String(id));
+            const updated = { id, start_date: newStart, end_date: newEnd || newStart, name: ev.title, color: ev.backgroundColor };
+            if (idx !== -1) localCalendarEntries.value.splice(idx, 1, updated);
+            else localCalendarEntries.value.push(updated);
+        } catch (e) {
+            console.error('eventDrop save error', e);
+            alert('予定の移動保存に失敗しました');
+            info.revert();
+        }
+    },
     eventResize: async function (info) {
         const newStart = info.event.start;
         const newEnd = info.event.end;
-        const startStr = info.event.startStr || (newStart ? newStart.toISOString() : null);
-        const endStr = info.event.endStr || (newEnd ? newEnd.toISOString() : null);
-        const fmtDateOnly = (iso) => (iso ? String(iso).split('T')[0] : null);
-        const displayStart = fmtDateOnly(startStr);
+        const fmtDateOnly = (d) => {
+            if (!d) return null;
+            const yyyy = d.getFullYear ? d.getFullYear() : new Date(d).getFullYear();
+            const mm = String((d.getMonth ? d.getMonth() : new Date(d).getMonth()) + 1).padStart(2, '0');
+            const dd = String(d.getDate ? d.getDate() : new Date(d).getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        };
+        const displayStart = fmtDateOnly(newStart);
         let displayEndInclusive = null;
-        if (endStr) {
-            const endDateOnly = fmtDateOnly(endStr);
+        if (newEnd) {
             if (info.event.allDay) {
-                const d = new Date(endDateOnly);
+                const d = new Date(newEnd);
                 d.setDate(d.getDate() - 1);
-                displayEndInclusive = d.toISOString().split('T')[0];
+                displayEndInclusive = fmtDateOnly(d);
             } else {
-                displayEndInclusive = endDateOnly;
+                displayEndInclusive = fmtDateOnly(newEnd);
             }
         }
-        let confirmMessage = '';
-        if (info.event.allDay) {
-            confirmMessage = `予定を変更しますか？\n開始: ${displayStart}\n終了: ${displayEndInclusive || displayStart}`;
-        } else {
-            const startDateObj = new Date(newStart);
-            const endDateObj = new Date(newEnd);
-            const date = startDateObj.toISOString().slice(0, 10);
-            const startHour = String(startDateObj.getHours()).padStart(2, '0');
-            const startMinute = String(startDateObj.getMinutes()).padStart(2, '0');
-            const endHour = String(endDateObj.getHours()).padStart(2, '0');
-            const endMinute = String(endDateObj.getMinutes()).padStart(2, '0');
-            confirmMessage = `予定の時間を変更しますか？\n開始: ${date} ${startHour}:${startMinute}\n終了: ${date} ${endHour}:${endMinute}`;
-        }
-        if (confirm(confirmMessage)) {
-            try {
-                // Debug: log event core fields to help diagnose missing project_schedule_id/project_job_id
-                try {
-                    console.info('[ProjectCalendar] eventResize start — event core fields', {
-                        id: info.event.id,
-                        event_id: info.event.event_id,
-                        extendedProps: info.event.extendedProps,
-                        defExtendedProps: info.event._def && info.event._def.extendedProps ? info.event._def.extendedProps : null,
-                        publicId: info.event._def && info.event._def.publicId ? info.event._def.publicId : null,
-                    });
-                } catch (e) {}
-                function stripTags(str) {
-                    return str ? str.replace(/<[^>]*>?/gm, '') : '';
-                }
-                // Prefer project schedule update when this event is part of a project
-                const ev = info.event;
-                const defExt = ev._def && ev._def.extendedProps ? ev._def.extendedProps : null;
-                const extended = ev.extendedProps || {};
-                const projectJobId =
-                    extended.project_job_id ||
-                    extended.project_job ||
-                    (defExt && (defExt.project_job_id || defExt.project_job)) ||
-                    (props.project &&
-                        (props.project.id || props.project.project_job_id || (props.project.project_job && props.project.project_job.id))) ||
-                    null;
-                // Try common fields for project schedule id
-                const inferredScheduleId =
-                    extended.project_schedule_id ||
-                    extended.project_schedule ||
-                    (defExt && (defExt.project_schedule_id || defExt.project_schedule)) ||
-                    extended.schedule_id ||
-                    ev.id ||
-                    ev.event_id ||
-                    (ev._def && ev._def.publicId) ||
-                    null;
 
-                if (projectJobId) {
-                    // project event resize detected — debug suppressed
-                    // If we have a schedule id, call coordinator.project_schedules.update
-                    if (inferredScheduleId) {
-                        try {
-                            const url = route('coordinator.project_schedules.update', { project_schedule: inferredScheduleId });
-                            const payload = ev.allDay
-                                ? {
-                                      name: ev.title || undefined,
-                                      start_date: displayStart,
-                                      end_date: displayEndInclusive || displayStart,
-                                      color: ev.backgroundColor || ev.color,
-                                  }
-                                : {
-                                      name: ev.title || undefined,
-                                      start_date: displayStart,
-                                      end_date: newEnd ? newEnd.toISOString() : undefined,
-                                      color: ev.backgroundColor || ev.color,
-                                  };
-                            await axios.patch(url, payload);
-                            alert('予定を更新しました');
-                        } catch (err) {
-                            console.error('project schedule update failed', err);
-                            alert('予定の更新に失敗しました');
-                            info.revert();
-                        }
-                    } else {
-                        // Try to resolve schedule id by lookup (title / start / end) similar to submitScheduleUpdate
-                        try {
-                            const normalizeDate = (d) => {
-                                if (!d) return null;
-                                try {
-                                    return String(d).split('T')[0];
-                                } catch (e) {
-                                    return String(d);
-                                }
-                            };
-                            const wantTitle = (ev.title || '').trim();
-                            const wantStart = ev.start || null;
-                            const wantEnd = ev.end || null;
+        try {
+            const ev = info.event;
+            const extended = ev.extendedProps || {};
+            const defExt = ev._def && ev._def.extendedProps ? ev._def.extendedProps : null;
 
-                            const tryMatch = (list) => {
-                                if (!Array.isArray(list)) return null;
-                                const wantTitleLower = (wantTitle || '').toLowerCase().trim();
-                                for (const item of list) {
-                                    try {
-                                        const itemTitleRaw = item.title || item.name || '';
-                                        const itemTitle = itemTitleRaw ? String(itemTitleRaw).trim() : '';
-                                        const itemTitleLower = itemTitle.toLowerCase();
-                                        const itemStart = normalizeDate(item.start ?? item.start_date ?? item.date);
-                                        const itemEndRaw = item.end ?? item.end_date ?? undefined;
-                                        const itemEnd = itemEndRaw ? normalizeDate(itemEndRaw) : null;
+            const id =
+                extended.project_schedule_id ||
+                extended.schedule_id ||
+                extended.project_schedule ||
+                (defExt && (defExt.project_schedule_id || defExt.schedule_id)) ||
+                ev.id ||
+                (ev._def && ev._def.publicId) ||
+                null;
 
-                                        const candidateId =
-                                            (item.extendedProps &&
-                                                (item.extendedProps.project_schedule_id ||
-                                                    item.extendedProps.event_id ||
-                                                    item.extendedProps.schedule_id)) ||
-                                            item.schedule_id ||
-                                            item.event_id ||
-                                            item.id ||
-                                            null;
-
-                                        if (wantTitleLower && itemTitleLower && wantTitleLower === itemTitleLower) {
-                                            if (wantStart && itemStart && normalizeDate(wantStart) === itemStart) return candidateId;
-                                            if (!wantStart) return candidateId;
-                                        }
-                                        if (wantStart && itemStart && normalizeDate(wantStart) === itemStart) {
-                                            if (wantEnd && itemEnd && normalizeDate(wantEnd) === itemEnd) return candidateId;
-                                            if (!wantEnd) return candidateId;
-                                        }
-                                        if (
-                                            wantTitleLower &&
-                                            itemTitleLower &&
-                                            (itemTitleLower.includes(wantTitleLower) || wantTitleLower.includes(itemTitleLower))
-                                        ) {
-                                            return candidateId;
-                                        }
-                                    } catch (e) {}
-                                }
-                                return null;
-                            };
-
-                            let resolved = null;
-                            resolved =
-                                tryMatch(calendarEvents.value) ||
-                                tryMatch(plainCalendarEvents.value) ||
-                                tryMatch(props.events && props.events.value ? props.events.value : props.events);
-                            if (!resolved && Array.isArray(props.schedules)) {
-                                for (const s of props.schedules) {
-                                    try {
-                                        const sTitle = (s.name || s.title || '').trim();
-                                        const sStart = normalizeDate(s.start_date || s.date || s.start);
-                                        if (
-                                            wantTitle &&
-                                            sTitle &&
-                                            wantTitle === sTitle &&
-                                            wantStart &&
-                                            sStart &&
-                                            normalizeDate(wantStart) === sStart
-                                        ) {
-                                            resolved = s.id;
-                                            break;
-                                        }
-                                    } catch (e) {}
-                                }
-                            }
-
-                            if (resolved) {
-                                console.info('[ProjectCalendar] eventResize resolved schedule id by lookup', resolved);
-                                try {
-                                    const url = route('coordinator.project_schedules.update', { project_schedule: resolved });
-                                    const payload = ev.allDay
-                                        ? {
-                                              name: ev.title || undefined,
-                                              start_date: displayStart,
-                                              end_date: displayEndInclusive || displayStart,
-                                              color: ev.backgroundColor || ev.color,
-                                          }
-                                        : {
-                                              name: ev.title || undefined,
-                                              start_date: displayStart,
-                                              end_date: newEnd ? newEnd.toISOString() : undefined,
-                                              color: ev.backgroundColor || ev.color,
-                                          };
-                                    await axios.patch(url, payload);
-                                    alert('予定を更新しました');
-                                } catch (err2) {
-                                    console.error('project schedule update failed (resolved)', err2);
-                                    alert('予定の更新に失敗しました');
-                                    info.revert();
-                                }
-                            } else {
-                                console.warn('[ProjectCalendar] cannot infer schedule id for project event; event shape:', ev);
-                                alert('プロジェクトに紐づくスケジュールIDが見つからないため更新できませんでした');
-                                info.revert();
-                            }
-                        } catch (e) {
-                            console.error('[ProjectCalendar] eventResize lookup error', e);
-                            alert('プロジェクトに紐づくスケジュールIDが見つからないため更新できませんでした');
-                            info.revert();
-                        }
-                    }
-                } else {
-                    // Only update generic events for personal calendar
-                    await axios.put(`/events/${extended.event_id}/calendar`, {
-                        date: displayStart,
-                        startHour: newStart ? String(newStart.getHours()).padStart(2, '0') : undefined,
-                        startMinute: newStart ? String(newStart.getMinutes()).padStart(2, '0') : undefined,
-                        endHour: newEnd ? String(newEnd.getHours()).padStart(2, '0') : undefined,
-                        endMinute: newEnd ? String(newEnd.getMinutes()).padStart(2, '0') : undefined,
-                    });
-                    alert('予定を更新しました');
-                }
-            } catch (e) {
-                // eventResize error suppressed; keep alert and revert
-                if (e.response && e.response.data) {
-                    alert('予定の更新に失敗しました');
-                    // API error detail suppressed
-                } else {
-                    alert('予定の更新に失敗しました');
-                }
+            if (id && !String(id).startsWith('memo') && !String(id).startsWith('comment')) {
+                // プロジェクトスケジュール
+                const url = route('coordinator.project_schedules.update', { project_schedule: id });
+                const payload = {
+                    start_date: displayStart,
+                    end_date: displayEndInclusive || displayStart,
+                };
+                await axios.patch(url, payload);
+                // localCalendarEntries を更新
+                const idx = localCalendarEntries.value.findIndex((x) => String(x.id) === String(id));
+                const updated = { id, start_date: displayStart, end_date: displayEndInclusive || displayStart, name: ev.title, color: ev.backgroundColor };
+                if (idx !== -1) localCalendarEntries.value.splice(idx, 1, updated);
+                else localCalendarEntries.value.push(updated);
+            } else if (extended.event_id) {
+                // 汎用イベント（個人カレンダー）
+                await axios.put(`/events/${extended.event_id}/calendar`, {
+                    date: displayStart,
+                    startHour: newStart ? String(newStart.getHours()).padStart(2, '0') : undefined,
+                    startMinute: newStart ? String(newStart.getMinutes()).padStart(2, '0') : undefined,
+                    endHour: newEnd ? String(newEnd.getHours()).padStart(2, '0') : undefined,
+                    endMinute: newEnd ? String(newEnd.getMinutes()).padStart(2, '0') : undefined,
+                });
+            } else {
                 info.revert();
             }
-        } else {
+        } catch (e) {
+            console.error('eventResize error', e);
+            alert('予定の更新に失敗しました');
             info.revert();
         }
     },
@@ -1096,6 +1051,34 @@ const calendarOptions = computed(() => ({
             // eventsSet error debug suppressed
         }
     },
+    eventMouseEnter: function (info) {
+        const ev = info.event;
+        const ext = ev.extendedProps || {};
+        const title = ev.title || '';
+        const description = ext.description || ext.body || '';
+        const startStr = ev.startStr ? ev.startStr.split('T')[0] : '';
+        let endDate = '';
+        if (ev.end) {
+            const d = new Date(ev.end);
+            d.setDate(d.getDate() - 1);
+            endDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+        const rect = info.el.getBoundingClientRect();
+        const mx = info.jsEvent ? info.jsEvent.clientX : rect.left;
+        const my = info.jsEvent ? info.jsEvent.clientY : rect.bottom;
+        hoverPopup.value = {
+            show: true,
+            x: Math.min(mx + 12, window.innerWidth - 290),
+            y: Math.min(my + 16, window.innerHeight - 120),
+            title,
+            startDate: startStr,
+            endDate,
+            description,
+        };
+    },
+    eventMouseLeave: function () {
+        hoverPopup.value.show = false;
+    },
     eventClick: function (info) {
         // comment click -> open edit modal for comment
         if (info.event.extendedProps.comment_id) {
@@ -1140,10 +1123,17 @@ const calendarOptions = computed(() => ({
 
 // 日付選択ハンドラー関数を定義
 function handleDateSelect(selectInfo) {
-    // 選択された日付を設定
-    selectedDate.value = selectInfo.startStr;
-    // 予定作成モーダルを開く
-    openEventModal();
+    const startStr = selectInfo.startStr ? selectInfo.startStr.split('T')[0] : null;
+    // allDay の end は exclusive なので -1日して inclusive に
+    let endStr = null;
+    if (selectInfo.endStr) {
+        const endRaw = selectInfo.endStr.split('T')[0];
+        const d = new Date(endRaw);
+        d.setDate(d.getDate() - 1);
+        endStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+    selectedDate.value = startStr;
+    openEventModal(startStr, endStr);
 }
 
 function goToScheduleShowFromAction() {
@@ -1199,18 +1189,18 @@ function openScheduleShowModal(event) {
             publicId: event._def && event._def.publicId ? event._def.publicId : null,
         });
     } catch (e) {}
-    scheduleShowData.value.id = event.extendedProps.project_schedule_id || event.extendedProps.event_id || event.id || null;
+    scheduleShowData.value.id =
+        event.extendedProps.project_schedule_id ||
+        event.extendedProps.schedule_id ||
+        event.extendedProps.event_id ||
+        event.id ||
+        null;
     scheduleShowData.value.title = event.title || '';
-    scheduleShowData.value.start = event.startStr
-        ? event.startStr.split('T')[0]
-        : event.start
-          ? new Date(event.start).toISOString().split('T')[0]
-          : '';
-    scheduleShowData.value.end = event.endStr
-        ? event.endStr.split('T')[0]
-        : event.end
-          ? new Date(event.end).toISOString().split('T')[0]
-          : scheduleShowData.value.start;
+    // addOneDay/subOneDay はスクリプトトップで定義済みのグローバルヘルパーを使用
+    scheduleShowData.value.start = event.startStr ? event.startStr.split('T')[0] : localDay(event.start);
+    // endStr は exclusive (翌日) → subOneDay して inclusive (DB保存値) に
+    const endExclStr = event.endStr ? event.endStr.split('T')[0] : (localDay(event.end) || null);
+    scheduleShowData.value.end = endExclStr ? subOneDay(endExclStr) : scheduleShowData.value.start;
     // prefer description from several possible locations on the clicked event
     const extractDescFromEvent = (ev) => {
         if (!ev) return null;
@@ -1556,8 +1546,8 @@ async function submitScheduleUpdate() {
                             ev.setProp('title', eventData.title);
                         } catch (e) {}
                         try {
-                            // setDates accepts string or Date; prefer ISO date strings
-                            ev.setDates(eventData.start || null, eventData.end || null);
+                            // end は exclusive（+1日）で渡す
+                            ev.setDates(eventData.start || null, addOneDay(eventData.end) || null, { allDay: true });
                         } catch (e) {}
                         try {
                             ev.setExtendedProp('description', s.description ?? '');
@@ -1570,28 +1560,13 @@ async function submitScheduleUpdate() {
                     } else {
                         // event not present in FC yet — add it
                         try {
-                            api.addEvent(eventData);
+                            api.addEvent({ ...eventData, end: addOneDay(eventData.end) });
                         } catch (e) {}
                     }
                 }
             } catch (e) {
                 console.error('[ProjectCalendar] fullcalendar update error', e);
             }
-
-            // Small sanity check: if FullCalendar still doesn't show the updated event, reload as a fallback
-            nextTick(() => {
-                try {
-                    const api = calendarRef.value && calendarRef.value.getApi ? calendarRef.value.getApi() : null;
-                    const found = api && api.getEventById ? api.getEventById(String(s.id)) : null;
-                    if (!found) {
-                        console.warn('[ProjectCalendar] schedule update not reflected in FullCalendar; performing full reload');
-                        router.reload();
-                    }
-                } catch (e) {
-                    console.error('[ProjectCalendar] post-update check error', e);
-                    router.reload();
-                }
-            });
         }
         showScheduleShowModal.value = false;
         isEditingSchedule.value = false;
@@ -1602,20 +1577,30 @@ async function submitScheduleUpdate() {
 }
 
 async function deleteSchedule() {
-    if (!confirm('この予定を削除しますか？')) return;
+    // 確認なしで削除
     try {
         const id = scheduleShowData.value.id;
         if (!id) throw new Error('Schedule id missing');
         const url = route('coordinator.project_schedules.destroy', { project_schedule: id });
         await axios.delete(url);
-        // mark as deleted in localCalendarEntries (or remove)
+
+        // FullCalendar から直接削除
+        try {
+            const api = calendarRef.value && calendarRef.value.getApi ? calendarRef.value.getApi() : null;
+            if (api) {
+                const ev = api.getEventById(String(id));
+                if (ev) ev.remove();
+            }
+        } catch (e) {}
+
+        // localCalendarEntries からも除去
         const idx = localCalendarEntries.value.findIndex((x) => String(x.id) === String(id));
         if (idx !== -1) {
             localCalendarEntries.value.splice(idx, 1);
         } else {
-            // add a deleted marker so computed will remove any existing
             localCalendarEntries.value.push({ id: id, deleted: true });
         }
+
         showScheduleShowModal.value = false;
         isEditingSchedule.value = false;
     } catch (e) {
@@ -1820,11 +1805,7 @@ async function submitSimpleEvent() {
         alert('日付を指定してください');
         return;
     }
-    if (simpleEventIsRange.value && !simpleEventEndDate.value) {
-        alert('終了日を指定してください');
-        return;
-    }
-    if (simpleEventIsRange.value && simpleEventEndDate.value < simpleEventStartDate.value) {
+    if (simpleEventEndDate.value && simpleEventEndDate.value < simpleEventStartDate.value) {
         alert('終了日は開始日以降を指定してください');
         return;
     }
@@ -1835,7 +1816,7 @@ async function submitSimpleEvent() {
             name: simpleEventTitle.value,
             description: simpleEventMemo.value || null,
             start_date: simpleEventStartDate.value,
-            end_date: simpleEventIsRange.value ? simpleEventEndDate.value : simpleEventStartDate.value,
+            end_date: simpleEventEndDate.value || simpleEventStartDate.value,
             color: simpleEventLabel.value || null,
         };
         // Basic client-side validation for required project_job_id
@@ -1924,6 +1905,69 @@ async function submitSimpleEvent() {
         }
         
         alert(errorMessage);
+    }
+}
+
+// ─── CSV エクスポート ────────────────────────────────────────
+function handleCsvExport() {
+    const projectJobId = props.project && props.project.id;
+    if (!projectJobId) {
+        alert('案件IDが取得できません');
+        return;
+    }
+    const url = route('coordinator.project_schedules.csv_export', { project_job_id: projectJobId });
+    window.location.href = url;
+}
+
+// ─── CSV インポート ────────────────────────────────────────
+const showCsvImportModal = ref(false);
+const csvImportFile = ref(null);
+const csvImportErrors = ref([]);
+const csvImportLoading = ref(false);
+
+function openCsvImportModal() {
+    csvImportFile.value = null;
+    csvImportErrors.value = [];
+    showCsvImportModal.value = true;
+}
+
+function onCsvFileChange(event) {
+    csvImportFile.value = event.target.files[0] ?? null;
+    csvImportErrors.value = [];
+}
+
+async function submitCsvImport() {
+    if (!csvImportFile.value) {
+        alert('CSVファイルを選択してください');
+        return;
+    }
+    const projectJobId = props.project && props.project.id;
+    if (!projectJobId) {
+        alert('案件IDが取得できません');
+        return;
+    }
+    csvImportLoading.value = true;
+    csvImportErrors.value = [];
+    try {
+        const formData = new FormData();
+        formData.append('project_job_id', projectJobId);
+        formData.append('file', csvImportFile.value);
+        const url = route('coordinator.project_schedules.csv_import');
+        const resp = await axios.post(url, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        const created = resp.data.created ?? 0;
+        showCsvImportModal.value = false;
+        alert(`${created}件の予定をインポートしました`);
+        router.reload();
+    } catch (e) {
+        if (e.response && e.response.data && e.response.data.errors) {
+            csvImportErrors.value = e.response.data.errors;
+        } else {
+            alert('インポートに失敗しました');
+        }
+    } finally {
+        csvImportLoading.value = false;
     }
 }
 </script>

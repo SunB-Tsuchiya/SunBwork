@@ -14,30 +14,24 @@ const props = defineProps({
 // Convert schedules to FullCalendar events
 const events = ref(
     (props.schedules || []).map((s) => {
-        // normalize start/end to date-only (YYYY-MM-DD) so allDay events don't shift due to TZ
-        const fmt = (v) => {
-            if (!v) return null;
-            try {
-                return String(v).split('T')[0];
-            } catch (e) {
-                return String(v);
-            }
-        };
-        // FullCalendar treats allDay end as exclusive, so add 1 day to end when passing as allDay
-        const startDateOnly = fmt(s.start_date);
-        const endDateOnly = fmt(s.end_date);
+        // start_date / end_date はバックエンドで date:Y-m-d キャストされるため YYYY-MM-DD で届く
+        const startDateOnly = s.start_date ? String(s.start_date).split('T')[0] : null;
+        const endDateOnly = s.end_date ? String(s.end_date).split('T')[0] : null;
+
+        // FullCalendar の allDay イベントは end が exclusive なので +1日する
         let endForCalendar = endDateOnly;
         if (endDateOnly) {
             try {
-                const d = new Date(endDateOnly);
+                const parts = endDateOnly.split('-').map(Number);
+                const d = new Date(parts[0], parts[1] - 1, parts[2]);
                 d.setDate(d.getDate() + 1);
-                endForCalendar = d.toISOString().split('T')[0];
+                endForCalendar = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
             } catch (e) {
                 endForCalendar = endDateOnly;
             }
         }
+
         const chosen = s.color ?? (s.progress >= 100 ? '#9ca3af' : '#2563eb');
-        // compute readable text color
         let textColor = '#ffffff';
         try {
             if (chosen && chosen.startsWith('#') && chosen.length === 7) {
@@ -48,18 +42,23 @@ const events = ref(
                 textColor = lum < 0.6 ? '#ffffff' : '#111827';
             }
         } catch (e) {}
+
         return {
+            id: s.id,           // FullCalendar の publicId として使用
             title: s.name,
             start: startDateOnly,
             end: endForCalendar,
             allDay: true,
-            // prefer explicit schedule color when present (label picker)
             color: chosen,
             backgroundColor: chosen,
             borderColor: chosen,
             textColor: textColor,
             description: s.description ?? '',
-            extendedProps: { schedule_id: s.id, progress: s.progress, description: s.description ?? '' },
+            extendedProps: {
+                schedule_id: s.id,
+                progress: s.progress,
+                description: s.description ?? '',
+            },
         };
     }),
 );

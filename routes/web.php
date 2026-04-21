@@ -584,6 +584,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::patch('project_schedules/{project_schedule}', [App\Http\Controllers\Coordinator\ProjectSchedulesController::class, 'update'])->name('project_schedules.update');
         Route::delete('project_schedules/{project_schedule}', [App\Http\Controllers\Coordinator\ProjectSchedulesController::class, 'destroy'])->name('project_schedules.destroy');
         Route::post('project_schedules/bulk_update', [App\Http\Controllers\Coordinator\ProjectSchedulesController::class, 'bulkUpdate'])->name('project_schedules.bulk_update');
+        Route::get('project_schedules/csv_export', [App\Http\Controllers\Coordinator\ProjectSchedulesController::class, 'csvExport'])->name('project_schedules.csv_export');
+        Route::post('project_schedules/csv_import', [App\Http\Controllers\Coordinator\ProjectSchedulesController::class, 'csvImport'])->name('project_schedules.csv_import');
 
         // Calendar PoC for ProjectSchedules
         Route::get('project_schedules/calendar', [App\Http\Controllers\Coordinator\ProjectSchedulesCalendarController::class, 'index'])->name('project_schedules.calendar');

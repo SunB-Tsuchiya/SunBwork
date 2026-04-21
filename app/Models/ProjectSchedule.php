@@ -27,8 +27,8 @@ class ProjectSchedule extends Model
 
     protected $casts = [
         'metadata' => 'array',
-        'start_date' => 'datetime',
-        'end_date' => 'datetime',
+        'start_date' => 'date:Y-m-d',
+        'end_date' => 'date:Y-m-d',
     ];
 
     public function projectJob()
