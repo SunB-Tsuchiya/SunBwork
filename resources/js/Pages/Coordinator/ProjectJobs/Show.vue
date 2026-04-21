@@ -324,7 +324,7 @@
                     <template v-else>
 
                         <!-- ── 続きジョブ シリーズパネル ── -->
-                        <div v-if="historyChainGroups.length > 0" class="mb-5 space-y-3">
+                        <div v-if="false" class="mb-5 space-y-3">
                             <div v-for="(chain, ci) in historyChainGroups" :key="ci"
                                  class="overflow-hidden rounded-lg border border-orange-200 bg-orange-50 shadow-sm">
                                 <div class="border-b border-orange-200 bg-orange-100 px-4 py-2">
