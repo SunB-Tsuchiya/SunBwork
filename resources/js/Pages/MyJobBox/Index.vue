@@ -97,13 +97,19 @@
                             <tr
                                 v-for="m in group.items"
                                 :key="m.id"
-                                :class="['cursor-pointer hover:bg-gray-100', m.__is_new ? 'new-highlight' : '']"
+                                :class="['cursor-pointer hover:bg-gray-100', m.__is_new ? 'new-highlight' : '', m.__chain_depth > 0 ? 'bg-orange-50' : '']"
                                 @click.prevent="rowClick(m, $event)"
                                 role="button"
                             >
                                 <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ getDateDisplay(m) }}</td>
                                 <td class="break-words border px-3 py-2 text-sm">
-                                    <span v-if="m.source_assignment_id" class="mr-1 inline-flex items-center rounded-full bg-orange-100 px-1.5 py-0.5 text-xs font-medium text-orange-700">↩続き</span>
+                                    <span v-if="m.__chain_depth > 0"
+                                          class="mr-1 inline-block text-orange-300"
+                                          :style="{ paddingLeft: (m.__chain_depth * 12) + 'px' }">└</span>
+                                    <span v-if="m.source_assignment_id"
+                                          class="mr-1 inline-flex items-center rounded-full bg-orange-100 px-1.5 py-0.5 text-xs font-medium text-orange-700">
+                                        ↩続き#{{ m.source_assignment_id }}
+                                    </span>
                                     <span v-if="m.proof_completed_at" class="mr-1 inline-flex items-center rounded-full bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">校正済</span>{{ m.title || '-' }}
                                 </td>
                                 <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ getClientName(m) }}</td>
@@ -410,6 +416,42 @@ function getGroupLabel(key) {
 const displayGroups = computed(() => {
     const assignments = Array.isArray(localAssignments.value) ? localAssignments.value : [];
 
+    // チェーン順にソート: source_assignment_id を持つアイテムをその親の直後に並べる
+    function sortWithChain(items) {
+        const byId = new Map(items.map((m) => [m.id, m]));
+        // ルート（source_assignment_id を持たない、またはグループ外参照）を日付順に並べる
+        const roots = items.filter((m) => !m.source_assignment_id || !byId.has(m.source_assignment_id));
+        const result = [];
+        const visited = new Set();
+        function appendWithChildren(item, depth) {
+            if (visited.has(item.id)) return;
+            visited.add(item.id);
+            result.push({ ...item, __chain_depth: depth });
+            // このアイテムを source とする続きジョブを探して追加
+            const children = items
+                .filter((m) => String(m.source_assignment_id) === String(item.id))
+                .sort((a, b) => (getDateKey(a) || '').localeCompare(getDateKey(b) || ''));
+            for (const child of children) {
+                appendWithChildren(child, depth + 1);
+            }
+        }
+        // 日付順にルートを並べてから追加
+        roots.sort((a, b) => {
+            const da = getDateKey(a) || '';
+            const db = getDateKey(b) || '';
+            if (da !== db) return da.localeCompare(db);
+            return getTimeKey(a).localeCompare(getTimeKey(b));
+        });
+        for (const root of roots) {
+            appendWithChildren(root, 0);
+        }
+        // まだ未追加のアイテム（孤立チェーン）を追加
+        for (const m of items) {
+            if (!visited.has(m.id)) result.push({ ...m, __chain_depth: 0 });
+        }
+        return result;
+    }
+
     const grouped = new Map();
     for (const m of assignments) {
         const key = getGroupKey(m);
@@ -417,17 +459,8 @@ const displayGroups = computed(() => {
         grouped.get(key).push(m);
     }
 
-    for (const items of grouped.values()) {
-        if (viewMode.value === 'date') {
-            items.sort((a, b) => getTimeKey(a).localeCompare(getTimeKey(b)));
-        } else {
-            items.sort((a, b) => {
-                const da = getDateKey(a) || '';
-                const db = getDateKey(b) || '';
-                if (da !== db) return da.localeCompare(db);
-                return getTimeKey(a).localeCompare(getTimeKey(b));
-            });
-        }
+    for (const [key, items] of grouped.entries()) {
+        grouped.set(key, sortWithChain(items));
     }
 
     const sortedKeys = Array.from(grouped.keys());

@@ -1525,6 +1525,40 @@ class JobBoxController extends Controller
                 }
                 $event->save();
 
+                // ── 重複イベントの interruption_minutes 処理 ──────────────────
+                try {
+                    $evNewStart = \Carbon\Carbon::parse($start);
+                    $evNewEnd   = \Carbon\Carbon::parse($end);
+                    $newDurationMins = abs((int)$evNewEnd->diffInMinutes($evNewStart));
+
+                    $overlappingEvents = Event::where('user_id', $user->id)
+                        ->where('id', '!=', $event->id)
+                        ->where('starts_at', '<', $evNewEnd->toDateTimeString())
+                        ->where('ends_at', '>', $evNewStart->toDateTimeString())
+                        ->get();
+
+                    foreach ($overlappingEvents as $existingEv) {
+                        $evStart = \Carbon\Carbon::parse($existingEv->starts_at);
+                        $evEnd   = \Carbon\Carbon::parse($existingEv->ends_at);
+                        $existingDurationMins = abs((int)$evEnd->diffInMinutes($evStart));
+
+                        $overlapStart = $evNewStart->gt($evStart) ? $evNewStart : $evStart;
+                        $overlapEnd   = $evNewEnd->lt($evEnd)    ? $evNewEnd   : $evEnd;
+                        $overlapMins  = max(0, (int)$overlapEnd->diffInMinutes($overlapStart));
+
+                        if ($overlapMins <= 0) continue;
+
+                        if ($newDurationMins >= $existingDurationMins) {
+                            $event->increment('interruption_minutes', $overlapMins);
+                        } else {
+                            $existingEv->increment('interruption_minutes', $overlapMins);
+                        }
+                    }
+                } catch (\Throwable $__overlapE) {
+                    \Illuminate\Support\Facades\Log::warning('JobBoxController: failed to process event overlap', ['error' => $__overlapE->getMessage()]);
+                }
+                // ──────────────────────────────────────────────────────────────
+
                 // Mark assignment as scheduled
                 if (Schema::hasColumn('project_job_assignments', 'scheduled')) {
                     $assignment->scheduled = true;

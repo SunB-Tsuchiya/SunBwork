@@ -18,11 +18,13 @@ const props = defineProps({
     lunch_end: { type: String, default: null },
     lunch_overlap_minutes: { type: Number, default: 0 },
     proof_requested: { type: Boolean, default: false },
+    chain_series: { type: Object, default: null },
 });
 
 const showProofModal = ref(false);
 
 const assignment = computed(() => props.event?.project_job_assignment ?? null);
+const chainSeries = computed(() => props.chain_series ?? null);
 
 function isEventCompleted() {
     try {
@@ -215,6 +217,59 @@ const eventTypeLabel = computed(() => props.event?.event_item_type?.name ?? null
             <!-- ジョブ割り当て詳細カード -->
             <div v-if="assignment">
                 <AssignmentDetailCard :assignment="assignment" />
+            </div>
+
+            <!-- 続きジョブ シリーズパネル -->
+            <div v-if="chainSeries && chainSeries.items && chainSeries.items.length > 1"
+                 class="overflow-hidden rounded-lg border border-orange-200 bg-orange-50 shadow-sm">
+                <div class="border-b border-orange-200 bg-orange-100 px-5 py-3">
+                    <h3 class="text-sm font-semibold text-orange-800">↩ 続きジョブ シリーズ（{{ chainSeries.items.length }}件）</h3>
+                </div>
+                <div class="divide-y divide-orange-100 px-5 py-2">
+                    <div v-for="(item, idx) in chainSeries.items" :key="item.assignment_id"
+                         class="flex items-start gap-3 py-2.5"
+                         :class="item.is_current ? 'bg-orange-100 -mx-5 px-5' : ''">
+                        <!-- 番号 -->
+                        <span class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+                              :class="item.is_current ? 'bg-orange-600 text-white' : 'bg-orange-200 text-orange-700'">
+                            {{ idx + 1 }}
+                        </span>
+                        <!-- タイトルと日付 -->
+                        <div class="min-w-0 flex-1">
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                <span class="text-sm font-medium text-gray-900">{{ item.title }}</span>
+                                <span v-if="item.is_current"
+                                      class="rounded-full bg-orange-600 px-1.5 py-0.5 text-xs text-white">現在</span>
+                                <span v-if="item.completed"
+                                      class="rounded-full bg-yellow-100 px-1.5 py-0.5 text-xs text-yellow-800">完了</span>
+                            </div>
+                            <!-- イベント一覧 -->
+                            <div v-if="item.events && item.events.length" class="mt-1 space-y-0.5">
+                                <div v-for="ev in item.events" :key="ev.id"
+                                     class="text-xs text-gray-500">
+                                    <a :href="route('events.show', ev.id)"
+                                       class="text-blue-600 hover:underline">
+                                        {{ ev.date }}
+                                    </a>
+                                    {{ ev.start }}〜{{ ev.end }}
+                                    <span class="ml-1 font-medium text-gray-700">{{ formatMins(ev.minutes) }}</span>
+                                </div>
+                            </div>
+                            <div v-else class="mt-0.5 text-xs text-gray-400">（予定未セット）</div>
+                        </div>
+                        <!-- 作業時間 -->
+                        <div class="shrink-0 text-right">
+                            <span class="text-sm font-bold" :class="item.minutes > 0 ? 'text-indigo-700' : 'text-gray-300'">
+                                {{ item.minutes > 0 ? formatMins(item.minutes) : '-' }}
+                            </span>
+                        </div>
+                    </div>
+                    <!-- シリーズ合計 -->
+                    <div class="flex items-center justify-between py-2.5">
+                        <span class="text-sm font-semibold text-orange-800">シリーズ合計</span>
+                        <span class="text-base font-bold text-orange-800">{{ formatMins(chainSeries.total_minutes) }}</span>
+                    </div>
+                </div>
             </div>
 
             <!-- ファイル一覧（file_info がある場合） -->

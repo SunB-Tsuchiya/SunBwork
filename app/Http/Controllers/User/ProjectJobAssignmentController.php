@@ -448,6 +448,10 @@ class ProjectJobAssignmentController extends Controller
                             $event->end = $eventEnd->toDateTimeString();
                             if (Schema::hasColumn('events', 'ends_at')) $event->ends_at = $eventEnd->toDateTimeString();
                         }
+                        // 時間変更時は interruption_minutes をリセットしてから再計算
+                        if (($eventStart || $eventEnd) && Schema::hasColumn('events', 'interruption_minutes')) {
+                            $event->interruption_minutes = 0;
+                        }
                         $event->save();
                     } else {
                         // create new event and link it to the by-myself assignment
@@ -468,6 +472,43 @@ class ProjectJobAssignmentController extends Controller
                         }
                         $event->save();
                     }
+
+                    // ── 重複イベントの interruption_minutes 処理 ──────────────────
+                    // 保存後、時間が重複する他のイベントとの差し引きを再計算する
+                    if ($event && $eventStart && $eventEnd) {
+                        try {
+                            $newDurationMins = abs((int)$eventEnd->diffInMinutes($eventStart));
+
+                            $overlappingEvents = Event::where('user_id', $event->user_id)
+                                ->where('id', '!=', $event->id)
+                                ->where('starts_at', '<', $eventEnd->toDateTimeString())
+                                ->where('ends_at', '>', $eventStart->toDateTimeString())
+                                ->get();
+
+                            foreach ($overlappingEvents as $existingEv) {
+                                $evStart = \Carbon\Carbon::parse($existingEv->starts_at);
+                                $evEnd   = \Carbon\Carbon::parse($existingEv->ends_at);
+                                $existingDurationMins = abs((int)$evEnd->diffInMinutes($evStart));
+
+                                $overlapStart = $eventStart->gt($evStart) ? $eventStart : $evStart;
+                                $overlapEnd   = $eventEnd->lt($evEnd)    ? $eventEnd   : $evEnd;
+                                $overlapMins  = max(0, (int)$overlapEnd->diffInMinutes($overlapStart));
+
+                                if ($overlapMins <= 0) continue;
+
+                                if ($newDurationMins >= $existingDurationMins) {
+                                    // 新しいイベントの方が長い → 自分から差し引く
+                                    $event->increment('interruption_minutes', $overlapMins);
+                                } else {
+                                    // 既存イベントの方が長い → 既存から差し引く
+                                    $existingEv->increment('interruption_minutes', $overlapMins);
+                                }
+                            }
+                        } catch (\Throwable $__overlapE) {
+                            \Illuminate\Support\Facades\Log::warning('ProjectJobAssignmentController::update: failed to process event overlap', ['error' => $__overlapE->getMessage()]);
+                        }
+                    }
+                    // ──────────────────────────────────────────────────────────────
                 }
             } catch (\Throwable $__e) {
                 \Illuminate\Support\Facades\Log::warning('Failed to update/create Event for ProjectJobAssignmentByMyself', ['error' => $__e->getMessage()]);
