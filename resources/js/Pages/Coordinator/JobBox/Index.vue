@@ -149,14 +149,19 @@
                             <tr
                                 v-for="m in group.items"
                                 :key="m.id"
-                                :class="['cursor-pointer hover:bg-gray-100', m.__is_new ? 'new-highlight' : '']"
+                                :class="['cursor-pointer hover:bg-gray-100', m.__is_new ? 'new-highlight' : '', m.__chain_depth > 0 ? 'bg-orange-50' : '']"
                                 @click.prevent="rowClick(m, $event)"
                                 role="button"
                             >
                                 <td class="break-words border px-3 py-2 text-sm text-gray-700">{{ getSender(m) }}</td>
                                 <td class="break-words border px-3 py-2 text-sm text-gray-700">{{ getRecipients(m) }}</td>
                                 <td class="break-words whitespace-pre-line border px-3 py-2 text-sm text-gray-600">{{ getCreatedAt(m) }}</td>
-                                <td class="break-words border px-3 py-2 text-sm">{{ m.subject || (m.body && m.body.slice(0, 60)) }}</td>
+                                <td class="break-words border px-3 py-2 text-sm">
+                                    <span v-if="m.__chain_depth > 0"
+                                          class="mr-1 inline-block text-orange-300"
+                                          :style="{ paddingLeft: (m.__chain_depth * 12) + 'px' }">└</span>
+                                    {{ m.subject || (m.body && m.body.slice(0, 60)) }}
+                                </td>
                                 <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ getClientName(m) }}</td>
                                 <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ getProjectJobTitle(m) }}</td>
                                 <td class="border px-3 py-2">
@@ -276,6 +281,29 @@ function getGroupLabel(key) {
     return key || '未設定';
 }
 
+// チェーン順ソート: source_assignment_id を持つメッセージを親の直後に配置
+function sortWithChainMsg(items) {
+    function msgId(m) { return String(m.project_job_assignment?.id ?? m.project_job_assignment_id ?? ''); }
+    function msgSrc(m) { return String(m.project_job_assignment?.source_assignment_id ?? ''); }
+    const byId = new Map(items.map((m) => [msgId(m), m]));
+    const roots = items.filter((m) => !msgSrc(m) || !byId.has(msgSrc(m)));
+    const result = [];
+    const visited = new Set();
+    function appendWithChildren(item, depth) {
+        const id = msgId(item);
+        if (visited.has(id)) return;
+        visited.add(id);
+        result.push({ ...item, __chain_depth: depth });
+        const children = items.filter((m) => msgSrc(m) === id);
+        for (const child of children) appendWithChildren(child, depth + 1);
+    }
+    for (const root of roots) appendWithChildren(root, 0);
+    for (const m of items) {
+        if (!visited.has(msgId(m))) result.push({ ...m, __chain_depth: 0 });
+    }
+    return result;
+}
+
 // グループ表示（重複排除なし：全メッセージを表示）
 const displayGroups = computed(() => {
     let messages = Array.isArray(localMessages.value) ? [...localMessages.value] : [];
@@ -291,13 +319,11 @@ const displayGroups = computed(() => {
         grouped.get(key).push(m);
     }
 
-    // グループ内ソート
-    for (const items of grouped.values()) {
+    // グループ内ソート（続きジョブを親の直後にインデント配置）
+    for (const [key, items] of grouped.entries()) {
         if (viewMode.value === 'date') {
-            // 同日内: 開始時刻昇順
             items.sort((a, b) => getTimeKey(a).localeCompare(getTimeKey(b)));
         } else {
-            // クライアント/案件ごと: 日付昇順、同日内は時刻昇順
             items.sort((a, b) => {
                 const da = getDateKey(a) || '';
                 const db = getDateKey(b) || '';
@@ -305,6 +331,7 @@ const displayGroups = computed(() => {
                 return getTimeKey(a).localeCompare(getTimeKey(b));
             });
         }
+        grouped.set(key, sortWithChainMsg(items));
     }
 
     // グループ順ソート

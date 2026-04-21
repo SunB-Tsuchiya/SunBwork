@@ -421,14 +421,19 @@
                                                 <tr
                                                     v-for="m in group.items"
                                                     :key="m.id"
-                                                    class="cursor-pointer hover:bg-indigo-50"
+                                                    :class="['cursor-pointer hover:bg-indigo-50', m.__chain_depth > 0 ? 'bg-orange-50' : '']"
                                                     @click.prevent="historyRowClick(m, $event)"
                                                     role="button"
                                                 >
                                                     <td class="break-words border px-3 py-2 text-sm text-gray-700">{{ historyGetSender(m) }}</td>
                                                     <td class="break-words border px-3 py-2 text-sm text-gray-700">{{ historyGetRecipients(m) }}</td>
                                                     <td class="break-words whitespace-pre-line border px-3 py-2 text-sm text-gray-600">{{ historyGetWorkDate(m) }}</td>
-                                                    <td class="break-words border px-3 py-2 text-sm">{{ m.subject || (m.body && m.body.slice(0, 60)) }}</td>
+                                                    <td class="break-words border px-3 py-2 text-sm">
+                                                        <span v-if="m.__chain_depth > 0"
+                                                              class="mr-1 inline-block text-orange-300"
+                                                              :style="{ paddingLeft: (m.__chain_depth * 12) + 'px' }">└</span>
+                                                        {{ m.subject || (m.body && m.body.slice(0, 60)) }}
+                                                    </td>
                                                     <td class="border px-3 py-2">
                                                         <span :class="statusBadgeClass(historyGetStatus(m))" class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">{{ historyGetStatus(m) }}</span>
                                                     </td>
@@ -484,14 +489,19 @@
                                                 <tr
                                                     v-for="m in group.items"
                                                     :key="m.id"
-                                                    class="cursor-pointer hover:bg-gray-100"
+                                                    :class="['cursor-pointer hover:bg-gray-100', m.__chain_depth > 0 ? 'bg-orange-50' : '']"
                                                     @click.prevent="historyRowClick(m, $event)"
                                                     role="button"
                                                 >
                                                     <td class="break-words border px-3 py-2 text-sm text-gray-700">{{ historyGetSender(m) }}</td>
                                                     <td class="break-words border px-3 py-2 text-sm text-gray-700">{{ historyGetRecipients(m) }}</td>
                                                     <td class="break-words whitespace-pre-line border px-3 py-2 text-sm text-gray-600">{{ historyGetWorkDate(m) }}</td>
-                                                    <td class="break-words border px-3 py-2 text-sm">{{ m.subject || (m.body && m.body.slice(0, 60)) }}</td>
+                                                    <td class="break-words border px-3 py-2 text-sm">
+                                                        <span v-if="m.__chain_depth > 0"
+                                                              class="mr-1 inline-block text-orange-300"
+                                                              :style="{ paddingLeft: (m.__chain_depth * 12) + 'px' }">└</span>
+                                                        {{ m.subject || (m.body && m.body.slice(0, 60)) }}
+                                                    </td>
                                                     <td class="border px-3 py-2">
                                                         <span :class="statusBadgeClass(historyGetStatus(m))" class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">{{ historyGetStatus(m) }}</span>
                                                     </td>
@@ -1259,6 +1269,29 @@ function isSheetLinked(m) {
     return aid !== '' && sheetLinkedSet.value.has(aid);
 }
 
+// チェーン順ソート: source_assignment_id を持つメッセージを親の直後に配置
+function sortWithChainHistoryMsg(items) {
+    function msgId(m) { return String(m.project_job_assignment?.id ?? m.project_job_assignment_id ?? ''); }
+    function msgSrc(m) { return String(m.project_job_assignment?.source_assignment_id ?? ''); }
+    const byId = new Map(items.map((m) => [msgId(m), m]));
+    const roots = items.filter((m) => !msgSrc(m) || !byId.has(msgSrc(m)));
+    const result = [];
+    const visited = new Set();
+    function appendWithChildren(item, depth) {
+        const id = msgId(item);
+        if (visited.has(id)) return;
+        visited.add(id);
+        result.push({ ...item, __chain_depth: depth });
+        const children = items.filter((m) => msgSrc(m) === id);
+        for (const child of children) appendWithChildren(child, depth + 1);
+    }
+    for (const root of roots) appendWithChildren(root, 0);
+    for (const m of items) {
+        if (!visited.has(msgId(m))) result.push({ ...m, __chain_depth: 0 });
+    }
+    return result;
+}
+
 function buildHistoryGroups(messages) {
     const grouped = new Map();
     for (const m of messages) {
@@ -1266,8 +1299,9 @@ function buildHistoryGroups(messages) {
         if (!grouped.has(key)) grouped.set(key, []);
         grouped.get(key).push(m);
     }
-    for (const items of grouped.values()) {
+    for (const [key, items] of grouped.entries()) {
         items.sort((a, b) => historyGetTimeKey(a).localeCompare(historyGetTimeKey(b)));
+        grouped.set(key, sortWithChainHistoryMsg(items));
     }
     const sortedKeys = Array.from(grouped.keys()).sort((a, b) => {
         if (!a) return 1; if (!b) return -1;
