@@ -54,10 +54,10 @@ class JobBoxController extends Controller
         $periodParam = $request->query('period');
         $usePeriodFilter = true;
         $periodModel = $periodParam;
-        if ($periodParam === null) {
-            $periodModel = now()->format('Y-m');
-        } elseif ($periodParam === '' || $periodParam === 'all') {
+        // period 未指定 または 'all' の場合は全期間表示（global() と同じ動作に統一）
+        if ($periodParam === null || $periodParam === '' || $periodParam === 'all') {
             $usePeriodFilter = false;
+            $periodModel = 'all';
         }
 
         $periodStart = null;

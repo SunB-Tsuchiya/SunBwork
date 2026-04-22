@@ -509,7 +509,7 @@ class ProgressSheetController extends Controller
         abort_unless($user, 401);
 
         // 管理者・担当コーディネーター・本人のみ許可
-        $isAdmin = in_array($user->user_role, ['admin', 'superadmin', 'coordinator', 'clerk']);
+        $isAdmin = in_array($user->user_role, ['admin', 'superadmin', 'coordinator', 'clerk', 'leader']);
         $isOwner = $assignment->user_id === $user->id;
         abort_unless($isAdmin || $isOwner, 403);
 
@@ -542,10 +542,11 @@ class ProgressSheetController extends Controller
         $user = $request->user();
         abort_unless($user, 401);
 
-        $isAdmin = in_array($user->user_role, ['admin', 'superadmin', 'coordinator', 'clerk']);
+        $isAdmin = in_array($user->user_role, ['admin', 'superadmin', 'coordinator', 'clerk', 'leader']);
         abort_unless($isAdmin, 403);
 
         $assignment->completed = false;
+        $assignment->status_id = null;
         $assignment->save();
 
         return response()->json(['success' => true, 'assignment_id' => $assignment->id]);

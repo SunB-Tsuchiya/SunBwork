@@ -807,7 +807,7 @@ function submitJobLink() {
 
 function openAssignmentDetail(assignmentId) {
   if (!assignmentId || !props.projectJob?.id) return;
-  router.visit(route('project_jobs.assignments.show', { projectJob: props.projectJob.id, assignment: assignmentId }));
+  router.visit(route('coordinator.project_jobs.assignments.show', { projectJob: props.projectJob.id, assignment: assignmentId }));
 }
 
 function openJobLinkDetail({ assignmentId, assignmentTitle, assigneeUserId, assigneeSubcontractorId, endDate, completed, rowId, colKey }) {

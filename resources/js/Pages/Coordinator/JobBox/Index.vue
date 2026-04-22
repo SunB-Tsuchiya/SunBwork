@@ -132,7 +132,7 @@
                             <col>                      <!-- タイトル（残り全幅） -->
                             <col style="width: 120px"> <!-- クライアント -->
                             <col style="width: 150px"> <!-- 案件名 -->
-                            <col style="width: 74px">  <!-- ステータス -->
+                            <col style="width: 90px">  <!-- ステータス -->
                         </colgroup>
                         <thead>
                             <tr class="bg-gray-50">
@@ -195,7 +195,7 @@
 import useToasts from '@/Composables/useToasts';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 
 const props = defineProps({ projectJob: Object, messages: Object });
 const page = usePage();
@@ -203,8 +203,11 @@ page.props.q_model = page.props.q || '';
 page.props.period_model = page.props.period ?? '';
 const monthOptions = computed(() => (Array.isArray(page.props.monthOptions) ? page.props.monthOptions : []));
 
-// 完了非表示フラグ（デフォルト：完了を隠す）
-const hideCompleted = ref(true);
+// 完了非表示フラグ（localStorage で状態を永続化。デフォルト：完了を隠す）
+const hideCompleted = ref(localStorage.getItem('jobbox_hideCompleted') !== 'false');
+watch(hideCompleted, (val) => {
+    localStorage.setItem('jobbox_hideCompleted', String(val));
+});
 
 // グループ表示モード
 const viewMode = ref('date');

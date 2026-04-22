@@ -20,13 +20,6 @@ function getCalendarLink() {
 
 function getJobboxLink() {
     try {
-        if (props.projectJob && props.projectJob.id) {
-            return route('coordinator.project_jobs.jobbox.index', { projectJob: props.projectJob.id });
-        }
-    } catch (e) {
-        // fallthrough
-    }
-    try {
         return route('coordinator.jobbox');
     } catch (e) {
         return '/coordinator/jobbox';
