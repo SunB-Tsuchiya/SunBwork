@@ -2,7 +2,7 @@
     <AppLayout :title="job.title || '案件詳細'">
         <template #header>
             <div class="flex items-center gap-3">
-                <Link :href="route('leader.project_jobs.index')" class="text-sm text-orange-600 hover:underline">← 案件総覧</Link>
+                <Link :href="route('leader.project_jobs.index')" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">← 案件一覧に戻る</Link>
                 <h2 class="text-xl font-semibold leading-tight text-gray-800">案件詳細</h2>
             </div>
         </template>

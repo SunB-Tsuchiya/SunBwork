@@ -1,16 +1,6 @@
 <template>
     <div class="calendar-container">
         <div class="mb-4 flex items-center gap-4">
-            <!-- Link back to project details when project prop is present -->
-            <button
-                v-if="props.project"
-                @click="goToProjectShow"
-                class="rounded border bg-gray-100 px-4 py-2 text-gray-800"
-                title="プロジェクト詳細に戻る"
-            >
-                ← プロジェクト詳細に戻る
-            </button>
-
             <button @click="openEventModal" class="rounded bg-blue-600 px-4 py-2 text-white">予定作成</button>
             <button @click="goToDiaryCreate" class="rounded bg-orange-500 px-4 py-2 text-white">メモ作成</button>
 
@@ -1142,22 +1132,6 @@ function goToScheduleShowFromAction() {
     router.get(route('coordinator.project_schedules.show', { project_schedule: selectedScheduleForAction.value }));
 }
 
-function goToProjectShow() {
-    try {
-        const pid = props.project && (props.project.id || props.project.project_job_id || props.project.project_job?.id);
-        if (!pid) return;
-        // prefer named Ziggy route; fallback to explicit path
-        try {
-            router.get(route('coordinator.project_jobs.show', { projectJob: pid }));
-        } catch (e) {
-            // Ziggy unavailable — build path from Ziggy config base URL to support /members prefix
-            const _base = (window.Ziggy && window.Ziggy.url) ? (() => { try { return new URL(window.Ziggy.url).pathname.replace(/\/$/, ''); } catch (ex) { return ''; } })() : '';
-            router.get(`${_base}/coordinator/project_jobs/${pid}`);
-        }
-    } catch (e) {
-        // ignore navigation errors
-    }
-}
 
 function openMemoModalFromAction() {
     if (!selectedScheduleForAction.value) return;

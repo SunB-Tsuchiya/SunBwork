@@ -1,18 +1,18 @@
 <template>
     <AppLayout :title="`JobBox - ${props.projectJob?.title || props.projectJob?.name || '全体'}`">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">JobBox — ジョブ関連メッセージ</h2>
+            <h2 class="text-xl font-semibold leading-tight text-gray-800">ジョブ一覧（JobBox）</h2>
         </template>
 
-        <div class="mx-auto max-w-6xl rounded bg-white p-6 shadow">
-            <div class="mb-4 flex items-center justify-between">
-                <h1 class="text-2xl font-bold">JobBox：{{ props.projectJob?.title || props.projectJob?.name || '全体' }}</h1>
-                <Link
-                    v-if="props.routeContext === 'coordinator'"
-                    :href="route('coordinator.project_jobs.assignment_select')"
-                    class="rounded bg-green-600 px-4 py-2 text-sm text-white hover:bg-green-700"
-                >新規作成</Link>
-            </div>
+        <template #headerExtras>
+            <Link
+                v-if="props.routeContext === 'coordinator'"
+                :href="route('coordinator.project_jobs.assignment_select')"
+                class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+            >新規作成</Link>
+        </template>
+
+        <div class="rounded bg-white p-6 shadow">
 
             <!-- 検索・フィルター行 -->
             <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">

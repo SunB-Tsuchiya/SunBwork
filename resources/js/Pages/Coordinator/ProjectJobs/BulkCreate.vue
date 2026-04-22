@@ -1,20 +1,16 @@
 <template>
     <AppLayout title="案件一括作成">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">
-                【進行管理】{{ $page.props.auth.user.name || 'ユーザー' }}さんのページ
-            </h2>
+            <div class="flex items-center gap-3">
+                <Link
+                    :href="route('coordinator.project_jobs.index')"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                >← 案件一覧に戻る</Link>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">案件一括作成</h2>
+            </div>
         </template>
 
         <div class="rounded bg-white p-6 shadow">
-            <!-- ページヘッダー -->
-            <div class="mb-6 flex items-center justify-between">
-                <h1 class="text-2xl font-bold">案件一括作成</h1>
-                <Link :href="route('coordinator.project_jobs.index')"
-                      class="rounded border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">
-                    案件一覧へ戻る
-                </Link>
-            </div>
 
             <!-- タブ切替 -->
             <div class="mb-6 flex gap-0 border-b border-gray-200">

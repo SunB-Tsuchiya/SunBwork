@@ -7,9 +7,15 @@
 <template>
     <AppLayout title="案件詳細">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">
-                【進行管理】{{ $page.props.auth.user.name || 'ユーザー' }}さんのページ
-            </h2>
+            <div class="flex items-center gap-3">
+                <Link
+                    :href="route('coordinator.project_jobs.index')"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                >← 案件一覧に戻る</Link>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">
+                    【進行管理】{{ $page.props.auth.user.name || 'ユーザー' }}さんのページ
+                </h2>
+            </div>
         </template>
 
         <!-- ── スティッキーヘッダー ──────────────────────────── -->
@@ -97,11 +103,7 @@
                         class="rounded bg-red-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-red-700"
                         @click="destroyJob"
                     >削除</button>
-                    <button
-                        type="button"
-                        class="rounded border border-gray-300 bg-white px-4 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50"
-                        @click="backToIndex"
-                    >一覧に戻る</button>
+
                 </div>
             </div>
 

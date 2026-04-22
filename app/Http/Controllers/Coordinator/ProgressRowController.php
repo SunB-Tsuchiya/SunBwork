@@ -21,6 +21,7 @@ class ProgressRowController extends Controller
         $validated = $request->validate([
             'label'     => 'required|string|max:255',
             'parent_id' => 'nullable|integer|exists:progress_rows,id',
+            'after_id'  => 'nullable|integer|exists:progress_rows,id',
         ]);
 
         // 孫行は禁止
@@ -30,14 +31,36 @@ class ProgressRowController extends Controller
             abort_unless(is_null($parent->parent_id), 422, '孫行は作成できません。');
         }
 
-        $maxOrder = $sheet->rows()->max('order') ?? -1;
+        if (!empty($validated['after_id'])) {
+            $afterRow = ProgressRow::findOrFail($validated['after_id']);
+            abort_unless($afterRow->sheet_id === $sheet->id, 422, '挿入基準行が同じシートに属していません。');
 
-        ProgressRow::create([
-            'sheet_id'  => $sheet->id,
-            'label'     => $validated['label'],
-            'order'     => $maxOrder + 1,
-            'parent_id' => $validated['parent_id'] ?? null,
-        ]);
+            // グループ親行の場合、最後の子行の order を基準にする
+            $lastChildOrder = ProgressRow::where('parent_id', $afterRow->id)->max('order');
+            $insertAfterOrder = $lastChildOrder ?? $afterRow->order;
+
+            DB::transaction(function () use ($sheet, $insertAfterOrder, $validated) {
+                ProgressRow::where('sheet_id', $sheet->id)
+                    ->where('order', '>', $insertAfterOrder)
+                    ->increment('order');
+
+                ProgressRow::create([
+                    'sheet_id'  => $sheet->id,
+                    'label'     => $validated['label'],
+                    'order'     => $insertAfterOrder + 1,
+                    'parent_id' => $validated['parent_id'] ?? null,
+                ]);
+            });
+        } else {
+            $maxOrder = $sheet->rows()->max('order') ?? -1;
+
+            ProgressRow::create([
+                'sheet_id'  => $sheet->id,
+                'label'     => $validated['label'],
+                'order'     => $maxOrder + 1,
+                'parent_id' => $validated['parent_id'] ?? null,
+            ]);
+        }
 
         return back()->with('success', '行を追加しました。');
     }
@@ -65,6 +88,50 @@ class ProgressRowController extends Controller
         ]);
 
         return back()->with('success', 'グループ化しました。');
+    }
+
+    /**
+     * 行を複製（グループ親の場合は子行もまとめて複製）
+     */
+    public function duplicate(Request $request, ProgressSheet $sheet, ProgressRow $row)
+    {
+        $this->authorizeEdit($request->user(), $sheet);
+        abort_unless($row->sheet_id === $sheet->id, 404);
+
+        $children = ProgressRow::where('parent_id', $row->id)
+            ->orderBy('order')
+            ->get();
+
+        // 挿入位置: 子行があれば最後の子行の order、なければ行自体の order
+        $insertAfterOrder = $children->isNotEmpty()
+            ? $children->max('order')
+            : $row->order;
+
+        $count = 1 + $children->count();
+
+        DB::transaction(function () use ($sheet, $insertAfterOrder, $count, $row, $children) {
+            ProgressRow::where('sheet_id', $sheet->id)
+                ->where('order', '>', $insertAfterOrder)
+                ->increment('order', $count);
+
+            $newRow = ProgressRow::create([
+                'sheet_id'  => $sheet->id,
+                'label'     => $row->label,
+                'order'     => $insertAfterOrder + 1,
+                'parent_id' => $row->parent_id,
+            ]);
+
+            foreach ($children as $i => $child) {
+                ProgressRow::create([
+                    'sheet_id'  => $sheet->id,
+                    'label'     => $child->label,
+                    'order'     => $insertAfterOrder + 2 + $i,
+                    'parent_id' => $newRow->id,
+                ]);
+            }
+        });
+
+        return back()->with('success', '行を複製しました。');
     }
 
     /**

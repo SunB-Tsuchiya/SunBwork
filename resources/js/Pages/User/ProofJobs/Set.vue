@@ -39,14 +39,14 @@ const updateUrl = route('user.proof_jobs.set', { proofRequest: props.proofReques
 <template>
     <AppLayout title="校正をセット">
         <template #header>
-            <div class="flex items-center justify-between">
-                <h2 class="text-xl font-semibold text-gray-800">校正をセット</h2>
+            <div class="flex items-center gap-3">
                 <Link
                     :href="route('user.proof_jobs.index')"
-                    class="text-sm text-gray-500 hover:text-gray-700"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
                 >
                     ← 一覧に戻る
                 </Link>
+                <h2 class="text-xl font-semibold text-gray-800">校正をセット</h2>
             </div>
         </template>
         <template #tabs>

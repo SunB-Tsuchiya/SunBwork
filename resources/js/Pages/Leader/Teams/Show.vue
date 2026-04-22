@@ -1,7 +1,7 @@
 <script setup>
 import UserTable from '@/Components/UserTable.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { router, usePage } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 
 const props = defineProps({
@@ -39,10 +39,13 @@ const leaderName = computed(() => {
 <template>
     <AppLayout :title="`チーム：${currentTeam.name || ''}`">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">チーム詳細</h2>
+            <div class="flex items-center gap-3">
+                <Link :href="route('leader.teams.index')" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">← チーム一覧に戻る</Link>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">チーム詳細</h2>
+            </div>
         </template>
 
-        <div class="mx-auto max-w-4xl rounded bg-white p-6 shadow">
+        <div class="rounded bg-white p-6 shadow">
             <div class="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                     <div class="text-sm text-gray-500">チーム名</div>
@@ -72,7 +75,6 @@ const leaderName = computed(() => {
             </div>
 
             <div class="mt-6 flex gap-2">
-                <button @click="goBack" class="rounded border px-4 py-2 text-sm">一覧へ戻る</button>
                 <button @click="goEdit" class="rounded bg-orange-500 px-4 py-2 text-sm text-white hover:bg-orange-600">編集</button>
             </div>
         </div>

@@ -107,7 +107,10 @@ const statusBadge = {
 <template>
     <AppLayout :title="`校正ジョブ - ${proofRequest.title}`">
         <template #header>
-            <h2 class="text-xl font-semibold text-gray-800">校正ジョブ — 詳細</h2>
+            <div class="flex items-center gap-3">
+                <Link :href="route('user.proof_jobs.index')" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">← 校正ジョブ一覧に戻る</Link>
+                <h2 class="text-xl font-semibold text-gray-800">校正ジョブ — 詳細</h2>
+            </div>
         </template>
         <template #tabs>
             <UserNavigationTabs active="proof_jobs" />
@@ -194,13 +197,6 @@ const statusBadge = {
 
             <!-- アクションボタン -->
             <div class="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-white px-5 py-3 shadow-sm">
-                <Link
-                    :href="route('user.proof_jobs.index')"
-                    class="inline-flex items-center rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
-                >
-                    戻る
-                </Link>
-
                 <template v-if="!isCompleted">
                     <!-- 予定をセット / 予定を編集 -->
                     <Link

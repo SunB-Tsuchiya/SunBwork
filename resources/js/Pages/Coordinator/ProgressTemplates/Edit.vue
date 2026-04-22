@@ -1,9 +1,15 @@
 <template>
   <AppLayout :title="isEdit ? 'テンプレート編集' : 'テンプレート新規作成'">
     <template #header>
-      <h2 class="text-xl font-semibold leading-tight text-gray-800">
-        {{ isEdit ? 'テンプレート編集' : 'テンプレート新規作成' }}
-      </h2>
+      <div class="flex items-center gap-3">
+        <Link
+          :href="route('coordinator.progress_templates.index')"
+          class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+        >← テンプレート一覧に戻る</Link>
+        <h2 class="text-xl font-semibold leading-tight text-gray-800">
+          {{ isEdit ? 'テンプレート編集' : 'テンプレート新規作成' }}
+        </h2>
+      </div>
     </template>
 
     <div class="rounded bg-white p-6 shadow">
@@ -263,9 +269,9 @@
         </button>
         <Link
           :href="route('coordinator.progress_templates.index')"
-          class="rounded border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
+          class="rounded bg-gray-100 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200"
         >
-          キャンセル
+          テンプレート一覧に戻る
         </Link>
       </div>
 

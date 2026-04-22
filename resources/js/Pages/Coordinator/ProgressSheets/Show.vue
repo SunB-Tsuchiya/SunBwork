@@ -3,6 +3,10 @@
     <template #header>
       <div class="flex flex-col gap-1">
         <div class="flex items-center gap-3">
+          <Link
+            :href="route('coordinator.project_jobs.show', { projectJob: projectJob.id })"
+            class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+          >← 案件詳細に戻る</Link>
           <h2 class="text-xl font-semibold leading-tight text-gray-800">
             進行管理表：{{ sheet.name }}
           </h2>
@@ -22,13 +26,6 @@
 
       <!-- ── ツールバー ──────────────────────────────── -->
       <div class="mb-4 flex flex-wrap items-center gap-3">
-        <Link
-          :href="route('coordinator.project_jobs.show', { projectJob: projectJob.id })"
-          class="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
-        >
-          ← 案件詳細に戻る
-        </Link>
-
         <template v-if="canEdit">
           <button
             type="button"
@@ -95,135 +92,155 @@
           />
         </div>
 
-        <!-- 左：行管理（台割） -->
+        <!-- 左：行・ステージ構成 -->
         <div>
-          <h3 class="mb-2 font-semibold text-gray-700">行管理（台割）</h3>
-
-          <!-- 行追加フォーム -->
-          <div class="mb-3 flex gap-2">
-            <input
-              v-model="newRowLabel"
-              type="text"
-              class="flex-1 rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-indigo-400 focus:outline-none"
-              placeholder="例: P.1-4"
-              @keydown.enter.prevent="addRow"
-            />
-            <button
-              type="button"
-              class="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
-              @click="addRow"
-            >
-              追加
-            </button>
-          </div>
-
-          <!-- すべてに子要素を追加 -->
-          <div class="mb-3 flex gap-2">
-            <input
-              v-model="bulkChildLabel"
-              type="text"
-              class="flex-1 rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-indigo-400 focus:outline-none"
-              placeholder="例: 学部学科"
-              @keydown.enter.prevent="addChildToAllGroups"
-            />
-            <button
-              type="button"
-              class="rounded bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700"
-              @click="addChildToAllGroups"
-            >
-              すべてに子要素を追加
-            </button>
-          </div>
-
-          <!-- テキストエリアで一括インポート -->
-          <details class="mb-3">
-            <summary class="cursor-pointer text-sm text-gray-500 hover:text-gray-700">一括インポート（改行区切り）</summary>
-            <div class="mt-2 flex flex-col gap-2">
-              <textarea
-                v-model="importText"
-                rows="5"
-                class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-indigo-400 focus:outline-none"
-                placeholder="P.1-4&#10;P.5-8&#10;表紙"
-              />
+          <div class="mb-2 flex items-center justify-between">
+            <h3 class="font-semibold text-gray-700">行・ステージ構成</h3>
+            <div class="flex gap-2">
               <button
                 type="button"
-                class="self-start rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
-                @click="importRows"
-              >
-                インポート
-              </button>
+                class="rounded border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50"
+                @click="showBulkImportModal = true"
+              >一括インポート</button>
+              <button
+                type="button"
+                class="rounded border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50"
+                @click="showAddChildModal = true"
+              >すべてに子要素を追加</button>
             </div>
-          </details>
+          </div>
 
           <!-- 行一覧（ツリー表示） -->
-          <div class="rounded border border-gray-200 p-2 space-y-2">
+          <div class="space-y-1">
               <template v-for="(row, idx) in topLevelRows" :key="row.id">
                 <div>
-
-              <!-- グループ親行 -->
-              <div v-if="childrenOf[row.id]?.length > 0">
-                <div class="flex items-center gap-2 rounded border border-indigo-200 bg-indigo-50 px-3 py-1.5">
-                  <span class="flex-1 text-sm font-medium text-indigo-700">{{ row.label }}</span>
-                  <span class="rounded bg-indigo-100 px-1.5 py-0.5 text-xs text-indigo-600">見出し</span>
-                  <button type="button" class="rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-600 hover:bg-blue-100" @click="startAddChild(row.id)">＋子行</button>
-                  <button v-if="idx > 0" type="button" class="text-xs text-gray-400 hover:text-gray-600" @click="moveTopRowUp(idx)">↑</button>
-                  <button v-if="idx < topLevelRows.length - 1" type="button" class="text-xs text-gray-400 hover:text-gray-600" @click="moveTopRowDown(idx)">↓</button>
-                  <button type="button" class="text-xs text-red-400 hover:text-red-600" @click="deleteRow(row)">✕</button>
-                </div>
-                <!-- 子行 -->
-                <div class="ml-6 mt-1 space-y-1 border-l border-indigo-200 pl-2">
-                  <div
-                    v-for="child in childrenOf[row.id]"
-                    :key="child.id"
-                    class="flex items-center gap-2 rounded border border-gray-200 bg-white px-3 py-1"
-                  >
-                    <span class="flex-1 text-sm">{{ child.label }}</span>
-                    <button type="button" class="text-xs text-red-400 hover:text-red-600" @click="deleteRow(child)">✕</button>
+                  <div class="rounded border border-gray-200 bg-white">
+                    <!-- 行ヘッダー -->
+                    <div class="flex items-center gap-2 px-3 py-2">
+                      <span class="cursor-grab text-gray-400">⠿</span>
+                      <input
+                        v-model="row.label"
+                        type="text"
+                        class="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none"
+                        placeholder="例: P.1-4"
+                        @change="updateRowLabel(row)"
+                        @keydown.enter.prevent
+                        @keyup.enter="updateRowLabel(row)"
+                      />
+                      <span v-if="childrenOf[row.id]?.length > 0" class="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">グループ</span>
+                      <button
+                        v-if="!childrenOf[row.id]?.length"
+                        type="button"
+                        class="rounded bg-indigo-50 px-2 py-0.5 text-xs text-indigo-600 hover:bg-indigo-100"
+                        @click="startAddChild(row.id)"
+                      >＋グループ</button>
+                      <button
+                        v-else
+                        type="button"
+                        class="rounded bg-blue-50 px-2 py-0.5 text-xs text-blue-600 hover:bg-blue-100"
+                        @click="startAddChild(row.id)"
+                      >＋子行</button>
+                      <button v-if="idx > 0" type="button" class="text-gray-400 hover:text-gray-600" @click="moveTopRowUp(idx)">↑</button>
+                      <button v-if="idx < topLevelRows.length - 1" type="button" class="text-gray-400 hover:text-gray-600" @click="moveTopRowDown(idx)">↓</button>
+                      <button type="button" class="rounded bg-orange-50 px-2 py-0.5 text-xs text-orange-600 hover:bg-orange-100" @click="duplicateRow(row)">複製</button>
+                      <button type="button" class="rounded px-1.5 py-0.5 text-xs text-red-400 hover:bg-red-50 hover:text-red-600" @click="deleteRow(row)">✕</button>
+                    </div>
+                    <!-- 子行リスト（グループがある、または追加中） -->
+                    <div v-if="childrenOf[row.id]?.length > 0 || addingChildTo === row.id" class="ml-6 border-l border-gray-200 pb-2 pl-2 pr-2">
+                      <div class="space-y-1">
+                        <div
+                          v-for="(child, cidx) in childrenOf[row.id]"
+                          :key="child.id"
+                          class="flex items-center gap-2 rounded border border-gray-200 bg-white px-3 py-2"
+                        >
+                          <span class="cursor-grab text-gray-400">⠿</span>
+                          <input
+                            v-model="child.label"
+                            type="text"
+                            class="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none"
+                            placeholder="子行ラベル"
+                            @change="updateRowLabel(child)"
+                            @keydown.enter.prevent
+                            @keyup.enter="updateRowLabel(child)"
+                          />
+                          <button v-if="cidx > 0" type="button" class="text-gray-400 hover:text-gray-600" @click="moveChildRowUp(row.id, cidx)">↑</button>
+                          <button v-if="cidx < childrenOf[row.id].length - 1" type="button" class="text-gray-400 hover:text-gray-600" @click="moveChildRowDown(row.id, cidx)">↓</button>
+                          <button type="button" class="rounded bg-orange-50 px-2 py-0.5 text-xs text-orange-600 hover:bg-orange-100" @click="duplicateRow(child)">複製</button>
+                          <button type="button" class="rounded px-1.5 py-0.5 text-xs text-red-400 hover:bg-red-50 hover:text-red-600" @click="deleteRow(child)">✕</button>
+                        </div>
+                        <!-- 子行追加インライン入力 -->
+                        <div v-if="addingChildTo === row.id" class="flex items-center gap-2 rounded border border-dashed border-gray-300 bg-white px-3 py-2">
+                          <span class="select-none text-transparent">⠿</span>
+                          <input
+                            v-model="newChildLabel"
+                            type="text"
+                            class="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none"
+                            placeholder="子行ラベル"
+                            @keydown.enter.prevent
+                            @keyup.enter="confirmAddChild(row)"
+                            @keydown.escape="newChildLabel = ''; addingChildTo = null"
+                            @blur="confirmAddChild(row)"
+                          />
+                          <button type="button" class="rounded bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700" @click="confirmAddChild(row)">追加</button>
+                          <button type="button" class="rounded px-1.5 py-0.5 text-xs text-red-400 hover:bg-red-50 hover:text-red-600" @mousedown.prevent @click="newChildLabel = ''; addingChildTo = null">✕</button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <!-- 子行追加インライン入力 -->
-                  <div v-if="addingChildTo === row.id" class="flex gap-2 pt-1">
-                    <input
-                      v-model="newChildLabel"
-                      type="text"
-                      class="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none"
-                      placeholder="子行ラベル"
-                      @keydown.enter.prevent="confirmAddChild(row)"
-                      @keydown.escape="addingChildTo = null"
-                    />
-                    <button type="button" class="rounded bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700" @click="confirmAddChild(row)">追加</button>
-                    <button type="button" class="text-xs text-gray-400 hover:text-gray-600" @click="addingChildTo = null">✕</button>
-                  </div>
-                </div>
-              </div>
 
-              <!-- フラット行 -->
-              <div v-else>
-                <div class="flex items-center gap-2 rounded border border-gray-200 px-3 py-1.5">
-                  <span class="flex-1 text-sm">{{ row.label }}</span>
-                  <button type="button" class="rounded bg-indigo-50 px-1.5 py-0.5 text-xs text-indigo-600 hover:bg-indigo-100" @click="startAddChild(row.id)" title="グループ化して子行を追加">グループ化</button>
-                  <button v-if="idx > 0" type="button" class="text-xs text-gray-400 hover:text-gray-600" @click="moveTopRowUp(idx)">↑</button>
-                  <button v-if="idx < topLevelRows.length - 1" type="button" class="text-xs text-gray-400 hover:text-gray-600" @click="moveTopRowDown(idx)">↓</button>
-                  <button type="button" class="text-xs text-red-400 hover:text-red-600" @click="deleteRow(row)">✕</button>
-                </div>
-                <!-- グループ化インライン入力 -->
-                <div v-if="addingChildTo === row.id" class="ml-6 mt-1 flex gap-2 border-l border-indigo-200 pl-2">
+              <!-- ここに行を挿入 -->
+              <div v-if="pendingNewRow?.after_id === row.id" class="mt-1 rounded border border-dashed border-gray-300 bg-white">
+                <div class="flex items-center gap-2 px-3 py-2">
+                  <span class="select-none text-transparent">⠿</span>
                   <input
-                    v-model="newChildLabel"
+                    data-pending-row-input
+                    v-model="pendingNewRow.label"
                     type="text"
                     class="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none"
-                    placeholder="最初の子行ラベル"
-                    @keydown.enter.prevent="confirmAddChild(row)"
-                    @keydown.escape="addingChildTo = null"
+                    placeholder="ラベルを入力して Enter"
+                    @keydown.enter.prevent
+                    @keyup.enter="commitPendingRow"
+                    @keydown.escape="cancelPendingRow"
+                    @blur="commitPendingRow"
                   />
-                  <button type="button" class="rounded bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700" @click="confirmAddChild(row)">追加</button>
-                  <button type="button" class="text-xs text-gray-400 hover:text-gray-600" @click="addingChildTo = null">✕</button>
+                  <button type="button" class="rounded px-1.5 py-0.5 text-xs text-red-400 hover:bg-red-50 hover:text-red-600" @mousedown.prevent @click="cancelPendingRow">✕</button>
                 </div>
               </div>
+              <button
+                v-else
+                type="button"
+                class="mt-1 flex w-full items-center justify-center rounded border border-dashed border-gray-300 py-0.5 text-xs text-gray-400 hover:border-blue-400 hover:text-blue-500"
+                @click="startPendingRow(row.id)"
+              >＋ ここに行を挿入</button>
 
                 </div>
               </template>
+
+              <!-- 行を追加 -->
+              <div v-if="pendingNewRow && pendingNewRow.after_id === null" class="mt-1 rounded border border-dashed border-gray-300 bg-white">
+                <div class="flex items-center gap-2 px-3 py-2">
+                  <span class="select-none text-transparent">⠿</span>
+                  <input
+                    data-pending-row-input
+                    v-model="pendingNewRow.label"
+                    type="text"
+                    class="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none"
+                    placeholder="ラベルを入力して Enter"
+                    @keydown.enter.prevent
+                    @keyup.enter="commitPendingRow"
+                    @keydown.escape="cancelPendingRow"
+                    @blur="commitPendingRow"
+                  />
+                  <button type="button" class="rounded px-1.5 py-0.5 text-xs text-red-400 hover:bg-red-50 hover:text-red-600" @mousedown.prevent @click="cancelPendingRow">✕</button>
+                </div>
+              </div>
+              <button
+                v-else
+                type="button"
+                class="mt-1 flex w-full items-center justify-center rounded border border-dashed border-gray-300 py-1.5 text-sm text-gray-500 hover:border-indigo-400 hover:text-indigo-500"
+                @click="startPendingRow(null)"
+              >＋ 行を追加</button>
           </div>
-            <div v-if="topLevelRows.length === 0" class="py-2 text-center text-sm text-gray-400">行がありません</div>
 
           <!-- 並び替え保存ボタン -->
           <button
@@ -234,6 +251,41 @@
           >
             並び順を保存
           </button>
+
+          <!-- 一括インポート モーダル -->
+          <div v-if="showBulkImportModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="showBulkImportModal = false">
+            <div class="w-96 rounded-lg bg-white p-6 shadow-xl">
+              <h4 class="mb-3 font-semibold text-gray-700">一括インポート（改行区切り）</h4>
+              <textarea
+                v-model="importText"
+                rows="8"
+                class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-indigo-400 focus:outline-none"
+                placeholder="P.1-4&#10;P.5-8&#10;表紙"
+              />
+              <div class="mt-3 flex justify-end gap-2">
+                <button type="button" class="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50" @click="showBulkImportModal = false">キャンセル</button>
+                <button type="button" class="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700" @click="importRows(); showBulkImportModal = false">インポート</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- すべてに子要素を追加 モーダル -->
+          <div v-if="showAddChildModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="showAddChildModal = false">
+            <div class="w-80 rounded-lg bg-white p-6 shadow-xl">
+              <h4 class="mb-3 font-semibold text-gray-700">すべてに子要素を追加</h4>
+              <input
+                v-model="bulkChildLabel"
+                type="text"
+                class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-indigo-400 focus:outline-none"
+                placeholder="例: 学部学科"
+                @keydown.enter.prevent="addChildToAllGroups(); showAddChildModal = false"
+              />
+              <div class="mt-3 flex justify-end gap-2">
+                <button type="button" class="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50" @click="showAddChildModal = false">キャンセル</button>
+                <button type="button" class="rounded bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700" @click="addChildToAllGroups(); showAddChildModal = false">追加</button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- 右：列構成エディタ -->
@@ -523,12 +575,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import ProgressTable from '@/Components/ProgressTable.vue';
 import ColumnTreeEditor from '@/Components/ColumnTreeEditor.vue';
 import ProofRequestModal from '@/Components/ProofRequestModal.vue';
+import useToasts from '@/Composables/useToasts';
+const { showToast } = useToasts();
 
 const props = defineProps({
   sheet: Object,
@@ -583,6 +637,9 @@ const importText = ref('');
 const addingChildTo = ref(null);
 const newChildLabel = ref('');
 const bulkChildLabel = ref('');
+const showBulkImportModal = ref(false);
+const showAddChildModal   = ref(false);
+const pendingNewRow = ref(null); // null | { label: string, after_id: number | null }
 
 // ── ジョブリンク ──────────────────────────────────────
 const jobLinkModal = ref({ open: false, isSelfAssign: true, isSubcontractor: false, rowId: null, colKey: null });
@@ -999,11 +1056,13 @@ const childrenOf = computed(() => {
   return map;
 });
 
-// 並び替え変更検出（トップレベルのみ）
+// 並び替え変更検出（トップレベル＋子行）
 let savedTopLevelIds = props.rows.filter((r) => !r.parent_id).map((r) => r.id);
+let savedAllRowIds   = props.rows.map((r) => r.id);
 
 const rowOrderChanged = computed(() =>
-  JSON.stringify(topLevelRows.value.map((r) => r.id)) !== JSON.stringify(savedTopLevelIds)
+  JSON.stringify(topLevelRows.value.map((r) => r.id)) !== JSON.stringify(savedTopLevelIds) ||
+  JSON.stringify(localRows.value.map((r) => r.id))    !== JSON.stringify(savedAllRowIds)
 );
 
 // ── 列構成 ──
@@ -1012,12 +1071,20 @@ function onColumnChange(updated) {
 }
 
 function saveColumnConfig() {
+  if (pendingNewRow.value?.label?.trim()) {
+    showToast('未確定の行ラベルがあります。Enter で確定してから保存してください。', 'warning', 4000);
+    return;
+  }
+  cancelPendingRow();
   router.put(
     route('coordinator.progress_sheets.update', { sheet: props.sheet.id }),
     { name: localSheetName.value, column_config: localColumnConfig.value },
     {
       preserveScroll: true,
-      onSuccess: () => { editMode.value = false; },
+      onSuccess: (page) => {
+        syncRowsFromPage(page);
+        editMode.value = false;
+      },
     }
   );
 }
@@ -1076,22 +1143,61 @@ function syncRowsFromPage(page) {
   if (page.props.rows) {
     localRows.value = page.props.rows.map((r) => ({ ...r }));
     savedTopLevelIds = localRows.value.filter((r) => !r.parent_id).map((r) => r.id);
+    savedAllRowIds   = localRows.value.map((r) => r.id);
   }
 }
 
-function addRow() {
-  const label = newRowLabel.value.trim();
+function startPendingRow(afterId) {
+  pendingNewRow.value = { label: '', after_id: afterId ?? null };
+  nextTick(() => {
+    const el = document.querySelector('[data-pending-row-input]');
+    if (el) el.focus();
+  });
+}
+
+function commitPendingRow() {
+  const label = pendingNewRow.value?.label?.trim();
+  if (!label) {
+    pendingNewRow.value = null;
+    return;
+  }
+  const afterId = pendingNewRow.value.after_id;
+  pendingNewRow.value = null;
+  router.post(
+    route('coordinator.progress_sheets.rows.store', { sheet: props.sheet.id }),
+    { label, ...(afterId !== null ? { after_id: afterId } : {}) },
+    { preserveScroll: true, onSuccess: (page) => { syncRowsFromPage(page); } }
+  );
+}
+
+function cancelPendingRow() {
+  pendingNewRow.value = null;
+}
+
+function duplicateRow(row) {
+  router.post(
+    route('coordinator.progress_sheets.rows.duplicate', { sheet: props.sheet.id, row: row.id }),
+    {},
+    { preserveScroll: true, onSuccess: (page) => { syncRowsFromPage(page); } }
+  );
+}
+
+function updateRowLabel(row) {
+  const label = row.label.trim();
+  if (!label) return;
+  router.put(
+    route('coordinator.progress_sheets.rows.update', { sheet: props.sheet.id, row: row.id }),
+    { label },
+    { preserveScroll: true, onSuccess: (page) => { syncRowsFromPage(page); } }
+  );
+}
+
+function addRow(label) {
   if (!label) return;
   router.post(
     route('coordinator.progress_sheets.rows.store', { sheet: props.sheet.id }),
     { label },
-    {
-      preserveScroll: true,
-      onSuccess: (page) => {
-        syncRowsFromPage(page);
-        newRowLabel.value = '';
-      },
-    }
+    { preserveScroll: true, onSuccess: (page) => { syncRowsFromPage(page); } }
   );
 }
 
@@ -1165,6 +1271,8 @@ function confirmAddChild(row) {
     );
   }
 }
+
+// startInsertAfter / confirmInsertAfter → startPendingRow / commitPendingRow に統合
 
 function addChildToAllGroups() {
   const label = bulkChildLabel.value.trim();
@@ -1259,6 +1367,30 @@ function extractGroup(arr, parentRow) {
   return result;
 }
 
+function moveChildRowUp(parentId, cidx) {
+  if (cidx < 1) return;
+  const children = childrenOf.value[parentId];
+  const rowA = children[cidx];
+  const rowB = children[cidx - 1];
+  const iA = localRows.value.indexOf(rowA);
+  const iB = localRows.value.indexOf(rowB);
+  const copy = [...localRows.value];
+  [copy[iA], copy[iB]] = [copy[iB], copy[iA]];
+  localRows.value = copy;
+}
+
+function moveChildRowDown(parentId, cidx) {
+  const children = childrenOf.value[parentId];
+  if (cidx >= children.length - 1) return;
+  const rowA = children[cidx];
+  const rowB = children[cidx + 1];
+  const iA = localRows.value.indexOf(rowA);
+  const iB = localRows.value.indexOf(rowB);
+  const copy = [...localRows.value];
+  [copy[iA], copy[iB]] = [copy[iB], copy[iA]];
+  localRows.value = copy;
+}
+
 function moveTopRowUp(idx) {
   if (idx < 1) return;
   const topRows = localRows.value.filter((r) => !r.parent_id);
@@ -1288,7 +1420,7 @@ function moveTopRowDown(idx) {
 }
 
 function saveRowOrder() {
-  const ids = topLevelRows.value.map((r) => r.id);
+  const ids = localRows.value.map((r) => r.id);
   router.put(
     route('coordinator.progress_sheets.rows.reorder', { sheet: props.sheet.id }),
     { ids },

@@ -3,6 +3,10 @@
         <template #header>
             <div class="flex flex-col gap-1">
                 <div class="flex items-center gap-3">
+                    <Link
+                        :href="route('user.project_jobs.show', { projectJob: projectJob.id })"
+                        class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                    >← 案件詳細に戻る</Link>
                     <h2 class="text-xl font-semibold leading-tight text-gray-800">進行管理表：{{ sheet.name }}</h2>
                 </div>
                 <!-- 案件情報バー -->
@@ -15,19 +19,6 @@
                 </div>
             </div>
         </template>
-
-        <div class="rounded bg-white p-6 shadow">
-            <!-- ツールバー -->
-            <div class="flex items-center gap-3">
-                <button
-                    type="button"
-                    class="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
-                    @click="backToJob"
-                >
-                    ← 案件詳細に戻る
-                </button>
-            </div>
-        </div>
 
         <!-- 進行管理表 -->
         <div class="mt-4">
@@ -116,7 +107,7 @@
 <script setup>
 import ProgressTable from '@/Components/ProgressTable.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { router, usePage } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import { ref, watch, onMounted, onUnmounted } from 'vue';
 import { route } from 'ziggy-js';
 

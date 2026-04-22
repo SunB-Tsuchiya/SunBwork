@@ -1,7 +1,10 @@
 <template>
     <AppLayout title="案件詳細">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">案件詳細</h2>
+            <div class="flex items-center gap-3">
+                <Link :href="route('user.project_jobs.index')" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">← 案件一覧に戻る</Link>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">案件詳細</h2>
+            </div>
         </template>
 
         <div class="rounded bg-white p-6 shadow">
@@ -35,16 +38,6 @@
                         class="mt-2 inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800"
                         >完了</span
                     >
-                </div>
-
-                <div class="flex flex-wrap items-center gap-2 pt-1">
-                    <button
-                        type="button"
-                        class="rounded border border-gray-300 bg-white px-4 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50"
-                        @click="backToIndex"
-                    >
-                        一覧に戻る
-                    </button>
                 </div>
             </div>
 
@@ -237,7 +230,7 @@
 <script setup>
 import ProofRequestModal from '@/Components/ProofRequestModal.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { router, usePage } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import { route } from 'ziggy-js';
 

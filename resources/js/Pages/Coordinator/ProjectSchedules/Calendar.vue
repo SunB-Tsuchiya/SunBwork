@@ -1,6 +1,7 @@
 <script setup>
 import ProjectCalendar from '@/Components/ProjectCalendar.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
+import { Link } from '@inertiajs/vue3';
 import { ref } from 'vue';
 
 const props = defineProps({
@@ -70,15 +71,22 @@ const diaries = ref([]);
 </script>
 
 <template>
-    <AppLayout title="プロジェクトスケジュール">
+    <AppLayout title="案件スケジュール">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">プロジェクト スケジュール</h2>
+            <div class="flex items-center gap-3">
+                <Link
+                    v-if="project"
+                    :href="route('coordinator.project_jobs.show', { projectJob: project.id })"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                >← 案件詳細に戻る</Link>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">案件スケジュール</h2>
+            </div>
         </template>
         <div class="rounded bg-white p-6 shadow">
                     <!-- Project header: show project name and client when available -->
                     <div class="mb-4 flex items-baseline justify-between">
                         <div>
-                            <h1 class="text-2xl font-semibold text-gray-900">{{ project ? project.name : 'プロジェクト' }}</h1>
+                            <h1 class="text-2xl font-semibold text-gray-900">{{ project ? project.name : '案件スケジュール' }}</h1>
                             <div class="text-sm text-gray-600">{{ client ? client.name : '' }}</div>
                         </div>
                     </div>

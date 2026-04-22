@@ -1,7 +1,7 @@
 <script setup>
 import UserTable from '@/Components/UserTable.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { useForm, usePage } from '@inertiajs/vue3';
+import { Link, useForm, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, ref, watch } from 'vue';
 
 const page = usePage();
@@ -67,10 +67,13 @@ const submit = () => {
 <template>
     <AppLayout title="ユニットチーム作成">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">新規ユニットチーム作成</h2>
+            <div class="flex items-center gap-3">
+                <Link :href="route('leader.teams.index')" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">← チーム一覧に戻る</Link>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">新規ユニットチーム作成</h2>
+            </div>
         </template>
 
-        <div class="mx-auto max-w-3xl rounded bg-white p-6 shadow">
+        <div class="rounded bg-white p-6 shadow">
             <form @submit.prevent="submit" class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700">会社</label>
