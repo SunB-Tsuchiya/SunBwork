@@ -4,7 +4,7 @@
       <div class="flex flex-col gap-1">
         <div class="flex items-center gap-3">
           <Link
-            :href="route('coordinator.project_jobs.show', { projectJob: projectJob.id })"
+            :href="route('coordinator.project_jobs.show', { projectJob: projectJob.id }) + '?tab=progress'"
             class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
           >← 案件詳細に戻る</Link>
           <h2 class="text-xl font-semibold leading-tight text-gray-800">

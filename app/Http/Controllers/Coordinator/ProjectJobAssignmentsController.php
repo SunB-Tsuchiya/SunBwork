@@ -548,7 +548,16 @@ class ProjectJobAssignmentsController extends Controller
             'user' => $userInfo,
             'job_type' => $a->job_type ?? null,
             'file_info' => $a->file_info ?? null,
+            'progress_cell_id' => null, // 後で上書き
         ];
+
+        // 進行表セルと紐付いているか判定
+        try {
+            $progressCell = \App\Models\ProgressCell::where('assignment_id', $a->id)->first();
+            $assignmentPayload['progress_cell_id'] = $progressCell?->id;
+        } catch (\Throwable $__e) {
+            // non-fatal
+        }
 
         // build difficulties list
         $difficultySelect = ['id', 'name'];

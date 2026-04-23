@@ -141,7 +141,7 @@ class ProjectSchedulesController extends Controller
 
         $schedules = ProjectSchedule::where('project_job_id', $projectJobId)
             ->orderBy('start_date')
-            ->get(['id', 'name', 'start_date', 'end_date', 'description', 'color', 'progress']);
+            ->get(['id', 'name', 'start_date', 'end_date', 'description', 'color']);
 
         $headers = [
             'Content-Type' => 'text/csv; charset=UTF-8',
@@ -153,15 +153,14 @@ class ProjectSchedulesController extends Controller
             // BOM for Excel
             fputs($handle, "\xEF\xBB\xBF");
             // Header row
-            fputcsv($handle, ['イベント名', '開始日', '終了日', 'メモ', '色', '進捗(%)']);
+            fputcsv($handle, ['イベント名', '開始日', '終了日', 'メモ', '色']);
             foreach ($schedules as $s) {
                 fputcsv($handle, [
                     $s->name ?? '',
-                    $s->start_date ?? '',
-                    $s->end_date ?? '',
+                    $s->start_date ? $s->start_date->format('Y-m-d') : '',
+                    $s->end_date   ? $s->end_date->format('Y-m-d')   : '',
                     $s->description ?? '',
                     $s->color ?? '',
-                    $s->progress ?? 0,
                 ]);
             }
             fclose($handle);
@@ -204,28 +203,24 @@ class ProjectSchedulesController extends Controller
         DB::beginTransaction();
         try {
             while (($line = fgetcsv($handle)) !== false) {
-                if (count($line) < 2) {
-                    $row++;
-                    continue;
-                }
                 [$name, $startDate, $endDate, $description, $color, $progress] = array_pad($line, 6, null);
 
                 $name = trim($name ?? '');
                 if ($name === '') {
-                    $errors[] = "{$row}行目: イベント名が空です";
+                    // イベント名が空の行（Excelの空行含む）は無視
                     $row++;
                     continue;
                 }
 
-                // 日付バリデーション
-                $startDate = trim($startDate ?? '');
-                $endDate = trim($endDate ?? '');
-                if ($startDate && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $startDate)) {
+                // 日付バリデーション（YYYY-MM-DD / YYYY/MM/DD / YYYY/M/D 0:00:00 すべて受け付ける）
+                $startDate = $this->parseDateValue($startDate ?? '');
+                $endDate   = $this->parseDateValue($endDate ?? '');
+                if ($startDate === false) {
                     $errors[] = "{$row}行目: 開始日の形式が不正です（YYYY-MM-DD）";
                     $row++;
                     continue;
                 }
-                if ($endDate && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $endDate)) {
+                if ($endDate === false) {
                     $errors[] = "{$row}行目: 終了日の形式が不正です（YYYY-MM-DD）";
                     $row++;
                     continue;
@@ -265,5 +260,34 @@ class ProjectSchedulesController extends Controller
             fclose($handle);
             return response()->json(['status' => 'error', 'message' => 'インポートに失敗しました: ' . $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * 日付文字列を YYYY-MM-DD に正規化する。
+     * 空文字は null、不正な形式は false を返す。
+     * 受け付ける形式: YYYY-MM-DD / YYYY/MM/DD / YYYY/M/D / YYYY/M/D H:MM:SS など
+     */
+    private function parseDateValue(string $value): string|null|false
+    {
+        // 時刻部分（スペース以降）を除去
+        $value = trim(preg_replace('/[\s　].*$/', '', trim($value)));
+
+        if ($value === '') {
+            return null;
+        }
+
+        // YYYY-MM-DD または YYYY/MM/DD（ゼロ埋めあり/なし）
+        if (!preg_match('/^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}$/', $value)) {
+            return false;
+        }
+
+        $normalized = str_replace('/', '-', $value);
+        [$y, $m, $d] = explode('-', $normalized);
+
+        if (!checkdate((int) $m, (int) $d, (int) $y)) {
+            return false;
+        }
+
+        return sprintf('%04d-%02d-%02d', (int) $y, (int) $m, (int) $d);
     }
 }

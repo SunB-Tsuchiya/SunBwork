@@ -215,12 +215,16 @@
 
                 <!-- 進行表に紐づける（Coordinator/Admin のみ） -->
                 <button
-                    v-if="canLinkCell && assignment?.id"
+                    v-if="canLinkCell && assignment?.id && !assignment?.progress_cell_id"
                     @click="showLinkCellModal = true"
                     class="rounded border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
                 >
                     進行表に紐づける
                 </button>
+                <span
+                    v-else-if="canLinkCell && assignment?.id && assignment?.progress_cell_id"
+                    class="cursor-not-allowed rounded border border-gray-300 bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-400"
+                >紐づけ済み</span>
                 <span
                     v-else-if="!isAssignmentCompleted && proofRequested"
                     class="rounded border border-gray-300 bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-400 cursor-not-allowed"

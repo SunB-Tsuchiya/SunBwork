@@ -21,12 +21,17 @@
                 <Link :href="route('coordinator.project_jobs.assignments.edit', { projectJob: projectJob.id, assignment: assignment.id })" class="rounded bg-yellow-500 px-4 py-2 text-white">編集</Link>
                 <button class="rounded bg-red-500 px-4 py-2 text-white" @click.prevent="deleteAssignment">削除</button>
                 <button
+                    v-if="!assignment.progress_cell_id"
                     type="button"
                     class="rounded border border-indigo-300 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
                     @click="showLinkCellModal = true"
                 >
                     進行表に紐づける
                 </button>
+                <span
+                    v-else
+                    class="cursor-not-allowed rounded border border-gray-300 bg-gray-100 px-4 py-2 text-sm font-medium text-gray-400"
+                >紐づけ済み</span>
             </div>
         </div>
 

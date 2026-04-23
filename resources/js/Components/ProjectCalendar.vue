@@ -266,8 +266,8 @@
                 <h2 class="mb-4 text-lg font-bold">CSVインポート</h2>
                 <div class="mb-4 rounded bg-gray-50 p-3 text-sm text-gray-600">
                     <p class="font-medium mb-1">CSVファイルのフォーマット（1行目はヘッダー行）：</p>
-                    <code class="block text-xs bg-gray-100 p-2 rounded">イベント名,開始日(YYYY-MM-DD),終了日(YYYY-MM-DD),メモ,色(#hex),進捗(%)</code>
-                    <p class="mt-1 text-xs text-gray-500">※ 終了日・メモ・色・進捗は省略可</p>
+                    <code class="block text-xs bg-gray-100 p-2 rounded">イベント名,開始日(YYYY-MM-DD),終了日(YYYY-MM-DD),メモ,色(#hex)</code>
+                    <p class="mt-1 text-xs text-gray-500">※ 終了日・メモ・色は省略可</p>
                 </div>
                 <div class="mb-4">
                     <label class="block text-sm font-medium mb-1">CSVファイルを選択</label>

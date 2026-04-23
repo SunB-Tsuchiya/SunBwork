@@ -142,38 +142,145 @@
                         <div class="flex gap-2">
                             <button
                                 type="button"
+                                :class="scheduleEditMode
+                                    ? 'rounded border border-gray-400 bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700'
+                                    : 'rounded border border-gray-300 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50'"
+                                @click="toggleScheduleEditMode"
+                            >{{ scheduleEditMode ? '編集モードを終了' : '編集モード' }}</button>
+                            <button
+                                v-if="!scheduleEditMode"
+                                type="button"
                                 class="rounded border border-blue-300 px-3 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50"
                                 @click="goScheduleCalendar"
                             >{{ hasScheduleFlag ? 'カレンダーで編集' : 'カレンダーで登録' }}</button>
+                            <button
+                                v-if="!scheduleEditMode"
+                                type="button"
+                                class="rounded border border-green-600 px-3 py-1 text-xs font-medium text-green-700 hover:bg-green-50"
+                                @click="handleCsvExport"
+                            >CSV出力</button>
+                            <button
+                                v-if="!scheduleEditMode"
+                                type="button"
+                                class="rounded border border-indigo-500 px-3 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-50"
+                                @click="openCsvImportModal"
+                            >CSV取込</button>
                         </div>
                     </div>
 
-                    <div v-if="schedules.length > 0" class="overflow-x-auto">
-                        <table class="min-w-full border text-sm">
-                            <thead>
-                                <tr class="bg-gray-50">
-                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">開始日</th>
-                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">終了日</th>
-                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">タイトル</th>
-                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">内容</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr
-                                    v-for="s in schedules"
-                                    :key="s.id"
-                                    class="cursor-pointer hover:bg-blue-50"
-                                    @click="goScheduleCalendar"
-                                >
-                                    <td class="border px-3 py-2 text-gray-700">{{ formatDate(s.start_date) }}</td>
-                                    <td class="border px-3 py-2 text-gray-700">{{ formatDate(s.end_date) }}</td>
-                                    <td class="border px-3 py-2 font-medium text-gray-900">{{ s.name || '-' }}</td>
-                                    <td class="border px-3 py-2 text-gray-600">{{ truncate(s.description, 40) }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <p v-else class="text-sm text-gray-400">スケジュール未登録</p>
+                    <!-- 閲覧モード -->
+                    <template v-if="!scheduleEditMode">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full border text-sm">
+                                <thead>
+                                    <tr class="bg-gray-50">
+                                        <th
+                                            class="cursor-pointer select-none border px-3 py-1.5 text-left text-xs font-medium text-gray-500 hover:bg-gray-100"
+                                            @click="toggleScheduleSort('start_date')"
+                                        >開始日 <span class="ml-0.5">{{ scheduleSortIcon('start_date') }}</span></th>
+                                        <th
+                                            class="cursor-pointer select-none border px-3 py-1.5 text-left text-xs font-medium text-gray-500 hover:bg-gray-100"
+                                            @click="toggleScheduleSort('end_date')"
+                                        >終了日 <span class="ml-0.5">{{ scheduleSortIcon('end_date') }}</span></th>
+                                        <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">タイトル</th>
+                                        <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">内容</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr
+                                        v-for="s in sortedSchedules"
+                                        :key="s.id"
+                                        class="hover:bg-gray-50"
+                                    >
+                                        <td class="border px-3 py-2 text-gray-700">{{ formatDate(s.start_date) }}</td>
+                                        <td class="border px-3 py-2 text-gray-700">{{ formatDate(s.end_date) }}</td>
+                                        <td class="border px-3 py-2 font-medium text-gray-900">{{ s.name || '-' }}</td>
+                                        <td class="border px-3 py-2 text-gray-600">{{ truncate(s.description, 40) }}</td>
+                                    </tr>
+                                    <tr v-if="sortedSchedules.length === 0">
+                                        <td colspan="4" class="border px-3 py-4 text-center text-xs text-gray-400">スケジュール未登録</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </template>
+
+                    <!-- 編集モード -->
+                    <template v-else>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full border text-sm">
+                                <thead>
+                                    <tr class="bg-gray-50">
+                                        <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">開始日</th>
+                                        <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">終了日</th>
+                                        <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">タイトル</th>
+                                        <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">内容</th>
+                                        <th class="border px-2 py-1.5 text-xs font-medium text-gray-500"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="(row, idx) in scheduleEditRows" :key="row._key" class="bg-white">
+                                        <td class="border px-2 py-1.5">
+                                            <input
+                                                type="date"
+                                                v-model="row.start_date"
+                                                class="w-36 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none"
+                                            />
+                                        </td>
+                                        <td class="border px-2 py-1.5">
+                                            <input
+                                                type="date"
+                                                v-model="row.end_date"
+                                                class="w-36 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none"
+                                            />
+                                        </td>
+                                        <td class="border px-2 py-1.5">
+                                            <input
+                                                type="text"
+                                                v-model="row.name"
+                                                placeholder="タイトル"
+                                                class="w-full min-w-32 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none"
+                                            />
+                                        </td>
+                                        <td class="border px-2 py-1.5">
+                                            <input
+                                                type="text"
+                                                v-model="row.description"
+                                                placeholder="内容（任意）"
+                                                class="w-full min-w-40 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none"
+                                            />
+                                        </td>
+                                        <td class="border px-2 py-1.5 text-center">
+                                            <button
+                                                type="button"
+                                                class="rounded px-2 py-0.5 text-xs text-red-500 hover:bg-red-50 hover:text-red-700"
+                                                @click="removeScheduleEditRow(idx)"
+                                            >×</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <button
+                            type="button"
+                            class="mt-2 rounded border border-dashed border-gray-300 px-4 py-1.5 text-xs text-gray-500 hover:border-indigo-300 hover:text-indigo-600"
+                            @click="addScheduleEditRow"
+                        >＋ 行を追加</button>
+                        <div class="mt-3 flex gap-2">
+                            <button
+                                type="button"
+                                :disabled="scheduleSaving"
+                                class="rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                                @click="saveScheduleEdits"
+                            >{{ scheduleSaving ? '保存中…' : '保存' }}</button>
+                            <button
+                                type="button"
+                                :disabled="scheduleSaving"
+                                class="rounded bg-gray-100 px-4 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-200 disabled:opacity-50"
+                                @click="cancelScheduleEditMode"
+                            >キャンセル</button>
+                        </div>
+                    </template>
                 </section>
 
                 <!-- ── メンバーセクション ──────────────────────── -->
@@ -701,16 +808,222 @@
         </div>
     </div>
 
+    <!-- ── スケジュール CSV インポートモーダル ──── -->
+    <div v-if="showCsvImportModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div class="w-full max-w-lg rounded-lg bg-white p-6 shadow-lg">
+            <h2 class="mb-4 text-lg font-bold">CSVインポート</h2>
+            <div class="mb-4 rounded bg-gray-50 p-3 text-sm text-gray-600">
+                <p class="mb-1 font-medium">CSVファイルのフォーマット（1行目はヘッダー行）：</p>
+                <code class="block rounded bg-gray-100 p-2 text-xs">イベント名,開始日(YYYY-MM-DD),終了日(YYYY-MM-DD),メモ,色(#hex)</code>
+                <p class="mt-1 text-xs text-gray-500">※ 終了日・メモ・色は省略可</p>
+            </div>
+            <div class="mb-4">
+                <label class="mb-1 block text-sm font-medium">CSVファイルを選択</label>
+                <input
+                    type="file"
+                    accept=".csv,text/csv"
+                    @change="onCsvFileChange"
+                    class="block w-full text-sm text-gray-500 file:mr-4 file:rounded file:border-0 file:bg-indigo-50 file:px-4 file:py-2 file:text-indigo-700"
+                />
+            </div>
+            <div v-if="csvImportErrors.length > 0" class="mb-4 rounded border border-red-300 bg-red-50 p-3">
+                <p class="mb-1 text-sm font-medium text-red-700">エラーがあります（全行キャンセルされます）：</p>
+                <ul class="list-disc pl-4 text-sm text-red-600">
+                    <li v-for="err in csvImportErrors" :key="err">{{ err }}</li>
+                </ul>
+            </div>
+            <div class="mt-4 flex justify-end gap-2">
+                <button type="button" @click="showCsvImportModal = false" class="rounded bg-gray-300 px-4 py-2 text-sm">キャンセル</button>
+                <button
+                    type="button"
+                    @click="submitCsvImport"
+                    :disabled="csvImportLoading"
+                    class="rounded bg-indigo-600 px-4 py-2 text-sm text-white disabled:opacity-50"
+                >{{ csvImportLoading ? '取込中...' : 'インポート実行' }}</button>
+            </div>
+        </div>
+    </div>
+
 </template>
 
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
+import axios from 'axios';
 import { computed, onMounted, ref, watch } from 'vue';
 
 const page = usePage();
 const job  = page.props.job || {};
 const schedules = computed(() => Array.isArray(page.props.schedules) ? page.props.schedules : []);
+
+// ── スケジュール ソート（閲覧モード） ───────────────────────────────────────
+const scheduleSortKey = ref('start_date');
+const scheduleSortDir = ref('asc');
+
+const sortedSchedules = computed(() => {
+    const key = scheduleSortKey.value;
+    const dir = scheduleSortDir.value === 'asc' ? 1 : -1;
+    return [...schedules.value].sort((a, b) => {
+        const av = a[key] ?? '';
+        const bv = b[key] ?? '';
+        if (av < bv) return -1 * dir;
+        if (av > bv) return  1 * dir;
+        return 0;
+    });
+});
+
+function toggleScheduleSort(key) {
+    if (scheduleSortKey.value === key) {
+        scheduleSortDir.value = scheduleSortDir.value === 'asc' ? 'desc' : 'asc';
+    } else {
+        scheduleSortKey.value = key;
+        scheduleSortDir.value = 'asc';
+    }
+}
+
+function scheduleSortIcon(key) {
+    if (scheduleSortKey.value !== key) return '↕';
+    return scheduleSortDir.value === 'asc' ? '▲' : '▼';
+}
+
+// ── スケジュール 編集モード ─────────────────────────────────────────────────
+const scheduleEditMode = ref(false);
+const scheduleEditRows = ref([]);
+const scheduleSaving   = ref(false);
+let   _scheduleKeySeq  = 0;
+
+function toggleScheduleEditMode() {
+    if (scheduleEditMode.value) {
+        cancelScheduleEditMode();
+    } else {
+        scheduleEditRows.value = schedules.value.map(s => ({
+            _key        : s.id,
+            id          : s.id,
+            start_date  : s.start_date ? String(s.start_date).split('T')[0] : '',
+            end_date    : s.end_date   ? String(s.end_date).split('T')[0]   : '',
+            name        : s.name        ?? '',
+            description : s.description ?? '',
+        }));
+        scheduleEditMode.value = true;
+    }
+}
+
+function cancelScheduleEditMode() {
+    scheduleEditMode.value = false;
+    scheduleEditRows.value = [];
+}
+
+function addScheduleEditRow() {
+    scheduleEditRows.value.push({
+        _key        : 'new_' + (++_scheduleKeySeq),
+        id          : null,
+        start_date  : '',
+        end_date    : '',
+        name        : '',
+        description : '',
+    });
+}
+
+function removeScheduleEditRow(idx) {
+    scheduleEditRows.value.splice(idx, 1);
+}
+
+async function saveScheduleEdits() {
+    if (scheduleSaving.value) return;
+    scheduleSaving.value = true;
+
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+    const originalIds = new Set(schedules.value.map(s => s.id));
+    const editIds     = new Set(scheduleEditRows.value.filter(r => r.id).map(r => r.id));
+    const deletedIds  = [...originalIds].filter(id => !editIds.has(id));
+
+    try {
+        // 削除
+        for (const id of deletedIds) {
+            await fetch(route('coordinator.project_schedules.destroy', { project_schedule: id }), {
+                method : 'DELETE',
+                headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+            });
+        }
+        // 更新・新規
+        for (const row of scheduleEditRows.value) {
+            if (!row.name.trim()) continue; // タイトル空は無視
+            const body = JSON.stringify({
+                project_job_id: job.id,
+                name       : row.name,
+                description: row.description,
+                start_date : row.start_date || null,
+                end_date   : row.end_date   || null,
+            });
+            const headers = { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' };
+            if (row.id) {
+                await fetch(route('coordinator.project_schedules.update', { project_schedule: row.id }), {
+                    method: 'PATCH', headers, body,
+                });
+            } else {
+                await fetch(route('coordinator.project_schedules.store'), {
+                    method: 'POST', headers, body,
+                });
+            }
+        }
+        scheduleEditMode.value = false;
+        scheduleEditRows.value = [];
+        router.reload({ only: ['schedules'] });
+    } finally {
+        scheduleSaving.value = false;
+    }
+}
+
+// ── スケジュール CSV ────────────────────────────────────────────────────────
+function handleCsvExport() {
+    const id = job.id;
+    if (!id) { alert('案件IDが取得できません'); return; }
+    window.location.href = route('coordinator.project_schedules.csv_export', { project_job_id: id });
+}
+
+const showCsvImportModal = ref(false);
+const csvImportFile      = ref(null);
+const csvImportErrors    = ref([]);
+const csvImportLoading   = ref(false);
+
+function openCsvImportModal() {
+    csvImportFile.value   = null;
+    csvImportErrors.value = [];
+    showCsvImportModal.value = true;
+}
+
+function onCsvFileChange(event) {
+    csvImportFile.value   = event.target.files[0] ?? null;
+    csvImportErrors.value = [];
+}
+
+async function submitCsvImport() {
+    if (!csvImportFile.value) { alert('CSVファイルを選択してください'); return; }
+    const id = job.id;
+    if (!id) { alert('案件IDが取得できません'); return; }
+    csvImportLoading.value = true;
+    csvImportErrors.value  = [];
+    try {
+        const formData = new FormData();
+        formData.append('project_job_id', id);
+        formData.append('file', csvImportFile.value);
+        const resp = await axios.post(route('coordinator.project_schedules.csv_import'), formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        const created = resp.data.created ?? 0;
+        showCsvImportModal.value = false;
+        alert(`${created}件の予定をインポートしました`);
+        router.reload({ only: ['schedules'] });
+    } catch (e) {
+        if (e.response?.data?.errors) {
+            csvImportErrors.value = e.response.data.errors;
+        } else {
+            alert('インポートに失敗しました');
+        }
+    } finally {
+        csvImportLoading.value = false;
+    }
+}
 
 // ── タブ定義 ─────────────────────────────────────────────────────────────
 const tabs = [
@@ -718,7 +1031,7 @@ const tabs = [
     { key: 'progress',  label: '進行管理表' },
     { key: 'history',   label: 'ジョブ履歴' },
 ];
-const activeTab = ref('overview');
+const activeTab = ref(new URLSearchParams(window.location.search).get('tab') || 'overview');
 
 // hasSchedule flag (server-side or derived)
 const serverHasSchedule = page.props.hasSchedule;
