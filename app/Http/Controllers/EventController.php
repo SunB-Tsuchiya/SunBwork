@@ -138,16 +138,16 @@ class EventController extends Controller
             $query->where('project_job_assignment_id', intval($jobFilter));
         }
         if ($date) {
-            // Interpret the incoming date (YYYY-MM-DD) in the application's timezone
-            // (config('app.timezone')) and convert to UTC range so we can robustly
-            // compare against timestamp columns stored in UTC in the DB.
+            // Interpret the incoming date (YYYY-MM-DD) in the application's timezone (Asia/Tokyo).
+            // Events are stored in the app timezone, so filter using only the local day range.
+            // Using orWhereBetween with a UTC range caused events from adjacent days to bleed
+            // through (e.g. prev-day events at 15:00+ JST matched the UTC window for the next day).
             try {
                 $tz = config('app.timezone') ?: 'UTC';
                 $startOfDay = Carbon::createFromFormat('Y-m-d', $date, $tz)->startOfDay();
                 $endOfDay = Carbon::createFromFormat('Y-m-d', $date, $tz)->endOfDay();
-                // convert to UTC for DB comparison
-                $startUtc = $startOfDay->copy()->setTimezone('UTC');
-                $endUtc = $endOfDay->copy()->setTimezone('UTC');
+                $localStartStr = $startOfDay->toDateTimeString();
+                $localEndStr = $endOfDay->toDateTimeString();
             } catch (\Exception $e) {
                 // fallback to naive whereDate if parsing fails
                 if (Schema::hasColumn('events', 'starts_at')) {
@@ -155,31 +155,16 @@ class EventController extends Controller
                 } else {
                     $query->whereDate('start', $date);
                 }
-                $startUtc = null;
-                $endUtc = null;
+                $localStartStr = null;
+                $localEndStr = null;
             }
 
-            if (isset($startUtc) && isset($endUtc)) {
-                // Build both UTC-range and local app-tz range strings. Some rows may have been
-                // persisted in UTC while others in app timezone; include either via OR so we
-                // don't accidentally drop events.
-                $utcStartStr = $startUtc->toDateTimeString();
-                $utcEndStr = $endUtc->toDateTimeString();
-                $localStartStr = $startOfDay->toDateTimeString();
-                $localEndStr = $endOfDay->toDateTimeString();
-
+            if (isset($localStartStr) && isset($localEndStr)) {
                 if (Schema::hasColumn('events', 'starts_at')) {
-                    $query->where(function ($q) use ($utcStartStr, $utcEndStr, $localStartStr, $localEndStr) {
-                        $q->whereBetween('starts_at', [$utcStartStr, $utcEndStr])
-                            ->orWhereBetween('starts_at', [$localStartStr, $localEndStr]);
-                    });
+                    $query->whereBetween('starts_at', [$localStartStr, $localEndStr]);
                 } else {
-                    $query->where(function ($q) use ($utcStartStr, $utcEndStr, $localStartStr, $localEndStr) {
-                        $q->whereBetween('start', [$utcStartStr, $utcEndStr])
-                            ->orWhereBetween('start', [$localStartStr, $localEndStr]);
-                    });
+                    $query->whereBetween('start', [$localStartStr, $localEndStr]);
                 }
-                // debug logging removed
             }
         }
         $events = $query->get();
