@@ -152,20 +152,35 @@ async function processAndInsertFile(file) {
     try {
         const res = await axios.post('/api/uploads', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
         const attach = res.data;
-        // insert placeholder with attachment id
-        const placeholder = `[[attachment:${attach.id}:${attach.original_name}]]`;
         const idx =
             (editorInstance && editorInstance.getSelection && editorInstance.getSelection()?.index) ||
             (editorInstance && editorInstance.getLength && editorInstance.getLength()) ||
             0;
-        editorInstance.insertText(idx, placeholder);
-        editorInstance.setSelection(idx + placeholder.length);
+        if (attach.status === 'ready' && attach.url) {
+            // サーバー側で同期処理済み: プレースホルダー不要でそのまま挿入
+            const url = attach.url;
+            if (editorInstance && editorInstance.insertText) {
+                if (attach.mime && attach.mime.startsWith('image/')) {
+                    editorInstance.insertEmbed(idx, 'image', url);
+                    editorInstance.setSelection(idx + 1);
+                } else {
+                    editorInstance.insertText(idx, attach.original_name, { link: url });
+                    editorInstance.setSelection(idx + attach.original_name.length);
+                }
+            }
+            form.files = [...(form.files || []), { id: attach.id, name: attach.original_name, status: 'ready', url, public_url: attach.public_url || null }];
+        } else {
+            // 非同期処理中: プレースホルダーを挿入してポーリングで置換
+            const placeholder = `[[attachment:${attach.id}:${attach.original_name}]]`;
+            editorInstance.insertText(idx, placeholder);
+            editorInstance.setSelection(idx + placeholder.length);
 
-        // track in form.files as pending meta (the actual file already sent)
-        form.files = [...(form.files || []), { id: attach.id, name: attach.original_name, status: attach.status }];
+            // track in form.files as pending meta (the actual file already sent)
+            form.files = [...(form.files || []), { id: attach.id, name: attach.original_name, status: attach.status }];
 
-        // poll for status and replace placeholder when ready
-        pollAttachmentAndReplace(attach.id, placeholder);
+            // poll for status and replace placeholder when ready
+            pollAttachmentAndReplace(attach.id, placeholder);
+        }
     } catch (e) {
         console.error('upload error', e);
         alert('ファイルのアップロードに失敗しました');

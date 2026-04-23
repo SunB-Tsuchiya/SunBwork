@@ -194,17 +194,33 @@ async function processAndInsertFile(file) {
     try {
         const res = await axios.post('/api/uploads', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
         const attach = res.data;
-        const placeholder = `[[attachment:${attach.id}:${attach.original_name}]]`;
         const idx =
             (editorInstance && editorInstance.getSelection && editorInstance.getSelection()?.index) ||
             (editorInstance && editorInstance.getLength && editorInstance.getLength()) ||
             0;
-        if (editorInstance && editorInstance.insertText) {
-            editorInstance.insertText(idx, placeholder);
-            editorInstance.setSelection(idx + placeholder.length);
+        if (attach.status === 'ready' && attach.url) {
+            // サーバー側で同期処理済み: プレースホルダー不要でそのまま挿入
+            const url = attach.url;
+            if (editorInstance && editorInstance.insertText) {
+                if (attach.mime && attach.mime.startsWith('image/')) {
+                    editorInstance.insertEmbed(idx, 'image', url);
+                    editorInstance.setSelection(idx + 1);
+                } else {
+                    editorInstance.insertText(idx, attach.original_name, { link: url });
+                    editorInstance.setSelection(idx + attach.original_name.length);
+                }
+            }
+            form.files = [...(form.files || []), { id: attach.id, name: attach.original_name, status: 'ready', url }];
+        } else {
+            // 非同期処理中: プレースホルダーを挿入してポーリングで置換
+            const placeholder = `[[attachment:${attach.id}:${attach.original_name}]]`;
+            if (editorInstance && editorInstance.insertText) {
+                editorInstance.insertText(idx, placeholder);
+                editorInstance.setSelection(idx + placeholder.length);
+            }
+            form.files = [...(form.files || []), { id: attach.id, name: attach.original_name, status: attach.status }];
+            pollAttachmentAndReplace(attach.id, placeholder);
         }
-        form.files = [...(form.files || []), { id: attach.id, name: attach.original_name, status: attach.status }];
-        pollAttachmentAndReplace(attach.id, placeholder);
     } catch (e) {
         console.error('upload error', e);
         alert('ファイルのアップロードに失敗しました');

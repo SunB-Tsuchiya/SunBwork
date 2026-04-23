@@ -88,15 +88,39 @@ class UploadController extends Controller
             'size' => $file->getSize(),
         ]);
 
-        // dispatch async job to process and update attachment
-        ProcessUploadJob::dispatch($tmpPath, $attachment->id, $request->input('type'), $request->user()?->id);
+        // キューワーカーなし環境（さくら等）でも即座に処理完了するよう同期実行する。
+        // 失敗した場合は非同期フォールバックしてポーリングで対応。
+        try {
+            ProcessUploadJob::dispatchSync($tmpPath, $attachment->id, $request->input('type'), $request->user()?->id);
+        } catch (\Throwable $e) {
+            Log::warning('UploadController: dispatchSync failed, falling back to async: ' . $e->getMessage());
+            ProcessUploadJob::dispatch($tmpPath, $attachment->id, $request->input('type'), $request->user()?->id);
+        }
 
-        return response()->json([
-            'id' => $attachment->id,
+        // 同期処理後の最新ステータスを取得してレスポンスに含める
+        $attachment->refresh();
+        $responseData = [
+            'id'            => $attachment->id,
             'original_name' => $attachment->original_name,
-            'status' => $attachment->status,
-            'size' => $attachment->size,
-        ]);
+            'status'        => $attachment->status,
+            'size'          => $attachment->size,
+            'mime'          => $attachment->mime_type,
+        ];
+        if ($attachment->status === 'ready' && $attachment->path) {
+            try {
+                $responseData['url'] = \Illuminate\Support\Facades\URL::temporarySignedRoute(
+                    'attachments.signed', now()->addMinutes(15), ['path' => $attachment->path]
+                );
+            } catch (\Exception $__e) {
+                try {
+                    $responseData['url'] = route('attachments.stream', ['path' => $attachment->path]);
+                } catch (\Throwable $__e2) {
+                    // ignore
+                }
+            }
+            $responseData['public_url'] = asset('storage/' . ltrim($attachment->path, '/'));
+        }
+        return response()->json($responseData);
     }
 
     // Return attachment metadata for client-side resolution

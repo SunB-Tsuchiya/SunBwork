@@ -226,7 +226,11 @@ class DiaryController extends Controller
         $diary->save();
 
         // work_records に勤務時間を upsert
-        $this->upsertWorkRecord($request, $data['date'], Auth::user());
+        try {
+            $this->upsertWorkRecord($request, $data['date'], Auth::user());
+        } catch (\Throwable $e) {
+            Log::warning('DiaryController: upsertWorkRecord failed (store): ' . $e->getMessage());
+        }
 
         // 本文内の [[attachment:{id}:filename]] プレースホルダを検出し、該当する attachments レコードを日報に紐付ける
         $contentForScan = $data['content'] ?? $request->input('content', '');
@@ -440,7 +444,11 @@ class DiaryController extends Controller
             $diary->update(['date' => $data['date'], 'content' => $data['content'], 'user_id' => $data['user_id']]);
 
             // work_records を upsert
-            $this->upsertWorkRecord($request, $data['date'], Auth::user());
+            try {
+                $this->upsertWorkRecord($request, $data['date'], Auth::user());
+            } catch (\Throwable $e) {
+                Log::warning('DiaryController: upsertWorkRecord failed (update): ' . $e->getMessage());
+            }
 
             // 本文内の [[attachment:{id}:filename]] プレースホルダを検出し、該当する attachments レコードを日報に紐付ける
             $contentForScan = $data['content'] ?? $request->input('content', '');
