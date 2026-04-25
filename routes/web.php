@@ -142,6 +142,10 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::get('/myjobbox/{assignment}', [\App\Http\Controllers\User\MyProjectJobController::class, 'showAssignment'])->name('user.myjobbox.show');
     Route::delete('/myjobbox/{assignment}', [\App\Http\Controllers\User\MyProjectJobController::class, 'destroyAssignment'])->name('user.myjobbox.destroy');
 
+    // 週間プランナー掲示板（User向け）
+    Route::get('/user/project-jobs/{projectJob}/week-posts', [App\Http\Controllers\User\ProjectScheduleWeekPostController::class, 'index'])->name('user.project_jobs.week_posts.index');
+    Route::post('/user/project-jobs/{projectJob}/week-posts', [App\Http\Controllers\User\ProjectScheduleWeekPostController::class, 'store'])->name('user.project_jobs.week_posts.store');
+
     // 進行管理表（User 閲覧・担当者登録）
     Route::get('/user/progress-sheets/{sheet}', [\App\Http\Controllers\User\ProgressSheetController::class, 'show'])->name('user.progress_sheets.show');
     Route::post('/user/progress-sheets/{sheet}/cells/{cell}/assign', [\App\Http\Controllers\User\ProgressSheetController::class, 'assign'])->name('progress_sheets.cells.assign');
@@ -603,6 +607,20 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::match(['put', 'patch'], 'project_memos/{memo}', [App\Http\Controllers\Coordinator\ProjectMemosController::class, 'update'])->name('project_memos.update');
         Route::get('project_memos/{memo}', [App\Http\Controllers\Coordinator\ProjectMemosController::class, 'show'])->name('project_memos.show');
         Route::delete('project_memos/{memo}', [App\Http\Controllers\Coordinator\ProjectMemosController::class, 'destroy'])->name('project_memos.destroy');
+
+        // 週間プランナー掲示板（週別投稿）
+        Route::get('project_jobs/{projectJob}/week-posts', [App\Http\Controllers\Coordinator\ProjectScheduleWeekPostController::class, 'index'])->name('project_jobs.week_posts.index');
+        Route::post('project_jobs/{projectJob}/week-posts', [App\Http\Controllers\Coordinator\ProjectScheduleWeekPostController::class, 'store'])->name('project_jobs.week_posts.store');
+
+        // 連携設定（G-01）: 進行表ごとの連携設定 CRUD
+        Route::get('progress-sheets/{sheet}/link-settings', [App\Http\Controllers\Coordinator\ProgressSheetItemController::class, 'index'])->name('progress_sheets.link_settings.index');
+        Route::post('progress-sheets/{sheet}/link-settings', [App\Http\Controllers\Coordinator\ProgressSheetItemController::class, 'store'])->name('progress_sheets.link_settings.store');
+        Route::put('progress-sheets/{sheet}/link-settings/{item}', [App\Http\Controllers\Coordinator\ProgressSheetItemController::class, 'update'])->name('progress_sheets.link_settings.update');
+        Route::delete('progress-sheets/{sheet}/link-settings/{item}', [App\Http\Controllers\Coordinator\ProgressSheetItemController::class, 'destroy'])->name('progress_sheets.link_settings.destroy');
+        Route::get('progress-sheets/{sheet}/link-settings/propose', [App\Http\Controllers\Coordinator\ProgressSheetItemController::class, 'propose'])->name('progress_sheets.link_settings.propose');
+        Route::post('progress-sheets/{sheet}/link-settings/import', [App\Http\Controllers\Coordinator\ProgressSheetItemController::class, 'importFromSheet'])->name('progress_sheets.link_settings.import');
+        // 連携設定（G-01）: カレンダー用・案件単位で calendar_linked 項目を返す
+        Route::get('project_jobs/{projectJob}/link-settings', [App\Http\Controllers\Coordinator\ProgressSheetItemController::class, 'indexForCalendar'])->name('project_jobs.link_settings.index');
 
         // Project_team_members リソースルート
         Route::resource('project_team_members', App\Http\Controllers\Coordinator\ProjectTeamMembersController::class)->names([

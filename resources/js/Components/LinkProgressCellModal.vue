@@ -16,6 +16,7 @@ const selectedRowId = ref(null);
 const selectedColKey = ref(null);
 const submitting    = ref(false);
 const conflict      = ref(null); // { existing_title, existing_id }
+const fetchError    = ref(null);
 
 // 現在選択中のシートオブジェクト
 const currentSheet = computed(() =>
@@ -52,8 +53,15 @@ watch(() => props.show, async (val) => {
             const data = await res.json();
             sheets.value = data.sheets ?? [];
             if (sheets.value.length === 1) selectedSheet.value = sheets.value[0].id;
+        } else {
+            const text = await res.text().catch(() => '');
+            console.error('[LinkProgressCellModal] HTTP error', res.status, res.statusText, text);
+            fetchError.value = `データ取得エラー (HTTP ${res.status})`;
         }
-    } catch { /* ignore */ }
+    } catch(e) {
+        console.error('[LinkProgressCellModal] fetch error:', e);
+        fetchError.value = 'データ取得に失敗しました';
+    }
     finally { loading.value = false; }
 });
 
@@ -63,6 +71,7 @@ function reset() {
     selectedRowId.value  = null;
     selectedColKey.value = null;
     conflict.value    = null;
+    fetchError.value  = null;
 }
 
 async function submit(force = false) {
@@ -111,6 +120,12 @@ async function submit(force = false) {
 
                 <!-- ローディング -->
                 <div v-if="loading" class="py-8 text-center text-sm text-gray-400">読み込み中…</div>
+
+                <!-- エラー -->
+                <div v-else-if="fetchError" class="py-4 text-center text-sm text-red-600">
+                    {{ fetchError }}<br>
+                    <span class="text-xs text-gray-400">詳細はブラウザのコンソールを確認してください</span>
+                </div>
 
                 <!-- 進行表なし -->
                 <div v-else-if="sheets.length === 0" class="py-6 text-center text-sm text-gray-500">

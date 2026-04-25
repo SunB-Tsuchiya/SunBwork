@@ -396,7 +396,7 @@ class ProgressSheetController extends Controller
     public function linkOptions(Request $request, ProjectJobAssignment $assignment): \Illuminate\Http\JsonResponse
     {
         $user = $request->user();
-        $isAdmin = in_array($user->user_role, ['admin', 'superadmin', 'coordinator', 'clerk']);
+        $isAdmin = in_array($user->user_role, ['admin', 'superadmin', 'coordinator', 'clerk', 'leader']);
         abort_unless($isAdmin, 403);
 
         $sheets = ProgressSheet::where('project_job_id', $assignment->project_job_id)
@@ -431,7 +431,7 @@ class ProgressSheetController extends Controller
     public function linkCell(Request $request, ProjectJobAssignment $assignment): \Illuminate\Http\JsonResponse
     {
         $user = $request->user();
-        $isAdmin = in_array($user->user_role, ['admin', 'superadmin', 'coordinator', 'clerk']);
+        $isAdmin = in_array($user->user_role, ['admin', 'superadmin', 'coordinator', 'clerk', 'leader']);
         abort_unless($isAdmin, 403);
 
         $validated = $request->validate([

@@ -631,6 +631,11 @@
                     </template><!-- /historyOpen -->
                 </section>
 
+                <!-- ── 連携設定タブ ──────────────────────────────── -->
+                <section v-show="activeTab === 'items'" class="py-5">
+                    <ProjectJobItemsTab :progress-sheets="progressSheets" />
+                </section>
+
                 <!-- 校正依頼履歴 -->
                 <section v-show="activeTab === 'history'" v-if="(page.props.proofHistory || []).length > 0" class="py-4">
                     <h3 class="mb-3 text-sm font-semibold text-gray-700">校正依頼履歴</h3>
@@ -848,6 +853,7 @@
 
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
+import ProjectJobItemsTab from '@/Components/ProjectJobItemsTab.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import { computed, onMounted, ref, watch } from 'vue';
@@ -1028,6 +1034,7 @@ async function submitCsvImport() {
 // ── タブ定義 ─────────────────────────────────────────────────────────────
 const tabs = [
     { key: 'overview',  label: '概要・メンバー' },
+    { key: 'items',     label: '連携設定' },
     { key: 'progress',  label: '進行管理表' },
     { key: 'history',   label: 'ジョブ履歴' },
 ];
@@ -1129,7 +1136,7 @@ function editMembers() {
 function cloneJob() {
     const id = job.id;
     if (!id) return;
-    if (!confirm('この案件をもとに新規案件を作成します。\nチームメンバーも引き継がれます。\nよいですか？')) return;
+    if (!confirm('この案件をもとに新規案件を作成します。\nスケジュール（日付は空）・進行管理表の行構造（担当者は未選択）・チームメンバーも引き継がれます。\nよいですか？')) return;
     router.post(route('coordinator.project_jobs.clone', { projectJob: id }));
 }
 
@@ -1486,23 +1493,13 @@ function historyGetStatus(m) {
     try {
         const assignment = m.project_job_assignment || {};
         const jam = m || {};
-        const statusKey = assignment.status?.key || jam.status?.key || null;
-        if (statusKey) {
-            switch (statusKey) {
-                case 'completed':  return '完了';
-                case 'scheduled':  return '進行中';
-                case 'confirmed':  return '確認済';
-                case 'received':
-                case 'order':
-                case 'in_progress': return '受信済';
-                default: break;
-            }
-        }
+        // 優先順位: 完了 > 進行中（セット）> 確認済み > 送信済み
         if (Boolean(jam.completed) || Boolean(assignment.completed)) return '完了';
-        if (Boolean(jam.scheduled) || Boolean(assignment.scheduled) || Boolean(assignment.scheduled_at)) return '進行中';
+        if (Boolean(jam.accepted) || Boolean(assignment.accepted) ||
+            Boolean(jam.scheduled) || Boolean(assignment.scheduled) || Boolean(assignment.scheduled_at)) return '進行中';
         const readAt = jam.read_at || assignment.read_at || null;
-        if (readAt) return Boolean(jam.accepted) || Boolean(assignment.accepted) ? '確認済' : '既読済';
-        if (Boolean(jam.accepted) || Boolean(assignment.accepted)) return '受信済';
+        if (readAt) return '確認済み';
+        if (Boolean(jam.assigned) || Boolean(assignment.assigned)) return '送信済み';
         return '-';
     } catch {
         return '-';
@@ -1511,12 +1508,11 @@ function historyGetStatus(m) {
 
 function statusBadgeClass(status) {
     switch (status) {
-        case '完了':    return 'bg-yellow-100 text-yellow-800';
+        case '完了':   return 'bg-yellow-100 text-yellow-800';
         case '進行中': return 'bg-blue-100 text-blue-800';
-        case '確認済':  return 'bg-green-100 text-green-800';
-        case '受信済':  return 'bg-indigo-100 text-indigo-800';
-        case '既読済':  return 'bg-gray-100 text-gray-700';
-        default:        return 'bg-gray-100 text-gray-700';
+        case '確認済み': return 'bg-green-100 text-green-800';
+        case '送信済み': return 'bg-gray-200 text-gray-700';
+        default:       return 'bg-gray-100 text-gray-700';
     }
 }
 

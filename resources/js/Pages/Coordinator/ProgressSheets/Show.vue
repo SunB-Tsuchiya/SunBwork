@@ -127,6 +127,10 @@
                         @keydown.enter.prevent
                         @keyup.enter="updateRowLabel(row)"
                       />
+                      <span
+                        v-if="row.deadline"
+                        :class="['rounded px-1.5 py-0.5 text-xs', deadlineStatus(row.deadline) === 'past' ? 'bg-gray-100 text-gray-400' : deadlineStatus(row.deadline) === 'soon' ? 'bg-yellow-100 text-yellow-700 font-semibold' : 'bg-blue-50 text-blue-600']"
+                      >⏰ {{ row.deadline }}</span>
                       <span v-if="childrenOf[row.id]?.length > 0" class="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">グループ</span>
                       <button
                         v-if="!childrenOf[row.id]?.length"
@@ -241,6 +245,14 @@
                 @click="startPendingRow(null)"
               >＋ 行を追加</button>
           </div>
+
+          <!-- 項目から読み込む -->
+          <button
+            v-if="props.projectJob?.id"
+            type="button"
+            class="mt-2 flex w-full items-center justify-center rounded border border-dashed border-indigo-300 py-1.5 text-sm text-indigo-600 hover:border-indigo-500 hover:bg-indigo-50"
+            @click="openLoadItemsModal"
+          >＋ 項目から読み込む</button>
 
           <!-- 並び替え保存ボタン -->
           <button
@@ -571,6 +583,69 @@
       :proof-cell-id="proofTargetCellId"
       @close="showProofModal = false; proofTargetAssignment = null; proofTargetCellId = null"
     />
+
+    <!-- ── 項目から読み込むモーダル ── -->
+    <div
+      v-if="showLoadItemsModal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      @click.self="showLoadItemsModal = false"
+    >
+      <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+        <h3 class="mb-4 text-lg font-semibold text-gray-800">項目から行を追加</h3>
+
+        <div v-if="loadItemsLoading" class="py-4 text-center text-sm text-gray-400">読み込み中...</div>
+        <template v-else>
+          <!-- 分類フィルター -->
+          <div class="mb-3">
+            <label class="block text-xs font-medium text-gray-600 mb-1">分類を選んで追加</label>
+            <div class="flex flex-wrap gap-2">
+              <button
+                type="button"
+                :class="['rounded px-3 py-1 text-xs font-medium border', !loadItemsCategory ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50']"
+                @click="loadItemsCategory = null"
+              >すべて</button>
+              <button
+                v-for="cat in loadItemsCategories"
+                :key="cat"
+                type="button"
+                :class="['rounded px-3 py-1 text-xs font-medium border', loadItemsCategory === cat ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50']"
+                @click="loadItemsCategory = cat"
+              >{{ cat }}</button>
+            </div>
+          </div>
+
+          <!-- プレビュー -->
+          <div class="mb-4 max-h-48 overflow-y-auto rounded border border-gray-200 text-sm">
+            <div v-if="loadItemsFiltered.length === 0" class="py-4 text-center text-gray-400">
+              {{ loadItemsList.length === 0 ? '項目が登録されていません' : 'この分類に項目はありません' }}
+            </div>
+            <div
+              v-for="item in loadItemsFiltered"
+              :key="item.id"
+              class="flex items-center justify-between border-b px-3 py-2 last:border-b-0"
+            >
+              <span class="font-medium text-gray-800">{{ item.name }}</span>
+              <div class="flex items-center gap-2">
+                <span class="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">{{ item.category }}</span>
+                <span v-if="item.deadline" class="text-xs text-gray-400">〜{{ item.deadline }}</span>
+              </div>
+            </div>
+          </div>
+
+          <p class="mb-4 text-xs text-gray-500">※ すでに紐づいている項目はスキップされます</p>
+
+          <div class="flex justify-end gap-2">
+            <button type="button" class="rounded border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50" @click="showLoadItemsModal = false">キャンセル</button>
+            <button
+              type="button"
+              :disabled="loadItemsSubmitting || loadItemsFiltered.length === 0"
+              class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+              @click="submitLoadItems"
+            >{{ loadItemsSubmitting ? '追加中...' : `${loadItemsFiltered.length} 件を追加` }}</button>
+          </div>
+        </template>
+      </div>
+    </div>
   </AppLayout>
 </template>
 
@@ -582,6 +657,8 @@ import ProgressTable from '@/Components/ProgressTable.vue';
 import ColumnTreeEditor from '@/Components/ColumnTreeEditor.vue';
 import ProofRequestModal from '@/Components/ProofRequestModal.vue';
 import useToasts from '@/Composables/useToasts';
+import axios from 'axios';
+import { route } from 'ziggy-js';
 const { showToast } = useToasts();
 
 const props = defineProps({
@@ -1145,6 +1222,93 @@ function syncRowsFromPage(page) {
     savedTopLevelIds = localRows.value.filter((r) => !r.parent_id).map((r) => r.id);
     savedAllRowIds   = localRows.value.map((r) => r.id);
   }
+}
+
+// ── 項目から読み込む ──────────────────────────────────────────────────────────
+const showLoadItemsModal  = ref(false);
+const loadItemsList       = ref([]);
+const loadItemsLoading    = ref(false);
+const loadItemsCategory   = ref(null); // null = すべて
+const loadItemsSubmitting = ref(false);
+
+const TODAY = (() => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+})();
+
+function deadlineStatus(deadline) {
+  if (!deadline) return null;
+  const today = new Date(TODAY);
+  const dl = new Date(deadline);
+  const diffMs = dl - today;
+  const diffDays = Math.ceil(diffMs / 86400000);
+  if (diffDays < 0)  return 'past';
+  if (diffDays <= 3) return 'soon';
+  return 'ok';
+}
+
+const ITEM_CATEGORY_COLORS = {
+  '全体スケジュール': '#f97316',
+  '組版':            '#8b5cf6',
+  '校正':            '#10b981',
+  '入稿':            '#06b6d4',
+  '出力・納品':      '#ef4444',
+  'サブ':            '#6b7280',
+  'その他':          '#84cc16',
+};
+
+const loadItemsFiltered = computed(() => {
+  if (!loadItemsCategory.value) return loadItemsList.value;
+  return loadItemsList.value.filter((i) => i.category === loadItemsCategory.value);
+});
+const loadItemsCategories = computed(() => [...new Set(loadItemsList.value.map((i) => i.category).filter(Boolean))]);
+
+async function openLoadItemsModal() {
+  if (!props.projectJob?.id) return;
+  showLoadItemsModal.value = true;
+  loadItemsLoading.value = true;
+  try {
+    const res = await axios.get(route('coordinator.project_jobs.items.index', { projectJob: props.projectJob.id }));
+    loadItemsList.value = res.data.items ?? [];
+    loadItemsCategory.value = null;
+  } catch (e) {
+    showToast('項目の取得に失敗しました', 'error');
+  } finally {
+    loadItemsLoading.value = false;
+  }
+}
+
+async function submitLoadItems() {
+  if (loadItemsSubmitting.value) return;
+  loadItemsSubmitting.value = true;
+  try {
+    const res = await axios.post(
+      route('coordinator.project_jobs.items.load_into_sheet', { projectJob: props.projectJob.id, sheet: props.sheet.id }),
+      { category: loadItemsCategory.value || null },
+    );
+    showLoadItemsModal.value = false;
+    showToast(`${res.data.added} 件の行を追加しました`, 'success');
+    router.reload({ only: ['rows'], onSuccess: (page) => { syncRowsFromPage(page); } });
+  } catch (e) {
+    showToast('読み込みに失敗しました', 'error');
+  } finally {
+    loadItemsSubmitting.value = false;
+  }
+}
+
+// ── 行の締切ステータス色クラス ─────────────────────────────────────────────
+function rowDeadlineClass(row) {
+  const status = deadlineStatus(row.deadline);
+  if (status === 'past') return 'text-gray-400';
+  if (status === 'soon') return 'text-yellow-600 font-semibold';
+  return 'text-gray-500';
+}
+
+function rowBgClass(row) {
+  const status = deadlineStatus(row.deadline);
+  if (status === 'past') return 'opacity-50';
+  if (status === 'soon') return 'bg-yellow-50';
+  return '';
 }
 
 function startPendingRow(afterId) {

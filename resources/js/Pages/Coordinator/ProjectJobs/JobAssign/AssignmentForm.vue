@@ -623,7 +623,7 @@
                     <button type="submit" class="rounded bg-green-600 px-4 py-2 text-white" :disabled="saving">保存して送信</button>
                 </template>
                 <Link
-                    :href="route('coordinator.project_jobs.assignments.index', { projectJob: projectJob ? projectJob.id : '' })"
+                    :href="backUrl ?? route('coordinator.project_jobs.assignments.index', { projectJob: projectJob ? projectJob.id : '' })"
                     class="rounded bg-gray-200 px-4 py-2"
                     >戻る</Link
                 >
@@ -726,6 +726,8 @@ const props = defineProps({
     updateOverrideUrl: { type: String, default: null },
     // 送信概念なしで「保存」ボタンのみ表示（校正管理者など）
     saveOnly: { type: Boolean, default: false },
+    // coordinator モード以外のコンテキスト（proof_coordinator等）で「戻る」先を上書き
+    backUrl: { type: String, default: null },
     // 作業日・時間スロット表示
     showWorkSlots:    { type: Boolean, default: false },
     initialWorkSlots: { type: Array,   default: () => [] },

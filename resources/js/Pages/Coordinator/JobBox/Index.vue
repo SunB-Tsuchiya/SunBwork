@@ -534,27 +534,13 @@ function getUnifiedStatus(m) {
     try {
         const jam = m || {};
         const assignment = m.project_job_assignment || {};
-        // status_model は Laravel が statusModel リレーションを snake_case 化したキー
-        const statusKey =
-            assignment.status_model?.key ||
-            assignment.status?.key ||
-            jam.status_model?.key ||
-            jam.status?.key ||
-            null;
-
-        // 優先順位: 完了 > 進行中 > 確認済み > 未読
-        if (statusKey === 'completed' || Boolean(jam.completed) || Boolean(assignment.completed)) return '完了';
-        if (statusKey === 'scheduled' || Boolean(jam.scheduled) || Boolean(assignment.scheduled) || Boolean(assignment.scheduled_at)) return '進行中';
-        
-        // 独自ジョブ（自分で自分に振るジョブ）の場合は「進行中」として扱う
-        const senderId = jam.sender_id || assignment.sender_id;
-        const userId = assignment.user_id;
-        if (senderId && userId && Number(senderId) === Number(userId)) {
-            return '進行中';
-        }
-        
+        // 優先順位: 完了 > セット（進行中）> 確認済み > 送信 > 未読
+        if (Boolean(jam.completed) || Boolean(assignment.completed)) return '完了';
+        if (Boolean(jam.accepted) || Boolean(assignment.accepted) ||
+            Boolean(jam.scheduled) || Boolean(assignment.scheduled) || Boolean(assignment.scheduled_at)) return '進行中';
         const readAt = jam.read_at || assignment.read_at || null;
-        if (statusKey === 'confirmed' || readAt || Boolean(jam.accepted) || Boolean(assignment.accepted)) return '確認済み';
+        if (readAt) return '確認済み';
+        if (Boolean(jam.assigned) || Boolean(assignment.assigned)) return '送信済み';
         return '未読';
     } catch {
         return '未読';
@@ -568,11 +554,12 @@ function getAssignmentStatus(m) {
 
 function statusBadgeClass(status) {
     switch (status) {
-        case '完了':     return 'bg-yellow-100 text-yellow-800';
+        case '完了':   return 'bg-yellow-100 text-yellow-800';
         case '進行中': return 'bg-blue-100 text-blue-800';
-        case '確認済み':  return 'bg-green-100 text-green-800';
-        case '未読':     return 'bg-red-100 text-red-800';
-        default:         return 'bg-gray-100 text-gray-700';
+        case '確認済み': return 'bg-green-100 text-green-800';
+        case '送信済み': return 'bg-gray-200 text-gray-700';
+        case '未読':   return 'bg-red-100 text-red-800';
+        default:       return 'bg-gray-100 text-gray-700';
     }
 }
 

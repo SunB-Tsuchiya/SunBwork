@@ -314,6 +314,7 @@ async function deleteEvent(ev) {
                     :updateOverrideUrl="updateUrl"
                     :saveOnly="true"
                     :show-work-slots="true"
+                    :backUrl="route('proof_coordinator.assignments.show', { proofRequest: proofRequest.id })"
                     @open-calendar="openPicker"
                 />
             </div>

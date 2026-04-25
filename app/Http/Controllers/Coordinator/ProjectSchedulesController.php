@@ -80,6 +80,16 @@ class ProjectSchedulesController extends Controller
         ]);
         $projectSchedule->save();
         $projectSchedule->refresh();
+
+        // 連携設定経由で progress_rows.deadline を同期
+        if ($projectSchedule->project_job_item_id) {
+            $item = \App\Models\ProjectJobItem::find($projectSchedule->project_job_item_id);
+            if ($item && $item->calendar_linked && $item->type === 'row' && $item->row_id) {
+                \App\Models\ProgressRow::where('id', $item->row_id)
+                    ->update(['deadline' => $projectSchedule->end_date?->toDateString()]);
+            }
+        }
+
         // Carbon を直接渡すと UTC ISO シリアライズで JST がずれるため toDateString() で返す
         return response()->json(['status' => 'ok', 'schedule' => [
             'id' => $projectSchedule->id,

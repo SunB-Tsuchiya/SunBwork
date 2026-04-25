@@ -11,6 +11,11 @@ class ProgressRow extends Model
         'label',
         'order',
         'parent_id',
+        'deadline',
+    ];
+
+    protected $casts = [
+        'deadline' => 'date:Y-m-d',
     ];
 
     public function sheet()
@@ -21,5 +26,15 @@ class ProgressRow extends Model
     public function cells()
     {
         return $this->hasMany(ProgressCell::class, 'row_id');
+    }
+
+    public function children()
+    {
+        return $this->hasMany(ProgressRow::class, 'parent_id')->orderBy('order');
+    }
+
+    public function parent()
+    {
+        return $this->belongsTo(ProgressRow::class, 'parent_id');
     }
 }

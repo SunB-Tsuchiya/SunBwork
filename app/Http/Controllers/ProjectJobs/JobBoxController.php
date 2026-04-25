@@ -793,39 +793,24 @@ class JobBoxController extends Controller
             }
         }
 
-        // mark read (and set accepted=true to link accepted to read)
-        if (! $message->read_at) {
-            $message->read_at = now();
-            // set accepted flag to true when message is read
-            try {
-                $message->accepted = true;
-            } catch (\Throwable $__e) {
-                // ignore if column missing
+        // mark read: only when the recipient (assigned user) views the message
+        // Coordinator/Leader viewing should NOT set read_at (that would show 確認済み prematurely)
+        $viewerIsRecipient = false;
+        try {
+            if ($user && $message->project_job_assignment_id) {
+                $recipientAssignment = ProjectJobAssignment::find($message->project_job_assignment_id);
+                $viewerIsRecipient = $recipientAssignment && (int)$recipientAssignment->user_id === (int)$user->id;
             }
-            // reflect read on the related assignment as well
+        } catch (\Throwable $__e) {}
+
+        if (! $message->read_at && $viewerIsRecipient) {
+            $message->read_at = now();
+            // reflect read_at on the related assignment as well
             try {
                 if ($message->project_job_assignment_id) {
                     $assignment = ProjectJobAssignment::find($message->project_job_assignment_id);
                     if ($assignment) {
                         $assignment->read_at = $message->read_at;
-                        try {
-                            $assignment->accepted = true;
-                        } catch (\Throwable $__e) {
-                        }
-                        // set status_id to 'confirmed' (accepted/read) if statuses table exists
-                        try {
-                            if (Schema::hasTable('statuses') && Schema::hasColumn('project_job_assignments', 'status_id')) {
-                                $status = DB::table('statuses')->where('key', 'confirmed')->first();
-                                if (!$status) {
-                                    $statusId = DB::table('statuses')->insertGetId(['key' => 'confirmed', 'name' => '確認済み', 'created_at' => now(), 'updated_at' => now()]);
-                                } else {
-                                    $statusId = $status->id;
-                                }
-                                $assignment->status_id = $statusId;
-                            }
-                        } catch (\Throwable $__e) {
-                            // non-fatal
-                        }
                         $assignment->save();
                     }
                 }
@@ -1084,24 +1069,24 @@ class JobBoxController extends Controller
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        if (! $jam->read_at) {
-            $jam->read_at = now();
-            // set accepted flag when marking read
-            try {
-                $jam->accepted = true;
-            } catch (\Throwable $__e) {
-                // ignore if column missing
+        // 確認済み（read_at）は受信者（担当ユーザー）が開いた時のみセット
+        // コーディネーター等が開いても read_at は変えない
+        $isRecipient = false;
+        try {
+            if ($jam->project_job_assignment_id) {
+                $checkAssignment = ProjectJobAssignment::find($jam->project_job_assignment_id);
+                $isRecipient = $checkAssignment && (int)$checkAssignment->user_id === (int)$user->id;
             }
+        } catch (\Throwable $__e) {}
+
+        if (! $jam->read_at && $isRecipient) {
+            $jam->read_at = now();
             // reflect read on related assignment as well
             try {
                 if ($jam->project_job_assignment_id) {
                     $assignment = ProjectJobAssignment::find($jam->project_job_assignment_id);
                     if ($assignment) {
                         $assignment->read_at = $jam->read_at;
-                        try {
-                            $assignment->accepted = true;
-                        } catch (\Throwable $__e) {
-                        }
                         $assignment->save();
                     }
                 }
@@ -1260,12 +1245,6 @@ class JobBoxController extends Controller
                 $assignment = ProjectJobAssignment::find($jam->project_job_assignment_id);
                 if ($assignment && (int)$assignment->project_job_id === (int)$projectJob->id) {
                     $assignment->assigned = true;
-                    // set accepted true on the assignment when JAM is created (recipient has received)
-                    try {
-                        $assignment->accepted = true;
-                    } catch (\Throwable $__e) {
-                        // ignore if column missing
-                    }
                     $assignment->save();
                 }
             } catch (\Throwable $__e) {
@@ -1448,13 +1427,7 @@ class JobBoxController extends Controller
             $jam->message_id = $message->id;
             $jam->save();
 
-            // Optionally mark assignment as accepted/completed (if such flags exist)
-            try {
-                $assignment->accepted = true;
-                $assignment->save();
-            } catch (\Throwable $__e) {
-                // non-fatal
-            }
+            // (accepted flag is set only when user calendars/sets the job, not on reply)
 
             // Broadcast job-specific event to coordinators
             try {
@@ -1614,7 +1587,10 @@ class JobBoxController extends Controller
                 }
                 // ──────────────────────────────────────────────────────────────
 
-                // Mark assignment as scheduled
+                // Mark assignment as scheduled (セット: accepted=true, scheduled=true)
+                if (Schema::hasColumn('project_job_assignments', 'accepted')) {
+                    $assignment->accepted = true;
+                }
                 if (Schema::hasColumn('project_job_assignments', 'scheduled')) {
                     $assignment->scheduled = true;
                 }

@@ -128,6 +128,7 @@ function onPickerConfirmed({ newSlots, updatedSlots }) {
                     :hide-status="true"
                     :storeOverrideUrl="storeUrl"
                     :show-work-slots="true"
+                    :backUrl="route('proof_coordinator.inbox')"
                     @open-calendar="openPicker"
                 />
             </div>

@@ -852,7 +852,6 @@ class ProjectJobAssignmentsController extends Controller
                         ]);
 
                         $assignment->assigned = true;
-                        try { $assignment->accepted = true; } catch (\Throwable $_) {}
                         $assignment->save();
 
                         try {

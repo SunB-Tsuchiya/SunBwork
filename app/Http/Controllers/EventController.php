@@ -1385,18 +1385,23 @@ class EventController extends Controller
                     $completedStatusId = $completedStatus ? $completedStatus->id : null;
                 }
 
-                // 同じ project_job_id + user_id で sender_id != user_id のレコードを検索
-                // （MyJobに対応するCoordinator割当を特定）
-                $coordinatorAssignments = ProjectJobAssignment::where('project_job_id', $assignment->project_job_id)
-                    ->where('user_id', $assignment->user_id)
-                    ->where(function ($query) use ($assignment) {
-                        $query->where('sender_id', '!=', $assignment->user_id)
-                            ->orWhere(function ($q) {
-                                $q->whereNull('sender_id')->where('id', '!=', $assignment->id ?? 0);
-                            });
-                    })
-                    ->where('id', '!=', $assignment->id) // 自身は除外
-                    ->get();
+                // supersedes_assignment_id で紐づいた特定のCoordinator割当のみを完了にする
+                // （同一案件・同一ユーザーの全割当を完了にする旧ロジックは他のジョブを誤完了させるバグがあったため廃止）
+                $coordinatorAssignments = collect();
+                if (!empty($assignment->supersedes_assignment_id)) {
+                    // MyJobが明示的に supersedes している Coordinator割当のみ
+                    $target = ProjectJobAssignment::find($assignment->supersedes_assignment_id);
+                    if ($target && $target->id !== $assignment->id) {
+                        $coordinatorAssignments = collect([$target]);
+                    }
+                } elseif (!empty($assignment->coordinator_assignment_id)) {
+                    // 校正ジョブ等の coordinator_assignment_id 経由
+                    $target = ProjectJobAssignment::find($assignment->coordinator_assignment_id);
+                    if ($target && $target->id !== $assignment->id) {
+                        $coordinatorAssignments = collect([$target]);
+                    }
+                }
+                // supersedes も coordinator_assignment_id もない場合は自動完了しない
 
                 $updatedCoordinatorIds = [];
                 foreach ($coordinatorAssignments as $cAssignment) {

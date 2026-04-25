@@ -2,7 +2,9 @@
 import ProjectCalendar from '@/Components/ProjectCalendar.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
+import { route } from 'ziggy-js';
+import axios from 'axios';
 
 const props = defineProps({
     schedules: { type: Array, default: () => [] },
@@ -10,6 +12,18 @@ const props = defineProps({
     client: { type: Object, default: null },
     comments: { type: Array, default: () => [] },
     memos: { type: Array, default: () => [] },
+});
+
+// カレンダー連携設定を非同期で取得（calendar_linked=true の項目のみ）
+const items = ref([]);
+onMounted(async () => {
+    if (!props.project) return;
+    try {
+        const res = await axios.get(route('coordinator.project_jobs.link_settings.index', { projectJob: props.project.id }));
+        items.value = res.data.items ?? [];
+    } catch (e) {
+        // 取得失敗は無視
+    }
 });
 
 // Convert schedules to FullCalendar events
@@ -68,6 +82,10 @@ const events = ref(
 // debug logging removed
 // Provide the converted events to the Calendar component
 const diaries = ref([]);
+
+const weekPostsUrl = computed(() =>
+    props.project ? route('coordinator.project_jobs.week_posts.index', { projectJob: props.project.id }) : null,
+);
 </script>
 
 <template>
@@ -91,7 +109,16 @@ const diaries = ref([]);
                         </div>
                     </div>
 
-                    <ProjectCalendar :diaries="diaries" :events="events" :comments="props.comments" :memos="props.memos" :project="props.project" />
+                    <ProjectCalendar
+                        :diaries="diaries"
+                        :events="events"
+                        :comments="props.comments"
+                        :memos="props.memos"
+                        :project="props.project"
+                        :schedules="props.schedules"
+                        :items="items"
+                        :weekPostsUrl="weekPostsUrl"
+                    />
         </div>
     </AppLayout>
 </template>

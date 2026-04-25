@@ -38,4 +38,9 @@ class ProgressSheet extends Model
     {
         return $this->hasMany(ProgressRow::class, 'sheet_id')->orderBy('order');
     }
+
+    public function linkSettings()
+    {
+        return $this->hasMany(ProjectJobItem::class, 'progress_sheet_id')->orderBy('order');
+    }
 }

@@ -5,6 +5,10 @@ namespace App\Http\Controllers\Coordinator;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\ProjectJob;
+use App\Models\ProjectSchedule;
+use App\Models\ProgressSheet;
+use App\Models\ProgressRow;
+use App\Models\ProgressCell;
 use App\Models\User;
 use Illuminate\Support\Arr;
 use Inertia\Inertia;
@@ -121,6 +125,119 @@ class ProjectJobController extends Controller
                     'project_job_id' => $newJob->id,
                     'user_id'        => $member->user_id,
                 ]);
+            }
+
+            // スケジュール複製（日付は空にする）
+            $schedules = ProjectSchedule::where('project_job_id', $projectJob->id)->orderBy('order')->get();
+            $scheduleIdMap = [];
+            // parent_id=null のスケジュールを先に処理
+            foreach ($schedules->where('parent_id', null) as $schedule) {
+                $newSchedule = ProjectSchedule::create([
+                    'project_job_id' => $newJob->id,
+                    'parent_id'      => null,
+                    'color'          => $schedule->color,
+                    'name'           => $schedule->name,
+                    'description'    => $schedule->description,
+                    'start_date'     => null,
+                    'end_date'       => null,
+                    'progress'       => 0,
+                    'status'         => null,
+                    'order'          => $schedule->order,
+                    'metadata'       => $schedule->metadata,
+                    'created_by'     => $schedule->created_by,
+                ]);
+                $scheduleIdMap[$schedule->id] = $newSchedule->id;
+            }
+            // parent_id がある子スケジュールを処理
+            foreach ($schedules->where('parent_id', '!=', null) as $schedule) {
+                $newParentId = $scheduleIdMap[$schedule->parent_id] ?? null;
+                $newSchedule = ProjectSchedule::create([
+                    'project_job_id' => $newJob->id,
+                    'parent_id'      => $newParentId,
+                    'color'          => $schedule->color,
+                    'name'           => $schedule->name,
+                    'description'    => $schedule->description,
+                    'start_date'     => null,
+                    'end_date'       => null,
+                    'progress'       => 0,
+                    'status'         => null,
+                    'order'          => $schedule->order,
+                    'metadata'       => $schedule->metadata,
+                    'created_by'     => $schedule->created_by,
+                ]);
+                $scheduleIdMap[$schedule->id] = $newSchedule->id;
+            }
+
+            // 進行管理表（ProgressSheet）複製
+            $sheets = ProgressSheet::where('project_job_id', $projectJob->id)->orderBy('sort_order')->get();
+            foreach ($sheets as $sheet) {
+                $newSheet = ProgressSheet::create([
+                    'project_job_id' => $newJob->id,
+                    'template_id'    => $sheet->template_id,
+                    'name'           => $sheet->name,
+                    'column_config'  => $sheet->column_config,
+                    'created_by'     => $sheet->created_by,
+                    'sort_order'     => $sheet->sort_order,
+                ]);
+
+                // 台割行（ProgressRow）複製：2パス（親→子の順）
+                $rows = ProgressRow::where('sheet_id', $sheet->id)->orderBy('order')->get();
+                $rowIdMap = [];
+
+                // 1パス目: parent_id=null のルート行
+                foreach ($rows->where('parent_id', null) as $row) {
+                    $newRow = ProgressRow::create([
+                        'sheet_id'  => $newSheet->id,
+                        'label'     => $row->label,
+                        'order'     => $row->order,
+                        'parent_id' => null,
+                    ]);
+                    $rowIdMap[$row->id] = $newRow->id;
+
+                    // セル複製（担当者・割り当ては除外）
+                    foreach ($row->cells as $cell) {
+                        ProgressCell::create([
+                            'row_id'                 => $newRow->id,
+                            'col_key'                => $cell->col_key,
+                            'value_text'             => $cell->value_text,
+                            'value_date'             => $cell->value_date,
+                            'value_bool'             => $cell->value_bool,
+                            'cell_type'              => $cell->cell_type,
+                            'value_user_id'          => null,
+                            'value_subcontractor_id' => null,
+                            'assignment_id'          => null,
+                            'proof_assignment_id'    => null,
+                        ]);
+                    }
+                }
+
+                // 2パス目: 子行（parent_id あり）
+                foreach ($rows->where('parent_id', '!=', null) as $row) {
+                    $newParentId = $rowIdMap[$row->parent_id] ?? null;
+                    $newRow = ProgressRow::create([
+                        'sheet_id'  => $newSheet->id,
+                        'label'     => $row->label,
+                        'order'     => $row->order,
+                        'parent_id' => $newParentId,
+                    ]);
+                    $rowIdMap[$row->id] = $newRow->id;
+
+                    // セル複製（担当者・割り当ては除外）
+                    foreach ($row->cells as $cell) {
+                        ProgressCell::create([
+                            'row_id'                 => $newRow->id,
+                            'col_key'                => $cell->col_key,
+                            'value_text'             => $cell->value_text,
+                            'value_date'             => $cell->value_date,
+                            'value_bool'             => $cell->value_bool,
+                            'cell_type'              => $cell->cell_type,
+                            'value_user_id'          => null,
+                            'value_subcontractor_id' => null,
+                            'assignment_id'          => null,
+                            'proof_assignment_id'    => null,
+                        ]);
+                    }
+                }
             }
         });
 

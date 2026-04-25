@@ -72,6 +72,19 @@
                         </table>
                     </div>
                     <p v-else class="text-sm text-gray-400">スケジュール未登録</p>
+
+                    <!-- カレンダー（月ビュー・週間プランナー切替） -->
+                    <div class="mt-4">
+                        <ProjectCalendar
+                            :schedules="schedules"
+                            :project="job"
+                            :weekPostsUrl="weekPostsUrl"
+                            :readonly="true"
+                            :events="[]"
+                            :comments="[]"
+                            :memos="[]"
+                        />
+                    </div>
                 </section>
 
                 <!-- ── メンバーセクション ──────────────────────── -->
@@ -229,6 +242,7 @@
 
 <script setup>
 import ProofRequestModal from '@/Components/ProofRequestModal.vue';
+import ProjectCalendar from '@/Components/ProjectCalendar.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
@@ -245,6 +259,9 @@ function openProofModal(assignment = null) {
     showProofModal.value = true;
 }
 const schedules = computed(() => (Array.isArray(page.props.schedules) ? page.props.schedules : []));
+const weekPostsUrl = computed(() =>
+    job.id ? route('user.project_jobs.week_posts.index', { projectJob: job.id }) : null,
+);
 const members = page.props.members || [];
 const hasMembers = computed(() => Array.isArray(members) && members.length > 0);
 const subCoordinators = computed(() => page.props.subCoordinators || []);

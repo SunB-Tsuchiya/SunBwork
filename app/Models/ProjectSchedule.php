@@ -11,6 +11,7 @@ class ProjectSchedule extends Model
 
     protected $fillable = [
         'project_job_id',
+        'project_job_item_id',
         'parent_id',
         'color',
         'name',
@@ -22,7 +23,7 @@ class ProjectSchedule extends Model
         'order',
         'metadata',
         'created_by',
-        'updated_by'
+        'updated_by',
     ];
 
     protected $casts = [
@@ -34,6 +35,11 @@ class ProjectSchedule extends Model
     public function projectJob()
     {
         return $this->belongsTo(ProjectJob::class);
+    }
+
+    public function item()
+    {
+        return $this->belongsTo(ProjectJobItem::class, 'project_job_item_id');
     }
 
     public function assignments()

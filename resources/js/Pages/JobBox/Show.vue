@@ -176,11 +176,18 @@ function routeBack() {
     }
 }
 
-// Mark JAM read when assignee opens this SPA view. Silent if API fails.
+// Mark JAM read when assignee (recipient) opens this SPA view. Silent if API fails.
+// Only the assigned user (recipient) triggers read_at — coordinator viewing must not.
 onMounted(async () => {
     try {
         const jamId = message && message.id;
         if (!jamId) return;
+        const authUserId = page.props.auth?.user?.id;
+        const recipientId = message.project_job_assignment?.user_id
+            ?? message.project_job_assignment?.user?.id
+            ?? null;
+        // Only call apiMarkRead if the viewer is the recipient
+        if (!authUserId || !recipientId || Number(authUserId) !== Number(recipientId)) return;
         const apiReadUrl = safeRoute('api.jobbox.read', { id: jamId }, `/api/jobbox/read/${jamId}`);
         await fetch(apiReadUrl, {
             method: 'POST',

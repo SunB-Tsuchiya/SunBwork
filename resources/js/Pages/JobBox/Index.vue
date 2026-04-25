@@ -406,31 +406,13 @@ function getAssignmentStatus(m) {
     try {
         const jam = m || {};
         const assignment = m.project_job_assignment || {};
-        const statusKey = assignment.status?.key || jam.status?.key || null;
-        if (statusKey) {
-            switch (statusKey) {
-                case 'completed': return '完了';
-                case 'scheduled': return 'セット済';
-                case 'confirmed': return '確認済';
-                case 'received':
-                case 'order':
-                case 'in_progress': return '受信済';
-                default: break;
-            }
-        }
+        // 優先順位: 完了 > セット > 確認済み > 送信
         if (Boolean(jam.completed) || Boolean(assignment.completed)) return '完了';
-        if (Boolean(jam.scheduled) || Boolean(assignment.scheduled) || Boolean(assignment.scheduled_at)) return 'セット済';
-        
-        // 独自ジョブ（自分で自分に振るジョブ）の場合は「セット済」として扱う
-        const senderId = jam.sender_id || assignment.sender_id;
-        const userId = assignment.user_id;
-        if (senderId && userId && Number(senderId) === Number(userId)) {
-            return 'セット済';
-        }
-        
+        if (Boolean(jam.accepted) || Boolean(assignment.accepted) ||
+            Boolean(jam.scheduled) || Boolean(assignment.scheduled) || Boolean(assignment.scheduled_at)) return 'セット済';
         const readAt = jam.read_at || assignment.read_at || null;
-        if (readAt) return Boolean(jam.accepted) || Boolean(assignment.accepted) ? '確認済' : '既読済';
-        if (Boolean(jam.accepted) || Boolean(assignment.accepted)) return '受信済';
+        if (readAt) return '確認済み';
+        if (Boolean(jam.assigned) || Boolean(assignment.assigned)) return '送信';
         return '-';
     } catch {
         return '-';
@@ -439,12 +421,11 @@ function getAssignmentStatus(m) {
 
 function statusBadgeClass(status) {
     switch (status) {
-        case '完了': return 'bg-yellow-100 text-yellow-800';
+        case '完了':   return 'bg-yellow-100 text-yellow-800';
         case 'セット済': return 'bg-blue-100 text-blue-800';
-        case '確認済': return 'bg-green-100 text-green-800';
-        case '受信済': return 'bg-indigo-100 text-indigo-800';
-        case '既読済': return 'bg-gray-100 text-gray-700';
-        default: return 'bg-gray-100 text-gray-700';
+        case '確認済み': return 'bg-green-100 text-green-800';
+        case '送信':   return 'bg-gray-200 text-gray-700';
+        default:       return 'bg-gray-100 text-gray-500';
     }
 }
 

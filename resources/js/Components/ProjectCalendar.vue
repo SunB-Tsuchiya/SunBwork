@@ -1,20 +1,50 @@
 <template>
     <div class="calendar-container">
         <div class="mb-4 flex items-center gap-4">
-            <button @click="openEventModal" class="rounded bg-blue-600 px-4 py-2 text-white">予定作成</button>
-            <button @click="goToDiaryCreate" class="rounded bg-orange-500 px-4 py-2 text-white">メモ作成</button>
-
-            <!-- CSV操作（案件に紐付いたカレンダーのみ表示） -->
+            <!-- ビュー切替（案件カレンダーのみ） -->
             <template v-if="props.project">
-                <button @click="handleCsvExport" class="rounded border border-green-600 px-4 py-2 text-green-700 hover:bg-green-50">
-                    CSV出力
+                <button
+                    @click="currentView = 'calendar'"
+                    class="rounded px-3 py-1.5 text-sm font-medium"
+                    :class="currentView === 'calendar' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
+                >
+                    月カレンダー
                 </button>
-                <button @click="openCsvImportModal" class="rounded border border-indigo-600 px-4 py-2 text-indigo-700 hover:bg-indigo-50">
-                    CSV取込
+                <button
+                    @click="currentView = 'week-planner'"
+                    class="rounded px-3 py-1.5 text-sm font-medium"
+                    :class="currentView === 'week-planner' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
+                >
+                    週間プランナー
                 </button>
+                <span class="mx-1 text-gray-300">|</span>
+            </template>
+
+            <template v-if="currentView === 'calendar'">
+                <button v-if="!props.readonly" @click="openEventModal" class="rounded bg-blue-600 px-4 py-2 text-white">予定作成</button>
+                <button v-if="!props.readonly" @click="goToDiaryCreate" class="rounded bg-orange-500 px-4 py-2 text-white">メモ作成</button>
+
+                <!-- CSV操作（案件に紐付いたカレンダーのみ表示） -->
+                <template v-if="props.project && !props.readonly">
+                    <button @click="handleCsvExport" class="rounded border border-green-600 px-4 py-2 text-green-700 hover:bg-green-50">
+                        CSV出力
+                    </button>
+                    <button @click="openCsvImportModal" class="rounded border border-indigo-600 px-4 py-2 text-indigo-700 hover:bg-indigo-50">
+                        CSV取込
+                    </button>
+                </template>
             </template>
         </div>
-        <FullCalendar ref="calendarRef" :options="calendarOptions" :events="plainCalendarEvents" />
+
+        <!-- 週間プランナービュー -->
+        <ProjectWeekPlanner
+            v-if="currentView === 'week-planner'"
+            :schedules="props.schedules"
+            :project="props.project"
+            :weekPostsUrl="props.weekPostsUrl"
+        />
+
+        <FullCalendar v-if="currentView === 'calendar'" ref="calendarRef" :options="calendarOptions" :events="plainCalendarEvents" />
 
         <!-- ホバーポップアップ -->
         <Teleport to="body">
@@ -221,6 +251,23 @@
                         ></button>
                     </div>
                 </div>
+                <!-- 連携設定リンク -->
+                <div v-if="(props.items ?? []).length > 0" class="mb-2">
+                    <label class="block text-sm font-medium">連携設定に紐づける</label>
+                    <div v-if="!isEditingSchedule" class="mt-1 text-sm text-gray-600">
+                        {{ scheduleShowData.item_id
+                            ? (props.items.find(i => i.id === scheduleShowData.item_id)?.name ?? '—')
+                            : '—（未設定）' }}
+                    </div>
+                    <select v-else v-model="scheduleEditItemId"
+                        class="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-indigo-400 focus:outline-none">
+                        <option :value="null">—（未設定）</option>
+                        <option v-for="item in props.items" :key="item.id" :value="item.id">
+                            {{ item.sheet_name ? '[' + item.sheet_name + '] ' : '' }}
+                            {{ item.parent_label ? item.parent_label + ' › ' : '' }}{{ item.name }}
+                        </option>
+                    </select>
+                </div>
                 <div class="mt-4 flex justify-end gap-2">
                     <button
                         type="button"
@@ -308,6 +355,7 @@ import { router, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
+import ProjectWeekPlanner from '@/Components/ProjectWeekPlanner.vue';
 
 const props = defineProps({
     schedules: { type: Array, default: () => [] },
@@ -315,8 +363,16 @@ const props = defineProps({
     comments: { type: Array, default: () => [] },
     memos: { type: Array, default: () => [] },
     project: { type: Object, default: null },
+    items: { type: Array, default: () => [] },
     diaryLabel: { type: String, default: 'メモ' },
+    readonly: { type: Boolean, default: false },
+    weekPostsUrl: { type: String, default: null },
 });
+
+// items prop はカレンダー連携用ドロップダウンのみに使用（独立イベントとして描画しない）
+
+// 現在のビュー（月カレンダー or 週間プランナー）
+const currentView = ref('calendar');
 
 // 今日の日付を取得する関数
 const getTodayString = () => {
@@ -377,12 +433,13 @@ const startHourSelectRef = ref(null);
 
 // schedule show/edit modal state
 const showScheduleShowModal = ref(false);
-const scheduleShowData = ref({ id: null, title: '', start: '', end: '', description: '', color: null });
+const scheduleShowData = ref({ id: null, title: '', start: '', end: '', description: '', color: null, item_id: null });
 const isEditingSchedule = ref(false);
 const scheduleEditTitle = ref('');
 const scheduleEditStart = ref('');
 const scheduleEditEnd = ref('');
 const scheduleEditColor = ref('');
+const scheduleEditItemId = ref(null);
 
 const page = usePage();
 // prefer server-provided helper flags if available on the user props
@@ -1305,6 +1362,7 @@ function toggleEdit(enable) {
         scheduleEditStart.value = scheduleShowData.value.start;
         scheduleEditEnd.value = scheduleShowData.value.end;
         scheduleEditColor.value = scheduleShowData.value.color;
+        scheduleEditItemId.value = scheduleShowData.value.item_id ?? null;
         try {
             console.info('[ProjectCalendar] toggleEdit entered edit mode', {
                 title: scheduleEditTitle.value,
@@ -1331,6 +1389,7 @@ async function submitScheduleUpdate() {
             end_date: scheduleEditEnd.value,
             color: scheduleEditColor.value || null,
             description: scheduleShowData.value && scheduleShowData.value.description ? scheduleShowData.value.description : '',
+            project_job_item_id: scheduleEditItemId.value || null,
         };
         // use coordinator project_schedules update endpoint if available
         // determine id robustly from several possible shapes (event, extendedProps, legacy names)
