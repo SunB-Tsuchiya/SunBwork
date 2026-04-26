@@ -229,6 +229,29 @@ class MyProjectJobController extends Controller
                 }
                 $current = $parent;
             }
+
+            // progress_cells.completed_at を更新（ジョブ完了と進行表を同期）
+            try {
+                \App\Models\ProgressCell::where('assignment_id', $assignment->id)
+                    ->whereNull('completed_at')
+                    ->update(['completed_at' => now()]);
+            } catch (\Throwable $__ePc) {
+                // non-fatal
+            }
+
+            // イベントも完了にする（進行表→イベント同期）
+            try {
+                $prefix = '【完了】';
+                $eventsToComplete = \App\Models\Event::where('project_job_assignment_id', $assignment->id)->get();
+                foreach ($eventsToComplete as $evt) {
+                    if (strpos($evt->title, $prefix) !== 0) {
+                        $evt->title = $prefix . $evt->title;
+                        $evt->save();
+                    }
+                }
+            } catch (\Throwable $__eEvtMy) {
+                // non-fatal
+            }
         } catch (\Throwable $__e) {
             return response()->json(['error' => $__e->getMessage()], 500);
         }

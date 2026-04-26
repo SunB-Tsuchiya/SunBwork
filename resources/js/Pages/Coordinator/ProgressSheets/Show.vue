@@ -56,6 +56,16 @@
             セット方式で初期化
           </button>
 
+          <!-- 新形式に変換 -->
+          <button
+            v-if="!editMode && hasOldPairs"
+            type="button"
+            class="rounded border border-orange-300 bg-orange-50 px-3 py-1.5 text-sm font-medium text-orange-700 hover:bg-orange-100"
+            @click="openConvertPreview"
+          >
+            新形式に変換
+          </button>
+
           <!-- シート削除 -->
           <button
             type="button"
@@ -64,6 +74,46 @@
           >
             シート削除
           </button>
+
+          <!-- 印刷 -->
+          <button
+            v-if="!editMode"
+            type="button"
+            class="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+            @click="openPrint"
+          >
+            印刷
+          </button>
+
+          <!-- 共有リンク -->
+          <template v-if="!editMode">
+            <button
+              v-if="!localShareToken"
+              type="button"
+              class="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+              :disabled="shareLoading"
+              @click="issueShare"
+            >
+              {{ shareLoading ? '発行中...' : '共有リンクを発行' }}
+            </button>
+            <template v-else>
+              <button
+                type="button"
+                class="rounded border border-blue-300 bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-100"
+                @click="copyShareUrl"
+              >
+                URLをコピー
+              </button>
+              <button
+                type="button"
+                class="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-50"
+                :disabled="shareLoading"
+                @click="revokeShare"
+              >
+                リンクを無効化
+              </button>
+            </template>
+          </template>
         </template>
 
         <!-- 変更保存ボタン（セル編集後） -->
@@ -75,6 +125,18 @@
         >
           変更を保存 ({{ pendingCells.length }})
         </button>
+
+        <!-- 全体完了率バッジ -->
+        <span
+          v-if="!editMode && sheetCompletion.total > 0"
+          class="ml-auto rounded px-3 py-1 text-sm font-medium"
+          :class="sheetCompletion.done === sheetCompletion.total
+            ? 'bg-green-100 text-green-700'
+            : 'bg-gray-100 text-gray-600'"
+        >
+          全体: {{ sheetCompletion.done }}/{{ sheetCompletion.total }} 完了
+          ({{ Math.round(sheetCompletion.done / sheetCompletion.total * 100) }}%)
+        </span>
 
       </div>
 
@@ -348,6 +410,7 @@
           :sizes="props.sizes"
           :assignments="props.assignments"
           :work-item-types="props.workItemTypes"
+          :project-schedules="props.projectSchedules"
           :can-edit="canEdit"
           :edit-mode="false"
           :auth-user-id="authUserId"
@@ -359,6 +422,11 @@
           @complete-assignment="onCompleteAssignmentFromCell"
           @proof-request-open="onProofRequestOpen"
           @proof-direct-complete="onProofDirectComplete"
+          @worker-complete="onWorkerComplete"
+          @worker-job-register="onWorkerJobRegister"
+          @worker-job-detail="onWorkerJobDetail"
+          @schedlink-complete="onSchedlinkComplete"
+          @note-save="onNoteSave"
         />
       </div>
     </div>
@@ -575,6 +643,70 @@
       </div>
     </div>
 
+    <!-- ── V2 変換プレビューモーダル ────────────────────────── -->
+    <div
+      v-if="showConvertModal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      @click.self="showConvertModal = false"
+    >
+      <div class="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
+        <h3 class="mb-3 text-lg font-semibold text-gray-800">新形式に変換 — プレビュー</h3>
+
+        <!-- 読み込み中 -->
+        <div v-if="convertPreviewLoading" class="py-8 text-center text-sm text-gray-400">読み込み中...</div>
+
+        <!-- プレビュー内容 -->
+        <template v-else-if="convertPreviewData">
+          <p class="mb-2 text-sm font-medium text-gray-600">検出されたペア：</p>
+          <ul class="mb-4 space-y-2">
+            <li
+              v-for="pair in convertPreviewData.pairs"
+              :key="pair.user_col_key"
+              class="rounded border border-gray-200 bg-gray-50 p-3 text-sm"
+            >
+              <div class="font-medium text-gray-700">
+                ✅ {{ pair.parent_label }} — 担当列＋登録欄 → 担当＋ジョブ（worker型）
+              </div>
+              <div class="mt-1 text-xs text-gray-500">
+                担当者設定: {{ pair.cells_with_user }}セル ／ ジョブ登録: {{ pair.cells_with_job }}セル
+              </div>
+              <div v-if="pair.cells_unmigratable > 0" class="mt-1 text-xs font-medium text-red-600">
+                ❌ 引き継げないデータ: {{ pair.cells_unmigratable }}セル（変換後に空になります）
+              </div>
+            </li>
+          </ul>
+
+          <div
+            v-if="convertPreviewData.total_unmigratable === 0"
+            class="mb-4 rounded bg-green-50 p-3 text-sm text-green-700"
+          >
+            ✅ すべてのデータが引き継がれます（担当者設定・ジョブ登録を保持）
+          </div>
+          <div v-else class="mb-4 rounded bg-red-50 p-3 text-sm text-red-700">
+            ⚠️ 引き継げないデータが {{ convertPreviewData.total_unmigratable }}件あります。
+            変換後にこれらのセルデータは空になります。
+          </div>
+
+          <p class="mb-4 text-xs font-medium text-orange-600">⚠️ この操作は元に戻せません。</p>
+        </template>
+
+        <div class="flex justify-end gap-3">
+          <button
+            type="button"
+            class="rounded border border-gray-300 px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+            @click="showConvertModal = false"
+          >キャンセル</button>
+          <button
+            v-if="convertPreviewData"
+            type="button"
+            class="rounded bg-orange-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-60"
+            :disabled="convertPreviewLoading"
+            @click="executeConvert"
+          >変換する（元に戻せません）</button>
+        </div>
+      </div>
+    </div>
+
     <ProofRequestModal
       :show="showProofModal"
       :initial-title="proofTargetAssignment?.title || projectJob?.title || ''"
@@ -671,6 +803,7 @@ const props = defineProps({
   sizes: { type: Array, default: () => [] },
   assignments: { type: Array, default: () => [] },
   workItemTypes: { type: Array, default: () => [] },
+  projectSchedules: { type: Array, default: () => [] },
   projectJob: Object,
   canEdit: Boolean,
   templates: Array,
@@ -705,6 +838,11 @@ const localSheetName = ref(props.sheet.name ?? '');
 const showRegisterModal = ref(false);
 const showV2InitModal = ref(false);
 const v2InitRounds = ref([{ label: '初校' }]);
+const showConvertModal      = ref(false);
+const convertPreviewData    = ref(null);
+const convertPreviewLoading = ref(false);
+const localShareToken       = ref(props.sheet.share_token ?? null);
+const shareLoading          = ref(false);
 const showProofModal = ref(false);
 const proofTargetAssignment = ref(null);
 const proofTargetCellId = ref(null);
@@ -1110,6 +1248,41 @@ async function onProofDirectComplete({ assignmentId }) {
   } catch { /* ignore */ }
 }
 
+// ── シート全体の完了率 ─────────────────────────────────────
+function collectAllLeaves(nodes) {
+  const result = [];
+  for (const node of nodes) {
+    if (!node.children || node.children.length === 0) result.push(node);
+    else result.push(...collectAllLeaves(node.children));
+  }
+  return result;
+}
+
+const sheetCompletion = computed(() => {
+  const config = props.sheet.column_config ?? [];
+  const completableCols = collectAllLeaves(config).filter(
+    (l) => ['worker', 'schedlink', 'joblink'].includes(l.type)
+  );
+  if (completableCols.length === 0) return { done: 0, total: 0 };
+  const cellMap = {};
+  for (const c of localCells.value) {
+    cellMap[`${c.row_id}_${c.col_key}`] = c;
+  }
+  const dataRows = (props.rows ?? []).filter((r) => !r.parent_id || true); // 全行対象
+  let total = 0;
+  let done = 0;
+  for (const row of dataRows) {
+    for (const col of completableCols) {
+      total++;
+      const c = cellMap[`${row.id}_${col.key}`];
+      if (!c) continue;
+      if (col.type === 'joblink') { if (c.assignment_completed) done++; }
+      else { if (c.completed_at || c.assignment_completed) done++; }
+    }
+  }
+  return { done, total };
+});
+
 // ローカルコピー
 const localColumnConfig = ref(JSON.parse(JSON.stringify(props.sheet.column_config ?? [])));
 const localRows = ref(props.rows.map((r) => ({ ...r })));
@@ -1179,11 +1352,7 @@ function generateV2ColumnConfig(rounds) {
           {
             key: key + '_kumihan',
             label: '組版',
-            type: 'text',
-            children: [
-              { key: key + '_kumihan_tanto',  label: '担当',   type: 'user' },
-              { key: key + '_kumihan_toroku', label: '登録欄', type: 'joblink' },
-            ],
+            type: 'worker',
           },
           {
             key: key + '_kosei',
@@ -1213,6 +1382,91 @@ function applyV2Init() {
     { name: localSheetName.value, column_config: config },
     { preserveScroll: true }
   );
+}
+
+// ── V2 変換（既存 user+joblink ペア → worker 型） ──────────────────
+function detectOldPairsInConfig(nodes) {
+  for (const node of nodes) {
+    const children = node.children ?? [];
+    for (let j = 0; j < children.length - 1; j++) {
+      if (children[j].type === 'user' && children[j + 1].type === 'joblink') return true;
+    }
+    if (children.length && detectOldPairsInConfig(children)) return true;
+  }
+  return false;
+}
+const hasOldPairs = computed(() => detectOldPairsInConfig(localColumnConfig.value));
+
+// ── 印刷 ─────────────────────────────────────────────────────────────────────
+function openPrint() {
+  window.open(route('coordinator.progress_sheets.print', { sheet: props.sheet.id }), '_blank');
+}
+
+// ── 共有リンク ────────────────────────────────────────────────────────────────
+async function issueShare() {
+  shareLoading.value = true;
+  try {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    const res = await fetch(route('coordinator.progress_sheets.share', { sheet: props.sheet.id }), {
+      method: 'POST',
+      headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+    });
+    const data = await res.json();
+    localShareToken.value = data.share_token;
+  } finally {
+    shareLoading.value = false;
+  }
+}
+
+async function revokeShare() {
+  if (!confirm('共有リンクを無効化しますか？現在のURLでのアクセスができなくなります。')) return;
+  shareLoading.value = true;
+  try {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    await fetch(route('coordinator.progress_sheets.unshare', { sheet: props.sheet.id }), {
+      method: 'DELETE',
+      headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+    });
+    localShareToken.value = null;
+  } finally {
+    shareLoading.value = false;
+  }
+}
+
+function copyShareUrl() {
+  const url = route('shared.progress_sheets.show', { token: localShareToken.value });
+  navigator.clipboard.writeText(url).then(() => {
+    alert('共有URLをコピーしました');
+  });
+}
+
+async function openConvertPreview() {
+  showConvertModal.value      = true;
+  convertPreviewData.value    = null;
+  convertPreviewLoading.value = true;
+  try {
+    const res = await axios.get(
+      route('coordinator.progress_sheets.convert_preview', { sheet: props.sheet.id })
+    );
+    convertPreviewData.value = res.data;
+  } catch (e) {
+    showConvertModal.value = false;
+    showToast('プレビューの取得に失敗しました。', 'error');
+  } finally {
+    convertPreviewLoading.value = false;
+  }
+}
+
+async function executeConvert() {
+  try {
+    await axios.put(
+      route('coordinator.progress_sheets.convert_to_v2', { sheet: props.sheet.id })
+    );
+    showConvertModal.value = false;
+    router.reload();
+  } catch (e) {
+    showToast('変換に失敗しました。', 'error');
+  }
 }
 
 // ── 行管理 ──
@@ -1611,6 +1865,52 @@ function onCellUpdate(payload) {
   const existing = localCells.value.find((c) => c.row_id === payload.row_id && c.col_key === payload.col_key);
   const fieldMap = { text: 'value_text', date: 'value_date', bool: 'value_bool', user: 'value_user_id', subcontractor: 'value_subcontractor_id' };
   const field = fieldMap[payload.value_type];
+
+  if (payload.value_type === 'schedlink') {
+    // schedlink型: value=schedule_id
+    const target = existing ?? (() => { const c = { row_id: payload.row_id, col_key: payload.col_key }; localCells.value.push(c); return c; })();
+    target.schedule_id = payload.value ?? null;
+    target.schedule_name = payload.value
+      ? (props.projectSchedules?.find((s) => s.id === payload.value)?.name ?? null)
+      : null;
+    target.schedule_end_date = payload.value
+      ? (props.projectSchedules?.find((s) => s.id === payload.value)?.end_date ?? null)
+      : null;
+    const sidx = pendingCells.value.findIndex((c) => c.row_id === payload.row_id && c.col_key === payload.col_key);
+    const schedlinkPayload = { row_id: payload.row_id, col_key: payload.col_key, value_type: 'schedlink', value: payload.value };
+    if (sidx >= 0) pendingCells.value[sidx] = schedlinkPayload;
+    else pendingCells.value.push(schedlinkPayload);
+    return;
+  }
+
+  if (payload.value_type === 'worker') {
+    // worker型: value=user_id, subcontractor_id は payload.subcontractor_id で来る
+    const target = existing ?? (() => { const c = { row_id: payload.row_id, col_key: payload.col_key }; localCells.value.push(c); return c; })();
+    if (payload.subcontractor_id) {
+      target.value_subcontractor_id = payload.subcontractor_id;
+      target.value_subcontractor_name = props.subcontractors?.find((s) => s.id === payload.subcontractor_id)?.name ?? null;
+      target.value_user_id = null;
+      target.value_user_name = null;
+    } else {
+      target.value_user_id = payload.value;
+      target.value_user_name = props.users.find((u) => u.id === payload.value)?.name ?? null;
+      target.value_subcontractor_id = null;
+      target.value_subcontractor_name = null;
+    }
+    // pendingに追加（worker型として保存）
+    const widx = pendingCells.value.findIndex((c) => c.row_id === payload.row_id && c.col_key === payload.col_key);
+    const workerPayload = {
+      row_id: payload.row_id,
+      col_key: payload.col_key,
+      value_type: 'worker',
+      value: payload.subcontractor_id ? null : payload.value,
+      subcontractor_id: payload.subcontractor_id ?? null,
+    };
+    if (widx >= 0) pendingCells.value[widx] = workerPayload;
+    else pendingCells.value.push(workerPayload);
+    return;
+  }
+
   if (existing) {
     existing[field] = payload.value;
     if (payload.value_type === 'user') {
@@ -1648,9 +1948,205 @@ function saveCells() {
     { cells: pendingCells.value },
     {
       preserveScroll: true,
-      onSuccess: () => { pendingCells.value = []; },
+      onSuccess: (page) => {
+        pendingCells.value = [];
+        if (page.props.cells) {
+          localCells.value = page.props.cells.map((c) => ({ ...c }));
+        }
+      },
     }
   );
+}
+
+// ── worker型セルハンドラ ──────────────────────────────────────────────────
+
+/** workerセルの「完了にする」 */
+async function onWorkerComplete({ cellId, assignmentId, rowId, colKey }) {
+  const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+  try {
+    if (assignmentId) {
+      // ジョブ紐づきあり: 既存の assignments.complete を使う（JobBoxController側でcompleted_atも更新）
+      await callAssignmentApi(route('coordinator.progress_sheets.assignments.complete', { assignment: assignmentId }));
+    } else if (cellId) {
+      // ジョブなし: セル単体の complete API
+      const res = await fetch(route('coordinator.progress_cells.complete', { cell: cellId }), {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+      });
+      if (!res.ok) throw new Error(await res.text());
+    }
+    // ローカルセルを更新
+    const idx = localCells.value.findIndex((c) => c.row_id === rowId && c.col_key === colKey);
+    if (idx >= 0) {
+      localCells.value.splice(idx, 1, {
+        ...localCells.value[idx],
+        completed_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
+        assignment_completed: assignmentId ? true : localCells.value[idx].assignment_completed,
+      });
+    }
+  } catch { /* ignore */ }
+}
+
+/** schedlinkセルの「完了にする」 */
+async function onSchedlinkComplete({ cellId, rowId, colKey }) {
+  if (!cellId) {
+    console.warn('[schedlink-complete] cellId が未定義です。先にセルを保存してください。', { rowId, colKey });
+    return;
+  }
+  const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+  try {
+    const res = await fetch(route('coordinator.progress_cells.complete', { cell: cellId }), {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      console.error('[schedlink-complete] API エラー', res.status, body);
+      return;
+    }
+    const json = await res.json();
+    const idx = localCells.value.findIndex((c) => c.row_id === rowId && c.col_key === colKey);
+    if (idx >= 0) {
+      localCells.value.splice(idx, 1, {
+        ...localCells.value[idx],
+        completed_at: json.completed_at ?? new Date().toISOString().slice(0, 19).replace('T', ' '),
+      });
+    }
+  } catch (e) {
+    console.error('[schedlink-complete] 例外', e);
+  }
+}
+
+/** セルメモ保存 */
+async function onNoteSave({ cellId, rowId, colKey, note }) {
+  const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+  if (!cellId) {
+    // セルが DB 未作成の場合: 位置指定エンドポイントで upsert + note 保存
+    try {
+      const res = await fetch(route('coordinator.progress_sheets.cell_note', { sheet: props.sheet.id }), {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'X-CSRF-TOKEN': csrf,
+          'X-Requested-With': 'XMLHttpRequest',
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({ row_id: rowId, col_key: colKey, cell_note: note }),
+      });
+      if (!res.ok) {
+        const body = await res.text();
+        console.error('[note-save] API エラー', res.status, body);
+        return;
+      }
+      const data = await res.json();
+      const authUser = usePage().props.auth?.user;
+      const existing = localCells.value.find((c) => c.row_id === rowId && c.col_key === colKey);
+      if (existing) {
+        const idx = localCells.value.indexOf(existing);
+        localCells.value.splice(idx, 1, {
+          ...existing,
+          id: data.cell_id,
+          cell_note: note,
+          cell_note_user_name: note ? (authUser?.name ?? null) : null,
+          cell_note_user_role: note ? (authUser?.user_role ?? null) : null,
+        });
+      } else {
+        localCells.value.push({
+          row_id: rowId,
+          col_key: colKey,
+          id: data.cell_id,
+          cell_note: note,
+          cell_note_user_name: note ? (authUser?.name ?? null) : null,
+          cell_note_user_role: note ? (authUser?.user_role ?? null) : null,
+        });
+      }
+    } catch (e) {
+      console.error('[note-save] 例外', e);
+    }
+    return;
+  }
+
+  try {
+    const res = await fetch(route('coordinator.progress_cells.note', { cell: cellId }), {
+      method: 'PATCH',
+      credentials: 'same-origin',
+      headers: {
+        'X-CSRF-TOKEN': csrf,
+        'X-Requested-With': 'XMLHttpRequest',
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({ cell_note: note }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      console.error('[note-save] API エラー', res.status, body);
+      return;
+    }
+    // ローカルのセルデータを即時更新
+    const idx = localCells.value.findIndex((c) => c.id === cellId);
+    if (idx >= 0) {
+      const authUser = usePage().props.auth?.user;
+      localCells.value.splice(idx, 1, {
+        ...localCells.value[idx],
+        cell_note: note,
+        cell_note_user_name: note ? (authUser?.name ?? null) : null,
+        cell_note_user_role: note ? (authUser?.user_role ?? null) : null,
+      });
+    }
+  } catch (e) {
+    console.error('[note-save] 例外', e);
+  }
+}
+
+/** workerセルの「＋ 登録」→ 既存のjob登録フローへ */
+function onWorkerJobRegister({ rowId, colKey, userId, subcontractorId }) {
+  // workerセル自身が担当者を持っているので、jobLinkModalと同様の処理
+  const title = buildJobTitle(rowId, colKey);
+  if (subcontractorId && !userId) {
+    jobLinkForm.value = { title, detail: '', desiredEndDate: '', assigneeUserId: null, assigneeSubcontractorId: subcontractorId };
+    jobLinkModal.value = { open: true, isSelfAssign: false, isSubcontractor: true, rowId, colKey };
+    return;
+  }
+  const assigneeId = userId ?? authUserId.value;
+  const isSelf = !userId || assigneeId === authUserId.value;
+  const sizeId = findSiblingCellValue(colKey, rowId, 'size') ?? findAncestorGroupId(colKey, 'size', props.sizes) ?? (props.projectJob.size_id ? String(props.projectJob.size_id) : null);
+  const stageId = findSiblingCellValue(colKey, rowId, 'stage') ?? findAncestorGroupId(colKey, 'stage', props.stages);
+  const workItemTypeId = findSiblingCellValue(colKey, rowId, 'workItemType') ?? findAncestorGroupId(colKey, 'workItemType', props.workItemTypes);
+  const params = { title };
+  if (sizeId) params.size_id = sizeId;
+  if (stageId) params.stage_id = stageId;
+  if (workItemTypeId) params.work_item_type_id = workItemTypeId;
+  if (props.projectJob?.client_id) params.client_id = props.projectJob.client_id;
+  params.project_job_id = props.projectJob.id;
+  params.progress_sheet_id = props.sheet.id;
+  params.row_id = rowId;
+  params.col_key = colKey;
+  if (isSelf) {
+    router.visit(route('events.create_job', params));
+  } else {
+    if (assigneeId) params.user_id = assigneeId;
+    router.visit(route('coordinator.project_jobs.assignments.create', { projectJob: props.projectJob.id, ...params }));
+  }
+}
+
+/** workerセルの「詳細」→ 既存のjob詳細モーダルを流用 */
+function onWorkerJobDetail({ assignmentId, rowId, colKey }) {
+  const cell = localCells.value.find((c) => c.row_id === rowId && c.col_key === colKey);
+  openJobLinkDetail({
+    assignmentId,
+    assignmentTitle: cell?.assignment_title ?? null,
+    assigneeUserId: cell?.assignment_user_id ?? cell?.value_user_id ?? null,
+    assigneeSubcontractorId: cell?.assignment_subcontractor_id ?? cell?.value_subcontractor_id ?? null,
+    endDate: cell?.assignment_end_date ?? cell?.cell_deadline ?? null,
+    completed: !!(cell?.completed_at || cell?.assignment_completed),
+    rowId,
+    colKey,
+  });
 }
 
 // ── テンプレート登録 ──

@@ -148,9 +148,12 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
 
     // 進行管理表（User 閲覧・担当者登録）
     Route::get('/user/progress-sheets/{sheet}', [\App\Http\Controllers\User\ProgressSheetController::class, 'show'])->name('user.progress_sheets.show');
+    Route::get('/user/progress-sheets/{sheet}/print', [\App\Http\Controllers\User\ProgressSheetController::class, 'printView'])->name('user.progress_sheets.print');
     Route::post('/user/progress-sheets/{sheet}/cells/{cell}/assign', [\App\Http\Controllers\User\ProgressSheetController::class, 'assign'])->name('progress_sheets.cells.assign');
     Route::delete('/user/progress-sheets/{sheet}/cells/{cell}/assign', [\App\Http\Controllers\User\ProgressSheetController::class, 'unassign'])->name('progress_sheets.cells.unassign');
     Route::post('/user/progress-sheets/{sheet}/cells/link-job', [\App\Http\Controllers\User\ProgressSheetController::class, 'linkJob'])->name('progress_sheets.cells.link_job_user');
+    Route::get('/user/progress-cells/my-assignments', [\App\Http\Controllers\User\ProgressCellController::class, 'myAssignments'])->name('user.progress_cells.my_assignments');
+    Route::post('/user/progress-cells/{cell}/complete', [\App\Http\Controllers\User\ProgressCellController::class, 'complete'])->name('user.progress_cells.complete');
 
     // チーム切り替え
     Route::put('/current-team', [App\Http\Controllers\CurrentTeamController::class, 'update'])->name('current-team.update');
@@ -681,6 +684,26 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('progress-sheets/assignments/{assignment}/proof-complete', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'proofDirectComplete'])->name('progress_sheets.assignments.proof_complete');
         Route::get('progress-sheets/assignments/{assignment}/link-options', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'linkOptions'])->name('progress_sheets.assignments.link_options');
         Route::post('progress-sheets/assignments/{assignment}/link-cell', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'linkCell'])->name('progress_sheets.assignments.link_cell');
+
+        // ── V2 セル操作 ───────────────────────────────────────────
+        Route::post('progress-cells/{cell}/complete', [App\Http\Controllers\Coordinator\ProgressCellController::class, 'complete'])->name('progress_cells.complete');
+        Route::patch('progress-cells/{cell}/deadline', [App\Http\Controllers\Coordinator\ProgressCellController::class, 'deadline'])->name('progress_cells.deadline');
+        Route::patch('progress-cells/{cell}/note', [App\Http\Controllers\Coordinator\ProgressCellController::class, 'note'])->name('progress_cells.note');
+        Route::post('progress-sheets/{sheet}/cell-note', [App\Http\Controllers\Coordinator\ProgressCellController::class, 'noteByPosition'])->name('progress_sheets.cell_note');
+
+        // ── V2 シート変換 ─────────────────────────────────────────
+        Route::get('progress-sheets/{sheet}/convert-preview', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'convertPreview'])->name('progress_sheets.convert_preview');
+        Route::put('progress-sheets/{sheet}/convert-to-v2', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'convertToV2'])->name('progress_sheets.convert_to_v2');
+
+        // ── V2 共有リンク ─────────────────────────────────────────
+        Route::post('progress-sheets/{sheet}/share', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'share'])->name('progress_sheets.share');
+        Route::delete('progress-sheets/{sheet}/share', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'unshare'])->name('progress_sheets.unshare');
+
+        // ── V-16 印刷 ─────────────────────────────────────────────
+        Route::get('progress-sheets/{sheet}/print', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'printView'])->name('progress_sheets.print');
+
+        // ── V-12 進行レポート ───────────────────────────────────────
+        Route::get('progress-report', [App\Http\Controllers\Coordinator\ProgressReportController::class, 'index'])->name('progress_report.index');
     });
 
 
@@ -690,6 +713,10 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 // 例: /debug/create → resources/js/Pages/Diaries/CreateDebug.vue
 // 例: /debug/other  → resources/js/Pages/OtherDebug.vue
 
+
+// 進行管理表 共有URL（認証不要・公開）
+Route::get('/shared/progress-sheets/{token}', [App\Http\Controllers\Shared\ProgressSheetController::class, 'show'])->name('shared.progress_sheets.show');
+Route::get('/shared/progress-sheets/{token}/print', [App\Http\Controllers\Shared\ProgressSheetController::class, 'printView'])->name('shared.progress_sheets.print');
 
 Route::get('/debug/create', function () {
     return Inertia::render('Diaries/CreateDebug');

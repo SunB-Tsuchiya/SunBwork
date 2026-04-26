@@ -129,6 +129,8 @@ class ProgressSheetController extends Controller
                 'valueSubcontractor:id,name',
                 'assignment:id,title,detail,desired_end_date,completed,proof_completed_at,user_id,sender_id,subcontractor_id',
                 'proofAssignment:id,title,completed,proof_completed_at,user_id,sender_id',
+                'schedule:id,name,end_date,completed_at',
+                'noteUser:id,name,user_role',
             ])
             ->get()
             ->map(fn($c) => [
@@ -153,6 +155,16 @@ class ProgressSheetController extends Controller
                 'proof_assignment_id'         => $c->proof_assignment_id,
                 'proof_assignment_title'      => $c->proofAssignment?->title,
                 'proof_assignment_completed'  => $c->proofAssignment?->completed,
+                // V2フィールド
+                'schedule_id'                 => $c->schedule_id,
+                'schedule_name'               => $c->schedule?->name,
+                'schedule_end_date'           => $c->schedule?->end_date?->format('Y-m-d'),
+                'schedule_completed_at'       => $c->schedule?->completed_at?->format('Y-m-d H:i:s'),
+                'cell_deadline'               => $c->cell_deadline?->format('Y-m-d'),
+                'cell_note'                   => $c->cell_note,
+                'cell_note_user_name'          => $c->noteUser?->name,
+                'cell_note_user_role'          => $c->noteUser?->user_role,
+                'completed_at'                => $c->completed_at?->format('Y-m-d H:i:s'),
             ]);
 
         // 担当者選択用ユーザー一覧（案件メンバー + Coordinator）
@@ -185,15 +197,28 @@ class ProgressSheetController extends Controller
             ->orderByDesc('updated_at')
             ->get(['id', 'name']);
 
+        // workerセル用: 同案件のスケジュール一覧
+        $projectSchedules = \App\Models\ProjectSchedule::where('project_job_id', $projectJob->id)
+            ->orderBy('start_date')
+            ->orderBy('name')
+            ->get(['id', 'name', 'start_date', 'end_date'])
+            ->map(fn($s) => [
+                'id'       => $s->id,
+                'name'     => $s->name,
+                'end_date' => $s->end_date?->format('Y-m-d'),
+            ]);
+
         return Inertia::render('Coordinator/ProgressSheets/Show', [
             'sheet'      => [
                 'id'            => $sheet->id,
                 'name'          => $sheet->name,
                 'column_config' => $sheet->column_config,
                 'created_by'    => $sheet->created_by,
+                'share_token'   => $sheet->share_token,
             ],
-            'rows'        => $rows,
-            'cells'       => $cells,
+            'rows'             => $rows,
+            'cells'            => $cells,
+            'projectSchedules' => $projectSchedules,
             'users'          => $users,
             'subcontractors' => $subcontractors,
             'stages'      => $stages,
@@ -517,6 +542,15 @@ class ProgressSheetController extends Controller
         $this->setCompletedStatus($assignment);
         $assignment->save();
 
+        // workerセルの completed_at を記録
+        try {
+            \App\Models\ProgressCell::where('assignment_id', $assignment->id)
+                ->whereNull('completed_at')
+                ->update(['completed_at' => now()]);
+        } catch (\Throwable $__e) {
+            // non-fatal
+        }
+
         // ジョブ通知（進行管理表リンクあり → リーダー/サブCoへ）
         try {
             $pj = $assignment->projectJob
@@ -529,6 +563,29 @@ class ProgressSheetController extends Controller
             }
         } catch (\Throwable $__eNotify) {
             \Illuminate\Support\Facades\Log::warning('ProgressSheetController: completeAssignment notification error', ['error' => $__eNotify->getMessage()]);
+        }
+
+        // イベントも完了にする（進行表→イベント同期）
+        try {
+            // coordinator割当 OR それを supersedes している by_myself割当 に紐づくイベントを完了
+            $eventAssignmentIds = [$assignment->id];
+            $supersedingIds = ProjectJobAssignment::where('supersedes_assignment_id', $assignment->id)
+                ->pluck('id')
+                ->toArray();
+            $eventAssignmentIds = array_merge($eventAssignmentIds, $supersedingIds);
+            $prefix = '【完了】';
+            $eventsToComplete = \App\Models\Event::whereIn(
+                'project_job_assignment_id',
+                array_unique(array_filter($eventAssignmentIds))
+            )->get();
+            foreach ($eventsToComplete as $evt) {
+                if (strpos($evt->title, $prefix) !== 0) {
+                    $evt->title = $prefix . $evt->title;
+                    $evt->save();
+                }
+            }
+        } catch (\Throwable $__eEvt) {
+            // non-fatal
         }
 
         return response()->json(['success' => true, 'assignment_id' => $assignment->id]);
@@ -592,5 +649,296 @@ class ProgressSheetController extends Controller
         } catch (\Throwable $e) {
             // status_id 更新失敗は無視（completed フラグのみ更新）
         }
+    }
+
+    /**
+     * 印刷専用ページ（Coordinator認証）
+     */
+    public function printView(Request $request, ProgressSheet $sheet)
+    {
+        $this->authorizeJobAccess($request->user(), $sheet->projectJob);
+        $sheet->load(['projectJob.client', 'projectJob.size']);
+        $projectJob = $sheet->projectJob;
+
+        $rows  = $sheet->rows()->orderBy('order')->get(['id', 'label', 'order', 'parent_id']);
+        $cells = $this->buildPrintCells($rows->pluck('id'));
+
+        return \Inertia\Inertia::render('Shared/ProgressSheets/Print', [
+            'sheet'      => ['id' => $sheet->id, 'name' => $sheet->name, 'column_config' => $sheet->column_config],
+            'rows'       => $rows,
+            'cells'      => $cells,
+            'projectJob' => [
+                'id'          => $projectJob->id,
+                'title'       => $projectJob->title,
+                'client_name' => $projectJob->client?->name,
+                'size_name'   => $projectJob->size?->name,
+                'page_count'  => $projectJob->page_count,
+            ],
+        ]);
+    }
+
+    private function buildPrintCells($rowIds): \Illuminate\Support\Collection
+    {
+        return ProgressCell::whereIn('row_id', $rowIds)
+            ->with([
+                'valueUser:id,name',
+                'valueSubcontractor:id,name',
+                'assignment:id,desired_end_date,completed',
+                'schedule:id,name,end_date,completed_at',
+                'noteUser:id,name,user_role',
+            ])
+            ->get()
+            ->map(fn($c) => [
+                'id'                       => $c->id,
+                'row_id'                   => $c->row_id,
+                'col_key'                  => $c->col_key,
+                'cell_type'                => $c->cell_type,
+                'value_text'               => $c->value_text,
+                'value_date'               => $c->value_date?->format('Y-m-d'),
+                'value_bool'               => $c->value_bool,
+                'value_user_id'            => $c->value_user_id,
+                'value_user_name'          => $c->valueUser?->name,
+                'value_subcontractor_id'   => $c->value_subcontractor_id,
+                'value_subcontractor_name' => $c->valueSubcontractor?->name,
+                'assignment_id'            => null,
+                'assignment_completed'     => $c->completed_at !== null || ($c->assignment?->completed ?? false),
+                'assignment_end_date'      => $c->assignment?->desired_end_date?->format('Y-m-d'),
+                'proof_assignment_id'      => null,
+                'proof_assignment_completed' => false,
+                'schedule_id'              => $c->schedule_id,
+                'schedule_name'            => $c->schedule?->name,
+                'schedule_end_date'        => $c->schedule?->end_date?->format('Y-m-d'),
+                'schedule_completed_at'    => $c->schedule?->completed_at?->format('Y-m-d H:i:s'),
+                'cell_deadline'            => $c->cell_deadline?->format('Y-m-d'),
+                'cell_note'                => $c->cell_note,
+                'cell_note_user_name'      => $c->noteUser?->name,
+                'cell_note_user_role'      => $c->noteUser?->user_role,
+                'completed_at'             => $c->completed_at?->format('Y-m-d H:i:s'),
+            ]);
+    }
+
+    /**
+     * 共有トークンを発行してURLを返す
+     */
+    public function share(Request $request, ProgressSheet $sheet): \Illuminate\Http\JsonResponse
+    {
+        $this->authorizeJobAccess($request->user(), $sheet->projectJob);
+
+        if (!$sheet->share_token) {
+            $sheet->share_token = \Illuminate\Support\Str::random(64);
+            $sheet->save();
+        }
+
+        return response()->json(['share_token' => $sheet->share_token]);
+    }
+
+    /**
+     * 共有トークンを無効化する
+     */
+    public function unshare(Request $request, ProgressSheet $sheet): \Illuminate\Http\JsonResponse
+    {
+        $this->authorizeJobAccess($request->user(), $sheet->projectJob);
+
+        $sheet->share_token = null;
+        $sheet->save();
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * 既存シートの user+joblink ペアを変換プレビュー（読み取り専用・変換しない）
+     */
+    public function convertPreview(Request $request, ProgressSheet $sheet): \Illuminate\Http\JsonResponse
+    {
+        $this->authorizeJobAccess($request->user(), $sheet->projectJob);
+
+        $pairs  = $this->detectUserJobPairs($sheet->column_config ?? []);
+        $rowIds = ProgressRow::where('sheet_id', $sheet->id)->pluck('id');
+
+        $result            = [];
+        $totalDataCells    = 0;
+        $totalUnmigratable = 0;
+
+        foreach ($pairs as $pair) {
+            $userColKey    = $pair['user_key'];
+            $joblinkColKey = $pair['joblink_key'];
+
+            $userCellsWithData = ProgressCell::whereIn('row_id', $rowIds)
+                ->where('col_key', $userColKey)
+                ->where(function ($q) {
+                    $q->whereNotNull('value_user_id')
+                      ->orWhereNotNull('value_subcontractor_id');
+                })
+                ->count();
+
+            $joblinkCellsWithData = ProgressCell::whereIn('row_id', $rowIds)
+                ->where('col_key', $joblinkColKey)
+                ->whereNotNull('assignment_id')
+                ->count();
+
+            $totalDataCells += $userCellsWithData + $joblinkCellsWithData;
+
+            $result[] = [
+                'parent_label'       => $pair['parent_label'],
+                'user_col_key'       => $userColKey,
+                'joblink_col_key'    => $joblinkColKey,
+                'worker_col_key'     => $userColKey,
+                'cells_with_user'    => $userCellsWithData,
+                'cells_with_job'     => $joblinkCellsWithData,
+                'cells_unmigratable' => 0,
+            ];
+        }
+
+        return response()->json([
+            'pairs'              => $result,
+            'total_pairs'        => count($result),
+            'total_data_cells'   => $totalDataCells,
+            'total_unmigratable' => $totalUnmigratable,
+        ]);
+    }
+
+    /**
+     * 既存シートの user+joblink ペアを worker 型に変換する（不可逆）
+     */
+    public function convertToV2(Request $request, ProgressSheet $sheet): \Illuminate\Http\JsonResponse
+    {
+        $this->authorizeJobAccess($request->user(), $sheet->projectJob);
+
+        $pairs = $this->detectUserJobPairs($sheet->column_config ?? []);
+
+        if (empty($pairs)) {
+            return response()->json(['message' => '変換対象のペアが見つかりませんでした。'], 422);
+        }
+
+        $rowIds = ProgressRow::where('sheet_id', $sheet->id)->pluck('id');
+
+        DB::transaction(function () use ($pairs, $rowIds, $sheet) {
+            foreach ($pairs as $pair) {
+                $userColKey    = $pair['user_key'];
+                $joblinkColKey = $pair['joblink_key'];
+
+                // joblink セルの assignment_id を、同 row_id の user セルにコピー
+                $joblinkCells = ProgressCell::whereIn('row_id', $rowIds)
+                    ->where('col_key', $joblinkColKey)
+                    ->whereNotNull('assignment_id')
+                    ->get(['id', 'row_id', 'assignment_id']);
+
+                foreach ($joblinkCells as $jc) {
+                    $userCell = ProgressCell::firstOrNew([
+                        'row_id'  => $jc->row_id,
+                        'col_key' => $userColKey,
+                    ]);
+                    // user セル側に assignment_id が未設定の場合のみコピー（既存データ保護）
+                    if (!$userCell->assignment_id) {
+                        $userCell->assignment_id = $jc->assignment_id;
+                        $userCell->save();
+                    }
+                }
+
+                // joblink セルを削除（assignment_id は user セルに移送済み）
+                ProgressCell::whereIn('row_id', $rowIds)
+                    ->where('col_key', $joblinkColKey)
+                    ->delete();
+            }
+
+            // column_config を変換
+            $newConfig            = $this->transformColumnConfig($sheet->column_config ?? [], $pairs);
+            $sheet->column_config = $newConfig;
+            $sheet->save();
+        });
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * column_config ツリーを再帰走査し、user+joblink の連続ペアを検出する
+     *
+     * @return array [['parent_label'=>string, 'user_key'=>string, 'joblink_key'=>string], ...]
+     */
+    private function detectUserJobPairs(array $nodes, string $parentLabel = ''): array
+    {
+        $pairs = [];
+        foreach ($nodes as $node) {
+            $label    = $node['label'] ?? $node['key'] ?? '';
+            $children = $node['children'] ?? [];
+
+            if (!empty($children)) {
+                // 直接の children で user→joblink の連続ペアを探す
+                for ($i = 0; $i < count($children) - 1; $i++) {
+                    if (($children[$i]['type']     ?? '') === 'user'
+                        && ($children[$i + 1]['type'] ?? '') === 'joblink'
+                    ) {
+                        $pairs[] = [
+                            'parent_label' => $label,
+                            'user_key'     => $children[$i]['key'],
+                            'joblink_key'  => $children[$i + 1]['key'],
+                        ];
+                        $i++; // joblink ノードをスキップ
+                    }
+                }
+                // 再帰（より深い階層も検出）
+                $pairs = array_merge($pairs, $this->detectUserJobPairs($children, $label));
+            }
+        }
+        return $pairs;
+    }
+
+    /**
+     * column_config ツリーを変換（user+joblink ペア → worker 型）
+     */
+    private function transformColumnConfig(array $nodes, array $pairs): array
+    {
+        // user_key → joblink_key のマップ
+        $pairMap     = [];
+        foreach ($pairs as $pair) {
+            $pairMap[$pair['user_key']] = $pair['joblink_key'];
+        }
+        $joblinkKeys = array_values($pairMap);
+
+        $result = [];
+        $i      = 0;
+        while ($i < count($nodes)) {
+            $node     = $nodes[$i];
+            $type     = $node['type'] ?? 'text';
+            $children = $node['children'] ?? [];
+
+            if ($type === 'user' && isset($pairMap[$node['key']])) {
+                // user → worker に変換し、直後の joblink をスキップ
+                $result[] = [
+                    'key'   => $node['key'],
+                    'label' => $node['label'] ?? '担当',
+                    'type'  => 'worker',
+                ];
+                if (isset($nodes[$i + 1]) && ($nodes[$i + 1]['type'] ?? '') === 'joblink') {
+                    $i++;
+                }
+            } elseif ($type === 'joblink' && in_array($node['key'], $joblinkKeys)) {
+                // joblink ペア側が単独で現れた場合 → スキップ
+            } elseif (!empty($children)) {
+                $newChildren = $this->transformColumnConfig($children, $pairs);
+
+                // 元 children が user+joblink の2つのみ → 変換後 worker 1つ → 親ごと worker に置き換え
+                $wasOnlyPair = count($children) === 2
+                    && ($children[0]['type'] ?? '') === 'user'
+                    && ($children[1]['type'] ?? '') === 'joblink';
+
+                if ($wasOnlyPair && count($newChildren) === 1 && ($newChildren[0]['type'] ?? '') === 'worker') {
+                    $result[] = [
+                        'key'   => $newChildren[0]['key'],
+                        'label' => $node['label'] ?? $newChildren[0]['label'],
+                        'type'  => 'worker',
+                    ];
+                } else {
+                    $node['children'] = $newChildren;
+                    $result[]         = $node;
+                }
+            } else {
+                $result[] = $node;
+            }
+
+            $i++;
+        }
+
+        return $result;
     }
 }

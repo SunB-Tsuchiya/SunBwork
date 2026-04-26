@@ -17,11 +17,18 @@ class ProgressCell extends Model
         'assignment_id',
         'proof_assignment_id',
         'cell_type',
+        'schedule_id',
+        'cell_deadline',
+        'cell_note',
+        'cell_note_user_id',
+        'completed_at',
     ];
 
     protected $casts = [
-        'value_date' => 'date',
-        'value_bool' => 'boolean',
+        'value_date'   => 'date',
+        'value_bool'   => 'boolean',
+        'cell_deadline' => 'date',
+        'completed_at'  => 'datetime',
     ];
 
     public function row()
@@ -47,5 +54,15 @@ class ProgressCell extends Model
     public function proofAssignment()
     {
         return $this->belongsTo(ProjectJobAssignment::class, 'proof_assignment_id');
+    }
+
+    public function schedule()
+    {
+        return $this->belongsTo(\App\Models\ProjectSchedule::class, 'schedule_id');
+    }
+
+    public function noteUser()
+    {
+        return $this->belongsTo(User::class, 'cell_note_user_id');
     }
 }

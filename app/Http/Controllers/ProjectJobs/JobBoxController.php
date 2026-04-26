@@ -1330,6 +1330,15 @@ class JobBoxController extends Controller
 
         $assignment->save();
 
+        // workerセルの completed_at を記録
+        try {
+            \App\Models\ProgressCell::where('assignment_id', $assignment->id)
+                ->whereNull('completed_at')
+                ->update(['completed_at' => now()]);
+        } catch (\Throwable $__e) {
+            // non-fatal
+        }
+
         // ジョブ通知
         try {
             $pj = $assignment->projectJob

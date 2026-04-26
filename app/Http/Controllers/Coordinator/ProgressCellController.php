@@ -9,6 +9,7 @@ use App\Models\ProgressSheet;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Carbon;
 
 class ProgressCellController extends Controller
 {
@@ -23,11 +24,14 @@ class ProgressCellController extends Controller
         $this->authorizeAccess($user, $sheet);
 
         $validated = $request->validate([
-            'cells'              => 'required|array',
-            'cells.*.row_id'     => 'required|integer',
-            'cells.*.col_key'    => 'required|string',
-            'cells.*.value_type' => 'required|in:text,date,bool,user,subcontractor',
-            'cells.*.value'      => 'nullable',
+            'cells'                    => 'required|array',
+            'cells.*.row_id'           => 'required|integer',
+            'cells.*.col_key'          => 'required|string',
+            'cells.*.value_type'       => 'required|in:text,date,bool,user,subcontractor,worker,schedlink',
+            'cells.*.value'            => 'nullable',
+            'cells.*.schedule_id'      => 'nullable|integer',
+            'cells.*.cell_deadline'    => 'nullable|date',
+            'cells.*.subcontractor_id' => 'nullable|integer',
         ]);
 
         // シートに属する row_id のみ許可
@@ -63,6 +67,28 @@ class ProgressCellController extends Controller
                     case 'subcontractor':
                         $data['value_subcontractor_id'] = $item['value'] ?: null;
                         break;
+                    case 'worker':
+                        // value は user_id（社内）/ subcontractor_id は別フィールドで来る
+                        $data['cell_type'] = 'worker';
+                        if (!empty($item['subcontractor_id'])) {
+                            $data['value_subcontractor_id'] = $item['subcontractor_id'];
+                            $data['value_user_id'] = null;
+                        } else {
+                            $data['value_user_id'] = $item['value'] ?: null;
+                            $data['value_subcontractor_id'] = null;
+                        }
+                        if (isset($item['schedule_id'])) {
+                            $data['schedule_id'] = $item['schedule_id'] ?: null;
+                        }
+                        if (isset($item['cell_deadline'])) {
+                            $data['cell_deadline'] = $item['cell_deadline'] ?: null;
+                        }
+                        break;
+                    case 'schedlink':
+                        // value は schedule_id
+                        $data['schedule_id'] = $item['value'] ?: null;
+                        $data['cell_type'] = 'schedlink';
+                        break;
                 }
 
                 ProgressCell::updateOrCreate(
@@ -73,6 +99,100 @@ class ProgressCellController extends Controller
         });
 
         return back()->with('success', 'セルを保存しました。');
+    }
+
+    /**
+     * workerセル / schedlinkセルを完了にする
+     * POST /coordinator/progress-cells/{cell}/complete
+     */
+    public function complete(Request $request, ProgressCell $cell)
+    {
+        $user = $request->user();
+        $sheet = $cell->row->sheet;
+        $this->authorizeAccess($user, $sheet);
+
+        $now = Carbon::now();
+        $cell->completed_at = $now;
+        $cell->save();
+
+        // schedlink型の場合、紐づいたスケジュールも完了にする
+        if ($cell->cell_type === 'schedlink' && $cell->schedule_id) {
+            \App\Models\ProjectSchedule::where('id', $cell->schedule_id)
+                ->update(['completed_at' => $now]);
+        }
+
+        return response()->json(['success' => true, 'completed_at' => $cell->completed_at->toDateTimeString()]);
+    }
+
+    /**
+     * 締め切りを手動上書き
+     * PATCH /coordinator/progress-cells/{cell}/deadline
+     */
+    public function deadline(Request $request, ProgressCell $cell)
+    {
+        $user = $request->user();
+        $sheet = $cell->row->sheet;
+        $this->authorizeAccess($user, $sheet);
+
+        $validated = $request->validate([
+            'cell_deadline' => 'nullable|date',
+        ]);
+
+        $cell->cell_deadline = $validated['cell_deadline'] ?: null;
+        $cell->save();
+
+        return response()->json(['success' => true, 'cell_deadline' => $cell->cell_deadline?->toDateString()]);
+    }
+
+    /**
+     * セルメモを行/列位置で保存（セルが未作成でも upsert）
+     * POST /coordinator/progress-sheets/{sheet}/cell-note
+     */
+    public function noteByPosition(Request $request, ProgressSheet $sheet)
+    {
+        $user = $request->user();
+        $this->authorizeAccess($user, $sheet);
+
+        $validated = $request->validate([
+            'row_id'    => 'required|integer',
+            'col_key'   => 'required|string',
+            'cell_note' => 'nullable|string|max:2000',
+        ]);
+
+        $allowedRowIds = ProgressRow::where('sheet_id', $sheet->id)->pluck('id')->toArray();
+        abort_unless(in_array((int)$validated['row_id'], $allowedRowIds), 422);
+
+        $note = $validated['cell_note'] ?: null;
+        $cell = ProgressCell::updateOrCreate(
+            ['row_id' => $validated['row_id'], 'col_key' => $validated['col_key']],
+            [
+                'cell_note'         => $note,
+                'cell_note_user_id' => $note ? $user->id : null,
+            ]
+        );
+
+        return response()->json(['success' => true, 'cell_id' => $cell->id]);
+    }
+
+    /**
+     * セルメモを保存
+     * PATCH /coordinator/progress-cells/{cell}/note
+     */
+    public function note(Request $request, ProgressCell $cell)
+    {
+        $user = $request->user();
+        $sheet = $cell->row->sheet;
+        $this->authorizeAccess($user, $sheet);
+
+        $validated = $request->validate([
+            'cell_note' => 'nullable|string|max:2000',
+        ]);
+
+        $cell->cell_note = $validated['cell_note'] ?: null;
+        $cell->cell_note_user_id = $validated['cell_note'] ? $user->id : null;
+        $cell->save();
+
+        return response()->json(['success' => true]);
     }
 
     // ─────

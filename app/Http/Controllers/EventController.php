@@ -1444,6 +1444,22 @@ class EventController extends Controller
             }
             // ─────────────────────────────────────────────────────────────────────
 
+            // progress_cells.completed_at を更新（ジョブ完了と進行表を同期）
+            try {
+                $progressCellAssignmentIds = [$assignment->id];
+                if (isset($updatedCoordinatorIds) && count($updatedCoordinatorIds) > 0) {
+                    $progressCellAssignmentIds = array_merge($progressCellAssignmentIds, $updatedCoordinatorIds);
+                }
+                \App\Models\ProgressCell::whereIn('assignment_id', array_unique(array_filter($progressCellAssignmentIds)))
+                    ->whereNull('completed_at')
+                    ->update(['completed_at' => now()]);
+            } catch (\Throwable $__ePc) {
+                Log::warning('EventController: failed to update progress_cells.completed_at', [
+                    'error' => $__ePc->getMessage(),
+                    'assignment_id' => $assignment->id ?? null,
+                ]);
+            }
+
             // Prefix event title with completion marker for persistent visibility
             $prefix = '【完了】';
             if (strpos($event->title, $prefix) !== 0) {

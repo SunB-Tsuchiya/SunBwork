@@ -73,23 +73,34 @@
               class="sticky left-0 z-10 border border-gray-200 bg-gray-50 px-3 py-1.5 font-medium text-gray-700 whitespace-nowrap align-middle"
               :class="row._isChild ? 'pl-6' : ''"
             >
-              <div class="flex items-center gap-2">
-                <span>{{ row.label }}</span>
-                <template v-if="editMode">
-                  <button
-                    type="button"
-                    class="text-xs text-blue-500 hover:underline"
-                    @click="emit('edit-row', row)"
-                  >
-                    編集
-                  </button>
-                  <button
-                    type="button"
-                    class="text-xs text-red-400 hover:underline"
-                    @click="emit('delete-row', row)"
-                  >
-                    削除
-                  </button>
+              <div class="flex flex-col gap-0.5">
+                <div class="flex items-center gap-2">
+                  <span>{{ row.label }}</span>
+                  <template v-if="editMode">
+                    <button
+                      type="button"
+                      class="text-xs text-blue-500 hover:underline"
+                      @click="emit('edit-row', row)"
+                    >
+                      編集
+                    </button>
+                    <button
+                      type="button"
+                      class="text-xs text-red-400 hover:underline"
+                      @click="emit('delete-row', row)"
+                    >
+                      削除
+                    </button>
+                  </template>
+                </div>
+                <!-- 完了率バッジ（2行目） -->
+                <template v-if="!editMode && rowCompletionMap[row.id] && rowCompletionMap[row.id].total > 0">
+                  <span
+                    class="inline-flex w-fit rounded-full border px-2 py-0.5 text-xs font-semibold"
+                    :class="rowCompletionMap[row.id].done === rowCompletionMap[row.id].total
+                      ? 'border-green-400 bg-green-100 text-green-700'
+                      : 'border-indigo-200 bg-indigo-50 text-indigo-600'"
+                  >進捗: {{ rowCompletionMap[row.id].done }}/{{ rowCompletionMap[row.id].total }}</span>
                 </template>
               </div>
             </td>
@@ -119,6 +130,7 @@
                 :sizes="sizes"
                 :assignments="assignments"
                 :work-item-types="workItemTypes"
+                :project-schedules="projectSchedules"
                 :locked-user-id="lockedUserIdForCell(row.id, leaf.key, leaf.type)"
                 :locked-subcontractor-id="lockedSubcontractorIdForCell(row.id, leaf.key, leaf.type)"
                 @update="emit('cell-update', $event)"
@@ -127,6 +139,11 @@
                 @complete-assignment="emit('complete-assignment', $event)"
                 @proof-request-open="emit('proof-request-open', $event)"
                 @proof-direct-complete="emit('proof-direct-complete', $event)"
+                @worker-complete="emit('worker-complete', $event)"
+                @worker-job-register="emit('worker-job-register', $event)"
+                @worker-job-detail="emit('worker-job-detail', $event)"
+                @schedlink-complete="emit('schedlink-complete', $event)"
+                @note-save="emit('note-save', $event)"
               />
             </template>
           </tr>
@@ -150,13 +167,14 @@ const props = defineProps({
   sizes: { type: Array, default: () => [] },
   assignments: { type: Array, default: () => [] },
   workItemTypes: { type: Array, default: () => [] },
+  projectSchedules: { type: Array, default: () => [] },
   canEdit: { type: Boolean, default: false },
   editMode: { type: Boolean, default: false },
   jobLinkOnly: { type: Boolean, default: false },
   authUserId: { type: [Number, String, null], default: null },
 });
 
-const emit = defineEmits(['cell-update', 'edit-row', 'delete-row', 'job-link-open', 'job-link-detail', 'complete-assignment', 'proof-request-open', 'proof-direct-complete']);
+const emit = defineEmits(['cell-update', 'edit-row', 'delete-row', 'job-link-open', 'job-link-detail', 'complete-assignment', 'proof-request-open', 'proof-direct-complete', 'worker-complete', 'worker-job-register', 'worker-job-detail', 'schedlink-complete', 'note-save']);
 
 // ── 行ツリー展開（parent_id を使って表示順に並べる） ────────
 const displayRows = computed(() => {
@@ -336,6 +354,26 @@ function lockedSubcontractorIdForCell(rowId, colKey, colType) {
   }
   return null;
 }
+
+// ── 行ごとの完了率マップ ─────────────────────────────────────
+const rowCompletionMap = computed(() => {
+  const completableCols = collectLeaves(props.columnConfig).filter(
+    (l) => ['worker', 'schedlink', 'joblink'].includes(l.type)
+  );
+  if (completableCols.length === 0) return {};
+  const map = {};
+  for (const row of props.rows) {
+    const total = completableCols.length;
+    const done = completableCols.filter((l) => {
+      const c = cellMap.value[`${row.id}_${l.key}`];
+      if (!c) return false;
+      if (l.type === 'joblink') return !!c.assignment_completed;
+      return !!c.completed_at;
+    }).length;
+    map[row.id] = { done, total };
+  }
+  return map;
+});
 
 // ── グループのサマリー文字列（折りたたみ時） ────────────────
 function groupSummary(rowId, groupKey) {

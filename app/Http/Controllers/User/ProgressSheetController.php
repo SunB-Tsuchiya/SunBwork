@@ -31,8 +31,10 @@ class ProgressSheetController extends Controller
         $cells = ProgressCell::whereIn('row_id', $rows->pluck('id'))
             ->with([
                 'valueUser:id,name',
+                'valueSubcontractor:id,name',
                 'assignment:id,title,detail,desired_end_date,completed,proof_completed_at,user_id,sender_id',
                 'proofAssignment:id,title,completed,proof_completed_at,user_id,sender_id',
+                'schedule:id,name,end_date,completed_at',
             ])
             ->get()
             ->map(fn ($c) => [
@@ -45,6 +47,13 @@ class ProgressSheetController extends Controller
                 'value_bool'                  => $c->value_bool,
                 'value_user_id'               => $c->value_user_id,
                 'value_user_name'             => $c->valueUser?->name,
+                'value_subcontractor_id'      => $c->value_subcontractor_id,
+                'value_subcontractor_name'    => $c->valueSubcontractor?->name,
+                'schedule_id'                 => $c->schedule_id,
+                'schedule_name'               => $c->schedule?->name,
+                'schedule_completed_at'       => $c->schedule?->completed_at?->format('Y-m-d H:i:s'),
+                'cell_deadline'               => $c->cell_deadline?->format('Y-m-d'),
+                'completed_at'                => $c->completed_at?->format('Y-m-d H:i:s'),
                 'assignment_id'               => $c->assignment_id,
                 'assignment_title'            => $c->assignment?->title,
                 'assignment_completed'        => $c->assignment?->completed,
@@ -76,6 +85,68 @@ class ProgressSheetController extends Controller
                 'id'          => $projectJob->id,
                 'title'       => $projectJob->title ?? $projectJob->name ?? '-',
                 'client_id'   => $projectJob->client_id ?? null,
+                'client_name' => $projectJob->client?->name ?? null,
+                'size_name'   => $projectJob->size?->name ?? null,
+                'page_count'  => $projectJob->page_count ?? null,
+            ],
+        ]);
+    }
+
+    /**
+     * 印刷専用ページ（User認証）
+     */
+    public function printView(Request $request, ProgressSheet $sheet)
+    {
+        $user = $request->user();
+        $sheet->load(['projectJob.client', 'projectJob.size', 'projectJob.coordinators']);
+        $projectJob = $sheet->projectJob;
+        $this->authorizeView($user, $projectJob);
+
+        $rows  = $sheet->rows()->orderBy('order')->get(['id', 'label', 'order', 'parent_id']);
+        $cells = ProgressCell::whereIn('row_id', $rows->pluck('id'))
+            ->with([
+                'valueUser:id,name',
+                'valueSubcontractor:id,name',
+                'assignment:id,desired_end_date,completed',
+                'schedule:id,name,end_date,completed_at',
+                'noteUser:id,name,user_role',
+            ])
+            ->get()
+            ->map(fn($c) => [
+                'id'                       => $c->id,
+                'row_id'                   => $c->row_id,
+                'col_key'                  => $c->col_key,
+                'cell_type'                => $c->cell_type,
+                'value_text'               => $c->value_text,
+                'value_date'               => $c->value_date?->format('Y-m-d'),
+                'value_bool'               => $c->value_bool,
+                'value_user_id'            => $c->value_user_id,
+                'value_user_name'          => $c->valueUser?->name,
+                'value_subcontractor_id'   => $c->value_subcontractor_id,
+                'value_subcontractor_name' => $c->valueSubcontractor?->name,
+                'assignment_id'            => null,
+                'assignment_completed'     => $c->completed_at !== null || ($c->assignment?->completed ?? false),
+                'assignment_end_date'      => $c->assignment?->desired_end_date?->format('Y-m-d'),
+                'proof_assignment_id'      => null,
+                'proof_assignment_completed' => false,
+                'schedule_id'              => $c->schedule_id,
+                'schedule_name'            => $c->schedule?->name,
+                'schedule_end_date'        => $c->schedule?->end_date?->format('Y-m-d'),
+                'schedule_completed_at'    => $c->schedule?->completed_at?->format('Y-m-d H:i:s'),
+                'cell_deadline'            => $c->cell_deadline?->format('Y-m-d'),
+                'cell_note'                => $c->cell_note,
+                'cell_note_user_name'      => $c->noteUser?->name,
+                'cell_note_user_role'      => $c->noteUser?->user_role,
+                'completed_at'             => $c->completed_at?->format('Y-m-d H:i:s'),
+            ]);
+
+        return Inertia::render('Shared/ProgressSheets/Print', [
+            'sheet'      => ['id' => $sheet->id, 'name' => $sheet->name, 'column_config' => $sheet->column_config ?? []],
+            'rows'       => $rows,
+            'cells'      => $cells,
+            'projectJob' => [
+                'id'          => $projectJob->id,
+                'title'       => $projectJob->title ?? '-',
                 'client_name' => $projectJob->client?->name ?? null,
                 'size_name'   => $projectJob->size?->name ?? null,
                 'page_count'  => $projectJob->page_count ?? null,

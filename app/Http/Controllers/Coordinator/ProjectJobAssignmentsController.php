@@ -878,7 +878,11 @@ class ProjectJobAssignmentsController extends Controller
                     try {
                         \App\Models\ProgressCell::updateOrCreate(
                             ['row_id' => (int) $a['_row_id'], 'col_key' => (string) $a['_col_key']],
-                            ['assignment_id' => $assignment->id]
+                            [
+                                'assignment_id' => $assignment->id,
+                                'value_user_id' => $assignment->user_id ?: null,
+                                'cell_type'     => 'worker',
+                            ]
                         );
                     } catch (\Throwable $__eCellLink) {
                         \Illuminate\Support\Facades\Log::warning('Failed to link ProgressCell after coordinator assignment', [
@@ -892,6 +896,18 @@ class ProjectJobAssignmentsController extends Controller
                 // previously we created a separate WorkItem here; now assignment stores type/size/stage/status/company/department directly
                 // No-op for WorkItem creation - clients should send lookup ids on assignment payload instead.
             });
+        }
+
+        // 進行表から発信した場合は進行表に戻る
+        $progressSheetId = null;
+        foreach ($data['assignments'] as $a) {
+            if (!empty($a['_progress_sheet_id'])) {
+                $progressSheetId = (int) $a['_progress_sheet_id'];
+                break;
+            }
+        }
+        if ($progressSheetId) {
+            return redirect()->route('coordinator.progress_sheets.show', ['sheet' => $progressSheetId]);
         }
 
         return redirect()->route('coordinator.project_jobs.assignments.index', ['projectJob' => $projectJob->id]);

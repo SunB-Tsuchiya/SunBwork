@@ -24,12 +24,14 @@ class ProjectSchedule extends Model
         'metadata',
         'created_by',
         'updated_by',
+        'completed_at',
     ];
 
     protected $casts = [
         'metadata' => 'array',
         'start_date' => 'date:Y-m-d',
         'end_date' => 'date:Y-m-d',
+        'completed_at' => 'datetime',
     ];
 
     public function projectJob()

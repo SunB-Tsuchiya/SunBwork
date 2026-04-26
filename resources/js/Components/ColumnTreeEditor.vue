@@ -86,6 +86,8 @@
           <option value="workItemType">作業種別</option>
           <option value="proof_user">校正担当者</option>
           <option value="joblink">登録・詳細</option>
+          <option value="worker">担当＋ジョブ（V2）</option>
+          <option value="schedlink">予定連携（V2）</option>
         </select>
         <!-- グループ（子あり）インジケーター -->
         <span v-if="node.children?.length > 0" class="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">グループ</span>
@@ -235,6 +237,8 @@ const TYPE_DEFAULT_LABELS = {
   user: '担当者',
   worktime: '作業時間',
   joblink: '登録',
+  worker: '担当',
+  schedlink: '予定',
 };
 
 /** タイプが変わったとき、不一致なラベルをリセット / デフォルトラベルを自動入力 */

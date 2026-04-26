@@ -13,6 +13,7 @@ class ProgressSheet extends Model
         'column_config',
         'created_by',
         'sort_order',
+        'share_token',
     ];
 
     protected $casts = [

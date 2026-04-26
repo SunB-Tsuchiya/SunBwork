@@ -389,6 +389,8 @@ const PREVIEW_TYPE_LABELS = {
   assignment: '作業分担',
   workItemType: '作業種別',
   joblink: '登録',
+  worker: '担当＋ジョブ',
+  schedlink: '予定連携',
 };
 
 function collectPreviewLeaves(nodes) {

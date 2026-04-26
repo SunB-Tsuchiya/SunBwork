@@ -8,6 +8,11 @@
                         class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
                     >← 案件詳細に戻る</Link>
                     <h2 class="text-xl font-semibold leading-tight text-gray-800">進行管理表：{{ sheet.name }}</h2>
+                    <button
+                        type="button"
+                        class="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+                        @click="openPrint"
+                    >印刷</button>
                 </div>
                 <!-- 案件情報バー -->
                 <div class="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-sm text-gray-600">
@@ -45,6 +50,7 @@
                     @job-link-open="openJobLink"
                     @job-link-detail="openJobLinkDetail"
                     @complete-assignment="onCompleteAssignment"
+                    @worker-complete="onWorkerComplete"
                 />
             </div>
         </div>
@@ -118,6 +124,10 @@ const props = defineProps({
 });
 
 const page = usePage();
+
+function openPrint() {
+    window.open(route('user.progress_sheets.print', { sheet: props.sheet.id }), '_blank');
+}
 
 // ── テーブルコンテナの動的高さ計算 ──────────────────────────
 const tableWrapRef = ref(null);
@@ -245,6 +255,42 @@ async function onCompleteAssignment({ assignmentId }) {
             if (cellIdx >= 0) {
                 localCells.value.splice(cellIdx, 1, { ...localCells.value[cellIdx], assignment_completed: true });
             }
+        }
+    } catch {
+        /* ignore */
+    }
+}
+
+async function onWorkerComplete({ cellId, assignmentId, rowId, colKey }) {
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    try {
+        if (assignmentId) {
+            // ジョブ紐づきあり: myjobbox complete (progress_cells.completed_at も更新される)
+            const res = await fetch(route('myjobbox.assignments.complete', { assignment: assignmentId }), {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+            });
+            if (!res.ok) return;
+        } else if (cellId) {
+            // ジョブなし・担当者のみ: セル単体の complete API
+            const res = await fetch(route('user.progress_cells.complete', { cell: cellId }), {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+            });
+            if (!res.ok) return;
+        } else {
+            return;
+        }
+        // ローカルセルを更新
+        const idx = localCells.value.findIndex((c) => c.row_id === rowId && c.col_key === colKey);
+        if (idx >= 0) {
+            localCells.value.splice(idx, 1, {
+                ...localCells.value[idx],
+                completed_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
+                assignment_completed: assignmentId ? true : localCells.value[idx].assignment_completed,
+            });
         }
     } catch {
         /* ignore */

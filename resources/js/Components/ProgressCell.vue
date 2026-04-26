@@ -122,6 +122,266 @@
     </template>
   </td>
 
+  <!-- worker型（担当＋ジョブ統合セル） -->
+  <td
+    v-else-if="colDef.type === 'worker'"
+    class="border border-gray-200 px-0 py-0 align-middle min-w-[200px] transition-colors"
+    :class="workerCellBg"
+    :style="workerCellBorder"
+  >
+    <div class="flex min-h-[52px]">
+      <!-- 左70%: 担当者 + 締切/完了 -->
+      <div class="flex-1 px-2 py-1 flex flex-col justify-center gap-0.5" style="min-width:0">
+        <!-- 完了済み / 登録済み: 担当者ロック表示 -->
+        <template v-if="cell.assignment_id || cell.completed_at || cell.assignment_completed">
+          <div class="flex items-center gap-1">
+            <span class="text-xs text-gray-400">🔒</span>
+            <span class="text-sm font-medium text-gray-700 truncate">{{ workerAssigneeName }}</span>
+          </div>
+          <span v-if="cell.completed_at || cell.assignment_completed" class="text-xs text-green-600">
+            完了: {{ cell.completed_at ? formatDate(cell.completed_at) : '済' }}
+          </span>
+          <span v-else-if="workerDeadline" class="text-xs" :class="workerDeadlineColor">
+            締切: {{ formatShortDate(workerDeadline) }}
+          </span>
+        </template>
+        <!-- 未登録: 担当者セレクター -->
+        <template v-else-if="canEdit">
+          <select
+            :value="cell.value_subcontractor_id ? ('s_' + cell.value_subcontractor_id) : (cell.value_user_id ? ('u_' + cell.value_user_id) : '')"
+            class="w-full rounded border border-gray-300 px-1 py-0.5 text-sm focus:border-indigo-400 focus:outline-none"
+            @change="onWorkerAssigneeChange($event.target.value)"
+          >
+            <option value="">— 担当者 —</option>
+            <optgroup v-if="users.length" label="メンバー">
+              <option v-for="u in users" :key="'u_' + u.id" :value="'u_' + u.id">{{ u.name }}</option>
+            </optgroup>
+            <optgroup v-if="subcontractors.length" label="外注先">
+              <option v-for="s in subcontractors" :key="'s_' + s.id" :value="'s_' + s.id">{{ s.name }}</option>
+            </optgroup>
+          </select>
+          <span v-if="workerDeadline" class="text-xs" :class="workerDeadlineColor">
+            締切: {{ formatShortDate(workerDeadline) }}
+          </span>
+        </template>
+        <!-- 読み取り専用 -->
+        <template v-else>
+          <span class="text-sm text-gray-700 truncate">{{ workerAssigneeName }}</span>
+          <span v-if="workerDeadline" class="text-xs" :class="workerDeadlineColor">
+            締切: {{ formatShortDate(workerDeadline) }}
+          </span>
+        </template>
+      </div>
+
+      <!-- 右30%: ステータス・操作ボタン -->
+      <div class="flex flex-col items-center justify-center gap-1 border-l border-gray-200 px-1.5 py-1" style="min-width:70px;max-width:80px">
+        <!-- 完了済み -->
+        <template v-if="cell.completed_at || cell.assignment_completed">
+          <span class="rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">✓ 完了</span>
+          <button
+            v-if="cell.assignment_id && canEdit"
+            type="button"
+            class="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600 hover:bg-gray-200"
+            @click="emit('worker-job-detail', { assignmentId: cell.assignment_id, rowId, colKey: colDef.key })"
+          >詳細</button>
+        </template>
+        <!-- 登録済み・未完了 -->
+        <template v-else-if="cell.assignment_id">
+          <span class="rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700">登録済</span>
+          <button
+            type="button"
+            class="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600 hover:bg-gray-200"
+            @click="emit('worker-job-detail', { assignmentId: cell.assignment_id, rowId, colKey: colDef.key })"
+          >詳細</button>
+          <button
+            v-if="canEdit || (authUserId && String(cell.value_user_id) === String(authUserId))"
+            type="button"
+            class="rounded bg-indigo-100 px-1.5 py-0.5 text-xs text-indigo-700 hover:bg-indigo-200"
+            @click="emit('worker-complete', { cellId: cell.id, assignmentId: cell.assignment_id, rowId, colKey: colDef.key })"
+          >完了にする</button>
+        </template>
+        <!-- 担当者選択済み・未登録 -->
+        <template v-else-if="cell.value_user_id || cell.value_subcontractor_id">
+          <span class="text-xs text-gray-400">┄ 未登録 ┄</span>
+          <button
+            v-if="canEdit"
+            type="button"
+            class="rounded border border-dashed border-indigo-300 bg-indigo-50 px-2 py-0.5 text-xs text-indigo-700 hover:bg-indigo-100"
+            @click="emit('worker-job-register', { rowId, colKey: colDef.key, userId: cell.value_user_id, subcontractorId: cell.value_subcontractor_id })"
+          >＋ 登録</button>
+        </template>
+        <!-- 未設定 -->
+        <template v-else>
+          <span class="text-xs text-gray-300">未設定</span>
+        </template>
+      </div>
+    </div>
+    <!-- メモ行 -->
+    <div v-if="cell.cell_note || canEdit" class="border-t border-gray-100 px-2 py-0.5">
+      <template v-if="!showNoteEdit">
+        <div class="relative">
+          <button
+            type="button"
+            class="flex w-full items-center gap-1 text-left text-xs"
+            :class="cell.cell_note ? 'text-blue-500 hover:text-blue-700' : 'text-gray-300 hover:text-gray-400'"
+            @mouseenter="cell.cell_note && (showNotePopup = true)"
+            @mouseleave="showNotePopup = false"
+            @click="canEdit && startNoteEdit()"
+          >
+            <span>📝</span>
+            <span v-if="cell.cell_note" class="min-w-0 truncate"><span v-if="cell.cell_note_user_name" :class="roleColorClass(cell.cell_note_user_role)" class="font-semibold">{{ cell.cell_note_user_name }}：</span>{{ noteFirstLine }}</span>
+            <span v-else class="text-xs text-gray-400">メモ</span>
+          </button>
+          <!-- ホバーポップアップ -->
+          <div
+            v-if="showNotePopup && cell.cell_note"
+            class="absolute bottom-full left-0 z-50 mb-1 w-64 rounded-lg border border-gray-200 bg-white p-2 shadow-lg"
+            @mouseenter="showNotePopup = true"
+            @mouseleave="showNotePopup = false"
+          >
+            <p class="whitespace-pre-wrap text-xs text-gray-700">{{ cell.cell_note }}</p>
+            <div v-if="cell.cell_note_user_name" class="mt-1 flex items-center gap-1 border-t border-gray-100 pt-1">
+              <span class="text-xs font-semibold" :class="roleColorClass(cell.cell_note_user_role)">{{ cell.cell_note_user_name }}</span>
+            </div>
+          </div>
+        </div>
+      </template>
+      <template v-else>
+        <div class="flex items-center gap-1">
+          <input
+            v-model="editingNote"
+            :ref="el => { if (el) el.focus() }"
+            type="text"
+            class="min-w-0 flex-1 rounded border border-gray-300 px-1 py-0.5 text-xs focus:border-indigo-400 focus:outline-none"
+            placeholder="メモを入力..."
+            @keydown.enter.prevent="saveNote"
+            @keydown.escape.prevent="cancelNoteEdit"
+          />
+          <button type="button" class="shrink-0 rounded bg-indigo-100 px-1.5 py-0.5 text-xs text-indigo-700 hover:bg-indigo-200" @click="saveNote">保存</button>
+          <button type="button" class="shrink-0 rounded bg-gray-100 px-1 py-0.5 text-xs text-gray-500 hover:bg-gray-200" @click="cancelNoteEdit">✕</button>
+        </div>
+      </template>
+    </div>
+  </td>
+
+  <!-- schedlink型（予定連携セル） -->
+  <td
+    v-else-if="colDef.type === 'schedlink'"
+    class="border border-gray-200 px-0 py-0 align-middle min-w-[180px] transition-colors"
+    :class="schedlinkCellBg"
+    :style="schedlinkCellBorder"
+  >
+    <div class="flex min-h-[52px]">
+      <!-- 左70%: スケジュール名 + 締切/完了 -->
+      <div class="flex-1 px-2 py-1 flex flex-col justify-center gap-0.5" style="min-width:0">
+        <!-- 完了済み -->
+        <template v-if="cell.completed_at">
+          <div class="flex items-center gap-1">
+            <span class="text-xs text-green-600">✓</span>
+            <span class="text-sm font-medium text-gray-700 truncate">{{ cell.schedule_name ?? '(未選択)' }}</span>
+          </div>
+          <span class="text-xs text-green-600">完了: {{ formatDate(cell.completed_at) }}</span>
+        </template>
+        <!-- 選択済み・未完了 -->
+        <template v-else-if="cell.schedule_id">
+          <span class="text-sm font-medium text-gray-700 truncate">{{ cell.schedule_name ?? String(cell.schedule_id) }}</span>
+          <span v-if="schedlinkDeadline" class="text-xs" :class="schedlinkDeadlineColor">
+            締切: {{ formatShortDate(schedlinkDeadline) }}
+          </span>
+        </template>
+        <!-- 未選択 -->
+        <template v-else-if="canEdit">
+          <select
+            :value="cell.schedule_id ?? ''"
+            class="w-full rounded border border-gray-300 px-1 py-0.5 text-sm focus:border-indigo-400 focus:outline-none"
+            @change="onSchedlinkSelect($event.target.value)"
+          >
+            <option value="">— スケジュール選択 —</option>
+            <option v-for="s in projectSchedules" :key="s.id" :value="s.id">
+              {{ s.name }}{{ s.end_date ? ` (〜${formatShortDate(s.end_date)})` : '' }}
+            </option>
+          </select>
+        </template>
+        <template v-else>
+          <span class="text-sm text-gray-400">未選択</span>
+        </template>
+      </div>
+
+      <!-- 右30%: 操作ボタン -->
+      <div class="flex flex-col items-center justify-center gap-1 border-l border-gray-200 px-1.5 py-1" style="min-width:70px;max-width:80px">
+        <!-- 完了済み -->
+        <template v-if="cell.completed_at">
+          <span class="rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">✓ 完了</span>
+        </template>
+        <!-- 選択済み・未完了 -->
+        <template v-else-if="cell.schedule_id">
+          <button
+            v-if="canEdit"
+            type="button"
+            class="rounded bg-indigo-100 px-1.5 py-0.5 text-xs text-indigo-700 hover:bg-indigo-200"
+            @click="emit('schedlink-complete', { cellId: cell.id, rowId, colKey: colDef.key })"
+          >完了にする</button>
+          <button
+            v-if="canEdit"
+            type="button"
+            class="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500 hover:bg-gray-200"
+            @click="onSchedlinkSelect('')"
+          >変更</button>
+        </template>
+        <!-- 未選択 -->
+        <template v-else>
+          <span class="text-xs text-gray-300">未設定</span>
+        </template>
+      </div>
+    </div>
+    <!-- メモ行 -->
+    <div v-if="cell.cell_note || canEdit" class="border-t border-gray-100 px-2 py-0.5">
+      <template v-if="!showNoteEdit">
+        <div class="relative">
+          <button
+            type="button"
+            class="flex w-full items-center gap-1 text-left text-xs"
+            :class="cell.cell_note ? 'text-blue-500 hover:text-blue-700' : 'text-gray-300 hover:text-gray-400'"
+            @mouseenter="cell.cell_note && (showNotePopup = true)"
+            @mouseleave="showNotePopup = false"
+            @click="canEdit && startNoteEdit()"
+          >
+            <span>📝</span>
+            <span v-if="cell.cell_note" class="min-w-0 truncate"><span v-if="cell.cell_note_user_name" :class="roleColorClass(cell.cell_note_user_role)" class="font-semibold">{{ cell.cell_note_user_name }}：</span>{{ noteFirstLine }}</span>
+            <span v-else class="text-xs text-gray-400">メモ</span>
+          </button>
+          <!-- ホバーポップアップ -->
+          <div
+            v-if="showNotePopup && cell.cell_note"
+            class="absolute bottom-full left-0 z-50 mb-1 w-64 rounded-lg border border-gray-200 bg-white p-2 shadow-lg"
+            @mouseenter="showNotePopup = true"
+            @mouseleave="showNotePopup = false"
+          >
+            <p class="whitespace-pre-wrap text-xs text-gray-700">{{ cell.cell_note }}</p>
+            <div v-if="cell.cell_note_user_name" class="mt-1 flex items-center gap-1 border-t border-gray-100 pt-1">
+              <span class="text-xs font-semibold" :class="roleColorClass(cell.cell_note_user_role)">{{ cell.cell_note_user_name }}</span>
+            </div>
+          </div>
+        </div>
+      </template>
+      <template v-else>
+        <div class="flex items-center gap-1">
+          <input
+            v-model="editingNote"
+            :ref="el => { if (el) el.focus() }"
+            type="text"
+            class="min-w-0 flex-1 rounded border border-gray-300 px-1 py-0.5 text-xs focus:border-indigo-400 focus:outline-none"
+            placeholder="メモを入力..."
+            @keydown.enter.prevent="saveNote"
+            @keydown.escape.prevent="cancelNoteEdit"
+          />
+          <button type="button" class="shrink-0 rounded bg-indigo-100 px-1.5 py-0.5 text-xs text-indigo-700 hover:bg-indigo-200" @click="saveNote">保存</button>
+          <button type="button" class="shrink-0 rounded bg-gray-100 px-1 py-0.5 text-xs text-gray-500 hover:bg-gray-200" @click="cancelNoteEdit">✕</button>
+        </div>
+      </template>
+    </div>
+  </td>
+
   <!-- ジョブリンク型 -->
   <td
     v-else-if="colDef.type === 'joblink'"
@@ -169,6 +429,52 @@
       </div>
       <div v-else class="mx-auto h-6 w-full rounded border border-dashed border-gray-200 bg-gray-50"></div>
     </template>
+    <!-- メモ行 -->
+    <div v-if="cell.cell_note || canEdit" class="mt-1 border-t border-gray-100 pt-0.5">
+      <template v-if="!showNoteEdit">
+        <div class="relative">
+          <button
+            type="button"
+            class="flex w-full items-center gap-1 text-left text-xs"
+            :class="cell.cell_note ? 'text-blue-500 hover:text-blue-700' : 'text-gray-300 hover:text-gray-400'"
+            @mouseenter="cell.cell_note && (showNotePopup = true)"
+            @mouseleave="showNotePopup = false"
+            @click="canEdit && startNoteEdit()"
+          >
+            <span>📝</span>
+            <span v-if="cell.cell_note" class="min-w-0 truncate"><span v-if="cell.cell_note_user_name" :class="roleColorClass(cell.cell_note_user_role)" class="font-semibold">{{ cell.cell_note_user_name }}：</span>{{ noteFirstLine }}</span>
+            <span v-else class="text-xs text-gray-400">メモ</span>
+          </button>
+          <!-- ホバーポップアップ -->
+          <div
+            v-if="showNotePopup && cell.cell_note"
+            class="absolute bottom-full left-0 z-50 mb-1 w-64 rounded-lg border border-gray-200 bg-white p-2 shadow-lg"
+            @mouseenter="showNotePopup = true"
+            @mouseleave="showNotePopup = false"
+          >
+            <p class="whitespace-pre-wrap text-xs text-gray-700">{{ cell.cell_note }}</p>
+            <div v-if="cell.cell_note_user_name" class="mt-1 flex items-center gap-1 border-t border-gray-100 pt-1">
+              <span class="text-xs font-semibold" :class="roleColorClass(cell.cell_note_user_role)">{{ cell.cell_note_user_name }}</span>
+            </div>
+          </div>
+        </div>
+      </template>
+      <template v-else>
+        <div class="flex items-center gap-1">
+          <input
+            v-model="editingNote"
+            :ref="el => { if (el) el.focus() }"
+            type="text"
+            class="min-w-0 flex-1 rounded border border-gray-300 px-1 py-0.5 text-xs focus:border-indigo-400 focus:outline-none"
+            placeholder="メモを入力..."
+            @keydown.enter.prevent="saveNote"
+            @keydown.escape.prevent="cancelNoteEdit"
+          />
+          <button type="button" class="shrink-0 rounded bg-indigo-100 px-1.5 py-0.5 text-xs text-indigo-700 hover:bg-indigo-200" @click="saveNote">保存</button>
+          <button type="button" class="shrink-0 rounded bg-gray-100 px-1 py-0.5 text-xs text-gray-500 hover:bg-gray-200" @click="cancelNoteEdit">✕</button>
+        </div>
+      </template>
+    </div>
   </td>
 
   <!-- ステージ型 -->
@@ -264,7 +570,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 const props = defineProps({
   cell: {
@@ -323,9 +629,13 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  projectSchedules: {
+    type: Array,
+    default: () => [],
+  },
 });
 
-const emit = defineEmits(['update', 'job-link-open', 'job-link-detail', 'complete-assignment', 'proof-request-open', 'proof-direct-complete']);
+const emit = defineEmits(['update', 'job-link-open', 'job-link-detail', 'complete-assignment', 'proof-request-open', 'proof-direct-complete', 'worker-complete', 'worker-job-register', 'worker-job-detail', 'schedlink-complete', 'note-save']);
 
 // ── 作業時間ヘルパー ──────────────────────────────
 // value_text に "HH:MM|HH:MM" 形式で開始・終了を保存
@@ -434,6 +744,189 @@ const workItemTypeLabel = computed(() => {
   if (!id) return '';
   return props.workItemTypes.find((t) => String(t.id) === String(id))?.name ?? id;
 });
+
+// ── worker型ヘルパー ──────────────────────────────────────
+const workerAssigneeName = computed(() => {
+  if (props.cell.value_subcontractor_id) {
+    const sub = props.subcontractors.find((s) => String(s.id) === String(props.cell.value_subcontractor_id));
+    return sub ? `[外注] ${sub.name}` : props.cell.value_subcontractor_name ?? '外注先';
+  }
+  if (props.cell.value_user_id) {
+    const u = props.users.find((u) => String(u.id) === String(props.cell.value_user_id));
+    return u?.name ?? props.cell.value_user_name ?? String(props.cell.value_user_id);
+  }
+  return props.cell.value_text ?? '';
+});
+
+const workerDeadline = computed(() => {
+  // 優先順: cell_deadline > schedule.end_date > assignment.desired_end_date
+  if (props.cell.cell_deadline) return props.cell.cell_deadline;
+  if (props.cell.schedule_end_date) return props.cell.schedule_end_date;
+  if (props.cell.assignment_end_date) return props.cell.assignment_end_date;
+  return null;
+});
+
+const workerDeadlineColor = computed(() => {
+  const d = workerDeadline.value;
+  if (!d || props.cell.completed_at) return 'text-gray-500';
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const deadline = new Date(d);
+  const diff = (deadline - today) / (1000 * 60 * 60 * 24);
+  if (diff < 0) return 'text-red-600 font-medium';
+  if (diff <= 3) return 'text-yellow-600 font-medium';
+  return 'text-gray-500';
+});
+
+const workerCellBg = computed(() => {
+  if (props.cell.completed_at) return 'bg-green-50';
+  const d = workerDeadline.value;
+  if (!d) return '';
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const deadline = new Date(d);
+  const diff = (deadline - today) / (1000 * 60 * 60 * 24);
+  if (diff < 0) return 'bg-red-50';
+  if (diff <= 3) return 'bg-yellow-50';
+  return '';
+});
+
+const workerCellBorder = computed(() => {
+  if (props.cell.completed_at) return 'border-left: 3px solid #16a34a';
+  const d = workerDeadline.value;
+  if (!d) return '';
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const deadline = new Date(d);
+  const diff = (deadline - today) / (1000 * 60 * 60 * 24);
+  if (diff < 0) return 'border-left: 3px solid #dc2626';
+  if (diff <= 3) return 'border-left: 3px solid #ca8a04';
+  return '';
+});
+
+function formatDate(dt) {
+  if (!dt) return '';
+  return dt.slice(0, 10);
+}
+
+function formatShortDate(d) {
+  if (!d) return '';
+  const parts = d.slice(0, 10).split('-');
+  if (parts.length === 3) return `${parts[0].slice(2)}/${parts[1]}/${parts[2]}`;
+  return d;
+}
+
+function onWorkerAssigneeChange(val) {
+  if (!val) {
+    emit('update', { row_id: props.rowId, col_key: props.colDef.key, value_type: 'worker', value: null });
+  } else if (val.startsWith('s_')) {
+    emit('update', { row_id: props.rowId, col_key: props.colDef.key, value_type: 'worker', value: null, subcontractor_id: Number(val.slice(2)) });
+  } else {
+    emit('update', { row_id: props.rowId, col_key: props.colDef.key, value_type: 'worker', value: Number(val.slice(2)) });
+  }
+}
+
+// ── schedlink型ヘルパー ──────────────────────────────────
+const schedlinkDeadline = computed(() => {
+  if (props.cell.cell_deadline) return props.cell.cell_deadline;
+  if (props.cell.schedule_end_date) return props.cell.schedule_end_date;
+  return null;
+});
+
+const schedlinkDeadlineColor = computed(() => {
+  const d = schedlinkDeadline.value;
+  if (!d || props.cell.completed_at) return 'text-gray-500';
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const deadline = new Date(d);
+  const diff = (deadline - today) / (1000 * 60 * 60 * 24);
+  if (diff < 0) return 'text-red-600 font-medium';
+  if (diff <= 3) return 'text-yellow-600 font-medium';
+  return 'text-gray-500';
+});
+
+const schedlinkCellBg = computed(() => {
+  if (props.cell.completed_at) return 'bg-green-50';
+  const d = schedlinkDeadline.value;
+  if (!d) return '';
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const deadline = new Date(d);
+  const diff = (deadline - today) / (1000 * 60 * 60 * 24);
+  if (diff < 0) return 'bg-red-50';
+  if (diff <= 3) return 'bg-yellow-50';
+  return '';
+});
+
+const schedlinkCellBorder = computed(() => {
+  if (props.cell.completed_at) return 'border-left: 3px solid #16a34a';
+  const d = schedlinkDeadline.value;
+  if (!d) return '';
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const deadline = new Date(d);
+  const diff = (deadline - today) / (1000 * 60 * 60 * 24);
+  if (diff < 0) return 'border-left: 3px solid #dc2626';
+  if (diff <= 3) return 'border-left: 3px solid #ca8a04';
+  return '';
+});
+
+function onSchedlinkSelect(val) {
+  emit('update', {
+    row_id: props.rowId,
+    col_key: props.colDef.key,
+    value_type: 'schedlink',
+    value: val ? Number(val) : null,
+  });
+}
+
+// ── メモ機能 ──────────────────────────────────────────
+const showNoteEdit = ref(false);
+const showNotePopup = ref(false);
+const editingNote = ref('');
+
+const noteFirstLine = computed(() => {
+  if (!props.cell.cell_note) return '';
+  return props.cell.cell_note.split('\n')[0];
+});
+
+// ── ロールカラー（ProjectWeekPlannerと同じ定義） ────────────────
+const ROLE_COLOR = {
+  superadmin: 'text-yellow-600',
+  admin:      'text-red-600',
+  leader:     'text-orange-600',
+  coordinator:'text-green-600',
+  clerk:      'text-purple-600',
+  user:       'text-blue-600',
+};
+const ROLE_LABEL = {
+  superadmin: 'SAdmin',
+  admin:      'Admin',
+  leader:     'Leader',
+  coordinator:'Co',
+  clerk:      'Clerk',
+  user:       'User',
+};
+function roleColorClass(userRole) {
+  return ROLE_COLOR[(userRole || '').toLowerCase()] || 'text-gray-700';
+}
+function roleLabel(userRole) {
+  return ROLE_LABEL[(userRole || '').toLowerCase()] || '';
+}
+
+function startNoteEdit() {
+  editingNote.value = props.cell.cell_note ?? '';
+  showNoteEdit.value = true;
+}
+
+function cancelNoteEdit() {
+  showNoteEdit.value = false;
+}
+
+function saveNote() {
+  showNoteEdit.value = false;
+  emit('note-save', { cellId: props.cell.id, rowId: props.rowId, colKey: props.colDef.key, note: editingNote.value || null });
+}
 
 const workItemTypesGrouped = computed(() => {
   const map = new Map();
