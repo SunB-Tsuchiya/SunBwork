@@ -27,7 +27,7 @@ class ProgressCellController extends Controller
             'cells'                    => 'required|array',
             'cells.*.row_id'           => 'required|integer',
             'cells.*.col_key'          => 'required|string',
-            'cells.*.value_type'       => 'required|in:text,date,bool,user,subcontractor,worker,schedlink',
+            'cells.*.value_type'       => 'required|in:text,date,bool,user,subcontractor,worker,schedlink,proof_user',
             'cells.*.value'            => 'nullable',
             'cells.*.schedule_id'      => 'nullable|integer',
             'cells.*.cell_deadline'    => 'nullable|date',
@@ -83,6 +83,10 @@ class ProgressCellController extends Controller
                         if (isset($item['cell_deadline'])) {
                             $data['cell_deadline'] = $item['cell_deadline'] ?: null;
                         }
+                        break;
+                    case 'proof_user':
+                        $data['cell_type'] = 'proof_user';
+                        $data['value_user_id'] = $item['value'] ?: null;
                         break;
                     case 'schedlink':
                         // value は schedule_id

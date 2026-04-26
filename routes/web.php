@@ -106,7 +106,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::get('/user/proof-jobs', [\App\Http\Controllers\User\ProofJobController::class, 'index'])->name('user.proof_jobs.index');
     Route::get('/user/proof-jobs/{proofRequest}', [\App\Http\Controllers\User\ProofJobController::class, 'show'])->name('user.proof_jobs.show');
     Route::get('/user/proof-jobs/{proofRequest}/set', [\App\Http\Controllers\User\ProofJobController::class, 'setPage'])->name('user.proof_jobs.set_page');
-    Route::post('/user/proof-jobs/{proofRequest}/set', [\App\Http\Controllers\User\ProofJobController::class, 'set'])->name('user.proof_jobs.set');
+    Route::match(['post', 'put'], '/user/proof-jobs/{proofRequest}/set', [\App\Http\Controllers\User\ProofJobController::class, 'set'])->name('user.proof_jobs.set');
     Route::post('/user/proof-jobs/{proofRequest}/complete', [\App\Http\Controllers\User\ProofJobController::class, 'complete'])->name('user.proof_jobs.complete');
 
     // ユーザー設定

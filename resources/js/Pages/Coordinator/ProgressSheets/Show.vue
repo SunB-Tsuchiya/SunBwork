@@ -46,16 +46,6 @@
             テンプレートとして登録
           </button>
 
-          <!-- セット方式で初期化 -->
-          <button
-            v-if="!editMode"
-            type="button"
-            class="rounded border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
-            @click="v2InitRounds = [{ label: '初校' }]; showV2InitModal = true"
-          >
-            セット方式で初期化
-          </button>
-
           <!-- 新形式に変換 -->
           <button
             v-if="!editMode && hasOldPairs"
@@ -594,55 +584,6 @@
       </div>
     </div>
 
-    <!-- ── セット方式 初期化モーダル ────────────────────── -->
-    <div
-      v-if="showV2InitModal"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      @click.self="showV2InitModal = false"
-    >
-      <div class="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
-        <h3 class="mb-2 text-lg font-semibold text-gray-800">セット方式で初期化</h3>
-        <p class="mb-3 text-xs text-gray-500">
-          「組版担当・登録欄 + 校正担当・登録欄」のペアが校ごとに生成されます。<br />
-          <span class="font-medium text-orange-600">※ 既存の列定義は上書きされます。</span>
-        </p>
-        <div class="space-y-2">
-          <div v-for="(round, idx) in v2InitRounds" :key="idx" class="flex items-center gap-2">
-            <span class="w-12 flex-shrink-0 text-xs text-gray-500">第{{ idx + 1 }}校</span>
-            <input
-              v-model="round.label"
-              type="text"
-              class="flex-1 rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-indigo-400 focus:outline-none"
-              :placeholder="idx === 0 ? '初校' : idx === 1 ? '再校' : '三校'"
-            />
-            <button
-              v-if="v2InitRounds.length > 1"
-              type="button"
-              class="text-xs text-red-400 hover:text-red-600"
-              @click="v2InitRounds.splice(idx, 1)"
-            >✕</button>
-          </div>
-          <button
-            type="button"
-            class="text-xs font-medium text-indigo-600 hover:underline"
-            @click="v2InitRounds.push({ label: '' })"
-          >＋ 校を追加</button>
-        </div>
-        <div class="mt-5 flex justify-end gap-3">
-          <button
-            type="button"
-            class="rounded border border-gray-300 px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
-            @click="showV2InitModal = false"
-          >キャンセル</button>
-          <button
-            type="button"
-            class="rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
-            @click="applyV2Init"
-          >適用</button>
-        </div>
-      </div>
-    </div>
-
     <!-- ── V2 変換プレビューモーダル ────────────────────────── -->
     <div
       v-if="showConvertModal"
@@ -665,7 +606,12 @@
               class="rounded border border-gray-200 bg-gray-50 p-3 text-sm"
             >
               <div class="font-medium text-gray-700">
-                ✅ {{ pair.parent_label }} — 担当列＋登録欄 → 担当＋ジョブ（worker型）
+                <template v-if="pair.source_type === 'proof_user'">
+                  ✅ {{ pair.parent_label }} — 校正担当欄＋登録欄 → 校正担当（proof_user型）
+                </template>
+                <template v-else>
+                  ✅ {{ pair.parent_label }} — 担当列＋登録欄 → 組版担当（worker型）
+                </template>
               </div>
               <div class="mt-1 text-xs text-gray-500">
                 担当者設定: {{ pair.cells_with_user }}セル ／ ジョブ登録: {{ pair.cells_with_job }}セル
@@ -836,8 +782,6 @@ onUnmounted(() => {
 const editMode = ref(props.canEdit && (props.sheet.column_config?.length ?? 0) === 0);
 const localSheetName = ref(props.sheet.name ?? '');
 const showRegisterModal = ref(false);
-const showV2InitModal = ref(false);
-const v2InitRounds = ref([{ label: '初校' }]);
 const showConvertModal      = ref(false);
 const convertPreviewData    = ref(null);
 const convertPreviewLoading = ref(false);
@@ -1207,19 +1151,35 @@ async function onCompleteAssignmentFromCell({ assignmentId }) {
   } catch { /* ignore */ }
 }
 
+/**
+ * column_config ツリーを走査して、proof_user セルと同じ親グループ内の
+ * worker 型兄弟セルの col_key を返す。見つからなければ null。
+ */
+function findWorkerSiblingKey(nodes, proofV2Key) {
+  for (const node of nodes) {
+    if (node.children?.length) {
+      if (node.children.some((c) => c.key === proofV2Key)) {
+        const workerSibling = node.children.find((c) => c.type === 'worker');
+        if (workerSibling) return workerSibling.key;
+      }
+      const found = findWorkerSiblingKey(node.children, proofV2Key);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
 /** 進行表の proof_user セルから「校正管理へ依頼」選択時 */
 function onProofRequestOpen({ rowId, colKey }) {
-  // proof_user セルの id を特定して ProofRequestModal に渡す
   const cell = localCells.value.find((c) => c.row_id === rowId && c.col_key === colKey);
   proofTargetCellId.value = cell?.id ?? null;
 
-  // colKey が "{prefix}_kosei_tanto" の場合、同じ行の "{prefix}_kumihan_toroku" セルから
-  // pja_operator の id とタイトルを取得して ProofRequestModal に渡す
-  const kumiTorokuKey = colKey.replace(/_kosei_tanto$/, '_kumihan_toroku');
-  if (kumiTorokuKey !== colKey) {
-    const kumiCell = localCells.value.find((c) => c.row_id === rowId && c.col_key === kumiTorokuKey);
-    proofTargetAssignment.value = kumiCell?.assignment_id
-      ? { id: kumiCell.assignment_id, title: kumiCell.assignment_title ?? '' }
+  // column_config ツリーから同グループ内の worker 型兄弟を探す
+  const workerKey = findWorkerSiblingKey(localColumnConfig.value, colKey);
+  if (workerKey) {
+    const workerCell = localCells.value.find((c) => c.row_id === rowId && c.col_key === workerKey);
+    proofTargetAssignment.value = workerCell?.assignment_id
+      ? { id: workerCell.assignment_id, title: workerCell.assignment_title ?? '' }
       : null;
   } else {
     proofTargetAssignment.value = null;
@@ -1228,7 +1188,7 @@ function onProofRequestOpen({ rowId, colKey }) {
   showProofModal.value = true;
 }
 
-/** joblink セルの「校了にする」ボタン */
+/** proof_user セルの「完了にする」（校正管理経由 / proof_assignment_id を持つセル） */
 async function onProofDirectComplete({ assignmentId }) {
   if (!assignmentId) return;
   try {
@@ -1239,10 +1199,15 @@ async function onProofDirectComplete({ assignmentId }) {
       headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
     });
     if (res.ok) {
-      // ローカルセルの assignment_proof_completed を更新
-      const idx = localCells.value.findIndex((c) => c.assignment_id === assignmentId);
+      // proof_assignment_id または assignment_id で検索（proof_user型セルは proof_assignment_id を使う）
+      let idx = localCells.value.findIndex((c) => c.proof_assignment_id === assignmentId);
+      if (idx < 0) idx = localCells.value.findIndex((c) => c.assignment_id === assignmentId);
       if (idx >= 0) {
-        localCells.value.splice(idx, 1, { ...localCells.value[idx], assignment_proof_completed: true });
+        localCells.value.splice(idx, 1, {
+          ...localCells.value[idx],
+          proof_assignment_completed: true,
+          completed_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
+        });
       }
     }
   } catch { /* ignore */ }
@@ -1261,7 +1226,7 @@ function collectAllLeaves(nodes) {
 const sheetCompletion = computed(() => {
   const config = props.sheet.column_config ?? [];
   const completableCols = collectAllLeaves(config).filter(
-    (l) => ['worker', 'schedlink', 'joblink'].includes(l.type)
+    (l) => ['worker', 'schedlink', 'joblink', 'proof_user'].includes(l.type)
   );
   if (completableCols.length === 0) return { done: 0, total: 0 };
   const cellMap = {};
@@ -1277,6 +1242,7 @@ const sheetCompletion = computed(() => {
       const c = cellMap[`${row.id}_${col.key}`];
       if (!c) continue;
       if (col.type === 'joblink') { if (c.assignment_completed) done++; }
+      else if (col.type === 'proof_user') { if (c.completed_at || c.assignment_completed || c.assignment_proof_completed || c.proof_assignment_completed) done++; }
       else { if (c.completed_at || c.assignment_completed) done++; }
     }
   }
@@ -1339,57 +1305,13 @@ function saveColumnConfig() {
   );
 }
 
-function generateV2ColumnConfig(rounds) {
-  return rounds
-    .filter((r) => r.label.trim())
-    .map((round, idx) => {
-      const key = 'round' + (idx + 1);
-      return {
-        key,
-        label: round.label.trim(),
-        type: 'text',
-        children: [
-          {
-            key: key + '_kumihan',
-            label: '組版',
-            type: 'worker',
-          },
-          {
-            key: key + '_kosei',
-            label: '校正',
-            type: 'text',
-            children: [
-              { key: key + '_kosei_tanto',  label: '担当',   type: 'proof_user' },
-              { key: key + '_kosei_toroku', label: '登録欄', type: 'joblink' },
-            ],
-          },
-        ],
-      };
-    });
-}
-
-function applyV2Init() {
-  const config = generateV2ColumnConfig(v2InitRounds.value);
-  if (config.length === 0) {
-    alert('少なくとも1つの校を入力してください。');
-    return;
-  }
-  localColumnConfig.value = config;
-  showV2InitModal.value = false;
-  editMode.value = false;
-  router.put(
-    route('coordinator.progress_sheets.update', { sheet: props.sheet.id }),
-    { name: localSheetName.value, column_config: config },
-    { preserveScroll: true }
-  );
-}
-
-// ── V2 変換（既存 user+joblink ペア → worker 型） ──────────────────
+// ── V2 変換（既存 user/proof_user+joblink ペア → worker/proof_user 型） ──────────────────
 function detectOldPairsInConfig(nodes) {
   for (const node of nodes) {
     const children = node.children ?? [];
     for (let j = 0; j < children.length - 1; j++) {
-      if (children[j].type === 'user' && children[j + 1].type === 'joblink') return true;
+      const t = children[j].type;
+      if ((t === 'user' || t === 'proof_user') && children[j + 1].type === 'joblink') return true;
     }
     if (children.length && detectOldPairsInConfig(children)) return true;
   }
@@ -1463,9 +1385,16 @@ async function executeConvert() {
       route('coordinator.progress_sheets.convert_to_v2', { sheet: props.sheet.id })
     );
     showConvertModal.value = false;
-    router.reload();
+    router.reload({
+      only: ['sheet', 'cells'],
+      onSuccess: (page) => {
+        localColumnConfig.value = JSON.parse(JSON.stringify(page.props.sheet.column_config ?? []));
+        localCells.value = page.props.cells.map((c) => ({ ...c }));
+      },
+    });
   } catch (e) {
-    showToast('変換に失敗しました。', 'error');
+    const msg = e?.response?.data?.message ?? '変換に失敗しました。';
+    showToast(msg, 'error');
   }
 }
 
@@ -1965,10 +1894,8 @@ async function onWorkerComplete({ cellId, assignmentId, rowId, colKey }) {
   const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
   try {
     if (assignmentId) {
-      // ジョブ紐づきあり: 既存の assignments.complete を使う（JobBoxController側でcompleted_atも更新）
       await callAssignmentApi(route('coordinator.progress_sheets.assignments.complete', { assignment: assignmentId }));
     } else if (cellId) {
-      // ジョブなし: セル単体の complete API
       const res = await fetch(route('coordinator.progress_cells.complete', { cell: cellId }), {
         method: 'POST',
         credentials: 'same-origin',
@@ -1976,16 +1903,19 @@ async function onWorkerComplete({ cellId, assignmentId, rowId, colKey }) {
       });
       if (!res.ok) throw new Error(await res.text());
     }
-    // ローカルセルを更新
-    const idx = localCells.value.findIndex((c) => c.row_id === rowId && c.col_key === colKey);
-    if (idx >= 0) {
-      localCells.value.splice(idx, 1, {
-        ...localCells.value[idx],
-        completed_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
-        assignment_completed: assignmentId ? true : localCells.value[idx].assignment_completed,
-      });
-    }
-  } catch { /* ignore */ }
+  } catch (e) {
+    console.error('[worker-complete] API エラー', e);
+    showToast('完了処理に失敗しました。', 'error');
+    return;
+  }
+  const idx = localCells.value.findIndex((c) => c.row_id === rowId && c.col_key === colKey);
+  if (idx >= 0) {
+    localCells.value.splice(idx, 1, {
+      ...localCells.value[idx],
+      completed_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
+      assignment_completed: assignmentId ? true : localCells.value[idx].assignment_completed,
+    });
+  }
 }
 
 /** schedlinkセルの「完了にする」 */

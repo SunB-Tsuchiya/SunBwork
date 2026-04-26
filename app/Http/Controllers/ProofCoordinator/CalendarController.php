@@ -197,10 +197,11 @@ class CalendarController extends Controller
                 $jstStart = Carbon::createFromFormat('Y-m-d H:i:s', $rawStart, 'UTC')->setTimezone('Asia/Tokyo');
                 $jstEnd   = Carbon::createFromFormat('Y-m-d H:i:s', $rawEnd,   'UTC')->setTimezone('Asia/Tokyo');
                 $event->update([
-                    'date'  => $jstStart->toDateString(),
-                    'start' => $jstStart->format('Y-m-d H:i:s'),
-                    'end'   => $jstEnd->format('Y-m-d H:i:s'),
-                    // starts_at/ends_at は setStart/EndAttribute ミューテータ経由で自動設定
+                    'date'      => $jstStart->toDateString(),
+                    'start'     => $jstStart->format('Y-m-d H:i:s'),
+                    'end'       => $jstEnd->format('Y-m-d H:i:s'),
+                    'starts_at' => $rawStart,
+                    'ends_at'   => $rawEnd,
                 ]);
             }
         } else {
@@ -449,7 +450,8 @@ class CalendarController extends Controller
             'date'                      => $jstStart->toDateString(),
             'start'                     => $jstStart->format('Y-m-d H:i:s'),
             'end'                       => $jstEnd->format('Y-m-d H:i:s'),
-            // starts_at/ends_at は setStart/EndAttribute ミューテータ経由で自動設定される
+            'starts_at'                 => $rawStart,
+            'ends_at'                   => $rawEnd,
             'title'                     => $proofRequest->title,
         ]);
     }

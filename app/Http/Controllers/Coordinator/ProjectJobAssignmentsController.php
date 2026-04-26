@@ -876,14 +876,43 @@ class ProjectJobAssignmentsController extends Controller
                 // 進行表セルリンク: _progress_sheet_id / _row_id / _col_key が渡された場合
                 if (!empty($a['_progress_sheet_id']) && !empty($a['_row_id']) && !empty($a['_col_key'])) {
                     try {
-                        \App\Models\ProgressCell::updateOrCreate(
-                            ['row_id' => (int) $a['_row_id'], 'col_key' => (string) $a['_col_key']],
+                        $colKey = (string) $a['_col_key'];
+                        $rowId  = (int) $a['_row_id'];
+
+                        // proof_user 型かどうかを column_config から判定
+                        $cellType = 'worker';
+                        try {
+                            $sheet = \App\Models\ProgressSheet::find((int) $a['_progress_sheet_id']);
+                            if ($sheet && $sheet->column_config) {
+                                $detectedType = $this->findColTypeInConfig($sheet->column_config, $colKey);
+                                if ($detectedType === 'proof_user') $cellType = 'proof_user';
+                            }
+                        } catch (\Throwable $__) {}
+
+                        $cell = \App\Models\ProgressCell::updateOrCreate(
+                            ['row_id' => $rowId, 'col_key' => $colKey],
                             [
                                 'assignment_id' => $assignment->id,
                                 'value_user_id' => $assignment->user_id ?: null,
-                                'cell_type'     => 'worker',
+                                'cell_type'     => $cellType,
                             ]
                         );
+
+                        // proof_user セルの場合は ProofRequest も作成して校正ジョブ一覧に表示
+                        if ($cellType === 'proof_user' && $assignment->user_id && $senderUser) {
+                            \App\Models\ProofRequest::updateOrCreate(
+                                ['project_job_assignment_id' => $assignment->id],
+                                [
+                                    'project_job_id'       => $projectJob->id,
+                                    'proof_cell_id'        => $cell->id,
+                                    'requester_id'         => $senderUser->id,
+                                    'proof_coordinator_id' => $senderUser->id,
+                                    'proofreader_id'       => $assignment->user_id,
+                                    'title'                => $assignment->title,
+                                    'status'               => 'assigned',
+                                ]
+                            );
+                        }
                     } catch (\Throwable $__eCellLink) {
                         \Illuminate\Support\Facades\Log::warning('Failed to link ProgressCell after coordinator assignment', [
                             'error'   => $__eCellLink->getMessage(),
@@ -911,6 +940,21 @@ class ProjectJobAssignmentsController extends Controller
         }
 
         return redirect()->route('coordinator.project_jobs.assignments.index', ['projectJob' => $projectJob->id]);
+    }
+
+    /** column_config ツリーから指定 key のセル型を再帰検索 */
+    private function findColTypeInConfig(array $nodes, string $key): ?string
+    {
+        foreach ($nodes as $node) {
+            if (($node['key'] ?? '') === $key) {
+                return $node['type'] ?? null;
+            }
+            if (!empty($node['children'])) {
+                $found = $this->findColTypeInConfig($node['children'], $key);
+                if ($found !== null) return $found;
+            }
+        }
+        return null;
     }
 
     /**

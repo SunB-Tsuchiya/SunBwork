@@ -358,7 +358,7 @@ function lockedSubcontractorIdForCell(rowId, colKey, colType) {
 // ── 行ごとの完了率マップ ─────────────────────────────────────
 const rowCompletionMap = computed(() => {
   const completableCols = collectLeaves(props.columnConfig).filter(
-    (l) => ['worker', 'schedlink', 'joblink'].includes(l.type)
+    (l) => ['worker', 'schedlink', 'joblink', 'proof_user'].includes(l.type)
   );
   if (completableCols.length === 0) return {};
   const map = {};
@@ -368,6 +368,7 @@ const rowCompletionMap = computed(() => {
       const c = cellMap.value[`${row.id}_${l.key}`];
       if (!c) return false;
       if (l.type === 'joblink') return !!c.assignment_completed;
+      if (l.type === 'proof_user') return !!(c.completed_at || c.assignment_completed || c.assignment_proof_completed || c.proof_assignment_completed);
       return !!c.completed_at;
     }).length;
     map[row.id] = { done, total };

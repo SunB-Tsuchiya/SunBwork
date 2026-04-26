@@ -96,30 +96,195 @@
     </template>
   </td>
 
-  <!-- 校正担当者型 -->
-  <td v-else-if="colDef.type === 'proof_user'" class="border border-gray-200 px-2 py-1 align-middle min-w-[130px]">
-    <!-- 校正管理経由で依頼済みの場合（ロック表示） -->
-    <template v-if="cell.proof_assignment_id">
-      <span class="rounded bg-pink-100 px-1.5 py-0.5 text-xs font-medium text-pink-700">校正管理経由</span>
-    </template>
-    <!-- 編集可能（未依頼 or 直接割当） -->
-    <template v-else-if="canEdit">
+  <!-- 校正担当者型（旧型：担当者選択のみ） -->
+  <td v-else-if="colDef.type === 'proof_user'" class="border border-gray-200 px-2 py-1 align-middle min-w-[120px]">
+    <template v-if="canEdit">
       <select
         :value="cell.value_user_id ? ('u_' + cell.value_user_id) : ''"
         class="w-full rounded border border-gray-300 px-1 py-0.5 text-sm focus:border-indigo-400 focus:outline-none"
-        @change="onProofUserChange($event.target.value)"
+        @change="onProofUserSimpleChange($event.target.value)"
       >
-        <option value="">—</option>
-        <option value="proof_coordinator" class="font-medium text-pink-700">📋 校正管理へ依頼</option>
-        <optgroup v-if="users.length" label="直接割当（管理外）">
-          <option v-for="u in users" :key="'u_' + u.id" :value="'u_' + u.id">{{ u.name }}</option>
-        </optgroup>
+        <option value="">— 校正担当者 —</option>
+        <option v-for="u in users" :key="'u_' + u.id" :value="'u_' + u.id">{{ u.name }}</option>
       </select>
     </template>
-    <!-- 読み取り専用 -->
     <template v-else>
       <span class="text-sm text-gray-700">{{ cell.value_user_name ?? '' }}</span>
     </template>
+  </td>
+
+  <!-- 校正担当者型（V2: 担当＋ジョブ統合セル） -->
+  <td
+    v-else-if="colDef.type === 'proof_v2'"
+    class="border border-gray-200 px-0 py-0 align-middle min-w-[200px] transition-colors"
+    :class="proofCellBg"
+    :style="proofCellBorder"
+  >
+    <div class="flex min-h-[52px]">
+      <!-- 左70%: 担当者 + 締切/完了 -->
+      <div class="flex-1 px-2 py-1 flex flex-col justify-center gap-0.5" style="min-width:0">
+        <!-- 完了済み -->
+        <template v-if="proofCellCompleted">
+          <div class="flex items-center gap-1">
+            <span class="text-xs text-green-600">✓</span>
+            <span class="text-sm font-medium text-gray-700 truncate">{{ proofAssigneeName }}</span>
+          </div>
+          <span class="text-xs text-green-600">
+            完了: {{ cell.completed_at ? formatDate(cell.completed_at) : '済' }}
+          </span>
+        </template>
+        <!-- 登録済み・未完了: ロック表示 -->
+        <template v-else-if="cell.assignment_id || cell.proof_assignment_id">
+          <div class="flex items-center gap-1">
+            <span class="text-xs text-gray-400">🔒</span>
+            <span class="text-sm font-medium text-gray-700 truncate">{{ proofAssigneeName }}</span>
+          </div>
+          <span v-if="proofDeadline" class="text-xs" :class="proofDeadlineColor">
+            締切: {{ formatShortDate(proofDeadline) }}
+          </span>
+        </template>
+        <!-- 校正依頼中（pending・未受理） -->
+        <template v-else-if="cell.proof_request_pending">
+          <div class="flex items-center gap-1">
+            <span class="text-xs text-yellow-500">📋</span>
+            <span class="text-sm font-medium text-yellow-700 truncate">校正管理へ依頼中</span>
+          </div>
+        </template>
+        <!-- 担当者設定済み・ジョブ未登録 -->
+        <template v-else-if="cell.value_user_id || cell.value_subcontractor_id">
+          <div class="flex items-center gap-1">
+            <span class="text-xs text-gray-400">🔒</span>
+            <span class="text-sm font-medium text-gray-700 truncate">{{ proofAssigneeName }}</span>
+          </div>
+          <span v-if="proofDeadline" class="text-xs" :class="proofDeadlineColor">
+            締切: {{ formatShortDate(proofDeadline) }}
+          </span>
+        </template>
+        <!-- 未設定: セレクター -->
+        <template v-else-if="canEdit">
+          <select
+            :value="cell.value_subcontractor_id ? ('s_' + cell.value_subcontractor_id) : (cell.value_user_id ? ('u_' + cell.value_user_id) : '')"
+            class="w-full rounded border border-gray-300 px-1 py-0.5 text-sm focus:border-indigo-400 focus:outline-none"
+            @change="onProofUserChange($event.target.value)"
+          >
+            <option value="">— 校正担当者 —</option>
+            <option value="proof_coordinator" class="font-medium text-pink-700">📋 校正管理へ依頼</option>
+            <optgroup v-if="users.length" label="直接割当（管理外）">
+              <option v-for="u in users" :key="'u_' + u.id" :value="'u_' + u.id">{{ u.name }}</option>
+            </optgroup>
+            <optgroup v-if="subcontractors.length" label="外注先">
+              <option v-for="s in subcontractors" :key="'s_' + s.id" :value="'s_' + s.id">{{ s.name }}</option>
+            </optgroup>
+          </select>
+        </template>
+        <!-- 読み取り専用 -->
+        <template v-else>
+          <span class="text-sm text-gray-700 truncate">{{ proofAssigneeName }}</span>
+        </template>
+      </div>
+
+      <!-- 右30%: ステータス・操作ボタン -->
+      <div class="flex flex-col items-center justify-center gap-1 border-l border-gray-200 px-1.5 py-1" style="min-width:70px;max-width:80px">
+        <!-- 完了済み -->
+        <template v-if="proofCellCompleted">
+          <span class="rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">✓ 完了</span>
+          <button
+            v-if="cell.assignment_id && canEdit"
+            type="button"
+            class="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600 hover:bg-gray-200"
+            @click="emit('worker-job-detail', { assignmentId: cell.assignment_id, rowId, colKey: colDef.key })"
+          >詳細</button>
+        </template>
+        <!-- 校正管理経由で登録済み・未完了 -->
+        <template v-else-if="cell.proof_assignment_id">
+          <span class="rounded bg-pink-100 px-1.5 py-0.5 text-xs text-pink-700">校正管理済</span>
+          <button
+            v-if="canEdit"
+            type="button"
+            class="rounded bg-indigo-100 px-1.5 py-0.5 text-xs text-indigo-700 hover:bg-indigo-200"
+            @click="emit('proof-direct-complete', { assignmentId: cell.proof_assignment_id })"
+          >完了にする</button>
+        </template>
+        <!-- 直接登録済み・未完了 -->
+        <template v-else-if="cell.assignment_id">
+          <span class="rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700">登録済</span>
+          <button
+            type="button"
+            class="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600 hover:bg-gray-200"
+            @click="emit('worker-job-detail', { assignmentId: cell.assignment_id, rowId, colKey: colDef.key })"
+          >詳細</button>
+          <button
+            v-if="canEdit || (authUserId && String(cell.value_user_id) === String(authUserId))"
+            type="button"
+            class="rounded bg-indigo-100 px-1.5 py-0.5 text-xs text-indigo-700 hover:bg-indigo-200"
+            @click="emit('worker-complete', { cellId: cell.id, assignmentId: cell.assignment_id, rowId, colKey: colDef.key })"
+          >完了にする</button>
+        </template>
+        <!-- 校正依頼中（pending・未受理） -->
+        <template v-else-if="cell.proof_request_pending">
+          <span class="rounded bg-yellow-100 px-1.5 py-0.5 text-xs text-yellow-700">📋 依頼中</span>
+        </template>
+        <!-- 担当者設定済み・未登録 -->
+        <template v-else-if="cell.value_user_id || cell.value_subcontractor_id">
+          <span class="text-xs text-gray-400">┄ 未登録 ┄</span>
+          <button
+            v-if="canEdit"
+            type="button"
+            class="rounded border border-dashed border-pink-300 bg-pink-50 px-2 py-0.5 text-xs text-pink-700 hover:bg-pink-100"
+            @click="emit('worker-job-register', { rowId, colKey: colDef.key, userId: cell.value_user_id, subcontractorId: cell.value_subcontractor_id ?? null })"
+          >＋ 登録</button>
+        </template>
+        <!-- 未設定 -->
+        <template v-else>
+          <span class="text-xs text-gray-300">未設定</span>
+        </template>
+      </div>
+    </div>
+    <!-- メモ行 -->
+    <div v-if="cell.cell_note || canEdit" class="border-t border-gray-100 px-2 py-0.5">
+      <template v-if="!showNoteEdit">
+        <div class="relative">
+          <button
+            type="button"
+            class="flex w-full items-center gap-1 text-left text-xs"
+            :class="cell.cell_note ? 'text-blue-500 hover:text-blue-700' : 'text-gray-300 hover:text-gray-400'"
+            @mouseenter="cell.cell_note && (showNotePopup = true)"
+            @mouseleave="showNotePopup = false"
+            @click="canEdit && startNoteEdit()"
+          >
+            <span>📝</span>
+            <span v-if="cell.cell_note" class="min-w-0 truncate"><span v-if="cell.cell_note_user_name" :class="roleColorClass(cell.cell_note_user_role)" class="font-semibold">{{ cell.cell_note_user_name }}：</span>{{ noteFirstLine }}</span>
+            <span v-else class="text-xs text-gray-400">メモ</span>
+          </button>
+          <div
+            v-if="showNotePopup && cell.cell_note"
+            class="absolute bottom-full left-0 z-50 mb-1 w-64 rounded-lg border border-gray-200 bg-white p-2 shadow-lg"
+            @mouseenter="showNotePopup = true"
+            @mouseleave="showNotePopup = false"
+          >
+            <p class="whitespace-pre-wrap text-xs text-gray-700">{{ cell.cell_note }}</p>
+            <div v-if="cell.cell_note_user_name" class="mt-1 flex items-center gap-1 border-t border-gray-100 pt-1">
+              <span class="text-xs font-semibold" :class="roleColorClass(cell.cell_note_user_role)">{{ cell.cell_note_user_name }}</span>
+            </div>
+          </div>
+        </div>
+      </template>
+      <template v-else>
+        <div class="flex items-center gap-1">
+          <input
+            v-model="editingNote"
+            :ref="el => { if (el) el.focus() }"
+            type="text"
+            class="min-w-0 flex-1 rounded border border-gray-300 px-1 py-0.5 text-xs focus:border-indigo-400 focus:outline-none"
+            placeholder="メモを入力..."
+            @keydown.enter.prevent="saveNote"
+            @keydown.escape.prevent="cancelNoteEdit"
+          />
+          <button type="button" class="shrink-0 rounded bg-indigo-100 px-1.5 py-0.5 text-xs text-indigo-700 hover:bg-indigo-200" @click="saveNote">保存</button>
+          <button type="button" class="shrink-0 rounded bg-gray-100 px-1 py-0.5 text-xs text-gray-500 hover:bg-gray-200" @click="cancelNoteEdit">✕</button>
+        </div>
+      </template>
+    </div>
   </td>
 
   <!-- worker型（担当＋ジョブ統合セル） -->
@@ -670,6 +835,16 @@ function onProofUserChange(val) {
     emit('proof-request-open', { rowId: props.rowId, colKey: props.colDef.key });
   } else if (val.startsWith('u_')) {
     emit('update', { row_id: props.rowId, col_key: props.colDef.key, value_type: 'user', value: Number(val.slice(2)) });
+  } else if (val.startsWith('s_')) {
+    emit('update', { row_id: props.rowId, col_key: props.colDef.key, value_type: 'subcontractor', value: Number(val.slice(2)) });
+  } else {
+    emit('update', { row_id: props.rowId, col_key: props.colDef.key, value_type: 'user', value: null });
+  }
+}
+
+function onProofUserSimpleChange(val) {
+  if (val.startsWith('u_')) {
+    emit('update', { row_id: props.rowId, col_key: props.colDef.key, value_type: 'user', value: Number(val.slice(2)) });
   } else {
     emit('update', { row_id: props.rowId, col_key: props.colDef.key, value_type: 'user', value: null });
   }
@@ -825,6 +1000,76 @@ function onWorkerAssigneeChange(val) {
     emit('update', { row_id: props.rowId, col_key: props.colDef.key, value_type: 'worker', value: Number(val.slice(2)) });
   }
 }
+
+// ── proof_user型ヘルパー ─────────────────────────────────
+const proofCellCompleted = computed(() => {
+  return !!(
+    props.cell.completed_at ||
+    props.cell.assignment_completed ||
+    props.cell.assignment_proof_completed ||
+    props.cell.proof_assignment_completed
+  );
+});
+
+const proofAssigneeName = computed(() => {
+  if (props.cell.proof_assignment_id && !props.cell.value_user_id && !props.cell.value_subcontractor_id) {
+    return '📋 校正管理経由';
+  }
+  if (props.cell.value_subcontractor_id) {
+    const sub = props.subcontractors.find((s) => String(s.id) === String(props.cell.value_subcontractor_id));
+    return sub ? `[外注] ${sub.name}` : props.cell.value_subcontractor_name ?? '外注先';
+  }
+  if (props.cell.value_user_id) {
+    const u = props.users.find((u) => String(u.id) === String(props.cell.value_user_id));
+    return u?.name ?? props.cell.value_user_name ?? String(props.cell.value_user_id);
+  }
+  return '';
+});
+
+const proofDeadline = computed(() => {
+  if (props.cell.cell_deadline) return props.cell.cell_deadline;
+  if (props.cell.schedule_end_date) return props.cell.schedule_end_date;
+  if (props.cell.assignment_end_date) return props.cell.assignment_end_date;
+  return null;
+});
+
+const proofDeadlineColor = computed(() => {
+  const d = proofDeadline.value;
+  if (!d || proofCellCompleted.value) return 'text-gray-500';
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const deadline = new Date(d);
+  const diff = (deadline - today) / (1000 * 60 * 60 * 24);
+  if (diff < 0) return 'text-red-600 font-medium';
+  if (diff <= 3) return 'text-yellow-600 font-medium';
+  return 'text-gray-500';
+});
+
+const proofCellBg = computed(() => {
+  if (proofCellCompleted.value) return 'bg-green-50';
+  const d = proofDeadline.value;
+  if (!d) return '';
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const deadline = new Date(d);
+  const diff = (deadline - today) / (1000 * 60 * 60 * 24);
+  if (diff < 0) return 'bg-red-50';
+  if (diff <= 3) return 'bg-yellow-50';
+  return '';
+});
+
+const proofCellBorder = computed(() => {
+  if (proofCellCompleted.value) return 'border-left: 3px solid #16a34a';
+  const d = proofDeadline.value;
+  if (!d) return '';
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const deadline = new Date(d);
+  const diff = (deadline - today) / (1000 * 60 * 60 * 24);
+  if (diff < 0) return 'border-left: 3px solid #dc2626';
+  if (diff <= 3) return 'border-left: 3px solid #ca8a04';
+  return '';
+});
 
 // ── schedlink型ヘルパー ──────────────────────────────────
 const schedlinkDeadline = computed(() => {

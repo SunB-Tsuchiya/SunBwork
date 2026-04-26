@@ -78,15 +78,15 @@
           <option value="text">自由入力</option>
           <option value="date">日付</option>
           <option value="checkbox">チェック</option>
-          <option value="user">担当者</option>
           <option value="worktime">作業時間</option>
           <option value="stage">ステージ</option>
           <option value="size">サイズ</option>
           <option value="assignment">作業分担</option>
           <option value="workItemType">作業種別</option>
           <option value="proof_user">校正担当者</option>
+          <option value="proof_v2">校正担当者（V2）</option>
           <option value="joblink">登録・詳細</option>
-          <option value="worker">担当＋ジョブ（V2）</option>
+          <option value="worker">組版担当（V2）</option>
           <option value="schedlink">予定連携（V2）</option>
         </select>
         <!-- グループ（子あり）インジケーター -->
@@ -166,13 +166,23 @@
     </div>
 
     <!-- 列追加ボタン -->
-    <button
-      type="button"
-      class="mt-1 flex w-full items-center justify-center rounded border border-dashed border-gray-300 py-1.5 text-sm text-gray-500 hover:border-indigo-400 hover:text-indigo-500"
-      @click="addLeaf"
-    >
-      ＋ 列を追加
-    </button>
+    <div class="mt-1 flex gap-2">
+      <button
+        type="button"
+        class="flex flex-1 items-center justify-center rounded border border-dashed border-gray-300 py-1.5 text-sm text-gray-500 hover:border-indigo-400 hover:text-indigo-500"
+        @click="addLeaf"
+      >
+        ＋ 列を追加
+      </button>
+      <button
+        type="button"
+        class="flex flex-1 items-center justify-center rounded border border-dashed border-indigo-300 py-1.5 text-sm text-indigo-600 hover:border-indigo-500 hover:bg-indigo-50"
+        title="組版担当＋校正担当のセットをグループとして追加"
+        @click="addKumihanKoseiPreset"
+      >
+        ＋ 組版＋校正セット
+      </button>
+    </div>
   </div>
 </template>
 
@@ -238,6 +248,7 @@ const TYPE_DEFAULT_LABELS = {
   worktime: '作業時間',
   joblink: '登録',
   worker: '担当',
+  proof_v2: '校正',
   schedlink: '予定',
 };
 
@@ -315,6 +326,19 @@ function cloneNode(node) {
 function duplicateNode(idx) {
   const clone = cloneNode(props.nodes[idx]);
   props.nodes.splice(idx + 1, 0, clone);
+  emit('change', props.nodes);
+}
+
+function addKumihanKoseiPreset() {
+  props.nodes.push({
+    key: genKey(),
+    label: '組版・校正',
+    type: 'text',
+    children: [
+      { key: genKey(), label: '組版', type: 'worker' },
+      { key: genKey(), label: '校正', type: 'proof_v2' },
+    ],
+  });
   emit('change', props.nodes);
 }
 </script>

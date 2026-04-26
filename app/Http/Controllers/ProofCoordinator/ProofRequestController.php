@@ -216,33 +216,41 @@ class ProofRequestController extends Controller
                         'value_user_id'       => $assigneeUserId,
                     ]);
             } elseif ($proofRequest->project_job_assignment_id) {
-                // proof_cell_id が未設定の場合：pja_operatorの組版セルから校正セルを自動検索・作成
+                // proof_cell_id が未設定の場合：pja_operator の組版セルから
+                // column_config ツリー走査で proof_user 兄弟を特定して紐づけ
                 $kumihanCell = \App\Models\ProgressCell::where('assignment_id', $proofRequest->project_job_assignment_id)->first();
-                if ($kumihanCell && preg_match('/^(.+)_kumihan_toroku$/', $kumihanCell->col_key, $m)) {
-                    $roundPrefix = $m[1];
-                    $rowId       = $kumihanCell->row_id;
+                if ($kumihanCell) {
+                    $proofColKey = null;
 
-                    // round{N}_kosei_tanto（proof_user）セルを作成/取得して紐づけ
-                    $koseiTantoCell = \App\Models\ProgressCell::firstOrCreate(
-                        ['row_id' => $rowId, 'col_key' => $roundPrefix . '_kosei_tanto']
-                    );
-                    $koseiTantoCell->update([
-                        'proof_assignment_id' => $assignment->id,
-                        'value_user_id'       => $assigneeUserId,
-                    ]);
+                    // column_config ツリー走査で worker の兄弟 proof_user を探す
+                    $row   = \App\Models\ProgressRow::find($kumihanCell->row_id);
+                    $sheet = $row ? \App\Models\ProgressSheet::find($row->sheet_id) : null;
+                    if ($sheet && ! empty($sheet->column_config)) {
+                        $proofColKey = $this->findProofUserSiblingKey($sheet->column_config, $kumihanCell->col_key);
+                    }
 
-                    // round{N}_kosei_toroku（joblink）セルを作成/取得して assignment_id を設定
-                    $koseiTorokuCell = \App\Models\ProgressCell::firstOrCreate(
-                        ['row_id' => $rowId, 'col_key' => $roundPrefix . '_kosei_toroku']
-                    );
-                    $koseiTorokuCell->update(['assignment_id' => $assignment->id]);
+                    // 旧セット方式フォールバック（_kumihan_toroku キー名パターン）
+                    if (! $proofColKey && preg_match('/^(.+)_kumihan_toroku$/', $kumihanCell->col_key, $m)) {
+                        $proofColKey = $m[1] . '_kosei_tanto';
+                    }
 
-                    // pja100 と校正セルを紐づけ
-                    $assignment->update(['progress_cell_id' => $koseiTantoCell->id]);
+                    if ($proofColKey) {
+                        $rowId     = $kumihanCell->row_id;
+                        $koseiCell = \App\Models\ProgressCell::firstOrCreate(
+                            ['row_id' => $rowId, 'col_key' => $proofColKey],
+                            ['cell_type' => 'proof_v2']
+                        );
+                        $koseiCell->update([
+                            'proof_assignment_id' => $assignment->id,
+                            'value_user_id'       => $assigneeUserId,
+                            'cell_type'           => 'proof_v2',
+                        ]);
 
-                    // ProofRequest.proof_cell_id を kosei_tanto セルに更新
-                    $proofRequest->proof_cell_id = $koseiTantoCell->id;
-                    $proofRequest->save();
+                        $assignment->update(['progress_cell_id' => $koseiCell->id]);
+
+                        $proofRequest->proof_cell_id = $koseiCell->id;
+                        $proofRequest->save();
+                    }
                 }
             }
 
@@ -1200,5 +1208,30 @@ class ProofRequestController extends Controller
                 }
             }
         }
+    }
+
+    /**
+     * column_config ツリーを再帰走査し、workerKey と同じ親グループ内の
+     * proof_v2（または旧 proof_user）型ノードの key を返す。見つからなければ null。
+     */
+    private function findProofUserSiblingKey(array $nodes, string $workerKey): ?string
+    {
+        foreach ($nodes as $node) {
+            if (! empty($node['children'])) {
+                $childKeys = array_column($node['children'], 'key');
+                if (in_array($workerKey, $childKeys, true)) {
+                    foreach ($node['children'] as $child) {
+                        if (in_array($child['type'] ?? '', ['proof_v2', 'proof_user'], true)) {
+                            return $child['key'];
+                        }
+                    }
+                }
+                $found = $this->findProofUserSiblingKey($node['children'], $workerKey);
+                if ($found !== null) {
+                    return $found;
+                }
+            }
+        }
+        return null;
     }
 }

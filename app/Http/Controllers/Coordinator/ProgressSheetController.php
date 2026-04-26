@@ -123,7 +123,7 @@ class ProgressSheetController extends Controller
 
         $rows = $sheet->rows()->orderBy('order')->get(['id', 'label', 'order', 'parent_id']);
 
-        $cells = ProgressCell::whereIn('row_id', $rows->pluck('id'))
+        $rawCells = ProgressCell::whereIn('row_id', $rows->pluck('id'))
             ->with([
                 'valueUser:id,name',
                 'valueSubcontractor:id,name',
@@ -132,8 +132,16 @@ class ProgressSheetController extends Controller
                 'schedule:id,name,end_date,completed_at',
                 'noteUser:id,name,user_role',
             ])
-            ->get()
-            ->map(fn($c) => [
+            ->get();
+
+        // proof_request pending 状態（依頼済みで未受理）を一括取得
+        $pendingProofCellIds = \App\Models\ProofRequest::where('status', 'pending')
+            ->whereIn('proof_cell_id', $rawCells->pluck('id')->filter())
+            ->pluck('proof_cell_id')
+            ->flip()
+            ->toArray();
+
+        $cells = $rawCells->map(fn($c) => [
                 'id'                          => $c->id,
                 'row_id'                      => $c->row_id,
                 'col_key'                     => $c->col_key,
@@ -154,7 +162,8 @@ class ProgressSheetController extends Controller
                 'assignment_end_date'         => $c->assignment?->desired_end_date?->format('Y-m-d'),
                 'proof_assignment_id'         => $c->proof_assignment_id,
                 'proof_assignment_title'      => $c->proofAssignment?->title,
-                'proof_assignment_completed'  => $c->proofAssignment?->completed,
+                'proof_assignment_completed'  => $c->proofAssignment?->completed || $c->proofAssignment?->proof_completed_at !== null,
+                'proof_request_pending'       => $c->id ? isset($pendingProofCellIds[$c->id]) : false,
                 // V2フィールド
                 'schedule_id'                 => $c->schedule_id,
                 'schedule_name'               => $c->schedule?->name,
@@ -410,7 +419,10 @@ class ProgressSheetController extends Controller
         $isAdmin = in_array($user->user_role, ['admin', 'superadmin', 'coordinator', 'clerk']);
         abort_unless($isAdmin, 403);
 
-        $assignment->update(['proof_completed_at' => now()]);
+        $assignment->update([
+            'proof_completed_at' => now(),
+            'completed'          => true,
+        ]);
 
         return response()->json(['success' => true]);
     }
@@ -780,6 +792,7 @@ class ProgressSheetController extends Controller
 
             $result[] = [
                 'parent_label'       => $pair['parent_label'],
+                'source_type'        => $pair['source_type'] ?? 'user',
                 'user_col_key'       => $userColKey,
                 'joblink_col_key'    => $joblinkColKey,
                 'worker_col_key'     => $userColKey,
@@ -865,13 +878,15 @@ class ProgressSheetController extends Controller
             if (!empty($children)) {
                 // 直接の children で user→joblink の連続ペアを探す
                 for ($i = 0; $i < count($children) - 1; $i++) {
-                    if (($children[$i]['type']     ?? '') === 'user'
+                    $srcType = $children[$i]['type'] ?? '';
+                    if (($srcType === 'user' || $srcType === 'proof_user')
                         && ($children[$i + 1]['type'] ?? '') === 'joblink'
                     ) {
                         $pairs[] = [
                             'parent_label' => $label,
                             'user_key'     => $children[$i]['key'],
                             'joblink_key'  => $children[$i + 1]['key'],
+                            'source_type'  => $srcType,
                         ];
                         $i++; // joblink ノードをスキップ
                     }
@@ -888,10 +903,12 @@ class ProgressSheetController extends Controller
      */
     private function transformColumnConfig(array $nodes, array $pairs): array
     {
-        // user_key → joblink_key のマップ
-        $pairMap     = [];
+        // user_key → joblink_key のマップ / user_key → source_type のマップ
+        $pairMap        = [];
+        $pairSourceType = [];
         foreach ($pairs as $pair) {
-            $pairMap[$pair['user_key']] = $pair['joblink_key'];
+            $pairMap[$pair['user_key']]        = $pair['joblink_key'];
+            $pairSourceType[$pair['user_key']] = $pair['source_type'] ?? 'user';
         }
         $joblinkKeys = array_values($pairMap);
 
@@ -902,12 +919,13 @@ class ProgressSheetController extends Controller
             $type     = $node['type'] ?? 'text';
             $children = $node['children'] ?? [];
 
-            if ($type === 'user' && isset($pairMap[$node['key']])) {
-                // user → worker に変換し、直後の joblink をスキップ
+            if (($type === 'user' || $type === 'proof_user') && isset($pairMap[$node['key']])) {
+                // user → worker に変換 / proof_user → proof_v2 に変換（V2統合型）
+                $targetType = ($pairSourceType[$node['key']] === 'proof_user') ? 'proof_v2' : 'worker';
                 $result[] = [
                     'key'   => $node['key'],
                     'label' => $node['label'] ?? '担当',
-                    'type'  => 'worker',
+                    'type'  => $targetType,
                 ];
                 if (isset($nodes[$i + 1]) && ($nodes[$i + 1]['type'] ?? '') === 'joblink') {
                     $i++;
@@ -917,16 +935,16 @@ class ProgressSheetController extends Controller
             } elseif (!empty($children)) {
                 $newChildren = $this->transformColumnConfig($children, $pairs);
 
-                // 元 children が user+joblink の2つのみ → 変換後 worker 1つ → 親ごと worker に置き換え
+                // 元 children が user/proof_user+joblink の2つのみ → 変換後1つ → 親ごと置き換え
                 $wasOnlyPair = count($children) === 2
-                    && ($children[0]['type'] ?? '') === 'user'
+                    && in_array($children[0]['type'] ?? '', ['user', 'proof_user'])
                     && ($children[1]['type'] ?? '') === 'joblink';
 
-                if ($wasOnlyPair && count($newChildren) === 1 && ($newChildren[0]['type'] ?? '') === 'worker') {
+                if ($wasOnlyPair && count($newChildren) === 1) {
                     $result[] = [
                         'key'   => $newChildren[0]['key'],
                         'label' => $node['label'] ?? $newChildren[0]['label'],
-                        'type'  => 'worker',
+                        'type'  => $newChildren[0]['type'],
                     ];
                 } else {
                     $node['children'] = $newChildren;

@@ -753,7 +753,7 @@
                         @click="addNextRound"
                     >＋ 校を追加</button>
                 </div>
-                <p class="mt-2 text-xs text-gray-400">各校に「組版担当・登録欄 + 校正担当・登録欄」が自動生成されます。</p>
+                <p class="mt-2 text-xs text-gray-400">各校に「組版担当（worker型）＋ 校正担当（proof_user型）」の2セルが自動生成されます。</p>
             </template>
 
             <div class="mt-5 flex justify-end gap-3">
@@ -1297,24 +1297,8 @@ function buildV2ColumnConfig(rounds) {
                 label,
                 type: 'text',
                 children: [
-                    {
-                        key: key + '_kumihan',
-                        label: '組版',
-                        type: 'text',
-                        children: [
-                            { key: key + '_kumihan_tanto',  label: '担当',   type: 'user' },
-                            { key: key + '_kumihan_toroku', label: '登録欄', type: 'joblink' },
-                        ],
-                    },
-                    {
-                        key: key + '_kosei',
-                        label: '校正',
-                        type: 'text',
-                        children: [
-                            { key: key + '_kosei_tanto',  label: '担当',   type: 'proof_user' },
-                            { key: key + '_kosei_toroku', label: '登録欄', type: 'joblink' },
-                        ],
-                    },
+                    { key: key + '_kumihan', label: '組版', type: 'worker' },
+                    { key: key + '_kosei',   label: '校正', type: 'proof_v2' },
                 ],
             };
         });
