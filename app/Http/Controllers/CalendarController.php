@@ -60,6 +60,8 @@ class CalendarController extends Controller
             $progressAssignmentIds = [];
             // 校正ジョブ（job_type='proof'）の assignment ID を取得（UTC 保存の時刻を正しく変換するため）
             $proofAssignmentIds = [];
+            $assignmentFlags = [];
+            $assignmentSenders = [];
             if (!empty($assignmentIds)) {
                 try {
                     $proofAssignmentIds = ProjectJobAssignment::whereIn('id', $assignmentIds)

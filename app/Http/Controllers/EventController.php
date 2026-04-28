@@ -830,12 +830,19 @@ class EventController extends Controller
     public function destroy(Event $event)
     {
         $this->authorize('delete', $event);
-        // 添付ファイルも削除
-        foreach ($event->attachments as $attachment) {
-            if ($attachment->path && Storage::disk('public')->exists($attachment->path)) {
-                Storage::disk('public')->delete($attachment->path);
+        // 添付ファイルも削除（エラーが出ても本体削除を続行）
+        try {
+            foreach ($event->attachments as $attachment) {
+                if ($attachment->path && Storage::disk('public')->exists($attachment->path)) {
+                    Storage::disk('public')->delete($attachment->path);
+                }
+                $attachment->delete();
             }
-            $attachment->delete();
+        } catch (\Throwable $e) {
+            Log::warning('EventController::destroy attachment deletion failed', [
+                'event_id' => $event->id,
+                'error'    => $e->getMessage(),
+            ]);
         }
         // イベント削除後、同じ assignment に紐づくイベントがなくなった場合は ProgressCell のリンクもクリア
         $assignmentIdToCheck = null;
@@ -869,8 +876,33 @@ class EventController extends Controller
             try {
                 $remaining = \App\Models\Event::where('project_job_assignment_id', $assignmentIdToCheck)->count();
                 if ($remaining === 0) {
+                    // progress_cells のリンクをクリア
                     \App\Models\ProgressCell::where('assignment_id', $assignmentIdToCheck)
                         ->update(['assignment_id' => null]);
+
+                    // PJA-B（マイジョブ）を取得し、元の依頼ジョブ（PJA-A）があればリセット
+                    $myJobAssignment = \App\Models\ProjectJobAssignment::find($assignmentIdToCheck);
+                    if ($myJobAssignment && $myJobAssignment->supersedes_assignment_id) {
+                        // PJA-A を未スケジュール状態に戻す → pendingRequests に再表示される
+                        \App\Models\ProjectJobAssignment::where('id', $myJobAssignment->supersedes_assignment_id)
+                            ->update([
+                                'accepted'     => false,
+                                'scheduled'    => false,
+                                'scheduled_at' => null,
+                            ]);
+                        Log::info('EventController::destroy: original requested assignment reset', [
+                            'original_assignment_id' => $myJobAssignment->supersedes_assignment_id,
+                            'my_job_assignment_id'   => $assignmentIdToCheck,
+                        ]);
+                    }
+
+                    // PJA-B（マイジョブ）を削除 → マイジョブ一覧から消え、依頼されたジョブに戻る
+                    if ($myJobAssignment) {
+                        $myJobAssignment->delete();
+                        Log::info('EventController::destroy: my-job assignment deleted', [
+                            'assignment_id' => $assignmentIdToCheck,
+                        ]);
+                    }
                 }
             } catch (\Throwable $e) { /* ignore */ }
 
