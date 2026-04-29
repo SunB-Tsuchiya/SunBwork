@@ -79,6 +79,9 @@ class HandleInertiaRequests extends Middleware
                             'isRepresentative'       => $request->user()->isAdmin() && $request->user()->isRepresentative(),
                             'isRepresentativeLeader' => $request->user()->isLeader() && $request->user()->isRepresentativeLeader(),
                             'isDepartmentLeader'     => $request->user()->isLeader() && $request->user()->isDepartmentLeader(),
+                            'isPrepressDepartment'   => $request->user()->isSuperAdmin() || $request->user()->isAdmin()
+                                ? true
+                                : (\App\Models\Department::find($request->user()->department_id)?->name === '製版'),
                         ]
                     )
                     : null,

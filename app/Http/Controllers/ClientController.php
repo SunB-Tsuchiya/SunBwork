@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\ChecksAdminPermission;
 use App\Http\Controllers\Concerns\ChecksLeaderPermission;
 use App\Models\Client;
 use App\Models\Company;
+use App\Models\Department;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -25,18 +26,41 @@ class ClientController extends Controller
         $this->requireLeaderPermission('client_management');
         $showDormant = $request->boolean('dormant', false);
         $user = Auth::user();
-        if ($user && $user->user_role === 'superadmin') {
-            $query = Client::query();
-        } else {
-            $companyId = $user->company_id ?? null;
-            $query = Client::forCompany($companyId);
+        $isSuperOrAdmin = in_array($user->user_role, ['superadmin', 'admin']);
+        $isLeader       = $user->user_role === 'leader';
+
+        if ($isSuperOrAdmin) {
+            $query   = Client::with('departments:id,name');
+            $clients = $showDormant ? $query->dormant()->get() : $query->active()->get();
+
+            return Inertia::render('Clients/Index', [
+                'clients'     => $clients,
+                'showDormant' => $showDormant,
+            ]);
         }
 
-        if ($showDormant) {
-            $clients = $query->dormant()->get();
-        } else {
-            $clients = $query->active()->get();
+        if ($isLeader) {
+            $companyId = $user->company_id ?? null;
+            $all = Client::with('departments:id,name')
+                ->forCompany($companyId);
+            $all = $showDormant ? $all->dormant()->get() : $all->active()->get();
+
+            $registered   = $all->filter(fn($c) => $c->departments->contains('id', $user->department_id))->values();
+            $unregistered = $all->filter(fn($c) => !$c->departments->contains('id', $user->department_id))->values();
+
+            return Inertia::render('Clients/Index', [
+                'clients'             => $registered,
+                'unregisteredClients' => $unregistered,
+                'showDormant'         => $showDormant,
+            ]);
         }
+
+        // Coordinator / Clerk など: 自部署のみ
+        $companyId = $user->company_id ?? null;
+        $query     = Client::with('departments:id,name')
+            ->forCompany($companyId)
+            ->whereHas('departments', fn($q) => $q->where('departments.id', $user->department_id));
+        $clients   = $showDormant ? $query->dormant()->get() : $query->active()->get();
 
         return Inertia::render('Clients/Index', [
             'clients'     => $clients,
@@ -49,7 +73,8 @@ class ClientController extends Controller
         $this->requireAdminPermission('client_management');
         $this->requireLeaderPermission('client_management');
         $this->authorize('create', Client::class);
-        return Inertia::render('Clients/Create');
+        $departments = Department::orderBy('id')->get(['id', 'name']);
+        return Inertia::render('Clients/Create', ['departments' => $departments]);
     }
 
     public function store(Request $request)
@@ -58,23 +83,43 @@ class ClientController extends Controller
         $this->requireLeaderPermission('client_management');
         $user = Auth::user();
         $this->authorize('create', Client::class);
+        $isSuperOrAdmin = in_array($user->user_role, ['superadmin', 'admin']);
+        $isLeader       = $user->user_role === 'leader';
 
-        $data = $request->validate([
-            'name' => 'required|string|max:255',
-            'detail' => 'nullable|string',
+        $rules = [
+            'name'       => 'required|string|max:255',
+            'detail'     => 'nullable|string',
             'company_id' => 'nullable|exists:companies,id',
-        ]);
+        ];
+        if ($isSuperOrAdmin) {
+            $rules['department_ids']   = 'nullable|array';
+            $rules['department_ids.*'] = 'exists:departments,id';
+        } elseif ($isLeader) {
+            $rules['department_ids']   = 'nullable|array';
+            $rules['department_ids.*'] = Rule::in([$user->department_id]);
+        }
 
-        // Non-superadmin users may only create clients for their own company
-        if (!($user && $user->user_role === 'superadmin')) {
+        $data = $request->validate($rules);
+        $departmentIds = $data['department_ids'] ?? null;
+        unset($data['department_ids']);
+
+        if (!$isSuperOrAdmin) {
             $data['company_id'] = $user->company_id ?? null;
         }
 
-        // DB column is `notes`, form sends `detail`
         $data['notes'] = $data['detail'] ?? null;
         unset($data['detail']);
 
-        Client::create($data);
+        $client = Client::create($data);
+
+        if ($isSuperOrAdmin && !empty($departmentIds)) {
+            $client->departments()->attach($departmentIds);
+        } elseif ($isLeader && !empty($departmentIds)) {
+            $client->departments()->attach($departmentIds);
+        } elseif (!$isSuperOrAdmin && !$isLeader && $user->department_id) {
+            $client->departments()->attach($user->department_id);
+        }
+
         return redirect()->route("{$this->routePrefix()}.clients.index");
     }
 
@@ -83,7 +128,12 @@ class ClientController extends Controller
         $this->requireAdminPermission('client_management');
         $this->requireLeaderPermission('client_management');
         $this->authorize('view', $client);
-        return Inertia::render('Clients/Edit', ['client' => $client]);
+        $client->load('departments:id,name');
+        $departments = Department::orderBy('id')->get(['id', 'name']);
+        return Inertia::render('Clients/Edit', [
+            'client'      => $client,
+            'departments' => $departments,
+        ]);
     }
 
     public function update(Request $request, Client $client)
@@ -92,23 +142,48 @@ class ClientController extends Controller
         $this->requireLeaderPermission('client_management');
         $this->authorize('update', $client);
 
-        $data = $request->validate([
-            'name' => 'required|string|max:255',
-            'detail' => 'nullable|string',
-            'company_id' => 'nullable|exists:companies,id',
-        ]);
-
-        // Non-superadmin users should not be able to change company_id
         $user = Auth::user();
-        if (!($user && $user->user_role === 'superadmin')) {
+        $isSuperOrAdmin = in_array($user->user_role, ['superadmin', 'admin']);
+        $isLeader       = $user->user_role === 'leader';
+
+        $rules = [
+            'name'       => 'required|string|max:255',
+            'detail'     => 'nullable|string',
+            'company_id' => 'nullable|exists:companies,id',
+        ];
+        if ($isSuperOrAdmin) {
+            $rules['department_ids']   = 'nullable|array';
+            $rules['department_ids.*'] = 'exists:departments,id';
+        } elseif ($isLeader) {
+            $rules['department_ids']   = 'nullable|array';
+            $rules['department_ids.*'] = Rule::in([$user->department_id]);
+        }
+
+        $data = $request->validate($rules);
+        $departmentIds = $data['department_ids'] ?? null;
+        unset($data['department_ids']);
+
+        if (!$isSuperOrAdmin) {
             unset($data['company_id']);
         }
 
-        // DB column is `notes`, form sends `detail`
         $data['notes'] = $data['detail'] ?? null;
         unset($data['detail']);
 
         $client->update($data);
+
+        if ($isSuperOrAdmin && $request->has('department_ids')) {
+            $client->departments()->sync($departmentIds ?? []);
+        } elseif ($isLeader && $request->has('department_ids')) {
+            // 自部署のみオン/オフ（他部署の紐付けは変更しない）
+            $ownDeptId = $user->department_id;
+            if (!empty($departmentIds) && in_array($ownDeptId, $departmentIds)) {
+                $client->departments()->syncWithoutDetaching([$ownDeptId]);
+            } else {
+                $client->departments()->detach($ownDeptId);
+            }
+        }
+
         return redirect()->route("{$this->routePrefix()}.clients.index");
     }
 
@@ -131,11 +206,33 @@ class ClientController extends Controller
             ->with('success', $msg);
     }
 
+    /** Leader が自部署とのクライアント紐付けをトグルする */
+    public function toggleDepartment(Client $client)
+    {
+        $this->requireLeaderPermission('client_management');
+        $user = Auth::user();
+        if ($user->user_role !== 'leader' || !$user->department_id) {
+            abort(403);
+        }
+
+        $deptId = $user->department_id;
+        if ($client->departments()->where('department_id', $deptId)->exists()) {
+            $client->departments()->detach($deptId);
+            $msg = "「{$client->name}」を自部署から外しました。";
+        } else {
+            $client->departments()->attach($deptId);
+            $msg = "「{$client->name}」を自部署に登録しました。";
+        }
+
+        return redirect()->route('leader.clients.index')->with('success', $msg);
+    }
+
     public function show(Client $client)
     {
         $this->requireAdminPermission('client_management');
         $this->requireLeaderPermission('client_management');
         $this->authorize('view', $client);
+        $client->load('departments:id,name');
         return Inertia::render('Clients/Show', ['client' => $client]);
     }
 
@@ -173,10 +270,12 @@ class ClientController extends Controller
         $this->requireLeaderPermission('client_management');
 
         $user  = Auth::user();
+        $isSuperOrAdmin = in_array($user->user_role, ['superadmin', 'admin']);
         $query = Client::select('id', 'name', 'is_dormant');
 
-        if (!($user && $user->user_role === 'superadmin')) {
-            $query->forCompany($user->company_id ?? null);
+        if (!$isSuperOrAdmin) {
+            $query->forCompany($user->company_id ?? null)
+                  ->whereHas('departments', fn($q) => $q->where('departments.id', $user->department_id));
         }
 
         // 案件作成等の通常用途は休眠クライアントを除外。
@@ -483,16 +582,19 @@ class ClientController extends Controller
         ]);
 
         $user = Auth::user();
-        $companyId = ($user && $user->user_role === 'superadmin')
+        $isSuperOrAdmin = in_array($user->user_role, ['superadmin', 'admin']);
+        $companyId = $isSuperOrAdmin
             ? $request->company_id
             : ($user->company_id ?? null);
+        $deptId = $isSuperOrAdmin ? 1 : ($user->department_id ?? 1);
 
         foreach ($request->clients as $row) {
-            Client::create([
+            $client = Client::create([
                 'name'       => $row['name'],
                 'notes'      => $row['detail'] ?? null,
                 'company_id' => $companyId,
             ]);
+            $client->departments()->attach($deptId);
         }
 
         $prefix = $this->routePrefix();

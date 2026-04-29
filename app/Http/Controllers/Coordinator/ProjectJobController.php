@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Coordinator;
 
 use App\Http\Controllers\Controller;
+use App\Services\PrepressImageService;
 use Illuminate\Http\Request;
 use App\Models\ProjectJob;
 use App\Models\ProjectSchedule;
@@ -17,6 +18,8 @@ use Illuminate\Support\Facades\Log;
 
 class ProjectJobController extends Controller
 {
+    public function __construct(private PrepressImageService $imageService) {}
+
     public function index(Request $request)
     {
         $user = $request->user();
@@ -246,6 +249,58 @@ class ProjectJobController extends Controller
             ->with('success', '案件を複製しました。タイトル・伝票番号・クライアントを確認・修正してください。');
     }
 
+    /**
+     * 他部署へ案件を共有（新規案件として登録）
+     * 共有対象フィールド: jobcode, title, client_id, size_id, page_count, detail
+     * 指定したリーダー/コーディネーターが user_id として登録される
+     */
+    public function share(Request $request, ProjectJob $projectJob)
+    {
+        $user = $request->user();
+        if (!$this->isJobCoordinator($projectJob, $user)) {
+            abort(403);
+        }
+
+        $data = $request->validate([
+            'target_user_id' => ['required', 'exists:users,id'],
+        ]);
+
+        $targetUser = \App\Models\User::findOrFail($data['target_user_id']);
+
+        // 自分の部署と異なる部署のユーザーのみ許可
+        if ($targetUser->department_id === $user->department_id) {
+            return back()->withErrors(['target_user_id' => '自部署のユーザーへの共有はできません。']);
+        }
+
+        $newJob = null;
+        DB::transaction(function () use ($projectJob, $targetUser, &$newJob) {
+            $newJob = ProjectJob::create([
+                'jobcode'           => $projectJob->jobcode,
+                'title'             => $projectJob->title,
+                'user_id'           => $targetUser->id,
+                'client_id'         => $projectJob->client_id,
+                'size_id'           => $projectJob->size_id,
+                'page_count'        => $projectJob->page_count,
+                'detail'            => $projectJob->detail,
+                'shared_from_id'    => $projectJob->id,
+                'image_path'        => $projectJob->image_path,
+                'original_filename' => $projectJob->original_filename,
+            ]);
+
+            // 共有先部署にクライアントが未登録の場合、自動で登録する
+            if ($projectJob->client_id && $targetUser->department_id) {
+                DB::table('client_departments')->insertOrIgnore([
+                    'client_id'     => $projectJob->client_id,
+                    'department_id' => $targetUser->department_id,
+                ]);
+            }
+        });
+
+        return redirect()
+            ->route('coordinator.project_jobs.show', $projectJob->id)
+            ->with('success', "「{$projectJob->title}」を {$targetUser->name} さんの部署に共有しました。");
+    }
+
     public function complete(Request $request, ProjectJob $projectJob)
     {
         $user = $request->user();
@@ -301,11 +356,21 @@ class ProjectJobController extends Controller
                 'sub_coordinator_ids.*' => 'exists:users,id',
                 'team_members'        => 'nullable|array',
                 'team_members.*.user_id' => 'required|integer|exists:users,id',
+                'image'               => ['nullable', 'file', 'mimes:jpg,jpeg,png,gif,webp,heic,heif,pdf', 'max:20480'],
             ]);
 
             $subIds = Arr::pull($data, 'sub_coordinator_ids', []);
             $teamMembers = Arr::pull($data, 'team_members', []);
-            
+            Arr::pull($data, 'image');
+
+            if ($request->hasFile('image') && $request->file('image')->isValid()) {
+                $imageMeta = $this->imageService->convertAndStore($request->file('image'));
+                if ($imageMeta) {
+                    $data['image_path']        = $imageMeta['path'];
+                    $data['original_filename'] = $imageMeta['original_filename'];
+                }
+            }
+
             $job = ProjectJob::create($data);
 
             // リーダー自身はピボットに入れない（重複回避）
@@ -706,6 +771,30 @@ class ProjectJobController extends Controller
             $proofHistory = [];
         }
 
+        // 他部署共有モーダル用: 現在ユーザーの部署以外の部署と、そのLeader/Coordinator
+        $currentDeptId = $request->user()->department_id;
+        $departmentCandidates = \App\Models\Department::where('active', true)
+            ->when($currentDeptId, fn ($q) => $q->where('id', '!=', $currentDeptId))
+            ->orderBy('sort_order')->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(function ($dept) {
+                $users = \App\Models\User::where('department_id', $dept->id)
+                    ->whereIn('user_role', ['leader', 'coordinator', 'clerk'])
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'user_role', 'department_id']);
+                return [
+                    'id'    => $dept->id,
+                    'name'  => $dept->name,
+                    'users' => $users->map(fn ($u) => [
+                        'id'        => $u->id,
+                        'name'      => $u->name,
+                        'user_role' => $u->user_role,
+                    ])->values()->toArray(),
+                ];
+            })
+            ->filter(fn ($d) => count($d['users']) > 0)
+            ->values();
+
         return Inertia::render('Coordinator/ProjectJobs/Show', [
             'job' => $projectJob,
             'subCoordinators' => $subCoordinators,
@@ -721,6 +810,14 @@ class ProjectJobController extends Controller
             'stages' => $stages,
             'sheetLinkedAssignmentIds' => $sheetLinkedAssignmentIds,
             'proofHistory' => $proofHistory,
+            'departmentCandidates' => $departmentCandidates,
+            'sharedJobs'           => $projectJob->sharedJobs()->with(['user', 'user.department'])->get()->map(fn ($j) => [
+                'id'              => $j->id,
+                'title'           => $j->title,
+                'user_id'         => $j->user_id,
+                'user_name'       => $j->user?->name,
+                'department_name' => $j->user?->department?->name,
+            ]),
         ]);
     }
 
@@ -907,6 +1004,60 @@ class ProjectJobController extends Controller
                 ->withErrors($e->validator)
                 ->withInput();
         }
+    }
+
+    public function storeImage(Request $request, ProjectJob $projectJob)
+    {
+        $user = $request->user();
+        if (!$this->isJobCoordinator($projectJob, $user)) {
+            abort(403);
+        }
+
+        $request->validate([
+            'image' => ['required', 'file', 'mimes:jpg,jpeg,png,gif,webp,heic,heif,pdf', 'max:20480'],
+        ]);
+
+        // 既存画像を削除
+        if ($projectJob->image_path) {
+            $this->imageService->delete($projectJob->image_path);
+        }
+
+        $imageMeta = $this->imageService->convertAndStore($request->file('image'));
+        if (!$imageMeta) {
+            return back()->withErrors(['image' => '画像の保存に失敗しました。']);
+        }
+
+        $projectJob->update([
+            'image_path'        => $imageMeta['path'],
+            'original_filename' => $imageMeta['original_filename'],
+        ]);
+
+        return back()->with('success', '伝票画像を保存しました。');
+    }
+
+    public function deleteImage(Request $request, ProjectJob $projectJob)
+    {
+        $user = $request->user();
+        if (!$this->isJobCoordinator($projectJob, $user)) {
+            abort(403);
+        }
+
+        if ($projectJob->image_path) {
+            // 同じ image_path を参照している共有先案件がある場合はファイルを削除しない
+            $otherJobs = ProjectJob::where('image_path', $projectJob->image_path)
+                ->where('id', '!=', $projectJob->id)
+                ->exists();
+            if (!$otherJobs) {
+                $this->imageService->delete($projectJob->image_path);
+            }
+        }
+
+        $projectJob->update([
+            'image_path'        => null,
+            'original_filename' => null,
+        ]);
+
+        return back()->with('success', '伝票画像を削除しました。');
     }
 
     public function destroy(ProjectJob $projectJob)

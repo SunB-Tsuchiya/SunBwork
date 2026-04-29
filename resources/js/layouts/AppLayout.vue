@@ -6,6 +6,7 @@ import DropdownLink from '@/Components/DropdownLink.vue';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
 import AdminNavigationTabs from '@/Components/Tabs/AdminNavigationTabs.vue';
 import ClerkNavigationTabs from '@/Components/Tabs/ClerkNavigationTabs.vue';
+import PrepressNavigationTabs from '@/Components/Tabs/PrepressNavigationTabs.vue';
 import CoordinatorNavigationTabs from '@/Components/Tabs/CoordinatorNavigationTabs.vue';
 import LeaderNavigationTabs from '@/Components/Tabs/LeaderNavigationTabs.vue';
 import ProofCoordinatorNavigationTabs from '@/Components/Tabs/ProofCoordinatorNavigationTabs.vue';
@@ -192,6 +193,7 @@ function roleNavClass(role) {
         coordinator:       'bg-green-600 text-white font-semibold',
         proof_coordinator: 'bg-pink-600 text-white font-semibold',
         user:              'bg-blue-500 text-white font-semibold',
+        prepress:          'bg-green-700 text-white font-semibold',
     };
     const inactiveMap = {
         superadmin:        'text-yellow-600 hover:text-yellow-800',
@@ -201,6 +203,7 @@ function roleNavClass(role) {
         coordinator:       'text-green-600 hover:text-green-800',
         proof_coordinator: 'text-pink-600 hover:text-pink-800',
         user:              'text-blue-600 hover:text-blue-800',
+        prepress:          'text-green-700 hover:text-green-900',
     };
     return `${base} ${currentRouteContext.value === role ? activeMap[role] : inactiveMap[role]}`;
 }
@@ -238,6 +241,7 @@ const currentRouteContext = computed(() => {
         if (r.startsWith('coordinator.')) return 'coordinator';
         if (r.startsWith('proof_coordinator.')) return 'proof_coordinator';
         if (r.startsWith('clerk.')) return 'clerk';
+        if (r.startsWith('prepress.')) return 'prepress';
         // user.project_jobs.* / user.jobbox.* は user エリア
         // それ以外の user.* も user エリア
         return 'user';
@@ -410,6 +414,7 @@ const currentRouteContext = computed(() => {
                             <Link :href="route('coordinator.dashboard')" :class="roleNavClass('coordinator')">Coordinator</Link>
                             <Link :href="route('proof_coordinator.dashboard')" :class="roleNavClass('proof_coordinator')">Proof Admin</Link>
                             <Link :href="route('user.dashboard')" :class="roleNavClass('user')">User</Link>
+                            <Link :href="route('prepress.dashboard')" :class="roleNavClass('prepress')">Prepress</Link>
                         </template>
 
                         <!-- Admin用ナビゲーション -->
@@ -420,6 +425,7 @@ const currentRouteContext = computed(() => {
                             <Link :href="route('coordinator.dashboard')" :class="roleNavClass('coordinator')">Coordinator</Link>
                             <Link :href="route('proof_coordinator.dashboard')" :class="roleNavClass('proof_coordinator')">Proof Admin</Link>
                             <Link :href="route('user.dashboard')" :class="roleNavClass('user')">User</Link>
+                            <Link :href="route('prepress.dashboard')" :class="roleNavClass('prepress')">Prepress</Link>
                         </template>
 
                         <!-- Leader用ナビゲーション（部署リーダーはClerk/ProofCoordinator も表示） -->
@@ -437,6 +443,11 @@ const currentRouteContext = computed(() => {
                             >Proof Admin</Link>
                             <Link :href="route('coordinator.dashboard')" :class="roleNavClass('coordinator')">Coordinator</Link>
                             <Link :href="route('user.dashboard')" :class="roleNavClass('user')">User</Link>
+                            <Link
+                                v-if="$page.props.auth.user.isPrepressDepartment"
+                                :href="route('prepress.dashboard')"
+                                :class="roleNavClass('prepress')"
+                            >Prepress</Link>
                         </template>
 
                         <!-- Clerk用ナビゲーション（Coordinator+User権限を持つ） -->
@@ -444,12 +455,22 @@ const currentRouteContext = computed(() => {
                             <Link :href="route('clerk.dashboard')" :class="roleNavClass('clerk')">Clerk</Link>
                             <Link :href="route('coordinator.dashboard')" :class="roleNavClass('coordinator')">Coordinator</Link>
                             <Link :href="route('user.dashboard')" :class="roleNavClass('user')">User</Link>
+                            <Link
+                                v-if="$page.props.auth.user.isPrepressDepartment"
+                                :href="route('prepress.dashboard')"
+                                :class="roleNavClass('prepress')"
+                            >Prepress</Link>
                         </template>
 
                         <!-- Coordinator用ナビゲーション -->
                         <template v-else-if="$page.props.auth.user.user_role === 'coordinator'">
                             <Link :href="route('coordinator.dashboard')" :class="roleNavClass('coordinator')">Coordinator</Link>
                             <Link :href="route('user.dashboard')" :class="roleNavClass('user')">User</Link>
+                            <Link
+                                v-if="$page.props.auth.user.isPrepressDepartment"
+                                :href="route('prepress.dashboard')"
+                                :class="roleNavClass('prepress')"
+                            >Prepress</Link>
                         </template>
 
                         <!-- ProofCoordinator用ナビゲーション -->
@@ -461,6 +482,11 @@ const currentRouteContext = computed(() => {
                         <!-- 一般ユーザー用ナビゲーション -->
                         <template v-else>
                             <Link :href="route('dashboard')" :class="roleNavClass('user')">Dashboard</Link>
+                            <Link
+                                v-if="$page.props.auth.user.isPrepressDepartment"
+                                :href="route('prepress.dashboard')"
+                                :class="roleNavClass('prepress')"
+                            >Prepress</Link>
                         </template>
                     </div>
                 </div>
@@ -493,6 +519,9 @@ const currentRouteContext = computed(() => {
                             <ResponsiveNavLink :href="route('user.dashboard')" :active="route().current('user.dashboard')">
                                 <span class="text-blue-600">User Dashboard</span>
                             </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('prepress.dashboard')" :active="route().current('prepress.dashboard')">
+                                <span class="text-green-700">Prepress Dashboard</span>
+                            </ResponsiveNavLink>
                         </template>
 
                         <!-- Admin用レスポンシブナビゲーション -->
@@ -508,6 +537,9 @@ const currentRouteContext = computed(() => {
                             </ResponsiveNavLink>
                             <ResponsiveNavLink :href="route('user.dashboard')" :active="route().current('user.dashboard')">
                                 <span class="text-blue-600">User Dashboard</span>
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('prepress.dashboard')" :active="route().current('prepress.dashboard')">
+                                <span class="text-green-700">Prepress Dashboard</span>
                             </ResponsiveNavLink>
                         </template>
 
@@ -532,11 +564,25 @@ const currentRouteContext = computed(() => {
                             <ResponsiveNavLink :href="route('user.dashboard')" :active="route().current('user.dashboard')">
                                 <span class="text-blue-600">User Dashboard</span>
                             </ResponsiveNavLink>
+                            <ResponsiveNavLink
+                                v-if="$page.props.auth.user.isPrepressDepartment"
+                                :href="route('prepress.dashboard')"
+                                :active="route().current('prepress.*')"
+                            >
+                                <span class="text-green-700">Prepress</span>
+                            </ResponsiveNavLink>
                         </template>
 
                         <!-- 一般ユーザー用レスポンシブナビゲーション -->
                         <template v-else>
                             <ResponsiveNavLink :href="route('dashboard')" :active="route().current('dashboard')"> Dashboard </ResponsiveNavLink>
+                            <ResponsiveNavLink
+                                v-if="$page.props.auth.user.isPrepressDepartment"
+                                :href="route('prepress.dashboard')"
+                                :active="route().current('prepress.*')"
+                            >
+                                <span class="text-green-700">Prepress</span>
+                            </ResponsiveNavLink>
                         </template>
                     </div>
 
@@ -649,6 +695,19 @@ const currentRouteContext = computed(() => {
                                 :active="route().current('coordinator.project_jobs.calendar')"
                             >
                                 <span class="text-green-600">案件カレンダー</span>
+                            </ResponsiveNavLink>
+                        </template>
+
+                        <!-- Prepress sub-tabs -->
+                        <template v-else-if="currentRouteContext === 'prepress'">
+                            <ResponsiveNavLink :href="route('prepress.dashboard')" :active="route().current('prepress.dashboard')">
+                                <span class="text-green-700">ダッシュボード</span>
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('prepress.board')" :active="route().current('prepress.board')">
+                                <span class="text-green-700">伝票ボード</span>
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('prepress.tickets.index')" :active="route().current('prepress.tickets.*')">
+                                <span class="text-green-700">伝票一覧</span>
                             </ResponsiveNavLink>
                         </template>
 
@@ -793,6 +852,7 @@ const currentRouteContext = computed(() => {
                                 <AdminNavigationTabs v-else-if="currentRouteContext === 'admin'" :active="getTopTabActive()" />
                                 <LeaderNavigationTabs v-else-if="currentRouteContext === 'leader'" :active="getTopTabActive()" />
                                 <ClerkNavigationTabs v-else-if="currentRouteContext === 'clerk'" :active="getTopTabActive()" />
+                                <PrepressNavigationTabs v-else-if="currentRouteContext === 'prepress'" :active="getTopTabActive()" />
                                 <ProofCoordinatorNavigationTabs v-else-if="currentRouteContext === 'proof_coordinator'" />
                                 <CoordinatorNavigationTabs
                                     v-else-if="currentRouteContext === 'coordinator'"

@@ -22,8 +22,8 @@
         <div class="sticky top-0 z-20 rounded-t bg-white px-6 pt-6 pb-0 shadow-md">
 
             <!-- ── タイトル行 ──────────────────────────────────── -->
-            <div class="mb-4 flex flex-wrap items-start gap-5">
-                <!-- 左：クライアント / 案件名 / サブ情報 -->
+            <div class="mb-4">
+                <!-- クライアント / 案件名 / サブ情報 -->
                 <div>
                     <p class="text-sm font-medium text-gray-400">
                         {{ job.client?.name || 'クライアント未設定' }}
@@ -40,12 +40,12 @@
                         <span v-if="job.page_count">総ページ数: <span class="font-medium text-gray-700">{{ job.page_count }} ページ</span></span>
                     </p>
                     <p v-if="subCoordinators.length > 0" class="mt-0.5 text-xs text-gray-400">
-                        サブCo: {{ subCoordinators.map((c) => c.name).join('、') }}
+                        サブリーダー: {{ subCoordinators.map((c) => c.name).join('、') }}
                     </p>
                 </div>
 
-                <!-- タイトル横：アクションボタン群 -->
-                <div class="flex flex-wrap items-center gap-2 pt-1">
+                <!-- アクションボタン群（サブリーダーの下） -->
+                <div class="mt-3 flex flex-wrap items-center gap-2">
                     <button
                         type="button"
                         :class="job.completed
@@ -54,11 +54,51 @@
                         :disabled="job.completed"
                         @click="goEdit"
                     >編集</button>
+                    <!-- 共有済バッジ or 共有ボタン -->
+                    <div class="relative" ref="shareButtonRef">
+                        <button
+                            v-if="sharedJobs.length > 0"
+                            type="button"
+                            class="rounded border border-emerald-500 bg-emerald-50 px-4 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-100"
+                            @click.stop="toggleSharedPopup"
+                        >✓ 共有済 ({{ sharedJobs.length }})</button>
+                        <button
+                            v-else
+                            type="button"
+                            class="rounded bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-emerald-700"
+                            @click="openShareModal"
+                        >共有</button>
+
+                        <!-- 共有先一覧ポップアップ -->
+                        <div
+                            v-if="showSharedPopup"
+                            class="absolute left-0 top-full z-30 mt-1 min-w-[260px] rounded-lg border border-emerald-200 bg-white shadow-lg"
+                            @click.stop
+                        >
+                            <div class="flex items-center justify-between border-b px-4 py-2">
+                                <span class="text-sm font-semibold text-gray-700">共有済の部署・リーダー</span>
+                                <button type="button" class="text-xs text-gray-400 hover:text-gray-600" @click="showSharedPopup = false">✕</button>
+                            </div>
+                            <ul class="divide-y divide-gray-100">
+                                <li v-for="sj in sharedJobs" :key="sj.id" class="px-4 py-2 text-sm">
+                                    <p class="font-medium text-gray-800">{{ sj.department_name || '部署未設定' }}</p>
+                                    <p class="text-xs text-gray-500">{{ sj.user_name || '—' }}</p>
+                                </li>
+                            </ul>
+                            <div class="border-t px-4 py-2">
+                                <button
+                                    type="button"
+                                    class="text-xs text-emerald-700 hover:underline"
+                                    @click="showSharedPopup = false; openShareModal()"
+                                >さらに別の部署へ共有する</button>
+                            </div>
+                        </div>
+                    </div>
                     <button
                         type="button"
                         class="rounded border border-blue-400 px-4 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-50"
                         @click="cloneJob"
-                    >この案件を複製する</button>
+                    >案件複製</button>
                     <button
                         type="button"
                         class="rounded bg-cyan-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-cyan-700"
@@ -634,6 +674,58 @@
                     </template><!-- /historyOpen -->
                 </section>
 
+                <!-- ── 伝票情報タブ ──────────────────────────────── -->
+                <section v-show="activeTab === 'voucher'" class="py-5">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-semibold text-gray-800">伝票情報</h3>
+                        <!-- 画像がない場合のアップロードボタン -->
+                        <label
+                            v-if="!job.image_url && !job.completed"
+                            class="cursor-pointer rounded-lg border border-green-700 px-4 py-1.5 text-sm font-medium text-green-700 hover:bg-green-50"
+                            :class="{ 'opacity-50 pointer-events-none': voucherForm.processing }"
+                        >
+                            {{ voucherForm.processing ? 'アップロード中...' : '📎 画像をアップロード' }}
+                            <input type="file" accept="image/*,.pdf" class="hidden" :disabled="voucherForm.processing" @change="onVoucherFileChange" />
+                        </label>
+                    </div>
+
+                    <!-- 画像あり -->
+                    <div v-if="job.image_url">
+                        <div class="relative inline-block">
+                            <img
+                                :src="job.image_url"
+                                :alt="job.original_filename ?? '伝票画像'"
+                                class="h-48 w-auto cursor-pointer rounded-lg border border-gray-200 object-contain shadow-sm"
+                                @click="showVoucherLightbox = true"
+                            />
+                        </div>
+                        <div class="mt-2 flex flex-wrap items-center gap-2">
+                            <span class="max-w-xs truncate text-xs text-gray-500">{{ job.original_filename }}</span>
+                            <button
+                                type="button"
+                                class="rounded border border-gray-300 px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-50"
+                                @click="showVoucherLightbox = true"
+                            >🔍 拡大</button>
+                            <!-- 差し替えボタン -->
+                            <label v-if="!job.completed" class="cursor-pointer rounded border border-blue-400 px-2 py-0.5 text-xs text-blue-600 hover:bg-blue-50" :class="{ 'opacity-50 pointer-events-none': voucherForm.processing }">
+                                {{ voucherForm.processing ? 'アップロード中...' : '📁 差し替え' }}
+                                <input type="file" accept="image/*,.pdf" class="hidden" :disabled="voucherForm.processing" @change="onVoucherFileChange" />
+                            </label>
+                            <!-- 削除ボタン -->
+                            <button
+                                v-if="!job.completed"
+                                type="button"
+                                class="rounded border border-red-400 px-2 py-0.5 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50"
+                                :disabled="voucherForm.processing"
+                                @click="confirmDeleteVoucherImage"
+                            >✕ 削除</button>
+                        </div>
+                    </div>
+
+                    <!-- 画像なし -->
+                    <p v-else class="text-sm text-gray-400">伝票画像なし</p>
+                </section>
+
                 <!-- ── 連携設定タブ ──────────────────────────────── -->
                 <section v-show="activeTab === 'items'" class="py-5">
                     <ProjectJobItemsTab :progress-sheets="progressSheets" />
@@ -907,12 +999,104 @@
         </div>
     </div>
 
+    <!-- ── 共有モーダル ────────────────────────────────────────────── -->
+    <Teleport to="body">
+        <div
+            v-if="showShareModal"
+            class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 pt-10 pb-10"
+            @click.self="closeShareModal"
+        >
+            <div class="mx-auto w-full max-w-lg rounded-lg bg-white shadow-xl">
+                <!-- ヘッダー -->
+                <div class="flex items-center justify-between border-b px-5 py-4">
+                    <h2 class="text-base font-semibold text-gray-800">他部署に案件を共有</h2>
+                    <button type="button" class="text-gray-400 hover:text-gray-600" @click="closeShareModal">✕</button>
+                </div>
+
+                <!-- 共有内容 -->
+                <div class="border-b bg-gray-50 px-5 py-3 text-sm text-gray-600">
+                    <p class="font-medium text-gray-700">共有する案件</p>
+                    <p class="mt-1">{{ job.jobcode ? '伝票番号: ' + job.jobcode + '　' : '' }}{{ job.title }}</p>
+                    <p class="mt-0.5 text-xs text-gray-500">クライアント・サイズ・総ページ数・詳細を含めてコピーします（変更は連動しません）</p>
+                </div>
+
+                <div class="px-5 py-4 space-y-4">
+                    <!-- 部署選択 -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">部署を選択</label>
+                        <select
+                            v-model="shareSelectedDeptId"
+                            class="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                            @change="shareSelectedUserId = null"
+                        >
+                            <option :value="null">-- 部署を選択してください --</option>
+                            <option v-for="dept in shareDepartments" :key="dept.id" :value="dept.id">
+                                {{ dept.name }}
+                            </option>
+                        </select>
+                    </div>
+
+                    <!-- リーダー/Co選択 -->
+                    <div v-if="shareSelectedDeptId">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">リーダー / コーディネーターを指名</label>
+                        <div v-if="shareUsersInDept.length === 0" class="text-sm text-gray-400">この部署にリーダー・コーディネーターがいません</div>
+                        <div v-else class="space-y-1">
+                            <label
+                                v-for="u in shareUsersInDept"
+                                :key="u.id"
+                                class="flex cursor-pointer items-center gap-3 rounded border px-3 py-2 text-sm hover:bg-gray-50"
+                                :class="shareSelectedUserId === u.id ? 'border-emerald-400 bg-emerald-50' : 'border-gray-200'"
+                            >
+                                <input type="radio" :value="u.id" v-model="shareSelectedUserId" class="accent-emerald-600" />
+                                <span class="font-medium text-gray-800">{{ u.name }}</span>
+                                <span class="ml-auto text-xs text-gray-400">{{ roleLabel(u.user_role) }}</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- フッター -->
+                <div class="flex items-center justify-end gap-3 border-t px-5 py-4">
+                    <button type="button" class="rounded border px-4 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50" @click="closeShareModal">キャンセル</button>
+                    <button
+                        type="button"
+                        class="rounded bg-emerald-600 px-5 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                        :disabled="!shareSelectedUserId || shareSubmitting"
+                        @click="submitShare"
+                    >{{ shareSubmitting ? '共有中...' : '共有する' }}</button>
+                </div>
+            </div>
+        </div>
+    </Teleport>
+
+    <!-- 伝票画像ライトボックス -->
+    <Teleport to="body">
+        <div
+            v-if="showVoucherLightbox && job.image_url"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+            @click.self="showVoucherLightbox = false"
+        >
+            <div class="relative max-h-[90vh] max-w-[90vw]">
+                <img
+                    :src="job.image_url"
+                    :alt="job.original_filename ?? '伝票画像'"
+                    class="max-h-[85vh] max-w-[88vw] rounded-lg object-contain"
+                />
+                <button
+                    type="button"
+                    class="absolute -right-3 -top-3 flex h-8 w-8 items-center justify-center rounded-full bg-white text-gray-800 shadow-md hover:bg-gray-100"
+                    @click="showVoucherLightbox = false"
+                >✕</button>
+            </div>
+        </div>
+    </Teleport>
+
 </template>
 
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
 import ProjectJobItemsTab from '@/Components/ProjectJobItemsTab.vue';
-import { Link, router, usePage } from '@inertiajs/vue3';
+import { Link, router, usePage, useForm } from '@inertiajs/vue3';
 import axios from 'axios';
 import { computed, onMounted, ref, watch } from 'vue';
 
@@ -1094,10 +1278,35 @@ const tabs = [
     { key: 'overview',  label: '概要・メンバー' },
     { key: 'progress',  label: '進行管理表' },
     { key: 'schedule',  label: 'スケジュール' },
+    { key: 'voucher',   label: '伝票情報' },
     { key: 'items',     label: '連携設定' },
     { key: 'history',   label: 'ジョブ履歴' },
 ];
 const activeTab = ref(new URLSearchParams(window.location.search).get('tab') || 'overview');
+
+// ── 伝票画像 ─────────────────────────────────────────────────────────────────
+const showVoucherLightbox = ref(false);
+const voucherForm = useForm({ image: null });
+
+function onVoucherFileChange(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    voucherForm.image = file;
+    voucherForm.post(route('coordinator.project_jobs.image.store', { projectJob: job.id }), {
+        forceFormData: true,
+        preserveScroll: true,
+        onSuccess: () => { voucherForm.reset(); },
+        onError: () => { alert('画像のアップロードに失敗しました。'); },
+    });
+}
+
+function confirmDeleteVoucherImage() {
+    if (!confirm('伝票画像を削除しますか？')) return;
+    router.delete(route('coordinator.project_jobs.image.destroy', { projectJob: job.id }), {
+        preserveScroll: true,
+    });
+}
 
 // hasSchedule flag (server-side or derived)
 const serverHasSchedule = page.props.hasSchedule;
@@ -1190,6 +1399,82 @@ function editMembers() {
     if (selectedIds.length) params.push('selected_user_ids=' + encodeURIComponent(selectedIds.join(',')));
     if (params.length) url += '?' + params.join('&');
     router.visit(url);
+}
+
+// ── 共有モーダル ─────────────────────────────────────────────────────────
+const shareDepartments = computed(() => {
+    const d = page.props.departmentCandidates;
+    return Array.isArray(d) ? d : [];
+});
+
+// 既共有一覧（サーバーから渡されたもの + 今セッションで追加したもの）
+const sharedJobsFromServer = computed(() => {
+    const s = page.props.sharedJobs;
+    return Array.isArray(s) ? s : [];
+});
+const sharedJobsLocal = ref([]);
+const sharedJobs = computed(() => [...sharedJobsFromServer.value, ...sharedJobsLocal.value]);
+
+// 共有済ポップアップ
+const showSharedPopup = ref(false);
+function toggleSharedPopup() {
+    showSharedPopup.value = !showSharedPopup.value;
+}
+// ポップアップ外クリックで閉じる
+if (typeof window !== 'undefined') {
+    window.addEventListener('click', () => { showSharedPopup.value = false; });
+}
+
+const showShareModal    = ref(false);
+const shareSelectedDeptId = ref(null);
+const shareSelectedUserId = ref(null);
+const shareSubmitting   = ref(false);
+
+const shareUsersInDept = computed(() => {
+    if (!shareSelectedDeptId.value) return [];
+    const dept = shareDepartments.value.find(d => d.id === shareSelectedDeptId.value);
+    return dept ? (dept.users ?? []) : [];
+});
+
+function roleLabel(role) {
+    const map = { leader: 'リーダー', coordinator: 'コーディネーター', clerk: '事務' };
+    return map[role] ?? role;
+}
+
+function openShareModal() {
+    shareSelectedDeptId.value = null;
+    shareSelectedUserId.value = null;
+    showShareModal.value = true;
+}
+
+function closeShareModal() {
+    showShareModal.value = false;
+}
+
+function submitShare() {
+    if (!shareSelectedUserId.value || shareSubmitting.value) return;
+    shareSubmitting.value = true;
+    // 選択中ユーザー情報を手元でも保持（リロード前に即時反映）
+    const selectedUser = shareUsersInDept.value.find(u => u.id === shareSelectedUserId.value);
+    const selectedDept = shareDepartments.value.find(d => d.id === shareSelectedDeptId.value);
+    router.post(
+        route('coordinator.project_jobs.share', { projectJob: job.id }),
+        { target_user_id: shareSelectedUserId.value },
+        {
+            onFinish: () => { shareSubmitting.value = false; },
+            onSuccess: () => {
+                // ローカルリストに追加（ページリロード後はサーバーから来る）
+                if (selectedUser && selectedDept) {
+                    sharedJobsLocal.value.push({
+                        id: null,
+                        user_name: selectedUser.name,
+                        department_name: selectedDept.name,
+                    });
+                }
+                closeShareModal();
+            },
+        }
+    );
 }
 
 function cloneJob() {

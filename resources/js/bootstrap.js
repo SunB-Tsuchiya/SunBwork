@@ -6,6 +6,8 @@ axios.defaults.withCredentials = true; // これも必須
 window.axios = axios;
 window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 window.axios.defaults.withCredentials = true;
+window.axios.defaults.headers.common['X-CSRF-TOKEN'] =
+    document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
 
 // SPAでAPI認証が必要な場合、初回にCSRFクッキーを取得してから Echo を初期化
 import Echo from 'laravel-echo';

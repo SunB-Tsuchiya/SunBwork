@@ -433,6 +433,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('clients/check-duplicate', [App\Http\Controllers\ClientController::class, 'checkDuplicate'])->name('clients.check_duplicate');
         Route::post('clients/{client}/merge', [App\Http\Controllers\ClientController::class, 'merge'])->name('clients.merge');
         Route::post('clients/{client}/dormant', [App\Http\Controllers\ClientController::class, 'dormant'])->name('clients.dormant');
+        Route::post('clients/{client}/toggle-department', [App\Http\Controllers\ClientController::class, 'toggleDepartment'])->name('clients.toggle_department');
         Route::resource('clients', App\Http\Controllers\ClientController::class)->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
         // Leader diary interactions (leader can view diaries for departments/units they lead)
         Route::get('diaryinteractions', [App\Http\Controllers\Diaries\DiaryInteractionController::class, 'index'])->name('diaryinteractions.index');
@@ -559,6 +560,9 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('project_jobs/{projectJob}/complete', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'complete'])->name('project_jobs.complete');
         Route::post('project_jobs/{projectJob}/uncomplete', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'uncomplete'])->name('project_jobs.uncomplete');
         Route::post('project_jobs/{projectJob}/clone', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'clone'])->name('project_jobs.clone');
+        Route::post('project_jobs/{projectJob}/share', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'share'])->name('project_jobs.share');
+        Route::post('project_jobs/{projectJob}/image', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'storeImage'])->name('project_jobs.image.store');
+        Route::delete('project_jobs/{projectJob}/image', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'deleteImage'])->name('project_jobs.image.destroy');
         // メンバー予定表（静的サブパスなので {projectJob} の前に定義）
         Route::get('project_jobs/{projectJob}/member-schedule', [App\Http\Controllers\Coordinator\ProjectJobMemberScheduleController::class, 'index'])->name('project_jobs.member_schedule');
         Route::get('project_jobs/{projectJob}/member-schedule/data', [App\Http\Controllers\Coordinator\ProjectJobMemberScheduleController::class, 'data'])->name('project_jobs.member_schedule.data');
@@ -768,6 +772,31 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::put('dispatchers/{dispatcher}/toggle', [\App\Http\Controllers\ProofCoordinator\ProofDispatcherController::class, 'toggle'])->name('dispatchers.toggle');
         Route::resource('dispatchers', \App\Http\Controllers\ProofCoordinator\ProofDispatcherController::class)
             ->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy']);
+    });
+
+// =====================================================
+// Prepress Routes（製版部署専用）
+// =====================================================
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified'])
+    ->prefix('prepress')
+    ->name('prepress.')
+    ->group(function () {
+        Route::get('dashboard', [\App\Http\Controllers\Prepress\PrepressDashboardController::class, 'index'])->name('dashboard');
+
+        // 伝票ボード
+        Route::get('board', [\App\Http\Controllers\Prepress\BoardController::class, 'index'])->name('board');
+        Route::patch('board/{ticket}/status', [\App\Http\Controllers\Prepress\BoardController::class, 'updateStatus'])->name('board.updateStatus');
+        // 伝票登録モーダル用 API
+        Route::get('api/clients', [\App\Http\Controllers\Prepress\BoardController::class, 'apiClients'])->name('api.clients');
+        Route::get('api/project-jobs', [\App\Http\Controllers\Prepress\BoardController::class, 'apiProjectJobs'])->name('api.projectJobs');
+
+        // 伝票管理
+        Route::get('tickets', [\App\Http\Controllers\Prepress\TicketController::class, 'index'])->name('tickets.index');
+        Route::get('tickets/create', [\App\Http\Controllers\Prepress\TicketController::class, 'create'])->name('tickets.create');
+        Route::post('tickets', [\App\Http\Controllers\Prepress\TicketController::class, 'store'])->name('tickets.store');
+        Route::patch('tickets/{ticket}/status', [\App\Http\Controllers\Prepress\TicketController::class, 'updateStatus'])->name('tickets.updateStatus');
+        Route::post('tickets/{ticket}/image', [\App\Http\Controllers\Prepress\TicketController::class, 'updateImage'])->name('tickets.updateImage');
+        Route::delete('tickets/{ticket}', [\App\Http\Controllers\Prepress\TicketController::class, 'destroy'])->name('tickets.destroy');
     });
 
 // 全ロール共通（読み取り専用）

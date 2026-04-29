@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Client extends Model
 {
@@ -22,6 +23,11 @@ class Client extends Model
         'fromSB'     => 'boolean',
         'is_dormant' => 'boolean',
     ];
+
+    public function departments(): BelongsToMany
+    {
+        return $this->belongsToMany(Department::class, 'client_departments');
+    }
 
     public function projectJobs()
     {

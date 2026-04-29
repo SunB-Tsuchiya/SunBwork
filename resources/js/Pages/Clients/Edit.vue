@@ -3,7 +3,16 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, useForm, usePage, router } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 
-const props = defineProps({ client: Object });
+const DEPT_COLORS = {
+    '情報出版': 'bg-blue-100 text-blue-700',
+    '製版':     'bg-green-100 text-green-700',
+    'オンデマンド': 'bg-purple-100 text-purple-700',
+};
+
+const props = defineProps({
+    client:      Object,
+    departments: { type: Array, default: () => [] },
+});
 
 const page = usePage();
 const routePrefix = computed(() => {
@@ -12,10 +21,15 @@ const routePrefix = computed(() => {
     if (role === 'coordinator') return 'coordinator';
     return 'leader';
 });
+const isAdmin    = computed(() => ['admin', 'superadmin'].includes(page.props.auth?.user?.user_role));
+const isLeader   = computed(() => page.props.auth?.user?.user_role === 'leader');
+const userDeptId = computed(() => page.props.auth?.user?.department_id);
+const ownDept    = computed(() => props.departments.find(d => d.id === userDeptId.value));
 
 const form = useForm({
-    name: props.client.name,
-    detail: props.client.notes,
+    name:           props.client.name,
+    detail:         props.client.notes,
+    department_ids: (props.client.departments ?? []).map(d => d.id),
 });
 
 function submit() {
@@ -145,6 +159,40 @@ function executeMerge() {
                     <label class="mb-1 block">詳細</label>
                     <textarea v-model="form.detail" class="w-full rounded border px-2 py-1"></textarea>
                 </div>
+
+                <!-- Admin/SuperAdmin: 全部署から複数選択 -->
+                <div v-if="isAdmin" class="mb-4">
+                    <label class="mb-2 block text-sm font-medium text-gray-700">部署 <span class="text-xs text-gray-400">（複数選択可）</span></label>
+                    <div class="flex flex-wrap gap-3">
+                        <label
+                            v-for="dept in props.departments"
+                            :key="dept.id"
+                            class="flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1 text-sm transition-colors"
+                            :class="form.department_ids.includes(dept.id)
+                                ? (DEPT_COLORS[dept.name] ?? 'bg-gray-100 text-gray-700') + ' border-transparent font-medium'
+                                : 'border-gray-300 text-gray-500 hover:border-gray-400'"
+                        >
+                            <input type="checkbox" :value="dept.id" v-model="form.department_ids" class="hidden" />
+                            {{ dept.name }}
+                        </label>
+                    </div>
+                    <p v-if="form.errors.department_ids" class="mt-1 text-xs text-red-600">{{ form.errors.department_ids }}</p>
+                </div>
+
+                <!-- Leader: 自部署のみオン/オフ -->
+                <div v-else-if="isLeader && ownDept" class="mb-4">
+                    <label class="mb-2 block text-sm font-medium text-gray-700">部署</label>
+                    <label
+                        class="inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1 text-sm transition-colors"
+                        :class="form.department_ids.includes(ownDept.id)
+                            ? (DEPT_COLORS[ownDept.name] ?? 'bg-gray-100 text-gray-700') + ' border-transparent font-medium'
+                            : 'border-gray-300 text-gray-500 hover:border-gray-400'"
+                    >
+                        <input type="checkbox" :value="ownDept.id" v-model="form.department_ids" class="hidden" />
+                        {{ ownDept.name }}
+                    </label>
+                </div>
+
                 <!-- 休眠バッジ -->
                 <div v-if="props.client.is_dormant" class="mb-4 flex items-center gap-2 rounded-md border border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-600">
                     <svg class="h-4 w-4 flex-shrink-0 text-gray-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 
 class ProjectJob extends Model
 {
@@ -19,13 +20,23 @@ class ProjectJob extends Model
         'page_count',
         'schedule',
         'completed',
+        'shared_from_id',
+        'image_path',
+        'original_filename',
     ];
+
+    protected $appends = ['image_url'];
 
     protected $casts = [
         'schedule' => 'array',
         'completed' => 'boolean',
         'page_count' => 'integer',
     ];
+
+    public function getImageUrlAttribute(): ?string
+    {
+        return $this->image_path ? Storage::disk('public')->url($this->image_path) : null;
+    }
 
     public function user()
     {
@@ -74,5 +85,17 @@ class ProjectJob extends Model
     public function items()
     {
         return $this->hasMany(\App\Models\ProjectJobItem::class, 'project_job_id');
+    }
+
+    // この案件から共有されて作られた案件一覧
+    public function sharedJobs()
+    {
+        return $this->hasMany(ProjectJob::class, 'shared_from_id');
+    }
+
+    // この案件の共有元案件
+    public function sharedFrom()
+    {
+        return $this->belongsTo(ProjectJob::class, 'shared_from_id');
     }
 }

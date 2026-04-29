@@ -82,6 +82,75 @@
                     <textarea v-model="form.detail" class="w-full rounded border px-3 py-2" rows="3"></textarea>
                 </div>
 
+                <!-- 伝票画像 -->
+                <div class="mb-6">
+                    <label class="mb-2 block font-semibold">作業ファイル情報（伝票画像）</label>
+
+                    <!-- 既存画像あり -->
+                    <div v-if="currentImageUrl">
+                        <div class="relative inline-block">
+                            <img
+                                :src="currentImageUrl"
+                                :alt="props.job.original_filename ?? '伝票画像'"
+                                class="h-40 w-auto cursor-pointer rounded-lg border border-gray-200 object-contain shadow-sm"
+                                @click="showLightbox = true"
+                            />
+                        </div>
+                        <div class="mt-2 flex flex-wrap items-center gap-2">
+                            <span class="max-w-xs truncate text-xs text-gray-500">{{ props.job.original_filename }}</span>
+                            <button type="button" class="rounded border border-gray-300 px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-50" @click="showLightbox = true">🔍 拡大</button>
+                            <label class="cursor-pointer rounded border border-blue-400 px-2 py-0.5 text-xs text-blue-600 hover:bg-blue-50">
+                                📁 差し替え
+                                <input type="file" accept="image/*,.pdf" class="hidden" @change="onVoucherFileChange" />
+                            </label>
+                            <button type="button" class="rounded border border-red-400 px-2 py-0.5 text-xs text-red-600 hover:bg-red-50" @click="confirmDeleteVoucherImage">✕ 削除</button>
+                        </div>
+                        <p v-if="voucherError" class="mt-1 text-xs text-red-600">{{ voucherError }}</p>
+                    </div>
+
+                    <!-- 新規プレビュー（ローカル選択後・まだ未保存） -->
+                    <div v-else-if="previewUrl">
+                        <div class="relative inline-block">
+                            <img :src="previewUrl" :alt="previewName" class="h-40 w-auto cursor-pointer rounded-lg border border-gray-200 object-contain shadow-sm" @click="showLightbox = true" />
+                            <button type="button" class="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-xs text-white shadow hover:bg-red-600" @click="removePreview">✕</button>
+                        </div>
+                        <div class="mt-2 flex items-center gap-2">
+                            <span class="max-w-xs truncate text-xs text-gray-500">{{ previewName }}</span>
+                            <button type="button" class="rounded border border-green-600 px-3 py-1 text-xs text-green-700 hover:bg-green-50" :disabled="voucherUploading" @click="uploadPendingFile">
+                                {{ voucherUploading ? 'アップロード中...' : '💾 保存する' }}
+                            </button>
+                            <button type="button" class="rounded border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50" @click="showLightbox = true">🔍 拡大</button>
+                        </div>
+                        <p v-if="voucherError" class="mt-1 text-xs text-red-600">{{ voucherError }}</p>
+                    </div>
+
+                    <!-- 画像なし -->
+                    <div v-else>
+                        <div
+                            class="flex flex-col items-center justify-center rounded-lg border-2 border-dashed px-6 py-8 transition-colors"
+                            :class="isDragging ? 'border-green-500 bg-green-50' : 'border-gray-300 bg-gray-50 hover:border-green-400'"
+                            @dragover.prevent="isDragging = true"
+                            @dragleave="isDragging = false"
+                            @drop.prevent="onDropZoneDrop"
+                        >
+                            <div class="mb-2 text-3xl text-gray-400">📎</div>
+                            <p class="text-sm text-gray-600">ここに画像をドロップ</p>
+                            <p class="mt-1 text-xs text-gray-400">JPG / PNG / WEBP / HEIC / GIF / PDF 対応（最大 20MB）</p>
+                        </div>
+                        <div class="mt-3 flex flex-wrap gap-2">
+                            <label class="cursor-pointer rounded-lg border border-green-700 px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-50">
+                                📁 フォルダから選ぶ
+                                <input type="file" accept="image/*,.pdf" class="hidden" @change="onFileInputChange" />
+                            </label>
+                            <label v-if="isMobile" class="cursor-pointer rounded-lg border border-gray-400 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">
+                                📷 カメラ画像を取り込む
+                                <input type="file" accept="image/*" capture="environment" class="hidden" @change="onFileInputChange" />
+                            </label>
+                        </div>
+                        <p v-if="voucherError" class="mt-1 text-xs text-red-600">{{ voucherError }}</p>
+                    </div>
+                </div>
+
                 <!-- スケジュール設定 -->
                 <div class="mb-4">
                     <h3 class="mb-1 font-semibold">スケジュール設定</h3>
@@ -128,13 +197,32 @@
                 </div>
             </form>
         </div>
+
+        <!-- 画像拡大ライトボックス -->
+        <Teleport to="body">
+            <div
+                v-if="showLightbox && (currentImageUrl || previewUrl)"
+                class="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+                @click.self="showLightbox = false"
+            >
+                <div class="relative max-h-[90vh] max-w-[90vw]">
+                    <img :src="currentImageUrl || previewUrl" :alt="previewName || props.job.original_filename || '伝票画像'" class="max-h-[85vh] max-w-[88vw] rounded-lg object-contain" />
+                    <button type="button" class="absolute -right-3 -top-3 flex h-8 w-8 items-center justify-center rounded-full bg-white text-gray-800 shadow-md hover:bg-gray-100" @click="showLightbox = false">✕</button>
+                </div>
+            </div>
+        </Teleport>
     </AppLayout>
 </template>
 
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
+
+const isMobile = computed(() => {
+    if (typeof navigator === 'undefined') return false;
+    return /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+});
 
 // ── サイズフィルター ──────────────────────────────────────
 const sizeFilter = ref('paper');
@@ -184,6 +272,98 @@ const props = defineProps({
     coordinatorCandidates: { type: Array, default: () => [] },
     sizes: { type: Array, default: () => [] },
 });
+
+// ── 伝票画像 ──────────────────────────────────────────────────────────────────
+// サーバーから渡された既存の画像 URL（router.reload で更新される）
+const currentImageUrl = ref(props.job.image_url ?? null);
+
+// ローカル選択中のファイル（まだ未保存）
+const previewUrl      = ref(null);
+const previewName     = ref('');
+const pendingFile     = ref(null);
+const isDragging      = ref(false);
+const showLightbox    = ref(false);
+const voucherUploading = ref(false);
+const voucherError    = ref('');
+
+// router.reload で props が更新されたとき currentImageUrl を同期
+watch(() => props.job.image_url, (url) => {
+    currentImageUrl.value = url ?? null;
+    // アップロード完了後はプレビューをクリア
+    previewUrl.value  = null;
+    previewName.value = '';
+    pendingFile.value = null;
+});
+
+function selectFile(file) {
+    if (!file) return;
+    pendingFile.value = file;
+    previewName.value = file.name;
+    voucherError.value = '';
+    const reader = new FileReader();
+    reader.onload = (e) => { previewUrl.value = e.target.result; };
+    reader.readAsDataURL(file);
+}
+
+function onFileInputChange(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (file) selectFile(file);
+}
+
+function onVoucherFileChange(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    // 既存画像の差し替え：即アップロード
+    uploadFile(file);
+}
+
+function onDropZoneDrop(e) {
+    isDragging.value = false;
+    const file = e.dataTransfer?.files?.[0];
+    if (file) selectFile(file);
+}
+
+function removePreview() {
+    previewUrl.value  = null;
+    previewName.value = '';
+    pendingFile.value = null;
+    voucherError.value = '';
+}
+
+function uploadPendingFile() {
+    if (!pendingFile.value) return;
+    uploadFile(pendingFile.value);
+}
+
+function uploadFile(file) {
+    voucherUploading.value = true;
+    voucherError.value = '';
+    const fd = new FormData();
+    fd.append('image', file);
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+    fetch(route('coordinator.project_jobs.image.store', { projectJob: props.job.id }), {
+        method: 'POST',
+        headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin',
+        body: fd,
+    }).then((res) => {
+        if (!res.ok) throw new Error('upload failed');
+        router.reload({ preserveScroll: true });
+    }).catch(() => {
+        voucherError.value = '画像のアップロードに失敗しました。';
+    }).finally(() => {
+        voucherUploading.value = false;
+    });
+}
+
+function confirmDeleteVoucherImage() {
+    if (!confirm('伝票画像を削除しますか？')) return;
+    router.delete(route('coordinator.project_jobs.image.destroy', { projectJob: props.job.id }), {
+        preserveScroll: true,
+    });
+}
 function decodeField(val, fallback = '') {
     if (val === null || val === undefined) return fallback;
     // If it's already an object (from model casting), return it

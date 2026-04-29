@@ -15,13 +15,16 @@ class SubcontractorController extends Controller
     public function index()
     {
         $user = Auth::user();
-        $query = Subcontractor::with('coordinators:id,name')
+        $query = Subcontractor::with('coordinators:id,name', 'departments:id,name')
             ->withCount('assignments');
 
         if ($user->user_role === 'superadmin') {
             $subcontractors = $query->get();
         } else {
-            $subcontractors = $query->forCompany($user->company_id)->get();
+            $subcontractors = $query
+                ->forCompany($user->company_id)
+                ->whereHas('departments', fn($q) => $q->where('departments.id', $user->department_id))
+                ->get();
         }
 
         return Inertia::render('Coordinator/Subcontractors/Index', [
@@ -57,10 +60,14 @@ class SubcontractorController extends Controller
             $data['company_id'] = $user->company_id;
         }
 
-        $subcontractor = DB::transaction(function () use ($data, $coordinatorIds) {
+        $user = Auth::user();
+        $subcontractor = DB::transaction(function () use ($data, $coordinatorIds, $user) {
             $sub = Subcontractor::create($data);
             if ($coordinatorIds) {
                 $sub->coordinators()->sync($coordinatorIds);
+            }
+            if ($user->department_id) {
+                $sub->departments()->attach($user->department_id);
             }
             return $sub;
         });

@@ -168,6 +168,64 @@
                     <div v-if="form.errors.detail" class="mt-1 text-sm text-red-600">{{ form.errors.detail }}</div>
                 </div>
 
+                <!-- 伝票画像 -->
+                <div class="mb-6">
+                    <label class="mb-2 block font-semibold">作業ファイル情報（伝票画像）</label>
+
+                    <!-- サムネイル表示 -->
+                    <div v-if="previewUrl" class="mb-3">
+                        <div class="relative inline-block">
+                            <img
+                                :src="previewUrl"
+                                :alt="previewName"
+                                class="h-40 w-auto rounded-lg border border-gray-200 object-contain shadow-sm cursor-pointer"
+                                @click="showLightbox = true"
+                            />
+                            <button
+                                type="button"
+                                class="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-xs text-white shadow hover:bg-red-600"
+                                @click="removeImage"
+                            >✕</button>
+                        </div>
+                        <div class="mt-2 flex items-center gap-2">
+                            <span class="max-w-xs truncate text-xs text-gray-500">{{ previewName }}</span>
+                            <button
+                                type="button"
+                                class="rounded border border-gray-300 px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-50"
+                                @click="showLightbox = true"
+                            >🔍 拡大</button>
+                        </div>
+                    </div>
+
+                    <!-- ドロップゾーン -->
+                    <div
+                        v-if="!previewUrl"
+                        class="flex flex-col items-center justify-center rounded-lg border-2 border-dashed px-6 py-8 transition-colors"
+                        :class="isDragging ? 'border-green-500 bg-green-50' : 'border-gray-300 bg-gray-50 hover:border-green-400'"
+                        @dragover.prevent="isDragging = true"
+                        @dragleave="isDragging = false"
+                        @drop.prevent="onDropZoneDrop"
+                    >
+                        <div class="mb-2 text-3xl text-gray-400">📎</div>
+                        <p class="text-sm text-gray-600">ここに画像をドロップ</p>
+                        <p class="mt-1 text-xs text-gray-400">JPG / PNG / WEBP / HEIC / GIF / PDF 対応（最大 20MB）</p>
+                    </div>
+
+                    <!-- ファイル選択ボタン -->
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        <label class="cursor-pointer rounded-lg border border-green-700 px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-50">
+                            📁 フォルダから選ぶ
+                            <input type="file" accept="image/*,.pdf" class="hidden" @change="onFileInputChange" />
+                        </label>
+                        <label v-if="isMobile" class="cursor-pointer rounded-lg border border-gray-400 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">
+                            📷 カメラ画像を取り込む
+                            <input type="file" accept="image/*" capture="environment" class="hidden" @change="onFileInputChange" />
+                        </label>
+                    </div>
+
+                    <div v-if="form.errors.image" class="mt-1 text-sm text-red-600">{{ form.errors.image }}</div>
+                </div>
+
                 <!-- チームメンバー選択 -->
                 <div class="mb-6">
                     <h3 class="mb-3 font-semibold text-gray-700">チームメンバー</h3>
@@ -417,6 +475,24 @@
                 </button>
             </template>
         </DialogModal>
+
+        <!-- 画像拡大ライトボックス -->
+        <Teleport to="body">
+            <div
+                v-if="showLightbox && previewUrl"
+                class="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+                @click.self="showLightbox = false"
+            >
+                <div class="relative max-h-[90vh] max-w-[90vw]">
+                    <img :src="previewUrl" :alt="previewName" class="max-h-[85vh] max-w-[88vw] rounded-lg object-contain" />
+                    <button
+                        type="button"
+                        class="absolute -right-3 -top-3 flex h-8 w-8 items-center justify-center rounded-full bg-white text-gray-800 shadow-md hover:bg-gray-100"
+                        @click="showLightbox = false"
+                    >✕</button>
+                </div>
+            </div>
+        </Teleport>
     </AppLayout>
 </template>
 
@@ -445,8 +521,46 @@ const form = useForm({
     size_id: '',
     page_count: '',
     detail: '',
-    team_members: [], // チームメンバー選択用
+    team_members: [],
+    image: null,
 });
+
+// ── 伝票画像 ────────────────────────────────────────────────────────────────
+const previewUrl   = ref(null);
+const previewName  = ref('');
+const isDragging   = ref(false);
+const showLightbox = ref(false);
+
+const isMobile = computed(() => {
+    if (typeof navigator === 'undefined') return false;
+    return /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+});
+
+function handleVoucherFile(file) {
+    if (!file) return;
+    form.image = file;
+    previewName.value = file.name;
+    const reader = new FileReader();
+    reader.onload = (e) => { previewUrl.value = e.target.result; };
+    reader.readAsDataURL(file);
+}
+
+function onDropZoneDrop(e) {
+    isDragging.value = false;
+    const file = e.dataTransfer?.files?.[0];
+    if (file) handleVoucherFile(file);
+}
+
+function onFileInputChange(e) {
+    const file = e.target.files?.[0];
+    if (file) handleVoucherFile(file);
+}
+
+function removeImage() {
+    form.image = null;
+    previewUrl.value  = null;
+    previewName.value = '';
+}
 
 // リーダーとして選択中のユーザーを除いたサブCo候補
 const subCandidates = computed(() =>
@@ -1040,6 +1154,7 @@ function doSubmit() {
     form.schedule = null;
     // submit to server; server redirects to index and Index.vue handles follow-up prompts
     form.post(route('coordinator.project_jobs.store'), {
+        forceFormData: true,
         preserveState: true,
         preserveScroll: true,
         onError: (errors) => {

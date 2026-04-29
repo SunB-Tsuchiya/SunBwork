@@ -31,7 +31,7 @@
                         >
                     </p>
                     <p v-if="subCoordinators.length > 0" class="mt-0.5 text-xs text-gray-400">
-                        サブCo: {{ subCoordinators.map((c) => c.name).join('、') }}
+                        サブリーダー: {{ subCoordinators.map((c) => c.name).join('、') }}
                     </p>
                     <span
                         v-if="job.completed"
