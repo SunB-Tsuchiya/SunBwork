@@ -59,7 +59,7 @@ const showLinkCellModal = ref(false);
 function deleteAssignment() {
     if (!confirm('この割当を本当に削除しますか？この操作は取り消せません。')) return;
     router.delete(route('coordinator.project_jobs.assignments.destroy', { projectJob: projectJob.id, assignment: assignment.id }), {
-        onSuccess: () => router.visit(route('coordinator.project_jobs.assignments.index', { projectJob: projectJob.id })),
+        onSuccess: () => router.visit(route('coordinator.project_jobs.show', { projectJob: projectJob.id }) + '?tab=history'),
         onError: () => alert('削除に失敗しました。詳細はコンソールを確認してください。'),
     });
 }

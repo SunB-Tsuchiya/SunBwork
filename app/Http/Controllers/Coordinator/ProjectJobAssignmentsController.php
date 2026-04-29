@@ -1048,7 +1048,7 @@ class ProjectJobAssignmentsController extends Controller
             $assignment->delete();
         });
 
-        return redirect()->route('coordinator.project_jobs.assignments.index', ['projectJob' => $projectJob->id]);
+        return redirect()->route('coordinator.project_jobs.show', ['projectJob' => $projectJob->id, 'tab' => 'history']);
     }
 
     /**

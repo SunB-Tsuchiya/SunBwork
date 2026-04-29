@@ -228,7 +228,7 @@
         <template v-else-if="cell.value_user_id || cell.value_subcontractor_id">
           <span class="text-xs text-gray-400">┄ 未登録 ┄</span>
           <button
-            v-if="canEdit"
+            v-if="authUserId"
             type="button"
             class="rounded border border-dashed border-pink-300 bg-pink-50 px-2 py-0.5 text-xs text-pink-700 hover:bg-pink-100"
             @click="emit('worker-job-register', { rowId, colKey: colDef.key, userId: cell.value_user_id, subcontractorId: cell.value_subcontractor_id ?? null })"
@@ -236,7 +236,13 @@
         </template>
         <!-- 未設定 -->
         <template v-else>
-          <span class="text-xs text-gray-300">未設定</span>
+          <button
+            v-if="authUserId"
+            type="button"
+            class="rounded border border-dashed border-pink-300 bg-pink-50 px-2 py-0.5 text-xs text-pink-700 hover:bg-pink-100"
+            @click="emit('worker-job-register', { rowId, colKey: colDef.key, userId: null, subcontractorId: null })"
+          >＋ 登録</button>
+          <span v-else class="text-xs text-gray-300">未設定</span>
         </template>
       </div>
     </div>
@@ -369,7 +375,7 @@
         <template v-else-if="cell.value_user_id || cell.value_subcontractor_id">
           <span class="text-xs text-gray-400">┄ 未登録 ┄</span>
           <button
-            v-if="canEdit"
+            v-if="authUserId"
             type="button"
             class="rounded border border-dashed border-indigo-300 bg-indigo-50 px-2 py-0.5 text-xs text-indigo-700 hover:bg-indigo-100"
             @click="emit('worker-job-register', { rowId, colKey: colDef.key, userId: cell.value_user_id, subcontractorId: cell.value_subcontractor_id })"
@@ -377,7 +383,13 @@
         </template>
         <!-- 未設定 -->
         <template v-else>
-          <span class="text-xs text-gray-300">未設定</span>
+          <button
+            v-if="authUserId"
+            type="button"
+            class="rounded border border-dashed border-indigo-300 bg-indigo-50 px-2 py-0.5 text-xs text-indigo-700 hover:bg-indigo-100"
+            @click="emit('worker-job-register', { rowId, colKey: colDef.key, userId: null, subcontractorId: null })"
+          >＋ 登録</button>
+          <span v-else class="text-xs text-gray-300">未設定</span>
         </template>
       </div>
     </div>

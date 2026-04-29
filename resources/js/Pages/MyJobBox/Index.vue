@@ -173,17 +173,31 @@
                         <!-- 案件選択（クライアント選択後） -->
                         <div v-if="jsSelectedClientId" class="mb-3">
                             <label class="mb-1 block text-sm font-medium text-gray-700">案件</label>
-                            <select v-model="jsSelectedProjectId" class="w-full rounded border border-gray-300 px-3 py-2 text-sm">
+                            <select v-model="jsSelectedProjectId" @change="onProjectChange" class="w-full rounded border border-gray-300 px-3 py-2 text-sm">
                                 <option value="">— 選択してください —</option>
                                 <option v-for="p in jsFilteredProjects" :key="p.id" :value="String(p.id)">{{ p.title || p.name }}</option>
                             </select>
                         </div>
 
+                        <!-- 進行表選択（案件選択後・複数シートの場合） -->
+                        <div v-if="jsSelectedProjectId && jsProgressSheets.length > 1" class="mb-3">
+                            <label class="mb-1 block text-sm font-medium text-gray-700">進行表</label>
+                            <select v-model="jsSelectedSheetId" class="w-full rounded border border-gray-300 px-3 py-2 text-sm">
+                                <option value="">— 選択してください —</option>
+                                <option v-for="s in jsProgressSheets" :key="s.id" :value="String(s.id)">{{ s.name }}</option>
+                            </select>
+                        </div>
+
                         <!-- 案件選択後のアクション -->
-                        <div v-if="jsSelectedProjectId" class="mt-4 flex justify-end gap-2">
+                        <div v-if="jsSelectedProjectId" class="mt-4 flex items-center justify-end gap-2">
+                            <span v-if="jsSheetsLoading" class="text-sm text-gray-400">読み込み中…</span>
+                            <span v-else-if="jsProgressSheets.length === 0 && !jsSheetsLoading" class="text-sm text-gray-400">進行表なし</span>
                             <button
-                                @click="goToProjectShow"
-                                class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                                @click="goToProgressSheet"
+                                :disabled="!canGoToSheet"
+                                :class="canGoToSheet
+                                    ? 'rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700'
+                                    : 'cursor-not-allowed rounded bg-gray-300 px-4 py-2 text-sm font-medium text-gray-500'"
                             >詳細を見る（進行表へ）</button>
                         </div>
                     </div>
@@ -210,15 +224,26 @@ const jsClients = ref([]);
 const jsProjects = ref([]);
 const jsSelectedClientId = ref('');
 const jsSelectedProjectId = ref('');
+const jsProgressSheets = ref([]);
+const jsSelectedSheetId = ref('');
+const jsSheetsLoading = ref(false);
 
 const jsFilteredProjects = computed(() => {
     if (!jsSelectedClientId.value) return [];
     return jsProjects.value.filter((p) => String(p.client_id) === String(jsSelectedClientId.value));
 });
 
+const canGoToSheet = computed(() => {
+    if (jsSheetsLoading.value || jsProgressSheets.value.length === 0) return false;
+    if (jsProgressSheets.value.length === 1) return true;
+    return !!jsSelectedSheetId.value;
+});
+
 async function openJobSheetModal() {
     jsSelectedClientId.value = '';
     jsSelectedProjectId.value = '';
+    jsProgressSheets.value = [];
+    jsSelectedSheetId.value = '';
     showJobSheetModal.value = true;
 
     if (jsClients.value.length === 0) {
@@ -242,14 +267,37 @@ async function openJobSheetModal() {
     }
 }
 
-function goToProjectShow() {
+async function onProjectChange() {
+    jsProgressSheets.value = [];
+    jsSelectedSheetId.value = '';
     if (!jsSelectedProjectId.value) return;
-    showJobSheetModal.value = false;
+    jsSheetsLoading.value = true;
     try {
-        router.visit(route('user.project_jobs.show', { projectJob: jsSelectedProjectId.value }));
-    } catch {
-        window.location.href = route('user.project_jobs.show', { projectJob: jsSelectedProjectId.value });
+        const res = await fetch(route('user.project_jobs.progress_sheets_json', { projectJob: jsSelectedProjectId.value }), {
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+        });
+        if (res.ok) {
+            jsProgressSheets.value = await res.json();
+            if (jsProgressSheets.value.length === 1) {
+                jsSelectedSheetId.value = String(jsProgressSheets.value[0].id);
+            }
+        }
+    } catch (e) {
+        // ignore
+    } finally {
+        jsSheetsLoading.value = false;
     }
+}
+
+function goToProgressSheet() {
+    if (!canGoToSheet.value) return;
+    const sheetId = jsProgressSheets.value.length === 1
+        ? jsProgressSheets.value[0].id
+        : jsSelectedSheetId.value;
+    if (!sheetId) return;
+    showJobSheetModal.value = false;
+    router.visit(route('user.progress_sheets.show', { sheet: sheetId }));
 }
 // ──────────────────────────────────────────────────────────────────────────
 

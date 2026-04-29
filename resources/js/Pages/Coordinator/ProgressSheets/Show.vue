@@ -927,7 +927,11 @@ function findAncestorGroupId(colKey, type, masterList) {
   return null;
 }
 
-/** ジョブタイトルを自動構築：「親行ラベルー縦軸ラベル_横軸中見出しー列ラベル」 */
+function normalizeTitle(title) {
+  return title.replace(/[ーｰ\-－—–]/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '');
+}
+
+/** ジョブタイトルを自動構築：「親行ラベル_縦軸ラベル_横軸中見出し_列ラベル」 */
 function buildJobTitle(rowId, colKey) {
   const row = localRows.value.find((r) => r.id === rowId);
   const parentRow = row?.parent_id ? localRows.value.find((r) => r.id === row.parent_id) : null;
@@ -935,7 +939,7 @@ function buildJobTitle(rowId, colKey) {
   const parentPath = breadcrumb ? breadcrumb.slice(0, -1) : []; // leafを除く親グループパス
   const rowPart = [parentRow?.label, row?.label].filter(Boolean).join('_');
   const colPart = parentPath.filter(Boolean).join('_');
-  return [rowPart, colPart].filter(Boolean).join('_');
+  return normalizeTitle([rowPart, colPart].filter(Boolean).join('_'));
 }
 
 function onAssigneeChange() {

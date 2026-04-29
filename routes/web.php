@@ -99,6 +99,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
 
     // 案件確認（ユーザー向け案件一覧・詳細）
     Route::get('/user/project-jobs/json', [App\Http\Controllers\User\ProjectJobController::class, 'projectsJson'])->name('user.project_jobs.json');
+    Route::get('/user/project-jobs/{projectJob}/progress-sheets-json', [App\Http\Controllers\User\ProjectJobController::class, 'progressSheetsJson'])->name('user.project_jobs.progress_sheets_json');
     Route::get('/user/project-jobs', [App\Http\Controllers\User\ProjectJobController::class, 'index'])->name('user.project_jobs.index');
     Route::get('/user/project-jobs/{projectJob}', [App\Http\Controllers\User\ProjectJobController::class, 'show'])->name('user.project_jobs.show');
 
@@ -705,6 +706,11 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 
         // ── V-12 進行レポート ───────────────────────────────────────
         Route::get('progress-report', [App\Http\Controllers\Coordinator\ProgressReportController::class, 'index'])->name('progress_report.index');
+
+        // ── Coordinator 設定 ───────────────────────────────────────
+        Route::get('settings', [App\Http\Controllers\Coordinator\CoordinatorSettingController::class, 'index'])->name('settings.index');
+        Route::get('settings/data', [App\Http\Controllers\Coordinator\CoordinatorSettingController::class, 'show'])->name('settings.data');
+        Route::put('settings', [App\Http\Controllers\Coordinator\CoordinatorSettingController::class, 'update'])->name('settings.update');
     });
 
 

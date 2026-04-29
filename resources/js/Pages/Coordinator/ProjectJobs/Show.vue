@@ -136,7 +136,7 @@
             <div class="divide-y divide-gray-100">
 
                 <!-- ── スケジュールセクション ──────────────────── -->
-                <section v-show="activeTab === 'overview'" class="py-5">
+                <section v-show="activeTab === 'schedule'" class="py-5">
                     <div class="mb-3 flex items-center gap-4">
                         <h3 class="font-semibold text-gray-800">スケジュール</h3>
                         <div class="flex gap-2">
@@ -390,13 +390,16 @@
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-200 bg-white">
-                                <tr v-for="ps in progressSheets" :key="ps.id" class="hover:bg-gray-50">
+                                <tr v-for="ps in progressSheets" :key="ps.id"
+                                    class="cursor-pointer hover:bg-indigo-50"
+                                    @click="router.get(route('coordinator.progress_sheets.show', { sheet: ps.id }))">
                                     <td class="px-4 py-2 text-sm font-medium text-gray-900">{{ ps.name }}</td>
                                     <td class="px-4 py-2 text-sm text-gray-500">{{ ps.created_at }}</td>
                                     <td class="px-4 py-2">
                                         <Link
                                             :href="route('coordinator.progress_sheets.show', { sheet: ps.id })"
                                             class="rounded bg-indigo-600 px-3 py-1 text-xs font-medium text-white hover:bg-indigo-700"
+                                            @click.stop
                                         >
                                             開く
                                         </Link>
@@ -515,7 +518,7 @@
                                                 <col style="width: 100px">
                                                 <col style="width: 140px">
                                                 <col>
-                                                <col style="width: 88px">
+                                                <col style="width: 100px">
                                             </colgroup>
                                             <thead>
                                                 <tr class="bg-gray-50">
@@ -583,7 +586,7 @@
                                                 <col style="width: 100px">
                                                 <col style="width: 140px">
                                                 <col>
-                                                <col style="width: 88px">
+                                                <col style="width: 100px">
                                             </colgroup>
                                             <thead>
                                                 <tr class="bg-gray-50">
@@ -694,29 +697,39 @@
             <!-- 作成方式の選択 -->
             <div class="mt-4 space-y-2">
                 <label class="flex cursor-pointer items-center gap-2 rounded border px-3 py-2 text-sm"
-                    :class="newSheetUseV2 ? 'border-indigo-300 bg-indigo-50' : 'border-gray-200 hover:bg-gray-50'"
-                    @click="newSheetUseV2 = true"
+                    :class="newSheetMode === 'v2' ? 'border-indigo-300 bg-indigo-50' : 'border-gray-200 hover:bg-gray-50'"
+                    @click="newSheetMode = 'v2'"
                 >
-                    <input type="radio" :checked="newSheetUseV2" class="h-4 w-4 text-indigo-600" />
+                    <input type="radio" :checked="newSheetMode === 'v2'" class="h-4 w-4 text-indigo-600" />
                     <div>
                         <div class="font-medium text-gray-700">組版・校正セット方式で作成</div>
-                        <div class="text-xs text-gray-400">組版担当+登録欄・校正担当+登録欄のペアを校ごとに自動生成</div>
+                        <div class="text-xs text-gray-400">組版担当+校正担当のペアを校ごとに自動生成</div>
                     </div>
                 </label>
                 <label class="flex cursor-pointer items-center gap-2 rounded border px-3 py-2 text-sm"
-                    :class="!newSheetUseV2 ? 'border-indigo-300 bg-indigo-50' : 'border-gray-200 hover:bg-gray-50'"
-                    @click="newSheetUseV2 = false"
+                    :class="newSheetMode === 'template' ? 'border-indigo-300 bg-indigo-50' : 'border-gray-200 hover:bg-gray-50'"
+                    @click="newSheetMode = 'template'"
                 >
-                    <input type="radio" :checked="!newSheetUseV2" class="h-4 w-4 text-indigo-600" />
+                    <input type="radio" :checked="newSheetMode === 'template'" class="h-4 w-4 text-indigo-600" />
                     <div>
                         <div class="font-medium text-gray-700">テンプレートから作成</div>
                         <div class="text-xs text-gray-400">保存済みテンプレートまたは空のシートで作成</div>
                     </div>
                 </label>
+                <label class="flex cursor-pointer items-center gap-2 rounded border px-3 py-2 text-sm"
+                    :class="newSheetMode === 'calendar' ? 'border-indigo-300 bg-indigo-50' : 'border-gray-200 hover:bg-gray-50'"
+                    @click="newSheetMode = 'calendar'"
+                >
+                    <input type="radio" :checked="newSheetMode === 'calendar'" class="h-4 w-4 text-indigo-600" />
+                    <div>
+                        <div class="font-medium text-gray-700">カレンダー（スケジュール）から作成</div>
+                        <div class="text-xs text-gray-400">カレンダーの予定を行として読み込み、開始日・終了日を設定</div>
+                    </div>
+                </label>
             </div>
 
             <!-- テンプレートから作成の場合 -->
-            <template v-if="!newSheetUseV2">
+            <template v-if="newSheetMode === 'template'">
                 <label class="mt-3 block text-sm font-medium text-gray-700">テンプレート（任意）</label>
                 <select
                     v-model="newSheetTemplateId"
@@ -728,7 +741,7 @@
             </template>
 
             <!-- セット方式の場合：校の入力 -->
-            <template v-else>
+            <template v-else-if="newSheetMode === 'v2'">
                 <div class="mt-3 space-y-2">
                     <div v-for="(round, idx) in newSheetRounds" :key="idx" class="flex items-center gap-2">
                         <span class="w-12 flex-shrink-0 text-xs text-gray-500">第{{ idx + 1 }}校</span>
@@ -753,7 +766,52 @@
                         @click="addNextRound"
                     >＋ 校を追加</button>
                 </div>
-                <p class="mt-2 text-xs text-gray-400">各校に「組版担当（worker型）＋ 校正担当（proof_user型）」の2セルが自動生成されます。</p>
+                <p class="mt-2 text-xs text-gray-400">各校に「組版担当（worker型）＋ 校正担当（proof_v2型）」の2セルが自動生成されます。</p>
+            </template>
+
+            <!-- カレンダーから作成の場合 -->
+            <template v-else-if="newSheetMode === 'calendar'">
+                <div class="mt-3">
+                    <div v-if="calendarSheetRows.length === 0" class="rounded border border-dashed border-gray-300 py-4 text-center text-sm text-gray-400">
+                        このプロジェクトにカレンダーの予定がありません
+                    </div>
+                    <template v-else>
+                        <div class="mb-1 grid grid-cols-[auto_1fr_120px_120px] gap-1 px-1 text-xs font-medium text-gray-500">
+                            <span></span>
+                            <span>項目名</span>
+                            <span>開始日</span>
+                            <span>終了日</span>
+                        </div>
+                        <div class="max-h-52 overflow-y-auto space-y-1">
+                            <div
+                                v-for="(row, idx) in calendarSheetRows"
+                                :key="idx"
+                                class="grid grid-cols-[auto_1fr_120px_120px] items-center gap-1"
+                            >
+                                <input type="checkbox" v-model="row.selected" class="h-4 w-4 rounded text-indigo-600" />
+                                <input
+                                    v-model="row.name"
+                                    type="text"
+                                    :disabled="!row.selected"
+                                    class="rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none disabled:bg-gray-50 disabled:text-gray-400"
+                                />
+                                <input
+                                    v-model="row.start_date"
+                                    type="date"
+                                    :disabled="!row.selected"
+                                    class="rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none disabled:bg-gray-50"
+                                />
+                                <input
+                                    v-model="row.end_date"
+                                    type="date"
+                                    :disabled="!row.selected"
+                                    class="rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none disabled:bg-gray-50"
+                                />
+                            </div>
+                        </div>
+                        <p class="mt-2 text-xs text-gray-400">チェックした項目が行になります。終了日は締め切りとして設定されます。</p>
+                    </template>
+                </div>
             </template>
 
             <div class="mt-5 flex justify-end gap-3">
@@ -1034,8 +1092,9 @@ async function submitCsvImport() {
 // ── タブ定義 ─────────────────────────────────────────────────────────────
 const tabs = [
     { key: 'overview',  label: '概要・メンバー' },
-    { key: 'items',     label: '連携設定' },
     { key: 'progress',  label: '進行管理表' },
+    { key: 'schedule',  label: 'スケジュール' },
+    { key: 'items',     label: '連携設定' },
     { key: 'history',   label: 'ジョブ履歴' },
 ];
 const activeTab = ref(new URLSearchParams(window.location.search).get('tab') || 'overview');
@@ -1241,7 +1300,8 @@ const sheetTemplates = computed(() => Array.isArray(page.props.sheetTemplates) ?
 const showCreateSheetModal = ref(false);
 const newSheetName = ref('');
 const newSheetTemplateId = ref(null);
-const newSheetUseV2 = ref(true);
+const newSheetMode = ref('v2'); // 'v2' | 'template' | 'calendar'
+const calendarSheetRows = ref([]);
 
 // stages（進行表セット方式モーダル用）
 const availableStages = computed(() => {
@@ -1261,10 +1321,19 @@ const newSheetRounds = ref([{ stage_id: null, stage_name: '' }]);
 
 // モーダルが開いた時点で stages が揃っていれば初期値をセット
 watch(showCreateSheetModal, (open) => {
-    if (open && firstStage.value && newSheetRounds.value.length === 1 && !newSheetRounds.value[0].stage_id) {
+    if (!open) return;
+    if (firstStage.value && newSheetRounds.value.length === 1 && !newSheetRounds.value[0].stage_id) {
         newSheetRounds.value[0].stage_id = firstStage.value.id;
         newSheetRounds.value[0].stage_name = firstStage.value.name;
     }
+    // カレンダー行をスケジュール一覧から初期化
+    calendarSheetRows.value = schedules.value.map((s) => ({
+        selected: true,
+        name: s.name ?? '',
+        start_date: s.start_date ?? '',
+        end_date: s.end_date ?? '',
+        schedule_id: s.id,
+    }));
 });
 
 /** 次の sort_order を持つステージを追加する */
@@ -1310,7 +1379,17 @@ function createSheet() {
         alert('シート名を入力してください。');
         return;
     }
-    if (newSheetUseV2.value) {
+
+    const resetModal = () => {
+        showCreateSheetModal.value = false;
+        newSheetName.value = '';
+        newSheetMode.value = 'v2';
+        newSheetTemplateId.value = null;
+        newSheetRounds.value = [{ stage_id: firstStage.value?.id ?? null, stage_name: firstStage.value?.name ?? '' }];
+        calendarSheetRows.value = [];
+    };
+
+    if (newSheetMode.value === 'v2') {
         const config = buildV2ColumnConfig(newSheetRounds.value);
         if (config.length === 0) {
             alert('少なくとも1つのステージを選択してください。');
@@ -1319,20 +1398,33 @@ function createSheet() {
         router.post(
             route('coordinator.project_jobs.progress_sheets.store', { projectJob: job.id }),
             { name, column_config: config },
-            {
-                onSuccess: () => {
-                    showCreateSheetModal.value = false;
-                    newSheetName.value = '';
-                    newSheetUseV2.value = false;
-                    newSheetRounds.value = [{ stage_id: firstStage.value?.id ?? null, stage_name: firstStage.value?.name ?? '' }];
-                },
-            },
+            { onSuccess: resetModal },
+        );
+    } else if (newSheetMode.value === 'calendar') {
+        const selectedRows = calendarSheetRows.value.filter((r) => r.selected && r.name.trim());
+        if (selectedRows.length === 0) {
+            alert('少なくとも1つの項目を選択してください。');
+            return;
+        }
+        const columnConfig = [
+            { key: 'start_date', label: '開始日', type: 'date' },
+            { key: 'end_date',   label: '終了日', type: 'date' },
+        ];
+        const initialRows = selectedRows.map((r) => ({
+            label:      r.name.trim(),
+            start_date: r.start_date || null,
+            end_date:   r.end_date   || null,
+        }));
+        router.post(
+            route('coordinator.project_jobs.progress_sheets.store', { projectJob: job.id }),
+            { name, column_config: columnConfig, initial_rows: initialRows },
+            { onSuccess: resetModal },
         );
     } else {
         router.post(
             route('coordinator.project_jobs.progress_sheets.store', { projectJob: job.id }),
             { name, template_id: newSheetTemplateId.value ?? null },
-            { onSuccess: () => { showCreateSheetModal.value = false; newSheetName.value = ''; newSheetTemplateId.value = null; } },
+            { onSuccess: resetModal },
         );
     }
 }
@@ -1477,26 +1569,25 @@ function historyGetStatus(m) {
     try {
         const assignment = m.project_job_assignment || {};
         const jam = m || {};
-        // 優先順位: 完了 > 進行中（セット）> 確認済み > 送信済み
+        // 優先順位: 完了 > セット済み > 確認済み > 未読
         if (Boolean(jam.completed) || Boolean(assignment.completed)) return '完了';
         if (Boolean(jam.accepted) || Boolean(assignment.accepted) ||
-            Boolean(jam.scheduled) || Boolean(assignment.scheduled) || Boolean(assignment.scheduled_at)) return '進行中';
+            Boolean(jam.scheduled) || Boolean(assignment.scheduled) || Boolean(assignment.scheduled_at)) return 'セット済み';
         const readAt = jam.read_at || assignment.read_at || null;
         if (readAt) return '確認済み';
-        if (Boolean(jam.assigned) || Boolean(assignment.assigned)) return '送信済み';
-        return '-';
+        return '未読';
     } catch {
-        return '-';
+        return '未読';
     }
 }
 
 function statusBadgeClass(status) {
     switch (status) {
-        case '完了':   return 'bg-yellow-100 text-yellow-800';
-        case '進行中': return 'bg-blue-100 text-blue-800';
-        case '確認済み': return 'bg-green-100 text-green-800';
-        case '送信済み': return 'bg-gray-200 text-gray-700';
-        default:       return 'bg-gray-100 text-gray-700';
+        case '完了':     return 'bg-yellow-100 text-yellow-800';
+        case 'セット済み': return 'bg-blue-100 text-blue-800';
+        case '確認済み':  return 'bg-green-100 text-green-800';
+        case '未読':     return 'bg-red-100 text-red-800';
+        default:         return 'bg-gray-100 text-gray-700';
     }
 }
 
@@ -1618,7 +1709,7 @@ function buildHistoryGroups(messages) {
     return sortedKeys.map((key) => ({ key, label: historyFormatDateLabel(key), items: grouped.get(key) }));
 }
 
-const historyOpen       = ref(false);
+const historyOpen       = ref(true);
 const historyLinkedOpen = ref(true);
 const historyOtherOpen  = ref(true);
 

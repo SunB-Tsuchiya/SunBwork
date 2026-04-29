@@ -251,6 +251,19 @@
                         ></button>
                     </div>
                 </div>
+                <!-- 完了状態バッジ -->
+                <div v-if="scheduleShowData.completed_at" class="mb-2 flex items-center justify-between rounded bg-green-50 px-3 py-2">
+                    <span class="text-sm font-medium text-green-700">✓ 完了済み</span>
+                    <button
+                        v-if="scheduleCanEdit(scheduleShowData.id) && !isEditingSchedule"
+                        type="button"
+                        @click="uncompleteSchedule"
+                        class="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-600 hover:bg-gray-50"
+                    >
+                        未完了に戻す
+                    </button>
+                </div>
+
                 <!-- 連携設定リンク -->
                 <div v-if="(props.items ?? []).length > 0" class="mb-2">
                     <label class="block text-sm font-medium">連携設定に紐づける</label>
@@ -367,7 +380,11 @@ const props = defineProps({
     diaryLabel: { type: String, default: 'メモ' },
     readonly: { type: Boolean, default: false },
     weekPostsUrl: { type: String, default: null },
+    uniformColors: { type: Boolean, default: false },
 });
+
+const UC_NORMAL    = { bg: '#dbeafe', border: '#1d4ed8', text: '#1e3a8a' };
+const UC_COMPLETED = { bg: '#dcfce7', border: '#15803d', text: '#14532d' };
 
 // items prop はカレンダー連携用ドロップダウンのみに使用（独立イベントとして描画しない）
 
@@ -433,7 +450,7 @@ const startHourSelectRef = ref(null);
 
 // schedule show/edit modal state
 const showScheduleShowModal = ref(false);
-const scheduleShowData = ref({ id: null, title: '', start: '', end: '', description: '', color: null, item_id: null });
+const scheduleShowData = ref({ id: null, title: '', start: '', end: '', description: '', color: null, item_id: null, completed_at: null });
 const isEditingSchedule = ref(false);
 const scheduleEditTitle = ref('');
 const scheduleEditStart = ref('');
@@ -673,13 +690,21 @@ const calendarEvents = computed(() => {
             `rgba(37,99,235,${alpha})`;
 
         // If the title indicates completion (prefix), override with dark yellow
-        const isCompleted = typeof title === 'string' && title.indexOf('【完了】') === 0;
-        if (isCompleted) color = '#b58900';
+        const isLegacyCompleted = typeof title === 'string' && title.indexOf('【完了】') === 0;
+        if (isLegacyCompleted) color = '#b58900';
+
+        // schedlink/project_schedule 完了: extendedProps.completed_at があればグレー
+        const completedAt = event.extendedProps?.completed_at ?? event.completed_at ?? null;
+        if (completedAt) color = '#9ca3af';
+
+        const displayTitle = completedAt
+            ? (title.startsWith('✓ ') ? title : '✓ ' + title)
+            : title;
 
         list.push({
             // include canonical `id` so FullCalendar and getEvents() return stable identifiers
             id: event.id ?? event.event_id ?? event.eventId ?? undefined,
-            title: title,
+            title: displayTitle,
             start: startRaw,
             end: endRaw ?? undefined,
             allDay: allDay,
@@ -688,6 +713,11 @@ const calendarEvents = computed(() => {
             borderColor: color,
             event_id: event.id ?? event.event_id,
             description: event.description ?? event.extendedProps?.description ?? '',
+            extendedProps: {
+                ...(event.extendedProps ?? {}),
+                completed_at: completedAt,
+                original_color: event.extendedProps?.original_color ?? event.color ?? null,
+            },
         });
     });
 
@@ -711,19 +741,27 @@ const calendarEvents = computed(() => {
             if (endDateOnly) {
                 endDateOnly = addOneDay(endDateOnly);
             }
-            const schedColor = s.color ?? '#3b82f6';
+            const isCompleted = !!s.completed_at || (s.progress ?? 0) >= 100;
+            let schedBg, schedBorder;
+            if (props.uniformColors) {
+                const uc = isCompleted ? UC_COMPLETED : UC_NORMAL;
+                schedBg = uc.bg; schedBorder = uc.border;
+            } else {
+                schedBg = isCompleted ? '#9ca3af' : (s.color ?? '#3b82f6');
+                schedBorder = schedBg;
+            }
             list.push({
                 id: s.id,
                 title: s.name ?? '',
                 start: startDateOnly,
                 end: endDateOnly ?? undefined,
                 allDay: true,
-                color: schedColor,
-                backgroundColor: schedColor,
-                borderColor: schedColor,
+                color: schedBorder,
+                backgroundColor: schedBg,
+                borderColor: schedBorder,
                 event_id: s.id,
                 description: s.description ?? '',
-                extendedProps: { project_schedule_id: s.id },
+                extendedProps: { project_schedule_id: s.id, completed_at: s.completed_at ?? null, progress: s.progress ?? 0, original_color: s.color ?? '#3b82f6' },
             });
         });
     }
@@ -805,6 +843,15 @@ const calendarEvents = computed(() => {
             if (existingId === eid) list.splice(i, 1);
         }
         if (e.deleted) return; // skip deleted markers
+        const eCompleted = !!e.completed_at || (e.progress ?? 0) >= 100;
+        let eBg, eBorder;
+        if (props.uniformColors) {
+            const uc = eCompleted ? UC_COMPLETED : UC_NORMAL;
+            eBg = uc.bg; eBorder = uc.border;
+        } else {
+            eBg = eCompleted ? '#9ca3af' : (e.color ?? '#3b82f6');
+            eBorder = eBg;
+        }
         list.push({
             id: e.id ?? e.event_id ?? undefined,
             title: e.name ?? e.title ?? '',
@@ -812,11 +859,12 @@ const calendarEvents = computed(() => {
             // FullCalendar は end を exclusive で扱う → DB の inclusive end_date に +1日
             end: addOneDay(e.end_date ?? e.end) ?? undefined,
             allDay: true,
-            color: e.color ?? '#3b82f6',
-            backgroundColor: e.color ?? '#3b82f6',
-            borderColor: e.color ?? '#3b82f6',
+            color: eBorder,
+            backgroundColor: eBg,
+            borderColor: eBorder,
             event_id: e.id ?? e.event_id,
             description: e.description ?? e.body ?? '',
+            extendedProps: { project_schedule_id: e.id ?? e.event_id, completed_at: e.completed_at ?? null, progress: e.progress ?? 0 },
         });
     });
 
@@ -1057,9 +1105,10 @@ const calendarOptions = computed(() => ({
                 info.el.classList.add('sb-event');
             } catch (e) {}
 
-            const bg = info.event.backgroundColor || info.event.color || info.event.extendedProps?.color || null;
+            const bg     = info.event.backgroundColor || info.event.color || info.event.extendedProps?.color || null;
+            const border = info.event.borderColor || bg;
             if (bg) {
-                // simple contrast: pick white or near-black text
+                // simple contrast: pick white or near-black text based on background luminance
                 let text = '#ffffff';
                 try {
                     if (typeof bg === 'string' && bg.startsWith('#') && bg.length === 7) {
@@ -1072,7 +1121,7 @@ const calendarOptions = computed(() => ({
                 } catch (cErr) {}
                 try {
                     info.el.style.backgroundColor = bg;
-                    info.el.style.borderColor = bg;
+                    info.el.style.borderColor = border;
                     info.el.style.color = text;
                 } catch (sErr) {}
             }
@@ -1080,6 +1129,21 @@ const calendarOptions = computed(() => ({
             // ignore
         }
     },
+    eventContent: props.uniformColors ? function (arg) {
+        const ext = arg.event.extendedProps || {};
+        if (!ext.project_schedule_id && !ext.schedule_id) return null;
+        const safe = (s) => String(s ?? '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const title = safe(arg.event.title);
+        const completed = !!ext.completed_at;
+        const progress  = ext.progress ?? 0;
+        const meta = completed ? '完了' : (progress > 0 ? progress + '%' : '');
+        return {
+            html: `<div class="fc-event-inner-uni" title="${title}">
+                ${meta ? `<div class="fc-event-meta-uni">${safe(meta)}</div>` : ''}
+                <div class="fc-event-name-uni">${title}</div>
+            </div>`,
+        };
+    } : undefined,
     eventsSet: function (events) {
         try {
             const api = calendarRef.value && calendarRef.value.getApi ? calendarRef.value.getApi() : null;
@@ -1340,8 +1404,9 @@ function openScheduleShowModal(event) {
         }
     }
     scheduleShowData.value.color = event.backgroundColor || event.color || null;
+    scheduleShowData.value.completed_at = event.extendedProps?.completed_at ?? null;
     // prep edit fields
-    scheduleEditTitle.value = scheduleShowData.value.title;
+    scheduleEditTitle.value = scheduleShowData.value.title.replace(/^✓ /, '');
     scheduleEditStart.value = scheduleShowData.value.start;
     scheduleEditEnd.value = scheduleShowData.value.end;
     scheduleEditColor.value = scheduleShowData.value.color;
@@ -1350,6 +1415,19 @@ function openScheduleShowModal(event) {
     try {
         console.info('[ProjectCalendar] openScheduleShowModal', { schedule: scheduleShowData.value, isEditingSchedule: isEditingSchedule.value });
     } catch (e) {}
+}
+
+async function uncompleteSchedule() {
+    const id = scheduleShowData.value.id;
+    if (!id) return;
+    try {
+        await axios.patch(route('coordinator.project_schedules.uncomplete', { project_schedule: id }));
+        showScheduleShowModal.value = false;
+        router.reload();
+    } catch (e) {
+        console.error('uncompleteSchedule error', e);
+        alert('未完了への変更に失敗しました');
+    }
 }
 
 function toggleEdit(enable) {
@@ -2067,5 +2145,27 @@ async function submitCsvImport() {
 .sb-event .fc-event-main-frame {
     color: inherit !important;
     background: transparent !important;
+}
+
+/* ── Uniform 2-line event layout ─────────────────────────── */
+:deep(.fc-event-inner-uni) {
+    overflow: hidden;
+    max-width: 100%;
+    padding: 2px 4px;
+    line-height: 1.35;
+}
+:deep(.fc-event-meta-uni) {
+    font-size: 0.62rem;
+    opacity: 0.75;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+:deep(.fc-event-name-uni) {
+    font-size: 0.72rem;
+    font-weight: 600;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }
 </style>

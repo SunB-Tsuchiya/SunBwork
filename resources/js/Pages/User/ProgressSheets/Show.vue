@@ -48,6 +48,7 @@
                     :job-link-only="true"
                     :auth-user-id="page.props.auth?.user?.id ?? null"
                     @job-link-open="openJobLink"
+                    @worker-job-register="openJobLink"
                     @job-link-detail="openJobLinkDetail"
                     @complete-assignment="onCompleteAssignment"
                     @worker-complete="onWorkerComplete"

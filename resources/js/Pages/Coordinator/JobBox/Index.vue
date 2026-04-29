@@ -132,7 +132,7 @@
                             <col>                      <!-- タイトル（残り全幅） -->
                             <col style="width: 120px"> <!-- クライアント -->
                             <col style="width: 150px"> <!-- 案件名 -->
-                            <col style="width: 90px">  <!-- ステータス -->
+                            <col style="width: 100px">  <!-- ステータス -->
                         </colgroup>
                         <thead>
                             <tr class="bg-gray-50">
@@ -209,13 +209,45 @@ watch(hideCompleted, (val) => {
     localStorage.setItem('jobbox_hideCompleted', String(val));
 });
 
-// グループ表示モード
+// グループ表示モード（DB永続化）
 const viewMode = ref('date');
 const viewModes = [
     { key: 'date', label: '日付ごと' },
     { key: 'client', label: 'クライアントごと' },
     { key: 'project', label: '案件ごと' },
 ];
+
+async function loadGroupModeSetting() {
+    try {
+        const res = await fetch(route('coordinator.settings.data'), {
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+        });
+        if (res.ok) {
+            const data = await res.json();
+            if (data.jobbox_group_mode) viewMode.value = data.jobbox_group_mode;
+        }
+    } catch (_) { /* ignore */ }
+}
+
+async function saveGroupModeSetting(mode) {
+    try {
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        await fetch(route('coordinator.settings.update'), {
+            method: 'PUT',
+            credentials: 'same-origin',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': csrf,
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+            },
+            body: JSON.stringify({ jobbox_group_mode: mode }),
+        });
+    } catch (_) { /* ignore */ }
+}
+
+watch(viewMode, (val) => saveGroupModeSetting(val));
 
 // ===== ユーティリティ =====
 
@@ -534,13 +566,12 @@ function getUnifiedStatus(m) {
     try {
         const jam = m || {};
         const assignment = m.project_job_assignment || {};
-        // 優先順位: 完了 > セット（進行中）> 確認済み > 送信 > 未読
+        // 優先順位: 完了 > セット済み > 確認済み > 未読
         if (Boolean(jam.completed) || Boolean(assignment.completed)) return '完了';
         if (Boolean(jam.accepted) || Boolean(assignment.accepted) ||
-            Boolean(jam.scheduled) || Boolean(assignment.scheduled) || Boolean(assignment.scheduled_at)) return '進行中';
+            Boolean(jam.scheduled) || Boolean(assignment.scheduled) || Boolean(assignment.scheduled_at)) return 'セット済み';
         const readAt = jam.read_at || assignment.read_at || null;
         if (readAt) return '確認済み';
-        if (Boolean(jam.assigned) || Boolean(assignment.assigned)) return '送信済み';
         return '未読';
     } catch {
         return '未読';
@@ -554,12 +585,11 @@ function getAssignmentStatus(m) {
 
 function statusBadgeClass(status) {
     switch (status) {
-        case '完了':   return 'bg-yellow-100 text-yellow-800';
-        case '進行中': return 'bg-blue-100 text-blue-800';
-        case '確認済み': return 'bg-green-100 text-green-800';
-        case '送信済み': return 'bg-gray-200 text-gray-700';
-        case '未読':   return 'bg-red-100 text-red-800';
-        default:       return 'bg-gray-100 text-gray-700';
+        case '完了':     return 'bg-yellow-100 text-yellow-800';
+        case 'セット済み': return 'bg-blue-100 text-blue-800';
+        case '確認済み':  return 'bg-green-100 text-green-800';
+        case '未読':     return 'bg-red-100 text-red-800';
+        default:         return 'bg-gray-100 text-gray-700';
     }
 }
 
@@ -584,6 +614,8 @@ function isUnread(m) {
 const { showToast } = useToasts();
 
 onMounted(() => {
+    loadGroupModeSetting();
+
     try {
         const authUser = page.props.auth.user;
         if (!authUser || !window.Echo) return;

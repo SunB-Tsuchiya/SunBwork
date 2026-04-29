@@ -46,33 +46,29 @@ const events = ref(
             }
         }
 
-        const chosen = s.color ?? (s.progress >= 100 ? '#9ca3af' : '#2563eb');
-        let textColor = '#ffffff';
-        try {
-            if (chosen && chosen.startsWith('#') && chosen.length === 7) {
-                const r = parseInt(chosen.slice(1, 3), 16);
-                const g = parseInt(chosen.slice(3, 5), 16);
-                const b = parseInt(chosen.slice(5, 7), 16);
-                const lum = 0.2126 * (r / 255) + 0.7152 * (g / 255) + 0.0722 * (b / 255);
-                textColor = lum < 0.6 ? '#ffffff' : '#111827';
-            }
-        } catch (e) {}
+        const isCompleted = !!s.completed_at || (s.progress ?? 0) >= 100;
+        const C = isCompleted
+            ? { bg: '#dcfce7', border: '#15803d', text: '#14532d' }
+            : { bg: '#dbeafe', border: '#1d4ed8', text: '#1e3a8a' };
 
         return {
-            id: s.id,           // FullCalendar の publicId として使用
-            title: s.name,
+            id: s.id,
+            title: s.name ?? '',
             start: startDateOnly,
             end: endForCalendar,
             allDay: true,
-            color: chosen,
-            backgroundColor: chosen,
-            borderColor: chosen,
-            textColor: textColor,
+            color: C.text,
+            backgroundColor: C.bg,
+            borderColor: C.border,
+            textColor: C.text,
             description: s.description ?? '',
             extendedProps: {
                 schedule_id: s.id,
-                progress: s.progress,
+                project_schedule_id: s.id,
+                progress: s.progress ?? 0,
                 description: s.description ?? '',
+                completed_at: s.completed_at ?? null,
+                original_color: s.color ?? null,
             },
         };
     }),
@@ -93,10 +89,9 @@ const weekPostsUrl = computed(() =>
         <template #header>
             <div class="flex items-center gap-3">
                 <Link
-                    v-if="project"
-                    :href="route('coordinator.project_jobs.show', { projectJob: project.id })"
+                    :href="route('coordinator.project_jobs.calendar')"
                     class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
-                >← 案件詳細に戻る</Link>
+                >← カレンダー一覧に戻る</Link>
                 <h2 class="text-xl font-semibold leading-tight text-gray-800">案件スケジュール</h2>
             </div>
         </template>
@@ -118,6 +113,7 @@ const weekPostsUrl = computed(() =>
                         :schedules="props.schedules"
                         :items="items"
                         :weekPostsUrl="weekPostsUrl"
+                        :uniformColors="true"
                     />
         </div>
     </AppLayout>

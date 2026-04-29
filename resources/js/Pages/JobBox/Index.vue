@@ -97,7 +97,7 @@
                             <col style="width: 130px"> <!-- クライアント -->
                             <col style="width: 160px"> <!-- 案件名 -->
                             <col style="width: 56px">  <!-- 既読 -->
-                            <col style="width: 88px">  <!-- ステータス -->
+                            <col style="width: 100px">  <!-- ステータス -->
                         </colgroup>
                         <thead>
                             <tr class="bg-gray-50">
@@ -418,26 +418,25 @@ function getAssignmentStatus(m) {
     try {
         const jam = m || {};
         const assignment = m.project_job_assignment || {};
-        // 優先順位: 完了 > セット > 確認済み > 送信
+        // 優先順位: 完了 > セット済み > 確認済み > 未読
         if (Boolean(jam.completed) || Boolean(assignment.completed)) return '完了';
         if (Boolean(jam.accepted) || Boolean(assignment.accepted) ||
-            Boolean(jam.scheduled) || Boolean(assignment.scheduled) || Boolean(assignment.scheduled_at)) return 'セット済';
+            Boolean(jam.scheduled) || Boolean(assignment.scheduled) || Boolean(assignment.scheduled_at)) return 'セット済み';
         const readAt = jam.read_at || assignment.read_at || null;
         if (readAt) return '確認済み';
-        if (Boolean(jam.assigned) || Boolean(assignment.assigned)) return '送信';
-        return '-';
+        return '未読';
     } catch {
-        return '-';
+        return '未読';
     }
 }
 
 function statusBadgeClass(status) {
     switch (status) {
-        case '完了':   return 'bg-yellow-100 text-yellow-800';
-        case 'セット済': return 'bg-blue-100 text-blue-800';
-        case '確認済み': return 'bg-green-100 text-green-800';
-        case '送信':   return 'bg-gray-200 text-gray-700';
-        default:       return 'bg-gray-100 text-gray-500';
+        case '完了':     return 'bg-yellow-100 text-yellow-800';
+        case 'セット済み': return 'bg-blue-100 text-blue-800';
+        case '確認済み':  return 'bg-green-100 text-green-800';
+        case '未読':     return 'bg-red-100 text-red-800';
+        default:         return 'bg-gray-100 text-gray-500';
     }
 }
 

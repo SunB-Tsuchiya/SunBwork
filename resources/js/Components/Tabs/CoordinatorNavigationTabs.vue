@@ -33,6 +33,14 @@ function getProgressReportLink() {
         return '/coordinator/progress-report';
     }
 }
+
+function getSettingsLink() {
+    try {
+        return route('coordinator.settings.index');
+    } catch (e) {
+        return '/coordinator/settings';
+    }
+}
 </script>
 
 <template>
@@ -44,6 +52,7 @@ function getProgressReportLink() {
             <Link :href="getJobboxLink()" :class="tab('jobs')"> ジョブ一覧 </Link>
             <Link :href="getCalendarLink()" :class="tab('calendar')"> 案件カレンダー </Link>
             <Link :href="getProgressReportLink()" :class="tab('progress_report')"> 進行レポート </Link>
+            <Link :href="getSettingsLink()" :class="tab('settings')"> 設定 </Link>
         </nav>
     </div>
 </template>

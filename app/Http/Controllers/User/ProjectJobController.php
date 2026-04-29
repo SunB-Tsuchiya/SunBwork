@@ -17,6 +17,32 @@ use Inertia\Inertia;
 class ProjectJobController extends Controller
 {
     /**
+     * Return JSON list of progress sheets for a given project job.
+     * Used by the "詳細を見る（進行表へ）" modal.
+     */
+    public function progressSheetsJson(Request $request, ProjectJob $projectJob)
+    {
+        $user = $request->user();
+
+        $hasAccess = $projectJob->projectJobAssignments()->where(function ($q) use ($user) {
+            $q->where('user_id', $user->id)->orWhere('sender_id', $user->id);
+        })->exists()
+            || $projectJob->teamMembers()->where('user_id', $user->id)->exists();
+
+        if (!$hasAccess) {
+            return response()->json([], 403);
+        }
+
+        $sheets = ProgressSheet::where('project_job_id', $projectJob->id)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get(['id', 'name'])
+            ->map(fn($s) => ['id' => $s->id, 'name' => $s->name]);
+
+        return response()->json($sheets);
+    }
+
+    /**
      * Return JSON list of clients and projects accessible to the current user.
      * Used by the calendar modal for "ジョブ作成（進行表から）".
      */

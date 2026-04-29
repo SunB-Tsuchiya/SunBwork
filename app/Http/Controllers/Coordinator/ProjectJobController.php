@@ -418,7 +418,7 @@ class ProjectJobController extends Controller
         // スケジュール一覧（Show に表として表示するため）
         $schedules = \App\Models\ProjectSchedule::where('project_job_id', $projectJob->id)
             ->orderBy('start_date')
-            ->get(['id', 'name', 'description', 'start_date', 'end_date']);
+            ->get(['id', 'name', 'description', 'start_date', 'end_date', 'completed_at']);
 
         // ジョブ履歴: この案件に紐づく job_assignment_messages を全件取得
         $jobHistory = [];

@@ -3,7 +3,9 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import CoordinatorNavigationTabs from '@/Components/Tabs/CoordinatorNavigationTabs.vue';
 import FullCalendar from '@fullcalendar/vue3';
 import dayGridPlugin from '@fullcalendar/daygrid';
+import { Link } from '@inertiajs/vue3';
 import { computed, onMounted, ref } from 'vue';
+import { route } from 'ziggy-js';
 
 const props = defineProps({
     projects:  { type: Array, default: () => [] },
@@ -17,18 +19,9 @@ const projectMap = computed(() => {
     return m;
 });
 
-function textColorFor(hex) {
-    try {
-        if (hex && hex.startsWith('#') && hex.length === 7) {
-            const r = parseInt(hex.slice(1, 3), 16);
-            const g = parseInt(hex.slice(3, 5), 16);
-            const b = parseInt(hex.slice(5, 7), 16);
-            const lum = 0.2126 * (r / 255) + 0.7152 * (g / 255) + 0.0722 * (b / 255);
-            return lum < 0.55 ? '#ffffff' : '#111827';
-        }
-    } catch (e) { /* ignore */ }
-    return '#ffffff';
-}
+// Unified colors: blue = normal, green = completed
+const COLOR_NORMAL    = { bg: '#dbeafe', border: '#1d4ed8', text: '#1e3a8a' }; // blue-100/700/900
+const COLOR_COMPLETED = { bg: '#dcfce7', border: '#15803d', text: '#14532d' }; // green-100/700/900
 
 function fmtDate(v) {
     if (!v) return null;
@@ -48,8 +41,9 @@ const events = computed(() =>
     (props.schedules || [])
         .filter(s => s.start_date)
         .map(s => {
-            const project = projectMap.value[s.project_job_id];
-            const bg = s.color || '#2563eb';
+            const project   = projectMap.value[s.project_job_id];
+            const isCompleted = !!s.completed_at || (s.progress ?? 0) >= 100;
+            const c         = isCompleted ? COLOR_COMPLETED : COLOR_NORMAL;
             const startDate = fmtDate(s.start_date);
             const endDate   = s.end_date ? addDay(fmtDate(s.end_date)) : addDay(startDate);
             return {
@@ -57,29 +51,28 @@ const events = computed(() =>
                 start:           startDate,
                 end:             endDate,
                 allDay:          true,
-                backgroundColor: bg,
-                borderColor:     bg,
-                textColor:       textColorFor(bg),
+                backgroundColor: c.bg,
+                borderColor:     c.border,
+                textColor:       c.text,
                 extendedProps: {
                     schedule_id:    s.id,
                     project_job_id: s.project_job_id,
                     project_title:  project?.title ?? '',
                     progress:       s.progress ?? 0,
+                    completed:      isCompleted,
                 },
             };
         })
 );
 
 function renderEventContent(arg) {
-    const proj    = arg.event.extendedProps.project_title;
-    const title   = arg.event.title;
-    const progress = arg.event.extendedProps.progress;
-    const safeTitle = title.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const safeProj  = proj.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const proj  = arg.event.extendedProps.project_title;
+    const title = arg.event.title;
+    const safe  = (s) => s.replace(/</g, '&lt;').replace(/>/g, '&gt;');
     return {
-        html: `<div class="fc-event-inner" title="${safeProj}: ${safeTitle}">
-                   <span class="fc-event-title">${safeTitle}</span>
-                   ${progress > 0 ? `<span class="fc-event-progress"> ${progress}%</span>` : ''}
+        html: `<div class="fc-event-inner" title="${safe(proj)}: ${safe(title)}">
+                   <div class="fc-event-project">${safe(proj)}</div>
+                   <div class="fc-event-schedule">${safe(title)}</div>
                </div>`,
     };
 }
@@ -119,9 +112,35 @@ const filteredEvents = computed(() =>
     events.value.filter(e => visibleIds.value.has(e.extendedProps.project_job_id))
 );
 
+// Track current view range for legend filtering
+const now = new Date();
+const viewStart = ref(new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]);
+const viewEnd   = ref(new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]);
+
+function onDatesSet(info) {
+    viewStart.value = info.startStr.split('T')[0];
+    viewEnd.value   = info.endStr.split('T')[0];
+}
+
+// Projects that have at least one schedule overlapping the current calendar view
+const projectsInView = computed(() => {
+    const start = viewStart.value;
+    const end   = viewEnd.value;
+    const inView = new Set();
+    (props.schedules || []).forEach(s => {
+        const sStart = s.start_date;
+        const sEnd   = s.end_date || s.start_date;
+        if (sStart && sStart <= end && sEnd >= start) {
+            inView.add(s.project_job_id);
+        }
+    });
+    return visibleProjects.value.filter(p => inView.has(p.id));
+});
+
 const calendarOptionsFinal = computed(() => ({
     ...calendarOptions.value,
     events: filteredEvents.value,
+    datesSet: onDatesSet,
 }));
 
 // ─── Scroll to current week ────────────────────────────────────────────────
@@ -175,28 +194,24 @@ function scrollToCurrentWeek() {
                     </label>
                 </div>
                 <div class="flex flex-wrap gap-2">
-                    <template v-for="project in visibleProjects" :key="project.id">
-                        <div
-                            class="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium"
-                            :style="{
-                                backgroundColor: project.color + '22',
-                                border: '1.5px solid ' + project.color,
-                                color: project.color,
-                            }"
+                    <template v-for="project in projectsInView" :key="project.id">
+                        <Link
+                            :href="route('coordinator.project_schedules.calendar', { project_job_id: project.id })"
+                            class="flex flex-col rounded-lg px-3 py-2.5 text-xs font-medium transition-opacity hover:opacity-75"
+                            :style="project.completed
+                                ? 'background-color:#dcfce7;border:1.5px solid #15803d;color:#14532d'
+                                : 'background-color:#dbeafe;border:1.5px solid #1d4ed8;color:#1e3a8a'"
                         >
-                            <span
-                                class="inline-block h-2.5 w-2.5 flex-shrink-0 rounded-sm"
-                                :style="{ backgroundColor: project.color }"
-                            ></span>
-                            <span>{{ project.title }}</span>
-                            <span v-if="project.client_name" class="ml-0.5 font-normal text-gray-500">
-                                （{{ project.client_name }}）
+                            <span class="font-semibold leading-snug">
+                                {{ project.title }}
+                                <span v-if="project.client_name" class="font-normal opacity-70">（{{ project.client_name }}）</span>
+                                <span v-if="project.completed" class="ml-1 opacity-60">完了</span>
                             </span>
-                            <span v-if="project.completed" class="ml-1 text-gray-400">完了</span>
-                        </div>
+                            <span class="mt-1 text-[0.6rem] opacity-55">＠ 詳細を見る</span>
+                        </Link>
                     </template>
-                    <div v-if="visibleProjects.length === 0" class="text-sm text-gray-400">
-                        表示する案件がありません
+                    <div v-if="projectsInView.length === 0" class="text-sm text-gray-400">
+                        この月に予定のある案件がありません
                     </div>
                 </div>
             </div>
@@ -228,15 +243,22 @@ function scrollToCurrentWeek() {
 /* ── Event pill styling ──────────────────────────────────────── */
 :deep(.fc-event-inner) {
     overflow: hidden;
+    max-width: 100%;
+    padding: 2px 4px;
+    line-height: 1.35;
+}
+:deep(.fc-event-project) {
+    font-size: 0.62rem;
+    opacity: 0.75;
+    overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
-    max-width: 100%;
-    padding: 0 3px;
-    font-size: 0.72rem;
-    line-height: 1.4;
 }
-:deep(.fc-event-progress) {
-    opacity: 0.75;
-    font-size: 0.65rem;
+:deep(.fc-event-schedule) {
+    font-size: 0.72rem;
+    font-weight: 600;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }
 </style>

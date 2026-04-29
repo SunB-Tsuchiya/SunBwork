@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\ProjectSchedule;
+use App\Models\ProjectJob;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -110,6 +111,19 @@ class ProjectSchedulesController extends Controller
         return response()->json(['status' => 'ok']);
     }
 
+    public function uncomplete(Request $request, ProjectSchedule $projectSchedule)
+    {
+        $this->authorize('update', $projectSchedule);
+        $projectSchedule->update(['completed_at' => null]);
+
+        // 紐づく schedlink セルも未完了に戻す
+        \App\Models\ProgressCell::where('schedule_id', $projectSchedule->id)
+            ->where('cell_type', 'schedlink')
+            ->update(['completed_at' => null]);
+
+        return response()->json(['status' => 'ok']);
+    }
+
     // Bulk update schedules (e.g., multiple drag changes)
     public function bulkUpdate(Request $request)
     {
@@ -149,13 +163,22 @@ class ProjectSchedulesController extends Controller
             abort(400, 'project_job_id is required');
         }
 
+        $projectJob = ProjectJob::find($projectJobId);
+        $rawTitle = $projectJob ? ($projectJob->title ?? '') : '';
+        $safeTitle = preg_replace('/[\/\\\\\:\*\?"<>\|]/', '_', $rawTitle);
+        $safeTitle = trim($safeTitle, '_');
+        if ($safeTitle === '') {
+            $safeTitle = (string) $projectJobId;
+        }
+        $filename = $safeTitle . '_スケジュール.csv';
+
         $schedules = ProjectSchedule::where('project_job_id', $projectJobId)
             ->orderBy('start_date')
             ->get(['id', 'name', 'start_date', 'end_date', 'description', 'color']);
 
         $headers = [
             'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="schedules_' . $projectJobId . '.csv"',
+            'Content-Disposition' => "attachment; filename*=UTF-8''" . rawurlencode($filename),
         ];
 
         $callback = function () use ($schedules) {

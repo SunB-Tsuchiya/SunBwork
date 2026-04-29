@@ -340,31 +340,15 @@ function historyFormatDateLabel(dateStr) {
 function historyGetStatus(m) {
     try {
         const assignment = m.project_job_assignment || {};
-        const statusKey = assignment.status?.key || null;
-        if (statusKey) {
-            switch (statusKey) {
-                case 'completed':
-                    return '完了';
-                case 'scheduled':
-                    return 'セット済';
-                case 'confirmed':
-                    return '確認済';
-                case 'received':
-                case 'order':
-                case 'in_progress':
-                    return '受信済';
-                default:
-                    break;
-            }
-        }
+        // 優先順位: 完了 > セット済み > 確認済み > 未読
         if (Boolean(m.completed) || Boolean(assignment.completed)) return '完了';
-        if (Boolean(m.scheduled) || Boolean(assignment.scheduled)) return 'セット済';
+        if (Boolean(m.accepted) || Boolean(assignment.accepted) ||
+            Boolean(m.scheduled) || Boolean(assignment.scheduled) || Boolean(assignment.scheduled_at)) return 'セット済み';
         const readAt = m.read_at || assignment.read_at || null;
-        if (readAt) return Boolean(m.accepted) || Boolean(assignment.accepted) ? '確認済' : '既読済';
-        if (Boolean(m.accepted) || Boolean(assignment.accepted)) return '受信済';
-        return '-';
+        if (readAt) return '確認済み';
+        return '未読';
     } catch {
-        return '-';
+        return '未読';
     }
 }
 
@@ -372,12 +356,12 @@ function statusBadgeClass(status) {
     switch (status) {
         case '完了':
             return 'bg-yellow-100 text-yellow-800';
-        case 'セット済':
+        case 'セット済み':
             return 'bg-blue-100 text-blue-800';
-        case '確認済':
+        case '確認済み':
             return 'bg-green-100 text-green-800';
-        case '受信済':
-            return 'bg-indigo-100 text-indigo-800';
+        case '未読':
+            return 'bg-red-100 text-red-800';
         default:
             return 'bg-gray-100 text-gray-700';
     }

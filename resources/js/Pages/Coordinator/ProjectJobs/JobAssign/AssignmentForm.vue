@@ -756,10 +756,23 @@ function effectiveAuthUser() {
 // Inline event editor state (user mode)
 const _today = new Date();
 const workDate = ref(`${_today.getFullYear()}-${String(_today.getMonth() + 1).padStart(2, '0')}-${String(_today.getDate()).padStart(2, '0')}`); // 今日の日付をデフォルトに (YYYY-MM-DD)
-const startTimeHour = ref('17');
-const startTimeMin = ref('30');
-const endTimeHour = ref('10');
-const endTimeMin = ref('00');
+function _calcInitStartTime() {
+    const jstParts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit', hour12: false,
+    }).formatToParts(new Date());
+    let h = Number(jstParts.find((p) => p.type === 'hour').value);
+    let m = Number(jstParts.find((p) => p.type === 'minute').value);
+    const rem = m % 5;
+    if (rem !== 0) m += (5 - rem);
+    if (m >= 60) { m -= 60; h += 1; }
+    if (h >= 24) h = 23;
+    return { h: String(h).padStart(2, '0'), m: String(m).padStart(2, '0') };
+}
+const _initTime = _calcInitStartTime();
+const startTimeHour = ref(_initTime.h);
+const startTimeMin  = ref(_initTime.m);
+const endTimeHour   = ref('17');
+const endTimeMin    = ref('30');
 
 // Event overlap checking state
 const overlappingEvents = ref([]);
@@ -1271,7 +1284,7 @@ onMounted(() => {
         if (ev) {
             const s = normalizeToDateTimePartsLocal(ev.start || ev.desired_start_date || ev.start_time || '');
             const e = normalizeToDateTimePartsLocal(ev.end || ev.desired_end_date || ev.desired_time || '');
-            workDate.value = s.date || (assignments.value[0] ? assignments.value[0].desired_start_date || '' : '');
+            workDate.value = s.date || assignments.value[0]?.desired_start_date || todayDateStr();
             if (s.time) {
                 const [sh, sm] = String(s.time).split(':');
                 startTimeHour.value = sh || '17';

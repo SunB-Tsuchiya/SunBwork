@@ -68,8 +68,8 @@ class ProjectJobsCalendarController extends Controller
                     'start_date'     => $fmt($s->start_date),
                     'end_date'       => $fmt($s->end_date),
                     'project_job_id' => $s->project_job_id,
-                    'color'          => $colorMap[$s->project_job_id] ?? '#2563eb',
                     'progress'       => $s->progress ?? 0,
+                    'completed_at'   => $s->completed_at ? $s->completed_at->toDateTimeString() : null,
                 ];
             })
             ->values();

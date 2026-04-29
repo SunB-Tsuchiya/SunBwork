@@ -24,9 +24,13 @@ class ProgressSheetController extends Controller
         $this->authorizeJobAccess($request->user(), $projectJob);
 
         $validated = $request->validate([
-            'name'          => 'required|string|max:255',
-            'template_id'   => 'nullable|exists:progress_templates,id',
-            'column_config' => 'nullable|array',
+            'name'                      => 'required|string|max:255',
+            'template_id'               => 'nullable|exists:progress_templates,id',
+            'column_config'             => 'nullable|array',
+            'initial_rows'              => 'nullable|array',
+            'initial_rows.*.label'      => 'required|string|max:255',
+            'initial_rows.*.start_date' => 'nullable|date',
+            'initial_rows.*.end_date'   => 'nullable|date',
         ]);
 
         $columnConfig = $validated['column_config'] ?? [];
@@ -52,6 +56,35 @@ class ProgressSheetController extends Controller
             'created_by'     => $request->user()->id,
             'sort_order'     => ProgressSheet::where('project_job_id', $projectJob->id)->max('sort_order') + 1,
         ]);
+
+        // カレンダーから作成の場合：initial_rows で行と日付セルを一括作成
+        if (!empty($validated['initial_rows'])) {
+            $order = 0;
+            foreach ($validated['initial_rows'] as $rowData) {
+                $row = ProgressRow::create([
+                    'sheet_id' => $sheet->id,
+                    'label'    => $rowData['label'],
+                    'order'    => $order++,
+                    'deadline' => $rowData['end_date'] ?? null,
+                ]);
+                if (!empty($rowData['start_date'])) {
+                    ProgressCell::create([
+                        'row_id'     => $row->id,
+                        'col_key'    => 'start_date',
+                        'cell_type'  => 'date',
+                        'value_date' => $rowData['start_date'],
+                    ]);
+                }
+                if (!empty($rowData['end_date'])) {
+                    ProgressCell::create([
+                        'row_id'     => $row->id,
+                        'col_key'    => 'end_date',
+                        'cell_type'  => 'date',
+                        'value_date' => $rowData['end_date'],
+                    ]);
+                }
+            }
+        }
 
         // テンプレートのrow_configがあれば台割行を初期作成
         if (!empty($template) && !empty($template->row_config)) {

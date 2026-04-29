@@ -76,7 +76,7 @@
                             <col style="width: 100px"> <!-- 担当 -->
                             <col style="width: 150px"> <!-- 終了希望日 -->
                             <col style="width: 100px"> <!-- 見積時間 -->
-                            <col style="width: 74px">  <!-- ステータス -->
+                            <col style="width: 100px">  <!-- ステータス -->
                         </colgroup>
                         <thead>
                             <tr class="bg-gray-50">
@@ -213,19 +213,20 @@ function getDateKey(a) {
 
 function getStatus(a) {
     const statusKey = a.status_model?.key ?? a.status?.key ?? null;
+    // 優先順位: 完了 > セット済み > 確認済み > 未読
     if (statusKey === 'completed' || Boolean(a.completed)) return '完了';
-    if (statusKey === 'scheduled'  || Boolean(a.scheduled) || Boolean(a.scheduled_at)) return '進行中';
-    if (statusKey === 'confirmed'  || a.read_at || Boolean(a.accepted)) return '確認済み';
+    if (statusKey === 'scheduled' || Boolean(a.accepted) || Boolean(a.scheduled) || Boolean(a.scheduled_at)) return 'セット済み';
+    if (statusKey === 'confirmed' || a.read_at) return '確認済み';
     return '未読';
 }
 
 function statusBadgeClass(status) {
     switch (status) {
-        case '完了':    return 'bg-yellow-100 text-yellow-800';
-        case '進行中':  return 'bg-blue-100 text-blue-800';
-        case '確認済み': return 'bg-green-100 text-green-800';
-        case '未読':    return 'bg-red-100 text-red-800';
-        default:        return 'bg-gray-100 text-gray-700';
+        case '完了':     return 'bg-yellow-100 text-yellow-800';
+        case 'セット済み': return 'bg-blue-100 text-blue-800';
+        case '確認済み':  return 'bg-green-100 text-green-800';
+        case '未読':     return 'bg-red-100 text-red-800';
+        default:         return 'bg-gray-100 text-gray-700';
     }
 }
 

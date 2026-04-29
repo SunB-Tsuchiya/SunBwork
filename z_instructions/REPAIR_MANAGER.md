@@ -27,6 +27,8 @@
 | `z_instructions/LAYOUT_GUIDELINES.md` | レイアウトガイドライン（L-01で作成予定） |
 | `z_instructions/CONSOLIDATED_09_domain_rules.md` | ドメインルール（権限・JobBox・通知等） |
 | `CLAUDE.md` | プロジェクト全体のルール（必読） |
+| `z_instructions/PROGRESS_SHEET_V2_DESIGN.md` | 進行表V2刷新 詳細設計書 |
+| `z_instructions/PROGRESS_SHEET_V2_PROMPT.md` | 進行表V2 Claude向けセッション開始プロンプト |
 
 ---
 
@@ -114,7 +116,30 @@ STEP 5: 完了記録
 
 | ID | 内容 | ステータス | 備考 |
 |----|------|-----------|------|
-| P-01 | 子案件機能（別伝票番号）計画書の作成 | 🔲 未着手 | 別の Claude セッションで進行 |
+| P-01 | 子案件機能（別伝票番号）計画書の作成 | ❌ スキップ | G-02（案件複製機能）で目的達成。進行表・カレンダーが複製できればグループ化不要とユーザー確認済み |
+
+### フェーズV：進行表刷新（V2）
+
+> 詳細設計書: `z_instructions/PROGRESS_SHEET_V2_DESIGN.md`
+
+| ID | 内容 | ステータス | 備考 |
+|----|------|-----------|------|
+| V-01 | DBマイグレーション（6カラム追加） | ✅ 完了 | progress_cells×4 / progress_sheets×1 / project_schedules×1 |
+| V-02 | `worker`型セル Backend API対応 | ✅ 完了 | ProgressCellController・JobBoxController完了連携 |
+| V-03 | `worker`型セル Frontend実装 | ✅ 完了 | ProgressCell.vue・Show.vue 更新 |
+| V-04 | `schedlink`型セル Backend API対応 | ✅ 完了 | complete()にschedlink対応・bulkUpdateにschedlinkケース追加・show()にschedule_name/schedule_completed_at追加 |
+| V-05 | `schedlink`型セル Frontend実装 | ✅ 完了 | ProgressCell/ProgressTable/Show.vue更新・ルート名二重プレフィックスバグ修正 |
+| V-06 | 締め切りアラート色 + 完了率バッジ | ✅ 完了 | アラート色はV-03/V-05で実装済み・完了率バッジ追加（2026-04-25） |
+| V-07 | 既存シート変換機能 | ✅ 完了 | プレビューAPI(GET)+変換API(PUT)の2段構成。全データ引き継ぎ+不可逆ボタンで確認後に変換 |
+| V-08 | テンプレートへの新セル型対応 | ✅ 完了 | PREVIEW_TYPE_LABELSにworker/schedlink追加（2026-04-25） |
+| V-09 | セルメモ・コメント機能 | ✅ 完了 | メモUI（1行表示+ホバーポップアップ+著者バッジ）実装完了 |
+| V-10 | User向け「自分の担当セル一覧」 | ✅ 完了 | JobBoxタブ追加・検索/期間/グループUI・バグ修正込み（2026-04-25） |
+| V-11 | 進行表の読み取り専用共有URL | ✅ 完了 | share_token発行・公開ページ・トークン無効化対応（2026-04-26） |
+| V-12 | Coordinator横断レポート | ✅ 完了 | スコープ=project_team_members・フィルター（担当者/案件/完了状況/締め切り/完了日）・色分け（2026-04-26） |
+| V-13 | 校正列のworker型対応 | ✅ 完了 | proof_userを2カラムUI（担当＋ジョブ登録＋完了管理）に刷新（2026-04-26） |
+| V-14 | カレンダー予定の完了表示 | 🔨 実装中 | ビルド成功・ユーザー確認待ち |
+| V-15 | セット方式削除・列追加UI刷新 | ✅ 完了 | buildV2ColumnConfig を worker+proof_v2 構成に変更・ColumnTreeEditor に「＋組版＋校正セット」プリセットボタン追加（2026-04-26） |
+| V-16 | 進行表の印刷機能 | ✅ 完了 | Coordinator/User/共有URL の3か所・手動「印刷を実行」方式（2026-04-26） |
 
 ---
 
@@ -239,7 +264,7 @@ STEP 5: 完了記録
 
 ## ■ 次の推奨作業
 
-**現時点の推奨:** G-01（スケジュールと進行管理表の連動）または P-01（子案件機能計画書）
+**現時点の推奨:** V-01（DBマイグレーション）から開始。詳細は `PROGRESS_SHEET_V2_DESIGN.md` を参照。
 
 ---
 

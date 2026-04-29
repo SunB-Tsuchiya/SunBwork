@@ -90,6 +90,10 @@ function actualDurationText() {
     return formatMins(actual);
 }
 
+function goBack() {
+    window.history.back();
+}
+
 function confirmDelete() {
     if (!confirm('この予定を削除しますか？')) return;
     router.delete(route('events.destroy', { event: props.event.id }));
@@ -212,7 +216,7 @@ const eventTypeLabel = computed(() => props.event?.event_item_type?.name ?? null
                         </span>
                         </template>
                     </template>
-                    <button @click="$router?.back ? $router.back() : window.history.back()"
+                    <button @click="goBack"
                             class="ml-auto inline-flex items-center gap-1.5 rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">
                         戻る
                     </button>

@@ -37,6 +37,7 @@ class ProjectSchedulesCalendarController extends Controller
                     'progress' => $s->progress ?? null,
                     'project_job_id' => $s->project_job_id ?? null,
                     'color' => $s->color ?? null,
+                    'completed_at' => $s->completed_at ? $s->completed_at->toDateTimeString() : null,
                     // include comments inline to keep the frontend shape similar to before
                     'comments' => $s->comments ? $s->comments->map(function ($c) {
                         return [
