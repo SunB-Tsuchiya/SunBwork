@@ -97,6 +97,13 @@ function handleFileSelect(file) {
     form.use_job_image = false;
     isJobImage.value = false;
     previewName.value = file.name;
+
+    // PDFはブラウザの<img>で表示できないためプレースホルダーを使う
+    if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+        previewUrl.value = '__pdf__';
+        return;
+    }
+
     const reader = new FileReader();
     reader.onload = (e) => { previewUrl.value = e.target.result; };
     reader.readAsDataURL(file);
@@ -251,7 +258,20 @@ const isMobile = computed(() => {
                         <!-- サムネイル表示 -->
                         <div v-if="previewUrl" class="mb-3">
                             <div class="relative inline-block">
+                                <!-- PDF プレースホルダー -->
+                                <div
+                                    v-if="previewUrl === '__pdf__'"
+                                    class="flex h-40 w-48 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 shadow-sm"
+                                >
+                                    <div class="text-center">
+                                        <div class="text-4xl">📄</div>
+                                        <p class="mt-1 text-xs text-gray-500">PDF</p>
+                                        <p class="text-xs text-gray-400">登録後に変換表示</p>
+                                    </div>
+                                </div>
+                                <!-- 画像プレビュー -->
                                 <img
+                                    v-else
                                     :src="previewUrl"
                                     :alt="previewName"
                                     class="h-40 w-auto rounded-lg border border-gray-200 object-contain shadow-sm"
@@ -269,6 +289,7 @@ const isMobile = computed(() => {
                                     class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700"
                                 >案件から引き継ぎ</span>
                                 <button
+                                    v-if="previewUrl !== '__pdf__'"
                                     type="button"
                                     class="rounded border border-gray-300 px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-50"
                                     @click="showLightbox = true"

@@ -104,8 +104,8 @@ function statusLabel(status) {
 // ── 詳細モーダル ──────────────────────────────────
 const detail = ref(null);
 
-function openDetail(ticket) { detail.value = ticket; }
-function closeDetail()      { detail.value = null; }
+function openDetail(ticket) { detail.value = ticket; cancelPendingFile(); }
+function closeDetail()      { detail.value = null;  cancelPendingFile(); }
 
 // ステータス変更
 const updatingStatus = ref(false);
@@ -149,16 +149,39 @@ const authUser = computed(() => page.props.auth?.user ?? null);
 const isAdmin  = computed(() => ['admin', 'superadmin'].includes(authUser.value?.user_role));
 
 // ── 詳細モーダル：画像アップロード ───────────────────────
-const uploadingImage = ref(false);
+const uploadingImage  = ref(false);
+const uploadError     = ref('');
+const pendingFile     = ref(null);
+const pendingPreview  = ref(null); // data URL or '__pdf__'
 
-async function uploadTicketImage(ticket, file) {
-    if (!file || uploadingImage.value) return;
+function selectPendingFile(file) {
+    if (!file) return;
+    uploadError.value = '';
+    pendingFile.value = file;
+    if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+        pendingPreview.value = '__pdf__';
+    } else {
+        const reader = new FileReader();
+        reader.onload = (e) => { pendingPreview.value = e.target.result; };
+        reader.readAsDataURL(file);
+    }
+}
+
+function cancelPendingFile() {
+    pendingFile.value    = null;
+    pendingPreview.value = null;
+    uploadError.value    = '';
+}
+
+async function savePendingImage() {
+    if (!pendingFile.value || uploadingImage.value) return;
     uploadingImage.value = true;
+    uploadError.value    = '';
     const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
     const fd = new FormData();
-    fd.append('image', file);
+    fd.append('image', pendingFile.value);
     try {
-        const res = await fetch(route('prepress.tickets.updateImage', { ticket: ticket.id }), {
+        const res = await fetch(route('prepress.tickets.updateImage', { ticket: detail.value.id }), {
             method: 'POST',
             credentials: 'same-origin',
             headers: {
@@ -170,21 +193,24 @@ async function uploadTicketImage(ticket, file) {
         });
         if (res.ok) {
             const data = await res.json();
-            const idx = props.tickets.findIndex(t => t.id === ticket.id);
+            const idx = props.tickets.findIndex(t => t.id === detail.value.id);
             if (idx >= 0) {
-                props.tickets[idx].image_path        = data.image_url ? data.image_url.replace('/storage/', '') : ticket.image_path;
+                props.tickets[idx].image_path        = data.image_url ? data.image_url.replace('/storage/', '') : detail.value.image_path;
                 props.tickets[idx].original_filename = data.original_filename;
             }
-            if (detail.value?.id === ticket.id) {
-                detail.value = {
-                    ...detail.value,
-                    image_path:        props.tickets[idx]?.image_path ?? detail.value.image_path,
-                    image_url:         data.image_url,
-                    original_filename: data.original_filename,
-                };
-            }
+            detail.value = {
+                ...detail.value,
+                image_path:        props.tickets[idx]?.image_path ?? detail.value.image_path,
+                image_url:         data.image_url,
+                original_filename: data.original_filename,
+            };
+            cancelPendingFile();
+        } else {
+            uploadError.value = '保存に失敗しました。もう一度お試しください。';
         }
-    } catch { /* ignore */ } finally {
+    } catch {
+        uploadError.value = '通信エラーが発生しました。';
+    } finally {
         uploadingImage.value = false;
     }
 }
@@ -502,7 +528,7 @@ const canCreate = computed(() => {
                             class="inline-flex items-center gap-1.5 rounded bg-gray-400 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-500"
                             :disabled="updatingStatus"
                             @click="changeStatus(detail, 'pending')"
-                        >予定に戻す</button>
+                        >準備に戻す</button>
 
                         <button
                             v-if="isAdmin"
@@ -547,18 +573,71 @@ const canCreate = computed(() => {
                 <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
                     <div class="flex items-center justify-between border-b bg-gray-50 px-5 py-3">
                         <h2 class="text-sm font-semibold text-gray-700">添付画像（伝票画像）</h2>
-                        <label class="cursor-pointer rounded border border-green-700 px-3 py-1 text-xs font-medium text-green-700 hover:bg-green-50">
+                        <!-- ファイル選択ボタン（pending中は非表示） -->
+                        <label
+                            v-if="!pendingFile"
+                            class="cursor-pointer rounded border border-green-700 px-3 py-1 text-xs font-medium text-green-700 hover:bg-green-50"
+                            :class="{ 'opacity-50 pointer-events-none': uploadingImage }"
+                        >
                             {{ detail.image_path ? '画像を変更' : '画像を登録' }}
                             <input
                                 type="file"
                                 accept="image/*,.pdf"
                                 class="hidden"
                                 :disabled="uploadingImage"
-                                @change="e => uploadTicketImage(detail, e.target.files?.[0])"
+                                @change="e => selectPendingFile(e.target.files?.[0])"
                             />
                         </label>
                     </div>
-                    <div v-if="detail.image_path" class="px-5 py-4">
+
+                    <!-- ① 新しいファイルが選択されている（保存待ち）状態 -->
+                    <div v-if="pendingFile" class="px-5 py-4 space-y-3">
+                        <p class="text-xs font-semibold text-blue-700">新しい画像を確認して「保存」してください</p>
+
+                        <!-- PDFプレースホルダー -->
+                        <div
+                            v-if="pendingPreview === '__pdf__'"
+                            class="flex h-32 w-40 items-center justify-center rounded-lg border border-gray-200 bg-gray-50"
+                        >
+                            <div class="text-center">
+                                <div class="text-3xl">📄</div>
+                                <p class="mt-1 text-xs text-gray-500">PDF</p>
+                                <p class="text-xs text-gray-400">保存時に変換</p>
+                            </div>
+                        </div>
+                        <!-- 画像プレビュー -->
+                        <img
+                            v-else-if="pendingPreview"
+                            :src="pendingPreview"
+                            alt="プレビュー"
+                            class="max-h-60 rounded border border-gray-200 object-contain"
+                        />
+
+                        <p class="text-xs text-gray-500">{{ pendingFile.name }}</p>
+
+                        <p v-if="uploadError" class="text-xs text-red-600">{{ uploadError }}</p>
+
+                        <!-- 保存・キャンセルボタン -->
+                        <div class="flex gap-2">
+                            <button
+                                type="button"
+                                class="rounded bg-green-700 px-4 py-1.5 text-sm font-semibold text-white hover:bg-green-800 disabled:opacity-50"
+                                :disabled="uploadingImage"
+                                @click="savePendingImage"
+                            >
+                                {{ uploadingImage ? '変換・保存中...' : '保存' }}
+                            </button>
+                            <button
+                                type="button"
+                                class="rounded border border-gray-300 px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+                                :disabled="uploadingImage"
+                                @click="cancelPendingFile"
+                            >キャンセル</button>
+                        </div>
+                    </div>
+
+                    <!-- ② 既存画像の表示 -->
+                    <div v-else-if="detail.image_path" class="px-5 py-4">
                         <img
                             :src="detail.image_url ?? ('/storage/' + detail.image_path)"
                             :alt="detail.original_filename ?? 'image'"
@@ -566,9 +645,11 @@ const canCreate = computed(() => {
                         />
                         <p v-if="detail.original_filename" class="mt-1 text-xs text-gray-400">{{ detail.original_filename }}</p>
                     </div>
+
+                    <!-- ③ 画像未登録 -->
                     <div v-else class="px-5 py-6 text-center text-sm text-gray-400">
                         <p>画像が登録されていません。</p>
-                        <p v-if="uploadingImage" class="mt-1 text-blue-500">アップロード中...</p>
+                        <p class="mt-1 text-xs">上の「画像を登録」ボタンからファイルを選択してください。</p>
                     </div>
                 </div>
             </div>
