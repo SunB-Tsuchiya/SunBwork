@@ -220,6 +220,21 @@ headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' }
 
 ---
 
+### ミス7: `~/www/members/storage/` シンボリックリンクが存在しない
+
+**症状:** `Storage::disk('public')` で保存した画像（prepress/jobticker 等）の URL が
+`https://sun-brain.co.jp/members/storage/...` の形式になるが、404 エラーになる。
+
+**原因:** `php artisan storage:link` は `~/SunBWork/public/storage/` を作成するが、
+さくらの公開ディレクトリは `~/www/members/` なのでそこには届かない。
+
+**対処:** さくら SSH で以下を一度だけ実行:
+```bash
+ln -s ~/SunBWork/storage/app/public ~/www/members/storage
+```
+
+---
+
 ## さくら本番 .env の重要設定（参考）
 
 ```env
@@ -249,6 +264,26 @@ SESSION_SAME_SITE=lax
 | `~/SunBWork/` | Laravel ルート |
 | `~/www/members/` | 公開ディレクトリ（`index.php` のパスが通常と異なる） |
 | `~/www/members/build/` | `~/SunBWork/public/build/` へのシンボリックリンク |
+| `~/www/members/storage/` | `~/SunBWork/storage/app/public/` へのシンボリックリンク（要手動作成） |
+
+---
+
+## 初回セットアップ（さくら SSH で一度だけ実行）
+
+通常の `php artisan storage:link` は `~/SunBWork/public/storage/` を作成するが、
+さくらの公開ディレクトリは `~/www/members/` であるため、別途シンボリックリンクが必要。
+
+```bash
+# storage シンボリックリンク（初回のみ）
+ln -s ~/SunBWork/storage/app/public ~/www/members/storage
+
+# 確認
+ls -la ~/www/members/
+# → storage -> /home/ユーザー名/SunBWork/storage/app/public
+```
+
+**これがないと `Storage::disk('public')` で保存した画像（prepress/jobticker 等）が
+`/members/storage/...` の URL で 404 になる。**
 
 ---
 
