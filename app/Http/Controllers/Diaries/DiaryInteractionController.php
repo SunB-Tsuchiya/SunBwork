@@ -44,12 +44,12 @@ class DiaryInteractionController extends Controller
             ->whereIn('team_type', ['department', 'unit'])
             ->get();
 
-        // サブリーダーとして所属するユニットチーム
+        // サブリーダーとして所属するチーム（department ならその部署全員、unit ならユニットメンバーのみ）
         $subLeaderTeamIds = DB::table('team_sub_leaders')
             ->where('user_id', $currentUser->id)
             ->pluck('team_id');
         $subLeaderTeams = Team::whereIn('id', $subLeaderTeamIds)
-            ->where('team_type', 'unit')
+            ->whereIn('team_type', ['department', 'unit'])
             ->get();
 
         $allTeams = $leaderTeams->merge($subLeaderTeams)->unique('id');
