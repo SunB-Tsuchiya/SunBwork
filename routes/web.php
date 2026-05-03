@@ -827,6 +827,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
 
         // 伝票OCR解析 API
         Route::post('ocr/analyze', [\App\Http\Controllers\Prepress\TicketOcrController::class, 'analyze'])->name('ocr.analyze');
+        Route::post('ocr/clients/{client}/attach-department', [\App\Http\Controllers\Prepress\TicketOcrController::class, 'attachClientToDepartment'])->name('ocr.attach_department');
     });
 
 // 全ロール共通（読み取り専用）

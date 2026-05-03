@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Prepress;
 
 use App\Http\Controllers\Controller;
+use App\Models\Client;
 use App\Services\OcrSpaceService;
 use App\Services\PrepressImageService;
 use Illuminate\Http\Request;
@@ -52,15 +53,50 @@ class TicketOcrController extends Controller
         // OCR解析
         $ocrResult = $this->ocrService->analyze($storagePath);
 
+        // matched_clients に in_department フラグを付与
+        $deptId = $request->user()->department_id;
+        $matchedClients = $ocrResult['matched_clients'] ?? [];
+        if ($deptId && !empty($matchedClients)) {
+            $clientIds = array_column($matchedClients, 'id');
+            $inDeptIds = Client::whereIn('id', $clientIds)
+                ->whereHas('departments', fn($q) => $q->where('department_id', $deptId))
+                ->pluck('id')
+                ->toArray();
+            $matchedClients = array_map(fn($c) => array_merge($c, [
+                'in_department' => in_array($c['id'], $inDeptIds, true),
+            ]), $matchedClients);
+        }
+
         return response()->json([
             'jobcode'          => $ocrResult['jobcode']     ?? '',
             'client_name'      => $ocrResult['client_name'] ?? '',
             'title'            => $ocrResult['title']       ?? '',
-            'matched_clients'  => $ocrResult['matched_clients'] ?? [],
+            'matched_clients'  => $matchedClients,
             'image_url'        => \Illuminate\Support\Facades\Storage::disk('public')->url($storagePath),
             'tmp_image_path'   => $storagePath,
             'original_filename' => $imageMeta['original_filename'] ?? $file->getClientOriginalName(),
         ]);
+    }
+
+    /**
+     * POST /prepress/ocr/clients/{client}/attach-department
+     *
+     * ログインユーザーの部署にクライアントを紐づける（OCRモーダルから呼ぶ専用API）。
+     * toggleではなく attach のみ（外すことはしない）。
+     */
+    public function attachClientToDepartment(Request $request, Client $client)
+    {
+        $this->authorizePrepress($request->user());
+
+        $user = $request->user();
+        if (!$user->department_id) {
+            return response()->json(['error' => '部署が設定されていません。'], 422);
+        }
+
+        // 既に紐づいていても syncWithoutDetaching で安全に追加
+        $client->departments()->syncWithoutDetaching([$user->department_id]);
+
+        return response()->json(['ok' => true, 'client_name' => $client->name]);
     }
 
     protected function authorizePrepress($user): void

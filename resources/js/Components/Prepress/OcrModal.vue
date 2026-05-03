@@ -45,21 +45,31 @@ const isCreating     = ref(false);
 const createError    = ref('');
 const createSuccess  = ref(false);
 
+// ── 部署未登録の確認 ────────────────────────────────────────
+const selectedClientInDept = ref(true); // 選択クライアントが自部署に登録済みか
+const isAttaching          = ref(false);
+const attachError          = ref('');
+const attachDismissed      = ref(false); // バナーを「スキップ」で閉じた
+
 // ── サムネイル拡大 ──────────────────────────────────────────
 const showLightbox = ref(false);
 
 // ── propsが変わったら各フィールドをリセット ─────────────────
 watch(() => props.ocrResult, (val) => {
-    jobcode.value    = val.jobcode     ?? '';
-    clientName.value = val.client_name ?? '';
-    title.value      = val.title       ?? '';
+    jobcode.value    = val.jobcode ?? '';
+    title.value      = val.title   ?? '';
     clientId.value   = '';
     matchedClients.value    = val.matched_clients ?? [];
     selectedClientIdx.value = matchedClients.value.length === 1 ? 0 : -1;
 
-    // 1件だけ一致した場合は自動で clientId をセット
+    // 1件だけ一致した場合は自動で clientId とDB名をセット
     if (matchedClients.value.length === 1) {
-        clientId.value = matchedClients.value[0].id;
+        clientId.value              = matchedClients.value[0].id;
+        clientName.value            = matchedClients.value[0].name; // OCR名ではなくDB名
+        selectedClientInDept.value  = matchedClients.value[0].in_department ?? true;
+    } else {
+        clientName.value = val.client_name ?? ''; // マッチなし時のみOCR名を初期表示
+        selectedClientInDept.value = true;
     }
 
     searchMode.value    = 'none';
@@ -69,15 +79,51 @@ watch(() => props.ocrResult, (val) => {
     newClientName.value = '';
     createError.value   = '';
     createSuccess.value = false;
+    attachError.value   = '';
+    attachDismissed.value = false;
 }, { deep: true, immediate: true });
 
 // ── クライアント候補から選択 ────────────────────────────────
 function selectMatched(idx) {
     selectedClientIdx.value = idx;
     const c = matchedClients.value[idx];
-    clientId.value   = c.id;
-    clientName.value = c.name;
-    searchMode.value = 'none';
+    clientId.value              = c.id;
+    clientName.value            = c.name; // 常にDB名を使う
+    selectedClientInDept.value  = c.in_department ?? true;
+    searchMode.value            = 'none';
+    attachError.value           = '';
+    attachDismissed.value       = false;
+}
+
+// ── クライアントを自部署に追加 ─────────────────────────────
+async function attachToDepartment() {
+    if (!clientId.value) return;
+    isAttaching.value = true;
+    attachError.value = '';
+    try {
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+        const res = await fetch(route('prepress.ocr.attach_department', { client: clientId.value }), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': csrf,
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({}),
+        });
+        if (res.ok) {
+            selectedClientInDept.value = true;
+        } else {
+            const err = await res.json();
+            attachError.value = err.error ?? '登録に失敗しました。';
+        }
+    } catch {
+        attachError.value = '通信エラーが発生しました。';
+    } finally {
+        isAttaching.value = false;
+    }
 }
 
 // ── 既存に紐づけ: ID直接入力 ───────────────────────────────
@@ -261,8 +307,32 @@ const clientStatus = computed(() => {
                                 <button
                                     type="button"
                                     class="ml-auto text-xs text-green-500 underline hover:text-green-700"
-                                    @click="clientId = ''; selectedClientIdx = -1;"
+                                    @click="clientId = ''; selectedClientIdx = -1; selectedClientInDept = true; attachDismissed = false;"
                                 >変更</button>
+                            </div>
+
+                            <!-- 部署未登録の確認バナー -->
+                            <div
+                                v-if="clientId && !selectedClientInDept && !attachDismissed"
+                                class="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 space-y-2"
+                            >
+                                <p>⚠ このクライアントは自部署に未登録です。部署に追加しますか？</p>
+                                <p class="text-xs text-amber-600">追加すると、自部署のクライアント一覧に表示されるようになります。</p>
+                                <div class="flex gap-2">
+                                    <button
+                                        type="button"
+                                        class="rounded bg-amber-500 px-3 py-1 text-xs font-medium text-white hover:bg-amber-600 disabled:opacity-50"
+                                        :disabled="isAttaching"
+                                        @click="attachToDepartment"
+                                    >{{ isAttaching ? '登録中...' : '追加する' }}</button>
+                                    <button
+                                        type="button"
+                                        class="rounded border border-amber-400 px-3 py-1 text-xs font-medium text-amber-700 hover:bg-amber-100"
+                                        @click="attachDismissed = true"
+                                    >スキップ</button>
+                                </div>
+                                <p v-if="attachError" class="text-xs text-red-600">{{ attachError }}</p>
+                                <p v-if="selectedClientInDept && !isAttaching" class="text-xs text-green-600">✓ 部署に追加しました。</p>
                             </div>
 
                             <!-- 候補リスト -->
