@@ -1,6 +1,6 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Link } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
 
 const props = defineProps({ subcontractors: Array });
 </script>
@@ -32,7 +32,10 @@ const props = defineProps({ subcontractors: Array });
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-200 bg-white">
-                            <tr v-for="sub in props.subcontractors" :key="sub.id" class="hover:bg-gray-50">
+                            <tr v-for="sub in props.subcontractors" :key="sub.id"
+                                class="cursor-pointer hover:bg-gray-50"
+                                @click="router.visit(route('coordinator.subcontractors.show', sub.id))"
+                            >
                                 <td class="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
                                     <Link :href="route('coordinator.subcontractors.show', sub.id)" class="text-green-700 hover:underline">
                                         {{ sub.name }}
@@ -46,7 +49,7 @@ const props = defineProps({ subcontractors: Array });
                                 </td>
                                 <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-700">{{ sub.assignments_count }}</td>
                                 <td class="whitespace-nowrap px-6 py-4 text-sm">
-                                    <Link :href="route('coordinator.subcontractors.edit', sub.id)" class="text-blue-600 hover:text-blue-900">編集</Link>
+                                    <Link :href="route('coordinator.subcontractors.edit', sub.id)" class="text-blue-600 hover:text-blue-900" @click.stop>編集</Link>
                                 </td>
                             </tr>
                         </tbody>

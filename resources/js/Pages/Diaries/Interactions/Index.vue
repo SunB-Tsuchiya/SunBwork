@@ -127,7 +127,7 @@ function markReadAllRoute() {
                         <option :value="90">90日分を表示</option>
                     </select>
 
-                    <button @click.prevent="applyFilters" class="ml-2 rounded bg-blue-600 px-3 py-1 text-xs text-white">適用</button>
+                    <button @click.prevent="applyFilters" class="ml-2 rounded bg-indigo-600 px-3 py-1 text-xs text-white">適用</button>
                 </div>
             </div>
 
@@ -156,7 +156,7 @@ function markReadAllRoute() {
                         <button
                             v-if="props.date === date"
                             @click.prevent="() => Inertia.post(route(markReadAllRoute()), { date: date })"
-                            class="ml-2 inline-flex items-center rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700"
+                            class="ml-2 inline-flex items-center rounded bg-indigo-600 px-2 py-1 text-xs text-white hover:bg-indigo-700"
                         >
                             全部既読にする
                         </button>
@@ -199,7 +199,7 @@ function markReadAllRoute() {
                     <template v-for="p in pageRange" :key="p">
                         <button
                             @click.prevent="() => Inertia.get(pageRoute(p))"
-                            :class="['rounded px-2 py-1', p === currentPage ? 'bg-blue-600 text-white' : 'border']"
+                            :class="['rounded px-2 py-1', p === currentPage ? 'bg-indigo-600 text-white' : 'border']"
                         >
                             {{ p }}
                         </button>

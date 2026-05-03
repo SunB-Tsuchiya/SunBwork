@@ -4,26 +4,37 @@ namespace App\Http\Controllers\Leader;
 
 use App\Http\Controllers\Controller;
 use App\Models\ProjectJob;
+use App\Models\Team;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class ProjectJobController extends Controller
 {
     /**
      * 部署に関係する案件をすべて表示（読み取り専用）
-     * 代表Coordinator または サブCoordinator が同じ部署 → 対象
+     * 部署リーダー/副リーダー → 部署メンバーが owner or coordinator の案件
+     * チームリーダー → unitメンバーが owner の案件
      */
     public function index(Request $request)
     {
-        $user         = $request->user();
-        $departmentId = $user->department_id;
-        $q            = $request->input('q', '');
-        $period       = $request->input('period', '');
+        $user   = $request->user();
+        $q      = $request->input('q', '');
+        $period = $request->input('period', '');
+
+        [$deptMemberIds, $unitMemberIds] = $this->getAccessibleMemberIds($user);
 
         $query = ProjectJob::with(['client', 'user'])
-            ->where(function ($sub) use ($departmentId) {
-                $sub->whereHas('user', fn ($u) => $u->where('department_id', $departmentId))
-                    ->orWhereHas('coordinators', fn ($c) => $c->where('users.department_id', $departmentId));
+            ->where(function ($sub) use ($deptMemberIds, $unitMemberIds) {
+                if (!empty($deptMemberIds)) {
+                    $sub->orWhere(function ($q) use ($deptMemberIds) {
+                        $q->whereIn('user_id', $deptMemberIds)
+                          ->orWhereHas('coordinators', fn ($c) => $c->whereIn('users.id', $deptMemberIds));
+                    });
+                }
+                if (!empty($unitMemberIds)) {
+                    $sub->orWhereIn('user_id', $unitMemberIds);
+                }
             });
 
         if ($q) {
@@ -60,24 +71,139 @@ class ProjectJobController extends Controller
 
     /**
      * 案件詳細（読み取り専用）
-     * 部署外の案件へのアクセスは 403
+     * アクセス権限外の案件は 403
      */
     public function show(Request $request, ProjectJob $projectJob)
     {
-        $user         = $request->user();
-        $departmentId = $user->department_id;
+        $user = $request->user();
 
-        $inDept = $projectJob->user?->department_id === $departmentId
-            || $projectJob->coordinators()->where('users.department_id', $departmentId)->exists();
+        [$deptMemberIds, $unitMemberIds] = $this->getAccessibleMemberIds($user);
 
-        if (! $inDept) {
+        $ownerId  = $projectJob->user_id;
+        $coordIds = $projectJob->coordinators()->pluck('users.id')->toArray();
+
+        $canAccess = (!empty($deptMemberIds) && (
+            in_array($ownerId, $deptMemberIds) || count(array_intersect($coordIds, $deptMemberIds)) > 0
+        )) || (!empty($unitMemberIds) && in_array($ownerId, $unitMemberIds));
+
+        if (! $canAccess) {
             abort(403, 'この案件は管理対象外です。');
         }
 
         $projectJob->load(['client', 'user', 'coordinators', 'teamMembers.user']);
 
+        $assignmentEvents = [];
+        try {
+            $assignments = \App\Models\ProjectJobAssignment::where('project_job_id', $projectJob->id)
+                ->with(['user', 'statusModel', 'stage'])
+                ->get();
+
+            $userAssignmentIds = $assignments->map(fn ($a) => $a->user?->assignment_id)
+                ->filter()->unique()->values()->all();
+
+            $assignmentNameMap = [];
+            $assignmentCodeMap = [];
+            if (!empty($userAssignmentIds)) {
+                $roleRecords       = \App\Models\Assignment::whereIn('id', $userAssignmentIds)->get(['id', 'name', 'code']);
+                $assignmentNameMap = $roleRecords->pluck('name', 'id')->toArray();
+                $assignmentCodeMap = $roleRecords->pluck('code', 'id')->toArray();
+            }
+
+            if (\Illuminate\Support\Facades\Schema::hasColumn('events', 'project_job_assignment_id')) {
+                foreach ($assignments as $a) {
+                    $events = \App\Models\Event::where('project_job_assignment_id', $a->id)
+                        ->orderBy('starts_at')
+                        ->get();
+
+                    foreach ($events as $ev) {
+                        $userAssignmentId   = $a->user?->assignment_id ?? null;
+                        $userAssignmentCode = $userAssignmentId ? ($assignmentCodeMap[$userAssignmentId] ?? null) : null;
+                        $userAssignmentName = $userAssignmentId ? ($assignmentNameMap[$userAssignmentId] ?? null) : null;
+
+                        $eventDate = null;
+                        try {
+                            if ($ev->starts_at) {
+                                $eventDate = \Illuminate\Support\Carbon::parse($ev->starts_at)->toDateString();
+                            }
+                        } catch (\Throwable $_) {}
+
+                        $assignmentEvents[] = [
+                            'assignment_id'   => $a->id,
+                            'user_id'         => $a->user?->id ?? $a->user_id ?? null,
+                            'user_name'       => $a->user?->name ?? null,
+                            'assignment_name' => $userAssignmentName ?? $a->title ?? null,
+                            'assignment_code' => $userAssignmentCode,
+                            'role_category'   => $this->toRoleCategory($userAssignmentCode),
+                            'stage_id'        => $a->stage_id ?? null,
+                            'stage_name'      => $a->stage?->name ?? null,
+                            'stage_sort'      => $a->stage?->sort_order ?? 99,
+                            'status_name'     => $a->statusModel?->name ?? null,
+                            'date'            => $eventDate,
+                            'start'           => $ev->start ?? $ev->starts_at ?? null,
+                            'end'             => $ev->end ?? $ev->ends_at ?? null,
+                        ];
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Leader: Failed to build assignmentEvents', [
+                'error'          => $e->getMessage(),
+                'project_job_id' => $projectJob->id,
+            ]);
+            $assignmentEvents = [];
+        }
+
         return Inertia::render('Leader/ProjectJobs/Show', [
-            'job' => $projectJob,
+            'job'              => $projectJob,
+            'assignmentEvents' => $assignmentEvents,
+            'roleConfig'       => [
+                ['key' => 'coordinator',  'label' => '進行管理'],
+                ['key' => 'production',   'label' => '組版・制作'],
+                ['key' => 'proofreading', 'label' => '校正'],
+                ['key' => 'other',        'label' => 'その他'],
+            ],
         ]);
+    }
+
+    /**
+     * ログインLeaderがアクセスできる案件のメンバーIDを返す
+     * @return array{0: int[], 1: int[]} [deptMemberIds, unitMemberIds]
+     */
+    private function getAccessibleMemberIds($user): array
+    {
+        // 部署チーム（leader or sub-leader）
+        $deptTeamIds = Team::where('team_type', 'department')
+            ->where(function ($q) use ($user) {
+                $q->where('leader_id', $user->id)
+                  ->orWhereHas('subLeaders', fn ($s) => $s->where('users.id', $user->id));
+            })
+            ->pluck('id')
+            ->toArray();
+
+        // unitチーム（leader）
+        $unitTeamIds = Team::where('team_type', 'unit')
+            ->where('leader_id', $user->id)
+            ->pluck('id')
+            ->toArray();
+
+        $deptMemberIds = !empty($deptTeamIds)
+            ? DB::table('team_user')->whereIn('team_id', $deptTeamIds)->pluck('user_id')->unique()->toArray()
+            : [];
+
+        $unitMemberIds = !empty($unitTeamIds)
+            ? DB::table('team_user')->whereIn('team_id', $unitTeamIds)->pluck('user_id')->unique()->toArray()
+            : [];
+
+        return [$deptMemberIds, $unitMemberIds];
+    }
+
+    private function toRoleCategory(?string $code): string
+    {
+        return match ($code) {
+            'shinko'   => 'coordinator',
+            'operator' => 'production',
+            'kousei'   => 'proofreading',
+            default    => 'other',
+        };
     }
 }

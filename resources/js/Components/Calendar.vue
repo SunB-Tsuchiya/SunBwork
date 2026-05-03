@@ -1,10 +1,11 @@
 <template>
     <div class="calendar-container">
             <div class="mb-4 flex flex-wrap gap-2">
-            <button @click="openEventModal" class="rounded bg-emerald-600 px-4 py-2 text-white">予定作成</button>
-            <button @click="goToJobCreate" class="rounded bg-indigo-600 px-4 py-2 text-white">ジョブ作成（独自）</button>
-            <button @click="openJobSheetModal" class="rounded bg-purple-600 px-4 py-2 text-white">ジョブ作成（進行表から）</button>
-            <button @click="goToDiaryCreate" class="rounded bg-orange-500 px-4 py-2 text-white">{{ props.diaryLabel }}作成</button>
+            <button @click="openClientEventModal" class="rounded bg-emerald-600 px-4 py-2 text-white">案件打合せ・外出</button>
+            <button @click="openInternalEventModal" class="rounded bg-teal-600 px-4 py-2 text-white">社内予定</button>
+            <button @click="goToJobCreate" class="rounded bg-indigo-600 px-4 py-2 text-white">マイジョブ</button>
+            <button @click="openJobSheetModal" class="rounded bg-purple-600 px-4 py-2 text-white">進行表ジョブ</button>
+            <button @click="goToDiaryCreate" class="rounded bg-orange-500 px-4 py-2 text-white">{{ props.diaryLabel }}入力</button>
             <button @click="openScheduleModal" class="rounded border border-gray-400 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                 日程設定
             </button>
@@ -77,9 +78,10 @@
             <div class="w-full max-w-xs rounded-lg bg-white p-6 text-center shadow-lg">
                 <h2 class="mb-4 text-lg font-bold">{{ selectedDate }} の操作</h2>
                 <div class="flex flex-col gap-4">
-                    <button @click="openEventModalFromSelect" class="rounded bg-emerald-600 px-4 py-2 text-white">予定作成</button>
-                    <button @click="goToJobCreate" class="rounded bg-indigo-600 px-4 py-2 text-white">ジョブ作成（独自）</button>
-                    <button @click="openJobSheetModal" class="rounded bg-purple-600 px-4 py-2 text-white">ジョブ作成（進行表から）</button>
+                    <button @click="openClientEventModalFromSelect" class="rounded bg-emerald-600 px-4 py-2 text-white">案件打合せ・外出</button>
+                    <button @click="openInternalEventModalFromSelect" class="rounded bg-teal-600 px-4 py-2 text-white">社内予定</button>
+                    <button @click="goToJobCreate" class="rounded bg-indigo-600 px-4 py-2 text-white">マイジョブ</button>
+                    <button @click="openJobSheetModal" class="rounded bg-purple-600 px-4 py-2 text-white">進行表ジョブ</button>
                     <button
                         v-if="isProofMember"
                         @click="showSelectModal = false; router.get(route('user.proof_jobs.index'))"
@@ -89,7 +91,7 @@
                     </button>
 
                     <button v-if="selectedScheduleId === null" @click="goToDiaryCreateFromSelect" class="rounded bg-orange-500 px-4 py-2 text-white">
-                        日報作成
+                        日報入力
                     </button>
                     <button v-else @click="goToScheduleMemoCreate(selectedScheduleId)" class="rounded bg-green-600 px-4 py-2 text-white">
                         メモ作成
@@ -683,9 +685,28 @@ onMounted(() => {
     });
 });
 
+/** JST の現在時刻を5分刻みに切り捨てて { h, m } を返す */
+function currentTimeSnapped5() {
+    const now = new Date();
+    const jstParts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Tokyo',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+    }).formatToParts(now);
+    const rawH = Number(jstParts.find((p) => p.type === 'hour').value);
+    const rawM = Number(jstParts.find((p) => p.type === 'minute').value);
+    const snappedM = Math.floor(rawM / 5) * 5;
+    return {
+        h: String(rawH).padStart(2, '0'),
+        m: String(snappedM).padStart(2, '0'),
+    };
+}
+
 function buildDateTimeParams() {
     const params = { date: selectedDate.value };
     if (clickedStartHour.value !== null && clickedStartMinute.value !== null) {
+        // カレンダーの時間スロットをクリックした場合
         const hh = String(clickedStartHour.value).padStart(2, '0');
         const mm = String(clickedStartMinute.value).padStart(2, '0');
         params.startHour = hh;
@@ -697,29 +718,66 @@ function buildDateTimeParams() {
             params.endHour = String((Number(hh) + 1) % 24).padStart(2, '0');
             params.endMinute = mm;
         }
+    } else {
+        // ボタンメニューから開いた場合 → 現在時刻（5分刻み）をデフォルトにする
+        const { h, m } = currentTimeSnapped5();
+        params.startHour = h;
+        params.startMinute = m;
+        params.endHour = String((Number(h) + 1) % 24).padStart(2, '0');
+        params.endMinute = m;
     }
     return params;
 }
 
-function openEventModal() {
+function openClientEventModal() {
     const params = buildDateTimeParams();
-    // 選択中の日付をセットしてEvents/Create.vueへ遷移
     try {
         const current = window.location.pathname + window.location.search + window.location.hash;
-        router.get(route('events.create', { ...params, return_to: current }));
+        router.get(route('events.client-event.create', { ...params, return_to: current }));
         return;
     } catch (e) {
-        router.get(route('events.create', params));
+        router.get(route('events.client-event.create', params));
     }
 }
 
-function openEventModalFromSelect() {
+function openInternalEventModal() {
     const params = buildDateTimeParams();
     try {
         const current = window.location.pathname + window.location.search + window.location.hash;
-        router.get(route('events.create', { ...params, return_to: current }));
+        router.get(route('events.internal-event.create', { ...params, return_to: current }));
+        return;
     } catch (e) {
-        router.get(route('events.create', params));
+        router.get(route('events.internal-event.create', params));
+    }
+}
+
+/** @deprecated 旧互換用（goToJobCreate から参照） */
+function openEventModal() {
+    openClientEventModal();
+}
+
+function openClientEventModalFromSelect() {
+    const params = buildDateTimeParams();
+    try {
+        const current = window.location.pathname + window.location.search + window.location.hash;
+        router.get(route('events.client-event.create', { ...params, return_to: current }));
+    } catch (e) {
+        router.get(route('events.client-event.create', params));
+    }
+    showSelectModal.value = false;
+    clickedStartHour.value = null;
+    clickedStartMinute.value = null;
+    clickedEndHour.value = null;
+    clickedEndMinute.value = null;
+}
+
+function openInternalEventModalFromSelect() {
+    const params = buildDateTimeParams();
+    try {
+        const current = window.location.pathname + window.location.search + window.location.hash;
+        router.get(route('events.internal-event.create', { ...params, return_to: current }));
+    } catch (e) {
+        router.get(route('events.internal-event.create', params));
     }
     showSelectModal.value = false;
     clickedStartHour.value = null;

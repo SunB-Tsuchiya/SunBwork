@@ -1,24 +1,23 @@
 <template>
     <AppLayout title="案件一覧">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">【進行管理】{{ $page.props.auth.user.name || 'ユーザー' }}さんのページ</h2>
+            <h2 class="text-xl font-semibold leading-tight text-gray-800">案件一覧</h2>
+        </template>
+
+        <template #headerExtras>
+            <div class="flex items-center gap-2">
+                <Link :href="route('coordinator.project_jobs.bulk_create.index')"
+                      class="rounded border border-green-600 px-4 py-2 text-sm text-green-700 hover:bg-green-50">
+                    テンプレートから一括作成
+                </Link>
+                <Link :href="route('coordinator.project_jobs.create')"
+                      class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+                    新規作成
+                </Link>
+            </div>
         </template>
 
         <div class="rounded bg-white p-6 shadow">
-            <div class="mb-6 flex items-center justify-between">
-                <h1 class="text-2xl font-bold">案件一覧</h1>
-                <div class="flex gap-2">
-                    <Link :href="route('coordinator.project_jobs.bulk_create.index')"
-                          class="rounded border border-green-600 px-4 py-2 text-sm text-green-700 hover:bg-green-50">
-                        テンプレートから一括作成
-                    </Link>
-                    <Link :href="route('coordinator.project_jobs.create')"
-                          class="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">
-                        新規作成
-                    </Link>
-                </div>
-            </div>
-
             <!-- 検索・フィルター行 -->
             <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div class="flex items-center gap-2">
@@ -28,7 +27,7 @@
                         placeholder="案件名/クライアントで検索"
                         class="w-72 rounded border px-3 py-2 text-sm"
                     />
-                    <button class="rounded bg-blue-600 px-3 py-2 text-white" @click.prevent="search">検索</button>
+                    <button class="rounded bg-indigo-600 px-3 py-2 text-white" @click.prevent="search">検索</button>
                     <button class="ml-2 rounded border px-3 py-2" @click.prevent="clearSearch">クリア</button>
                 </div>
             </div>

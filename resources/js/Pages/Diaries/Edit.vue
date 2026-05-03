@@ -429,20 +429,32 @@ const back = () => {
 
 <template>
     <AppLayout title="日報編集">
-        <div class="rounded bg-white p-6 shadow">
-            <h1 class="mb-4 text-2xl font-bold">日報編集</h1>
+        <template #header>
+            <div class="flex items-center gap-3">
+                <button @click="back"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                >← 戻る</button>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">日報編集</h2>
+            </div>
+        </template>
+
+        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
             <form @submit.prevent="submit">
-                <div class="mb-4 flex flex-wrap gap-4">
+                <!-- 1行目: 日付・勤務形態 -->
+                <div class="mb-3 flex flex-wrap gap-4">
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-700">日付</label>
                         <input type="date" v-model="form.date" class="rounded border p-2 text-sm" />
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-700">勤務形態</label>
-                        <select v-model="form.work_style" class="rounded border p-2 text-sm" @change="onWorktypeChange">
+                        <select v-model="form.work_style" class="min-w-[11rem] rounded border p-2 text-sm" @change="onWorktypeChange">
                             <option v-for="wt in worktypes" :key="wt.id" :value="wt.name">{{ wt.name }}</option>
                         </select>
                     </div>
+                </div>
+                <!-- 2行目: 始業時間・終業時間 -->
+                <div class="mb-4 flex flex-wrap gap-4">
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-700">始業時間</label>
                         <div class="flex items-center gap-1">
@@ -488,12 +500,11 @@ const back = () => {
                         添付済み: <span v-if="form.files && form.files.length">{{ form.files.length }} 個</span><span v-else>0 個</span>
                     </div>
                 </div>
-                <div class="flex space-x-4">
-                    <button :disabled="isSubmitting" type="submit" class="rounded bg-blue-600 px-4 py-2 text-white disabled:opacity-60">
+                <div class="mt-4 flex justify-end gap-3">
+                    <button :disabled="isSubmitting" type="submit" class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60">
                         <span v-if="isSubmitting">送信中...</span>
                         <span v-else>更新</span>
                     </button>
-                    <button @click.prevent="back" class="rounded bg-gray-200 px-4 py-2 text-gray-700">戻る</button>
                 </div>
             </form>
         </div>

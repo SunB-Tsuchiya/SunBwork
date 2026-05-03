@@ -17,13 +17,69 @@ class ProofJobController extends Controller
     // ──────────────────────────────────────────────────────
     //  一覧
     // ──────────────────────────────────────────────────────
-    public function index(): Response
+    public function index(Request $request): Response
     {
-        $user = Auth::user();
+        $user          = Auth::user();
+        $q             = $request->input('q');
+        $hideCompleted = $request->boolean('hide_completed', true);
+        $clientId      = $request->input('client_id');
 
-        $proofRequests = ProofRequest::with(['requester', 'projectJob'])
+        // 年月フィルター（deadline 基準）
+        $periodParam     = $request->input('period');
+        $usePeriodFilter = true;
+        $periodModel     = $periodParam;
+        if ($periodParam === null) {
+            $periodModel = now()->format('Y-m');
+        } elseif ($periodParam === '' || $periodParam === 'all') {
+            $usePeriodFilter = false;
+        }
+        $periodStart = null;
+        $periodEnd   = null;
+        if ($usePeriodFilter && $periodModel) {
+            try {
+                $periodStart = \Carbon\Carbon::createFromFormat('Y-m', $periodModel)->startOfMonth()->setTimezone('UTC');
+                $periodEnd   = \Carbon\Carbon::createFromFormat('Y-m', $periodModel)->endOfMonth()->setTimezone('UTC');
+            } catch (\Throwable $e) {
+                $periodModel = now()->format('Y-m');
+                $periodStart = now()->startOfMonth()->setTimezone('UTC');
+                $periodEnd   = now()->endOfMonth()->setTimezone('UTC');
+            }
+        }
+
+        // 月選択肢（前後6か月）
+        $monthOptions = [];
+        for ($i = -6; $i <= 6; $i++) {
+            $m              = now()->addMonths($i)->format('Y-m');
+            $monthOptions[] = [
+                'value' => $m,
+                'label' => now()->addMonths($i)->format('Y年n月'),
+            ];
+        }
+
+        $query = ProofRequest::with(['requester', 'projectJob.client'])
             ->where('proofreader_id', $user->id)
-            ->whereIn('status', ['assigned', 'in_progress', 'completed'])
+            ->whereIn('status', ['assigned', 'in_progress', 'completed']);
+
+        if ($q) {
+            $query->where('title', 'like', "%{$q}%");
+        }
+
+        if ($hideCompleted) {
+            $query->where('status', '!=', 'completed');
+        }
+
+        if ($usePeriodFilter && $periodStart && $periodEnd) {
+            $query->whereBetween('deadline', [
+                $periodStart->format('Y-m-d H:i:s'),
+                $periodEnd->format('Y-m-d H:i:s'),
+            ]);
+        }
+
+        if ($clientId) {
+            $query->whereHas('projectJob', fn ($sub) => $sub->where('client_id', $clientId));
+        }
+
+        $proofRequests = $query
             ->orderByRaw("FIELD(status, 'in_progress', 'assigned', 'completed')")
             ->orderBy('deadline')
             ->get()
@@ -33,7 +89,7 @@ class ProofJobController extends Controller
                     ->where('sender_id', $pr->proof_coordinator_id)
                     ->latest()->first();
 
-                $pja101 = null;
+                $pja101    = null;
                 $workSlots = [];
                 if ($pja100) {
                     $pja101 = ProjectJobAssignment::whereColumn('sender_id', 'user_id')
@@ -61,13 +117,30 @@ class ProofJobController extends Controller
                     'deadline'       => $pr->deadline?->toIso8601String(),
                     'requester_name' => $pr->requester?->name,
                     'job_title'      => $pr->projectJob?->title,
+                    'client_name'    => $pr->projectJob?->client?->name,
                     'is_set'         => $pja101 !== null,
                     'work_slots'     => $workSlots,
                 ];
-            })->toArray();
+            })->values()->toArray();
+
+        // クライアント絞り込み用リスト
+        $clients = \App\Models\Client::whereIn('id',
+            ProofRequest::where('proofreader_id', $user->id)
+                ->whereNotNull('project_job_id')
+                ->join('project_jobs', 'project_jobs.id', '=', 'proof_requests.project_job_id')
+                ->pluck('project_jobs.client_id')
+                ->unique()
+                ->filter()
+        )->orderBy('name')->get(['id', 'name']);
 
         return Inertia::render('User/ProofJobs/Index', [
             'proofRequests' => $proofRequests,
+            'q'             => $q,
+            'hideCompleted' => $hideCompleted,
+            'period'        => $periodModel ?? '',
+            'clientId'      => $clientId ? (int) $clientId : null,
+            'clients'       => $clients,
+            'monthOptions'  => $monthOptions,
         ]);
     }
 

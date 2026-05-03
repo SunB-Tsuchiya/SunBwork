@@ -1051,18 +1051,74 @@ class EventController extends Controller
 
         $chainSeries = $this->computeChainSeries($event);
 
+        // ── リアルタイム重複計算（stored interruption_minutes に依存しない） ──
+        $overlappingEvents = [];
+        $dynamicInterruptionMinutes = 0;
+        try {
+            if ($evStartJst && $evEndJst) {
+                $myStart = Carbon::parse($event->starts_at);
+                $myEnd   = Carbon::parse($event->ends_at);
+                $myDurationMins = abs((int) $myEnd->diffInMinutes($myStart));
+
+                $overlaps = Event::where('user_id', $event->user_id)
+                    ->where('id', '!=', $event->id)
+                    ->where('starts_at', '<', $myEnd->toDateTimeString())
+                    ->where('ends_at', '>', $myStart->toDateTimeString())
+                    ->get(['id', 'title', 'starts_at', 'ends_at']);
+
+                foreach ($overlaps as $ov) {
+                    $ovStart = Carbon::parse($ov->starts_at);
+                    $ovEnd   = Carbon::parse($ov->ends_at);
+                    $ovDurationMins = abs((int) $ovEnd->diffInMinutes($ovStart));
+
+                    $overlapStart = $myStart->gt($ovStart) ? $myStart : $ovStart;
+                    $overlapEnd   = $myEnd->lt($ovEnd)    ? $myEnd   : $ovEnd;
+                    $overlapMins  = max(0, (int) $overlapStart->diffInMinutes($overlapEnd, false));
+
+                    if ($overlapMins <= 0) continue;
+
+                    // このイベントが「長い側」か「短い側」かを判断
+                    // 長い側（または同じ）なら、このイベントから差し引く
+                    if ($myDurationMins >= $ovDurationMins) {
+                        $dynamicInterruptionMinutes += $overlapMins;
+                        $overlappingEvents[] = [
+                            'id'           => $ov->id,
+                            'title'        => $ov->title,
+                            'overlap_mins' => $overlapMins,
+                            'direction'    => 'self',  // 自分（このイベント）から差し引く
+                        ];
+                    }
+                    // 短い側なら相手のイベントから差し引くので、このイベントの作業時間には影響しない
+                    // ただし表示参考として含める
+                    else {
+                        $overlappingEvents[] = [
+                            'id'           => $ov->id,
+                            'title'        => $ov->title,
+                            'overlap_mins' => $overlapMins,
+                            'direction'    => 'other', // 相手のイベントから差し引く
+                        ];
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('EventController::show: failed to compute dynamic overlaps', ['error' => $e->getMessage()]);
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
         $hideEdit = request()->query('hide_edit') ? true : false;
         return Inertia::render('Events/Show', [
-            'event'                  => $event,
-            'jst_start'              => $evStartJst?->format('Y-m-d H:i'),
-            'jst_end'                => $evEndJst?->format('Y-m-d H:i'),
-            'hide_edit'              => $hideEdit,
-            'coordinator_assignment' => $coordinatorAssignmentInfo ?? null,
-            'lunch_start'            => $lunchStart,
-            'lunch_end'              => $lunchEnd,
-            'lunch_overlap_minutes'  => $lunchOverlapMinutes,
-            'proof_requested'        => $proofRequested,
-            'chain_series'           => $chainSeries,
+            'event'                        => $event,
+            'jst_start'                    => $evStartJst?->format('Y-m-d H:i'),
+            'jst_end'                      => $evEndJst?->format('Y-m-d H:i'),
+            'hide_edit'                    => $hideEdit,
+            'coordinator_assignment'       => $coordinatorAssignmentInfo ?? null,
+            'lunch_start'                  => $lunchStart,
+            'lunch_end'                    => $lunchEnd,
+            'lunch_overlap_minutes'        => $lunchOverlapMinutes,
+            'proof_requested'              => $proofRequested,
+            'chain_series'                 => $chainSeries,
+            'overlapping_events'           => $overlappingEvents,
+            'dynamic_interruption_minutes' => $dynamicInterruptionMinutes,
         ]);
     }
 
@@ -1133,17 +1189,68 @@ class EventController extends Controller
 
         $chainSeries = $this->computeChainSeries($event);
 
+        // ── リアルタイム重複計算（show() と同じロジック） ──
+        $overlappingEvents = [];
+        $dynamicInterruptionMinutes = 0;
+        try {
+            if ($evStartJst && $evEndJst) {
+                $myStart = Carbon::parse($event->starts_at);
+                $myEnd   = Carbon::parse($event->ends_at);
+                $myDurationMins = abs((int) $myEnd->diffInMinutes($myStart));
+
+                $overlaps = Event::where('user_id', $event->user_id)
+                    ->where('id', '!=', $event->id)
+                    ->where('starts_at', '<', $myEnd->toDateTimeString())
+                    ->where('ends_at', '>', $myStart->toDateTimeString())
+                    ->get(['id', 'title', 'starts_at', 'ends_at']);
+
+                foreach ($overlaps as $ov) {
+                    $ovStart = Carbon::parse($ov->starts_at);
+                    $ovEnd   = Carbon::parse($ov->ends_at);
+                    $ovDurationMins = abs((int) $ovEnd->diffInMinutes($ovStart));
+
+                    $overlapStart = $myStart->gt($ovStart) ? $myStart : $ovStart;
+                    $overlapEnd   = $myEnd->lt($ovEnd)    ? $myEnd   : $ovEnd;
+                    $overlapMins  = max(0, (int) $overlapStart->diffInMinutes($overlapEnd, false));
+
+                    if ($overlapMins <= 0) continue;
+
+                    if ($myDurationMins >= $ovDurationMins) {
+                        $dynamicInterruptionMinutes += $overlapMins;
+                        $overlappingEvents[] = [
+                            'id'           => $ov->id,
+                            'title'        => $ov->title,
+                            'overlap_mins' => $overlapMins,
+                            'direction'    => 'self',
+                        ];
+                    } else {
+                        $overlappingEvents[] = [
+                            'id'           => $ov->id,
+                            'title'        => $ov->title,
+                            'overlap_mins' => $overlapMins,
+                            'direction'    => 'other',
+                        ];
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('EventController::showForCoordinator: failed to compute dynamic overlaps', ['error' => $e->getMessage()]);
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
         return Inertia::render('Events/Show', [
-            'event'                  => $event,
-            'jst_start'              => $evStartJst?->format('Y-m-d H:i'),
-            'jst_end'                => $evEndJst?->format('Y-m-d H:i'),
-            'hide_edit'              => true,
-            'view_as_coordinator'    => true,
-            'coordinator_assignment' => null,
-            'lunch_start'            => $lunchStart,
-            'lunch_end'              => $lunchEnd,
-            'lunch_overlap_minutes'  => $lunchOverlapMinutes,
-            'chain_series'           => $chainSeries,
+            'event'                        => $event,
+            'jst_start'                    => $evStartJst?->format('Y-m-d H:i'),
+            'jst_end'                      => $evEndJst?->format('Y-m-d H:i'),
+            'hide_edit'                    => true,
+            'view_as_coordinator'          => true,
+            'coordinator_assignment'       => null,
+            'lunch_start'                  => $lunchStart,
+            'lunch_end'                    => $lunchEnd,
+            'lunch_overlap_minutes'        => $lunchOverlapMinutes,
+            'chain_series'                 => $chainSeries,
+            'overlapping_events'           => $overlappingEvents,
+            'dynamic_interruption_minutes' => $dynamicInterruptionMinutes,
         ]);
     }
 
@@ -1151,6 +1258,100 @@ class EventController extends Controller
      * イベントに紐づく続きジョブチェーン情報を計算して返す共通メソッド。
      * show() / showForCoordinator() 両方で使用する。
      */
+
+    /**
+     * イベントの interruption_minutes をDBから動的に再計算して保存する。
+     * store() / update() の後、および destroy() の前に呼び出すことで stored 値を常に正確に保つ。
+     *
+     * @param Event $event 対象イベント（既に DB に存在すること）
+     * @param string|null $oldStart 更新前の starts_at (UTC文字列)。update 時に旧重複範囲の解除に使用。
+     * @param string|null $oldEnd   更新前の ends_at (UTC文字列)。
+     */
+    private function recalcInterruptionMinutes(Event $event, ?string $oldStart = null, ?string $oldEnd = null): void
+    {
+        try {
+
+            $myStart = Carbon::parse($event->starts_at);
+            $myEnd   = Carbon::parse($event->ends_at);
+            $myDurationMins = abs((int) $myEnd->diffInMinutes($myStart));
+
+            // ① このイベント自身の interruption_minutes を再計算
+            //   （このイベントが「長い側」であるときに他のイベントに中断される分）
+            $overlaps = Event::where('user_id', $event->user_id)
+                ->where('id', '!=', $event->id)
+                ->where('starts_at', '<', $myEnd->toDateTimeString())
+                ->where('ends_at', '>', $myStart->toDateTimeString())
+                ->get(['id', 'starts_at', 'ends_at']);
+
+            $selfInterruption = 0;
+            foreach ($overlaps as $ov) {
+                $ovStart = Carbon::parse($ov->starts_at);
+                $ovEnd   = Carbon::parse($ov->ends_at);
+                $ovDuration = abs((int) $ovEnd->diffInMinutes($ovStart));
+                if ($myDurationMins < $ovDuration) continue; // 自分が短い側 → 自分は中断されない
+                $overlapStart = $myStart->gt($ovStart) ? $myStart : $ovStart;
+                $overlapEnd   = $myEnd->lt($ovEnd)    ? $myEnd   : $ovEnd;
+                $overlapMins  = max(0, (int) $overlapStart->diffInMinutes($overlapEnd, false));
+                $selfInterruption += $overlapMins;
+            }
+            $event->interruption_minutes = $selfInterruption;
+            $event->saveQuietly();
+
+            // ② このイベントが「短い側」であるイベント（このイベントが相手の interruption になる）の再計算
+            foreach ($overlaps as $ov) {
+                $this->recalcSingleStoredInterruption(Event::find($ov->id));
+            }
+
+            // ③ update の場合: 旧時間帯で重複していたイベントの再計算（時間変更で重複解除された可能性）
+            if ($oldStart && $oldEnd) {
+                $oldS = Carbon::parse($oldStart);
+                $oldE = Carbon::parse($oldEnd);
+                $oldOverlaps = Event::where('user_id', $event->user_id)
+                    ->where('id', '!=', $event->id)
+                    ->where('starts_at', '<', $oldE->toDateTimeString())
+                    ->where('ends_at', '>', $oldS->toDateTimeString())
+                    ->get(['id']);
+                foreach ($oldOverlaps as $ov) {
+                    $this->recalcSingleStoredInterruption(Event::find($ov->id));
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('EventController: recalcInterruptionMinutes failed', ['event_id' => $event->id, 'error' => $e->getMessage()]);
+        }
+    }
+
+    /** イベント1件の stored interruption_minutes を再計算して保存する（他への波及なし）*/
+    private function recalcSingleStoredInterruption(?Event $event): void
+    {
+        try {
+            $myStart = Carbon::parse($event->starts_at);
+            $myEnd   = Carbon::parse($event->ends_at);
+            $myDuration = abs((int) $myEnd->diffInMinutes($myStart));
+
+            $overlaps = Event::where('user_id', $event->user_id)
+                ->where('id', '!=', $event->id)
+                ->where('starts_at', '<', $myEnd->toDateTimeString())
+                ->where('ends_at', '>', $myStart->toDateTimeString())
+                ->get(['id', 'starts_at', 'ends_at']);
+
+            $total = 0;
+            foreach ($overlaps as $ov) {
+                $ovStart = Carbon::parse($ov->starts_at);
+                $ovEnd   = Carbon::parse($ov->ends_at);
+                $ovDuration = abs((int) $ovEnd->diffInMinutes($ovStart));
+                if ($myDuration < $ovDuration) continue;
+                $overlapStart = $myStart->gt($ovStart) ? $myStart : $ovStart;
+                $overlapEnd   = $myEnd->lt($ovEnd)    ? $myEnd   : $ovEnd;
+                $overlapMins  = max(0, (int) $overlapStart->diffInMinutes($overlapEnd, false));
+                $total += $overlapMins;
+            }
+            $event->interruption_minutes = $total;
+            $event->saveQuietly();
+        } catch (\Throwable $e) {
+            Log::warning('EventController: recalcSingleStoredInterruption failed', ['event_id' => $event->id, 'error' => $e->getMessage()]);
+        }
+    }
+
     private function computeChainSeries(Event $event): ?array
     {
         $chainSeries = null;

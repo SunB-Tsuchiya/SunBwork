@@ -43,6 +43,18 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     // store/update are handled by the resource route declared below to avoid duplicate route names
     Route::delete('/events/{event}', [App\Http\Controllers\EventController::class, 'destroy'])->name('events.destroy');
 
+    // 案件打合せ・外出フォーム（ClientEvent）
+    Route::get('/events/client-event/create', [App\Http\Controllers\Events\ClientEventController::class, 'create'])->name('events.client-event.create');
+    Route::post('/events/client-event', [App\Http\Controllers\Events\ClientEventController::class, 'store'])->name('events.client-event.store');
+    Route::get('/events/client-event/{event}/edit', [App\Http\Controllers\Events\ClientEventController::class, 'edit'])->name('events.client-event.edit');
+    Route::put('/events/client-event/{event}', [App\Http\Controllers\Events\ClientEventController::class, 'update'])->name('events.client-event.update');
+
+    // 社内予定フォーム（InternalEvent）
+    Route::get('/events/internal-event/create', [App\Http\Controllers\Events\InternalEventController::class, 'create'])->name('events.internal-event.create');
+    Route::post('/events/internal-event', [App\Http\Controllers\Events\InternalEventController::class, 'store'])->name('events.internal-event.store');
+    Route::get('/events/internal-event/{event}/edit', [App\Http\Controllers\Events\InternalEventController::class, 'edit'])->name('events.internal-event.edit');
+    Route::put('/events/internal-event/{event}', [App\Http\Controllers\Events\InternalEventController::class, 'update'])->name('events.internal-event.update');
+
     // ユーザー割り当てジョブ一覧・詳細 (旧: assigned-projects, 新: assigned-jobs)
     Route::prefix('user/assigned-projects')->name('user.assigned-projects.')->group(function () {
         Route::get('/', [App\Http\Controllers\User\AssignedProjectController::class, 'index'])->name('index');
@@ -102,6 +114,9 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::get('/user/project-jobs/{projectJob}/progress-sheets-json', [App\Http\Controllers\User\ProjectJobController::class, 'progressSheetsJson'])->name('user.project_jobs.progress_sheets_json');
     Route::get('/user/project-jobs', [App\Http\Controllers\User\ProjectJobController::class, 'index'])->name('user.project_jobs.index');
     Route::get('/user/project-jobs/{projectJob}', [App\Http\Controllers\User\ProjectJobController::class, 'show'])->name('user.project_jobs.show');
+
+    // 校正状況（ユーザー自身の依頼のみ）
+    Route::get('/user/proof/status', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'userProofStatus'])->name('user.proof.status');
 
     // 校正ジョブ（ユーザー）
     Route::get('/user/proof-jobs', [\App\Http\Controllers\User\ProofJobController::class, 'index'])->name('user.proof_jobs.index');
@@ -283,6 +298,10 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         // Ziggy用: 明示的にadmin.dashboardルートを追加
         Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
 
+        // 案件総覧
+        Route::get('project-jobs', [App\Http\Controllers\Admin\ProjectJobController::class, 'index'])->name('project_jobs.index');
+        Route::get('project-jobs/{projectJob}', [App\Http\Controllers\Admin\ProjectJobController::class, 'show'])->name('project_jobs.show');
+
         // CSV一括登録（リソースルートより前に配置）
         Route::get('users/csv/upload', [App\Http\Controllers\Admin\UserController::class, 'csvUpload'])->name('users.csv.upload');
         Route::post('users/csv/preview', [App\Http\Controllers\Admin\UserController::class, 'csvPreview'])->name('users.csv.preview');
@@ -360,6 +379,10 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('leader-permissions', [App\Http\Controllers\Admin\LeaderPermissionController::class, 'index'])->name('leader_permissions.index');
         Route::get('leader-permissions/{leaderuser}/edit', [App\Http\Controllers\Admin\LeaderPermissionController::class, 'edit'])->name('leader_permissions.edit');
         Route::put('leader-permissions/{leaderuser}', [App\Http\Controllers\Admin\LeaderPermissionController::class, 'update'])->name('leader_permissions.update');
+
+        // 会議設定（Admin用）
+        Route::resource('meeting-definitions', App\Http\Controllers\Admin\MeetingDefinitionController::class)
+            ->names('meeting_definitions');
     });
 
 
@@ -478,6 +501,10 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         // 案件総覧（部署リーダー: 部署内全案件を読み取り専用で閲覧）
         Route::get('project-jobs', [App\Http\Controllers\Leader\ProjectJobController::class, 'index'])->name('project_jobs.index');
         Route::get('project-jobs/{projectJob}', [App\Http\Controllers\Leader\ProjectJobController::class, 'show'])->name('project_jobs.show');
+
+        // 会議設定（Leader用）
+        Route::resource('meeting-definitions', App\Http\Controllers\Leader\MeetingDefinitionController::class)
+            ->names('meeting_definitions');
     });
 
 // クライアント管理（Admin用）は上の admin グループに統合済み（重複削除）
@@ -797,6 +824,9 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
         Route::patch('tickets/{ticket}/status', [\App\Http\Controllers\Prepress\TicketController::class, 'updateStatus'])->name('tickets.updateStatus');
         Route::post('tickets/{ticket}/image', [\App\Http\Controllers\Prepress\TicketController::class, 'updateImage'])->name('tickets.updateImage');
         Route::delete('tickets/{ticket}', [\App\Http\Controllers\Prepress\TicketController::class, 'destroy'])->name('tickets.destroy');
+
+        // 伝票OCR解析 API
+        Route::post('ocr/analyze', [\App\Http\Controllers\Prepress\TicketOcrController::class, 'analyze'])->name('ocr.analyze');
     });
 
 // 全ロール共通（読み取り専用）

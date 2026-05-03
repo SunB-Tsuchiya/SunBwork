@@ -204,21 +204,32 @@ class DiaryController extends Controller
 
     public function store(Request $request)
     {
+        $noDiary = (bool) $request->input('no_diary', false);
+
+        $contentRules = $noDiary
+            ? ['nullable', 'string']
+            : [
+                'required',
+                function ($attribute, $value, $fail) {
+                    if (trim(strip_tags($value)) === '') {
+                        $fail('内容を入力してください。');
+                    }
+                },
+              ];
 
         $data = $request->validate([
             'date'       => 'required|date',
             'work_style' => 'nullable|string|max:50',
             'start_time' => 'nullable|date_format:H:i',
             'end_time'   => 'nullable|date_format:H:i',
-            'content' => [
-                'required',
-                function ($attribute, $value, $fail) {
-                    if (trim(strip_tags($value)) === '') {
-                        $fail('内容を入力してください。');
-                    }
-                }
-            ],
+            'content'    => $contentRules,
         ]);
+
+        // no_diary フラグが立っている場合、または本文が空の場合は空文字で保存
+        if ($noDiary || trim(strip_tags($data['content'] ?? '')) === '') {
+            $data['content'] = '';
+        }
+
         $diary = new Diary();
         $diary->user_id = Auth::id();
         $diary->date    = Carbon::parse($data['date'])->toDateString();

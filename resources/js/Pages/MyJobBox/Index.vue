@@ -1,7 +1,7 @@
 <template>
     <AppLayout :title="`MyJobBox - ${props.projectJob?.name || ''}`">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">MyJobBox — マイジョブ</h2>
+            <h2 class="text-xl font-semibold leading-tight text-gray-800">MyJobBox — マイジョブBOX</h2>
         </template>
 
         <div class="mx-auto max-w-6xl rounded bg-white p-6 shadow">
@@ -23,12 +23,12 @@
                     <Link
                         :href="typeof route === 'function' ? route('user.project_jobs.assignments.create') : '/project_jobs/assignments/create-user'"
                         class="rounded bg-indigo-600 px-4 py-2 text-sm text-white"
-                        >ジョブ作成（独自）</Link
+                        >マイジョブBOX</Link
                     >
                     <button
                         @click="openJobSheetModal"
                         class="rounded bg-purple-600 px-4 py-2 text-sm text-white"
-                    >ジョブ作成（進行表から）</button>
+                    >進行表ジョブ</button>
                 </div>
             </div>
 

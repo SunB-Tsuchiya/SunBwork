@@ -32,12 +32,27 @@ function parseTime(t) {
     return { hour: parts[0] || '00', minute: parts[1] || '00' };
 }
 
+function roundTo5Minutes(date) {
+    const h = date.getHours();
+    const rounded = Math.round(date.getMinutes() / 5) * 5;
+    if (rounded >= 60) {
+        const nh = h + 1 > 23 ? 23 : h + 1;
+        return { hour: String(nh).padStart(2, '0'), minute: '00' };
+    }
+    return { hour: String(h).padStart(2, '0'), minute: String(rounded).padStart(2, '0') };
+}
+
 // ユーザー設定の基本勤務形態を優先し、なければ先頭を使う
 const firstWt = (props.defaultWorktypeId
     ? props.worktypes.find((w) => w.id === props.defaultWorktypeId)
     : null) ?? props.worktypes[0] ?? null;
 const defStart = parseTime(firstWt?.start_time ?? '08:00');
-const defEnd   = parseTime(firstWt?.end_time   ?? '17:00');
+// 終業時間: 現在時刻が規定終了時間より後ならば現在時刻（5分刻み）を初期値にする
+const _wtEnd = parseTime(firstWt?.end_time ?? '17:00');
+const _now = new Date();
+const _wtEndMin = parseInt(_wtEnd.hour) * 60 + parseInt(_wtEnd.minute);
+const _nowMin   = _now.getHours() * 60 + _now.getMinutes();
+const defEnd = _nowMin > _wtEndMin ? roundTo5Minutes(_now) : _wtEnd;
 
 const content = ref('');
 const form = useForm({
@@ -51,6 +66,7 @@ const form = useForm({
     end_time:     `${defEnd.hour}:${defEnd.minute}`,
     content,
     files: [],
+    no_diary: false,
 });
 
 const hours   = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
@@ -317,6 +333,29 @@ function handleEditorReady(editor) {
 
 const { showToast, showValidationErrors } = useToasts();
 
+const submitWithoutDiary = () => {
+    form.start_time = `${form.start_hour}:${form.start_minute}`;
+    form.end_time = `${form.end_hour}:${form.end_minute}`;
+    form.no_diary = true;
+    form.post(route('diaries.store'), {
+        forceFormData: true,
+        onStart: () => {
+            try { showToast('送信中...', 'info', 1000); } catch (e) {}
+        },
+        onFinish: () => { form.no_diary = false; },
+        onSuccess: () => {
+            try { showToast('保存しました', 'success', 1500); } catch (e) {}
+        },
+        onError: (errors) => {
+            try {
+                showValidationErrors(errors, 6000);
+            } catch (e) {
+                try { showToast('保存に失敗しました', 'error', 4000); } catch (ee) {}
+            }
+        },
+    });
+};
+
 const submit = () => {
     const html = form.content?.trim() || '';
     if (html === '' || html === '<p><br></p>' || html === '<p></p>') {
@@ -444,11 +483,22 @@ function applyPastDiary(rec) {
 
 <template>
     <AppLayout title="日報作成">
-        <div class="rounded bg-white p-6 shadow">
-            <div class="mb-4 flex items-center justify-between">
-                <h1 class="text-2xl font-bold">日報作成 ({{ form.date }})</h1>
-                <button type="button" @click="openPastModal" class="rounded bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700">過去データから流用</button>
+        <template #header>
+            <div class="flex items-center gap-3">
+                <Link :href="route('diaries.index')"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                >← 日報一覧に戻る</Link>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">日報作成</h2>
             </div>
+        </template>
+
+        <template #headerExtras>
+            <button type="button" @click="openPastModal"
+                class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+            >過去データから流用</button>
+        </template>
+
+        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
 
             <!-- single event form (tabs removed) -->
             <div>
@@ -456,17 +506,21 @@ function applyPastDiary(rec) {
                     <div v-if="Object.keys(form.errors).length" class="mb-4 text-red-600">
                         <ul></ul>
                     </div>
-                    <div class="mb-4 flex flex-wrap gap-4">
+                    <!-- 1行目: 日付・勤務形態 -->
+                    <div class="mb-3 flex flex-wrap gap-4">
                         <div>
                             <label class="mb-1 block text-sm font-medium text-gray-700">日付</label>
                             <input type="date" v-model="form.date" class="rounded border p-2 text-sm" />
                         </div>
                         <div>
                             <label class="mb-1 block text-sm font-medium text-gray-700">勤務形態</label>
-                            <select v-model="form.work_style" class="rounded border p-2 text-sm" @change="onWorktypeChange">
+                            <select v-model="form.work_style" class="min-w-[11rem] rounded border p-2 text-sm" @change="onWorktypeChange">
                                 <option v-for="wt in worktypes" :key="wt.id" :value="wt.name">{{ wt.name }}</option>
                             </select>
                         </div>
+                    </div>
+                    <!-- 2行目: 始業時間・終業時間 -->
+                    <div class="mb-4 flex flex-wrap gap-4">
                         <div>
                             <label class="mb-1 block text-sm font-medium text-gray-700">始業時間</label>
                             <div class="flex items-center gap-1">
@@ -522,9 +576,10 @@ function applyPastDiary(rec) {
                             添付済み: <span v-if="form.files && form.files.length">{{ form.files.length }} 個</span><span v-else>0 個</span>
                         </div>
                     </div>
-                    <div class="flex space-x-4">
-                        <button type="submit" class="rounded bg-blue-600 px-4 py-2 text-white">保存</button>
-                        <Link :href="route('dashboard')" class="rounded bg-gray-200 px-4 py-2 text-gray-700">キャンセル</Link>
+                    <div class="mt-4 flex justify-end gap-3">
+                        <Link :href="route('dashboard')" class="rounded bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300">キャンセル</Link>
+                        <button type="button" @click="submitWithoutDiary" class="rounded bg-gray-500 px-4 py-2 text-sm font-medium text-white hover:bg-gray-600">日報なしで保存</button>
+                        <button type="submit" class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">保存</button>
                     </div>
                 </form>
             </div>
@@ -549,14 +604,14 @@ function applyPastDiary(rec) {
                         v-for="opt in pastRangeOptions"
                         :key="opt.value"
                         @click="pastDateRange = opt.value"
-                        :class="pastDateRange === opt.value ? 'bg-blue-600 text-white' : 'border text-gray-700 hover:bg-gray-100'"
+                        :class="pastDateRange === opt.value ? 'bg-indigo-600 text-white' : 'border text-gray-700 hover:bg-gray-100'"
                         class="rounded px-4 py-1.5 text-sm"
                     >{{ opt.label }}</button>
                 </div>
                 <button
                     @click="fetchPastDiaries"
                     :disabled="pastLoading"
-                    class="mt-3 rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-60"
+                    class="mt-3 rounded bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700 disabled:opacity-60"
                 >{{ pastLoading ? '取得中...' : '検索' }}</button>
             </div>
 

@@ -1,5 +1,6 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
+import OcrModal from '@/Components/Prepress/OcrModal.vue';
 import { useForm, usePage } from '@inertiajs/vue3';
 import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
@@ -11,16 +12,60 @@ const props = defineProps({
 });
 
 const form = useForm({
-    client_id:     props.prefill.client_id   ?? '',
-    client_name:   props.prefill.client_name ?? '',
-    jobcode:       props.prefill.jobcode     ?? '',
-    title:         props.prefill.title       ?? '',
-    memo:          '',
-    status:        'pending',
-    image:         null,
-    project_job_id: props.prefill.project_job_id ?? '',
-    use_job_image: !!(props.prefill.job_image_path),
+    client_id:          props.prefill.client_id   ?? '',
+    client_name:        props.prefill.client_name ?? '',
+    jobcode:            props.prefill.jobcode     ?? '',
+    title:              props.prefill.title       ?? '',
+    memo:               '',
+    status:             'pending',
+    image:              null,
+    project_job_id:     props.prefill.project_job_id ?? '',
+    use_job_image:      !!(props.prefill.job_image_path),
+    tmp_ocr_image_path: props.prefill.tmp_ocr_image_path ?? '',
 });
+
+// ── OCR ──────────────────────────────────────────────────
+const isOcrLoading = ref(false);
+const showOcrModal = ref(false);
+const ocrResult    = ref({});
+
+async function triggerOcr(file) {
+    isOcrLoading.value = true;
+    showOcrModal.value = false;
+    const fd   = new FormData();
+    fd.append('image', file);
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+    try {
+        const res = await axios.post(route('prepress.ocr.analyze'), fd, {
+            headers: { 'X-CSRF-TOKEN': csrf, 'Content-Type': 'multipart/form-data' },
+        });
+        ocrResult.value    = res.data;
+        showOcrModal.value = true;
+    } catch {
+        // OCR失敗時は無視してフォームをそのまま使う
+    } finally {
+        isOcrLoading.value = false;
+    }
+}
+
+function onOcrApply(result) {
+    // OCRモーダルで確定した値をフォームに反映
+    form.jobcode            = result.jobcode     || form.jobcode;
+    form.title              = result.title       || form.title;
+    form.client_id          = result.client_id   || '';
+    form.client_name        = result.client_name || form.client_name;
+    form.tmp_ocr_image_path = result.tmp_image_path || '';
+
+    // サーバー側で変換済み画像を使うため、再アップロード不要
+    if (result.tmp_image_path) {
+        form.image       = null;
+        form.use_job_image = false;
+        previewUrl.value  = result.image_url || previewUrl.value;
+        previewName.value = result.original_filename || previewName.value;
+        isJobImage.value  = false;
+    }
+    showOcrModal.value = false;
+}
 
 // ── クライアント選択（coordinator スタイル）────────────────
 const clientSuggestions  = ref([]);
@@ -85,8 +130,8 @@ function onClientIdChange() {
 }
 
 // ── 画像プレビュー ──────────────────────────────────────
-const previewUrl    = ref(props.prefill.job_image_url  ?? null);
-const previewName   = ref(props.prefill.job_original_filename ?? '');
+const previewUrl    = ref(props.prefill.ocr_image_url ?? props.prefill.job_image_url  ?? null);
+const previewName   = ref(props.prefill.original_filename ?? props.prefill.job_original_filename ?? '');
 const isJobImage    = ref(!!(props.prefill.job_image_path));
 const isDragging    = ref(false);
 const showLightbox  = ref(false);
@@ -101,12 +146,14 @@ function handleFileSelect(file) {
     // PDFはブラウザの<img>で表示できないためプレースホルダーを使う
     if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
         previewUrl.value = '__pdf__';
-        return;
+    } else {
+        const reader = new FileReader();
+        reader.onload = (e) => { previewUrl.value = e.target.result; };
+        reader.readAsDataURL(file);
     }
 
-    const reader = new FileReader();
-    reader.onload = (e) => { previewUrl.value = e.target.result; };
-    reader.readAsDataURL(file);
+    // OCR解析をトリガー
+    triggerOcr(file);
 }
 
 function onDropZoneDrop(e) {
@@ -121,11 +168,12 @@ function onFileInputChange(e) {
 }
 
 function removeImage() {
-    form.image         = null;
-    form.use_job_image = false;
-    isJobImage.value   = false;
-    previewUrl.value   = null;
-    previewName.value  = '';
+    form.image              = null;
+    form.use_job_image      = false;
+    form.tmp_ocr_image_path = '';
+    isJobImage.value        = false;
+    previewUrl.value        = null;
+    previewName.value       = '';
 }
 
 // ── 送信 ─────────────────────────────────────────────
@@ -253,7 +301,19 @@ const isMobile = computed(() => {
 
                     <!-- 伝票画像 -->
                     <div>
-                        <label class="mb-2 block text-sm font-semibold text-gray-700">作業ファイル情報（伝票画像）</label>
+                        <label class="mb-2 block text-sm font-semibold text-gray-700">
+                            作業ファイル情報（伝票画像）
+                            <span
+                                v-if="isOcrLoading"
+                                class="ml-2 inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-normal text-green-700"
+                            >
+                                <svg class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                                </svg>
+                                OCR解析中...
+                            </span>
+                        </label>
 
                         <!-- サムネイル表示 -->
                         <div v-if="previewUrl" class="mb-3">
@@ -374,5 +434,13 @@ const isMobile = computed(() => {
                 </div>
             </div>
         </Teleport>
+
+        <!-- OCRモーダル -->
+        <OcrModal
+            :show="showOcrModal"
+            :ocr-result="ocrResult"
+            @apply="onOcrApply"
+            @close="showOcrModal = false"
+        />
     </AppLayout>
 </template>

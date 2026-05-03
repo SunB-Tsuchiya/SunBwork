@@ -129,12 +129,15 @@ function typeMeta(type) {
 
 <template>
     <AppLayout title="ジョブ通知">
+        <template #header>
+            <h2 class="text-xl font-semibold leading-tight text-gray-800">ジョブ通知</h2>
+        </template>
+
         <div class="rounded bg-white shadow">
 
-            <!-- ヘッダー + フィルター -->
+            <!-- フィルター -->
             <div class="border-b px-6 py-4">
                 <div class="flex flex-wrap items-center gap-3">
-                    <h2 class="text-lg font-semibold text-gray-800">ジョブ通知</h2>
                     <div class="ml-auto flex flex-wrap items-center gap-2">
                         <label class="text-sm text-gray-600">表示:</label>
                         <select v-model="viewMode" class="rounded border px-2 py-1 text-sm">
@@ -152,14 +155,14 @@ function typeMeta(type) {
                         <button
                             @click="unreadOnly = !unreadOnly"
                             class="rounded border px-3 py-1 text-xs transition"
-                            :class="unreadOnly ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'"
+                            :class="unreadOnly ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'"
                         >
                             未読のみ
                         </button>
 
                         <button
                             @click="applyFilters"
-                            class="rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-700"
+                            class="rounded bg-indigo-600 px-3 py-1 text-xs text-white hover:bg-indigo-700"
                         >
                             適用
                         </button>

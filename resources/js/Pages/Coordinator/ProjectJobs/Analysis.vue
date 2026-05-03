@@ -5,22 +5,17 @@
   テーブルは「日付順」「ステージ順」で切り替え可能。
 -->
 <template>
-    <AppLayout title="ジョブ詳細">
+    <AppLayout title="作業分析">
         <template #header>
-            <div class="flex items-center justify-between">
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">
-                    ジョブ詳細 — {{ job.title || '案件' }}
-                </h2>
+            <div class="flex items-center gap-3">
                 <button
                     type="button"
-                    class="inline-flex items-center gap-1.5 rounded border border-gray-300 bg-white px-4 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
                     @click="goShow"
-                >
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
-                    </svg>
-                    案件詳細に戻る
-                </button>
+                >← 案件詳細に戻る</button>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">
+                    作業分析 — {{ job.title || '案件' }}
+                </h2>
             </div>
         </template>
 

@@ -3,8 +3,8 @@
         <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
             <div class="mb-4 flex items-center justify-between">
                 <h1 class="text-2xl font-bold">
-                    <template v-if="hasSourceJob">依頼されたジョブをマイジョブとして登録</template>
-                    <template v-else>ジョブ作成（独自）</template>
+                    <template v-if="hasSourceJob">依頼されたジョブをマイジョブBOXとして登録</template>
+                    <template v-else>マイジョブBOX</template>
                 </h1>
                 <button v-if="!hasSourceJob" @click="openModal" class="rounded border border-gray-300 bg-gray-50 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100">
                     過去データから流用

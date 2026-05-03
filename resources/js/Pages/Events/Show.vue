@@ -19,6 +19,8 @@ const props = defineProps({
     lunch_overlap_minutes: { type: Number, default: 0 },
     proof_requested: { type: Boolean, default: false },
     chain_series: { type: Object, default: null },
+    overlapping_events: { type: Array, default: () => [] },
+    dynamic_interruption_minutes: { type: Number, default: 0 },
 });
 
 const showProofModal = ref(false);
@@ -81,9 +83,25 @@ function durationText() {
     return formatMins(totalRecordedMins());
 }
 
-const interruptionMins = computed(() => props.event?.interruption_minutes ?? 0);
+// stored interruption_minutes (旧：フォーム送信時に保存)
+const storedInterruptionMins = computed(() => props.event?.interruption_minutes ?? 0);
+// dynamic_interruption_minutes はサーバーが毎回リアルタイムで計算した値
+// stored より dynamic を優先する（stale 問題を回避）
+const interruptionMins = computed(() =>
+    props.dynamic_interruption_minutes > 0
+        ? props.dynamic_interruption_minutes
+        : storedInterruptionMins.value,
+);
 const lunchMins = computed(() => props.lunch_overlap_minutes ?? 0);
 const hasDeductions = computed(() => lunchMins.value > 0 || interruptionMins.value > 0);
+// 自分から差し引く重複イベント（表示用）
+const selfOverlapEvents = computed(() =>
+    (props.overlapping_events ?? []).filter((e) => e.direction === 'self'),
+);
+// 相手から差し引く重複イベント（参考表示用）
+const otherOverlapEvents = computed(() =>
+    (props.overlapping_events ?? []).filter((e) => e.direction === 'other'),
+);
 
 function actualDurationText() {
     const actual = Math.max(0, totalRecordedMins() - lunchMins.value - interruptionMins.value);
@@ -105,10 +123,58 @@ function submitComplete() {
 }
 
 const eventTypeLabel = computed(() => props.event?.event_item_type?.name ?? null);
+
+const CLIENT_SLUGS   = ['client_visit', 'customer_visit', 'outing'];
+const INTERNAL_SLUGS = ['meeting_internal', 'conference', 'other'];
+
+/** event_item_type の slug に応じた編集ルート URL */
+const editHref = computed(() => {
+    const slug = props.event?.event_item_type?.slug ?? null;
+    if (CLIENT_SLUGS.includes(slug)) {
+        return route('events.client-event.edit', { event: props.event.id });
+    }
+    if (INTERNAL_SLUGS.includes(slug)) {
+        return route('events.internal-event.edit', { event: props.event.id });
+    }
+    return route('events.edit', props.event.id);
+});
 </script>
 
 <template>
     <AppLayout title="イベント詳細">
+        <template #header>
+            <div class="flex items-center gap-3">
+                <button @click="goBack"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                >← 戻る</button>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">予定詳細</h2>
+            </div>
+        </template>
+
+        <template #headerExtras>
+            <div class="flex items-center gap-2">
+                <template v-if="view_as_coordinator">
+                    <span class="inline-flex cursor-not-allowed items-center gap-1.5 rounded bg-gray-300 px-4 py-2 text-sm font-medium text-gray-500" title="Coordinator は編集できません">
+                        編集（閲覧のみ）
+                    </span>
+                    <span class="inline-flex cursor-not-allowed items-center gap-1.5 rounded bg-gray-300 px-4 py-2 text-sm font-medium text-gray-500" title="Coordinator は削除できません">
+                        削除（閲覧のみ）
+                    </span>
+                </template>
+                <template v-else>
+                    <Link v-if="!hide_edit"
+                          :href="editHref"
+                          class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+                        編集
+                    </Link>
+                    <button @click="confirmDelete"
+                            class="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
+                        削除
+                    </button>
+                </template>
+            </div>
+        </template>
+
         <div class="mx-auto max-w-2xl space-y-4">
 
             <!-- イベント情報カード -->
@@ -149,14 +215,29 @@ const eventTypeLabel = computed(() => props.event?.event_item_type?.name ?? null
                             <div v-if="hasDeductions" class="mt-1 space-y-0.5 text-xs text-gray-400">
                                 <div>記録 {{ durationText() }}</div>
                                 <div v-if="lunchMins > 0" class="text-amber-600">休憩 −{{ formatMins(lunchMins) }}（{{ lunch_start }}〜{{ lunch_end }}）</div>
-                                <div v-if="interruptionMins > 0" class="text-orange-600">重複 −{{ formatMins(interruptionMins) }}</div>
+                                <div v-if="interruptionMins > 0" class="text-orange-600">中断 −{{ formatMins(interruptionMins) }}</div>
                             </div>
                         </div>
                     </div>
-                    <!-- 重複の注記 -->
-                    <div v-if="interruptionMins > 0"
-                         class="mt-3 rounded bg-orange-50 border border-orange-200 px-3 py-2 text-xs text-orange-700">
-                        この予定は他の予定と時間が重複しているため、合計 {{ formatMins(interruptionMins) }} を実作業時間から差し引いています。
+                    <!-- 重複イベントの詳細表示 -->
+                    <div v-if="selfOverlapEvents.length > 0"
+                         class="mt-3 rounded bg-orange-50 border border-orange-200 px-3 py-2 text-xs text-orange-700 space-y-1">
+                        <div class="font-semibold">この予定は以下の予定と重複しているため、合計 {{ formatMins(interruptionMins) }} を実作業時間から差し引いています：</div>
+                        <ul class="ml-3 list-disc space-y-0.5">
+                            <li v-for="ev in selfOverlapEvents" :key="ev.id">
+                                「{{ ev.title }}」― {{ formatMins(ev.overlap_mins) }} 重複
+                            </li>
+                        </ul>
+                    </div>
+                    <!-- 相手イベントへの影響（参考表示） -->
+                    <div v-if="otherOverlapEvents.length > 0"
+                         class="mt-2 rounded bg-sky-50 border border-sky-200 px-3 py-2 text-xs text-sky-700 space-y-1">
+                        <div class="font-semibold">この予定は以下の長い予定の中断として記録されています：</div>
+                        <ul class="ml-3 list-disc space-y-0.5">
+                            <li v-for="ev in otherOverlapEvents" :key="ev.id">
+                                「{{ ev.title }}」― {{ formatMins(ev.overlap_mins) }} 分
+                            </li>
+                        </ul>
                     </div>
                 </div>
 
@@ -167,40 +248,19 @@ const eventTypeLabel = computed(() => props.event?.event_item_type?.name ?? null
                 </div>
 
                 <!-- ボタン類 -->
-                <div class="flex flex-wrap items-center gap-2 border-t bg-gray-50 px-5 py-3">
-                    <!-- Coordinator閲覧モード: 編集・削除はグレーアウト -->
-                    <template v-if="view_as_coordinator">
-                        <span class="inline-flex cursor-not-allowed items-center gap-1.5 rounded bg-gray-300 px-3 py-1.5 text-sm font-medium text-gray-500" title="Coordinator は編集できません">
-                            編集（閲覧のみ）
-                        </span>
-                        <span class="inline-flex cursor-not-allowed items-center gap-1.5 rounded bg-gray-300 px-3 py-1.5 text-sm font-medium text-gray-500" title="Coordinator は削除できません">
-                            削除（閲覧のみ）
-                        </span>
-                    </template>
-                    <template v-else>
-                        <Link v-if="!hide_edit"
-                              :href="route('events.edit', event.id)"
-                              class="inline-flex items-center gap-1.5 rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700">
-                            編集
-                        </Link>
-                        <button @click="confirmDelete"
-                                class="inline-flex items-center gap-1.5 rounded bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700">
-                            削除
-                        </button>
-                    </template>
-                    <template v-if="event.project_job_assignment_id">
-                        <button
-                            @click="submitComplete"
-                            :disabled="isEventCompleted()"
-                            :class="isEventCompleted()
-                                ? 'inline-flex cursor-not-allowed items-center gap-1.5 rounded bg-yellow-800 px-3 py-1.5 text-sm font-medium text-white opacity-70'
-                                : 'inline-flex items-center gap-1.5 rounded bg-yellow-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-yellow-700'"
-                        >
-                            {{ isEventCompleted() ? '完了済み' : '完了する' }}
-                        </button>
+                <div v-if="event.project_job_assignment_id" class="flex flex-wrap items-center gap-2 border-t bg-gray-50 px-5 py-3">
+                    <button
+                        @click="submitComplete"
+                        :disabled="isEventCompleted()"
+                        :class="isEventCompleted()
+                            ? 'inline-flex cursor-not-allowed items-center gap-1.5 rounded bg-yellow-800 px-3 py-1.5 text-sm font-medium text-white opacity-70'
+                            : 'inline-flex items-center gap-1.5 rounded bg-yellow-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-yellow-700'"
+                    >
+                        {{ isEventCompleted() ? '完了済み' : '完了する' }}
+                    </button>
 
-                        <!-- 校正依頼ボタン（完了済みまたは校正ジョブは非表示） -->
-                        <template v-if="assignment?.job_type !== 'proof'">
+                    <!-- 校正依頼ボタン（完了済みまたは校正ジョブは非表示） -->
+                    <template v-if="assignment?.job_type !== 'proof'">
                         <button
                             v-if="!isEventCompleted() && !props.proof_requested"
                             @click="showProofModal = true"
@@ -214,12 +274,7 @@ const eventTypeLabel = computed(() => props.event?.event_item_type?.name ?? null
                         >
                             校正依頼済み
                         </span>
-                        </template>
                     </template>
-                    <button @click="goBack"
-                            class="ml-auto inline-flex items-center gap-1.5 rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">
-                        戻る
-                    </button>
                 </div>
             </div>
 

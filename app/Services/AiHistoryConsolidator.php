@@ -49,7 +49,7 @@ class AiHistoryConsolidator
             foreach ($list as $later) {
                 $baseTime = Carbon::parse($base->created_at);
                 $laterTime = Carbon::parse($later->created_at);
-                $diff = $laterTime->diffInMinutes($baseTime);
+                $diff = abs($baseTime->diffInMinutes($laterTime));
                 if ($diff <= $threshold) {
                     // merge later into base
                     if (!$dry) {

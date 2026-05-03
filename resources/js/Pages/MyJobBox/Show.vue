@@ -1,10 +1,13 @@
 <template>
     <AppLayout :title="`ジョブ割り当て - ${assignment?.title || ''}`">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">ジョブ割り当て — 詳細</h2>
+            <div class="flex items-center gap-3">
+                <Link :href="routeBack()" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">← マイジョブBOXに戻る</Link>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">ジョブ割り当て — 詳細</h2>
+            </div>
         </template>
 
-        <div class="mx-auto max-w-3xl space-y-4">
+        <div class="space-y-4">
             <!-- ジョブ割り当て詳細カード -->
             <AssignmentDetailCard :assignment="assignment" />
 
@@ -139,13 +142,6 @@
 
             <!-- アクションボタン -->
             <div class="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-white px-5 py-3 shadow-sm">
-                <Link
-                    :href="routeBack()"
-                    class="inline-flex items-center rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
-                >
-                    戻る
-                </Link>
-
                 <button
                     v-if="canDelete"
                     @click="deleteAssignment"
@@ -158,7 +154,7 @@
                     <Link
                         v-if="assignment.scheduled || assignment.scheduled_at"
                         :href="editHref"
-                        class="inline-flex items-center rounded bg-blue-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-600"
+                        class="inline-flex items-center rounded bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
                     >
                         予定を編集
                     </Link>
@@ -180,7 +176,7 @@
                     <Link
                         v-else-if="!(assignment.scheduled || assignment.scheduled_at)"
                         :href="typeof route === 'function' ? route('events.create_job', { job: assignment.id }) : `/events/create-job?job=${assignment.id}`"
-                        class="inline-flex items-center rounded bg-blue-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-600"
+                        class="inline-flex items-center rounded bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
                     >
                         予定をセット
                     </Link>

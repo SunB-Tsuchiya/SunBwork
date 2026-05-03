@@ -84,7 +84,7 @@ function closeDuplicateModal() {
             </div>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
             <!-- CSV一括登録 -->
             <div class="mb-6">
                 <h3 class="mb-2 text-base font-medium text-orange-800">CSV一括登録</h3>

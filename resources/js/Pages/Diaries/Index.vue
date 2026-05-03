@@ -62,8 +62,7 @@ const selectedPerPage = computed(() => (props.meta && props.meta.per_page ? Numb
         <div class="rounded bg-white p-6 shadow">
             <div class="mb-4 flex items-center justify-between">
                 <div class="flex items-center">
-                    <h1 class="text-2xl font-bold">日報一覧</h1>
-                    <button @click="showCalendar = true" class="ml-4 text-gray-600 hover:text-blue-600" ref="calendarBtn">
+                    <button @click="showCalendar = true" class="text-gray-600 hover:text-blue-600" ref="calendarBtn">
                         <FontAwesomeIcon :icon="faCalendar" size="lg" />
                     </button>
                     <div v-if="showCalendar">
@@ -91,7 +90,7 @@ const selectedPerPage = computed(() => (props.meta && props.meta.per_page ? Numb
                     <option :value="30">30日分を表示</option>
                     <option :value="90">90日分を表示</option>
                 </select>
-                <button class="ml-2 rounded bg-blue-600 px-3 py-1 text-xs text-white" @click.prevent="applyFilters">適用</button>
+                <button class="ml-2 rounded bg-indigo-600 px-3 py-1 text-xs text-white" @click.prevent="applyFilters">適用</button>
             </div>
 
             <!-- For personal diaries, show only date and content. Hide name/id/dept/read columns by configuring DiaryTable props. -->
@@ -142,7 +141,7 @@ const selectedPerPage = computed(() => (props.meta && props.meta.per_page ? Numb
                 </div>
                 <div class="space-x-1">
                     <template v-for="p in Array.from({ length: lastPage }, (_, i) => i + 1)" :key="p">
-                        <button @click.prevent="goToPage(p)" :class="['rounded px-2 py-1', p === currentPage ? 'bg-blue-600 text-white' : 'border']">
+                        <button @click.prevent="goToPage(p)" :class="['rounded px-2 py-1', p === currentPage ? 'bg-indigo-600 text-white' : 'border']">
                             {{ p }}
                         </button>
                     </template>

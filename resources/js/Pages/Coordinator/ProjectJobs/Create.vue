@@ -9,10 +9,14 @@
 <template>
     <AppLayout title="プロジェクトジョブ作成">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">【進行管理】{{ $page.props.auth.user.name || 'ユーザー' }}さんのページ</h2>
+            <div class="flex items-center gap-3">
+                <Link :href="route('coordinator.project_jobs.index')"
+                      class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                >← 案件一覧に戻る</Link>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">案件作成</h2>
+            </div>
         </template>
-        <div class="rounded bg-white p-6 shadow">
-            <h1 class="mb-6 text-2xl font-bold">プロジェクトジョブ作成</h1>
+        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
             <form @submit.prevent="submit">
                 <!-- クライアント選択（一番最初） -->
                 <div class="mb-4">
@@ -76,7 +80,7 @@
                     </p>
                     <div class="mt-2 flex gap-2">
                         <button type="button"
-                                class="rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-700"
+                                class="rounded bg-indigo-600 px-3 py-1 text-xs text-white hover:bg-indigo-700"
                                 @click="applyPreset">引き継ぐ</button>
                         <button type="button"
                                 class="rounded border border-gray-300 px-3 py-1 text-xs text-gray-600 hover:bg-gray-50"
@@ -241,8 +245,8 @@
                         <span v-if="form.team_members.length === 0" class="text-sm text-gray-400">メンバー未設定</span>
                     </div>
                     <div class="flex items-center gap-2">
-                        <button type="button" 
-                                class="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                        <button type="button"
+                                class="rounded bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700"
                                 @click="openMemberModal">
                             メンバーを選択
                         </button>
@@ -252,13 +256,14 @@
                 </div>
 
                 <!-- メンバー・スケジュール登録は後続ステップで実装 -->
-                <div class="mt-6 flex gap-4">
-                    <button type="submit" class="rounded bg-blue-600 px-6 py-2 text-white hover:bg-blue-700">作成</button>
-                    <!-- Optional: if this page was opened with ?project_job_id=..., allow direct open of schedule -->
-                    <button v-if="projectJobId" type="button" class="rounded bg-blue-100 px-4 py-2 text-blue-700" @click="goSchedule">
+                <div class="mt-6 flex justify-end gap-3">
+                    <Link :href="route('coordinator.project_jobs.index')"
+                          class="rounded bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
+                    >キャンセル</Link>
+                    <button v-if="projectJobId" type="button" class="rounded bg-blue-100 px-4 py-2 text-sm text-blue-700 hover:bg-blue-200" @click="goSchedule">
                         スケジュール設定
                     </button>
-                    <!-- <button type="button" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600" @click="clearFormAndRoute">情報をクリアする</button> -->
+                    <button type="submit" class="rounded bg-indigo-600 px-6 py-2 text-sm font-medium text-white hover:bg-indigo-700">作成</button>
                 </div>
             </form>
 
@@ -499,7 +504,7 @@
 <script setup>
 import DialogModal from '@/Components/DialogModal.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { router, useForm, usePage } from '@inertiajs/vue3';
+import { Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 
 const props = defineProps({

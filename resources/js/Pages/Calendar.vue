@@ -47,9 +47,9 @@ defineProps({
 </script>
 
 <template>
-    <AppLayout title="予定表">
+    <AppLayout title="カレンダー">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">予定表</h2>
+            <h2 class="text-xl font-semibold leading-tight text-gray-800">カレンダー</h2>
         </template>
         <div class="rounded bg-white p-6 shadow">
             <Calendar

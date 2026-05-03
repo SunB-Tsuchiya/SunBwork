@@ -1581,7 +1581,7 @@ class JobBoxController extends Controller
 
                         $overlapStart = $evNewStart->gt($evStart) ? $evNewStart : $evStart;
                         $overlapEnd   = $evNewEnd->lt($evEnd)    ? $evNewEnd   : $evEnd;
-                        $overlapMins  = max(0, (int)$overlapEnd->diffInMinutes($overlapStart));
+                        $overlapMins  = max(0, (int)$overlapStart->diffInMinutes($overlapEnd, false));
 
                         if ($overlapMins <= 0) continue;
 

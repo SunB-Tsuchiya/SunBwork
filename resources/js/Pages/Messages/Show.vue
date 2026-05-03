@@ -1,27 +1,28 @@
 <template>
     <AppLayout :title="subjectText || 'メール詳細'">
         <template #header>
-            <h2 class="text-xl font-semibold">メール詳細</h2>
+            <div class="flex items-center gap-3">
+                <Link :href="route('messages.index')" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">← 一覧に戻る</Link>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">メール詳細</h2>
+            </div>
+        </template>
+
+        <template #headerExtras>
+            <button
+                v-if="
+                    currentUserId &&
+                    (currentUserId === (localMessage?.from_user_id ?? localMessage?.from_user?.id) ||
+                        (Array.isArray(localMessage?.recipients) &&
+                            localMessage.recipients.some((r) => (r.user_id ?? r.user?.id) === currentUserId)))
+                "
+                @click.prevent="onTrashClick"
+                class="rounded bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
+            >
+                {{ isTrashedByCurrentUser ? '完全削除' : '削除' }}
+            </button>
         </template>
 
         <div class="rounded bg-white p-6 shadow">
-            <div class="mb-4 flex items-center justify-between">
-                <a :href="route('messages.index')" class="text-sm text-blue-600 underline">← 一覧に戻る</a>
-                <div>
-                    <button
-                        v-if="
-                            currentUserId &&
-                            (currentUserId === (localMessage?.from_user_id ?? localMessage?.from_user?.id) ||
-                                (Array.isArray(localMessage?.recipients) &&
-                                    localMessage.recipients.some((r) => (r.user_id ?? r.user?.id) === currentUserId)))
-                        "
-                        @click.prevent="onTrashClick"
-                        class="rounded bg-red-50 px-2 py-1 text-sm text-red-700 hover:bg-red-100"
-                    >
-                        {{ isTrashedByCurrentUser ? '完全削除' : '削除' }}
-                    </button>
-                </div>
-            </div>
             <h3 class="text-lg font-semibold">{{ subjectText }}</h3>
             <div class="mt-1 text-sm text-gray-500">差出人: {{ senderName }}</div>
             <div class="mt-4 text-sm text-gray-700" v-html="sanitizedBody" @click="onBodyClick"></div>
@@ -109,7 +110,7 @@
 <script setup>
 import { ensureAttachmentUrl, ensureThumbUrl } from '@/Helpers/attachment';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { router, usePage } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import DOMPurify from 'dompurify';
 import { computed, onMounted, ref, watch } from 'vue';

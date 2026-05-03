@@ -97,6 +97,12 @@ const isAdminOrAbove = computed(() => ['admin', 'superadmin'].includes(page.prop
             >
                 Leader権限管理
             </Link>
+            <Link
+                :href="route('leader.meeting_definitions.index')"
+                :class="tab('meeting_definitions')"
+            >
+                会議設定
+            </Link>
         </nav>
     </div>
 </template>

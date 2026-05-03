@@ -149,7 +149,7 @@ function executeMerge() {
             <h2 class="text-xl font-semibold leading-tight text-gray-800">クライアント編集</h2>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
             <form @submit.prevent="submit">
                 <div class="mb-4">
                     <label class="mb-1 block">名前</label>

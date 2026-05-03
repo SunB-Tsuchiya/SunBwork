@@ -1,7 +1,15 @@
 <template>
     <AppLayout title="ジョブ編集">
+        <template #header>
+            <div class="flex items-center gap-3">
+                <button @click="goBack"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                >← 戻る</button>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">ジョブ編集</h2>
+            </div>
+        </template>
+
         <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
-            <h1 class="mb-4 text-2xl font-bold">ジョブ編集（ユーザー）</h1>
             <div>
                 <AssignmentFormUser
                     mode="user"
@@ -25,6 +33,8 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import AssignmentFormUser from '@/Pages/Coordinator/ProjectJobs/JobAssign/AssignmentForm.vue';
 import { usePage } from '@inertiajs/vue3';
+
+function goBack() { window.history.back(); }
 import { ref } from 'vue';
 
 const page = usePage();

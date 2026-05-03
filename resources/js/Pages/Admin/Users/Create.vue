@@ -216,17 +216,13 @@ const submit = () => {
 <template>
     <AppLayout title="新規ユーザー登録">
         <template #header>
-            <div class="flex items-center justify-between">
-                <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                    新規ユーザー登録
-                </h2>
-                <Link :href="route('admin.users.index')" class="text-gray-600 hover:text-gray-900">
-                    ← ユーザー一覧に戻る
-                </Link>
+            <div class="flex items-center gap-3">
+                <Link :href="route('admin.users.index')" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">← ユーザー一覧に戻る</Link>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">新規ユーザー登録</h2>
             </div>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
                     <h3 class="text-lg font-medium text-blue-900 mb-2">CSV一括登録</h3>
                     <p class="text-sm text-blue-700 mb-4">
                         CSVファイルを使用して複数のユーザーを一度に登録できます。

@@ -797,6 +797,66 @@ function createFromSelect() {
     }
 }
 
+function createClientEventFromSelect() {
+    const hh = String(clickedStartHour.value).padStart(2, '0');
+    const mm = String(clickedStartMinute.value).padStart(2, '0');
+    const endH = String(Math.min(23, clickedStartHour.value + 1)).padStart(2, '0');
+    const endM = mm;
+    showSelectModal.value = false;
+    const current = window.location.pathname + window.location.search + window.location.hash;
+    try {
+        router.get(
+            route('events.client-event.create', {
+                date: formatJstDate(props.diary.date),
+                startHour: hh,
+                startMinute: mm,
+                endHour: endH,
+                endMinute: endM,
+                return_to: current,
+            }),
+        );
+    } catch (e) {
+        window.location.href = route('events.client-event.create', {
+            date: formatJstDate(props.diary.date),
+            startHour: hh,
+            startMinute: mm,
+            endHour: endH,
+            endMinute: endM,
+            return_to: current,
+        });
+    }
+}
+
+function createInternalEventFromSelect() {
+    const hh = String(clickedStartHour.value).padStart(2, '0');
+    const mm = String(clickedStartMinute.value).padStart(2, '0');
+    const endH = String(Math.min(23, clickedStartHour.value + 1)).padStart(2, '0');
+    const endM = mm;
+    showSelectModal.value = false;
+    const current = window.location.pathname + window.location.search + window.location.hash;
+    try {
+        router.get(
+            route('events.internal-event.create', {
+                date: formatJstDate(props.diary.date),
+                startHour: hh,
+                startMinute: mm,
+                endHour: endH,
+                endMinute: endM,
+                return_to: current,
+            }),
+        );
+    } catch (e) {
+        window.location.href = route('events.internal-event.create', {
+            date: formatJstDate(props.diary.date),
+            startHour: hh,
+            startMinute: mm,
+            endHour: endH,
+            endMinute: endM,
+            return_to: current,
+        });
+    }
+}
+
 function closeSelectModal() {
     showSelectModal.value = false;
 }
@@ -1145,11 +1205,18 @@ onUnmounted(() => {
 <template>
     <AppLayout title="日報表示">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">日報一覧</h2>
+            <div class="flex items-center gap-3">
+                <button @click="back" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">← 戻る</button>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">日報詳細</h2>
+            </div>
+        </template>
+
+        <template #headerExtras>
+            <Link :href="editHref" class="rounded bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700">編集</Link>
+            <button @click="deleteDiary" class="rounded bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700">削除</button>
         </template>
 
         <div class="rounded bg-white p-6 shadow">
-            <h1 class="mb-3 text-2xl font-bold">日報 {{ formatJstDate(props.diary.date) }}</h1>
 
             <!-- 勤務情報バー -->
             <div v-if="workRecord" class="mb-4 flex flex-wrap items-center gap-x-5 gap-y-1 rounded border border-gray-200 bg-gray-50 px-4 py-2 text-sm">
@@ -1170,7 +1237,8 @@ onUnmounted(() => {
                 <!-- 上から順: 日報内容 -->
                 <div class="flex flex-col gap-3">
                     <div class="prose max-h-52 overflow-y-auto rounded border p-3 text-sm">
-                        <div v-html="sanitizedContent" @click="onBodyClick"></div>
+                        <span v-if="!sanitizedContent || !sanitizedContent.trim()" class="text-gray-400 italic">日報はありません</span>
+                        <div v-else v-html="sanitizedContent" @click="onBodyClick"></div>
                     </div>
 
                     <!-- 既読者表示 -->
@@ -1180,11 +1248,6 @@ onUnmounted(() => {
 
                     
 
-                    <div class="flex space-x-3">
-                        <Link :href="editHref" class="rounded bg-blue-600 px-4 py-2 text-sm text-white">編集</Link>
-                        <button @click="deleteDiary" class="rounded bg-red-600 px-4 py-2 text-sm text-white">削除</button>
-                        <button @click="back" class="rounded bg-gray-200 px-4 py-2 text-sm text-gray-700">戻る</button>
-                    </div>
                 </div>
                 <!-- タイムライン（内容の下に表示） -->
                 <div>
@@ -1300,7 +1363,8 @@ onUnmounted(() => {
                             {{ formatJstDate(props.diary.date) }} {{ pad2(clickedStartHour) }}:{{ pad2(clickedStartMinute) }} の操作
                         </h2>
                         <div class="flex flex-col gap-4">
-                            <button @click="createFromSelect" class="rounded bg-blue-600 px-4 py-2 text-white">予定作成</button>
+                            <button @click="createClientEventFromSelect" class="rounded bg-emerald-600 px-4 py-2 text-white">案件打合せ・外出</button>
+                            <button @click="createInternalEventFromSelect" class="rounded bg-teal-600 px-4 py-2 text-white">社内予定</button>
                             <button @click="closeSelectModal" class="rounded bg-gray-300 px-4 py-2">キャンセル</button>
                         </div>
                     </div>

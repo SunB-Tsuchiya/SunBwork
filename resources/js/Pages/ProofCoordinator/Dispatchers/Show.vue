@@ -20,10 +20,23 @@ function destroy() {
 <template>
     <AppLayout title="単発派遣 詳細">
         <template #header>
-            <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <Link :href="route('proof_coordinator.dispatchers.index')" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">← 一覧に戻る</Link>
                 <h2 class="text-xl font-semibold leading-tight text-gray-800">単発派遣 詳細</h2>
-                <Link :href="route('proof_coordinator.dispatchers.index')" class="text-gray-600 hover:text-gray-900">← 一覧に戻る</Link>
             </div>
+        </template>
+
+        <template #headerExtras>
+            <Link
+                :href="route('proof_coordinator.dispatchers.edit', dispatcher.id)"
+                class="rounded bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
+            >編集</Link>
+            <button
+                v-if="assignmentCount === 0"
+                type="button"
+                @click="destroy"
+                class="rounded bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
+            >削除</button>
         </template>
 
         <template #tabs>
@@ -66,25 +79,9 @@ function destroy() {
                     </div>
                 </dl>
 
-                <div class="mt-6 flex gap-3">
-                    <Link
-                        :href="route('proof_coordinator.dispatchers.edit', dispatcher.id)"
-                        class="rounded border border-pink-300 bg-pink-50 px-4 py-2 text-sm font-medium text-pink-700 hover:bg-pink-100"
-                    >
-                        編集
-                    </Link>
-                    <button
-                        v-if="assignmentCount === 0"
-                        type="button"
-                        @click="destroy"
-                        class="rounded border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
-                    >
-                        削除
-                    </button>
-                    <p v-else class="flex items-center text-xs text-gray-400">
-                        ※ 校正ジョブが {{ assignmentCount }} 件あるため削除できません。アサイン表示をオフにしてください。
-                    </p>
-                </div>
+                <p v-if="assignmentCount > 0" class="mt-4 text-xs text-gray-400">
+                    ※ 校正ジョブが {{ assignmentCount }} 件あるため削除できません。アサイン表示をオフにしてください。
+                </p>
 
                 <div v-if="flash.dispatcherDeleteError" class="mt-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                     校正ジョブが {{ flash.dispatcherDeleteError.count }} 件紐づいているため削除できません。

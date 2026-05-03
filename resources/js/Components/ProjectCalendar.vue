@@ -22,7 +22,7 @@
 
             <template v-if="currentView === 'calendar'">
                 <button v-if="!props.readonly" @click="openEventModal" class="rounded bg-blue-600 px-4 py-2 text-white">予定作成</button>
-                <button v-if="!props.readonly" @click="goToDiaryCreate" class="rounded bg-orange-500 px-4 py-2 text-white">メモ作成</button>
+                <button v-if="!props.readonly && props.showMemoButton" @click="goToDiaryCreate" class="rounded bg-orange-500 px-4 py-2 text-white">メモ作成</button>
 
                 <!-- CSV操作（案件に紐付いたカレンダーのみ表示） -->
                 <template v-if="props.project && !props.readonly">
@@ -379,6 +379,7 @@ const props = defineProps({
     items: { type: Array, default: () => [] },
     diaryLabel: { type: String, default: 'メモ' },
     readonly: { type: Boolean, default: false },
+    showMemoButton: { type: Boolean, default: true },
     weekPostsUrl: { type: String, default: null },
     uniformColors: { type: Boolean, default: false },
 });

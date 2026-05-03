@@ -30,7 +30,7 @@ class UserController extends Controller
     public function index()
     {
         $this->requireAdminPermission('user_management');
-        $users = User::orderBy('created_at', 'desc')->get();
+        $users = User::with('positionTitle')->orderBy('created_at', 'desc')->get();
         $assignments = \App\Models\Assignment::all();
         $departments = Department::all();
         $user = Auth::user();
@@ -158,6 +158,7 @@ class UserController extends Controller
     public function show(User $user)
     {
         $this->requireAdminPermission('user_management');
+        $user->load('positionTitle');
         return Inertia::render('Admin/Users/Show', [
             'user' => $user,
         ]);

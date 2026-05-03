@@ -1,28 +1,24 @@
 <template>
     <AppLayout :title="`割当編集 - ${projectJob ? projectJob.title : ''}`">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">割当編集</h2>
-        </template>
-
-        <div class="rounded bg-white p-6 shadow">
-            <div class="mb-4 flex items-center justify-between">
-                <h1 class="text-2xl font-bold">割当を編集</h1>
-                <button
-                    type="button"
-                    @click="openModal"
-                    class="rounded bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700"
-                >過去データから流用</button>
-            </div>
-
-            <AssignmentForm :key="formKey" :projectJob="projectJob" :members="members" :assignments="formAssignments" :editMode="true" />
-
-            <div class="mt-4">
+            <div class="flex items-center gap-3">
                 <Link
                     :href="route('coordinator.project_jobs.assignments.index', { projectJob: projectJob.id })"
-                    class="rounded bg-gray-200 px-4 py-2"
-                    >戻る</Link
-                >
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                >← 割り当て一覧に戻る</Link>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">割当編集</h2>
             </div>
+        </template>
+        <template #headerExtras>
+            <button
+                type="button"
+                @click="openModal"
+                class="rounded bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700"
+            >過去データから流用</button>
+        </template>
+
+        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
+            <AssignmentForm :key="formKey" :projectJob="projectJob" :members="members" :assignments="formAssignments" :editMode="true" />
         </div>
     </AppLayout>
 

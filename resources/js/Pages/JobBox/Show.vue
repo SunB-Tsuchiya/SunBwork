@@ -1,10 +1,26 @@
 <template>
     <AppLayout :title="`ジョブ割り当て - ${projectJob.title}`">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">ジョブ割り当て — メッセージ表示</h2>
+            <div class="flex items-center gap-3">
+                <Link :href="routeBack()"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                >← 戻る</Link>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">ジョブ割り当て — メッセージ表示</h2>
+            </div>
         </template>
 
-        <div class="mx-auto max-w-3xl space-y-4">
+        <template #headerExtras>
+            <div v-if="isPrivilegedUser" class="flex items-center gap-2">
+                <Link :href="assignmentEditHref"
+                    class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                >編集</Link>
+                <button v-if="canEditDelete" @click.prevent="deleteMessage"
+                    class="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+                >削除</button>
+            </div>
+        </template>
+
+        <div class="mx-auto max-w-2xl space-y-4">
 
             <!-- メッセージ情報カード -->
             <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
@@ -29,23 +45,13 @@
                      ユーザーが自分でスケジュールする場合はMyJobBoxを使う。 -->
 
                 <!-- ボタン類 -->
-                <div class="flex flex-wrap items-center gap-2 border-t bg-gray-50 px-5 py-3">
-                    <Link :href="routeBack()" class="inline-flex items-center gap-1.5 rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">戻る</Link>
-
-                    <template v-if="isPrivilegedUser">
-                        <Link
-                            :href="assignmentEditHref"
-                            class="inline-flex items-center gap-1.5 rounded bg-yellow-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-yellow-600"
-                        >編集</Link>
-                        <button v-if="canEditDelete" class="inline-flex items-center gap-1.5 rounded bg-red-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-600" @click.prevent="deleteMessage">削除</button>
-                    </template>
-
+                <div v-if="isAssignee || linkedAssignmentId" class="flex flex-wrap items-center gap-2 border-t bg-gray-50 px-5 py-3">
                     <template v-if="isAssignee">
                         <!-- 進行表から依頼されたジョブ → events.create_job へ、独立ジョブ → マイジョブ作成フォームへ -->
                         <Link
                             v-if="!assignment.is_registered"
                             :href="myJobBoxHref"
-                            class="inline-flex items-center gap-1.5 rounded bg-blue-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-600"
+                            class="inline-flex items-center gap-1.5 rounded bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
                         >
                             {{ assignment.progress_cell_id ? 'ジョブをセット（進行表から）' : 'マイジョブとして登録' }}
                         </Link>
@@ -53,8 +59,6 @@
                             v-else
                             class="inline-flex items-center gap-1.5 rounded bg-gray-400 px-3 py-1.5 text-sm font-medium text-white cursor-not-allowed"
                         >登録済み</span>
-                        <!-- assignment-job（Coordinator依頼）の完了。
-                             directly project_job_assignments を更新し、Coordinatorの一覧に反映される -->
                         <button
                             @click="submitComplete"
                             :class="isAssignmentCompleted || isSubmittingComplete

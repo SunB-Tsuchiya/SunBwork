@@ -294,7 +294,7 @@ class ProjectJobAssignmentController extends Controller
 
                                     $overlapStart = $eventStart->gt($evStart) ? $eventStart : $evStart;
                                     $overlapEnd   = $eventEnd->lt($evEnd) ? $eventEnd : $evEnd;
-                                    $overlapMins  = max(0, (int)$overlapEnd->diffInMinutes($overlapStart));
+                                    $overlapMins  = max(0, (int)$overlapStart->diffInMinutes($overlapEnd, false));
 
                                     if ($overlapMins <= 0) continue;
 
@@ -492,7 +492,7 @@ class ProjectJobAssignmentController extends Controller
 
                                 $overlapStart = $eventStart->gt($evStart) ? $eventStart : $evStart;
                                 $overlapEnd   = $eventEnd->lt($evEnd)    ? $eventEnd   : $evEnd;
-                                $overlapMins  = max(0, (int)$overlapEnd->diffInMinutes($overlapStart));
+                                $overlapMins  = max(0, (int)$overlapStart->diffInMinutes($overlapEnd, false));
 
                                 if ($overlapMins <= 0) continue;
 

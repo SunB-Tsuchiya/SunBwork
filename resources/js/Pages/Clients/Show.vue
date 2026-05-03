@@ -24,7 +24,7 @@ const routePrefix = computed(() => {
             <h2 class="text-xl font-semibold leading-tight text-gray-800">クライアント詳細</h2>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
             <div class="mb-4"><strong>ID:</strong> {{ client.id }}</div>
             <div class="mb-4"><strong>会社名:</strong> {{ client.name }}</div>
             <div class="mb-4">

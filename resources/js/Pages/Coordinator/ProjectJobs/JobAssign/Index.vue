@@ -1,11 +1,15 @@
 <template>
     <AppLayout :title="`ジョブ割り当て一覧 - ${projectJob.title}`">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">【進行管理】{{ $page.props.auth.user.name || 'ユーザー' }}さんのページ</h2>
+            <div class="flex items-center gap-3">
+                <Link :href="route('coordinator.project_jobs.show', { projectJob: projectJob.id })"
+                      class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                >← 案件詳細に戻る</Link>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">ジョブ割り当て一覧</h2>
+            </div>
         </template>
 
         <div class="rounded bg-white p-6 shadow">
-            <h1 class="mb-4 text-2xl font-bold">ジョブ割り当て一覧：{{ projectJob.title }}</h1>
 
             <!-- 検索・フィルター行 -->
             <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -16,7 +20,7 @@
                         placeholder="タイトル/詳細/担当で検索"
                         class="w-72 rounded border px-3 py-2 text-sm"
                     />
-                    <button class="rounded bg-blue-600 px-3 py-2 text-white" @click.prevent="search">検索</button>
+                    <button class="rounded bg-indigo-600 px-3 py-2 text-white" @click.prevent="search">検索</button>
                     <button class="ml-2 rounded border px-3 py-2" @click.prevent="clearSearch">クリア</button>
                 </div>
             </div>
@@ -139,7 +143,7 @@
 
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
-import { router, usePage } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 
 const props = defineProps({

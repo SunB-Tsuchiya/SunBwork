@@ -97,6 +97,17 @@ class TicketController extends Controller
                     'job_original_filename'  => $job->original_filename,
                 ];
             }
+        } elseif ($request->filled('tmp_ocr_image_path')) {
+            // OCR読み込みからの事前入力
+            $prefill = [
+                'client_id'          => $request->input('client_id')          ?: null,
+                'client_name'        => $request->input('client_name',        ''),
+                'jobcode'            => $request->input('jobcode',            ''),
+                'title'              => $request->input('title',              ''),
+                'tmp_ocr_image_path' => $request->input('tmp_ocr_image_path', ''),
+                'ocr_image_url'      => $request->input('ocr_image_url',      ''),
+                'original_filename'  => $request->input('original_filename',  ''),
+            ];
         }
 
         return inertia('Prepress/Tickets/Create', [
@@ -111,15 +122,16 @@ class TicketController extends Controller
         $this->authorizePrepress($request->user());
 
         $validated = $request->validate([
-            'title'           => ['required', 'string', 'max:255'],
-            'jobcode'         => ['nullable', 'string', 'max:100'],
-            'client_id'       => ['nullable', 'integer', 'exists:clients,id'],
-            'client_name'     => ['nullable', 'string', 'max:255'],
-            'memo'            => ['nullable', 'string', 'max:5000'],
-            'status'          => ['required', Rule::in(array_keys(PrepressTicket::STATUS_LABELS))],
-            'image'           => ['nullable', 'file', 'mimes:jpg,jpeg,png,gif,webp,heic,heif,pdf', 'max:20480'],
-            'project_job_id'  => ['nullable', 'integer', 'exists:project_jobs,id'],
-            'use_job_image'   => ['nullable', 'boolean'],
+            'title'              => ['required', 'string', 'max:255'],
+            'jobcode'            => ['nullable', 'string', 'max:100'],
+            'client_id'          => ['nullable', 'integer', 'exists:clients,id'],
+            'client_name'        => ['nullable', 'string', 'max:255'],
+            'memo'               => ['nullable', 'string', 'max:5000'],
+            'status'             => ['required', Rule::in(array_keys(PrepressTicket::STATUS_LABELS))],
+            'image'              => ['nullable', 'file', 'mimes:jpg,jpeg,png,gif,webp,heic,heif,pdf', 'max:20480'],
+            'project_job_id'     => ['nullable', 'integer', 'exists:project_jobs,id'],
+            'use_job_image'      => ['nullable', 'boolean'],
+            'tmp_ocr_image_path' => ['nullable', 'string', 'max:500'],
         ]);
 
         // client_id が指定されていれば DB から名前を取得して上書き
@@ -152,6 +164,16 @@ class TicketController extends Controller
                     'original_filename' => $originalFilename,
                 ]);
             }
+        } elseif (!empty($validated['tmp_ocr_image_path'])) {
+            // OCR解析時にすでに変換済みの画像を使い回す（二重変換を避ける）
+            $tmpPath = $validated['tmp_ocr_image_path'];
+            // セキュリティ: prepress/jobticker/ 以外のパスを拒否
+            if (str_starts_with($tmpPath, 'prepress/jobticker/')
+                && \Illuminate\Support\Facades\Storage::disk('public')->exists($tmpPath)
+            ) {
+                $imagePath        = $tmpPath;
+                $originalFilename = basename($tmpPath);
+            }
         } elseif ($request->boolean('use_job_image') && $job && $job->image_path) {
             // 案件の画像を伝票に共有（ファイルコピーなし・同一パス参照）
             $imagePath        = $job->image_path;
@@ -161,6 +183,7 @@ class TicketController extends Controller
         $ticket = PrepressTicket::create([
             'user_id'           => $request->user()->id,
             'project_job_id'    => $job?->id,
+            'client_id'         => !empty($validated['client_id']) ? $validated['client_id'] : null,
             'title'             => $validated['title'],
             'jobcode'           => $validated['jobcode'] ?? null,
             'project_name'      => null,

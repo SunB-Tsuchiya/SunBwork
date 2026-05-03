@@ -1,11 +1,15 @@
 <template>
     <AppLayout title="割当作成 - 案件選択">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">【進行管理】割当作成</h2>
+            <div class="flex items-center gap-3">
+                <Link :href="route('coordinator.jobbox')"
+                      class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                >← ジョブ一覧に戻る</Link>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">案件選択</h2>
+            </div>
         </template>
 
-        <div class="mx-auto max-w-lg rounded bg-white p-6 shadow">
-            <h1 class="mb-6 text-2xl font-bold">案件を選択</h1>
+        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
 
             <div v-if="projects.length === 0" class="py-8 text-center text-sm text-gray-400">
                 オーナーとして登録されている進行中の案件がありません。<br />
@@ -40,7 +44,6 @@
                         :disabled="!selectedProjectId"
                         class="rounded bg-green-600 px-6 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-40"
                     >割当を作成する</button>
-                    <Link :href="route('coordinator.jobbox')" class="rounded bg-gray-200 px-4 py-2 text-sm text-gray-700 hover:bg-gray-300">戻る</Link>
                 </div>
             </div>
         </div>

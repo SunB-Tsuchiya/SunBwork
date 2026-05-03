@@ -13,6 +13,7 @@ class PrepressTicket extends Model
     protected $fillable = [
         'user_id',
         'project_job_id',
+        'client_id',
         'jobcode',
         'title',
         'project_name',

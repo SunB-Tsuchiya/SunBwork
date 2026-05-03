@@ -4,6 +4,8 @@ import AssignmentFormUser from '@/Pages/Coordinator/ProjectJobs/JobAssign/Assign
 import { usePage } from '@inertiajs/vue3';
 import { ref, watch } from 'vue';
 
+function goBack() { window.history.back(); }
+
 const page = usePage();
 const projectJob = ref(page.props.projectJob || null);
 const members = page.props.members || [];
@@ -232,13 +234,17 @@ function applyRequestJob(rec) {
 
 <template>
     <AppLayout title="ジョブイベント作成">
-        <div class="mx-auto max-w-3xl rounded bg-white p-6 shadow">
-            <!-- Header row -->
-            <div class="mb-4 flex items-center justify-between">
-                <div>
-                    <h1 class="text-2xl font-bold">ジョブイベント作成</h1>
-                    <p class="text-sm text-gray-600">プロジェクトジョブに紐づくイベントを登録します。</p>
-                </div>
+        <template #header>
+            <div class="flex items-center gap-3">
+                <button @click="goBack"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                >← 戻る</button>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">ジョブ作成</h2>
+            </div>
+        </template>
+
+        <template #headerExtras>
+            <div class="flex items-center gap-2">
                 <button @click="openModal" class="rounded border border-gray-300 bg-gray-50 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100">
                     過去データから流用
                 </button>
@@ -246,6 +252,9 @@ function applyRequestJob(rec) {
                     依頼ジョブとして登録
                 </button>
             </div>
+        </template>
+
+        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
 
             <div class="rounded border border-gray-100 p-4 shadow-sm">
                 <h2 class="mb-4 text-lg font-medium text-gray-700">割当内容</h2>
@@ -282,7 +291,7 @@ function applyRequestJob(rec) {
                         <div class="mb-4 flex items-center gap-2">
                             <button
                                 @click="hideCompleted = !hideCompleted"
-                                :class="hideCompleted ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'"
+                                :class="hideCompleted ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700'"
                                 class="rounded px-3 py-1 text-sm font-medium transition-colors"
                             >
                                 {{ hideCompleted ? '完了を非表示中' : '完了を表示しない' }}
@@ -397,7 +406,7 @@ function applyRequestJob(rec) {
                         </button>
                         <button
                             @click="applyAsNew"
-                            class="w-full rounded-lg bg-blue-500 px-4 py-3 text-left text-sm font-medium text-white hover:bg-blue-600"
+                            class="w-full rounded-lg bg-indigo-600 px-4 py-3 text-left text-sm font-medium text-white hover:bg-indigo-700"
                         >
                             <div class="font-semibold">新規として引用</div>
                             <div class="mt-0.5 text-xs opacity-90">内容を引き継いで独立した新しいジョブとして作成します。</div>

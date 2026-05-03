@@ -347,12 +347,14 @@ async function updateComment() {
 <template>
     <AppLayout title="日報表示">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">日報一覧</h2>
+            <div class="flex items-center gap-3">
+                <button @click="goIndex" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">← 一覧に戻る</button>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">日報詳細</h2>
+            </div>
         </template>
 
         <div class="rounded bg-white p-6 shadow">
             <div class="mb-3 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-                <h1 class="text-2xl font-bold">日報 {{ formatJstDate(props.diary.date) }}</h1>
                 <span class="text-sm text-gray-600">
                     <span v-if="diary.department_name">{{ diary.department_name }}：</span>{{ diary.user_name }}
                 </span>
@@ -380,7 +382,10 @@ async function updateComment() {
 
             <div class="space-y-5">
                 <!-- 日報本文 -->
-                <div class="max-h-52 overflow-y-auto rounded border p-3 text-sm diary-content mx-auto" v-html="props.diary.content"></div>
+                <div class="max-h-52 overflow-y-auto rounded border p-3 text-sm diary-content mx-auto">
+                    <span v-if="!props.diary.content || !props.diary.content.trim()" class="text-gray-400 italic">日報はありません</span>
+                    <div v-else v-html="props.diary.content"></div>
+                </div>
 
                 <!-- 当日の予定（全幅） -->
                 <div>
@@ -428,8 +433,7 @@ async function updateComment() {
             </div>
 
             <div class="mt-4 flex justify-end space-x-2">
-                <button @click="goIndex" class="rounded bg-gray-200 px-4 py-2 text-gray-700">一覧へ</button>
-                <button @click="markRead" class="rounded bg-blue-600 px-4 py-2 text-white">既読にする</button>
+                <button @click="markRead" class="rounded bg-indigo-600 px-4 py-2 text-white">既読にする</button>
             </div>
 
             <!-- コメント編集モーダル -->
@@ -452,7 +456,7 @@ async function updateComment() {
                         <button
                             @click="updateComment"
                             :disabled="isUpdatingComment"
-                            class="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
+                            class="rounded bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-50"
                         >
                             {{ isUpdatingComment ? '更新中...' : '更新' }}
                         </button>

@@ -1,10 +1,14 @@
 <template>
     <AppLayout title="案件編集">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">【進行管理】{{ $page.props.auth.user.name || 'ユーザー' }}さんのページ</h2>
+            <div class="flex items-center gap-3">
+                <Link :href="route('coordinator.project_jobs.index')"
+                      class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                >← 案件一覧に戻る</Link>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">案件編集</h2>
+            </div>
         </template>
-        <div class="rounded bg-white p-6 shadow">
-            <h1 class="mb-6 text-2xl font-bold">案件編集</h1>
+        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
             <form @submit.prevent="submit">
                 <div class="mb-4">
                     <label class="mb-1 block font-semibold">伝票番号</label>
@@ -181,14 +185,17 @@
                         </button>
                     </div>
                 </div>
-                <div class="mt-6 flex flex-wrap items-center gap-4">
-                    <button type="submit" class="rounded bg-blue-600 px-6 py-2 text-white hover:bg-blue-700">更新</button>
-                    <Link :href="route('coordinator.project_jobs.index')" class="rounded bg-gray-200 px-4 py-2">一覧へ戻る</Link>
-                    <span v-if="props.job.completed" class="inline-flex items-center rounded-full bg-yellow-100 px-3 py-1 text-sm font-medium text-yellow-800">完了済み</span>
+                <div class="mt-6 flex justify-end gap-3">
+                    <Link :href="route('coordinator.project_jobs.index')"
+                          class="rounded bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
+                    >キャンセル</Link>
+                    <button type="submit" class="rounded bg-indigo-600 px-6 py-2 text-sm font-medium text-white hover:bg-indigo-700">更新</button>
+                </div>
+                <div v-if="props.job.completed" class="mt-3 flex justify-end gap-3">
+                    <span class="inline-flex items-center rounded-full bg-yellow-100 px-3 py-1 text-sm font-medium text-yellow-800">完了済み</span>
                     <button
-                        v-if="props.job.completed"
                         type="button"
-                        class="rounded bg-orange-500 px-4 py-2 text-white hover:bg-orange-600"
+                        class="rounded bg-orange-500 px-4 py-2 text-sm text-white hover:bg-orange-600"
                         :disabled="uncompleting"
                         @click="uncomplete"
                     >

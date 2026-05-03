@@ -22,9 +22,9 @@ function submit() {
 <template>
     <AppLayout title="単発派遣 編集">
         <template #header>
-            <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <Link :href="route('proof_coordinator.dispatchers.show', props.dispatcher.id)" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">← 詳細に戻る</Link>
                 <h2 class="text-xl font-semibold leading-tight text-gray-800">単発派遣 編集</h2>
-                <Link :href="route('proof_coordinator.dispatchers.show', props.dispatcher.id)" class="text-gray-600 hover:text-gray-900">← 詳細に戻る</Link>
             </div>
         </template>
 
@@ -32,8 +32,8 @@ function submit() {
             <ProofCoordinatorNavigationTabs active="dispatchers" />
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
-            <form @submit.prevent="submit" class="max-w-lg space-y-4">
+        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
+            <form @submit.prevent="submit" class="space-y-4">
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">名前 / 会社名 <span class="text-red-500">*</span></label>
                     <p class="mb-1 text-xs text-gray-400">個人名・会社名どちらでも可</p>

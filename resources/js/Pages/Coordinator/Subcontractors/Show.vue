@@ -24,14 +24,20 @@ function destroy() {
 <template>
     <AppLayout title="外注先詳細">
         <template #header>
-            <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <Link :href="route('coordinator.subcontractors.index')"
+                      class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                >← 一覧に戻る</Link>
                 <h2 class="text-xl font-semibold leading-tight text-gray-800">外注先 詳細</h2>
-                <div class="flex items-center gap-3">
-                    <Link :href="route('coordinator.subcontractors.edit', props.subcontractor.id)" class="rounded bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700">編集</Link>
-                    <Link :href="route('coordinator.subcontractors.index')" class="text-gray-600 hover:text-gray-900 text-sm">← 一覧に戻る</Link>
-                </div>
             </div>
         </template>
+        <template #headerExtras>
+            <Link :href="route('coordinator.subcontractors.edit', props.subcontractor.id)"
+                  class="rounded bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700"
+            >編集</Link>
+        </template>
+
+        <div class="mx-auto max-w-2xl">
 
         <!-- 削除エラー -->
         <div v-if="deleteError" class="mb-4 rounded bg-red-50 p-4 text-sm text-red-700">
@@ -99,6 +105,8 @@ function destroy() {
                 この外注先を削除する
             </button>
         </div>
+
+        </div><!-- /mx-auto max-w-2xl -->
     </AppLayout>
 
     <!-- 削除確認モーダル -->

@@ -180,45 +180,34 @@ const submit = () => {    errorMessage.value = '';
                 return;
             }
 
-            // ジョブ紐付きイベント（重複扱い）とその他に分類
-            const jobLinked = overlapping.filter((ev) => ev.project_job_assignment_id);
-            const otherOverlap = overlapping.filter((ev) => !ev.project_job_assignment_id);
-
             let confirmMsg = '';
             let interruptedIds = [];   // 既存イベントが長い（既存から差し引く）
             let ownOverlapMins = 0;    // 新しいイベントが長い（自分から差し引く）
 
-            if (jobLinked.length > 0) {
-                const lines = jobLinked.map((ev) => {
-                    const evStart = new Date(ev.start);
-                    const evEnd = new Date(ev.end);
-                    const evDuration = evEnd - evStart;
-                    const overlapStart = newStart > evStart ? newStart : evStart;
-                    const overlapEnd = newEnd < evEnd ? newEnd : evEnd;
-                    const overlapMins = Math.max(0, Math.round((overlapEnd - overlapStart) / 60000));
-                    const startStr = evStart.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-                    const endStr = evEnd.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+            const lines = overlapping.map((ev) => {
+                const evStart = new Date(ev.start);
+                const evEnd = new Date(ev.end);
+                const evDuration = evEnd - evStart;
+                const overlapStart = newStart > evStart ? newStart : evStart;
+                const overlapEnd = newEnd < evEnd ? newEnd : evEnd;
+                const overlapMins = Math.max(0, Math.round((overlapEnd - overlapStart) / 60000));
+                const startStr = evStart.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+                const endStr = evEnd.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
 
-                    if (newDuration >= evDuration) {
-                        // 新しいイベントが長い（または同じ） → 新しいイベントが「差し込まれた側」
-                        ownOverlapMins += overlapMins;
-                        return `「${ev.title}」(${startStr}〜${endStr}) → ${overlapMins}分間重複（今回の予定から差し引き）`;
-                    } else {
-                        // 既存イベントが長い → 既存イベントが「差し込まれた側」
-                        interruptedIds.push(ev.id);
-                        return `「${ev.title}」(${startStr}〜${endStr}) → ${overlapMins}分間重複（既存の予定から差し引き）`;
-                    }
-                });
-
-                confirmMsg = '以下の作業と時間が重複しています。登録しますか？\n\n';
-                confirmMsg += lines.join('\n');
-                confirmMsg += '\n\n【OK】を押すと、時間の長い方の予定から重複時間が差し引かれます。';
-                if (otherOverlap.length > 0) {
-                    confirmMsg += '\n（その他にも重複する予定があります）';
+                if (newDuration >= evDuration) {
+                    // 新しいイベントが長い（または同じ） → 新しいイベントが「差し込まれた側」
+                    ownOverlapMins += overlapMins;
+                    return `「${ev.title}」(${startStr}〜${endStr}) → ${overlapMins}分間重複（今回の予定から差し引き）`;
+                } else {
+                    // 既存イベントが長い → 既存イベントが「差し込まれた側」
+                    interruptedIds.push(ev.id);
+                    return `「${ev.title}」(${startStr}〜${endStr}) → ${overlapMins}分間重複（既存の予定から差し引き）`;
                 }
-            } else {
-                confirmMsg = '同じ時間に予定があります。登録しますか？';
-            }
+            });
+
+            confirmMsg = '以下の予定と時間が重複しています。登録しますか？\n\n';
+            confirmMsg += lines.join('\n');
+            confirmMsg += '\n\n【OK】を押すと、時間の長い方の予定から重複時間が差し引かれます。';
 
             if (!confirm(confirmMsg)) return;
 
@@ -247,11 +236,16 @@ watch(
 
 <template>
     <AppLayout title="イベント作成">
-        <div class="mx-auto max-w-3xl rounded bg-white p-6 shadow">
-            <div class="mb-6 border-b pb-4">
-                <h1 class="text-2xl font-bold">イベント作成</h1>
-                <p class="text-sm text-gray-600">個人予定を登録します。{{ formatJstDate(form.date) ? `（${formatJstDate(form.date)}）` : '' }}</p>
+        <template #header>
+            <div class="flex items-center gap-3">
+                <Link :href="returnTo && returnTo !== '' ? returnTo : route('calendar.index')"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                >← 戻る</Link>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">予定作成</h2>
             </div>
+        </template>
+
+        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
             <form @submit.prevent="submit">
                 <div v-if="errorMessage" class="mb-4 rounded border-l-4 border-red-500 bg-red-50 p-3 text-red-700">
                     {{ errorMessage }}
@@ -308,18 +302,18 @@ watch(
                     </div>
                 </div>
 
-                <div class="flex space-x-4">
+                <div class="mt-6 flex justify-end gap-3">
+                    <Link :href="returnTo && returnTo !== '' ? returnTo : route('calendar.index')"
+                        class="rounded bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                    >キャンセル</Link>
                     <button
                         type="submit"
                         :disabled="form.processing"
-                        class="flex items-center gap-2 rounded bg-blue-600 px-4 py-2 text-white disabled:opacity-50"
+                        class="flex items-center gap-2 rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
                     >
-                        <template v-if="form.processing"> 保存中… </template>
+                        <template v-if="form.processing">保存中…</template>
                         <template v-else>保存</template>
                     </button>
-                    <Link :href="returnTo && returnTo !== '' ? returnTo : route('calendar.index')" class="rounded bg-gray-200 px-4 py-2 text-gray-700"
-                        >キャンセル</Link
-                    >
                 </div>
             </form>
         </div>

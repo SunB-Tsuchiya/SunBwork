@@ -114,6 +114,7 @@ const weekPostsUrl = computed(() =>
                         :items="items"
                         :weekPostsUrl="weekPostsUrl"
                         :uniformColors="true"
+                        :showMemoButton="false"
                     />
         </div>
     </AppLayout>

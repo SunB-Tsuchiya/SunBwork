@@ -12,6 +12,8 @@ class Event extends Model
     protected $fillable = [
         'user_id',
         'project_job_assignment_id',
+        'project_job_id',
+        'destination',
         'title',
         'event_item_type_id',
         // DB has 'body', controllers use 'description'
@@ -56,6 +58,11 @@ class Event extends Model
     public function projectJobAssignment()
     {
         return $this->belongsTo(ProjectJobAssignment::class, 'project_job_assignment_id');
+    }
+
+    public function projectJob(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(ProjectJob::class);
     }
 
     public function projectJobAssignmentByMyself()

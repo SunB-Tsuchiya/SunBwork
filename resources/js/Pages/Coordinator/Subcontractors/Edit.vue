@@ -29,14 +29,16 @@ function submit() {
 <template>
     <AppLayout title="外注先編集">
         <template #header>
-            <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <Link :href="route('coordinator.subcontractors.show', props.subcontractor.id)"
+                      class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                >← 詳細に戻る</Link>
                 <h2 class="text-xl font-semibold leading-tight text-gray-800">外注先 編集</h2>
-                <Link :href="route('coordinator.subcontractors.show', props.subcontractor.id)" class="text-gray-600 hover:text-gray-900">← 詳細に戻る</Link>
             </div>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
-            <form @submit.prevent="submit" class="space-y-4 max-w-lg">
+        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
+            <form @submit.prevent="submit" class="space-y-4">
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">名前 / 会社名 <span class="text-red-500">*</span></label>
                     <p class="mb-1 text-xs text-gray-400">個人名・会社名どちらでも可</p>

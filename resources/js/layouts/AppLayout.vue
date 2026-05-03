@@ -171,6 +171,7 @@ const getTopTabActive = () => {
         if (r.includes('clients')) return 'clients';
         if (r.includes('workload_setting')) return 'workload_setting';
         if (r.includes('workload_analyzer')) return 'workload';
+        if (r.startsWith('leader.project_jobs')) return 'project_jobs';
         if (r.includes('diaryinteractions') || r.includes('diaries')) return 'diaries';
         if (r.includes('ai')) return 'ai';
         if (r.includes('calendar')) return 'calendar';
@@ -714,7 +715,7 @@ const currentRouteContext = computed(() => {
                         <!-- User sub-tabs -->
                         <template v-else>
                             <ResponsiveNavLink :href="route('user.myjobbox.index')" :active="route().current('user.myjobbox*')">
-                                <span class="text-blue-600">マイジョブ</span>
+                                <span class="text-blue-600">マイジョブBOX</span>
                             </ResponsiveNavLink>
                             <ResponsiveNavLink :href="route('user.jobbox.index')" :active="route().current('user.jobbox*')">
                                 <span class="text-blue-600">依頼されたジョブ</span>
@@ -723,7 +724,7 @@ const currentRouteContext = computed(() => {
                                 <span class="text-blue-600">日報一覧</span>
                             </ResponsiveNavLink>
                             <ResponsiveNavLink :href="route('calendar.index')" :active="route().current('calendar.*')">
-                                <span class="text-blue-600">予定表</span>
+                                <span class="text-blue-600">カレンダー</span>
                             </ResponsiveNavLink>
                         </template>
                     </div>

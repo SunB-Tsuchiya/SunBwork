@@ -121,7 +121,7 @@
                         type="button"
                         class="rounded bg-teal-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-teal-700"
                         @click="goAnalysis"
-                    >ジョブ詳細</button>
+                    >作業分析</button>
                     <!-- 完了 / 未完了 -->
                     <button
                         v-if="!job.completed"

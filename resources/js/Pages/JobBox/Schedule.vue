@@ -1,7 +1,10 @@
 <template>
     <AppLayout :title="`スケジュール設定 - ${assignment.title}`">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">スケジュール設定</h2>
+            <div class="flex items-center gap-3">
+                <Link :href="backHref" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">← ジョブ詳細に戻る</Link>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">スケジュール設定</h2>
+            </div>
         </template>
 
         <div class="mx-auto max-w-2xl space-y-4">
@@ -109,11 +112,10 @@
                         <button
                             type="submit"
                             :disabled="submitting"
-                            class="rounded bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                            class="rounded bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
                         >
                             {{ submitting ? '保存中...' : (existingEvent ? '更新する' : '保存する') }}
                         </button>
-                        <Link :href="backHref" class="rounded bg-gray-200 px-4 py-2 text-sm text-gray-700 hover:bg-gray-300">戻る</Link>
                     </div>
                 </form>
             </div>

@@ -1,7 +1,7 @@
 <script setup>
 import UserTable from '@/Components/UserTable.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { router, usePage } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 
 const props = defineProps({
@@ -16,14 +16,6 @@ const currentTeam = ref(props.team || {});
 
 // Debug: log incoming props and resolved team/users to browser console
 // Debug logging removed
-
-const goBack = () => {
-    router.visit(route('admin.teams.index'));
-};
-
-const goEdit = () => {
-    router.visit(route('admin.teams.edit', { team: currentTeam.value.id }));
-};
 
 // table helpers
 const departments = computed(() => page.props.departments || []);
@@ -64,10 +56,20 @@ const leaderName = computed(() => {
 <template>
     <AppLayout :title="`チーム：${currentTeam.name || ''}`">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">チーム詳細</h2>
+            <div class="flex items-center gap-3">
+                <Link :href="route('admin.teams.index')" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">← チーム一覧に戻る</Link>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">チーム詳細</h2>
+            </div>
+        </template>
+        <template #headerExtras>
+            <Link
+                v-if="currentTeam.team_type !== 'department'"
+                :href="route('admin.teams.edit', { team: currentTeam.id })"
+                class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+            >編集</Link>
         </template>
 
-        <div class="mx-auto max-w-4xl rounded bg-white p-6 shadow">
+        <div class="rounded bg-white p-6 shadow">
                     <div class="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div>
                             <div class="text-sm text-gray-500">ID</div>
@@ -104,16 +106,6 @@ const leaderName = computed(() => {
                         <UserTable :users="currentTeam.users || []" :departments="departments" :assignments="assignments" :show-actions="false" />
                     </div>
 
-                    <div class="mt-6 flex gap-2">
-                        <button @click="goBack" class="rounded border px-4 py-2 text-sm">一覧へ戻る</button>
-                        <button
-                            v-if="currentTeam.team_type !== 'department'"
-                            @click="goEdit"
-                            class="rounded bg-blue-500 px-4 py-2 text-sm text-white hover:bg-blue-600"
-                        >
-                            編集
-                        </button>
-                    </div>
         </div>
     </AppLayout>
 </template>

@@ -166,14 +166,12 @@ async function deleteEvent(ev) {
 <template>
     <AppLayout title="校正ジョブ編集">
         <template #header>
-            <div class="flex items-center justify-between">
-                <h2 class="text-xl font-semibold text-gray-800">校正ジョブ 編集</h2>
+            <div class="flex items-center gap-3">
                 <Link
                     :href="route('proof_coordinator.assignments.show', { proofRequest: proofRequest.id })"
-                    class="text-sm text-gray-500 hover:text-gray-700"
-                >
-                    ← 詳細に戻る
-                </Link>
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                >← 詳細に戻る</Link>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">校正ジョブ 編集</h2>
             </div>
         </template>
 
@@ -181,7 +179,7 @@ async function deleteEvent(ev) {
             <ProofCoordinatorNavigationTabs active="assignments" />
         </template>
 
-        <div class="space-y-4">
+        <div class="mx-auto max-w-3xl space-y-4">
 
             <!-- ユーザーがスケジュール設定済み警告 -->
             <div v-if="userHasSetSchedule"

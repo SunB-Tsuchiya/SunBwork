@@ -22,7 +22,7 @@ const tab = (key) => [
                 案件確認
             </Link>
             <Link :href="route('user.myjobbox.index')" :class="tab('myjob')">
-                マイジョブ
+                マイジョブBOX
             </Link>
             <Link :href="route('user.jobbox.index')" :class="tab('jobbox')">
                 依頼されたジョブ
@@ -31,12 +31,13 @@ const tab = (key) => [
                 日報一覧
             </Link>
             <Link :href="route('calendar.index')" :class="tab('calendar')">
-                予定表
+                カレンダー
             </Link>
-            <Link :href="route('proof.calendar')" :class="tab('proof_calendar')">
+            <!-- 校正カレンダー: 非表示（後で使用予定） -->
+            <!-- <Link :href="route('proof.calendar')" :class="tab('proof_calendar')">
                 校正カレンダー
-            </Link>
-            <Link :href="route('proof.status')" :class="tab('proof_status')">
+            </Link> -->
+            <Link :href="route('user.proof.status')" :class="tab('proof_status')">
                 校正状況
             </Link>
             <Link

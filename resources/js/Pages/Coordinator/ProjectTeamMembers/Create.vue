@@ -5,11 +5,11 @@
                 <h2 class="text-xl font-semibold leading-tight text-gray-800">チームメンバー管理</h2>
             </div>
         </template>
-        <div class="rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
                             <div class="mb-4 flex items-center justify-between">
                                 <h3 class="text-lg font-medium text-gray-900">登録チームメンバー一覧</h3>
                                 <div class="flex items-center space-x-2">
-                                    <button @click="openSearchModal" class="rounded bg-blue-600 px-4 py-2 font-bold text-white hover:bg-blue-700">
+                                    <button @click="openSearchModal" class="rounded bg-indigo-600 px-4 py-2 font-bold text-white hover:bg-indigo-700">
                                         絞り込み
                                     </button>
                                     <button @click="clearSearch" class="rounded bg-gray-300 px-4 py-2 font-bold text-gray-800 hover:bg-gray-400">
@@ -45,7 +45,7 @@
                                 </template>
                                 <template #footer>
                                     <button class="mr-2 rounded bg-gray-300 px-4 py-2" @click="closeSearchModal">閉じる</button>
-                                    <button class="rounded bg-blue-600 px-4 py-2 text-white" @click="doSearch">絞り込み</button>
+                                    <button class="rounded bg-indigo-600 px-4 py-2 text-white" @click="doSearch">絞り込み</button>
                                 </template>
                             </DialogModal>
                             <div class="overflow-x-auto">
@@ -124,7 +124,7 @@
                                     </tbody>
                                 </table>
                                 <div class="mt-4 flex justify-end">
-                                    <button class="rounded bg-blue-600 px-6 py-2 font-bold text-white hover:bg-blue-700" @click="registerMembers">
+                                    <button class="rounded bg-indigo-600 px-6 py-2 font-bold text-white hover:bg-indigo-700" @click="registerMembers">
                                         メンバー登録
                                     </button>
                                 </div>

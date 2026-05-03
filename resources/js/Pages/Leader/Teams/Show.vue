@@ -45,7 +45,7 @@ const leaderName = computed(() => {
             </div>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
             <div class="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                     <div class="text-sm text-gray-500">チーム名</div>

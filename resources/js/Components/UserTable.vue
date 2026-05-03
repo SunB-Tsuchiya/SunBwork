@@ -55,7 +55,7 @@ const toggleAll = () => {
     else emit('update:selected', allIds.value.slice());
 };
 
-const sortKey = ref('id');
+const sortKey = ref('position_title');
 const sortDesc = ref(false);
 const changeSort = (key) => {
     if (sortKey.value === key) {
@@ -148,6 +148,9 @@ const sortedUsers = computed(() => {
         } else if (key === 'user_role') {
             va = getAssignmentText(a.user_role);
             vb = getAssignmentText(b.user_role);
+        } else if (key === 'position_title') {
+            va = a.position_title?.sort_order ?? 999;
+            vb = b.position_title?.sort_order ?? 999;
         } else {
             va = a[key];
             vb = b[key];
@@ -215,6 +218,18 @@ const sortedUsers = computed(() => {
                         </span>
                     </th>
                     <th
+                        @click.prevent="changeSort('position_title')"
+                        class="cursor-pointer px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                    >
+                        役職
+                        <span class="ml-2 inline-block w-4 text-center text-xs" aria-hidden="true">
+                            <template v-if="sortKey === 'position_title'">
+                                <span v-if="!sortDesc">▲</span>
+                                <span v-else>▼</span>
+                            </template>
+                        </span>
+                    </th>
+                    <th
                         @click.prevent="changeSort('assignment_id')"
                         class="cursor-pointer px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
                     >
@@ -252,6 +267,7 @@ const sortedUsers = computed(() => {
                     <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ user.id }}</td>
                     <td class="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">{{ user.name }}</td>
                     <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ getDepartmentName(user.department_id) }}</td>
+                    <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ user.position_title?.name || '-' }}</td>
                     <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ getAssignmentName(user.assignment_id) }}</td>
                     <td class="whitespace-nowrap px-6 py-4">
                         <span :class="getAssignmentBadgeClass(user.user_role)" class="inline-flex rounded-full px-2 py-1 text-xs font-semibold">{{

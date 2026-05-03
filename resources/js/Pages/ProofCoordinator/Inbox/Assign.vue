@@ -69,11 +69,11 @@ function onPickerConfirmed({ newSlots, updatedSlots }) {
 <template>
     <AppLayout title="校正員の割り当て">
         <template #header>
-            <div class="flex items-center justify-between">
-                <h2 class="text-xl font-semibold text-gray-800">校正員の割り当て</h2>
-                <Link :href="route('proof_coordinator.inbox')" class="text-sm text-gray-500 hover:text-gray-700">
-                    ← 受信ボックスに戻る
-                </Link>
+            <div class="flex items-center gap-3">
+                <Link :href="route('proof_coordinator.inbox')"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                >← 受信ボックスに戻る</Link>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">校正員の割り当て</h2>
             </div>
         </template>
 
@@ -81,7 +81,7 @@ function onPickerConfirmed({ newSlots, updatedSlots }) {
             <ProofCoordinatorNavigationTabs active="inbox" />
         </template>
 
-        <div class="space-y-4">
+        <div class="mx-auto max-w-3xl space-y-4">
 
             <!-- 依頼情報（読み取り専用） -->
             <div class="rounded border border-pink-100 bg-pink-50 p-4 text-sm">

@@ -17,6 +17,6 @@ const team = page.props.team;
         </template>
 
         <EditForUnits v-if="team.team_type === 'unit'" />
-        <div v-else class="rounded bg-white p-6 shadow text-gray-500">このチームは編集できません。</div>
+        <div v-else class="mx-auto max-w-2xl rounded bg-white p-6 shadow text-gray-500">このチームは編集できません。</div>
     </AppLayout>
 </template>

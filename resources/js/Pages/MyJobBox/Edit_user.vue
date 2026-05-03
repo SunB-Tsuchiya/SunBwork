@@ -1,7 +1,15 @@
 <template>
     <AppLayout title="ジョブ編集">
+        <template #header>
+            <div class="flex items-center gap-3">
+                <Link :href="route('user.myjobbox.index')"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                >← マイジョブBOXに戻る</Link>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">ジョブ編集</h2>
+            </div>
+        </template>
+
         <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
-            <h1 class="mb-4 text-2xl font-bold">ジョブ編集（マイジョブ）</h1>
             <div>
                 <AssignmentFormUser
                     mode="user"
@@ -15,9 +23,6 @@
                     :user-clients="userClients"
                     :user-projects="userProjects"
                 />
-            </div>
-            <div class="mt-4">
-                <Link :href="route('user.myjobbox.index')" class="rounded bg-gray-200 px-4 py-2">戻る</Link>
             </div>
         </div>
     </AppLayout>

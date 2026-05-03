@@ -109,8 +109,16 @@ const submit = () => {
 
 <template>
     <AppLayout title="イベント編集">
+        <template #header>
+            <div class="flex items-center gap-3">
+                <Link :href="returnTo && returnTo !== '' ? returnTo : route('calendar.index')"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                >← 戻る</Link>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">予定編集</h2>
+            </div>
+        </template>
+
         <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
-            <h1 class="mb-4 text-2xl font-bold">イベント編集 ({{ form.date }})</h1>
             <form @submit.prevent="submit">
                 <div class="mb-4">
                     <label class="mb-1 block text-sm font-medium text-gray-700">タイトル</label>
@@ -154,11 +162,11 @@ const submit = () => {
                         </div>
                     </div>
                 </div>
-                <div class="flex space-x-4">
-                    <button type="submit" class="rounded bg-blue-600 px-4 py-2 text-white">更新</button>
-                    <Link :href="returnTo && returnTo !== '' ? returnTo : route('calendar.index')" class="rounded bg-gray-200 px-4 py-2 text-gray-700"
-                        >キャンセル</Link
-                    >
+                <div class="mt-6 flex justify-end gap-3">
+                    <Link :href="returnTo && returnTo !== '' ? returnTo : route('calendar.index')"
+                        class="rounded bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                    >キャンセル</Link>
+                    <button type="submit" class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">更新</button>
                 </div>
             </form>
         </div>

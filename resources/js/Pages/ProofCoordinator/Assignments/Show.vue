@@ -2,7 +2,7 @@
 import AssignmentDetailCard from '@/Components/AssignmentDetailCard.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import ProofCoordinatorNavigationTabs from '@/Components/Tabs/ProofCoordinatorNavigationTabs.vue';
-import { Link, router, usePage } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
 import { computed, onMounted, ref } from 'vue';
 
 const props = defineProps({
@@ -10,8 +10,6 @@ const props = defineProps({
     assignment:          { type: Object, default: null },
     proofreaderSchedule: { type: Object, default: null },
 });
-
-const page = usePage();
 
 // ---- ステータス ----
 const statusLabel = {
@@ -144,7 +142,35 @@ const totalActual         = computed(() => formattedEvents.value.reduce((s, e) =
 <template>
     <AppLayout :title="`校正詳細 - ${proofRequest.title}`">
         <template #header>
-            <h2 class="text-xl font-semibold text-gray-800">校正依頼 — 詳細</h2>
+            <div class="flex items-center gap-3">
+                <Link :href="route('proof_coordinator.assignments')"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                >← 割り当て一覧に戻る</Link>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">校正依頼 — 詳細</h2>
+            </div>
+        </template>
+
+        <template #headerExtras>
+            <div class="flex items-center gap-2">
+                <Link
+                    :href="route('proof_coordinator.assignments.edit', { proofRequest: proofRequest.id })"
+                    class="rounded bg-pink-600 px-4 py-2 text-sm font-medium text-white hover:bg-pink-700"
+                >編集</Link>
+                <button
+                    v-if="proofRequest.status === 'assigned'"
+                    @click="start"
+                    class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                >開始</button>
+                <button
+                    v-if="proofRequest.status !== 'completed'"
+                    @click="complete"
+                    class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+                >完了</button>
+                <span
+                    v-if="proofRequest.status === 'completed'"
+                    class="rounded bg-yellow-100 px-3 py-1.5 text-sm font-medium text-yellow-800"
+                >完了済み</span>
+            </div>
         </template>
 
         <template #tabs>
@@ -255,46 +281,6 @@ const totalActual         = computed(() => formattedEvents.value.reduce((s, e) =
                         </tfoot>
                     </table>
                 </div>
-            </div>
-
-            <!-- アクションボタン -->
-            <div class="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-white px-5 py-3 shadow-sm">
-                <Link
-                    :href="route('proof_coordinator.assignments')"
-                    class="inline-flex items-center rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
-                >
-                    一覧に戻る
-                </Link>
-
-                <Link
-                    :href="route('proof_coordinator.assignments.edit', { proofRequest: proofRequest.id })"
-                    class="inline-flex items-center rounded bg-pink-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-pink-700"
-                >
-                    編集
-                </Link>
-
-                <button
-                    v-if="proofRequest.status === 'assigned'"
-                    @click="start"
-                    class="inline-flex items-center rounded bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
-                >
-                    開始
-                </button>
-
-                <button
-                    v-if="proofRequest.status !== 'completed'"
-                    @click="complete"
-                    class="inline-flex items-center rounded bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700"
-                >
-                    完了
-                </button>
-
-                <span
-                    v-if="proofRequest.status === 'completed'"
-                    class="rounded bg-yellow-100 px-3 py-1.5 text-sm font-medium text-yellow-800"
-                >
-                    完了済み
-                </span>
             </div>
 
         </div>

@@ -4,12 +4,7 @@
             <h2 class="text-xl font-semibold leading-tight text-gray-800">【リーダー】案件総覧</h2>
         </template>
 
-        <div class="mx-auto max-w-6xl rounded bg-white p-6 shadow">
-            <div class="mb-4">
-                <h1 class="text-2xl font-bold">案件総覧</h1>
-                <p class="mt-1 text-sm text-gray-500">部署内のすべての案件を表示しています（読み取り専用）</p>
-            </div>
-
+        <div class="rounded bg-white p-6 shadow">
             <!-- 検索・フィルター行 -->
             <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div class="flex items-center gap-2">

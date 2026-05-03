@@ -28,6 +28,12 @@ const isRepresentative = computed(() => page.props.auth?.user?.isRepresentative 
     <div class="mb-6">
         <nav class="flex flex-wrap gap-2" aria-label="Tabs">
             <Link
+                :href="route('admin.project_jobs.index')"
+                :class="tab('project_jobs')"
+            >
+                案件総覧
+            </Link>
+            <Link
                 v-if="can('company_management') && typeof route === 'function' && route().has('admin.companies.index')"
                 :href="route('admin.companies.index')"
                 :class="tab('companies')"
@@ -95,6 +101,12 @@ const isRepresentative = computed(() => page.props.auth?.user?.isRepresentative 
                 :class="tab('leader_permissions')"
             >
                 Leader権限管理
+            </Link>
+            <Link
+                :href="route('admin.meeting_definitions.index')"
+                :class="tab('meeting_definitions')"
+            >
+                会議設定
             </Link>
         </nav>
     </div>

@@ -160,21 +160,23 @@ const getAssignmentText = (assignment) => {
 <template>
     <AppLayout title="ユーザー管理">
         <template #header>
-            <div class="flex items-center justify-between">
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">ユーザー管理</h2>
-                <template v-if="myuser?.user_role === 'superadmin' || myuser?.user_role === 'admin'">
-                    <Link :href="route('admin.users.create')" class="rounded bg-red-600 px-4 py-2 font-bold text-white hover:bg-red-700">
-                        新規ユーザー登録
-                    </Link>
-                </template>
-            </div>
+            <h2 class="text-xl font-semibold leading-tight text-gray-800">ユーザー管理</h2>
+        </template>
+        <template #headerExtras>
+            <Link
+                v-if="myuser?.user_role === 'superadmin' || myuser?.user_role === 'admin'"
+                :href="route('admin.users.create')"
+                class="rounded bg-red-600 px-4 py-2 font-bold text-white hover:bg-red-700"
+            >
+                新規ユーザー登録
+            </Link>
         </template>
         <div class="rounded bg-white p-6 shadow">
                             <div class="mb-4 flex items-center justify-between">
                                 <h3 class="text-lg font-medium text-gray-900">登録ユーザー一覧</h3>
                                 <div class="text-sm text-gray-500">総数: {{ filteredUsers.length }}人</div>
                                 <div class="flex items-center space-x-2">
-                                    <button @click="openSearchModal" class="rounded bg-blue-600 px-4 py-2 font-bold text-white hover:bg-blue-700">
+                                    <button @click="openSearchModal" class="rounded bg-indigo-600 px-4 py-2 font-bold text-white hover:bg-indigo-700">
                                         絞り込み
                                     </button>
                                     <button @click="clearSearch" class="rounded bg-gray-300 px-4 py-2 font-bold text-gray-800 hover:bg-gray-400">
@@ -228,7 +230,7 @@ const getAssignmentText = (assignment) => {
                                     </template>
                                     <template #footer>
                                         <button class="mr-2 rounded bg-gray-300 px-4 py-2" @click="closeSearchModal">閉じる</button>
-                                        <button class="rounded bg-blue-600 px-4 py-2 text-white" @click="doSearch">絞り込み</button>
+                                        <button class="rounded bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700" @click="doSearch">絞り込み</button>
                                     </template>
                                 </DialogModal>
                                 <UserTable :users="sortedUsers" :departments="props.departments" :assignments="props.assignments" />

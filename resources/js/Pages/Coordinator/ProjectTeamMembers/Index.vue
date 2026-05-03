@@ -9,7 +9,7 @@
             <div class="flex items-center justify-between mb-4">
               <h3 class="text-lg font-medium text-gray-900">登録チームメンバー一覧</h3>
               <div class="flex items-center space-x-2">
-                <button @click="openSearchModal" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">絞り込み</button>
+                <button @click="openSearchModal" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded">絞り込み</button>
                 <button @click="clearSearch" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded">クリア</button>
               </div>
             </div>
@@ -33,7 +33,7 @@
               </template>
               <template #footer>
                 <button class="bg-gray-300 px-4 py-2 rounded mr-2" @click="closeSearchModal">閉じる</button>
-                <button class="bg-blue-600 text-white px-4 py-2 rounded" @click="doSearch">絞り込み</button>
+                <button class="bg-indigo-600 text-white px-4 py-2 rounded" @click="doSearch">絞り込み</button>
               </template>
             </DialogModal>
             <div class="overflow-x-auto">
@@ -96,7 +96,7 @@
                 </tbody>
               </table>
               <div class="mt-4 flex justify-end">
-                <button class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded" @click="registerMembers">メンバー登録</button>
+                <button class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded" @click="registerMembers">メンバー登録</button>
               </div>
             </div>
     </div>

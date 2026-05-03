@@ -1083,6 +1083,98 @@ class ProofRequestController extends Controller
     }
 
     /**
+     * GET /user/proof/status
+     * ユーザー自身が校正依頼したジョブのステータス一覧
+     */
+    public function userProofStatus(Request $request): Response
+    {
+        $userId = Auth::id();
+        $q      = $request->input('q');
+        $hideCompleted = $request->boolean('hide_completed', true);
+        $clientId = $request->input('client_id');
+
+        // 年月フィルター（deadline 基準）
+        $periodParam = $request->input('period');
+        $usePeriodFilter = true;
+        $periodModel = $periodParam;
+        if ($periodParam === null) {
+            $periodModel = now()->format('Y-m');
+        } elseif ($periodParam === '' || $periodParam === 'all') {
+            $usePeriodFilter = false;
+        }
+        $periodStart = null;
+        $periodEnd   = null;
+        if ($usePeriodFilter && $periodModel) {
+            try {
+                $periodStart = Carbon::createFromFormat('Y-m', $periodModel)->startOfMonth()->setTimezone('UTC');
+                $periodEnd   = Carbon::createFromFormat('Y-m', $periodModel)->endOfMonth()->setTimezone('UTC');
+            } catch (\Throwable $e) {
+                $periodModel = now()->format('Y-m');
+                $periodStart = Carbon::now()->startOfMonth()->setTimezone('UTC');
+                $periodEnd   = Carbon::now()->endOfMonth()->setTimezone('UTC');
+            }
+        }
+
+        // 月選択肢（前後6か月）
+        $monthOptions = [];
+        for ($i = -6; $i <= 6; $i++) {
+            $m = now()->addMonths($i)->format('Y-m');
+            $monthOptions[] = [
+                'value' => $m,
+                'label' => now()->addMonths($i)->format('Y年n月'),
+            ];
+        }
+
+        $query = ProofRequest::with(['projectJob.client', 'proofreader'])
+            ->where('requester_id', $userId)
+            ->orderByDesc('deadline');
+
+        if ($q) {
+            $query->where(function ($sub) use ($q) {
+                $sub->where('title', 'like', "%{$q}%")
+                    ->orWhere('note',  'like', "%{$q}%");
+            });
+        }
+
+        if ($hideCompleted) {
+            $query->where('status', '!=', 'completed');
+        }
+
+        if ($usePeriodFilter && $periodStart && $periodEnd) {
+            $query->whereBetween('deadline', [
+                $periodStart->format('Y-m-d H:i:s'),
+                $periodEnd->format('Y-m-d H:i:s'),
+            ]);
+        }
+
+        if ($clientId) {
+            $query->whereHas('projectJob', fn ($q) => $q->where('client_id', $clientId));
+        }
+
+        $proofRequests = $query->paginate(50)->withQueryString();
+
+        // クライアント絞り込み用リスト（自分が依頼したものに関わるクライアントのみ）
+        $clients = \App\Models\Client::whereIn('id',
+            ProofRequest::where('requester_id', $userId)
+                ->whereNotNull('project_job_id')
+                ->join('project_jobs', 'project_jobs.id', '=', 'proof_requests.project_job_id')
+                ->pluck('project_jobs.client_id')
+                ->unique()
+                ->filter()
+        )->orderBy('name')->get(['id', 'name']);
+
+        return Inertia::render('User/ProofStatus', [
+            'proofRequests' => $proofRequests,
+            'q'             => $q,
+            'hideCompleted' => $hideCompleted,
+            'period'        => $periodModel ?? '',
+            'clientId'      => $clientId ? (int) $clientId : null,
+            'clients'       => $clients,
+            'monthOptions'  => $monthOptions,
+        ]);
+    }
+
+    /**
      * GET /proof/status
      * 全員向けステータス一覧
      */
