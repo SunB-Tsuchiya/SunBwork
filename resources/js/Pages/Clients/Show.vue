@@ -13,6 +13,11 @@ defineProps({ client: Object });
 
 const page = usePage();
 const routePrefix = computed(() => {
+    try {
+        const r = route().current() ?? '';
+        if (r.startsWith('admin.')) return 'admin';
+        if (r.startsWith('leader.')) return 'leader';
+    } catch {}
     const role = page.props.auth?.user?.user_role ?? 'leader';
     return ['admin', 'superadmin'].includes(role) ? 'admin' : 'leader';
 });

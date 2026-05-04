@@ -51,7 +51,14 @@ function start() {
 function complete() {
     if (!confirm('この校正を完了にしますか？依頼者に通知されます。')) return;
     router.put(route('proof_coordinator.assignments.complete', { proofRequest: props.proofRequest.id }), {}, {
-        onSuccess: () => router.get(route('proof_coordinator.assignments')),
+        onSuccess: () => router.get(route('proof_coordinator.jobs')),
+    });
+}
+
+function uncomplete() {
+    if (!confirm('この校正を未完了（校正中）に戻しますか？')) return;
+    router.put(route('proof_coordinator.assignments.uncomplete', { proofRequest: props.proofRequest.id }), {}, {
+        preserveScroll: true,
     });
 }
 
@@ -143,38 +150,40 @@ const totalActual         = computed(() => formattedEvents.value.reduce((s, e) =
     <AppLayout :title="`校正詳細 - ${proofRequest.title}`">
         <template #header>
             <div class="flex items-center gap-3">
-                <Link :href="route('proof_coordinator.assignments')"
+                <Link :href="route('proof_coordinator.jobs')"
                     class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
-                >← 割り当て一覧に戻る</Link>
+                >← ジョブ管理に戻る</Link>
                 <h2 class="text-xl font-semibold leading-tight text-gray-800">校正依頼 — 詳細</h2>
             </div>
         </template>
 
         <template #headerExtras>
             <div class="flex items-center gap-2">
+                <!-- 進行中のみ編集ボタンを表示 -->
                 <Link
+                    v-if="proofRequest.status !== 'completed'"
                     :href="route('proof_coordinator.assignments.edit', { proofRequest: proofRequest.id })"
                     class="rounded bg-pink-600 px-4 py-2 text-sm font-medium text-white hover:bg-pink-700"
                 >編集</Link>
-                <button
-                    v-if="proofRequest.status === 'assigned'"
-                    @click="start"
-                    class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-                >開始</button>
+                <!-- 進行中のみ完了ボタンを表示 -->
                 <button
                     v-if="proofRequest.status !== 'completed'"
                     @click="complete"
                     class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
-                >完了</button>
-                <span
-                    v-if="proofRequest.status === 'completed'"
-                    class="rounded bg-yellow-100 px-3 py-1.5 text-sm font-medium text-yellow-800"
-                >完了済み</span>
+                >完了にする</button>
+                <!-- 完了済み：未完了に戻すボタン -->
+                <template v-if="proofRequest.status === 'completed'">
+                    <span class="rounded bg-yellow-100 px-3 py-1.5 text-sm font-medium text-yellow-800">完了済み</span>
+                    <button
+                        @click="uncomplete"
+                        class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    >未完了に戻す</button>
+                </template>
             </div>
         </template>
 
         <template #tabs>
-            <ProofCoordinatorNavigationTabs active="assignments" />
+            <ProofCoordinatorNavigationTabs active="jobs" />
         </template>
 
         <div class="mx-auto max-w-3xl space-y-4">

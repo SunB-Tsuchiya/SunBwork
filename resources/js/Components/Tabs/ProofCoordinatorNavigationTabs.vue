@@ -27,17 +27,14 @@ const tab = (key) => [
                     {{ pendingCount }}
                 </span>
             </Link>
-            <Link :href="route('proof_coordinator.assignments')" :class="tab('assignments')">
-                割り振り管理
+            <Link :href="route('proof_coordinator.jobs')" :class="tab('jobs')">
+                ジョブ管理
             </Link>
             <Link :href="route('proof_coordinator.calendar')" :class="tab('calendar')">
                 校正カレンダー
             </Link>
             <Link :href="route('proof_coordinator.workload')" :class="tab('workload')">
                 校正員作業量
-            </Link>
-            <Link :href="route('proof_coordinator.history')" :class="tab('history')">
-                案件校正履歴
             </Link>
             <Link :href="route('proof_coordinator.team.index')" :class="tab('team')">
                 校正チーム管理

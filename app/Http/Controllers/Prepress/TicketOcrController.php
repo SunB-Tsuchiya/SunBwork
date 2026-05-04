@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Prepress;
 
 use App\Http\Controllers\Controller;
 use App\Models\Client;
+use App\Models\Department;
 use App\Services\OcrSpaceService;
 use App\Services\PrepressImageService;
 use Illuminate\Http\Request;
@@ -54,7 +55,7 @@ class TicketOcrController extends Controller
         $ocrResult = $this->ocrService->analyze($storagePath);
 
         // matched_clients に in_department フラグを付与
-        $deptId = $request->user()->department_id;
+        $deptId = $this->getPrepressDeptId($request->user());
         $matchedClients = $ocrResult['matched_clients'] ?? [];
         if ($deptId && !empty($matchedClients)) {
             $clientIds = array_column($matchedClients, 'id');
@@ -89,14 +90,27 @@ class TicketOcrController extends Controller
         $this->authorizePrepress($request->user());
 
         $user = $request->user();
-        if (!$user->department_id) {
+        $deptId = $this->getPrepressDeptId($user);
+        if (!$deptId) {
             return response()->json(['error' => '部署が設定されていません。'], 422);
         }
 
         // 既に紐づいていても syncWithoutDetaching で安全に追加
-        $client->departments()->syncWithoutDetaching([$user->department_id]);
+        $client->departments()->syncWithoutDetaching([$deptId]);
 
         return response()->json(['ok' => true, 'client_name' => $client->name]);
+    }
+
+    /**
+     * Prepress コンテキストで使うべき department_id を返す。
+     * Admin/SuperAdmin はユーザー部署ではなく「製版」部署を使う（authorizePrepress と同じ基準）。
+     */
+    private function getPrepressDeptId($user): ?int
+    {
+        if ($user->isSuperAdmin() || $user->isAdmin()) {
+            return Department::where('name', '製版')->value('id');
+        }
+        return $user->department_id;
     }
 
     protected function authorizePrepress($user): void

@@ -782,12 +782,14 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::put('assignments/{proofRequest}/assign', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'assign'])->name('assignments.assign');
         Route::put('assignments/{proofRequest}/start', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'start'])->name('assignments.start');
         Route::put('assignments/{proofRequest}/complete', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'complete'])->name('assignments.complete');
+        Route::put('assignments/{proofRequest}/uncomplete', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'uncomplete'])->name('assignments.uncomplete');
         Route::get('calendar', [\App\Http\Controllers\ProofCoordinator\CalendarController::class, 'index'])->name('calendar');
         Route::get('calendar/data', [\App\Http\Controllers\ProofCoordinator\CalendarController::class, 'data'])->name('calendar.data');
         Route::get('calendar/picker-data', [\App\Http\Controllers\ProofCoordinator\CalendarController::class, 'pickerData'])->name('calendar.picker_data');
         Route::post('schedules', [\App\Http\Controllers\ProofCoordinator\CalendarController::class, 'store'])->name('schedules.store');
         Route::put('schedules/{proofSchedule}', [\App\Http\Controllers\ProofCoordinator\CalendarController::class, 'update'])->name('schedules.update');
         Route::delete('schedules/{proofSchedule}', [\App\Http\Controllers\ProofCoordinator\CalendarController::class, 'destroy'])->name('schedules.destroy');
+        Route::get('jobs', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'jobManagement'])->name('jobs');
         Route::get('workload', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'workload'])->name('workload');
         Route::get('history', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'history'])->name('history');
         Route::get('team', [\App\Http\Controllers\ProofCoordinator\ProofTeamController::class, 'index'])->name('team.index');

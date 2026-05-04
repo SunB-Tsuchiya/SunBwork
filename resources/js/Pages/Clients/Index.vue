@@ -17,6 +17,13 @@ const props = defineProps({
 
 const page = usePage();
 const routePrefix = computed(() => {
+    try {
+        const r = route().current() ?? '';
+        if (r.startsWith('admin.')) return 'admin';
+        if (r.startsWith('leader.')) return 'leader';
+        if (r.startsWith('coordinator.')) return 'coordinator';
+    } catch {}
+    // fallback: user_role ベース
     const role = page.props.auth?.user?.user_role ?? 'leader';
     if (['admin', 'superadmin'].includes(role)) return 'admin';
     if (role === 'coordinator') return 'coordinator';
@@ -35,10 +42,14 @@ function toggleDormantView() {
 
 function toggleDepartment(clientId) {
     router.post(
-        route('leader.clients.toggle_department', clientId),
+        route(`${routePrefix.value}.clients.toggle_department`, clientId),
         {},
         { preserveScroll: true },
     );
+}
+
+function goToEdit(clientId) {
+    router.visit(route(`${routePrefix.value}.clients.edit`, { client: clientId }));
 }
 </script>
 
@@ -91,7 +102,12 @@ function toggleDepartment(clientId) {
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-200 bg-white">
-                            <tr v-for="client in props.clients" :key="client.id" class="hover:bg-green-50/40">
+                            <tr
+                                v-for="client in props.clients"
+                                :key="client.id"
+                                class="hover:bg-green-50/40 cursor-pointer"
+                                @click="goToEdit(client.id)"
+                            >
                                 <td class="whitespace-nowrap px-6 py-3 text-gray-600">{{ client.id }}</td>
                                 <td class="whitespace-nowrap px-6 py-3 font-medium text-gray-900">
                                     {{ client.name }}
@@ -102,9 +118,9 @@ function toggleDepartment(clientId) {
                                     <button
                                         type="button"
                                         class="rounded border border-red-300 px-3 py-1 text-xs text-red-600 hover:bg-red-50"
-                                        @click="toggleDepartment(client.id)"
+                                        @click.stop="toggleDepartment(client.id)"
                                     >外す</button>
-                                    <Link :href="route(`${routePrefix}.clients.edit`, client.id)" class="text-blue-600 hover:text-blue-900 text-xs">編集</Link>
+                                    <Link :href="route(`${routePrefix}.clients.edit`, { client: client.id })" class="text-blue-600 hover:text-blue-900 text-xs" @click.stop>編集</Link>
                                 </td>
                             </tr>
                         </tbody>
@@ -134,7 +150,12 @@ function toggleDepartment(clientId) {
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-200 bg-white">
-                            <tr v-for="client in props.unregisteredClients" :key="client.id" class="hover:bg-gray-50">
+                            <tr
+                                v-for="client in props.unregisteredClients"
+                                :key="client.id"
+                                class="hover:bg-gray-50 cursor-pointer"
+                                @click="goToEdit(client.id)"
+                            >
                                 <td class="whitespace-nowrap px-6 py-3 text-gray-500">{{ client.id }}</td>
                                 <td class="whitespace-nowrap px-6 py-3 text-gray-700">{{ client.name }}</td>
                                 <td class="px-6 py-3">
@@ -150,7 +171,7 @@ function toggleDepartment(clientId) {
                                     <button
                                         type="button"
                                         class="rounded border border-green-600 px-3 py-1 text-xs text-green-700 hover:bg-green-50"
-                                        @click="toggleDepartment(client.id)"
+                                        @click.stop="toggleDepartment(client.id)"
                                     >自部署に追加</button>
                                 </td>
                             </tr>
@@ -180,7 +201,12 @@ function toggleDepartment(clientId) {
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-200 bg-white">
-                            <tr v-for="client in props.clients" :key="client.id" class="hover:bg-gray-50">
+                            <tr
+                                v-for="client in props.clients"
+                                :key="client.id"
+                                class="hover:bg-gray-50 cursor-pointer"
+                                @click="goToEdit(client.id)"
+                            >
                                 <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900">{{ client.id }}</td>
                                 <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
                                     {{ client.name }}
@@ -196,7 +222,7 @@ function toggleDepartment(clientId) {
                                 </td>
                                 <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-700">{{ client.detail || client.notes || '' }}</td>
                                 <td class="whitespace-nowrap px-6 py-4 text-sm">
-                                    <Link :href="route(`${routePrefix}.clients.edit`, client.id)" class="text-blue-600 hover:text-blue-900">編集</Link>
+                                    <Link :href="route(`${routePrefix}.clients.edit`, { client: client.id })" class="text-blue-600 hover:text-blue-900" @click.stop>編集</Link>
                                 </td>
                             </tr>
                         </tbody>

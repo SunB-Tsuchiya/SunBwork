@@ -16,6 +16,13 @@ const props = defineProps({
 
 const page = usePage();
 const routePrefix = computed(() => {
+    try {
+        const r = route().current() ?? '';
+        if (r.startsWith('admin.')) return 'admin';
+        if (r.startsWith('leader.')) return 'leader';
+        if (r.startsWith('coordinator.')) return 'coordinator';
+    } catch {}
+    // fallback: user_role ベース
     const role = page.props.auth?.user?.user_role ?? 'leader';
     if (['admin', 'superadmin'].includes(role)) return 'admin';
     if (role === 'coordinator') return 'coordinator';

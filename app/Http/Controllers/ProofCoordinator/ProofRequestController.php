@@ -268,12 +268,12 @@ class ProofRequestController extends Controller
                 }
             }
 
-            // 校正依頼を受理済みに更新
+            // 校正依頼を受理済みに更新（割り当てと同時に校正中へ）
             // 単発派遣の場合 proofreader_id は coordinator 自身（通知は不要）
             $proofRequest->update([
                 'proof_coordinator_id' => $senderUser->id,
                 'proofreader_id'       => $isDispatcher ? null : $assigneeUserId,
-                'status'               => 'assigned',
+                'status'               => 'in_progress',
             ]);
 
             // 校正員への通知（単発派遣の場合はスキップ）
@@ -699,6 +699,71 @@ class ProofRequestController extends Controller
     }
 
     /**
+     * GET /proof-coordinator/jobs
+     * ジョブ管理（進行中・完了 統合ページ）
+     */
+    public function jobManagement(Request $request): Response
+    {
+        $tab       = $request->input('tab', 'active');
+        $search    = $request->input('search', '');
+        $period    = $request->input('period', '');
+        $dateField = $request->input('date_field', 'created_at'); // 'created_at' | 'deadline'
+
+        $applyFilters = function ($query) use ($search, $period, $dateField) {
+            if ($search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('title', 'like', "%{$search}%")
+                      ->orWhereHas('projectJob', fn ($q2) => $q2->where('title', 'like', "%{$search}%"));
+                });
+            }
+            if ($period) {
+                $col = $dateField === 'deadline' ? 'deadline' : 'created_at';
+                $query->whereRaw("DATE_FORMAT({$col}, '%Y-%m') = ?", [$period]);
+            }
+        };
+
+        // 進行中（assigned + in_progress）
+        $activeQuery = ProofRequest::with(['requester', 'proofCoordinator', 'proofreader', 'projectJob'])
+            ->whereIn('status', ['assigned', 'in_progress'])
+            ->orderBy('deadline');
+        $applyFilters($activeQuery);
+        $activeRequests = $activeQuery->get();
+
+        // 完了（completed）
+        $completedQuery = ProofRequest::with(['requester', 'proofCoordinator', 'proofreader', 'projectJob'])
+            ->where('status', 'completed')
+            ->orderByDesc('completed_at');
+        $applyFilters($completedQuery);
+        // 年月未指定時は直近3か月のみ表示
+        if (! $period) {
+            $completedQuery->where('completed_at', '>=', now()->subMonths(3)->startOfMonth());
+        }
+        $completedRequests = $completedQuery->get();
+
+        // 年月セレクター用オプション
+        $monthOptions = ProofRequest::selectRaw("DATE_FORMAT(created_at, '%Y-%m') as value")
+            ->groupByRaw("DATE_FORMAT(created_at, '%Y-%m')")
+            ->orderByRaw("DATE_FORMAT(created_at, '%Y-%m') DESC")
+            ->pluck('value')
+            ->map(fn ($m) => [
+                'value' => $m,
+                'label' => sprintf('%d年%d月', (int) explode('-', $m)[0], (int) explode('-', $m)[1]),
+            ])
+            ->values()
+            ->toArray();
+
+        return Inertia::render('ProofCoordinator/Jobs/Index', [
+            'activeRequests'    => $activeRequests,
+            'completedRequests' => $completedRequests,
+            'tab'               => $tab,
+            'search'            => $search,
+            'period'            => $period,
+            'dateField'         => $dateField,
+            'monthOptions'      => $monthOptions,
+        ]);
+    }
+
+    /**
      * PUT /proof-coordinator/assignments/{proofRequest}/assign
      * 校正員を割り当て → status = assigned
      */
@@ -768,6 +833,42 @@ class ProofRequestController extends Controller
         }
 
         return back()->with('success', '校正が完了しました。依頼者に通知しました。');
+    }
+
+    /**
+     * PUT /proof-coordinator/assignments/{proofRequest}/uncomplete
+     * 完了 → 校正中（in_progress）に戻す
+     */
+    public function uncomplete(ProofRequest $proofRequest)
+    {
+        if ($proofRequest->status !== 'completed') {
+            return back()->with('error', 'この校正はまだ完了していません。');
+        }
+
+        DB::transaction(function () use ($proofRequest) {
+            // ProofRequest を in_progress に戻す
+            $proofRequest->update([
+                'status'       => 'in_progress',
+                'completed_at' => null,
+            ]);
+
+            // 元ジョブ（pja_operator）の proof_completed_at をクリア
+            if ($proofRequest->project_job_assignment_id) {
+                ProjectJobAssignment::where('id', $proofRequest->project_job_assignment_id)
+                    ->update(['proof_completed_at' => null]);
+            }
+
+            // pja100（校正割当ジョブ）の completed フラグを戻す
+            if ($proofRequest->proofreader_id && $proofRequest->proof_coordinator_id) {
+                ProjectJobAssignment::where('project_job_id', $proofRequest->project_job_id)
+                    ->where('user_id', $proofRequest->proofreader_id)
+                    ->where('sender_id', $proofRequest->proof_coordinator_id)
+                    ->whereColumn('sender_id', '!=', 'user_id')
+                    ->update(['completed' => false]);
+            }
+        });
+
+        return back()->with('success', '校正を未完了に戻しました。');
     }
 
     /**

@@ -1,6 +1,7 @@
 <script setup>
 import Calendar from '@/Components/Calendar.vue';
 import DiaryTable from '@/Components/Diaries/DiaryTable.vue';
+import UserNavigationTabs from '@/Components/Tabs/UserNavigationTabs.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { faCalendar } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
@@ -57,6 +58,10 @@ const selectedPerPage = computed(() => (props.meta && props.meta.per_page ? Numb
     <AppLayout title="日報一覧">
         <template #header>
             <h2 class="text-xl font-semibold leading-tight text-gray-800">日報一覧</h2>
+        </template>
+
+        <template #tabs>
+            <UserNavigationTabs active="diaries" />
         </template>
 
         <div class="rounded bg-white p-6 shadow">

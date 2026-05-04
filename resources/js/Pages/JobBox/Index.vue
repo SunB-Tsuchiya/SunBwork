@@ -13,15 +13,7 @@
         </template>
 
         <template v-if="props.routeContext !== 'coordinator'" #tabs>
-            <nav class="flex gap-1">
-                <span class="rounded-t bg-white px-4 py-2 text-sm font-semibold text-blue-700 border-b-2 border-blue-600">
-                    ジョブ一覧
-                </span>
-                <Link
-                    :href="route('user.progress_cells.my_assignments')"
-                    class="rounded-t px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900"
-                >進行表担当</Link>
-            </nav>
+            <UserNavigationTabs active="jobbox" />
         </template>
 
         <div class="rounded bg-white p-6 shadow">
@@ -163,6 +155,7 @@
 <script setup>
 import useToasts from '@/Composables/useToasts';
 import AppLayout from '@/layouts/AppLayout.vue';
+import UserNavigationTabs from '@/Components/Tabs/UserNavigationTabs.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, ref } from 'vue';
 

@@ -1,4 +1,5 @@
 <script setup>
+import UserNavigationTabs from '@/Components/Tabs/UserNavigationTabs.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { router } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
@@ -143,8 +144,11 @@ const displayGroups = computed(() => {
             <h2 class="text-xl font-semibold leading-tight text-gray-800">校正状況</h2>
         </template>
 
-        <div class="mx-auto max-w-6xl rounded bg-white p-6 shadow">
-            <h1 class="mb-4 text-2xl font-bold">校正状況：</h1>
+        <template #tabs>
+            <UserNavigationTabs active="proof_status" />
+        </template>
+
+        <div class="rounded bg-white p-6 shadow">
 
             <!-- 検索・フィルター行 -->
             <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -155,7 +159,7 @@ const displayGroups = computed(() => {
                         placeholder="タイトル/詳細で検索"
                         class="w-72 rounded border px-3 py-2 text-sm"
                     />
-                    <button class="rounded bg-blue-600 px-3 py-2 text-white" @click.prevent="search">検索</button>
+                    <button class="rounded bg-indigo-600 px-3 py-2 text-white" @click.prevent="search">検索</button>
                     <button class="ml-2 rounded border px-3 py-2" @click.prevent="clearSearch">クリア</button>
                 </div>
             </div>

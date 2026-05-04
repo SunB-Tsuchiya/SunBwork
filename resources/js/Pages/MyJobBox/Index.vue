@@ -4,8 +4,11 @@
             <h2 class="text-xl font-semibold leading-tight text-gray-800">MyJobBox — マイジョブBOX</h2>
         </template>
 
-        <div class="mx-auto max-w-6xl rounded bg-white p-6 shadow">
-            <h1 class="mb-4 text-2xl font-bold">MyJobBox：{{ props.projectJob?.name || '' }}</h1>
+        <template #tabs>
+            <UserNavigationTabs active="myjob" />
+        </template>
+
+        <div class="rounded bg-white p-6 shadow">
 
             <!-- 検索・フィルター行 -->
             <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -16,19 +19,19 @@
                         placeholder="タイトル/詳細で検索"
                         class="w-72 rounded border px-3 py-2 text-sm"
                     />
-                    <button class="rounded bg-blue-600 px-3 py-2 text-white" @click.prevent="search">検索</button>
+                    <button class="rounded bg-indigo-600 px-3 py-2 text-white" @click.prevent="search">検索</button>
                     <button class="ml-2 rounded border px-3 py-2" @click.prevent="clearSearch">クリア</button>
                 </div>
                 <div class="flex items-center gap-2">
                     <Link
                         :href="typeof route === 'function' ? route('user.project_jobs.assignments.create') : '/project_jobs/assignments/create-user'"
                         class="rounded bg-indigo-600 px-4 py-2 text-sm text-white"
-                        >マイジョブBOX</Link
+                        >マイジョブ作成</Link
                     >
                     <button
                         @click="openJobSheetModal"
                         class="rounded bg-purple-600 px-4 py-2 text-sm text-white"
-                    >進行表ジョブ</button>
+                    >進行表ジョブ作成</button>
                 </div>
             </div>
 
@@ -212,6 +215,7 @@
 </template>
 
 <script setup>
+import UserNavigationTabs from '@/Components/Tabs/UserNavigationTabs.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
