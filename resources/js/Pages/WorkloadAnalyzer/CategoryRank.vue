@@ -1,5 +1,6 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
+import { useUIState } from '@/Composables/useUIState';
 import { Inertia } from '@inertiajs/inertia';
 import { Head, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
@@ -105,11 +106,11 @@ const categories = [
     },
 ];
 
-const selectedCategory = ref('total_pages');
+const selectedCategory = useUIState('sbw_category_rank_category', 'total_pages');
 const currentCategory = computed(() => categories.find((c) => c.key === selectedCategory.value) ?? categories[0]);
 
 // 雇用形態フィルター
-const employmentFilter = ref('all'); // 'all' | 'regular_contract' | 'dispatch_outsource'
+const employmentFilter = useUIState('sbw_category_rank_employment_filter', 'all'); // 'all' | 'regular_contract' | 'dispatch_outsource'
 
 const EMPLOYMENT_FILTER_OPTIONS = [
     { value: 'all',                label: 'すべて' },

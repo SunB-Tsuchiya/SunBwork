@@ -133,6 +133,7 @@
 
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
+import { useUIState } from '@/Composables/useUIState';
 import { router } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import { route } from 'ziggy-js';
@@ -146,13 +147,13 @@ const props = defineProps({
 
 const qModel = ref(props.q || '');
 const periodModel = ref(props.period ?? '');
-const hideCompleted = ref(true);
+const hideCompleted = useUIState('sbw_leader_pj_hide_completed', true);
 
 const monthOptions = computed(() => (Array.isArray(props.monthOptions) ? props.monthOptions : []));
 const localJobs = ref((props.jobs || []).map((j) => ({ ...j })));
 
 // グループ表示モード
-const viewMode = ref('date');
+const viewMode = useUIState('sbw_leader_pj_view_mode', 'date');
 const viewModes = [
     { key: 'date', label: '日付ごと' },
     { key: 'client', label: 'クライアントごと' },
@@ -161,8 +162,8 @@ const viewModes = [
 
 // ===== ソート =====
 
-const sortKey = ref('created_at');
-const sortDir = ref('desc');
+const sortKey = useUIState('sbw_leader_pj_sort_key', 'created_at');
+const sortDir = useUIState('sbw_leader_pj_sort_dir', 'desc');
 
 function toggleSort(key) {
     if (sortKey.value === key) {

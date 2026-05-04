@@ -1,6 +1,7 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
 import ProofCoordinatorNavigationTabs from '@/Components/Tabs/ProofCoordinatorNavigationTabs.vue';
+import { useUIState } from '@/Composables/useUIState';
 import { Link, router } from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
 
@@ -9,7 +10,7 @@ const props = defineProps({
 });
 
 const searchInput = ref('');
-const groupMode   = ref('deadline'); // 'deadline' | 'created_at' | 'project'
+const groupMode   = useUIState('sbw_proof_inbox_group_mode', 'deadline'); // 'deadline' | 'created_at' | 'project'
 
 const groupModeOptions = [
     { key: 'deadline',   label: '締め切りごと' },

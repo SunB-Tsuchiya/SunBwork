@@ -23,6 +23,7 @@ class ProgressReportController extends Controller
         } else {
             $allowedJobIds = ProjectTeamMember::where('user_id', $user->id)
                 ->pluck('project_job_id')
+                ->unique()
                 ->all();
         }
 

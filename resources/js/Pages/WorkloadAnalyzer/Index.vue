@@ -1,5 +1,6 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
+import { useUIState } from '@/Composables/useUIState';
 import { Inertia } from '@inertiajs/inertia';
 import { Head, usePage } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
@@ -52,8 +53,8 @@ const selectedYmLabel = computed(() => {
 });
 
 // client-side sort state: key and direction ('asc'|'desc')
-const sortKey = ref('deviation');
-const sortDir = ref('desc');
+const sortKey = useUIState('sbw_workload_sort_key', 'deviation');
+const sortDir = useUIState('sbw_workload_sort_dir', 'desc');
 
 function toggleSort(key) {
     if (sortKey.value === key) {
@@ -257,10 +258,10 @@ function formatHour(h) {
 }
 
 // 表示モード: 'total' = 部署全体, 'by_role' = 役割ごと
-const viewMode = ref('total');
+const viewMode = useUIState('sbw_workload_view_mode', 'total');
 
 // 雇用形態フィルター
-const employmentFilter = ref('all'); // 'all' | 'regular_contract' | 'dispatch_outsource'
+const employmentFilter = useUIState('sbw_workload_employment_filter', 'all'); // 'all' | 'regular_contract' | 'dispatch_outsource'
 
 const EMPLOYMENT_FILTER_OPTIONS = [
     { value: 'all',               label: 'すべて' },

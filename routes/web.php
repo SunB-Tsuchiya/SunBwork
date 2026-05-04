@@ -735,6 +735,10 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         // ── V-16 印刷 ─────────────────────────────────────────────
         Route::get('progress-sheets/{sheet}/print', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'printView'])->name('progress_sheets.print');
 
+        // ── 進行表一覧 ─────────────────────────────────────────────
+        Route::get('progress-sheet-list', [App\Http\Controllers\Coordinator\ProgressSheetListController::class, 'index'])->name('progress_sheet_list.index');
+        Route::post('progress-sheet-list/favorite/{sheet}', [App\Http\Controllers\Coordinator\ProgressSheetListController::class, 'toggleFavorite'])->name('progress_sheet_list.favorite');
+
         // ── V-12 進行レポート ───────────────────────────────────────
         Route::get('progress-report', [App\Http\Controllers\Coordinator\ProgressReportController::class, 'index'])->name('progress_report.index');
 

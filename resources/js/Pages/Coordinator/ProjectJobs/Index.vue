@@ -54,13 +54,26 @@
                 </label>
             </div>
 
-            <!-- 月グループ表示 -->
+            <!-- ビューモード切替ボタン -->
+            <div class="mt-4 flex gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1 w-fit">
+                <button
+                    v-for="mode in viewModes"
+                    :key="mode.key"
+                    @click="viewMode = mode.key"
+                    :class="viewMode === mode.key
+                        ? 'bg-white text-indigo-700 font-semibold shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'"
+                    class="rounded px-4 py-1.5 text-sm transition-all"
+                >{{ mode.label }}</button>
+            </div>
+
+            <!-- グループ表示 -->
             <div class="mt-4 overflow-x-auto">
                 <div v-if="displayGroups.length === 0" class="py-8 text-center text-sm text-gray-400">
                     表示するデータがありません。
                 </div>
 
-                <template v-for="group in displayGroups" :key="group.month">
+                <template v-for="group in displayGroups" :key="group.key">
                     <!-- 月ヘッダー -->
                     <div class="mt-4 rounded bg-gray-100 px-4 py-1.5 text-sm font-semibold text-gray-700 first:mt-0">
                         {{ group.label }}
@@ -122,24 +135,34 @@
 
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
+import { useUIState } from '@/Composables/useUIState';
 import { Link, router, usePage } from '@inertiajs/vue3';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 
 const props = defineProps({ jobs: Array, registerFlags: Array, jobid: [Number, String], monthOptions: Array, q: String, period: String });
 const page = usePage();
 page.props.q_model = props.q || '';
-page.props.period_model = props.period ?? '';
+page.props.period_model = props.period || 'all';
 
 const monthOptions = computed(() => (Array.isArray(props.monthOptions) ? props.monthOptions : []));
-const hideCompleted = ref(true);
+const hideCompleted = useUIState('sbw_coord_pj_hide_completed', true);
 
 // ローカルコピー（完了ボタンで即時更新するため）
 const localJobs = ref((props.jobs || []).map((j) => ({ ...j })));
 
+// ===== ビューモード =====
+
+const viewModes = [
+    { key: 'date', label: '日付ごと' },
+    { key: 'client', label: 'クライアントごと' },
+    { key: 'project', label: '案件ごと' },
+];
+const viewMode = useUIState('pj_index_view_mode', 'date');
+
 // ===== ソート =====
 
-const sortKey = ref('created_at');
-const sortDir = ref('desc');
+const sortKey = useUIState('sbw_coord_pj_sort_key', 'created_at');
+const sortDir = useUIState('sbw_coord_pj_sort_dir', 'desc');
 
 function toggleSort(key) {
     if (sortKey.value === key) {
@@ -204,6 +227,23 @@ const displayGroups = computed(() => {
 
     jobs = sortJobs(jobs);
 
+    if (viewMode.value === 'client') {
+        const grouped = new Map();
+        for (const j of jobs) {
+            const key = j.client?.name || '（クライアントなし）';
+            if (!grouped.has(key)) grouped.set(key, []);
+            grouped.get(key).push(j);
+        }
+        const sortedKeys = Array.from(grouped.keys()).sort((a, b) => a.localeCompare(b, 'ja'));
+        return sortedKeys.map((k) => ({ key: k, label: k, items: grouped.get(k) }));
+    }
+
+    if (viewMode.value === 'project') {
+        const sorted = [...jobs].sort((a, b) => (a.title || a.name || '').localeCompare(b.title || b.name || '', 'ja'));
+        return [{ key: 'all', label: '全案件', items: sorted }];
+    }
+
+    // date モード（デフォルト）: 月グループ
     const grouped = new Map();
     for (const j of jobs) {
         const mk = getMonthKey(j);
@@ -218,7 +258,7 @@ const displayGroups = computed(() => {
     });
 
     return sortedKeys.map((mk) => ({
-        month: mk,
+        key: mk,
         label: formatMonthLabel(mk),
         items: grouped.get(mk),
     }));

@@ -154,6 +154,7 @@
 
 <script setup>
 import useToasts from '@/Composables/useToasts';
+import { useUIState } from '@/Composables/useUIState';
 import AppLayout from '@/layouts/AppLayout.vue';
 import UserNavigationTabs from '@/Components/Tabs/UserNavigationTabs.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
@@ -166,10 +167,10 @@ page.props.period_model = page.props.period ?? '';
 const monthOptions = computed(() => (Array.isArray(page.props.monthOptions) ? page.props.monthOptions : []));
 
 // 完了非表示フラグ（デフォルト：完了を隠す）
-const hideCompleted = ref(true);
+const hideCompleted = useUIState('sbw_jobbox_hide_completed', true);
 
 // グループ表示モード
-const viewMode = ref('date');
+const viewMode = useUIState('sbw_jobbox_view_mode', 'date');
 const viewModes = [
     { key: 'date', label: '日付ごと' },
     { key: 'client', label: 'クライアントごと' },

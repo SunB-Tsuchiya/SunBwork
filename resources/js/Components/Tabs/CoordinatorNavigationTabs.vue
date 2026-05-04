@@ -26,6 +26,14 @@ function getJobboxLink() {
     }
 }
 
+function getProgressSheetListLink() {
+    try {
+        return route('coordinator.progress_sheet_list.index');
+    } catch (e) {
+        return '/coordinator/progress-sheet-list';
+    }
+}
+
 function getProgressReportLink() {
     try {
         return route('coordinator.progress_report.index');
@@ -51,6 +59,7 @@ function getSettingsLink() {
             <Link :href="getAssignmentsLink()" :class="tab('projects')"> 案件一覧 </Link>
             <Link :href="getJobboxLink()" :class="tab('jobs')"> ジョブ一覧 </Link>
             <Link :href="getCalendarLink()" :class="tab('calendar')"> 案件カレンダー </Link>
+            <Link :href="getProgressSheetListLink()" :class="tab('progress_sheet_list')"> 進行表一覧 </Link>
             <Link :href="getProgressReportLink()" :class="tab('progress_report')"> 進行レポート </Link>
             <Link :href="getSettingsLink()" :class="tab('settings')"> 設定 </Link>
         </nav>

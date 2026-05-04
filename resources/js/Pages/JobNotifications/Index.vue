@@ -1,5 +1,6 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
+import { useUIState } from '@/Composables/useUIState';
 import { Link, router } from '@inertiajs/vue3';
 import { route } from 'ziggy-js';
 import { ref, computed } from 'vue';
@@ -48,7 +49,7 @@ function markReadHover(n) {
 
 const viewMode      = ref(props.filters?.group === 'month' ? 'month' : 'day');
 const selectedDays  = ref(props.filters?.days ?? 30);
-const unreadOnly    = ref(false);
+const unreadOnly    = useUIState('sbw_notifications_unread_only', false);
 
 function applyFilters() {
     router.get(route('job-notifications.index'), {

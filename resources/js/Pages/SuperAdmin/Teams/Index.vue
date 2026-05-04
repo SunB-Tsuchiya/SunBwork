@@ -1,7 +1,7 @@
 <script setup>
 // copied from Admin/Teams/Index.vue with route names adjusted to superadmin
 import AppLayout from '@/layouts/AppLayout.vue';
-
+import { useUIState } from '@/Composables/useUIState';
 import { computed, ref } from 'vue';
 
 const props = defineProps({
@@ -14,7 +14,7 @@ const props = defineProps({
 // showType は表示モード。'department' または 'unit' を使う。
 // 注意: 判定は team.personal_team ではなく team.team_type を参照して行う。
 // 以前AIが personal_team を誤って参照していたため、ここでも team_type ベースで判定します。
-const showType = ref('department'); // 'department' or 'unit'
+const showType = useUIState('sbw_superadmin_teams_show_type', 'department'); // 'department' or 'unit'
 
 const filteredTeams = computed(() => {
     // department view: department 切り替え時は team_type が 'personal' と 'unit' のチームは除外する

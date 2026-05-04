@@ -1,6 +1,7 @@
 <script setup>
 import UserNavigationTabs from '@/Components/Tabs/UserNavigationTabs.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
+import { useUIState } from '@/Composables/useUIState';
 import { router } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 
@@ -54,7 +55,7 @@ function toggleHideCompleted() {
 }
 
 // ── グループ表示モード ──
-const viewMode = ref('date');
+const viewMode = useUIState('sbw_user_proof_view_mode', 'date');
 const viewModes = [
     { key: 'date',   label: '日付ごと' },
     { key: 'client', label: 'クライアントごと' },

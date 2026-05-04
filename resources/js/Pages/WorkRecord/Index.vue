@@ -1,5 +1,6 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
+import { useUIState } from '@/Composables/useUIState';
 import { router } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 
@@ -13,7 +14,7 @@ const props = defineProps({
 
 const viewMode      = ref(props.filters?.group === 'month' ? 'month' : 'day');
 const selectedDays  = ref(props.filters?.days ? Number(props.filters.days) : 30);
-const sortOvertime  = ref(false);
+const sortOvertime  = useUIState('sbw_workrecord_sort_overtime', false);
 
 function indexRoute() {
     return `${props.routePrefix}.work_records.index`;

@@ -217,6 +217,7 @@
 <script setup>
 import UserNavigationTabs from '@/Components/Tabs/UserNavigationTabs.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
+import { useUIState } from '@/Composables/useUIState';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
@@ -322,10 +323,10 @@ watch(() => props.myAssignments?.data, (newData) => {
 });
 
 // 完了非表示
-const hideCompleted = ref(true);
+const hideCompleted = useUIState('sbw_myjobbox_hide_completed', true);
 
 // グループ表示モード
-const viewMode = ref('date');
+const viewMode = useUIState('sbw_myjobbox_view_mode', 'date');
 const viewModes = [
     { key: 'date', label: '日付ごと' },
     { key: 'client', label: 'クライアントごと' },

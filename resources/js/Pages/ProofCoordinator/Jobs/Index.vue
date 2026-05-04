@@ -1,6 +1,7 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
 import ProofCoordinatorNavigationTabs from '@/Components/Tabs/ProofCoordinatorNavigationTabs.vue';
+import { useUIState } from '@/Composables/useUIState';
 import { router } from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
 
@@ -18,7 +19,7 @@ const currentTab      = ref(props.tab);
 const searchInput     = ref(props.search);
 const periodInput     = ref(props.period);
 const dateFieldInput  = ref(props.dateField);
-const groupMode       = ref('deadline'); // 'project' | 'proofreader' | 'deadline'
+const groupMode       = useUIState('sbw_proof_jobs_group_mode', 'deadline'); // 'project' | 'proofreader' | 'deadline'
 
 const statusLabel = {
     assigned:    '割り当て済み',
