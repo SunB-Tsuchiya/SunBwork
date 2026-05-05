@@ -72,6 +72,7 @@ class InternalEventController extends Controller
         $event->body               = $validated['description'] ?? null;
         $event->starts_at          = $start;
         $event->ends_at            = $end;
+        $event->meeting_definition_id = $validated['meeting_definition_id'] ?? null;
         $event->save();
 
         // own_interruption_minutes
@@ -127,6 +128,7 @@ class InternalEventController extends Controller
             'event'              => $event,
             'eventItemTypes'     => $eventItemTypes,
             'meetingDefinitions' => $meetingDefinitions,
+            'selectedMeetingId'  => $event->meeting_definition_id,
             'date'               => $event->starts_at?->toDateString() ?? '',
             'startHour'          => $event->starts_at?->format('H') ?? '09',
             'startMinute'        => $event->starts_at?->format('i') ?? '00',
@@ -141,14 +143,15 @@ class InternalEventController extends Controller
         $this->authorizeEvent($event);
 
         $validated = $request->validate([
-            'event_item_type_id' => 'required|exists:event_item_types,id',
-            'title'              => 'required|string|max:255',
-            'date'               => 'required|date',
-            'startHour'          => 'required|string',
-            'startMinute'        => 'required|string',
-            'endHour'            => 'required|string',
-            'endMinute'          => 'required|string',
-            'description'        => 'nullable|string',
+            'event_item_type_id'     => 'required|exists:event_item_types,id',
+            'title'                  => 'required|string|max:255',
+            'date'                   => 'required|date',
+            'startHour'              => 'required|string',
+            'startMinute'            => 'required|string',
+            'endHour'                => 'required|string',
+            'endMinute'              => 'required|string',
+            'description'            => 'nullable|string',
+            'meeting_definition_id'  => 'nullable|exists:meeting_definitions,id',
         ]);
 
         $event->event_item_type_id = $validated['event_item_type_id'];
@@ -156,6 +159,7 @@ class InternalEventController extends Controller
         $event->body               = $validated['description'] ?? null;
         $event->starts_at          = $validated['date'] . ' ' . $validated['startHour'] . ':' . $validated['startMinute'] . ':00';
         $event->ends_at            = $validated['date'] . ' ' . $validated['endHour']   . ':' . $validated['endMinute']   . ':00';
+        $event->meeting_definition_id = $validated['meeting_definition_id'] ?? null;
         $event->save();
 
         return redirect()->route('calendar.index')->with('success', '予定を更新しました。');

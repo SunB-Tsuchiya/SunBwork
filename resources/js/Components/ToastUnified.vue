@@ -92,10 +92,21 @@ function dismiss(id) {
     dismissToast(id);
 }
 
+function clearFlashFromHistory() {
+    try {
+        const state = history.state;
+        if (state?.page?.props?.flash) {
+            state.page.props.flash = null;
+            history.replaceState(state, '', window.location.href);
+        }
+    } catch (e) {}
+}
+
 function checkFlashAndErrors() {
     const flash = page.props.flash;
     if (flash && flash.message) {
         pushLocal({ id: `flash-${Date.now()}`, type: flash.type || 'success', message: flash.message });
+        clearFlashFromHistory();
     }
     const errors = page.props.errors || {};
     if (errors && Object.keys(errors).length) {

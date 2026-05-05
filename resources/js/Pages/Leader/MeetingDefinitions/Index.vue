@@ -39,6 +39,7 @@ function destroy(id) {
                     <tr class="border-b text-left text-gray-600">
                         <th class="py-2 pr-4">タイトル</th>
                         <th class="py-2 pr-4">繰り返し</th>
+                        <th class="py-2 pr-4">週</th>
                         <th class="py-2 pr-4">曜日</th>
                         <th class="py-2 pr-4">時間</th>
                         <th class="py-2 pr-4">メンバー数</th>
@@ -53,6 +54,7 @@ function destroy(id) {
                     >
                         <td class="py-2 pr-4 font-medium">{{ def.title }}</td>
                         <td class="py-2 pr-4">{{ recurrenceLabel[def.recurrence] }}</td>
+                        <td class="py-2 pr-4">{{ def.recurrence === 'monthly' && def.week_of_month ? `第${def.week_of_month}週` : '—' }}</td>
                         <td class="py-2 pr-4">{{ dayLabel[def.day_of_week] }}曜</td>
                         <td class="py-2 pr-4">{{ def.start_time.slice(0,5) }}〜{{ def.end_time.slice(0,5) }}</td>
                         <td class="py-2 pr-4">{{ def.members?.length ?? 0 }}名</td>

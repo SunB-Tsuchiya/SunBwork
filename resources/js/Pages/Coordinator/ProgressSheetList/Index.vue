@@ -5,6 +5,55 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import CoordinatorNavigationTabs from '@/Components/Tabs/CoordinatorNavigationTabs.vue';
 import axios from 'axios';
 
+// ── 新規作成モーダル ────────────────────────────────────────────────────────
+const showCreateModal    = ref(false);
+const createModalLoading = ref(false);
+const createClients      = ref([]);
+const createProjects     = ref([]);
+const createClientId     = ref('');
+const createProjectId    = ref('');
+
+const createFilteredProjects = computed(() => {
+    if (!createClientId.value) return [];
+    return createProjects.value.filter(p => String(p.client_id) === String(createClientId.value));
+});
+
+async function openCreateModal() {
+    createClientId.value  = '';
+    createProjectId.value = '';
+    showCreateModal.value = true;
+
+    if (createClients.value.length === 0) {
+        createModalLoading.value = true;
+        try {
+            const res = await fetch(route('coordinator.progress_sheet_list.create_projects_json'), {
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.clients?.length)  createClients.value  = data.clients;
+                if (data.projects?.length) createProjects.value = data.projects;
+            }
+        } catch (e) {
+            // ignore
+        } finally {
+            createModalLoading.value = false;
+        }
+    }
+}
+
+function goToCreateSheet() {
+    if (!createProjectId.value) return;
+    showCreateModal.value = false;
+    sessionStorage.setItem('sbw_ps_create_return', 'progress_sheet_list');
+    router.visit(
+        route('coordinator.project_jobs.show', { projectJob: createProjectId.value })
+        + '?create_sheet=1',
+    );
+}
+// ───────────────────────────────────────────────────────────────────────────
+
 const props = defineProps({
     sheets:         { type: Array, default: () => [] },
     favoriteSheets: { type: Array, default: () => [] },
@@ -145,6 +194,13 @@ function openSheet(sheet) {
     <AppLayout title="進行表一覧">
         <template #header>
             <h2 class="text-xl font-semibold leading-tight text-gray-800">進行表一覧</h2>
+        </template>
+
+        <template #headerExtras>
+            <button
+                @click="openCreateModal"
+                class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+            >新規作成</button>
         </template>
 
         <template #tabs>
@@ -318,4 +374,66 @@ function openSheet(sheet) {
 
         </div>
     </AppLayout>
+
+    <!-- ── 新規作成モーダル（案件選択） ──────────────────────────────────── -->
+    <Teleport to="body">
+        <div
+            v-if="showCreateModal"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+            @click.self="showCreateModal = false"
+        >
+            <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+                <h2 class="mb-4 text-lg font-semibold text-gray-800">進行表を新規作成</h2>
+
+                <div v-if="createModalLoading" class="py-8 text-center text-sm text-gray-500">読み込み中…</div>
+                <div v-else>
+                    <div v-if="createClients.length === 0" class="py-4 text-center text-sm text-gray-400">
+                        リーダーまたは副リーダーの案件がありません。
+                    </div>
+                    <template v-else>
+                        <!-- クライアント選択 -->
+                        <div class="mb-4">
+                            <label class="mb-1 block text-sm font-medium text-gray-700">クライアント</label>
+                            <select
+                                v-model="createClientId"
+                                @change="createProjectId = ''"
+                                class="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                            >
+                                <option value="">— 選択してください —</option>
+                                <option v-for="c in createClients" :key="c.id" :value="String(c.id)">{{ c.name }}</option>
+                            </select>
+                        </div>
+
+                        <!-- 案件選択（クライアント選択後） -->
+                        <div v-if="createClientId" class="mb-4">
+                            <label class="mb-1 block text-sm font-medium text-gray-700">案件</label>
+                            <select
+                                v-model="createProjectId"
+                                class="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                            >
+                                <option value="">— 選択してください —</option>
+                                <option v-for="p in createFilteredProjects" :key="p.id" :value="String(p.id)">{{ p.title }}</option>
+                            </select>
+                        </div>
+                    </template>
+                </div>
+
+                <div class="mt-6 flex justify-end gap-3">
+                    <button
+                        type="button"
+                        @click="showCreateModal = false"
+                        class="rounded bg-gray-100 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200"
+                    >キャンセル</button>
+                    <button
+                        type="button"
+                        @click="goToCreateSheet"
+                        :disabled="!createProjectId"
+                        :class="createProjectId
+                            ? 'rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700'
+                            : 'cursor-not-allowed rounded bg-gray-300 px-4 py-2 text-sm font-medium text-gray-400'"
+                    >次へ（案件詳細へ）</button>
+                </div>
+            </div>
+        </div>
+    </Teleport>
 </template>

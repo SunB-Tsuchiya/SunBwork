@@ -5,15 +5,17 @@ import { computed, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
 
 const props = defineProps({
-    eventItemTypes: { type: Array,  default: () => [] },
-    clients:        { type: Array,  default: () => [] },
-    projects:       { type: Array,  default: () => [] },
-    event:          { type: Object, default: null },
-    date:           { type: String, default: '' },
-    startHour:      { type: String, default: '09' },
-    startMinute:    { type: String, default: '00' },
-    endHour:        { type: String, default: '10' },
-    endMinute:      { type: String, default: '00' },
+    eventItemTypes:    { type: Array,  default: () => [] },
+    clients:           { type: Array,  default: () => [] },
+    projects:          { type: Array,  default: () => [] },
+    event:             { type: Object, default: null },
+    selectedClientId:  { type: Number, default: null },
+    selectedProjectId: { type: Number, default: null },
+    date:              { type: String, default: '' },
+    startHour:         { type: String, default: '09' },
+    startMinute:       { type: String, default: '00' },
+    endHour:           { type: String, default: '10' },
+    endMinute:         { type: String, default: '00' },
 });
 
 const isEdit = computed(() => !!props.event);
@@ -25,8 +27,8 @@ const showClientFields = computed(() => ['client_visit', 'customer_visit'].inclu
 const showDestination   = computed(() => selectedType.value?.slug === 'outing');
 
 // ---- クライアント・プロジェクト ----
-const selectedClientId  = ref(props.event?.project_job?.client_id ?? null);
-const selectedProjectId = ref(props.event?.project_job_id ?? null);
+const selectedClientId  = ref(props.selectedClientId ?? props.event?.project_job?.client_id ?? null);
+const selectedProjectId = ref(props.selectedProjectId ?? props.event?.project_job_id ?? null);
 
 const filteredProjects = computed(() => {
     if (!selectedClientId.value) return [];
@@ -43,6 +45,8 @@ watch(selectedTypeId, () => {
         selectedClientId.value = null;
         selectedProjectId.value = null;
     }
+    // タイプ変更は新しい意図なので手動編集フラグをリセットして必ず更新
+    titleManuallyEdited.value = false;
     autoUpdateTitle();
 });
 
@@ -51,8 +55,8 @@ const titleManuallyEdited = ref(false);
 
 const autoTitle = computed(() => {
     const typeName    = selectedType.value?.name ?? '';
-    const clientName  = props.clients.find((c) => c.id === selectedClientId.value)?.name ?? '';
-    const projectName = filteredProjects.value.find((p) => p.id === selectedProjectId.value)?.title ?? '';
+    const clientName  = props.clients.find((c) => String(c.id) === String(selectedClientId.value))?.name ?? '';
+    const projectName = filteredProjects.value.find((p) => String(p.id) === String(selectedProjectId.value))?.title ?? '';
     return [typeName, clientName, projectName].filter(Boolean).join('_');
 });
 
@@ -72,7 +76,7 @@ function minsOptions(currentVal) {
 const form = useForm({
     event_item_type_id:      selectedTypeId.value,
     title:                   props.event?.title ?? autoTitle.value,
-    description:             props.event?.description ?? '',
+    description:             props.event?.description ?? props.event?.body ?? '',
     date:                    props.date,
     startHour:               props.startHour,
     startMinute:             props.startMinute,
@@ -87,7 +91,6 @@ const form = useForm({
 // form と reactive ref を同期
 watch(selectedTypeId,    (v) => { form.event_item_type_id = v; });
 watch(selectedProjectId, (v) => { form.project_job_id = v; });
-watch(() => form.title,  () => { titleManuallyEdited.value = true; });
 
 // 開始時刻変更で終了時刻を追従
 watch(
@@ -217,7 +220,7 @@ const submit = () => {
             </div>
         </template>
 
-        <div class="mx-auto max-w-3xl rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
             <form @submit.prevent="submit" class="space-y-5">
 
                 <div v-if="errorMessage" class="rounded border-l-4 border-red-500 bg-red-50 p-3 text-red-700 text-sm">
@@ -267,6 +270,7 @@ const submit = () => {
                         class="w-full rounded border p-2 text-sm"
                         required
                         placeholder="自動生成されます（手動で変更可）"
+                        @input="titleManuallyEdited = true"
                     />
                     <p v-if="form.errors.title" class="mt-1 text-xs text-red-500">{{ form.errors.title }}</p>
                 </div>

@@ -75,19 +75,14 @@
           class="rounded border border-gray-300 px-1 py-1 text-xs focus:border-indigo-400 focus:outline-none"
           @change="setNodeType(node, $event.target.value)"
         >
-          <option value="text">自由入力</option>
+          <option value="stage">ステージ</option>
+          <option value="worker">組版担当</option>
+          <option value="proof_v2">校正担当</option>
+          <option value="schedlink">スケジュール連携</option>
+          <option value="workItemType">作業種別</option>
           <option value="date">日付</option>
           <option value="checkbox">チェック</option>
-          <option value="worktime">作業時間</option>
-          <option value="stage">ステージ</option>
-          <option value="size">サイズ</option>
-          <option value="assignment">作業分担</option>
-          <option value="workItemType">作業種別</option>
-          <option value="proof_user">校正担当者</option>
-          <option value="proof_v2">校正担当者（V2）</option>
-          <option value="joblink">登録・詳細</option>
-          <option value="worker">組版担当（V2）</option>
-          <option value="schedlink">予定連携（V2）</option>
+          <option value="text">自由入力</option>
         </select>
         <!-- グループ（子あり）インジケーター -->
         <span v-if="node.children?.length > 0" class="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">グループ</span>

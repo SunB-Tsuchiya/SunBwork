@@ -39,9 +39,23 @@ class ProjectJobAssignmentUserController extends Controller
             $ptms = \App\Models\ProjectTeamMember::with(['projectJob.client'])
                 ->where('user_id', $user->id)
                 ->get();
-            $jobs = $ptms->map(function ($ptm) {
+            $jobsFromTeam = $ptms->map(function ($ptm) {
                 return $ptm->projectJob;
             })->filter();
+
+            // 案件リーダーとして紐づいている案件
+            $jobsAsLeader = \App\Models\ProjectJob::with('client')
+                ->where('user_id', $user->id)
+                ->where('completed', false)
+                ->get();
+
+            // 副リーダー（project_job_coordinators）として紐づいている案件
+            $jobsAsSubLeader = \App\Models\ProjectJob::with('client')
+                ->whereHas('coordinators', fn($q) => $q->where('users.id', $user->id))
+                ->where('completed', false)
+                ->get();
+
+            $jobs = $jobsFromTeam->merge($jobsAsLeader)->merge($jobsAsSubLeader)->unique('id');
 
             $userProjects = $jobs->map(function ($job) {
                 return [

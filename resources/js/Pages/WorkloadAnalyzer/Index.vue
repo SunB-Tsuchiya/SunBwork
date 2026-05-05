@@ -2,7 +2,7 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import { useUIState } from '@/Composables/useUIState';
 import { Inertia } from '@inertiajs/inertia';
-import { Head, usePage } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 defineProps({
     // 期待する props: companies: [{ id, name, departments: [{ id, name, teams: [{ id, name, members: [{ id, name }] }] }] }]
@@ -161,7 +161,17 @@ for (let i = 0; i < 12; i++) {
     months.push({ value: `${y}-${m}`, label: `${y}年${m}月` });
 }
 
-const guideUrl = computed(() => `${rolePrefix}/workload-analyzer/guide`);
+const guideUrl = computed(() => {
+    try { return route(`${routeNamePrefix}.workload_analyzer.guide`); } catch (e) {}
+    return `${rolePrefix}/workload-analyzer/guide`;
+});
+
+const settingsUrl = computed(() => {
+    try { return route(`${routeNamePrefix}.workload_analyzer.settings`); } catch (e) {}
+    return `${rolePrefix}/workload-analyzer/settings`;
+});
+
+const canAccessSettings = computed(() => routeNamePrefix !== 'superadmin');
 
 function goToCategoryRank() {
     const ym = selectedYm.value || currentMonth;
@@ -343,15 +353,15 @@ function diffMinutes(estimated, actual) {
     <AppLayout title="作業量分析">
         <template #header>
             <div class="flex items-center gap-2.5">
-                <h1 class="text-2xl font-semibold">作業量分析</h1>
-                <h2 class="text-lg text-gray-600">{{ selectedYmLabel }}</h2>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">作業量分析</h2>
+                <span class="text-base text-gray-500">{{ selectedYmLabel }}</span>
             </div>
         </template>
 
         <!-- settings button slot -->
         <template #headerExtras>
             <div class="flex items-center gap-2">
-                <a
+                <Link
                     :href="guideUrl"
                     class="inline-flex items-center rounded bg-blue-50 px-3 py-1 text-sm text-blue-700 hover:bg-blue-100"
                 >
@@ -359,9 +369,10 @@ function diffMinutes(estimated, actual) {
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
                     分析ガイド
-                </a>
-                <a
-                    href="/leader/workload-analyzer/settings"
+                </Link>
+                <Link
+                    v-if="canAccessSettings"
+                    :href="settingsUrl"
                     class="inline-flex items-center rounded bg-gray-100 px-3 py-1 text-sm text-gray-700 hover:bg-gray-200"
                 >
                     <svg class="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
@@ -381,7 +392,7 @@ function diffMinutes(estimated, actual) {
                         />
                     </svg>
                     設定
-                </a>
+                </Link>
             </div>
         </template>
 

@@ -2,7 +2,7 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import { useUIState } from '@/Composables/useUIState';
 import { Inertia } from '@inertiajs/inertia';
-import { Head, usePage } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 
 const props = defineProps({
@@ -212,6 +212,16 @@ const rankBadgeClass = (rank) => {
 
 <template>
     <AppLayout title="作業量分析 カテゴリ別ランク">
+        <template #header>
+            <div class="flex items-center gap-3">
+                <Link
+                    :href="(() => { try { return route(`${routeNamePrefix}.workload_analyzer.index`); } catch(e) { return `${rolePrefix}/workload-analyzer`; } })()"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                >← 作業量分析に戻る</Link>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">作業量分析 — カテゴリ別ランク</h2>
+            </div>
+        </template>
+
         <Head title="作業量分析 カテゴリ別ランク" />
 
         <div class="rounded bg-white p-6 shadow">

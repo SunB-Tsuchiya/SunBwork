@@ -10,6 +10,7 @@ use App\Models\ProjectSchedule;
 use App\Models\ProgressSheet;
 use App\Models\ProgressRow;
 use App\Models\ProgressCell;
+use App\Models\ProjectTeamMember;
 use App\Models\User;
 use Illuminate\Support\Arr;
 use Inertia\Inertia;
@@ -381,9 +382,17 @@ class ProjectJobController extends Controller
 
             // チームメンバーの作成
             foreach ($teamMembers as $member) {
-                \App\Models\ProjectTeamMember::create([
+                ProjectTeamMember::firstOrCreate([
                     'project_job_id' => $job->id,
-                    'user_id' => (int) $member['user_id'],
+                    'user_id'        => (int) $member['user_id'],
+                ]);
+            }
+
+            // リーダー・副リーダーをチームメンバーに自動追加（追加のみ・削除なし）
+            foreach (array_unique(array_merge([(int) $job->user_id], $syncIds)) as $userId) {
+                ProjectTeamMember::firstOrCreate([
+                    'project_job_id' => $job->id,
+                    'user_id'        => $userId,
                 ]);
             }
 
@@ -997,6 +1006,14 @@ class ProjectJobController extends Controller
             // リーダー自身はピボットに入れない
             $syncIds = array_values(array_filter($subIds, fn ($id) => $id != $projectJob->user_id));
             $projectJob->coordinators()->sync($syncIds);
+
+            // リーダー・副リーダーをチームメンバーに自動追加（追加のみ・削除なし）
+            foreach (array_unique(array_merge([(int) $projectJob->user_id], $syncIds)) as $userId) {
+                ProjectTeamMember::firstOrCreate([
+                    'project_job_id' => $projectJob->id,
+                    'user_id'        => $userId,
+                ]);
+            }
 
             return redirect()->route('coordinator.project_jobs.index');
         } catch (\Illuminate\Validation\ValidationException $e) {

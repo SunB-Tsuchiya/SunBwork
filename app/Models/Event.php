@@ -13,6 +13,7 @@ class Event extends Model
         'user_id',
         'project_job_assignment_id',
         'project_job_id',
+        'meeting_definition_id',
         'destination',
         'title',
         'event_item_type_id',

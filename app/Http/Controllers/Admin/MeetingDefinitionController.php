@@ -44,24 +44,26 @@ class MeetingDefinitionController extends LeaderMeetingDefinitionController
     {
         // Leader の store ロジックを再利用し、リダイレクト先だけ admin ルートに変更
         $validated = $request->validate([
-            'title'       => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'recurrence'  => 'required|in:weekly,biweekly,monthly',
-            'day_of_week' => 'required|integer|min:0|max:6',
-            'start_time'  => 'required|date_format:H:i',
-            'end_time'    => 'required|date_format:H:i|after:start_time',
-            'members'     => 'required|array|min:1',
-            'members.*'   => 'exists:users,id',
+            'title'         => 'required|string|max:255',
+            'description'   => 'nullable|string',
+            'recurrence'    => 'required|in:weekly,biweekly,monthly',
+            'day_of_week'   => 'required|integer|min:0|max:6',
+            'week_of_month' => 'nullable|integer|min:1|max:5',
+            'start_time'    => 'required|date_format:H:i',
+            'end_time'      => 'required|date_format:H:i|after:start_time',
+            'members'       => 'required|array|min:1',
+            'members.*'     => 'exists:users,id',
         ]);
 
         $def = MeetingDefinition::create([
-            'created_by'  => Auth::id(),
-            'title'       => $validated['title'],
-            'description' => $validated['description'] ?? null,
-            'recurrence'  => $validated['recurrence'],
-            'day_of_week' => $validated['day_of_week'],
-            'start_time'  => $validated['start_time'],
-            'end_time'    => $validated['end_time'],
+            'created_by'    => Auth::id(),
+            'title'         => $validated['title'],
+            'description'   => $validated['description'] ?? null,
+            'recurrence'    => $validated['recurrence'],
+            'day_of_week'   => $validated['day_of_week'],
+            'week_of_month' => $validated['recurrence'] === 'monthly' ? ($validated['week_of_month'] ?? null) : null,
+            'start_time'    => $validated['start_time'],
+            'end_time'      => $validated['end_time'],
         ]);
         $def->members()->sync($validated['members']);
 
@@ -89,23 +91,25 @@ class MeetingDefinitionController extends LeaderMeetingDefinitionController
         }
 
         $validated = $request->validate([
-            'title'       => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'recurrence'  => 'required|in:weekly,biweekly,monthly',
-            'day_of_week' => 'required|integer|min:0|max:6',
-            'start_time'  => 'required|date_format:H:i',
-            'end_time'    => 'required|date_format:H:i|after:start_time',
-            'members'     => 'required|array|min:1',
-            'members.*'   => 'exists:users,id',
+            'title'         => 'required|string|max:255',
+            'description'   => 'nullable|string',
+            'recurrence'    => 'required|in:weekly,biweekly,monthly',
+            'day_of_week'   => 'required|integer|min:0|max:6',
+            'week_of_month' => 'nullable|integer|min:1|max:5',
+            'start_time'    => 'required|date_format:H:i',
+            'end_time'      => 'required|date_format:H:i|after:start_time',
+            'members'       => 'required|array|min:1',
+            'members.*'     => 'exists:users,id',
         ]);
 
         $meetingDefinition->update([
-            'title'       => $validated['title'],
-            'description' => $validated['description'] ?? null,
-            'recurrence'  => $validated['recurrence'],
-            'day_of_week' => $validated['day_of_week'],
-            'start_time'  => $validated['start_time'],
-            'end_time'    => $validated['end_time'],
+            'title'         => $validated['title'],
+            'description'   => $validated['description'] ?? null,
+            'recurrence'    => $validated['recurrence'],
+            'day_of_week'   => $validated['day_of_week'],
+            'week_of_month' => $validated['recurrence'] === 'monthly' ? ($validated['week_of_month'] ?? null) : null,
+            'start_time'    => $validated['start_time'],
+            'end_time'      => $validated['end_time'],
         ]);
         $meetingDefinition->members()->sync($validated['members']);
 

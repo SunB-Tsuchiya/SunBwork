@@ -1,6 +1,6 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Head, usePage } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 const page = usePage();
@@ -12,17 +12,29 @@ const rolePrefix = (() => {
     if (r.includes('admin')) return '/admin';
     return '/leader';
 })();
+const routeNamePrefix = (() => {
+    const r = String(userRole).toLowerCase();
+    if (r.includes('super')) return 'superadmin';
+    if (r.includes('admin')) return 'admin';
+    return 'leader';
+})();
 
-const indexUrl    = computed(() => `${rolePrefix}/workload-analyzer`);
-const settingsUrl = computed(() => `${rolePrefix}/workload-analyzer/settings`);
+const indexUrl    = computed(() => {
+    try { return route(`${routeNamePrefix}.workload_analyzer.index`); } catch (e) {}
+    return `${rolePrefix}/workload-analyzer`;
+});
+const settingsUrl = computed(() => {
+    try { return route(`${routeNamePrefix}.workload_analyzer.settings`); } catch (e) {}
+    return `${rolePrefix}/workload-analyzer/settings`;
+});
 </script>
 
 <template>
     <AppLayout title="作業量分析 — 分析ガイド">
         <template #header>
             <div class="flex items-center gap-3">
-                <a :href="indexUrl" class="text-sm text-gray-500 hover:text-gray-700">← 分析一覧に戻る</a>
-                <h2 class="text-xl font-semibold text-gray-800">作業量分析 — 分析ガイド</h2>
+                <Link :href="indexUrl" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">← 作業量分析に戻る</Link>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">作業量分析 — 分析ガイド</h2>
             </div>
         </template>
 
@@ -101,7 +113,7 @@ const settingsUrl = computed(() => `${rolePrefix}/workload-analyzer/settings`);
                     </table>
                 </div>
                 <p class="mt-3 text-xs text-gray-500">
-                    ※ 各係数は「<a :href="settingsUrl" class="text-blue-600 underline">作業量分析 設定</a>」画面で調整可能です。
+                    ※ 各係数は「<Link :href="settingsUrl" class="text-blue-600 underline">作業量分析 設定</Link>」画面で調整可能です。
                 </p>
             </div>
 
@@ -333,7 +345,7 @@ const settingsUrl = computed(() => `${rolePrefix}/workload-analyzer/settings`);
                         <p class="font-semibold text-gray-800">Q. 係数はどこで変更できる？</p>
                         <p class="mt-1 text-sm text-gray-600">
                             A.
-                            <a :href="settingsUrl" class="text-blue-600 underline">作業量分析 設定</a>
+                            <Link :href="settingsUrl" class="text-blue-600 underline">作業量分析 設定</Link>
                             画面でステージ・サイズ・種別・難易度・イベント種別・残業の係数を変更できます。
                             変更は翌月の計算から反映されます。
                         </p>
@@ -363,14 +375,7 @@ const settingsUrl = computed(() => `${rolePrefix}/workload-analyzer/settings`);
                 </div>
             </div>
 
-            <!-- 戻るボタン -->
-            <div class="flex justify-center pb-4">
-                <a
-                    :href="indexUrl"
-                    class="rounded bg-orange-600 px-6 py-2 text-sm font-medium text-white hover:bg-orange-700"
-                >← 分析一覧に戻る</a>
-            </div>
-
         </div>
+
     </AppLayout>
 </template>

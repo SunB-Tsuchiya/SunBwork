@@ -117,6 +117,7 @@ class ProjectSchedulesCalendarController extends Controller
             'client' => $client,
             'comments' => $comments,
             'memos' => $projectMemos,
+            'initialView' => in_array($request->input('view'), ['calendar', 'week-planner']) ? $request->input('view') : 'calendar',
         ]);
     }
 

@@ -315,7 +315,17 @@ onMounted(() => {
 </script>
 
 <template>
-    <AppLayout>
+    <AppLayout title="作業量分析 — 詳細">
+        <template #header>
+            <div class="flex items-center gap-3">
+                <Link
+                    :href="route(`${routePrefix}.workload_analyzer.index`)"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                >← 作業量分析に戻る</Link>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">{{ props.user_name ?? `ユーザー #${props.user_id}` }} — 作業量分析詳細</h2>
+            </div>
+        </template>
+
         <Head title="作業量分析 - 詳細" />
 
         <div class="rounded bg-white p-6 shadow">
@@ -324,7 +334,6 @@ onMounted(() => {
                             <h1 class="text-2xl font-bold">{{ props.user_name ?? `ユーザー #${props.user_id}` }}</h1>
                             <p class="mt-1 text-base text-gray-600">作業量分析 — {{ props.selected_ym?.replace('-', '年').replace(/(\d{2})$/, (m) => parseInt(m, 10) + '月') }}</p>
                         </div>
-                        <Link :href="route(`${routePrefix}.workload_analyzer.index`)" class="text-sm text-blue-600 hover:underline">← 一覧に戻る</Link>
                     </div>
 
                     <div class="space-y-6">

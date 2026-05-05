@@ -2,9 +2,10 @@
 import ProjectCalendar from '@/Components/ProjectCalendar.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link } from '@inertiajs/vue3';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
 import axios from 'axios';
+import { scheduleStatusColor } from '@/Helpers/scheduleColor.js';
 
 const props = defineProps({
     schedules: { type: Array, default: () => [] },
@@ -12,6 +13,7 @@ const props = defineProps({
     client: { type: Object, default: null },
     comments: { type: Array, default: () => [] },
     memos: { type: Array, default: () => [] },
+    initialView: { type: String, default: 'calendar' },
 });
 
 // カレンダー連携設定を非同期で取得（calendar_linked=true の項目のみ）
@@ -27,52 +29,50 @@ onMounted(async () => {
 });
 
 // Convert schedules to FullCalendar events
-const events = ref(
-    (props.schedules || []).map((s) => {
-        // start_date / end_date はバックエンドで date:Y-m-d キャストされるため YYYY-MM-DD で届く
-        const startDateOnly = s.start_date ? String(s.start_date).split('T')[0] : null;
-        const endDateOnly = s.end_date ? String(s.end_date).split('T')[0] : null;
-
-        // FullCalendar の allDay イベントは end が exclusive なので +1日する
-        let endForCalendar = endDateOnly;
-        if (endDateOnly) {
-            try {
-                const parts = endDateOnly.split('-').map(Number);
-                const d = new Date(parts[0], parts[1] - 1, parts[2]);
-                d.setDate(d.getDate() + 1);
-                endForCalendar = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-            } catch (e) {
-                endForCalendar = endDateOnly;
-            }
+function mapScheduleToEvent(s) {
+    const startDateOnly = s.start_date ? String(s.start_date).split('T')[0] : null;
+    const endDateOnly = s.end_date ? String(s.end_date).split('T')[0] : null;
+    let endForCalendar = endDateOnly;
+    if (endDateOnly) {
+        try {
+            const parts = endDateOnly.split('-').map(Number);
+            const d = new Date(parts[0], parts[1] - 1, parts[2]);
+            d.setDate(d.getDate() + 1);
+            endForCalendar = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        } catch (e) {
+            endForCalendar = endDateOnly;
         }
-
-        const isCompleted = !!s.completed_at || (s.progress ?? 0) >= 100;
-        const C = isCompleted
-            ? { bg: '#dcfce7', border: '#15803d', text: '#14532d' }
-            : { bg: '#dbeafe', border: '#1d4ed8', text: '#1e3a8a' };
-
-        return {
-            id: s.id,
-            title: s.name ?? '',
-            start: startDateOnly,
-            end: endForCalendar,
-            allDay: true,
-            color: C.text,
-            backgroundColor: C.bg,
-            borderColor: C.border,
-            textColor: C.text,
+    }
+    const isCompleted = !!s.completed_at || (s.progress ?? 0) >= 100;
+    const uc = scheduleStatusColor(endDateOnly, isCompleted);
+    return {
+        id: s.id,
+        title: s.name ?? '',
+        start: startDateOnly,
+        end: endForCalendar,
+        allDay: true,
+        color: uc.border,
+        backgroundColor: uc.bg,
+        borderColor: uc.border,
+        textColor: uc.text,
+        description: s.description ?? '',
+        extendedProps: {
+            schedule_id: s.id,
+            project_schedule_id: s.id,
+            progress: s.progress ?? 0,
             description: s.description ?? '',
-            extendedProps: {
-                schedule_id: s.id,
-                project_schedule_id: s.id,
-                progress: s.progress ?? 0,
-                description: s.description ?? '',
-                completed_at: s.completed_at ?? null,
-                original_color: s.color ?? null,
-            },
-        };
-    }),
-);
+            completed_at: s.completed_at ?? null,
+            end_date: endDateOnly,
+        },
+    };
+}
+
+const events = ref((props.schedules || []).map(mapScheduleToEvent));
+
+// router.reload() 後に props.schedules が更新されたとき、events を再構築
+watch(() => props.schedules, (newSchedules) => {
+    events.value = (newSchedules || []).map(mapScheduleToEvent);
+});
 
 // Debug: log incoming props and computed events
 // debug logging removed
@@ -115,6 +115,8 @@ const weekPostsUrl = computed(() =>
                         :weekPostsUrl="weekPostsUrl"
                         :uniformColors="true"
                         :showMemoButton="false"
+                        :initialView="props.initialView"
+                        :panelStorageKey="props.project ? 'cal_sp_' + props.project.id : ''"
                     />
         </div>
     </AppLayout>

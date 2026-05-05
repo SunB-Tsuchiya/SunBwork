@@ -26,8 +26,13 @@
                         <div
                             v-for="s in day.schedules"
                             :key="s.id"
-                            class="mb-1 inline-block rounded px-2 py-0.5 text-xs font-medium text-white"
-                            :style="{ backgroundColor: s.color || '#6366f1' }"
+                            class="mb-1 inline-block rounded px-2 py-0.5 text-xs font-medium"
+                            :style="{
+                                backgroundColor: scheduleStatusColor(s.end_date, !!s.completed_at || (s.progress ?? 0) >= 100).bg,
+                                borderColor: scheduleStatusColor(s.end_date, !!s.completed_at || (s.progress ?? 0) >= 100).border,
+                                color: scheduleStatusColor(s.end_date, !!s.completed_at || (s.progress ?? 0) >= 100).text,
+                                border: '1px solid',
+                            }"
                         >
                             {{ s.name || '（タイトルなし）' }}
                             <span class="ml-1 font-normal opacity-80">〜{{ formatDate(s.end_date) }}</span>
@@ -133,6 +138,7 @@
 <script setup>
 import axios from 'axios';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { scheduleStatusColor } from '@/Helpers/scheduleColor.js';
 
 const props = defineProps({
     schedules: { type: Array, default: () => [] },

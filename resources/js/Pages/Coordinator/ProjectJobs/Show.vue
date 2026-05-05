@@ -177,150 +177,18 @@
 
                 <!-- ── スケジュールセクション ──────────────────── -->
                 <section v-show="activeTab === 'schedule'" class="py-5">
-                    <div class="mb-3 flex items-center gap-4">
-                        <h3 class="font-semibold text-gray-800">スケジュール</h3>
-                        <div class="flex gap-2">
-                            <button
-                                type="button"
-                                :class="scheduleEditMode
-                                    ? 'rounded border border-gray-400 bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700'
-                                    : 'rounded border border-gray-300 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50'"
-                                @click="toggleScheduleEditMode"
-                            >{{ scheduleEditMode ? '編集モードを終了' : '編集モード' }}</button>
-                            <button
-                                v-if="!scheduleEditMode"
-                                type="button"
-                                class="rounded border border-blue-300 px-3 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50"
-                                @click="goScheduleCalendar"
-                            >{{ hasScheduleFlag ? 'カレンダーで編集' : 'カレンダーで登録' }}</button>
-                            <button
-                                v-if="!scheduleEditMode"
-                                type="button"
-                                class="rounded border border-green-600 px-3 py-1 text-xs font-medium text-green-700 hover:bg-green-50"
-                                @click="handleCsvExport"
-                            >CSV出力</button>
-                            <button
-                                v-if="!scheduleEditMode"
-                                type="button"
-                                class="rounded border border-indigo-500 px-3 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-50"
-                                @click="openCsvImportModal"
-                            >CSV取込</button>
-                        </div>
-                    </div>
-
-                    <!-- 閲覧モード -->
-                    <template v-if="!scheduleEditMode">
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full border text-sm">
-                                <thead>
-                                    <tr class="bg-gray-50">
-                                        <th
-                                            class="cursor-pointer select-none border px-3 py-1.5 text-left text-xs font-medium text-gray-500 hover:bg-gray-100"
-                                            @click="toggleScheduleSort('start_date')"
-                                        >開始日 <span class="ml-0.5">{{ scheduleSortIcon('start_date') }}</span></th>
-                                        <th
-                                            class="cursor-pointer select-none border px-3 py-1.5 text-left text-xs font-medium text-gray-500 hover:bg-gray-100"
-                                            @click="toggleScheduleSort('end_date')"
-                                        >終了日 <span class="ml-0.5">{{ scheduleSortIcon('end_date') }}</span></th>
-                                        <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">タイトル</th>
-                                        <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">内容</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr
-                                        v-for="s in sortedSchedules"
-                                        :key="s.id"
-                                        class="hover:bg-gray-50"
-                                    >
-                                        <td class="border px-3 py-2 text-gray-700">{{ formatDate(s.start_date) }}</td>
-                                        <td class="border px-3 py-2 text-gray-700">{{ formatDate(s.end_date) }}</td>
-                                        <td class="border px-3 py-2 font-medium text-gray-900">{{ s.name || '-' }}</td>
-                                        <td class="border px-3 py-2 text-gray-600">{{ truncate(s.description, 40) }}</td>
-                                    </tr>
-                                    <tr v-if="sortedSchedules.length === 0">
-                                        <td colspan="4" class="border px-3 py-4 text-center text-xs text-gray-400">スケジュール未登録</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </template>
-
-                    <!-- 編集モード -->
-                    <template v-else>
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full border text-sm">
-                                <thead>
-                                    <tr class="bg-gray-50">
-                                        <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">開始日</th>
-                                        <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">終了日</th>
-                                        <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">タイトル</th>
-                                        <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">内容</th>
-                                        <th class="border px-2 py-1.5 text-xs font-medium text-gray-500"></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-for="(row, idx) in scheduleEditRows" :key="row._key" class="bg-white">
-                                        <td class="border px-2 py-1.5">
-                                            <input
-                                                type="date"
-                                                v-model="row.start_date"
-                                                class="w-36 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none"
-                                            />
-                                        </td>
-                                        <td class="border px-2 py-1.5">
-                                            <input
-                                                type="date"
-                                                v-model="row.end_date"
-                                                class="w-36 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none"
-                                            />
-                                        </td>
-                                        <td class="border px-2 py-1.5">
-                                            <input
-                                                type="text"
-                                                v-model="row.name"
-                                                placeholder="タイトル"
-                                                class="w-full min-w-32 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none"
-                                            />
-                                        </td>
-                                        <td class="border px-2 py-1.5">
-                                            <input
-                                                type="text"
-                                                v-model="row.description"
-                                                placeholder="内容（任意）"
-                                                class="w-full min-w-40 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none"
-                                            />
-                                        </td>
-                                        <td class="border px-2 py-1.5 text-center">
-                                            <button
-                                                type="button"
-                                                class="rounded px-2 py-0.5 text-xs text-red-500 hover:bg-red-50 hover:text-red-700"
-                                                @click="removeScheduleEditRow(idx)"
-                                            >×</button>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                        <button
-                            type="button"
-                            class="mt-2 rounded border border-dashed border-gray-300 px-4 py-1.5 text-xs text-gray-500 hover:border-indigo-300 hover:text-indigo-600"
-                            @click="addScheduleEditRow"
-                        >＋ 行を追加</button>
-                        <div class="mt-3 flex gap-2">
-                            <button
-                                type="button"
-                                :disabled="scheduleSaving"
-                                class="rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-                                @click="saveScheduleEdits"
-                            >{{ scheduleSaving ? '保存中…' : '保存' }}</button>
-                            <button
-                                type="button"
-                                :disabled="scheduleSaving"
-                                class="rounded bg-gray-100 px-4 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-200 disabled:opacity-50"
-                                @click="cancelScheduleEditMode"
-                            >キャンセル</button>
-                        </div>
-                    </template>
+                    <ProjectCalendar
+                        ref="projectCalendarRef"
+                        :schedules="schedules"
+                        :events="scheduleEvents"
+                        :comments="[]"
+                        :memos="[]"
+                        :project="{ id: job.id, name: job.title, jobcode: job.jobcode ?? null }"
+                        :weekPostsUrl="scheduleWeekPostsUrl"
+                        :showMemoButton="false"
+                        :uniformColors="true"
+                        :stayInPlace="true"
+                    />
                 </section>
 
                 <!-- ── メンバーセクション ──────────────────────── -->
@@ -963,42 +831,6 @@
         </div>
     </div>
 
-    <!-- ── スケジュール CSV インポートモーダル ──── -->
-    <div v-if="showCsvImportModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-        <div class="w-full max-w-lg rounded-lg bg-white p-6 shadow-lg">
-            <h2 class="mb-4 text-lg font-bold">CSVインポート</h2>
-            <div class="mb-4 rounded bg-gray-50 p-3 text-sm text-gray-600">
-                <p class="mb-1 font-medium">CSVファイルのフォーマット（1行目はヘッダー行）：</p>
-                <code class="block rounded bg-gray-100 p-2 text-xs">イベント名,開始日(YYYY-MM-DD),終了日(YYYY-MM-DD),メモ,色(#hex)</code>
-                <p class="mt-1 text-xs text-gray-500">※ 終了日・メモ・色は省略可</p>
-            </div>
-            <div class="mb-4">
-                <label class="mb-1 block text-sm font-medium">CSVファイルを選択</label>
-                <input
-                    type="file"
-                    accept=".csv,text/csv"
-                    @change="onCsvFileChange"
-                    class="block w-full text-sm text-gray-500 file:mr-4 file:rounded file:border-0 file:bg-indigo-50 file:px-4 file:py-2 file:text-indigo-700"
-                />
-            </div>
-            <div v-if="csvImportErrors.length > 0" class="mb-4 rounded border border-red-300 bg-red-50 p-3">
-                <p class="mb-1 text-sm font-medium text-red-700">エラーがあります（全行キャンセルされます）：</p>
-                <ul class="list-disc pl-4 text-sm text-red-600">
-                    <li v-for="err in csvImportErrors" :key="err">{{ err }}</li>
-                </ul>
-            </div>
-            <div class="mt-4 flex justify-end gap-2">
-                <button type="button" @click="showCsvImportModal = false" class="rounded bg-gray-300 px-4 py-2 text-sm">キャンセル</button>
-                <button
-                    type="button"
-                    @click="submitCsvImport"
-                    :disabled="csvImportLoading"
-                    class="rounded bg-indigo-600 px-4 py-2 text-sm text-white disabled:opacity-50"
-                >{{ csvImportLoading ? '取込中...' : 'インポート実行' }}</button>
-            </div>
-        </div>
-    </div>
-
     <!-- ── 共有モーダル ────────────────────────────────────────────── -->
     <Teleport to="body">
         <div
@@ -1096,13 +928,42 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
 import ProjectJobItemsTab from '@/Components/ProjectJobItemsTab.vue';
+import ProjectCalendar from '@/Components/ProjectCalendar.vue';
+import { scheduleStatusColor } from '@/Helpers/scheduleColor.js';
 import { Link, router, usePage, useForm } from '@inertiajs/vue3';
 import axios from 'axios';
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 
 const page = usePage();
 const job  = page.props.job || {};
 const schedules = computed(() => Array.isArray(page.props.schedules) ? page.props.schedules : []);
+
+// FullCalendar 用イベント（スケジュールタブに埋め込む ProjectCalendar 向け）
+const scheduleEvents = computed(() =>
+    schedules.value.map((s) => {
+        const startDateOnly = s.start_date ? String(s.start_date).split('T')[0] : null;
+        const endDateOnly   = s.end_date   ? String(s.end_date).split('T')[0]   : null;
+        let endForCalendar = endDateOnly;
+        if (endDateOnly) {
+            try {
+                const [y, m, d] = endDateOnly.split('-').map(Number);
+                const dt = new Date(y, m - 1, d);
+                dt.setDate(dt.getDate() + 1);
+                endForCalendar = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+            } catch { /* ignore */ }
+        }
+        const isCompleted = !!s.completed_at || (s.progress ?? 0) >= 100;
+        const uc = scheduleStatusColor(endDateOnly, isCompleted);
+        return {
+            id: s.id, title: s.name ?? '', start: startDateOnly, end: endForCalendar,
+            allDay: true, backgroundColor: uc.bg, borderColor: uc.border, textColor: uc.text,
+            extendedProps: { schedule_id: s.id, progress: s.progress ?? 0, completed_at: s.completed_at ?? null },
+        };
+    })
+);
+const scheduleWeekPostsUrl = computed(() =>
+    job.id ? route('coordinator.project_jobs.week_posts.index', { projectJob: job.id }) : null
+);
 
 // ── スケジュール ソート（閲覧モード） ───────────────────────────────────────
 const scheduleSortKey = ref('start_date');
@@ -1282,7 +1143,21 @@ const tabs = [
     { key: 'items',     label: '連携設定' },
     { key: 'history',   label: 'ジョブ履歴' },
 ];
-const activeTab = ref(new URLSearchParams(window.location.search).get('tab') || 'overview');
+const activeTab = ref((() => {
+    const fromUrl = new URLSearchParams(window.location.search).get('tab');
+    if (fromUrl) return fromUrl;
+    try { return localStorage.getItem(`project_job_tab_${job.id}`) || 'overview'; } catch (e) { return 'overview'; }
+})());
+
+// スケジュールタブの ProjectCalendar ref
+// 初回表示時に FullCalendar のサイズを再計算（v-showで隠された状態で mount されるため）
+const projectCalendarRef = ref(null);
+watch(activeTab, (tab) => {
+    try { localStorage.setItem(`project_job_tab_${job.id}`, tab); } catch (e) {}
+    if (tab === 'schedule') {
+        nextTick(() => projectCalendarRef.value?.updateCalendarSize?.());
+    }
+});
 
 // ── 伝票画像 ─────────────────────────────────────────────────────────────────
 const showVoucherLightbox = ref(false);
@@ -1358,6 +1233,12 @@ onMounted(() => {
                 router.visit(route('coordinator.project_team_members.create') + '?project_job_id=' + createdJobId);
             }
         }
+    }
+
+    // 進行表一覧の「新規作成」から遷移してきた場合、進行表作成モーダルを自動オープン
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('create_sheet') === '1') {
+        showCreateSheetModal.value = true;
     }
 });
 
@@ -1649,7 +1530,7 @@ function buildV2ColumnConfig(rounds) {
             return {
                 key,
                 label,
-                type: 'text',
+                type: 'stage',
                 children: [
                     { key: key + '_kumihan', label: '組版', type: 'worker' },
                     { key: key + '_kosei',   label: '校正', type: 'proof_v2' },

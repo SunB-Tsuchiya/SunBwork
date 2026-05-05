@@ -771,6 +771,12 @@ onMounted(() => {
   calcTableHeight();
   window.addEventListener('resize', calcTableHeight);
   document.body.style.overflowX = 'hidden';
+
+  // 進行表一覧の「新規作成」フローで作成された場合、一覧へリダイレクト
+  if (sessionStorage.getItem('sbw_ps_create_return') === 'progress_sheet_list') {
+    sessionStorage.removeItem('sbw_ps_create_return');
+    router.visit(route('coordinator.progress_sheet_list.index'));
+  }
 });
 
 onUnmounted(() => {

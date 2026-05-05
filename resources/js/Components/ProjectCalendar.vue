@@ -4,14 +4,14 @@
             <!-- ビュー切替（案件カレンダーのみ） -->
             <template v-if="props.project">
                 <button
-                    @click="currentView = 'calendar'"
+                    @click="switchView('calendar')"
                     class="rounded px-3 py-1.5 text-sm font-medium"
                     :class="currentView === 'calendar' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
                 >
                     月カレンダー
                 </button>
                 <button
-                    @click="currentView = 'week-planner'"
+                    @click="switchView('week-planner')"
                     class="rounded px-3 py-1.5 text-sm font-medium"
                     :class="currentView === 'week-planner' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
                 >
@@ -22,6 +22,12 @@
 
             <template v-if="currentView === 'calendar'">
                 <button v-if="!props.readonly" @click="openEventModal" class="rounded bg-blue-600 px-4 py-2 text-white">予定作成</button>
+                <button
+                    v-if="props.project && !props.readonly"
+                    @click="schedulePanelOpen = !schedulePanelOpen"
+                    class="rounded px-4 py-2 font-medium"
+                    :class="schedulePanelOpen ? 'bg-indigo-700 text-white' : 'bg-indigo-100 text-indigo-800 hover:bg-indigo-200'"
+                >スケジュール</button>
                 <button v-if="!props.readonly && props.showMemoButton" @click="goToDiaryCreate" class="rounded bg-orange-500 px-4 py-2 text-white">メモ作成</button>
 
                 <!-- CSV操作（案件に紐付いたカレンダーのみ表示） -->
@@ -36,6 +42,122 @@
             </template>
         </div>
 
+        <!-- ── スケジュールパネル（トグル、カレンダー上部） ── -->
+        <div v-if="schedulePanelOpen && props.project && !props.readonly" class="mb-4 rounded border border-gray-200 bg-gray-50 p-4">
+            <div class="mb-3 flex flex-wrap items-center gap-2">
+                <h3 class="font-semibold text-gray-800">スケジュール一覧</h3>
+                <div class="ml-2 flex flex-wrap gap-2">
+                    <button
+                        type="button"
+                        :class="panelEditMode
+                            ? 'rounded border border-gray-400 bg-gray-600 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700'
+                            : 'rounded border border-gray-300 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50'"
+                        @click="togglePanelEditMode"
+                    >{{ panelEditMode ? '編集モードを終了' : '編集モード' }}</button>
+                    <button v-if="!panelEditMode" type="button"
+                        class="rounded border border-green-600 px-3 py-1 text-xs font-medium text-green-700 hover:bg-green-50"
+                        @click="handleCsvExport"
+                    >CSV出力</button>
+                    <button v-if="!panelEditMode" type="button"
+                        class="rounded border border-indigo-500 px-3 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-50"
+                        @click="openCsvImportModal"
+                    >CSV取込</button>
+                    <button v-if="!panelEditMode" type="button"
+                        :class="scheduleShowAll
+                            ? 'rounded border border-orange-500 bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700 hover:bg-orange-100'
+                            : 'rounded border border-gray-400 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50'"
+                        @click="scheduleShowAll = !scheduleShowAll"
+                    >{{ scheduleShowAll ? '折りたたむ' : '全件表示' }}</button>
+                </div>
+            </div>
+
+            <!-- 閲覧モード -->
+            <template v-if="!panelEditMode">
+                <div class="overflow-x-auto">
+                    <div :class="scheduleShowAll ? '' : 'max-h-[220px] overflow-y-auto schedule-scroll'">
+                        <table class="min-w-full border text-sm">
+                            <thead class="sticky top-0 z-10">
+                                <tr class="bg-gray-100">
+                                    <th class="cursor-pointer select-none border px-3 py-1.5 text-left text-xs font-medium text-gray-500 hover:bg-gray-200"
+                                        @click="togglePanelSort('start_date')">開始日 <span class="ml-0.5">{{ panelSortIcon('start_date') }}</span></th>
+                                    <th class="cursor-pointer select-none border px-3 py-1.5 text-left text-xs font-medium text-gray-500 hover:bg-gray-200"
+                                        @click="togglePanelSort('end_date')">終了日 <span class="ml-0.5">{{ panelSortIcon('end_date') }}</span></th>
+                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">タイトル</th>
+                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">内容</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="s in panelSortedSchedules" :key="s.id" class="hover:bg-white">
+                                    <td class="border px-3 py-2 text-gray-700">{{ s.start_date ?? '-' }}</td>
+                                    <td class="border px-3 py-2 text-gray-700">{{ s.end_date ?? '-' }}</td>
+                                    <td class="border px-3 py-2 font-medium text-gray-900">{{ s.name || '-' }}</td>
+                                    <td class="border px-3 py-2 text-gray-600">{{ s.description ? String(s.description).slice(0, 40) : '' }}</td>
+                                </tr>
+                                <tr v-if="!(props.schedules || []).length">
+                                    <td colspan="4" class="border px-3 py-4 text-center text-xs text-gray-400">スケジュール未登録</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </template>
+
+            <!-- 編集モード -->
+            <template v-else>
+                <div class="overflow-x-auto">
+                    <div class="max-h-[220px] overflow-y-auto schedule-scroll">
+                    <table class="min-w-full border text-sm">
+                        <thead class="sticky top-0 z-10">
+                            <tr class="bg-gray-100">
+                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">開始日</th>
+                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">終了日</th>
+                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">タイトル</th>
+                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">内容</th>
+                                <th class="border px-2 py-1.5 text-xs font-medium text-gray-500"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(row, idx) in panelEditRows" :key="row._key" class="bg-white">
+                                <td class="border px-2 py-1.5">
+                                    <input type="date" v-model="row.start_date"
+                                        class="w-36 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none" />
+                                </td>
+                                <td class="border px-2 py-1.5">
+                                    <input type="date" v-model="row.end_date"
+                                        class="w-36 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none" />
+                                </td>
+                                <td class="border px-2 py-1.5">
+                                    <input type="text" v-model="row.name" placeholder="タイトル"
+                                        class="w-full min-w-32 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none" />
+                                </td>
+                                <td class="border px-2 py-1.5">
+                                    <input type="text" v-model="row.description" placeholder="内容（任意）"
+                                        class="w-full min-w-40 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none" />
+                                </td>
+                                <td class="border px-2 py-1.5 text-center">
+                                    <button type="button"
+                                        class="rounded px-2 py-0.5 text-xs text-red-500 hover:bg-red-50 hover:text-red-700"
+                                        @click="removePanelEditRow(idx)">×</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+                <button type="button"
+                    class="mt-2 rounded border border-dashed border-gray-300 px-4 py-1.5 text-xs text-gray-500 hover:border-indigo-300 hover:text-indigo-600"
+                    @click="addPanelEditRow">＋ 行を追加</button>
+                <div class="mt-3 flex gap-2">
+                    <button type="button" :disabled="panelSaving"
+                        class="rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                        @click="savePanelEdits">{{ panelSaving ? '保存中…' : '保存' }}</button>
+                    <button type="button" :disabled="panelSaving"
+                        class="rounded bg-gray-100 px-4 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-200 disabled:opacity-50"
+                        @click="cancelPanelEditMode">キャンセル</button>
+                </div>
+            </template>
+        </div>
+
         <!-- 週間プランナービュー -->
         <ProjectWeekPlanner
             v-if="currentView === 'week-planner'"
@@ -44,7 +166,7 @@
             :weekPostsUrl="props.weekPostsUrl"
         />
 
-        <FullCalendar v-if="currentView === 'calendar'" ref="calendarRef" :options="calendarOptions" :events="plainCalendarEvents" />
+        <FullCalendar v-if="currentView === 'calendar'" ref="calendarRef" :options="calendarOptions" />
 
         <!-- ホバーポップアップ -->
         <Teleport to="body">
@@ -164,21 +286,6 @@
                     <label class="block text-sm font-medium">メモ</label>
                     <textarea v-model="simpleEventMemo" class="w-full rounded border p-2" rows="6"></textarea>
                 </div>
-                <div class="mb-2">
-                    <label class="block text-sm font-medium">ラベル（色）</label>
-                    <div class="mt-2 flex gap-2">
-                        <button
-                            v-for="c in simpleEventLabelChoices"
-                            :key="c"
-                            type="button"
-                            @click="simpleEventLabel = c"
-                            :aria-pressed="simpleEventLabel === c"
-                            :style="{ backgroundColor: c }"
-                            class="h-8 w-8 rounded-full border-2"
-                            :class="simpleEventLabel === c ? 'ring-2 ring-indigo-400 ring-offset-1' : ''"
-                        ></button>
-                    </div>
-                </div>
                 <div class="mt-4 flex justify-end gap-2">
                     <button type="button" @click="showSimpleEventModal = false" class="rounded bg-gray-300 px-4 py-2">キャンセル</button>
                     <button type="button" @click="submitSimpleEvent" class="rounded bg-green-600 px-4 py-2 text-white">保存</button>
@@ -234,22 +341,6 @@
                         disabled
                     ></textarea>
                     <textarea v-else v-model="scheduleShowData.description" class="w-full rounded border p-2" rows="4"></textarea>
-                </div>
-                <div class="mb-2">
-                    <label class="block text-sm font-medium">ラベル</label>
-                    <div class="mt-2 flex gap-2">
-                        <button
-                            v-for="c in simpleEventLabelChoices"
-                            :key="c + '_show'"
-                            type="button"
-                            @click="isEditingSchedule ? (scheduleEditColor = c) : null"
-                            :style="{ backgroundColor: c }"
-                            class="h-8 w-8 rounded-full border-2"
-                            :class="
-                                (isEditingSchedule ? scheduleEditColor : scheduleShowData.color) === c ? 'ring-2 ring-indigo-400 ring-offset-1' : ''
-                            "
-                        ></button>
-                    </div>
                 </div>
                 <!-- 完了状態バッジ -->
                 <div v-if="scheduleShowData.completed_at" class="mb-2 flex items-center justify-between rounded bg-green-50 px-3 py-2">
@@ -369,6 +460,7 @@ import axios from 'axios';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
 import ProjectWeekPlanner from '@/Components/ProjectWeekPlanner.vue';
+import { scheduleStatusColor } from '@/Helpers/scheduleColor.js';
 
 const props = defineProps({
     schedules: { type: Array, default: () => [] },
@@ -382,15 +474,27 @@ const props = defineProps({
     showMemoButton: { type: Boolean, default: true },
     weekPostsUrl: { type: String, default: null },
     uniformColors: { type: Boolean, default: false },
+    initialView: { type: String, default: 'calendar' },
+    stayInPlace: { type: Boolean, default: false },
+    panelStorageKey: { type: String, default: '' },
 });
 
-const UC_NORMAL    = { bg: '#dbeafe', border: '#1d4ed8', text: '#1e3a8a' };
-const UC_COMPLETED = { bg: '#dcfce7', border: '#15803d', text: '#14532d' };
 
 // items prop はカレンダー連携用ドロップダウンのみに使用（独立イベントとして描画しない）
 
 // 現在のビュー（月カレンダー or 週間プランナー）
-const currentView = ref('calendar');
+const currentView = ref(props.initialView || 'calendar');
+
+function switchView(view) {
+    if (!props.project || props.stayInPlace) {
+        currentView.value = view;
+        return;
+    }
+    router.get(route('coordinator.project_schedules.calendar'), {
+        project_job_id: props.project.id,
+        view,
+    });
+}
 
 // 今日の日付を取得する関数
 const getTodayString = () => {
@@ -456,7 +560,6 @@ const isEditingSchedule = ref(false);
 const scheduleEditTitle = ref('');
 const scheduleEditStart = ref('');
 const scheduleEditEnd = ref('');
-const scheduleEditColor = ref('');
 const scheduleEditItemId = ref(null);
 
 const page = usePage();
@@ -562,15 +665,9 @@ const simpleEventIsRange = ref(false);
 const simpleEventStartDate = ref(getTodayString());
 const simpleEventEndDate = ref(getTodayString());
 const simpleEventMemo = ref('');
-const simpleEventLabel = ref('');
-const simpleEventLabelChoices = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#6b7280'];
 const calendarRef = ref(null);
 // plain (non-proxied) events copy for FullCalendar to avoid Proxy/reactivity issues
 const plainCalendarEvents = ref([]);
-// minimal calendar ref; avoid aggressive polling
-// If FullCalendar sometimes reports zero events immediately after mount,
-// perform a single guarded addEventSource to ensure events render.
-const didForceAddEvents = ref(false);
 
 onMounted(() => {
     nextTick(() => {
@@ -580,42 +677,156 @@ onMounted(() => {
             const idx = Array.from(startHourSelectRef.value.options).findIndex((opt) => opt.value === currentHour);
             if (idx >= 0) startHourSelectRef.value.selectedIndex = idx;
         }
-        // TEMP DEBUG: log resolved user props to help diagnose permission issue
-        try {
-            console.info('[ProjectCalendar] userProps for permission debug', userProps.value);
-        } catch (e) {}
-        // TEMP DEBUG: log incoming props and computed events length to diagnose missing schedules
-        try {
-            console.info('[ProjectCalendar] incoming props', {
-                schedules: props.schedules,
-                events: props.events && props.events.value ? props.events.value : props.events,
-                memos: props.memos,
-                comments: props.comments,
-            });
-        } catch (e) {}
-        // Small delayed injection attempt in case API is already ready shortly after mount
-        try {
-            setTimeout(() => {
-                try {
-                    const apiNow = calendarRef.value && calendarRef.value.getApi ? calendarRef.value.getApi() : null;
+    });
+    // スケジュールパネルの開閉状態を localStorage から復元
+    const lsKey = props.panelStorageKey || (props.project?.id ? `schedule_panel_${props.project.id}` : '');
+    if (lsKey) {
+        const saved = localStorage.getItem(lsKey);
+        if (saved !== null) schedulePanelOpen.value = saved === 'true';
+    }
+});
 
-                    if (apiNow && Array.isArray(plainCalendarEvents.value) && plainCalendarEvents.value.length > 0) {
-                        try {
-                            apiNow.getEventSources().forEach((s) => s.remove());
-                            apiNow.addEventSource(JSON.parse(JSON.stringify(plainCalendarEvents.value)));
+// FullCalendar サイズ再計算（v-show で隠されていた後に呼ぶ）
+const updateCalendarSize = () => {
+    nextTick(() => {
+        calendarRef.value?.getApi?.()?.updateSize?.();
+    });
+};
+defineExpose({ updateCalendarSize });
 
-                            didForceAddEvents.value = true;
-                        } catch (e) {
-                            // ProjectCalendar onMounted inject error debug suppressed
-                        }
-                    }
-                } catch (e) {
-                    // ProjectCalendar immediate inject error debug suppressed
-                }
-            }, 300);
-        } catch (e) {}
+// ── スケジュールパネル（トグル）──────────────────────────────────────────────
+const schedulePanelOpen = ref(false);
+watch(schedulePanelOpen, (val) => {
+    const lsKey = props.panelStorageKey || (props.project?.id ? `schedule_panel_${props.project.id}` : '');
+    if (lsKey) {
+        localStorage.setItem(lsKey, String(val));
+    }
+});
+
+// 「全件表示」状態（localStorage 保存）
+const scheduleShowAll = ref(false);
+(() => {
+    try {
+        const lsKey = props.project?.id ? `schedule_show_all_${props.project.id}` : '';
+        if (lsKey) scheduleShowAll.value = localStorage.getItem(lsKey) === 'true';
+    } catch (e) {}
+})();
+watch(scheduleShowAll, (val) => {
+    try {
+        const lsKey = props.project?.id ? `schedule_show_all_${props.project.id}` : '';
+        if (lsKey) localStorage.setItem(lsKey, String(val));
+    } catch (e) {}
+});
+
+// パネル内ソート
+const panelSortKey = ref('start_date');
+const panelSortDir = ref('asc');
+const panelSortedSchedules = computed(() => {
+    const key = panelSortKey.value;
+    const dir = panelSortDir.value === 'asc' ? 1 : -1;
+    return [...(props.schedules || [])].sort((a, b) => {
+        const av = a[key] ?? '';
+        const bv = b[key] ?? '';
+        if (av < bv) return -1 * dir;
+        if (av > bv) return  1 * dir;
+        return 0;
     });
 });
+function togglePanelSort(key) {
+    if (panelSortKey.value === key) {
+        panelSortDir.value = panelSortDir.value === 'asc' ? 'desc' : 'asc';
+    } else {
+        panelSortKey.value = key;
+        panelSortDir.value = 'asc';
+    }
+}
+function panelSortIcon(key) {
+    if (panelSortKey.value !== key) return '↕';
+    return panelSortDir.value === 'asc' ? '▲' : '▼';
+}
+
+// パネル内編集モード
+const panelEditMode = ref(false);
+const panelEditRows = ref([]);
+const panelSaving   = ref(false);
+let   _panelKeySeq  = 0;
+
+function togglePanelEditMode() {
+    if (panelEditMode.value) {
+        cancelPanelEditMode();
+    } else {
+        panelEditRows.value = (props.schedules || []).map(s => ({
+            _key       : s.id,
+            id         : s.id,
+            start_date : s.start_date ? String(s.start_date).split('T')[0] : '',
+            end_date   : s.end_date   ? String(s.end_date).split('T')[0]   : '',
+            name       : s.name        ?? '',
+            description: s.description ?? '',
+        }));
+        panelEditMode.value = true;
+    }
+}
+function cancelPanelEditMode() {
+    panelEditMode.value = false;
+    panelEditRows.value = [];
+}
+function addPanelEditRow() {
+    panelEditRows.value.push({
+        _key       : 'new_' + (++_panelKeySeq),
+        id         : null,
+        start_date : '',
+        end_date   : '',
+        name       : '',
+        description: '',
+    });
+}
+function removePanelEditRow(idx) {
+    panelEditRows.value.splice(idx, 1);
+}
+async function savePanelEdits() {
+    if (panelSaving.value) return;
+    const projectJobId = props.project?.id;
+    if (!projectJobId) return;
+    panelSaving.value = true;
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+    const originalIds = new Set((props.schedules || []).map(s => s.id));
+    const editIds     = new Set(panelEditRows.value.filter(r => r.id).map(r => r.id));
+    const deletedIds  = [...originalIds].filter(id => !editIds.has(id));
+    try {
+        for (const id of deletedIds) {
+            await fetch(route('coordinator.project_schedules.destroy', { project_schedule: id }), {
+                method : 'DELETE',
+                headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+            });
+        }
+        for (const row of panelEditRows.value) {
+            if (!row.name.trim()) continue;
+            const body = JSON.stringify({
+                project_job_id: projectJobId,
+                name       : row.name,
+                description: row.description,
+                start_date : row.start_date || null,
+                end_date   : row.end_date   || null,
+            });
+            const headers = { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' };
+            if (row.id) {
+                await fetch(route('coordinator.project_schedules.update', { project_schedule: row.id }), {
+                    method: 'PATCH', headers, body,
+                });
+            } else {
+                await fetch(route('coordinator.project_schedules.store'), {
+                    method: 'POST', headers, body,
+                });
+            }
+        }
+        panelEditMode.value = false;
+        panelEditRows.value = [];
+        // schedules プロパティのみリロードして カレンダーと一覧を更新
+        router.reload({ only: ['schedules'] });
+    } finally {
+        panelSaving.value = false;
+    }
+}
 
 function openEventModal(startDate = null, endDate = null) {
     simpleEventTitle.value = '';
@@ -702,6 +913,9 @@ const calendarEvents = computed(() => {
             ? (title.startsWith('✓ ') ? title : '✓ ' + title)
             : title;
 
+        const resolvedBorderColor = event.borderColor ?? event.border_color ?? color;
+        const resolvedTextColor = event.textColor ?? event.text_color ?? null;
+
         list.push({
             // include canonical `id` so FullCalendar and getEvents() return stable identifiers
             id: event.id ?? event.event_id ?? event.eventId ?? undefined,
@@ -709,9 +923,9 @@ const calendarEvents = computed(() => {
             start: startRaw,
             end: endRaw ?? undefined,
             allDay: allDay,
-            color: color,
             backgroundColor: color,
-            borderColor: color,
+            borderColor: resolvedBorderColor,
+            ...(resolvedTextColor ? { textColor: resolvedTextColor } : {}),
             event_id: event.id ?? event.event_id,
             description: event.description ?? event.extendedProps?.description ?? '',
             extendedProps: {
@@ -743,23 +957,18 @@ const calendarEvents = computed(() => {
                 endDateOnly = addOneDay(endDateOnly);
             }
             const isCompleted = !!s.completed_at || (s.progress ?? 0) >= 100;
-            let schedBg, schedBorder;
-            if (props.uniformColors) {
-                const uc = isCompleted ? UC_COMPLETED : UC_NORMAL;
-                schedBg = uc.bg; schedBorder = uc.border;
-            } else {
-                schedBg = isCompleted ? '#9ca3af' : (s.color ?? '#3b82f6');
-                schedBorder = schedBg;
-            }
+            const uc = scheduleStatusColor(s.end_date, isCompleted);
+            const schedBg = uc.bg;
+            const schedBorder = uc.border;
             list.push({
                 id: s.id,
                 title: s.name ?? '',
                 start: startDateOnly,
                 end: endDateOnly ?? undefined,
                 allDay: true,
-                color: schedBorder,
                 backgroundColor: schedBg,
                 borderColor: schedBorder,
+                textColor: uc.text,
                 event_id: s.id,
                 description: s.description ?? '',
                 extendedProps: { project_schedule_id: s.id, completed_at: s.completed_at ?? null, progress: s.progress ?? 0, original_color: s.color ?? '#3b82f6' },
@@ -845,14 +1054,9 @@ const calendarEvents = computed(() => {
         }
         if (e.deleted) return; // skip deleted markers
         const eCompleted = !!e.completed_at || (e.progress ?? 0) >= 100;
-        let eBg, eBorder;
-        if (props.uniformColors) {
-            const uc = eCompleted ? UC_COMPLETED : UC_NORMAL;
-            eBg = uc.bg; eBorder = uc.border;
-        } else {
-            eBg = eCompleted ? '#9ca3af' : (e.color ?? '#3b82f6');
-            eBorder = eBg;
-        }
+        const eUc = scheduleStatusColor(e.end_date ?? e.end, eCompleted);
+        const eBg = eUc.bg;
+        const eBorder = eUc.border;
         list.push({
             id: e.id ?? e.event_id ?? undefined,
             title: e.name ?? e.title ?? '',
@@ -900,62 +1104,18 @@ watch(
     { immediate: true },
 );
 
-// If the FullCalendar API becomes available after mount and it has no events,
-// push the plain events as an event source once.
+// plainCalendarEvents が変わるたびに FullCalendar API で確実に再描画する。
+// :events バインドに頼らず imperative API を使うことで、
+// 保存後 router.reload() でプロパティが更新された際にも反映される。
 watch(
     plainCalendarEvents,
     (events) => {
-        try {
-            // If API not ready, retry a few times with a short delay to allow FullCalendar to initialize
-            const tryInject = (attempt = 0) => {
-                try {
-                    const apiNow = calendarRef.value && calendarRef.value.getApi ? calendarRef.value.getApi() : null;
-                    const current = apiNow && apiNow.getEvents ? apiNow.getEvents() : [];
-                    if (
-                        !didForceAddEvents.value &&
-                        apiNow &&
-                        (current == null || current.length === 0) &&
-                        Array.isArray(events) &&
-                        events.length > 0
-                    ) {
-                        try {
-                            didForceAddEvents.value = true;
-                            apiNow.getEventSources().forEach((s) => s.remove());
-                            apiNow.addEventSource(events);
-                            // debug
-
-                            console.info('[ProjectCalendar] injected events into FullCalendar via retry', events.length);
-                            return;
-                        } catch (e) {
-                            // ProjectCalendar plainCalendarEvents addEventSource error debug suppressed
-                        }
-                    }
-                    // Not ready yet — schedule another attempt up to limit
-                    const MAX = 12; // ~2.4s max
-                    if (attempt < MAX) {
-                        setTimeout(() => tryInject(attempt + 1), 200);
-                    }
-                } catch (e) {
-                    // ProjectCalendar plainCalendarEvents retry error debug suppressed
-                }
-            };
-            tryInject(0);
-        } catch (e) {
-            // ProjectCalendar plainCalendarEvents watcher error debug suppressed
-        }
-    },
-    { immediate: true },
-);
-
-// watch calendarEvents for debugging - logs initial and subsequent values
-watch(
-    calendarEvents,
-    (_val) => {
-        try {
-            // no-op: rely on FullCalendar's eventsSet and :events binding
-        } catch (e) {
-            // ProjectCalendar calendarEvents watch error debug suppressed
-        }
+        nextTick(() => {
+            const api = calendarRef.value?.getApi?.();
+            if (!api || !Array.isArray(events)) return;
+            api.removeAllEvents();
+            if (events.length > 0) api.addEventSource(events);
+        });
     },
     { immediate: true },
 );
@@ -1022,6 +1182,8 @@ const calendarOptions = computed(() => ({
             const updated = { id, start_date: newStart, end_date: newEnd || newStart, name: ev.title, color: ev.backgroundColor };
             if (idx !== -1) localCalendarEntries.value.splice(idx, 1, updated);
             else localCalendarEntries.value.push(updated);
+            // スケジュール表も最新に更新
+            router.reload({ only: ['schedules'] });
         } catch (e) {
             console.error('eventDrop save error', e);
             alert('予定の移動保存に失敗しました');
@@ -1077,6 +1239,8 @@ const calendarOptions = computed(() => ({
                 const updated = { id, start_date: displayStart, end_date: displayEndInclusive || displayStart, name: ev.title, color: ev.backgroundColor };
                 if (idx !== -1) localCalendarEntries.value.splice(idx, 1, updated);
                 else localCalendarEntries.value.push(updated);
+                // スケジュール表も最新に更新
+                router.reload({ only: ['schedules'] });
             } else if (extended.event_id) {
                 // 汎用イベント（個人カレンダー）
                 await axios.put(`/events/${extended.event_id}/calendar`, {
@@ -1124,6 +1288,9 @@ const calendarOptions = computed(() => ({
                     info.el.style.backgroundColor = bg;
                     info.el.style.borderColor = border;
                     info.el.style.color = text;
+                    // Also apply to .fc-event-main so FullCalendar's default white is overridden
+                    const mainEl = info.el.querySelector('.fc-event-main');
+                    if (mainEl) mainEl.style.color = text;
                 } catch (sErr) {}
             }
         } catch (e) {
@@ -1149,18 +1316,17 @@ const calendarOptions = computed(() => ({
         try {
             const api = calendarRef.value && calendarRef.value.getApi ? calendarRef.value.getApi() : null;
             const localCount = Array.isArray(calendarEvents?.value) ? calendarEvents.value.length : 0;
-            // if FullCalendar has no events but our computed list has items, add as a source once
             if (api && !didForceAddEvents.value && (events == null || events.length === 0) && localCount > 0) {
                 try {
                     didForceAddEvents.value = true;
                     api.getEventSources().forEach((s) => s.remove());
                     api.addEventSource(calendarEvents.value);
                 } catch (e) {
-                    // guarded eventsSet addEventSource error debug suppressed
+                    // injection failed
                 }
             }
         } catch (e) {
-            // eventsSet error debug suppressed
+            // eventsSet error
         }
     },
     eventMouseEnter: function (info) {
@@ -1194,8 +1360,6 @@ const calendarOptions = computed(() => ({
     eventClick: function (info) {
         // comment click -> open edit modal for comment
         if (info.event.extendedProps.comment_id) {
-            // Prevent navigation; open inline modal
-            // Find comment data from props.comments
             const cid = info.event.extendedProps.comment_id;
             const comment = (props.comments || []).find((c) => c.id === cid) || {
                 id: cid,
@@ -1219,14 +1383,6 @@ const calendarOptions = computed(() => ({
         }
         // For other events (schedules/personal events) open a modal showing details
         if (!info.event.extendedProps.comment_id && !info.event.extendedProps.memo_id) {
-            try {
-                console.info('[ProjectCalendar] eventClick — clicked event core fields', {
-                    id: info.event.id,
-                    event_id: info.event.event_id,
-                    extendedProps: info.event.extendedProps,
-                    defExtendedProps: info.event._def && info.event._def.extendedProps ? info.event._def.extendedProps : null,
-                });
-            } catch (e) {}
             openScheduleShowModal(info.event);
         }
     },
@@ -1276,15 +1432,6 @@ function openEditModalForComment(comment) {
 }
 
 function openScheduleShowModal(event) {
-    try {
-        console.info('[ProjectCalendar] openScheduleShowModal — event core fields', {
-            id: event.id,
-            event_id: event.event_id,
-            extendedProps: event.extendedProps,
-            defExtendedProps: event._def && event._def.extendedProps ? event._def.extendedProps : null,
-            publicId: event._def && event._def.publicId ? event._def.publicId : null,
-        });
-    } catch (e) {}
     scheduleShowData.value.id =
         event.extendedProps.project_schedule_id ||
         event.extendedProps.schedule_id ||
@@ -1292,9 +1439,7 @@ function openScheduleShowModal(event) {
         event.id ||
         null;
     scheduleShowData.value.title = event.title || '';
-    // addOneDay/subOneDay はスクリプトトップで定義済みのグローバルヘルパーを使用
     scheduleShowData.value.start = event.startStr ? event.startStr.split('T')[0] : localDay(event.start);
-    // endStr は exclusive (翌日) → subOneDay して inclusive (DB保存値) に
     const endExclStr = event.endStr ? event.endStr.split('T')[0] : (localDay(event.end) || null);
     scheduleShowData.value.end = endExclStr ? subOneDay(endExclStr) : scheduleShowData.value.start;
     // prefer description from several possible locations on the clicked event
@@ -1326,7 +1471,7 @@ function openScheduleShowModal(event) {
     // If description missing, attempt to find a matching schedule object with description
     if (!scheduleShowData.value.description) {
         try {
-            const findInList = (list, _listName = '') => {
+            const findInList = (list) => {
                 if (!Array.isArray(list)) return null;
                 const wantId = scheduleShowData.value.id ? String(scheduleShowData.value.id) : null;
                 const wantTitle = (scheduleShowData.value.title || '').toLowerCase().trim();
@@ -1343,11 +1488,8 @@ function openScheduleShowModal(event) {
                     }
                 };
 
-                // debug suppressed for findInList searching
-
                 for (const ev of list) {
                     try {
-                        // extract candidate id robustly
                         let evId = null;
                         if (ev) {
                             if (ev.id !== undefined && ev.id !== null) evId = String(ev.id);
@@ -1362,46 +1504,28 @@ function openScheduleShowModal(event) {
 
                         const desc = ev.description ?? ev.extendedProps?.description ?? ev.body ?? null;
                         if (wantId && evId && wantId === evId) {
-                            if (desc) {
-                                try {
-                                    // findInList matched by id debug suppressed
-                                } catch (e) {}
-                                return desc;
-                            }
+                            if (desc) return desc;
                         }
 
-                        // fallback: title+start match with normalized dates
                         const evTitle = (ev.title || ev.name || '').toString().toLowerCase().trim();
                         const evStartRaw = ev.start ?? ev.start_date ?? ev.date ?? null;
                         const evStart = normalizeDate(evStartRaw);
                         const wantStartNorm = normalizeDate(wantStart);
                         if (wantTitle && evTitle && wantTitle === evTitle && wantStartNorm && evStart && wantStartNorm === evStart) {
-                            if (desc) {
-                                try {
-                                    // findInList matched by title+start debug suppressed
-                                } catch (e) {}
-                                return desc;
-                            }
+                            if (desc) return desc;
                         }
                     } catch (e) {}
                 }
                 return null;
             };
 
-            // check local overrides first
             let found = findInList(localCalendarEntries.value || []);
             if (!found) found = findInList(calendarEvents.value || []);
             if (!found) found = findInList(props.events && props.events.value ? props.events.value : props.events);
             if (!found && Array.isArray(props.schedules)) found = findInList(props.schedules);
             if (found) scheduleShowData.value.description = found;
-            else {
-                // debug: emit small samples so developer can inspect why lookup failed
-                try {
-                    // debug suppressed: lookup failed samples removed
-                } catch (e) {}
-            }
         } catch (e) {
-            // ignore
+            // lookup error ignored
         }
     }
     scheduleShowData.value.color = event.backgroundColor || event.color || null;
@@ -1410,12 +1534,8 @@ function openScheduleShowModal(event) {
     scheduleEditTitle.value = scheduleShowData.value.title.replace(/^✓ /, '');
     scheduleEditStart.value = scheduleShowData.value.start;
     scheduleEditEnd.value = scheduleShowData.value.end;
-    scheduleEditColor.value = scheduleShowData.value.color;
     isEditingSchedule.value = false;
     showScheduleShowModal.value = true;
-    try {
-        console.info('[ProjectCalendar] openScheduleShowModal', { schedule: scheduleShowData.value, isEditingSchedule: isEditingSchedule.value });
-    } catch (e) {}
 }
 
 async function uncompleteSchedule() {
@@ -1432,27 +1552,12 @@ async function uncompleteSchedule() {
 }
 
 function toggleEdit(enable) {
-    try {
-        console.info('[ProjectCalendar] toggleEdit requested', { enable, before: isEditingSchedule.value });
-    } catch (e) {}
     isEditingSchedule.value = !!enable;
     if (enable) {
         scheduleEditTitle.value = scheduleShowData.value.title;
         scheduleEditStart.value = scheduleShowData.value.start;
         scheduleEditEnd.value = scheduleShowData.value.end;
-        scheduleEditColor.value = scheduleShowData.value.color;
         scheduleEditItemId.value = scheduleShowData.value.item_id ?? null;
-        try {
-            console.info('[ProjectCalendar] toggleEdit entered edit mode', {
-                title: scheduleEditTitle.value,
-                start: scheduleEditStart.value,
-                end: scheduleEditEnd.value,
-            });
-        } catch (e) {}
-    } else {
-        try {
-            console.info('[ProjectCalendar] toggleEdit exited edit mode', { isEditingSchedule: isEditingSchedule.value });
-        } catch (e) {}
     }
 }
 
@@ -1466,7 +1571,6 @@ async function submitScheduleUpdate() {
             name: scheduleEditTitle.value,
             start_date: scheduleEditStart.value,
             end_date: scheduleEditEnd.value,
-            color: scheduleEditColor.value || null,
             description: scheduleShowData.value && scheduleShowData.value.description ? scheduleShowData.value.description : '',
             project_job_item_id: scheduleEditItemId.value || null,
         };
@@ -1535,21 +1639,16 @@ async function submitScheduleUpdate() {
                                 ev.id ||
                                 null;
 
-                            // 1) title (case-insensitive) + start exact match
                             if (wantTitleLower && evTitleLower && wantTitleLower === evTitleLower) {
                                 if (wantStart && evStart && normalizeDate(wantStart) === evStart) return candidateId;
-                                // if start not specified, accept title match
                                 if (!wantStart) return candidateId;
                             }
 
-                            // 2) fallback: start+end both match (dates normalized)
                             if (wantStart && evStart && normalizeDate(wantStart) === evStart) {
                                 if (wantEnd && evEnd && normalizeDate(wantEnd) === evEnd) return candidateId;
-                                // if event has no end or end not specified, still accept start-only match
                                 if (!wantEnd) return candidateId;
                             }
 
-                            // 3) last resort: title includes/startsWith or vice versa
                             if (wantTitleLower && evTitleLower && (evTitleLower.includes(wantTitleLower) || wantTitleLower.includes(evTitleLower))) {
                                 return candidateId;
                             }
@@ -1558,12 +1657,10 @@ async function submitScheduleUpdate() {
                     return null;
                 };
 
-                // try computed list first
                 id =
                     tryMatch(calendarEvents.value) ||
                     tryMatch(plainCalendarEvents.value) ||
                     tryMatch(props.events && props.events.value ? props.events.value : props.events);
-                // fallback to props.schedules raw objects
                 if (!id && Array.isArray(props.schedules)) {
                     for (const s of props.schedules) {
                         try {
@@ -1576,11 +1673,6 @@ async function submitScheduleUpdate() {
                         } catch (e) {}
                     }
                 }
-                if (id) {
-                    console.info('[ProjectCalendar] submitScheduleUpdate resolved id by lookup', id);
-                } else {
-                    console.error('[ProjectCalendar] submitScheduleUpdate failed to resolve id after lookup', scheduleShowData.value);
-                }
             } catch (e) {
                 console.error('[ProjectCalendar] submitScheduleUpdate lookup error', e);
             }
@@ -1590,36 +1682,18 @@ async function submitScheduleUpdate() {
             throw new Error('Schedule id missing');
         }
         const url = route('coordinator.project_schedules.update', { project_schedule: id });
-        // debug: log resolved id, URL and payload to help diagnose 404 from server
-        try {
-            console.info('[ProjectCalendar] submitScheduleUpdate resolved id', id, 'url', url, 'payload', payload);
-        } catch (e) {}
-        // defensive: do not attempt request if url would contain 'undefined'
         if (String(url).includes('undefined')) {
-            try {
-                console.error('[ProjectCalendar] submitScheduleUpdate aborting: url contains undefined', { id, url });
-            } catch (e) {}
             throw new Error('Invalid update URL, aborting');
         }
         let resp = null;
         try {
             resp = await axios.patch(url, payload);
         } catch (err) {
-            // If Ziggy-produced URL yields 404, try explicit coordinator path fallback
-            try {
-                const status = err && err.response && err.response.status ? err.response.status : null;
-
-                console.warn('[ProjectCalendar] submitScheduleUpdate first attempt failed', { url, status, err });
-            } catch (ee) {}
             if (err && err.response && err.response.status === 404) {
                 const explicit = `/coordinator/project_schedules/${id}`;
                 try {
-                    console.info('[ProjectCalendar] submitScheduleUpdate trying explicit URL', explicit);
                     resp = await axios.patch(explicit, payload);
                 } catch (err2) {
-                    try {
-                        console.error('[ProjectCalendar] submitScheduleUpdate explicit attempt failed', { explicit, err2 });
-                    } catch (eee) {}
                     throw err2;
                 }
             } else {
@@ -1627,10 +1701,6 @@ async function submitScheduleUpdate() {
             }
         }
         if (resp && resp.data && resp.data.schedule) {
-            // debug: log server response to verify description and returned schedule
-            try {
-                console.info('[ProjectCalendar] submitScheduleUpdate response', resp.data);
-            } catch (e) {}
             const s = resp.data.schedule;
             // replace or add in localCalendarEntries
             const idx = localCalendarEntries.value.findIndex((x) => String(x.id) === String(s.id));
@@ -1653,12 +1723,10 @@ async function submitScheduleUpdate() {
                         color: s.color ?? s.backgroundColor ?? null,
                     };
                     if (ev) {
-                        // update props on the existing event
                         try {
                             ev.setProp('title', eventData.title);
                         } catch (e) {}
                         try {
-                            // end は exclusive（+1日）で渡す
                             ev.setDates(eventData.start || null, addOneDay(eventData.end) || null, { allDay: true });
                         } catch (e) {}
                         try {
@@ -1670,7 +1738,6 @@ async function submitScheduleUpdate() {
                             ev.setProp('color', eventData.color);
                         } catch (e) {}
                     } else {
-                        // event not present in FC yet — add it
                         try {
                             api.addEvent({ ...eventData, end: addOneDay(eventData.end) });
                         } catch (e) {}
@@ -1682,6 +1749,8 @@ async function submitScheduleUpdate() {
         }
         showScheduleShowModal.value = false;
         isEditingSchedule.value = false;
+        // スケジュール表も最新に更新
+        router.reload({ only: ['schedules'] });
     } catch (e) {
         console.error('submitScheduleUpdate error', e);
         alert('予定の更新に失敗しました');
@@ -1821,10 +1890,10 @@ async function submitScheduleMemo() {
                     const api = calendarRef.value && calendarRef.value.getApi ? calendarRef.value.getApi() : null;
                     if (api) api.addEvent(commentObj);
                 } catch (e) {
-                    // submitScheduleMemo addEvent failed debug suppressed
+                    // addEvent failed
                 }
             } catch (e) {
-                // submitScheduleMemo post-processing failed debug suppressed
+                // post-processing failed
             }
 
             showMemoModal.value = false;
@@ -1893,11 +1962,11 @@ async function submitScheduleMemo() {
                     const api = calendarRef.value && calendarRef.value.getApi ? calendarRef.value.getApi() : null;
                     if (api) api.addEvent(memoEvent);
                 } catch (e) {
-                    // submitScheduleMemo addEvent project memo failed debug suppressed
+                    // addEvent failed
                 }
             }
         } catch (e) {
-            // submitScheduleMemo post-processing failed debug suppressed
+            // post-processing failed
         }
         showMemoModal.value = false;
         memoBody.value = '';
@@ -1929,7 +1998,6 @@ async function submitSimpleEvent() {
             description: simpleEventMemo.value || null,
             start_date: simpleEventStartDate.value,
             end_date: simpleEventEndDate.value || simpleEventStartDate.value,
-            color: simpleEventLabel.value || null,
         };
         // Basic client-side validation for required project_job_id
         if (!payload.project_job_id) {
@@ -1950,59 +2018,17 @@ async function submitSimpleEvent() {
             return;
         }
         const resp = await axios.post(route('coordinator.project_schedules.store'), payload);
-        
+
         // 成功時の処理
         showSimpleEventModal.value = false;
-        
+
         // フォームをリセット
         simpleEventTitle.value = '';
         simpleEventMemo.value = '';
-        simpleEventLabel.value = '';
         simpleEventIsRange.value = false;
-        if (resp && resp.data && resp.data.schedule) {
-            // push the returned schedule into localCalendarEntries so calendar shows it immediately
-            const sched = resp.data.schedule;
-            localCalendarEntries.value.push(sched);
 
-            // Also attempt to inject the new event directly into FullCalendar so the
-            // created schedule is visible immediately even if the automatic re-injection
-            // guard has already run.
-            try {
-                const api = calendarRef.value && calendarRef.value.getApi ? calendarRef.value.getApi() : null;
-                const eventObj = {
-                    id: sched.id,
-                    title: sched.name ?? sched.title ?? '',
-                    start: sched.start_date ? String(sched.start_date).split('T')[0] : (sched.date ?? null),
-                    end: sched.end_date ? String(sched.end_date).split('T')[0] : undefined,
-                    allDay: true,
-                    color: sched.color ?? undefined,
-                    backgroundColor: sched.color ?? undefined,
-                    borderColor: sched.color ?? undefined,
-                    event_id: sched.id,
-                    description: sched.description ?? '',
-                    extendedProps: { project_schedule_id: sched.id, project_job_id: sched.project_job_id ?? null },
-                };
-                if (api) {
-                    // If end date exists, FullCalendar expects exclusive end for allDay;
-                    // keep the same behavior as mapping from props.schedules earlier.
-                    if (eventObj.end) {
-                        try {
-                            const d = new Date(eventObj.end);
-                            d.setDate(d.getDate() + 1);
-                            eventObj.end = d.toISOString().split('T')[0];
-                        } catch (e) {}
-                    }
-                    api.addEvent(eventObj);
-                }
-            } catch (e) {
-                // submitSimpleEvent inject failed debug suppressed
-                // fallback: reload if injection fails
-                setTimeout(() => window.location.reload(), 200);
-            }
-        } else {
-            // fallback: reload if no schedule returned
-            setTimeout(() => window.location.reload(), 200);
-        }
+        // 予定追加成功後、ページリロードしてデータ同期を確保
+        setTimeout(() => window.location.reload(), 300);
     } catch (e) {
         console.error('submitSimpleEvent error', e);
         let errorMessage = '予定の作成に失敗しました';
@@ -2085,6 +2111,26 @@ async function submitCsvImport() {
 </script>
 
 <style scoped>
+/* 細いスクロールバー */
+.schedule-scroll::-webkit-scrollbar {
+    width: 4px;
+}
+.schedule-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+.schedule-scroll::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 2px;
+}
+.schedule-scroll::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+/* Firefox */
+.schedule-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+}
+
 .calendar-container {
     padding: 1rem;
 }

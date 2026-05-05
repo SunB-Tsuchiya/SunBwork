@@ -8,6 +8,7 @@ const props = defineProps({
     eventItemTypes:     { type: Array,  default: () => [] },
     meetingDefinitions: { type: Array,  default: () => [] },
     event:              { type: Object, default: null },
+    selectedMeetingId:  { type: Number, default: null },
     date:               { type: String, default: '' },
     startHour:          { type: String, default: '09' },
     startMinute:        { type: String, default: '00' },
@@ -23,24 +24,47 @@ const selectedType   = computed(() => props.eventItemTypes.find((t) => t.id === 
 const showMeetingSelect = computed(() => selectedType.value?.slug === 'conference');
 
 // ---- 会議定義 ----
-const selectedMeetingId = ref(null);
+const selectedMeetingId = ref(props.selectedMeetingId ?? null);
 const titleManuallyEdited = ref(false);
 
-/** 今日以降の次の曜日の日付を返す */
+/** 今日以降の次の曜日の日付を返す（毎週・隔週用） */
 function calcNextDate(dayOfWeek) {
     const today = new Date();
-    // JST に揃える
-    const jstOffset = 9 * 60 * 60 * 1000;
-    const todayJst = new Date(today.getTime() + jstOffset);
-    todayJst.setHours(0, 0, 0, 0);
-    const todayDow = todayJst.getDay();
+    today.setHours(0, 0, 0, 0);
+    const todayDow = today.getDay();
     let diff = dayOfWeek - todayDow;
     if (diff <= 0) diff += 7;
-    const next = new Date(todayJst.getTime() + diff * 24 * 60 * 60 * 1000);
+    const next = new Date(today.getTime() + diff * 24 * 60 * 60 * 1000);
     const yyyy = next.getFullYear();
     const mm   = String(next.getMonth() + 1).padStart(2, '0');
     const dd   = String(next.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
+}
+
+/**
+ * 毎月の第 weekOfMonth 週の dayOfWeek 曜日で、今日より未来の直近日付を返す。
+ * 例: 第2週・月曜 → 今月の第2月曜が未来なら今月、過去なら来月を返す。
+ */
+function calcNextMonthlyDate(dayOfWeek, weekOfMonth) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    for (let offset = 0; offset <= 24; offset++) {
+        const firstOfMonth = new Date(today.getFullYear(), today.getMonth() + offset, 1);
+        const firstDow = firstOfMonth.getDay();
+        let diff = dayOfWeek - firstDow;
+        if (diff < 0) diff += 7;
+        const candidate = new Date(firstOfMonth.getFullYear(), firstOfMonth.getMonth(), 1 + diff + (weekOfMonth - 1) * 7);
+        // 月をまたいでしまう場合はスキップ
+        if (candidate.getMonth() !== firstOfMonth.getMonth()) continue;
+        // 今日より未来のみ採用
+        if (candidate > today) {
+            const yyyy = candidate.getFullYear();
+            const mm   = String(candidate.getMonth() + 1).padStart(2, '0');
+            const dd   = String(candidate.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        }
+    }
+    return '';
 }
 
 watch(selectedMeetingId, (id) => {
@@ -56,10 +80,27 @@ watch(selectedMeetingId, (id) => {
     form.startMinute  = String(meeting.start_time).split(':')[1].padStart(2, '0');
     form.endHour      = String(meeting.end_time).split(':')[0].padStart(2, '0');
     form.endMinute    = String(meeting.end_time).split(':')[1].padStart(2, '0');
-    form.date         = calcNextDate(meeting.day_of_week);
+    if (meeting.recurrence === 'monthly' && meeting.week_of_month) {
+        form.date = calcNextMonthlyDate(meeting.day_of_week, meeting.week_of_month);
+    } else {
+        form.date = calcNextDate(meeting.day_of_week);
+    }
 });
 
-watch(() => form.title, () => { titleManuallyEdited.value = true; });
+// タイプ変更時はタイトルを自動更新（手動編集フラグをリセット）
+watch(selectedTypeId, (v) => {
+    form.event_item_type_id = v;
+    const conferenceId = props.eventItemTypes.find((t) => t.slug === 'conference')?.id;
+    if (v !== conferenceId) {
+        selectedMeetingId.value = null;
+        // 会議以外はタイプ名をタイトルに自動セット
+        titleManuallyEdited.value = false;
+        form.title = props.eventItemTypes.find((t) => t.id === v)?.name ?? '';
+    } else {
+        // 会議に切り替えた場合は選択済み会議があればタイトルをセット
+        titleManuallyEdited.value = false;
+    }
+});
 
 // 分オプション（5分刻み）
 const minuteOptions = ['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'];
@@ -71,23 +112,17 @@ function minsOptions(currentVal) {
 const form = useForm({
     event_item_type_id:      selectedTypeId.value,
     title:                   props.event?.title ?? '',
-    description:             props.event?.description ?? '',
+    description:             props.event?.body ?? props.event?.description ?? '',
     date:                    props.date,
     startHour:               props.startHour,
     startMinute:             props.startMinute,
     endHour:                 props.endHour,
     endMinute:               props.endMinute,
-    meeting_definition_id:   null,
+    meeting_definition_id:   props.selectedMeetingId ?? null,
     interrupted_event_ids:   [],
     own_interruption_minutes: 0,
 });
 
-watch(selectedTypeId, (v) => {
-    form.event_item_type_id = v;
-    if (v !== props.eventItemTypes.find((t) => t.slug === 'conference')?.id) {
-        selectedMeetingId.value = null;
-    }
-});
 watch(selectedMeetingId, (v) => { form.meeting_definition_id = v; });
 
 watch(
@@ -219,7 +254,7 @@ const dayLabel = ['日', '月', '火', '水', '木', '金', '土'];
             </div>
         </template>
 
-        <div class="mx-auto max-w-3xl rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
             <form @submit.prevent="submit" class="space-y-5">
 
                 <div v-if="errorMessage" class="rounded border-l-4 border-red-500 bg-red-50 p-3 text-red-700 text-sm">
@@ -241,7 +276,7 @@ const dayLabel = ['日', '月', '火', '水', '木', '金', '土'];
                 <div v-if="showMeetingSelect">
                     <label class="mb-1 block text-sm font-medium text-gray-700">会議種類</label>
                     <select v-model="selectedMeetingId" class="w-full rounded border p-2 text-sm">
-                        <option :value="null">— 自由入力 —</option>
+                        <option :value="null">— 選択なし —</option>
                         <option v-for="m in meetingDefinitions" :key="m.id" :value="m.id">
                             {{ m.title }}（{{ recurrenceLabel[m.recurrence] }}・{{ dayLabel[m.day_of_week] }}曜）
                         </option>
@@ -256,6 +291,7 @@ const dayLabel = ['日', '月', '火', '水', '木', '金', '土'];
                         type="text"
                         class="w-full rounded border p-2 text-sm"
                         required
+                        @input="titleManuallyEdited = true"
                     />
                     <p v-if="form.errors.title" class="mt-1 text-xs text-red-500">{{ form.errors.title }}</p>
                 </div>

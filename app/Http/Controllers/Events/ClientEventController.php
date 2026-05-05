@@ -36,8 +36,21 @@ class ClientEventController extends Controller
             $ptms = \App\Models\ProjectTeamMember::with(['projectJob.client'])
                 ->where('user_id', $user->id)
                 ->get();
+            $jobsFromTeam = $ptms->map(fn($ptm) => $ptm->projectJob)->filter();
 
-            $jobs = $ptms->map(fn($ptm) => $ptm->projectJob)->filter()->unique('id');
+            // 案件リーダーとして紐づいている案件も含める
+            $jobsAsLeader = \App\Models\ProjectJob::with('client')
+                ->where('user_id', $user->id)
+                ->where('completed', false)
+                ->get();
+
+            // 副リーダー（project_job_coordinators）として紐づいている案件も含める
+            $jobsAsSubLeader = \App\Models\ProjectJob::with('client')
+                ->whereHas('coordinators', fn($q) => $q->where('users.id', $user->id))
+                ->where('completed', false)
+                ->get();
+
+            $jobs = $jobsFromTeam->merge($jobsAsLeader)->merge($jobsAsSubLeader)->unique('id');
 
             $userProjects = $jobs->map(fn($job) => [
                 'id'        => $job->id,
@@ -138,6 +151,7 @@ class ClientEventController extends Controller
     public function edit(Event $event)
     {
         $this->authorizeEvent($event);
+        $event->load('projectJob'); // client_id 取得のため
 
         $slugs = ['client_visit', 'customer_visit', 'outing'];
         $eventItemTypes = EventItemType::whereIn('slug', $slugs)
@@ -152,7 +166,22 @@ class ClientEventController extends Controller
             $ptms = \App\Models\ProjectTeamMember::with(['projectJob.client'])
                 ->where('user_id', $user->id)
                 ->get();
-            $jobs = $ptms->map(fn($ptm) => $ptm->projectJob)->filter()->unique('id');
+            $jobsFromTeam = $ptms->map(fn($ptm) => $ptm->projectJob)->filter();
+
+            // 案件リーダーとして紐づいている案件も含める
+            $jobsAsLeader = \App\Models\ProjectJob::with('client')
+                ->where('user_id', $user->id)
+                ->where('completed', false)
+                ->get();
+
+            // 副リーダー（project_job_coordinators）として紐づいている案件も含める
+            $jobsAsSubLeader = \App\Models\ProjectJob::with('client')
+                ->whereHas('coordinators', fn($q) => $q->where('users.id', $user->id))
+                ->where('completed', false)
+                ->get();
+
+            $jobs = $jobsFromTeam->merge($jobsAsLeader)->merge($jobsAsSubLeader)->unique('id');
+
             $userProjects = $jobs->map(fn($job) => [
                 'id'        => $job->id,
                 'title'     => $job->title ?? ($job->name ?? ''),
@@ -171,6 +200,8 @@ class ClientEventController extends Controller
             'eventItemTypes' => $eventItemTypes,
             'clients'        => $userClients,
             'projects'       => $userProjects,
+            'selectedClientId'  => $event->projectJob?->client_id,
+            'selectedProjectId' => $event->project_job_id,
             'date'           => $event->starts_at?->toDateString() ?? '',
             'startHour'      => $event->starts_at?->format('H') ?? '09',
             'startMinute'    => $event->starts_at?->format('i') ?? '00',

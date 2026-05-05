@@ -1,9 +1,9 @@
 <script setup>
 import useToasts from '@/Composables/useToasts';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Head, usePage } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
-import { reactive } from 'vue';
+import { computed, reactive } from 'vue';
 
 const page = usePage();
 const props = defineProps({
@@ -14,6 +14,27 @@ const props = defineProps({
     eventItemTypes: { type: Array, default: () => [] },
     worktimeItemTypes: { type: Array, default: () => [] },
 });
+
+const authUser = page?.props?.value?.auth?.user || page?.props?.value?.user || {};
+const userRole = authUser?.user_role || '';
+const rolePrefix = (() => {
+    const r = String(userRole).toLowerCase();
+    if (r.includes('super')) return '/superadmin';
+    if (r.includes('admin')) return '/admin';
+    return '/leader';
+})();
+const routeNamePrefix = (() => {
+    const r = String(userRole).toLowerCase();
+    if (r.includes('super')) return 'superadmin';
+    if (r.includes('admin')) return 'admin';
+    return 'leader';
+})();
+
+const indexUrl = computed(() => {
+    try { return route(`${routeNamePrefix}.workload_analyzer.index`); } catch (e) {}
+    return `${rolePrefix}/workload-analyzer`;
+});
+const settingsSaveUrl = computed(() => `${rolePrefix}/workload-analyzer/settings`);
 
 // build options 0..3 step 0.25
 const options = [];
@@ -72,7 +93,7 @@ function saveTable(table) {
 
     saving[table] = true;
     axios
-        .post('/leader/workload-analyzer/settings', { table, rows })
+        .post(settingsSaveUrl.value, { table, rows })
         .then((res) => {
             showToast(res.data && res.data.message ? res.data.message : '保存しました。', 'success');
         })
@@ -88,6 +109,16 @@ function saveTable(table) {
 
 <template>
     <AppLayout title="作業量分析 設定">
+        <template #header>
+            <div class="flex items-center gap-3">
+                <Link
+                    :href="indexUrl"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                >← 作業量分析に戻る</Link>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">作業量分析 — 設定</h2>
+            </div>
+        </template>
+
         <Head title="作業量分析 設定" />
 
         <div class="rounded bg-white p-6 shadow">
@@ -259,7 +290,7 @@ function saveTable(table) {
                         </section>
 
                         <div class="pt-4">
-                            <a href="/leader/workload-analyzer" class="text-sm text-gray-600">キャンセル</a>
+                            <Link :href="indexUrl" class="rounded bg-gray-100 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200">キャンセル</Link>
                         </div>
                     </div>
         </div>

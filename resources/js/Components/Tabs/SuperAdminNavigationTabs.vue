@@ -48,6 +48,13 @@ const tab = (key) => [
                 AI設定
             </Link>
             <Link
+                v-if="typeof route === 'function' && route().has('superadmin.workload_analyzer.index')"
+                :href="route('superadmin.workload_analyzer.index')"
+                :class="tab('workload')"
+            >
+                作業量分析
+            </Link>
+            <Link
                 :href="route('debug.api')"
                 :class="tab('debug')"
             >

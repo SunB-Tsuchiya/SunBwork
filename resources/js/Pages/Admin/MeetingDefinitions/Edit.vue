@@ -21,13 +21,14 @@ const minuteOptions = ['00', '05', '10', '15', '20', '25', '30', '35', '40', '45
 const initMemberIds = props.meetingDefinition.members?.map((m) => m.id) ?? [];
 
 const form = useForm({
-    title:       props.meetingDefinition.title ?? '',
-    description: props.meetingDefinition.description ?? '',
-    recurrence:  props.meetingDefinition.recurrence ?? 'weekly',
-    day_of_week: props.meetingDefinition.day_of_week ?? 1,
-    start_time:  props.meetingDefinition.start_time?.slice(0, 5) ?? '10:00',
-    end_time:    props.meetingDefinition.end_time?.slice(0, 5) ?? '11:00',
-    members:     [...initMemberIds],
+    title:         props.meetingDefinition.title ?? '',
+    description:   props.meetingDefinition.description ?? '',
+    recurrence:    props.meetingDefinition.recurrence ?? 'weekly',
+    day_of_week:   props.meetingDefinition.day_of_week ?? 1,
+    week_of_month: props.meetingDefinition.week_of_month ?? null,
+    start_time:    props.meetingDefinition.start_time?.slice(0, 5) ?? '10:00',
+    end_time:      props.meetingDefinition.end_time?.slice(0, 5) ?? '11:00',
+    members:       [...initMemberIds],
 });
 
 const startHour   = ref(form.start_time.split(':')[0]);
@@ -81,8 +82,8 @@ function submit() {
             </div>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
-            <form @submit.prevent="submit" class="space-y-5 max-w-2xl">
+        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
+            <form @submit.prevent="submit" class="space-y-5">
                 <div v-if="errorMessage" class="rounded border-l-4 border-red-500 bg-red-50 p-3 text-red-700 text-sm">{{ errorMessage }}</div>
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">タイトル <span class="text-red-500">*</span></label>
@@ -100,6 +101,19 @@ function submit() {
                         </label>
                     </div>
                 </div>
+                <!-- 週指定（毎月のみ） -->
+                <div v-if="form.recurrence === 'monthly'">
+                    <label class="mb-1 block text-sm font-medium text-gray-700">週指定 <span class="text-red-500">*</span></label>
+                    <select v-model="form.week_of_month" class="rounded border p-2 text-sm">
+                        <option :value="null">— 選択 —</option>
+                        <option :value="1">第1週</option>
+                        <option :value="2">第2週</option>
+                        <option :value="3">第3週</option>
+                        <option :value="4">第4週</option>
+                        <option :value="5">第5週</option>
+                    </select>
+                    <p v-if="form.errors.week_of_month" class="mt-1 text-xs text-red-500">{{ form.errors.week_of_month }}</p>
+                </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">曜日 <span class="text-red-500">*</span></label>
                     <div class="flex gap-3">
@@ -112,11 +126,11 @@ function submit() {
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-700">開始時刻</label>
                         <div class="flex items-center gap-1">
-                            <select v-model="startHour" @change="syncTimes" class="rounded border p-2 text-sm">
+                            <select v-model="startHour" @change="syncTimes" class="w-20 rounded border p-2 text-sm">
                                 <option v-for="h in Array.from({length:24},(_,i)=>String(i).padStart(2,'0'))" :key="h" :value="h">{{ h }}</option>
                             </select>
                             <span>:</span>
-                            <select v-model="startMinute" @change="syncTimes" class="rounded border p-2 text-sm">
+                            <select v-model="startMinute" @change="syncTimes" class="w-20 rounded border p-2 text-sm">
                                 <option v-for="m in minuteOptions" :key="m" :value="m">{{ m }}</option>
                             </select>
                         </div>
@@ -124,11 +138,11 @@ function submit() {
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-700">終了時刻</label>
                         <div class="flex items-center gap-1">
-                            <select v-model="endHour" @change="syncTimes" class="rounded border p-2 text-sm">
+                            <select v-model="endHour" @change="syncTimes" class="w-20 rounded border p-2 text-sm">
                                 <option v-for="h in Array.from({length:24},(_,i)=>String(i).padStart(2,'0'))" :key="h" :value="h">{{ h }}</option>
                             </select>
                             <span>:</span>
-                            <select v-model="endMinute" @change="syncTimes" class="rounded border p-2 text-sm">
+                            <select v-model="endMinute" @change="syncTimes" class="w-20 rounded border p-2 text-sm">
                                 <option v-for="m in minuteOptions" :key="m" :value="m">{{ m }}</option>
                             </select>
                         </div>

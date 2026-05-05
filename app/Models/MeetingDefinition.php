@@ -17,6 +17,7 @@ class MeetingDefinition extends Model
         'description',
         'recurrence',
         'day_of_week',
+        'week_of_month',
         'start_time',
         'end_time',
     ];

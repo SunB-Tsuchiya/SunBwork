@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CoordinatorProgressSheetFavorite;
 use App\Models\CoordinatorSetting;
 use App\Models\ProgressSheet;
+use App\Models\ProjectJob;
 use App\Models\ProjectTeamMember;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -16,14 +17,17 @@ class ProgressSheetListController extends Controller
     {
         $user = $request->user();
 
-        // スコープ: Admin/SuperAdmin/Clerk は全件、それ以外は自分が team_member に含まれる案件のみ
+        // スコープ: Admin/SuperAdmin/Clerk は全件
+        // それ以外はチームメンバー登録 OR リーダー(user_id) OR 副リーダー(project_job_coordinators) の案件
         if ($user->isAdmin() || $user->isSuperAdmin() || $user->isClerk()) {
             $allowedJobIds = null;
         } else {
-            $allowedJobIds = ProjectTeamMember::where('user_id', $user->id)
-                ->pluck('project_job_id')
-                ->unique()
-                ->all();
+            $teamMemberIds = ProjectTeamMember::where('user_id', $user->id)
+                ->pluck('project_job_id');
+            $leaderCoIds = ProjectJob::where('user_id', $user->id)
+                ->orWhereHas('coordinators', fn ($c) => $c->where('users.id', $user->id))
+                ->pluck('id');
+            $allowedJobIds = $teamMemberIds->merge($leaderCoIds)->unique()->values()->all();
         }
 
         $search       = $request->input('search', '');
@@ -103,6 +107,44 @@ class ProgressSheetListController extends Controller
                 'month'         => $yearMonth,
                 'show_complete' => $showComplete,
             ],
+        ]);
+    }
+
+    /**
+     * 新規作成モーダル用: 自分がリーダーまたは副リーダーの未完了案件をJSON返却
+     */
+    public function createProjectsJson(Request $request)
+    {
+        $user = $request->user();
+
+        $jobs = ProjectJob::where('completed', false)
+            ->where(function ($q) use ($user) {
+                $q->where('user_id', $user->id)
+                  ->orWhereHas('coordinators', fn ($c) => $c->where('users.id', $user->id));
+            })
+            ->with('client')
+            ->orderBy('title')
+            ->get(['id', 'title', 'client_id']);
+
+        $clientsMap = [];
+        foreach ($jobs as $job) {
+            if ($job->client) {
+                $clientsMap[$job->client->id] = [
+                    'id'   => $job->client->id,
+                    'name' => $job->client->name ?? '-',
+                ];
+            }
+        }
+
+        $projects = $jobs->map(fn ($j) => [
+            'id'        => $j->id,
+            'title'     => $j->title ?? '-',
+            'client_id' => $j->client_id,
+        ])->values();
+
+        return response()->json([
+            'clients'  => array_values($clientsMap),
+            'projects' => $projects,
         ]);
     }
 

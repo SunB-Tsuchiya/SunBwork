@@ -57,7 +57,16 @@ class ProjectJobController extends Controller
         $teamMemberJobIds = ProjectTeamMember::where('user_id', $user->id)
             ->pluck('project_job_id');
 
-        $jobIds = $assignmentJobIds->merge($teamMemberJobIds)->unique();
+        // 案件リーダー・副リーダーとして紐づいている案件IDも含める
+        $leaderJobIds = ProjectJob::where('user_id', $user->id)
+            ->where('completed', false)
+            ->pluck('id');
+
+        $subLeaderJobIds = ProjectJob::whereHas('coordinators', function ($q) use ($user) {
+            $q->where('users.id', $user->id);
+        })->where('completed', false)->pluck('id');
+
+        $jobIds = $assignmentJobIds->merge($teamMemberJobIds)->merge($leaderJobIds)->merge($subLeaderJobIds)->unique();
 
         $jobs = ProjectJob::whereIn('id', $jobIds)
             ->where('completed', false)
