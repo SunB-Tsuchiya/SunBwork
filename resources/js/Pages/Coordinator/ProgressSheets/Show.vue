@@ -4,7 +4,7 @@
       <div class="flex flex-col gap-1">
         <div class="flex items-center gap-3">
           <Link
-            :href="route('coordinator.project_jobs.show', { projectJob: projectJob.id }) + '?tab=progress'"
+            :href="route('coordinator.project_jobs.show', { projectJob: projectJob.id })"
             class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
           >← 案件詳細に戻る</Link>
           <h2 class="text-xl font-semibold leading-tight text-gray-800">
@@ -1236,7 +1236,7 @@ function collectAllLeaves(nodes) {
 const sheetCompletion = computed(() => {
   const config = props.sheet.column_config ?? [];
   const completableCols = collectAllLeaves(config).filter(
-    (l) => ['worker', 'schedlink', 'joblink', 'proof_user'].includes(l.type)
+    (l) => ['worker', 'schedlink', 'joblink', 'proof_user', 'proof_v2'].includes(l.type)
   );
   if (completableCols.length === 0) return { done: 0, total: 0 };
   const cellMap = {};

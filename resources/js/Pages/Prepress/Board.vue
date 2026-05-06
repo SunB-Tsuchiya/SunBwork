@@ -53,6 +53,55 @@ const ticketsByStatus = computed(() => {
     return map;
 });
 
+// ── 削除モード ──────────────────────────────────────────────
+const deleteMode = ref(false);
+const selectedForDelete = ref(new Set());
+
+function toggleDeleteMode() {
+    deleteMode.value = !deleteMode.value;
+    if (!deleteMode.value) selectedForDelete.value = new Set();
+}
+
+function toggleSelectForDelete(id) {
+    const s = new Set(selectedForDelete.value);
+    if (s.has(id)) s.delete(id);
+    else s.add(id);
+    selectedForDelete.value = s;
+}
+
+function selectAllForDelete(tickets) {
+    selectedForDelete.value = new Set(tickets.map(t => t.id));
+}
+
+async function executeDelete() {
+    const ids = [...selectedForDelete.value];
+    if (ids.length === 0) return;
+    if (!confirm(
+        `${ids.length}件の伝票を完了ボックスから削除します。\n` +
+        `データは伝票履歴に残りますが、画像は削除されます。\n` +
+        `よろしいですか？`
+    )) return;
+
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    for (const id of ids) {
+        try {
+            await axios.patch(
+                route('prepress.board.archiveFromCompleted', { ticket: id }),
+                {},
+                { headers: { 'X-CSRF-TOKEN': csrf } }
+            );
+            const ticket = localTickets.value.find(t => t.id === id);
+            if (ticket) {
+                ticket.status     = 'deleted';
+                ticket.image_url  = null;
+                ticket.image_path = null;
+            }
+        } catch { /* ignore */ }
+    }
+    selectedForDelete.value = new Set();
+    deleteMode.value = false;
+}
+
 // Drag & Drop
 const draggedId  = ref(null);
 const draggedStatus = ref(null);
@@ -285,6 +334,29 @@ const canCreate = computed(() => createMode.value === 'new' || !!selectedJobId.v
                         <span class="ml-2 rounded-full bg-white/60 px-2 py-0.5 text-xs font-medium">
                             {{ ticketsByStatus[col.key].length }}
                         </span>
+                        <!-- 完了列専用: 削除モードボタン -->
+                        <template v-if="col.key === 'completed'">
+                            <button
+                                type="button"
+                                class="ml-auto rounded px-3 py-1 text-xs font-semibold transition-colors"
+                                :class="deleteMode
+                                    ? 'bg-red-600 text-white hover:bg-red-700'
+                                    : 'bg-white/70 text-red-700 hover:bg-white'"
+                                @click="toggleDeleteMode"
+                            >{{ deleteMode ? '削除モード終了' : '削除モード' }}</button>
+                            <button
+                                v-if="deleteMode"
+                                type="button"
+                                class="ml-2 rounded bg-white/70 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-white"
+                                @click="selectAllForDelete(ticketsByStatus['completed'])"
+                            >全件チェック</button>
+                            <button
+                                v-if="deleteMode && selectedForDelete.size > 0"
+                                type="button"
+                                class="ml-2 rounded bg-red-700 px-3 py-1 text-xs font-semibold text-white hover:bg-red-800"
+                                @click="executeDelete"
+                            >削除（{{ selectedForDelete.size }}件）</button>
+                        </template>
                     </div>
 
                     <!-- カードグリッド: 2列 -->
@@ -296,17 +368,39 @@ const canCreate = computed(() => createMode.value === 'new' || !!selectedJobId.v
                             <div
                                 v-for="ticket in ticketsByStatus[col.key]"
                                 :key="ticket.id"
-                                draggable="true"
-                                class="cursor-grab rounded-lg border-2 border-indigo-400 bg-white shadow-sm transition-all hover:shadow-md active:cursor-grabbing select-none"
-                                :class="{ 'opacity-50 scale-95': draggedId === ticket.id }"
-                                @dragstart="onDragStart(ticket)"
+                                :draggable="!(col.key === 'completed' && deleteMode)"
+                                class="relative cursor-grab rounded-lg border-2 border-indigo-400 bg-white shadow-sm transition-all hover:shadow-md active:cursor-grabbing select-none"
+                                :class="[
+                                    { 'opacity-50 scale-95': draggedId === ticket.id },
+                                    { 'ring-2 ring-red-500 ring-offset-1': col.key === 'completed' && deleteMode && selectedForDelete.has(ticket.id) },
+                                ]"
+                                @dragstart="!(col.key === 'completed' && deleteMode) && onDragStart(ticket)"
                                 @dragend="onDragEnd"
+                                @click="col.key === 'completed' && deleteMode ? toggleSelectForDelete(ticket.id) : null"
                             >
+                                <!-- 削除モード選択ハイライト -->
+                                <div
+                                    v-if="col.key === 'completed' && deleteMode && selectedForDelete.has(ticket.id)"
+                                    class="pointer-events-none absolute inset-0 z-10 rounded-lg bg-red-500/20"
+                                />
+                                <!-- 削除モード チェックボックス -->
+                                <div
+                                    v-if="col.key === 'completed' && deleteMode"
+                                    class="absolute left-2 top-2 z-20"
+                                    @click.stop="toggleSelectForDelete(ticket.id)"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        :checked="selectedForDelete.has(ticket.id)"
+                                        class="h-5 w-5 cursor-pointer rounded border-2 border-red-400 accent-red-600"
+                                        @change.stop="toggleSelectForDelete(ticket.id)"
+                                    />
+                                </div>
                                 <!-- A4縦上半分サムネイル -->
                                 <div
                                     class="overflow-hidden rounded-t-md bg-indigo-50"
                                     style="aspect-ratio: 210 / 148;"
-                                    @click="openLightbox(ticket)"
+                                    @click.stop="col.key === 'completed' && deleteMode ? toggleSelectForDelete(ticket.id) : openLightbox(ticket)"
                                 >
                                     <img
                                         v-if="ticket.image_url"

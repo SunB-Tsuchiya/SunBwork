@@ -114,7 +114,7 @@ class ProjectSchedulesController extends Controller
     public function uncomplete(Request $request, ProjectSchedule $projectSchedule)
     {
         $this->authorize('update', $projectSchedule);
-        $projectSchedule->update(['completed_at' => null]);
+        $projectSchedule->update(['completed_at' => null, 'progress' => 0]);
 
         // 紐づく schedlink セルも未完了に戻す
         \App\Models\ProgressCell::where('schedule_id', $projectSchedule->id)

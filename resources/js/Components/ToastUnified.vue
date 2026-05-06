@@ -4,22 +4,17 @@
         <transition-group name="toast" tag="div" class="w-full space-y-3">
             <div v-for="t in composableToasts" :key="t.id" class="toast-wrapper mx-auto w-full">
                 <div :class="toastClass(t.type)">
-                    <div class="flex items-center justify-between">
-                        <div class="flex-1 pr-4">{{ t.message }}</div>
-                        <div class="flex items-center gap-3">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="flex-1 leading-relaxed">{{ t.message }}</div>
+                        <div class="flex shrink-0 items-center gap-2">
                             <button
                                 v-if="t.action && typeof t.action.handler === 'function'"
-                                @click="
-                                    () => {
-                                        t.action.handler();
-                                        dismiss(t.id);
-                                    }
-                                "
-                                class="text-sm text-white underline"
+                                @click="() => { t.action.handler(); dismiss(t.id); }"
+                                class="text-xs underline opacity-70 hover:opacity-100"
                             >
                                 {{ t.action.label || 'Action' }}
                             </button>
-                            <button @click="dismiss(t.id)" class="ml-3 text-sm text-white">✕</button>
+                            <button @click="dismiss(t.id)" class="text-base leading-none opacity-40 hover:opacity-70">✕</button>
                         </div>
                     </div>
                 </div>
@@ -27,19 +22,24 @@
         </transition-group>
 
         <!-- Event-driven toasts (flash/errors/jobrequest/message) managed locally -->
-        <transition-group name="toast" tag="div" class="mt-3">
+        <transition-group name="toast" tag="div" class="mt-3 space-y-3">
             <div
                 v-for="toast in localToasts"
                 :key="toast.id"
                 v-show="toast.visible"
-                class="flex items-start justify-between rounded p-4 text-base shadow-lg"
-                :class="toast.type === 'error' ? 'bg-red-600 text-white' : 'bg-orange-600 text-white'"
+                class="flex items-start gap-3 rounded-xl border p-4 shadow-md text-sm"
+                :class="toast.type === 'error'
+                    ? 'bg-red-50 border-red-400 text-red-900'
+                    : 'bg-teal-50 border-teal-400 text-teal-900'"
             >
+                <span class="mt-0.5 shrink-0 text-base font-bold leading-none">
+                    {{ toast.type === 'error' ? '✕' : '✓' }}
+                </span>
                 <div class="flex-1">
-                    <div class="text-lg font-semibold">{{ toast.type === 'error' ? 'エラー' : '通知' }}</div>
-                    <div class="mt-1">{{ toast.message }}</div>
+                    <div class="font-semibold">{{ toast.type === 'error' ? 'エラー' : '通知' }}</div>
+                    <div class="mt-0.5 opacity-90">{{ toast.message }}</div>
                 </div>
-                <button @click="dismissLocal(toast.id)" class="ms-4 text-white opacity-90 hover:opacity-100">✕</button>
+                <button @click="dismissLocal(toast.id)" class="shrink-0 text-base leading-none opacity-40 hover:opacity-70">✕</button>
             </div>
         </transition-group>
     </div>

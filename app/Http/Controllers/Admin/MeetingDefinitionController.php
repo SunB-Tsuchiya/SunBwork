@@ -18,7 +18,12 @@ class MeetingDefinitionController extends LeaderMeetingDefinitionController
 {
     protected function getAvailableMembers(): \Illuminate\Support\Collection
     {
-        return User::orderBy('name')->get(['id', 'name', 'department_id']);
+        return User::orderBy('name')->get(['id', 'name', 'department_id', 'assignment_id']);
+    }
+
+    protected function getDepartments(): \Illuminate\Support\Collection
+    {
+        return \App\Models\Department::orderBy('name')->get();
     }
 
     public function index()
@@ -37,6 +42,8 @@ class MeetingDefinitionController extends LeaderMeetingDefinitionController
     {
         return Inertia::render('Admin/MeetingDefinitions/Create', [
             'availableMembers' => $this->getAvailableMembers(),
+            'departments'      => $this->getDepartments(),
+            'assignments'      => \App\Models\Assignment::orderBy('name')->get(),
         ]);
     }
 
@@ -81,6 +88,8 @@ class MeetingDefinitionController extends LeaderMeetingDefinitionController
         return Inertia::render('Admin/MeetingDefinitions/Edit', [
             'meetingDefinition' => $meetingDefinition,
             'availableMembers'  => $this->getAvailableMembers(),
+            'departments'       => $this->getDepartments(),
+            'assignments'       => \App\Models\Assignment::orderBy('name')->get(),
         ]);
     }
 

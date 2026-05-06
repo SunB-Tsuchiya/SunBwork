@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Coordinator;
 use App\Http\Controllers\Controller;
 use App\Models\ProjectJob;
 use App\Models\ProjectJobItem;
+use App\Models\ProjectSchedule;
 use App\Models\ProgressRow;
 use App\Models\ProgressSheet;
+use App\Services\ProgressLinkService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -33,11 +35,21 @@ class ProgressSheetItemController extends Controller
         // column_config のリーフ列一覧（col セレクター用）
         $columns = $this->flattenColumns($sheet->column_config ?? []);
 
+        // 全階層列一覧（col_key セレクター用：親グループも選択可）
+        $allColumns = $this->flattenAllColumns($sheet->column_config ?? []);
+
+        // 案件に紐づくスケジュール一覧（進捗連携セレクター用）
+        $schedules = ProjectSchedule::where('project_job_id', $sheet->project_job_id)
+            ->orderBy('start_date')
+            ->get(['id', 'name', 'start_date', 'end_date']);
+
         return response()->json([
             'items'        => $items,
             'rows'         => $rows,
             'columns'      => $columns,
+            'allColumns'   => $allColumns,
             'columnConfig' => $sheet->column_config ?? [],
+            'schedules'    => $schedules,
         ]);
     }
 
@@ -49,12 +61,12 @@ class ProgressSheetItemController extends Controller
         $this->authorizeCoordinator($sheet);
 
         $validated = $request->validate([
-            'name'            => 'required|string|max:255',
-            'type'            => 'required|in:row,column',
-            'row_id'          => 'nullable|integer|exists:progress_rows,id',
-            'col_key'         => 'nullable|string|max:255',
-            'parent_label'    => 'nullable|string|max:255',
-            'calendar_linked' => 'boolean',
+            'name'                => 'required|string|max:255',
+            'type'                => 'required|in:row,column',
+            'row_id'              => 'nullable|integer|exists:progress_rows,id',
+            'col_key'             => 'nullable|string|max:255',
+            'parent_label'        => 'nullable|string|max:255',
+            'linked_schedule_id'  => 'nullable|integer|exists:project_schedules,id',
         ]);
 
         $maxOrder = $sheet->linkSettings()
@@ -62,14 +74,15 @@ class ProgressSheetItemController extends Controller
             ->max('order') ?? -1;
 
         $item = ProjectJobItem::create([
-            'progress_sheet_id' => $sheet->id,
-            'name'              => $validated['name'],
-            'type'              => $validated['type'],
-            'row_id'            => $validated['row_id'] ?? null,
-            'col_key'           => $validated['col_key'] ?? null,
-            'parent_label'      => $validated['parent_label'] ?? null,
-            'calendar_linked'   => $validated['calendar_linked'] ?? false,
-            'order'             => $maxOrder + 1,
+            'progress_sheet_id'  => $sheet->id,
+            'name'               => $validated['name'],
+            'type'               => $validated['type'],
+            'row_id'             => $validated['row_id'] ?? null,
+            'col_key'            => $validated['col_key'] ?? null,
+            'parent_label'       => $validated['parent_label'] ?? null,
+            'calendar_linked'    => true,
+            'linked_schedule_id' => $validated['linked_schedule_id'] ?? null,
+            'order'              => $maxOrder + 1,
         ]);
 
         return response()->json($this->formatItem($item));
@@ -84,16 +97,22 @@ class ProgressSheetItemController extends Controller
         abort_unless($item->progress_sheet_id === $sheet->id, 404);
 
         $validated = $request->validate([
-            'name'            => 'nullable|string|max:255',
-            'type'            => 'nullable|in:row,column',
-            'row_id'          => 'nullable|integer|exists:progress_rows,id',
-            'col_key'         => 'nullable|string|max:255',
-            'parent_label'    => 'nullable|string|max:255',
-            'calendar_linked' => 'nullable|boolean',
-            'order'           => 'nullable|integer',
+            'name'               => 'nullable|string|max:255',
+            'type'               => 'nullable|in:row,column',
+            'row_id'             => 'nullable|integer|exists:progress_rows,id',
+            'col_key'            => 'nullable|string|max:255',
+            'parent_label'       => 'nullable|string|max:255',
+            'order'              => 'nullable|integer',
+            'linked_schedule_id' => 'nullable|integer|exists:project_schedules,id',
         ]);
 
-        $item->update(array_filter($validated, fn($v) => $v !== null));
+        $updateData = array_filter($validated, fn($v) => $v !== null);
+        if (array_key_exists('linked_schedule_id', $validated)) {
+            $updateData['linked_schedule_id'] = $validated['linked_schedule_id'];
+        }
+        $updateData['calendar_linked'] = true;
+
+        $item->update($updateData);
         $item->refresh();
 
         return response()->json($this->formatItem($item));
@@ -137,14 +156,14 @@ class ProgressSheetItemController extends Controller
         $this->authorizeCoordinator($sheet);
 
         $validated = $request->validate([
-            'items'                  => 'required|array',
-            'items.*.name'           => 'required|string|max:255',
-            'items.*.type'           => 'required|in:row,column',
-            'items.*.row_id'         => 'nullable|integer|exists:progress_rows,id',
-            'items.*.col_key'        => 'nullable|string|max:255',
-            'items.*.parent_label'   => 'nullable|string|max:255',
-            'items.*.calendar_linked'=> 'nullable|boolean',
-            'items.*.order'          => 'nullable|integer',
+            'items'                         => 'required|array',
+            'items.*.name'                  => 'required|string|max:255',
+            'items.*.type'                  => 'required|in:row,column',
+            'items.*.row_id'                => 'nullable|integer|exists:progress_rows,id',
+            'items.*.col_key'               => 'nullable|string|max:255',
+            'items.*.parent_label'          => 'nullable|string|max:255',
+            'items.*.order'                 => 'nullable|integer',
+            'items.*.linked_schedule_id'    => 'nullable|integer|exists:project_schedules,id',
         ]);
 
         DB::transaction(function () use ($validated, $sheet) {
@@ -153,14 +172,15 @@ class ProgressSheetItemController extends Controller
 
             foreach ($validated['items'] as $idx => $data) {
                 ProjectJobItem::create([
-                    'progress_sheet_id' => $sheet->id,
-                    'name'              => $data['name'],
-                    'type'              => $data['type'],
-                    'row_id'            => $data['row_id'] ?? null,
-                    'col_key'           => $data['col_key'] ?? null,
-                    'parent_label'      => $data['parent_label'] ?? null,
-                    'calendar_linked'   => $data['calendar_linked'] ?? false,
-                    'order'             => $data['order'] ?? $idx,
+                    'progress_sheet_id'  => $sheet->id,
+                    'name'               => $data['name'],
+                    'type'               => $data['type'],
+                    'row_id'             => $data['row_id'] ?? null,
+                    'col_key'            => $data['col_key'] ?? null,
+                    'parent_label'       => $data['parent_label'] ?? null,
+                    'calendar_linked'    => true,
+                    'linked_schedule_id' => $data['linked_schedule_id'] ?? null,
+                    'order'              => $data['order'] ?? $idx,
                 ]);
             }
         });
@@ -170,7 +190,20 @@ class ProgressSheetItemController extends Controller
             ->get()
             ->map(fn($i) => $this->formatItem($i));
 
+        // 保存後に全スケジュール進捗を再計算
+        ProgressLinkService::recalculateSheet($sheet->id);
+
         return response()->json(['status' => 'ok', 'items' => $items]);
+    }
+
+    /**
+     * シートの全リンクスケジュール進捗を手動再計算する
+     */
+    public function recalculate(ProgressSheet $sheet)
+    {
+        $this->authorizeCoordinator($sheet);
+        ProgressLinkService::recalculateSheet($sheet->id);
+        return response()->json(['status' => 'ok']);
     }
 
     /**
@@ -294,7 +327,7 @@ class ProgressSheetItemController extends Controller
     }
 
     /**
-     * column_config をフラット化してセレクター用に返す
+     * column_config をフラット化してセレクター用に返す（リーフのみ）
      */
     private function flattenColumns(array $config, string $prefix = ''): array
     {
@@ -311,17 +344,35 @@ class ProgressSheetItemController extends Controller
         return $result;
     }
 
+    /**
+     * column_config をフラット化して全階層（親グループ含む）を返す
+     */
+    private function flattenAllColumns(array $config, string $prefix = ''): array
+    {
+        $result = [];
+        foreach ($config as $col) {
+            $label = $prefix ? $prefix . ' > ' . ($col['label'] ?? $col['key']) : ($col['label'] ?? $col['key']);
+            $children = $col['children'] ?? [];
+            $result[] = ['key' => $col['key'], 'label' => $label, 'isLeaf' => empty($children)];
+            if (!empty($children)) {
+                $result = array_merge($result, $this->flattenAllColumns($children, $label));
+            }
+        }
+        return $result;
+    }
+
     private function formatItem(ProjectJobItem $item): array
     {
         return [
-            'id'              => $item->id,
-            'name'            => $item->name,
-            'type'            => $item->type,
-            'row_id'          => $item->row_id,
-            'col_key'         => $item->col_key,
-            'parent_label'    => $item->parent_label,
-            'calendar_linked' => (bool) $item->calendar_linked,
-            'order'           => $item->order,
+            'id'                 => $item->id,
+            'name'               => $item->name,
+            'type'               => $item->type,
+            'row_id'             => $item->row_id,
+            'col_key'            => $item->col_key,
+            'parent_label'       => $item->parent_label,
+            'calendar_linked'    => (bool) $item->calendar_linked,
+            'linked_schedule_id' => $item->linked_schedule_id,
+            'order'              => $item->order,
         ];
     }
 

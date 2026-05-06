@@ -15,6 +15,9 @@ const canSeeLeader = computed(() =>
 const canSeeAdmin = computed(() =>
     ['admin', 'superadmin'].includes(userRole.value)
 );
+const canSeeProofCoordinator = computed(() =>
+    ['proof_coordinator', 'leader', 'admin', 'superadmin'].includes(userRole.value)
+);
 
 const guides = computed(() => {
     const all = [
@@ -62,6 +65,21 @@ const guides = computed(() => {
             btn: 'bg-green-600 hover:bg-green-700 text-white',
             iconBg: 'bg-green-100',
             visible: canSeeCoordinator.value,
+        },
+        {
+            key: 'proof_coordinator',
+            title: '校正管理者向けガイド',
+            subtitle: 'Proof Admin',
+            description: '校正依頼の受信・担当割り当て、校正ジョブ管理、校正チーム管理など、校正管理者向けの説明書です。',
+            icon: '📐',
+            route: 'guide.proof_coordinator',
+            bgFrom: 'from-pink-50',
+            bgTo: 'to-rose-50',
+            border: 'border-pink-200',
+            badge: 'bg-pink-100 text-pink-700',
+            btn: 'bg-pink-500 hover:bg-pink-600 text-white',
+            iconBg: 'bg-pink-100',
+            visible: canSeeProofCoordinator.value,
         },
         {
             key: 'user',

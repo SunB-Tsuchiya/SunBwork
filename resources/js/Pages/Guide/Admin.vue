@@ -32,23 +32,25 @@ import { Link } from '@inertiajs/vue3';
                 <ol class="space-y-1 text-sm text-red-600">
                     <li><a href="#role" class="hover:underline">1. Adminの役割</a></li>
                     <li><a href="#flow" class="hover:underline">2. 基本的な使い方の流れ</a></li>
-                    <li><a href="#company" class="hover:underline">3. 会社管理</a></li>
-                    <li><a href="#users" class="hover:underline">4. ユーザー管理</a></li>
-                    <li><a href="#teams" class="hover:underline">5. 部署管理</a></li>
-                    <li><a href="#diary" class="hover:underline">6. 日報管理</a></li>
-                    <li><a href="#clients" class="hover:underline">7. クライアント管理</a></li>
-                    <li><a href="#workload" class="hover:underline">8. 作業量分析</a></li>
-                    <li><a href="#worktype" class="hover:underline">9. 勤務形態設定</a></li>
-                    <li><a href="#workrecord" class="hover:underline">10. 勤務時間管理</a></li>
-                    <li><a href="#admin-permissions" class="hover:underline">11. Admin権限管理（代表Adminのみ）</a></li>
-                    <li><a href="#leader-permissions" class="hover:underline">12. Leader権限管理</a></li>
+                    <li><a href="#project-jobs" class="hover:underline">3. 案件総覧</a></li>
+                    <li><a href="#company" class="hover:underline">4. 会社管理</a></li>
+                    <li><a href="#users" class="hover:underline">5. ユーザー管理</a></li>
+                    <li><a href="#teams" class="hover:underline">6. 部署管理</a></li>
+                    <li><a href="#diary" class="hover:underline">7. 日報管理</a></li>
+                    <li><a href="#clients" class="hover:underline">8. クライアント管理</a></li>
+                    <li><a href="#workload" class="hover:underline">9. 作業量分析</a></li>
+                    <li><a href="#worktype" class="hover:underline">10. 勤務形態設定</a></li>
+                    <li><a href="#workrecord" class="hover:underline">11. 勤務時間管理</a></li>
+                    <li><a href="#admin-permissions" class="hover:underline">12. Admin権限管理（代表Adminのみ）</a></li>
+                    <li><a href="#leader-permissions" class="hover:underline">13. Leader権限管理</a></li>
+                    <li><a href="#meeting" class="hover:underline">14. 会議設定</a></li>
                 </ol>
             </div>
 
             <!-- 1. 役割 -->
             <div id="role" class="scroll-mt-16 rounded-xl bg-white p-6 shadow-sm">
                 <h2 class="mb-4 flex items-center gap-2 text-xl font-bold text-gray-800">
-                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100 text-sm text-red-600 font-bold">1</span>
+                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100 text-sm font-bold text-red-600">1</span>
                     Adminの役割
                 </h2>
                 <p class="mb-5 leading-relaxed text-gray-600">
@@ -61,6 +63,7 @@ import { Link } from '@inertiajs/vue3';
                     <div class="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500">画面上部のタブメニュー（権限によって異なります）</div>
                     <div class="divide-y divide-gray-100">
                         <div v-for="tab in [
+                            { name: '案件総覧', cond: '全Admin', desc: '全案件の一覧・状況確認' },
                             { name: '会社管理', cond: '権限あり', desc: '会社情報の編集' },
                             { name: 'ユーザー管理', cond: '権限あり', desc: '全ユーザーの登録・編集・削除' },
                             { name: '部署管理', cond: '権限あり', desc: '部署・チーム構成の管理' },
@@ -71,6 +74,7 @@ import { Link } from '@inertiajs/vue3';
                             { name: '勤務時間管理', cond: '権限あり', desc: '全社の勤務記録の確認・管理' },
                             { name: 'Admin権限管理', cond: '代表Adminのみ', desc: '他Adminへの権限フラグ付与・変更' },
                             { name: 'Leader権限管理', cond: '全Admin', desc: 'Leaderへの権限フラグ付与・変更' },
+                            { name: '会議設定', cond: '全Admin', desc: '定例会議の参加メンバー・スケジュール設定' },
                         ]" :key="tab.name" class="flex items-center gap-4 px-4 py-3">
                             <span class="w-36 rounded-md bg-red-50 px-2 py-1 text-center text-sm font-medium text-red-700">{{ tab.name }}</span>
                             <span class="w-32 text-xs text-gray-400">{{ tab.cond }}</span>
@@ -83,7 +87,7 @@ import { Link } from '@inertiajs/vue3';
             <!-- 2. 基本の流れ -->
             <div id="flow" class="scroll-mt-16 rounded-xl bg-white p-6 shadow-sm">
                 <h2 class="mb-4 flex items-center gap-2 text-xl font-bold text-gray-800">
-                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100 text-sm text-red-600 font-bold">2</span>
+                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100 text-sm font-bold text-red-600">2</span>
                     基本的な使い方の流れ
                 </h2>
                 <div class="flex flex-wrap items-center gap-2">
@@ -98,15 +102,37 @@ import { Link } from '@inertiajs/vue3';
                             <span class="text-2xl">{{ step.icon }}</span>
                             <span class="mt-1 text-xs text-red-700">{{ step.label }}</span>
                         </div>
-                        <span v-if="i < 4" class="text-gray-300 text-xl">→</span>
+                        <span v-if="i < 4" class="text-xl text-gray-300">→</span>
                     </div>
                 </div>
             </div>
 
-            <!-- 3. 会社管理 -->
+            <!-- 3. 案件総覧 -->
+            <div id="project-jobs" class="scroll-mt-16 rounded-xl bg-white p-6 shadow-sm">
+                <h2 class="mb-4 flex items-center gap-2 text-xl font-bold text-gray-800">
+                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100 text-sm font-bold text-red-600">3</span>
+                    案件総覧
+                </h2>
+                <p class="mb-4 text-gray-600">
+                    <strong class="text-red-600">「案件総覧」タブ</strong>では、全社の案件を一覧で確認できます。
+                </p>
+                <div class="grid gap-3 sm:grid-cols-3">
+                    <div v-for="item in [
+                        { icon: '📋', title: '全案件の一覧', desc: '進行中・完了済みを含む全案件を確認' },
+                        { icon: '🔍', title: '案件詳細の閲覧', desc: '各案件の進行状況・メンバー・ジョブ履歴を確認' },
+                        { icon: '📊', title: 'ステータス把握', desc: 'クライアント・担当者・進捗をまとめて把握' },
+                    ]" :key="item.title" class="rounded-xl border border-gray-100 p-4 text-center">
+                        <div class="mb-2 text-2xl">{{ item.icon }}</div>
+                        <div class="mb-1 text-sm font-semibold text-gray-700">{{ item.title }}</div>
+                        <p class="text-xs text-gray-500">{{ item.desc }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. 会社管理 -->
             <div id="company" class="scroll-mt-16 rounded-xl bg-white p-6 shadow-sm">
                 <h2 class="mb-4 flex items-center gap-2 text-xl font-bold text-gray-800">
-                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100 text-sm text-red-600 font-bold">3</span>
+                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100 text-sm font-bold text-red-600">4</span>
                     会社管理
                 </h2>
                 <p class="mb-3 text-gray-600">自社の基本情報を管理します。</p>
@@ -122,10 +148,10 @@ import { Link } from '@inertiajs/vue3';
                 </div>
             </div>
 
-            <!-- 4. ユーザー管理 -->
+            <!-- 5. ユーザー管理 -->
             <div id="users" class="scroll-mt-16 rounded-xl bg-white p-6 shadow-sm">
                 <h2 class="mb-4 flex items-center gap-2 text-xl font-bold text-gray-800">
-                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100 text-sm text-red-600 font-bold">4</span>
+                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100 text-sm font-bold text-red-600">5</span>
                     ユーザー管理
                 </h2>
                 <p class="mb-4 text-gray-600">全社のユーザーを一元管理できます。</p>
@@ -149,6 +175,7 @@ import { Link } from '@inertiajs/vue3';
                         { role: 'Admin', badge: 'bg-red-100 text-red-700', desc: '会社単位の管理者（このガイドの対象）' },
                         { role: 'Leader', badge: 'bg-orange-100 text-orange-700', desc: '部署・チームのリーダー' },
                         { role: 'Coordinator', badge: 'bg-green-100 text-green-700', desc: '案件・ジョブの進行管理担当者' },
+                        { role: 'Proof Admin', badge: 'bg-pink-100 text-pink-700', desc: '校正ジョブの管理担当者' },
                         { role: 'User', badge: 'bg-blue-100 text-blue-700', desc: '一般作業ユーザー' },
                     ]" :key="r.role" class="flex items-center gap-4 border-b border-gray-50 px-4 py-3 last:border-0">
                         <span class="w-28 rounded-full px-3 py-1 text-center text-xs font-semibold" :class="r.badge">{{ r.role }}</span>
@@ -168,17 +195,16 @@ import { Link } from '@inertiajs/vue3';
                 </div>
             </div>
 
-            <!-- 5. 部署管理 -->
+            <!-- 6. 部署管理 -->
             <div id="teams" class="scroll-mt-16 rounded-xl bg-white p-6 shadow-sm">
                 <h2 class="mb-4 flex items-center gap-2 text-xl font-bold text-gray-800">
-                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100 text-sm text-red-600 font-bold">5</span>
+                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100 text-sm font-bold text-red-600">6</span>
                     部署管理
                 </h2>
                 <p class="mb-4 text-gray-600">部署・チーム・ユニットの構成を管理できます。</p>
 
-                <!-- 階層図 -->
                 <div class="mb-5 rounded-xl border border-gray-100 bg-gray-50 p-5">
-                    <div class="text-sm font-semibold text-gray-500 mb-3">組織の階層構造</div>
+                    <div class="mb-3 text-sm font-semibold text-gray-500">組織の階層構造</div>
                     <div class="space-y-2 text-sm">
                         <div class="flex items-center gap-2">
                             <span class="rounded bg-red-100 px-2 py-1 text-xs font-semibold text-red-700">会社</span>
@@ -201,24 +227,23 @@ import { Link } from '@inertiajs/vue3';
                 </ul>
             </div>
 
-            <!-- 6. 日報管理 -->
+            <!-- 7. 日報管理 -->
             <div id="diary" class="scroll-mt-16 rounded-xl bg-white p-6 shadow-sm">
                 <h2 class="mb-4 flex items-center gap-2 text-xl font-bold text-gray-800">
-                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100 text-sm text-red-600 font-bold">6</span>
+                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100 text-sm font-bold text-red-600">7</span>
                     日報管理
                 </h2>
                 <p class="mb-4 text-gray-600">
                     <strong class="text-red-600">「日報管理」タブ</strong>では、全社のメンバーの日報を一覧で確認できます。
                 </p>
 
-                <!-- 注目ポイント -->
                 <div class="mb-5 flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
                     <span class="text-2xl">✨</span>
                     <div>
-                        <div class="mb-1 font-semibold text-amber-700">日報にはその日の予定表タイムラインが自動表示されます</div>
+                        <div class="mb-1 font-semibold text-amber-700">日報にはその日のカレンダータイムラインが自動表示されます</div>
                         <p class="text-sm text-amber-600">
-                            日報を開くと、そのメンバーが<strong>その日に予定表に登録していたスケジュール</strong>がタイムライン形式で自動表示されます。
-                            文章の記録と予定表の記録を同時に把握でき、勤務実態を正確に確認できます。
+                            日報を開くと、そのメンバーが<strong>その日にカレンダーに登録していたスケジュール</strong>がタイムライン形式で自動表示されます。
+                            文章の記録とカレンダーの記録を同時に把握でき、勤務実態を正確に確認できます。
                         </p>
                     </div>
                 </div>
@@ -237,10 +262,10 @@ import { Link } from '@inertiajs/vue3';
                 </div>
             </div>
 
-            <!-- 7. クライアント管理 -->
+            <!-- 8. クライアント管理 -->
             <div id="clients" class="scroll-mt-16 rounded-xl bg-white p-6 shadow-sm">
                 <h2 class="mb-4 flex items-center gap-2 text-xl font-bold text-gray-800">
-                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100 text-sm text-red-600 font-bold">7</span>
+                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100 text-sm font-bold text-red-600">8</span>
                     クライアント管理
                 </h2>
                 <p class="mb-4 text-gray-600">全社の取引先を管理できます。</p>
@@ -258,10 +283,10 @@ import { Link } from '@inertiajs/vue3';
                 </div>
             </div>
 
-            <!-- 8. 作業量分析 -->
+            <!-- 9. 作業量分析 -->
             <div id="workload" class="scroll-mt-16 rounded-xl bg-white p-6 shadow-sm">
                 <h2 class="mb-4 flex items-center gap-2 text-xl font-bold text-gray-800">
-                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100 text-sm text-red-600 font-bold">8</span>
+                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100 text-sm font-bold text-red-600">9</span>
                     作業量分析
                 </h2>
                 <p class="mb-4 text-gray-600">
@@ -302,10 +327,10 @@ import { Link } from '@inertiajs/vue3';
                 </div>
             </div>
 
-            <!-- 9. 勤務形態設定 -->
+            <!-- 10. 勤務形態設定 -->
             <div id="worktype" class="scroll-mt-16 rounded-xl bg-white p-6 shadow-sm">
                 <h2 class="mb-4 flex items-center gap-2 text-xl font-bold text-gray-800">
-                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100 text-sm text-red-600 font-bold">9</span>
+                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100 text-sm font-bold text-red-600">10</span>
                     勤務形態設定
                 </h2>
                 <p class="mb-4 text-gray-600">
@@ -314,7 +339,7 @@ import { Link } from '@inertiajs/vue3';
                 <div class="grid gap-3 sm:grid-cols-3">
                     <div v-for="item in [
                         { icon: '⏰', title: '開始・終了時刻', desc: '各シフトの始業・終業時刻を設定' },
-                        { icon: '📅', title: 'カレンダー反映', desc: 'ユーザーの予定表に即時反映' },
+                        { icon: '📅', title: 'カレンダー反映', desc: 'ユーザーのカレンダーに即時反映' },
                         { icon: '🌙', title: '夜勤対応', desc: '16時以降開始のシフトは翌6時まで表示' },
                     ]" :key="item.title" class="rounded-xl border border-gray-100 p-4 text-center">
                         <div class="mb-2 text-2xl">{{ item.icon }}</div>
@@ -324,10 +349,10 @@ import { Link } from '@inertiajs/vue3';
                 </div>
             </div>
 
-            <!-- 10. 勤務時間管理 -->
+            <!-- 11. 勤務時間管理 -->
             <div id="workrecord" class="scroll-mt-16 rounded-xl bg-white p-6 shadow-sm">
                 <h2 class="mb-4 flex items-center gap-2 text-xl font-bold text-gray-800">
-                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100 text-sm text-red-600 font-bold">10</span>
+                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100 text-sm font-bold text-red-600">11</span>
                     勤務時間管理
                 </h2>
                 <p class="text-gray-600">
@@ -335,13 +360,13 @@ import { Link } from '@inertiajs/vue3';
                 </p>
             </div>
 
-            <!-- 11. Admin権限管理 -->
+            <!-- 12. Admin権限管理 -->
             <div id="admin-permissions" class="scroll-mt-16 rounded-xl bg-white p-6 shadow-sm">
                 <h2 class="mb-1 flex items-center gap-2 text-xl font-bold text-gray-800">
-                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100 text-sm text-red-600 font-bold">11</span>
+                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100 text-sm font-bold text-red-600">12</span>
                     Admin権限管理
                 </h2>
-                <div class="mb-4 text-xs text-red-500 font-medium">※ 代表Admin（筆頭管理者）のみ表示</div>
+                <div class="mb-4 text-xs font-medium text-red-500">※ 代表Admin（筆頭管理者）のみ表示</div>
                 <p class="mb-4 text-gray-600">
                     同じAdminロールを持つユーザーの権限フラグを管理できます。
                 </p>
@@ -363,10 +388,10 @@ import { Link } from '@inertiajs/vue3';
                 </div>
             </div>
 
-            <!-- 12. Leader権限管理 -->
+            <!-- 13. Leader権限管理 -->
             <div id="leader-permissions" class="scroll-mt-16 rounded-xl bg-white p-6 shadow-sm">
                 <h2 class="mb-4 flex items-center gap-2 text-xl font-bold text-gray-800">
-                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100 text-sm text-red-600 font-bold">12</span>
+                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100 text-sm font-bold text-red-600">13</span>
                     Leader権限管理
                 </h2>
                 <p class="mb-4 text-gray-600">
@@ -389,8 +414,31 @@ import { Link } from '@inertiajs/vue3';
                 </div>
             </div>
 
+            <!-- 14. 会議設定 -->
+            <div id="meeting" class="scroll-mt-16 rounded-xl bg-white p-6 shadow-sm">
+                <h2 class="mb-4 flex items-center gap-2 text-xl font-bold text-gray-800">
+                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100 text-sm font-bold text-red-600">14</span>
+                    会議設定
+                </h2>
+                <p class="mb-4 text-gray-600">
+                    <strong class="text-red-600">「会議設定」タブ</strong>では、定例会議の参加メンバーとスケジュールを設定できます。
+                    設定した会議は参加メンバーのカレンダーに自動反映されます。
+                </p>
+                <div class="grid gap-3 sm:grid-cols-3">
+                    <div v-for="item in [
+                        { icon: '📋', title: '会議の登録・編集', desc: '会議名・曜日・時間・繰り返し設定' },
+                        { icon: '👥', title: 'メンバー選択', desc: '部署・担当での絞り込みで参加者を選択' },
+                        { icon: '📅', title: 'カレンダー自動反映', desc: '参加メンバーのカレンダーに会議予定が自動表示' },
+                    ]" :key="item.title" class="rounded-xl border border-gray-100 p-4 text-center">
+                        <div class="mb-2 text-2xl">{{ item.icon }}</div>
+                        <div class="mb-1 text-sm font-semibold text-gray-700">{{ item.title }}</div>
+                        <p class="text-xs text-gray-500">{{ item.desc }}</p>
+                    </div>
+                </div>
+            </div>
+
             <!-- ガイド一覧に戻る -->
-            <div class="flex justify-center pt-2 pb-4">
+            <div class="flex justify-center pb-4 pt-2">
                 <Link :href="route('guide.index')" class="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-5 py-2 text-sm font-medium text-red-600 shadow-sm hover:bg-red-50">
                     ← ガイド一覧に戻る
                 </Link>

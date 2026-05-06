@@ -103,6 +103,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
         Route::get('/coordinator', [App\Http\Controllers\GuideController::class, 'coordinator'])->name('coordinator');
         Route::get('/leader', [App\Http\Controllers\GuideController::class, 'leader'])->name('leader');
         Route::get('/admin', [App\Http\Controllers\GuideController::class, 'admin'])->name('admin');
+        Route::get('/proof-coordinator', [App\Http\Controllers\GuideController::class, 'proofCoordinator'])->name('proof_coordinator');
     });
 
     // Ziggy用: 明示的にuser.dashboardルートを追加
@@ -655,6 +656,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::delete('progress-sheets/{sheet}/link-settings/{item}', [App\Http\Controllers\Coordinator\ProgressSheetItemController::class, 'destroy'])->name('progress_sheets.link_settings.destroy');
         Route::get('progress-sheets/{sheet}/link-settings/propose', [App\Http\Controllers\Coordinator\ProgressSheetItemController::class, 'propose'])->name('progress_sheets.link_settings.propose');
         Route::post('progress-sheets/{sheet}/link-settings/import', [App\Http\Controllers\Coordinator\ProgressSheetItemController::class, 'importFromSheet'])->name('progress_sheets.link_settings.import');
+        Route::post('progress-sheets/{sheet}/link-settings/recalculate', [App\Http\Controllers\Coordinator\ProgressSheetItemController::class, 'recalculate'])->name('progress_sheets.link_settings.recalculate');
         // 連携設定（G-01）: カレンダー用・案件単位で calendar_linked 項目を返す
         Route::get('project_jobs/{projectJob}/link-settings', [App\Http\Controllers\Coordinator\ProgressSheetItemController::class, 'indexForCalendar'])->name('project_jobs.link_settings.index');
 
@@ -820,6 +822,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
         // 伝票ボード
         Route::get('board', [\App\Http\Controllers\Prepress\BoardController::class, 'index'])->name('board');
         Route::patch('board/{ticket}/status', [\App\Http\Controllers\Prepress\BoardController::class, 'updateStatus'])->name('board.updateStatus');
+        Route::patch('board/{ticket}/archive', [\App\Http\Controllers\Prepress\BoardController::class, 'archiveFromCompleted'])->name('board.archiveFromCompleted');
         // 伝票登録モーダル用 API
         Route::get('api/clients', [\App\Http\Controllers\Prepress\BoardController::class, 'apiClients'])->name('api.clients');
         Route::get('api/project-jobs', [\App\Http\Controllers\Prepress\BoardController::class, 'apiProjectJobs'])->name('api.projectJobs');

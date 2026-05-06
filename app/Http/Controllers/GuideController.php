@@ -46,4 +46,14 @@ class GuideController extends Controller
 
         return Inertia::render('Guide/Admin');
     }
+
+    public function proofCoordinator()
+    {
+        $role = Auth::user()->user_role;
+        if (! in_array($role, ['proof_coordinator', 'leader', 'admin', 'superadmin'])) {
+            abort(403);
+        }
+
+        return Inertia::render('Guide/ProofCoordinator');
+    }
 }

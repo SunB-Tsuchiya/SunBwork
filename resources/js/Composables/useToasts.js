@@ -39,17 +39,16 @@ function dismissToast(id) {
 }
 
 function toastClass(type) {
-    // Make toasts more prominent and use an orange theme by default
-    const base = 'text-white p-4 rounded shadow-lg text-base';
+    const base = 'rounded-xl border p-4 shadow-md text-sm';
     switch (type) {
         case 'success':
-            return base + ' bg-orange-600';
+            return base + ' bg-teal-50 border-teal-400 text-teal-900';
         case 'error':
-            return base + ' bg-red-600';
+            return base + ' bg-red-50 border-red-400 text-red-900';
         case 'warning':
-            return base + ' bg-orange-500';
+            return base + ' bg-sky-50 border-sky-400 text-sky-900';
         default:
-            return base + ' bg-orange-600';
+            return base + ' bg-blue-50 border-blue-400 text-blue-900';
     }
 }
 

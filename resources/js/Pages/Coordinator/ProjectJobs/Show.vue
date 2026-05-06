@@ -759,6 +759,7 @@
                                     v-model="row.start_date"
                                     type="date"
                                     :disabled="!row.selected"
+                                    @change="row.end_date = row.end_date || row.start_date"
                                     class="rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none disabled:bg-gray-50"
                                 />
                                 <input

@@ -1285,14 +1285,10 @@ onMounted(() => {
             const s = normalizeToDateTimePartsLocal(ev.start || ev.desired_start_date || ev.start_time || '');
             const e = normalizeToDateTimePartsLocal(ev.end || ev.desired_end_date || ev.desired_time || '');
             workDate.value = s.date || assignments.value[0]?.desired_start_date || todayDateStr();
-            if (s.time) {
-                const [sh, sm] = String(s.time).split(':');
-                startTimeHour.value = sh || '17';
-                startTimeMin.value = sm || '30';
-            } else if (assignments.value[0]) {
-                startTimeHour.value = assignments.value[0].start_time_hour || '17';
-                startTimeMin.value = assignments.value[0].start_time_min || '30';
-            }
+            // 新規作成時は常に現在時刻の5分刻みを使用する
+            const _nowTime = _calcInitStartTime();
+            startTimeHour.value = _nowTime.h;
+            startTimeMin.value  = _nowTime.m;
             if (e.time) {
                 const [eh, em] = String(e.time).split(':');
                 endTimeHour.value = eh || startTimeHour.value || '10';

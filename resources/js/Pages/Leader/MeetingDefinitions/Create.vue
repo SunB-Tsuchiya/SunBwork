@@ -1,12 +1,15 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
+import DialogModal from '@/Components/DialogModal.vue';
 import { Link, useForm } from '@inertiajs/vue3';
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { route } from 'ziggy-js';
 
 const props = defineProps({
-    availableMembers:   { type: Array,  default: () => [] },
-    meetingDefinition:  { type: Object, default: null },
+    availableMembers:  { type: Array,  default: () => [] },
+    departments:       { type: Array,  default: () => [] },
+    assignments:       { type: Array,  default: () => [] },
+    meetingDefinition: { type: Object, default: null },
 });
 
 const isEdit = computed(() => !!props.meetingDefinition);
@@ -17,17 +20,11 @@ const recurrenceOptions = [
     { value: 'monthly',  label: '毎月' },
 ];
 const dayOfWeekOptions = [
-    { value: 0, label: '日' },
-    { value: 1, label: '月' },
-    { value: 2, label: '火' },
-    { value: 3, label: '水' },
-    { value: 4, label: '木' },
-    { value: 5, label: '金' },
-    { value: 6, label: '土' },
+    { value: 0, label: '日' }, { value: 1, label: '月' }, { value: 2, label: '火' },
+    { value: 3, label: '水' }, { value: 4, label: '木' }, { value: 5, label: '金' }, { value: 6, label: '土' },
 ];
 const minuteOptions = ['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'];
 
-// 初期選択メンバー
 const initMemberIds = props.meetingDefinition?.members?.map((m) => m.id) ?? [];
 
 const form = useForm({
@@ -41,7 +38,6 @@ const form = useForm({
     members:       initMemberIds,
 });
 
-// 時刻セレクタ用
 const startHour   = ref(form.start_time.split(':')[0]);
 const startMinute = ref(form.start_time.split(':')[1]);
 const endHour     = ref(form.end_time.split(':')[0]);
@@ -52,37 +48,97 @@ function syncTimes() {
     form.end_time   = `${endHour.value}:${endMinute.value}`;
 }
 
-// メンバー絞り込みモーダル
-const showMemberModal = ref(false);
-const memberSearch    = ref('');
+// メンバー選択モーダル
+const showMemberModal      = ref(false);
+const selectedDepartmentId = ref('');
+const selectedAssignmentId = ref('');
+const selectedMemberIds    = ref([...initMemberIds]);
 
-const filteredMembers = computed(() => {
-    const q = memberSearch.value.toLowerCase();
-    if (!q) return props.availableMembers;
-    return props.availableMembers.filter((u) => u.name.toLowerCase().includes(q));
+watch(selectedDepartmentId, () => { selectedAssignmentId.value = ''; });
+
+const filteredAssignments = computed(() => {
+    if (!selectedDepartmentId.value) return [];
+    return props.assignments.filter((a) =>
+        props.availableMembers.some(
+            (m) => m.department_id == selectedDepartmentId.value && m.assignment_id == a.id,
+        ),
+    );
 });
 
-const selectedMemberIds = ref([...initMemberIds]);
+const filteredMembers = computed(() => {
+    let list = props.availableMembers;
+    if (selectedDepartmentId.value) list = list.filter((m) => m.department_id == selectedDepartmentId.value);
+    if (selectedAssignmentId.value) list = list.filter((m) => m.assignment_id == selectedAssignmentId.value);
+    return list;
+});
+
+const allChecked = computed(() =>
+    filteredMembers.value.length > 0 &&
+    filteredMembers.value.every((m) => selectedMemberIds.value.includes(m.id)),
+);
+
+const selectedMemberNames = computed(() =>
+    props.availableMembers.filter((u) => form.members.includes(u.id)).map((u) => u.name),
+);
+
+function openMemberModal() {
+    selectedMemberIds.value = [...form.members];
+    showMemberModal.value   = true;
+}
+
+function closeMemberModal() {
+    showMemberModal.value      = false;
+    selectedDepartmentId.value = '';
+    selectedAssignmentId.value = '';
+}
 
 function toggleMember(id) {
     const idx = selectedMemberIds.value.indexOf(id);
     if (idx >= 0) selectedMemberIds.value.splice(idx, 1);
     else selectedMemberIds.value.push(id);
 }
-function selectAll() {
-    selectedMemberIds.value = filteredMembers.value.map((u) => u.id);
-}
-function clearAll() {
-    selectedMemberIds.value = [];
-}
-function confirmMembers() {
-    form.members = [...selectedMemberIds.value];
-    showMemberModal.value = false;
+
+function toggleAllMembers() {
+    if (allChecked.value) {
+        selectedMemberIds.value = selectedMemberIds.value.filter(
+            (id) => !filteredMembers.value.some((m) => m.id === id),
+        );
+    } else {
+        filteredMembers.value.forEach((m) => {
+            if (!selectedMemberIds.value.includes(m.id)) selectedMemberIds.value.push(m.id);
+        });
+    }
 }
 
-const selectedMemberNames = computed(() =>
-    props.availableMembers.filter((u) => form.members.includes(u.id)).map((u) => u.name),
-);
+function clearMemberFilters() {
+    selectedDepartmentId.value = '';
+    selectedAssignmentId.value = '';
+}
+
+function confirmMembers() {
+    form.members = [...selectedMemberIds.value];
+    closeMemberModal();
+}
+
+function getDepartmentName(deptId) {
+    return props.departments.find((d) => d.id === deptId)?.name ?? '';
+}
+
+function getAssignmentName(assignId) {
+    return props.assignments.find((a) => a.id === assignId)?.name ?? '';
+}
+
+function getAssignmentBadgeClass(name) {
+    const map = {
+        '進行': 'bg-blue-100 text-blue-800',
+        '営業': 'bg-green-100 text-green-800',
+        '校正': 'bg-yellow-100 text-yellow-800',
+        'DTP':  'bg-purple-100 text-purple-800',
+        '製版': 'bg-red-100 text-red-800',
+        '印刷': 'bg-gray-100 text-gray-800',
+    };
+    return map[name] ?? 'bg-gray-100 text-gray-800';
+}
 
 const errorMessage = ref('');
 
@@ -121,20 +177,17 @@ function submit() {
                     {{ errorMessage }}
                 </div>
 
-                <!-- タイトル -->
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">タイトル <span class="text-red-500">*</span></label>
                     <input v-model="form.title" type="text" class="w-full rounded border p-2 text-sm" required />
                     <p v-if="form.errors.title" class="mt-1 text-xs text-red-500">{{ form.errors.title }}</p>
                 </div>
 
-                <!-- 概要 -->
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">概要</label>
                     <textarea v-model="form.description" rows="3" class="w-full rounded border p-2 text-sm"></textarea>
                 </div>
 
-                <!-- 繰り返し設定 -->
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">繰り返し <span class="text-red-500">*</span></label>
                     <div class="flex gap-4">
@@ -146,7 +199,6 @@ function submit() {
                     <p v-if="form.errors.recurrence" class="mt-1 text-xs text-red-500">{{ form.errors.recurrence }}</p>
                 </div>
 
-                <!-- 週指定（毎月のみ） -->
                 <div v-if="form.recurrence === 'monthly'">
                     <label class="mb-1 block text-sm font-medium text-gray-700">週指定 <span class="text-red-500">*</span></label>
                     <select v-model="form.week_of_month" class="rounded border p-2 text-sm">
@@ -160,7 +212,6 @@ function submit() {
                     <p v-if="form.errors.week_of_month" class="mt-1 text-xs text-red-500">{{ form.errors.week_of_month }}</p>
                 </div>
 
-                <!-- 曜日 -->
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">曜日 <span class="text-red-500">*</span></label>
                     <div class="flex gap-3">
@@ -172,7 +223,6 @@ function submit() {
                     <p v-if="form.errors.day_of_week" class="mt-1 text-xs text-red-500">{{ form.errors.day_of_week }}</p>
                 </div>
 
-                <!-- 開始・終了時刻 -->
                 <div class="flex flex-wrap gap-6">
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-700">開始時刻</label>
@@ -200,7 +250,6 @@ function submit() {
                     </div>
                 </div>
 
-                <!-- 参加メンバー -->
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">参加メンバー <span class="text-red-500">*</span></label>
                     <div class="mb-2 flex flex-wrap gap-1">
@@ -215,7 +264,7 @@ function submit() {
                     </div>
                     <button
                         type="button"
-                        @click="showMemberModal = true"
+                        @click="openMemberModal"
                         class="rounded border border-orange-400 px-3 py-1.5 text-sm text-orange-600 hover:bg-orange-50"
                     >
                         メンバーを選択
@@ -223,7 +272,6 @@ function submit() {
                     <p v-if="form.errors.members" class="mt-1 text-xs text-red-500">{{ form.errors.members }}</p>
                 </div>
 
-                <!-- 送信ボタン -->
                 <div class="flex gap-3 pt-2">
                     <button
                         type="submit"
@@ -244,63 +292,73 @@ function submit() {
         </div>
 
         <!-- メンバー選択モーダル -->
-        <div v-if="showMemberModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <div class="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
-                <h3 class="mb-4 text-base font-semibold text-gray-800">メンバーを選択</h3>
-
-                <!-- 絞り込み -->
-                <input
-                    v-model="memberSearch"
-                    type="text"
-                    placeholder="名前で絞り込み..."
-                    class="mb-3 w-full rounded border p-2 text-sm"
-                />
-
-                <div class="mb-2 flex gap-3">
-                    <button type="button" @click="selectAll" class="text-xs text-orange-600 hover:underline">全選択</button>
-                    <button type="button" @click="clearAll"  class="text-xs text-gray-500 hover:underline">クリア</button>
+        <DialogModal :show="showMemberModal" @close="closeMemberModal">
+            <template #title>メンバーを選択</template>
+            <template #content>
+                <div class="mb-4 flex items-center gap-4">
+                    <div class="flex-1">
+                        <label class="mb-1 block text-sm font-medium">部署</label>
+                        <select v-model="selectedDepartmentId" class="w-full rounded border px-3 py-2 text-sm">
+                            <option value="">-- 全部署 --</option>
+                            <option v-for="dept in departments" :key="dept.id" :value="String(dept.id)">{{ dept.name }}</option>
+                        </select>
+                    </div>
+                    <div class="flex-1">
+                        <label class="mb-1 block text-sm font-medium">担当</label>
+                        <select v-model="selectedAssignmentId" class="w-full rounded border px-3 py-2 text-sm" :disabled="!selectedDepartmentId">
+                            <option value="">-- 全担当 --</option>
+                            <option v-for="a in filteredAssignments" :key="a.id" :value="String(a.id)">{{ a.name }}</option>
+                        </select>
+                    </div>
+                    <div class="flex items-end">
+                        <button type="button" class="rounded bg-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-400" @click="clearMemberFilters">クリア</button>
+                    </div>
                 </div>
-
-                <div class="max-h-64 overflow-y-auto rounded border">
-                    <table class="w-full text-sm">
-                        <tbody>
-                            <tr
-                                v-for="member in filteredMembers"
-                                :key="member.id"
-                                class="border-b hover:bg-gray-50 cursor-pointer"
-                                @click="toggleMember(member.id)"
-                            >
-                                <td class="py-2 pl-3">
-                                    <input
-                                        type="checkbox"
-                                        :checked="selectedMemberIds.includes(member.id)"
-                                        @click.stop="toggleMember(member.id)"
-                                        class="accent-orange-600"
-                                    />
+                <div class="max-h-96 overflow-y-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="sticky top-0 bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                                    <input type="checkbox" :checked="allChecked" @change="toggleAllMembers" />
+                                </th>
+                                <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">名前</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">部署</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">担当</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200 bg-white">
+                            <tr v-for="member in filteredMembers" :key="member.id"
+                                class="cursor-pointer hover:bg-gray-50"
+                                :class="{ 'bg-blue-50': selectedMemberIds.includes(member.id) }"
+                                @click="toggleMember(member.id)">
+                                <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-500" @click.stop>
+                                    <input type="checkbox" :value="member.id" v-model="selectedMemberIds" />
                                 </td>
-                                <td class="py-2 pl-2">{{ member.name }}</td>
+                                <td class="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">{{ member.name }}</td>
+                                <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-500">{{ getDepartmentName(member.department_id) }}</td>
+                                <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
+                                    <span :class="getAssignmentBadgeClass(getAssignmentName(member.assignment_id))" class="inline-flex rounded-full px-2 py-1 text-xs font-semibold">
+                                        {{ getAssignmentName(member.assignment_id) }}
+                                    </span>
+                                </td>
                             </tr>
                         </tbody>
                     </table>
+                    <div v-if="filteredMembers.length === 0" class="py-8 text-center text-gray-500">該当するメンバーがいません</div>
                 </div>
-
-                <div class="mt-4 flex gap-3">
-                    <button
-                        type="button"
-                        @click="confirmMembers"
-                        class="rounded bg-orange-600 px-4 py-2 text-sm text-white hover:bg-orange-700"
-                    >
-                        確定（{{ selectedMemberIds.length }}名）
-                    </button>
-                    <button
-                        type="button"
-                        @click="showMemberModal = false"
-                        class="rounded border px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
-                    >
-                        キャンセル
-                    </button>
+                <div v-if="selectedMemberIds.length > 0" class="mt-4 rounded bg-blue-50 p-3">
+                    <div class="text-sm font-medium text-blue-700">{{ selectedMemberIds.length }}人選択中</div>
+                    <div class="mt-1 flex flex-wrap gap-1">
+                        <span v-for="id in selectedMemberIds" :key="id" class="inline-flex rounded bg-blue-100 px-2 py-1 text-xs text-blue-700">
+                            {{ availableMembers.find((m) => m.id === id)?.name }}
+                        </span>
+                    </div>
                 </div>
-            </div>
-        </div>
+            </template>
+            <template #footer>
+                <button type="button" class="mr-3 rounded border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" @click="closeMemberModal">キャンセル</button>
+                <button type="button" class="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700" @click="confirmMembers">確定（{{ selectedMemberIds.length }}名）</button>
+            </template>
+        </DialogModal>
     </AppLayout>
 </template>

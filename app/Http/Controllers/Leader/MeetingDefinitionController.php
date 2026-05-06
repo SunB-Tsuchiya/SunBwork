@@ -11,17 +11,26 @@ use Inertia\Inertia;
 
 class MeetingDefinitionController extends Controller
 {
-    /** 対象メンバーの取得（Leader: 自部署のみ） */
+    /** 対象メンバーの取得（部署リーダーまたは Admin/SuperAdmin: 全ユーザー、それ以外: 自部署のみ） */
     protected function getAvailableMembers(): \Illuminate\Support\Collection
     {
         $user = Auth::user();
-        // Admin/SuperAdmin は全ユーザー、Leader は自部署のみ
-        if (in_array($user->user_role, ['admin', 'superadmin'])) {
-            return User::orderBy('name')->get(['id', 'name', 'department_id']);
+        if (in_array($user->user_role, ['admin', 'superadmin']) || $user->isDepartmentLeader()) {
+            return User::orderBy('name')->get(['id', 'name', 'department_id', 'assignment_id']);
         }
         return User::where('department_id', $user->department_id)
             ->orderBy('name')
-            ->get(['id', 'name', 'department_id']);
+            ->get(['id', 'name', 'department_id', 'assignment_id']);
+    }
+
+    /** 部署一覧の取得（部署リーダー: 全部署、それ以外: 自部署のみ） */
+    protected function getDepartments(): \Illuminate\Support\Collection
+    {
+        $user = Auth::user();
+        if ($user->isDepartmentLeader()) {
+            return \App\Models\Department::orderBy('name')->get();
+        }
+        return \App\Models\Department::where('id', $user->department_id)->get();
     }
 
     public function index()
@@ -40,6 +49,8 @@ class MeetingDefinitionController extends Controller
     {
         return Inertia::render('Leader/MeetingDefinitions/Create', [
             'availableMembers' => $this->getAvailableMembers(),
+            'departments'      => $this->getDepartments(),
+            'assignments'      => \App\Models\Assignment::orderBy('name')->get(),
         ]);
     }
 
@@ -82,6 +93,8 @@ class MeetingDefinitionController extends Controller
         return Inertia::render('Leader/MeetingDefinitions/Edit', [
             'meetingDefinition' => $meetingDefinition,
             'availableMembers'  => $this->getAvailableMembers(),
+            'departments'       => $this->getDepartments(),
+            'assignments'       => \App\Models\Assignment::orderBy('name')->get(),
         ]);
     }
 

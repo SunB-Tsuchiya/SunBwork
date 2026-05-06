@@ -452,7 +452,7 @@ const canCreate = computed(() => {
                 </div>
                 <label class="flex cursor-pointer items-center gap-2 text-sm text-gray-700 select-none">
                     <input type="checkbox" v-model="hideCompleted" class="h-4 w-4 rounded border-gray-300" />
-                    完了を表示しない
+                    完了・削除を表示しない
                 </label>
             </div>
 

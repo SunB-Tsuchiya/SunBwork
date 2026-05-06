@@ -28,6 +28,11 @@ const submitting = ref(false);
 const hours = Array.from({ length: 24 }, (_, i) => i);
 const minutes = [0, 15, 30, 45];
 
+function todayStr() {
+    const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 // モーダルが開くたびに初期値をセット
 watch(() => props.show, (val) => {
     if (val) {
@@ -37,7 +42,7 @@ watch(() => props.show, (val) => {
             : '';
         form.value = {
             title:                     proofTitle,
-            deadline_date:             '',
+            deadline_date:             todayStr(),
             deadline_hour:             17,
             deadline_minute:           30,
             note:                      '',

@@ -42,7 +42,12 @@
               <span>▶</span>
               <span>{{ cell.label }}</span>
             </span>
-            <span v-else>{{ cell.label }}</span>
+            <span v-else class="flex flex-col items-center gap-0.5 leading-tight">
+              <span>{{ cell.label }}</span>
+              <span v-if="groupProgressMap[cell.key]" class="text-xs font-normal text-gray-400">
+                {{ groupProgressMap[cell.key].done }}/{{ groupProgressMap[cell.key].total }}
+              </span>
+            </span>
           </th>
         </tr>
       </thead>
@@ -358,7 +363,7 @@ function lockedSubcontractorIdForCell(rowId, colKey, colType) {
 // ── 行ごとの完了率マップ ─────────────────────────────────────
 const rowCompletionMap = computed(() => {
   const completableCols = collectLeaves(props.columnConfig).filter(
-    (l) => ['worker', 'schedlink', 'joblink', 'proof_user'].includes(l.type)
+    (l) => ['worker', 'schedlink', 'joblink', 'proof_user', 'proof_v2'].includes(l.type)
   );
   if (completableCols.length === 0) return {};
   const map = {};
@@ -372,6 +377,38 @@ const rowCompletionMap = computed(() => {
       return !!c.completed_at;
     }).length;
     map[row.id] = { done, total };
+  }
+  return map;
+});
+
+// ── 列グループごとの進捗マップ { [groupKey]: { done, total } } ──
+const COMPLETABLE_TYPES = ['worker', 'schedlink', 'joblink', 'proof_user', 'proof_v2'];
+
+function getCompletableLeaves(node) {
+  const children = node.children ?? [];
+  if (children.length === 0) {
+    return COMPLETABLE_TYPES.includes(node.type ?? '') ? [node] : [];
+  }
+  return children.flatMap(c => getCompletableLeaves(c));
+}
+
+const groupProgressMap = computed(() => {
+  const map = {};
+  for (const node of props.columnConfig) {
+    const children = node.children ?? [];
+    if (children.length === 0) continue; // リーフはスキップ
+    const leaves = node.children.flatMap(c => getCompletableLeaves(c));
+    if (leaves.length === 0) continue;
+    const total = leaves.length * props.rows.length;
+    const done  = leaves.reduce((sum, l) => {
+      return sum + props.rows.filter(row => {
+        const c = cellMap.value[`${row.id}_${l.key}`];
+        if (!c) return false;
+        if (l.type === 'proof_user') return !!(c.completed_at || c.assignment_proof_completed || c.assignment_completed);
+        return !!c.completed_at;
+      }).length;
+    }, 0);
+    map[node.key] = { done, total };
   }
   return map;
 });

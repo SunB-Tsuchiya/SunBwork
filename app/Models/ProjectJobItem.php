@@ -14,6 +14,7 @@ class ProjectJobItem extends Model
         'col_key',
         'parent_label',
         'calendar_linked',
+        'linked_schedule_id',
         'order',
     ];
 
@@ -34,5 +35,10 @@ class ProjectJobItem extends Model
     public function schedules()
     {
         return $this->hasMany(ProjectSchedule::class);
+    }
+
+    public function linkedSchedule()
+    {
+        return $this->belongsTo(ProjectSchedule::class, 'linked_schedule_id');
     }
 }

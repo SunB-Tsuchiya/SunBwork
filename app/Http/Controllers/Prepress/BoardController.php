@@ -17,7 +17,7 @@ class BoardController extends Controller
     {
         $this->authorizePrepress($request->user());
 
-        $tickets = PrepressTicket::orderByDesc('updated_at')->get([
+        $tickets = PrepressTicket::where('status', '!=', PrepressTicket::STATUS_DELETED)->orderByDesc('updated_at')->get([
             'id', 'title', 'jobcode', 'project_name', 'client_name', 'memo', 'status', 'image_path', 'created_at',
         ])->each->append('image_url');
 
@@ -36,6 +36,30 @@ class BoardController extends Controller
         ]);
 
         $ticket->update(['status' => $request->status]);
+
+        return response()->noContent();
+    }
+
+    /**
+     * 完了ボックスから伝票を削除（ステータスを削除にし、画像ファイルを削除）
+     */
+    public function archiveFromCompleted(Request $request, PrepressTicket $ticket)
+    {
+        $this->authorizePrepress($request->user());
+
+        if ($ticket->status !== PrepressTicket::STATUS_COMPLETED) {
+            return response()->json(['message' => '完了ステータスの伝票のみ削除できます。'], 422);
+        }
+
+        // 画像ファイルを削除
+        if ($ticket->image_path) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($ticket->image_path);
+        }
+
+        $ticket->update([
+            'status'     => PrepressTicket::STATUS_DELETED,
+            'image_path' => null,
+        ]);
 
         return response()->noContent();
     }

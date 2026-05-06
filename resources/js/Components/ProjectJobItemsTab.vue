@@ -17,7 +17,9 @@ function initSheetState(sheetId) {
             items:          [],
             rows:           [],
             columns:        [],
+            allColumns:     [],
             columnConfig:   [],
+            schedules:      [],
             loading:        false,
             editRows:       [],
             editColumns:    [],
@@ -31,6 +33,27 @@ function initSheetState(sheetId) {
 }
 
 // ── fetch ─────────────────────────────────────────────────────────────────────
+async function recalculateAll(sheetId) {
+    const st = sheetStates.value[sheetId];
+    if (!st) return;
+    try {
+        await axios.post(route('coordinator.progress_sheets.link_settings.recalculate', { sheet: sheetId }));
+    } catch (e) {
+        alert('再計算に失敗しました');
+    }
+}
+
+async function refreshSchedules(sheetId) {
+    const st = sheetStates.value[sheetId];
+    if (!st) return;
+    try {
+        const res = await axios.get(route('coordinator.progress_sheets.link_settings.index', { sheet: sheetId }));
+        st.schedules = res.data.schedules ?? [];
+    } catch (e) {
+        console.error('スケジュール再読込エラー', e);
+    }
+}
+
 async function fetchItems(sheetId) {
     const st = initSheetState(sheetId);
     st.loading = true;
@@ -39,7 +62,9 @@ async function fetchItems(sheetId) {
         st.items        = res.data.items        ?? [];
         st.rows         = res.data.rows         ?? [];
         st.columns      = res.data.columns      ?? [];
+        st.allColumns   = res.data.allColumns   ?? [];
         st.columnConfig = res.data.columnConfig ?? [];
+        st.schedules    = res.data.schedules    ?? [];
     } catch (e) {
         console.error('連携設定取得エラー', e);
         st.items = [];
@@ -95,6 +120,11 @@ function flattenConfigNodes(nodes, depth = 0, parentLabel = '') {
     return result;
 }
 
+function getScheduleName(sheetId, linkedScheduleId) {
+    if (!linkedScheduleId) return null;
+    return (sheetStates.value[sheetId]?.schedules ?? []).find(s => s.id === linkedScheduleId)?.name ?? null;
+}
+
 // 現在の編集リストに row_id / col_key が既に含まれているか
 function isRowAdded(sheetId, rowId) {
     const st = sheetStates.value[sheetId];
@@ -121,7 +151,8 @@ function addItemFromModal(sheetId, type, { name, row_id, col_key, parent_label }
         row_id: row_id ?? null,
         col_key: col_key ?? null,
         parent_label: parent_label ?? null,
-        calendar_linked: false,
+        calendar_linked: true,
+        linked_schedule_id: null,
         order: 0,
     };
 
@@ -155,7 +186,7 @@ function cancelEdit(sheetId) {
 function addEditRow(sheetId, type) {
     const st = sheetStates.value[sheetId];
     const list = type === 'row' ? st.editRows : st.editColumns;
-    list.push({ id: null, name: '', type, row_id: null, col_key: null, parent_label: null, calendar_linked: false, order: list.length });
+    list.push({ id: null, name: '', type, row_id: null, col_key: null, parent_label: null, calendar_linked: true, linked_schedule_id: null, order: list.length });
 }
 
 function removeEditRow(sheetId, type, idx) {
@@ -249,9 +280,11 @@ onMounted(() => {
                 <h3 class="font-semibold text-gray-800">{{ sheet.name }}－連携設定</h3>
                 <div v-if="sheetStates[sheet.id]" class="flex gap-2">
                     <template v-if="sheetStates[sheet.id].mode === 'view'">
+                        <button type="button" class="rounded border border-gray-300 px-3 py-1 text-sm text-gray-500 hover:bg-gray-50" @click="recalculateAll(sheet.id)" title="連携スケジュールの進捗を現在の完了セルから再計算します">↺ 全再計算</button>
                         <button type="button" class="rounded border border-indigo-300 px-3 py-1 text-sm text-indigo-600 hover:bg-indigo-50" @click="enterEdit(sheet.id)">編集</button>
                     </template>
                     <template v-else-if="sheetStates[sheet.id].mode === 'edit'">
+                        <button type="button" class="rounded border border-gray-300 px-3 py-1 text-sm text-gray-500 hover:bg-gray-50" @click="refreshSchedules(sheet.id)" title="スケジュール一覧を再読み込みします">↻ スケジュール再読込</button>
                         <button type="button" class="rounded bg-indigo-600 px-3 py-1 text-sm font-medium text-white hover:bg-indigo-700" @click="saveEdit(sheet.id)">保存</button>
                         <button type="button" class="rounded border border-gray-300 px-3 py-1 text-sm text-gray-600 hover:bg-gray-50" @click="cancelEdit(sheet.id)">キャンセル</button>
                     </template>
@@ -334,7 +367,7 @@ onMounted(() => {
                             <div v-if="group" class="mb-1 text-xs font-medium text-gray-500">{{ group }}</div>
                             <div v-for="item in items" :key="item.id" class="mb-1 flex items-center gap-2 text-sm text-gray-800">
                                 <span :class="group ? 'ml-3' : ''">{{ item.name }}</span>
-                                <span v-if="item.calendar_linked" class="rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700">カレンダー連携</span>
+                                <span v-if="item.linked_schedule_id" class="rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">{{ getScheduleName(sheet.id, item.linked_schedule_id) ?? '連携中' }}</span>
                             </div>
                         </div>
                     </div>
@@ -345,7 +378,7 @@ onMounted(() => {
                             <div v-if="group" class="mb-1 text-xs font-medium text-gray-500">{{ group }}</div>
                             <div v-for="item in items" :key="item.id" class="mb-1 flex items-center gap-2 text-sm text-gray-800">
                                 <span :class="group ? 'ml-3' : ''">{{ item.name }}</span>
-                                <span v-if="item.calendar_linked" class="rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700">カレンダー連携</span>
+                                <span v-if="item.linked_schedule_id" class="rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">{{ getScheduleName(sheet.id, item.linked_schedule_id) ?? '連携中' }}</span>
                             </div>
                         </div>
                     </div>
@@ -386,10 +419,13 @@ onMounted(() => {
                                         class="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none" />
                                 </div>
                             </div>
-                            <label class="flex cursor-pointer items-center gap-1.5 text-xs text-gray-600">
-                                <input type="checkbox" v-model="item.calendar_linked" class="rounded" />
-                                カレンダーと連携する
-                            </label>
+                            <div>
+                                <label class="mb-0.5 block text-xs text-gray-500">連携スケジュール</label>
+                                <select v-model="item.linked_schedule_id" class="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none">
+                                    <option :value="null">— 未連携 —</option>
+                                    <option v-for="s in sheetStates[sheet.id].schedules" :key="s.id" :value="s.id">{{ s.name }}</option>
+                                </select>
+                            </div>
                         </div>
                         <button type="button" class="mt-1 w-full rounded border border-dashed border-gray-300 py-1.5 text-sm text-gray-500 hover:border-indigo-400 hover:text-indigo-600" @click="addEditRow(sheet.id, 'row')">＋ 空欄を追加</button>
                     </div>
@@ -414,7 +450,9 @@ onMounted(() => {
                                     <label class="mb-0.5 block text-xs text-gray-500">進行表の列</label>
                                     <select v-model="item.col_key" class="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none">
                                         <option :value="null">—</option>
-                                        <option v-for="col in sheetStates[sheet.id].columns" :key="col.key" :value="col.key">{{ col.label }}</option>
+                                        <option v-for="col in sheetStates[sheet.id].allColumns" :key="col.key" :value="col.key">
+                                            {{ col.label }}{{ !col.isLeaf ? '（グループ全体）' : '' }}
+                                        </option>
                                     </select>
                                 </div>
                                 <div class="flex-1">
@@ -423,10 +461,13 @@ onMounted(() => {
                                         class="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none" />
                                 </div>
                             </div>
-                            <label class="flex cursor-pointer items-center gap-1.5 text-xs text-gray-600">
-                                <input type="checkbox" v-model="item.calendar_linked" class="rounded" />
-                                カレンダーと連携する
-                            </label>
+                            <div>
+                                <label class="mb-0.5 block text-xs text-gray-500">連携スケジュール</label>
+                                <select v-model="item.linked_schedule_id" class="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none">
+                                    <option :value="null">— 未連携 —</option>
+                                    <option v-for="s in sheetStates[sheet.id].schedules" :key="s.id" :value="s.id">{{ s.name }}</option>
+                                </select>
+                            </div>
                         </div>
                         <button type="button" class="mt-1 w-full rounded border border-dashed border-gray-300 py-1.5 text-sm text-gray-500 hover:border-indigo-400 hover:text-indigo-600" @click="addEditRow(sheet.id, 'column')">＋ 空欄を追加</button>
                     </div>
@@ -502,18 +543,11 @@ onMounted(() => {
 
                         <!-- 横列ツリー -->
                         <template v-else>
-                            <p class="mb-3 text-xs text-gray-500">クリックして追加。グレーはすでに追加済みです。</p>
+                            <p class="mb-3 text-xs text-gray-500">クリックして追加。グレーはすでに追加済みです。親グループを選ぶと配下の列すべてが対象になります。</p>
                             <div v-if="flattenConfigNodes(sheetStates[sheet.id].columnConfig).length === 0" class="text-sm text-gray-400">列がありません。</div>
                             <template v-for="node in flattenConfigNodes(sheetStates[sheet.id].columnConfig)" :key="node.key">
-                                <!-- グループヘッダー -->
-                                <div v-if="!node.isLeaf"
-                                    class="mb-1 text-xs font-semibold text-gray-500"
-                                    :style="{ marginTop: '12px', paddingLeft: (node.depth * 12) + 'px' }">
-                                    {{ node.label }}
-                                </div>
-                                <!-- リーフ（クリック可） -->
-                                <div v-else
-                                    class="mb-1 flex items-center gap-2 rounded border px-3 py-2 text-sm transition-colors"
+                                <!-- 全ノードをクリック可能 -->
+                                <div class="mb-1 flex items-center gap-2 rounded border px-3 py-2 text-sm transition-colors"
                                     :style="{ marginLeft: (node.depth * 12) + 'px' }"
                                     :class="isColAdded(sheet.id, node.key)
                                         ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
@@ -521,6 +555,7 @@ onMounted(() => {
                                     @click="!isColAdded(sheet.id, node.key) && addItemFromModal(sheet.id, 'column', { name: node.label, col_key: node.key, parent_label: node.parentLabel })">
                                     <span v-if="isColAdded(sheet.id, node.key)" class="text-green-500">✓</span>
                                     <span>{{ node.label }}</span>
+                                    <span v-if="!node.isLeaf" class="text-xs text-gray-400">（グループ全体）</span>
                                     <span v-if="!isColAdded(sheet.id, node.key)" class="ml-auto text-xs text-indigo-400">追加</span>
                                 </div>
                             </template>

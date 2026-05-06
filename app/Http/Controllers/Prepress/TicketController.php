@@ -45,7 +45,10 @@ class TicketController extends Controller
         }
 
         if ($hideCompleted) {
-            $query->where('status', '!=', PrepressTicket::STATUS_COMPLETED);
+            $query->whereNotIn('status', [
+                PrepressTicket::STATUS_COMPLETED,
+                PrepressTicket::STATUS_DELETED,
+            ]);
         }
 
         $tickets = $query->get();

@@ -7,6 +7,7 @@ use App\Models\ProgressCell;
 use App\Models\ProgressRow;
 use App\Models\ProgressSheet;
 use App\Models\User;
+use App\Services\ProgressLinkService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
@@ -124,6 +125,8 @@ class ProgressCellController extends Controller
             \App\Models\ProjectSchedule::where('id', $cell->schedule_id)
                 ->update(['completed_at' => $now]);
         }
+
+        ProgressLinkService::recalculate($cell);
 
         return response()->json(['success' => true, 'completed_at' => $cell->completed_at->toDateTimeString()]);
     }

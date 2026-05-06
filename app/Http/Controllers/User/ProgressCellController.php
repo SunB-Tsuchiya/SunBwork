@@ -4,6 +4,7 @@ namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
 use App\Models\ProgressCell;
+use App\Services\ProgressLinkService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Inertia\Inertia;
@@ -31,6 +32,8 @@ class ProgressCellController extends Controller
             \App\Models\ProjectSchedule::where('id', $cell->schedule_id)
                 ->update(['completed_at' => $now]);
         }
+
+        ProgressLinkService::recalculate($cell);
 
         return response()->json(['success' => true, 'completed_at' => $cell->completed_at->toDateTimeString()]);
     }

@@ -30,12 +30,14 @@ class PrepressTicket extends Model
     const STATUS_IN_PROGRESS = 'in_progress';
     const STATUS_SUBMITTING  = 'submitting';
     const STATUS_COMPLETED   = 'completed';
+    const STATUS_DELETED     = 'deleted';
 
     const STATUS_LABELS = [
         'pending'     => '準備',
         'in_progress' => '作業中',
         'submitting'  => '入稿予定',
         'completed'   => '完了',
+        'deleted'     => '削除',
     ];
 
     public function user()

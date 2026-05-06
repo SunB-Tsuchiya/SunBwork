@@ -21,7 +21,7 @@
             </template>
 
             <template v-if="currentView === 'calendar'">
-                <button v-if="!props.readonly" @click="openEventModal" class="rounded bg-blue-600 px-4 py-2 text-white">予定作成</button>
+                <button v-if="!props.readonly" @click="() => openEventModal()" class="rounded bg-blue-600 px-4 py-2 text-white">予定作成</button>
                 <button
                     v-if="props.project && !props.readonly"
                     @click="schedulePanelOpen = !schedulePanelOpen"
@@ -120,6 +120,7 @@
                             <tr v-for="(row, idx) in panelEditRows" :key="row._key" class="bg-white">
                                 <td class="border px-2 py-1.5">
                                     <input type="date" v-model="row.start_date"
+                                        @change="row.end_date = row.end_date || row.start_date"
                                         class="w-36 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none" />
                                 </td>
                                 <td class="border px-2 py-1.5">
@@ -561,6 +562,11 @@ const scheduleEditTitle = ref('');
 const scheduleEditStart = ref('');
 const scheduleEditEnd = ref('');
 const scheduleEditItemId = ref(null);
+
+// 開始日を選んだとき、終了日が未設定なら自動的に同じ日付をセット
+watch(scheduleEditStart, (val) => {
+    if (!scheduleEditEnd.value) scheduleEditEnd.value = val;
+});
 
 const page = usePage();
 // prefer server-provided helper flags if available on the user props

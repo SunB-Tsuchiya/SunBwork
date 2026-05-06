@@ -30,8 +30,11 @@ class ProjectJobsCalendarController extends Controller
     {
         $user = Auth::user();
 
-        // Coordinator's own project jobs
-        $projectJobs = ProjectJob::where('user_id', $user->id)
+        // Coordinator's own project jobs (owner or sub-coordinator)
+        $projectJobs = ProjectJob::where(function ($q) use ($user) {
+                $q->where('user_id', $user->id)
+                    ->orWhereHas('coordinators', fn ($c) => $c->where('users.id', $user->id));
+            })
             ->with('client')
             ->orderBy('created_at', 'desc')
             ->get();
