@@ -148,13 +148,14 @@
                 <button type="button"
                     class="mt-2 rounded border border-dashed border-gray-300 px-4 py-1.5 text-xs text-gray-500 hover:border-indigo-300 hover:text-indigo-600"
                     @click="addPanelEditRow">＋ 行を追加</button>
-                <div class="mt-3 flex gap-2">
+                <div class="mt-3 flex flex-wrap items-center gap-2">
                     <button type="button" :disabled="panelSaving"
                         class="rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
                         @click="savePanelEdits">{{ panelSaving ? '保存中…' : '保存' }}</button>
                     <button type="button" :disabled="panelSaving"
                         class="rounded bg-gray-100 px-4 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-200 disabled:opacity-50"
                         @click="cancelPanelEditMode">キャンセル</button>
+                    <span v-if="panelSaveError" class="text-xs text-red-600">{{ panelSaveError }}</span>
                 </div>
             </template>
         </div>
@@ -752,10 +753,11 @@ function panelSortIcon(key) {
 }
 
 // パネル内編集モード
-const panelEditMode = ref(false);
-const panelEditRows = ref([]);
-const panelSaving   = ref(false);
-let   _panelKeySeq  = 0;
+const panelEditMode  = ref(false);
+const panelEditRows  = ref([]);
+const panelSaving    = ref(false);
+const panelSaveError = ref('');
+let   _panelKeySeq   = 0;
 
 function togglePanelEditMode() {
     if (panelEditMode.value) {
@@ -793,17 +795,20 @@ async function savePanelEdits() {
     if (panelSaving.value) return;
     const projectJobId = props.project?.id;
     if (!projectJobId) return;
-    panelSaving.value = true;
+    panelSaving.value    = true;
+    panelSaveError.value = '';
     const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
     const originalIds = new Set((props.schedules || []).map(s => s.id));
     const editIds     = new Set(panelEditRows.value.filter(r => r.id).map(r => r.id));
     const deletedIds  = [...originalIds].filter(id => !editIds.has(id));
+    const errors = [];
     try {
         for (const id of deletedIds) {
-            await fetch(route('coordinator.project_schedules.destroy', { project_schedule: id }), {
+            const res = await fetch(route('coordinator.project_schedules.destroy', { project_schedule: id }), {
                 method : 'DELETE',
                 headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
             });
+            if (!res.ok) errors.push(`削除失敗 (${res.status})`);
         }
         for (const row of panelEditRows.value) {
             if (!row.name.trim()) continue;
@@ -815,18 +820,33 @@ async function savePanelEdits() {
                 end_date   : row.end_date   || null,
             });
             const headers = { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' };
+            let res;
             if (row.id) {
-                await fetch(route('coordinator.project_schedules.update', { project_schedule: row.id }), {
+                res = await fetch(route('coordinator.project_schedules.update', { project_schedule: row.id }), {
                     method: 'PATCH', headers, body,
                 });
             } else {
-                await fetch(route('coordinator.project_schedules.store'), {
+                res = await fetch(route('coordinator.project_schedules.store'), {
                     method: 'POST', headers, body,
                 });
             }
+            if (!res.ok) {
+                const text = await res.text().catch(() => '');
+                let msg = `保存失敗 (${res.status})`;
+                try {
+                    const json = JSON.parse(text);
+                    if (json.message) msg += ': ' + json.message;
+                } catch (_) { /* ignore */ }
+                errors.push(msg);
+            }
         }
-        panelEditMode.value = false;
-        panelEditRows.value = [];
+        if (errors.length > 0) {
+            panelSaveError.value = errors.join(' / ');
+            return;
+        }
+        panelEditMode.value  = false;
+        panelEditRows.value  = [];
+        panelSaveError.value = '';
         // schedules プロパティのみリロードして カレンダーと一覧を更新
         router.reload({ only: ['schedules'] });
     } finally {

@@ -17,6 +17,9 @@ class ProjectSchedulePolicy
         if (method_exists($user, 'isCoordinator') && $user->isCoordinator()) {
             return true;
         }
+        if (method_exists($user, 'isClerk') && $user->isClerk()) {
+            return true;
+        }
 
         // Allow admins and superadmins
         if (method_exists($user, 'isAdmin') && $user->isAdmin()) {
@@ -51,6 +54,9 @@ class ProjectSchedulePolicy
     public function delete(User $user, ProjectSchedule $projectSchedule)
     {
         if (method_exists($user, 'isCoordinator') && $user->isCoordinator()) {
+            return true;
+        }
+        if (method_exists($user, 'isClerk') && $user->isClerk()) {
             return true;
         }
         if (method_exists($user, 'isAdmin') && $user->isAdmin()) {

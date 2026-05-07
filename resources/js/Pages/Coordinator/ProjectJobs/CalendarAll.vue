@@ -194,7 +194,7 @@ function scrollToCurrentWeek() {
                     </label>
                 </div>
                 <div class="flex flex-wrap gap-2">
-                    <template v-for="project in projectsInView" :key="project.id">
+                    <template v-for="project in visibleProjects" :key="project.id">
                         <Link
                             :href="route('coordinator.project_schedules.calendar', { project_job_id: project.id })"
                             class="flex flex-col rounded-lg px-3 py-2.5 text-xs font-medium transition-opacity hover:opacity-75"
