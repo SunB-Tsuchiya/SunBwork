@@ -80,7 +80,7 @@ class InternalEventController extends Controller
         $event->body                  = $validated['description'] ?? null;
         $event->starts_at             = $start;
         $event->ends_at               = $end;
-        $event->interruption_minutes  = (int) ($validated['own_interruption_minutes'] ?? 0) ?: null;
+        $event->interruption_minutes  = (int) ($validated['own_interruption_minutes'] ?? 0);
         if ($hasMeetingTables) {
             $event->meeting_definition_id = $validated['meeting_definition_id'] ?? null;
         }
