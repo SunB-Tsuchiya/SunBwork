@@ -20,15 +20,16 @@ const routePrefix = computed(() => {
     if (role === 'coordinator') return 'coordinator';
     return 'leader';
 });
-const isAdmin   = computed(() => ['admin', 'superadmin'].includes(page.props.auth?.user?.user_role));
-const isLeader  = computed(() => page.props.auth?.user?.user_role === 'leader');
-const userDeptId = computed(() => page.props.auth?.user?.department_id);
-const ownDept   = computed(() => props.departments.find(d => d.id === userDeptId.value));
+const isAdmin       = computed(() => ['admin', 'superadmin'].includes(page.props.auth?.user?.user_role));
+const isLeader      = computed(() => page.props.auth?.user?.user_role === 'leader');
+const isCoordinator = computed(() => ['coordinator', 'clerk'].includes(page.props.auth?.user?.user_role));
+const userDeptId    = computed(() => page.props.auth?.user?.department_id);
+const ownDept       = computed(() => props.departments.find(d => d.id === userDeptId.value));
 
 const form = useForm({
     name:           '',
     detail:         '',
-    department_ids: isLeader.value && userDeptId.value ? [userDeptId.value] : [],
+    department_ids: (isLeader.value || isCoordinator.value) && userDeptId.value ? [userDeptId.value] : [],
 });
 
 // ===== 重複チェック =====
@@ -135,8 +136,8 @@ function closeDuplicateModal() {
                     <p v-if="form.errors.department_ids" class="mt-1 text-xs text-red-600">{{ form.errors.department_ids }}</p>
                 </div>
 
-                <!-- Leader: 自部署のみオン/オフ -->
-                <div v-else-if="isLeader && ownDept" class="mb-4">
+                <!-- Leader / Coordinator: 自部署のみオン/オフ -->
+                <div v-else-if="(isLeader || isCoordinator) && ownDept" class="mb-4">
                     <label class="mb-2 block text-sm font-medium text-gray-700">部署</label>
                     <label
                         class="inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1 text-sm transition-colors"

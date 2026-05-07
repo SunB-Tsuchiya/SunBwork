@@ -83,8 +83,9 @@ class ClientController extends Controller
         $this->requireLeaderPermission('client_management');
         $user = Auth::user();
         $this->authorize('create', Client::class);
-        $isSuperOrAdmin = in_array($user->user_role, ['superadmin', 'admin']);
-        $isLeader       = $user->user_role === 'leader';
+        $isSuperOrAdmin = $user->isSuperAdmin() || $user->isAdmin();
+        $isLeader       = $user->isLeader();
+        $isCoordinator  = $user->isCoordinator() || $user->isClerk();
 
         $rules = [
             'name'       => 'required|string|max:255',
@@ -94,7 +95,7 @@ class ClientController extends Controller
         if ($isSuperOrAdmin) {
             $rules['department_ids']   = 'nullable|array';
             $rules['department_ids.*'] = 'exists:departments,id';
-        } elseif ($isLeader) {
+        } elseif ($isLeader || $isCoordinator) {
             $rules['department_ids']   = 'nullable|array';
             $rules['department_ids.*'] = Rule::in([$user->department_id]);
         }
@@ -112,9 +113,7 @@ class ClientController extends Controller
 
         $client = Client::create($data);
 
-        if ($isSuperOrAdmin && !empty($departmentIds)) {
-            $client->departments()->attach($departmentIds);
-        } elseif ($isLeader && !empty($departmentIds)) {
+        if (!empty($departmentIds)) {
             $client->departments()->attach($departmentIds);
         } elseif (!$isSuperOrAdmin && !$isLeader && $user->department_id) {
             $client->departments()->attach($user->department_id);

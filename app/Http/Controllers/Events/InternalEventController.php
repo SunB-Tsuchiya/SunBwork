@@ -9,6 +9,7 @@ use App\Models\MeetingDefinition;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
 class InternalEventController extends Controller
@@ -27,10 +28,12 @@ class InternalEventController extends Controller
             ->orderBy('sort_order')
             ->get(['id', 'name', 'slug']);
 
-        // ログインユーザーが参加メンバーとなっている会議定義を取得
-        $meetingDefinitions = MeetingDefinition::whereHas('members', function ($q) {
-            $q->where('user_id', Auth::id());
-        })->get(['id', 'title', 'description', 'recurrence', 'day_of_week', 'start_time', 'end_time']);
+        // ログインユーザーが参加メンバーとなっている会議定義を取得（テーブル未作成環境では空配列）
+        $meetingDefinitions = Schema::hasTable('meeting_definitions')
+            ? MeetingDefinition::whereHas('members', function ($q) {
+                $q->where('user_id', Auth::id());
+            })->get(['id', 'title', 'description', 'recurrence', 'day_of_week', 'start_time', 'end_time'])
+            : collect();
 
         return Inertia::render('Events/CreateInternalEvent', [
             'eventItemTypes'     => $eventItemTypes,
@@ -46,7 +49,9 @@ class InternalEventController extends Controller
     /** 社内予定保存 */
     public function store(Request $request)
     {
-        $validated = $request->validate([
+        $hasMeetingTables = $this->hasMeetingTables();
+
+        $rules = [
             'event_item_type_id'      => 'required|exists:event_item_types,id',
             'title'                   => 'required|string|max:255',
             'date'                    => 'required|date',
@@ -55,32 +60,31 @@ class InternalEventController extends Controller
             'endHour'                 => 'required|string',
             'endMinute'               => 'required|string',
             'description'             => 'nullable|string',
-            // meeting_definition_id は events テーブルに保存しない（自動入力トリガーのみ）
-            'meeting_definition_id'   => 'nullable|exists:meeting_definitions,id',
             'interrupted_event_ids'   => 'nullable|array',
             'interrupted_event_ids.*' => 'integer',
             'own_interruption_minutes'=> 'nullable|integer',
-        ]);
+        ];
+        if ($hasMeetingTables) {
+            $rules['meeting_definition_id'] = 'nullable|exists:meeting_definitions,id';
+        }
+
+        $validated = $request->validate($rules);
 
         $start = $validated['date'] . ' ' . $validated['startHour'] . ':' . $validated['startMinute'] . ':00';
         $end   = $validated['date'] . ' ' . $validated['endHour']   . ':' . $validated['endMinute']   . ':00';
 
         $event = new Event();
-        $event->user_id            = Auth::id();
-        $event->event_item_type_id = $validated['event_item_type_id'];
-        $event->title              = $validated['title'];
-        $event->body               = $validated['description'] ?? null;
-        $event->starts_at          = $start;
-        $event->ends_at            = $end;
-        $event->meeting_definition_id = $validated['meeting_definition_id'] ?? null;
-        $event->save();
-
-        // own_interruption_minutes
-        $ownMins = (int) ($validated['own_interruption_minutes'] ?? 0);
-        if ($ownMins > 0) {
-            $event->interruption_minutes = $ownMins;
-            $event->save();
+        $event->user_id               = Auth::id();
+        $event->event_item_type_id    = $validated['event_item_type_id'];
+        $event->title                 = $validated['title'];
+        $event->body                  = $validated['description'] ?? null;
+        $event->starts_at             = $start;
+        $event->ends_at               = $end;
+        $event->interruption_minutes  = (int) ($validated['own_interruption_minutes'] ?? 0) ?: null;
+        if ($hasMeetingTables) {
+            $event->meeting_definition_id = $validated['meeting_definition_id'] ?? null;
         }
+        $event->save();
 
         // interrupted_event_ids
         if (!empty($validated['interrupted_event_ids'])) {
@@ -120,9 +124,11 @@ class InternalEventController extends Controller
             ->orderBy('sort_order')
             ->get(['id', 'name', 'slug']);
 
-        $meetingDefinitions = MeetingDefinition::whereHas('members', function ($q) {
-            $q->where('user_id', Auth::id());
-        })->get(['id', 'title', 'description', 'recurrence', 'day_of_week', 'start_time', 'end_time']);
+        $meetingDefinitions = Schema::hasTable('meeting_definitions')
+            ? MeetingDefinition::whereHas('members', function ($q) {
+                $q->where('user_id', Auth::id());
+            })->get(['id', 'title', 'description', 'recurrence', 'day_of_week', 'start_time', 'end_time'])
+            : collect();
 
         return Inertia::render('Events/CreateInternalEvent', [
             'event'              => $event,
@@ -142,7 +148,9 @@ class InternalEventController extends Controller
     {
         $this->authorizeEvent($event);
 
-        $validated = $request->validate([
+        $hasMeetingTables = $this->hasMeetingTables();
+
+        $rules = [
             'event_item_type_id'     => 'required|exists:event_item_types,id',
             'title'                  => 'required|string|max:255',
             'date'                   => 'required|date',
@@ -151,15 +159,21 @@ class InternalEventController extends Controller
             'endHour'                => 'required|string',
             'endMinute'              => 'required|string',
             'description'            => 'nullable|string',
-            'meeting_definition_id'  => 'nullable|exists:meeting_definitions,id',
-        ]);
+        ];
+        if ($hasMeetingTables) {
+            $rules['meeting_definition_id'] = 'nullable|exists:meeting_definitions,id';
+        }
+
+        $validated = $request->validate($rules);
 
         $event->event_item_type_id = $validated['event_item_type_id'];
         $event->title              = $validated['title'];
         $event->body               = $validated['description'] ?? null;
         $event->starts_at          = $validated['date'] . ' ' . $validated['startHour'] . ':' . $validated['startMinute'] . ':00';
         $event->ends_at            = $validated['date'] . ' ' . $validated['endHour']   . ':' . $validated['endMinute']   . ':00';
-        $event->meeting_definition_id = $validated['meeting_definition_id'] ?? null;
+        if ($hasMeetingTables) {
+            $event->meeting_definition_id = $validated['meeting_definition_id'] ?? null;
+        }
         $event->save();
 
         return redirect()->route('calendar.index')->with('success', '予定を更新しました。');
@@ -170,5 +184,11 @@ class InternalEventController extends Controller
         if ($event->user_id !== Auth::id()) {
             abort(403);
         }
+    }
+
+    private function hasMeetingTables(): bool
+    {
+        return Schema::hasTable('meeting_definitions')
+            && Schema::hasColumn('events', 'meeting_definition_id');
     }
 }

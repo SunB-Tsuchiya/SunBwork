@@ -25,11 +25,12 @@ class ClientPolicy
 
     /**
      * Determine whether the user can create clients.
-     * Allow only superadmin or users belonging to the same company (optional).
      */
     public function create(User $user)
     {
-        return $user->user_role === 'superadmin' || isset($user->company_id);
+        return $user->isSuperAdmin() || $user->isAdmin() || $user->isLeader()
+            || $user->isCoordinator() || $user->isClerk()
+            || isset($user->company_id);
     }
 
     /**
