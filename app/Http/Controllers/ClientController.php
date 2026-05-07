@@ -439,9 +439,9 @@ class ClientController extends Controller
     {
         $role = Auth::user()->user_role ?? 'leader';
         return match ($role) {
-            'admin', 'superadmin' => 'admin',
-            'coordinator'         => 'coordinator',
-            default               => 'leader',
+            'admin', 'superadmin'  => 'admin',
+            'coordinator', 'clerk' => 'coordinator',
+            default                => 'leader',
         };
     }
 

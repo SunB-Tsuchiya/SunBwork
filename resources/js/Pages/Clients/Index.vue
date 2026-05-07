@@ -26,7 +26,7 @@ const routePrefix = computed(() => {
     // fallback: user_role ベース
     const role = page.props.auth?.user?.user_role ?? 'leader';
     if (['admin', 'superadmin'].includes(role)) return 'admin';
-    if (role === 'coordinator') return 'coordinator';
+    if (['coordinator', 'clerk'].includes(role)) return 'coordinator';
     return 'leader';
 });
 

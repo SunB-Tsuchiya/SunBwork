@@ -17,7 +17,7 @@ const page = usePage();
 const routePrefix = computed(() => {
     const role = page.props.auth?.user?.user_role ?? 'leader';
     if (['admin', 'superadmin'].includes(role)) return 'admin';
-    if (role === 'coordinator') return 'coordinator';
+    if (['coordinator', 'clerk'].includes(role)) return 'coordinator';
     return 'leader';
 });
 const isAdmin       = computed(() => ['admin', 'superadmin'].includes(page.props.auth?.user?.user_role));

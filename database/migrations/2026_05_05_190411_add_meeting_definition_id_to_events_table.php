@@ -12,17 +12,16 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('events', function (Blueprint $table) {
-            //
+            $table->unsignedBigInteger('meeting_definition_id')->nullable()->after('project_job_id');
+            $table->foreign('meeting_definition_id')->references('id')->on('meeting_definitions')->nullOnDelete();
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::table('events', function (Blueprint $table) {
-            //
+            $table->dropForeign(['meeting_definition_id']);
+            $table->dropColumn('meeting_definition_id');
         });
     }
 };
