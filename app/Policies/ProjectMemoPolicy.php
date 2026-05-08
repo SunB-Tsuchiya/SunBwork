@@ -15,6 +15,7 @@ class ProjectMemoPolicy
         // Owner can view; coordinators/admins/leaders can view in this PoC
         if ($user->id === $memo->user_id) return true;
         if (method_exists($user, 'isCoordinator') && $user->isCoordinator()) return true;
+        if (method_exists($user, 'isClerk') && $user->isClerk()) return true;
         if (method_exists($user, 'isAdmin') && $user->isAdmin()) return true;
         if (method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin()) return true;
         if (method_exists($user, 'isLeader') && $user->isLeader()) return true;
@@ -37,8 +38,9 @@ class ProjectMemoPolicy
     {
         // Owner may delete
         if ($user->id === $memo->user_id) return true;
-        // Coordinators/admins/leaders may delete
+        // Coordinators/clerks/admins/leaders may delete
         if (method_exists($user, 'isCoordinator') && $user->isCoordinator()) return true;
+        if (method_exists($user, 'isClerk') && $user->isClerk()) return true;
         if (method_exists($user, 'isAdmin') && $user->isAdmin()) return true;
         if (method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin()) return true;
         if (method_exists($user, 'isLeader') && $user->isLeader()) return true;

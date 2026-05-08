@@ -94,12 +94,18 @@
                             :key="group.key"
                         >
                             <!-- グループ行 -->
-                            <div class="flex items-center justify-between rounded bg-gray-50 px-3 py-1.5">
+                            <div class="flex flex-wrap items-center justify-between gap-2 rounded bg-gray-50 px-3 py-1.5">
                                 <span class="text-sm font-semibold text-gray-700">
                                     {{ group.label }}
                                     <span class="ml-1.5 text-xs font-normal text-gray-400">{{ group.items.length }} 件</span>
                                 </span>
-                                <span class="text-xs font-medium text-gray-500">
+                                <span class="flex flex-wrap items-center gap-3 text-xs font-medium text-gray-500">
+                                    <span v-if="group.totalLunchMinutes > 0" class="text-orange-500">
+                                        昼休憩: −{{ formatMin(group.totalLunchMinutes) }}
+                                    </span>
+                                    <span v-if="group.totalOverlapMinutes > 0" class="text-red-400">
+                                        重複除算: −{{ formatMin(group.totalOverlapMinutes) }}
+                                    </span>
                                     小計: <span class="font-bold text-gray-700">{{ formatMin(group.totalMinutes) }}</span>
                                 </span>
                             </div>
@@ -108,19 +114,22 @@
                             <table class="min-w-full divide-y divide-gray-100 border text-sm">
                                 <thead>
                                     <tr class="bg-gray-50">
-                                        <!-- 日付順: 担当者 / ステージ / 開始 / 終了 / 作業時間 -->
+                                        <!-- 日付順: 担当者 / ステージ / 開始 / 終了 / ... -->
                                         <template v-if="groupBy[role.key] === 'date'">
                                             <th class="border-b px-3 py-2 text-left text-xs font-medium text-gray-500">担当者</th>
                                             <th class="border-b px-3 py-2 text-left text-xs font-medium text-gray-500">ステージ</th>
                                         </template>
-                                        <!-- ステージ順: 日付 / 担当者 / 開始 / 終了 / 作業時間 -->
+                                        <!-- ステージ順: 日付 / 担当者 / 開始 / 終了 / ... -->
                                         <template v-else>
                                             <th class="border-b px-3 py-2 text-left text-xs font-medium text-gray-500">日付</th>
                                             <th class="border-b px-3 py-2 text-left text-xs font-medium text-gray-500">担当者</th>
                                         </template>
                                         <th class="border-b px-3 py-2 text-left text-xs font-medium text-gray-500">開始</th>
                                         <th class="border-b px-3 py-2 text-left text-xs font-medium text-gray-500">終了</th>
-                                        <th class="border-b px-3 py-2 text-right text-xs font-medium text-gray-500">作業時間</th>
+                                        <th class="border-b px-3 py-2 text-right text-xs font-medium text-gray-500">生時間</th>
+                                        <th class="border-b px-3 py-2 text-right text-xs font-medium text-orange-500">昼休憩</th>
+                                        <th class="border-b px-3 py-2 text-right text-xs font-medium text-red-400">重複除算</th>
+                                        <th class="border-b px-3 py-2 text-right text-xs font-medium text-gray-700">実作業時間</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-100 bg-white">
@@ -139,7 +148,14 @@
                                         </template>
                                         <td class="px-3 py-2 text-gray-600">{{ formatTime(ev.start) }}</td>
                                         <td class="px-3 py-2 text-gray-600">{{ formatTime(ev.end) }}</td>
-                                        <td class="px-3 py-2 text-right font-medium text-gray-800">{{ calcDuration(ev.start, ev.end) }}</td>
+                                        <td class="px-3 py-2 text-right text-gray-500">{{ formatMin(ev.total_minutes ?? 0) }}</td>
+                                        <td class="px-3 py-2 text-right" :class="ev.lunch_minutes > 0 ? 'text-orange-500 font-medium' : 'text-gray-300'">
+                                            {{ ev.lunch_minutes > 0 ? '−' + formatMin(ev.lunch_minutes) : '−' }}
+                                        </td>
+                                        <td class="px-3 py-2 text-right" :class="ev.interruption_minutes > 0 ? 'text-red-400 font-medium' : 'text-gray-300'">
+                                            {{ ev.interruption_minutes > 0 ? '−' + formatMin(ev.interruption_minutes) : '−' }}
+                                        </td>
+                                        <td class="px-3 py-2 text-right font-bold text-gray-800">{{ formatMin(ev.actual_minutes ?? 0) }}</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -201,6 +217,8 @@ function totalMinutesByRole(roleKey) {
 }
 
 function eventMinutes(e) {
+    // サーバー計算済みの actual_minutes を優先。なければ生差分にフォールバック
+    if (typeof e.actual_minutes === 'number') return Math.max(0, e.actual_minutes);
     if (!e.start || !e.end) return 0;
     try {
         const diff = Math.round((new Date(e.end) - new Date(e.start)) / 60000);
@@ -238,7 +256,9 @@ function groupByDate(events) {
             key,
             label: formatDateLabel(key),
             items,
-            totalMinutes: items.reduce((s, e) => s + eventMinutes(e), 0),
+            totalMinutes:        items.reduce((s, e) => s + eventMinutes(e), 0),
+            totalLunchMinutes:   items.reduce((s, e) => s + (e.lunch_minutes || 0), 0),
+            totalOverlapMinutes: items.reduce((s, e) => s + (e.interruption_minutes || 0), 0),
         };
     });
 }
@@ -259,7 +279,9 @@ function groupByStage(events) {
             key,
             label: g.name,
             items: g.items,
-            totalMinutes: g.items.reduce((s, e) => s + eventMinutes(e), 0),
+            totalMinutes:        g.items.reduce((s, e) => s + eventMinutes(e), 0),
+            totalLunchMinutes:   g.items.reduce((s, e) => s + (e.lunch_minutes || 0), 0),
+            totalOverlapMinutes: g.items.reduce((s, e) => s + (e.interruption_minutes || 0), 0),
         };
     });
 }

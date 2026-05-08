@@ -21,7 +21,7 @@ class JobBoxController extends Controller
         // Allow coordinators/leaders/admins/superadmins as before; for normal users,
         // ensure the user is assigned to this project_job before showing jobbox.
         $user = $request->user();
-        $isPrivileged = $user && (method_exists($user, 'isCoordinator') && ($user->isCoordinator() || $user->isLeader() || $user->isAdmin() || $user->isSuperAdmin()));
+        $isPrivileged = $user && (method_exists($user, 'isCoordinator') && ($user->isCoordinator() || $user->isLeader() || $user->isAdmin() || $user->isSuperAdmin() || $user->isClerk()));
 
         // routeContext: user ルート経由ならば 'user'、coordinator ルート経由ならば 'coordinator'
         $routeName = $request->route()?->getName();
@@ -778,7 +778,7 @@ class JobBoxController extends Controller
     {
         // Authorization: allow privileged roles or assigned users only
         $user = $request->user();
-        $isPrivileged = $user && (method_exists($user, 'isCoordinator') && ($user->isCoordinator() || $user->isLeader() || $user->isAdmin() || $user->isSuperAdmin()));
+        $isPrivileged = $user && (method_exists($user, 'isCoordinator') && ($user->isCoordinator() || $user->isLeader() || $user->isAdmin() || $user->isSuperAdmin() || $user->isClerk()));
 
         // routeContext: user ルート経由ならば 'user'、coordinator ルート経由ならば 'coordinator'
         $showRouteName = $request->route()?->getName();
@@ -969,7 +969,7 @@ class JobBoxController extends Controller
         ])->findOrFail($id);
 
         // Authorization: allow if user is privileged, owner of the project, sender, or assigned
-        $isPrivileged = $user && (method_exists($user, 'isCoordinator') && ($user->isCoordinator() || $user->isLeader() || $user->isAdmin() || $user->isSuperAdmin()));
+        $isPrivileged = $user && (method_exists($user, 'isCoordinator') && ($user->isCoordinator() || $user->isLeader() || $user->isAdmin() || $user->isSuperAdmin() || $user->isClerk()));
         $isOwner = false;
         try {
             $pj = $jam->projectJobAssignment ? $jam->projectJobAssignment->projectJob : null;
@@ -1127,7 +1127,7 @@ class JobBoxController extends Controller
     public function edit(ProjectJob $projectJob, JobAssignmentMessage $message)
     {
         $user = \Illuminate\Support\Facades\Auth::user();
-        $isPrivileged = $user && (method_exists($user, 'isCoordinator') && ($user->isCoordinator() || $user->isLeader() || $user->isAdmin() || $user->isSuperAdmin()));
+        $isPrivileged = $user && (method_exists($user, 'isCoordinator') && ($user->isCoordinator() || $user->isLeader() || $user->isAdmin() || $user->isSuperAdmin() || $user->isClerk()));
         if (! $isPrivileged) {
             abort(403, 'Access denied.');
         }
@@ -1151,7 +1151,7 @@ class JobBoxController extends Controller
     public function update(ProjectJob $projectJob, JobAssignmentMessage $message, \Illuminate\Http\Request $request)
     {
         $user = \Illuminate\Support\Facades\Auth::user();
-        $isPrivileged = $user && (method_exists($user, 'isCoordinator') && ($user->isCoordinator() || $user->isLeader() || $user->isAdmin() || $user->isSuperAdmin()));
+        $isPrivileged = $user && (method_exists($user, 'isCoordinator') && ($user->isCoordinator() || $user->isLeader() || $user->isAdmin() || $user->isSuperAdmin() || $user->isClerk()));
         if (! $isPrivileged) {
             abort(403, 'Access denied.');
         }
@@ -1305,7 +1305,7 @@ class JobBoxController extends Controller
     public function completeAssignment(Request $request, ProjectJobAssignment $assignment)
     {
         $user = $request->user();
-        $isPrivileged = $user && (method_exists($user, 'isCoordinator') && ($user->isCoordinator() || $user->isLeader() || $user->isAdmin() || $user->isSuperAdmin()));
+        $isPrivileged = $user && (method_exists($user, 'isCoordinator') && ($user->isCoordinator() || $user->isLeader() || $user->isAdmin() || $user->isSuperAdmin() || $user->isClerk()));
 
         if (!$isPrivileged && (!$user || $assignment->user_id !== $user->id)) {
             return response()->json(['error' => 'Access denied'], 403);

@@ -867,6 +867,19 @@ class ProjectJobController extends Controller
                 $assignmentCodeMap = $roleRecords->pluck('code', 'id')->toArray();
             }
 
+            // ユーザーごとの昼休憩デフォルト設定を一括取得（user_settings.lunch_start/lunch_end）
+            $userIds = $assignments->map(fn ($a) => $a->user?->id ?? $a->user_id)
+                ->filter()->unique()->values()->all();
+            $userSettingMap = [];
+            if (!empty($userIds)) {
+                \App\Models\UserSetting::whereIn('user_id', $userIds)->get()
+                    ->each(function ($s) use (&$userSettingMap) {
+                        $userSettingMap[$s->user_id] = $s;
+                    });
+            }
+            // ユーザーごとの昼休憩キャッシュ（日付別）: [userId => [date => ['start','end']|null]]
+            $breakDateCache = [];
+
             if (\Illuminate\Support\Facades\Schema::hasColumn('events', 'project_job_assignment_id')) {
                 foreach ($assignments as $a) {
                     $events = \App\Models\Event::where('project_job_assignment_id', $a->id)
@@ -879,29 +892,68 @@ class ProjectJobController extends Controller
                         $userAssignmentCode = $userAssignmentId ? ($assignmentCodeMap[$userAssignmentId] ?? null) : null;
 
                         // 日付（グループキー用）
-                        $startVal   = $ev->starts_at ?? null;
-                        $eventDate  = null;
+                        $startVal  = $ev->starts_at ?? null;
+                        $endVal    = $ev->ends_at   ?? null;
+                        $eventDate = null;
                         try {
                             if ($startVal) {
                                 $eventDate = \Illuminate\Support\Carbon::parse($startVal)->toDateString();
                             }
                         } catch (\Throwable $_) {}
 
+                        // ── 時間計算 ──────────────────────────────────────────
+                        $totalMins        = 0;
+                        $interruptionMins = (int)($ev->interruption_minutes ?? 0);
+                        $lunchMins        = 0;
+                        $actualMins       = 0;
+                        try {
+                            if ($startVal && $endVal) {
+                                $evStart   = \Carbon\Carbon::parse($startVal);
+                                $evEnd     = \Carbon\Carbon::parse($endVal);
+                                $totalMins = max(0, (int)$evStart->diffInMinutes($evEnd, false));
+
+                                // 昼休憩との重複を計算
+                                $userId = $a->user?->id ?? $a->user_id ?? null;
+                                if ($userId && $eventDate) {
+                                    if (!isset($breakDateCache[$userId][$eventDate])) {
+                                        $bi = \App\Models\UserMonthlyBreak::breakForDate((int)$userId, $eventDate);
+                                        if (!$bi) {
+                                            $us = $userSettingMap[$userId] ?? null;
+                                            $bi = ['start' => ($us?->lunch_start ?: '12:00'), 'end' => ($us?->lunch_end ?: '13:00')];
+                                        }
+                                        $breakDateCache[$userId][$eventDate] = $bi;
+                                    }
+                                    $bi = $breakDateCache[$userId][$eventDate];
+                                    $lunchS = \Carbon\Carbon::parse($eventDate . ' ' . $bi['start']);
+                                    $lunchE = \Carbon\Carbon::parse($eventDate . ' ' . $bi['end']);
+                                    $oS = $evStart->gt($lunchS) ? $evStart : $lunchS;
+                                    $oE = $evEnd->lt($lunchE)   ? $evEnd   : $lunchE;
+                                    $lunchMins = max(0, (int)$oS->diffInMinutes($oE, false));
+                                }
+
+                                $actualMins = max(0, $totalMins - $interruptionMins - $lunchMins);
+                            }
+                        } catch (\Throwable $_) {}
+
                         $assignmentEvents[] = [
-                            'assignment_id'   => $a->id,
-                            'user_id'         => $a->user?->id ?? $a->user_id ?? null,
-                            'user_name'       => $a->user?->name ?? null,
-                            'assignment_name' => $userAssignmentName ?? $a->title ?? null,
-                            'assignment_code' => $userAssignmentCode,
+                            'assignment_id'        => $a->id,
+                            'user_id'              => $a->user?->id ?? $a->user_id ?? null,
+                            'user_name'            => $a->user?->name ?? null,
+                            'assignment_name'      => $userAssignmentName ?? $a->title ?? null,
+                            'assignment_code'      => $userAssignmentCode,
                             // 役割カテゴリ: ① 将来は assignments.job_role_category ② code 既定値
-                            'role_category'   => $this->toRoleCategory($userAssignmentCode),
-                            'stage_id'        => $a->stage_id ?? null,
-                            'stage_name'      => $a->stage?->name ?? null,
-                            'stage_sort'      => $a->stage?->sort_order ?? 99,
-                            'status_name'     => $a->statusModel?->name ?? null,
-                            'date'            => $eventDate,
-                            'start'           => $ev->start ?? $ev->starts_at ?? null,
-                            'end'             => $ev->end ?? $ev->ends_at ?? null,
+                            'role_category'        => $this->toRoleCategory($userAssignmentCode),
+                            'stage_id'             => $a->stage_id ?? null,
+                            'stage_name'           => $a->stage?->name ?? null,
+                            'stage_sort'           => $a->stage?->sort_order ?? 99,
+                            'status_name'          => $a->statusModel?->name ?? null,
+                            'date'                 => $eventDate,
+                            'start'                => $ev->start ?? $ev->starts_at ?? null,
+                            'end'                  => $ev->end ?? $ev->ends_at ?? null,
+                            'total_minutes'        => $totalMins,
+                            'interruption_minutes' => $interruptionMins,
+                            'lunch_minutes'        => $lunchMins,
+                            'actual_minutes'       => $actualMins,
                         ];
                     }
                 }

@@ -26,6 +26,7 @@ git status --short | grep -v "public/build"
 
 **確認すること:**
 - Controller / Model / Migration / routes ファイルが漏れていないか
+- **`??` で表示される未追跡ファイルも確認する** — `z_instructions/` の新規ファイルは必ずコミット対象に含めること
 - `routes/web.php` を変更した場合は **Ziggy 再生成が必要**（→ ステップ2へ）
 - 変更なければステップ3へ
 
@@ -67,6 +68,9 @@ npm run build
 git add <変更したController/Model/Migration/routesファイル> \
         public/build/ \
         resources/js/ziggy.js   # routes/web.php を変更した場合のみ
+
+# z_instructions/ に新規ファイルがあれば必ず追加
+git add z_instructions/   # 新規ドキュメントがあれば
 
 git commit -m "feat/fix/build: <変更内容の説明>"
 ```
