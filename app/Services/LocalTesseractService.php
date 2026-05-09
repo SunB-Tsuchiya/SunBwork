@@ -29,13 +29,13 @@ class LocalTesseractService extends OcrSpaceService
     // x: 左から約 8〜28%、y: row1
     private const REGION_JOBCODE = [0.080, 0.088, 0.280, 0.128];
 
-    // クライアント名エリア（緑背景ボックス）
-    // x: 左から約 42〜66%、y: row1
-    private const REGION_CLIENT  = [0.420, 0.088, 0.660, 0.128];
+    // row1 全体（受注番号行 全幅）。クライアント名を parseClientName で抽出する。
+    // 緑エリアの x座標が不明なため全幅をOCRし、コード行の次行ロジックで取得する。
+    private const REGION_CLIENT  = [0.003, 0.088, 0.660, 0.128];
 
     // 品名テキスト行（「品名」ラベルを含む行全体。後処理でラベルを除去）
-    // x: 全幅、y: row2
-    private const REGION_TITLE   = [0.003, 0.127, 0.660, 0.170];
+    // y: 12.0% 開始（12.7%では先頭文字が欠落するため少し広げる）
+    private const REGION_TITLE   = [0.003, 0.120, 0.660, 0.170];
 
     public function analyze(string $storagePath): array
     {
@@ -85,8 +85,8 @@ class LocalTesseractService extends OcrSpaceService
                 $jobcode = $this->parseJobcode($jobcodeRaw);
             }
 
-            // クライアント名: トリム後そのまま（searchClients 内で会社形態語除去）
-            $clientName = trim($clientRaw);
+            // クライアント名: row1全体をOCRし parseClientName（コード行の次行ロジック）で抽出
+            $clientName = $this->parseClientName($clientRaw);
 
             // 品名: 「品名」ラベル除去 + 日本語字間スペース除去
             $title = $this->cleanTitle($titleRaw);
@@ -172,6 +172,9 @@ class LocalTesseractService extends OcrSpaceService
     private function cleanTitle(string $text): string
     {
         $text = trim($text);
+
+        // 先頭の記号ノイズ（| l ｜ 等）を除去
+        $text = preg_replace('/^[\s　|lｌ｜]+/u', '', $text);
 
         // 「品名」「品目」ラベルを先頭から除去
         $text = preg_replace('/^[\s　]*品[名目][\s　]*/u', '', $text);
