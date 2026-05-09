@@ -26,15 +26,11 @@ use Illuminate\Support\Facades\Storage;
 class LocalTesseractService extends OcrSpaceService
 {
     // 受注番号値エリア（数字専用）
-    private const REGION_JOBCODE = [0.080, 0.088, 0.280, 0.128];
+    private const REGION_JOBCODE  = [0.080, 0.088, 0.280, 0.128];
 
-    // クライアント名エリア（受注番号右側〜右端、row1のみ）
-    // 幅を広くして得意先エリアを確実にカバー
-    private const REGION_CLIENT  = [0.280, 0.088, 0.900, 0.128];
-
-    // 品名テキスト行（row2のみ、幅を狭めて他列の混入を防ぐ）
-    // y: 12.0% 開始で先頭文字の欠落を防ぐ
-    private const REGION_TITLE   = [0.003, 0.120, 0.660, 0.170];
+    // row1 + row2 全幅（クライアント名・品名テキスト取得用）
+    // 0.900 まで広げて得意先エリアをカバー（0.660 だと「文化工房」が取れない）
+    private const REGION_COMBINED = [0.003, 0.088, 0.900, 0.170];
 
     public function analyze(string $storagePath): array
     {
@@ -63,20 +59,17 @@ class LocalTesseractService extends OcrSpaceService
             $w = $imagick->getImageWidth();
             $h = $imagick->getImageHeight();
 
-            // 受注番号: jpn+eng（engのみだと数字誤読あり）
-            $jobcodeRaw = $this->cropAndOcr($imagick, $w, $h, self::REGION_JOBCODE, $binary, 7, 'jpn+eng');
-            // クライアント名: row1のみ・幅広・jpn専用
-            $clientRaw  = $this->cropAndOcr($imagick, $w, $h, self::REGION_CLIENT,  $binary, 7, 'jpn');
-            // 品名: row2のみ・幅狭・jpn専用
-            $titleRaw   = $this->cropAndOcr($imagick, $w, $h, self::REGION_TITLE,   $binary, 6, 'jpn');
+            // 受注番号: 数字エリア（jpn+eng で数字誤読を防ぐ）
+            $jobcodeRaw  = $this->cropAndOcr($imagick, $w, $h, self::REGION_JOBCODE,  $binary, 7, 'jpn+eng');
+            // row1+row2 全体: クライアント名・品名を同時取得（jpn 専用で日本語認識精度を上げる）
+            $combinedRaw = $this->cropAndOcr($imagick, $w, $h, self::REGION_COMBINED, $binary, 6, 'jpn');
 
             $imagick->clear();
             $imagick->destroy();
 
-            Log::info('LocalTesseractService: raw OCR (3-region)', [
-                'jobcode_raw' => $jobcodeRaw,
-                'client_raw'  => $clientRaw,
-                'title_raw'   => $titleRaw,
+            Log::info('LocalTesseractService: raw OCR (2-region)', [
+                'jobcode_raw'  => $jobcodeRaw,
+                'combined_raw' => $combinedRaw,
             ]);
 
             // 受注番号: 数字のみ抽出
@@ -85,19 +78,20 @@ class LocalTesseractService extends OcrSpaceService
                 $jobcode = $this->parseJobcode($jobcodeRaw);
             }
 
-            // クライアント名: row1クロップをそのままクリーニング
-            $clientName = $this->cleanClientText($clientRaw);
+            // クライアント名: jobcode行から数字除外 → クリーニング
+            $clientName = $this->parseClientNameTesseract($combinedRaw);
 
             // 品名: 「品名」ラベル以降を抽出 → クリーニング
-            $title = $this->cleanTitle($this->parseTitleTesseract($titleRaw));
+            $title = $this->cleanTitle($this->parseTitleTesseract($combinedRaw));
 
             // DB検索: まず全体で、ヒットしなければ先頭を1〜3文字削って再検索
             $matchedClients = $this->searchClientsSliding($clientName);
 
-            Log::info('LocalTesseractService: OCR completed', [
+            Log::info('LocalTesseractService: OCR parsed', [
                 'jobcode'     => $jobcode,
                 'client_name' => $clientName,
                 'title'       => mb_substr($title, 0, 50),
+                'db_hits'     => count($matchedClients),
             ]);
 
             return [
@@ -213,13 +207,36 @@ class LocalTesseractService extends OcrSpaceService
 
     /**
      * Tesseract 向け品名テキスト抽出。
-     * 「品名」「品目」ラベルの後に続くテキストをすべて返す（クリーニングは cleanTitle で行う）。
+     * 優先: 「品名」「品目」ラベルの後に続くテキストを取得。
+     * フォールバック: jobcode行（7桁以上数字を含む行）の次の行以降を品名とする。
      */
     private function parseTitleTesseract(string $text): string
     {
+        // 「品名」「品目」ラベルの後を優先取得
         if (preg_match('/品[名目][\s　\r\n]+([\s\S]+)/u', $text, $m)) {
             return trim($m[1]);
         }
+
+        // フォールバック: jobcode行の次の行以降を品名候補とする
+        $lines = array_values(array_filter(
+            array_map('trim', preg_split('/\r\n|\r|\n/', $text)),
+            fn($l) => $l !== ''
+        ));
+
+        $foundJobcode = false;
+        $titleLines   = [];
+        foreach ($lines as $line) {
+            if ($foundJobcode) {
+                $titleLines[] = $line;
+            } elseif (preg_match('/\d{7,12}/', $line)) {
+                $foundJobcode = true;
+            }
+        }
+
+        if (!empty($titleLines)) {
+            return implode(' ', $titleLines);
+        }
+
         return parent::parseTitle($text);
     }
 
