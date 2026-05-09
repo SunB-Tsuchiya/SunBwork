@@ -191,7 +191,7 @@ class OcrSpaceService
      * OCR結果例: "受注番 号\n4505963\n品名\n「得意先\n05660\n（株）文化工房\n..."
      * → 7〜10桁の連続数字行を受注番号とする。
      */
-    private function parseJobcode(string $text): string
+    protected function parseJobcode(string $text): string
     {
         // 「受注番号」ラベルの後（OCRミス "受注番 号" にも対応）
         if (preg_match('/受注[\s　番]*号[\s　\r\n]*(\d{5,12})/u', $text, $m)) {
@@ -209,7 +209,7 @@ class OcrSpaceService
      * OCRは「得意先コード（4〜6桁数字の行）」の直後の行をクライアント名として返す。
      * 列単位で読まれるためコードと名前が別行になることが多い。
      */
-    private function parseClientName(string $text): string
+    protected function parseClientName(string $text): string
     {
         $lines = array_values(array_filter(
             array_map('trim', preg_split('/\r\n|\r|\n/', $text)),
@@ -244,7 +244,7 @@ class OcrSpaceService
      * OCRの列読み取り順の都合で「品名」ラベルがクライアント列より先に来るため、
      * 「品名」ラベルではなくクライアント名行位置を基準に抽出する。
      */
-    private function parseTitle(string $text): string
+    protected function parseTitle(string $text): string
     {
         $lines = array_values(array_filter(
             array_map('trim', preg_split('/\r\n|\r|\n/', $text)),
@@ -300,7 +300,7 @@ class OcrSpaceService
      * 例: "（株）文化工房" → "文化工房"
      *     "株式会社ABC商事" → "ABC商事"
      */
-    private function normalizeCompanyName(string $name): string
+    protected function normalizeCompanyName(string $name): string
     {
         $normalized = $name;
         foreach (self::COMPANY_WORDS as $word) {

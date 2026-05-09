@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\URL;
+use App\Services\OcrSpaceService;
+use App\Services\LocalTesseractService;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -15,7 +17,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // OCR_DRIVER=local のとき LocalTesseractService を使う
+        $this->app->bind(OcrSpaceService::class, function () {
+            if (config('services.tesseract.driver') === 'local') {
+                return new LocalTesseractService();
+            }
+            return new OcrSpaceService();
+        });
     }
 
     /**

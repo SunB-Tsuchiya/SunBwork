@@ -39,4 +39,11 @@ return [
         'api_key' => env('OCR_SPACE_API_KEY'),
     ],
 
+    'tesseract' => [
+        'driver'          => env('OCR_DRIVER', 'ocr_space'),
+        'binary'          => env('TESSERACT_BINARY', '/usr/bin/tesseract'),
+        'lib_path'        => env('TESSERACT_LIB_PATH', ''),
+        'tessdata_prefix' => env('TESSDATA_PREFIX', ''),
+    ],
+
 ];
