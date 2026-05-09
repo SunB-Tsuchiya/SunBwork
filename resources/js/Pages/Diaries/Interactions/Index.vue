@@ -108,7 +108,14 @@ function markReadAllRoute() {
 <template>
     <AppLayout :title="props.pageTitle">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">{{ props.headerTitle }}</h2>
+            <div v-if="props.date" class="flex items-center gap-3">
+                <Link
+                    :href="route(routeForIndex())"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                >← 日報一覧に戻る</Link>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">{{ props.headerTitle }}</h2>
+            </div>
+            <h2 v-else class="text-xl font-semibold leading-tight text-gray-800">{{ props.headerTitle }}</h2>
         </template>
 
         <div class="rounded bg-white p-6 shadow">
@@ -138,7 +145,7 @@ function markReadAllRoute() {
                         <Link
                             :href="route(routeForIndex(), { date: date })"
                             class="inline-flex items-center rounded border bg-white px-2 py-1 text-xs hover:bg-gray-50"
-                            aria-label="日付別表示へ"
+                            aria-label="全件表示"
                         >
                             <svg
                                 xmlns="http://www.w3.org/2000/svg"
@@ -150,7 +157,7 @@ function markReadAllRoute() {
                             >
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
                             </svg>
-                            <span class="text-xs">一覧を見る</span>
+                            <span class="text-xs">全件表示</span>
                         </Link>
 
                         <button
