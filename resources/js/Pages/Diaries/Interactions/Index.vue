@@ -40,6 +40,8 @@ const tableFilters = computed(() => {
 const viewMode = ref(props.filters && props.filters.group === 'month' ? 'month' : 'day');
 // days to show (default from props.filters.days or 30)
 const selectedDays = ref(props.filters && props.filters.days ? Number(props.filters.days) : 30);
+// search query (shared across all date groups)
+const searchQuery = ref(props.filters && props.filters.q ? props.filters.q : '');
 
 const groupedByDate = computed(() => {
     const map = {};
@@ -88,6 +90,8 @@ function applyFilters() {
     params.days = selectedDays.value;
     if (viewMode.value === 'month') params.group = 'month';
     else delete params.group;
+    if (searchQuery.value) params.q = searchQuery.value;
+    else delete params.q;
     params.page = 1;
     Inertia.get(route(routeForIndex(), params));
 }
@@ -121,6 +125,14 @@ function markReadAllRoute() {
         <div class="rounded bg-white p-6 shadow">
             <div class="mb-4 flex items-center justify-between">
                 <div class="flex items-center space-x-3">
+                    <input
+                        v-model="searchQuery"
+                        type="search"
+                        placeholder="検索 (ID/名前/部署/内容)"
+                        class="w-56 rounded border px-2 py-1 text-sm"
+                        @keydown.enter.prevent="applyFilters"
+                    />
+
                     <label class="text-sm">表示:</label>
                     <select v-model="viewMode" class="w-40 rounded border px-2 py-1 text-sm">
                         <option value="day">日別表示</option>
@@ -175,6 +187,7 @@ function markReadAllRoute() {
                     :serverMode="true"
                     :meta="props.meta"
                     :filters="tableFilters"
+                    :searchable="false"
                     :maxDescriptionLines="1"
                     :showUnreadToggle="false"
                     :fullContent="props.date === date"
