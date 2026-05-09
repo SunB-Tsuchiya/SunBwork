@@ -941,35 +941,52 @@
         >
             <div class="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
                 <h3 class="mb-4 text-lg font-semibold text-gray-800">伝票画像のアップロード</h3>
-                <p class="mb-4 text-sm text-gray-600">
-                    画像を読み込むと OCR で伝票番号・案件名・クライアントを自動入力します。
-                </p>
-                <label class="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-green-500 bg-green-50 px-6 py-8 text-green-700 hover:bg-green-100">
-                    <span class="mb-1 text-2xl">📄</span>
-                    <span class="text-sm font-medium">ファイルを読み込む（OCR自動入力）</span>
-                    <span class="mt-1 text-xs text-gray-400">JPG / PNG / PDF 対応（最大 20MB）</span>
-                    <input
-                        type="file"
-                        accept="image/*,.pdf"
-                        class="hidden"
-                        @change="onVoucherOcrFileChange"
-                    />
-                </label>
+
+                <!-- ドロップゾーン -->
+                <div
+                    class="rounded-lg border-2 border-dashed transition-colors"
+                    :class="isDragOverVoucher
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-300 bg-gray-50 hover:border-gray-400'"
+                    @dragenter.prevent="isDragOverVoucher = true"
+                    @dragleave.prevent="isDragOverVoucher = false"
+                    @dragover.prevent
+                    @drop.prevent="onVoucherOcrDrop"
+                >
+                    <div class="py-10 text-center">
+                        <!-- OCR解析中 -->
+                        <div v-if="isVoucherOcrLoading" class="text-blue-600">
+                            <svg class="mx-auto mb-3 h-9 w-9 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+                            </svg>
+                            <p class="text-sm font-medium">OCR解析中...</p>
+                            <p class="mt-1 text-xs text-gray-400">しばらくお待ちください</p>
+                        </div>
+                        <!-- 待機中 -->
+                        <div v-else>
+                            <p class="text-3xl mb-3">📥</p>
+                            <p class="text-sm font-medium text-gray-600">PDFや画像をここにドロップ</p>
+                            <p class="mt-1 text-xs text-gray-400">または</p>
+                            <label class="mt-3 inline-block cursor-pointer rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+                                ファイルを選択
+                                <input
+                                    type="file"
+                                    class="hidden"
+                                    accept="image/*,.pdf"
+                                    @change="onVoucherOcrFileChange"
+                                />
+                            </label>
+                            <p class="mt-3 text-xs text-gray-400">対応形式: PDF, JPG, PNG, GIF, WebP</p>
+                        </div>
+                    </div>
+                </div>
+
                 <button
                     type="button"
                     class="mt-4 w-full rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
                     @click="closeVoucherOcrModal"
                 >キャンセル</button>
-            </div>
-        </div>
-    </Teleport>
-
-    <!-- OCR解析中オーバーレイ -->
-    <Teleport to="body">
-        <div v-if="isVoucherOcrLoading" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/50">
-            <div class="rounded-xl bg-white px-8 py-6 shadow-xl">
-                <p class="text-sm font-medium text-gray-700">OCR解析中...</p>
-                <p class="mt-1 text-xs text-gray-400">しばらくお待ちください</p>
             </div>
         </div>
     </Teleport>
@@ -1226,6 +1243,7 @@ const voucherForm = useForm({ image: null });
 // ── 伝票OCR ──────────────────────────────────────────────────────────────────
 const showVoucherOcrModal    = ref(false); // ファイル選択モーダル
 const isVoucherOcrLoading    = ref(false);
+const isDragOverVoucher      = ref(false);
 const showVoucherOcrResult   = ref(false); // OcrModal
 const voucherOcrResult       = ref({});
 const voucherOcrFileInput    = ref(null);
@@ -1237,13 +1255,11 @@ function openVoucherOcrModal() {
 function closeVoucherOcrModal() {
     showVoucherOcrModal.value = false;
     isVoucherOcrLoading.value = false;
+    isDragOverVoucher.value   = false;
 }
 
-async function onVoucherOcrFileChange(e) {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    showVoucherOcrModal.value = false;
+async function triggerVoucherOcr(file) {
+    // モーダルはそのまま表示（ドロップゾーン内にスピナーを出す）
     isVoucherOcrLoading.value = true;
     try {
         const fd = new FormData();
@@ -1252,13 +1268,28 @@ async function onVoucherOcrFileChange(e) {
         const res = await axios.post(route('coordinator.project_jobs.ocr.analyze'), fd, {
             headers: { 'X-CSRF-TOKEN': csrf, 'Content-Type': 'multipart/form-data' },
         });
-        voucherOcrResult.value    = res.data;
+        voucherOcrResult.value     = res.data;
+        showVoucherOcrModal.value  = false; // 結果モーダルを出す前に閉じる
         showVoucherOcrResult.value = true;
     } catch {
+        showVoucherOcrModal.value = false;
         alert('OCR解析に失敗しました。ファイルを確認して再試行してください。');
     } finally {
         isVoucherOcrLoading.value = false;
     }
+}
+
+function onVoucherOcrDrop(e) {
+    isDragOverVoucher.value = false;
+    const file = e.dataTransfer?.files?.[0];
+    if (file) triggerVoucherOcr(file);
+}
+
+async function onVoucherOcrFileChange(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    await triggerVoucherOcr(file);
 }
 
 async function onVoucherOcrApply(result) {
