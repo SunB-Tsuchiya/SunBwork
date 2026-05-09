@@ -25,12 +25,16 @@ use Illuminate\Support\Facades\Storage;
  */
 class LocalTesseractService extends OcrSpaceService
 {
-    // 受注番号値エリア（数字専用クロップ）
-    private const REGION_JOBCODE  = [0.080, 0.088, 0.280, 0.128];
+    // 受注番号値エリア（数字専用）
+    private const REGION_JOBCODE = [0.080, 0.088, 0.280, 0.128];
 
-    // row1 + row2 全幅（クライアント名・品名テキスト取得用）
-    // x を 0.003〜0.900 に拡大して得意先エリアを確実にカバーする
-    private const REGION_COMBINED = [0.003, 0.088, 0.900, 0.170];
+    // クライアント名エリア（受注番号右側〜右端、row1のみ）
+    // 幅を広くして得意先エリアを確実にカバー
+    private const REGION_CLIENT  = [0.280, 0.088, 0.900, 0.128];
+
+    // 品名テキスト行（row2のみ、幅を狭めて他列の混入を防ぐ）
+    // y: 12.0% 開始で先頭文字の欠落を防ぐ
+    private const REGION_TITLE   = [0.003, 0.120, 0.660, 0.170];
 
     public function analyze(string $storagePath): array
     {
@@ -59,32 +63,36 @@ class LocalTesseractService extends OcrSpaceService
             $w = $imagick->getImageWidth();
             $h = $imagick->getImageHeight();
 
-            // 受注番号: jpn+eng（eng のみだと数字を誤読するため）
-            $jobcodeRaw  = $this->cropAndOcr($imagick, $w, $h, self::REGION_JOBCODE,  $binary, 7, 'jpn+eng');
-            // クライアント名・品名: jpn のみ（jpn+eng だと日本語が英字誤読される）
-            $combinedRaw = $this->cropAndOcr($imagick, $w, $h, self::REGION_COMBINED, $binary, 6, 'jpn');
+            // 受注番号: jpn+eng（engのみだと数字誤読あり）
+            $jobcodeRaw = $this->cropAndOcr($imagick, $w, $h, self::REGION_JOBCODE, $binary, 7, 'jpn+eng');
+            // クライアント名: row1のみ・幅広・jpn専用
+            $clientRaw  = $this->cropAndOcr($imagick, $w, $h, self::REGION_CLIENT,  $binary, 7, 'jpn');
+            // 品名: row2のみ・幅狭・jpn専用
+            $titleRaw   = $this->cropAndOcr($imagick, $w, $h, self::REGION_TITLE,   $binary, 6, 'jpn');
 
             $imagick->clear();
             $imagick->destroy();
 
-            Log::info('LocalTesseractService: raw OCR', [
-                'jobcode_raw'  => $jobcodeRaw,
-                'combined_raw' => $combinedRaw,
+            Log::info('LocalTesseractService: raw OCR (3-region)', [
+                'jobcode_raw' => $jobcodeRaw,
+                'client_raw'  => $clientRaw,
+                'title_raw'   => $titleRaw,
             ]);
 
             // 受注番号: 数字のみ抽出
             $jobcode = preg_replace('/[^0-9]/', '', $jobcodeRaw);
             if (!preg_match('/^\d{5,12}$/', $jobcode)) {
-                $jobcode = $this->parseJobcode($combinedRaw);
+                $jobcode = $this->parseJobcode($jobcodeRaw);
             }
 
-            // クライアント名: jobcode行から数字を除いた残りを取得
-            $clientName = $this->parseClientNameTesseract($combinedRaw);
+            // クライアント名: row1クロップをそのままクリーニング
+            $clientName = $this->cleanClientText($clientRaw);
 
             // 品名: 「品名」ラベル以降を抽出 → クリーニング
-            $title = $this->cleanTitle($this->parseTitleTesseract($combinedRaw));
+            $title = $this->cleanTitle($this->parseTitleTesseract($titleRaw));
 
-            $matchedClients = $this->searchClients($clientName);
+            // DB検索: まず全体で、ヒットしなければ先頭を1〜3文字削って再検索
+            $matchedClients = $this->searchClientsSliding($clientName);
 
             Log::info('LocalTesseractService: OCR completed', [
                 'jobcode'     => $jobcode,
@@ -103,6 +111,64 @@ class LocalTesseractService extends OcrSpaceService
             Log::error('LocalTesseractService: exception', ['message' => $e->getMessage()]);
             return $this->emptyResult();
         }
+    }
+
+    /**
+     * クライアント名クロップ画像のテキストをクリーニングして返す。
+     * row1 専用クロップのため、そのままクリーニングするだけでクライアント名が得られる。
+     */
+    private function cleanClientText(string $text): string
+    {
+        $text = trim($text);
+
+        // 先頭の記号ノイズを除去
+        $text = preg_replace('/^[\s　|lｌ｜\[\]()\-]+/u', '', $text);
+
+        // 意味のある行を結合
+        $lines = array_filter(
+            array_map('trim', preg_split('/\r\n|\r|\n/', $text)),
+            fn($l) => $l !== '' && mb_strlen($l) >= 2
+        );
+        $text = implode(' ', array_values($lines));
+
+        // CJK 字間スペースを除去（文 化工 房 → 文化工房）
+        $text = preg_replace(
+            '/(?<=[\x{3040}-\x{9fff}\x{f900}-\x{faff}])\s+(?=[\x{3040}-\x{9fff}\x{f900}-\x{faff}])/u',
+            '',
+            $text
+        );
+
+        // 末尾の記号ノイズを除去
+        return trim(preg_replace('/[\s　|lｌ｜\[\]()\-]+$/u', '', $text));
+    }
+
+    /**
+     * クライアント名でDB検索。ヒットしない場合は先頭を1〜3文字削って再検索する。
+     * OCR誤読による先頭ノイズ文字（例: "物文化工房" → "文化工房"）に対応。
+     */
+    private function searchClientsSliding(string $name): array
+    {
+        if (mb_strlen($name) < 2) {
+            return [];
+        }
+
+        // まず全体で検索
+        $results = $this->searchClients($name);
+        if (!empty($results)) {
+            return $results;
+        }
+
+        // 先頭を1〜3文字ずつ削って再検索
+        $maxTrim = min(3, mb_strlen($name) - 2);
+        for ($i = 1; $i <= $maxTrim; $i++) {
+            $partial = mb_substr($name, $i);
+            $results = $this->searchClients($partial);
+            if (!empty($results)) {
+                return $results;
+            }
+        }
+
+        return [];
     }
 
     /**
@@ -246,6 +312,9 @@ class LocalTesseractService extends OcrSpaceService
 
         // アンダースコアをスペースに置換（_PDF → PDF）
         $text = str_replace('_', ' ', $text);
+
+        // 複数スペースを1つに正規化
+        $text = preg_replace('/\s{2,}/', ' ', $text);
 
         // 末尾の記号ノイズを除去
         $text = preg_replace('/[\s　|Tl｜]+$/u', '', $text);
