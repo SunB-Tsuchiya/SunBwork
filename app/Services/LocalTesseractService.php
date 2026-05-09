@@ -208,7 +208,8 @@ class LocalTesseractService extends OcrSpaceService
     /**
      * Tesseract 向け品名テキスト抽出。
      * 優先: 「品名」「品目」ラベルの後に続くテキストを取得。
-     * フォールバック: jobcode行（7桁以上数字を含む行）の次の行以降を品名とする。
+     * フォールバック: jobcode行以降の行のうち、CJK文字を最も多く含む行を品名とする。
+     *   （行間ノイズ「了、。押当者ーー」より実際の品名行が CJK 文字数で上回る）
      */
     private function parseTitleTesseract(string $text): string
     {
@@ -217,24 +218,30 @@ class LocalTesseractService extends OcrSpaceService
             return trim($m[1]);
         }
 
-        // フォールバック: jobcode行の次の行以降を品名候補とする
+        // フォールバック: jobcode行以降で CJK 文字数が最多の行を品名候補とする
         $lines = array_values(array_filter(
             array_map('trim', preg_split('/\r\n|\r|\n/', $text)),
             fn($l) => $l !== ''
         ));
 
         $foundJobcode = false;
-        $titleLines   = [];
+        $best         = '';
+        $bestCount    = 0;
         foreach ($lines as $line) {
             if ($foundJobcode) {
-                $titleLines[] = $line;
+                preg_match_all('/[\x{3040}-\x{9fff}\x{f900}-\x{faff}]/u', $line, $m);
+                $count = count($m[0]);
+                if ($count > $bestCount) {
+                    $bestCount = $count;
+                    $best      = $line;
+                }
             } elseif (preg_match('/\d{7,12}/', $line)) {
                 $foundJobcode = true;
             }
         }
 
-        if (!empty($titleLines)) {
-            return implode(' ', $titleLines);
+        if ($best !== '') {
+            return $best;
         }
 
         return parent::parseTitle($text);
