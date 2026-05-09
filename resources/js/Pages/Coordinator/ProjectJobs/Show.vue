@@ -547,14 +547,16 @@
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="font-semibold text-gray-800">伝票情報</h3>
                         <!-- 画像がない場合のアップロードボタン -->
-                        <label
+                        <button
                             v-if="!job.image_url && !job.completed"
-                            class="cursor-pointer rounded-lg border border-green-700 px-4 py-1.5 text-sm font-medium text-green-700 hover:bg-green-50"
-                            :class="{ 'opacity-50 pointer-events-none': voucherForm.processing }"
+                            type="button"
+                            class="rounded-lg border border-green-700 px-4 py-1.5 text-sm font-medium text-green-700 hover:bg-green-50 disabled:opacity-50"
+                            :disabled="isVoucherOcrLoading"
+                            @click="openVoucherOcrModal"
                         >
-                            {{ voucherForm.processing ? 'アップロード中...' : '📎 画像をアップロード' }}
-                            <input type="file" accept="image/*,.pdf" class="hidden" :disabled="voucherForm.processing" @change="onVoucherFileChange" />
-                        </label>
+                            <span v-if="isVoucherOcrLoading">OCR解析中...</span>
+                            <span v-else>📎 画像をアップロード</span>
+                        </button>
                     </div>
 
                     <!-- 画像あり -->
@@ -574,17 +576,23 @@
                                 class="rounded border border-gray-300 px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-50"
                                 @click="showVoucherLightbox = true"
                             >🔍 拡大</button>
-                            <!-- 差し替えボタン -->
-                            <label v-if="!job.completed" class="cursor-pointer rounded border border-blue-400 px-2 py-0.5 text-xs text-blue-600 hover:bg-blue-50" :class="{ 'opacity-50 pointer-events-none': voucherForm.processing }">
-                                {{ voucherForm.processing ? 'アップロード中...' : '📁 差し替え' }}
-                                <input type="file" accept="image/*,.pdf" class="hidden" :disabled="voucherForm.processing" @change="onVoucherFileChange" />
-                            </label>
+                            <!-- 差し替えボタン（OCRモーダル経由） -->
+                            <button
+                                v-if="!job.completed"
+                                type="button"
+                                class="rounded border border-blue-400 px-2 py-0.5 text-xs text-blue-600 hover:bg-blue-50 disabled:opacity-50"
+                                :disabled="isVoucherOcrLoading"
+                                @click="openVoucherOcrModal"
+                            >
+                                <span v-if="isVoucherOcrLoading">OCR解析中...</span>
+                                <span v-else>📁 差し替え</span>
+                            </button>
                             <!-- 削除ボタン -->
                             <button
                                 v-if="!job.completed"
                                 type="button"
                                 class="rounded border border-red-400 px-2 py-0.5 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50"
-                                :disabled="voucherForm.processing"
+                                :disabled="isVoucherOcrLoading"
                                 @click="confirmDeleteVoucherImage"
                             >✕ 削除</button>
                         </div>
@@ -924,10 +932,61 @@
         </div>
     </Teleport>
 
+    <!-- 伝票OCR ファイル選択モーダル -->
+    <Teleport to="body">
+        <div
+            v-if="showVoucherOcrModal"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+            @click.self="closeVoucherOcrModal"
+        >
+            <div class="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
+                <h3 class="mb-4 text-lg font-semibold text-gray-800">伝票画像のアップロード</h3>
+                <p class="mb-4 text-sm text-gray-600">
+                    画像を読み込むと OCR で伝票番号・案件名・クライアントを自動入力します。
+                </p>
+                <label class="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-green-500 bg-green-50 px-6 py-8 text-green-700 hover:bg-green-100">
+                    <span class="mb-1 text-2xl">📄</span>
+                    <span class="text-sm font-medium">ファイルを読み込む（OCR自動入力）</span>
+                    <span class="mt-1 text-xs text-gray-400">JPG / PNG / PDF 対応（最大 20MB）</span>
+                    <input
+                        type="file"
+                        accept="image/*,.pdf"
+                        class="hidden"
+                        @change="onVoucherOcrFileChange"
+                    />
+                </label>
+                <button
+                    type="button"
+                    class="mt-4 w-full rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
+                    @click="closeVoucherOcrModal"
+                >キャンセル</button>
+            </div>
+        </div>
+    </Teleport>
+
+    <!-- OCR解析中オーバーレイ -->
+    <Teleport to="body">
+        <div v-if="isVoucherOcrLoading" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/50">
+            <div class="rounded-xl bg-white px-8 py-6 shadow-xl">
+                <p class="text-sm font-medium text-gray-700">OCR解析中...</p>
+                <p class="mt-1 text-xs text-gray-400">しばらくお待ちください</p>
+            </div>
+        </div>
+    </Teleport>
+
+    <!-- OCR結果モーダル -->
+    <OcrModal
+        :show="showVoucherOcrResult"
+        :ocrResult="voucherOcrResult"
+        @apply="onVoucherOcrApply"
+        @close="showVoucherOcrResult = false"
+    />
+
 </template>
 
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
+import OcrModal from '@/Components/Prepress/OcrModal.vue';
 import ProjectJobItemsTab from '@/Components/ProjectJobItemsTab.vue';
 import ProjectCalendar from '@/Components/ProjectCalendar.vue';
 import { scheduleStatusColor } from '@/Helpers/scheduleColor.js';
@@ -1163,6 +1222,96 @@ watch(activeTab, (tab) => {
 // ── 伝票画像 ─────────────────────────────────────────────────────────────────
 const showVoucherLightbox = ref(false);
 const voucherForm = useForm({ image: null });
+
+// ── 伝票OCR ──────────────────────────────────────────────────────────────────
+const showVoucherOcrModal    = ref(false); // ファイル選択モーダル
+const isVoucherOcrLoading    = ref(false);
+const showVoucherOcrResult   = ref(false); // OcrModal
+const voucherOcrResult       = ref({});
+const voucherOcrFileInput    = ref(null);
+
+function openVoucherOcrModal() {
+    showVoucherOcrModal.value = true;
+}
+
+function closeVoucherOcrModal() {
+    showVoucherOcrModal.value = false;
+    isVoucherOcrLoading.value = false;
+}
+
+async function onVoucherOcrFileChange(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    showVoucherOcrModal.value = false;
+    isVoucherOcrLoading.value = true;
+    try {
+        const fd = new FormData();
+        fd.append('image', file);
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+        const res = await axios.post(route('coordinator.project_jobs.ocr.analyze'), fd, {
+            headers: { 'X-CSRF-TOKEN': csrf, 'Content-Type': 'multipart/form-data' },
+        });
+        voucherOcrResult.value    = res.data;
+        showVoucherOcrResult.value = true;
+    } catch {
+        alert('OCR解析に失敗しました。ファイルを確認して再試行してください。');
+    } finally {
+        isVoucherOcrLoading.value = false;
+    }
+}
+
+async function onVoucherOcrApply(result) {
+    showVoucherOcrResult.value = false;
+
+    // 更新が必要なフィールドを確認
+    const currentJobcode  = job.jobcode  ?? '';
+    const currentTitle    = job.title    ?? '';
+    const currentClientId = String(job.client_id ?? '');
+    const newJobcode  = result.jobcode     ?? '';
+    const newTitle    = result.title       ?? '';
+    const newClientId = String(result.client_id ?? '');
+
+    const hasFieldDiff = (newJobcode && newJobcode !== currentJobcode)
+        || (newTitle && newTitle !== currentTitle)
+        || (newClientId && newClientId !== currentClientId);
+
+    let updateFields = false;
+    if (hasFieldDiff) {
+        const changes = [];
+        if (newJobcode && newJobcode !== currentJobcode)       changes.push(`伝票番号: 「${currentJobcode || '未設定'}」→「${newJobcode}」`);
+        if (newTitle   && newTitle   !== currentTitle)         changes.push(`案件名: 「${currentTitle}」→「${newTitle}」`);
+        if (newClientId && newClientId !== currentClientId)    changes.push(`クライアント: 「${job.client?.name ?? '未設定'}」→「${result.client_name ?? ''}」`);
+        updateFields = confirm(
+            `以下の差分を案件詳細に反映しますか？\n\n` +
+            changes.join('\n') +
+            `\n\n「OK」で反映、「キャンセル」で画像のみ保存します。`
+        );
+    }
+
+    // applyOcrResult エンドポイントを呼ぶ
+    try {
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+        const payload = {
+            tmp_image_path:    result.tmp_image_path,
+            original_filename: result.original_filename ?? '',
+            update_fields:     updateFields,
+        };
+        if (updateFields) {
+            if (newJobcode)  payload.jobcode   = newJobcode;
+            if (newTitle)    payload.title     = newTitle;
+            if (newClientId) payload.client_id = parseInt(newClientId, 10);
+        }
+        await axios.patch(
+            route('coordinator.project_jobs.ocr.apply', { projectJob: job.id }),
+            payload,
+            { headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' } }
+        );
+        router.reload({ preserveScroll: true });
+    } catch {
+        alert('画像の保存に失敗しました。');
+    }
+}
 
 function onVoucherFileChange(e) {
     const file = e.target.files?.[0];

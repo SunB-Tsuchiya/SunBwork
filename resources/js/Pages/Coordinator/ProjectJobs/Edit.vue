@@ -90,8 +90,14 @@
                 <div class="mb-6">
                     <label class="mb-2 block font-semibold">作業ファイル情報（伝票画像）</label>
 
+                    <!-- OCR ローディング -->
+                    <div v-if="isOcrLoading" class="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-green-400 bg-green-50 px-6 py-8">
+                        <p class="text-sm font-medium text-green-700">OCR解析中...</p>
+                        <p class="mt-1 text-xs text-gray-400">しばらくお待ちください</p>
+                    </div>
+
                     <!-- 既存画像あり -->
-                    <div v-if="currentImageUrl">
+                    <div v-else-if="currentImageUrl">
                         <div class="relative inline-block">
                             <img
                                 :src="currentImageUrl"
@@ -104,7 +110,7 @@
                             <span class="max-w-xs truncate text-xs text-gray-500">{{ props.job.original_filename }}</span>
                             <button type="button" class="rounded border border-gray-300 px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-50" @click="showLightbox = true">🔍 拡大</button>
                             <label class="cursor-pointer rounded border border-blue-400 px-2 py-0.5 text-xs text-blue-600 hover:bg-blue-50">
-                                📁 差し替え
+                                📁 差し替え（OCR）
                                 <input type="file" accept="image/*,.pdf" class="hidden" @change="onVoucherFileChange" />
                             </label>
                             <button type="button" class="rounded border border-red-400 px-2 py-0.5 text-xs text-red-600 hover:bg-red-50" @click="confirmDeleteVoucherImage">✕ 削除</button>
@@ -112,7 +118,7 @@
                         <p v-if="voucherError" class="mt-1 text-xs text-red-600">{{ voucherError }}</p>
                     </div>
 
-                    <!-- 新規プレビュー（ローカル選択後・まだ未保存） -->
+                    <!-- 新規プレビュー（OCR済み or ローカル選択後・まだ未保存） -->
                     <div v-else-if="previewUrl">
                         <div class="relative inline-block">
                             <img :src="previewUrl" :alt="previewName" class="h-40 w-auto cursor-pointer rounded-lg border border-gray-200 object-contain shadow-sm" @click="showLightbox = true" />
@@ -143,7 +149,7 @@
                         </div>
                         <div class="mt-3 flex flex-wrap gap-2">
                             <label class="cursor-pointer rounded-lg border border-green-700 px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-50">
-                                📁 フォルダから選ぶ
+                                📁 ファイルを読み込む（OCR自動入力）
                                 <input type="file" accept="image/*,.pdf" class="hidden" @change="onFileInputChange" />
                             </label>
                             <label v-if="isMobile" class="cursor-pointer rounded-lg border border-gray-400 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">
@@ -219,11 +225,31 @@
             </div>
         </Teleport>
     </AppLayout>
+
+    <!-- OCR ローディングオーバーレイ -->
+    <Teleport to="body">
+        <div v-if="isOcrLoading" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/50">
+            <div class="rounded-xl bg-white px-8 py-6 shadow-xl">
+                <p class="text-sm font-medium text-gray-700">OCR解析中...</p>
+                <p class="mt-1 text-xs text-gray-400">しばらくお待ちください</p>
+            </div>
+        </div>
+    </Teleport>
+
+    <!-- OCR結果モーダル -->
+    <OcrModal
+        :show="showOcrModal"
+        :ocrResult="ocrResult"
+        @apply="onOcrApply"
+        @close="showOcrModal = false"
+    />
 </template>
 
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
+import OcrModal from '@/Components/Prepress/OcrModal.vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
+import axios from 'axios';
 import { computed, ref, watch } from 'vue';
 
 const isMobile = computed(() => {
@@ -285,63 +311,128 @@ const props = defineProps({
 const currentImageUrl = ref(props.job.image_url ?? null);
 
 // ローカル選択中のファイル（まだ未保存）
-const previewUrl      = ref(null);
-const previewName     = ref('');
-const pendingFile     = ref(null);
-const isDragging      = ref(false);
-const showLightbox    = ref(false);
+const previewUrl       = ref(null);
+const previewName      = ref('');
+const pendingFile      = ref(null);
+const pendingOcrPath   = ref(null); // OCR 済み tmp パス
+const isDragging       = ref(false);
+const showLightbox     = ref(false);
 const voucherUploading = ref(false);
-const voucherError    = ref('');
+const voucherError     = ref('');
+
+// OCR
+const isOcrLoading = ref(false);
+const showOcrModal = ref(false);
+const ocrResult    = ref({});
 
 // router.reload で props が更新されたとき currentImageUrl を同期
 watch(() => props.job.image_url, (url) => {
     currentImageUrl.value = url ?? null;
     // アップロード完了後はプレビューをクリア
-    previewUrl.value  = null;
-    previewName.value = '';
-    pendingFile.value = null;
+    previewUrl.value   = null;
+    previewName.value  = '';
+    pendingFile.value  = null;
+    pendingOcrPath.value = null;
 });
 
-function selectFile(file) {
-    if (!file) return;
-    pendingFile.value = file;
-    previewName.value = file.name;
+async function runOcr(file) {
+    isOcrLoading.value = true;
+    showOcrModal.value = false;
     voucherError.value = '';
-    const reader = new FileReader();
-    reader.onload = (e) => { previewUrl.value = e.target.result; };
-    reader.readAsDataURL(file);
+    const fd = new FormData();
+    fd.append('image', file);
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+    try {
+        const res = await axios.post(route('coordinator.project_jobs.ocr.analyze'), fd, {
+            headers: { 'X-CSRF-TOKEN': csrf, 'Content-Type': 'multipart/form-data' },
+        });
+        ocrResult.value    = res.data;
+        showOcrModal.value = true;
+    } catch {
+        // OCR 失敗時は従来の selectFile フォールバック
+        pendingFile.value  = file;
+        previewName.value  = file.name;
+        voucherError.value = '';
+        const reader = new FileReader();
+        reader.onload = (e) => { previewUrl.value = e.target.result; };
+        reader.readAsDataURL(file);
+    } finally {
+        isOcrLoading.value = false;
+    }
+}
+
+function onOcrApply(result) {
+    // フォームフィールドに OCR 結果を反映
+    if (result.jobcode)     form.jobcode     = result.jobcode;
+    if (result.title)       form.title       = result.title;
+    if (result.client_id)   form.client_id   = result.client_id;
+    if (result.client_name) form.client_name = result.client_name;
+    // 画像プレビューを OCR 変換済み画像に差し替え
+    if (result.tmp_image_path) {
+        pendingOcrPath.value = result.tmp_image_path;
+        pendingFile.value    = null;
+        previewUrl.value     = result.image_url || previewUrl.value;
+        previewName.value    = result.original_filename || previewName.value;
+    }
+    showOcrModal.value = false;
 }
 
 function onFileInputChange(e) {
     const file = e.target.files?.[0];
     e.target.value = '';
-    if (file) selectFile(file);
+    if (file) runOcr(file);
 }
 
 function onVoucherFileChange(e) {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    // 既存画像の差し替え：即アップロード
-    uploadFile(file);
+    // 既存画像の差し替え：OCR 経由
+    runOcr(file);
 }
 
 function onDropZoneDrop(e) {
     isDragging.value = false;
     const file = e.dataTransfer?.files?.[0];
-    if (file) selectFile(file);
+    if (file) runOcr(file);
 }
 
 function removePreview() {
-    previewUrl.value  = null;
-    previewName.value = '';
-    pendingFile.value = null;
-    voucherError.value = '';
+    previewUrl.value     = null;
+    previewName.value    = '';
+    pendingFile.value    = null;
+    pendingOcrPath.value = null;
+    voucherError.value   = '';
 }
 
 function uploadPendingFile() {
-    if (!pendingFile.value) return;
-    uploadFile(pendingFile.value);
+    if (pendingOcrPath.value) {
+        uploadOcrPath(pendingOcrPath.value, previewName.value);
+    } else if (pendingFile.value) {
+        uploadFile(pendingFile.value);
+    }
+}
+
+function uploadOcrPath(tmpPath, originalFilename) {
+    voucherUploading.value = true;
+    voucherError.value = '';
+    const fd = new FormData();
+    fd.append('tmp_ocr_image_path', tmpPath);
+    if (originalFilename) fd.append('original_filename', originalFilename);
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+    fetch(route('coordinator.project_jobs.image.store', { projectJob: props.job.id }), {
+        method: 'POST',
+        headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin',
+        body: fd,
+    }).then((res) => {
+        if (!res.ok) throw new Error('upload failed');
+        router.reload({ preserveScroll: true });
+    }).catch(() => {
+        voucherError.value = '画像のアップロードに失敗しました。';
+    }).finally(() => {
+        voucherUploading.value = false;
+    });
 }
 
 function uploadFile(file) {

@@ -203,7 +203,7 @@
 
                     <!-- ドロップゾーン -->
                     <div
-                        v-if="!previewUrl"
+                        v-if="!previewUrl && !isOcrLoading"
                         class="flex flex-col items-center justify-center rounded-lg border-2 border-dashed px-6 py-8 transition-colors"
                         :class="isDragging ? 'border-green-500 bg-green-50' : 'border-gray-300 bg-gray-50 hover:border-green-400'"
                         @dragover.prevent="isDragging = true"
@@ -215,10 +215,16 @@
                         <p class="mt-1 text-xs text-gray-400">JPG / PNG / WEBP / HEIC / GIF / PDF 対応（最大 20MB）</p>
                     </div>
 
+                    <!-- OCR ローディング -->
+                    <div v-if="isOcrLoading" class="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-green-400 bg-green-50 px-6 py-8">
+                        <p class="text-sm font-medium text-green-700">OCR解析中...</p>
+                        <p class="mt-1 text-xs text-gray-400">しばらくお待ちください</p>
+                    </div>
+
                     <!-- ファイル選択ボタン -->
-                    <div class="mt-3 flex flex-wrap gap-2">
+                    <div v-if="!isOcrLoading" class="mt-3 flex flex-wrap gap-2">
                         <label class="cursor-pointer rounded-lg border border-green-700 px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-50">
-                            📁 フォルダから選ぶ
+                            📁 ファイルを読み込む（OCR自動入力）
                             <input type="file" accept="image/*,.pdf" class="hidden" @change="onFileInputChange" />
                         </label>
                         <label v-if="isMobile" class="cursor-pointer rounded-lg border border-gray-400 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">
@@ -499,12 +505,32 @@
             </div>
         </Teleport>
     </AppLayout>
+
+    <!-- OCR ローディングオーバーレイ -->
+    <Teleport to="body">
+        <div v-if="isOcrLoading" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/50">
+            <div class="rounded-xl bg-white px-8 py-6 shadow-xl">
+                <p class="text-sm font-medium text-gray-700">OCR解析中...</p>
+                <p class="mt-1 text-xs text-gray-400">しばらくお待ちください</p>
+            </div>
+        </div>
+    </Teleport>
+
+    <!-- OCR結果モーダル -->
+    <OcrModal
+        :show="showOcrModal"
+        :ocrResult="ocrResult"
+        @apply="onOcrApply"
+        @close="showOcrModal = false"
+    />
 </template>
 
 <script setup>
 import DialogModal from '@/Components/DialogModal.vue';
+import OcrModal from '@/Components/Prepress/OcrModal.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, useForm, usePage } from '@inertiajs/vue3';
+import axios from 'axios';
 import { computed, ref, watch } from 'vue';
 
 const props = defineProps({
@@ -528,6 +554,7 @@ const form = useForm({
     detail: '',
     team_members: [],
     image: null,
+    tmp_ocr_image_path: '',
 });
 
 // ── 伝票画像 ────────────────────────────────────────────────────────────────
@@ -536,18 +563,53 @@ const previewName  = ref('');
 const isDragging   = ref(false);
 const showLightbox = ref(false);
 
+// ── OCR ─────────────────────────────────────────────────────────────────────
+const isOcrLoading  = ref(false);
+const showOcrModal  = ref(false);
+const ocrResult     = ref({});
+
 const isMobile = computed(() => {
     if (typeof navigator === 'undefined') return false;
     return /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
 });
 
-function handleVoucherFile(file) {
+async function handleVoucherFile(file) {
     if (!file) return;
-    form.image = file;
-    previewName.value = file.name;
-    const reader = new FileReader();
-    reader.onload = (e) => { previewUrl.value = e.target.result; };
-    reader.readAsDataURL(file);
+    isOcrLoading.value = true;
+    showOcrModal.value = false;
+    const fd = new FormData();
+    fd.append('image', file);
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+    try {
+        const res = await axios.post(route('coordinator.project_jobs.ocr.analyze'), fd, {
+            headers: { 'X-CSRF-TOKEN': csrf, 'Content-Type': 'multipart/form-data' },
+        });
+        ocrResult.value    = res.data;
+        showOcrModal.value = true;
+    } catch {
+        // OCR 失敗時はそのままプレビュー表示
+        form.image    = file;
+        previewName.value = file.name;
+        const reader = new FileReader();
+        reader.onload = (e) => { previewUrl.value = e.target.result; };
+        reader.readAsDataURL(file);
+    } finally {
+        isOcrLoading.value = false;
+    }
+}
+
+function onOcrApply(result) {
+    form.jobcode            = result.jobcode     || form.jobcode;
+    form.title              = result.title       || form.title;
+    form.client_id          = result.client_id   || '';
+    form.client_name        = result.client_name || form.client_name;
+    form.tmp_ocr_image_path = result.tmp_image_path || '';
+    form.image              = null;
+    if (result.tmp_image_path) {
+        previewUrl.value  = result.image_url || previewUrl.value;
+        previewName.value = result.original_filename || previewName.value;
+    }
+    showOcrModal.value = false;
 }
 
 function onDropZoneDrop(e) {
@@ -558,11 +620,13 @@ function onDropZoneDrop(e) {
 
 function onFileInputChange(e) {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (file) handleVoucherFile(file);
 }
 
 function removeImage() {
     form.image = null;
+    form.tmp_ocr_image_path = '';
     previewUrl.value  = null;
     previewName.value = '';
 }

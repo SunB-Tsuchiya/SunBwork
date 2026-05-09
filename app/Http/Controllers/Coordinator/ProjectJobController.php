@@ -4,8 +4,11 @@ namespace App\Http\Controllers\Coordinator;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\CalculatesEventTime;
+use App\Models\Client;
+use App\Services\OcrSpaceService;
 use App\Services\PrepressImageService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use App\Models\ProjectJob;
 use App\Models\ProjectSchedule;
 use App\Models\ProgressSheet;
@@ -22,7 +25,10 @@ class ProjectJobController extends Controller
 {
     use CalculatesEventTime;
 
-    public function __construct(private PrepressImageService $imageService) {}
+    public function __construct(
+        private PrepressImageService $imageService,
+        private OcrSpaceService $ocrService,
+    ) {}
 
     public function index(Request $request)
     {
@@ -361,11 +367,13 @@ class ProjectJobController extends Controller
                 'team_members'        => 'nullable|array',
                 'team_members.*.user_id' => 'required|integer|exists:users,id',
                 'image'               => ['nullable', 'file', 'mimes:jpg,jpeg,png,gif,webp,heic,heif,pdf', 'max:20480'],
+                'tmp_ocr_image_path'  => ['nullable', 'string', 'max:500'],
             ]);
 
             $subIds = Arr::pull($data, 'sub_coordinator_ids', []);
             $teamMembers = Arr::pull($data, 'team_members', []);
             Arr::pull($data, 'image');
+            $tmpOcrPath = Arr::pull($data, 'tmp_ocr_image_path');
 
             if ($request->hasFile('image') && $request->file('image')->isValid()) {
                 $imageMeta = $this->imageService->convertAndStore($request->file('image'));
@@ -373,6 +381,12 @@ class ProjectJobController extends Controller
                     $data['image_path']        = $imageMeta['path'];
                     $data['original_filename'] = $imageMeta['original_filename'];
                 }
+            } elseif ($tmpOcrPath
+                && str_starts_with($tmpOcrPath, 'prepress/jobticker/')
+                && Storage::disk('public')->exists($tmpOcrPath)
+            ) {
+                $data['image_path']        = $tmpOcrPath;
+                $data['original_filename'] = basename($tmpOcrPath);
             }
 
             $job = ProjectJob::create($data);
@@ -1071,7 +1085,8 @@ class ProjectJobController extends Controller
         }
 
         $request->validate([
-            'image' => ['required', 'file', 'mimes:jpg,jpeg,png,gif,webp,heic,heif,pdf', 'max:20480'],
+            'image'              => ['nullable', 'file', 'mimes:jpg,jpeg,png,gif,webp,heic,heif,pdf', 'max:20480'],
+            'tmp_ocr_image_path' => ['nullable', 'string', 'max:500'],
         ]);
 
         // 既存画像を削除
@@ -1079,7 +1094,18 @@ class ProjectJobController extends Controller
             $this->imageService->delete($projectJob->image_path);
         }
 
-        $imageMeta = $this->imageService->convertAndStore($request->file('image'));
+        $imageMeta = null;
+        if ($request->hasFile('image') && $request->file('image')->isValid()) {
+            $imageMeta = $this->imageService->convertAndStore($request->file('image'));
+        } elseif ($request->filled('tmp_ocr_image_path')) {
+            $tmpPath = $request->input('tmp_ocr_image_path');
+            if (str_starts_with($tmpPath, 'prepress/jobticker/')
+                && Storage::disk('public')->exists($tmpPath)
+            ) {
+                $imageMeta = ['path' => $tmpPath, 'original_filename' => basename($tmpPath)];
+            }
+        }
+
         if (!$imageMeta) {
             return back()->withErrors(['image' => '画像の保存に失敗しました。']);
         }
@@ -1115,6 +1141,110 @@ class ProjectJobController extends Controller
         ]);
 
         return back()->with('success', '伝票画像を削除しました。');
+    }
+
+    /**
+     * POST coordinator/project_jobs/ocr/analyze
+     * 伝票画像をOCR解析し JSON を返す（画像は tmp 保存のみ・DB変更なし）。
+     */
+    public function analyzeOcr(Request $request)
+    {
+        $request->validate([
+            'image' => ['required', 'file', 'mimes:jpg,jpeg,png,gif,webp,heic,heif,pdf', 'max:20480'],
+        ]);
+
+        $file = $request->file('image');
+        $imageMeta = $this->imageService->convertAndStore($file);
+
+        if (!$imageMeta || empty($imageMeta['path'])) {
+            return response()->json([
+                'error'           => '画像の変換に失敗しました。',
+                'jobcode'         => '',
+                'client_name'     => '',
+                'title'           => '',
+                'matched_clients' => [],
+                'image_url'       => null,
+                'tmp_image_path'  => null,
+            ], 422);
+        }
+
+        $storagePath = $imageMeta['path'];
+        $ocrResult   = $this->ocrService->analyze($storagePath);
+
+        return response()->json([
+            'jobcode'           => $ocrResult['jobcode']     ?? '',
+            'client_name'       => $ocrResult['client_name'] ?? '',
+            'title'             => $ocrResult['title']       ?? '',
+            'matched_clients'   => $ocrResult['matched_clients'] ?? [],
+            'image_url'         => Storage::disk('public')->url($storagePath),
+            'tmp_image_path'    => $storagePath,
+            'original_filename' => $imageMeta['original_filename'] ?? $file->getClientOriginalName(),
+        ]);
+    }
+
+    /**
+     * PATCH coordinator/project_jobs/{projectJob}/ocr-apply
+     * OCR 結果を案件に適用する：伝票画像保存 + jobcode/title/client_id の任意更新。
+     */
+    public function applyOcrResult(Request $request, ProjectJob $projectJob)
+    {
+        $user = $request->user();
+        if (!$this->isJobCoordinator($projectJob, $user)) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'tmp_image_path'    => ['required', 'string', 'max:500'],
+            'original_filename' => ['nullable', 'string', 'max:255'],
+            'jobcode'           => ['nullable', 'string', 'max:255', 'regex:/^[0-9\-]+$/'],
+            'title'             => ['nullable', 'string', 'max:255'],
+            'client_id'         => ['nullable', 'integer', 'exists:clients,id'],
+            'update_fields'     => ['nullable', 'boolean'],
+        ]);
+
+        $tmpPath = $validated['tmp_image_path'];
+        if (!str_starts_with($tmpPath, 'prepress/jobticker/')
+            || !Storage::disk('public')->exists($tmpPath)
+        ) {
+            return response()->json(['error' => '画像ファイルが見つかりません。'], 422);
+        }
+
+        // 既存画像の削除（共有参照がない場合のみ）
+        if ($projectJob->image_path && $projectJob->image_path !== $tmpPath) {
+            $otherJobs = ProjectJob::where('image_path', $projectJob->image_path)
+                ->where('id', '!=', $projectJob->id)
+                ->exists();
+            if (!$otherJobs) {
+                $this->imageService->delete($projectJob->image_path);
+            }
+        }
+
+        $updateData = [
+            'image_path'        => $tmpPath,
+            'original_filename' => $validated['original_filename'] ?? basename($tmpPath),
+        ];
+
+        // フィールド更新が要求された場合のみ上書き
+        if (!empty($validated['update_fields'])) {
+            if (isset($validated['jobcode'])) {
+                $updateData['jobcode'] = $validated['jobcode'] ?: null;
+            }
+            if (!empty($validated['title'])) {
+                $updateData['title'] = $validated['title'];
+            }
+            if (!empty($validated['client_id'])) {
+                $updateData['client_id'] = $validated['client_id'];
+            }
+        }
+
+        $projectJob->update($updateData);
+
+        return response()->json([
+            'ok'       => true,
+            'message'  => '伝票画像とフィールドを更新しました。',
+            'image_url' => Storage::disk('public')->url($tmpPath),
+            'original_filename' => $updateData['original_filename'],
+        ]);
     }
 
     public function destroy(ProjectJob $projectJob)

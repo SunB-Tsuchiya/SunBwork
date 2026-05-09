@@ -584,6 +584,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('project_jobs/assignment-select', [App\Http\Controllers\Coordinator\ProjectJobAssignmentsController::class, 'selectProject'])->name('project_jobs.assignment_select');
         Route::get('project_jobs/calendar', [App\Http\Controllers\Coordinator\ProjectJobsCalendarController::class, 'index'])->name('project_jobs.calendar');
         Route::post('project_jobs/check-duplicate', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'checkDuplicate'])->name('project_jobs.check_duplicate');
+        Route::post('project_jobs/ocr/analyze', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'analyzeOcr'])->name('project_jobs.ocr.analyze');
         Route::post('project_jobs', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'store'])->name('project_jobs.store');
         Route::post('project_jobs/{projectJob}/complete', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'complete'])->name('project_jobs.complete');
         Route::post('project_jobs/{projectJob}/uncomplete', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'uncomplete'])->name('project_jobs.uncomplete');
@@ -591,6 +592,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('project_jobs/{projectJob}/share', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'share'])->name('project_jobs.share');
         Route::post('project_jobs/{projectJob}/image', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'storeImage'])->name('project_jobs.image.store');
         Route::delete('project_jobs/{projectJob}/image', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'deleteImage'])->name('project_jobs.image.destroy');
+        Route::patch('project_jobs/{projectJob}/ocr-apply', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'applyOcrResult'])->name('project_jobs.ocr.apply');
         // メンバー予定表（静的サブパスなので {projectJob} の前に定義）
         Route::get('project_jobs/{projectJob}/member-schedule', [App\Http\Controllers\Coordinator\ProjectJobMemberScheduleController::class, 'index'])->name('project_jobs.member_schedule');
         Route::get('project_jobs/{projectJob}/member-schedule/data', [App\Http\Controllers\Coordinator\ProjectJobMemberScheduleController::class, 'data'])->name('project_jobs.member_schedule.data');
