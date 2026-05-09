@@ -440,7 +440,7 @@ watch(
                         >
                             <div
                                 v-if="props.fullContent"
-                                class="prose prose-sm max-w-none"
+                                class="diary-full-content"
                                 v-html="sanitizeHtml(d.content ?? d.description ?? '')"
                             ></div>
                             <div v-else>
@@ -485,3 +485,19 @@ watch(
 </template>
 
 <!-- Rely on Tailwind's line-clamp utility -->
+
+<style scoped>
+/* fullContent モード: Word/Excel 貼り付け時のインラインスタイルを !important で上書きし行間を統一 */
+.diary-full-content :deep(p) {
+    margin-top: 0 !important;
+    margin-bottom: 0.5em !important;
+    line-height: 1.4 !important;
+}
+.diary-full-content :deep(*) {
+    line-height: 1.4 !important;
+    margin-top: 0 !important;
+}
+.diary-full-content :deep(br + br) {
+    display: none;
+}
+</style>

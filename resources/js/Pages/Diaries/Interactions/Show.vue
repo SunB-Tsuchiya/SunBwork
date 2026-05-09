@@ -382,7 +382,7 @@ async function updateComment() {
 
             <div class="space-y-5">
                 <!-- 日報本文 -->
-                <div class="max-h-52 overflow-y-auto rounded border p-3 text-sm diary-content mx-auto">
+                <div class="max-h-52 overflow-y-auto rounded border p-3 text-sm diary-content">
                     <span v-if="!props.diary.content || !props.diary.content.trim()" class="text-gray-400 italic">日報はありません</span>
                     <div v-else v-html="props.diary.content"></div>
                 </div>
@@ -468,9 +468,9 @@ async function updateComment() {
 </template>
 
 <style scoped>
-/* 日報本文の幅とタイポグラフィ調整 */
+/* 日報本文のタイポグラフィ調整 */
 .diary-content {
-    width: 80%;
+    width: 100%;
 }
 .diary-content p {
     /* 段落間 margin は 1.5em */
