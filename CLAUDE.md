@@ -104,6 +104,34 @@ route('coordinator.project_jobs.show', { projectJob: job.id });
 
 ---
 
+## UTC / JST 混在ルール ⚠️
+
+`events.starts_at / ends_at` の保存形式が2種類ある:
+
+| イベント種別 | 保存形式 | 読み出し時の注意 |
+|---|---|---|
+| 通常イベント（社内予定・外出等） | **JST 文字列**をそのまま保存 | `Carbon::parse($v)` で JST として扱える |
+| 校正ジョブイベント（`job_type='proof'`） | **UTC 文字列**で保存 | そのまま parse すると 9 時間ずれる |
+
+**必ずこのルールに従うこと:**
+- `Carbon::parse($event->starts_at)` を直接使わない — proof イベントで 9 時間ずれる
+- **`CalculatesEventTime` トレイトの `resolveJstCarbon($event, 'starts_at')` を使う**
+  → `app/Http/Controllers/Concerns/CalculatesEventTime.php` に実装済み
+- トレイトを使えるコントローラーでは `use CalculatesEventTime;` を宣言し、`projectJobAssignment:id,job_type` を eager load してから呼ぶ
+
+```php
+// NG
+$start = Carbon::parse($event->starts_at); // proof なら 9時間ずれる
+
+// OK
+$event->load('projectJobAssignment:id,job_type');
+$start = $this->resolveJstCarbon($event, 'starts_at'); // JST Carbon を返す
+```
+
+昼休憩計算も同トレイトの `computeLunchMinutes($evStart, $evEnd, $userId, $cache)` を使うこと（UserMonthlyBreak → UserSetting → デフォルト 12:00–13:00 の優先順）。
+
+---
+
 ## データ設計 クイックリファレンス
 
 **`project_job_assignments`** が JobBox・MyJobBox 両方の唯一のテーブル:
