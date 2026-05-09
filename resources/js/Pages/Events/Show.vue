@@ -215,7 +215,7 @@ const editHref = computed(() => {
                             <div v-if="hasDeductions" class="mt-1 space-y-0.5 text-xs text-gray-400">
                                 <div>記録 {{ durationText() }}</div>
                                 <div v-if="lunchMins > 0" class="text-amber-600">休憩 −{{ formatMins(lunchMins) }}（{{ lunch_start }}〜{{ lunch_end }}）</div>
-                                <div v-if="interruptionMins > 0" class="text-orange-600">中断 −{{ formatMins(interruptionMins) }}</div>
+                                <div v-if="interruptionMins > 0" class="text-orange-600">重複・中断 −{{ formatMins(interruptionMins) }}</div>
                             </div>
                         </div>
                     </div>

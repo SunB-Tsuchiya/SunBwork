@@ -25,9 +25,12 @@ use App\Events\MessageCreated;
 use App\Services\HtmlSanitizer;
 use App\Models\Team;
 use App\Models\Unit;
+use App\Http\Controllers\Concerns\CalculatesEventTime;
 
 class EventController extends Controller
 {
+    use CalculatesEventTime;
+
     // Reuse permission logic from DiaryInteractionController to determine which user ids
     // the current actor may inspect. Kept local to avoid cross-controller dependency.
     protected function buildPermittedUserIdsForActor($currentUser)
@@ -96,6 +99,10 @@ class EventController extends Controller
         $start = $validated['date'] . ' ' . $validated['startHour'] . ':' . $validated['startMinute'] . ':00';
         $end   = $validated['date'] . ' ' . $validated['endHour']   . ':' . $validated['endMinute']   . ':00';
 
+        // 旧時刻を記録（recalc で旧重複範囲の解除に使用）
+        $oldStart = $event->getRawOriginal('starts_at');
+        $oldEnd   = $event->getRawOriginal('ends_at');
+
         // setStart/EndAttribute が $start/$end の JST 文字列を attributes['starts_at'/'ends_at'] に
         // そのまま格納する（EventController::store() と同じ方式）。
         // UTC 変換を行うと events テーブル全体で格納方式が不整合になるため除去する。
@@ -105,6 +112,9 @@ class EventController extends Controller
 
         // proof_schedule 自動連動
         $this->syncProofScheduleFromEvent($event);
+
+        // Q-01: 重複分の再計算（旧時間帯の解除 + 新時間帯の計算）
+        $this->recalcInterruptionMinutes($event, $oldStart, $oldEnd);
 
         return response()->json(['message' => 'Event time updated successfully.']);
     }
@@ -167,7 +177,7 @@ class EventController extends Controller
                 }
             }
         }
-        $events = $query->get();
+        $events = $query->with('projectJobAssignment:id,job_type')->get();
 
         // For JSON clients (axios in the diary interactions view) enrich events
         // with the same job/progress/self-assigned metadata and color mapping
@@ -263,36 +273,13 @@ class EventController extends Controller
                         'is_self_assigned' => $isSelf,
                     ]);
 
-                    // ランチ休憩の重複分を計算して付与
+                    // Q-04+Q-07: ランチ休憩の重複分を計算して付与
                     $lunchOverlapMinutes = 0;
                     try {
-                        $startsAt = $e->starts_at ?? $e->start ?? null;
-                        $endsAt   = $e->ends_at   ?? $e->end   ?? null;
-                        if ($startsAt && $endsAt) {
-                            $evDate = \Carbon\Carbon::parse($startsAt)->toDateString();
-                            if (!array_key_exists($evDate, $lunchBreakCache)) {
-                                $breakInfo = null;
-                                try {
-                                    $breakInfo = \App\Models\UserMonthlyBreak::breakForDate((int)$baseUserId, $evDate);
-                                } catch (\Throwable $_) {}
-                                if (!$breakInfo) {
-                                    // レコード未存在の場合はDBカラムのデフォルト値（12:00〜13:00）を使用
-                                    $lunchS = $userLunchSettingForIndex?->lunch_start ?: '12:00';
-                                    $lunchE = $userLunchSettingForIndex?->lunch_end   ?: '13:00';
-                                    $breakInfo = ['start' => $lunchS, 'end' => $lunchE];
-                                }
-                                $lunchBreakCache[$evDate] = $breakInfo;
-                            }
-                            $breakInfo = $lunchBreakCache[$evDate];
-                            if ($breakInfo) {
-                                $lunchStartDt = \Carbon\Carbon::parse($evDate . ' ' . $breakInfo['start']);
-                                $lunchEndDt   = \Carbon\Carbon::parse($evDate . ' ' . $breakInfo['end']);
-                                $evStart      = \Carbon\Carbon::parse($startsAt);
-                                $evEnd        = \Carbon\Carbon::parse($endsAt);
-                                $overlapStart = $evStart->gt($lunchStartDt) ? $evStart : $lunchStartDt;
-                                $overlapEnd   = $evEnd->lt($lunchEndDt)    ? $evEnd   : $lunchEndDt;
-                                $lunchOverlapMinutes = max(0, (int)$overlapStart->diffInMinutes($overlapEnd, false));
-                            }
+                        $evStart = $this->resolveJstCarbon($e, 'starts_at');
+                        $evEnd   = $this->resolveJstCarbon($e, 'ends_at');
+                        if ($evStart && $evEnd) {
+                            $lunchOverlapMinutes = $this->computeLunchMinutes($evStart, $evEnd, (int)$baseUserId, $lunchBreakCache);
                         }
                     } catch (\Throwable $_) {}
                     $arr['lunch_overlap_minutes'] = $lunchOverlapMinutes;
@@ -718,6 +705,9 @@ class EventController extends Controller
         // proof_schedule 自動連動
         $this->syncProofScheduleFromEvent($event);
 
+        // Q-03: サーバー側で重複分を正確に再計算（フロントエンド計算を上書き）
+        $this->recalcInterruptionMinutes($event);
+
         return redirect()->route('calendar.index');
     }
 
@@ -740,6 +730,10 @@ class EventController extends Controller
         $dateStr  = $data['date'];
         $newStart = $dateStr . ' ' . $data['startHour'] . ':' . $data['startMinute'] . ':00';
         $newEnd   = $dateStr . ' ' . $data['endHour']   . ':' . $data['endMinute']   . ':00';
+
+        // 旧時刻を記録（recalc で旧重複範囲の解除に使用）
+        $oldStart = $event->getRawOriginal('starts_at');
+        $oldEnd   = $event->getRawOriginal('ends_at');
 
         // update_from_calendar() と同じ方式でモデル経由で保存
         $event->title       = $data['title'];
@@ -823,6 +817,9 @@ class EventController extends Controller
         // proof_schedule 自動連動
         $this->syncProofScheduleFromEvent($event);
 
+        // Q-01: 重複分の再計算（旧時間帯の解除 + 新時間帯の計算）
+        $this->recalcInterruptionMinutes($event, $oldStart, $oldEnd);
+
         return redirect()->back()->with('success', 'イベントを更新しました。');
     }
 
@@ -830,6 +827,25 @@ class EventController extends Controller
     public function destroy(Event $event)
     {
         $this->authorize('delete', $event);
+
+        // Q-02: 削除前に重複していたイベントIDを記録（削除後の波及再計算に使用）
+        $overlappingBeforeDelete = collect();
+        try {
+            if ($event->starts_at && $event->ends_at) {
+                $rawS = $event->getRawOriginal('starts_at');
+                $rawE = $event->getRawOriginal('ends_at');
+                if ($rawS && $rawE) {
+                    $overlappingBeforeDelete = Event::where('user_id', $event->user_id)
+                        ->where('id', '!=', $event->id)
+                        ->whereNotNull('starts_at')
+                        ->whereNotNull('ends_at')
+                        ->where('starts_at', '<', Carbon::parse($rawE)->addDay()->toDateTimeString())
+                        ->where('ends_at', '>', Carbon::parse($rawS)->subDay()->toDateTimeString())
+                        ->with('projectJobAssignment:id,job_type')
+                        ->get(['id', 'starts_at', 'ends_at', 'project_job_assignment_id']);
+                }
+            }
+        } catch (\Throwable $e) { /* non-fatal */ }
         // 添付ファイルも削除（エラーが出ても本体削除を続行）
         try {
             foreach ($event->attachments as $attachment) {
@@ -871,6 +887,13 @@ class EventController extends Controller
         } catch (\Throwable $e) { /* ignore */ }
 
         $event->delete();
+
+        // Q-02: 削除後の波及再計算（重複していたイベントの interruption_minutes を更新）
+        try {
+            foreach ($overlappingBeforeDelete as $ov) {
+                $this->recalcSingleStoredInterruption($ov);
+            }
+        } catch (\Throwable $e) { /* non-fatal */ }
 
         if ($assignmentIdToCheck) {
             try {
@@ -1003,38 +1026,27 @@ class EventController extends Controller
             }
         }
         // JST 時刻を正確に取得（proof イベントは UTC 保存、一般は JST 保存）
-        $evStartJst = $this->resolveEventJstCarbon($event, 'starts_at');
-        $evEndJst   = $this->resolveEventJstCarbon($event, 'ends_at');
+        if (!$event->relationLoaded('projectJobAssignment')) {
+            $event->load('projectJobAssignment:id,job_type');
+        }
+        $evStartJst = $this->resolveJstCarbon($event, 'starts_at');
+        $evEndJst   = $this->resolveJstCarbon($event, 'ends_at');
 
-        // 休憩設定を取得し、イベント時間との重複分を計算
-        // 優先順: 日別設定（user_monthly_breaks） > グローバル設定（user_settings.lunch_start/lunch_end）
+        // Q-04: 昼休憩計算を共通メソッドに委譲
         $lunchStart = null;
-        $lunchEnd = null;
+        $lunchEnd   = null;
         $lunchOverlapMinutes = 0;
         try {
-            $breakInfo = null;
-            if ($event->user_id && $evStartJst) {
-                $eventDate = $evStartJst->toDateString();
-                // 日別設定を優先
-                $breakInfo = UserMonthlyBreak::breakForDate((int) $event->user_id, $eventDate);
-            }
-            // 日別設定がなければグローバル設定にフォールバック
-            // レコード自体が存在しない場合はDBカラムのデフォルト値（12:00〜13:00）を使用する
-            if (!$breakInfo && $event->user_id) {
-                $userSetting = UserSetting::where('user_id', $event->user_id)->first();
-                $lunchS = $userSetting?->lunch_start ?: '12:00';
-                $lunchE = $userSetting?->lunch_end   ?: '13:00';
-                $breakInfo = ['start' => $lunchS, 'end' => $lunchE];
-            }
-            if ($breakInfo && $evStartJst && $evEndJst) {
-                $lunchStart   = $breakInfo['start'];
-                $lunchEnd     = $breakInfo['end'];
-                $evDate       = $evStartJst->toDateString();
-                $lunchStartDt = Carbon::parse($evDate . ' ' . $lunchStart);
-                $lunchEndDt   = Carbon::parse($evDate . ' ' . $lunchEnd);
-                $overlapStart = $evStartJst->gt($lunchStartDt) ? $evStartJst : $lunchStartDt;
-                $overlapEnd   = $evEndJst->lt($lunchEndDt)   ? $evEndJst   : $lunchEndDt;
-                $lunchOverlapMinutes = max(0, (int) $overlapStart->diffInMinutes($overlapEnd, false));
+            if ($evStartJst && $evEndJst && $event->user_id) {
+                $lunchCache = [];
+                $lunchOverlapMinutes = $this->computeLunchMinutes($evStartJst, $evEndJst, (int) $event->user_id, $lunchCache);
+                // 表示用: 昼休憩時刻を取得
+                $evDate = $evStartJst->toDateString();
+                $bi = $lunchCache[$evDate] ?? null;
+                if ($bi) {
+                    $lunchStart = $bi['start'];
+                    $lunchEnd   = $bi['end'];
+                }
             }
         } catch (\Throwable $e) {
             // non-fatal
@@ -1051,51 +1063,50 @@ class EventController extends Controller
 
         $chainSeries = $this->computeChainSeries($event);
 
-        // ── リアルタイム重複計算（stored interruption_minutes に依存しない） ──
+        // ── Q-07: リアルタイム重複計算（resolveJstCarbon で UTC/JST 混在を正しく処理）──
         $overlappingEvents = [];
         $dynamicInterruptionMinutes = 0;
         try {
             if ($evStartJst && $evEndJst) {
-                $myStart = Carbon::parse($event->starts_at);
-                $myEnd   = Carbon::parse($event->ends_at);
-                $myDurationMins = abs((int) $myEnd->diffInMinutes($myStart));
+                $myDurationMins = abs((int) $evEndJst->diffInMinutes($evStartJst));
+                $windowStart = $evStartJst->copy()->subDay()->toDateTimeString();
+                $windowEnd   = $evEndJst->copy()->addDay()->toDateTimeString();
 
-                $overlaps = Event::where('user_id', $event->user_id)
+                $candidates = Event::where('user_id', $event->user_id)
                     ->where('id', '!=', $event->id)
-                    ->where('starts_at', '<', $myEnd->toDateTimeString())
-                    ->where('ends_at', '>', $myStart->toDateTimeString())
-                    ->get(['id', 'title', 'starts_at', 'ends_at']);
+                    ->whereNotNull('starts_at')
+                    ->whereNotNull('ends_at')
+                    ->where('starts_at', '<', $windowEnd)
+                    ->where('ends_at', '>', $windowStart)
+                    ->with('projectJobAssignment:id,job_type')
+                    ->get(['id', 'title', 'starts_at', 'ends_at', 'project_job_assignment_id']);
 
-                foreach ($overlaps as $ov) {
-                    $ovStart = Carbon::parse($ov->starts_at);
-                    $ovEnd   = Carbon::parse($ov->ends_at);
+                foreach ($candidates as $ov) {
+                    $ovStart = $this->resolveJstCarbon($ov, 'starts_at');
+                    $ovEnd   = $this->resolveJstCarbon($ov, 'ends_at');
+                    if (!$ovStart || !$ovEnd) continue;
+                    if (!$ovStart->lt($evEndJst) || !$ovEnd->gt($evStartJst)) continue;
+
                     $ovDurationMins = abs((int) $ovEnd->diffInMinutes($ovStart));
-
-                    $overlapStart = $myStart->gt($ovStart) ? $myStart : $ovStart;
-                    $overlapEnd   = $myEnd->lt($ovEnd)    ? $myEnd   : $ovEnd;
-                    $overlapMins  = max(0, (int) $overlapStart->diffInMinutes($overlapEnd, false));
-
+                    $overlapStart   = $evStartJst->gt($ovStart) ? $evStartJst : $ovStart;
+                    $overlapEnd     = $evEndJst->lt($ovEnd)    ? $evEndJst   : $ovEnd;
+                    $overlapMins    = max(0, (int) $overlapStart->diffInMinutes($overlapEnd, false));
                     if ($overlapMins <= 0) continue;
 
-                    // このイベントが「長い側」か「短い側」かを判断
-                    // 長い側（または同じ）なら、このイベントから差し引く
                     if ($myDurationMins >= $ovDurationMins) {
                         $dynamicInterruptionMinutes += $overlapMins;
                         $overlappingEvents[] = [
                             'id'           => $ov->id,
                             'title'        => $ov->title,
                             'overlap_mins' => $overlapMins,
-                            'direction'    => 'self',  // 自分（このイベント）から差し引く
+                            'direction'    => 'self',
                         ];
-                    }
-                    // 短い側なら相手のイベントから差し引くので、このイベントの作業時間には影響しない
-                    // ただし表示参考として含める
-                    else {
+                    } else {
                         $overlappingEvents[] = [
                             'id'           => $ov->id,
                             'title'        => $ov->title,
                             'overlap_mins' => $overlapMins,
-                            'direction'    => 'other', // 相手のイベントから差し引く
+                            'direction'    => 'other',
                         ];
                     }
                 }
@@ -1153,35 +1164,24 @@ class EventController extends Controller
             ]);
         }
 
-        // JST 時刻を正確に取得
-        $evStartJst = $this->resolveEventJstCarbon($event, 'starts_at');
-        $evEndJst   = $this->resolveEventJstCarbon($event, 'ends_at');
+        // JST 時刻を正確に取得（projectJobAssignment は上の load で済み）
+        $evStartJst = $this->resolveJstCarbon($event, 'starts_at');
+        $evEndJst   = $this->resolveJstCarbon($event, 'ends_at');
 
-        // 休憩時間
+        // Q-04: 昼休憩計算を共通メソッドに委譲
         $lunchStart = null;
-        $lunchEnd = null;
+        $lunchEnd   = null;
         $lunchOverlapMinutes = 0;
         try {
-            $breakInfo = null;
-            if ($event->user_id && $evStartJst) {
-                $eventDate = $evStartJst->toDateString();
-                $breakInfo = UserMonthlyBreak::breakForDate((int) $event->user_id, $eventDate);
-            }
-            if (!$breakInfo && $event->user_id) {
-                $userSetting = UserSetting::where('user_id', $event->user_id)->first();
-                $lunchS = $userSetting?->lunch_start ?: '12:00';
-                $lunchE = $userSetting?->lunch_end   ?: '13:00';
-                $breakInfo = ['start' => $lunchS, 'end' => $lunchE];
-            }
-            if ($breakInfo && $evStartJst && $evEndJst) {
-                $lunchStart   = $breakInfo['start'];
-                $lunchEnd     = $breakInfo['end'];
-                $evDate       = $evStartJst->toDateString();
-                $lunchStartDt = Carbon::parse($evDate . ' ' . $lunchStart);
-                $lunchEndDt   = Carbon::parse($evDate . ' ' . $lunchEnd);
-                $overlapStart = $evStartJst->gt($lunchStartDt) ? $evStartJst : $lunchStartDt;
-                $overlapEnd   = $evEndJst->lt($lunchEndDt)   ? $evEndJst   : $lunchEndDt;
-                $lunchOverlapMinutes = max(0, (int) $overlapStart->diffInMinutes($overlapEnd, false));
+            if ($evStartJst && $evEndJst && $event->user_id) {
+                $lunchCache = [];
+                $lunchOverlapMinutes = $this->computeLunchMinutes($evStartJst, $evEndJst, (int) $event->user_id, $lunchCache);
+                $evDate = $evStartJst->toDateString();
+                $bi = $lunchCache[$evDate] ?? null;
+                if ($bi) {
+                    $lunchStart = $bi['start'];
+                    $lunchEnd   = $bi['end'];
+                }
             }
         } catch (\Throwable $e) {
             // non-fatal
@@ -1189,30 +1189,34 @@ class EventController extends Controller
 
         $chainSeries = $this->computeChainSeries($event);
 
-        // ── リアルタイム重複計算（show() と同じロジック） ──
+        // ── Q-07: リアルタイム重複計算（resolveJstCarbon 対応）──
         $overlappingEvents = [];
         $dynamicInterruptionMinutes = 0;
         try {
             if ($evStartJst && $evEndJst) {
-                $myStart = Carbon::parse($event->starts_at);
-                $myEnd   = Carbon::parse($event->ends_at);
-                $myDurationMins = abs((int) $myEnd->diffInMinutes($myStart));
+                $myDurationMins = abs((int) $evEndJst->diffInMinutes($evStartJst));
+                $windowStart = $evStartJst->copy()->subDay()->toDateTimeString();
+                $windowEnd   = $evEndJst->copy()->addDay()->toDateTimeString();
 
-                $overlaps = Event::where('user_id', $event->user_id)
+                $candidates = Event::where('user_id', $event->user_id)
                     ->where('id', '!=', $event->id)
-                    ->where('starts_at', '<', $myEnd->toDateTimeString())
-                    ->where('ends_at', '>', $myStart->toDateTimeString())
-                    ->get(['id', 'title', 'starts_at', 'ends_at']);
+                    ->whereNotNull('starts_at')
+                    ->whereNotNull('ends_at')
+                    ->where('starts_at', '<', $windowEnd)
+                    ->where('ends_at', '>', $windowStart)
+                    ->with('projectJobAssignment:id,job_type')
+                    ->get(['id', 'title', 'starts_at', 'ends_at', 'project_job_assignment_id']);
 
-                foreach ($overlaps as $ov) {
-                    $ovStart = Carbon::parse($ov->starts_at);
-                    $ovEnd   = Carbon::parse($ov->ends_at);
+                foreach ($candidates as $ov) {
+                    $ovStart = $this->resolveJstCarbon($ov, 'starts_at');
+                    $ovEnd   = $this->resolveJstCarbon($ov, 'ends_at');
+                    if (!$ovStart || !$ovEnd) continue;
+                    if (!$ovStart->lt($evEndJst) || !$ovEnd->gt($evStartJst)) continue;
+
                     $ovDurationMins = abs((int) $ovEnd->diffInMinutes($ovStart));
-
-                    $overlapStart = $myStart->gt($ovStart) ? $myStart : $ovStart;
-                    $overlapEnd   = $myEnd->lt($ovEnd)    ? $myEnd   : $ovEnd;
-                    $overlapMins  = max(0, (int) $overlapStart->diffInMinutes($overlapEnd, false));
-
+                    $overlapStart   = $evStartJst->gt($ovStart) ? $evStartJst : $ovStart;
+                    $overlapEnd     = $evEndJst->lt($ovEnd)    ? $evEndJst   : $ovEnd;
+                    $overlapMins    = max(0, (int) $overlapStart->diffInMinutes($overlapEnd, false));
                     if ($overlapMins <= 0) continue;
 
                     if ($myDurationMins >= $ovDurationMins) {
@@ -1258,99 +1262,6 @@ class EventController extends Controller
      * イベントに紐づく続きジョブチェーン情報を計算して返す共通メソッド。
      * show() / showForCoordinator() 両方で使用する。
      */
-
-    /**
-     * イベントの interruption_minutes をDBから動的に再計算して保存する。
-     * store() / update() の後、および destroy() の前に呼び出すことで stored 値を常に正確に保つ。
-     *
-     * @param Event $event 対象イベント（既に DB に存在すること）
-     * @param string|null $oldStart 更新前の starts_at (UTC文字列)。update 時に旧重複範囲の解除に使用。
-     * @param string|null $oldEnd   更新前の ends_at (UTC文字列)。
-     */
-    private function recalcInterruptionMinutes(Event $event, ?string $oldStart = null, ?string $oldEnd = null): void
-    {
-        try {
-
-            $myStart = Carbon::parse($event->starts_at);
-            $myEnd   = Carbon::parse($event->ends_at);
-            $myDurationMins = abs((int) $myEnd->diffInMinutes($myStart));
-
-            // ① このイベント自身の interruption_minutes を再計算
-            //   （このイベントが「長い側」であるときに他のイベントに中断される分）
-            $overlaps = Event::where('user_id', $event->user_id)
-                ->where('id', '!=', $event->id)
-                ->where('starts_at', '<', $myEnd->toDateTimeString())
-                ->where('ends_at', '>', $myStart->toDateTimeString())
-                ->get(['id', 'starts_at', 'ends_at']);
-
-            $selfInterruption = 0;
-            foreach ($overlaps as $ov) {
-                $ovStart = Carbon::parse($ov->starts_at);
-                $ovEnd   = Carbon::parse($ov->ends_at);
-                $ovDuration = abs((int) $ovEnd->diffInMinutes($ovStart));
-                if ($myDurationMins < $ovDuration) continue; // 自分が短い側 → 自分は中断されない
-                $overlapStart = $myStart->gt($ovStart) ? $myStart : $ovStart;
-                $overlapEnd   = $myEnd->lt($ovEnd)    ? $myEnd   : $ovEnd;
-                $overlapMins  = max(0, (int) $overlapStart->diffInMinutes($overlapEnd, false));
-                $selfInterruption += $overlapMins;
-            }
-            $event->interruption_minutes = $selfInterruption;
-            $event->saveQuietly();
-
-            // ② このイベントが「短い側」であるイベント（このイベントが相手の interruption になる）の再計算
-            foreach ($overlaps as $ov) {
-                $this->recalcSingleStoredInterruption(Event::find($ov->id));
-            }
-
-            // ③ update の場合: 旧時間帯で重複していたイベントの再計算（時間変更で重複解除された可能性）
-            if ($oldStart && $oldEnd) {
-                $oldS = Carbon::parse($oldStart);
-                $oldE = Carbon::parse($oldEnd);
-                $oldOverlaps = Event::where('user_id', $event->user_id)
-                    ->where('id', '!=', $event->id)
-                    ->where('starts_at', '<', $oldE->toDateTimeString())
-                    ->where('ends_at', '>', $oldS->toDateTimeString())
-                    ->get(['id']);
-                foreach ($oldOverlaps as $ov) {
-                    $this->recalcSingleStoredInterruption(Event::find($ov->id));
-                }
-            }
-        } catch (\Throwable $e) {
-            Log::warning('EventController: recalcInterruptionMinutes failed', ['event_id' => $event->id, 'error' => $e->getMessage()]);
-        }
-    }
-
-    /** イベント1件の stored interruption_minutes を再計算して保存する（他への波及なし）*/
-    private function recalcSingleStoredInterruption(?Event $event): void
-    {
-        try {
-            $myStart = Carbon::parse($event->starts_at);
-            $myEnd   = Carbon::parse($event->ends_at);
-            $myDuration = abs((int) $myEnd->diffInMinutes($myStart));
-
-            $overlaps = Event::where('user_id', $event->user_id)
-                ->where('id', '!=', $event->id)
-                ->where('starts_at', '<', $myEnd->toDateTimeString())
-                ->where('ends_at', '>', $myStart->toDateTimeString())
-                ->get(['id', 'starts_at', 'ends_at']);
-
-            $total = 0;
-            foreach ($overlaps as $ov) {
-                $ovStart = Carbon::parse($ov->starts_at);
-                $ovEnd   = Carbon::parse($ov->ends_at);
-                $ovDuration = abs((int) $ovEnd->diffInMinutes($ovStart));
-                if ($myDuration < $ovDuration) continue;
-                $overlapStart = $myStart->gt($ovStart) ? $myStart : $ovStart;
-                $overlapEnd   = $myEnd->lt($ovEnd)    ? $myEnd   : $ovEnd;
-                $overlapMins  = max(0, (int) $overlapStart->diffInMinutes($overlapEnd, false));
-                $total += $overlapMins;
-            }
-            $event->interruption_minutes = $total;
-            $event->saveQuietly();
-        } catch (\Throwable $e) {
-            Log::warning('EventController: recalcSingleStoredInterruption failed', ['event_id' => $event->id, 'error' => $e->getMessage()]);
-        }
-    }
 
     private function computeChainSeries(Event $event): ?array
     {
@@ -2515,17 +2426,4 @@ class EventController extends Controller
         }
     }
 
-    /**
-     * イベントの starts_at / ends_at を JST Carbon として返す。
-     * proof ジョブのイベントは UTC 保存、一般イベントは JST 保存のため
-     * job_type を見て元タイムゾーンを切り替える。
-     */
-    private function resolveEventJstCarbon(Event $event, string $field): ?\Carbon\Carbon
-    {
-        $raw = $event->getRawOriginal($field);
-        if (! $raw) return null;
-        $isProof = ($event->projectJobAssignment?->job_type ?? null) === 'proof';
-        return Carbon::createFromFormat('Y-m-d H:i:s', $raw, $isProof ? 'UTC' : 'Asia/Tokyo')
-                     ->setTimezone('Asia/Tokyo');
-    }
 }

@@ -104,7 +104,7 @@
                                         昼休憩: −{{ formatMin(group.totalLunchMinutes) }}
                                     </span>
                                     <span v-if="group.totalOverlapMinutes > 0" class="text-red-400">
-                                        重複除算: −{{ formatMin(group.totalOverlapMinutes) }}
+                                        重複・中断: −{{ formatMin(group.totalOverlapMinutes) }}
                                     </span>
                                     小計: <span class="font-bold text-gray-700">{{ formatMin(group.totalMinutes) }}</span>
                                 </span>
@@ -128,7 +128,7 @@
                                         <th class="border-b px-3 py-2 text-left text-xs font-medium text-gray-500">終了</th>
                                         <th class="border-b px-3 py-2 text-right text-xs font-medium text-gray-500">生時間</th>
                                         <th class="border-b px-3 py-2 text-right text-xs font-medium text-orange-500">昼休憩</th>
-                                        <th class="border-b px-3 py-2 text-right text-xs font-medium text-red-400">重複除算</th>
+                                        <th class="border-b px-3 py-2 text-right text-xs font-medium text-red-400">重複・中断</th>
                                         <th class="border-b px-3 py-2 text-right text-xs font-medium text-gray-700">実作業時間</th>
                                     </tr>
                                 </thead>

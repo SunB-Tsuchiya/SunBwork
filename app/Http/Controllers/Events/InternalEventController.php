@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Events;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\CalculatesEventTime;
 use App\Models\Event;
 use App\Models\EventItemType;
 use App\Models\MeetingDefinition;
@@ -14,6 +15,8 @@ use Inertia\Inertia;
 
 class InternalEventController extends Controller
 {
+    use CalculatesEventTime;
+
     /** 社内予定フォーム表示 */
     public function create(Request $request)
     {
@@ -111,6 +114,9 @@ class InternalEventController extends Controller
             }
         }
 
+        // Q-03: サーバー側で重複分を正確に再計算
+        $this->recalcInterruptionMinutes($event);
+
         return redirect()->route('calendar.index')->with('success', '予定を登録しました。');
     }
 
@@ -166,6 +172,9 @@ class InternalEventController extends Controller
 
         $validated = $request->validate($rules);
 
+        $oldStart = $event->getRawOriginal('starts_at');
+        $oldEnd   = $event->getRawOriginal('ends_at');
+
         $event->event_item_type_id = $validated['event_item_type_id'];
         $event->title              = $validated['title'];
         $event->body               = $validated['description'] ?? null;
@@ -175,6 +184,9 @@ class InternalEventController extends Controller
             $event->meeting_definition_id = $validated['meeting_definition_id'] ?? null;
         }
         $event->save();
+
+        // Q-01: 重複分の再計算
+        $this->recalcInterruptionMinutes($event, $oldStart, $oldEnd);
 
         return redirect()->route('calendar.index')->with('success', '予定を更新しました。');
     }

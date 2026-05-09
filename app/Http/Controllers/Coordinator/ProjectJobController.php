@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Coordinator;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\CalculatesEventTime;
 use App\Services\PrepressImageService;
 use Illuminate\Http\Request;
 use App\Models\ProjectJob;
@@ -19,6 +20,8 @@ use Illuminate\Support\Facades\Log;
 
 class ProjectJobController extends Controller
 {
+    use CalculatesEventTime;
+
     public function __construct(private PrepressImageService $imageService) {}
 
     public function index(Request $request)
@@ -657,10 +660,11 @@ class ProjectJobController extends Controller
                 ->filter()->unique()->values()->toArray();
 
             if (!empty($assignmentIds)) {
-                $eventGroupsByAssignment = DB::table('events')
-                    ->whereIn('project_job_assignment_id', $assignmentIds)
+                // Q-07: Eloquent + with() で job_type をロードし resolveJstCarbon を使えるようにする
+                $eventGroupsByAssignment = \App\Models\Event::whereIn('project_job_assignment_id', $assignmentIds)
                     ->whereNotNull('starts_at')
                     ->orderBy('starts_at')
+                    ->with('projectJobAssignment:id,job_type')
                     ->get(['id', 'project_job_assignment_id', 'starts_at', 'ends_at', 'interruption_minutes'])
                     ->groupBy('project_job_assignment_id');
 
@@ -669,14 +673,15 @@ class ProjectJobController extends Controller
                     if ($aid && $eventGroupsByAssignment->has($aid)) {
                         $evs = $eventGroupsByAssignment->get($aid);
                         $first = $evs->first();
-                        // backward compat: keep first event fields
+                        $firstS = $this->resolveJstCarbon($first, 'starts_at');
+                        $firstE = $this->resolveJstCarbon($first, 'ends_at');
                         $m['event_id']        = $first->id;
-                        $m['event_starts_at'] = $first->starts_at ? \Carbon\Carbon::parse($first->starts_at)->setTimezone('Asia/Tokyo')->toIso8601String() : null;
-                        $m['event_ends_at']   = $first->ends_at   ? \Carbon\Carbon::parse($first->ends_at)->setTimezone('Asia/Tokyo')->toIso8601String()   : null;
+                        $m['event_starts_at'] = $firstS?->toIso8601String();
+                        $m['event_ends_at']   = $firstE?->toIso8601String();
                         // all events for this assignment
                         $m['all_events'] = $evs->map(function ($ev) {
-                            $s = $ev->starts_at ? \Carbon\Carbon::parse($ev->starts_at)->setTimezone('Asia/Tokyo') : null;
-                            $e = $ev->ends_at   ? \Carbon\Carbon::parse($ev->ends_at)->setTimezone('Asia/Tokyo')   : null;
+                            $s = $this->resolveJstCarbon($ev, 'starts_at');
+                            $e = $this->resolveJstCarbon($ev, 'ends_at');
                             $totalMins = ($s && $e) ? max(0, (int) $s->diffInMinutes($e, false)) : 0;
                             $interrupt = (int) ($ev->interruption_minutes ?? 0);
                             return [
@@ -882,8 +887,10 @@ class ProjectJobController extends Controller
 
             if (\Illuminate\Support\Facades\Schema::hasColumn('events', 'project_job_assignment_id')) {
                 foreach ($assignments as $a) {
+                    // Q-04+Q-07: with() で job_type をロードし resolveJstCarbon を使えるようにする
                     $events = \App\Models\Event::where('project_job_assignment_id', $a->id)
                         ->orderBy('starts_at')
+                        ->with('projectJobAssignment:id,job_type')
                         ->get();
 
                     foreach ($events as $ev) {
@@ -891,15 +898,10 @@ class ProjectJobController extends Controller
                         $userAssignmentName = $userAssignmentId ? ($assignmentNameMap[$userAssignmentId] ?? null) : null;
                         $userAssignmentCode = $userAssignmentId ? ($assignmentCodeMap[$userAssignmentId] ?? null) : null;
 
-                        // 日付（グループキー用）
-                        $startVal  = $ev->starts_at ?? null;
-                        $endVal    = $ev->ends_at   ?? null;
-                        $eventDate = null;
-                        try {
-                            if ($startVal) {
-                                $eventDate = \Illuminate\Support\Carbon::parse($startVal)->toDateString();
-                            }
-                        } catch (\Throwable $_) {}
+                        // Q-07: JST 解決（proof=UTC / 通常=JST）
+                        $evStart   = $this->resolveJstCarbon($ev, 'starts_at');
+                        $evEnd     = $this->resolveJstCarbon($ev, 'ends_at');
+                        $eventDate = $evStart?->toDateString();
 
                         // ── 時間計算 ──────────────────────────────────────────
                         $totalMins        = 0;
@@ -907,28 +909,14 @@ class ProjectJobController extends Controller
                         $lunchMins        = 0;
                         $actualMins       = 0;
                         try {
-                            if ($startVal && $endVal) {
-                                $evStart   = \Carbon\Carbon::parse($startVal);
-                                $evEnd     = \Carbon\Carbon::parse($endVal);
+                            if ($evStart && $evEnd) {
                                 $totalMins = max(0, (int)$evStart->diffInMinutes($evEnd, false));
 
-                                // 昼休憩との重複を計算
+                                // Q-04: 昼休憩計算を共通メソッドに委譲
                                 $userId = $a->user?->id ?? $a->user_id ?? null;
-                                if ($userId && $eventDate) {
-                                    if (!isset($breakDateCache[$userId][$eventDate])) {
-                                        $bi = \App\Models\UserMonthlyBreak::breakForDate((int)$userId, $eventDate);
-                                        if (!$bi) {
-                                            $us = $userSettingMap[$userId] ?? null;
-                                            $bi = ['start' => ($us?->lunch_start ?: '12:00'), 'end' => ($us?->lunch_end ?: '13:00')];
-                                        }
-                                        $breakDateCache[$userId][$eventDate] = $bi;
-                                    }
-                                    $bi = $breakDateCache[$userId][$eventDate];
-                                    $lunchS = \Carbon\Carbon::parse($eventDate . ' ' . $bi['start']);
-                                    $lunchE = \Carbon\Carbon::parse($eventDate . ' ' . $bi['end']);
-                                    $oS = $evStart->gt($lunchS) ? $evStart : $lunchS;
-                                    $oE = $evEnd->lt($lunchE)   ? $evEnd   : $lunchE;
-                                    $lunchMins = max(0, (int)$oS->diffInMinutes($oE, false));
+                                if ($userId) {
+                                    if (!isset($breakDateCache[$userId])) $breakDateCache[$userId] = [];
+                                    $lunchMins = $this->computeLunchMinutes($evStart, $evEnd, (int)$userId, $breakDateCache[$userId]);
                                 }
 
                                 $actualMins = max(0, $totalMins - $interruptionMins - $lunchMins);

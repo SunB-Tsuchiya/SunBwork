@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\ProjectJobs;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\CalculatesEventTime;
 use App\Models\ProjectJob;
 use App\Models\JobAssignmentMessage;
 use App\Models\ProjectJobAssignment;
@@ -16,6 +17,7 @@ use Inertia\Inertia;
 
 class JobBoxController extends Controller
 {
+    use CalculatesEventTime;
     public function index(ProjectJob $projectJob, Request $request)
     {
         // Allow coordinators/leaders/admins/superadmins as before; for normal users,
@@ -496,12 +498,12 @@ class JobBoxController extends Controller
                 $sourceMap = \App\Models\ProjectJobAssignment::whereIn('id', $allAids)
                     ->pluck('source_assignment_id', 'id');
 
-                // 全イベントを groupBy で取得
-                $allEventsGrouped = DB::table('events')
-                    ->whereIn('project_job_assignment_id', $allAids)
+                // 全イベントを groupBy で取得（Eloquent: resolveJstCarbon で UTC/JST 混在対応）
+                $allEventsGrouped = \App\Models\Event::whereIn('project_job_assignment_id', $allAids)
                     ->whereNotNull('starts_at')
                     ->orderBy('starts_at')
-                    ->get(['id', 'project_job_assignment_id', 'starts_at', 'ends_at', 'interruption_minutes'])
+                    ->with('projectJobAssignment:id,job_type')
+                    ->get(['id', 'project_job_assignment_id', 'starts_at', 'ends_at', 'interruption_minutes', 'project_job_assignment_id'])
                     ->groupBy('project_job_assignment_id');
 
                 $merged = array_map(function ($m) use ($sourceMap, $allEventsGrouped) {
@@ -516,8 +518,8 @@ class JobBoxController extends Controller
                     if ($aid && $allEventsGrouped->has($aid)) {
                         $evs = $allEventsGrouped->get($aid);
                         $m['all_events'] = $evs->map(function ($ev) {
-                            $s = $ev->starts_at ? \Carbon\Carbon::parse($ev->starts_at)->setTimezone('Asia/Tokyo') : null;
-                            $e = $ev->ends_at   ? \Carbon\Carbon::parse($ev->ends_at)->setTimezone('Asia/Tokyo')   : null;
+                            $s = $this->resolveJstCarbon($ev, 'starts_at');
+                            $e = $this->resolveJstCarbon($ev, 'ends_at');
                             $totalMins = ($s && $e) ? max(0, (int) $s->diffInMinutes($e, false)) : 0;
                             $interrupt = (int) ($ev->interruption_minutes ?? 0);
                             return [

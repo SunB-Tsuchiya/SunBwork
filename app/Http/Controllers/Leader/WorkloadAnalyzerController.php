@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Leader;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\CalculatesEventTime;
 use App\Http\Controllers\Concerns\ChecksAdminPermission;
 use App\Http\Controllers\Concerns\ChecksLeaderPermission;
 use Illuminate\Http\Request;
@@ -26,7 +27,7 @@ use Illuminate\Support\Facades\DB;
 
 class WorkloadAnalyzerController extends Controller
 {
-    use ChecksAdminPermission, ChecksLeaderPermission;
+    use ChecksAdminPermission, ChecksLeaderPermission, CalculatesEventTime;
 
     public function index(Request $request)
     {
@@ -251,41 +252,21 @@ class WorkloadAnalyzerController extends Controller
             try {
                 $evItems = \App\Models\Event::where('user_id', $userId)
                     ->whereBetween('starts_at', [$start, $end])
+                    ->with('projectJobAssignment:id,job_type')
                     ->get();
                 $evCoeffMap = EventItemType::pluck('coefficient', 'id')->toArray();
-                // ユーザー休憩設定（グローバル設定フォールバック用）
-                $evUserBreakSetting = null;
-                try { $evUserBreakSetting = \App\Models\UserSetting::where('user_id', $userId)->first(); } catch (\Throwable $e) {}
                 $evBreakDateCache = []; // YYYY-MM-DD => ['start','end']|null
                 foreach ($evItems as $ev) {
                     $hours = 0.0;
                     try {
-                        if ($ev->starts_at && $ev->ends_at) {
-                            $evStart = \Carbon\Carbon::parse($ev->starts_at);
-                            $evEnd   = \Carbon\Carbon::parse($ev->ends_at);
+                        $evStart = $this->resolveJstCarbon($ev, 'starts_at');
+                        $evEnd   = $this->resolveJstCarbon($ev, 'ends_at');
+                        if ($evStart && $evEnd) {
                             $totalMins = abs($evStart->diffInMinutes($evEnd));
                             // 中断時間を差し引く（stored interruption_minutes）
                             $interruptionMins = (int)($ev->interruption_minutes ?? 0);
                             // 休憩時間を計算して差し引く
-                            $lunchMins = 0;
-                            try {
-                                $evDate = $evStart->toDateString();
-                                if (!array_key_exists($evDate, $evBreakDateCache)) {
-                                    $bi = \App\Models\UserMonthlyBreak::breakForDate((int)$userId, $evDate);
-                                    if (!$bi && $evUserBreakSetting) {
-                                        $bi = ['start' => ($evUserBreakSetting->lunch_start ?: '12:00'), 'end' => ($evUserBreakSetting->lunch_end ?: '13:00')];
-                                    }
-                                    $evBreakDateCache[$evDate] = $bi;
-                                }
-                                $bi = $evBreakDateCache[$evDate];
-                                if ($bi) {
-                                    $lunchS = \Carbon\Carbon::parse($evDate . ' ' . $bi['start']);
-                                    $lunchE = \Carbon\Carbon::parse($evDate . ' ' . $bi['end']);
-                                    $oS = $evStart->gt($lunchS) ? $evStart : $lunchS;
-                                    $oE = $evEnd->lt($lunchE)   ? $evEnd   : $lunchE;
-                                    $lunchMins = max(0, (int)$oS->diffInMinutes($oE, false));
-                                }
-                            } catch (\Throwable $lE) {}
+                            $lunchMins = $this->computeLunchMinutes($evStart, $evEnd, (int)$userId, $evBreakDateCache);
                             $actualMins = max(0, $totalMins - $interruptionMins - $lunchMins);
                             $hours = $actualMins / 60.0;
                         }
@@ -1107,40 +1088,20 @@ class WorkloadAnalyzerController extends Controller
         try {
             $evItems = \App\Models\Event::where('user_id', $userId)
                 ->whereBetween('starts_at', [$start, $end])
+                ->with('projectJobAssignment:id,job_type')
                 ->get();
-            // ユーザー休憩設定（グローバル設定フォールバック用）
-            $showEvUserBreakSetting = null;
-            try { $showEvUserBreakSetting = \App\Models\UserSetting::where('user_id', $userId)->first(); } catch (\Throwable $e) {}
             $showEvBreakDateCache = []; // YYYY-MM-DD => ['start','end']|null
             foreach ($evItems as $ev) {
                 $hours = 0.0;
                 try {
-                    if ($ev->starts_at && $ev->ends_at) {
-                        $evStart = \Carbon\Carbon::parse($ev->starts_at);
-                        $evEnd   = \Carbon\Carbon::parse($ev->ends_at);
+                    $evStart = $this->resolveJstCarbon($ev, 'starts_at');
+                    $evEnd   = $this->resolveJstCarbon($ev, 'ends_at');
+                    if ($evStart && $evEnd) {
                         $totalMins = abs($evStart->diffInMinutes($evEnd));
                         // 中断時間を差し引く（stored interruption_minutes）
                         $interruptionMins = (int)($ev->interruption_minutes ?? 0);
                         // 休憩時間を計算して差し引く
-                        $lunchMins = 0;
-                        try {
-                            $evDate = $evStart->toDateString();
-                            if (!array_key_exists($evDate, $showEvBreakDateCache)) {
-                                $bi = \App\Models\UserMonthlyBreak::breakForDate((int)$userId, $evDate);
-                                if (!$bi && $showEvUserBreakSetting) {
-                                    $bi = ['start' => ($showEvUserBreakSetting->lunch_start ?: '12:00'), 'end' => ($showEvUserBreakSetting->lunch_end ?: '13:00')];
-                                }
-                                $showEvBreakDateCache[$evDate] = $bi;
-                            }
-                            $bi = $showEvBreakDateCache[$evDate];
-                            if ($bi) {
-                                $lunchS = \Carbon\Carbon::parse($evDate . ' ' . $bi['start']);
-                                $lunchE = \Carbon\Carbon::parse($evDate . ' ' . $bi['end']);
-                                $oS = $evStart->gt($lunchS) ? $evStart : $lunchS;
-                                $oE = $evEnd->lt($lunchE)   ? $evEnd   : $lunchE;
-                                $lunchMins = max(0, (int)$oS->diffInMinutes($oE, false));
-                            }
-                        } catch (\Throwable $lE) {}
+                        $lunchMins = $this->computeLunchMinutes($evStart, $evEnd, (int)$userId, $showEvBreakDateCache);
                         $actualMins = max(0, $totalMins - $interruptionMins - $lunchMins);
                         $hours = $actualMins / 60.0;
                     }
@@ -1530,10 +1491,12 @@ class WorkloadAnalyzerController extends Controller
             } catch (\Throwable $e) {}
             try {
                 $evCoeffMap = EventItemType::pluck('coefficient', 'id')->toArray();
-                $evItems = \App\Models\Event::where('user_id', $uid)->whereBetween('starts_at', [$start, $end])->get();
+                $evItems = \App\Models\Event::where('user_id', $uid)->whereBetween('starts_at', [$start, $end])->with('projectJobAssignment:id,job_type')->get();
                 foreach ($evItems as $ev) {
-                    if (!$ev->starts_at || !$ev->ends_at) continue;
-                    $hours = abs(\Carbon\Carbon::parse($ev->starts_at)->diffInMinutes(\Carbon\Carbon::parse($ev->ends_at)) / 60.0);
+                    $evStart = $this->resolveJstCarbon($ev, 'starts_at');
+                    $evEnd   = $this->resolveJstCarbon($ev, 'ends_at');
+                    if (!$evStart || !$evEnd) continue;
+                    $hours = abs($evStart->diffInMinutes($evEnd) / 60.0);
                     if ($hours <= 0) continue;
                     $coeff = ($ev->event_item_type_id && isset($evCoeffMap[$ev->event_item_type_id])) ? (float)$evCoeffMap[$ev->event_item_type_id] : 1.0;
                     $s['event'] += $hours * $coeff;
