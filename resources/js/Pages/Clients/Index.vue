@@ -62,21 +62,23 @@ function goToEdit(clientId) {
             </h2>
         </template>
         <template #headerExtras>
-            <button
-                type="button"
-                class="rounded border px-4 py-2 font-bold"
-                :class="props.showDormant
-                    ? 'border-blue-400 bg-blue-50 text-blue-700 hover:bg-blue-100'
-                    : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'"
-                @click="toggleDormantView"
-            >
-                {{ props.showDormant ? '通常一覧を表示' : '休眠を表示' }}
-            </button>
-            <Link
-                v-if="!props.showDormant"
-                :href="route(`${routePrefix}.clients.create`)"
-                class="rounded bg-orange-600 px-4 py-2 font-bold text-white hover:bg-orange-700"
-            >新規作成</Link>
+            <div class="flex items-center gap-4">
+                <button
+                    type="button"
+                    class="rounded px-4 py-2 text-sm font-medium text-white"
+                    :class="props.showDormant
+                        ? 'bg-blue-600 hover:bg-blue-700'
+                        : 'bg-gray-500 hover:bg-gray-600'"
+                    @click="toggleDormantView"
+                >
+                    {{ props.showDormant ? '通常一覧を表示' : '休眠を表示' }}
+                </button>
+                <Link
+                    v-if="!props.showDormant"
+                    :href="route(`${routePrefix}.clients.create`)"
+                    class="rounded bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700"
+                >新規作成</Link>
+            </div>
         </template>
 
         <!-- ── Leader: 2セクション表示 ── -->
