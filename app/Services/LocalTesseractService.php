@@ -25,17 +25,13 @@ use Illuminate\Support\Facades\Storage;
  */
 class LocalTesseractService extends OcrSpaceService
 {
-    // 受注番号値エリア（黄色背景ボックス）
+    // 受注番号値エリア（黄色背景ボックス）― 数字専用クロップ
     // x: 左から約 8〜28%、y: row1
-    private const REGION_JOBCODE = [0.080, 0.088, 0.280, 0.128];
+    private const REGION_JOBCODE  = [0.080, 0.088, 0.280, 0.128];
 
-    // row1 全体（受注番号行 全幅）。クライアント名を parseClientName で抽出する。
-    // 緑エリアの x座標が不明なため全幅をOCRし、コード行の次行ロジックで取得する。
-    private const REGION_CLIENT  = [0.003, 0.088, 0.660, 0.128];
-
-    // 品名テキスト行（「品名」ラベルを含む行全体。後処理でラベルを除去）
-    // y: 12.0% 開始（12.7%では先頭文字が欠落するため少し広げる）
-    private const REGION_TITLE   = [0.003, 0.120, 0.660, 0.170];
+    // row1 + row2 全体（クライアント名・品名テキスト取得用）
+    // Tesseract が列を混在させるため合算クロップし、パース処理で分離する
+    private const REGION_COMBINED = [0.003, 0.088, 0.660, 0.170];
 
     public function analyze(string $storagePath): array
     {
@@ -64,32 +60,30 @@ class LocalTesseractService extends OcrSpaceService
             $w = $imagick->getImageWidth();
             $h = $imagick->getImageHeight();
 
-            // 3 領域を個別にOCR（合算クロップ→列混在の問題を回避）
-            $jobcodeRaw = $this->cropAndOcr($imagick, $w, $h, self::REGION_JOBCODE, $binary, 7);
-            $clientRaw  = $this->cropAndOcr($imagick, $w, $h, self::REGION_CLIENT,  $binary, 7);
-            $titleRaw   = $this->cropAndOcr($imagick, $w, $h, self::REGION_TITLE,   $binary, 6);
+            // 受注番号: 数字専用クロップ（確実に取得）
+            $jobcodeRaw  = $this->cropAndOcr($imagick, $w, $h, self::REGION_JOBCODE,  $binary, 7);
+            // クライアント名 + 品名: 合算クロップ（分離クロップでは日本語誤認識が増えるため）
+            $combinedRaw = $this->cropAndOcr($imagick, $w, $h, self::REGION_COMBINED, $binary, 6);
 
             $imagick->clear();
             $imagick->destroy();
 
-            Log::info('LocalTesseractService: raw OCR (3-region)', [
-                'jobcode_raw' => $jobcodeRaw,
-                'client_raw'  => $clientRaw,
-                'title_raw'   => $titleRaw,
+            Log::info('LocalTesseractService: raw OCR', [
+                'jobcode_raw'  => $jobcodeRaw,
+                'combined_raw' => $combinedRaw,
             ]);
 
-            // 受注番号: 数字のみ抽出（OCRノイズを除去）
+            // 受注番号: 数字のみ抽出
             $jobcode = preg_replace('/[^0-9]/', '', $jobcodeRaw);
             if (!preg_match('/^\d{5,12}$/', $jobcode)) {
-                // 領域ずれ等でうまく取れなかった場合は親クラスのパーサーで再試行
-                $jobcode = $this->parseJobcode($jobcodeRaw);
+                $jobcode = $this->parseJobcode($combinedRaw);
             }
 
-            // クライアント名: row1全体をOCRし parseClientName（コード行の次行ロジック）で抽出
-            $clientName = $this->parseClientName($clientRaw);
+            // クライアント名: jobcode行から数字を除いた残りを取得
+            $clientName = $this->parseClientNameTesseract($combinedRaw);
 
-            // 品名: 「品名」ラベル除去 + 日本語字間スペース除去
-            $title = $this->cleanTitle($titleRaw);
+            // 品名: 「品名」ラベル以降を抽出 → クリーニング
+            $title = $this->cleanTitle($this->parseTitleTesseract($combinedRaw));
 
             $matchedClients = $this->searchClients($clientName);
 
@@ -110,6 +104,48 @@ class LocalTesseractService extends OcrSpaceService
             Log::error('LocalTesseractService: exception', ['message' => $e->getMessage()]);
             return $this->emptyResult();
         }
+    }
+
+    /**
+     * Tesseract 向けクライアント名抽出。
+     *
+     * Tesseract は受注番号行を "4505963 クライアント名" のように1行で出力する。
+     * jobcode（7桁以上の数字）を見つけ、その行から数字を除いた残りをクライアント名とする。
+     */
+    private function parseClientNameTesseract(string $text): string
+    {
+        $lines = array_values(array_filter(
+            array_map('trim', preg_split('/\r\n|\r|\n/', $text)),
+            fn($l) => $l !== ''
+        ));
+
+        foreach ($lines as $line) {
+            if (preg_match('/\d{7,12}/', $line)) {
+                // 数字をすべて除去
+                $rest = trim(preg_replace('/\d+/', '', $line));
+                // 先頭・末尾の記号ノイズを除去
+                $rest = trim(preg_replace('/^[\s　|lｌ｜\[\]()\-]+/u', '', $rest));
+                $rest = trim(preg_replace('/[\s　|lｌ｜\[\]()\-]+$/u', '', $rest));
+                if (mb_strlen($rest) >= 2) {
+                    return $rest;
+                }
+            }
+        }
+
+        // フォールバック: 親クラスの 4〜6桁コード行ロジック
+        return parent::parseClientName($text);
+    }
+
+    /**
+     * Tesseract 向け品名テキスト抽出。
+     * 「品名」「品目」ラベルの後に続くテキストをすべて返す（クリーニングは cleanTitle で行う）。
+     */
+    private function parseTitleTesseract(string $text): string
+    {
+        if (preg_match('/品[名目][\s　\r\n]+([\s\S]+)/u', $text, $m)) {
+            return trim($m[1]);
+        }
+        return parent::parseTitle($text);
     }
 
     /**
