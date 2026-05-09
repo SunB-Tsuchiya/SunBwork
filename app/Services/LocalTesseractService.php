@@ -59,8 +59,8 @@ class LocalTesseractService extends OcrSpaceService
             $w = $imagick->getImageWidth();
             $h = $imagick->getImageHeight();
 
-            // 受注番号: 数字専用クロップ（eng のみで数字認識精度を上げる）
-            $jobcodeRaw  = $this->cropAndOcr($imagick, $w, $h, self::REGION_JOBCODE,  $binary, 7, 'eng');
+            // 受注番号: jpn+eng（eng のみだと数字を誤読するため）
+            $jobcodeRaw  = $this->cropAndOcr($imagick, $w, $h, self::REGION_JOBCODE,  $binary, 7, 'jpn+eng');
             // クライアント名・品名: jpn のみ（jpn+eng だと日本語が英字誤読される）
             $combinedRaw = $this->cropAndOcr($imagick, $w, $h, self::REGION_COMBINED, $binary, 6, 'jpn');
 
@@ -122,8 +122,18 @@ class LocalTesseractService extends OcrSpaceService
             if (preg_match('/\d{7,12}/', $line)) {
                 // 数字をすべて除去
                 $rest = trim(preg_replace('/\d+/', '', $line));
-                // 先頭・末尾の記号ノイズを除去
+                // 先頭の記号ノイズを除去
                 $rest = trim(preg_replace('/^[\s　|lｌ｜\[\]()\-]+/u', '', $rest));
+                // 「出力」「担当」「下請」「年」などのラベルが出たらそこで切る（後続フィールド混入防止）
+                if (preg_match('/^(.*?)(?:\s+(?:出力|担当|下請|担\s|印刷|製本)|[:：]\s*\d|\s{3,})/u', $rest, $cut)) {
+                    $rest = $cut[1];
+                }
+                // CJK 字間スペースを除去（文 化工 房 → 文化工房）
+                $rest = preg_replace(
+                    '/(?<=[\x{3040}-\x{9fff}\x{f900}-\x{faff}])\s+(?=[\x{3040}-\x{9fff}\x{f900}-\x{faff}])/u',
+                    '',
+                    $rest
+                );
                 $rest = trim(preg_replace('/[\s　|lｌ｜\[\]()\-]+$/u', '', $rest));
                 if (mb_strlen($rest) >= 2) {
                     return $rest;
@@ -230,6 +240,12 @@ class LocalTesseractService extends OcrSpaceService
             '',
             $text
         );
+
+        // 区切り文字「ーー」以降（他フィールドの混入）を除去
+        $text = preg_replace('/\s*[ーｰ\-]{2,}[\s\S]*/u', '', $text);
+
+        // アンダースコアをスペースに置換（_PDF → PDF）
+        $text = str_replace('_', ' ', $text);
 
         // 末尾の記号ノイズを除去
         $text = preg_replace('/[\s　|Tl｜]+$/u', '', $text);
