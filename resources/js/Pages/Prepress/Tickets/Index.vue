@@ -218,7 +218,7 @@ async function savePendingImage() {
 
 // ── 伝票登録モーダル ─────────────────────────────────
 const showCreateModal = ref(false);
-const createMode = ref('new'); // 'new' | 'from_job' | 'ocr'
+const createMode = ref('ocr'); // 'ocr' | 'new' | 'from_job'
 
 const clientId   = ref('');
 const clientName = ref('');
@@ -239,7 +239,7 @@ const ocrResult     = ref({});
 
 function openCreateModal() {
     showCreateModal.value = true;
-    createMode.value = 'new';
+    createMode.value = 'ocr';
     resetModalState();
 }
 

@@ -1,8 +1,10 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
+import OcrModal from '@/Components/Prepress/OcrModal.vue';
 import { router } from '@inertiajs/vue3';
 import axios from 'axios';
 import { ref, computed, watch } from 'vue';
+import { route } from 'ziggy-js';
 
 const props = defineProps({
     tickets: { type: Array, default: () => [] },
@@ -164,7 +166,7 @@ function closeLightbox() { lightboxTicket.value = null; }
 
 // ── 伝票登録モーダル ─────────────────────────────────
 const showCreateModal = ref(false);
-const createMode = ref('new');
+const createMode = ref('ocr');
 
 const clientId   = ref('');
 const clientName = ref('');
@@ -177,8 +179,75 @@ const selectedJobId = ref('');
 const projectJobs   = ref([]);
 const loadingJobs   = ref(false);
 
-function openCreateModal() { showCreateModal.value = true; createMode.value = 'new'; resetModalState(); }
-function closeCreateModal() { showCreateModal.value = false; }
+// ── OCR（ファイル読み込み）────────────────────────────
+const isOcrLoading  = ref(false);
+const isDragOver    = ref(false);
+const showOcrModal  = ref(false);
+const ocrResult     = ref({});
+
+function openCreateModal() {
+    showCreateModal.value = true;
+    createMode.value = 'ocr';
+    resetModalState();
+}
+
+function closeCreateModal() {
+    showCreateModal.value = false;
+    showOcrModal.value = false;
+    isOcrLoading.value = false;
+    isDragOver.value   = false;
+    ocrResult.value    = {};
+}
+
+// バックドロップクリック: OCRモード中は閉じない
+function handleModalBackdropClick() {
+    if (createMode.value === 'ocr') return;
+    closeCreateModal();
+}
+
+async function triggerOcrFromBoard(file) {
+    isOcrLoading.value = true;
+    showOcrModal.value = false;
+    const fd   = new FormData();
+    fd.append('image', file);
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+    try {
+        const res = await axios.post(route('prepress.ocr.analyze'), fd, {
+            headers: { 'X-CSRF-TOKEN': csrf, 'Content-Type': 'multipart/form-data' },
+        });
+        ocrResult.value    = res.data;
+        showOcrModal.value = true;
+    } catch {
+        alert('OCR解析に失敗しました。ファイルを確認して再試行してください。');
+    } finally {
+        isOcrLoading.value = false;
+    }
+}
+
+function onOcrDrop(e) {
+    isDragOver.value = false;
+    const file = e.dataTransfer?.files?.[0];
+    if (file) triggerOcrFromBoard(file);
+}
+
+function onOcrFileInput(e) {
+    const file = e.target.files?.[0];
+    if (file) triggerOcrFromBoard(file);
+    e.target.value = '';
+}
+
+function onOcrApplyFromBoard(result) {
+    router.get(route('prepress.tickets.create'), {
+        client_id:          result.client_id         || '',
+        client_name:        result.client_name       || '',
+        jobcode:            result.jobcode            || '',
+        title:              result.title             || '',
+        tmp_ocr_image_path: result.tmp_image_path    || '',
+        ocr_image_url:      result.image_url         || '',
+        original_filename:  result.original_filename || '',
+    });
+    closeCreateModal();
+}
 
 function resetModalState() {
     clientId.value   = '';
@@ -188,6 +257,10 @@ function resetModalState() {
     selectedClientSuggestionIndex.value = -1;
     selectedJobId.value = '';
     projectJobs.value   = [];
+    isOcrLoading.value  = false;
+    isDragOver.value    = false;
+    showOcrModal.value  = false;
+    ocrResult.value     = {};
 }
 
 function onClientNameInput() {
@@ -248,12 +321,19 @@ async function fetchProjectJobs(cId) {
 }
 
 function handleCreate() {
-    if (createMode.value === 'new') { router.get(route('prepress.tickets.create')); }
-    else { if (!selectedJobId.value) return; router.get(route('prepress.tickets.create'), { project_job_id: selectedJobId.value }); }
+    if (createMode.value === 'new') {
+        router.get(route('prepress.tickets.create'));
+    } else {
+        if (!selectedJobId.value) return;
+        router.get(route('prepress.tickets.create'), { project_job_id: selectedJobId.value });
+    }
     closeCreateModal();
 }
 
-const canCreate = computed(() => createMode.value === 'new' || !!selectedJobId.value);
+const canCreate = computed(() => {
+    if (createMode.value === 'new') return true;
+    return !!selectedJobId.value;
+});
 </script>
 
 <template>
@@ -473,7 +553,7 @@ const canCreate = computed(() => createMode.value === 'new' || !!selectedJobId.v
             <div
                 v-if="showCreateModal"
                 class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
-                @click.self="closeCreateModal"
+                @click.self="handleModalBackdropClick"
             >
                 <div class="w-full max-w-lg rounded-xl bg-white shadow-2xl">
                     <div class="flex items-center justify-between border-b px-6 py-4">
@@ -481,23 +561,90 @@ const canCreate = computed(() => createMode.value === 'new' || !!selectedJobId.v
                         <button type="button" class="text-gray-400 hover:text-gray-600" @click="closeCreateModal">✕</button>
                     </div>
 
+                    <!-- モード選択（縦並び） -->
                     <div class="px-6 pt-5">
-                        <div class="flex gap-3">
+                        <div class="flex flex-col gap-3">
+                            <!-- ファイル読み込み（OCR） -->
                             <button
                                 type="button"
-                                class="flex-1 rounded-lg border-2 py-3 text-sm font-medium transition-colors"
-                                :class="createMode === 'new' ? 'border-green-600 bg-green-50 text-green-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'"
+                                class="flex w-full items-center gap-3 rounded-lg border-2 px-4 py-3 text-left text-sm font-medium transition-colors"
+                                :class="createMode === 'ocr'
+                                    ? 'border-blue-600 bg-blue-50 text-blue-700'
+                                    : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'"
+                                @click="createMode = 'ocr'; resetModalState()"
+                            >
+                                <span class="text-lg">📄</span>
+                                <span>ファイル読み込み（OCR自動入力）</span>
+                            </button>
+                            <!-- 新規作成 -->
+                            <button
+                                type="button"
+                                class="flex w-full items-center gap-3 rounded-lg border-2 px-4 py-3 text-left text-sm font-medium transition-colors"
+                                :class="createMode === 'new'
+                                    ? 'border-green-600 bg-green-50 text-green-700'
+                                    : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'"
                                 @click="createMode = 'new'; resetModalState()"
-                            >新規作成</button>
+                            >
+                                <span class="text-lg">✏️</span>
+                                <span>新規作成</span>
+                            </button>
+                            <!-- 案件から読み込む -->
                             <button
                                 type="button"
-                                class="flex-1 rounded-lg border-2 py-3 text-sm font-medium transition-colors"
-                                :class="createMode === 'from_job' ? 'border-green-600 bg-green-50 text-green-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'"
+                                class="flex w-full items-center gap-3 rounded-lg border-2 px-4 py-3 text-left text-sm font-medium transition-colors"
+                                :class="createMode === 'from_job'
+                                    ? 'border-green-600 bg-green-50 text-green-700'
+                                    : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'"
                                 @click="createMode = 'from_job'; resetModalState()"
-                            >案件から読み込む</button>
+                            >
+                                <span class="text-lg">📋</span>
+                                <span>案件から読み込む</span>
+                            </button>
                         </div>
                     </div>
 
+                    <!-- ▼ ファイル読み込み（OCR）モード -->
+                    <div v-if="createMode === 'ocr'" class="px-6 pt-5">
+                        <div
+                            class="rounded-lg border-2 border-dashed transition-colors"
+                            :class="isDragOver
+                                ? 'border-blue-500 bg-blue-50'
+                                : 'border-gray-300 bg-gray-50 hover:border-gray-400'"
+                            @dragenter.prevent="isDragOver = true"
+                            @dragleave.prevent="isDragOver = false"
+                            @dragover.prevent
+                            @drop.prevent="onOcrDrop"
+                        >
+                            <div class="py-10 text-center">
+                                <div v-if="isOcrLoading" class="text-blue-600">
+                                    <svg class="mx-auto mb-3 h-9 w-9 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+                                    </svg>
+                                    <p class="text-sm font-medium">OCR解析中...</p>
+                                    <p class="mt-1 text-xs text-gray-400">しばらくお待ちください</p>
+                                </div>
+                                <div v-else>
+                                    <p class="text-3xl mb-3">📥</p>
+                                    <p class="text-sm font-medium text-gray-600">PDFや画像をここにドロップ</p>
+                                    <p class="mt-1 text-xs text-gray-400">または</p>
+                                    <label class="mt-3 inline-block cursor-pointer rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+                                        ファイルを選択
+                                        <input
+                                            type="file"
+                                            class="hidden"
+                                            accept="application/pdf,image/jpeg,image/png,image/gif,image/webp"
+                                            @change="onOcrFileInput"
+                                        />
+                                    </label>
+                                    <p class="mt-3 text-xs text-gray-400">対応形式: PDF, JPG, PNG, GIF, WebP</p>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="mt-2 text-xs text-gray-400">※ OCR完了後に確認画面が表示されます</p>
+                    </div>
+
+                    <!-- ▼ 案件から読み込む -->
                     <div v-if="createMode === 'from_job'" class="space-y-4 px-6 pt-5">
                         <div>
                             <label class="mb-1 block text-sm font-semibold text-gray-700">クライアント</label>
@@ -563,11 +710,13 @@ const canCreate = computed(() => createMode.value === 'new' || !!selectedJobId.v
                         </div>
                     </div>
 
+                    <!-- ▼ 新規作成の説明 -->
                     <div v-if="createMode === 'new'" class="px-6 pt-5">
                         <p class="text-sm text-gray-500">空白の伝票登録フォームに移動します。</p>
                     </div>
 
-                    <div class="flex items-center justify-end gap-3 border-t px-6 py-4 mt-5">
+                    <!-- フッター（OCRモードはキャンセルのみ） -->
+                    <div v-if="createMode !== 'ocr'" class="flex items-center justify-end gap-3 border-t px-6 py-4 mt-5">
                         <button
                             type="button"
                             class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
@@ -580,9 +729,24 @@ const canCreate = computed(() => createMode.value === 'new' || !!selectedJobId.v
                             @click="handleCreate"
                         >作成</button>
                     </div>
+                    <div v-else class="flex items-center justify-end border-t px-6 py-4 mt-5">
+                        <button
+                            type="button"
+                            class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
+                            @click="closeCreateModal"
+                        >キャンセル</button>
+                    </div>
                 </div>
             </div>
         </Teleport>
+
+        <!-- OCR確認モーダル -->
+        <OcrModal
+            :show="showOcrModal"
+            :ocr-result="ocrResult"
+            @apply="onOcrApplyFromBoard"
+            @close="showOcrModal = false"
+        />
 
     </AppLayout>
 </template>
