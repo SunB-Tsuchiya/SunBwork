@@ -237,3 +237,177 @@ Tesseract バイナリが見つからない場合（`file_exists($binary)` 失�
 | tessdata_best より速度優先 | `tessdata_fast` に切り替え（GitHub: tesseract-ocr/tessdata_fast） |
 | Tesseract バージョンアップ | `~/src/tesseract-X.X.X` でビルドし直す（Leptonica は使い回し可） |
 | バイナリのパーミッション確認 | `ls -lh /home/silverlamb759/local/bin/tesseract` で 755 を確認 |
+
+---
+
+## 8. 読み取り調整ログ（2026-05-09 チューニング記録）
+
+### 対象伝票
+
+DocuCentre-VII C7773 複合機でスキャンしたモノクロ JPEG を PDF 化したもの（`sample.pdf`）。
+PDF 内部は DCTDecode（JPEG）埋め込み、2482×3510px、DeviceRGB。
+
+読み取り対象フィールド:
+
+| フィールド | 値（正解） | 種別 |
+|---|---|---|
+| 受注番号（jobcode） | `4505963` | 数字のみ |
+| 得意先（client） | `（株）文化工房` | 日本語 |
+| 品名（title） | `日本医科大学 150周年記念誌 PDF制作代` | 日本語＋数字 |
+
+---
+
+### 8-1. クロップ領域設計（最終確定）
+
+```php
+// 受注番号エリア（数字専用・狭め）
+private const REGION_JOBCODE  = [0.080, 0.088, 0.280, 0.128];
+
+// row1+row2 全幅（得意先・品名を同時取得）
+// x=0.900 まで広げないと「文化工房」が取れない（0.660 だと欠ける）
+private const REGION_COMBINED = [0.003, 0.088, 0.900, 0.170];
+```
+
+**3-region（REGION_CLIENT / REGION_TITLE 個別クロップ）は廃止。**
+行1だけの薄いクロップでは Tesseract が安定して読めず、
+combined 1枚で取得してパース関数で分離する方が精度が高い。
+
+---
+
+### 8-2. 言語設定（重要）
+
+| クロップ | 言語設定 | 理由 |
+|---|---|---|
+| REGION_JOBCODE | `jpn+eng` | `eng` のみだと数字を誤読することがある |
+| REGION_COMBINED | `jpn` **のみ** | `jpn+eng` にすると漢字が英字として誤認識される（例: 「文化工房」→「XIE TE」「MWXIETE」） |
+
+**`jpn+eng` は combined に使ってはいけない。**
+
+---
+
+### 8-3. 画像前処理チェーン（`cropAndOcr()` 内）
+
+```php
+// 常に2倍以上に拡大（スキャン JPEG の解像度不足を補う）
+$minH = 300;
+if ($ch < $minH) {
+    $scale = (int)ceil($minH / $ch);
+    $crop->resizeImage($cw * $scale, $ch * $scale, Imagick::FILTER_LANCZOS, 1);
+} else {
+    $crop->resizeImage($cw * 2, $ch * 2, Imagick::FILTER_LANCZOS, 1);
+}
+$crop->transformImageColorspace(Imagick::COLORSPACE_GRAY);
+$crop->sharpenImage(0, 1.0);   // JPEG ぼやけを補正
+$crop->normalizeImage();
+// 二値化: モノクロスキャンのノイズ・JPEG 圧縮アーティファクトを除去
+$qr = Imagick::getQuantumRange();
+$crop->thresholdImage(intval($qr['quantumRangeLong'] * 0.5));
+$crop->setImageFormat('png');
+```
+
+この前処理順序で認識精度が大幅に向上した（特に二値化が効果的）。
+
+---
+
+### 8-4. 得意先（クライアント名）の抽出ロジック
+
+#### `parseClientNameTesseract()`
+
+combined_raw の中から 7桁以上の数字を含む行（= jobcode 行）を見つけ、
+その行から数字を除いた残りをクライアント名とする。
+
+```
+combined_raw 例:
+  受注 状 号 ... 得意 先 05560
+  4505963 物 文 化工 房 出力 日 時 :2026...   ← jobcode行
+  了 、 。 押 当 者 ーー                        ← 行間ノイズ
+  日 本 医科 大 学 150 周 年...               ← 品名行
+```
+
+jobcode 行の `4505963` を除去すると `物 文化工房` が残る。
+
+#### `searchClientsSliding()`（スライディングDB検索）
+
+OCR ノイズで先頭に余分な文字が付く（例: `物文化工房`）ため、
+マッチしない場合は先頭を 1〜3 文字ずつ削って再検索する。
+
+```
+「物文化工房」→ DB検索: ヒットなし
+「文化工房」  → DB検索: ヒット ✅
+```
+
+#### `cleanClientText()`
+
+CJK 字間スペース除去（Tesseract が「文 化工 房」と出力するのを「文化工房」に修正）:
+
+```php
+preg_replace(
+    '/(?<=[\x{3040}-\x{9fff}\x{f900}-\x{faff}])\s+(?=[\x{3040}-\x{9fff}\x{f900}-\x{faff}])/u',
+    '',
+    $text
+);
+```
+
+---
+
+### 8-5. 品名（title）の抽出ロジック
+
+#### `parseTitleTesseract()` — 優先と fallback
+
+**優先:** `品[名目]` ラベルの後に続くテキストを取得。
+
+**fallback:** combined_raw に「品名」ラベルが含まれない場合（幅広クロップで混入する他フィールドが邪魔するとき）、
+jobcode 行以降の行のうち **CJK 文字を最も多く含む行** を品名として採用。
+
+これにより行間ノイズ行（`了、。押当者ーー`、CJK 文字 4個）よりも
+実際の品名行（`日本医科大学 150周年記念誌...`、CJK 文字 多数）が正しく選ばれる。
+
+#### `cleanTitle()` — クリーニング順序
+
+```
+1. 先頭の記号ノイズ（| l ｜ 等）を除去
+2. 「品名」「品目」ラベルを先頭から除去
+3. CJK 字間スペースを除去（「日 本 医科 大 学」→「日本医科大学」）
+4. 「ーー」以降（他フィールドの混入）を除去
+5. アンダースコアをスペースに置換（_PDF → PDF）
+6. 複数スペースを1つに正規化
+7. 末尾の記号ノイズを除去
+```
+
+**注意:** `ーー`（長音符2つ）が品名行に付いていることがある（例: `PDF制作代 ーー 大和田両`）。
+step 4 で `ーー` 以降をすべて削除することで正しい品名が得られる。
+ただし step 3 の CJK 字間スペース除去後は `代ーー` のようにくっつくため、
+`\s*[ーｰ\-]{2,}[\s\S]*` パターンで確実に削除できる。
+
+---
+
+### 8-6. 実際のログと結果
+
+**combined_raw（実際の Tesseract 出力）:**
+```
+受注 状 号 上 語 語 間 症 凍 得意 先 05560
+4505963 物 文 化工 房 出力 日 時 :2026 年 03 月 06
+了 、 。 押 当 者 ーー
+日 本 医科 大 学 150 周 年 記念 誌 _PDF 制作 代 ーー 大 和田 両
+```
+
+**パース結果（最終）:**
+
+| フィールド | 結果 | 備考 |
+|---|---|---|
+| jobcode | `4505963` | 正常 |
+| client_name | `物文化工房` | OCR ノイズ（先頭「物」）あり → sliding で「文化工房」DB ヒット |
+| title | `日本医科大学 150 周年記念誌 PDF 制作代` | cleanTitle で正規化済み |
+| db_hits | 1 | 「文化工房」でヒット |
+
+---
+
+### 8-7. 試行錯誤の記録（失敗パターン）
+
+| 試した設定 | 結果 | 原因・備考 |
+|---|---|---|
+| 3-region（REGION_CLIENT y=0.088-0.128、REGION_TITLE y=0.120-0.170） | client_raw が空、title が欠ける | 薄い1行クロップは Tesseract に向かない |
+| combined に `jpn+eng` | 「文化工房」→「XIE TE」「MWXIETE」 | 漢字が英字として誤認識される |
+| REGION_COMBINED x=0.003-0.660 | 「文化工房」が取れない | 得意先エリアが x≈50-75% にあるため幅不足 |
+| fallback でjobcode行以降の全行を結合 | 品名が「了、。押当者」になる | 行間ノイズ行の「ーー」で cleanTitle が切断 |
+| `parseTitleTesseract` fallback: CJK文字最多行を採用 | 正常取得 ✅ | 現在の実装 |
