@@ -2,7 +2,7 @@
 import DiaryTable from '@/Components/Diaries/DiaryTable.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Inertia } from '@inertiajs/inertia';
-import { usePage } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
 import { computed, nextTick, ref, watch } from 'vue';
 
 function formatDate(d) {
@@ -184,14 +184,16 @@ const groupedByDate = computed(() => {
 <template>
     <AppLayout :title="props.pageTitle">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">{{ props.headerTitle }}</h2>
+            <div class="flex items-center gap-3">
+                <Link
+                    :href="route(routeForIndex())"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                >← 日報一覧に戻る</Link>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">{{ props.headerTitle }}</h2>
+            </div>
         </template>
 
         <div class="rounded bg-white p-6 shadow">
-        <!-- 一覧に戻るリンクを見出し下に表示 -->
-        <div class="mb-2">
-            <a :href="route(routeForIndex())" class="text-sm text-blue-600 hover:underline">一覧に戻る</a>
-        </div>
 
         <div v-for="(list, date) in groupedByDate" :key="date" class="mb-8">
                     <div class="mb-2">
