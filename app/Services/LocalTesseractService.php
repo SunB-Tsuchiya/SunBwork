@@ -28,8 +28,9 @@ class LocalTesseractService extends OcrSpaceService
     // 受注番号値エリア（数字専用クロップ）
     private const REGION_JOBCODE  = [0.080, 0.088, 0.280, 0.128];
 
-    // row1 + row2 全体（クライアント名・品名テキスト取得用）
-    private const REGION_COMBINED = [0.003, 0.088, 0.660, 0.170];
+    // row1 + row2 全幅（クライアント名・品名テキスト取得用）
+    // x を 0.003〜0.900 に拡大して得意先エリアを確実にカバーする
+    private const REGION_COMBINED = [0.003, 0.088, 0.900, 0.170];
 
     public function analyze(string $storagePath): array
     {
@@ -58,10 +59,10 @@ class LocalTesseractService extends OcrSpaceService
             $w = $imagick->getImageWidth();
             $h = $imagick->getImageHeight();
 
-            // 受注番号: 数字専用クロップ（PSM=7: 1行モード）
-            $jobcodeRaw  = $this->cropAndOcr($imagick, $w, $h, self::REGION_JOBCODE,  $binary, 7);
-            // クライアント名・品名: 合算クロップ（PSM=6: ブロックモード）
-            $combinedRaw = $this->cropAndOcr($imagick, $w, $h, self::REGION_COMBINED, $binary, 6);
+            // 受注番号: 数字専用クロップ（eng のみで数字認識精度を上げる）
+            $jobcodeRaw  = $this->cropAndOcr($imagick, $w, $h, self::REGION_JOBCODE,  $binary, 7, 'eng');
+            // クライアント名・品名: jpn のみ（jpn+eng だと日本語が英字誤読される）
+            $combinedRaw = $this->cropAndOcr($imagick, $w, $h, self::REGION_COMBINED, $binary, 6, 'jpn');
 
             $imagick->clear();
             $imagick->destroy();
@@ -163,7 +164,8 @@ class LocalTesseractService extends OcrSpaceService
         int $h,
         array $region,
         string $binary,
-        int $psm = 6
+        int $psm = 6,
+        string $lang = 'jpn+eng'
     ): string {
         [$x1p, $y1p, $x2p, $y2p] = $region;
         $x  = (int)($w * $x1p);
@@ -199,7 +201,7 @@ class LocalTesseractService extends OcrSpaceService
         $crop->clear();
         $crop->destroy();
 
-        $result = $this->runTesseract($binary, $tmpPath, $psm);
+        $result = $this->runTesseract($binary, $tmpPath, $psm, $lang);
         @unlink($tmpPath);
 
         return $result ?? '';
@@ -239,9 +241,10 @@ class LocalTesseractService extends OcrSpaceService
      * tesseract バイナリを実行してテキストを返す。
      * 失敗時は null を返す。
      *
-     * @param  int  $psm  ページセグメンテーションモード（7=1行, 6=ブロック）
+     * @param  int     $psm   ページセグメンテーションモード（7=1行, 6=ブロック）
+     * @param  string  $lang  言語指定（'jpn' / 'jpn+eng' / 'eng'）
      */
-    private function runTesseract(string $binary, string $imagePath, int $psm = 6): ?string
+    private function runTesseract(string $binary, string $imagePath, int $psm = 6, string $lang = 'jpn+eng'): ?string
     {
         $libPath  = config('services.tesseract.lib_path', '');
         $tessdata = config('services.tesseract.tessdata_prefix', '');
@@ -251,9 +254,10 @@ class LocalTesseractService extends OcrSpaceService
         if ($tessdata) $env['TESSDATA_PREFIX']  = $tessdata;
 
         $cmd = sprintf(
-            '%s %s stdout -l jpn+eng --psm %d 2>/dev/null',
+            '%s %s stdout -l %s --psm %d 2>/dev/null',
             escapeshellarg($binary),
             escapeshellarg($imagePath),
+            escapeshellarg($lang),
             $psm
         );
 
