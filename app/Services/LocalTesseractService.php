@@ -25,12 +25,10 @@ use Illuminate\Support\Facades\Storage;
  */
 class LocalTesseractService extends OcrSpaceService
 {
-    // 受注番号値エリア（黄色背景ボックス）― 数字専用クロップ
-    // x: 左から約 8〜28%、y: row1
+    // 受注番号値エリア（数字専用クロップ）
     private const REGION_JOBCODE  = [0.080, 0.088, 0.280, 0.128];
 
     // row1 + row2 全体（クライアント名・品名テキスト取得用）
-    // Tesseract が列を混在させるため合算クロップし、パース処理で分離する
     private const REGION_COMBINED = [0.003, 0.088, 0.660, 0.170];
 
     public function analyze(string $storagePath): array
@@ -60,9 +58,9 @@ class LocalTesseractService extends OcrSpaceService
             $w = $imagick->getImageWidth();
             $h = $imagick->getImageHeight();
 
-            // 受注番号: 数字専用クロップ（確実に取得）
+            // 受注番号: 数字専用クロップ（PSM=7: 1行モード）
             $jobcodeRaw  = $this->cropAndOcr($imagick, $w, $h, self::REGION_JOBCODE,  $binary, 7);
-            // クライアント名 + 品名: 合算クロップ（分離クロップでは日本語誤認識が増えるため）
+            // クライアント名・品名: 合算クロップ（PSM=6: ブロックモード）
             $combinedRaw = $this->cropAndOcr($imagick, $w, $h, self::REGION_COMBINED, $binary, 6);
 
             $imagick->clear();
@@ -177,14 +175,23 @@ class LocalTesseractService extends OcrSpaceService
         $crop->cropImage($cw, $ch, $x, $y);
         $crop->setImagePage($cw, $ch, 0, 0);
 
-        // 高さが不足する場合は拡大（最低 80px）
-        if ($ch < 80) {
-            $scale = (int)ceil(80 / $ch);
+        // スキャン画像の精度向上のため常に2倍以上に拡大（OCR.space の scale:true 相当）
+        $minH = 300;
+        if ($ch < $minH) {
+            $scale = (int)ceil($minH / $ch);
             $crop->resizeImage($cw * $scale, $ch * $scale, \Imagick::FILTER_LANCZOS, 1);
+        } else {
+            // 十分な高さがある場合も2倍に拡大して認識精度を上げる
+            $crop->resizeImage($cw * 2, $ch * 2, \Imagick::FILTER_LANCZOS, 1);
         }
 
         $crop->transformImageColorspace(\Imagick::COLORSPACE_GRAY);
+        // シャープニング: JPEGスキャンのぼやけを補正してテキスト輪郭を強調
+        $crop->sharpenImage(0, 1.0);
         $crop->normalizeImage();
+        // 二値化: モノクロスキャンのノイズ・圧縮アーティファクトを除去し純粋な白黒に変換
+        $qr = \Imagick::getQuantumRange();
+        $crop->thresholdImage(intval($qr['quantumRangeLong'] * 0.5));
         $crop->setImageFormat('png');
 
         $tmpPath = tempnam(sys_get_temp_dir(), 'ocr_') . '.png';
