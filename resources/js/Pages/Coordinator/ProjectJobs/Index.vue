@@ -21,10 +21,10 @@
 
             <!-- ★ お気に入り -->
             <div class="rounded bg-white shadow">
-                <div class="flex items-center gap-2 border-b border-yellow-200 bg-yellow-50 px-4 py-3">
-                    <span class="text-yellow-500 text-lg">★</span>
-                    <span class="text-sm font-semibold text-yellow-800">お気に入り</span>
-                    <span class="text-xs text-yellow-600">（完了案件含む・フィルター対象外）</span>
+                <div class="flex items-center gap-2 border-b border-yellow-300 bg-yellow-200 px-4 py-3">
+                    <span class="text-yellow-600 text-lg">★</span>
+                    <span class="text-sm font-semibold text-yellow-900">お気に入り</span>
+                    <span class="text-xs text-yellow-700">（完了案件含む・フィルター対象外）</span>
                 </div>
 
                 <div v-if="localFavoriteJobs.length === 0" class="px-4 py-6 text-center text-sm text-gray-400">
@@ -40,12 +40,12 @@
                         <col class="w-12" />
                     </colgroup>
                     <thead>
-                        <tr class="bg-yellow-50">
-                            <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">登録日</th>
-                            <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">案件名</th>
-                            <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">クライアント名</th>
-                            <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">ステータス</th>
-                            <th class="border px-3 py-1.5 text-center text-xs font-medium text-gray-500">★</th>
+                        <tr class="bg-yellow-100">
+                            <th class="border px-3 py-1.5 text-left text-xs font-medium text-yellow-900">登録日</th>
+                            <th class="border px-3 py-1.5 text-left text-xs font-medium text-yellow-900">案件名</th>
+                            <th class="border px-3 py-1.5 text-left text-xs font-medium text-yellow-900">クライアント名</th>
+                            <th class="border px-3 py-1.5 text-left text-xs font-medium text-yellow-900">ステータス</th>
+                            <th class="border px-3 py-1.5 text-center text-xs font-medium text-yellow-900">★</th>
                         </tr>
                     </thead>
                     <tbody>

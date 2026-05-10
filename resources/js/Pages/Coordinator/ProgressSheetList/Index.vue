@@ -211,10 +211,10 @@ function openSheet(sheet) {
 
             <!-- ★ お気に入り -->
             <div class="rounded bg-white shadow">
-                <div class="flex items-center gap-2 border-b border-yellow-200 bg-yellow-50 px-4 py-3">
-                    <span class="text-yellow-500 text-lg">★</span>
-                    <span class="text-sm font-semibold text-yellow-800">お気に入り</span>
-                    <span class="text-xs text-yellow-600">（完了案件含む・フィルター対象外）</span>
+                <div class="flex items-center gap-2 border-b border-yellow-300 bg-yellow-200 px-4 py-3">
+                    <span class="text-yellow-600 text-lg">★</span>
+                    <span class="text-sm font-semibold text-yellow-900">お気に入り</span>
+                    <span class="text-xs text-yellow-700">（完了案件含む・フィルター対象外）</span>
                 </div>
 
                 <div v-if="localFavoriteSheets.length === 0" class="px-4 py-6 text-center text-sm text-gray-400">
@@ -222,7 +222,7 @@ function openSheet(sheet) {
                 </div>
 
                 <table v-else class="w-full text-sm">
-                    <thead class="border-b bg-gray-50 text-left text-xs text-gray-500">
+                    <thead class="border-b bg-yellow-100 text-left text-xs text-yellow-900">
                         <tr>
                             <th class="px-4 py-2 font-medium">作成日</th>
                             <th class="px-4 py-2 font-medium">案件名</th>
