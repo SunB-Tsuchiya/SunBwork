@@ -62,11 +62,11 @@ class AutoCompleteMyJobs extends Command
         }
 
         // ── 更新 ────────────────────────────────────────────────────────────
+        // project_job_assignments には completed_at カラムが存在しないため completed のみ更新
         $now     = Carbon::now();
         $updated = (clone $query)->update([
-            'completed'    => true,
-            'completed_at' => $now,
-            'updated_at'   => $now,
+            'completed'  => true,
+            'updated_at' => $now,
         ]);
 
         $this->info("完了に更新しました: {$updated} 件");
