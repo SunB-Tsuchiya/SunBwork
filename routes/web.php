@@ -539,6 +539,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     ->name('job-notifications.')
     ->group(function () {
         Route::get('/', [\App\Http\Controllers\JobNotificationController::class, 'index'])->name('index');
+        Route::post('/read-all', [\App\Http\Controllers\JobNotificationController::class, 'markReadAll'])->name('markReadAll');
         Route::post('/{jobNotification}/read', [\App\Http\Controllers\JobNotificationController::class, 'markRead'])->name('markRead');
         Route::get('/{jobNotification}', [\App\Http\Controllers\JobNotificationController::class, 'show'])->name('show');
     });

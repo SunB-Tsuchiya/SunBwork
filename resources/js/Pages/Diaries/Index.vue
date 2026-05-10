@@ -13,36 +13,67 @@ import { route } from 'ziggy-js';
 const props = defineProps({ diaries: Array, meta: Object, filters: Object });
 const showCalendar = ref(false);
 
-// days selector: default to 7 days for "my diaries"
-const selectedDays = ref(props.filters && props.filters.days ? Number(props.filters.days) : 7);
+// 年月セレクター: デフォルトは現在の月
+const _now = new Date();
+const _currentYear = _now.getFullYear();
+const _currentMonth = _now.getMonth() + 1;
 
-const currentPage = computed(() => (props.meta && props.meta.current_page ? props.meta.current_page : 1));
-const lastPage = computed(() => (props.meta && props.meta.last_page ? props.meta.last_page : 1));
+function _buildPeriodValue(y, m) {
+    return y && m ? `${y}-${String(m).padStart(2, '0')}` : 'all';
+}
 
-function applyFilters() {
-    const params = Object.assign({}, props.filters || {});
-    params.days = selectedDays.value;
-    params.page = 1;
-    // Prefer Ziggy route helper to build the full URL with query params.
+const selectedPeriod = ref(
+    props.filters && props.filters.year && props.filters.month
+        ? _buildPeriodValue(props.filters.year, props.filters.month)
+        : props.filters && props.filters.period === 'all'
+        ? 'all'
+        : _buildPeriodValue(_currentYear, _currentMonth),
+);
+
+// 全期間 + 過去36か月を降順で生成
+const periodOptions = (() => {
+    const opts = [{ value: 'all', label: '全期間' }];
+    let y = _currentYear,
+        m = _currentMonth;
+    for (let i = 0; i < 36; i++) {
+        opts.push({ value: `${y}-${String(m).padStart(2, '0')}`, label: `${y}年${m}月` });
+        m--;
+        if (m < 1) {
+            m = 12;
+            y--;
+        }
+    }
+    return opts;
+})();
+
+function getPeriodParams() {
+    if (selectedPeriod.value !== 'all') {
+        const [y, mo] = selectedPeriod.value.split('-');
+        return { year: y, month: String(parseInt(mo)) };
+    }
+    return { period: 'all' };
+}
+
+function onPeriodChange() {
+    const params = { ...getPeriodParams(), page: 1 };
     try {
         Inertia.get(route('diaries.index', params));
         return;
     } catch (e) {
-        // fallback to manual query string if Ziggy route isn't available
+        // fallback
     }
-    const qs = new URLSearchParams(params).toString();
-    Inertia.get(`/diaries?${qs}`);
+    Inertia.get(`/diaries?${new URLSearchParams(params).toString()}`);
 }
 
+const currentPage = computed(() => (props.meta && props.meta.current_page ? props.meta.current_page : 1));
+const lastPage = computed(() => (props.meta && props.meta.last_page ? props.meta.last_page : 1));
+
 function pageRoute(n) {
-    const params = Object.assign({}, props.filters || {});
-    params.days = selectedDays.value;
-    params.page = n;
-    const qs = new URLSearchParams(params).toString();
+    const params = { ...getPeriodParams(), page: n };
     try {
         return route('diaries.index', params);
     } catch (e) {
-        return `/diaries?${qs}`;
+        return `/diaries?${new URLSearchParams(params).toString()}`;
     }
 }
 
@@ -89,13 +120,10 @@ const selectedPerPage = computed(() => (props.meta && props.meta.per_page ? Numb
             </div>
 
             <div class="mb-4">
-                <label class="mr-2 text-sm">期間:</label>
-                <select v-model.number="selectedDays" class="w-50 w-40 rounded border px-2 py-1 text-sm">
-                    <option :value="7">7日分を表示</option>
-                    <option :value="30">30日分を表示</option>
-                    <option :value="90">90日分を表示</option>
+                <label class="mr-2 text-sm">表示期間:</label>
+                <select v-model="selectedPeriod" class="rounded border px-2 py-1 text-sm" @change="onPeriodChange">
+                    <option v-for="opt in periodOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
                 </select>
-                <button class="ml-2 rounded bg-indigo-600 px-3 py-1 text-xs text-white" @click.prevent="applyFilters">適用</button>
             </div>
 
             <!-- For personal diaries, show only date and content. Hide name/id/dept/read columns by configuring DiaryTable props. -->

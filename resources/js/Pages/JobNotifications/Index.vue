@@ -48,21 +48,103 @@ function markReadHover(n) {
 // ---- /ホバー既読 ----
 
 const viewMode      = ref(props.filters?.group === 'month' ? 'month' : 'day');
-const selectedDays  = ref(props.filters?.days ?? 30);
 const unreadOnly    = useUIState('sbw_notifications_unread_only', false);
+
+// 年月セレクター
+const _now = new Date();
+const _currentYear = _now.getFullYear();
+const _currentMonth = _now.getMonth() + 1;
+
+function _buildPeriodValue(y, m) {
+    return y && m ? `${y}-${String(m).padStart(2, '0')}` : 'all';
+}
+
+const selectedPeriod = ref(
+    props.filters?.year && props.filters?.month
+        ? _buildPeriodValue(props.filters.year, props.filters.month)
+        : props.filters?.period === 'all'
+        ? 'all'
+        : _buildPeriodValue(_currentYear, _currentMonth),
+);
+
+const periodOptions = (() => {
+    const opts = [{ value: 'all', label: '全期間' }];
+    let y = _currentYear, m = _currentMonth;
+    for (let i = 0; i < 36; i++) {
+        opts.push({ value: `${y}-${String(m).padStart(2, '0')}`, label: `${y}年${m}月` });
+        m--;
+        if (m < 1) { m = 12; y--; }
+    }
+    return opts;
+})();
+
+function getPeriodParams() {
+    if (selectedPeriod.value !== 'all') {
+        const [y, mo] = selectedPeriod.value.split('-');
+        return { year: y, month: String(parseInt(mo)) };
+    }
+    return { period: 'all' };
+}
+
+function onPeriodChange() {
+    router.get(route('job-notifications.index'), {
+        group: viewMode.value,
+        ...getPeriodParams(),
+    }, { preserveState: false });
+}
+
+// 検索クエリー
+const searchQuery = ref('');
 
 function applyFilters() {
     router.get(route('job-notifications.index'), {
         group: viewMode.value,
-        days:  selectedDays.value,
+        ...getPeriodParams(),
     }, { preserveState: false });
+}
+
+// 全て既読にする
+const markingAllRead = ref(false);
+function markAllRead() {
+    if (markingAllRead.value) return;
+    markingAllRead.value = true;
+    const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    fetch(route('job-notifications.markReadAll'), {
+        method: 'POST',
+        headers: {
+            'X-CSRF-TOKEN': token,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(getPeriodParams()),
+    }).then(res => {
+        if (res.ok) {
+            const now = new Date().toISOString();
+            localNotifications.value.forEach(n => {
+                if (!n.read_at) n.read_at = now;
+            });
+        }
+    }).finally(() => {
+        markingAllRead.value = false;
+    });
 }
 
 const groupedNotifications = computed(() => {
     const map = {};
-    const source = unreadOnly.value
-        ? (localNotifications.value || []).filter(n => !n.read_at)
-        : (localNotifications.value || []);
+    const sq = searchQuery.value.trim().toLowerCase();
+    const source = (localNotifications.value || []).filter(n => {
+        if (unreadOnly.value && n.read_at) return false;
+        if (sq) {
+            const label = (TYPE_LABELS[n.type]?.label ?? n.type ?? '').toLowerCase();
+            const msg   = (n.message ?? '').toLowerCase();
+            const title = (n.project_job?.title ?? '').toLowerCase();
+            const sender = (n.sender?.name ?? '').toLowerCase();
+            const status = n.read_at ? '既読' : '未読';
+            if (!msg.includes(sq) && !label.includes(sq) && !title.includes(sq) && !sender.includes(sq) && !status.includes(sq)) return false;
+        }
+        return true;
+    });
     source.forEach((n) => {
         let raw = '不明';
         if (n.created_at) {
@@ -138,19 +220,26 @@ function typeMeta(type) {
 
             <!-- フィルター -->
             <div class="border-b px-6 py-4">
-                <div class="flex flex-wrap items-center gap-3">
-                    <div class="ml-auto flex flex-wrap items-center gap-2">
-                        <label class="text-sm text-gray-600">表示:</label>
-                        <select v-model="viewMode" class="rounded border px-2 py-1 text-sm">
-                            <option value="day">日別表示</option>
-                            <option value="month">月別表示</option>
-                        </select>
+                <div class="flex flex-wrap items-center gap-2">
+                    <!-- 検索ボックス（左端） -->
+                    <input
+                        v-model="searchQuery"
+                        type="search"
+                        placeholder="検索 (内容/種別/案件/未読・既読)"
+                        class="w-72 rounded border px-2 py-1 text-sm"
+                    />
 
+                    <button
+                        @click="applyFilters"
+                        class="rounded bg-indigo-600 px-3 py-1 text-xs text-white hover:bg-indigo-700"
+                    >
+                        適用
+                    </button>
+
+                    <div class="ml-auto flex flex-wrap items-center gap-2">
                         <label class="text-sm text-gray-600">期間:</label>
-                        <select v-model.number="selectedDays" class="rounded border px-2 py-1 text-sm">
-                            <option :value="7">7日分</option>
-                            <option :value="30">30日分</option>
-                            <option :value="90">90日分</option>
+                        <select v-model="selectedPeriod" class="rounded border px-2 py-1 text-sm" @change="onPeriodChange">
+                            <option v-for="opt in periodOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
                         </select>
 
                         <button
@@ -162,10 +251,11 @@ function typeMeta(type) {
                         </button>
 
                         <button
-                            @click="applyFilters"
-                            class="rounded bg-indigo-600 px-3 py-1 text-xs text-white hover:bg-indigo-700"
+                            @click="markAllRead"
+                            :disabled="markingAllRead"
+                            class="rounded border border-green-600 px-3 py-1 text-xs text-green-700 hover:bg-green-50 disabled:opacity-50"
                         >
-                            適用
+                            全て既読にする
                         </button>
                     </div>
                 </div>

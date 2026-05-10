@@ -25,12 +25,31 @@ class DiaryController extends Controller
         $userId = Auth::id();
 
         // server-side filters and pagination for personal diaries
-        $days = intval($request->input('days', 7));
+        $year   = $request->input('year', null);
+        $month  = $request->input('month', null);
+        $period = $request->input('period', null);
         $perPage = intval($request->input('perPage', 30));
         $page = max(1, intval($request->input('page', 1)));
         $q = trim((string) $request->input('q', ''));
         $unread = intval($request->input('unread', 0));
         $onlyDate = $request->input('date', null);
+
+        // デフォルト: 何も指定がなければ現在月を表示
+        if ($period !== 'all' && !$year && !$month) {
+            $year  = now()->year;
+            $month = now()->month;
+        }
+
+        // 日付範囲を構築
+        if ($period === 'all') {
+            $lower = null;
+            $upper = null;
+        } else {
+            $y = intval($year);
+            $m = intval($month);
+            $lower = sprintf('%04d-%02d-01', $y, $m);
+            $upper = Carbon::createFromDate($y, $m, 1)->endOfMonth()->toDateString();
+        }
 
         // if a specific date is requested, return that date's entries (full content)
         if ($onlyDate) {
@@ -59,12 +78,8 @@ class DiaryController extends Controller
 
         // free-text query -> diary-level pagination
         if ($q !== '') {
-            $lower = now()->subDays($days)->toDateString();
-            $upper = now()->toDateString();
-
             $query = Diary::where('user_id', $userId)
-                ->where('date', '>=', $lower)
-                ->where('date', '<=', $upper)
+                ->when($lower !== null, fn ($qb) => $qb->where('date', '>=', $lower)->where('date', '<=', $upper))
                 ->where(function ($qq) use ($q) {
                     if (is_numeric($q)) {
                         $qq->orWhere('id', intval($q));
@@ -89,7 +104,7 @@ class DiaryController extends Controller
             })->values();
 
             $meta = $paginator->toArray()['meta'] ?? null;
-            $filters = ['q' => $q, 'days' => $days, 'perPage' => $perPage, 'unread' => $unread];
+            $filters = ['q' => $q, 'year' => $year, 'month' => $month, 'period' => $period, 'perPage' => $perPage, 'unread' => $unread];
 
             return Inertia::render('Diaries/Index', [
                 'diaries' => $diariesArr,
@@ -98,13 +113,11 @@ class DiaryController extends Controller
             ]);
         }
 
-        // default: return one diary per distinct date within the days window, paginated by date
-        $lower = now()->subDays($days)->toDateString();
-        $upper = now()->toDateString();
-
-        $datesQuery = Diary::where('user_id', $userId)
-            ->where('date', '>=', $lower)
-            ->where('date', '<=', $upper);
+        // default: return one diary per distinct date within the selected period, paginated by date
+        $datesQuery = Diary::where('user_id', $userId);
+        if ($lower !== null) {
+            $datesQuery->where('date', '>=', $lower)->where('date', '<=', $upper);
+        }
 
         if ($unread) {
             $datesQuery->whereRaw("JSON_CONTAINS(read_by, JSON_ARRAY(?)) = 0", [$userId]);
@@ -162,7 +175,7 @@ class DiaryController extends Controller
             'total' => $totalDates,
         ];
 
-        $filters = ['q' => '', 'days' => $days, 'perPage' => $perPage, 'unread' => $unread];
+        $filters = ['q' => '', 'year' => $year, 'month' => $month, 'period' => $period, 'perPage' => $perPage, 'unread' => $unread];
 
         // end debugging
 

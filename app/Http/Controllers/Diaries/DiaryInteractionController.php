@@ -93,7 +93,7 @@ class DiaryInteractionController extends Controller
             // no permitted users -> render empty index
             $departments = [];
             $meta = null;
-            $filters = ['q' => '', 'days' => 30, 'perPage' => 20];
+            $filters = ['q' => '', 'year' => null, 'month' => null, 'period' => null, 'perPage' => 20];
             $routePrefix = $isAdmin ? 'admin' : 'leader';
 
             return Inertia::render('Diaries/Interactions/Index', [
@@ -108,7 +108,24 @@ class DiaryInteractionController extends Controller
         }
 
         // server-side filters and pagination
-        $days = intval($request->input('days', 30));
+        $year   = $request->input('year', null);
+        $month  = $request->input('month', null);
+        $period = $request->input('period', null);
+        // デフォルト: 何も指定がなければ現在月を表示
+        if ($period !== 'all' && !$year && !$month) {
+            $year  = now()->year;
+            $month = now()->month;
+        }
+        // 日付範囲を構築
+        if ($period === 'all') {
+            $lower = null;
+            $upper = null;
+        } else {
+            $y = intval($year);
+            $m = intval($month);
+            $lower = sprintf('%04d-%02d-01', $y, $m);
+            $upper = \Carbon\Carbon::createFromDate($y, $m, 1)->endOfMonth()->toDateString();
+        }
         $perPage = intval($request->input('perPage', 30));
         $currentUserId = Auth::id();
         $q = trim((string) $request->input('q', ''));
@@ -122,7 +139,7 @@ class DiaryInteractionController extends Controller
             $query = Diary::with('user.department')
                 ->whereIn('user_id', $userIds)
                 ->where('user_id', '!=', $currentUserId)
-                ->where('date', '>=', now()->subDays($days))
+                ->when($lower !== null, fn ($qb) => $qb->where('date', '>=', $lower)->where('date', '<=', $upper))
                 ->where(function ($qq) use ($q) {
                     if (is_numeric($q)) {
                         $qq->orWhere('id', intval($q));
@@ -185,7 +202,9 @@ class DiaryInteractionController extends Controller
             $meta = $paginator->toArray()['meta'] ?? null;
             $filters = [
                 'q' => $q,
-                'days' => $days,
+                'year' => $year,
+                'month' => $month,
+                'period' => $period,
                 'perPage' => intval($request->input('perPage', 20)),
                 'unread' => $hasUnreadParam ? $unread : null,
             ];
@@ -273,8 +292,10 @@ class DiaryInteractionController extends Controller
 
         // get distinct dates within the window
         $datesQuery = Diary::whereIn('user_id', $userIds)
-            ->where('user_id', '!=', $currentUserId)
-            ->where('date', '>=', now()->subDays($days));
+            ->where('user_id', '!=', $currentUserId);
+        if ($lower !== null) {
+            $datesQuery->where('date', '>=', $lower)->where('date', '<=', $upper);
+        }
 
         if ($hasUnreadParam && $unread === 1) {
             $datesQuery->whereRaw("JSON_CONTAINS(COALESCE(read_by, JSON_ARRAY()), JSON_ARRAY(?)) = 0", [$currentUserId]);
@@ -354,7 +375,7 @@ class DiaryInteractionController extends Controller
             'total' => $totalDates,
         ];
 
-        $filters = ['q' => '', 'days' => $days, 'perPage' => $perPage, 'unread' => $hasUnreadParam ? $unread : null];
+        $filters = ['q' => '', 'year' => $year, 'month' => $month, 'period' => $period, 'perPage' => $perPage, 'unread' => $hasUnreadParam ? $unread : null];
         $routePrefix = $isAdmin ? 'admin' : 'leader';
 
         return Inertia::render('Diaries/Interactions/Index', [

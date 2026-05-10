@@ -1,0 +1,1 @@
+import{A as c,h as i}from"./app-BPZDErCE.js";function n(e,o){const t=localStorage.getItem(e);let a=o;if(t!==null)try{a=JSON.parse(t)}catch{a=t}const r=i(a);return c(r,s=>localStorage.setItem(e,JSON.stringify(s))),r}export{n as u};

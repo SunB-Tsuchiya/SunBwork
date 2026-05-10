@@ -38,8 +38,55 @@ const tableFilters = computed(() => {
 
 // viewMode: 'day' or 'month' — default from query (props.filters.group) or 'day'
 const viewMode = ref(props.filters && props.filters.group === 'month' ? 'month' : 'day');
-// days to show (default from props.filters.days or 30)
-const selectedDays = ref(props.filters && props.filters.days ? Number(props.filters.days) : 30);
+
+// 年月セレクター
+const _now = new Date();
+const _currentYear = _now.getFullYear();
+const _currentMonth = _now.getMonth() + 1;
+
+function _buildPeriodValue(y, m) {
+    return y && m ? `${y}-${String(m).padStart(2, '0')}` : 'all';
+}
+
+const selectedPeriod = ref(
+    props.filters && props.filters.year && props.filters.month
+        ? _buildPeriodValue(props.filters.year, props.filters.month)
+        : props.filters && props.filters.period === 'all'
+        ? 'all'
+        : _buildPeriodValue(_currentYear, _currentMonth),
+);
+
+// 全期間 + 過去36か月を降順で生成
+const periodOptions = (() => {
+    const opts = [{ value: 'all', label: '全期間' }];
+    let y = _currentYear,
+        m = _currentMonth;
+    for (let i = 0; i < 36; i++) {
+        opts.push({ value: `${y}-${String(m).padStart(2, '0')}`, label: `${y}年${m}月` });
+        m--;
+        if (m < 1) {
+            m = 12;
+            y--;
+        }
+    }
+    return opts;
+})();
+
+function getPeriodParams() {
+    if (selectedPeriod.value !== 'all') {
+        const [y, mo] = selectedPeriod.value.split('-');
+        return { year: y, month: String(parseInt(mo)) };
+    }
+    return { period: 'all' };
+}
+
+function onPeriodChange() {
+    const params = { ...getPeriodParams(), page: 1 };
+    if (viewMode.value === 'month') params.group = 'month';
+    if (searchQuery.value) params.q = searchQuery.value;
+    Inertia.get(route(routeForIndex(), params));
+}
+
 // search query (shared across all date groups)
 const searchQuery = ref(props.filters && props.filters.q ? props.filters.q : '');
 
@@ -80,19 +127,18 @@ const pageRange = computed(() => {
 
 function pageRoute(n) {
     // build params from tableFilters (which excludes unread) and set page
-    const params = Object.assign({}, tableFilters.value || {});
-    params.page = n;
+    const params = { ...getPeriodParams(), page: n };
+    if (viewMode.value === 'month') params.group = 'month';
+    if (searchQuery.value) params.q = searchQuery.value;
     return route(routeForIndex(), params);
 }
 
 function applyFilters() {
-    const params = Object.assign({}, tableFilters.value || {});
-    params.days = selectedDays.value;
+    const params = { ...getPeriodParams(), page: 1 };
     if (viewMode.value === 'month') params.group = 'month';
     else delete params.group;
     if (searchQuery.value) params.q = searchQuery.value;
     else delete params.q;
-    params.page = 1;
     Inertia.get(route(routeForIndex(), params));
 }
 
@@ -140,10 +186,8 @@ function markReadAllRoute() {
                     </select>
 
                     <label class="text-sm">期間:</label>
-                    <select v-model.number="selectedDays" class="w-30 w-40 rounded border px-2 py-1 text-sm">
-                        <option :value="7">7日分を表示</option>
-                        <option :value="30">30日分を表示</option>
-                        <option :value="90">90日分を表示</option>
+                    <select v-model="selectedPeriod" class="rounded border px-2 py-1 text-sm" @change="onPeriodChange">
+                        <option v-for="opt in periodOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
                     </select>
 
                     <button @click.prevent="applyFilters" class="ml-2 rounded bg-indigo-600 px-3 py-1 text-xs text-white">適用</button>

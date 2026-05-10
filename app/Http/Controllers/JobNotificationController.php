@@ -14,25 +14,40 @@ class JobNotificationController extends Controller
     {
         $user = $request->user();
 
-        $group = $request->query('group', 'day');
-        $days  = (int) $request->query('days', 30);
-        if (! in_array($days, [7, 30, 90])) {
-            $days = 30;
+        $group  = $request->query('group', 'day');
+        $year   = $request->query('year', null);
+        $month  = $request->query('month', null);
+        $period = $request->query('period', null);
+
+        // デフォルト: 何も指定がなければ現在月を表示
+        if ($period !== 'all' && !$year && !$month) {
+            $year  = now()->year;
+            $month = now()->month;
         }
 
-        $since = Carbon::now()->subDays($days)->startOfDay();
-
-        $notifications = JobNotification::where('recipient_id', $user->id)
-            ->where('created_at', '>=', $since)
+        $query = JobNotification::where('recipient_id', $user->id)
             ->with(['sender', 'projectJob'])
-            ->orderByDesc('created_at')
-            ->get();
+            ->orderByDesc('created_at');
+
+        if ($period === 'all') {
+            // 全件
+        } else {
+            $y = intval($year);
+            $m = intval($month);
+            $lower = Carbon::createFromDate($y, $m, 1)->startOfMonth();
+            $upper = Carbon::createFromDate($y, $m, 1)->endOfMonth();
+            $query->whereBetween('created_at', [$lower, $upper]);
+        }
+
+        $notifications = $query->get();
 
         return Inertia::render('JobNotifications/Index', [
             'notifications' => $notifications,
             'filters'       => [
-                'group' => $group,
-                'days'  => $days,
+                'group'  => $group,
+                'year'   => $year,
+                'month'  => $month,
+                'period' => $period,
             ],
         ]);
     }
@@ -48,6 +63,29 @@ class JobNotificationController extends Controller
         if (is_null($jobNotification->read_at)) {
             $jobNotification->update(['read_at' => now()]);
         }
+
+        return response()->json(['ok' => true]);
+    }
+
+    public function markReadAll(Request $request)
+    {
+        $user   = $request->user();
+        $year   = $request->input('year', null);
+        $month  = $request->input('month', null);
+        $period = $request->input('period', null);
+
+        $query = JobNotification::where('recipient_id', $user->id)
+            ->whereNull('read_at');
+
+        if ($period !== 'all' && $year && $month) {
+            $y = intval($year);
+            $m = intval($month);
+            $lower = Carbon::createFromDate($y, $m, 1)->startOfMonth();
+            $upper = Carbon::createFromDate($y, $m, 1)->endOfMonth();
+            $query->whereBetween('created_at', [$lower, $upper]);
+        }
+
+        $query->update(['read_at' => now()]);
 
         return response()->json(['ok' => true]);
     }
