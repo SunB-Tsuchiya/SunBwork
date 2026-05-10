@@ -13,12 +13,16 @@ class Kernel extends ConsoleKernel
         \App\Console\Commands\DispatchSummaries::class,
         \App\Console\Commands\MigrateAttachmentsToAttachmentables::class,
         \App\Console\Commands\TestTeamDeletePivot::class,
+        \App\Console\Commands\AutoCompleteMyJobs::class,
     ];
 
     protected function schedule(\Illuminate\Console\Scheduling\Schedule $schedule)
     {
         // Run the summary dispatcher every 5 minutes to detect conversations that need summarization
         $schedule->command('ai:dispatch-summaries')->everyFiveMinutes();
+
+        // マイジョブ（自己割当）で日付を過ぎたものを毎日深夜0:05に自動完了にする
+        $schedule->command('auto-complete:my-jobs')->dailyAt('00:05');
     }
 
     protected function commands()

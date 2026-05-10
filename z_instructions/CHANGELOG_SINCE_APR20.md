@@ -295,6 +295,29 @@
 
 ---
 
+---
+
+### フェーズ10：期間セレクター刷新・マイジョブ改善（2026年5月）
+
+#### UI改善（期間セレクター統一）
+
+- **diaries/index** — 7日/30日/90日 の期間セレクターを年月セレクター（全期間・最新36ヶ月）に変更。選択と同時にページ遷移。`DiaryController` のパラメータを `days` → `year`/`month`/`period` に変更。
+- **admin/diaryinteractions** — 同様に年月セレクターに変更。`DiaryInteractionController` も同様改修。
+- **job-notifications** — 年月セレクター追加。検索ボックス（幅 `w-72`）を左端に配置。適用ボタンを検索ボックス専用に移動。「全て既読にする」ボタン追加。`JobNotificationController::markReadAll()` 追加、`POST /job-notifications/read-all` ルート追加。表示形式（日別/月別）セレクターを削除。
+
+#### バグ修正
+
+- **自己割当ジョブのステータスが常に「未読」になるバグ** — `ProjectJobAssignmentController::store()` 内の `Schema::hasColumn('project_job_assignment_by_myself', ...)` チェックが、テーブル統合（`project_job_assignments` に統合済み）により常に `false` を返していた。`Schema::hasColumn` チェックを削除し、`read_at`/`scheduled`/`scheduled_at`/`assigned`/`accepted` を無条件でセットするよう修正。既存レコード（ローカル27件、さくら側）もDBで直接修正。
+- **CalendarAll.vue のtodayボタン** — FullCalendar `buttonText.today` を `'今日'` → `'today'` に統一。
+
+#### 自動完了バッチ（マイジョブ）
+
+- **機能概要** — マイジョブ（`sender_id = user_id`）で `scheduled_at` が翌日以降を過ぎたもの（`desired_end_date` を第2優先）を毎日深夜に自動完了にする。
+- **実装ファイル** — `app/Console/Commands/AutoCompleteMyJobs.php`（Artisanコマンド）、`app/Console/Kernel.php`（スケジューラー登録・毎日0:05実行）。
+- **完了条件** — `scheduled_at < 今日 00:00`（優先）または `desired_end_date < 今日`（次候補）、かつ `completed = false`、かつ `sender_id = user_id`。どちらの日付もない場合は対象外。
+
+---
+
 ## タスク総数サマリー
 
 | フェーズ | 計画・設計 | 完了 | 保留/未着手 |
@@ -309,4 +332,5 @@
 | フェーズ7：レイアウト修繕（R） | 25件 | 25件完了 | — |
 | フェーズ8：校正Coジョブ管理（P） | 5件 | 5件完了 | — |
 | フェーズ9：UI状態永続化（P） | 14件 | 14件完了 | — |
-| **合計** | **約120件** | **約120件完了** | **—** |
+| フェーズ10：期間セレクター刷新・マイジョブ改善（P） | 5件 | 5件完了 | — |
+| **合計** | **約125件** | **約125件完了** | **—** |

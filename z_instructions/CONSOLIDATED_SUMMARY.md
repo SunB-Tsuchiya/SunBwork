@@ -46,4 +46,12 @@
 
 ---
 
+**2026-05 追記: マイジョブ自動完了バッチ**
+
+- `app/Console/Commands/AutoCompleteMyJobs.php` — 自己割当ジョブのうち日付超過（`scheduled_at` 優先、`desired_end_date` 次候補）かつ未完了のものを `completed = true` にするバッチ
+- `app/Console/Kernel.php` — 毎日 `00:05` に `auto-complete:my-jobs` を実行するよう登録
+- さくらサーバーでは `crontab -e` で `* * * * * cd ~/SunBWork && php artisan schedule:run >> /dev/null 2>&1` が必要（未登録の場合は手動追加）
+
+---
+
 この要約を `z_instructions/CONSOLIDATED_SUMMARY.md` として作成しました。次は詳細チェックリストの自動テスト化（スクリプト化）を行うか、要点を必要なチームメンバー向けに分割することをおすすめします。
