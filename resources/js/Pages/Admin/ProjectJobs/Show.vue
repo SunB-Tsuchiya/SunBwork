@@ -50,7 +50,13 @@ function eventsByRole(roleKey) {
 }
 
 function totalMinutesByRole(roleKey) {
-    return eventsByRole(roleKey).reduce((sum, e) => sum + eventMinutes(e), 0);
+    return eventsByRole(roleKey).reduce((sum, e) => sum + actualMinutes(e), 0);
+}
+
+// actual_minutes（昼休憩・重複中断除算済み）を優先。なければ生計算
+function actualMinutes(e) {
+    if (typeof e.actual_minutes === 'number') return e.actual_minutes;
+    return eventMinutes(e);
 }
 
 function eventMinutes(e) {
@@ -81,7 +87,7 @@ function groupByDate(events) {
     });
     return sorted.map(([key, items]) => {
         items.sort((a, b) => (a.start || '').localeCompare(b.start || ''));
-        return { key, label: formatDateLabel(key), items, totalMinutes: items.reduce((s, e) => s + eventMinutes(e), 0) };
+        return { key, label: formatDateLabel(key), items, totalMinutes: items.reduce((s, e) => s + actualMinutes(e), 0) };
     });
 }
 
@@ -96,7 +102,7 @@ function groupByStage(events) {
     const sorted = [...map.entries()].sort(([, a], [, b]) => a.sort - b.sort);
     return sorted.map(([key, g]) => {
         g.items.sort((a, b) => (a.start || '').localeCompare(b.start || ''));
-        return { key, label: g.name, items: g.items, totalMinutes: g.items.reduce((s, e) => s + eventMinutes(e), 0) };
+        return { key, label: g.name, items: g.items, totalMinutes: g.items.reduce((s, e) => s + actualMinutes(e), 0) };
     });
 }
 
@@ -332,7 +338,13 @@ function formatDateShort(dateStr) {
                                         {{ group.label }}
                                         <span class="ml-1.5 text-xs font-normal text-gray-400">{{ group.items.length }} 件</span>
                                     </span>
-                                    <span class="text-xs font-medium text-gray-500">
+                                    <span class="flex items-center gap-3 text-xs font-medium text-gray-500">
+                                        <span v-if="group.items.reduce((s, e) => s + (e.lunch_minutes ?? 0), 0) > 0" class="text-orange-500">
+                                            昼休憩: −{{ formatMin(group.items.reduce((s, e) => s + (e.lunch_minutes ?? 0), 0)) }}
+                                        </span>
+                                        <span v-if="group.items.reduce((s, e) => s + (e.interruption_minutes ?? 0), 0) > 0" class="text-red-400">
+                                            重複・中断: −{{ formatMin(group.items.reduce((s, e) => s + (e.interruption_minutes ?? 0), 0)) }}
+                                        </span>
                                         小計: <span class="font-bold text-gray-700">{{ formatMin(group.totalMinutes) }}</span>
                                     </span>
                                 </div>
@@ -349,7 +361,10 @@ function formatDateShort(dateStr) {
                                             </template>
                                             <th class="border-b px-3 py-2 text-left text-xs font-medium text-gray-500">開始</th>
                                             <th class="border-b px-3 py-2 text-left text-xs font-medium text-gray-500">終了</th>
-                                            <th class="border-b px-3 py-2 text-right text-xs font-medium text-gray-500">作業時間</th>
+                                            <th class="border-b px-3 py-2 text-right text-xs font-medium text-gray-500">生時間</th>
+                                            <th class="border-b px-3 py-2 text-right text-xs font-medium text-orange-500">昼休憩</th>
+                                            <th class="border-b px-3 py-2 text-right text-xs font-medium text-red-400">重複・中断</th>
+                                            <th class="border-b px-3 py-2 text-right text-xs font-medium text-gray-700">実作業時間</th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-gray-100 bg-white">
@@ -364,7 +379,14 @@ function formatDateShort(dateStr) {
                                             </template>
                                             <td class="px-3 py-2 text-gray-600">{{ formatTime(ev.start) }}</td>
                                             <td class="px-3 py-2 text-gray-600">{{ formatTime(ev.end) }}</td>
-                                            <td class="px-3 py-2 text-right font-medium text-gray-800">{{ calcDuration(ev.start, ev.end) }}</td>
+                                            <td class="px-3 py-2 text-right text-gray-500">{{ calcDuration(ev.start, ev.end) }}</td>
+                                            <td class="px-3 py-2 text-right" :class="(ev.lunch_minutes ?? 0) > 0 ? 'text-orange-500 font-medium' : 'text-gray-300'">
+                                                {{ (ev.lunch_minutes ?? 0) > 0 ? '−' + formatMin(ev.lunch_minutes) : '−' }}
+                                            </td>
+                                            <td class="px-3 py-2 text-right" :class="(ev.interruption_minutes ?? 0) > 0 ? 'text-red-400 font-medium' : 'text-gray-300'">
+                                                {{ (ev.interruption_minutes ?? 0) > 0 ? '−' + formatMin(ev.interruption_minutes) : '−' }}
+                                            </td>
+                                            <td class="px-3 py-2 text-right font-medium text-gray-800">{{ formatMin(actualMinutes(ev)) }}</td>
                                         </tr>
                                     </tbody>
                                 </table>

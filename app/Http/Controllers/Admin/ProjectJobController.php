@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\CalculatesEventTime;
 use App\Models\Assignment;
 use App\Models\Event;
 use App\Models\ProjectJob;
 use App\Models\ProjectJobAssignment;
 use App\Models\Team;
+use App\Models\UserSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +19,7 @@ use Inertia\Inertia;
 
 class ProjectJobController extends Controller
 {
+    use CalculatesEventTime;
     public function index(Request $request)
     {
         $departments    = Team::where('team_type', 'department')->orderBy('id')->get(['id', 'name']);
@@ -91,10 +94,16 @@ class ProjectJobController extends Controller
                 $assignmentCodeMap = $roleRecords->pluck('code', 'id')->toArray();
             }
 
+            // ユーザーごとの昼休憩設定一括取得
+            $userIds = $assignments->map(fn ($a) => $a->user?->id ?? $a->user_id)
+                ->filter()->unique()->values()->all();
+            $breakDateCache = [];
+
             if (Schema::hasColumn('events', 'project_job_assignment_id')) {
                 foreach ($assignments as $a) {
                     $events = Event::where('project_job_assignment_id', $a->id)
                         ->orderBy('starts_at')
+                        ->with('projectJobAssignment:id,job_type')
                         ->get();
 
                     foreach ($events as $ev) {
@@ -102,27 +111,46 @@ class ProjectJobController extends Controller
                         $userAssignmentCode = $userAssignmentId ? ($assignmentCodeMap[$userAssignmentId] ?? null) : null;
                         $userAssignmentName = $userAssignmentId ? ($assignmentNameMap[$userAssignmentId] ?? null) : null;
 
-                        $eventDate = null;
+                        // Q-07: JST 解決（proof=UTC / 通常=JST）
+                        $evStart   = $this->resolveJstCarbon($ev, 'starts_at');
+                        $evEnd     = $this->resolveJstCarbon($ev, 'ends_at');
+                        $eventDate = $evStart?->toDateString();
+
+                        // 時間計算（昼休憩・重複中断を考慮）
+                        $totalMins        = 0;
+                        $interruptionMins = (int)($ev->interruption_minutes ?? 0);
+                        $lunchMins        = 0;
+                        $actualMins       = 0;
                         try {
-                            if ($ev->starts_at) {
-                                $eventDate = Carbon::parse($ev->starts_at)->toDateString();
+                            if ($evStart && $evEnd) {
+                                $totalMins = max(0, (int)$evStart->diffInMinutes($evEnd, false));
+                                $userId = $a->user?->id ?? $a->user_id ?? null;
+                                if ($userId) {
+                                    if (!isset($breakDateCache[$userId])) $breakDateCache[$userId] = [];
+                                    $lunchMins = $this->computeLunchMinutes($evStart, $evEnd, (int)$userId, $breakDateCache[$userId]);
+                                }
+                                $actualMins = max(0, $totalMins - $interruptionMins - $lunchMins);
                             }
                         } catch (\Throwable $_) {}
 
                         $assignmentEvents[] = [
-                            'assignment_id'   => $a->id,
-                            'user_id'         => $a->user?->id ?? $a->user_id ?? null,
-                            'user_name'       => $a->user?->name ?? null,
-                            'assignment_name' => $userAssignmentName ?? $a->title ?? null,
-                            'assignment_code' => $userAssignmentCode,
-                            'role_category'   => $this->toRoleCategory($userAssignmentCode),
-                            'stage_id'        => $a->stage_id ?? null,
-                            'stage_name'      => $a->stage?->name ?? null,
-                            'stage_sort'      => $a->stage?->sort_order ?? 99,
-                            'status_name'     => $a->statusModel?->name ?? null,
-                            'date'            => $eventDate,
-                            'start'           => $ev->start ?? $ev->starts_at ?? null,
-                            'end'             => $ev->end ?? $ev->ends_at ?? null,
+                            'assignment_id'        => $a->id,
+                            'user_id'              => $a->user?->id ?? $a->user_id ?? null,
+                            'user_name'            => $a->user?->name ?? null,
+                            'assignment_name'      => $userAssignmentName ?? $a->title ?? null,
+                            'assignment_code'      => $userAssignmentCode,
+                            'role_category'        => $this->toRoleCategory($userAssignmentCode),
+                            'stage_id'             => $a->stage_id ?? null,
+                            'stage_name'           => $a->stage?->name ?? null,
+                            'stage_sort'           => $a->stage?->sort_order ?? 99,
+                            'status_name'          => $a->statusModel?->name ?? null,
+                            'date'                 => $eventDate,
+                            'start'                => $ev->start ?? $ev->starts_at ?? null,
+                            'end'                  => $ev->end ?? $ev->ends_at ?? null,
+                            'total_minutes'        => $totalMins,
+                            'interruption_minutes' => $interruptionMins,
+                            'lunch_minutes'        => $lunchMins,
+                            'actual_minutes'       => $actualMins,
                         ];
                     }
                 }
