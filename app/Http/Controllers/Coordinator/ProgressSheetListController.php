@@ -16,17 +16,12 @@ class ProgressSheetListController extends Controller
     {
         $user = $request->user();
 
-        // スコープ: Admin/SuperAdmin/Clerk は全件
-        // それ以外はリーダー(project_jobs.user_id) OR 副リーダー(project_job_coordinators) の案件のみ
-        if ($user->isAdmin() || $user->isSuperAdmin() || $user->isClerk()) {
-            $allowedJobIds = null;
-        } else {
-            $allowedJobIds = ProjectJob::where('user_id', $user->id)
-                ->orWhereHas('coordinators', fn ($c) => $c->where('users.id', $user->id))
-                ->pluck('id')
-                ->values()
-                ->all();
-        }
+        // すべてのロールで自分がリーダー(project_jobs.user_id) OR 副リーダー(project_job_coordinators) の案件のみ
+        $allowedJobIds = ProjectJob::where('user_id', $user->id)
+            ->orWhereHas('coordinators', fn ($c) => $c->where('users.id', $user->id))
+            ->pluck('id')
+            ->values()
+            ->all();
 
         $search       = $request->input('search', '');
         $yearMonth    = $request->input('month', '');
@@ -45,11 +40,8 @@ class ProgressSheetListController extends Controller
 
         // 進行表クエリ
         $query = ProgressSheet::with(['projectJob:id,title,client_id,completed', 'projectJob.client:id,name'])
-            ->select('progress_sheets.*');
-
-        if ($allowedJobIds !== null) {
-            $query->whereIn('project_job_id', $allowedJobIds);
-        }
+            ->select('progress_sheets.*')
+            ->whereIn('project_job_id', $allowedJobIds);
 
         if ($search) {
             $query->where(function ($q) use ($search) {
@@ -76,12 +68,10 @@ class ProgressSheetListController extends Controller
             ->all();
 
         // お気に入りシート（完了案件も含む・フィルター対象外で別途取得）
-        $favQuery = ProgressSheet::with(['projectJob:id,title,client_id,completed', 'projectJob.client:id,name'])
-            ->whereIn('id', $favoriteIds);
-        if ($allowedJobIds !== null) {
-            $favQuery->whereIn('project_job_id', $allowedJobIds);
-        }
-        $favoriteSheets = $favQuery->orderBy('created_at', 'desc')->get();
+        $favoriteSheets = ProgressSheet::with(['projectJob:id,title,client_id,completed', 'projectJob.client:id,name'])
+            ->whereIn('id', $favoriteIds)
+            ->whereIn('project_job_id', $allowedJobIds)
+            ->orderBy('created_at', 'desc')->get();
 
         $mapSheet = function (ProgressSheet $sheet) use ($favoriteIds) {
             return [
