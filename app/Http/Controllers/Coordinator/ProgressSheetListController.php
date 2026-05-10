@@ -7,7 +7,6 @@ use App\Models\CoordinatorProgressSheetFavorite;
 use App\Models\CoordinatorSetting;
 use App\Models\ProgressSheet;
 use App\Models\ProjectJob;
-use App\Models\ProjectTeamMember;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -18,16 +17,15 @@ class ProgressSheetListController extends Controller
         $user = $request->user();
 
         // スコープ: Admin/SuperAdmin/Clerk は全件
-        // それ以外はチームメンバー登録 OR リーダー(user_id) OR 副リーダー(project_job_coordinators) の案件
+        // それ以外はリーダー(project_jobs.user_id) OR 副リーダー(project_job_coordinators) の案件のみ
         if ($user->isAdmin() || $user->isSuperAdmin() || $user->isClerk()) {
             $allowedJobIds = null;
         } else {
-            $teamMemberIds = ProjectTeamMember::where('user_id', $user->id)
-                ->pluck('project_job_id');
-            $leaderCoIds = ProjectJob::where('user_id', $user->id)
+            $allowedJobIds = ProjectJob::where('user_id', $user->id)
                 ->orWhereHas('coordinators', fn ($c) => $c->where('users.id', $user->id))
-                ->pluck('id');
-            $allowedJobIds = $teamMemberIds->merge($leaderCoIds)->unique()->values()->all();
+                ->pluck('id')
+                ->values()
+                ->all();
         }
 
         $search       = $request->input('search', '');

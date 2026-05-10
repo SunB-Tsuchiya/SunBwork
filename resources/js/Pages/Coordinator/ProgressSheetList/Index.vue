@@ -209,51 +209,6 @@ function openSheet(sheet) {
 
         <div class="space-y-6">
 
-            <!-- 検索・フィルター -->
-            <div class="rounded bg-white p-4 shadow">
-                <div class="flex flex-col gap-3 md:flex-row md:items-center">
-                    <input
-                        v-model="searchQuery"
-                        @keyup.enter="search"
-                        placeholder="案件名・進行表名・クライアントで検索"
-                        class="w-80 rounded border px-3 py-2 text-sm"
-                    />
-                    <button class="rounded bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700" @click.prevent="search">検索</button>
-                    <button class="rounded border px-3 py-2 text-sm hover:bg-gray-50" @click.prevent="clearSearch">クリア</button>
-
-                    <div class="flex items-center gap-2">
-                        <label class="text-sm text-gray-700">年月:</label>
-                        <select
-                            v-model="selectedMonth"
-                            @change="search"
-                            class="rounded border px-3 py-2 text-sm"
-                            style="width: 9.5em"
-                        >
-                            <option value="">全期間</option>
-                            <option v-for="m in monthOptions" :key="m.value" :value="m.value">{{ m.label }}</option>
-                        </select>
-                    </div>
-
-                    <label class="flex cursor-pointer items-center gap-2 text-sm text-gray-700 select-none">
-                        <input type="checkbox" v-model="showComplete" @change="search" class="h-4 w-4 rounded border-gray-300" />
-                        完了案件を含む
-                    </label>
-                </div>
-
-                <!-- ソートモード -->
-                <div class="mt-3 flex gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1 w-fit">
-                    <button
-                        v-for="mode in viewModes"
-                        :key="mode.key"
-                        @click="viewMode = mode.key"
-                        :class="viewMode === mode.key
-                            ? 'bg-white text-green-700 font-semibold shadow-sm'
-                            : 'text-gray-600 hover:text-gray-900'"
-                        class="rounded px-4 py-1.5 text-sm transition-all"
-                    >{{ mode.label }}</button>
-                </div>
-            </div>
-
             <!-- ★ お気に入り -->
             <div class="rounded bg-white shadow">
                 <div class="flex items-center gap-2 border-b border-yellow-200 bg-yellow-50 px-4 py-3">
@@ -307,6 +262,51 @@ function openSheet(sheet) {
                         </tr>
                     </tbody>
                 </table>
+            </div>
+
+            <!-- 検索・フィルター -->
+            <div class="rounded bg-white p-4 shadow">
+                <div class="flex flex-col gap-3 md:flex-row md:items-center">
+                    <input
+                        v-model="searchQuery"
+                        @keyup.enter="search"
+                        placeholder="案件名・進行表名・クライアントで検索"
+                        class="w-80 rounded border px-3 py-2 text-sm"
+                    />
+                    <button class="rounded bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700" @click.prevent="search">検索</button>
+                    <button class="rounded border px-3 py-2 text-sm hover:bg-gray-50" @click.prevent="clearSearch">クリア</button>
+
+                    <div class="flex items-center gap-2">
+                        <label class="text-sm text-gray-700">年月:</label>
+                        <select
+                            v-model="selectedMonth"
+                            @change="search"
+                            class="rounded border px-3 py-2 text-sm"
+                            style="width: 9.5em"
+                        >
+                            <option value="">全期間</option>
+                            <option v-for="m in monthOptions" :key="m.value" :value="m.value">{{ m.label }}</option>
+                        </select>
+                    </div>
+
+                    <label class="flex cursor-pointer items-center gap-2 text-sm text-gray-700 select-none">
+                        <input type="checkbox" v-model="showComplete" @change="search" class="h-4 w-4 rounded border-gray-300" />
+                        完了案件を含む
+                    </label>
+                </div>
+
+                <!-- ソートモード -->
+                <div class="mt-3 flex gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1 w-fit">
+                    <button
+                        v-for="mode in viewModes"
+                        :key="mode.key"
+                        @click="viewMode = mode.key"
+                        :class="viewMode === mode.key
+                            ? 'bg-white text-green-700 font-semibold shadow-sm'
+                            : 'text-gray-600 hover:text-gray-900'"
+                        class="rounded px-4 py-1.5 text-sm transition-all"
+                    >{{ mode.label }}</button>
+                </div>
             </div>
 
             <!-- 一覧 -->

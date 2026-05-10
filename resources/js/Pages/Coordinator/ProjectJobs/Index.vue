@@ -17,7 +17,62 @@
             </div>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="space-y-4">
+
+            <!-- ★ お気に入り -->
+            <div class="rounded bg-white shadow">
+                <div class="flex items-center gap-2 border-b border-yellow-200 bg-yellow-50 px-4 py-3">
+                    <span class="text-yellow-500 text-lg">★</span>
+                    <span class="text-sm font-semibold text-yellow-800">お気に入り</span>
+                    <span class="text-xs text-yellow-600">（完了案件含む・フィルター対象外）</span>
+                </div>
+
+                <div v-if="localFavoriteJobs.length === 0" class="px-4 py-6 text-center text-sm text-gray-400">
+                    お気に入りの案件はありません。
+                </div>
+
+                <table v-else class="w-full table-fixed border">
+                    <colgroup>
+                        <col class="w-28" />
+                        <col />
+                        <col class="w-44" />
+                        <col class="w-24" />
+                        <col class="w-12" />
+                    </colgroup>
+                    <thead>
+                        <tr class="bg-yellow-50">
+                            <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">登録日</th>
+                            <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">案件名</th>
+                            <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">クライアント名</th>
+                            <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">ステータス</th>
+                            <th class="border px-3 py-1.5 text-center text-xs font-medium text-gray-500">★</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="job in localFavoriteJobs" :key="job.id" class="cursor-pointer hover:bg-yellow-50" @click="rowClick($event, job)">
+                            <td class="border px-3 py-2 text-sm text-gray-600">{{ formatDate(job.created_at) }}</td>
+                            <td class="border px-3 py-2 text-sm font-medium text-gray-800">{{ job.title || job.name }}</td>
+                            <td class="border px-3 py-2 text-sm text-gray-600">{{ job.client?.name || '-' }}</td>
+                            <td class="border px-3 py-2">
+                                <span
+                                    :class="job.completed ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-700'"
+                                    class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+                                >{{ job.completed ? '完了' : '進行中' }}</span>
+                            </td>
+                            <td class="border px-3 py-2 text-center" @click.stop>
+                                <button
+                                    @click="toggleFavorite(job, true)"
+                                    class="text-lg leading-none transition-colors text-yellow-400 hover:text-yellow-300"
+                                    title="お気に入り解除"
+                                >★</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 検索・一覧 -->
+            <div class="rounded bg-white p-6 shadow">
             <!-- 検索・フィルター行 -->
             <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div class="flex items-center gap-2">
@@ -86,6 +141,7 @@
                             <col />
                             <col class="w-44" />
                             <col class="w-24" />
+                            <col class="w-12" />
                         </colgroup>
                         <thead>
                             <tr class="bg-gray-50">
@@ -105,6 +161,7 @@
                                         ステータス<span class="text-gray-400">{{ sortIndicator('status') }}</span>
                                     </button>
                                 </th>
+                                <th class="border px-3 py-1.5 text-center text-xs font-medium text-gray-500">★</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -118,6 +175,14 @@
                                         class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
                                     >{{ job.completed ? '完了' : '進行中' }}</span>
                                 </td>
+                                <td class="border px-3 py-2 text-center" @click.stop>
+                                    <button
+                                        @click="toggleFavorite(job)"
+                                        class="text-lg leading-none transition-colors"
+                                        :class="job.is_favorite ? 'text-yellow-400 hover:text-yellow-300' : 'text-gray-300 hover:text-yellow-400'"
+                                        :title="job.is_favorite ? 'お気に入り解除' : 'お気に入りに追加'"
+                                    >★</button>
+                                </td>
                             </tr>
                         </tbody>
                     </table>
@@ -129,6 +194,7 @@
                 表示中 {{ totalDisplayCount }} 件
                 <span v-if="hideCompleted && hiddenCompletedCount > 0" class="ml-2 text-xs text-gray-400">（完了 {{ hiddenCompletedCount }} 件を非表示）</span>
             </div>
+            </div><!-- /検索・一覧 -->
         </div>
     </AppLayout>
 </template>
@@ -138,8 +204,9 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { useUIState } from '@/Composables/useUIState';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, ref, watch } from 'vue';
+import axios from 'axios';
 
-const props = defineProps({ jobs: Array, registerFlags: Array, jobid: [Number, String], monthOptions: Array, q: String, period: String });
+const props = defineProps({ jobs: Array, favoriteJobs: { type: Array, default: () => [] }, registerFlags: Array, jobid: [Number, String], monthOptions: Array, q: String, period: String });
 const page = usePage();
 page.props.q_model = props.q || '';
 page.props.period_model = props.period || 'all';
@@ -149,6 +216,32 @@ const hideCompleted = useUIState('sbw_coord_pj_hide_completed', true);
 
 // ローカルコピー（完了ボタンで即時更新するため）
 const localJobs = ref((props.jobs || []).map((j) => ({ ...j })));
+const localFavoriteJobs = ref((props.favoriteJobs || []).map((j) => ({ ...j })));
+
+async function toggleFavorite(job, isFavSection = false) {
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    try {
+        const res = await axios.post(
+            route('coordinator.project_jobs.favorite', { projectJob: job.id }),
+            {},
+            { headers: { 'X-CSRF-TOKEN': csrf } },
+        );
+        const nowFav = res.data.is_favorite;
+
+        const idx = localJobs.value.findIndex(j => j.id === job.id);
+        if (idx !== -1) localJobs.value[idx].is_favorite = nowFav;
+
+        if (nowFav) {
+            if (!localFavoriteJobs.value.find(j => j.id === job.id)) {
+                localFavoriteJobs.value.unshift({ ...job, is_favorite: true });
+            }
+        } else {
+            localFavoriteJobs.value = localFavoriteJobs.value.filter(j => j.id !== job.id);
+        }
+    } catch (e) {
+        console.error('お気に入り更新エラー', e);
+    }
+}
 
 // ===== ビューモード =====
 
