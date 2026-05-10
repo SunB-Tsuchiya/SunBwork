@@ -16,9 +16,10 @@ class ProgressSheetListController extends Controller
     {
         $user = $request->user();
 
-        // すべてのロールで自分がリーダー(project_jobs.user_id) OR 副リーダー(project_job_coordinators) の案件のみ
+        // リーダー / 副リーダー / チームメンバー（coordinator権限ユーザー）の案件のみ
         $allowedJobIds = ProjectJob::where('user_id', $user->id)
             ->orWhereHas('coordinators', fn ($c) => $c->where('users.id', $user->id))
+            ->orWhereHas('teamMembers', fn ($t) => $t->where('user_id', $user->id))
             ->pluck('id')
             ->values()
             ->all();
