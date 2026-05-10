@@ -92,53 +92,30 @@ class ProjectJobAssignmentController extends Controller
                 // legacy difficulty string column removed from payload
 
                 // Create assignment: for user-created assignments prefer the
-                // `project_job_assignment_by_myself` table so users' own schedules
-                // are stored separately from coordinator-created canonical rows.
+                // `ProjectJobAssignmentByMyself` model (alias for project_job_assignments
+                // with a self_assigned global scope). sender_id = user_id が自己割当マーカー。
                 if (class_exists(ProjectJobAssignmentByMyself::class)) {
                     // 自己割当ジョブは sender_id = user_id が必須。
                     // フォームから sender_id が送られない場合は認証ユーザーをデフォルトにする。
                     $createPayload['sender_id'] = $a['sender_id'] ?? ($user ? $user->id : null);
-                    // Set assignment flags and timestamps when saving from user-side job creation
-                    try {
-                        if (Schema::hasColumn('project_job_assignment_by_myself', 'assigned')) {
-                            $createPayload['assigned'] = 1;
-                        }
-                        if (Schema::hasColumn('project_job_assignment_by_myself', 'accepted')) {
-                            $createPayload['accepted'] = 1;
-                        }
-                        if (Schema::hasColumn('project_job_assignment_by_myself', 'scheduled')) {
-                            $createPayload['scheduled'] = 1;
-                        }
-                        if (Schema::hasColumn('project_job_assignment_by_myself', 'read_at')) {
-                            $createPayload['read_at'] = now();
-                        }
-                        if (Schema::hasColumn('project_job_assignment_by_myself', 'scheduled_at')) {
-                            $createPayload['scheduled_at'] = now();
-                        }
-                    } catch (\Throwable $__ePayload) {
-                        // defensive: ignore schema inspection errors and continue without flags
-                    }
+                    // 自己割当は本人が登録している時点で「確認済み＋セット済み」状態が正しい。
+                    // (旧テーブル project_job_assignment_by_myself は統合済みのため
+                    //  Schema::hasColumn チェックは不要。project_job_assignments に直接セットする)
+                    $createPayload['assigned']     = true;
+                    $createPayload['accepted']     = true;
+                    $createPayload['scheduled']    = true;
+                    $createPayload['read_at']      = now();
+                    $createPayload['scheduled_at'] = now();
 
                     $assignment = ProjectJobAssignmentByMyself::create($createPayload);
-                    // If model/table doesn't allow mass-assigning read_at, set it explicitly after create
-                    try {
-                        if (Schema::hasColumn('project_job_assignment_by_myself', 'read_at') && empty($assignment->read_at)) {
-                            $assignment->read_at = now();
-                            $assignment->save();
-                        }
-                    } catch (\Throwable $__eSetRead) {
-                        // ignore
-                    }
                 } else {
                     // Fallback to canonical table if the by_myself model/table isn't present
+                    $createPayload['assigned']     = true;
+                    $createPayload['accepted']     = true;
+                    $createPayload['scheduled']    = true;
+                    $createPayload['read_at']      = now();
+                    $createPayload['scheduled_at'] = now();
                     $assignment = ProjectJobAssignment::create($createPayload);
-                    try {
-                        if (Schema::hasColumn('project_job_assignments', 'read_at') && empty($assignment->read_at)) {
-                            $assignment->read_at = now();
-                            $assignment->save();
-                        }
-                    } catch (\Throwable $__eSetRead2) {
-                    }
                 }
 
                 // 進行表セルリンク: _row_id と _col_key が渡された場合（_progress_sheet_id は任意）

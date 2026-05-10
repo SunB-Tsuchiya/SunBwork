@@ -91,7 +91,7 @@ const calendarOptions = computed(() => ({
     height:       'auto',   // cells expand; scroll is handled by the wrapper div
     eventContent: renderEventContent,
     buttonText: {
-        today: '今日',
+        today: 'today',
         month: '月',
         week:  '週',
     },
