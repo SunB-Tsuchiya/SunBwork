@@ -3,7 +3,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import OcrModal from '@/Components/Prepress/OcrModal.vue';
 import { router, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import { route } from 'ziggy-js';
 
 const props = defineProps({
@@ -32,6 +32,17 @@ const openPanel = ref('none');
 function togglePanel(panel) {
     openPanel.value = openPanel.value === panel ? 'none' : panel;
 }
+
+// ボードエリア外クリックでパネルを閉じる
+const boardRef = ref(null);
+function onDocumentClick(e) {
+    if (openPanel.value === 'none') return;
+    if (boardRef.value && !boardRef.value.contains(e.target)) {
+        openPanel.value = 'none';
+    }
+}
+onMounted(()    => document.addEventListener('click', onDocumentClick, true));
+onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick, true));
 
 const visibleColumnKeys = computed(() => {
     if (openPanel.value === 'ready')     return ['pending',     'submitting'];
@@ -474,7 +485,7 @@ const canCreate = computed(() => {
         </template>
 
         <!-- 90vw 幅でメインコンテンツ幅を突き破る -->
-        <div style="width: 90vw; margin-left: calc((90vw - 100%) / -2);">
+        <div ref="boardRef" style="width: 90vw; margin-left: calc((90vw - 100%) / -2);">
 
             <!-- アコーディオン操作バー -->
             <div class="mb-3 flex items-center justify-between">
