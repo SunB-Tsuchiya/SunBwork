@@ -120,6 +120,96 @@ class TicketController extends Controller
         ]);
     }
 
+    public function show(Request $request, PrepressTicket $ticket)
+    {
+        $this->authorizePrepress($request->user());
+
+        $ticket->load('user');
+        $ticket->append('image_url');
+
+        return inertia('Prepress/Tickets/Show', [
+            'ticket'   => $ticket,
+            'statuses' => PrepressTicket::STATUS_LABELS,
+        ]);
+    }
+
+    public function edit(Request $request, PrepressTicket $ticket)
+    {
+        $this->authorizePrepress($request->user());
+
+        $ticket->load('user');
+        $ticket->append('image_url');
+
+        return inertia('Prepress/Tickets/Edit', [
+            'ticket'   => $ticket,
+            'statuses' => PrepressTicket::STATUS_LABELS,
+        ]);
+    }
+
+    public function update(Request $request, PrepressTicket $ticket)
+    {
+        $this->authorizePrepress($request->user());
+
+        $validated = $request->validate([
+            'title'      => ['required', 'string', 'max:255'],
+            'jobcode'    => ['nullable', 'string', 'max:100'],
+            'client_id'  => ['nullable', 'integer', 'exists:clients,id'],
+            'client_name'=> ['nullable', 'string', 'max:255'],
+            'memo'       => ['nullable', 'string', 'max:5000'],
+            'status'     => ['required', Rule::in(array_keys(PrepressTicket::STATUS_LABELS))],
+            'image'      => ['nullable', 'file', 'mimes:jpg,jpeg,png,gif,webp,heic,heif,pdf', 'max:20480'],
+            'keep_image' => ['nullable', 'boolean'],
+        ]);
+
+        $clientName = $validated['client_name'] ?? null;
+        if (!empty($validated['client_id'])) {
+            $client = Client::find($validated['client_id']);
+            if ($client) $clientName = $client->name;
+        }
+
+        $imagePath        = $ticket->image_path;
+        $originalFilename = $ticket->original_filename;
+
+        if ($request->hasFile('image') && $request->file('image')->isValid()) {
+            // 旧画像を削除（案件共有でなければ）
+            if ($ticket->image_path) {
+                $sharedWithJob = $ticket->project_job_id
+                    && optional(ProjectJob::find($ticket->project_job_id))->image_path === $ticket->image_path;
+                if (!$sharedWithJob) {
+                    $this->imageService->delete($ticket->image_path);
+                }
+            }
+            $imageMeta        = $this->imageService->convertAndStore($request->file('image'));
+            $imagePath        = $imageMeta['path'] ?? null;
+            $originalFilename = $imageMeta['original_filename'] ?? null;
+        } elseif (!$request->boolean('keep_image')) {
+            // 画像削除指示
+            if ($ticket->image_path) {
+                $sharedWithJob = $ticket->project_job_id
+                    && optional(ProjectJob::find($ticket->project_job_id))->image_path === $ticket->image_path;
+                if (!$sharedWithJob) {
+                    $this->imageService->delete($ticket->image_path);
+                }
+            }
+            $imagePath        = null;
+            $originalFilename = null;
+        }
+
+        $ticket->update([
+            'client_id'         => !empty($validated['client_id']) ? $validated['client_id'] : null,
+            'title'             => $validated['title'],
+            'jobcode'           => $validated['jobcode'] ?? null,
+            'client_name'       => $clientName,
+            'memo'              => $validated['memo'] ?? null,
+            'status'            => $validated['status'],
+            'image_path'        => $imagePath,
+            'original_filename' => $originalFilename,
+        ]);
+
+        return redirect()->route('prepress.tickets.show', $ticket)
+            ->with('success', '伝票「' . $ticket->title . '」を更新しました。');
+    }
+
     public function store(Request $request)
     {
         $this->authorizePrepress($request->user());

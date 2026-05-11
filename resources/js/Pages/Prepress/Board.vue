@@ -484,8 +484,8 @@ const canCreate = computed(() => {
             </div>
         </template>
 
-        <!-- 90vw 幅でメインコンテンツ幅を突き破る -->
-        <div ref="boardRef" style="width: 90vw; margin-left: calc((90vw - 100%) / -2);">
+        <!-- 進行表と同様 100vw 全幅に拡張 -->
+        <div ref="boardRef" style="width: 100vw; margin-left: calc(-50vw + 50%); padding-left: 1.5rem; padding-right: 1.5rem; box-sizing: border-box;">
 
             <!-- アコーディオン操作バー -->
             <div class="mb-3 flex items-center justify-between">
@@ -725,13 +725,20 @@ const canCreate = computed(() => {
                                 @click="changeStatus(detail, 'pending')"
                             >準備に戻す</button>
 
-                            <button
-                                v-if="isAdmin"
-                                type="button"
-                                class="ml-auto inline-flex items-center gap-1.5 rounded bg-red-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-600"
-                                :disabled="deleting"
-                                @click="deleteTicket(detail)"
-                            >削除</button>
+                            <div class="ml-auto flex items-center gap-2">
+                                <a
+                                    :href="route('prepress.tickets.edit', { ticket: detail.id })"
+                                    class="inline-flex items-center gap-1.5 rounded bg-indigo-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-600"
+                                >編集</a>
+
+                                <button
+                                    v-if="isAdmin"
+                                    type="button"
+                                    class="inline-flex items-center gap-1.5 rounded bg-red-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-600"
+                                    :disabled="deleting"
+                                    @click="deleteTicket(detail)"
+                                >削除</button>
+                            </div>
                         </div>
                     </div>
 

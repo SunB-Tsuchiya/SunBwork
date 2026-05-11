@@ -539,7 +539,6 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     ->name('job-notifications.')
     ->group(function () {
         Route::get('/', [\App\Http\Controllers\JobNotificationController::class, 'index'])->name('index');
-        Route::post('/read-all', [\App\Http\Controllers\JobNotificationController::class, 'markReadAll'])->name('markReadAll');
         Route::post('/{jobNotification}/read', [\App\Http\Controllers\JobNotificationController::class, 'markRead'])->name('markRead');
         Route::get('/{jobNotification}', [\App\Http\Controllers\JobNotificationController::class, 'show'])->name('show');
     });
@@ -594,7 +593,6 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('project_jobs/{projectJob}/image', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'storeImage'])->name('project_jobs.image.store');
         Route::delete('project_jobs/{projectJob}/image', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'deleteImage'])->name('project_jobs.image.destroy');
         Route::patch('project_jobs/{projectJob}/ocr-apply', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'applyOcrResult'])->name('project_jobs.ocr.apply');
-        Route::post('project_jobs/{projectJob}/favorite', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'toggleFavorite'])->name('project_jobs.favorite');
         // メンバー予定表（静的サブパスなので {projectJob} の前に定義）
         Route::get('project_jobs/{projectJob}/member-schedule', [App\Http\Controllers\Coordinator\ProjectJobMemberScheduleController::class, 'index'])->name('project_jobs.member_schedule');
         Route::get('project_jobs/{projectJob}/member-schedule/data', [App\Http\Controllers\Coordinator\ProjectJobMemberScheduleController::class, 'data'])->name('project_jobs.member_schedule.data');
@@ -835,6 +833,9 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
         Route::get('tickets', [\App\Http\Controllers\Prepress\TicketController::class, 'index'])->name('tickets.index');
         Route::get('tickets/create', [\App\Http\Controllers\Prepress\TicketController::class, 'create'])->name('tickets.create');
         Route::post('tickets', [\App\Http\Controllers\Prepress\TicketController::class, 'store'])->name('tickets.store');
+        Route::get('tickets/{ticket}', [\App\Http\Controllers\Prepress\TicketController::class, 'show'])->name('tickets.show');
+        Route::get('tickets/{ticket}/edit', [\App\Http\Controllers\Prepress\TicketController::class, 'edit'])->name('tickets.edit');
+        Route::post('tickets/{ticket}', [\App\Http\Controllers\Prepress\TicketController::class, 'update'])->name('tickets.update');
         Route::patch('tickets/{ticket}/status', [\App\Http\Controllers\Prepress\TicketController::class, 'updateStatus'])->name('tickets.updateStatus');
         Route::post('tickets/{ticket}/image', [\App\Http\Controllers\Prepress\TicketController::class, 'updateImage'])->name('tickets.updateImage');
         Route::delete('tickets/{ticket}', [\App\Http\Controllers\Prepress\TicketController::class, 'destroy'])->name('tickets.destroy');

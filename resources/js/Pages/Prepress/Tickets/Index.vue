@@ -508,7 +508,7 @@ const canCreate = computed(() => {
                                 v-for="ticket in group.items"
                                 :key="ticket.id"
                                 class="cursor-pointer hover:bg-gray-100"
-                                @click="openDetail(ticket)"
+                                @click="router.get(route('prepress.tickets.show', { ticket: ticket.id }))"
                                 role="button"
                             >
                                 <td class="break-words border px-3 py-2 text-sm text-gray-700">{{ ticket.user?.name ?? '—' }}</td>
