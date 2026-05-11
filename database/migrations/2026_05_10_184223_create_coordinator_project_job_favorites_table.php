@@ -13,7 +13,12 @@ return new class extends Migration
     {
         Schema::create('coordinator_project_job_favorites', function (Blueprint $table) {
             $table->id();
+            $table->unsignedBigInteger('user_id');
+            $table->unsignedBigInteger('project_job_id');
             $table->timestamps();
+            $table->unique(['user_id', 'project_job_id']);
+            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
+            $table->foreign('project_job_id')->references('id')->on('project_jobs')->onDelete('cascade');
         });
     }
 
