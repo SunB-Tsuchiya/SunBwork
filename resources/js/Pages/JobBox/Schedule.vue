@@ -2,14 +2,14 @@
     <AppLayout :title="`スケジュール設定 - ${assignment.title}`">
         <template #header>
             <div class="flex items-center gap-3">
-                <Link :href="backHref" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">← ジョブ詳細に戻る</Link>
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">スケジュール設定</h2>
+                <Link :href="backHref" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300">← ジョブ詳細に戻る</Link>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">スケジュール設定</h2>
             </div>
         </template>
 
         <div class="mx-auto max-w-2xl space-y-4">
             <!-- ジョブ内容（読み取り専用） -->
-            <div class="rounded bg-white p-6 shadow">
+            <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
                 <h3 class="mb-3 text-base font-semibold text-gray-700">依頼内容（変更不可）</h3>
                 <dl class="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
                     <div class="col-span-full flex gap-2">
@@ -60,7 +60,7 @@
             </div>
 
             <!-- スケジュール入力フォーム -->
-            <div class="rounded bg-white p-6 shadow">
+            <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
                 <h3 class="mb-4 text-base font-semibold text-gray-700">
                     {{ existingEvent ? 'スケジュール編集' : 'スケジュールをセット' }}
                 </h3>

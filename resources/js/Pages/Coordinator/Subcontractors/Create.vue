@@ -64,13 +64,13 @@ function toggleCoordinator(id) {
         <template #header>
             <div class="flex items-center gap-3">
                 <Link :href="route('coordinator.subcontractors.index')"
-                      class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                      class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300"
                 >← 一覧に戻る</Link>
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">外注先 新規作成</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">外注先 新規作成</h2>
             </div>
         </template>
 
-        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-2xl rounded bg-white px-4 py-6 sm:p-6 shadow">
             <form @submit.prevent="submit" class="space-y-4">
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">名前 / 会社名 <span class="text-red-500">*</span></label>
@@ -153,7 +153,7 @@ function toggleCoordinator(id) {
                 </div>
                 <p class="mb-4 text-sm font-medium text-red-600">名前を変更してから再度登録してください。</p>
                 <div class="flex justify-end">
-                    <button type="button" @click="showDuplicateModal = false" class="rounded bg-gray-200 px-4 py-2 font-bold text-gray-700 hover:bg-gray-300">
+                    <button type="button" @click="showDuplicateModal = false" class="rounded bg-gray-200 px-4 py-2 font-bold text-gray-700 whitespace-nowrap hover:bg-gray-300">
                         閉じる（名前を変更する）
                     </button>
                 </div>

@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Coordinator;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\CalculatesEventTime;
 use App\Models\Client;
-use App\Models\CoordinatorProjectJobFavorite;
 use App\Services\OcrSpaceService;
 use App\Services\PrepressImageService;
 use Illuminate\Http\Request;
@@ -57,27 +56,6 @@ class ProjectJobController extends Controller
 
         $jobs = $query->orderBy('created_at', 'desc')->get();
 
-        // お気に入り ID 一覧
-        $favoriteIds = CoordinatorProjectJobFavorite::where('user_id', $user->id)
-            ->pluck('project_job_id')
-            ->all();
-
-        // is_favorite フラグを付与
-        $jobs->each(function ($job) use ($favoriteIds) {
-            $job->is_favorite = in_array($job->id, $favoriteIds);
-        });
-
-        // お気に入りジョブ（完了含む・フィルター対象外で別途取得）
-        $favoriteJobs = ProjectJob::with('client')
-            ->whereIn('id', $favoriteIds)
-            ->where(function ($q) use ($user) {
-                $q->where('user_id', $user->id)
-                    ->orWhereHas('coordinators', fn ($c) => $c->where('users.id', $user->id));
-            })
-            ->orderBy('created_at', 'desc')
-            ->get()
-            ->map(fn($j) => array_merge($j->toArray(), ['is_favorite' => true]));
-
         // 直近12ヶ月の月オプション
         $monthOptions = [];
         for ($i = 0; $i < 12; $i++) {
@@ -91,36 +69,13 @@ class ProjectJobController extends Controller
         $jobid = session('jobid');
         $registerFlags = session('register_flags', []);
         return Inertia::render('Coordinator/ProjectJobs/Index', [
-            'jobs'          => $jobs,
-            'favoriteJobs'  => $favoriteJobs->values(),
-            'jobid'         => $jobid,
+            'jobs' => $jobs,
+            'jobid' => $jobid,
             'registerFlags' => $registerFlags,
-            'monthOptions'  => $monthOptions,
-            'q'             => $q,
-            'period'        => $period,
+            'monthOptions' => $monthOptions,
+            'q' => $q,
+            'period' => $period,
         ]);
-    }
-
-    public function toggleFavorite(Request $request, ProjectJob $projectJob)
-    {
-        $user = $request->user();
-
-        $existing = CoordinatorProjectJobFavorite::where('user_id', $user->id)
-            ->where('project_job_id', $projectJob->id)
-            ->first();
-
-        if ($existing) {
-            $existing->delete();
-            $isFavorite = false;
-        } else {
-            CoordinatorProjectJobFavorite::create([
-                'user_id'        => $user->id,
-                'project_job_id' => $projectJob->id,
-            ]);
-            $isFavorite = true;
-        }
-
-        return response()->json(['is_favorite' => $isFavorite]);
     }
 
     /**

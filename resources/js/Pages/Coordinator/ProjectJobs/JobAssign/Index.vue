@@ -3,13 +3,13 @@
         <template #header>
             <div class="flex items-center gap-3">
                 <Link :href="route('coordinator.project_jobs.show', { projectJob: projectJob.id })"
-                      class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                      class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300"
                 >← 案件詳細に戻る</Link>
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">ジョブ割り当て一覧</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">ジョブ割り当て一覧</h2>
             </div>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
 
             <!-- 検索・フィルター行 -->
             <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -18,7 +18,7 @@
                         v-model="page.props.q_model"
                         @keyup.enter="search"
                         placeholder="タイトル/詳細/担当で検索"
-                        class="w-72 rounded border px-3 py-2 text-sm"
+                        class="w-full sm:w-72 rounded border px-3 py-2 text-sm"
                     />
                     <button class="rounded bg-indigo-600 px-3 py-2 text-white" @click.prevent="search">検索</button>
                     <button class="ml-2 rounded border px-3 py-2" @click.prevent="clearSearch">クリア</button>

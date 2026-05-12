@@ -169,9 +169,9 @@ async function deleteEvent(ev) {
             <div class="flex items-center gap-3">
                 <Link
                     :href="route('proof_coordinator.assignments.show', { proofRequest: proofRequest.id })"
-                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300"
                 >← 詳細に戻る</Link>
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">校正ジョブ 編集</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">校正ジョブ 編集</h2>
             </div>
         </template>
 
@@ -214,7 +214,7 @@ async function deleteEvent(ev) {
             </div>
 
             <!-- 作業時間 編集セクション -->
-            <div v-if="localEvents.length > 0" class="rounded bg-white p-6 shadow">
+            <div v-if="localEvents.length > 0" class="rounded bg-white px-4 py-6 sm:p-6 shadow">
                 <h3 class="mb-4 text-sm font-semibold text-gray-700">登録済み作業時間</h3>
                 <div class="space-y-3">
                     <div
@@ -296,7 +296,7 @@ async function deleteEvent(ev) {
             </div>
 
             <!-- ジョブ割り当てフォーム -->
-            <div class="rounded bg-white p-6 shadow">
+            <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
                 <p class="mb-4 text-sm text-gray-500">
                     ※ 担当者・作業詳細を編集してください。
                 </p>

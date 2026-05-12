@@ -19,7 +19,7 @@ const roleLabel = {
     <AppLayout title="Adminユーザー詳細">
         <template #header>
             <div class="flex items-center justify-between">
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">Adminユーザー詳細</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">Adminユーザー詳細</h2>
                 <div class="flex gap-2">
                     <Link
                         :href="route('superadmin.adminusers.edit', { adminuser: user.id })"
@@ -37,7 +37,7 @@ const roleLabel = {
             </div>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <div class="mx-auto max-w-lg">
             <h3 class="mb-4 text-lg font-medium text-gray-900">ユーザー情報</h3>
             <dl class="divide-y divide-gray-200">

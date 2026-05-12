@@ -47,7 +47,7 @@ const showProfile = ref(false);
 <template>
     <AppLayout title="Dashboard" :user="user">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">
                 <span v-if="user?.user_role === 'admin'"> 【管理者→ユーザーモード】{{ user?.name || 'ユーザー' }}さんのページ </span>
                 <span v-else-if="user?.user_role === 'leader'"> 【リーダー→ユーザーモード】{{ user?.name || 'ユーザー' }}さんのページ </span>
                 <span v-else-if="user?.user_role === 'coordinator'">【進行管理→ユーザーモード】{{ user?.name || 'ユーザー' }}さんのページ</span>
@@ -109,7 +109,7 @@ const showProfile = ref(false);
             </div>
         </div>
         <!-- カレンダー -->
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <Calendar
                 :diaries="diaries"
                 :events="events"

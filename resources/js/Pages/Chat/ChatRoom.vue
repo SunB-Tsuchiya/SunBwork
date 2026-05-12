@@ -818,7 +818,7 @@ function onCompositionEnd() {
         <!-- hidden file input used by Upload button -->
         <input ref="uploadInput" type="file" style="display: none" @change="onUploadInputChange" multiple />
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">チャットルーム</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">チャットルーム</h2>
         </template>
         <!-- フラッシュメッセージ -->
         <transition name="fade">
@@ -881,6 +881,7 @@ function onCompositionEnd() {
                             <span class="text-lg font-bold">メンバー一覧</span>
                             <button @click="showMembers = false" class="text-gray-500 hover:text-gray-800">×</button>
                         </div>
+                        <div class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-gray-200">
                             <thead class="bg-gray-50">
                                 <tr>
@@ -895,6 +896,7 @@ function onCompositionEnd() {
                                 </tr>
                             </tbody>
                         </table>
+                        </div>
                         <div class="mt-4 flex justify-end">
                             <button @click="showMembers = false" class="rounded bg-blue-600 px-4 py-2 text-white">閉じる</button>
                         </div>

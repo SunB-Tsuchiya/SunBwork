@@ -153,10 +153,10 @@ function executeMerge() {
 <template>
     <AppLayout title="クライアント編集">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">クライアント編集</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">クライアント編集</h2>
         </template>
 
-        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-2xl rounded bg-white px-4 py-6 sm:p-6 shadow">
             <form @submit.prevent="submit">
                 <div class="mb-4">
                     <label class="mb-1 block">名前</label>
@@ -210,7 +210,7 @@ function executeMerge() {
 
                 <div class="mt-6 flex flex-wrap gap-3">
                     <button type="submit" class="rounded bg-orange-600 px-4 py-2 font-bold text-white hover:bg-orange-700">更新</button>
-                    <Link :href="route(`${routePrefix}.clients.index`)" class="rounded bg-gray-200 px-4 py-2 font-bold text-gray-700 hover:bg-gray-300">一覧へ戻る</Link>
+                    <Link :href="route(`${routePrefix}.clients.index`)" class="rounded bg-gray-200 px-4 py-2 font-bold text-gray-700 whitespace-nowrap hover:bg-gray-300">一覧へ戻る</Link>
 
                     <!-- 休眠 / 解除ボタン -->
                     <button
@@ -307,7 +307,7 @@ function executeMerge() {
                                 </button>
                                 <button
                                     type="button"
-                                    class="rounded bg-gray-200 px-4 py-2 font-bold text-gray-700 hover:bg-gray-300"
+                                    class="rounded bg-gray-200 px-4 py-2 font-bold text-gray-700 whitespace-nowrap hover:bg-gray-300"
                                     @click="closeModal"
                                 >
                                     閉じる
@@ -347,6 +347,7 @@ function executeMerge() {
 
                             <!-- クライアント一覧 -->
                             <div class="mb-4 max-h-60 overflow-y-auto rounded border border-gray-200">
+                                <div class="overflow-x-auto">
                                 <table class="min-w-full divide-y divide-gray-200 text-sm">
                                     <thead class="sticky top-0 bg-gray-50">
                                         <tr>
@@ -379,6 +380,7 @@ function executeMerge() {
                                         </tr>
                                     </tbody>
                                 </table>
+                                </div>
                             </div>
 
                             <!-- 選択中クライアントの確認表示 -->
@@ -403,7 +405,7 @@ function executeMerge() {
                                 </button>
                                 <button
                                     type="button"
-                                    class="rounded bg-gray-200 px-4 py-2 font-bold text-gray-700 hover:bg-gray-300"
+                                    class="rounded bg-gray-200 px-4 py-2 font-bold text-gray-700 whitespace-nowrap hover:bg-gray-300"
                                     @click="closeModal"
                                 >
                                     キャンセル

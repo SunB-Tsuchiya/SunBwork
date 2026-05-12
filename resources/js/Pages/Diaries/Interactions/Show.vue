@@ -348,12 +348,12 @@ async function updateComment() {
     <AppLayout title="日報表示">
         <template #header>
             <div class="flex items-center gap-3">
-                <button @click="goIndex" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">← 一覧に戻る</button>
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">日報詳細</h2>
+                <button @click="goIndex" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300">← 一覧に戻る</button>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">日報詳細</h2>
             </div>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <div class="mb-3 flex flex-wrap items-baseline gap-x-4 gap-y-1">
                 <span class="text-sm text-gray-600">
                     <span v-if="diary.department_name">{{ diary.department_name }}：</span>{{ diary.user_name }}

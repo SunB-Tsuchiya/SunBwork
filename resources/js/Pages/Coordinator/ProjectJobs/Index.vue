@@ -1,7 +1,7 @@
 <template>
     <AppLayout title="案件一覧">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">案件一覧</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">案件一覧</h2>
         </template>
 
         <template #headerExtras>
@@ -34,7 +34,7 @@
                 <table v-else class="w-full table-fixed border">
                     <colgroup>
                         <col class="w-28" />
-                        <col />
+                        <col class="w-36" />
                         <col class="w-44" />
                         <col class="w-24" />
                         <col class="w-12" />
@@ -51,7 +51,7 @@
                     <tbody>
                         <tr v-for="job in localFavoriteJobs" :key="job.id" class="cursor-pointer hover:bg-yellow-50" @click="rowClick($event, job)">
                             <td class="border px-3 py-2 text-sm text-gray-600">{{ formatDate(job.created_at) }}</td>
-                            <td class="border px-3 py-2 text-sm font-medium text-gray-800">{{ job.title || job.name }}</td>
+                            <td class="border px-3 py-2 text-sm font-medium text-gray-800 max-w-0 truncate" :title="job.title || job.name">{{ job.title || job.name }}</td>
                             <td class="border px-3 py-2 text-sm text-gray-600">{{ job.client?.name || '-' }}</td>
                             <td class="border px-3 py-2">
                                 <span
@@ -72,7 +72,7 @@
             </div>
 
             <!-- 検索・一覧 -->
-            <div class="rounded bg-white p-6 shadow">
+            <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <!-- 検索・フィルター行 -->
             <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div class="flex items-center gap-2">
@@ -80,7 +80,7 @@
                         v-model="page.props.q_model"
                         @keyup.enter="search"
                         placeholder="案件名/クライアントで検索"
-                        class="w-72 rounded border px-3 py-2 text-sm"
+                        class="w-full sm:w-72 rounded border px-3 py-2 text-sm"
                     />
                     <button class="rounded bg-indigo-600 px-3 py-2 text-white" @click.prevent="search">検索</button>
                     <button class="ml-2 rounded border px-3 py-2" @click.prevent="clearSearch">クリア</button>
@@ -138,7 +138,7 @@
                     <table class="w-full table-fixed border">
                         <colgroup>
                             <col class="w-28" />
-                            <col />
+                            <col class="w-36" />
                             <col class="w-44" />
                             <col class="w-24" />
                             <col class="w-12" />
@@ -167,7 +167,7 @@
                         <tbody>
                             <tr v-for="job in group.items" :key="job.id" class="cursor-pointer hover:bg-blue-50" @click="rowClick($event, job)">
                                 <td class="border px-3 py-2 text-sm text-gray-600">{{ formatDate(job.created_at) }}</td>
-                                <td class="border px-3 py-2 text-sm">{{ job.title || job.name }}</td>
+                                <td class="border px-3 py-2 text-sm max-w-0 truncate" :title="job.title || job.name">{{ job.title || job.name }}</td>
                                 <td class="border px-3 py-2 text-sm text-gray-600">{{ job.client?.name || '-' }}</td>
                                 <td class="border px-3 py-2">
                                     <span

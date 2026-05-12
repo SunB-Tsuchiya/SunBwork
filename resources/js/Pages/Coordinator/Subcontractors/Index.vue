@@ -8,7 +8,7 @@ const props = defineProps({ subcontractors: Array });
 <template>
     <AppLayout title="外注先一覧">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">外注先管理</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">外注先管理</h2>
         </template>
         <template #headerExtras>
             <Link :href="route('coordinator.subcontractors.create')" class="rounded bg-green-600 px-4 py-2 font-bold text-white hover:bg-green-700">
@@ -16,7 +16,7 @@ const props = defineProps({ subcontractors: Array });
             </Link>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <template v-if="props.subcontractors.length === 0">
                 <p class="py-8 text-gray-500">外注先はまだ登録されていません</p>
             </template>

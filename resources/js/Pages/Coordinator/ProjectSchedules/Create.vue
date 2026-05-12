@@ -1,6 +1,6 @@
 <template>
     <AppLayout title="ガント作成（PoC）">
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <h1 class="mb-4 text-xl font-bold">タスク作成（PoC）</h1>
             <form @submit.prevent="submit">
                 <div class="mb-2">

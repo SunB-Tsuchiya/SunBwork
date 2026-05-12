@@ -1206,8 +1206,8 @@ onUnmounted(() => {
     <AppLayout title="日報表示">
         <template #header>
             <div class="flex items-center gap-3">
-                <button @click="back" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">← 戻る</button>
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">日報詳細</h2>
+                <button @click="back" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300">← 戻る</button>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">日報詳細</h2>
             </div>
         </template>
 
@@ -1216,7 +1216,7 @@ onUnmounted(() => {
             <button @click="deleteDiary" class="rounded bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700">削除</button>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
 
             <!-- 勤務情報バー -->
             <div v-if="workRecord" class="mb-4 flex flex-wrap items-center gap-x-5 gap-y-1 rounded border border-gray-200 bg-gray-50 px-4 py-2 text-sm">

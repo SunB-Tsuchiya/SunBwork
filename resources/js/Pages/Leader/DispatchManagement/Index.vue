@@ -79,13 +79,13 @@ function toggleHidden(user) {
 <template>
     <AppLayout title="派遣社員管理">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">派遣社員管理</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">派遣社員管理</h2>
         </template>
         <template #tabs>
             <LeaderNavigationTabs active="dispatch" />
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <!-- ツールバー：非表示切り替えボタン -->
             <div class="mb-4 flex items-center justify-between">
                 <p class="text-sm text-gray-500">

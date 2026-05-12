@@ -10,16 +10,16 @@
             <div class="flex items-center gap-3">
                 <button
                     type="button"
-                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300"
                     @click="goShow"
                 >← 案件詳細に戻る</button>
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">
                     作業分析 — {{ job.title || '案件' }}
                 </h2>
             </div>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
 
             <!-- ── 案件ヘッダー ──────────────────────────────── -->
             <div class="mb-5 border-b border-gray-100 pb-4">

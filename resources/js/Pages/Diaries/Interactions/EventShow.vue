@@ -138,7 +138,7 @@ function onBack() {
                 <!-- ボタン類（読み取り専用：戻るのみ） -->
                 <div class="flex flex-wrap items-center gap-2 border-t bg-gray-50 px-5 py-3">
                     <button type="button" @click.prevent="onBack"
-                            class="ml-auto inline-flex items-center gap-1.5 rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">
+                            class="ml-auto inline-flex items-center gap-1.5 rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300">
                         戻る
                     </button>
                 </div>

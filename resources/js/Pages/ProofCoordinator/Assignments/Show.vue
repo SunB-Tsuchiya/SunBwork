@@ -151,9 +151,9 @@ const totalActual         = computed(() => formattedEvents.value.reduce((s, e) =
         <template #header>
             <div class="flex items-center gap-3">
                 <Link :href="route('proof_coordinator.jobs')"
-                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300"
                 >← ジョブ管理に戻る</Link>
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">校正依頼 — 詳細</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">校正依頼 — 詳細</h2>
             </div>
         </template>
 
@@ -253,7 +253,8 @@ const totalActual         = computed(() => formattedEvents.value.reduce((s, e) =
                 </div>
                 <div class="px-5 py-4">
                     <div v-if="formattedEvents.length === 0" class="text-sm text-gray-500">予定が見つかりません。</div>
-                    <table v-else class="w-full text-sm">
+                    <div v-else class="overflow-x-auto">
+                    <table class="w-full text-sm">
                         <thead>
                             <tr class="border-b text-xs text-gray-500">
                                 <th class="pb-2 text-left font-medium">作業日</th>
@@ -289,6 +290,7 @@ const totalActual         = computed(() => formattedEvents.value.reduce((s, e) =
                             </tr>
                         </tfoot>
                     </table>
+                    </div>
                 </div>
             </div>
 

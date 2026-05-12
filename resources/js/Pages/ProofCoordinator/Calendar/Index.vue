@@ -53,7 +53,7 @@ const calendarOptions = computed(() => ({
             <ProofCoordinatorNavigationTabs active="calendar" />
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <!-- 凡例 -->
             <div class="mb-4 flex flex-wrap gap-3 text-xs">
                 <span class="flex items-center gap-1"><span class="inline-block h-3 w-3 rounded-full bg-gray-400"></span>依頼中</span>

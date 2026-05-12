@@ -39,13 +39,14 @@ function getMemberNames(room) {
 <template>
     <AppLayout title="チャットルーム一覧">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">チャットルーム一覧</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">チャットルーム一覧</h2>
         </template>
-        <div class="mx-auto max-w-4xl rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-4xl rounded bg-white px-4 py-6 sm:p-6 shadow">
                 <div v-if="success" class="mb-4 rounded border border-green-300 bg-green-100 p-3 text-green-800">
                     {{ success }}
                 </div>
                 <button class="mb-4 rounded bg-blue-600 px-4 py-2 text-white" @click="createRoom">新しいチャットルームを作成</button>
+                <div class="overflow-x-auto">
                 <table class="mb-4 min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
@@ -75,6 +76,7 @@ function getMemberNames(room) {
                         </tr>
                     </tbody>
                 </table>
+                </div>
                 <div class="mt-6">
                     <a href="/bot/chat" class="text-purple-600 hover:underline"> AIチャットはこちら </a>
                 </div>

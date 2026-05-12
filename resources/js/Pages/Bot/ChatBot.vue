@@ -822,7 +822,7 @@ onUnmounted(() => {
 <template>
     <AppLayout title="AIチャット">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">AIチャット</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">AIチャット</h2>
         </template>
         <div class="mx-auto flex max-w-6xl flex-col gap-4 rounded bg-white p-4 shadow" style="height: calc(100vh - 140px)">
                 <div class="mb-4 flex items-center justify-between">

@@ -1,14 +1,14 @@
 <template>
     <AppLayout title="案件総覧">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">【Admin】案件総覧</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">【Admin】案件総覧</h2>
         </template>
 
         <template #tabs>
             <AdminNavigationTabs active="project_jobs" />
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
 
             <!-- 部署切り替えボタン -->
             <div class="mb-4 flex flex-wrap gap-2">

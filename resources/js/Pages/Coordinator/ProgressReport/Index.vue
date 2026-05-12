@@ -7,7 +7,7 @@
             <CoordinatorNavigationTabs active="progress_report" />
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <!-- フィルター -->
             <div class="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <!-- 担当者 -->

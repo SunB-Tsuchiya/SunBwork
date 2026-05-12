@@ -10,7 +10,7 @@
             </div>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
                         <form @submit.prevent="submit" class="mx-auto grid max-w-3xl grid-cols-1 gap-6">
                             <div v-if="prefillLoading" class="rounded-md border border-yellow-100 bg-yellow-50 p-2 text-sm text-yellow-700">
                                 受信者情報を読み込み中... 少々お待ちください
@@ -142,6 +142,7 @@
                                 <div class="mt-2 text-sm text-gray-600">
                                     添付済み: <span>{{ attachments && attachments.length ? attachments.length : 0 }} 個</span>
                                 </div>
+                                <div class="overflow-x-auto">
                                 <table class="mt-3 w-full text-sm">
                                     <thead>
                                         <tr class="text-left text-xs text-gray-500">
@@ -164,6 +165,7 @@
                                         </tr>
                                     </tbody>
                                 </table>
+                                </div>
                             </div>
                             <div class="mt-4 flex items-center justify-between">
                                 <div>

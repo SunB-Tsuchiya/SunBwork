@@ -108,7 +108,7 @@ const getAssignmentName = (assignment_id) => {
     <AppLayout title="ユーザー管理">
         <template #header>
             <div class="flex items-center justify-between">
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">ユーザー管理</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">ユーザー管理</h2>
                 <template v-if="myuser?.user_role === 'superadmin'">
                     <Link :href="route('superadmin.users.create')" class="rounded bg-red-600 px-4 py-2 font-bold text-white hover:bg-red-700"
                         >新規ユーザー登録</Link
@@ -117,7 +117,7 @@ const getAssignmentName = (assignment_id) => {
             </div>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <div class="mb-4 flex items-center justify-between">
                 <h3 class="text-lg font-medium text-gray-900">登録アカウント一覧</h3>
                 <div class="text-sm text-gray-500">総数: {{ users.length }}人</div>

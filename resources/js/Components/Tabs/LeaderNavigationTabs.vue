@@ -1,6 +1,6 @@
 <script setup>
-import { Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
+import { Link, usePage, router } from '@inertiajs/vue3';
 
 const props = defineProps({
     active: { type: String, default: '' },
@@ -15,20 +15,60 @@ const tab = (key) => [
 ];
 
 const page = usePage();
-
-// leader_permissions が null（未設定）の場合は全権限オン扱い
 const perm = computed(() => page.props.auth?.leaderPermissions ?? null);
 const can = (key) => perm.value === null || perm.value[key] === true;
-
-// 部署リーダーのみユーザー管理タブを表示
 const isDepartmentLeader = computed(() => page.props.auth?.user?.isDepartmentLeader === true);
-// Admin / SuperAdmin は常にアクセス可
 const isAdminOrAbove = computed(() => ['admin', 'superadmin'].includes(page.props.auth?.user?.user_role));
+
+function tryRoute(name) {
+    try { return route(name); } catch { return null; }
+}
+
+const tabs = computed(() => [
+    { key: 'user_management', href: tryRoute('leader.user_management.index'), label: 'ユーザー管理', condition: isDepartmentLeader.value },
+    {
+        key: 'project_jobs',
+        href: tryRoute('leader.project_jobs.index'),
+        label: '案件総覧',
+        condition: (isDepartmentLeader.value || isAdminOrAbove.value) && can('project_job_overview'),
+    },
+    { key: 'teams', href: tryRoute('leader.teams.index'), label: 'チーム管理' },
+    { key: 'clients', href: tryRoute('leader.clients.index'), label: 'クライアント管理', condition: can('client_management') },
+    { key: 'diaries', href: tryRoute('leader.diaryinteractions.index'), label: '日報管理', condition: can('diary_management') },
+    { key: 'workload', href: tryRoute('leader.workload_analyzer.index'), label: '作業量分析', condition: can('workload_analysis') },
+    { key: 'workload_setting', href: tryRoute('workload_setting.index'), label: '作業項目設定', condition: can('workload_setting') },
+    { key: 'work_records', href: tryRoute('leader.work_records.index'), label: '勤務時間管理', condition: can('work_record_management') },
+    { key: 'dispatch', href: tryRoute('leader.dispatch_management.index'), label: '派遣管理', condition: can('dispatch_management') },
+    { key: 'leader_permissions', href: tryRoute('leader.leader_permissions.index'), label: 'Leader権限管理' },
+    { key: 'meeting_definitions', href: tryRoute('leader.meeting_definitions.index'), label: '会議設定' },
+].filter(t => t.condition !== false && t.href));
+
+function onMobileSelect(e) {
+    const href = e.target.value;
+    if (href) router.get(href);
+}
 </script>
 
 <template>
     <div class="mb-6">
-        <nav class="flex flex-wrap gap-2" aria-label="Tabs">
+        <!-- モバイル: ドロップダウン -->
+        <div class="sm:hidden">
+            <select
+                @change="onMobileSelect"
+                class="w-full rounded-md border border-orange-300 bg-white px-3 py-2 text-sm text-orange-700 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+            >
+                <option value="">— ページを選択 —</option>
+                <option
+                    v-for="t in tabs"
+                    :key="t.key"
+                    :value="t.href"
+                    :selected="active === t.key"
+                >{{ t.label }}</option>
+            </select>
+        </div>
+
+        <!-- デスクトップ: タブ -->
+        <nav class="hidden sm:flex flex-wrap gap-2" aria-label="Tabs">
             <Link
                 v-if="isDepartmentLeader"
                 :href="route('leader.user_management.index')"

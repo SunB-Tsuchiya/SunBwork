@@ -1,6 +1,6 @@
 <template>
     <AppLayout title="ジョブ作成">
-        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-2xl rounded bg-white px-4 py-6 sm:p-6 shadow">
             <h1 class="mb-4 text-2xl font-bold">ジョブ作成２</h1>
             <div>
                 <AssignmentFormUser

@@ -1,7 +1,7 @@
 <template>
     <AppLayout :title="`JobBox - ${props.projectJob?.title || props.projectJob?.name || '全体'}`">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">ジョブ一覧（JobBox）</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">ジョブ一覧（JobBox）</h2>
         </template>
 
         <template #headerExtras>
@@ -11,7 +11,7 @@
             >新規作成</Link>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
 
             <!-- 検索・フィルター行 -->
             <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -20,7 +20,7 @@
                         v-model="page.props.q_model"
                         @keyup.enter="search"
                         placeholder="タイトル/詳細/担当で検索"
-                        class="w-72 rounded border px-3 py-2 text-sm"
+                        class="w-full sm:w-72 rounded border px-3 py-2 text-sm"
                     />
                     <button class="rounded bg-blue-600 px-3 py-2 text-white" @click.prevent="search">検索</button>
                     <button class="ml-2 rounded border px-3 py-2" @click.prevent="clearSearch">クリア</button>

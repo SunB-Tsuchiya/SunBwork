@@ -353,7 +353,7 @@ function diffMinutes(estimated, actual) {
     <AppLayout title="作業量分析">
         <template #header>
             <div class="flex items-center gap-2.5">
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">作業量分析</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">作業量分析</h2>
                 <span class="text-base text-gray-500">{{ selectedYmLabel }}</span>
             </div>
         </template>
@@ -398,7 +398,7 @@ function diffMinutes(estimated, actual) {
 
         <Head title="作業量分析" />
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <h1 class="mb-4 text-xl font-semibold text-gray-800">総合ランキング</h1>
 
             <!-- ランキング種別トグル -->
@@ -467,6 +467,7 @@ function diffMinutes(estimated, actual) {
                                     </button>
                                 </div>
                                 <div class="mt-2 overflow-hidden bg-white shadow sm:rounded-lg">
+                                    <div class="overflow-x-auto">
                                     <table class="w-full min-w-full table-fixed divide-y divide-gray-200">
                                         <thead>
                                             <tr>
@@ -659,6 +660,7 @@ function diffMinutes(estimated, actual) {
                                             </template>
                                         </tbody>
                                     </table>
+                                    </div>
                                 </div>
                             </div>
                         </div>

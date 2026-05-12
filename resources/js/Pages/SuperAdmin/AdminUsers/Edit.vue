@@ -78,14 +78,14 @@ const submit = () => {
     <AppLayout title="Adminユーザー編集">
         <template #header>
             <div class="flex items-center justify-between">
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">Adminユーザー編集</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">Adminユーザー編集</h2>
                 <Link :href="route('superadmin.adminusers.index')" class="text-gray-600 hover:text-gray-900">
                     ← Adminユーザー一覧に戻る
                 </Link>
             </div>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <form @submit.prevent="submit">
                 <div>
                     <InputLabel for="name" value="名前" />

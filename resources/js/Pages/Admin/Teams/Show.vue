@@ -57,8 +57,8 @@ const leaderName = computed(() => {
     <AppLayout :title="`チーム：${currentTeam.name || ''}`">
         <template #header>
             <div class="flex items-center gap-3">
-                <Link :href="route('admin.teams.index')" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">← チーム一覧に戻る</Link>
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">チーム詳細</h2>
+                <Link :href="route('admin.teams.index')" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300">← チーム一覧に戻る</Link>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">チーム詳細</h2>
             </div>
         </template>
         <template #headerExtras>
@@ -69,7 +69,7 @@ const leaderName = computed(() => {
             >編集</Link>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
                     <div class="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div>
                             <div class="text-sm text-gray-500">ID</div>

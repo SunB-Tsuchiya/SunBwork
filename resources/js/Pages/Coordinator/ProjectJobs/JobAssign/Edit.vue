@@ -4,9 +4,9 @@
             <div class="flex items-center gap-3">
                 <Link
                     :href="route('coordinator.project_jobs.assignments.index', { projectJob: projectJob.id })"
-                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300"
                 >← 割り当て一覧に戻る</Link>
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">割当編集</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">割当編集</h2>
             </div>
         </template>
         <template #headerExtras>
@@ -17,7 +17,7 @@
             >過去データから流用</button>
         </template>
 
-        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-2xl rounded bg-white px-4 py-6 sm:p-6 shadow">
             <AssignmentForm :key="formKey" :projectJob="projectJob" :members="members" :assignments="formAssignments" :editMode="true" />
         </div>
     </AppLayout>
@@ -91,7 +91,8 @@
                 <div v-if="!modalLoading && modalRecords.length === 0" class="py-8 text-center text-sm text-gray-400">
                     データがありません。
                 </div>
-                <table v-if="modalRecords.length > 0" class="min-w-full divide-y divide-gray-200 text-sm">
+                <div v-if="modalRecords.length > 0" class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 text-sm">
                     <thead class="bg-gray-50">
                         <tr>
                             <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">日付</th>
@@ -116,11 +117,12 @@
                         </tr>
                     </tbody>
                 </table>
+                </div>
             </div>
 
             <!-- フッター -->
             <div class="border-t px-6 py-3 text-right">
-                <button @click="closeModal" class="rounded bg-gray-200 px-4 py-2 text-sm text-gray-700 hover:bg-gray-300">閉じる</button>
+                <button @click="closeModal" class="rounded bg-gray-200 px-4 py-2 text-sm text-gray-700 whitespace-nowrap hover:bg-gray-300">閉じる</button>
             </div>
         </div>
     </div>

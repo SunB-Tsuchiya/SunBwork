@@ -47,7 +47,7 @@ const submit = () => {
 </script>
 
 <template>
-    <div class="mx-auto max-w-4xl rounded bg-white p-6 shadow">
+    <div class="mx-auto max-w-4xl rounded bg-white px-4 py-6 sm:p-6 shadow">
                 <form @submit.prevent="submit" class="space-y-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700">会社</label>

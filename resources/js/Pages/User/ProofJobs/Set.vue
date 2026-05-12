@@ -42,7 +42,7 @@ const updateUrl = route('user.proof_jobs.set', { proofRequest: props.proofReques
             <div class="flex items-center gap-3">
                 <Link
                     :href="route('user.proof_jobs.index')"
-                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300"
                 >
                     ← 一覧に戻る
                 </Link>
@@ -81,7 +81,7 @@ const updateUrl = route('user.proof_jobs.set', { proofRequest: props.proofReques
             </div>
 
             <!-- ジョブ割り当てフォーム（作業時間スロット付き） -->
-            <div class="rounded bg-white p-6 shadow">
+            <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
                 <p class="mb-4 text-sm text-gray-500">
                     ※ 作業詳細と作業日・時間を入力して保存してください。
                 </p>

@@ -56,7 +56,7 @@ function goToEdit(clientId) {
 <template>
     <AppLayout title="クライアント一覧">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">
                 クライアント管理
                 <span v-if="props.showDormant" class="ml-2 rounded-full bg-gray-200 px-2 py-0.5 text-sm font-normal text-gray-600">休眠一覧</span>
             </h2>
@@ -184,7 +184,7 @@ function goToEdit(clientId) {
         </template>
 
         <!-- ── Admin / Coordinator など: 通常1テーブル表示 ── -->
-        <div v-else class="rounded bg-white p-6 shadow">
+        <div v-else class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <template v-if="props.clients.length === 0">
                 <p class="py-8 text-gray-500">
                     {{ props.showDormant ? '休眠クライアントはありません' : 'クライアントはまだ登録されていません' }}

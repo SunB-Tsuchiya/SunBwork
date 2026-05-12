@@ -320,15 +320,15 @@ onMounted(() => {
             <div class="flex items-center gap-3">
                 <Link
                     :href="route(`${routePrefix}.workload_analyzer.index`)"
-                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300"
                 >← 作業量分析に戻る</Link>
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">{{ props.user_name ?? `ユーザー #${props.user_id}` }} — 作業量分析詳細</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">{{ props.user_name ?? `ユーザー #${props.user_id}` }} — 作業量分析詳細</h2>
             </div>
         </template>
 
         <Head title="作業量分析 - 詳細" />
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
                     <div class="mb-6 flex items-start justify-between border-b pb-4">
                         <div>
                             <h1 class="text-2xl font-bold">{{ props.user_name ?? `ユーザー #${props.user_id}` }}</h1>
@@ -488,6 +488,7 @@ onMounted(() => {
                                     <div class="flex gap-4">
                                         <div class="flex-1">
                                             <h4 class="font-medium">詳細</h4>
+                                            <div class="overflow-x-auto">
                                             <table class="mt-2 w-full table-fixed text-sm">
                                                 <thead>
                                                     <tr>
@@ -508,6 +509,7 @@ onMounted(() => {
                                                     </tr>
                                                 </tbody>
                                             </table>
+                                            </div>
                                         </div>
                                     </div>
 

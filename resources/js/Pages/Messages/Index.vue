@@ -4,7 +4,7 @@
             <h2 class="text-xl font-semibold leading-tight">メール</h2>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
                     <!-- Top toolbar: compose, address book, search -->
                     <div class="mb-4 flex items-center gap-3">
                         <Link :href="route('messages.create')" class="inline-flex items-center gap-2 rounded bg-blue-600 px-3 py-2 text-white">

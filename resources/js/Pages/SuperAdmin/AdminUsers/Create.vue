@@ -224,12 +224,12 @@ const submit = () => {
     <AppLayout title="新規Adminユーザー登録">
         <template #header>
             <div class="flex items-center justify-between">
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">新規Adminユーザー登録</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">新規Adminユーザー登録</h2>
                 <Link :href="route('superadmin.adminusers.index')" class="text-gray-600 hover:text-gray-900"> ← Adminユーザー一覧に戻る </Link>
             </div>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
                     <!-- <h3 class="text-lg font-medium text-blue-900 mb-2">CSV一括登録</h3>
                     <p class="text-sm text-blue-700 mb-4">
                         CSVファイルを使用して複数のユーザーを一度に登録できます。

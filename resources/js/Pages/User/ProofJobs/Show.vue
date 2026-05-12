@@ -108,7 +108,7 @@ const statusBadge = {
     <AppLayout :title="`校正ジョブ - ${proofRequest.title}`">
         <template #header>
             <div class="flex items-center gap-3">
-                <Link :href="route('user.proof_jobs.index')" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">← 校正ジョブ一覧に戻る</Link>
+                <Link :href="route('user.proof_jobs.index')" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300">← 校正ジョブ一覧に戻る</Link>
                 <h2 class="text-xl font-semibold text-gray-800">校正ジョブ — 詳細</h2>
             </div>
         </template>
@@ -168,6 +168,7 @@ const statusBadge = {
                     <h3 class="text-sm font-semibold text-gray-700">セットされた予定</h3>
                 </div>
                 <div class="px-5 py-4">
+                    <div class="overflow-x-auto">
                     <table class="w-full text-sm">
                         <thead>
                             <tr class="border-b text-xs text-gray-500">
@@ -192,6 +193,7 @@ const statusBadge = {
                             </tr>
                         </tfoot>
                     </table>
+                    </div>
                 </div>
             </div>
 

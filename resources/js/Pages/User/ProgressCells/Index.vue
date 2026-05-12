@@ -1,7 +1,7 @@
 <template>
     <AppLayout title="進行表担当一覧">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">進行表担当一覧</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">進行表担当一覧</h2>
         </template>
 
         <template #tabs>
@@ -16,7 +16,7 @@
             </nav>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <!-- 検索・フィルター行 -->
             <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div class="flex items-center gap-2">
@@ -24,7 +24,7 @@
                         v-model="searchQ"
                         @keyup.enter="() => {}"
                         placeholder="案件名/進行表/行/列/クライアントで検索"
-                        class="w-72 rounded border px-3 py-2 text-sm"
+                        class="w-full sm:w-72 rounded border px-3 py-2 text-sm"
                     />
                     <button class="ml-2 rounded border px-3 py-2 text-sm" @click="searchQ = ''">クリア</button>
                 </div>

@@ -1,6 +1,6 @@
 <template>
     <AppLayout title="ジョブ作成">
-        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-2xl rounded bg-white px-4 py-6 sm:p-6 shadow">
             <div class="mb-4 flex items-center justify-between">
                 <h1 class="text-2xl font-bold">
                     <template v-if="hasSourceJob">依頼されたジョブをマイジョブBOXとして登録</template>
@@ -100,7 +100,8 @@
                         <div class="max-h-80 overflow-y-auto rounded border border-gray-200">
                             <div v-if="modalLoading" class="py-8 text-center text-sm text-gray-500">読み込み中...</div>
                             <div v-else-if="records.length === 0" class="py-8 text-center text-sm text-gray-500">該当データがありません</div>
-                            <table v-else class="min-w-full divide-y divide-gray-200 text-sm">
+                            <div v-else class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200 text-sm">
                                 <thead class="sticky top-0 bg-gray-50">
                                     <tr>
                                         <th class="px-3 py-2 text-left font-medium text-gray-600">日付</th>
@@ -130,6 +131,7 @@
                                     </tr>
                                 </tbody>
                             </table>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -188,6 +190,7 @@
                         <div v-if="requestLoading" class="py-8 text-center text-sm text-gray-500">読み込み中...</div>
                         <div v-else-if="requestRecords.length === 0" class="py-8 text-center text-sm text-gray-500">未対応の依頼ジョブはありません</div>
                         <div v-else class="max-h-80 overflow-y-auto rounded border border-gray-200">
+                            <div class="overflow-x-auto">
                             <table class="min-w-full divide-y divide-gray-200 text-sm">
                                 <thead class="sticky top-0 bg-gray-50">
                                     <tr>
@@ -206,6 +209,7 @@
                                     </tr>
                                 </tbody>
                             </table>
+                            </div>
                         </div>
                     </div>
                 </div>

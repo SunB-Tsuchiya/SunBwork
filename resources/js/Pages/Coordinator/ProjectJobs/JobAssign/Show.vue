@@ -3,9 +3,9 @@
         <template #header>
             <div class="flex items-center gap-3">
                 <Link :href="route('coordinator.project_jobs.assignments.index', { projectJob: projectJob.id })"
-                      class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                      class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300"
                 >← 割り当て一覧に戻る</Link>
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">ジョブ割り当て詳細</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">ジョブ割り当て詳細</h2>
             </div>
         </template>
 
@@ -28,7 +28,7 @@
             </div>
         </template>
 
-        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-2xl rounded bg-white px-4 py-6 sm:p-6 shadow">
             <AssignmentForm :projectJob="projectJob" :members="$page.props.members || []" :assignments="[assignment]" :editMode="false" />
 
             <!-- ファイル一覧（file_info があれば常に表示） -->

@@ -587,148 +587,6 @@ const currentRouteContext = computed(() => {
                         </template>
                     </div>
 
-                    <!-- Responsive Role Sub-Tabs (route-context based) -->
-                    <div class="space-y-1 border-t border-gray-200 pb-3 pt-2">
-                        <!-- SuperAdmin sub-tabs -->
-                        <template v-if="currentRouteContext === 'superadmin'">
-                            <ResponsiveNavLink
-                                v-if="typeof route === 'function' && route().has('superadmin.companies.index')"
-                                :href="route('superadmin.companies.index')"
-                                :active="route().current('superadmin.companies.*')"
-                                ><span class="text-yellow-600">会社の追加と管理</span></ResponsiveNavLink
-                            >
-                            <ResponsiveNavLink :href="route('superadmin.adminusers.index')" :active="route().current('superadmin.adminusers.*')"
-                                ><span class="text-yellow-600">Adminユーザー管理</span></ResponsiveNavLink
-                            >
-                            <ResponsiveNavLink
-                                v-if="typeof route === 'function' && route().has('superadmin.ai.index')"
-                                :href="route('superadmin.ai.index')"
-                                :active="route().current('superadmin.ai.*')"
-                                ><span class="text-yellow-600">AI設定</span></ResponsiveNavLink
-                            >
-                            <ResponsiveNavLink :href="route('debug.api')" :active="route().current('debug.api')"
-                                ><span class="text-yellow-600">APIデバッグページ</span></ResponsiveNavLink
-                            >
-                        </template>
-
-                        <!-- Admin sub-tabs -->
-                        <template v-else-if="currentRouteContext === 'admin'">
-                            <ResponsiveNavLink
-                                v-if="typeof route === 'function' && route().has('admin.companies.index')"
-                                :href="route('admin.companies.index')"
-                                :active="route().current('admin.companies.*')"
-                                ><span class="text-red-600">会社管理</span></ResponsiveNavLink
-                            >
-                            <ResponsiveNavLink :href="route('admin.users.index')" :active="route().current('admin.users.*')">
-                                <span class="text-red-600">ユーザー管理</span>
-                            </ResponsiveNavLink>
-                            <ResponsiveNavLink :href="route('admin.teams.index')" :active="route().current('admin.teams.*')">
-                                <span class="text-red-600">チーム管理</span>
-                            </ResponsiveNavLink>
-                            <ResponsiveNavLink :href="route('admin.diaryinteractions.index')" :active="route().current('admin.diaryinteractions.*')">
-                                <span class="text-red-600">日報管理</span>
-                            </ResponsiveNavLink>
-                            <ResponsiveNavLink :href="route('admin.clients.index')" :active="route().current('admin.clients.*')">
-                                <span class="text-red-600">クライアント管理</span>
-                            </ResponsiveNavLink>
-                            <ResponsiveNavLink :href="route('admin.workload_analyzer.index')" :active="route().current('admin.workload_analyzer.*')">
-                                <span class="text-red-600">作業量分析</span>
-                            </ResponsiveNavLink>
-                        </template>
-
-                        <!-- Leader sub-tabs -->
-                        <template v-else-if="currentRouteContext === 'leader'">
-                            <ResponsiveNavLink :href="route('leader.clients.index')" :active="route().current('leader.clients.*')">
-                                <span class="text-orange-600">クライアント管理</span>
-                            </ResponsiveNavLink>
-                            <ResponsiveNavLink
-                                :href="route('leader.diaryinteractions.index')"
-                                :active="route().current('leader.diaryinteractions.*')"
-                            >
-                                <span class="text-orange-600">日報管理</span>
-                            </ResponsiveNavLink>
-                            <ResponsiveNavLink
-                                :href="route('leader.workload_analyzer.index')"
-                                :active="route().current('leader.workload_analyzer.*')"
-                            >
-                                <span class="text-orange-600"></span>
-                            </ResponsiveNavLink>
-                            <ResponsiveNavLink :href="route('workload_setting.index')" :active="route().current('workload_setting.*')">
-                                <span class="text-orange-600">作業項目設定</span>
-                            </ResponsiveNavLink>
-                        </template>
-
-                        <!-- ProofCoordinator sub-tabs -->
-                        <template v-else-if="currentRouteContext === 'proof_coordinator'">
-                            <ResponsiveNavLink :href="route('proof_coordinator.inbox')" :active="route().current('proof_coordinator.inbox')">
-                                <span class="text-pink-600">校正依頼受信</span>
-                            </ResponsiveNavLink>
-                            <ResponsiveNavLink :href="route('proof_coordinator.assignments')" :active="route().current('proof_coordinator.assignments')">
-                                <span class="text-pink-600">割り振り管理</span>
-                            </ResponsiveNavLink>
-                            <ResponsiveNavLink :href="route('proof_coordinator.calendar')" :active="route().current('proof_coordinator.calendar')">
-                                <span class="text-pink-600">校正カレンダー</span>
-                            </ResponsiveNavLink>
-                            <ResponsiveNavLink :href="route('proof_coordinator.workload')" :active="route().current('proof_coordinator.workload')">
-                                <span class="text-pink-600">校正員作業量</span>
-                            </ResponsiveNavLink>
-                            <ResponsiveNavLink :href="route('proof_coordinator.history')" :active="route().current('proof_coordinator.history')">
-                                <span class="text-pink-600">案件校正履歴</span>
-                            </ResponsiveNavLink>
-                        </template>
-
-                        <!-- Coordinator sub-tabs -->
-                        <template v-else-if="currentRouteContext === 'coordinator'">
-                            <ResponsiveNavLink
-                                :href="route('coordinator.clients.index')"
-                                :active="route().current('coordinator.clients.*')"
-                            >
-                                <span class="text-green-600">クライアント管理</span>
-                            </ResponsiveNavLink>
-                            <ResponsiveNavLink
-                                :href="route('coordinator.project_jobs.index')"
-                                :active="route().current('coordinator.project_jobs.*')"
-                            >
-                                <span class="text-green-600">案件一覧</span>
-                            </ResponsiveNavLink>
-                            <ResponsiveNavLink
-                                :href="route('coordinator.project_jobs.calendar')"
-                                :active="route().current('coordinator.project_jobs.calendar')"
-                            >
-                                <span class="text-green-600">案件カレンダー</span>
-                            </ResponsiveNavLink>
-                        </template>
-
-                        <!-- Prepress sub-tabs -->
-                        <template v-else-if="currentRouteContext === 'prepress'">
-                            <ResponsiveNavLink :href="route('prepress.dashboard')" :active="route().current('prepress.dashboard')">
-                                <span class="text-green-700">ダッシュボード</span>
-                            </ResponsiveNavLink>
-                            <ResponsiveNavLink :href="route('prepress.board')" :active="route().current('prepress.board')">
-                                <span class="text-green-700">伝票ボード</span>
-                            </ResponsiveNavLink>
-                            <ResponsiveNavLink :href="route('prepress.tickets.index')" :active="route().current('prepress.tickets.*')">
-                                <span class="text-green-700">伝票一覧</span>
-                            </ResponsiveNavLink>
-                        </template>
-
-                        <!-- User sub-tabs -->
-                        <template v-else>
-                            <ResponsiveNavLink :href="route('user.myjobbox.index')" :active="route().current('user.myjobbox*')">
-                                <span class="text-blue-600">マイジョブBOX</span>
-                            </ResponsiveNavLink>
-                            <ResponsiveNavLink :href="route('user.jobbox.index')" :active="route().current('user.jobbox*')">
-                                <span class="text-blue-600">依頼されたジョブ</span>
-                            </ResponsiveNavLink>
-                            <ResponsiveNavLink :href="route('diaries.index')" :active="route().current('diaries.*')">
-                                <span class="text-blue-600">日報一覧</span>
-                            </ResponsiveNavLink>
-                            <ResponsiveNavLink :href="route('calendar.index')" :active="route().current('calendar.*')">
-                                <span class="text-blue-600">カレンダー</span>
-                            </ResponsiveNavLink>
-                        </template>
-                    </div>
-
                     <!-- Responsive Settings Options -->
                     <div class="border-t border-gray-200 pb-1 pt-4">
                         <div class="flex items-center px-4">
@@ -828,11 +686,11 @@ const currentRouteContext = computed(() => {
 
             <!-- Page Heading -->
             <header v-if="$slots.header" class="bg-white shadow">
-                <div class="mx-auto flex min-h-[4.5rem] max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-                    <div class="flex-1">
+                <div class="mx-auto flex flex-col gap-y-2 max-w-7xl px-4 py-3 sm:min-h-[4.5rem] sm:flex-row sm:items-center sm:justify-between sm:gap-x-4 sm:py-4 sm:px-6 lg:px-8">
+                    <div class="min-w-0 flex-1">
                         <slot name="header" />
                     </div>
-                    <div class="ml-4 flex-shrink-0">
+                    <div class="flex-shrink-0">
                         <slot name="headerExtras" />
                     </div>
                 </div>

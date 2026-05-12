@@ -68,12 +68,13 @@ function goToShow(id) {
             <ProofCoordinatorNavigationTabs active="assignments" />
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <p v-if="proofRequests.length === 0" class="text-gray-500">
                 進行中の校正依頼はありません。
             </p>
 
-            <table v-else class="min-w-full divide-y divide-gray-200">
+            <div v-else class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
                         <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">タイトル</th>
@@ -144,6 +145,7 @@ function goToShow(id) {
                     </tr>
                 </tbody>
             </table>
+            </div>
         </div>
     </AppLayout>
 </template>

@@ -78,7 +78,7 @@ function completeInfo() {
 
 <template>
     <AppLayout title="イベント（閲覧）">
-        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-2xl rounded bg-white px-4 py-6 sm:p-6 shadow">
             <h1 class="mb-4 text-2xl font-bold">イベント（閲覧） {{ props.event.title }}</h1>
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700">日時</label>

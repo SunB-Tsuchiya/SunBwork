@@ -24,10 +24,10 @@ const submit = async () => {
 <template>
     <AppLayout title="AIプリセット管理">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">AIプリセット管理</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">AIプリセット管理</h2>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
                         <div class="mb-4">
                             <h3 class="font-semibold">新規プリセット</h3>
                             <div class="mt-2 grid grid-cols-1 gap-2 md:grid-cols-3">

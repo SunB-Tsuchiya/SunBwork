@@ -486,9 +486,9 @@ function applyPastDiary(rec) {
         <template #header>
             <div class="flex items-center gap-3">
                 <Link :href="route('diaries.index')"
-                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300"
                 >← 日報一覧に戻る</Link>
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">日報作成</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">日報作成</h2>
             </div>
         </template>
 
@@ -498,7 +498,7 @@ function applyPastDiary(rec) {
             >過去データから流用</button>
         </template>
 
-        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-2xl rounded bg-white px-4 py-6 sm:p-6 shadow">
 
             <!-- single event form (tabs removed) -->
             <div>
@@ -577,7 +577,7 @@ function applyPastDiary(rec) {
                         </div>
                     </div>
                     <div class="mt-4 flex justify-end gap-3">
-                        <Link :href="route('dashboard')" class="rounded bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300">キャンセル</Link>
+                        <Link :href="route('dashboard')" class="rounded bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300">キャンセル</Link>
                         <button type="button" @click="submitWithoutDiary" class="rounded bg-gray-500 px-4 py-2 text-sm font-medium text-white hover:bg-gray-600">日報なしで保存</button>
                         <button type="submit" class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">保存</button>
                     </div>
@@ -619,7 +619,8 @@ function applyPastDiary(rec) {
             <div class="flex-1 overflow-y-auto px-6 py-4">
                 <p v-if="pastError" class="mb-3 text-sm text-red-600">{{ pastError }}</p>
                 <p v-if="!pastLoading && pastRecords.length === 0" class="py-8 text-center text-sm text-gray-400">該当する日報がありません。</p>
-                <table v-if="pastRecords.length > 0" class="min-w-full divide-y divide-gray-200 text-sm">
+                <div v-if="pastRecords.length > 0" class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 text-sm">
                     <thead class="bg-gray-50">
                         <tr>
                             <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 w-28">日付</th>
@@ -638,11 +639,12 @@ function applyPastDiary(rec) {
                         </tr>
                     </tbody>
                 </table>
+                </div>
             </div>
 
             <!-- フッター -->
             <div class="border-t px-6 py-3 text-right">
-                <button @click="closePastModal" class="rounded bg-gray-200 px-4 py-2 text-sm text-gray-700 hover:bg-gray-300">閉じる</button>
+                <button @click="closePastModal" class="rounded bg-gray-200 px-4 py-2 text-sm text-gray-700 whitespace-nowrap hover:bg-gray-300">閉じる</button>
             </div>
         </div>
     </div>

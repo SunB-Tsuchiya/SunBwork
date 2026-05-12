@@ -1,9 +1,12 @@
 <script setup>
-import { Link } from '@inertiajs/vue3';
+import { computed } from 'vue';
+import { Link, router } from '@inertiajs/vue3';
+
 const props = defineProps({
     active: { type: String, default: '' },
     projectJob: { type: Object, default: null },
 });
+
 // Coordinator カラー: green
 const tab = (key) => [
     'rounded-md px-3 py-2 text-sm font-medium',
@@ -49,11 +52,44 @@ function getSettingsLink() {
         return '/coordinator/settings';
     }
 }
+
+const tabs = computed(() => [
+    { key: 'clients', href: route('coordinator.clients.index'), label: 'クライアント管理' },
+    { key: 'subcontractors', href: route('coordinator.subcontractors.index'), label: '外注先管理' },
+    { key: 'projects', href: getAssignmentsLink(), label: '案件一覧' },
+    { key: 'jobs', href: getJobboxLink(), label: 'ジョブ一覧' },
+    { key: 'calendar', href: getCalendarLink(), label: '案件カレンダー' },
+    { key: 'progress_sheet_list', href: getProgressSheetListLink(), label: '進行表一覧' },
+    { key: 'progress_report', href: getProgressReportLink(), label: '進行レポート' },
+    { key: 'settings', href: getSettingsLink(), label: '設定' },
+].filter(t => t.href));
+
+function onMobileSelect(e) {
+    const href = e.target.value;
+    if (href) router.get(href);
+}
 </script>
 
 <template>
     <div class="mb-6">
-        <nav class="flex space-x-8" aria-label="Tabs">
+        <!-- モバイル: ドロップダウン -->
+        <div class="sm:hidden">
+            <select
+                @change="onMobileSelect"
+                class="w-full rounded-md border border-green-300 bg-white px-3 py-2 text-sm text-green-700 shadow-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+            >
+                <option value="">— ページを選択 —</option>
+                <option
+                    v-for="t in tabs"
+                    :key="t.key"
+                    :value="t.href"
+                    :selected="active === t.key"
+                >{{ t.label }}</option>
+            </select>
+        </div>
+
+        <!-- デスクトップ: タブ -->
+        <nav class="hidden sm:flex flex-wrap gap-2" aria-label="Tabs">
             <Link :href="route('coordinator.clients.index')" :class="tab('clients')"> クライアント管理 </Link>
             <Link :href="route('coordinator.subcontractors.index')" :class="tab('subcontractors')"> 外注先管理 </Link>
             <Link :href="getAssignmentsLink()" :class="tab('projects')"> 案件一覧 </Link>

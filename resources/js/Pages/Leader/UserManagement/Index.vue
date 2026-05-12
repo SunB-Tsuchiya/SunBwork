@@ -130,7 +130,7 @@ const isDirty = (userId) => dirtyRows.value.some((r) => r.id === userId);
         </template>
         <template #header>
             <div class="flex items-center justify-between">
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">ユーザー管理（部署）</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">ユーザー管理（部署）</h2>
                 <Link
                     v-if="!editMode"
                     :href="route('leader.user_management.create')"
@@ -141,7 +141,7 @@ const isDirty = (userId) => dirtyRows.value.some((r) => r.id === userId);
             </div>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <!-- ツールバー -->
             <div class="mb-4 flex items-center gap-3">
                 <input
@@ -172,6 +172,7 @@ const isDirty = (userId) => dirtyRows.value.some((r) => r.id === userId);
             </div>
 
             <!-- テーブル -->
+            <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
@@ -261,6 +262,7 @@ const isDirty = (userId) => dirtyRows.value.some((r) => r.id === userId);
                     </template>
                 </tbody>
             </table>
+            </div>
 
             <!-- 一覧編集モード: 下部ボタン -->
             <div v-if="editMode" class="mt-6 flex items-center justify-end gap-3 border-t border-gray-200 pt-4">

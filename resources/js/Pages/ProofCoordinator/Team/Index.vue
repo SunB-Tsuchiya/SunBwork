@@ -71,7 +71,7 @@ function saveOrder() {
         <div class="space-y-6">
 
             <!-- メンバー追加 -->
-            <div class="rounded bg-white p-6 shadow">
+            <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
                 <h3 class="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">メンバーを追加</h3>
                 <form @submit.prevent="addMember" class="flex items-end gap-3">
                     <div class="flex-1">
@@ -103,7 +103,7 @@ function saveOrder() {
             </div>
 
             <!-- 現在のメンバー一覧 -->
-            <div class="rounded bg-white p-6 shadow">
+            <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
                 <div class="mb-4 flex items-center justify-between">
                     <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500">
                         現在のメンバー（{{ sortedMembers.length }}名）
@@ -126,7 +126,8 @@ function saveOrder() {
                     校正チームにメンバーはいません。
                 </p>
 
-                <table v-else class="min-w-full divide-y divide-gray-200">
+                <div v-else class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
                             <th v-if="sortMode" class="w-20 px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">順序</th>
@@ -172,6 +173,7 @@ function saveOrder() {
                         </tr>
                     </tbody>
                 </table>
+                </div>
 
                 <p v-if="sortMode" class="mt-3 text-xs text-gray-400">
                     ▲▼ で順番を入れ替えられます。順番はカレンダー表示にも反映されます。

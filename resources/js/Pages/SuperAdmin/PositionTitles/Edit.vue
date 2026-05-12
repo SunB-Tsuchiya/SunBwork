@@ -77,19 +77,20 @@ function submit() {
     <AppLayout title="役職称号 編集">
         <template #header>
             <div class="flex items-center justify-between">
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">役職称号 編集</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">役職称号 編集</h2>
                 <Link :href="route('superadmin.position_titles.index')" class="text-gray-600 hover:text-gray-900">
                     ← 一覧に戻る
                 </Link>
             </div>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <div class="mx-auto w-full md:w-1/2">
 
                 <!-- Admin 用称号 -->
                 <section class="mb-10">
                     <h3 class="mb-4 text-base font-semibold text-gray-700">Admin 用（社長・役員クラス）</h3>
+                    <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
                         <thead class="bg-gray-50">
                             <tr>
@@ -142,6 +143,7 @@ function submit() {
                             </tr>
                         </tbody>
                     </table>
+                    </div>
                     <button
                         type="button"
                         @click="addRow(state.adminRows)"
@@ -154,6 +156,7 @@ function submit() {
                 <!-- Leader 用称号 -->
                 <section class="mb-6">
                     <h3 class="mb-4 text-base font-semibold text-gray-700">Leader 用（部長・課長クラス）</h3>
+                    <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
                         <thead class="bg-gray-50">
                             <tr>
@@ -206,6 +209,7 @@ function submit() {
                             </tr>
                         </tbody>
                     </table>
+                    </div>
                     <button
                         type="button"
                         @click="addRow(state.leaderRows)"

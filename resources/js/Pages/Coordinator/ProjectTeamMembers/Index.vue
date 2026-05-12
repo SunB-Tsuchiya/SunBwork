@@ -5,7 +5,7 @@
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">チームメンバー管理</h2>
       </div>
     </template>
-    <div class="rounded bg-white p-6 shadow">
+    <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <div class="flex items-center justify-between mb-4">
               <h3 class="text-lg font-medium text-gray-900">登録チームメンバー一覧</h3>
               <div class="flex items-center space-x-2">

@@ -22,11 +22,11 @@ const confirmDelete = (companyId) => {
     <AppLayout title="会社管理">
         <template #header>
             <div class="flex items-center justify-between">
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">会社管理</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">会社管理</h2>
             </div>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <div v-if="companies.length === 0" class="py-8 text-center text-gray-500">
                 会社が登録されていません。
             </div>

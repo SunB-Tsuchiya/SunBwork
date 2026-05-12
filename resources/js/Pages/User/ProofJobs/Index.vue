@@ -141,7 +141,7 @@ const displayGroups = computed(() => {
             <h2 class="text-xl font-semibold text-gray-800">校正ジョブ</h2>
         </template>
 
-        <div class="mx-auto max-w-6xl rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-6xl rounded bg-white px-4 py-6 sm:p-6 shadow">
             <h1 class="mb-4 text-2xl font-bold">校正ジョブ：</h1>
 
             <!-- 検索・フィルター行 -->
@@ -151,7 +151,7 @@ const displayGroups = computed(() => {
                         v-model="localQ"
                         @keyup.enter="search"
                         placeholder="タイトルで検索"
-                        class="w-72 rounded border px-3 py-2 text-sm"
+                        class="w-full sm:w-72 rounded border px-3 py-2 text-sm"
                     />
                     <button class="rounded bg-pink-600 px-3 py-2 text-white" @click.prevent="search">検索</button>
                     <button class="ml-2 rounded border px-3 py-2" @click.prevent="clearSearch">クリア</button>

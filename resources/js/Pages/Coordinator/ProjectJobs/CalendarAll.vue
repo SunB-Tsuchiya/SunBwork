@@ -77,11 +77,17 @@ function renderEventContent(arg) {
     };
 }
 
+const isMobileScreen = typeof window !== 'undefined' && window.innerWidth < 640;
+
 const calendarOptions = computed(() => ({
     plugins:       [dayGridPlugin],
     initialView:   'dayGridMonth',
     locale:        'ja',
-    headerToolbar: {
+    headerToolbar: isMobileScreen ? {
+        left:   'prev,next',
+        center: 'title',
+        right:  'dayGridMonth,dayGridWeek',
+    } : {
         left:   'prev,next today',
         center: 'title',
         right:  'dayGridMonth,dayGridWeek',
@@ -182,7 +188,7 @@ function scrollToCurrentWeek() {
             <CoordinatorNavigationTabs active="calendar" />
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
 
             <!-- Legend -->
             <div class="mb-5">
@@ -225,6 +231,20 @@ function scrollToCurrentWeek() {
 </template>
 
 <style scoped>
+@media (max-width: 639px) {
+    :deep(.fc-toolbar-title) {
+        font-size: 1rem;
+        font-weight: 600;
+    }
+    :deep(.fc-button) {
+        padding: 0.2rem 0.45rem !important;
+        font-size: 0.75rem !important;
+    }
+    :deep(.fc-toolbar.fc-header-toolbar) {
+        gap: 0.25rem;
+    }
+}
+
 /* ── Scrollable container ────────────────────────────────────── */
 /* Height ≈ 3 rows × row-height + ~80px header.
    Adjust row-height in .fc-daygrid-day-frame below.           */

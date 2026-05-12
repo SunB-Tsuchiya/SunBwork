@@ -70,14 +70,14 @@ function resetDiaryToDefault() {
 <template>
     <AppLayout title="派遣・業務委託管理 編集">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">雇用形態・設定の編集</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">雇用形態・設定の編集</h2>
         </template>
         <template #tabs>
             <LeaderNavigationTabs active="dispatch" />
         </template>
 
         <div class="mx-auto max-w-xl">
-            <div class="rounded bg-white p-6 shadow">
+            <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
                 <!-- ユーザー情報 -->
                 <div class="mb-6 rounded-lg bg-gray-50 p-4">
                     <p class="text-lg font-semibold text-gray-800">{{ dispatchUser.name }}</p>

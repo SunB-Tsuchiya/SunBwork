@@ -160,7 +160,7 @@ const getAssignmentText = (assignment) => {
 <template>
     <AppLayout title="ユーザー管理">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">ユーザー管理</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">ユーザー管理</h2>
         </template>
         <template #headerExtras>
             <Link
@@ -171,7 +171,7 @@ const getAssignmentText = (assignment) => {
                 新規ユーザー登録
             </Link>
         </template>
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
                             <div class="mb-4 flex items-center justify-between">
                                 <h3 class="text-lg font-medium text-gray-900">登録ユーザー一覧</h3>
                                 <div class="text-sm text-gray-500">総数: {{ filteredUsers.length }}人</div>

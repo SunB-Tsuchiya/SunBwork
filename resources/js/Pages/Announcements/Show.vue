@@ -19,7 +19,7 @@ const targetLabel = (type) => ({
             <h2 class="text-xl font-semibold text-gray-800">お知らせ詳細</h2>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <!-- 戻るリンク -->
             <div class="mb-4">
                 <Link :href="route('announcements.index')" class="text-sm text-gray-500 hover:text-gray-700">

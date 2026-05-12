@@ -22,7 +22,7 @@ const calendarViewLabel = {
             <UserNavigationTabs active="settings" />
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <div class="mb-4 flex items-center justify-between">
                 <h3 class="text-lg font-semibold text-gray-800">ユーザー設定</h3>
                 <Link :href="route('user.settings.edit')" class="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700">

@@ -1,13 +1,13 @@
 <template>
   <AppLayout title="テンプレート詳細">
     <template #header>
-      <h2 class="text-xl font-semibold leading-tight text-gray-800">テンプレート詳細</h2>
+      <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">テンプレート詳細</h2>
     </template>
 
     <div class="space-y-6">
 
       <!-- メタ情報 -->
-      <div class="rounded bg-white p-6 shadow">
+      <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
         <div class="mb-4 flex items-start justify-between gap-3">
           <div>
             <h3 class="text-lg font-semibold text-gray-800">{{ template.name }}</h3>
@@ -44,7 +44,7 @@
       <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
 
         <!-- 列管理 -->
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
           <h3 class="mb-3 font-semibold text-gray-700">列管理</h3>
           <div v-if="template.row_config.length === 0" class="text-sm text-gray-400 italic">
             行が設定されていません
@@ -78,7 +78,7 @@
         </div>
 
         <!-- 行・ステージ構成 -->
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
           <h3 class="mb-3 font-semibold text-gray-700">行・ステージ構成</h3>
           <div v-if="template.column_config.length === 0" class="text-sm text-gray-400 italic">
             列が設定されていません
@@ -89,7 +89,7 @@
       </div>
 
       <!-- レイアウトプレビュー -->
-      <div class="rounded bg-white p-6 shadow">
+      <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
         <h3 class="mb-3 font-semibold text-gray-700">レイアウトプレビュー</h3>
         <div class="overflow-x-auto rounded border border-gray-200">
           <table class="min-w-full border-collapse text-xs">

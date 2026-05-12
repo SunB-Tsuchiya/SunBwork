@@ -62,7 +62,7 @@ const submit = () => {
             </div>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
                         <!-- 説明セクション -->
                         <div class="mb-8">
                             <h3 class="text-lg font-medium text-gray-900 mb-4">CSVファイル形式について</h3>

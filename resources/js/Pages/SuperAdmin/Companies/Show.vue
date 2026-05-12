@@ -14,7 +14,7 @@ defineProps({
     <AppLayout title="会社詳細">
         <template #header>
             <div class="flex items-center justify-between">
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">会社詳細</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">会社詳細</h2>
                 <Link
                     :href="route('superadmin.companies.edit', company.id)"
                     class="rounded bg-blue-600 px-4 py-2 font-bold text-white hover:bg-blue-700"
@@ -24,7 +24,7 @@ defineProps({
             </div>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <!-- 会社名 -->
             <div class="mb-6">
                 <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">会社名</div>

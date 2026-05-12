@@ -193,7 +193,7 @@ function openSheet(sheet) {
 <template>
     <AppLayout title="進行表一覧">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">進行表一覧</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">進行表一覧</h2>
         </template>
 
         <template #headerExtras>
@@ -221,7 +221,8 @@ function openSheet(sheet) {
                     お気に入りの進行表はありません。
                 </div>
 
-                <table v-else class="w-full text-sm">
+                <div v-else class="overflow-x-auto">
+                <table class="w-full text-sm">
                     <thead class="border-b bg-yellow-100 text-left text-xs text-yellow-900">
                         <tr>
                             <th class="px-4 py-2 font-medium">作成日</th>
@@ -262,6 +263,7 @@ function openSheet(sheet) {
                         </tr>
                     </tbody>
                 </table>
+                </div>
             </div>
 
             <!-- 検索・フィルター -->
@@ -327,6 +329,7 @@ function openSheet(sheet) {
                             <span class="ml-2 text-xs text-gray-400">{{ group.items.length }}件</span>
                         </div>
 
+                        <div class="overflow-x-auto">
                         <table class="w-full text-sm">
                             <thead class="border-b bg-white text-left text-xs text-gray-400">
                                 <tr>
@@ -368,6 +371,7 @@ function openSheet(sheet) {
                                 </tr>
                             </tbody>
                         </table>
+                        </div>
                     </template>
                 </template>
             </div>

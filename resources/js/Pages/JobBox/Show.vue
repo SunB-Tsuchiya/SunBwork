@@ -3,9 +3,9 @@
         <template #header>
             <div class="flex items-center gap-3">
                 <Link :href="routeBack()"
-                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300"
                 >← 戻る</Link>
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">ジョブ割り当て — メッセージ表示</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">ジョブ割り当て — メッセージ表示</h2>
             </div>
         </template>
 

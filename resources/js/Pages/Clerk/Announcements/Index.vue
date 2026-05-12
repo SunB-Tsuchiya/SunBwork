@@ -24,7 +24,7 @@ const goToShow = (id) => {
             <h2 class="text-xl font-semibold text-gray-800">お知らせ通知</h2>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <ClerkNavigationTabs active="announcements" />
 
             <div class="mb-4 flex justify-end">
@@ -40,7 +40,8 @@ const goToShow = (id) => {
                 送信したお知らせはありません
             </div>
 
-            <table v-else class="min-w-full divide-y divide-gray-200">
+            <div v-else class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
                         <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">送信日時</th>
@@ -69,6 +70,7 @@ const goToShow = (id) => {
                     </tr>
                 </tbody>
             </table>
+            </div>
         </div>
     </AppLayout>
 </template>

@@ -326,12 +326,12 @@ function revert() {
 <template>
     <AppLayout :title="`${typeLabel} 編集`">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">{{ typeLabel }} の編集</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">{{ typeLabel }} の編集</h2>
         </template>
 
         <Head :title="`${typeLabel} 編集`" />
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <!-- 戻るリンク -->
             <div class="mb-4">
                 <a :href="route('workload_setting.index')" class="text-sm text-gray-500 hover:text-gray-700"> ← 一覧に戻る </a>
@@ -572,7 +572,7 @@ function revert() {
                 <div class="flex justify-end gap-2 border-t px-6 py-4">
                     <button
                         type="button"
-                        class="rounded bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                        class="rounded bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300"
                         @click="showGroupModal = false; newGroupName = ''; groupModalError = ''"
                     >
                         キャンセル
@@ -653,7 +653,7 @@ function revert() {
                 <div class="flex justify-end gap-2 border-t px-6 py-4">
                     <button
                         type="button"
-                        class="rounded bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                        class="rounded bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300"
                         @click="showGroupEditModal = false"
                     >
                         キャンセル

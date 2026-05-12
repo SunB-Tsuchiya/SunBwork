@@ -9,7 +9,7 @@ import { Link } from '@inertiajs/vue3';
             <div class="flex items-center gap-3">
                 <Link :href="route('guide.index')" class="text-sm text-green-500 hover:underline">← ガイド一覧</Link>
                 <span class="text-gray-300">/</span>
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">コーディネーター向けガイド</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">コーディネーター向けガイド</h2>
             </div>
         </template>
 

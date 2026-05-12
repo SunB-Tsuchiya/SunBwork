@@ -1,17 +1,29 @@
 <template>
     <div class="calendar-container">
-            <div class="mb-4 flex flex-wrap gap-2">
-            <button @click="openClientEventModal" class="rounded bg-emerald-600 px-4 py-2 text-white">案件打合せ・外出</button>
-            <button @click="openInternalEventModal" class="rounded bg-teal-600 px-4 py-2 text-white">社内予定</button>
-            <button @click="goToJobCreate" class="rounded bg-indigo-600 px-4 py-2 text-white">マイジョブ</button>
-            <button @click="openJobSheetModal" class="rounded bg-purple-600 px-4 py-2 text-white">進行表ジョブ</button>
-            <button @click="goToDiaryCreate" class="rounded bg-orange-500 px-4 py-2 text-white">{{ props.diaryLabel }}入力</button>
-            <button @click="openScheduleModal" class="rounded border border-gray-400 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                日程設定
-            </button>
-            <button @click="openBreakModal" class="rounded border border-teal-400 bg-white px-4 py-2 text-sm text-teal-700 hover:bg-teal-50">
-                休憩設定
-            </button>
+            <div class="mb-4">
+            <!-- モバイル: アクションドロップダウン -->
+            <div class="sm:hidden">
+                <select @change="onMobileActionSelect" class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                    <option value="">— 操作を選択 —</option>
+                    <option value="client_event">案件打合せ・外出</option>
+                    <option value="internal_event">社内予定</option>
+                    <option value="myjob">マイジョブ</option>
+                    <option value="job_sheet">進行表ジョブ</option>
+                    <option value="diary">{{ props.diaryLabel }}入力</option>
+                    <option value="schedule">日程設定</option>
+                    <option value="break">休憩設定</option>
+                </select>
+            </div>
+            <!-- デスクトップ: ボタン列 -->
+            <div class="hidden sm:flex flex-wrap gap-2">
+                <button @click="openClientEventModal" class="rounded bg-emerald-600 px-4 py-2 text-white">案件打合せ・外出</button>
+                <button @click="openInternalEventModal" class="rounded bg-teal-600 px-4 py-2 text-white">社内予定</button>
+                <button @click="goToJobCreate" class="rounded bg-indigo-600 px-4 py-2 text-white">マイジョブ</button>
+                <button @click="openJobSheetModal" class="rounded bg-purple-600 px-4 py-2 text-white">進行表ジョブ</button>
+                <button @click="goToDiaryCreate" class="rounded bg-orange-500 px-4 py-2 text-white">{{ props.diaryLabel }}入力</button>
+                <button @click="openScheduleModal" class="rounded border border-gray-400 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">日程設定</button>
+                <button @click="openBreakModal" class="rounded border border-teal-400 bg-white px-4 py-2 text-sm text-teal-700 hover:bg-teal-50">休憩設定</button>
+            </div>
         </div>
         <FullCalendar ref="fullCalendarRef" :options="calendarOptions" />
         <!-- 予定作成モーダル -->
@@ -1056,10 +1068,24 @@ const baseEvents = computed(() => [
 // 通常イベント + 始業前背景イベントを結合
 const allEvents = computed(() => [...baseEvents.value, ...backgroundEvents.value]);
 
+const isMobileScreen = typeof window !== 'undefined' && window.innerWidth < 640;
+
+function onMobileActionSelect(e) {
+    const val = e.target.value;
+    e.target.value = '';
+    if (val === 'client_event') openClientEventModal();
+    else if (val === 'internal_event') openInternalEventModal();
+    else if (val === 'myjob') goToJobCreate();
+    else if (val === 'job_sheet') openJobSheetModal();
+    else if (val === 'diary') goToDiaryCreate();
+    else if (val === 'schedule') openScheduleModal();
+    else if (val === 'break') openBreakModal();
+}
+
 const calendarOptions = computed(() => ({
     plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],
     // choose initial view: if all events are all-day, use month grid so they are visible
-    initialView: props.initialView,
+    initialView: isMobileScreen ? 'dayGridMonth' : props.initialView,
     // initialDate allows FullCalendar to open on a specific day (YYYY-MM-DD)
     initialDate: selectedDate.value,
     events: allEvents.value,
@@ -1068,7 +1094,11 @@ const calendarOptions = computed(() => ({
         viewEnd.value = info.end;
     },
     locale: 'ja',
-    headerToolbar: {
+    headerToolbar: isMobileScreen ? {
+        left: 'prev,next',
+        center: 'title',
+        right: 'dayGridMonth,timeGridWeek',
+    } : {
         left: 'prev,next today',
         center: 'title',
         right: 'dayGridMonth,timeGridWeek,timeGridDay',
@@ -1442,5 +1472,20 @@ const submitEvent = async () => {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+/* モバイル: カレンダーヘッダーのタイトル・ボタンを小さく */
+@media (max-width: 639px) {
+    :deep(.fc-toolbar-title) {
+        font-size: 1rem;
+        font-weight: 600;
+    }
+    :deep(.fc-button) {
+        padding: 0.2rem 0.45rem !important;
+        font-size: 0.75rem !important;
+    }
+    :deep(.fc-toolbar.fc-header-toolbar) {
+        gap: 0.25rem;
+    }
 }
 </style>

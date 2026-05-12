@@ -34,7 +34,7 @@ const readRate = computed(() => {
             <h2 class="text-xl font-semibold text-gray-800">お知らせ詳細</h2>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <ClerkNavigationTabs active="announcements" />
 
             <div class="mb-4">
@@ -73,6 +73,7 @@ const readRate = computed(() => {
             </div>
 
             <!-- 受信者一覧 -->
+            <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
@@ -101,6 +102,7 @@ const readRate = computed(() => {
                     </tr>
                 </tbody>
             </table>
+            </div>
         </div>
     </AppLayout>
 </template>

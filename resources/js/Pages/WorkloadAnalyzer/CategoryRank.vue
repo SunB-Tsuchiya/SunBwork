@@ -216,15 +216,15 @@ const rankBadgeClass = (rank) => {
             <div class="flex items-center gap-3">
                 <Link
                     :href="(() => { try { return route(`${routeNamePrefix}.workload_analyzer.index`); } catch(e) { return `${rolePrefix}/workload-analyzer`; } })()"
-                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300"
                 >← 作業量分析に戻る</Link>
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">作業量分析 — カテゴリ別ランク</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">作業量分析 — カテゴリ別ランク</h2>
             </div>
         </template>
 
         <Head title="作業量分析 カテゴリ別ランク" />
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <h1 class="mb-4 text-xl font-semibold text-gray-800">総合ランキング</h1>
 
             <!-- ランキング種別トグル + 雇用形態フィルター -->

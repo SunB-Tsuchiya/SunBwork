@@ -54,14 +54,14 @@ const submit = () => {
         </template>
         <template #header>
             <div class="flex items-center justify-between">
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">ユーザー編集（部署）</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">ユーザー編集（部署）</h2>
                 <Link :href="route('leader.user_management.index')" class="text-sm text-gray-600 hover:text-gray-900">
                     ← ユーザー一覧に戻る
                 </Link>
             </div>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <p class="mb-6 text-sm text-gray-500">対象: <strong>{{ editUser.name }}</strong>（{{ editUser.email }}）</p>
 
             <form @submit.prevent="submit" class="max-w-lg space-y-4">

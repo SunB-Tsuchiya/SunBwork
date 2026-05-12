@@ -21,8 +21,8 @@ function destroy() {
     <AppLayout title="単発派遣 詳細">
         <template #header>
             <div class="flex items-center gap-3">
-                <Link :href="route('proof_coordinator.dispatchers.index')" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">← 一覧に戻る</Link>
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">単発派遣 詳細</h2>
+                <Link :href="route('proof_coordinator.dispatchers.index')" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300">← 一覧に戻る</Link>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">単発派遣 詳細</h2>
             </div>
         </template>
 
@@ -44,7 +44,7 @@ function destroy() {
         </template>
 
         <div class="space-y-4">
-            <div class="rounded bg-white p-6 shadow">
+            <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
                 <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                         <dt class="text-xs font-medium text-gray-500">名前 / 会社名</dt>

@@ -412,7 +412,7 @@ const canCreate = computed(() => {
 <template>
     <AppLayout title="伝票一覧">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">伝票一覧</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">伝票一覧</h2>
         </template>
         <template #headerExtras>
             <button
@@ -422,14 +422,14 @@ const canCreate = computed(() => {
             >＋ 伝票登録</button>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <!-- 検索行 -->
             <div class="flex items-center gap-2">
                 <input
                     v-model="qModel"
                     @keyup.enter="search"
                     placeholder="タイトル/詳細/担当で検索"
-                    class="w-72 rounded border px-3 py-2 text-sm"
+                    class="w-full sm:w-72 rounded border px-3 py-2 text-sm"
                 />
                 <button class="rounded bg-blue-600 px-3 py-2 text-sm text-white" @click.prevent="search">検索</button>
                 <button class="ml-2 rounded border px-3 py-2 text-sm" @click.prevent="clearSearch">クリア</button>
@@ -568,7 +568,7 @@ const canCreate = computed(() => {
                     <div class="flex flex-wrap items-center gap-2 border-t bg-gray-50 px-5 py-3">
                         <button
                             type="button"
-                            class="inline-flex items-center gap-1.5 rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                            class="inline-flex items-center gap-1.5 rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300"
                             @click="closeDetail"
                         >閉じる</button>
 

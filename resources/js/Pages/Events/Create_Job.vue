@@ -237,9 +237,9 @@ function applyRequestJob(rec) {
         <template #header>
             <div class="flex items-center gap-3">
                 <button @click="goBack"
-                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300"
                 >← 戻る</button>
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">ジョブ作成</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">ジョブ作成</h2>
             </div>
         </template>
 
@@ -254,7 +254,7 @@ function applyRequestJob(rec) {
             </div>
         </template>
 
-        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-2xl rounded bg-white px-4 py-6 sm:p-6 shadow">
 
             <div class="rounded border border-gray-100 p-4 shadow-sm">
                 <h2 class="mb-4 text-lg font-medium text-gray-700">割当内容</h2>
@@ -343,7 +343,8 @@ function applyRequestJob(rec) {
                         <div class="max-h-80 overflow-y-auto rounded border border-gray-200">
                             <div v-if="modalLoading" class="py-8 text-center text-sm text-gray-500">読み込み中...</div>
                             <div v-else-if="records.length === 0" class="py-8 text-center text-sm text-gray-500">該当データがありません</div>
-                            <table v-else class="min-w-full divide-y divide-gray-200 text-sm">
+                            <div v-else class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200 text-sm">
                                 <thead class="sticky top-0 bg-gray-50">
                                     <tr>
                                         <th class="px-3 py-2 text-left font-medium text-gray-600">日付</th>
@@ -377,6 +378,7 @@ function applyRequestJob(rec) {
                                     </tr>
                                 </tbody>
                             </table>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -435,6 +437,7 @@ function applyRequestJob(rec) {
                         <div v-if="requestLoading" class="py-8 text-center text-sm text-gray-500">読み込み中...</div>
                         <div v-else-if="requestRecords.length === 0" class="py-8 text-center text-sm text-gray-500">未対応の依頼ジョブはありません</div>
                         <div v-else class="max-h-80 overflow-y-auto rounded border border-gray-200">
+                            <div class="overflow-x-auto">
                             <table class="min-w-full divide-y divide-gray-200 text-sm">
                                 <thead class="sticky top-0 bg-gray-50">
                                     <tr>
@@ -453,6 +456,7 @@ function applyRequestJob(rec) {
                                     </tr>
                                 </tbody>
                             </table>
+                            </div>
                         </div>
                     </div>
                 </div>

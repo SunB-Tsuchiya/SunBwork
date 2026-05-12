@@ -2,8 +2,8 @@
     <AppLayout :title="`ジョブ割り当て - ${assignment?.title || ''}`">
         <template #header>
             <div class="flex items-center gap-3">
-                <Link :href="routeBack()" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">← マイジョブBOXに戻る</Link>
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">ジョブ割り当て — 詳細</h2>
+                <Link :href="routeBack()" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300">← マイジョブBOXに戻る</Link>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">ジョブ割り当て — 詳細</h2>
             </div>
         </template>
 
@@ -23,7 +23,8 @@
                 </div>
                 <div class="px-5 py-4">
                     <div v-if="formattedEvents.length === 0" class="text-sm text-gray-500">予定が見つかりません。</div>
-                    <table v-else class="w-full text-sm">
+                    <div v-else class="overflow-x-auto">
+                    <table class="w-full text-sm">
                         <thead>
                             <tr class="border-b text-xs text-gray-500">
                                 <th class="pb-2 text-left font-medium">作業日</th>
@@ -64,6 +65,7 @@
                             </tr>
                         </tfoot>
                     </table>
+                    </div>
                     <p v-if="hasInterruptions" class="mt-2 text-xs text-gray-500">
                         ※ 差し込み作業が発生したため、中断時間を実作業時間から除外しています。
                     </p>

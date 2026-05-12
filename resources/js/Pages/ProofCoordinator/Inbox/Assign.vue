@@ -71,9 +71,9 @@ function onPickerConfirmed({ newSlots, updatedSlots }) {
         <template #header>
             <div class="flex items-center gap-3">
                 <Link :href="route('proof_coordinator.inbox')"
-                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300"
                 >← 受信ボックスに戻る</Link>
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">校正員の割り当て</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">校正員の割り当て</h2>
             </div>
         </template>
 
@@ -109,7 +109,7 @@ function onPickerConfirmed({ newSlots, updatedSlots }) {
             </div>
 
             <!-- ジョブ割り当てフォーム -->
-            <div class="rounded bg-white p-6 shadow">
+            <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
                 <p class="mb-4 text-sm text-gray-500">
                     ※ 担当者を選択してください。選択できるのは校正チームのメンバーまたは校正担当者です。<br>
                     ※ 作業詳細（種別・サイズ・ステージ等）は依頼者のジョブから引き継いでいます。必要に応じて修正してください。

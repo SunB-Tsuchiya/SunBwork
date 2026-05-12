@@ -1,10 +1,10 @@
 <template>
     <AppLayout title="案件総覧">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">【リーダー】案件総覧</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">【リーダー】案件総覧</h2>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <!-- 検索・フィルター行 -->
             <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div class="flex items-center gap-2">

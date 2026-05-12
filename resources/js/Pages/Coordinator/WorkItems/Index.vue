@@ -285,9 +285,9 @@ async function saveOrder(table, ids) {
 <template>
     <AppLayout title="Work Items">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">【進行管理】{{ $page.props.auth.user.name || 'ユーザー' }}さんのページ</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">【進行管理】{{ $page.props.auth.user.name || 'ユーザー' }}さんのページ</h2>
         </template>
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <h1 class="mb-4 text-2xl font-semibold">Work Items（作業項目）</h1>
             <div class="mb-2 flex flex-wrap items-center gap-4">
                 <!-- Company select: visible to superadmin only -->
@@ -344,6 +344,7 @@ async function saveOrder(table, ids) {
                             <h2 class="text-lg font-medium">Type</h2>
                             <button @click.prevent="openModal('Type')" class="rounded bg-blue-600 px-3 py-1 text-sm text-white">新規追加</button>
                         </div>
+                        <div class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-gray-200">
                             <tbody class="divide-y divide-gray-200 bg-white">
                                 <tr
@@ -366,6 +367,7 @@ async function saveOrder(table, ids) {
                                 </tr>
                             </tbody>
                         </table>
+                        </div>
                     </div>
 
                     <!-- Sizes -->
@@ -374,6 +376,7 @@ async function saveOrder(table, ids) {
                             <h2 class="text-lg font-medium">Size</h2>
                             <button @click.prevent="openModal('Size')" class="rounded bg-blue-600 px-3 py-1 text-sm text-white">新規追加</button>
                         </div>
+                        <div class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-gray-200">
                             <tbody class="divide-y divide-gray-200 bg-white">
                                 <tr
@@ -410,6 +413,7 @@ async function saveOrder(table, ids) {
                                 </tr>
                             </tbody>
                         </table>
+                        </div>
                     </div>
 
                     <!-- Stages -->
@@ -418,6 +422,7 @@ async function saveOrder(table, ids) {
                             <h2 class="text-lg font-medium">Stage</h2>
                             <button @click.prevent="openModal('Stage')" class="rounded bg-blue-600 px-3 py-1 text-sm text-white">新規追加</button>
                         </div>
+                        <div class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-gray-200">
                             <tbody class="divide-y divide-gray-200 bg-white">
                                 <tr
@@ -440,6 +445,7 @@ async function saveOrder(table, ids) {
                                 </tr>
                             </tbody>
                         </table>
+                        </div>
                     </div>
 
                     <!-- Statuses -->
@@ -448,6 +454,7 @@ async function saveOrder(table, ids) {
                             <h2 class="text-lg font-medium">Status</h2>
                             <button @click.prevent="openModal('Status')" class="rounded bg-blue-600 px-3 py-1 text-sm text-white">新規追加</button>
                         </div>
+                        <div class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-gray-200">
                             <tbody class="divide-y divide-gray-200 bg-white">
                                 <tr
@@ -467,6 +474,7 @@ async function saveOrder(table, ids) {
                                 </tr>
                             </tbody>
                         </table>
+                        </div>
                     </div>
                 </div>
             </div>

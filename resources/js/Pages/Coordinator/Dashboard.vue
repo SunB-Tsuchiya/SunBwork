@@ -15,11 +15,11 @@ const user = page.props.user;
 <template>
     <AppLayout title="Coordinator Dashboard" :user="user">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">【進行管理】{{ user?.name || 'ユーザー' }}さんのページ</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">【進行管理】{{ user?.name || 'ユーザー' }}さんのページ</h2>
         </template>
 
         <!-- プロフィール情報表示 -->
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <h3 class="mb-4 text-lg font-medium text-gray-900">進行管理プロフィール情報</h3>
             <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div>

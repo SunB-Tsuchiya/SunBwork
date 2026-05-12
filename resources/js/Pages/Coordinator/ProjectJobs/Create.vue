@@ -11,39 +11,39 @@
         <template #header>
             <div class="flex items-center gap-3">
                 <Link :href="route('coordinator.project_jobs.index')"
-                      class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                      class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300"
                 >← 案件一覧に戻る</Link>
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">案件作成</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">案件作成</h2>
             </div>
         </template>
-        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-2xl rounded bg-white px-4 py-6 sm:p-6 shadow">
             <form @submit.prevent="submit">
                 <!-- クライアント選択（一番最初） -->
                 <div class="mb-4">
                     <label class="mb-1 block font-semibold">クライアント</label>
-                    <div class="flex items-center gap-2">
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
                         <div class="flex items-center gap-1">
                             <label class="text-sm">ID:</label>
-                            <input 
-                                v-model="form.client_id" 
-                                type="number" 
+                            <input
+                                v-model="form.client_id"
+                                type="number"
                                 class="w-20 rounded border px-3 py-2"
                                 placeholder="ID"
                                 @input="onClientIdChange"
                                 :disabled="isLoadingClientById" />
                             <div v-if="isLoadingClientById" class="text-xs text-blue-600">読込中...</div>
                         </div>
-                        
+
                         <div class="relative flex-1">
-                            <input 
-                                v-model="form.client_name" 
-                                type="text" 
+                            <input
+                                v-model="form.client_name"
+                                type="text"
                                 class="w-full rounded border px-3 py-2"
                                 placeholder="名前を入力（オートコンプリート）"
                                 @input="onClientNameInput"
                                 @keydown="onClientNameKeydown"
                                 @blur="onClientNameBlur" />
-                            
+
                             <!-- オートコンプリート候補リスト -->
                             <div v-if="showNameSuggestions && clientNameSuggestions.length > 0"
                                  class="absolute top-full z-50 mt-1 w-full rounded border border-gray-300 bg-white shadow-lg max-h-60 overflow-y-auto">
@@ -60,9 +60,9 @@
                                 </div>
                             </div>
                         </div>
-                        
-                        <button type="button" 
-                                class="rounded bg-blue-100 px-3 py-2 text-blue-700 hover:bg-blue-200" 
+
+                        <button type="button"
+                                class="w-full rounded bg-blue-100 px-3 py-2 text-blue-700 hover:bg-blue-200 sm:w-auto"
                                 @click="openClientModal">詳細検索</button>
                     </div>
                     <div v-if="form.errors.client_id" class="mt-1 text-sm text-red-600">{{ form.errors.client_id }}</div>
@@ -307,6 +307,7 @@
             <DialogModal :show="showClientListModal" @close="closeClientListModal">
                 <template #title>クライアント一覧</template>
                 <template #content>
+                    <div class="overflow-x-auto">
                     <table class="min-w-full">
                         <thead>
                             <tr>
@@ -321,6 +322,7 @@
                             </tr>
                         </tbody>
                     </table>
+                    </div>
                     <div v-if="clientList.length === 0" class="py-4 text-gray-500">クライアントがありません</div>
                 </template>
                 <template #footer>
@@ -354,7 +356,7 @@
             <template #footer>
                 <div class="flex w-full justify-between">
                     <button
-                        class="rounded bg-gray-200 px-4 py-2 text-sm text-gray-700 hover:bg-gray-300"
+                        class="rounded bg-gray-200 px-4 py-2 text-sm text-gray-700 whitespace-nowrap hover:bg-gray-300"
                         @click="closeDuplicateModal"
                     >
                         閉じる（タイトルを変更する）
@@ -414,6 +416,7 @@
 
                 <!-- メンバー一覧テーブル -->
                 <div class="max-h-96 overflow-y-auto">
+                    <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="sticky top-0 bg-gray-50">
                             <tr>
@@ -453,6 +456,7 @@
                             </tr>
                         </tbody>
                     </table>
+                    </div>
                     <div v-if="filteredMembers.length === 0" class="py-8 text-center text-gray-500">
                         該当するメンバーがいません
                     </div>

@@ -26,10 +26,10 @@ const routePrefix = computed(() => {
 <template>
     <AppLayout title="クライアント詳細">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">クライアント詳細</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">クライアント詳細</h2>
         </template>
 
-        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-2xl rounded bg-white px-4 py-6 sm:p-6 shadow">
             <div class="mb-4"><strong>ID:</strong> {{ client.id }}</div>
             <div class="mb-4"><strong>会社名:</strong> {{ client.name }}</div>
             <div class="mb-4">
@@ -45,7 +45,7 @@ const routePrefix = computed(() => {
             <div class="mb-4"><strong>詳細:</strong> {{ client.notes }}</div>
             <div class="mt-6 flex gap-4">
                 <Link :href="route(`${routePrefix}.clients.edit`, client.id)" class="rounded bg-orange-600 px-4 py-2 font-bold text-white hover:bg-orange-700">編集</Link>
-                <Link :href="route(`${routePrefix}.clients.index`)" class="rounded bg-gray-200 px-4 py-2 font-bold text-gray-700 hover:bg-gray-300">一覧へ戻る</Link>
+                <Link :href="route(`${routePrefix}.clients.index`)" class="rounded bg-gray-200 px-4 py-2 font-bold text-gray-700 whitespace-nowrap hover:bg-gray-300">一覧へ戻る</Link>
             </div>
         </div>
     </AppLayout>

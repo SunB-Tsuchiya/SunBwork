@@ -139,7 +139,7 @@ async function savePendingImage() {
 <template>
     <AppLayout title="伝票詳細">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">伝票詳細</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">伝票詳細</h2>
         </template>
 
         <div class="mx-auto max-w-3xl space-y-4">
@@ -167,7 +167,7 @@ async function savePendingImage() {
                 <div class="flex flex-wrap items-center gap-2 border-t bg-gray-50 px-5 py-3">
                     <a
                         :href="route('prepress.tickets.index')"
-                        class="inline-flex items-center gap-1.5 rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                        class="inline-flex items-center gap-1.5 rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300"
                     >← 一覧に戻る</a>
 
                     <button

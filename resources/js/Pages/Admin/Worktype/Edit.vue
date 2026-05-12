@@ -88,7 +88,7 @@ function submit() {
 <template>
     <AppLayout title="勤務形態設定 - 編集">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">
                 勤務形態設定 - 編集
                 <span v-if="company_name" class="ml-2 text-base font-normal text-gray-500">{{ company_name }}</span>
             </h2>
@@ -97,7 +97,7 @@ function submit() {
             <AdminNavigationTabs active="worktypes" />
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200 text-sm">
                     <thead class="bg-gray-50">
@@ -187,7 +187,7 @@ function submit() {
                     <button type="button" @click="submit" class="rounded bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700">
                         保存する
                     </button>
-                    <Link :href="route('admin.worktypes.index')" class="rounded bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300">
+                    <Link :href="route('admin.worktypes.index')" class="rounded bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300">
                         保存せずに戻る
                     </Link>
                 </div>

@@ -29,7 +29,7 @@ function changeMonth() {
             <ProofCoordinatorNavigationTabs active="workload" />
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <!-- 月選択 -->
             <div class="mb-4 flex items-center gap-3">
                 <label class="text-sm font-medium text-gray-700">対象月</label>
@@ -45,7 +45,8 @@ function changeMonth() {
                 校正員が登録されていません。
             </p>
 
-            <table v-else class="min-w-full divide-y divide-gray-200">
+            <div v-else class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
                         <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">校正員名</th>
@@ -67,6 +68,7 @@ function changeMonth() {
                     </tr>
                 </tbody>
             </table>
+            </div>
         </div>
     </AppLayout>
 </template>

@@ -2,10 +2,10 @@
     <AppLayout title="チームメンバー管理">
         <template #header>
             <div class="flex items-center justify-between">
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">チームメンバー管理</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">チームメンバー管理</h2>
             </div>
         </template>
-        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-2xl rounded bg-white px-4 py-6 sm:p-6 shadow">
                             <div class="mb-4 flex items-center justify-between">
                                 <h3 class="text-lg font-medium text-gray-900">登録チームメンバー一覧</h3>
                                 <div class="flex items-center space-x-2">

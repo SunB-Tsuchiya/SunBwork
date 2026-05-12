@@ -220,7 +220,7 @@ const submit = () => {
             </div>
         </template>
 
-        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-2xl rounded bg-white px-4 py-6 sm:p-6 shadow">
             <form @submit.prevent="submit" class="space-y-5">
 
                 <div v-if="errorMessage" class="rounded border-l-4 border-red-500 bg-red-50 p-3 text-red-700 text-sm">
@@ -298,7 +298,7 @@ const submit = () => {
                 <!-- 時間 -->
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">時間</label>
-                    <div class="mt-1 flex items-end gap-4">
+                    <div class="mt-1 flex flex-col sm:flex-row items-start sm:items-end gap-4">
                         <div class="flex flex-col">
                             <label class="text-xs text-gray-600">開始</label>
                             <div class="flex items-center gap-2">

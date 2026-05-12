@@ -88,14 +88,14 @@ const selectedPerPage = computed(() => (props.meta && props.meta.per_page ? Numb
 <template>
     <AppLayout title="日報一覧">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">日報一覧</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">日報一覧</h2>
         </template>
 
         <template #tabs>
             <UserNavigationTabs active="diaries" />
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <div class="mb-4 flex items-center justify-between">
                 <div class="flex items-center">
                     <button @click="showCalendar = true" class="text-gray-600 hover:text-blue-600" ref="calendarBtn">

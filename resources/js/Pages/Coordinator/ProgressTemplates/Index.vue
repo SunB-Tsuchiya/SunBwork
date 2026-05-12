@@ -1,10 +1,10 @@
 <template>
   <AppLayout title="進行管理テンプレート">
     <template #header>
-      <h2 class="text-xl font-semibold leading-tight text-gray-800">進行管理テンプレート</h2>
+      <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">進行管理テンプレート</h2>
     </template>
 
-    <div class="rounded bg-white p-6 shadow">
+    <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
 
       <!-- ツールバー -->
       <div class="mb-4 flex items-center gap-3">
@@ -17,7 +17,8 @@
       </div>
 
       <!-- 一覧テーブル -->
-      <table v-if="templates.length > 0" class="min-w-full divide-y divide-gray-200">
+      <div v-if="templates.length > 0" class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
           <tr>
             <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">テンプレート名</th>
@@ -62,6 +63,7 @@
           </tr>
         </tbody>
       </table>
+      </div>
 
       <div v-else class="py-8 text-center text-gray-400">テンプレートがありません。</div>
 

@@ -51,12 +51,12 @@ const submit = () => {
     <AppLayout title="クライアントCSV一括登録">
         <template #header>
             <div class="flex items-center justify-between">
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">クライアントCSV一括登録</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">クライアントCSV一括登録</h2>
                 <Link :href="route(`${routePrefix}.clients.create`)" class="text-gray-600 hover:text-gray-900">← 新規作成に戻る</Link>
             </div>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <!-- 説明セクション -->
             <div class="mb-8">
                 <h3 class="mb-4 text-lg font-medium text-gray-900">CSVファイル形式について</h3>

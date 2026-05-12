@@ -142,14 +142,14 @@ const displayGroups = computed(() => {
 <template>
     <AppLayout title="校正状況">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">校正状況</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">校正状況</h2>
         </template>
 
         <template #tabs>
             <UserNavigationTabs active="proof_status" />
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
 
             <!-- 検索・フィルター行 -->
             <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -158,7 +158,7 @@ const displayGroups = computed(() => {
                         v-model="localQ"
                         @keyup.enter="search"
                         placeholder="タイトル/詳細で検索"
-                        class="w-72 rounded border px-3 py-2 text-sm"
+                        class="w-full sm:w-72 rounded border px-3 py-2 text-sm"
                     />
                     <button class="rounded bg-indigo-600 px-3 py-2 text-white" @click.prevent="search">検索</button>
                     <button class="ml-2 rounded border px-3 py-2" @click.prevent="clearSearch">クリア</button>

@@ -66,9 +66,9 @@ const submit = () => {
 <template>
     <AppLayout title="会社新規登録">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">会社新規登録</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">会社新規登録</h2>
         </template>
-        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-2xl rounded bg-white px-4 py-6 sm:p-6 shadow">
             <form @submit.prevent="submit">
                 <div class="mb-6">
                     <InputLabel for="name" value="会社名" />

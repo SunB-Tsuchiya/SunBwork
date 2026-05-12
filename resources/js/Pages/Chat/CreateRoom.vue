@@ -192,9 +192,9 @@ function createRoom() {
 <template>
     <AppLayout title="チャットルーム作成">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">チャットルーム作成</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">チャットルーム作成</h2>
         </template>
-        <div class="mx-auto max-w-3xl rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-3xl rounded bg-white px-4 py-6 sm:p-6 shadow">
                 <div class="mb-4">
                     <label class="mr-4 font-bold">ルーム種別:</label>
                     <label class="mr-4"><input type="radio" value="private" v-model="roomType" /> パーソナル</label>
@@ -213,6 +213,7 @@ function createRoom() {
                 </div>
                 <div class="mb-4">
                     <label class="mb-1 block font-bold">選択中のメンバー</label>
+                    <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
@@ -251,6 +252,7 @@ function createRoom() {
                             </tr>
                         </tbody>
                     </table>
+                    </div>
                 </div>
                 <div class="mb-4 mt-6 flex justify-end">
                     <button class="rounded bg-blue-600 px-6 py-2 text-white" @click="createRoom">作成する</button>
@@ -271,6 +273,7 @@ function createRoom() {
                             </option>
                         </select>
                     </div>
+                    <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
@@ -308,6 +311,7 @@ function createRoom() {
                             </tr>
                         </tbody>
                     </table>
+                    </div>
                     <div v-if="errors.members" class="mt-1 text-sm text-red-600">{{ errors.members }}</div>
                 </div>
             </div>

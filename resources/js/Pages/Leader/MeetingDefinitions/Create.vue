@@ -170,7 +170,7 @@ function submit() {
             </div>
         </template>
 
-        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-2xl rounded bg-white px-4 py-6 sm:p-6 shadow">
             <form @submit.prevent="submit" class="space-y-5">
 
                 <div v-if="errorMessage" class="rounded border-l-4 border-red-500 bg-red-50 p-3 text-red-700 text-sm">
@@ -315,6 +315,7 @@ function submit() {
                     </div>
                 </div>
                 <div class="max-h-96 overflow-y-auto">
+                    <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="sticky top-0 bg-gray-50">
                             <tr>
@@ -344,6 +345,7 @@ function submit() {
                             </tr>
                         </tbody>
                     </table>
+                    </div>
                     <div v-if="filteredMembers.length === 0" class="py-8 text-center text-gray-500">該当するメンバーがいません</div>
                 </div>
                 <div v-if="selectedMemberIds.length > 0" class="mt-4 rounded bg-blue-50 p-3">

@@ -104,7 +104,7 @@ const guides = computed(() => {
 <template>
     <AppLayout title="使い方ガイド">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">使い方ガイド</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">使い方ガイド</h2>
         </template>
 
         <div class="rounded-lg bg-white p-8 shadow">

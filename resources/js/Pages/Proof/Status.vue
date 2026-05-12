@@ -46,7 +46,7 @@ function toggleMine() {
             <h2 class="text-xl font-semibold text-gray-800">校正状況</h2>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <div class="mb-4 flex items-center gap-3">
                 <button
                     @click="toggleMine"
@@ -63,7 +63,8 @@ function toggleMine() {
                 校正依頼はありません。
             </p>
 
-            <table v-else class="min-w-full divide-y divide-gray-200">
+            <div v-else class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
                         <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">タイトル</th>
@@ -92,6 +93,7 @@ function toggleMine() {
                     </tr>
                 </tbody>
             </table>
+            </div>
 
             <!-- ページネーション -->
             <div v-if="proofRequests.links" class="mt-4 flex justify-center gap-1">

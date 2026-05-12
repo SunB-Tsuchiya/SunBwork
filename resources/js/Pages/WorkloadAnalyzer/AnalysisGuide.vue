@@ -33,8 +33,8 @@ const settingsUrl = computed(() => {
     <AppLayout title="作業量分析 — 分析ガイド">
         <template #header>
             <div class="flex items-center gap-3">
-                <Link :href="indexUrl" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">← 作業量分析に戻る</Link>
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">作業量分析 — 分析ガイド</h2>
+                <Link :href="indexUrl" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300">← 作業量分析に戻る</Link>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">作業量分析 — 分析ガイド</h2>
             </div>
         </template>
 
@@ -43,7 +43,7 @@ const settingsUrl = computed(() => {
         <div class="space-y-6">
 
             <!-- ① 概要 -->
-            <div class="rounded bg-white p-6 shadow">
+            <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
                 <h3 class="mb-3 border-b pb-2 text-lg font-bold text-orange-700">① この分析の目的</h3>
                 <p class="leading-relaxed text-gray-700">
                     作業量分析は、各メンバーが月間にどれだけの作業をこなしたかを数値化し、
@@ -64,7 +64,7 @@ const settingsUrl = computed(() => {
             </div>
 
             <!-- ② 6つのカテゴリ -->
-            <div class="rounded bg-white p-6 shadow">
+            <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
                 <h3 class="mb-3 border-b pb-2 text-lg font-bold text-orange-700">② 6つの評価カテゴリ</h3>
                 <p class="mb-4 text-sm text-gray-600">
                     作業は以下の6つの観点から計測されます。各カテゴリが 0〜100 点のスコアになり、合計 0〜600 点が総合ポイントです。
@@ -118,7 +118,7 @@ const settingsUrl = computed(() => {
             </div>
 
             <!-- ③ 生スコアの計算式 -->
-            <div class="rounded bg-white p-6 shadow">
+            <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
                 <h3 class="mb-3 border-b pb-2 text-lg font-bold text-orange-700">③ 生スコアの計算式</h3>
                 <p class="mb-3 text-sm text-gray-600">
                     まず各カテゴリの「生スコア」を計算します。
@@ -140,7 +140,7 @@ const settingsUrl = computed(() => {
             </div>
 
             <!-- ④ 職種グループ別パーセンタイル（核心） -->
-            <div class="rounded bg-white p-6 shadow">
+            <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
                 <h3 class="mb-3 border-b pb-2 text-lg font-bold text-orange-700">④ 職種グループ別パーセンタイル変換（核心）</h3>
                 <p class="mb-3 leading-relaxed text-gray-700">
                     生スコアを <strong>同じ担当（職種）のメンバー内で順位付け</strong> し、
@@ -275,7 +275,7 @@ const settingsUrl = computed(() => {
             </div>
 
             <!-- ⑤ 総合ポイント -->
-            <div class="rounded bg-white p-6 shadow">
+            <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
                 <h3 class="mb-3 border-b pb-2 text-lg font-bold text-orange-700">⑤ 総合ポイント（0〜600）</h3>
                 <p class="mb-3 text-sm text-gray-700">
                     6つのカテゴリのパーセンタイル点（各 0〜100）を合計したものが総合ポイントです。
@@ -302,7 +302,7 @@ const settingsUrl = computed(() => {
             </div>
 
             <!-- ⑥ 偏差値 -->
-            <div class="rounded bg-white p-6 shadow">
+            <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
                 <h3 class="mb-3 border-b pb-2 text-lg font-bold text-orange-700">⑥ 偏差値（参考値）</h3>
                 <p class="mb-3 text-sm text-gray-700">
                     総合ポイントを会社全体（全担当混合）で統計処理し、偏差値に変換します。
@@ -322,7 +322,7 @@ const settingsUrl = computed(() => {
             </div>
 
             <!-- ⑦ よくある質問 -->
-            <div class="rounded bg-white p-6 shadow">
+            <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
                 <h3 class="mb-4 border-b pb-2 text-lg font-bold text-orange-700">⑦ よくある質問（Q&amp;A）</h3>
                 <div class="space-y-4">
                     <div>

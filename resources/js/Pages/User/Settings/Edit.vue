@@ -27,7 +27,7 @@ function submit() {
             <UserNavigationTabs active="settings" />
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <form @submit.prevent="submit" class="max-w-md space-y-5">
 
                 <!-- 基本勤務形態 -->

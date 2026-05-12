@@ -1,10 +1,10 @@
 <template>
     <AppLayout :title="`ジョブメッセージ編集 - ${projectJob.title}`">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">ジョブメッセージ編集</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">ジョブメッセージ編集</h2>
         </template>
 
-        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-2xl rounded bg-white px-4 py-6 sm:p-6 shadow">
             <h1 class="mb-4 text-xl font-bold">
                 メッセージ #{{ message.id }} を編集
             </h1>

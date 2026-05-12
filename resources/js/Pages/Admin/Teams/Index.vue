@@ -45,10 +45,10 @@ const handleDelete = async (teamId) => {
 <template>
     <AppLayout title="部署管理">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">部署管理</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">部署管理</h2>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <div v-if="departmentTeams.length === 0" class="py-8 text-center text-gray-500">
                 部署チームが登録されていません。
             </div>

@@ -19,7 +19,7 @@ function toggle(dispatcher) {
 <template>
     <AppLayout title="単発派遣管理">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">単発派遣管理</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">単発派遣管理</h2>
         </template>
         <template #headerExtras>
             <Link
@@ -34,7 +34,7 @@ function toggle(dispatcher) {
             <ProofCoordinatorNavigationTabs active="dispatchers" />
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <p class="mb-4 text-xs text-gray-500">
                 「アサイン表示」をオンにすると、校正ジョブのアサイン時に担当者セレクターに表示されます。
             </p>

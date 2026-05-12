@@ -151,6 +151,7 @@
                                     {{ group.label }}（{{ group.files.length }}ファイル
                                     <template v-if="group.totalPages"> / {{ group.totalPages }}ページ</template>）
                                 </div>
+                                <div class="overflow-x-auto">
                                 <table class="w-full text-xs">
                                     <thead>
                                         <tr class="bg-gray-100 text-left">
@@ -196,6 +197,7 @@
                                         </tr>
                                     </tbody>
                                 </table>
+                                </div>
                             </div>
                             <!-- 合計 -->
                             <div class="mt-2 rounded border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-900">
@@ -415,7 +417,7 @@
             <div class="mt-2" v-if="props.mode === 'coordinator'">
                 <div class="mt-2">
                     <label class="mb-1 block font-semibold">締め切り</label>
-                    <div class="flex items-center gap-3">
+                    <div class="flex flex-wrap items-center gap-3">
                         <input
                             v-model="block.desired_end_date"
                             :min="minEndDate(idx)"
@@ -425,20 +427,22 @@
                             @change="onEndDateChange(idx)"
                             :disabled="!editMode"
                         />
-                        <select
-                            v-model="block.desired_time_hour"
-                            :disabled="!editMode"
-                            :class="['w-20 rounded border px-3 py-2',
-                                    getFieldError('assignments.0.desired_time') || getFieldError('desired_time') ? 'border-red-500 bg-red-50' : '']"
-                            @change="onHourChange(idx)"
-                        >
-                            <option v-for="h in availableHours(idx)" :key="h" :value="h">{{ h }}</option>
-                        </select>
-                        <select v-model="block.desired_time_min" :disabled="!editMode" 
-                               :class="['w-20 rounded border px-3 py-2',
-                                       getFieldError('assignments.0.desired_time') || getFieldError('desired_time') ? 'border-red-500 bg-red-50' : '']">
-                            <option v-for="m in availableMins(idx, block.desired_time_hour)" :key="m" :value="m">{{ m }}</option>
-                        </select>
+                        <div class="flex items-center gap-3">
+                            <select
+                                v-model="block.desired_time_hour"
+                                :disabled="!editMode"
+                                :class="['w-20 rounded border px-3 py-2',
+                                        getFieldError('assignments.0.desired_time') || getFieldError('desired_time') ? 'border-red-500 bg-red-50' : '']"
+                                @change="onHourChange(idx)"
+                            >
+                                <option v-for="h in availableHours(idx)" :key="h" :value="h">{{ h }}</option>
+                            </select>
+                            <select v-model="block.desired_time_min" :disabled="!editMode"
+                                   :class="['w-20 rounded border px-3 py-2',
+                                           getFieldError('assignments.0.desired_time') || getFieldError('desired_time') ? 'border-red-500 bg-red-50' : '']">
+                                <option v-for="m in availableMins(idx, block.desired_time_hour)" :key="m" :value="m">{{ m }}</option>
+                            </select>
+                        </div>
                     </div>
                     <div v-if="getFieldError('assignments.0.desired_end_date') || getFieldError('desired_end_date')" 
                          class="mt-1 text-sm text-red-600">
@@ -464,7 +468,7 @@
 
             <!-- 見積時間: coordinator = 常に編集可, user = 既存レコードのみ読み取り表示 -->
             <label class="mb-1 mt-2 block font-semibold">見積時間</label>
-            <div class="flex items-center gap-2">
+            <div class="flex flex-wrap items-center gap-2">
                 <template v-if="props.mode === 'coordinator'">
                     <select v-model="block.estimated_hours" :disabled="!editMode" class="w-40 rounded border px-3 py-2">
                         <option value="">未指定</option>
@@ -503,7 +507,7 @@
             </div>
             <div class="mt-2">
                 <label class="block text-sm font-medium text-gray-700">時間</label>
-                <div class="mt-1 flex items-end gap-4">
+                <div class="mt-1 flex flex-col gap-4 sm:flex-row sm:items-end">
                     <div class="flex flex-col">
                         <label class="text-xs text-gray-600">開始</label>
                         <div class="flex items-center gap-2">
@@ -606,7 +610,7 @@
             </div>
         </div>
 
-        <div class="flex gap-2" v-if="editMode">
+        <div class="flex flex-wrap gap-2" v-if="editMode">
             <template v-if="props.mode === 'coordinator'">
                 <!-- 新規作成のみ「ブロック追加」を表示 -->
                 <button v-if="!isEditMode" type="button" class="rounded bg-blue-600 px-4 py-2 text-white" @click="addBlock">ジョブブロックを追加</button>
@@ -672,7 +676,7 @@
             <div class="flex justify-end gap-2 border-t px-6 py-4">
                 <button
                     @click="closeOverlapModal"
-                    class="rounded bg-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-300"
+                    class="rounded bg-gray-200 px-4 py-2 text-gray-700 whitespace-nowrap hover:bg-gray-300"
                 >
                     キャンセル
                 </button>

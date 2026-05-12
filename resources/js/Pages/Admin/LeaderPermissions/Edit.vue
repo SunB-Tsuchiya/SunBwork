@@ -54,11 +54,11 @@ const goBack = () => {
     <AppLayout title="Leader権限設定">
         <template #header>
             <div class="flex items-center justify-between">
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">Leader権限設定</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">Leader権限設定</h2>
             </div>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <div class="mx-auto max-w-lg">
                 <!-- 対象ユーザー情報 -->
                 <div class="mb-6 rounded-md bg-gray-50 px-4 py-3">

@@ -2,8 +2,8 @@
     <AppLayout :title="subjectText || 'メール詳細'">
         <template #header>
             <div class="flex items-center gap-3">
-                <Link :href="route('messages.index')" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">← 一覧に戻る</Link>
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">メール詳細</h2>
+                <Link :href="route('messages.index')" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300">← 一覧に戻る</Link>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">メール詳細</h2>
             </div>
         </template>
 
@@ -22,7 +22,7 @@
             </button>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <h3 class="text-lg font-semibold">{{ subjectText }}</h3>
             <div class="mt-1 text-sm text-gray-500">差出人: {{ senderName }}</div>
             <div class="mt-4 text-sm text-gray-700" v-html="sanitizedBody" @click="onBodyClick"></div>

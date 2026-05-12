@@ -67,10 +67,10 @@ const removeRole = (depIdx, assignmentIdx) => {
 <template>
     <AppLayout title="会社編集">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">会社編集</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">会社編集</h2>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <div class="mx-auto max-w-2xl">
                 <form @submit.prevent="submit">
                     <!-- 会社名 -->

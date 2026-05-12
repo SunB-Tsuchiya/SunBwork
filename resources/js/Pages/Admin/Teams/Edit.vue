@@ -63,9 +63,9 @@ const isRestricted = computed(() => {
 <template>
     <AppLayout title="チーム編集">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">チーム編集</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">チーム編集</h2>
         </template>
-        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-2xl rounded bg-white px-4 py-6 sm:p-6 shadow">
             <!-- If this is a unit team, render the unit-specific edit form -->
             <component :is="team.team_type === 'unit' ? EditForUnits : 'div'">
                 <template v-if="team.team_type !== 'unit'">

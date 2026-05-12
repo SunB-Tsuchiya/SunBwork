@@ -20,7 +20,7 @@ function formatTime(t) {
     <AppLayout title="勤務形態設定">
         <template #header>
             <div class="flex items-center justify-between">
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">勤務形態設定</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">勤務形態設定</h2>
                 <Link
                     v-if="!is_superadmin"
                     :href="route('admin.worktypes.edit')"
@@ -36,7 +36,7 @@ function formatTime(t) {
 
         <!-- SuperAdmin: 全会社分を表示 -->
         <template v-if="is_superadmin">
-            <div v-for="group in groups" :key="group.company_id" class="mb-6 rounded bg-white p-6 shadow">
+            <div v-for="group in groups" :key="group.company_id" class="mb-6 rounded bg-white px-4 py-6 sm:p-6 shadow">
                 <div class="mb-4 flex items-center justify-between">
                     <h1 class="text-xl font-semibold">
                         勤務形態設定
@@ -50,6 +50,7 @@ function formatTime(t) {
                     </Link>
                 </div>
                 <template v-if="group.worktypes.length">
+                    <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
@@ -68,6 +69,7 @@ function formatTime(t) {
                             </tr>
                         </tbody>
                     </table>
+                    </div>
                 </template>
                 <p v-else class="text-sm text-gray-500">登録なし</p>
             </div>
@@ -75,12 +77,13 @@ function formatTime(t) {
 
         <!-- 通常 Admin: 自社のみ -->
         <template v-else>
-            <div class="rounded bg-white p-6 shadow">
+            <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
                 <h1 class="mb-4 text-xl font-semibold">
                     勤務形態設定
                     <span v-if="company_name" class="ml-2 text-base font-normal text-gray-500">{{ company_name }}</span>
                 </h1>
                 <template v-if="worktypes.length">
+                    <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
@@ -99,6 +102,7 @@ function formatTime(t) {
                             </tr>
                         </tbody>
                     </table>
+                    </div>
                 </template>
                 <p v-else class="text-sm text-gray-500">登録なし</p>
             </div>

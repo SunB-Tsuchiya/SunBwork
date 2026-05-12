@@ -475,7 +475,7 @@ const canCreate = computed(() => {
     <AppLayout title="伝票ボード">
         <template #header>
             <div class="flex items-center justify-between">
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">伝票ボード</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">伝票ボード</h2>
                 <button
                     type="button"
                     class="rounded-lg bg-green-700 px-4 py-2 text-sm font-medium text-white hover:bg-green-800"
@@ -689,7 +689,7 @@ const canCreate = computed(() => {
                         <div class="flex flex-wrap items-center gap-2 border-t bg-gray-50 px-5 py-3">
                             <button
                                 type="button"
-                                class="inline-flex items-center gap-1.5 rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                                class="inline-flex items-center gap-1.5 rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300"
                                 @click="closeDetail"
                             >閉じる</button>
 

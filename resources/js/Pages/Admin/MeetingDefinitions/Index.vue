@@ -30,11 +30,12 @@ function destroy(id) {
             </Link>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <p v-if="meetingDefinitions.length === 0" class="text-sm text-gray-500">
                 登録済みの会議はありません。
             </p>
-            <table v-else class="w-full text-sm">
+            <div v-else class="overflow-x-auto">
+            <table class="w-full text-sm">
                 <thead>
                     <tr class="border-b text-left text-gray-600">
                         <th class="py-2 pr-4">タイトル</th>
@@ -71,6 +72,7 @@ function destroy(id) {
                     </tr>
                 </tbody>
             </table>
+            </div>
         </div>
     </AppLayout>
 </template>

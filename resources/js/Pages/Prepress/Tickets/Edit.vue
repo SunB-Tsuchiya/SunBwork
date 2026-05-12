@@ -175,7 +175,7 @@ const isMobile = computed(() => {
 <template>
     <AppLayout title="伝票編集">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">伝票編集</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">伝票編集</h2>
         </template>
 
         <div class="mx-auto max-w-2xl">

@@ -257,7 +257,7 @@ watch(
 
 <template>
     <AppLayout title="イベント作成">
-        <div class="mx-auto max-w-3xl rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-3xl rounded bg-white px-4 py-6 sm:p-6 shadow">
             <div class="mb-4 flex items-center justify-between">
                 <h1 class="text-2xl font-bold">イベント作成</h1>
                 <div class="flex items-center space-x-2">

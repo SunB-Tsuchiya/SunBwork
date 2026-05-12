@@ -24,11 +24,11 @@ const permKeys = Object.keys(permLabels);
     <AppLayout title="Leader権限管理">
         <template #header>
             <div class="flex items-center justify-between">
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">Leader権限管理</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">Leader権限管理</h2>
             </div>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <div v-if="leaders.length === 0" class="py-8 text-center text-gray-500">
                 Leaderユーザーが登録されていません。
             </div>

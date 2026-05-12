@@ -197,7 +197,7 @@ onUnmounted(() => {
             <h2 class="text-xl font-semibold text-gray-800">校正カレンダー</h2>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
 
             <!-- ─── 表示切り替えボタン ────────────────────────────── -->
             <div class="mb-4 flex items-center justify-between">

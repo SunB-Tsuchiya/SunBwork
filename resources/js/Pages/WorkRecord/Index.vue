@@ -81,10 +81,10 @@ const lastPage    = computed(() => props.meta?.last_page ?? 1);
 <template>
     <AppLayout title="勤務時間管理">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">勤務時間管理</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">勤務時間管理</h2>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <!-- フィルタ -->
             <div class="mb-6 flex flex-wrap items-center gap-3">
                 <label class="text-sm">表示:</label>

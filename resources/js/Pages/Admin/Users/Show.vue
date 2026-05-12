@@ -11,11 +11,11 @@ defineProps({
     <AppLayout title="ユーザー詳細">
         <template #header>
             <div class="flex items-center gap-3">
-                <Link :href="route('admin.users.index')" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">← ユーザー一覧に戻る</Link>
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">ユーザー詳細</h2>
+                <Link :href="route('admin.users.index')" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300">← ユーザー一覧に戻る</Link>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">ユーザー詳細</h2>
             </div>
         </template>
-        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-2xl rounded bg-white px-4 py-6 sm:p-6 shadow">
                         <h3 class="mb-4 text-lg font-medium text-gray-900">ユーザー情報</h3>
                         <dl class="divide-y divide-gray-200">
                             <div class="flex justify-between py-4">

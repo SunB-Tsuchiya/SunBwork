@@ -26,9 +26,9 @@ function destroy() {
         <template #header>
             <div class="flex items-center gap-3">
                 <Link :href="route('coordinator.subcontractors.index')"
-                      class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                      class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300"
                 >← 一覧に戻る</Link>
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">外注先 詳細</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">外注先 詳細</h2>
             </div>
         </template>
         <template #headerExtras>
@@ -46,7 +46,7 @@ function destroy() {
 
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <!-- 基本情報 -->
-            <div class="rounded bg-white p-6 shadow">
+            <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
                 <h3 class="mb-4 text-base font-semibold text-gray-700">基本情報</h3>
                 <dl class="space-y-3">
                     <div>
@@ -69,7 +69,7 @@ function destroy() {
             </div>
 
             <!-- 管理担当Coordinator -->
-            <div class="rounded bg-white p-6 shadow">
+            <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
                 <h3 class="mb-4 text-base font-semibold text-gray-700">管理担当 Coordinator</h3>
                 <template v-if="props.subcontractor.coordinators && props.subcontractor.coordinators.length">
                     <ul class="space-y-1">
@@ -92,7 +92,7 @@ function destroy() {
         </div>
 
         <!-- 削除 -->
-        <div class="mt-6 rounded bg-white p-6 shadow">
+        <div class="mt-6 rounded bg-white px-4 py-6 sm:p-6 shadow">
             <h3 class="mb-2 text-base font-semibold text-red-700">外注先の削除</h3>
             <p class="mb-4 text-sm text-gray-600">
                 割当が残っている場合は削除できません。

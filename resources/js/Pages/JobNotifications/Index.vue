@@ -213,7 +213,7 @@ function typeMeta(type) {
 <template>
     <AppLayout title="ジョブ通知">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">ジョブ通知</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">ジョブ通知</h2>
         </template>
 
         <div class="rounded bg-white shadow">
@@ -226,7 +226,7 @@ function typeMeta(type) {
                         v-model="searchQuery"
                         type="search"
                         placeholder="検索 (内容/種別/案件/未読・既読)"
-                        class="w-72 rounded border px-2 py-1 text-sm"
+                        class="w-full sm:w-72 rounded border px-2 py-1 text-sm"
                     />
 
                     <button

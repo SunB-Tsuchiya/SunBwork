@@ -140,14 +140,14 @@ function uncomplete(id) {
 <template>
     <AppLayout title="ジョブ管理">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">ジョブ管理</h2>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">ジョブ管理</h2>
         </template>
 
         <template #tabs>
             <ProofCoordinatorNavigationTabs active="jobs" />
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
 
             <!-- 検索・フィルター -->
             <div class="flex flex-col gap-3">

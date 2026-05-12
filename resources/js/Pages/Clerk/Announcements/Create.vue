@@ -79,7 +79,7 @@ const submit = () => {
             <h2 class="text-xl font-semibold text-gray-800">お知らせ作成</h2>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <ClerkNavigationTabs active="announcements" />
 
             <form @submit.prevent="submit" class="mx-auto max-w-2xl space-y-6">
@@ -190,6 +190,7 @@ const submit = () => {
 
                     <!-- ユーザー一覧 -->
                     <div class="flex-1 overflow-y-auto">
+                        <div class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-gray-200">
                             <thead class="sticky top-0 bg-gray-50">
                                 <tr>
@@ -221,6 +222,7 @@ const submit = () => {
                                 </tr>
                             </tbody>
                         </table>
+                        </div>
                         <p v-if="filteredUsers.length === 0" class="py-6 text-center text-sm text-gray-500">
                             該当するユーザーがいません
                         </p>

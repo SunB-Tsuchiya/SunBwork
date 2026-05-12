@@ -89,12 +89,12 @@ const submit = () => {
     <AppLayout title="ユーザー編集">
         <template #header>
             <div class="flex items-center gap-3">
-                <Link :href="route('admin.users.index')" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">← ユーザー一覧に戻る</Link>
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">ユーザー編集</h2>
+                <Link :href="route('admin.users.index')" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300">← ユーザー一覧に戻る</Link>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">ユーザー編集</h2>
             </div>
         </template>
 
-        <div class="mx-auto max-w-2xl rounded bg-white p-6 shadow">
+        <div class="mx-auto max-w-2xl rounded bg-white px-4 py-6 sm:p-6 shadow">
             <form @submit.prevent="submit">
 
                 <!-- 名前 -->

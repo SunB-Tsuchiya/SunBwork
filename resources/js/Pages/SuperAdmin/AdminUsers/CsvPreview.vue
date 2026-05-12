@@ -61,12 +61,12 @@ const getRoleLabel = (role) => {
     <AppLayout title="CSV登録確認">
         <template #header>
             <div class="flex items-center justify-between">
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">CSV登録確認</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">CSV登録確認</h2>
                 <Link :href="route('superadmin.adminusers.csv.upload')" class="text-gray-600 hover:text-gray-900"> ← CSVアップロードに戻る </Link>
             </div>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
                 <!-- 登録先情報 -->
                 <div class="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
                     <h3 class="mb-3 text-lg font-medium text-blue-800">📍 登録先情報</h3>
