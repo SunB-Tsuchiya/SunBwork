@@ -12,11 +12,22 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('coordinator_project_job_favorites', function (Blueprint $table) {
-            $table->unsignedBigInteger('user_id')->after('id');
-            $table->unsignedBigInteger('project_job_id')->after('user_id');
-            $table->unique(['user_id', 'project_job_id']);
-            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
-            $table->foreign('project_job_id')->references('id')->on('project_jobs')->onDelete('cascade');
+            if (!Schema::hasColumn('coordinator_project_job_favorites', 'user_id')) {
+                $table->unsignedBigInteger('user_id')->after('id');
+            }
+            if (!Schema::hasColumn('coordinator_project_job_favorites', 'project_job_id')) {
+                $table->unsignedBigInteger('project_job_id')->after('user_id');
+            }
+            // インデックスが存在しない場合のみ追加
+            try {
+                $table->unique(['user_id', 'project_job_id']);
+            } catch (\Exception $e) {}
+            try {
+                $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
+            } catch (\Exception $e) {}
+            try {
+                $table->foreign('project_job_id')->references('id')->on('project_jobs')->onDelete('cascade');
+            } catch (\Exception $e) {}
         });
     }
 
