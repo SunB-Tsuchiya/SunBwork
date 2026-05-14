@@ -16,14 +16,12 @@ class Kernel extends ConsoleKernel
         \App\Console\Commands\AutoCompleteMyJobs::class,
     ];
 
-    protected function schedule(\Illuminate\Console\Scheduling\Schedule $schedule)
-    {
-        // Run the summary dispatcher every 5 minutes to detect conversations that need summarization
-        $schedule->command('ai:dispatch-summaries')->everyFiveMinutes();
-
-        // マイジョブ（自己割当）で日付を過ぎたものを毎日深夜0:05に自動完了にする
-        $schedule->command('auto-complete:my-jobs')->dailyAt('00:05');
-    }
+    // Laravel 11 では Kernel::schedule() は自動呼出しされないため routes/console.php に移行済み
+    // protected function schedule(\Illuminate\Console\Scheduling\Schedule $schedule)
+    // {
+    //     $schedule->command('ai:dispatch-summaries')->everyFiveMinutes();
+    //     $schedule->command('auto-complete:my-jobs')->dailyAt('00:05');
+    // }
 
     protected function commands()
     {
