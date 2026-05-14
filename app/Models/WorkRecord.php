@@ -38,17 +38,31 @@ class WorkRecord extends Model
 
     /**
      * overtime/early_leave を計算して属性にセットする
+     *
+     * 前倒し出勤（規定開始より早く来た分）は残業に含めない。
+     * 残業・早退の判断は「規定終業時刻との差分」のみで行う。
      */
     public function calcOvertime(): void
     {
-        if (!$this->scheduled_start || !$this->scheduled_end) {
+        if (!$this->scheduled_start || !$this->scheduled_end || !$this->start_time || !$this->end_time) {
             $this->overtime_minutes    = 0;
             $this->early_leave_minutes = 0;
             return;
         }
 
-        $scheduledMinutes = self::scheduledDuration($this->scheduled_start, $this->scheduled_end);
-        $actualMinutes    = self::scheduledDuration($this->start_time, $this->end_time);
+        $scheduledStart = self::timeToMinutes(substr($this->scheduled_start, 0, 5));
+        $scheduledEnd   = self::timeToMinutes(substr($this->scheduled_end,   0, 5));
+        $actualStart    = self::timeToMinutes(substr($this->start_time,      0, 5));
+        $actualEnd      = self::timeToMinutes(substr($this->end_time,        0, 5));
+
+        // 夜勤対応: 終業が始業より早い場合は翌日扱い
+        if ($scheduledEnd < $scheduledStart) $scheduledEnd += 1440;
+        if ($actualEnd    < $actualStart)    $actualEnd    += 1440;
+
+        // 前倒し開始は残業に含めない: 規定開始時刻より早い分はカウントしない
+        $effectiveStart   = max($actualStart, $scheduledStart);
+        $scheduledMinutes = $scheduledEnd - $scheduledStart;
+        $actualMinutes    = $actualEnd - $effectiveStart;
         $diff             = $actualMinutes - $scheduledMinutes;
 
         $this->overtime_minutes    = max(0, $diff);
