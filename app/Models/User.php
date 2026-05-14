@@ -37,6 +37,9 @@ class User extends Authenticatable
         'department_id',
         'assignment_id',
         'position_title_id',
+        'is_ghost',
+        'ghost_owner_id',
+        'ghost_expires_at',
     ];
 
     /**
@@ -70,7 +73,29 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_ghost' => 'boolean',
+            'ghost_expires_at' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::addGlobalScope('no_ghost', fn ($q) => $q->where('is_ghost', false));
+    }
+
+    public function scopeWithGhosts($query)
+    {
+        return $query->withoutGlobalScope('no_ghost');
+    }
+
+    public function ghostOwner()
+    {
+        return $this->belongsTo(User::class, 'ghost_owner_id');
+    }
+
+    public function ghostUsers()
+    {
+        return $this->hasMany(User::class, 'ghost_owner_id');
     }
 
     /**

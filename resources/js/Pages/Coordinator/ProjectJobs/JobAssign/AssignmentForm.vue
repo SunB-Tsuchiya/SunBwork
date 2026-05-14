@@ -35,10 +35,20 @@
 
             <label class="mb-1 mt-2 block font-semibold">ジョブ名</label>
             <div>
-                <input v-model="block.title_suffix" :disabled="!editMode" type="text" 
-                       :class="['w-full rounded border px-3 py-2', 
-                               getFieldError('assignments.0.title') || getFieldError('title') ? 'border-red-500 bg-red-50' : '']" />
-                <div v-if="getFieldError('assignments.0.title') || getFieldError('title')" 
+                <input
+                    v-model="block.title_suffix"
+                    :disabled="!editMode"
+                    type="text"
+                    :list="`item-suggestions-${idx}`"
+                    :class="['w-full rounded border px-3 py-2',
+                            getFieldError('assignments.0.title') || getFieldError('title') ? 'border-red-500 bg-red-50' : '']"
+                    @focus="fetchItemSuggestions(block)"
+                    @input="fetchItemSuggestions(block)"
+                />
+                <datalist :id="`item-suggestions-${idx}`">
+                    <option v-for="s in getBlockSuggestions(block)" :key="s" :value="s" />
+                </datalist>
+                <div v-if="getFieldError('assignments.0.title') || getFieldError('title')"
                      class="mt-1 text-sm text-red-600">
                     {{ getFieldError('assignments.0.title') || getFieldError('title') }}
                 </div>
@@ -237,7 +247,7 @@
                 <select v-model="block.user_id" class="w-full rounded border px-3 py-2" @change="onUserChange(block)">
                     <option value="">未指定</option>
                     <option v-for="m in props.members || members" :key="m.id" :value="m.id">
-                        {{ m.name }}{{ m.assignment_name ? '（' + m.assignment_name + '）' : '' }}
+                        {{ m.is_ghost ? '[テスト] ' : '' }}{{ m.name }}{{ m.assignment_name ? '（' + m.assignment_name + '）' : '' }}
                         {{ m.employment_type === 'proof_dispatcher' ? '【単発派遣】' : ['dispatch','outsource','contract'].includes(m.employment_type) ? '【' + m.employment_type_label + '】' : '' }}
                     </option>
                 </select>
@@ -2495,6 +2505,37 @@ defineExpose({
         });
     },
 });
+
+// ── 項目リスト オートコンプリート ──────────────────────────────────────
+const itemSuggestionsMap = ref({});
+
+function getBlockSuggestions(block) {
+    const key = block.project_job_id || props.projectJob?.id;
+    return key ? (itemSuggestionsMap.value[key] ?? []) : [];
+}
+
+const suggestionFetchedFor = new Set();
+
+async function fetchItemSuggestions(block) {
+    const jobId = block.project_job_id || props.projectJob?.id;
+    if (!jobId || suggestionFetchedFor.has(jobId)) return;
+    suggestionFetchedFor.add(jobId);
+    try {
+        const routeName = props.mode === 'user'
+            ? 'user.item_entries.suggestions'
+            : 'coordinator.item_entries.suggestions';
+        const res = await fetch(route(routeName, { projectJob: jobId }) + '?q=', {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin',
+        });
+        if (res.ok) {
+            const data = await res.json();
+            itemSuggestionsMap.value[jobId] = data.suggestions ?? [];
+        }
+    } catch (e) {
+        // サイレント失敗
+    }
+}
 </script>
 
 <style scoped>

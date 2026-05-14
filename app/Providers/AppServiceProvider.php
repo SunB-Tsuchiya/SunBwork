@@ -2,13 +2,15 @@
 
 namespace App\Providers;
 
-use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\Log;
+use App\Auth\GhostAwareUserProvider;
+use App\Services\LocalTesseractService;
+use App\Services\OcrSpaceService;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\URL;
-use App\Services\OcrSpaceService;
-use App\Services\LocalTesseractService;
+use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -31,6 +33,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Auth::provider('ghost_aware_eloquent', function ($app, array $config) {
+            return new GhostAwareUserProvider($app['hash'], $config['model']);
+        });
+
         \Inertia\Inertia::share('user', function () {
             $user = \Illuminate\Support\Facades\Auth::user();
             if (!$user) return null;

@@ -5,7 +5,25 @@ import axios from 'axios';
 
 const props = defineProps({
     progressSheets: { type: Array, default: () => [] },
+    jobId:          { type: [Number, String], default: null },
 });
+
+// ── 項目リスト オートコンプリート ──────────────────────────────────────
+const itemSuggestions = ref([]);
+let suggestionsFetched = false;
+
+async function fetchItemSuggestions() {
+    if (!props.jobId || suggestionsFetched) return;
+    suggestionsFetched = true;
+    try {
+        const res = await axios.get(
+            route('coordinator.item_entries.suggestions', { projectJob: props.jobId }) + '?q='
+        );
+        itemSuggestions.value = res.data.suggestions ?? [];
+    } catch (e) {
+        // サイレント失敗
+    }
+}
 
 // ── state: シートごとに管理 ───────────────────────────────────────────────────
 const sheetStates = ref({});
@@ -400,7 +418,9 @@ onMounted(() => {
                         <div v-for="(item, idx) in sheetStates[sheet.id].editRows" :key="idx" class="mb-2 rounded border border-gray-200 bg-gray-50 p-2">
                             <div class="mb-1.5 flex gap-2">
                                 <input v-model="item.name" type="text" placeholder="名前"
-                                    class="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none" />
+                                    list="item-name-suggestions"
+                                    class="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none"
+                                    @focus="fetchItemSuggestions" />
                                 <button type="button" class="px-1 text-sm text-red-400 hover:text-red-600" @click="removeEditRow(sheet.id, 'row', idx)">×</button>
                             </div>
                             <div class="mb-1.5 flex gap-2">
@@ -442,7 +462,9 @@ onMounted(() => {
                         <div v-for="(item, idx) in sheetStates[sheet.id].editColumns" :key="idx" class="mb-2 rounded border border-gray-200 bg-gray-50 p-2">
                             <div class="mb-1.5 flex gap-2">
                                 <input v-model="item.name" type="text" placeholder="名前"
-                                    class="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none" />
+                                    list="item-name-suggestions"
+                                    class="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none"
+                                    @focus="fetchItemSuggestions" />
                                 <button type="button" class="px-1 text-sm text-red-400 hover:text-red-600" @click="removeEditRow(sheet.id, 'column', idx)">×</button>
                             </div>
                             <div class="mb-1.5 flex gap-2">
@@ -574,4 +596,9 @@ onMounted(() => {
             </div>
         </div>
     </div>
+
+    <!-- 項目リスト オートコンプリート用 datalist -->
+    <datalist id="item-name-suggestions">
+        <option v-for="s in itemSuggestions" :key="s" :value="s" />
+    </datalist>
 </template>

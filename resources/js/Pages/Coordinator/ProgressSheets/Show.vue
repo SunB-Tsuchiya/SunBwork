@@ -419,6 +419,31 @@
           @note-save="onNoteSave"
         />
       </div>
+
+      <!-- 作業時間集計サマリー -->
+      <div v-if="!editMode && workerLeafCols.length > 0" class="mt-3 overflow-auto rounded border border-gray-200 bg-white px-4 py-3 shadow">
+        <div class="mb-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500">作業時間集計</div>
+        <table class="border-collapse text-xs">
+          <thead>
+            <tr class="bg-gray-50">
+              <th v-for="col in workerLeafCols" :key="col.key" class="border border-gray-200 px-3 py-1.5 text-center font-medium text-gray-600 whitespace-nowrap">
+                {{ col.label }}
+              </th>
+              <th class="border border-gray-200 px-3 py-1.5 text-center font-semibold text-indigo-700">合計</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td v-for="col in workerLeafCols" :key="col.key" class="border border-gray-200 px-3 py-1.5 text-right font-medium text-gray-700">
+                {{ formatWorkMins(workerColWorkMinutes[col.key]) }}
+              </td>
+              <td class="border border-gray-200 px-3 py-1.5 text-right font-semibold text-indigo-700">
+                {{ formatWorkMins(workerGrandTotal) }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <!-- ── ジョブリンク登録モーダル ──────────────────── -->
@@ -1263,6 +1288,34 @@ const sheetCompletion = computed(() => {
 const localColumnConfig = ref(JSON.parse(JSON.stringify(props.sheet.column_config ?? [])));
 const localRows = ref(props.rows.map((r) => ({ ...r })));
 const localCells = ref(props.cells.map((c) => ({ ...c })));
+
+// worker/joblink 型列の作業時間集計
+const workerLeafCols = computed(() =>
+    collectAllLeaves(localColumnConfig.value).filter(
+        (l) => ['worker', 'joblink'].includes(l.type)
+    )
+);
+
+const workerColWorkMinutes = computed(() => {
+    const totals = {};
+    for (const col of workerLeafCols.value) {
+        totals[col.key] = localCells.value
+            .filter((c) => c.col_key === col.key && c.work_minutes)
+            .reduce((s, c) => s + (c.work_minutes ?? 0), 0);
+    }
+    return totals;
+});
+
+const workerGrandTotal = computed(() =>
+    Object.values(workerColWorkMinutes.value).reduce((s, v) => s + v, 0)
+);
+
+function formatWorkMins(mins) {
+    if (!mins) return '—';
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return h > 0 ? `${h}h${m > 0 ? m + 'm' : ''}` : `${m}m`;
+}
 
 // セル pending（未保存の変更）
 const pendingCells = ref([]);

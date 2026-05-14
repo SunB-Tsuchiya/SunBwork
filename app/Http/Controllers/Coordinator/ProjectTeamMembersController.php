@@ -95,7 +95,19 @@ class ProjectTeamMembersController extends Controller
         if ($leaderDepartmentId) {
             $membersQuery->where('department_id', $leaderDepartmentId);
         }
-        $members = $membersQuery->get();
+        $members = $membersQuery->get()->map(fn ($u) => array_merge($u->toArray(), ['is_ghost' => false]));
+
+        $ghosts = User::withGhosts()
+            ->where('ghost_owner_id', Auth::id())
+            ->get(['id', 'name'])
+            ->map(fn ($g) => [
+                'id'            => $g->id,
+                'name'          => $g->name,
+                'department_id' => null,
+                'assignment_id' => null,
+                'is_ghost'      => true,
+            ]);
+        $members = collect($members)->concat($ghosts)->values();
 
         return Inertia::render('Coordinator/ProjectTeamMembers/Create', [
             'members' => $members,

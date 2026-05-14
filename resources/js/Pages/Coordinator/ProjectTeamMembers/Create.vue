@@ -74,7 +74,9 @@
                                                 <input type="checkbox" :value="member.id" v-model="selectedMemberIds" />
                                             </td>
                                             <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ member.id }}</td>
-                                            <td class="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">{{ member.name }}</td>
+                                            <td class="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
+                                                <span v-if="member.is_ghost" class="mr-1 rounded bg-amber-100 px-1 py-0.5 text-xs font-semibold text-amber-800">[テスト]</span>{{ member.name }}
+                                            </td>
                                             <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
                                                 {{ getDepartmentName(member.department_id) }}
                                             </td>
@@ -105,7 +107,9 @@
                                     <tbody class="divide-y divide-gray-200 bg-white">
                                         <tr v-for="member in selectedMembers" :key="member.id" class="hover:bg-gray-50">
                                             <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ member.id }}</td>
-                                            <td class="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">{{ member.name }}</td>
+                                            <td class="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
+                                                <span v-if="member.is_ghost" class="mr-1 rounded bg-amber-100 px-1 py-0.5 text-xs font-semibold text-amber-800">[テスト]</span>{{ member.name }}
+                                            </td>
                                             <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
                                                 {{ getDepartmentName(member.department_id) }}
                                             </td>
@@ -217,14 +221,15 @@ const filteredAssignments = computed(() => {
     return props.assignments.filter((a) => String(a.department_id) === String(selectedDepartmentId.value));
 });
 const filteredMembers = computed(() => {
-    let result = props.members;
+    const ghosts = props.members.filter((m) => m.is_ghost);
+    let result = props.members.filter((m) => !m.is_ghost);
     if (selectedDepartmentId.value) {
         result = result.filter((m) => String(m.department_id) === String(selectedDepartmentId.value));
     }
     if (selectedAssignmentId.value) {
         result = result.filter((m) => String(m.assignment_id) === String(selectedAssignmentId.value));
     }
-    return result;
+    return [...result, ...ghosts];
 });
 const getDepartmentName = (department_id) => {
     const department = props.departments.find((d) => d.id === department_id);

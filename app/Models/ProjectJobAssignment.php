@@ -97,7 +97,7 @@ class ProjectJobAssignment extends Model
 
     public function sender()
     {
-        return $this->belongsTo(User::class, 'sender_id');
+        return $this->belongsTo(User::class, 'sender_id')->withoutGlobalScope('no_ghost');
     }
 
     // 元ジョブ（続き元）
@@ -124,7 +124,7 @@ class ProjectJobAssignment extends Model
 
     public function user()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class)->withoutGlobalScope('no_ghost');
     }
 
     // Relations to lookup models (optional)

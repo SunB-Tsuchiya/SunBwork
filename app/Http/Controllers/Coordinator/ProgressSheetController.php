@@ -207,7 +207,29 @@ class ProgressSheetController extends Controller
                 'cell_note_user_name'          => $c->noteUser?->name,
                 'cell_note_user_role'          => $c->noteUser?->user_role,
                 'completed_at'                => $c->completed_at?->format('Y-m-d H:i:s'),
+                'work_minutes'                => null, // events から後で上書き
             ]);
+
+        // events から worker セルの作業時間をバッチ算出
+        $workerAssignmentIds = $cells->whereNotNull('assignment_id')->pluck('assignment_id')->unique()->toArray();
+        if (!empty($workerAssignmentIds)) {
+            $evtMinutes = DB::table('events')
+                ->whereIn('project_job_assignment_id', $workerAssignmentIds)
+                ->whereNotNull('ends_at')
+                ->selectRaw('project_job_assignment_id,
+                    COALESCE(SUM(TIMESTAMPDIFF(MINUTE, starts_at, ends_at)
+                        - COALESCE(interruption_minutes, 0)), 0) as total')
+                ->groupBy('project_job_assignment_id')
+                ->pluck('total', 'project_job_assignment_id')
+                ->toArray();
+
+            $cells = $cells->map(function ($c) use ($evtMinutes) {
+                if ($c['assignment_id'] && isset($evtMinutes[$c['assignment_id']])) {
+                    $c['work_minutes'] = (int) $evtMinutes[$c['assignment_id']];
+                }
+                return $c;
+            });
+        }
 
         // 担当者選択用ユーザー一覧（案件メンバー + Coordinator）
         $memberIds = $projectJob->teamMembers()->pluck('user_id')->toArray();

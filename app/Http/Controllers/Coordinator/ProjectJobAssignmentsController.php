@@ -201,10 +201,23 @@ class ProjectJobAssignmentsController extends Controller
                 'assignment_name'       => $m->user?->assignment?->name,
                 'employment_type'       => $m->user?->employment_type ?? 'regular',
                 'employment_type_label' => $m->user ? $m->user->employmentTypeLabel() : '',
+                'is_ghost'              => false,
             ];
         })->filter(function ($item) use ($selfId) {
             return $item['id'] !== null && $item['id'] !== $selfId;
         })->values();
+        $ghosts = \App\Models\User::withGhosts()
+            ->where('ghost_owner_id', $selfId)
+            ->get(['id', 'name'])
+            ->map(fn ($g) => [
+                'id'                    => $g->id,
+                'name'                  => $g->name,
+                'assignment_name'       => null,
+                'employment_type'       => 'regular',
+                'employment_type_label' => '',
+                'is_ghost'              => true,
+            ]);
+        $members = $members->concat($ghosts);
 
         // ensure projectJob has client relation loaded so the create/edit pages can display client name
         if (method_exists($projectJob, 'load')) {
@@ -298,10 +311,23 @@ class ProjectJobAssignmentsController extends Controller
                 'assignment_name'       => $m->user?->assignment?->name,
                 'employment_type'       => $m->user?->employment_type ?? 'regular',
                 'employment_type_label' => $m->user ? $m->user->employmentTypeLabel() : '',
+                'is_ghost'              => false,
             ];
         })->filter(function ($item) use ($selfId) {
             return $item['id'] !== null && $item['id'] !== $selfId;
         })->values();
+        $ghosts = \App\Models\User::withGhosts()
+            ->where('ghost_owner_id', $selfId)
+            ->get(['id', 'name'])
+            ->map(fn ($g) => [
+                'id'                    => $g->id,
+                'name'                  => $g->name,
+                'assignment_name'       => null,
+                'employment_type'       => 'regular',
+                'employment_type_label' => '',
+                'is_ghost'              => true,
+            ]);
+        $members = $members->concat($ghosts);
 
         $a = $assignment;
 
@@ -448,10 +474,24 @@ class ProjectJobAssignmentsController extends Controller
                 'assignment_name'       => $m->user?->assignment?->name,
                 'employment_type'       => $m->user?->employment_type ?? 'regular',
                 'employment_type_label' => $m->user ? $m->user->employmentTypeLabel() : '',
+                'is_ghost'              => false,
             ];
         })->filter(function ($item) {
             return $item['id'] !== null;
         })->values();
+        $showSelfId = Auth::id();
+        $ghosts = \App\Models\User::withGhosts()
+            ->where('ghost_owner_id', $showSelfId)
+            ->get(['id', 'name'])
+            ->map(fn ($g) => [
+                'id'                    => $g->id,
+                'name'                  => $g->name,
+                'assignment_name'       => null,
+                'employment_type'       => 'regular',
+                'employment_type_label' => '',
+                'is_ghost'              => true,
+            ]);
+        $members = $members->concat($ghosts);
 
         // ensure projectJob has client relation loaded for the show page
         if (method_exists($projectJob, 'load')) {

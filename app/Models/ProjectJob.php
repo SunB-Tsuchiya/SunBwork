@@ -82,6 +82,16 @@ class ProjectJob extends Model
         return $this->hasMany(\App\Models\ProgressSheet::class, 'project_job_id');
     }
 
+    public function itemEntries()
+    {
+        return $this->hasMany(\App\Models\ProjectItemEntry::class, 'project_job_id')->orderBy('sort_order');
+    }
+
+    public function workflowSheets()
+    {
+        return $this->hasMany(\App\Models\WorkflowSheet::class, 'project_job_id')->orderBy('sort_order');
+    }
+
     public function items()
     {
         return $this->hasMany(\App\Models\ProjectJobItem::class, 'project_job_id');

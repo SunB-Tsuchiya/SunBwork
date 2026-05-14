@@ -315,6 +315,7 @@
           <span v-else-if="workerDeadline" class="text-xs" :class="workerDeadlineColor">
             締切: {{ formatShortDate(workerDeadline) }}
           </span>
+          <span v-if="cell.work_minutes" class="text-xs text-gray-500">作業: {{ formatWorkMinutes(cell.work_minutes) }}</span>
         </template>
         <!-- 未登録: 担当者セレクター -->
         <template v-else-if="canEdit">
@@ -994,6 +995,13 @@ const workerCellBorder = computed(() => {
 function formatDate(dt) {
   if (!dt) return '';
   return dt.slice(0, 10);
+}
+
+function formatWorkMinutes(mins) {
+  if (!mins) return '';
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return h > 0 ? `${h}h${m > 0 ? m + 'm' : ''}` : `${m}m`;
 }
 
 function formatShortDate(d) {

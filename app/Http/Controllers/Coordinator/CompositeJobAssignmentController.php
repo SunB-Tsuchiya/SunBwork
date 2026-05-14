@@ -35,8 +35,22 @@ class CompositeJobAssignmentController extends Controller
                 'assignment_name'       => $m->user?->assignment?->name,
                 'employment_type'       => $m->user?->employment_type ?? 'regular',
                 'employment_type_label' => $m->user ? $m->user->employmentTypeLabel() : '',
+                'is_ghost'              => false,
             ];
         })->filter(fn($item) => $item['id'] !== null)->values();
+        $compositeSelfId = Auth::id();
+        $ghosts = \App\Models\User::withGhosts()
+            ->where('ghost_owner_id', $compositeSelfId)
+            ->get(['id', 'name'])
+            ->map(fn ($g) => [
+                'id'                    => $g->id,
+                'name'                  => $g->name,
+                'assignment_name'       => null,
+                'employment_type'       => 'regular',
+                'employment_type_label' => '',
+                'is_ghost'              => true,
+            ]);
+        $members = $members->concat($ghosts);
 
         $types = \App\Models\WorkItemType::orderBy('sort_order')->orderBy('name')
             ->get(['id', 'name', 'group', 'company_id', 'department_id']);

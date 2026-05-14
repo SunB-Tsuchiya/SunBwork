@@ -42,6 +42,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin'          => \App\Http\Middleware\AdminMiddleware::class,
             'leader'         => \App\Http\Middleware\LeaderMiddleware::class,
             'coordinator'    => \App\Http\Middleware\CoordinatorMiddleware::class,
+            'ghost'          => \App\Http\Middleware\GhostUserMiddleware::class,
             'proof_coordinator' => \App\Http\Middleware\ProofCoordinatorMiddleware::class,
             'clerk'          => \App\Http\Middleware\ClerkMiddleware::class,
             'owner'          => \App\Http\Middleware\OwnerMiddleware::class, // 後方互換性のため残す

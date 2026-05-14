@@ -18,6 +18,18 @@
 **「git にアップ」「さくらにデプロイ」を求められたとき:**
 → `z_instructions/DEPLOY_SAKURA.md` の手順に従う。VITE_APP_BASE_PATH の切り替えを必ず行うこと。
 
+**大規模な新機能・修繕作業に入るとき（複数フェーズ・5ファイル以上の変更を伴う場合）:**
+→ 実装前に必ず以下の3ファイルを `z_instructions/` に作成し、ユーザーの確認を取ること:
+
+| ファイル名の例 | 役割 |
+|---|---|
+| `{PREFIX}_PLAN{N}.md` | 詳細仕様・DB設計・フェーズ別タスク・変更ファイル一覧 |
+| `{PREFIX}_MANAGER{N}.md` | 進捗管理・作業フロー・進捗一覧テーブル・作業ログ |
+| `{PREFIX}{N}_PROMPT.md` | 新セッション開始用のプロンプト・設計サマリー |
+
+命名例: `GHOST_PLAN1.md` / `GHOST_MANAGER1.md` / `GHOST1_PROMPT.md`  
+既存の例: `REPAIR_PLAN4.md` / `REPAIR_MANAGER4.md` / `REPAIR4_PROMPT.md`
+
 ---
 
 ## プロジェクト基本情報

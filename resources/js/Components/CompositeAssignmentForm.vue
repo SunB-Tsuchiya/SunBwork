@@ -176,7 +176,7 @@
             <select v-model="form.user_id" class="w-full rounded border px-3 py-2">
                 <option value="">未指定（自己割当）</option>
                 <option v-for="m in members" :key="m.id" :value="m.id">
-                    {{ m.name }}{{ m.assignment_name ? '（' + m.assignment_name + '）' : '' }}
+                    {{ m.is_ghost ? '[テスト] ' : '' }}{{ m.name }}{{ m.assignment_name ? '（' + m.assignment_name + '）' : '' }}
                     {{ m.employment_type === 'proof_dispatcher' ? '【単発派遣】' : ['dispatch','outsource','contract'].includes(m.employment_type) ? '【' + m.employment_type_label + '】' : '' }}
                 </option>
             </select>

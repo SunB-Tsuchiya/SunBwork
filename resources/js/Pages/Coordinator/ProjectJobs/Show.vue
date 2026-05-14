@@ -10,9 +10,9 @@
             <div class="flex items-center gap-3">
                 <Link
                     :href="route('coordinator.project_jobs.index')"
-                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
                 >← 案件一覧に戻る</Link>
-                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">
                     【進行管理】{{ $page.props.auth.user.name || 'ユーザー' }}さんのページ
                 </h2>
             </div>
@@ -319,6 +319,105 @@
                     <p v-else class="text-sm text-gray-400">進行管理表なし</p>
                 </section>
 
+                <!-- ── 項目リストセクション ──────────────────── -->
+                <section v-show="activeTab === 'item_list'" class="py-5">
+                    <div class="mb-3 flex items-center gap-4">
+                        <h3 class="font-semibold text-gray-800">項目リスト</h3>
+                        <button
+                            v-if="!editingItemList"
+                            type="button"
+                            class="rounded border border-indigo-300 px-3 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
+                            @click="startEditItemList"
+                        >編集</button>
+                        <template v-else>
+                            <button
+                                type="button"
+                                class="rounded bg-indigo-600 px-3 py-1 text-xs font-medium text-white hover:bg-indigo-700"
+                                @click="saveItemList"
+                                :disabled="itemListSaving"
+                            >保存</button>
+                            <button
+                                type="button"
+                                class="rounded border border-gray-300 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                                @click="cancelEditItemList"
+                            >キャンセル</button>
+                        </template>
+                    </div>
+
+                    <!-- 表示モード -->
+                    <div v-if="!editingItemList">
+                        <div v-if="itemEntries.length > 0">
+                            <ul class="divide-y divide-gray-100 rounded border border-gray-200 bg-white">
+                                <li
+                                    v-for="(entry, idx) in itemEntries"
+                                    :key="entry.id ?? idx"
+                                    class="px-4 py-2 text-sm text-gray-800"
+                                >{{ entry.name }}</li>
+                            </ul>
+                            <p class="mt-1 text-xs text-gray-400">{{ itemEntries.length }} 件</p>
+                        </div>
+                        <p v-else class="text-sm text-gray-400">項目リスト未登録。「編集」ボタンから入力してください。</p>
+                    </div>
+
+                    <!-- 編集モード -->
+                    <div v-else>
+                        <p class="mb-2 text-xs text-gray-500">1行に1項目を入力してください。空行は無視されます。</p>
+                        <textarea
+                            v-model="itemListText"
+                            class="w-full rounded border border-gray-300 px-3 py-2 text-sm leading-relaxed focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                            rows="12"
+                            placeholder="序章初校作成&#10;第一章レイアウトデザイン&#10;第一章初校..."
+                        ></textarea>
+                    </div>
+                </section>
+
+                <!-- ── 工程シートセクション ───────────────────── -->
+                <section v-show="activeTab === 'workflow'" class="py-5">
+                    <div class="mb-3 flex items-center gap-4">
+                        <h3 class="font-semibold text-gray-800">工程シート</h3>
+                        <button
+                            type="button"
+                            class="rounded border border-indigo-300 px-3 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
+                            @click="showCreateWorkflowModal = true"
+                        >新規作成</button>
+                        <Link
+                            :href="route('coordinator.workflow_templates.index')"
+                            class="text-xs text-gray-500 hover:underline"
+                        >テンプレート管理</Link>
+                    </div>
+
+                    <div v-if="workflowSheets.length > 0" class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">シート名</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">作成日</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200 bg-white">
+                                <tr
+                                    v-for="ws in workflowSheets"
+                                    :key="ws.id"
+                                    class="cursor-pointer hover:bg-indigo-50"
+                                    @click="router.get(route('coordinator.workflow_sheets.show', { sheet: ws.id }))"
+                                >
+                                    <td class="px-4 py-2 text-sm font-medium text-gray-900">{{ ws.name }}</td>
+                                    <td class="px-4 py-2 text-sm text-gray-500">{{ ws.created_at }}</td>
+                                    <td class="px-4 py-2">
+                                        <Link
+                                            :href="route('coordinator.workflow_sheets.show', { sheet: ws.id })"
+                                            class="rounded bg-indigo-600 px-3 py-1 text-xs font-medium text-white hover:bg-indigo-700"
+                                            @click.stop
+                                        >開く</Link>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p v-else class="text-sm text-gray-400">工程シートなし</p>
+                </section>
+
                 <!-- ── ジョブ履歴セクション ───────────────────── -->
                 <section v-show="activeTab === 'history'" class="py-5">
                     <div class="mb-3 flex flex-wrap items-center gap-4">
@@ -604,7 +703,7 @@
 
                 <!-- ── 連携設定タブ ──────────────────────────────── -->
                 <section v-show="activeTab === 'items'" class="py-5">
-                    <ProjectJobItemsTab :progress-sheets="progressSheets" />
+                    <ProjectJobItemsTab :progress-sheets="progressSheets" :job-id="job.id" />
                 </section>
 
                 <!-- 校正依頼履歴 -->
@@ -836,6 +935,50 @@
             <div class="flex justify-end gap-3">
                 <button type="button" class="rounded border border-gray-300 px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-50" @click="showReorderModal = false">キャンセル</button>
                 <button type="button" class="rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700" @click="saveSheetOrder">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── 工程シート 新規作成モーダル ──────────────────────────── -->
+    <div
+        v-if="showCreateWorkflowModal"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+        @click.self="showCreateWorkflowModal = false"
+    >
+        <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+            <h3 class="mb-4 text-lg font-semibold text-gray-800">工程シートを新規作成</h3>
+            <div class="mb-4">
+                <label class="mb-1 block text-sm font-medium text-gray-700">シート名 <span class="text-red-500">*</span></label>
+                <input
+                    v-model="newWorkflowName"
+                    type="text"
+                    class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                    placeholder="例：書籍A 組版工程"
+                    @keyup.enter="submitCreateWorkflow"
+                />
+            </div>
+            <div class="mb-5">
+                <label class="mb-1 block text-sm font-medium text-gray-700">テンプレート（任意）</label>
+                <select
+                    v-model="newWorkflowTemplateId"
+                    class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+                >
+                    <option :value="null">── テンプレートなし（デフォルト4工程）</option>
+                    <option v-for="t in workflowTemplates" :key="t.id" :value="t.id">{{ t.name }}</option>
+                </select>
+            </div>
+            <div class="flex justify-end gap-3">
+                <button
+                    type="button"
+                    class="rounded border border-gray-300 px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+                    @click="showCreateWorkflowModal = false"
+                >キャンセル</button>
+                <button
+                    type="button"
+                    class="rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                    :disabled="!newWorkflowName.trim() || newWorkflowCreating"
+                    @click="submitCreateWorkflow"
+                >作成</button>
             </div>
         </div>
     </div>
@@ -1213,12 +1356,14 @@ async function submitCsvImport() {
 
 // ── タブ定義 ─────────────────────────────────────────────────────────────
 const tabs = [
-    { key: 'overview',  label: '概要・メンバー' },
-    { key: 'progress',  label: '進行管理表' },
-    { key: 'schedule',  label: 'スケジュール' },
-    { key: 'voucher',   label: '伝票情報' },
-    { key: 'items',     label: '連携設定' },
-    { key: 'history',   label: 'ジョブ履歴' },
+    { key: 'overview',     label: '概要・メンバー' },
+    { key: 'progress',     label: '進行管理表' },
+    { key: 'item_list',    label: '項目リスト' },
+    { key: 'workflow',     label: '工程シート' },
+    { key: 'schedule',     label: 'スケジュール' },
+    { key: 'voucher',      label: '伝票情報' },
+    { key: 'items',        label: '連携設定' },
+    { key: 'history',      label: 'ジョブ履歴' },
 ];
 const activeTab = ref((() => {
     const fromUrl = new URLSearchParams(window.location.search).get('tab');
@@ -1809,6 +1954,80 @@ function saveSheetOrder() {
         router.reload({ only: ['progressSheets'] });
     });
 }
+// ── 項目リスト ────────────────────────────────────────────────────────────
+
+const itemEntries    = computed(() => Array.isArray(page.props.itemEntries) ? page.props.itemEntries : []);
+const editingItemList = ref(false);
+const itemListText   = ref('');
+const itemListSaving = ref(false);
+
+function startEditItemList() {
+    itemListText.value = itemEntries.value.map((e) => e.name).join('\n');
+    editingItemList.value = true;
+}
+
+function cancelEditItemList() {
+    editingItemList.value = false;
+    itemListText.value = '';
+}
+
+async function saveItemList() {
+    itemListSaving.value = true;
+    const names = itemListText.value
+        .split('\n')
+        .map((s) => s.trim())
+        .filter(Boolean);
+    const entries = names.map((name, idx) => ({ name, sort_order: idx }));
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+    try {
+        await fetch(route('coordinator.item_entries.update', { projectJob: job.id }), {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrf,
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({ entries }),
+        });
+        editingItemList.value = false;
+        router.reload({ only: ['itemEntries'] });
+    } catch (e) {
+        alert('保存に失敗しました');
+    } finally {
+        itemListSaving.value = false;
+    }
+}
+
+// ── 工程シート ────────────────────────────────────────────────────────────
+
+const workflowSheets          = computed(() => Array.isArray(page.props.workflowSheets) ? page.props.workflowSheets : []);
+const workflowTemplates       = computed(() => Array.isArray(page.props.workflowTemplates) ? page.props.workflowTemplates : []);
+const showCreateWorkflowModal = ref(false);
+const newWorkflowName         = ref('');
+const newWorkflowTemplateId   = ref(null);
+const newWorkflowCreating     = ref(false);
+
+async function submitCreateWorkflow() {
+    if (!newWorkflowName.value.trim()) return;
+    newWorkflowCreating.value = true;
+    router.post(
+        route('coordinator.project_jobs.workflow_sheets.store', { projectJob: job.id }),
+        {
+            name:        newWorkflowName.value.trim(),
+            template_id: newWorkflowTemplateId.value || null,
+        },
+        {
+            onFinish: () => {
+                newWorkflowCreating.value = false;
+                showCreateWorkflowModal.value = false;
+                newWorkflowName.value = '';
+                newWorkflowTemplateId.value = null;
+            },
+        }
+    );
+}
+
 // ── ジョブ履歴 ────────────────────────────────────────────────────────────
 
 const hideHistoryCompleted = ref(false);

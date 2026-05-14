@@ -230,6 +230,8 @@ const computeCoordinatorActive = () => {
     }
 };
 
+const isGhostMode = computed(() => !!page.props.user?.is_ghost);
+
 // Determine which role "area" the current route belongs to.
 // SuperAdmin/Admin can navigate to lower-role areas; use route prefix to detect.
 const currentRouteContext = computed(() => {
@@ -259,6 +261,18 @@ const currentRouteContext = computed(() => {
             <meta name="csrf-token" :content="$page.props.csrf_token" />
         </Head>
         <Banner />
+
+        <!-- ゴーストモードバナー -->
+        <div v-if="isGhostMode" class="sticky top-0 z-50 flex items-center justify-between bg-amber-400 px-4 py-2 text-sm font-medium text-amber-900">
+            <span>テストモード中（{{ page.props.user.name }} として操作中）</span>
+            <button
+                type="button"
+                class="rounded bg-amber-700 px-3 py-1 text-white hover:bg-amber-800"
+                @click="router.post(route('coordinator.ghost.exit'))"
+            >
+                Coordinator に戻る
+            </button>
+        </div>
 
         <div class="min-h-screen bg-gray-100">
             <nav class="border-b border-gray-100 bg-white">

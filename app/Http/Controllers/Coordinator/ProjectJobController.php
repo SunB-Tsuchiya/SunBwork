@@ -252,6 +252,37 @@ class ProjectJobController extends Controller
                     }
                 }
             }
+
+            // 項目リスト複製
+            $itemEntries = \App\Models\ProjectItemEntry::where('project_job_id', $projectJob->id)->orderBy('sort_order')->get();
+            foreach ($itemEntries as $entry) {
+                \App\Models\ProjectItemEntry::create([
+                    'project_job_id' => $newJob->id,
+                    'name'           => $entry->name,
+                    'sort_order'     => $entry->sort_order,
+                ]);
+            }
+
+            // 工程シート複製（行のみ・セルデータは除外）
+            $wSheets = \App\Models\WorkflowSheet::where('project_job_id', $projectJob->id)->orderBy('sort_order')->get();
+            foreach ($wSheets as $wSheet) {
+                $newWSheet = \App\Models\WorkflowSheet::create([
+                    'project_job_id' => $newJob->id,
+                    'template_id'    => $wSheet->template_id,
+                    'name'           => $wSheet->name,
+                    'stage_config'   => $wSheet->stage_config,
+                    'sort_order'     => $wSheet->sort_order,
+                    'created_by'     => $wSheet->created_by,
+                ]);
+                $wRows = \App\Models\WorkflowRow::where('sheet_id', $wSheet->id)->orderBy('sort_order')->get();
+                foreach ($wRows as $wRow) {
+                    \App\Models\WorkflowRow::create([
+                        'sheet_id'   => $newWSheet->id,
+                        'label'      => $wRow->label,
+                        'sort_order' => $wRow->sort_order,
+                    ]);
+                }
+            }
         });
 
         return redirect()
@@ -564,6 +595,21 @@ class ProjectJobController extends Controller
                 'created_at' => $s->created_at?->format('Y-m-d'),
             ]);
 
+        // 工程シート一覧
+        $workflowSheets = $projectJob->workflowSheets()
+            ->select(['id', 'name', 'sort_order', 'created_at'])
+            ->get()
+            ->map(fn ($s) => [
+                'id'         => $s->id,
+                'name'       => $s->name,
+                'sort_order' => $s->sort_order,
+                'created_at' => $s->created_at?->format('Y-m-d'),
+            ]);
+
+        // 項目リスト
+        $itemEntries = $projectJob->itemEntries()
+            ->get(['id', 'name', 'sort_order']);
+
         // 進行表に紐づいているアサインメント ID 一覧（ジョブ履歴の分類に使用）
         $sheetLinkedAssignmentIds = [];
         try {
@@ -833,8 +879,11 @@ class ProjectJobController extends Controller
             'assignmentEvents' => $assignmentEvents,
             'schedules' => $schedules,
             'jobHistory' => $jobHistory,
-            'progressSheets' => $progressSheets,
-            'sheetTemplates' => $sheetTemplates,
+            'progressSheets'  => $progressSheets,
+            'sheetTemplates'  => $sheetTemplates,
+            'workflowSheets'  => $workflowSheets,
+            'itemEntries'     => $itemEntries,
+            'workflowTemplates' => \App\Models\WorkflowTemplate::orderByDesc('updated_at')->get(['id', 'name']),
             'stages' => $stages,
             'sheetLinkedAssignmentIds' => $sheetLinkedAssignmentIds,
             'proofHistory' => $proofHistory,

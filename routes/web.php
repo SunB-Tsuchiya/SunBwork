@@ -29,7 +29,7 @@ Route::get('/', function () {
 Route::get('/debug/events/send-test-completion', [App\Http\Controllers\EventController::class, 'sendTestCompletion'])->name('debug.events.send_test_completion');
 
 // User Dashboard (default authenticated users)
-Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified'])->group(function () {
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'ghost'])->group(function () {
     // ...既存コード...
     // チャットルームメッセージ送信
     Route::post('/chat/rooms/{id}/messages', [App\Http\Controllers\Chat\ChatController::class, 'sendRoomMessage'])->name('chat.rooms.messages.send');
@@ -171,6 +171,14 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::post('/user/progress-sheets/{sheet}/cells/link-job', [\App\Http\Controllers\User\ProgressSheetController::class, 'linkJob'])->name('progress_sheets.cells.link_job_user');
     Route::get('/user/progress-cells/my-assignments', [\App\Http\Controllers\User\ProgressCellController::class, 'myAssignments'])->name('user.progress_cells.my_assignments');
     Route::post('/user/progress-cells/{cell}/complete', [\App\Http\Controllers\User\ProgressCellController::class, 'complete'])->name('user.progress_cells.complete');
+
+    // 項目リスト候補（User向け：マイジョブ作成用）
+    Route::get('/user/project-jobs/{projectJob}/item-entries/suggestions', [\App\Http\Controllers\User\ItemEntrySuggestController::class, 'suggestions'])->name('user.item_entries.suggestions');
+
+    // 工程シート（User 閲覧・セル更新）
+    Route::get('/user/workflow-sheets/{sheet}', [\App\Http\Controllers\User\WorkflowSheetController::class, 'show'])->name('user.workflow_sheets.show');
+    Route::put('/user/workflow-sheets/{sheet}/cells', [\App\Http\Controllers\User\WorkflowCellController::class, 'update'])->name('user.workflow_sheets.cells.update');
+    Route::post('/user/workflow-cells/{cell}/complete', [\App\Http\Controllers\User\WorkflowCellController::class, 'complete'])->name('user.workflow_cells.complete');
 
     // チーム切り替え
     Route::put('/current-team', [App\Http\Controllers\CurrentTeamController::class, 'update'])->name('current-team.update');
@@ -751,7 +759,46 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('settings', [App\Http\Controllers\Coordinator\CoordinatorSettingController::class, 'index'])->name('settings.index');
         Route::get('settings/data', [App\Http\Controllers\Coordinator\CoordinatorSettingController::class, 'show'])->name('settings.data');
         Route::put('settings', [App\Http\Controllers\Coordinator\CoordinatorSettingController::class, 'update'])->name('settings.update');
+
+        // ── 項目リスト ─────────────────────────────────────────────
+        Route::get('project_jobs/{projectJob}/item-entries', [App\Http\Controllers\Coordinator\ItemEntryController::class, 'index'])->name('item_entries.index');
+        Route::put('project_jobs/{projectJob}/item-entries', [App\Http\Controllers\Coordinator\ItemEntryController::class, 'update'])->name('item_entries.update');
+        Route::get('project_jobs/{projectJob}/item-entries/suggestions', [App\Http\Controllers\Coordinator\ItemEntryController::class, 'suggestions'])->name('item_entries.suggestions');
+
+        // ── 工程シート ─────────────────────────────────────────────
+        Route::post('project_jobs/{projectJob}/workflow-sheets', [App\Http\Controllers\Coordinator\WorkflowSheetController::class, 'store'])->name('project_jobs.workflow_sheets.store');
+        Route::put('project_jobs/{projectJob}/workflow-sheets/reorder', [App\Http\Controllers\Coordinator\WorkflowSheetController::class, 'reorder'])->name('project_jobs.workflow_sheets.reorder');
+        Route::get('workflow-sheets/{sheet}', [App\Http\Controllers\Coordinator\WorkflowSheetController::class, 'show'])->name('workflow_sheets.show');
+        Route::put('workflow-sheets/{sheet}', [App\Http\Controllers\Coordinator\WorkflowSheetController::class, 'update'])->name('workflow_sheets.update');
+        Route::delete('workflow-sheets/{sheet}', [App\Http\Controllers\Coordinator\WorkflowSheetController::class, 'destroy'])->name('workflow_sheets.destroy');
+        Route::post('workflow-sheets/{sheet}/rows', [App\Http\Controllers\Coordinator\WorkflowRowController::class, 'store'])->name('workflow_sheets.rows.store');
+        Route::post('workflow-sheets/{sheet}/rows/import', [App\Http\Controllers\Coordinator\WorkflowRowController::class, 'import'])->name('workflow_sheets.rows.import');
+        Route::put('workflow-sheets/{sheet}/rows/{row}', [App\Http\Controllers\Coordinator\WorkflowRowController::class, 'update'])->name('workflow_sheets.rows.update');
+        Route::delete('workflow-sheets/{sheet}/rows/{row}', [App\Http\Controllers\Coordinator\WorkflowRowController::class, 'destroy'])->name('workflow_sheets.rows.destroy');
+        Route::put('workflow-sheets/{sheet}/rows/reorder', [App\Http\Controllers\Coordinator\WorkflowRowController::class, 'reorder'])->name('workflow_sheets.rows.reorder');
+        Route::put('workflow-sheets/{sheet}/cells', [App\Http\Controllers\Coordinator\WorkflowCellController::class, 'bulkUpdate'])->name('workflow_sheets.cells.update');
+        Route::post('workflow-sheets/{sheet}/cells/register', [App\Http\Controllers\Coordinator\WorkflowCellController::class, 'register'])->name('workflow_sheets.cells.register');
+        Route::post('workflow-cells/{cell}/complete', [App\Http\Controllers\Coordinator\WorkflowCellController::class, 'complete'])->name('workflow_cells.complete');
+        Route::post('workflow-cells/{cell}/unregister', [App\Http\Controllers\Coordinator\WorkflowCellController::class, 'unregister'])->name('workflow_cells.unregister');
+
+        // ── 工程シートテンプレート ──────────────────────────────────
+        Route::get('workflow-templates', [App\Http\Controllers\Coordinator\WorkflowTemplateController::class, 'index'])->name('workflow_templates.index');
+        Route::post('workflow-templates', [App\Http\Controllers\Coordinator\WorkflowTemplateController::class, 'store'])->name('workflow_templates.store');
+        Route::put('workflow-templates/{template}', [App\Http\Controllers\Coordinator\WorkflowTemplateController::class, 'update'])->name('workflow_templates.update');
+        Route::delete('workflow-templates/{template}', [App\Http\Controllers\Coordinator\WorkflowTemplateController::class, 'destroy'])->name('workflow_templates.destroy');
+
+        // ── ゴーストユーザー管理 ────────────────────────────────────
+        Route::get('ghost-users', [App\Http\Controllers\Coordinator\GhostUserController::class, 'index'])->name('ghost_users.index');
+        Route::get('ghost-users/guide', [App\Http\Controllers\Coordinator\GhostUserController::class, 'guide'])->name('ghost_users.guide');
+        Route::post('ghost-users', [App\Http\Controllers\Coordinator\GhostUserController::class, 'store'])->name('ghost_users.store');
+        Route::delete('ghost-users/{ghostUserId}', [App\Http\Controllers\Coordinator\GhostUserController::class, 'destroy'])->name('ghost_users.destroy');
+        Route::post('ghost-users/{ghostUserId}/switch', [App\Http\Controllers\Coordinator\GhostUserController::class, 'switch'])->name('ghost_users.switch');
     });
+
+// ゴーストセッション復帰（ghost ユーザーが呼ぶため coordinator middleware 外）
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified'])
+    ->post('/coordinator/ghost/exit', [App\Http\Controllers\Coordinator\GhostUserController::class, 'exit'])
+    ->name('coordinator.ghost.exit');
 
 
 
@@ -833,9 +880,6 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
         Route::get('tickets', [\App\Http\Controllers\Prepress\TicketController::class, 'index'])->name('tickets.index');
         Route::get('tickets/create', [\App\Http\Controllers\Prepress\TicketController::class, 'create'])->name('tickets.create');
         Route::post('tickets', [\App\Http\Controllers\Prepress\TicketController::class, 'store'])->name('tickets.store');
-        Route::get('tickets/{ticket}', [\App\Http\Controllers\Prepress\TicketController::class, 'show'])->name('tickets.show');
-        Route::get('tickets/{ticket}/edit', [\App\Http\Controllers\Prepress\TicketController::class, 'edit'])->name('tickets.edit');
-        Route::post('tickets/{ticket}', [\App\Http\Controllers\Prepress\TicketController::class, 'update'])->name('tickets.update');
         Route::patch('tickets/{ticket}/status', [\App\Http\Controllers\Prepress\TicketController::class, 'updateStatus'])->name('tickets.updateStatus');
         Route::post('tickets/{ticket}/image', [\App\Http\Controllers\Prepress\TicketController::class, 'updateImage'])->name('tickets.updateImage');
         Route::delete('tickets/{ticket}', [\App\Http\Controllers\Prepress\TicketController::class, 'destroy'])->name('tickets.destroy');
