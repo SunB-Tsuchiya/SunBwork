@@ -285,7 +285,16 @@ const calendarEvents = computed(() => {
                 start: ev.start ?? ev.start_date ?? undefined,
                 end: ev.end ?? ev.end_date ?? undefined,
                 allDay: ev.allDay ?? ev.all_day ?? false,
-                color: isCompleted ? '#b58900' : (ev.backgroundColor ?? ev.color ?? '#3b82f6'),
+                ...(() => {
+                    const base = ev.backgroundColor ?? ev.color ?? '#3b82f6';
+                    if (isCompleted) {
+                        const h = base.replace('#', '');
+                        const full = h.length === 3 ? h.split('').map(c => c + c).join('') : h;
+                        const r = parseInt(full.slice(0,2),16), g = parseInt(full.slice(2,4),16), b = parseInt(full.slice(4,6),16);
+                        return { backgroundColor: `rgba(${r},${g},${b},0.18)`, borderColor: base, textColor: base };
+                    }
+                    return { backgroundColor: base, borderColor: base, textColor: '#ffffff' };
+                })(),
                 description: ev.description ?? ev.extendedProps?.description ?? '',
                 extendedProps: ev.extendedProps ?? {},
             });

@@ -356,6 +356,34 @@ import axios from 'axios';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
 
+/**
+ * hex カラーを rgba に変換して薄い背景色を生成する
+ * @param {string} hex  例: '#4F46E5' または '#4f6'
+ * @param {number} alpha 0〜1
+ */
+function hexToRgba(hex, alpha = 0.18) {
+    const h = hex.replace('#', '');
+    const full = h.length === 3
+        ? h.split('').map(c => c + c).join('')
+        : h;
+    const r = parseInt(full.slice(0, 2), 16);
+    const g = parseInt(full.slice(2, 4), 16);
+    const b = parseInt(full.slice(4, 6), 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+}
+
+/**
+ * 完了イベント用のスタイルを返す
+ * 縁・テキストは元色 100%、背景は薄く
+ */
+function completedEventStyle(color) {
+    return {
+        backgroundColor: hexToRgba(color, 0.18),
+        borderColor: color,
+        textColor: color,
+    };
+}
+
 const props = defineProps({
     diaries: {
         type: Array,
@@ -1040,22 +1068,24 @@ const baseEvents = computed(() => [
         }
 
         // default coloring path
-        const chosenColor = isCompleted
-                ? '#b58900'
-                : (isProgressLinked
-                    ? (event.color ?? '#7C3AED')
-                    : (isSelfAssigned
-                        ? (event.color ?? '#4F46E5')
-                        : (event.color ?? '#059669')
-                    )
-                );
+        const baseColor = isProgressLinked
+            ? (event.color ?? '#7C3AED')
+            : (isSelfAssigned
+                ? (event.color ?? '#4F46E5')
+                : (event.color ?? '#059669')
+            );
+
+        // 完了: 縁・テキストは元色100%、背景は薄く表示
+        const colorProps = isCompleted
+            ? completedEventStyle(baseColor)
+            : { backgroundColor: baseColor, borderColor: baseColor, textColor: '#ffffff' };
 
         return {
             title: event.title,
             start: event.start,
             end: event.end ?? undefined,
             allDay: event.allDay ?? false,
-            color: chosenColor,
+            ...colorProps,
             event_id: event.id,
             schedule_id: event.extendedProps?.schedule_id ?? event.schedule_id ?? undefined,
             description: event.description ?? event.extendedProps?.description ?? '',
