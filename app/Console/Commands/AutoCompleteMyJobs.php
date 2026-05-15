@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use App\Models\Event;
 
 /**
  * マイジョブ（自己割当ジョブ）自動完了バッチ
@@ -64,12 +65,36 @@ class AutoCompleteMyJobs extends Command
         // ── 更新 ────────────────────────────────────────────────────────────
         // project_job_assignments には completed_at カラムが存在しないため completed のみ更新
         $now     = Carbon::now();
+
+        // 対象IDを取得してから更新（イベント更新に使うため）
+        $targetIds = (clone $query)->pluck('id')->toArray();
+
         $updated = (clone $query)->update([
             'completed'  => true,
             'updated_at' => $now,
         ]);
 
         $this->info("完了に更新しました: {$updated} 件");
+
+        // ── 紐付くカレンダーイベントのタイトルに【完了】を付加 ──────────────
+        // CalendarController / Calendar.vue はタイトルの先頭が「【完了】」かどうかで金色表示を判定するため
+        if (!empty($targetIds)) {
+            $prefix  = '【完了】';
+            $events  = \App\Models\Event::whereIn('project_job_assignment_id', $targetIds)
+                ->where(function ($q) use ($prefix) {
+                    $q->whereNull('title')
+                      ->orWhere('title', 'not like', $prefix . '%');
+                })
+                ->get(['id', 'title']);
+
+            $eventCount = 0;
+            foreach ($events as $ev) {
+                $ev->title = $prefix . ($ev->title ?? '');
+                $ev->save();
+                $eventCount++;
+            }
+            $this->info("カレンダーイベントに【完了】を付加: {$eventCount} 件");
+        }
 
         return self::SUCCESS;
     }
