@@ -145,7 +145,7 @@ function resolveStatusDisplay(slug) {
 
 const filteredUsers = computed(() => {
     if (!activeDept.value) return users.value;
-    return users.value.filter(u => u.department_id === activeDept.value);
+    return users.value.filter(u => u.department_id === activeDept.value || !u.department_id);
 });
 
 const presentUsers = computed(() => filteredUsers.value.filter(u => !ABSENT_SLUGS.has(u.status)));
