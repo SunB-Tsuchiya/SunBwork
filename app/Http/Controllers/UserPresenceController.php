@@ -37,9 +37,9 @@ class UserPresenceController extends Controller
         $data = $users
             ->filter(fn(User $u) => !($u->presenceStatus?->is_hidden ?? false))
             ->sortBy([
-                fn($u) => $u->presenceStatus?->sort_order ?? 9999,
-                fn($u) => $u->department_id ?? 9999,
-                fn($u) => $u->name,
+                fn($a, $b) => ($a->presenceStatus?->sort_order ?? 9999) <=> ($b->presenceStatus?->sort_order ?? 9999),
+                fn($a, $b) => ($a->department_id ?? 9999) <=> ($b->department_id ?? 9999),
+                fn($a, $b) => $a->name <=> $b->name,
             ])
             ->values()
             ->map(function (User $u) {

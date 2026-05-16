@@ -35,10 +35,10 @@ class PresenceBoardSettingsController extends Controller
             ->whereNull('ghost_owner_id')
             ->get()
             ->sortBy([
-                fn($u) => $u->presenceStatus?->sort_order ?? 9999,
-                fn($u) => $u->positionTitle?->sort_order ?? 9999,
-                fn($u) => $employmentPriority[$u->employment_type ?? 'regular'] ?? 99,
-                fn($u) => $u->name,
+                fn($a, $b) => ($a->presenceStatus?->sort_order ?? 9999) <=> ($b->presenceStatus?->sort_order ?? 9999),
+                fn($a, $b) => ($a->positionTitle?->sort_order ?? 9999) <=> ($b->positionTitle?->sort_order ?? 9999),
+                fn($a, $b) => ($employmentPriority[$a->employment_type ?? 'regular'] ?? 99) <=> ($employmentPriority[$b->employment_type ?? 'regular'] ?? 99),
+                fn($a, $b) => $a->name <=> $b->name,
             ])
             ->values()
             ->map(fn(User $u) => [
