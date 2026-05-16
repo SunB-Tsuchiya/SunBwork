@@ -25,13 +25,13 @@
 </template>
 
 <script setup>
-import { ref, computed, inject, onMounted } from 'vue';
+import { ref, computed, inject, onMounted, onUnmounted } from 'vue';
 import IrukaStatusModal from './IrukaStatusModal.vue';
 import { getStatus } from './statusConfig.js';
 
 const authUser = inject('authUser', null);
 
-const currentStatus  = ref('present');
+const currentStatus  = ref('left');
 const currentComment = ref('');
 const showModal      = ref(false);
 const statuses       = ref(null); // DB順のステータスリスト
@@ -47,6 +47,11 @@ const selfUser = computed(() => ({
 
 onMounted(async () => {
     await Promise.all([fetchSelf(), fetchStatuses()]);
+    window.addEventListener('iruka:refresh', fetchSelf);
+});
+
+onUnmounted(() => {
+    window.removeEventListener('iruka:refresh', fetchSelf);
 });
 
 async function fetchSelf() {
@@ -80,7 +85,7 @@ async function handleSave({ userId, status, comment }) {
 async function handleClear() {
     try {
         await window.axios.post('/presence/self/clear');
-        currentStatus.value  = 'present';
+        currentStatus.value  = 'left';
         currentComment.value = '';
         showModal.value = false;
         window.dispatchEvent(new CustomEvent('iruka:refresh'));

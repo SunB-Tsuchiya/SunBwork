@@ -5,6 +5,7 @@ import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
 import IrukaStatusBadge from '@/Components/Iruka/IrukaStatusBadge.vue';
+import IrukaMobileStatusButton from '@/Components/Iruka/IrukaMobileStatusButton.vue';
 import AdminNavigationTabs from '@/Components/Tabs/AdminNavigationTabs.vue';
 import ClerkNavigationTabs from '@/Components/Tabs/ClerkNavigationTabs.vue';
 import PrepressNavigationTabs from '@/Components/Tabs/PrepressNavigationTabs.vue';
@@ -280,12 +281,17 @@ const currentRouteContext = computed(() => {
                 <!-- Primary Navigation Menu -->
                 <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                     <!-- Row 1: Logo + Icons + Profile -->
-                    <div class="flex h-11 items-center justify-between">
+                    <div class="relative flex h-11 items-center justify-between">
                         <!-- Logo -->
                         <div class="flex shrink-0 items-center">
                             <Link :href="route('dashboard')">
                                 <ApplicationMark class="block h-8 w-auto" />
                             </Link>
+                        </div>
+
+                        <!-- モバイルのみ: ヘッダー中央に在席ステータス -->
+                        <div class="absolute left-1/2 -translate-x-1/2 sm:hidden">
+                            <IrukaMobileStatusButton />
                         </div>
 
                         <!-- Right side: icon buttons + profile dropdown -->

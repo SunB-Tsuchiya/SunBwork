@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class IrukaStatusOrder extends Model
 {
-    protected $fillable = ['company_id', 'slug', 'sort_order', 'is_active'];
+    protected $fillable = ['company_id', 'slug', 'sort_order', 'is_active', 'custom_label', 'custom_color'];
 
     protected $casts = [
         'is_active'  => 'boolean',

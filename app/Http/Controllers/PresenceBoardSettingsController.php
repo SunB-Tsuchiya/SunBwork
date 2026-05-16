@@ -50,9 +50,12 @@ class PresenceBoardSettingsController extends Controller
 
         $statusOrders = IrukaStatusOrder::getOrCreateForCompany($authUser->company_id)
             ->map(fn ($o) => [
-                'slug'      => $o->slug,
-                'sort_order'=> $o->sort_order,
-                'is_active' => $o->is_active,
+                'id'           => $o->id,
+                'slug'         => $o->slug,
+                'sort_order'   => $o->sort_order,
+                'is_active'    => $o->is_active,
+                'custom_label' => $o->custom_label,
+                'custom_color' => $o->custom_color,
             ]);
 
         return Inertia::render('Iruka/BoardSettings', [
@@ -97,25 +100,86 @@ class PresenceBoardSettingsController extends Controller
     }
 
     /**
-     * ステータス表示順・有効/無効を一括保存
+     * ステータス表示順・有効/無効・カスタムラベル/カラーを一括保存
      */
     public function updateStatuses(Request $request)
     {
         $authUser = Auth::user();
 
         $items = $request->validate([
-            'items'              => 'required|array',
-            'items.*.slug'       => 'required|string|max:50',
-            'items.*.sort_order' => 'required|integer|min:0',
-            'items.*.is_active'  => 'required|boolean',
+            'items'               => 'required|array',
+            'items.*.slug'        => 'required|string|max:50',
+            'items.*.sort_order'  => 'required|integer|min:0',
+            'items.*.is_active'   => 'required|boolean',
+            'items.*.custom_label'=> 'nullable|string|max:50',
+            'items.*.custom_color'=> 'nullable|string|max:30',
         ])['items'];
 
         foreach ($items as $item) {
             IrukaStatusOrder::updateOrCreate(
                 ['company_id' => $authUser->company_id, 'slug' => $item['slug']],
-                ['sort_order' => $item['sort_order'], 'is_active' => $item['is_active']]
+                [
+                    'sort_order'   => $item['sort_order'],
+                    'is_active'    => $item['is_active'],
+                    'custom_label' => $item['custom_label'] ?: null,
+                    'custom_color' => $item['custom_color'] ?: null,
+                ]
             );
         }
+
+        return response()->json(['ok' => true]);
+    }
+
+    /**
+     * カスタムステータスを新規追加
+     */
+    public function createStatus(Request $request)
+    {
+        $authUser = Auth::user();
+
+        $validated = $request->validate([
+            'custom_label' => 'required|string|max:50',
+            'custom_color' => 'required|string|max:30',
+        ]);
+
+        $slug = 'cust_' . time();
+        $maxOrder = IrukaStatusOrder::where('company_id', $authUser->company_id)->max('sort_order') ?? 0;
+
+        $record = IrukaStatusOrder::create([
+            'company_id'   => $authUser->company_id,
+            'slug'         => $slug,
+            'sort_order'   => $maxOrder + 1,
+            'is_active'    => true,
+            'custom_label' => $validated['custom_label'],
+            'custom_color' => $validated['custom_color'],
+        ]);
+
+        return response()->json([
+            'id'           => $record->id,
+            'slug'         => $record->slug,
+            'sort_order'   => $record->sort_order,
+            'is_active'    => $record->is_active,
+            'custom_label' => $record->custom_label,
+            'custom_color' => $record->custom_color,
+        ]);
+    }
+
+    /**
+     * カスタムステータスを削除（cust_ プレフィックスのもののみ）
+     */
+    public function deleteStatus(IrukaStatusOrder $statusOrder)
+    {
+        $authUser = Auth::user();
+
+        if ($statusOrder->company_id !== $authUser->company_id) {
+            abort(403);
+        }
+
+        if (!str_starts_with($statusOrder->slug, 'cust_')) {
+            return response()->json(['error' => '組み込みステータスは削除できません'], 422);
+        }
+
+        $statusOrder->delete();
 
         return response()->json(['ok' => true]);
     }

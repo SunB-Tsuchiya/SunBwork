@@ -104,47 +104,141 @@
             <!-- ===== ステータス設定タブ ===== -->
             <div v-show="activeTab === 'statuses'">
                 <p class="mb-4 text-sm text-gray-500">
-                    ステータスボタンの表示順・表示/非表示を設定できます。非表示にしたステータスはモーダルに表示されません。
+                    ステータスボタンの表示順・表示/非表示・名前・色を設定できます。✏️ で編集、＋ で新規追加できます。
                 </p>
 
                 <div class="overflow-x-auto flex justify-center">
-                    <table class="text-sm">
+                    <table class="text-sm w-full max-w-lg">
                         <thead>
                             <tr class="border-b border-gray-200 text-left text-xs font-medium text-gray-500">
-                                <th class="pb-2 pr-2 w-24">順序</th>
-                                <th class="pb-2 pr-6 w-48">ステータス</th>
-                                <th class="pb-2 w-20">表示</th>
+                                <th class="pb-2 pr-2 w-20">順序</th>
+                                <th class="pb-2 pr-2">ステータス</th>
+                                <th class="pb-2 w-16 text-center">表示</th>
+                                <th class="pb-2 w-16 text-center">操作</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
-                            <tr v-for="(item, idx) in localStatuses" :key="item.slug" :class="item.is_active ? '' : 'bg-gray-50'">
-                                <td class="py-2 pr-2 w-24">
-                                    <div class="flex items-center gap-1">
-                                        <span class="w-5 text-xs text-gray-400">{{ idx + 1 }}</span>
-                                        <button type="button" :disabled="idx === 0" class="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30" @click="moveStatusUp(idx)">▲</button>
-                                        <button type="button" :disabled="idx === localStatuses.length - 1" class="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30" @click="moveStatusDown(idx)">▼</button>
-                                    </div>
-                                </td>
-                                <td class="py-2 pr-6 w-48">
-                                    <div class="flex items-center gap-2">
-                                        <span class="h-2.5 w-2.5 rounded-full shrink-0" :class="statusDef(item.slug).dot" />
-                                        <span class="font-medium" :class="item.is_active ? 'text-gray-800' : 'line-through text-gray-400'">
-                                            {{ statusDef(item.slug).label }}
-                                        </span>
-                                    </div>
-                                </td>
-                                <td class="py-2 w-20">
-                                    <button type="button"
-                                        class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
-                                        :class="item.is_active ? 'bg-blue-500' : 'bg-gray-300'"
-                                        @click="toggleStatus(idx)"
-                                    >
-                                        <span class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200" :class="item.is_active ? 'translate-x-4' : 'translate-x-0'" />
-                                    </button>
-                                </td>
-                            </tr>
+                            <template v-for="(item, idx) in localStatuses" :key="item.slug">
+                                <!-- 通常行 -->
+                                <tr v-if="editingIdx !== idx" :class="item.is_active ? '' : 'bg-gray-50'">
+                                    <td class="py-2 pr-2 w-20">
+                                        <div class="flex items-center gap-1">
+                                            <span class="w-5 text-xs text-gray-400">{{ idx + 1 }}</span>
+                                            <button type="button" :disabled="idx === 0" class="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30" @click="moveStatusUp(idx)">▲</button>
+                                            <button type="button" :disabled="idx === localStatuses.length - 1" class="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30" @click="moveStatusDown(idx)">▼</button>
+                                        </div>
+                                    </td>
+                                    <td class="py-2 pr-2">
+                                        <div class="flex items-center gap-2">
+                                            <span class="h-2.5 w-2.5 rounded-full shrink-0" :class="resolvedStatus(item).dot" />
+                                            <span class="font-medium" :class="item.is_active ? 'text-gray-800' : 'line-through text-gray-400'">
+                                                {{ resolvedStatus(item).label }}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td class="py-2 w-16 text-center">
+                                        <button type="button"
+                                            class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
+                                            :class="item.is_active ? 'bg-blue-500' : 'bg-gray-300'"
+                                            @click="toggleStatus(idx)"
+                                        >
+                                            <span class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200" :class="item.is_active ? 'translate-x-4' : 'translate-x-0'" />
+                                        </button>
+                                    </td>
+                                    <td class="py-2 w-16 text-center">
+                                        <div class="flex items-center justify-center gap-1">
+                                            <button type="button" class="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-blue-600" title="編集" @click="startEdit(idx)">
+                                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                            </button>
+                                            <button v-if="isCustom(item)" type="button" class="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-red-500" title="削除" @click="deleteStatus(item, idx)">
+                                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+
+                                <!-- 編集行 -->
+                                <tr v-else class="bg-blue-50">
+                                    <td class="py-2 pr-2 w-20">
+                                        <span class="ml-1 text-xs text-blue-400">{{ idx + 1 }}</span>
+                                    </td>
+                                    <td class="py-2 pr-2" colspan="3">
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <input
+                                                v-model="editLabel"
+                                                type="text"
+                                                maxlength="50"
+                                                class="w-32 rounded border border-blue-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                                placeholder="名前"
+                                            />
+                                            <!-- カラーピッカー -->
+                                            <div class="flex flex-wrap gap-1">
+                                                <button
+                                                    v-for="c in COLOR_OPTIONS"
+                                                    :key="c.key"
+                                                    type="button"
+                                                    :title="c.label"
+                                                    class="h-5 w-5 rounded-full border-2 transition-transform hover:scale-110"
+                                                    :class="[swatchBg(c.key), editColor === c.key ? 'border-gray-700 scale-110' : 'border-transparent']"
+                                                    @click="editColor = c.key"
+                                                />
+                                            </div>
+                                            <div class="flex gap-1">
+                                                <button type="button" class="rounded bg-blue-500 px-2 py-1 text-xs font-medium text-white hover:bg-blue-600" @click="applyEdit(idx)">決定</button>
+                                                <button type="button" class="rounded bg-gray-100 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-200" @click="cancelEdit">取消</button>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </template>
                         </tbody>
                     </table>
+                </div>
+
+                <!-- 新規追加フォーム -->
+                <div class="mt-4 flex justify-center">
+                    <div class="w-full max-w-lg">
+                        <div v-if="!showAddForm">
+                            <button type="button" class="flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-4 py-2 text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 w-full justify-center" @click="openAddForm">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                                ステータスを追加
+                            </button>
+                        </div>
+                        <div v-else class="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                            <p class="mb-2 text-xs font-medium text-blue-700">新しいステータスを追加</p>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <input
+                                    v-model="newLabel"
+                                    type="text"
+                                    maxlength="50"
+                                    class="w-36 rounded border border-blue-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                    placeholder="ステータス名"
+                                />
+                                <!-- カラーピッカー -->
+                                <div class="flex flex-wrap gap-1">
+                                    <button
+                                        v-for="c in COLOR_OPTIONS"
+                                        :key="c.key"
+                                        type="button"
+                                        :title="c.label"
+                                        class="h-5 w-5 rounded-full border-2 transition-transform hover:scale-110"
+                                        :class="[swatchBg(c.key), newColor === c.key ? 'border-gray-700 scale-110' : 'border-transparent']"
+                                        @click="newColor = c.key"
+                                    />
+                                </div>
+                                <!-- プレビュー -->
+                                <span v-if="newLabel" class="rounded-lg px-2 py-1.5 text-xs font-medium" :class="[previewBtnBg, previewBtnText]">
+                                    {{ newLabel }}
+                                </span>
+                            </div>
+                            <div class="mt-2 flex gap-2">
+                                <button type="button" class="rounded bg-blue-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-600 disabled:opacity-50" :disabled="!newLabel.trim() || addingStatus" @click="addStatus">
+                                    {{ addingStatus ? '追加中…' : '追加する' }}
+                                </button>
+                                <button type="button" class="rounded bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-200" @click="closeAddForm">キャンセル</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="mt-6 flex items-center justify-end gap-3">
@@ -164,7 +258,7 @@
 import { ref, computed } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link } from '@inertiajs/vue3';
-import { getStatus } from '@/Components/Iruka/statusConfig.js';
+import { resolveStatus, COLOR_OPTIONS, STATUS_GROUPS } from '@/Components/Iruka/statusConfig.js';
 
 const props = defineProps({
     users:        { type: Array,   default: () => [] },
@@ -226,13 +320,35 @@ async function saveUsers() {
 }
 
 // ===== ステータス設定 =====
-const localStatuses   = ref(props.statusOrders.map(s => ({ ...s })));
-const savingStatuses  = ref(false);
-const savedStatuses   = ref(false);
+const localStatuses  = ref(props.statusOrders.map(s => ({ ...s })));
+const savingStatuses = ref(false);
+const savedStatuses  = ref(false);
 
-function statusDef(slug) {
-    return getStatus(slug);
+// 行単位編集
+const editingIdx = ref(null);
+const editLabel  = ref('');
+const editColor  = ref('gray');
+
+// 新規追加フォーム
+const showAddForm  = ref(false);
+const newLabel     = ref('');
+const newColor     = ref('blue');
+const addingStatus = ref(false);
+
+function resolvedStatus(item) {
+    return resolveStatus(item);
 }
+
+function isCustom(item) {
+    return item.slug.startsWith('cust_');
+}
+
+function swatchBg(colorKey) {
+    return STATUS_GROUPS[colorKey]?.badge ?? 'bg-gray-400';
+}
+
+const previewBtnBg   = computed(() => STATUS_GROUPS[newColor.value]?.btnBg   ?? 'bg-gray-100');
+const previewBtnText = computed(() => STATUS_GROUPS[newColor.value]?.btnText  ?? 'text-gray-600');
 
 function toggleStatus(idx) {
     localStatuses.value[idx].is_active = !localStatuses.value[idx].is_active;
@@ -253,11 +369,83 @@ function moveStatusDown(idx) {
     savedStatuses.value = false;
 }
 
+function startEdit(idx) {
+    editingIdx.value = idx;
+    const item = localStatuses.value[idx];
+    editLabel.value = item.custom_label ?? resolveStatus(item).label;
+    editColor.value = item.custom_color  ?? resolveStatus(item).group;
+}
+
+function applyEdit(idx) {
+    const item = localStatuses.value[idx];
+    const resolved = resolveStatus(item);
+    item.custom_label = editLabel.value.trim() === resolved.label && !isCustom(item) ? null : editLabel.value.trim() || null;
+    item.custom_color = editColor.value === resolved.group && !isCustom(item) ? null : editColor.value;
+    editingIdx.value = null;
+    savedStatuses.value = false;
+}
+
+function cancelEdit() {
+    editingIdx.value = null;
+}
+
+function openAddForm() {
+    showAddForm.value = true;
+    newLabel.value = '';
+    newColor.value = 'blue';
+}
+
+function closeAddForm() {
+    showAddForm.value = false;
+}
+
+async function addStatus() {
+    if (!newLabel.value.trim()) return;
+    addingStatus.value = true;
+    try {
+        const res = await window.axios.post(route('presence.board_settings.statuses.create'), {
+            custom_label: newLabel.value.trim(),
+            custom_color: newColor.value,
+        });
+        localStatuses.value.push({
+            id:           res.data.id,
+            slug:         res.data.slug,
+            sort_order:   res.data.sort_order,
+            is_active:    res.data.is_active,
+            custom_label: res.data.custom_label,
+            custom_color: res.data.custom_color,
+        });
+        closeAddForm();
+        window.dispatchEvent(new CustomEvent('iruka:refresh'));
+    } catch (_) {
+        alert('追加に失敗しました。');
+    } finally {
+        addingStatus.value = false;
+    }
+}
+
+async function deleteStatus(item, idx) {
+    if (!confirm(`「${resolveStatus(item).label}」を削除しますか？`)) return;
+    try {
+        await window.axios.delete(route('presence.board_settings.statuses.delete', { statusOrder: item.id }));
+        localStatuses.value.splice(idx, 1);
+        window.dispatchEvent(new CustomEvent('iruka:refresh'));
+    } catch (_) {
+        alert('削除に失敗しました。');
+    }
+}
+
 async function saveStatuses() {
     savingStatuses.value = true;
     savedStatuses.value  = false;
     try {
-        const items = localStatuses.value.map((s, i) => ({ slug: s.slug, sort_order: i, is_active: s.is_active }));
+        const items = localStatuses.value.map((s, i) => ({
+            slug:         s.slug,
+            sort_order:   i,
+            is_active:    s.is_active,
+            custom_label: s.custom_label ?? null,
+            custom_color: s.custom_color ?? null,
+        }));
         await window.axios.post(route('presence.board_settings.statuses'), { items });
         savedStatuses.value = true;
         window.dispatchEvent(new CustomEvent('iruka:refresh'));

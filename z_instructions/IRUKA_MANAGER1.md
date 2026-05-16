@@ -48,10 +48,21 @@
 | **Phase 9C** | PresenceBoardSettingsController 拡張 | ✅完了 | 2026-05-16 | updateStatuses追加・statusOrders prop |
 | **Phase 9C** | BoardSettings.vue ステータス管理タブ追加 | ✅完了 | 2026-05-16 | タブ切替・▲▼・表示/非表示 |
 | **Phase 9C** | IrukaBoard.vue statuses対応 | ✅完了 | 2026-05-16 | statuses fetch・モーダルへ渡す |
+| **Phase 10** | デフォルトステータスを退社に変更 | ✅完了 | 2026-05-16 | API返却値のみ変更・日報生成なし |
+| **Phase 10** | ボードをカードグリッド→縦リストに変更 | ✅完了 | 2026-05-16 | 1行コンパクト表示 |
+| **Phase 10** | 出社中/退社・休暇グループ分け | ✅完了 | 2026-05-16 | 下段4種(left/paid_leave/special_leave/early_leave) |
+| **Phase 10** | 部署タブ「全部署」削除・各部署のみ | ✅完了 | 2026-05-16 | localStorage移行対応 |
+| **Phase 10** | カードから部署名表示削除 | ✅完了 | 2026-05-16 | |
 
 ---
 
 ## 作業ログ
+
+### 2026-05-16（続き）
+- Phase 10 実装完了
+- デフォルトステータス present→left（日報生成なし）
+- ボードレイアウト縦リスト化・グループ分け（出社中/退社・休暇）
+- 部署タブから「全部署」削除・各部署のみに変更
 
 ### 2026-05-16
 - Phase 8 実装完了・ビルド成功

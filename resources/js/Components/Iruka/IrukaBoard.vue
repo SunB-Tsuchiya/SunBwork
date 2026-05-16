@@ -1,48 +1,80 @@
 <template>
-    <div class="space-y-4">
-        <!-- 部署フィルターボタン -->
-        <div class="flex flex-wrap gap-2">
+    <div class="mx-auto max-w-2xl rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
+
+        <!-- 部署タブ（複数部署のときのみ表示） -->
+        <div v-if="deptTabs.length > 1" class="flex border-b border-gray-200 bg-gray-50 overflow-x-auto">
             <button
                 v-for="dept in deptTabs"
                 :key="dept.id"
                 type="button"
-                class="rounded-full border px-3 py-1 text-sm font-medium transition-colors"
+                class="shrink-0 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap"
                 :class="activeDept === dept.id
-                    ? 'border-blue-500 bg-blue-500 text-white'
-                    : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'"
+                    ? 'border-blue-500 text-blue-600 bg-white'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'"
                 @click="activeDept = dept.id"
-            >
-                {{ dept.name }}
-            </button>
+            >{{ dept.name }}</button>
         </div>
 
-        <!-- ユーザーカード一覧 -->
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            <div
-                v-for="u in filteredUsers"
-                :key="u.id"
-                class="cursor-pointer rounded-lg border border-gray-200 bg-white p-3 shadow-sm transition-shadow hover:shadow-md"
-                @click="openModal(u)"
-            >
-                <div class="flex items-start justify-between gap-2">
-                    <div class="min-w-0 flex-1">
-                        <p class="truncate text-sm font-semibold text-gray-800">{{ u.name }}</p>
-                        <p class="text-xs text-gray-400">{{ u.department }}</p>
-                    </div>
-                    <!-- ステータスバッジ -->
-                    <span
-                        class="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium text-white"
-                        :class="getStatus(u.status).color"
-                    >{{ getStatus(u.status).label }}</span>
+        <div class="divide-y divide-gray-100">
+            <!-- 出社中グループ -->
+            <template v-if="presentUsers.length > 0">
+                <div class="bg-green-50 px-4 py-1.5">
+                    <span class="text-xs font-medium text-green-600">出社中 {{ presentUsers.length }}人</span>
                 </div>
+                <div
+                    v-for="u in presentUsers"
+                    :key="u.id"
+                    class="flex items-center gap-2 px-4 py-1.5 cursor-pointer hover:bg-blue-50 transition-colors"
+                    @click="openModal(u)"
+                >
+                    <span class="w-16 shrink-0 font-bold text-cyan-700 text-sm truncate">{{ u.name }}</span>
+                    <span
+                        v-if="u.comment"
+                        class="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600 whitespace-pre-line"
+                        style="max-width: 220px;"
+                    >{{ u.comment }}</span>
+                    <div class="flex-1" />
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <span class="h-2 w-2 rounded-full shrink-0" :class="resolveStatusDisplay(u.status).dot" />
+                        <span class="text-sm font-medium w-20 text-right" :class="resolveStatusDisplay(u.status).textColor">
+                            {{ resolveStatusDisplay(u.status).label }}
+                        </span>
+                    </div>
+                    <span class="text-xs text-gray-300 w-14 text-right shrink-0">{{ formatTime(u.updated_at) }}</span>
+                </div>
+            </template>
 
-                <!-- ひとこと -->
-                <p v-if="u.comment" class="mt-2 line-clamp-2 text-xs text-gray-500">{{ u.comment }}</p>
+            <!-- 退社・休暇グループ -->
+            <template v-if="absentUsers.length > 0">
+                <div class="bg-gray-50 px-4 py-1.5" :class="{ 'border-t border-gray-200': presentUsers.length > 0 }">
+                    <span class="text-xs font-medium text-gray-400">退社・休暇 {{ absentUsers.length }}人</span>
+                </div>
+                <div
+                    v-for="u in absentUsers"
+                    :key="u.id"
+                    class="flex items-center gap-2 px-4 py-1.5 cursor-pointer hover:bg-gray-50 transition-colors opacity-50"
+                    @click="openModal(u)"
+                >
+                    <span class="w-16 shrink-0 font-bold text-gray-500 text-sm truncate">{{ u.name }}</span>
+                    <span
+                        v-if="u.comment"
+                        class="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-500 whitespace-pre-line"
+                        style="max-width: 220px;"
+                    >{{ u.comment }}</span>
+                    <div class="flex-1" />
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <span class="h-2 w-2 rounded-full shrink-0" :class="resolveStatusDisplay(u.status).dot" />
+                        <span class="text-sm font-medium w-20 text-right" :class="resolveStatusDisplay(u.status).textColor">
+                            {{ resolveStatusDisplay(u.status).label }}
+                        </span>
+                    </div>
+                    <span class="text-xs text-gray-300 w-14 text-right shrink-0">{{ formatTime(u.updated_at) }}</span>
+                </div>
+            </template>
 
-                <!-- 最終更新時間 -->
-                <p class="mt-2 text-right text-[10px] text-gray-300">
-                    {{ formatTime(u.updated_at) }}
-                </p>
+            <!-- メンバーなし -->
+            <div v-if="filteredUsers.length === 0" class="py-8 text-center text-sm text-gray-400">
+                表示するメンバーがいません
             </div>
         </div>
 
@@ -63,36 +95,61 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, inject } from 'vue';
 import IrukaStatusModal from './IrukaStatusModal.vue';
-import { getStatus } from './statusConfig.js';
+import { getStatus, resolveStatus } from './statusConfig.js';
 
 const props = defineProps({
     departments: { type: Array, default: () => [] },
 });
 
-const authUser    = inject('authUser', null);
-const users       = ref([]);
-const statuses    = ref(null);
+const authUser = inject('authUser', null);
+const users    = ref([]);
+const statuses = ref(null);
 
+// 退社・休暇グループに分類するスラッグ
+const ABSENT_SLUGS = new Set(['left', 'paid_leave', 'special_leave', 'early_leave']);
+
+// 部署タブ（「全部署」なし、各部署のみ）
+const deptTabs = computed(() => props.departments);
+
+// localStorage から復元。null / 無効値は最初の部署 ID にフォールバック
 const DEPT_KEY = 'iruka_active_dept';
-const savedDept = localStorage.getItem(DEPT_KEY);
-const activeDept = ref(savedDept !== null ? (savedDept === 'null' ? null : Number(savedDept)) : null);
+function initDept() {
+    const saved = localStorage.getItem(DEPT_KEY);
+    if (saved && saved !== 'null') {
+        const n = Number(saved);
+        if (props.departments.some(d => d.id === n)) return n;
+    }
+    return props.departments[0]?.id ?? null;
+}
+const activeDept = ref(initDept());
 
 watch(activeDept, (val) => {
     localStorage.setItem(DEPT_KEY, val === null ? 'null' : String(val));
 });
+
 const showModal   = ref(false);
 const modalTarget = ref(null);
 let pollTimer = null;
 
-const deptTabs = computed(() => [
-    { id: null, name: '全部署' },
-    ...props.departments,
-]);
+// statusMap: slug → resolveStatus(orderRecord) のマップ（カスタム対応）
+const statusMap = computed(() => {
+    if (!statuses.value) return null;
+    const map = {};
+    statuses.value.forEach(s => { map[s.slug] = resolveStatus(s); });
+    return map;
+});
+
+function resolveStatusDisplay(slug) {
+    return statusMap.value?.[slug] ?? getStatus(slug);
+}
 
 const filteredUsers = computed(() => {
-    if (activeDept.value === null) return users.value;
+    if (!activeDept.value) return users.value;
     return users.value.filter(u => u.department_id === activeDept.value);
 });
+
+const presentUsers = computed(() => filteredUsers.value.filter(u => !ABSENT_SLUGS.has(u.status)));
+const absentUsers  = computed(() => filteredUsers.value.filter(u =>  ABSENT_SLUGS.has(u.status)));
 
 onMounted(async () => {
     await Promise.all([fetchPresence(), fetchStatuses()]);

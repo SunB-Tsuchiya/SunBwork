@@ -120,6 +120,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     Route::get('/presence/board-settings', [App\Http\Controllers\PresenceBoardSettingsController::class, 'index'])->name('presence.board_settings');
     Route::post('/presence/board-settings', [App\Http\Controllers\PresenceBoardSettingsController::class, 'update'])->name('presence.board_settings.update');
     Route::post('/presence/board-settings/statuses', [App\Http\Controllers\PresenceBoardSettingsController::class, 'updateStatuses'])->name('presence.board_settings.statuses');
+    Route::post('/presence/board-settings/statuses/create', [App\Http\Controllers\PresenceBoardSettingsController::class, 'createStatus'])->name('presence.board_settings.statuses.create');
+    Route::delete('/presence/board-settings/statuses/{statusOrder}', [App\Http\Controllers\PresenceBoardSettingsController::class, 'deleteStatus'])->name('presence.board_settings.statuses.delete');
 
     // 案件確認（ユーザー向け案件一覧・詳細）
     Route::get('/user/project-jobs/json', [App\Http\Controllers\User\ProjectJobController::class, 'projectsJson'])->name('user.project_jobs.json');

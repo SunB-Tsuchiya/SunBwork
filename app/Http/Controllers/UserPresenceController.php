@@ -49,7 +49,7 @@ class UserPresenceController extends Controller
                     'name'          => $u->name,
                     'department_id' => $u->department_id,
                     'department'    => $u->department?->name ?? '未所属',
-                    'status'        => $ps?->status ?? 'present',
+                    'status'        => $ps?->status ?? 'left',
                     'comment'       => $ps?->comment ?? '',
                     'updated_at'    => $ps?->updated_at?->toDateTimeString() ?? null,
                     'updated_by_id' => $ps?->updated_by_id ?? null,
@@ -126,7 +126,12 @@ class UserPresenceController extends Controller
 
         return response()->json(
             $orders->where('is_active', true)
-                   ->map(fn ($o) => ['slug' => $o->slug, 'sort_order' => $o->sort_order])
+                   ->map(fn ($o) => [
+                       'slug'         => $o->slug,
+                       'sort_order'   => $o->sort_order,
+                       'custom_label' => $o->custom_label,
+                       'custom_color' => $o->custom_color,
+                   ])
                    ->values()
         );
     }

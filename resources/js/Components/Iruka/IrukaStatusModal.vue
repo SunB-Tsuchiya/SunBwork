@@ -56,19 +56,36 @@
                 </div>
 
                 <!-- フッター -->
-                <div class="flex items-center justify-end gap-3 border-t border-gray-100 px-5 py-3">
-                    <button
-                        v-if="isSelf"
-                        type="button"
-                        class="text-sm text-red-500 hover:text-red-700"
-                        @click="handleClear"
-                    >削除する</button>
+                <div class="flex items-center justify-between border-t border-gray-100 px-5 py-3">
+                    <!-- 使い方ガイドボタン -->
                     <button
                         type="button"
-                        class="text-sm text-gray-500 hover:text-gray-700"
-                        @click="$emit('close')"
-                    >キャンセル</button>
+                        class="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
+                        @click="showGuide = true"
+                    >
+                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        使い方ガイド
+                    </button>
+
+                    <div class="flex items-center gap-3">
+                        <button
+                            v-if="isSelf"
+                            type="button"
+                            class="text-sm text-red-500 hover:text-red-700"
+                            @click="handleClear"
+                        >削除する</button>
+                        <button
+                            type="button"
+                            class="text-sm text-gray-500 hover:text-gray-700"
+                            @click="$emit('close')"
+                        >キャンセル</button>
+                    </div>
                 </div>
+
+                <!-- 使い方ガイドモーダル -->
+                <IrukaGuideModal :show="showGuide" @close="showGuide = false" />
             </div>
         </div>
     </Teleport>
@@ -76,7 +93,8 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue';
-import { STATUSES, getBtnClasses } from './statusConfig.js';
+import { STATUSES, getBtnClasses, resolveStatus } from './statusConfig.js';
+import IrukaGuideModal from './IrukaGuideModal.vue';
 
 const props = defineProps({
     show:       { type: Boolean, default: false },
@@ -87,27 +105,26 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'save', 'clear']);
 
-const localStatus  = ref(props.targetUser.status ?? 'present');
+const localStatus  = ref(props.targetUser.status ?? 'left');
 const localComment = ref(props.targetUser.comment ?? '');
+const showGuide    = ref(false);
 
-// DB順があればそれを使い、なければ静的 STATUSES 順にフォールバック
+// DB順があればそれを使い（カスタムラベル/カラー反映）、なければ静的 STATUSES 順にフォールバック
 const displayStatuses = computed(() => {
     if (props.statuses && props.statuses.length > 0) {
-        return props.statuses
-            .map(s => STATUSES.find(st => st.slug === s.slug))
-            .filter(Boolean);
+        return props.statuses.map(s => resolveStatus(s));
     }
     return STATUSES;
 });
 
 watch(() => props.targetUser, (u) => {
-    localStatus.value  = u.status ?? 'present';
+    localStatus.value  = u.status ?? 'left';
     localComment.value = u.comment ?? '';
 }, { deep: true });
 
 watch(() => props.show, (v) => {
     if (v) {
-        localStatus.value  = props.targetUser.status ?? 'present';
+        localStatus.value  = props.targetUser.status ?? 'left';
         localComment.value = props.targetUser.comment ?? '';
     }
 });
