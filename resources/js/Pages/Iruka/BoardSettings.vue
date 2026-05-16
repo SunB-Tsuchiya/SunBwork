@@ -46,21 +46,6 @@
                     >{{ d.name }}</button>
                 </div>
 
-                <!-- ソートボタン -->
-                <div class="mb-4 flex flex-wrap items-center gap-2">
-                    <span class="text-xs text-gray-400 shrink-0">並び替え：</span>
-                    <button
-                        v-for="s in SORT_OPTIONS"
-                        :key="s.key"
-                        type="button"
-                        class="rounded-full px-3 py-1 text-xs font-medium border transition-colors"
-                        :class="currentSort === s.key
-                            ? 'border-indigo-400 bg-indigo-50 text-indigo-700'
-                            : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'"
-                        @click="applySort(s.key)"
-                    >{{ s.label }}</button>
-                </div>
-
                 <!-- ユーザーテーブル -->
                 <div class="overflow-x-auto">
                     <table class="text-sm w-full">
@@ -274,7 +259,7 @@
 <script setup>
 import { ref, computed } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Link, router } from '@inertiajs/vue3';
+import { Link } from '@inertiajs/vue3';
 import { resolveStatus, COLOR_OPTIONS, STATUS_GROUPS } from '@/Components/Iruka/statusConfig.js';
 
 const props = defineProps({
@@ -289,51 +274,17 @@ const activeTab = ref('users');
 
 // ===== ユーザー設定 =====
 const localUsers   = ref(props.users.map(u => ({ ...u })));
-// 部署フィルター：全部署なし。初期値は最初の部署
+// 部署フィルター：初期値は最初の部署
 const selectedDept = ref(props.departments[0]?.id ?? null);
 const savingUsers  = ref(false);
 const savedUsers   = ref(false);
-const currentSort  = ref(null); // null = 手動順
 
-const SORT_OPTIONS = [
-    { key: 'position',   label: '役職順' },
-    { key: 'employment', label: '雇用形態順' },
-    { key: 'name',       label: '名前順' },
-];
-
-const EMPLOYMENT_PRIORITY = {
-    regular: 1, contract: 2, dispatch: 3, outsource: 4,
-};
 const EMPLOYMENT_LABELS = {
     regular: '正社員', contract: '契約社員', dispatch: '派遣社員', outsource: '業務委託',
 };
 
 function employmentLabel(type) {
     return EMPLOYMENT_LABELS[type] ?? type ?? '';
-}
-
-function applySort(key) {
-    currentSort.value = key;
-    savedUsers.value  = false;
-    const arr = [...localUsers.value];
-    if (key === 'position') {
-        arr.sort((a, b) => {
-            const pa = a.position_sort_order ?? 9999;
-            const pb = b.position_sort_order ?? 9999;
-            if (pa !== pb) return pa - pb;
-            return a.name.localeCompare(b.name, 'ja');
-        });
-    } else if (key === 'employment') {
-        arr.sort((a, b) => {
-            const ea = EMPLOYMENT_PRIORITY[a.employment_type] ?? 99;
-            const eb = EMPLOYMENT_PRIORITY[b.employment_type] ?? 99;
-            if (ea !== eb) return ea - eb;
-            return a.name.localeCompare(b.name, 'ja');
-        });
-    } else if (key === 'name') {
-        arr.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
-    }
-    localUsers.value = arr;
 }
 
 const visibleUsers = computed(() => {
@@ -381,8 +332,8 @@ async function saveUsers() {
     try {
         const items = localUsers.value.map((u, i) => ({ user_id: u.id, sort_order: i, is_hidden: u.is_hidden }));
         await window.axios.post(route('presence.board_settings.update'), { items });
+        savedUsers.value = true;
         window.dispatchEvent(new CustomEvent('iruka:refresh'));
-        router.get(route('dashboard'));
     } catch (e) {
         alert(e.response?.data?.message ?? '保存に失敗しました。再度お試しください。');
     } finally {
@@ -518,8 +469,8 @@ async function saveStatuses() {
             custom_color: s.custom_color ?? null,
         }));
         await window.axios.post(route('presence.board_settings.statuses'), { items });
+        savedStatuses.value = true;
         window.dispatchEvent(new CustomEvent('iruka:refresh'));
-        router.get(route('dashboard'));
     } catch (e) {
         alert(e.response?.data?.message ?? '保存に失敗しました。再度お試しください。');
     } finally {
