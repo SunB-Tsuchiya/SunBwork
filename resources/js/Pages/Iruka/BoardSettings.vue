@@ -62,13 +62,15 @@
                 </div>
 
                 <!-- ユーザーテーブル -->
-                <div class="overflow-x-auto flex justify-center">
-                    <table class="text-sm">
+                <div class="overflow-x-auto">
+                    <table class="text-sm w-full">
                         <thead>
                             <tr class="border-b border-gray-200 text-left text-xs font-medium text-gray-500">
-                                <th class="pb-2 pr-2 w-24">順序</th>
-                                <th class="pb-2 pr-6 w-48">名前</th>
-                                <th class="pb-2 w-20">ボード表示</th>
+                                <th class="pb-2 pr-2 w-20">順序</th>
+                                <th class="pb-2 pr-3 w-32">名前</th>
+                                <th class="pb-2 pr-3 w-24">役職</th>
+                                <th class="pb-2 pr-3 w-24">雇用形態</th>
+                                <th class="pb-2 w-16 text-center">ボード表示</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
@@ -77,17 +79,23 @@
                                 :key="item.id"
                                 :class="item.is_hidden ? 'bg-gray-50' : ''"
                             >
-                                <td class="py-2 pr-2 w-24">
+                                <td class="py-1.5 pr-2 w-20">
                                     <div class="flex items-center gap-1">
                                         <span class="w-5 text-xs text-gray-400">{{ visIdx + 1 }}</span>
                                         <button type="button" :disabled="visIdx === 0" class="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30" @click="moveUserUp(visIdx)">▲</button>
                                         <button type="button" :disabled="visIdx === visibleUsers.length - 1" class="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30" @click="moveUserDown(visIdx)">▼</button>
                                     </div>
                                 </td>
-                                <td class="py-2 pr-6 w-48 font-medium" :class="item.is_hidden ? 'line-through text-gray-400' : 'text-gray-800'">
+                                <td class="py-1.5 pr-3 w-32 font-medium" :class="item.is_hidden ? 'line-through text-gray-400' : 'text-gray-800'">
                                     {{ item.name }}
                                 </td>
-                                <td class="py-2 w-20">
+                                <td class="py-1.5 pr-3 w-24 text-xs text-gray-500">
+                                    {{ item.position_title ?? '―' }}
+                                </td>
+                                <td class="py-1.5 pr-3 w-24 text-xs text-gray-500">
+                                    {{ employmentLabel(item.employment_type) }}
+                                </td>
+                                <td class="py-1.5 w-16 text-center">
                                     <button type="button"
                                         class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
                                         :class="item.is_hidden ? 'bg-gray-300' : 'bg-blue-500'"
@@ -288,28 +296,31 @@ const savedUsers   = ref(false);
 const currentSort  = ref(null); // null = 手動順
 
 const SORT_OPTIONS = [
-    { key: 'role',       label: '役職順' },
+    { key: 'position',   label: '役職順' },
     { key: 'employment', label: '雇用形態順' },
     { key: 'name',       label: '名前順' },
 ];
 
-const ROLE_PRIORITY = {
-    superadmin: 1, admin: 2, coordinator: 3,
-    proof_coordinator: 4, leader: 5, clerk: 6, user: 7,
-};
 const EMPLOYMENT_PRIORITY = {
     regular: 1, contract: 2, dispatch: 3, outsource: 4,
 };
+const EMPLOYMENT_LABELS = {
+    regular: '正社員', contract: '契約社員', dispatch: '派遣社員', outsource: '業務委託',
+};
+
+function employmentLabel(type) {
+    return EMPLOYMENT_LABELS[type] ?? type ?? '';
+}
 
 function applySort(key) {
     currentSort.value = key;
     savedUsers.value  = false;
     const arr = [...localUsers.value];
-    if (key === 'role') {
+    if (key === 'position') {
         arr.sort((a, b) => {
-            const ra = ROLE_PRIORITY[a.user_role] ?? 99;
-            const rb = ROLE_PRIORITY[b.user_role] ?? 99;
-            if (ra !== rb) return ra - rb;
+            const pa = a.position_sort_order ?? 9999;
+            const pb = b.position_sort_order ?? 9999;
+            if (pa !== pb) return pa - pb;
             return a.name.localeCompare(b.name, 'ja');
         });
     } else if (key === 'employment') {

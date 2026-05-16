@@ -22,15 +22,6 @@ class PresenceBoardSettingsController extends Controller
         $userIds  = $this->getAllowedUserIds($authUser);
         $isAdmin  = in_array($authUser->user_role, ['admin', 'superadmin', 'clerk']);
 
-        $rolePriority = [
-            'superadmin'        => 1,
-            'admin'             => 2,
-            'coordinator'       => 3,
-            'proof_coordinator' => 4,
-            'leader'            => 5,
-            'clerk'             => 6,
-            'user'              => 7,
-        ];
         $employmentPriority = [
             'regular'   => 1,
             'contract'  => 2,
@@ -38,27 +29,28 @@ class PresenceBoardSettingsController extends Controller
             'outsource' => 4,
         ];
 
-        $users = User::with(['department', 'presenceStatus'])
+        $users = User::with(['department', 'presenceStatus', 'positionTitle'])
             ->whereIn('id', $userIds)
             ->where('is_ghost', false)
             ->whereNull('ghost_owner_id')
             ->get()
             ->sortBy([
                 fn($u) => $u->presenceStatus?->sort_order ?? 9999,
-                fn($u) => $rolePriority[$u->user_role] ?? 99,
+                fn($u) => $u->positionTitle?->sort_order ?? 9999,
                 fn($u) => $employmentPriority[$u->employment_type ?? 'regular'] ?? 99,
                 fn($u) => $u->name,
             ])
             ->values()
             ->map(fn(User $u) => [
-                'id'              => $u->id,
-                'name'            => $u->name,
-                'department'      => $u->department?->name ?? '未所属',
-                'department_id'   => $u->department_id,
-                'sort_order'      => $u->presenceStatus?->sort_order ?? 0,
-                'is_hidden'       => (bool) ($u->presenceStatus?->is_hidden ?? false),
-                'user_role'       => $u->user_role,
-                'employment_type' => $u->employment_type ?? 'regular',
+                'id'                  => $u->id,
+                'name'                => $u->name,
+                'department'          => $u->department?->name ?? '未所属',
+                'department_id'       => $u->department_id,
+                'sort_order'          => $u->presenceStatus?->sort_order ?? 0,
+                'is_hidden'           => (bool) ($u->presenceStatus?->is_hidden ?? false),
+                'position_title'      => $u->positionTitle?->name,
+                'position_sort_order' => $u->positionTitle?->sort_order ?? 9999,
+                'employment_type'     => $u->employment_type ?? 'regular',
             ]);
 
         $departments = $isAdmin
