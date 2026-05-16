@@ -35,7 +35,7 @@
                 </p>
 
                 <!-- 部署フィルター（Admin のみ・各部署のみ） -->
-                <div v-if="isAdmin && departments.length > 0" class="mb-4 flex flex-wrap gap-2">
+                <div v-if="isAdmin && departments.length > 0" class="mb-3 flex flex-wrap gap-2">
                     <button
                         v-for="d in departments"
                         :key="d.id"
@@ -44,6 +44,21 @@
                         class="rounded-full px-3 py-1 text-xs font-medium transition-colors"
                         :class="selectedDept === d.id ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
                     >{{ d.name }}</button>
+                </div>
+
+                <!-- ソートボタン -->
+                <div class="mb-4 flex flex-wrap items-center gap-2">
+                    <span class="text-xs text-gray-400 shrink-0">並び替え：</span>
+                    <button
+                        v-for="s in SORT_OPTIONS"
+                        :key="s.key"
+                        type="button"
+                        class="rounded-full px-3 py-1 text-xs font-medium border transition-colors"
+                        :class="currentSort === s.key
+                            ? 'border-indigo-400 bg-indigo-50 text-indigo-700'
+                            : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'"
+                        @click="applySort(s.key)"
+                    >{{ s.label }}</button>
                 </div>
 
                 <!-- ユーザーテーブル -->
@@ -270,6 +285,45 @@ const localUsers   = ref(props.users.map(u => ({ ...u })));
 const selectedDept = ref(props.departments[0]?.id ?? null);
 const savingUsers  = ref(false);
 const savedUsers   = ref(false);
+const currentSort  = ref(null); // null = 手動順
+
+const SORT_OPTIONS = [
+    { key: 'role',       label: '役職順' },
+    { key: 'employment', label: '雇用形態順' },
+    { key: 'name',       label: '名前順' },
+];
+
+const ROLE_PRIORITY = {
+    superadmin: 1, admin: 2, coordinator: 3,
+    proof_coordinator: 4, leader: 5, clerk: 6, user: 7,
+};
+const EMPLOYMENT_PRIORITY = {
+    regular: 1, contract: 2, dispatch: 3, outsource: 4,
+};
+
+function applySort(key) {
+    currentSort.value = key;
+    savedUsers.value  = false;
+    const arr = [...localUsers.value];
+    if (key === 'role') {
+        arr.sort((a, b) => {
+            const ra = ROLE_PRIORITY[a.user_role] ?? 99;
+            const rb = ROLE_PRIORITY[b.user_role] ?? 99;
+            if (ra !== rb) return ra - rb;
+            return a.name.localeCompare(b.name, 'ja');
+        });
+    } else if (key === 'employment') {
+        arr.sort((a, b) => {
+            const ea = EMPLOYMENT_PRIORITY[a.employment_type] ?? 99;
+            const eb = EMPLOYMENT_PRIORITY[b.employment_type] ?? 99;
+            if (ea !== eb) return ea - eb;
+            return a.name.localeCompare(b.name, 'ja');
+        });
+    } else if (key === 'name') {
+        arr.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+    }
+    localUsers.value = arr;
+}
 
 const visibleUsers = computed(() => {
     if (!selectedDept.value) return localUsers.value;

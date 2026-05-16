@@ -63,7 +63,8 @@ class PresenceBoardSettingsController extends Controller
 
         $departments = $isAdmin
             ? Department::where('company_id', $authUser->company_id)
-                ->orderBy('name')
+                ->orderBy('sort_order')
+                ->orderBy('id')
                 ->get(['id', 'name'])
             : collect();
 
