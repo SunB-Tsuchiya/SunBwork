@@ -320,6 +320,14 @@ class User extends Authenticatable
     }
 
     /**
+     * 在席ステータス（イルカ機能）
+     */
+    public function presenceStatus()
+    {
+        return $this->hasOne(\App\Models\UserPresenceStatus::class);
+    }
+
+    /**
      * ユーザーの会社
      */
     public function company(): BelongsTo

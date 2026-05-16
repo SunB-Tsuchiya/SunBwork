@@ -41,6 +41,7 @@ const tabs = computed(() => [
     { key: 'dispatch', href: tryRoute('leader.dispatch_management.index'), label: '派遣管理', condition: can('dispatch_management') },
     { key: 'leader_permissions', href: tryRoute('leader.leader_permissions.index'), label: 'Leader権限管理' },
     { key: 'meeting_definitions', href: tryRoute('leader.meeting_definitions.index'), label: '会議設定' },
+    { key: 'presence_board_settings', href: tryRoute('presence.board_settings'), label: '在席ボード管理' },
 ].filter(t => t.condition !== false && t.href));
 
 function onMobileSelect(e) {
@@ -142,6 +143,12 @@ function onMobileSelect(e) {
                 :class="tab('meeting_definitions')"
             >
                 会議設定
+            </Link>
+            <Link
+                :href="route('presence.board_settings')"
+                :class="tab('presence_board_settings')"
+            >
+                在席ボード管理
             </Link>
         </nav>
     </div>

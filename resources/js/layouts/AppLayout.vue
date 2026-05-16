@@ -4,6 +4,7 @@ import Banner from '@/Components/Banner.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
+import IrukaStatusBadge from '@/Components/Iruka/IrukaStatusBadge.vue';
 import AdminNavigationTabs from '@/Components/Tabs/AdminNavigationTabs.vue';
 import ClerkNavigationTabs from '@/Components/Tabs/ClerkNavigationTabs.vue';
 import PrepressNavigationTabs from '@/Components/Tabs/PrepressNavigationTabs.vue';
@@ -289,6 +290,9 @@ const currentRouteContext = computed(() => {
 
                         <!-- Right side: icon buttons + profile dropdown -->
                         <div class="hidden sm:flex sm:items-center sm:gap-1">
+                            <!-- イルカ在席バッジ -->
+                            <IrukaStatusBadge class="mr-1" />
+
                             <!-- お知らせ -->
                             <div class="group relative">
                                 <Link :href="route('announcements.index')" class="relative flex h-8 w-8 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700">

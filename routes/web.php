@@ -110,6 +110,17 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
     Route::get('/user/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('user.dashboard');
 
+    // 在席管理（イルカ）
+    Route::get('/presence', [App\Http\Controllers\UserPresenceController::class, 'index'])->name('presence.index');
+    Route::get('/presence/statuses', [App\Http\Controllers\UserPresenceController::class, 'statuses'])->name('presence.statuses');
+    Route::post('/presence/self/clear', [App\Http\Controllers\UserPresenceController::class, 'clearSelf'])->name('presence.clear_self');
+    Route::post('/presence/{user}', [App\Http\Controllers\UserPresenceController::class, 'update'])->name('presence.update');
+
+    // 在席ボード管理（Admin・Leader）
+    Route::get('/presence/board-settings', [App\Http\Controllers\PresenceBoardSettingsController::class, 'index'])->name('presence.board_settings');
+    Route::post('/presence/board-settings', [App\Http\Controllers\PresenceBoardSettingsController::class, 'update'])->name('presence.board_settings.update');
+    Route::post('/presence/board-settings/statuses', [App\Http\Controllers\PresenceBoardSettingsController::class, 'updateStatuses'])->name('presence.board_settings.statuses');
+
     // 案件確認（ユーザー向け案件一覧・詳細）
     Route::get('/user/project-jobs/json', [App\Http\Controllers\User\ProjectJobController::class, 'projectsJson'])->name('user.project_jobs.json');
     Route::get('/user/project-jobs/{projectJob}/progress-sheets-json', [App\Http\Controllers\User\ProjectJobController::class, 'progressSheetsJson'])->name('user.project_jobs.progress_sheets_json');

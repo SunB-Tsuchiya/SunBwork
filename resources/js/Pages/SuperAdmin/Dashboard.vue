@@ -1,15 +1,12 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
-// tabs are rendered centrally in AppLayout.vue
+import IrukaBoard from '@/Components/Iruka/IrukaBoard.vue';
 
 defineProps({
-    available_teams: {
-        type: Array,
-        default: () => [],
-    },
+    available_teams: { type: Array, default: () => [] },
+    departments:     { type: Array, default: () => [] },
 });
 
-// ユーザー情報はinertiaのpropsから取得する
 import { usePage } from '@inertiajs/vue3';
 const page = usePage();
 const user = page.props.user;
@@ -21,36 +18,6 @@ const user = page.props.user;
             <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">【スーパ管理者】{{ user?.name || 'ユーザー' }}さんのページ</h2>
         </template>
 
-        <!-- ナビゲーションタブ (中央化のため AppLayout.vue で表示) -->
-
-        <!-- プロフィール情報表示 -->
-        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
-            <h3 class="mb-4 text-lg font-medium text-gray-900">スーパ管理者プロフィール情報</h3>
-            <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">名前</label>
-                    <p class="mt-1 text-sm text-gray-900">{{ user?.name || '未設定' }}</p>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">メールアドレス</label>
-                    <p class="mt-1 text-sm text-gray-900">{{ user?.email || '未設定' }}</p>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">会社・部署</label>
-                    <p class="mt-1 text-sm text-gray-900">
-                        {{ user?.company?.name || user?.current_team?.company_name || '未設定' }}
-                        <span v-if="user?.department?.name || user?.current_team?.department_name"> - {{ user?.department?.name || user?.current_team?.department_name }}</span>
-                    </p>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">担当</label>
-                    <p class="mt-1 text-sm text-gray-900">{{ user?.assignment?.name || '未設定' }}</p>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">権限レベル</label>
-                    <p class="mt-1 text-sm font-semibold text-red-600">{{ user?.user_role || '未設定' }}</p>
-                </div>
-            </div>
-        </div>
+        <IrukaBoard :departments="$page.props.departments" />
     </AppLayout>
 </template>

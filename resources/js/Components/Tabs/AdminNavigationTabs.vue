@@ -41,6 +41,7 @@ const tabs = computed(() => [
     { key: 'admin_permissions', href: tryRoute('admin.admin_permissions.index'), label: 'Admin権限管理', condition: isRepresentative.value },
     { key: 'leader_permissions', href: tryRoute('admin.leader_permissions.index'), label: 'Leader権限管理' },
     { key: 'meeting_definitions', href: tryRoute('admin.meeting_definitions.index'), label: '会議設定' },
+    { key: 'presence_board_settings', href: tryRoute('presence.board_settings'), label: '在席ボード管理' },
 ].filter(t => t.condition !== false && t.href));
 
 function onMobileSelect(e) {
@@ -149,6 +150,12 @@ function onMobileSelect(e) {
                 :class="tab('meeting_definitions')"
             >
                 会議設定
+            </Link>
+            <Link
+                :href="route('presence.board_settings')"
+                :class="tab('presence_board_settings')"
+            >
+                在席ボード管理
             </Link>
         </nav>
     </div>

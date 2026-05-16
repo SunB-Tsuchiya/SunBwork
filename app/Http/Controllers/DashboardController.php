@@ -14,6 +14,7 @@ use App\Models\ProgressCell;
 use App\Models\UserMonthlySchedule;
 use App\Models\Worktype;
 use Illuminate\Support\Facades\Schema;
+use App\Models\Department;
 
 class DashboardController extends Controller
 {
@@ -293,6 +294,17 @@ class DashboardController extends Controller
             }
         }
 
+        // 部署一覧（イルカボード用）
+        $departments = [];
+        try {
+            $departments = Department::where('company_id', $user->company_id)
+                ->orderBy('sort_order')
+                ->get(['id', 'name'])
+                ->toArray();
+        } catch (\Throwable $e) {
+            Log::error('DashboardController departments error: ' . $e->getMessage());
+        }
+
         return Inertia::render($component, [
             'user'            => $user,
             'diaries'         => $diaries,
@@ -302,6 +314,7 @@ class DashboardController extends Controller
             'defaultWorktype' => $defaultWorktype,
             'worktypes'       => $worktypes,
             'dailyWorktypes'  => $dailyWorktypes,
+            'departments'     => $departments,
         ]);
     }
 }

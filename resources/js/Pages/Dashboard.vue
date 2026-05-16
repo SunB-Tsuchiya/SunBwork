@@ -2,46 +2,33 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import Calendar from '@/Components/Calendar.vue';
 import UserNavigationTabs from '@/Components/Tabs/UserNavigationTabs.vue';
+import IrukaBoard from '@/Components/Iruka/IrukaBoard.vue';
 // User tabs remain per-page
 
 defineProps({
-    diaries: {
-        type: Array,
-        default: () => [],
-    },
-    events: {
-        type: Array,
-        default: () => [],
-    },
-    jobs: {
-        type: Array,
-        default: () => [],
-    },
-    calendarView: {
-        type: String,
-        default: 'timeGridWeek',
-    },
-    defaultWorktype: {
-        type: Object,
-        default: null,
-    },
-    worktypes: {
-        type: Array,
-        default: () => [],
-    },
-    dailyWorktypes: {
-        type: Array,
-        default: () => [],
-    },
+    diaries:        { type: Array,  default: () => [] },
+    events:         { type: Array,  default: () => [] },
+    jobs:           { type: Array,  default: () => [] },
+    calendarView:   { type: String, default: 'timeGridWeek' },
+    defaultWorktype:{ type: Object, default: null },
+    worktypes:      { type: Array,  default: () => [] },
+    dailyWorktypes: { type: Array,  default: () => [] },
+    departments:    { type: Array,  default: () => [] },
 });
 
-// ユーザー情報はinertiaのpropsから取得する
 import { usePage } from '@inertiajs/vue3';
 import { ref } from 'vue';
 const page = usePage();
 const user = page.props.user;
 
 const showProfile = ref(false);
+
+const STORAGE_KEY = 'dashboard_tab';
+const activeTab = ref(localStorage.getItem(STORAGE_KEY) ?? 'calendar');
+function setTab(tab) {
+    activeTab.value = tab;
+    localStorage.setItem(STORAGE_KEY, tab);
+}
 </script>
 
 <template>
@@ -63,8 +50,25 @@ const showProfile = ref(false);
         <!--AI用メモ：ここまでapplayoutで管理-->
 
         <!--AI用メモ：ここからを各ページのコンテンツとする-->
+
+        <!-- タブ切替（カレンダー / イルカ） -->
+        <div class="mb-4 flex rounded-lg border border-gray-200 bg-white p-1 shadow-sm w-fit">
+            <button
+                type="button"
+                class="rounded-md px-4 py-1.5 text-sm font-medium transition-colors"
+                :class="activeTab === 'calendar' ? 'bg-blue-500 text-white shadow' : 'text-gray-500 hover:text-gray-700'"
+                @click="setTab('calendar')"
+            >📅 カレンダー</button>
+            <button
+                type="button"
+                class="rounded-md px-4 py-1.5 text-sm font-medium transition-colors"
+                :class="activeTab === 'iruka' ? 'bg-blue-500 text-white shadow' : 'text-gray-500 hover:text-gray-700'"
+                @click="setTab('iruka')"
+            >🐬 在席ボード</button>
+        </div>
+
         <!-- プロフィール情報表示（トグル式） -->
-        <div class="mb-6 rounded bg-white shadow">
+        <div v-show="activeTab === 'calendar'" class="mb-6 rounded bg-white shadow">
             <button
                 @click="showProfile = !showProfile"
                 class="flex w-full items-center justify-between px-6 py-4 text-left"
@@ -109,7 +113,7 @@ const showProfile = ref(false);
             </div>
         </div>
         <!-- カレンダー -->
-        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
+        <div v-show="activeTab === 'calendar'" class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <Calendar
                 :diaries="diaries"
                 :events="events"
@@ -120,6 +124,11 @@ const showProfile = ref(false);
                 :daily-worktypes="dailyWorktypes"
                 diary-label="日報"
             />
+        </div>
+
+        <!-- イルカ在席ボード -->
+        <div v-show="activeTab === 'iruka'">
+            <IrukaBoard :departments="$page.props.departments" />
         </div>
         <!--AI用メモ：ここまでを各ページのコンテンツとする-->
 
