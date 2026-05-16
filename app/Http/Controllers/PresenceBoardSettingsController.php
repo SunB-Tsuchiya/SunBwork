@@ -99,13 +99,21 @@ class PresenceBoardSettingsController extends Controller
             if (!in_array($userId, $allowedIds, true)) {
                 continue;
             }
-            UserPresenceStatus::updateOrCreate(
-                ['user_id' => $userId],
-                [
+            $ps = UserPresenceStatus::where('user_id', $userId)->first();
+            if ($ps) {
+                $ps->update([
                     'sort_order' => $item['sort_order'],
                     'is_hidden'  => $item['is_hidden'],
-                ]
-            );
+                ]);
+            } else {
+                // 新規作成時は status を 'left' にする（DB デフォルトの 'present' にしない）
+                UserPresenceStatus::create([
+                    'user_id'    => $userId,
+                    'status'     => 'left',
+                    'sort_order' => $item['sort_order'],
+                    'is_hidden'  => $item['is_hidden'],
+                ]);
+            }
         }
 
         return response()->json(['ok' => true]);

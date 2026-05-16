@@ -97,7 +97,7 @@ class UserPresenceController extends Controller
     }
 
     /**
-     * 自分のコメントを削除（ステータスはpresentに戻す）
+     * 自分のコメントを削除（ステータスは left に戻す）
      */
     public function clearSelf(Request $request)
     {
@@ -106,7 +106,7 @@ class UserPresenceController extends Controller
         UserPresenceStatus::updateOrCreate(
             ['user_id' => $user->id],
             [
-                'status'        => 'present',
+                'status'        => 'left',
                 'comment'       => '',
                 'updated_by_id' => $user->id,
                 'status_source' => 'manual',

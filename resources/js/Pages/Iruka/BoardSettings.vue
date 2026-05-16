@@ -345,8 +345,16 @@ const visibleUsers = computed(() => {
 });
 
 function toggleUser(userId) {
-    const item = localUsers.value.find(u => u.id === userId);
-    if (item) { item.is_hidden = !item.is_hidden; savedUsers.value = false; }
+    const idx = localUsers.value.findIndex(u => u.id === userId);
+    if (idx === -1) return;
+    const item = localUsers.value[idx];
+    item.is_hidden = !item.is_hidden;
+    savedUsers.value = false;
+    if (item.is_hidden) {
+        // 非表示にしたら末尾へ自動移動
+        localUsers.value.splice(idx, 1);
+        localUsers.value.push(item);
+    }
 }
 
 function moveUserUp(visIdx) {
