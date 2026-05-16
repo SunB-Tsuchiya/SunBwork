@@ -114,14 +114,15 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     Route::get('/presence', [App\Http\Controllers\UserPresenceController::class, 'index'])->name('presence.index');
     Route::get('/presence/statuses', [App\Http\Controllers\UserPresenceController::class, 'statuses'])->name('presence.statuses');
     Route::post('/presence/self/clear', [App\Http\Controllers\UserPresenceController::class, 'clearSelf'])->name('presence.clear_self');
-    Route::post('/presence/{user}', [App\Http\Controllers\UserPresenceController::class, 'update'])->name('presence.update');
 
-    // 在席ボード管理（Admin・Leader）
+    // 在席ボード管理（Admin・Leader）— {user} ワイルドカードより前に定義が必須
     Route::get('/presence/board-settings', [App\Http\Controllers\PresenceBoardSettingsController::class, 'index'])->name('presence.board_settings');
     Route::post('/presence/board-settings', [App\Http\Controllers\PresenceBoardSettingsController::class, 'update'])->name('presence.board_settings.update');
     Route::post('/presence/board-settings/statuses', [App\Http\Controllers\PresenceBoardSettingsController::class, 'updateStatuses'])->name('presence.board_settings.statuses');
     Route::post('/presence/board-settings/statuses/create', [App\Http\Controllers\PresenceBoardSettingsController::class, 'createStatus'])->name('presence.board_settings.statuses.create');
     Route::delete('/presence/board-settings/statuses/{statusOrder}', [App\Http\Controllers\PresenceBoardSettingsController::class, 'deleteStatus'])->name('presence.board_settings.statuses.delete');
+
+    Route::post('/presence/{user}', [App\Http\Controllers\UserPresenceController::class, 'update'])->name('presence.update');
 
     // 案件確認（ユーザー向け案件一覧・詳細）
     Route::get('/user/project-jobs/json', [App\Http\Controllers\User\ProjectJobController::class, 'projectsJson'])->name('user.project_jobs.json');

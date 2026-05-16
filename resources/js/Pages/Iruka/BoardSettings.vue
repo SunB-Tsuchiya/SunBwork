@@ -34,14 +34,8 @@
                     表示順の変更・ボードへの表示/非表示を設定できます。非表示にしたユーザーは在席ボードに表示されません。
                 </p>
 
-                <!-- 部署フィルター（Admin のみ） -->
+                <!-- 部署フィルター（Admin のみ・各部署のみ） -->
                 <div v-if="isAdmin && departments.length > 0" class="mb-4 flex flex-wrap gap-2">
-                    <button
-                        type="button"
-                        @click="selectedDept = null"
-                        class="rounded-full px-3 py-1 text-xs font-medium transition-colors"
-                        :class="selectedDept === null ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
-                    >全部署</button>
                     <button
                         v-for="d in departments"
                         :key="d.id"
@@ -272,13 +266,17 @@ const activeTab = ref('users');
 
 // ===== ユーザー設定 =====
 const localUsers   = ref(props.users.map(u => ({ ...u })));
-const selectedDept = ref(null);
+// 部署フィルター：全部署なし。初期値は最初の部署
+const selectedDept = ref(props.departments[0]?.id ?? null);
 const savingUsers  = ref(false);
 const savedUsers   = ref(false);
 
 const visibleUsers = computed(() => {
     if (!selectedDept.value) return localUsers.value;
-    return localUsers.value.filter(u => u.department_id === selectedDept.value);
+    // department_id が null のユーザー（部署未設定）は全タブに表示
+    return localUsers.value.filter(u =>
+        u.department_id === selectedDept.value || !u.department_id
+    );
 });
 
 function toggleUser(userId) {
