@@ -28,6 +28,9 @@ const props = defineProps({
     // when true, route names/paths for actions should use the centralized
     // diary interactions routes (diaryinteractions.*) instead of diaries.*
     useInteractionRoutes: { type: Boolean, default: false },
+    // control visibility of individual columns
+    showIdColumn: { type: Boolean, default: true },
+    showDeptColumn: { type: Boolean, default: true },
 });
 
 const emit = defineEmits(['update:selected', 'selection-change']);
@@ -305,6 +308,19 @@ function onRowClick(d, event) {
     window.location.href = path;
 }
 
+// total visible columns (used for empty-row colspan)
+const totalColumns = computed(() => {
+    if (props.compact) return 2;
+    let count = 1; // date
+    if (props.showCheckboxes) count++;
+    if (props.showIdColumn) count++; // id
+    count++; // name
+    if (props.showDeptColumn) count++; // dept
+    count++; // content
+    if (props.showReadColumn) count++;
+    return count;
+});
+
 // measure is no longer done in JS; rely on Tailwind's line-clamp utility for truncation.
 function cleanupOptimisticReads(diaries) {
     try {
@@ -370,7 +386,7 @@ watch(
                                 </span>
                             </button>
                         </th>
-                        <th v-if="!props.compact" class="w-12 px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                        <th v-if="!props.compact && props.showIdColumn" class="w-12 px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                             <button class="inline-flex items-center text-xs font-medium" @click.prevent="setSort('id')">
                                 <span>ID</span>
                                 <span v-if="sortKey === 'id'" class="ml-1 text-xs" aria-hidden>
@@ -391,7 +407,7 @@ watch(
                             </button>
                         </th>
                         <th
-                            v-if="!props.compact"
+                            v-if="!props.compact && props.showDeptColumn"
                             class="w-24 px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:w-24 md:w-32"
                         >
                             <button class="inline-flex items-center text-xs font-medium" @click.prevent="setSort('dept')">
@@ -427,9 +443,9 @@ watch(
                             <input type="checkbox" :value="d.id" v-model="selected" />
                         </td>
                         <td class="px-3 py-4 text-sm text-gray-500">{{ formatMD(d.date) }}</td>
-                        <td v-if="!props.compact" class="px-6 py-4 text-sm text-gray-500">{{ d.id }}</td>
+                        <td v-if="!props.compact && props.showIdColumn" class="px-6 py-4 text-sm text-gray-500">{{ d.id }}</td>
                         <td v-if="!props.compact" class="truncate px-6 py-4 text-sm font-medium text-gray-900">{{ d.name }}</td>
-                        <td v-if="!props.compact" class="truncate px-6 py-4 text-sm text-gray-500">{{ getDept(d) }}</td>
+                        <td v-if="!props.compact && props.showDeptColumn" class="truncate px-6 py-4 text-sm text-gray-500">{{ getDept(d) }}</td>
                         <!-- Allow single-line truncation on index view; fullContent shows full text -->
                         <td
                             :class="
@@ -463,7 +479,7 @@ watch(
                     </tr>
                     <tr v-if="filtered.length === 0">
                         <td
-                            :colspan="props.compact ? 2 : props.showCheckboxes ? (props.showReadColumn ? 7 : 6) : props.showReadColumn ? 6 : 5"
+                            :colspan="totalColumns"
                             class="px-6 py-4 text-sm text-gray-500"
                         >
                             日報はありません

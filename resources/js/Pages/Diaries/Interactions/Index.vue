@@ -3,10 +3,15 @@ import DiaryTable from '@/Components/Diaries/DiaryTable.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Inertia } from '@inertiajs/inertia';
 import { Link } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 function formatDate(d) {
     if (!d) return '不明';
+    // 月別グループキー "YYYY-MM" の場合は "YYYY年M月" として表示
+    const monthOnly = d.match(/^(\d{4})-(\d{2})$/);
+    if (monthOnly) {
+        return `${monthOnly[1]}年${parseInt(monthOnly[2])}月`;
+    }
     const dt = new Date(d);
     if (isNaN(dt.getTime())) return d;
     const y = dt.getFullYear();
@@ -38,6 +43,11 @@ const tableFilters = computed(() => {
 
 // viewMode: 'day' or 'month' — default from query (props.filters.group) or 'day'
 const viewMode = ref(props.filters && props.filters.group === 'month' ? 'month' : 'day');
+
+// 部署フィルター（null = 全部署）
+const selectedDept = ref(null);
+// ページ遷移のたびにリセット
+watch(() => props.filters, () => { selectedDept.value = null; });
 
 // 年月セレクター
 const _now = new Date();
@@ -90,10 +100,27 @@ function onPeriodChange() {
 // search query (shared across all date groups)
 const searchQuery = ref(props.filters && props.filters.q ? props.filters.q : '');
 
+// 全日記から一意な部署リストを算出
+const allDepts = computed(() => {
+    const set = new Set();
+    (props.departments || []).forEach((group) => {
+        (group.diaries || []).forEach((d) => {
+            const dept = (d.department) || (d.user && d.user.department && d.user.department.name) || '';
+            if (dept) set.add(dept);
+        });
+    });
+    return Array.from(set).sort();
+});
+
 const groupedByDate = computed(() => {
     const map = {};
     (props.departments || []).forEach((group) => {
         (group.diaries || []).forEach((d) => {
+            // 部署フィルター適用
+            if (selectedDept.value) {
+                const deptName = d.department || (d.user && d.user.department && d.user.department.name) || '';
+                if (deptName !== selectedDept.value) return;
+            }
             const raw = d.date || '不明';
             const date = viewMode.value === 'month' ? raw.slice(0, 7) : raw;
             if (!map[date]) map[date] = [];
@@ -169,6 +196,20 @@ function markReadAllRoute() {
         </template>
 
         <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
+            <!-- 部署フィルターボタン -->
+            <div v-if="allDepts.length > 0" class="mb-4 flex flex-wrap gap-2">
+                <button
+                    @click="selectedDept = null"
+                    :class="['rounded px-3 py-1 text-sm font-medium transition-colors', selectedDept === null ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200']"
+                >全部署</button>
+                <button
+                    v-for="dept in allDepts"
+                    :key="dept"
+                    @click="selectedDept = selectedDept === dept ? null : dept"
+                    :class="['rounded px-3 py-1 text-sm font-medium transition-colors', selectedDept === dept ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200']"
+                >{{ dept }}</button>
+            </div>
+
             <div class="mb-4 flex items-center justify-between">
                 <div class="flex items-center space-x-3">
                     <input
@@ -236,6 +277,8 @@ function markReadAllRoute() {
                     :showUnreadToggle="false"
                     :fullContent="props.date === date"
                     :useInteractionRoutes="true"
+                    :showIdColumn="false"
+                    :showDeptColumn="false"
                 />
             </div>
             <!-- pagination -->

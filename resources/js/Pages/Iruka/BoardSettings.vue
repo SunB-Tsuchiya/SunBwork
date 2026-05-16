@@ -274,7 +274,7 @@
 <script setup>
 import { ref, computed } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Link } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
 import { resolveStatus, COLOR_OPTIONS, STATUS_GROUPS } from '@/Components/Iruka/statusConfig.js';
 
 const props = defineProps({
@@ -381,10 +381,10 @@ async function saveUsers() {
     try {
         const items = localUsers.value.map((u, i) => ({ user_id: u.id, sort_order: i, is_hidden: u.is_hidden }));
         await window.axios.post(route('presence.board_settings.update'), { items });
-        savedUsers.value = true;
         window.dispatchEvent(new CustomEvent('iruka:refresh'));
-    } catch (_) {
-        alert('保存に失敗しました。再度お試しください。');
+        router.get(route('dashboard'));
+    } catch (e) {
+        alert(e.response?.data?.message ?? '保存に失敗しました。再度お試しください。');
     } finally {
         savingUsers.value = false;
     }
@@ -518,10 +518,10 @@ async function saveStatuses() {
             custom_color: s.custom_color ?? null,
         }));
         await window.axios.post(route('presence.board_settings.statuses'), { items });
-        savedStatuses.value = true;
         window.dispatchEvent(new CustomEvent('iruka:refresh'));
-    } catch (_) {
-        alert('保存に失敗しました。再度お試しください。');
+        router.get(route('dashboard'));
+    } catch (e) {
+        alert(e.response?.data?.message ?? '保存に失敗しました。再度お試しください。');
     } finally {
         savingStatuses.value = false;
     }
