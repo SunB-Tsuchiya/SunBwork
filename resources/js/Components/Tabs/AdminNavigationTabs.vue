@@ -24,6 +24,7 @@ function tryRoute(name) {
 }
 
 const tabs = computed(() => [
+    { key: 'dashboard', href: tryRoute('admin.dashboard'), label: 'ダッシュボード' },
     { key: 'project_jobs', href: tryRoute('admin.project_jobs.index'), label: '案件総覧' },
     {
         key: 'companies',
@@ -41,7 +42,7 @@ const tabs = computed(() => [
     { key: 'admin_permissions', href: tryRoute('admin.admin_permissions.index'), label: 'Admin権限管理', condition: isRepresentative.value },
     { key: 'leader_permissions', href: tryRoute('admin.leader_permissions.index'), label: 'Leader権限管理' },
     { key: 'meeting_definitions', href: tryRoute('admin.meeting_definitions.index'), label: '会議設定' },
-    { key: 'presence_board_settings', href: tryRoute('presence.board_settings'), label: '在席ボード管理' },
+    { key: 'presence_board_settings', href: tryRoute('admin.presence.board_settings'), label: '在席ボード管理' },
 ].filter(t => t.condition !== false && t.href));
 
 function onMobileSelect(e) {
@@ -70,6 +71,12 @@ function onMobileSelect(e) {
 
         <!-- デスクトップ: タブ -->
         <nav class="hidden sm:flex flex-wrap gap-2" aria-label="Tabs">
+            <Link
+                :href="route('admin.dashboard')"
+                :class="tab('dashboard')"
+            >
+                ダッシュボード
+            </Link>
             <Link
                 :href="route('admin.project_jobs.index')"
                 :class="tab('project_jobs')"
@@ -152,7 +159,7 @@ function onMobileSelect(e) {
                 会議設定
             </Link>
             <Link
-                :href="route('presence.board_settings')"
+                :href="route('admin.presence.board_settings')"
                 :class="tab('presence_board_settings')"
             >
                 在席ボード管理

@@ -152,61 +152,7 @@ class ProjectJobController extends Controller
         ]);
     }
 
-    public function linkProgressCell(Request $request, ProjectJob $projectJob, ProgressSheet $sheet)
-    {
-        $user = $request->user();
 
-        // アクセス確認（自分が関係する案件、またはチームメンバー）
-        $hasAccess = ProjectJobAssignment::where('project_job_id', $projectJob->id)
-            ->where(function ($q) use ($user) {
-                $q->where('user_id', $user->id)->orWhere('sender_id', $user->id);
-            })->exists()
-            || ProjectTeamMember::where('project_job_id', $projectJob->id)
-                ->where('user_id', $user->id)->exists();
-
-        if (!$hasAccess) {
-            abort(403);
-        }
-
-        $validated = $request->validate([
-            'row_id'                    => 'required|integer',
-            'col_key'                   => 'required|string',
-            'title'                     => 'required|string|max:255',
-            'desired_end_date'          => 'nullable|date',
-            'supersedes_assignment_id'  => 'nullable|exists:project_job_assignments,id',
-        ]);
-
-        // row が このシートに属することを確認
-        $allowedRowIds = ProgressRow::where('sheet_id', $sheet->id)->pluck('id')->toArray();
-        abort_unless(in_array($validated['row_id'], $allowedRowIds), 403);
-
-        $createdAssignment = null;
-        DB::transaction(function () use ($validated, $projectJob, $sheet, $user, &$createdAssignment) {
-            $assignment = ProjectJobAssignment::create([
-                'project_job_id'              => $projectJob->id,
-                'user_id'                     => $user->id,
-                'sender_id'                   => $user->id,  // 自己割当
-                'title'                       => $validated['title'],
-                'desired_end_date'            => $validated['desired_end_date'] ?? null,
-                'supersedes_assignment_id'    => $validated['supersedes_assignment_id'] ?? null,
-                'read_at'                     => now(),
-            ]);
-
-            ProgressCell::updateOrCreate(
-                ['row_id' => $validated['row_id'], 'col_key' => $validated['col_key']],
-                ['assignment_id' => $assignment->id]
-            );
-
-            $createdAssignment = $assignment;
-        });
-
-        // 進行管理表からのジョブ登録通知（リーダー・副リーダーへ）
-        if ($createdAssignment) {
-            \App\Services\JobNotificationService::notifyProgressRegistered($user, $projectJob, $createdAssignment);
-        }
-
-        return back()->with('success', 'マイジョブとして登録しました。');
-    }
 
     public function show(Request $request, ProjectJob $projectJob)
     {

@@ -93,6 +93,21 @@ class HandleInertiaRequests extends Middleware
                 'leaderPermissions' => $request->user()?->isLeader()
                     ? LeaderPermission::where('user_id', $request->user()->id)->first()
                     : null,
+                // スクリプトツールへのアクセス権
+                'canAccessScripts' => (function () use ($request) {
+                    $user = $request->user();
+                    if (! $user) {
+                        return false;
+                    }
+                    if (in_array($user->user_role, ['superadmin', 'admin'])) {
+                        return true;
+                    }
+                    if ($user->user_role === 'leader') {
+                        return (bool) (LeaderPermission::where('user_id', $user->id)->value('script_access') ?? false);
+                    }
+
+                    return false;
+                })(),
                 // 校正チームメンバーフラグ
                 'isProofMember' => $request->user()
                     ? ProofTeamMember::where('user_id', $request->user()->id)->exists()

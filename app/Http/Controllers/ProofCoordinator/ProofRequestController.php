@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\ProofCoordinator;
 
 use App\Http\Controllers\Controller;
+use App\Models\Department;
 use App\Models\Event;
 use App\Models\ProofRequest;
 use App\Models\ProofSchedule;
@@ -26,6 +27,33 @@ class ProofRequestController extends Controller
     // =====================================================
     //  管理者向け（ProofCoordinator / Admin / SuperAdmin / 部署Leader）
     // =====================================================
+
+    /**
+     * GET /proof-coordinator/dashboard
+     * ダッシュボード（在席ボード表示）
+     */
+    public function dashboard(): Response
+    {
+        $user = Auth::user();
+
+        $departments = [];
+        try {
+            $departments = Department::where('company_id', $user->company_id)
+                ->orderBy('sort_order')
+                ->get(['id', 'name'])
+                ->toArray();
+        } catch (\Throwable $e) {
+            Log::error('ProofCoordinator dashboard departments error: ' . $e->getMessage());
+        }
+
+        $pendingCount = ProofRequest::pending()->count();
+
+        return Inertia::render('ProofCoordinator/Dashboard', [
+            'user'         => $user,
+            'departments'  => $departments,
+            'pendingCount' => $pendingCount,
+        ]);
+    }
 
     /**
      * GET /proof-coordinator/inbox

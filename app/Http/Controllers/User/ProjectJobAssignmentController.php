@@ -47,6 +47,7 @@ class ProjectJobAssignmentController extends Controller
             'assignments.*.supersedes_assignment_id' => 'nullable|exists:project_job_assignments,id',
             'assignments.*.file_info' => 'nullable',
             'assignments.*._progress_sheet_id' => 'nullable|integer',
+            'assignments.*._workflow_sheet_id' => 'nullable|integer',
             'assignments.*._row_id' => 'nullable|integer',
             'assignments.*._col_key' => 'nullable|string|max:64',
         ]);
@@ -119,7 +120,7 @@ class ProjectJobAssignmentController extends Controller
                 }
 
                 // 進行表セルリンク: _row_id と _col_key が渡された場合（_progress_sheet_id は任意）
-                if (!empty($a['_row_id']) && !empty($a['_col_key'])) {
+                if (!empty($a['_row_id']) && !empty($a['_col_key']) && empty($a['_workflow_sheet_id'])) {
                     try {
                         ProgressCell::updateOrCreate(
                             ['row_id' => (int)$a['_row_id'], 'col_key' => (string)$a['_col_key']],
@@ -141,6 +142,26 @@ class ProjectJobAssignmentController extends Controller
                     } catch (\Throwable $__eNotify) {
                         \Illuminate\Support\Facades\Log::warning('Failed to send progress registration notification', [
                             'error' => $__eNotify->getMessage(),
+                        ]);
+                    }
+                }
+
+                // 管理シートセルリンク: _workflow_sheet_id / _row_id / _col_key が渡された場合
+                if (!empty($a['_workflow_sheet_id']) && !empty($a['_row_id']) && !empty($a['_col_key'])) {
+                    try {
+                        \App\Models\WorkflowCell::updateOrCreate(
+                            ['row_id' => (int) $a['_row_id'], 'stage_key' => (string) $a['_col_key']],
+                            [
+                                'assignment_id'    => $assignment->id,
+                                'value_user_id'    => $assignment->user_id ?: null,
+                                'assigned_user_id' => $assignment->user_id ?: null,
+                            ]
+                        );
+                    } catch (\Throwable $__eWfCellLink) {
+                        \Illuminate\Support\Facades\Log::warning('Failed to link WorkflowCell after user assignment', [
+                            'error' => $__eWfCellLink->getMessage(),
+                            'row_id' => $a['_row_id'],
+                            'col_key' => $a['_col_key'],
                         ]);
                     }
                 }
@@ -296,7 +317,21 @@ class ProjectJobAssignmentController extends Controller
             });
         }
 
-        // Redirect to calendar after creation
+        // 管理シート経由なら管理シートへ、それ以外はカレンダーへ
+        $workflowSheetId = null;
+        foreach ($data['assignments'] as $a) {
+            if (!empty($a['_workflow_sheet_id'])) {
+                $workflowSheetId = (int) $a['_workflow_sheet_id'];
+                break;
+            }
+        }
+        if ($workflowSheetId) {
+            try {
+                return redirect()->route('coordinator.workflow_sheets.show', ['sheet' => $workflowSheetId]);
+            } catch (\Throwable $__e) {
+                // fall through to calendar
+            }
+        }
         try {
             return redirect()->route('calendar.index');
         } catch (\Exception $e) {

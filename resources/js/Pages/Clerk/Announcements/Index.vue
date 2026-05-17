@@ -1,6 +1,5 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
-import ClerkNavigationTabs from '@/Components/Tabs/ClerkNavigationTabs.vue';
 import { Link, router } from '@inertiajs/vue3';
 
 defineProps({
@@ -25,8 +24,6 @@ const goToShow = (id) => {
         </template>
 
         <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
-            <ClerkNavigationTabs active="announcements" />
-
             <div class="mb-4 flex justify-end">
                 <Link
                     :href="route('clerk.announcements.create')"

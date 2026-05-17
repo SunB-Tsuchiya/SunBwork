@@ -11,16 +11,72 @@
         <span class="cursor-grab text-gray-400">⠿</span>
 
         <!-- ラベル編集：type に応じてinput / selectを切り替え（全ノード共通） -->
-        <!-- ステージ型 -->
-        <select
-          v-if="node.type === 'stage'"
-          v-model="node.label"
-          class="flex-1 rounded border border-indigo-300 bg-indigo-50 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none"
-          @change="emit('change', nodes)"
-        >
-          <option value="">— ステージを選択 —</option>
-          <option v-for="s in labelSelectOptions(node)" :key="s.id" :value="s.name">{{ s.name }}</option>
-        </select>
+        <!-- 項目型（管理シート用） -->
+        <template v-if="node.type === 'item'">
+          <button
+            v-if="props.itemEntries.length > 0"
+            type="button"
+            class="rounded border border-gray-300 px-1.5 py-0.5 text-xs text-gray-500 hover:bg-gray-50 whitespace-nowrap"
+            :title="itemModes.get(node.key) === 'text' ? '項目リストから選択' : '手入力に切替'"
+            @click="toggleItemMode(node.key)"
+          >{{ itemModes.get(node.key) === 'text' ? '📋' : '✏️' }}</button>
+          <select
+            v-if="itemModes.get(node.key) !== 'text' && props.itemEntries.length > 0"
+            v-model="node.label"
+            class="flex-1 rounded border border-indigo-300 bg-indigo-50 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none"
+            @change="emit('change', nodes)"
+          >
+            <option value="">— 項目を選択 —</option>
+            <option v-for="e in props.itemEntries" :key="e.id" :value="e.name">{{ e.name }}</option>
+          </select>
+          <input
+            v-else
+            v-model="node.label"
+            type="text"
+            class="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none"
+            placeholder="項目名"
+            @input="emit('change', nodes)"
+          />
+        </template>
+        <!-- ステージ型（左：項目入力, 右：ステージ選択） -->
+        <template v-else-if="node.type === 'stage'">
+          <!-- 項目入力（左） -->
+          <button
+            v-if="props.itemEntries.length > 0"
+            type="button"
+            class="rounded border border-gray-300 px-1.5 py-0.5 text-xs text-gray-500 hover:bg-gray-50 whitespace-nowrap"
+            :title="stageItemModes.get(node.key) === 'text' ? '項目リストから選択' : '手入力に切替'"
+            @click="toggleStageItemMode(node.key)"
+          >{{ stageItemModes.get(node.key) === 'text' ? '📋' : '✏️' }}</button>
+          <select
+            v-if="stageItemModes.get(node.key) !== 'text' && props.itemEntries.length > 0"
+            v-model="node.item_label"
+            class="rounded border border-blue-300 bg-blue-50 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
+            style="max-width:130px"
+            @change="emit('change', nodes)"
+          >
+            <option value="">— 項目選択 —</option>
+            <option v-for="e in props.itemEntries" :key="e.id" :value="e.name">{{ e.name }}</option>
+          </select>
+          <input
+            v-else
+            v-model="node.item_label"
+            type="text"
+            class="rounded border border-blue-200 px-2 py-1 text-sm focus:border-blue-400 focus:outline-none"
+            style="max-width:130px"
+            placeholder="項目名（任意）"
+            @input="emit('change', nodes)"
+          />
+          <!-- ステージ選択（右） -->
+          <select
+            v-model="node.label"
+            class="flex-1 rounded border border-indigo-300 bg-indigo-50 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none"
+            @change="emit('change', nodes)"
+          >
+            <option value="">— ステージを選択 —</option>
+            <option v-for="s in labelSelectOptions(node)" :key="s.id" :value="s.name">{{ s.name }}</option>
+          </select>
+        </template>
         <!-- サイズ型 -->
         <select
           v-else-if="node.type === 'size'"
@@ -59,7 +115,7 @@
             </optgroup>
           </template>
         </select>
-        <!-- それ以外（text / date / checkbox / user / worktime / joblink / group[legacy]） -->
+        <!-- それ以外（text / date / bool / checkbox / user / worktime / joblink / worker / coordinator / proof_v2 / group[legacy]） -->
         <input
           v-else
           v-model="node.label"
@@ -75,13 +131,16 @@
           class="rounded border border-gray-300 px-1 py-1 text-xs focus:border-indigo-400 focus:outline-none"
           @change="setNodeType(node, $event.target.value)"
         >
+          <option value="item">項目</option>
           <option value="stage">ステージ</option>
           <option value="worker">組版担当</option>
+          <option value="coordinator">進行担当</option>
           <option value="proof_v2">校正担当</option>
           <option value="schedlink">スケジュール連携</option>
           <option value="workItemType">作業種別</option>
           <option value="date">日付</option>
-          <option value="checkbox">チェック</option>
+          <option value="bool">チェック</option>
+          <option value="checkbox">チェック(旧)</option>
           <option value="text">自由入力</option>
         </select>
         <!-- グループ（子あり）インジケーター -->
@@ -155,6 +214,7 @@
           :sizes="sizes"
           :assignments="assignments"
           :work-item-types="workItemTypes"
+          :item-entries="itemEntries"
           @change="(updated) => { node.children = updated.slice(); emit('change', nodes); }"
         />
       </div>
@@ -177,11 +237,21 @@
       >
         ＋ 組版＋校正セット
       </button>
+      <button
+        type="button"
+        class="flex flex-1 items-center justify-center rounded border border-dashed border-blue-300 py-1.5 text-sm text-blue-600 hover:border-blue-500 hover:bg-blue-50"
+        title="項目＋ステージ＋組版・校正のセットを追加"
+        @click="addItemStagePreset"
+      >
+        ＋ 項目＋ステージ
+      </button>
     </div>
   </div>
 </template>
 
 <script setup>
+import { reactive } from 'vue';
+
 function genKey() {
   return crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
 }
@@ -190,11 +260,26 @@ const props = defineProps({
     type: Array,
     required: true,
   },
-  stages: { type: Array, default: () => [] },
-  sizes:  { type: Array, default: () => [] },
-  assignments: { type: Array, default: () => [] },
+  stages:        { type: Array, default: () => [] },
+  sizes:         { type: Array, default: () => [] },
+  assignments:   { type: Array, default: () => [] },
   workItemTypes: { type: Array, default: () => [] },
+  itemEntries:   { type: Array, default: () => [] },
 });
+
+// item タイプのラベルモード管理（select: 項目リストから / text: 手入力）
+const itemModes = reactive(new Map());
+function toggleItemMode(key) {
+  const cur = itemModes.get(key) ?? 'select';
+  itemModes.set(key, cur === 'select' ? 'text' : 'select');
+}
+
+// stage タイプの item_label モード管理（select / text）
+const stageItemModes = reactive(new Map());
+function toggleStageItemMode(key) {
+  const cur = stageItemModes.get(key) ?? 'select';
+  stageItemModes.set(key, cur === 'select' ? 'text' : 'select');
+}
 
 const emit = defineEmits(['change']);
 
@@ -237,12 +322,15 @@ function workItemTypesGrouped() {
 }
 
 const TYPE_DEFAULT_LABELS = {
+  item: '',
   date: '日付',
+  bool: 'チェック',
   checkbox: 'チェック',
   user: '担当者',
   worktime: '作業時間',
   joblink: '登録',
   worker: '担当',
+  coordinator: '進行',
   proof_v2: '校正',
   schedlink: '予定',
 };
@@ -312,6 +400,7 @@ function moveDown(idx) {
 // ── グループ複製（全子孫を含む深いコピー・キーは新規発行）──
 function cloneNode(node) {
   const cloned = { key: genKey(), label: node.label, type: node.type };
+  if (node.item_label) cloned.item_label = node.item_label;
   if (node.children && node.children.length > 0) {
     cloned.children = node.children.map(cloneNode);
   }
@@ -321,6 +410,20 @@ function cloneNode(node) {
 function duplicateNode(idx) {
   const clone = cloneNode(props.nodes[idx]);
   props.nodes.splice(idx + 1, 0, clone);
+  emit('change', props.nodes);
+}
+
+function addItemStagePreset() {
+  props.nodes.push({
+    key: genKey(),
+    label: '',
+    item_label: '',
+    type: 'stage',
+    children: [
+      { key: genKey(), label: '組版', type: 'worker' },
+      { key: genKey(), label: '校正', type: 'proof_v2' },
+    ],
+  });
   emit('change', props.nodes);
 }
 

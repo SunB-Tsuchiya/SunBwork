@@ -20,6 +20,7 @@ function tryRoute(name) {
 }
 
 const tabs = computed(() => [
+    { key: 'dashboard', href: tryRoute('proof_coordinator.dashboard'), label: 'ダッシュボード' },
     {
         key: 'inbox',
         href: tryRoute('proof_coordinator.inbox'),
@@ -58,6 +59,9 @@ function onMobileSelect(e) {
 
         <!-- デスクトップ: タブ -->
         <nav class="hidden sm:flex flex-wrap gap-2" aria-label="Tabs">
+            <Link :href="route('proof_coordinator.dashboard')" :class="tab('dashboard')">
+                ダッシュボード
+            </Link>
             <Link :href="route('proof_coordinator.inbox')" :class="tab('inbox')" class="relative">
                 校正依頼受信
                 <span

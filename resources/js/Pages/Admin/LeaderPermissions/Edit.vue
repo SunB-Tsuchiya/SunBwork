@@ -21,6 +21,7 @@ const permItems = [
     { key: 'dispatch_management',    label: '派遣管理' },
     { key: 'user_management',        label: 'ユーザー管理（部署リーダーのみ有効）' },
     { key: 'project_job_overview',   label: '案件総覧（部署リーダーのみ有効）' },
+    { key: 'script_access',          label: 'スクリプトツール' },
 ];
 
 const form = useForm({
@@ -32,6 +33,7 @@ const form = useForm({
     dispatch_management:    props.permissions.dispatch_management,
     user_management:        props.permissions.user_management,
     project_job_overview:   props.permissions.project_job_overview,
+    script_access:          props.permissions.script_access,
 });
 
 const submit = () => {

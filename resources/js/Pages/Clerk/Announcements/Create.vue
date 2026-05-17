@@ -1,6 +1,6 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
-import ClerkNavigationTabs from '@/Components/Tabs/ClerkNavigationTabs.vue';
+
 import { router } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 
@@ -80,8 +80,6 @@ const submit = () => {
         </template>
 
         <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
-            <ClerkNavigationTabs active="announcements" />
-
             <form @submit.prevent="submit" class="mx-auto max-w-2xl space-y-6">
                 <!-- 宛先 -->
                 <div>

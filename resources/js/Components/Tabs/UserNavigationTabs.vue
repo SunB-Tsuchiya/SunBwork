@@ -22,6 +22,7 @@ function tryRoute(name) {
 }
 
 const tabs = computed(() => [
+    { key: 'dashboard', href: tryRoute('user.dashboard'), label: 'ダッシュボード' },
     { key: 'project_jobs', href: tryRoute('user.project_jobs.index'), label: '案件確認' },
     { key: 'myjob', href: tryRoute('user.myjobbox.index'), label: 'マイジョブBOX' },
     { key: 'jobbox', href: tryRoute('user.jobbox.index'), label: '依頼されたジョブ' },
@@ -58,6 +59,9 @@ function onMobileSelect(e) {
 
         <!-- デスクトップ: タブ -->
         <nav class="hidden sm:flex flex-wrap gap-2" aria-label="Tabs">
+            <Link :href="route('user.dashboard')" :class="tab('dashboard')">
+                ダッシュボード
+            </Link>
             <Link :href="route('user.project_jobs.index')" :class="tab('project_jobs')">
                 案件確認
             </Link>

@@ -1,6 +1,6 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
-import ClerkNavigationTabs from '@/Components/Tabs/ClerkNavigationTabs.vue';
+
 import { Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
@@ -35,8 +35,6 @@ const readRate = computed(() => {
         </template>
 
         <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
-            <ClerkNavigationTabs active="announcements" />
-
             <div class="mb-4">
                 <Link :href="route('clerk.announcements.index')" class="text-sm text-gray-500 hover:text-gray-700">
                     ← 送信済み一覧に戻る

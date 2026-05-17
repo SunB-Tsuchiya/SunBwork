@@ -19,6 +19,7 @@ class WorkflowRowController extends Controller
             'label'         => 'required|string|max:255',
             'item_entry_id' => 'nullable|integer|exists:project_item_entries,id',
             'parent_id'     => 'nullable|integer|exists:workflow_rows,id',
+            'stage_id'      => 'nullable|integer|exists:stages,id',
         ]);
 
         $row = WorkflowRow::create([
@@ -27,6 +28,7 @@ class WorkflowRowController extends Controller
             'label'         => $validated['label'],
             'sort_order'    => WorkflowRow::where('sheet_id', $sheet->id)->max('sort_order') + 1,
             'item_entry_id' => $validated['item_entry_id'] ?? null,
+            'stage_id'      => $validated['stage_id'] ?? null,
         ]);
 
         return response()->json(['row' => $this->formatRow($row)]);
@@ -69,7 +71,8 @@ class WorkflowRowController extends Controller
         abort_unless($row->sheet_id === $sheet->id, 404);
 
         $validated = $request->validate([
-            'label' => 'required|string|max:255',
+            'label'    => 'sometimes|string|max:255',
+            'stage_id' => 'sometimes|nullable|integer|exists:stages,id',
         ]);
 
         $row->update($validated);

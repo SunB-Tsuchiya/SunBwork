@@ -37,6 +37,14 @@ function getProgressSheetListLink() {
     }
 }
 
+function getWorkflowSheetListLink() {
+    try {
+        return route('coordinator.workflow_sheet_list.index');
+    } catch (e) {
+        return '/coordinator/workflow-sheet-list';
+    }
+}
+
 function getProgressReportLink() {
     try {
         return route('coordinator.progress_report.index');
@@ -62,12 +70,14 @@ function getGhostUsersLink() {
 }
 
 const tabs = computed(() => [
+    { key: 'dashboard', href: route('coordinator.dashboard'), label: 'ダッシュボード' },
     { key: 'clients', href: route('coordinator.clients.index'), label: 'クライアント管理' },
     { key: 'subcontractors', href: route('coordinator.subcontractors.index'), label: '外注先管理' },
     { key: 'projects', href: getAssignmentsLink(), label: '案件一覧' },
     { key: 'jobs', href: getJobboxLink(), label: 'ジョブ一覧' },
     { key: 'calendar', href: getCalendarLink(), label: '案件カレンダー' },
     { key: 'progress_sheet_list', href: getProgressSheetListLink(), label: '進行表一覧' },
+    { key: 'workflow_sheet_list', href: getWorkflowSheetListLink(), label: '管理シート一覧' },
     { key: 'progress_report', href: getProgressReportLink(), label: '進行レポート' },
     { key: 'settings', href: getSettingsLink(), label: '設定' },
     { key: 'ghost_users', href: getGhostUsersLink(), label: 'テストユーザー' },
@@ -99,12 +109,14 @@ function onMobileSelect(e) {
 
         <!-- デスクトップ: タブ -->
         <nav class="hidden sm:flex flex-wrap gap-2" aria-label="Tabs">
+            <Link :href="route('coordinator.dashboard')" :class="tab('dashboard')"> ダッシュボード </Link>
             <Link :href="route('coordinator.clients.index')" :class="tab('clients')"> クライアント管理 </Link>
             <Link :href="route('coordinator.subcontractors.index')" :class="tab('subcontractors')"> 外注先管理 </Link>
             <Link :href="getAssignmentsLink()" :class="tab('projects')"> 案件一覧 </Link>
             <Link :href="getJobboxLink()" :class="tab('jobs')"> ジョブ一覧 </Link>
             <Link :href="getCalendarLink()" :class="tab('calendar')"> 案件カレンダー </Link>
             <Link :href="getProgressSheetListLink()" :class="tab('progress_sheet_list')"> 進行表一覧 </Link>
+            <Link :href="getWorkflowSheetListLink()" :class="tab('workflow_sheet_list')"> 管理シート一覧 </Link>
             <Link :href="getProgressReportLink()" :class="tab('progress_report')"> 進行レポート </Link>
             <Link :href="getSettingsLink()" :class="tab('settings')"> 設定 </Link>
             <Link :href="getGhostUsersLink()" :class="tab('ghost_users')"> テストユーザー </Link>

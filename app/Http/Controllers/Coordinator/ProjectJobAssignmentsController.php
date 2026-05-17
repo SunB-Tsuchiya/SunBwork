@@ -189,8 +189,9 @@ class ProjectJobAssignmentsController extends Controller
         $prefillWorkItemTypeId = $request->query('work_item_type_id');
         $prefillUserId = $request->query('user_id') ? (int) $request->query('user_id') : null;
         // 進行管理表セルリンク用（joblink登録後に assignment_id を紐付ける）
-        $prefillProgressSheetId = $request->query('progress_sheet_id') ? (int) $request->query('progress_sheet_id') : null;
-        $prefillRowId = $request->query('row_id') ? (int) $request->query('row_id') : null;
+        $prefillProgressSheetId  = $request->query('progress_sheet_id')  ? (int) $request->query('progress_sheet_id')  : null;
+        $prefillWorkflowSheetId  = $request->query('workflow_sheet_id')  ? (int) $request->query('workflow_sheet_id')  : null;
+        $prefillRowId  = $request->query('row_id')  ? (int) $request->query('row_id')  : null;
         $prefillColKey = $request->query('col_key');
         // send available team members for selection (exclude self for normal jobs)
         $selfId  = Auth::id();
@@ -287,8 +288,9 @@ class ProjectJobAssignmentsController extends Controller
             'prefill_size_id' => $prefillSizeId,
             'prefill_work_item_type_id' => $prefillWorkItemTypeId,
             'prefill_user_id' => $prefillUserId,
-            'prefill_progress_sheet_id' => $prefillProgressSheetId,
-            'prefill_row_id' => $prefillRowId,
+            'prefill_progress_sheet_id'  => $prefillProgressSheetId,
+            'prefill_workflow_sheet_id'  => $prefillWorkflowSheetId,
+            'prefill_row_id'  => $prefillRowId,
             'prefill_col_key' => $prefillColKey,
             'types' => $types,
             'sizes' => $sizes,
@@ -790,9 +792,10 @@ class ProjectJobAssignmentsController extends Controller
             'assignments.*.sender_id' => 'nullable|exists:users,id',
             'assignments.*.title' => 'nullable|string|max:255',
             'assignments.*.description' => 'nullable|string',
-            'assignments.*._progress_sheet_id' => 'nullable|integer',
-            'assignments.*._row_id' => 'nullable|integer',
-            'assignments.*._col_key' => 'nullable|string|max:64',
+            'assignments.*._progress_sheet_id'  => 'nullable|integer',
+            'assignments.*._workflow_sheet_id'  => 'nullable|integer',
+            'assignments.*._row_id'   => 'nullable|integer',
+            'assignments.*._col_key'  => 'nullable|string|max:64',
             'assignments.*.file_info' => 'nullable|string',
         ]);
 
@@ -962,6 +965,26 @@ class ProjectJobAssignmentsController extends Controller
                     }
                 }
 
+                // 管理シートセルリンク: _workflow_sheet_id / _row_id / _col_key が渡された場合
+                if (!empty($a['_workflow_sheet_id']) && !empty($a['_row_id']) && !empty($a['_col_key'])) {
+                    try {
+                        \App\Models\WorkflowCell::updateOrCreate(
+                            ['row_id' => (int) $a['_row_id'], 'stage_key' => (string) $a['_col_key']],
+                            [
+                                'assignment_id'    => $assignment->id,
+                                'value_user_id'    => $assignment->user_id ?: null,
+                                'assigned_user_id' => $assignment->user_id ?: null,
+                            ]
+                        );
+                    } catch (\Throwable $__eWfCellLink) {
+                        \Illuminate\Support\Facades\Log::warning('Failed to link WorkflowCell after coordinator assignment', [
+                            'error'   => $__eWfCellLink->getMessage(),
+                            'row_id'  => $a['_row_id'],
+                            'col_key' => $a['_col_key'],
+                        ]);
+                    }
+                }
+
                 // previously we created a separate WorkItem here; now assignment stores type/size/stage/status/company/department directly
                 // No-op for WorkItem creation - clients should send lookup ids on assignment payload instead.
             });
@@ -969,14 +992,16 @@ class ProjectJobAssignmentsController extends Controller
 
         // 進行表から発信した場合は進行表に戻る
         $progressSheetId = null;
+        $workflowSheetId = null;
         foreach ($data['assignments'] as $a) {
-            if (!empty($a['_progress_sheet_id'])) {
-                $progressSheetId = (int) $a['_progress_sheet_id'];
-                break;
-            }
+            if (!empty($a['_progress_sheet_id']))  { $progressSheetId = (int) $a['_progress_sheet_id'];  break; }
+            if (!empty($a['_workflow_sheet_id']))   { $workflowSheetId = (int) $a['_workflow_sheet_id'];  break; }
         }
         if ($progressSheetId) {
             return redirect()->route('coordinator.progress_sheets.show', ['sheet' => $progressSheetId]);
+        }
+        if ($workflowSheetId) {
+            return redirect()->route('coordinator.workflow_sheets.show', ['sheet' => $workflowSheetId]);
         }
 
         return redirect()->route('coordinator.project_jobs.assignments.index', ['projectJob' => $projectJob->id]);

@@ -143,8 +143,9 @@ const props = defineProps({
     prefill_size_id: { type: [String, Number], default: null },
     prefill_work_item_type_id: { type: [String, Number], default: null },
     prefill_user_id: { type: [String, Number], default: null },
-    prefill_progress_sheet_id: { type: [String, Number], default: null },
-    prefill_row_id: { type: [String, Number], default: null },
+    prefill_progress_sheet_id:  { type: [String, Number], default: null },
+    prefill_workflow_sheet_id:  { type: [String, Number], default: null },
+    prefill_row_id:  { type: [String, Number], default: null },
     prefill_col_key: { type: String, default: null },
 });
 const projectJob = props.projectJob;
@@ -168,7 +169,8 @@ const formAssignments = ref(
           _locked_work_item_type: !!props.prefill_work_item_type_id,
           _locked_user: !!props.prefill_user_id,
           _progress_sheet_id: props.prefill_progress_sheet_id ?? null,
-          _row_id: props.prefill_row_id ?? null,
+          _workflow_sheet_id: props.prefill_workflow_sheet_id ?? null,
+          _row_id:  props.prefill_row_id  ?? null,
           _col_key: props.prefill_col_key ?? null,
         }]
       : []

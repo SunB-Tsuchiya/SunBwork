@@ -3,7 +3,7 @@
         <template #header>
             <div class="flex items-center gap-3">
                 <Link
-                    :href="route('dashboard')"
+                    :href="route(c.backRoute)"
                     class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
                 >← ダッシュボードに戻る</Link>
                 <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">🐬 在席ボード管理</h2>
@@ -17,13 +17,13 @@
                 <button
                     type="button"
                     class="pb-3 text-sm font-medium border-b-2 transition-colors -mb-px"
-                    :class="activeTab === 'users' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+                    :class="activeTab === 'users' ? c.tab : c.tabInactive"
                     @click="activeTab = 'users'"
                 >ユーザー設定</button>
                 <button
                     type="button"
                     class="pb-3 text-sm font-medium border-b-2 transition-colors -mb-px"
-                    :class="activeTab === 'statuses' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+                    :class="activeTab === 'statuses' ? c.tab : c.tabInactive"
                     @click="activeTab = 'statuses'"
                 >ステータス設定</button>
             </div>
@@ -42,7 +42,7 @@
                         type="button"
                         @click="selectedDept = d.id"
                         class="rounded-full px-3 py-1 text-xs font-medium transition-colors"
-                        :class="selectedDept === d.id ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                        :class="selectedDept === d.id ? c.deptActive : c.deptInactive"
                     >{{ d.name }}</button>
                 </div>
 
@@ -83,7 +83,7 @@
                                 <td class="py-1.5 w-16 text-center">
                                     <button type="button"
                                         class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
-                                        :class="item.is_hidden ? 'bg-gray-300' : 'bg-blue-500'"
+                                        :class="item.is_hidden ? 'bg-gray-300' : c.toggle"
                                         @click="toggleUser(item.id)"
                                     >
                                         <span class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200" :class="item.is_hidden ? 'translate-x-0' : 'translate-x-4'" />
@@ -96,8 +96,8 @@
 
                 <div class="mt-6 flex items-center justify-end gap-3">
                     <span v-if="savedUsers" class="mr-auto text-sm text-green-600">✓ 保存しました</span>
-                    <Link :href="route('dashboard')" class="rounded bg-gray-100 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200">キャンセル</Link>
-                    <button type="button" class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50" :disabled="savingUsers" @click="saveUsers">
+                    <Link :href="route(c.backRoute)" class="rounded bg-gray-100 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200">キャンセル</Link>
+                    <button type="button" class="rounded px-4 py-2 text-sm font-medium text-white disabled:opacity-50" :class="c.saveBtn" :disabled="savingUsers" @click="saveUsers">
                         {{ savingUsers ? '保存中…' : '保存する' }}
                     </button>
                 </div>
@@ -246,7 +246,7 @@
                 <div class="mt-6 flex items-center justify-end gap-3">
                     <span v-if="savedStatuses" class="mr-auto text-sm text-green-600">✓ 保存しました</span>
                     <button type="button" class="rounded bg-gray-100 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200" @click="activeTab = 'users'">キャンセル</button>
-                    <button type="button" class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50" :disabled="savingStatuses" @click="saveStatuses">
+                    <button type="button" class="rounded px-4 py-2 text-sm font-medium text-white disabled:opacity-50" :class="c.saveBtn" :disabled="savingStatuses" @click="saveStatuses">
                         {{ savingStatuses ? '保存中…' : '保存する' }}
                     </button>
                 </div>
@@ -267,7 +267,41 @@ const props = defineProps({
     departments:  { type: Array,   default: () => [] },
     isAdmin:      { type: Boolean, default: false },
     statusOrders: { type: Array,   default: () => [] },
+    context:      { type: String,  default: 'admin' }, // 'admin' | 'leader' (フォールバック用)
 });
+
+// コンテキスト別カラー
+const colorMap = {
+    admin:  {
+        tab:         'border-red-500 text-red-600',
+        tabInactive: 'border-transparent text-gray-500 hover:text-gray-700',
+        deptActive:  'bg-red-500 text-white',
+        deptInactive:'bg-gray-100 text-gray-600 hover:bg-gray-200',
+        toggle:      'bg-red-500',
+        saveBtn:     'bg-red-600 hover:bg-red-700',
+        backRoute:   'admin.dashboard',
+    },
+    leader: {
+        tab:         'border-orange-500 text-orange-600',
+        tabInactive: 'border-transparent text-gray-500 hover:text-gray-700',
+        deptActive:  'bg-orange-500 text-white',
+        deptInactive:'bg-gray-100 text-gray-600 hover:bg-gray-200',
+        toggle:      'bg-orange-500',
+        saveBtn:     'bg-orange-600 hover:bg-orange-700',
+        backRoute:   'leader.dashboard',
+    },
+};
+
+// クライアント側のルート名から確実にコンテキストを判定（サーバー props のフォールバックとして props.context を使用）
+const effectiveContext = computed(() => {
+    try {
+        const r = route().current() ?? '';
+        if (r.startsWith('leader.')) return 'leader';
+        if (r.startsWith('admin.') || r.startsWith('superadmin.')) return 'admin';
+    } catch { /* ignore */ }
+    return props.context ?? 'admin';
+});
+const c = computed(() => colorMap[effectiveContext.value] ?? colorMap.admin);
 
 // ===== タブ =====
 const activeTab = ref('users');

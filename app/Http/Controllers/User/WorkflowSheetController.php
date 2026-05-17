@@ -67,9 +67,9 @@ class WorkflowSheetController extends Controller
 
         return Inertia::render('User/WorkflowSheets/Show', [
             'sheet' => [
-                'id'           => $sheet->id,
-                'name'         => $sheet->name,
-                'stage_config' => $sheet->stage_config,
+                'id'            => $sheet->id,
+                'name'          => $sheet->name,
+                'column_config' => $sheet->getEffectiveColumnConfig(),
             ],
             'rows'             => $rows,
             'cells'            => $cells,

@@ -25,6 +25,7 @@ function tryRoute(name) {
 }
 
 const tabs = computed(() => [
+    { key: 'dashboard', href: tryRoute('leader.dashboard'), label: 'ダッシュボード' },
     { key: 'user_management', href: tryRoute('leader.user_management.index'), label: 'ユーザー管理', condition: isDepartmentLeader.value },
     {
         key: 'project_jobs',
@@ -41,7 +42,7 @@ const tabs = computed(() => [
     { key: 'dispatch', href: tryRoute('leader.dispatch_management.index'), label: '派遣管理', condition: can('dispatch_management') },
     { key: 'leader_permissions', href: tryRoute('leader.leader_permissions.index'), label: 'Leader権限管理' },
     { key: 'meeting_definitions', href: tryRoute('leader.meeting_definitions.index'), label: '会議設定' },
-    { key: 'presence_board_settings', href: tryRoute('presence.board_settings'), label: '在席ボード管理' },
+    { key: 'presence_board_settings', href: tryRoute('leader.presence.board_settings'), label: '在席ボード管理' },
 ].filter(t => t.condition !== false && t.href));
 
 function onMobileSelect(e) {
@@ -70,6 +71,9 @@ function onMobileSelect(e) {
 
         <!-- デスクトップ: タブ -->
         <nav class="hidden sm:flex flex-wrap gap-2" aria-label="Tabs">
+            <Link :href="route('leader.dashboard')" :class="tab('dashboard')">
+                ダッシュボード
+            </Link>
             <Link
                 v-if="isDepartmentLeader"
                 :href="route('leader.user_management.index')"
@@ -145,7 +149,7 @@ function onMobileSelect(e) {
                 会議設定
             </Link>
             <Link
-                :href="route('presence.board_settings')"
+                :href="route('leader.presence.board_settings')"
                 :class="tab('presence_board_settings')"
             >
                 在席ボード管理

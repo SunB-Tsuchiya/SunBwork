@@ -1072,6 +1072,7 @@ function normalizeAssignment(a) {
             _locked_work_item_type: a._locked_work_item_type || false,
             _locked_user: a._locked_user || false,
             _progress_sheet_id: a._progress_sheet_id ?? null,
+            _workflow_sheet_id: a._workflow_sheet_id ?? null,
             _row_id: a._row_id ?? null,
             _col_key: a._col_key ?? null,
             file_info: a.file_info ?? null,
@@ -1125,6 +1126,7 @@ function normalizeAssignment(a) {
             _locked_work_item_type: a._locked_work_item_type || false,
             _locked_user: a._locked_user || false,
             _progress_sheet_id: a._progress_sheet_id ?? null,
+            _workflow_sheet_id: a._workflow_sheet_id ?? null,
             _row_id: a._row_id ?? null,
             _col_key: a._col_key ?? null,
         };
@@ -2228,7 +2230,8 @@ async function save(sendImmediately = true) {
                     amounts_unit: a.amounts_unit || 'page',
                     file_info: a.file_info ? JSON.stringify(a.file_info) : null,
                     _progress_sheet_id: a._progress_sheet_id ?? null,
-                    _row_id: a._row_id ?? null,
+                    _workflow_sheet_id: a._workflow_sheet_id ?? null,
+                    _row_id:  a._row_id  ?? null,
                     _col_key: a._col_key ?? null,
                 };
             }),
@@ -2390,7 +2393,8 @@ async function save(sendImmediately = true) {
                 supersedes_assignment_id: a.supersedes_assignment_id || null,
                 file_info: a.file_info ?? null,
                 _progress_sheet_id: a._progress_sheet_id ?? null,
-                _row_id: a._row_id ?? null,
+                _workflow_sheet_id: a._workflow_sheet_id ?? null,
+                _row_id:  a._row_id  ?? null,
                 _col_key: a._col_key ?? null,
             })),
         };

@@ -15,6 +15,7 @@ class LeaderPermission extends Model
         'work_record_management',
         'dispatch_management',
         'user_management',
+        'script_access',
     ];
 
     protected $casts = [
@@ -25,6 +26,7 @@ class LeaderPermission extends Model
         'work_record_management' => 'boolean',
         'dispatch_management'    => 'boolean',
         'user_management'        => 'boolean',
+        'script_access'          => 'boolean',
     ];
 
     public function user()

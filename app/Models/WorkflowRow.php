@@ -12,6 +12,7 @@ class WorkflowRow extends Model
         'label',
         'sort_order',
         'item_entry_id',
+        'stage_id',
     ];
 
     public function sheet()
@@ -37,5 +38,10 @@ class WorkflowRow extends Model
     public function children()
     {
         return $this->hasMany(WorkflowRow::class, 'parent_id')->orderBy('sort_order');
+    }
+
+    public function stage()
+    {
+        return $this->belongsTo(\App\Models\Stage::class, 'stage_id');
     }
 }

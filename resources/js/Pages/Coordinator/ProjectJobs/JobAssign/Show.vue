@@ -11,16 +11,6 @@
 
         <template #headerExtras>
             <div class="flex items-center gap-2">
-                <button
-                    v-if="!assignment.progress_cell_id"
-                    type="button"
-                    class="rounded border border-indigo-300 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
-                    @click="showLinkCellModal = true"
-                >進行表に紐づける</button>
-                <span
-                    v-else
-                    class="cursor-not-allowed rounded border border-gray-300 bg-gray-100 px-4 py-2 text-sm font-medium text-gray-400"
-                >紐づけ済み</span>
                 <Link :href="route('coordinator.project_jobs.assignments.edit', { projectJob: projectJob.id, assignment: assignment.id })"
                       class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
                 >編集</Link>
@@ -36,13 +26,6 @@
                 <FileInfoDisplay :fileInfo="assignment.file_info" />
             </div>
         </div>
-
-        <LinkProgressCellModal
-            :show="showLinkCellModal"
-            :assignment-id="assignment?.id ?? null"
-            @close="showLinkCellModal = false"
-            @linked="showLinkCellModal = false"
-        />
     </AppLayout>
 </template>
 
@@ -50,13 +33,10 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import AssignmentForm from '@/Pages/Coordinator/ProjectJobs/JobAssign/AssignmentForm.vue';
 import FileInfoDisplay from '@/Components/FileInfoDisplay.vue';
-import LinkProgressCellModal from '@/Components/LinkProgressCellModal.vue';
 import { Link, router } from '@inertiajs/vue3';
 import { ref } from 'vue';
 
 const { projectJob, assignment } = defineProps({ projectJob: Object, assignment: Object });
-
-const showLinkCellModal = ref(false);
 
 function deleteAssignment() {
     if (!confirm('この割当を本当に削除しますか？この操作は取り消せません。')) return;

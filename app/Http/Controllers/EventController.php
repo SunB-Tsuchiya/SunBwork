@@ -1868,9 +1868,10 @@ class EventController extends Controller
         $prefillStageId = $request->query('stage_id');          // 進行管理表: ステージID
         $prefillSizeId = $request->query('size_id');             // 進行管理表: サイズID
         $prefillWorkItemTypeId = $request->query('work_item_type_id'); // 進行管理表: 作業種別ID
-        $prefillProgressSheetId = $request->query('progress_sheet_id'); // User進行表: シートID
-        $prefillRowId = $request->query('row_id');               // User進行表: 行ID
-        $prefillColKey = $request->query('col_key');             // User進行表: 列キー
+        $prefillProgressSheetId  = $request->query('progress_sheet_id');  // User進行表: シートID
+        $prefillWorkflowSheetId  = $request->query('workflow_sheet_id'); // 管理シート: シートID
+        $prefillRowId = $request->query('row_id');               // 進行表/管理シート: 行ID
+        $prefillColKey = $request->query('col_key');             // 進行表/管理シート: 列キー
         $startHour = $request->query('startHour');
         $startMinute = $request->query('startMinute');
         $endHour = $request->query('endHour');
@@ -1924,9 +1925,8 @@ class EventController extends Controller
             }
         }
 
-        // 進行管理表 joblink 経由でタイトルまたは progress_sheet_id が渡された場合（$jobId なし）、prefill assignments を構築
-        // $prefillTitle が空でも $prefillProgressSheetId があれば prefill を作成する
-        if (!$jobId && ($prefillTitle || $prefillProgressSheetId)) {
+        // 進行管理表/管理シート joblink 経由でタイトルまたは sheet_id が渡された場合（$jobId なし）、prefill assignments を構築
+        if (!$jobId && ($prefillTitle || $prefillProgressSheetId || $prefillWorkflowSheetId)) {
             $jobAssignments = [[
                 'id' => null,
                 'project_job_id' => $prefillProjectJobId ?? null,
@@ -1940,8 +1940,9 @@ class EventController extends Controller
                 '_locked_stage' => (bool)$prefillStageId,
                 '_locked_size' => (bool)$prefillSizeId,
                 '_locked_work_item_type' => (bool)$prefillWorkItemTypeId,
-                '_progress_sheet_id' => $prefillProgressSheetId ? (int)$prefillProgressSheetId : null,
-                '_row_id' => $prefillRowId ? (int)$prefillRowId : null,
+                '_progress_sheet_id'  => $prefillProgressSheetId  ? (int)$prefillProgressSheetId  : null,
+                '_workflow_sheet_id'  => $prefillWorkflowSheetId  ? (int)$prefillWorkflowSheetId  : null,
+                '_row_id'  => $prefillRowId  ? (int)$prefillRowId  : null,
                 '_col_key' => $prefillColKey ?? null,
             ]];
         }

@@ -19,7 +19,7 @@
         </template>
 
         <!-- ── スティッキーヘッダー ──────────────────────────── -->
-        <div class="sticky top-0 z-20 rounded-t bg-white px-6 pt-6 pb-0 shadow-md">
+        <div class="sticky top-0 z-20 rounded-t bg-white px-4 sm:px-6 pt-4 sm:pt-6 pb-0 shadow-md">
 
             <!-- ── タイトル行 ──────────────────────────────────── -->
             <div class="mb-4">
@@ -45,27 +45,29 @@
                 </div>
 
                 <!-- アクションボタン群（サブリーダーの下） -->
-                <div class="mt-3 flex flex-wrap items-center gap-2">
+                <div class="mt-3 flex flex-wrap items-center gap-1.5 sm:gap-2">
+                    <!-- ── 常時表示ボタン ────────────────────────── -->
                     <button
                         type="button"
                         :class="job.completed
-                            ? 'rounded bg-gray-300 px-4 py-1.5 text-sm font-medium text-gray-400 cursor-not-allowed'
-                            : 'rounded bg-yellow-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-yellow-700'"
+                            ? 'rounded bg-gray-300 px-3 py-1 sm:px-4 sm:py-1.5 text-xs sm:text-sm font-medium text-gray-400 cursor-not-allowed'
+                            : 'rounded bg-yellow-600 px-3 py-1 sm:px-4 sm:py-1.5 text-xs sm:text-sm font-medium text-white hover:bg-yellow-700'"
                         :disabled="job.completed"
                         @click="goEdit"
                     >編集</button>
+
                     <!-- 共有済バッジ or 共有ボタン -->
                     <div class="relative" ref="shareButtonRef">
                         <button
                             v-if="sharedJobs.length > 0"
                             type="button"
-                            class="rounded border border-emerald-500 bg-emerald-50 px-4 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-100"
+                            class="rounded border border-emerald-500 bg-emerald-50 px-3 py-1 sm:px-4 sm:py-1.5 text-xs sm:text-sm font-medium text-emerald-700 hover:bg-emerald-100"
                             @click.stop="toggleSharedPopup"
                         >✓ 共有済 ({{ sharedJobs.length }})</button>
                         <button
                             v-else
                             type="button"
-                            class="rounded bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-emerald-700"
+                            class="rounded bg-emerald-600 px-3 py-1 sm:px-4 sm:py-1.5 text-xs sm:text-sm font-medium text-white hover:bg-emerald-700"
                             @click="openShareModal"
                         >共有</button>
 
@@ -94,67 +96,123 @@
                             </div>
                         </div>
                     </div>
-                    <button
-                        type="button"
-                        class="rounded border border-blue-400 px-4 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-50"
-                        @click="cloneJob"
-                    >案件複製</button>
-                    <button
-                        type="button"
-                        class="rounded bg-cyan-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-cyan-700"
-                        @click="goMemberSchedule"
-                    >メンバー予定表</button>
+
                     <button
                         type="button"
                         :class="job.completed
-                            ? 'rounded bg-gray-300 px-4 py-1.5 text-sm font-medium text-gray-400 cursor-not-allowed'
-                            : 'rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700'"
+                            ? 'rounded bg-gray-300 px-3 py-1 sm:px-4 sm:py-1.5 text-xs sm:text-sm font-medium text-gray-400 cursor-not-allowed'
+                            : 'rounded bg-indigo-600 px-3 py-1 sm:px-4 sm:py-1.5 text-xs sm:text-sm font-medium text-white hover:bg-indigo-700'"
                         :disabled="job.completed"
                         @click="goJobAssign"
                     >ジョブ割り当て</button>
-                    <button
-                        type="button"
-                        class="rounded border border-indigo-300 bg-white px-4 py-1.5 text-sm font-medium text-indigo-600 hover:bg-indigo-50"
-                        @click="goAssignmentList"
-                    >割り当て一覧</button>
-                    <button
-                        type="button"
-                        class="rounded bg-teal-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-teal-700"
-                        @click="goAnalysis"
-                    >作業分析</button>
+
                     <!-- 完了 / 未完了 -->
                     <button
                         v-if="!job.completed"
                         type="button"
-                        class="rounded bg-green-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-green-700"
+                        class="rounded bg-green-600 px-3 py-1 sm:px-4 sm:py-1.5 text-xs sm:text-sm font-medium text-white hover:bg-green-700"
                         @click="completeJob"
                     >完了にする</button>
                     <template v-else>
-                        <span class="inline-flex items-center rounded-full bg-yellow-100 px-3 py-1 text-sm font-medium text-yellow-800">完了済み</span>
+                        <span class="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 sm:px-3 sm:py-1 text-xs sm:text-sm font-medium text-yellow-800">完了済み</span>
                         <button
                             type="button"
-                            class="rounded bg-orange-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-orange-600"
+                            class="rounded bg-orange-500 px-3 py-1 sm:px-4 sm:py-1.5 text-xs sm:text-sm font-medium text-white hover:bg-orange-600"
                             @click="uncompleteJob"
                         >未完了に戻す</button>
                     </template>
-                    <!-- 削除 -->
+
+                    <!-- ── SM以上のみ表示ボタン ─────────────────── -->
                     <button
                         type="button"
-                        class="rounded bg-red-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-red-700"
+                        class="hidden sm:inline-flex rounded border border-blue-400 px-4 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-50"
+                        @click="cloneJob"
+                    >案件複製</button>
+                    <button
+                        type="button"
+                        class="hidden sm:inline-flex rounded bg-cyan-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-cyan-700"
+                        @click="goMemberSchedule"
+                    >メンバー予定表</button>
+                    <button
+                        type="button"
+                        class="hidden sm:inline-flex rounded border border-indigo-300 bg-white px-4 py-1.5 text-sm font-medium text-indigo-600 hover:bg-indigo-50"
+                        @click="goAssignmentList"
+                    >割り当て一覧</button>
+                    <button
+                        type="button"
+                        class="hidden sm:inline-flex rounded bg-teal-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-teal-700"
+                        @click="goAnalysis"
+                    >作業分析</button>
+                    <button
+                        type="button"
+                        class="hidden sm:inline-flex rounded bg-red-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-red-700"
                         @click="destroyJob"
                     >削除</button>
 
+                    <!-- ── モバイル用「その他」ドロップダウン ─── -->
+                    <div class="relative sm:hidden" ref="moreMenuRef">
+                        <button
+                            type="button"
+                            class="flex items-center gap-1 rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                            @click.stop="showMoreMenu = !showMoreMenu"
+                        >
+                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h.01M12 12h.01M19 12h.01" /></svg>
+                            その他
+                        </button>
+                        <div
+                            v-if="showMoreMenu"
+                            class="absolute left-0 top-full z-30 mt-1 w-40 rounded-lg border border-gray-200 bg-white shadow-lg"
+                            @click.stop
+                        >
+                            <button
+                                type="button"
+                                class="block w-full px-4 py-2.5 text-left text-sm text-blue-700 hover:bg-blue-50"
+                                @click="showMoreMenu = false; cloneJob()"
+                            >案件複製</button>
+                            <button
+                                type="button"
+                                class="block w-full px-4 py-2.5 text-left text-sm text-cyan-700 hover:bg-cyan-50"
+                                @click="showMoreMenu = false; goMemberSchedule()"
+                            >メンバー予定表</button>
+                            <button
+                                type="button"
+                                class="block w-full px-4 py-2.5 text-left text-sm text-indigo-600 hover:bg-indigo-50"
+                                @click="showMoreMenu = false; goAssignmentList()"
+                            >割り当て一覧</button>
+                            <button
+                                type="button"
+                                class="block w-full px-4 py-2.5 text-left text-sm text-teal-700 hover:bg-teal-50"
+                                @click="showMoreMenu = false; goAnalysis()"
+                            >作業分析</button>
+                            <div class="border-t border-gray-100" />
+                            <button
+                                type="button"
+                                class="block w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50"
+                                @click="showMoreMenu = false; destroyJob()"
+                            >削除</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <!-- ── タブバー ──────────────────────────────────────── -->
-            <div class="mt-2 flex gap-1 border-b border-gray-200">
+            <!-- モバイル: セレクター -->
+            <div class="mt-2 sm:hidden border-b border-gray-200 pb-2">
+                <select
+                    v-model="activeTab"
+                    class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                >
+                    <option v-for="tab in tabs" :key="tab.key" :value="tab.key">{{ tab.label }}</option>
+                </select>
+            </div>
+            <!-- SM以上: タブボタン -->
+            <div class="mt-2 hidden sm:flex gap-1 border-b border-gray-200 overflow-x-auto">
                 <button
                     v-for="tab in tabs"
                     :key="tab.key"
                     type="button"
                     :class="[
-                        'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
+                        'shrink-0 px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap',
                         activeTab === tab.key
                             ? 'border-indigo-500 text-indigo-700'
                             : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
@@ -165,7 +223,7 @@
         </div><!-- /sticky header -->
 
         <!-- ── タブコンテンツ ─────────────────────────────────── -->
-        <div class="rounded-b bg-white px-6 pb-6 shadow-md">
+        <div class="rounded-b bg-white px-4 sm:px-6 pb-6 shadow-md">
 
             <!-- 詳細メモ（概要タブのみ） -->
             <div
@@ -1627,9 +1685,14 @@ const showSharedPopup = ref(false);
 function toggleSharedPopup() {
     showSharedPopup.value = !showSharedPopup.value;
 }
-// ポップアップ外クリックで閉じる
+// その他メニュー（モバイル用）
+const showMoreMenu = ref(false);
+// ポップアップ・メニュー外クリックで閉じる
 if (typeof window !== 'undefined') {
-    window.addEventListener('click', () => { showSharedPopup.value = false; });
+    window.addEventListener('click', () => {
+        showSharedPopup.value = false;
+        showMoreMenu.value    = false;
+    });
 }
 
 const showShareModal    = ref(false);

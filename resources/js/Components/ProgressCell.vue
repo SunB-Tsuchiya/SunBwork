@@ -295,7 +295,7 @@
 
   <!-- worker型（担当＋ジョブ統合セル） -->
   <td
-    v-else-if="colDef.type === 'worker'"
+    v-else-if="colDef.type === 'worker' || colDef.type === 'coordinator'"
     class="border border-gray-200 px-0 py-0 align-middle min-w-[200px] transition-colors"
     :class="workerCellBg"
     :style="workerCellBorder"

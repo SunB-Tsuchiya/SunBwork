@@ -1,10 +1,10 @@
 <template>
-    <AppLayout :title="`工程シート: ${sheet.name}`">
+    <AppLayout :title="`管理シート: ${sheet.name}`">
         <template #header>
             <div class="flex items-center gap-3">
                 <h2 class="text-lg font-semibold text-gray-800">
                     {{ projectJob.title }}
-                    <span class="ml-2 text-base font-normal text-gray-400">工程シート</span>
+                    <span class="ml-2 text-base font-normal text-gray-400">管理シート</span>
                 </h2>
             </div>
         </template>
@@ -90,7 +90,7 @@ const props = defineProps({
 });
 
 const localCells = ref([...props.cells]);
-const stages     = computed(() => props.sheet.stage_config?.stages ?? []);
+const stages     = computed(() => props.sheet.column_config ?? []);
 
 // ── 行グループ化 ──────────────────────────────────────────────────────────
 const topLevelRows = computed(() => props.rows.filter((r) => !r.parent_id));

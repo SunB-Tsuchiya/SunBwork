@@ -3,12 +3,15 @@
 namespace App\Http\Controllers\Coordinator;
 
 use App\Http\Controllers\Controller;
+use App\Models\JobAssignmentMessage;
 use App\Models\ProjectJobAssignment;
 use App\Models\WorkflowSheet;
 use App\Models\WorkflowRow;
 use App\Models\WorkflowCell;
+use App\Services\JobNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class WorkflowCellController extends Controller
 {
@@ -17,25 +20,43 @@ class WorkflowCellController extends Controller
         $this->authorizeSheet($request->user(), $sheet);
 
         $validated = $request->validate([
-            'cells'                    => 'required|array',
-            'cells.*.row_id'           => 'required|integer|exists:workflow_rows,id',
-            'cells.*.stage_key'        => 'required|string|max:64',
-            'cells.*.assigned_user_id' => 'nullable|integer|exists:users,id',
-            'cells.*.assignment_id'    => 'nullable|integer|exists:project_job_assignments,id',
-            'cells.*.cell_note'        => 'nullable|string',
+            'cells'                           => 'required|array',
+            'cells.*.row_id'                  => 'required|integer|exists:workflow_rows,id',
+            'cells.*.stage_key'               => 'required|string|max:64',
+            'cells.*.cell_type'               => 'nullable|string|max:32',
+            'cells.*.assigned_user_id'        => 'nullable|integer|exists:users,id',
+            'cells.*.value_text'              => 'nullable|string',
+            'cells.*.value_date'              => 'nullable|date',
+            'cells.*.value_bool'              => 'nullable|boolean',
+            'cells.*.value_user_id'           => 'nullable|integer|exists:users,id',
+            'cells.*.value_subcontractor_id'  => 'nullable|integer|exists:subcontractors,id',
+            'cells.*.proof_assignment_id'     => 'nullable|integer|exists:project_job_assignments,id',
+            'cells.*.schedule_id'             => 'nullable|integer|exists:project_schedules,id',
+            'cells.*.cell_deadline'           => 'nullable|date',
+            'cells.*.assignment_id'           => 'nullable|integer|exists:project_job_assignments,id',
+            'cells.*.completed_at'            => 'nullable|string',
+            'cells.*.cell_note'               => 'nullable|string',
         ]);
+
+        $scalarFields = [
+            'cell_type', 'assigned_user_id', 'value_text', 'value_date', 'value_bool',
+            'value_user_id', 'value_subcontractor_id', 'proof_assignment_id',
+            'schedule_id', 'cell_deadline', 'completed_at',
+        ];
 
         $rowIds      = collect($validated['cells'])->pluck('row_id')->unique();
         $validRowIds = WorkflowRow::where('sheet_id', $sheet->id)->whereIn('id', $rowIds)->pluck('id');
 
-        DB::transaction(function () use ($validated, $validRowIds, $request) {
+        DB::transaction(function () use ($validated, $validRowIds, $scalarFields, $request) {
             foreach ($validated['cells'] as $data) {
                 if (!$validRowIds->contains($data['row_id'])) {
                     continue;
                 }
                 $attrs = [];
-                if (array_key_exists('assigned_user_id', $data)) {
-                    $attrs['assigned_user_id'] = $data['assigned_user_id'];
+                foreach ($scalarFields as $field) {
+                    if (array_key_exists($field, $data)) {
+                        $attrs[$field] = $data[$field];
+                    }
                 }
                 if (array_key_exists('cell_note', $data)) {
                     $attrs['cell_note'] = $data['cell_note'];
@@ -53,7 +74,14 @@ class WorkflowCellController extends Controller
         });
 
         $updatedCells = WorkflowCell::whereIn('row_id', $validRowIds)
-            ->with(['assignedUser:id,name', 'noteUser:id,name'])
+            ->with([
+                'assignedUser:id,name,user_role',
+                'valueUser:id,name',
+                'valueSubcontractor:id,name',
+                'proofAssignment:id,title,completed,proof_completed_at,user_id',
+                'schedule:id,name,end_date',
+                'noteUser:id,name,user_role',
+            ])
             ->get();
 
         $assignmentIds = $updatedCells->whereNotNull('assignment_id')->pluck('assignment_id')->unique();
@@ -78,19 +106,19 @@ class WorkflowCellController extends Controller
             'user_id'          => 'required|integer|exists:users,id',
             'desired_end_date' => 'nullable|date',
             'title'            => 'nullable|string|max:255',
+            'stage_id'         => 'nullable|integer|exists:stages,id',
         ]);
 
         $row = WorkflowRow::where('id', $validated['row_id'])
             ->where('sheet_id', $sheet->id)
             ->firstOrFail();
 
-        $stages = collect($sheet->stage_config['stages'] ?? []);
-        $stage  = $stages->firstWhere('key', $validated['stage_key']);
-        abort_unless($stage, 422, 'ステージキーが見つかりません');
+        $col = $this->findColumnByKey($sheet->getEffectiveColumnConfig(), $validated['stage_key']);
+        abort_unless($col, 422, 'ステージキーが見つかりません');
 
         $projectJob = $sheet->projectJob;
         $title = $validated['title']
-            ?? "{$projectJob->title} - {$row->label}（{$stage['label']}）";
+            ?? "{$projectJob->title} - {$row->label}（{$col['label']}）";
 
         $assignment = ProjectJobAssignment::create([
             'project_job_id'   => $projectJob->id,
@@ -99,18 +127,95 @@ class WorkflowCellController extends Controller
             'title'            => $title,
             'assigned'         => true,
             'desired_end_date' => $validated['desired_end_date'] ?? null,
+            'stage_id'         => $validated['stage_id'] ?? $row->stage_id ?? null,
         ]);
 
         $cell = WorkflowCell::updateOrCreate(
             ['row_id' => $row->id, 'stage_key' => $validated['stage_key']],
             [
                 'assigned_user_id' => $validated['user_id'],
+                'value_user_id'    => $validated['user_id'],
                 'assignment_id'    => $assignment->id,
                 'completed_at'     => null,
             ]
         );
 
         $cell->load('assignedUser:id,name');
+
+        // ─── 依頼発信: JobAssignmentMessage 作成 + 通知 ───────────────────
+        $senderUser = $request->user();
+
+        // ① ジョブ通知（job_notifications テーブル）
+        try {
+            $projectJob->load('coordinators');
+            JobNotificationService::notifyNewJob(
+                $senderUser,
+                $validated['user_id'],
+                $projectJob,
+                $assignment
+            );
+        } catch (\Throwable $e) {
+            Log::warning('WorkflowCell::register notifyNewJob failed', ['error' => $e->getMessage()]);
+        }
+
+        // ② JobAssignmentMessage 作成（JobBox に依頼メッセージを発信）
+        try {
+            $assignedUser = \App\Models\User::find($validated['user_id']);
+            $bodyText = implode("\n", array_filter([
+                'ジョブ割り当て依頼',
+                '案件: ' . ($projectJob->title ?? ''),
+                'ジョブ: ' . $title,
+                $assignedUser ? '担当: ' . $assignedUser->name : null,
+                !empty($validated['desired_end_date']) ? '締め切り: ' . $validated['desired_end_date'] : null,
+            ]));
+
+            $jam = JobAssignmentMessage::create([
+                'project_job_assignment_id' => $assignment->id,
+                'sender_id'                => $senderUser->id,
+                'subject'                  => $title,
+                'body'                     => $bodyText,
+            ]);
+
+            try {
+                $jamLoaded = JobAssignmentMessage::with([
+                    'sender',
+                    'projectJobAssignment.user',
+                    'projectJobAssignment.projectJob.client',
+                ])->find($jam->id);
+                event(new \App\Events\JobMessageCreated(
+                    $jamLoaded,
+                    [$validated['user_id']],
+                    $jam->id
+                ));
+            } catch (\Throwable $_) {
+                // WebSocket broadcast 失敗は非致命的
+            }
+        } catch (\Throwable $eSend) {
+            Log::warning('WorkflowCell::register JobAssignmentMessage creation failed', [
+                'error' => $eSend->getMessage(),
+            ]);
+        }
+        // ────────────────────────────────────────────────────────────────
+
+        // ③ proof_v2/proof_worker ステージ: ProofRequest を作成して校正ジョブ一覧に表示
+        if (in_array($col['type'] ?? '', ['proof_worker', 'proof_v2']) && $assignment->user_id) {
+            try {
+                \App\Models\ProofRequest::updateOrCreate(
+                    ['project_job_assignment_id' => $assignment->id],
+                    [
+                        'project_job_id'       => $projectJob->id,
+                        'proof_cell_id'        => null, // workflow_cell 経由（progress_cell ではない）
+                        'requester_id'         => $senderUser->id,
+                        'proof_coordinator_id' => $senderUser->id,
+                        'proofreader_id'       => $assignment->user_id,
+                        'title'                => $title,
+                        'status'               => 'assigned',
+                    ]
+                );
+            } catch (\Throwable $eProof) {
+                Log::warning('WorkflowCell::register ProofRequest creation failed', ['error' => $eProof->getMessage()]);
+            }
+        }
 
         return response()->json([
             'cell' => $this->formatCell($cell, []),
@@ -175,20 +280,34 @@ class WorkflowCellController extends Controller
 
     private function formatCell(WorkflowCell $c, array $eventMinutes): array
     {
-        $workMinutes = $c->assignment_id
-            ? ($eventMinutes[$c->assignment_id] ?? 0)
-            : 0;
+        $workMinutes = $c->assignment_id ? ($eventMinutes[$c->assignment_id] ?? 0) : 0;
 
         return [
-            'id'                 => $c->id,
-            'row_id'             => $c->row_id,
-            'stage_key'          => $c->stage_key,
-            'assigned_user_id'   => $c->assigned_user_id,
-            'assigned_user_name' => $c->assignedUser?->name,
-            'assignment_id'      => $c->assignment_id,
-            'work_minutes'       => $workMinutes,
-            'completed_at'       => $c->completed_at?->format('Y-m-d H:i:s'),
-            'cell_note'          => $c->cell_note,
+            'id'                         => $c->id,
+            'row_id'                     => $c->row_id,
+            'stage_key'                  => $c->stage_key,
+            'cell_type'                  => $c->cell_type ?? 'worker',
+            'value_text'                 => $c->value_text,
+            'value_date'                 => $c->value_date?->format('Y-m-d'),
+            'value_bool'                 => $c->value_bool,
+            'value_user_id'              => $c->value_user_id ?? $c->assigned_user_id,
+            'value_user_name'            => $c->valueUser?->name ?? $c->assignedUser?->name,
+            'value_subcontractor_id'     => $c->value_subcontractor_id,
+            'value_subcontractor_name'   => $c->valueSubcontractor?->name,
+            'assignment_id'              => $c->assignment_id,
+            'proof_assignment_id'        => $c->proof_assignment_id,
+            'proof_assignment_title'     => $c->proofAssignment?->title,
+            'proof_assignment_completed' => $c->proofAssignment?->completed
+                                            || $c->proofAssignment?->proof_completed_at !== null,
+            'schedule_id'                => $c->schedule_id,
+            'schedule_name'              => $c->schedule?->name,
+            'schedule_end_date'          => $c->schedule?->end_date?->format('Y-m-d'),
+            'cell_deadline'              => $c->cell_deadline?->format('Y-m-d'),
+            'cell_note'                  => $c->cell_note,
+            'cell_note_user_name'        => $c->noteUser?->name,
+            'cell_note_user_role'        => $c->noteUser?->user_role,
+            'completed_at'               => $c->completed_at?->format('Y-m-d H:i:s'),
+            'work_minutes'               => $workMinutes,
         ];
     }
 
@@ -216,6 +335,18 @@ class WorkflowCellController extends Controller
             ->selectRaw('COALESCE(SUM(TIMESTAMPDIFF(MINUTE, starts_at, ends_at)
                 - COALESCE(interruption_minutes, 0)), 0) as total')
             ->value('total');
+    }
+
+    private function findColumnByKey(array $nodes, string $key): ?array
+    {
+        foreach ($nodes as $node) {
+            if (($node['key'] ?? '') === $key) return $node;
+            if (!empty($node['children'])) {
+                $found = $this->findColumnByKey($node['children'], $key);
+                if ($found) return $found;
+            }
+        }
+        return null;
     }
 
     private function authorizeSheet($user, WorkflowSheet $sheet): void

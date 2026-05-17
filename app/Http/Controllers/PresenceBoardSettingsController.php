@@ -22,6 +22,13 @@ class PresenceBoardSettingsController extends Controller
         $userIds  = $this->getAllowedUserIds($authUser);
         $isAdmin  = in_array($authUser->user_role, ['admin', 'superadmin', 'clerk']);
 
+        // context: ロールに応じてフロントのカラーテーマを決定
+        $context = match ($authUser->user_role) {
+            'superadmin', 'admin', 'clerk' => 'admin',
+            'leader'                       => 'leader',
+            default                        => 'admin',
+        };
+
         $employmentPriority = [
             'regular'   => 1,
             'contract'  => 2,
@@ -75,6 +82,7 @@ class PresenceBoardSettingsController extends Controller
             'departments'  => $departments,
             'isAdmin'      => $isAdmin,
             'statusOrders' => $statusOrders,
+            'context'      => $context,
         ]);
     }
 

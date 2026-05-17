@@ -28,12 +28,22 @@ const selectedMeetingId = ref(props.selectedMeetingId ?? null);
 const titleManuallyEdited = ref(false);
 
 /** 今日以降の次の曜日の日付を返す（毎週・隔週用） */
-function calcNextDate(dayOfWeek) {
+function calcNextDate(dayOfWeek, startHour, startMinute) {
+    const now   = new Date();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayDow = today.getDay();
     let diff = dayOfWeek - todayDow;
-    if (diff <= 0) diff += 7;
+
+    if (diff === 0) {
+        // 当日が会議曜日と一致する場合：会議開始時刻がまだ未来なら当日、過ぎていたら来週
+        const meetingStart = new Date(today);
+        meetingStart.setHours(parseInt(startHour, 10), parseInt(startMinute, 10), 0, 0);
+        if (now >= meetingStart) diff = 7;
+    } else if (diff < 0) {
+        diff += 7;
+    }
+
     const next = new Date(today.getTime() + diff * 24 * 60 * 60 * 1000);
     const yyyy = next.getFullYear();
     const mm   = String(next.getMonth() + 1).padStart(2, '0');
@@ -42,10 +52,11 @@ function calcNextDate(dayOfWeek) {
 }
 
 /**
- * 毎月の第 weekOfMonth 週の dayOfWeek 曜日で、今日より未来の直近日付を返す。
- * 例: 第2週・月曜 → 今月の第2月曜が未来なら今月、過去なら来月を返す。
+ * 毎月の第 weekOfMonth 週の dayOfWeek 曜日で、今日以降の直近日付を返す。
+ * 当日が対象日かつ会議開始時刻が未来なら当日を返す。
  */
-function calcNextMonthlyDate(dayOfWeek, weekOfMonth) {
+function calcNextMonthlyDate(dayOfWeek, weekOfMonth, startHour, startMinute) {
+    const now   = new Date();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     for (let offset = 0; offset <= 24; offset++) {
@@ -56,12 +67,22 @@ function calcNextMonthlyDate(dayOfWeek, weekOfMonth) {
         const candidate = new Date(firstOfMonth.getFullYear(), firstOfMonth.getMonth(), 1 + diff + (weekOfMonth - 1) * 7);
         // 月をまたいでしまう場合はスキップ
         if (candidate.getMonth() !== firstOfMonth.getMonth()) continue;
-        // 今日より未来のみ採用
         if (candidate > today) {
+            // 今日より先の日付は無条件採用
             const yyyy = candidate.getFullYear();
             const mm   = String(candidate.getMonth() + 1).padStart(2, '0');
             const dd   = String(candidate.getDate()).padStart(2, '0');
             return `${yyyy}-${mm}-${dd}`;
+        } else if (candidate.getTime() === today.getTime()) {
+            // 当日が対象日の場合：会議開始時刻が未来なら当日を採用
+            const meetingStart = new Date(today);
+            meetingStart.setHours(parseInt(startHour, 10), parseInt(startMinute, 10), 0, 0);
+            if (now < meetingStart) {
+                const yyyy = candidate.getFullYear();
+                const mm   = String(candidate.getMonth() + 1).padStart(2, '0');
+                const dd   = String(candidate.getDate()).padStart(2, '0');
+                return `${yyyy}-${mm}-${dd}`;
+            }
         }
     }
     return '';
@@ -81,9 +102,9 @@ watch(selectedMeetingId, (id) => {
     form.endHour      = String(meeting.end_time).split(':')[0].padStart(2, '0');
     form.endMinute    = String(meeting.end_time).split(':')[1].padStart(2, '0');
     if (meeting.recurrence === 'monthly' && meeting.week_of_month) {
-        form.date = calcNextMonthlyDate(meeting.day_of_week, meeting.week_of_month);
+        form.date = calcNextMonthlyDate(meeting.day_of_week, meeting.week_of_month, form.startHour, form.startMinute);
     } else {
-        form.date = calcNextDate(meeting.day_of_week);
+        form.date = calcNextDate(meeting.day_of_week, form.startHour, form.startMinute);
     }
 });
 

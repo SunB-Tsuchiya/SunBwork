@@ -173,13 +173,24 @@ const getTopTabActive = () => {
         if (r.includes('clients')) return 'clients';
         if (r.includes('workload_setting')) return 'workload_setting';
         if (r.includes('workload_analyzer')) return 'workload';
-        if (r.startsWith('leader.project_jobs')) return 'project_jobs';
+        if (r.includes('project_jobs')) return 'project_jobs';
         if (r.includes('diaryinteractions') || r.includes('diaries')) return 'diaries';
         if (r.includes('ai')) return 'ai';
         if (r.includes('calendar')) return 'calendar';
         if (r.includes('myjobbox') || r === 'dashboard') return 'myjob';
         if (r.includes('user.jobbox')) return 'jobbox';
+        if (r.includes('announcements')) return 'announcements';
         if (r.includes('profile')) return 'profile';
+        if (r.endsWith('.dashboard')) return 'dashboard';
+        if (r.includes('presence')) return 'presence_board_settings';
+        if (r.includes('proof_jobs')) return 'proof_jobs';
+        if (r.includes('user.proof')) return 'proof_status';
+        if (r.includes('worktypes')) return 'worktypes';
+        if (r.includes('work_records')) return 'work_records';
+        if (r.includes('leader_permissions')) return 'leader_permissions';
+        if (r.includes('meeting_definitions')) return 'meeting_definitions';
+        if (r.includes('dispatch')) return 'dispatch';
+        if (r.startsWith('user.settings')) return 'settings';
         return '';
     } catch {
         return '';
@@ -218,6 +229,8 @@ const computeCoordinatorActive = () => {
         if (!r) return '';
         // clients routes → clients tab
         if (r.startsWith('coordinator.clients')) return 'clients';
+        // subcontractors routes → subcontractors tab
+        if (r.startsWith('coordinator.subcontractors')) return 'subcontractors';
         // jobbox routes → jobs tab
         if (r.includes('jobbox')) return 'jobs';
         // assignments routes → jobs tab
@@ -226,6 +239,11 @@ const computeCoordinatorActive = () => {
         if (r.includes('calendar')) return 'calendar';
         // explicit project_jobs routes (index/show/create/edit) → projects tab
         if (r.match(/^coordinator\.project_jobs\.(index|show|create|edit|store|update|destroy|complete)$/)) return 'projects';
+        if (r.startsWith('coordinator.progress_sheet_list')) return 'progress_sheet_list';
+        if (r.startsWith('coordinator.progress_report')) return 'progress_report';
+        if (r.startsWith('coordinator.settings')) return 'settings';
+        if (r.startsWith('coordinator.ghost_users')) return 'ghost_users';
+        if (r === 'coordinator.dashboard') return 'dashboard';
         return '';
     } catch {
         return '';
@@ -233,6 +251,8 @@ const computeCoordinatorActive = () => {
 };
 
 const isGhostMode = computed(() => !!page.props.user?.is_ghost);
+
+const canAccessScripts = computed(() => page.props.auth?.canAccessScripts ?? false);
 
 // Determine which role "area" the current route belongs to.
 // SuperAdmin/Admin can navigate to lower-role areas; use route prefix to detect.
@@ -254,6 +274,44 @@ const currentRouteContext = computed(() => {
         return page.props.auth?.user?.user_role || 'user';
     }
 });
+
+// ロール別ダッシュボードルート名
+const ROLE_DASHBOARD_ROUTE = {
+    superadmin:       'superadmin.dashboard',
+    admin:            'admin.dashboard',
+    leader:           'leader.dashboard',
+    coordinator:      'coordinator.dashboard',
+    proof_coordinator:'proof_coordinator.dashboard',
+    clerk:            'clerk.dashboard',
+    user:             'user.dashboard',
+    prepress:         'prepress.dashboard',
+};
+
+// ページ遷移時に現ロールの最終URLをlocalStorageに保存
+watch(
+    () => page.url,
+    (url) => {
+        const role = currentRouteContext.value;
+        if (role && url) {
+            try { localStorage.setItem(`lastTab_${role}`, url); } catch {}
+        }
+    },
+    { immediate: true },
+);
+
+// ロールボタン押下: 保存済みURL → なければdashboard
+function navigateToRole(role) {
+    try {
+        const saved = localStorage.getItem(`lastTab_${role}`);
+        if (saved) {
+            router.get(saved);
+        } else {
+            router.get(route(ROLE_DASHBOARD_ROUTE[role]));
+        }
+    } catch {
+        router.get('/');
+    }
+}
 </script>
 
 <template>
@@ -337,6 +395,19 @@ const currentRouteContext = computed(() => {
                                 <div class="pointer-events-none absolute right-0 top-9 z-50 w-44 rounded-md bg-gray-800 px-3 py-2 text-xs text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
                                     <p class="font-medium">使い方ガイド</p>
                                     <p class="text-gray-300">操作方法・ヘルプ</p>
+                                </div>
+                            </div>
+
+                            <!-- スクリプトツール -->
+                            <div v-if="canAccessScripts" class="group relative">
+                                <Link :href="route('scripts.index')" class="flex h-8 w-8 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z" />
+                                    </svg>
+                                </Link>
+                                <div class="pointer-events-none absolute right-0 top-9 z-50 w-44 rounded-md bg-gray-800 px-3 py-2 text-xs text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                                    <p class="font-medium">スクリプト</p>
+                                    <p class="text-gray-300">業務ツール・自動化</p>
                                 </div>
                             </div>
 
@@ -432,86 +503,86 @@ const currentRouteContext = computed(() => {
                                 (typeof route === 'function' ? route().has('superadmin.dashboard') : false)
                             "
                         >
-                            <Link :href="route('superadmin.dashboard')" :class="roleNavClass('superadmin')">SuperAdmin</Link>
-                            <Link :href="route('admin.dashboard')" :class="roleNavClass('admin')">Admin</Link>
-                            <Link :href="route('leader.dashboard')" :class="roleNavClass('leader')">Leader</Link>
-                            <Link :href="route('clerk.dashboard')" :class="roleNavClass('clerk')">Clerk</Link>
-                            <Link :href="route('coordinator.dashboard')" :class="roleNavClass('coordinator')">Coordinator</Link>
-                            <Link :href="route('proof_coordinator.dashboard')" :class="roleNavClass('proof_coordinator')">Proof Admin</Link>
-                            <Link :href="route('user.dashboard')" :class="roleNavClass('user')">User</Link>
-                            <Link :href="route('prepress.dashboard')" :class="roleNavClass('prepress')">Prepress</Link>
+                            <button type="button" @click="navigateToRole('superadmin')" :class="roleNavClass('superadmin')">SuperAdmin</button>
+                            <button type="button" @click="navigateToRole('admin')" :class="roleNavClass('admin')">Admin</button>
+                            <button type="button" @click="navigateToRole('leader')" :class="roleNavClass('leader')">Leader</button>
+                            <button type="button" @click="navigateToRole('clerk')" :class="roleNavClass('clerk')">Clerk</button>
+                            <button type="button" @click="navigateToRole('coordinator')" :class="roleNavClass('coordinator')">Coordinator</button>
+                            <button type="button" @click="navigateToRole('proof_coordinator')" :class="roleNavClass('proof_coordinator')">Proof Admin</button>
+                            <button type="button" @click="navigateToRole('user')" :class="roleNavClass('user')">User</button>
+                            <button type="button" @click="navigateToRole('prepress')" :class="roleNavClass('prepress')">Prepress</button>
                         </template>
 
                         <!-- Admin用ナビゲーション -->
                         <template v-else-if="$page.props.auth.user.user_role === 'admin'">
-                            <Link :href="route('admin.dashboard')" :class="roleNavClass('admin')">Admin</Link>
-                            <Link :href="route('leader.dashboard')" :class="roleNavClass('leader')">Leader</Link>
-                            <Link :href="route('clerk.dashboard')" :class="roleNavClass('clerk')">Clerk</Link>
-                            <Link :href="route('coordinator.dashboard')" :class="roleNavClass('coordinator')">Coordinator</Link>
-                            <Link :href="route('proof_coordinator.dashboard')" :class="roleNavClass('proof_coordinator')">Proof Admin</Link>
-                            <Link :href="route('user.dashboard')" :class="roleNavClass('user')">User</Link>
-                            <Link :href="route('prepress.dashboard')" :class="roleNavClass('prepress')">Prepress</Link>
+                            <button type="button" @click="navigateToRole('admin')" :class="roleNavClass('admin')">Admin</button>
+                            <button type="button" @click="navigateToRole('leader')" :class="roleNavClass('leader')">Leader</button>
+                            <button type="button" @click="navigateToRole('clerk')" :class="roleNavClass('clerk')">Clerk</button>
+                            <button type="button" @click="navigateToRole('coordinator')" :class="roleNavClass('coordinator')">Coordinator</button>
+                            <button type="button" @click="navigateToRole('proof_coordinator')" :class="roleNavClass('proof_coordinator')">Proof Admin</button>
+                            <button type="button" @click="navigateToRole('user')" :class="roleNavClass('user')">User</button>
+                            <button type="button" @click="navigateToRole('prepress')" :class="roleNavClass('prepress')">Prepress</button>
                         </template>
 
                         <!-- Leader用ナビゲーション（部署リーダーはClerk/ProofCoordinator も表示） -->
                         <template v-else-if="$page.props.auth.user.user_role === 'leader'">
-                            <Link :href="route('leader.dashboard')" :class="roleNavClass('leader')">Leader</Link>
-                            <Link
+                            <button type="button" @click="navigateToRole('leader')" :class="roleNavClass('leader')">Leader</button>
+                            <button
                                 v-if="$page.props.auth.user.isDepartmentLeader"
-                                :href="route('clerk.dashboard')"
+                                type="button" @click="navigateToRole('clerk')"
                                 :class="roleNavClass('clerk')"
-                            >Clerk</Link>
-                            <Link
+                            >Clerk</button>
+                            <button
                                 v-if="$page.props.auth.user.isDepartmentLeader"
-                                :href="route('proof_coordinator.dashboard')"
+                                type="button" @click="navigateToRole('proof_coordinator')"
                                 :class="roleNavClass('proof_coordinator')"
-                            >Proof Admin</Link>
-                            <Link :href="route('coordinator.dashboard')" :class="roleNavClass('coordinator')">Coordinator</Link>
-                            <Link :href="route('user.dashboard')" :class="roleNavClass('user')">User</Link>
-                            <Link
+                            >Proof Admin</button>
+                            <button type="button" @click="navigateToRole('coordinator')" :class="roleNavClass('coordinator')">Coordinator</button>
+                            <button type="button" @click="navigateToRole('user')" :class="roleNavClass('user')">User</button>
+                            <button
                                 v-if="$page.props.auth.user.isPrepressDepartment"
-                                :href="route('prepress.dashboard')"
+                                type="button" @click="navigateToRole('prepress')"
                                 :class="roleNavClass('prepress')"
-                            >Prepress</Link>
+                            >Prepress</button>
                         </template>
 
                         <!-- Clerk用ナビゲーション（Coordinator+User権限を持つ） -->
                         <template v-else-if="$page.props.auth.user.user_role === 'clerk'">
-                            <Link :href="route('clerk.dashboard')" :class="roleNavClass('clerk')">Clerk</Link>
-                            <Link :href="route('coordinator.dashboard')" :class="roleNavClass('coordinator')">Coordinator</Link>
-                            <Link :href="route('user.dashboard')" :class="roleNavClass('user')">User</Link>
-                            <Link
+                            <button type="button" @click="navigateToRole('clerk')" :class="roleNavClass('clerk')">Clerk</button>
+                            <button type="button" @click="navigateToRole('coordinator')" :class="roleNavClass('coordinator')">Coordinator</button>
+                            <button type="button" @click="navigateToRole('user')" :class="roleNavClass('user')">User</button>
+                            <button
                                 v-if="$page.props.auth.user.isPrepressDepartment"
-                                :href="route('prepress.dashboard')"
+                                type="button" @click="navigateToRole('prepress')"
                                 :class="roleNavClass('prepress')"
-                            >Prepress</Link>
+                            >Prepress</button>
                         </template>
 
                         <!-- Coordinator用ナビゲーション -->
                         <template v-else-if="$page.props.auth.user.user_role === 'coordinator'">
-                            <Link :href="route('coordinator.dashboard')" :class="roleNavClass('coordinator')">Coordinator</Link>
-                            <Link :href="route('user.dashboard')" :class="roleNavClass('user')">User</Link>
-                            <Link
+                            <button type="button" @click="navigateToRole('coordinator')" :class="roleNavClass('coordinator')">Coordinator</button>
+                            <button type="button" @click="navigateToRole('user')" :class="roleNavClass('user')">User</button>
+                            <button
                                 v-if="$page.props.auth.user.isPrepressDepartment"
-                                :href="route('prepress.dashboard')"
+                                type="button" @click="navigateToRole('prepress')"
                                 :class="roleNavClass('prepress')"
-                            >Prepress</Link>
+                            >Prepress</button>
                         </template>
 
                         <!-- ProofCoordinator用ナビゲーション -->
                         <template v-else-if="$page.props.auth.user.user_role === 'proof_coordinator'">
-                            <Link :href="route('proof_coordinator.dashboard')" :class="roleNavClass('proof_coordinator')">Proof Admin</Link>
-                            <Link :href="route('user.dashboard')" :class="roleNavClass('user')">User</Link>
+                            <button type="button" @click="navigateToRole('proof_coordinator')" :class="roleNavClass('proof_coordinator')">Proof Admin</button>
+                            <button type="button" @click="navigateToRole('user')" :class="roleNavClass('user')">User</button>
                         </template>
 
                         <!-- 一般ユーザー用ナビゲーション -->
                         <template v-else>
-                            <Link :href="route('dashboard')" :class="roleNavClass('user')">Dashboard</Link>
-                            <Link
+                            <button type="button" @click="navigateToRole('user')" :class="roleNavClass('user')">Dashboard</button>
+                            <button
                                 v-if="$page.props.auth.user.isPrepressDepartment"
-                                :href="route('prepress.dashboard')"
+                                type="button" @click="navigateToRole('prepress')"
                                 :class="roleNavClass('prepress')"
-                            >Prepress</Link>
+                            >Prepress</button>
                         </template>
                     </div>
                 </div>
@@ -736,7 +807,7 @@ const currentRouteContext = computed(() => {
                                 <LeaderNavigationTabs v-else-if="currentRouteContext === 'leader'" :active="getTopTabActive()" />
                                 <ClerkNavigationTabs v-else-if="currentRouteContext === 'clerk'" :active="getTopTabActive()" />
                                 <PrepressNavigationTabs v-else-if="currentRouteContext === 'prepress'" :active="getTopTabActive()" />
-                                <ProofCoordinatorNavigationTabs v-else-if="currentRouteContext === 'proof_coordinator'" />
+                                <ProofCoordinatorNavigationTabs v-else-if="currentRouteContext === 'proof_coordinator'" :active="getTopTabActive()" />
                                 <CoordinatorNavigationTabs
                                     v-else-if="currentRouteContext === 'coordinator'"
                                     :projectJob="page.props.projectJob"

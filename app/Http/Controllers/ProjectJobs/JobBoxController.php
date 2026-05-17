@@ -282,10 +282,11 @@ class JobBoxController extends Controller
                     ->where(function ($q) {
                         $q->whereColumn('pja_self.supersedes_assignment_id', 'project_job_assignments.id')
                           ->orWhere(function ($q2) {
-                              // 自己一致（pja_self が同一レコード）を防ぐため id が異なる条件を付ける
+                              // 自己割当が coordinator アサインより新しい場合のみ非表示
+                              // (pja_self.id > project_job_assignments.id で前後関係を判定)
                               $q2->whereColumn('pja_self.title', 'project_job_assignments.title')
                                  ->whereColumn('pja_self.project_job_id', 'project_job_assignments.project_job_id')
-                                 ->whereColumn('pja_self.id', '<>', 'project_job_assignments.id');
+                                 ->whereColumn('pja_self.id', '>', 'project_job_assignments.id');
                           });
                     })
                     ->whereColumn('pja_self.user_id', 'project_job_assignments.user_id')
@@ -1335,6 +1336,13 @@ class JobBoxController extends Controller
         // workerセルの completed_at を記録
         try {
             \App\Models\ProgressCell::where('assignment_id', $assignment->id)
+                ->whereNull('completed_at')
+                ->update(['completed_at' => now()]);
+        } catch (\Throwable $__e) {
+            // non-fatal
+        }
+        try {
+            \App\Models\WorkflowCell::where('assignment_id', $assignment->id)
                 ->whereNull('completed_at')
                 ->update(['completed_at' => now()]);
         } catch (\Throwable $__e) {

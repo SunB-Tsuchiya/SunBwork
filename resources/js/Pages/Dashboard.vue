@@ -17,7 +17,7 @@ defineProps({
 });
 
 import { usePage } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { nextTick, ref, watch } from 'vue';
 const page = usePage();
 const user = page.props.user;
 
@@ -29,6 +29,14 @@ function setTab(tab) {
     activeTab.value = tab;
     localStorage.setItem(STORAGE_KEY, tab);
 }
+
+// 在席ボード → カレンダーに切り替えたとき、FullCalendarのサイズを再計算させる
+watch(activeTab, async (newTab) => {
+    if (newTab === 'calendar') {
+        await nextTick();
+        window.dispatchEvent(new Event('resize'));
+    }
+});
 </script>
 
 <template>
@@ -42,7 +50,7 @@ function setTab(tab) {
             </h2>
         </template>
         <template #tabs>
-            <UserNavigationTabs active="profile" />
+            <UserNavigationTabs active="dashboard" />
         </template>
 
         <!-- ナビゲーションタブ (ユーザーはページ内で管理) -->

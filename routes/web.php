@@ -106,6 +106,12 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('/proof-coordinator', [App\Http\Controllers\GuideController::class, 'proofCoordinator'])->name('proof_coordinator');
     });
 
+    // スクリプトツール
+    Route::prefix('scripts')->name('scripts.')->group(function () {
+        Route::get('/', [App\Http\Controllers\ScriptController::class, 'index'])->name('index');
+        Route::get('/{script:slug}', [App\Http\Controllers\ScriptController::class, 'show'])->name('show');
+    });
+
     // Ziggy用: 明示的にuser.dashboardルートを追加
     Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
     Route::get('/user/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('user.dashboard');
@@ -114,6 +120,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     Route::get('/presence', [App\Http\Controllers\UserPresenceController::class, 'index'])->name('presence.index');
     Route::get('/presence/statuses', [App\Http\Controllers\UserPresenceController::class, 'statuses'])->name('presence.statuses');
     Route::post('/presence/self/clear', [App\Http\Controllers\UserPresenceController::class, 'clearSelf'])->name('presence.clear_self');
+    Route::get('/presence/status-update', [App\Http\Controllers\UserPresenceController::class, 'statusUpdatePage'])->name('presence.status_update');
 
     // 在席ボード管理（Admin・Leader）— {user} ワイルドカードより前に定義が必須
     Route::get('/presence/board-settings', [App\Http\Controllers\PresenceBoardSettingsController::class, 'index'])->name('presence.board_settings');
@@ -182,7 +189,6 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     Route::get('/user/progress-sheets/{sheet}/print', [\App\Http\Controllers\User\ProgressSheetController::class, 'printView'])->name('user.progress_sheets.print');
     Route::post('/user/progress-sheets/{sheet}/cells/{cell}/assign', [\App\Http\Controllers\User\ProgressSheetController::class, 'assign'])->name('progress_sheets.cells.assign');
     Route::delete('/user/progress-sheets/{sheet}/cells/{cell}/assign', [\App\Http\Controllers\User\ProgressSheetController::class, 'unassign'])->name('progress_sheets.cells.unassign');
-    Route::post('/user/progress-sheets/{sheet}/cells/link-job', [\App\Http\Controllers\User\ProgressSheetController::class, 'linkJob'])->name('progress_sheets.cells.link_job_user');
     Route::get('/user/progress-cells/my-assignments', [\App\Http\Controllers\User\ProgressCellController::class, 'myAssignments'])->name('user.progress_cells.my_assignments');
     Route::post('/user/progress-cells/{cell}/complete', [\App\Http\Controllers\User\ProgressCellController::class, 'complete'])->name('user.progress_cells.complete');
 
@@ -264,8 +270,6 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     // JobBox JSON API (SPA session auth — must be in web.php, not api.php)
     Route::get('/api/jobbox/{id}', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'apiShow'])->name('api.jobbox.show');
     Route::post('/api/jobbox/{id}/read', [\App\Http\Controllers\ProjectJobs\JobBoxController::class, 'apiMarkRead'])->name('api.jobbox.read');
-    // User progress sheet cell link (MyJob登録)
-    Route::post('/user/project-jobs/{projectJob}/progress-sheets/{sheet}/link-job', [App\Http\Controllers\User\ProjectJobController::class, 'linkProgressCell'])->name('user.project_jobs.progress_sheets.link_job');
     // User self-assignment routes
     Route::post('project_jobs/{projectJob}/assignments/user', [App\Http\Controllers\User\ProjectJobAssignmentController::class, 'store'])->name('user.project_jobs.assignments.store');
     Route::patch('project_jobs/{projectJob}/assignments/{assignment}/user', [App\Http\Controllers\User\ProjectJobAssignmentController::class, 'update'])->name('user.project_jobs.assignments.update');
@@ -406,6 +410,9 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         // 会議設定（Admin用）
         Route::resource('meeting-definitions', App\Http\Controllers\Admin\MeetingDefinitionController::class)
             ->names('meeting_definitions');
+
+        // 在席ボード管理（Admin用）
+        Route::get('presence/board-settings', [App\Http\Controllers\PresenceBoardSettingsController::class, 'index'])->name('presence.board_settings');
     });
 
 
@@ -528,6 +535,9 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         // 会議設定（Leader用）
         Route::resource('meeting-definitions', App\Http\Controllers\Leader\MeetingDefinitionController::class)
             ->names('meeting_definitions');
+
+        // 在席ボード管理（Leader用）
+        Route::get('presence/board-settings', [App\Http\Controllers\PresenceBoardSettingsController::class, 'index'])->name('presence.board_settings');
     });
 
 // クライアント管理（Admin用）は上の admin グループに統合済み（重複削除）
@@ -741,9 +751,6 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('progress-sheets/assignments/{assignment}/complete', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'completeAssignment'])->name('progress_sheets.assignments.complete');
         Route::post('progress-sheets/assignments/{assignment}/uncomplete', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'uncompleteAssignment'])->name('progress_sheets.assignments.uncomplete');
         Route::post('progress-sheets/assignments/{assignment}/proof-complete', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'proofDirectComplete'])->name('progress_sheets.assignments.proof_complete');
-        Route::get('progress-sheets/assignments/{assignment}/link-options', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'linkOptions'])->name('progress_sheets.assignments.link_options');
-        Route::post('progress-sheets/assignments/{assignment}/link-cell', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'linkCell'])->name('progress_sheets.assignments.link_cell');
-
         // ── V2 セル操作 ───────────────────────────────────────────
         Route::post('progress-cells/{cell}/complete', [App\Http\Controllers\Coordinator\ProgressCellController::class, 'complete'])->name('progress_cells.complete');
         Route::patch('progress-cells/{cell}/deadline', [App\Http\Controllers\Coordinator\ProgressCellController::class, 'deadline'])->name('progress_cells.deadline');
@@ -765,6 +772,9 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('progress-sheet-list', [App\Http\Controllers\Coordinator\ProgressSheetListController::class, 'index'])->name('progress_sheet_list.index');
         Route::get('progress-sheet-list/create-projects-json', [App\Http\Controllers\Coordinator\ProgressSheetListController::class, 'createProjectsJson'])->name('progress_sheet_list.create_projects_json');
         Route::post('progress-sheet-list/favorite/{sheet}', [App\Http\Controllers\Coordinator\ProgressSheetListController::class, 'toggleFavorite'])->name('progress_sheet_list.favorite');
+        Route::get('workflow-sheet-list', [App\Http\Controllers\Coordinator\WorkflowSheetListController::class, 'index'])->name('workflow_sheet_list.index');
+        Route::get('workflow-sheet-list/create-projects-json', [App\Http\Controllers\Coordinator\WorkflowSheetListController::class, 'createProjectsJson'])->name('workflow_sheet_list.create_projects_json');
+        Route::post('workflow-sheet-list/favorite/{sheet}', [App\Http\Controllers\Coordinator\WorkflowSheetListController::class, 'toggleFavorite'])->name('workflow_sheet_list.favorite');
 
         // ── V-12 進行レポート ───────────────────────────────────────
         Route::get('progress-report', [App\Http\Controllers\Coordinator\ProgressReportController::class, 'index'])->name('progress_report.index');
@@ -794,6 +804,10 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('workflow-sheets/{sheet}/cells/register', [App\Http\Controllers\Coordinator\WorkflowCellController::class, 'register'])->name('workflow_sheets.cells.register');
         Route::post('workflow-cells/{cell}/complete', [App\Http\Controllers\Coordinator\WorkflowCellController::class, 'complete'])->name('workflow_cells.complete');
         Route::post('workflow-cells/{cell}/unregister', [App\Http\Controllers\Coordinator\WorkflowCellController::class, 'unregister'])->name('workflow_cells.unregister');
+        Route::get('workflow-sheets/{sheet}/print', [App\Http\Controllers\Coordinator\WorkflowSheetController::class, 'printView'])->name('workflow_sheets.print');
+        Route::post('workflow-sheets/{sheet}/register-template', [App\Http\Controllers\Coordinator\WorkflowSheetController::class, 'registerAsTemplate'])->name('workflow_sheets.register_template');
+        Route::post('workflow-sheets/{sheet}/share', [App\Http\Controllers\Coordinator\WorkflowSheetController::class, 'share'])->name('workflow_sheets.share');
+        Route::delete('workflow-sheets/{sheet}/share', [App\Http\Controllers\Coordinator\WorkflowSheetController::class, 'unshare'])->name('workflow_sheets.unshare');
 
         // ── 工程シートテンプレート ──────────────────────────────────
         Route::get('workflow-templates', [App\Http\Controllers\Coordinator\WorkflowTemplateController::class, 'index'])->name('workflow_templates.index');
@@ -826,6 +840,9 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
 Route::get('/shared/progress-sheets/{token}', [App\Http\Controllers\Shared\ProgressSheetController::class, 'show'])->name('shared.progress_sheets.show');
 Route::get('/shared/progress-sheets/{token}/print', [App\Http\Controllers\Shared\ProgressSheetController::class, 'printView'])->name('shared.progress_sheets.print');
 
+// 管理シート 共有URL（認証不要・公開）
+Route::get('/shared/workflow-sheets/{token}', [App\Http\Controllers\Shared\WorkflowSheetController::class, 'show'])->name('shared.workflow_sheets.show');
+
 Route::get('/debug/create', function () {
     return Inertia::render('Diaries/CreateDebug');
 })->name('debug.create');
@@ -839,7 +856,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     ->prefix('proof-coordinator')
     ->name('proof_coordinator.')
     ->group(function () {
-        Route::get('dashboard', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'inbox'])->name('dashboard');
+        Route::get('dashboard', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'dashboard'])->name('dashboard');
         Route::get('inbox', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'inbox'])->name('inbox');
         Route::get('inbox/{proofRequest}/assign', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'assignPage'])->name('inbox.assign_page');
         Route::post('inbox/{proofRequest}/assign', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'assignStore'])->name('inbox.assign_store');

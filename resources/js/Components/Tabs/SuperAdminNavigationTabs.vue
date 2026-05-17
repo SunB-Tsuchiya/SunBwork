@@ -19,6 +19,7 @@ function tryRoute(name) {
 }
 
 const tabs = computed(() => [
+    { key: 'dashboard', href: tryRoute('superadmin.dashboard'), label: 'ダッシュボード' },
     {
         key: 'companies',
         href: tryRoute('superadmin.companies.index'),
@@ -69,6 +70,13 @@ function onMobileSelect(e) {
 
         <!-- デスクトップ: タブ -->
         <nav class="hidden sm:flex flex-wrap gap-2" aria-label="Tabs">
+            <Link
+                v-if="typeof route === 'function' && route().has('superadmin.dashboard')"
+                :href="route('superadmin.dashboard')"
+                :class="tab('dashboard')"
+            >
+                ダッシュボード
+            </Link>
             <Link
                 v-if="typeof route === 'function' && route().has('superadmin.companies.index')"
                 :href="route('superadmin.companies.index')"

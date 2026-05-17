@@ -14,9 +14,38 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Inertia\Inertia;
 
 class UserPresenceController extends Controller
 {
+    /**
+     * モバイル向けステータス更新ページ（Inertia）
+     */
+    public function statusUpdatePage()
+    {
+        $user      = Auth::user();
+        $companyId = $user->company_id;
+
+        $presence = UserPresenceStatus::where('user_id', $user->id)->first();
+        $orders   = IrukaStatusOrder::getOrCreateForCompany($companyId);
+
+        $statuses = $orders->where('is_active', true)
+            ->map(fn ($o) => [
+                'slug'         => $o->slug,
+                'sort_order'   => $o->sort_order,
+                'custom_label' => $o->custom_label,
+                'custom_color' => $o->custom_color,
+            ])
+            ->values();
+
+        return Inertia::render('Iruka/StatusUpdate', [
+            'userId'         => $user->id,
+            'currentStatus'  => $presence?->status  ?? 'left',
+            'currentComment' => $presence?->comment ?? '',
+            'statuses'       => $statuses,
+        ]);
+    }
+
     /**
      * 全ユーザーの在席ステータス一覧を返す（ポーリング用）
      */
