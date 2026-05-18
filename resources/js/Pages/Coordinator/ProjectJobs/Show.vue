@@ -1417,7 +1417,7 @@ const tabs = [
     { key: 'overview',     label: '概要・メンバー' },
     { key: 'progress',     label: '進行管理表' },
     { key: 'item_list',    label: '項目リスト' },
-    { key: 'workflow',     label: '工程シート' },
+    { key: 'workflow',     label: '管理シート' },
     { key: 'schedule',     label: 'スケジュール' },
     { key: 'voucher',      label: '伝票情報' },
     { key: 'items',        label: '連携設定' },

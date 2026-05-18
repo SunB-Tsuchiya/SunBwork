@@ -145,13 +145,16 @@ function upsertCell(updated) {
 
 // ── Work minutes ───────────────────────────────────────────────────────────────
 function colTotal(stageKey) {
-    return localCells.value.filter(c => c.stage_key === stageKey).reduce((s, c) => s + (c.work_minutes ?? 0), 0);
+    return localCells.value.filter(c => c.stage_key === stageKey).reduce((s, c) => s + (c.work_minutes ?? 0) + (c.proof_work_minutes ?? 0), 0);
 }
-const grandTotal = computed(() => localCells.value.reduce((s, c) => s + (c.work_minutes ?? 0), 0));
+const grandTotal = computed(() => localCells.value.reduce((s, c) => s + (c.work_minutes ?? 0) + (c.proof_work_minutes ?? 0), 0));
 function fmtMin(m) {
     if (!m) return '—';
-    const h = Math.floor(m / 60), mn = m % 60;
-    return h > 0 ? `${h}h${mn > 0 ? mn + 'm' : ''}` : `${mn}m`;
+    const rounded = Math.round(m / 10) * 10;
+    const h = Math.floor(rounded / 60), mn = rounded % 60;
+    if (h > 0 && mn > 0) return `${h}H${mn}m`;
+    if (h > 0) return `${h}H`;
+    return `${mn}m`;
 }
 
 // ── Column tree traversal helpers ─────────────────────────────────────────────

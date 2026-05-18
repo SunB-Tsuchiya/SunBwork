@@ -1300,8 +1300,8 @@ const workerColWorkMinutes = computed(() => {
     const totals = {};
     for (const col of workerLeafCols.value) {
         totals[col.key] = localCells.value
-            .filter((c) => c.col_key === col.key && c.work_minutes)
-            .reduce((s, c) => s + (c.work_minutes ?? 0), 0);
+            .filter((c) => c.col_key === col.key)
+            .reduce((s, c) => s + (c.work_minutes ?? 0) + (c.proof_work_minutes ?? 0), 0);
     }
     return totals;
 });
@@ -1312,9 +1312,12 @@ const workerGrandTotal = computed(() =>
 
 function formatWorkMins(mins) {
     if (!mins) return '—';
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    return h > 0 ? `${h}h${m > 0 ? m + 'm' : ''}` : `${m}m`;
+    const rounded = Math.round(mins / 10) * 10;
+    const h = Math.floor(rounded / 60);
+    const m = rounded % 60;
+    if (h > 0 && m > 0) return `${h}H${m}m`;
+    if (h > 0) return `${h}H`;
+    return `${m}m`;
 }
 
 // セル pending（未保存の変更）

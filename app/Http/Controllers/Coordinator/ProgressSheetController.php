@@ -208,28 +208,96 @@ class ProgressSheetController extends Controller
                 'cell_note_user_role'          => $c->noteUser?->user_role,
                 'completed_at'                => $c->completed_at?->format('Y-m-d H:i:s'),
                 'work_minutes'                => null, // events から後で上書き
+                'proof_work_minutes'          => 0,    // events から後で上書き
             ]);
 
-        // events から worker セルの作業時間をバッチ算出
-        $workerAssignmentIds = $cells->whereNotNull('assignment_id')->pluck('assignment_id')->unique()->toArray();
+        // events から worker セルの作業時間をバッチ算出（1イベント最大1440分でキャップ）
+        $workerAssignmentIds = $cells->whereNotNull('assignment_id')->pluck('assignment_id')->unique()->values()->toArray();
+
+        // coordinator PJA を supersede している worker 自己割当 PJA も取得
+        $supersedingPjas = [];
         if (!empty($workerAssignmentIds)) {
-            $evtMinutes = DB::table('events')
-                ->whereIn('project_job_assignment_id', $workerAssignmentIds)
+            $supRows = DB::table('project_job_assignments')
+                ->whereIn('supersedes_assignment_id', $workerAssignmentIds)
+                ->select('id', 'supersedes_assignment_id')
+                ->get();
+            foreach ($supRows as $r) {
+                $supersedingPjas[(int)$r->supersedes_assignment_id][] = (int)$r->id;
+            }
+        }
+        $supersedingIds = array_merge(...array_values($supersedingPjas) ?: [[]]);
+        $allPjaIds = array_unique(array_merge($workerAssignmentIds, $supersedingIds));
+
+        $evtMinutes = [];
+        if (!empty($allPjaIds)) {
+            $rawMinutes = DB::table('events')
+                ->whereIn('project_job_assignment_id', $allPjaIds)
                 ->whereNotNull('ends_at')
                 ->selectRaw('project_job_assignment_id,
-                    COALESCE(SUM(TIMESTAMPDIFF(MINUTE, starts_at, ends_at)
-                        - COALESCE(interruption_minutes, 0)), 0) as total')
+                    COALESCE(SUM(GREATEST(0, LEAST(TIMESTAMPDIFF(MINUTE, starts_at, ends_at), 1440)
+                        - COALESCE(interruption_minutes, 0))), 0) as total')
                 ->groupBy('project_job_assignment_id')
                 ->pluck('total', 'project_job_assignment_id')
                 ->toArray();
-
-            $cells = $cells->map(function ($c) use ($evtMinutes) {
-                if ($c['assignment_id'] && isset($evtMinutes[$c['assignment_id']])) {
-                    $c['work_minutes'] = (int) $evtMinutes[$c['assignment_id']];
+            foreach ($workerAssignmentIds as $coordId) {
+                $total = (int)($rawMinutes[$coordId] ?? 0);
+                foreach ($supersedingPjas[$coordId] ?? [] as $wId) {
+                    $total += (int)($rawMinutes[$wId] ?? 0);
                 }
-                return $c;
-            });
+                $evtMinutes[$coordId] = $total;
+            }
         }
+
+        // proof_assignment_id 用のイベントも取得
+        $proofAssignmentIds = $cells->whereNotNull('proof_assignment_id')->pluck('proof_assignment_id')->unique()->values()->toArray();
+        $supersedingProofPjas = [];
+        if (!empty($proofAssignmentIds)) {
+            // supersedes_assignment_id または coordinator_assignment_id で紐づく pja101 を取得
+            $supProofRows = DB::table('project_job_assignments')
+                ->where(function ($q) use ($proofAssignmentIds) {
+                    $q->whereIn('supersedes_assignment_id', $proofAssignmentIds)
+                      ->orWhereIn('coordinator_assignment_id', $proofAssignmentIds);
+                })
+                ->whereColumn('sender_id', 'user_id')
+                ->select('id', 'supersedes_assignment_id', 'coordinator_assignment_id')
+                ->get();
+            foreach ($supProofRows as $r) {
+                $parentId = $r->coordinator_assignment_id ?? $r->supersedes_assignment_id;
+                if ($parentId) {
+                    $supersedingProofPjas[(int)$parentId][] = (int)$r->id;
+                }
+            }
+        }
+        $supersedingProofIds = array_merge(...array_values($supersedingProofPjas) ?: [[]]);
+        $allProofPjaIds = array_unique(array_merge($proofAssignmentIds, $supersedingProofIds));
+
+        $proofEvtMinutes = [];
+        if (!empty($allProofPjaIds)) {
+            $rawProofMinutes = DB::table('events')
+                ->whereIn('project_job_assignment_id', $allProofPjaIds)
+                ->whereNotNull('ends_at')
+                ->selectRaw('project_job_assignment_id,
+                    COALESCE(SUM(GREATEST(0, LEAST(TIMESTAMPDIFF(MINUTE, starts_at, ends_at), 1440)
+                        - COALESCE(interruption_minutes, 0))), 0) as total')
+                ->groupBy('project_job_assignment_id')
+                ->pluck('total', 'project_job_assignment_id')
+                ->toArray();
+            foreach ($proofAssignmentIds as $proofId) {
+                $total = (int)($rawProofMinutes[$proofId] ?? 0);
+                foreach ($supersedingProofPjas[$proofId] ?? [] as $wId) {
+                    $total += (int)($rawProofMinutes[$wId] ?? 0);
+                }
+                $proofEvtMinutes[$proofId] = $total;
+            }
+        }
+
+        $cells = $cells->map(function ($c) use ($evtMinutes, $proofEvtMinutes) {
+            if ($c['assignment_id'] && isset($evtMinutes[$c['assignment_id']])) {
+                $c['work_minutes'] = $evtMinutes[$c['assignment_id']];
+            }
+            $c['proof_work_minutes'] = $c['proof_assignment_id'] ? ($proofEvtMinutes[$c['proof_assignment_id']] ?? 0) : 0;
+            return $c;
+        });
 
         // 担当者選択用ユーザー一覧（案件メンバー + Coordinator）
         $memberIds = $projectJob->teamMembers()->pluck('user_id')->toArray();

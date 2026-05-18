@@ -109,7 +109,12 @@
       </select>
     </template>
     <template v-else>
-      <span class="text-sm text-gray-700">{{ cell.value_user_name ?? '' }}</span>
+      <div class="flex flex-col gap-0.5">
+        <span class="text-sm text-gray-700">{{ cell.value_user_name ?? '' }}</span>
+        <span v-if="cell.proof_work_minutes || cell.work_minutes" class="text-xs text-gray-500">
+          作業: {{ formatWorkMinutes(cell.proof_work_minutes || cell.work_minutes) }}
+        </span>
+      </div>
     </template>
   </td>
 
@@ -132,6 +137,9 @@
           <span class="text-xs text-green-600">
             完了: {{ cell.completed_at ? formatDate(cell.completed_at) : '済' }}
           </span>
+          <span v-if="cell.proof_work_minutes || cell.work_minutes" class="text-xs text-gray-500">
+            作業: {{ formatWorkMinutes(cell.proof_work_minutes || cell.work_minutes) }}
+          </span>
         </template>
         <!-- 登録済み・未完了: ロック表示 -->
         <template v-else-if="cell.assignment_id || cell.proof_assignment_id">
@@ -141,6 +149,9 @@
           </div>
           <span v-if="proofDeadline" class="text-xs" :class="proofDeadlineColor">
             締切: {{ formatShortDate(proofDeadline) }}
+          </span>
+          <span v-if="cell.proof_work_minutes || cell.work_minutes" class="text-xs text-gray-500">
+            作業: {{ formatWorkMinutes(cell.proof_work_minutes || cell.work_minutes) }}
           </span>
         </template>
         <!-- 校正依頼中（pending・未受理） -->
@@ -999,9 +1010,12 @@ function formatDate(dt) {
 
 function formatWorkMinutes(mins) {
   if (!mins) return '';
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return h > 0 ? `${h}h${m > 0 ? m + 'm' : ''}` : `${m}m`;
+  const rounded = Math.round(mins / 10) * 10;
+  const h = Math.floor(rounded / 60);
+  const m = rounded % 60;
+  if (h > 0 && m > 0) return `${h}H${m}m`;
+  if (h > 0) return `${h}H`;
+  return `${m}m`;
 }
 
 function formatShortDate(d) {

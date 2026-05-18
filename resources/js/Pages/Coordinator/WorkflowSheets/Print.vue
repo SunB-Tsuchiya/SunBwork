@@ -14,20 +14,37 @@ const localCells = ref(props.cells.map(c => ({ ...c })));
 
 const columnConfig = computed(() => props.sheet.column_config ?? []);
 
-const topLevelRows = computed(() => localRows.value.filter(r => !r.parent_id));
-const childrenOf   = computed(() => {
-    const map = {};
-    localRows.value.forEach(r => {
-        if (r.parent_id) {
-            if (!map[r.parent_id]) map[r.parent_id] = [];
-            map[r.parent_id].push(r);
-        }
-    });
-    return map;
-});
+// デフォルト行の row_id（_default ラベルまたは最初の行）
+const defaultRowId = computed(() =>
+    localRows.value.find(r => r.label === '_default')?.id ?? localRows.value[0]?.id ?? null
+);
 
-function getCell(rowId, stageKey) {
-    return localCells.value.find(c => c.row_id === rowId && c.stage_key === stageKey) ?? {};
+// ── 縦積みレイアウト判定 ──────────────────────────────────────────
+const stageRows = computed(() =>
+    columnConfig.value.filter(n => n.type === 'stage' && n.children?.length > 0)
+);
+const useVerticalLayout = computed(() => stageRows.value.length > 0);
+
+// 列ヘッダー: 先頭ステージの子ノードを基準にする
+const verticalColumns = computed(() =>
+    stageRows.value.length ? stageRows.value[0].children : []
+);
+
+// 非縦積み（フラット）時のリーフ列
+function getLeaves(nodes) {
+    const result = [];
+    (nodes ?? []).forEach(n => {
+        if (!n.children?.length) result.push(n);
+        else result.push(...getLeaves(n.children));
+    });
+    return result;
+}
+const flatLeafCols = computed(() => getLeaves(columnConfig.value));
+
+// ── セル参照 ─────────────────────────────────────────────────────
+function getCellByStageKey(stageKey) {
+    if (!stageKey || defaultRowId.value === null) return {};
+    return localCells.value.find(c => c.row_id === defaultRowId.value && c.stage_key === stageKey) ?? {};
 }
 
 function stageName(stageId) {
@@ -41,17 +58,32 @@ const printDate = computed(() => {
 
 function fmtMin(m) {
     if (!m) return '';
-    const h = Math.floor(m / 60), mn = m % 60;
-    return h > 0 ? `${h}h${mn > 0 ? mn + 'm' : ''}` : `${mn}m`;
+    const rounded = Math.round(m / 10) * 10;
+    const h = Math.floor(rounded / 60), mn = rounded % 60;
+    if (h > 0 && mn > 0) return `${h}H${mn}m`;
+    if (h > 0) return `${h}H`;
+    return `${mn}m`;
 }
 
 function cellDisplay(cell, col) {
     if (!cell || !cell.id) return '';
-    const t = col.type;
+    const t = col?.type;
     if (t === 'worker' || t === 'coordinator') {
-        return cell.value_user_name ?? cell.value_subcontractor_name ?? '';
+        const name = cell.value_user_name ?? cell.value_subcontractor_name ?? '';
+        const mins = (cell.work_minutes ?? 0) + (cell.proof_work_minutes ?? 0);
+        const parts = [name];
+        if (cell.assignment_completed || cell.completed_at) parts.push('✓');
+        if (mins) parts.push(fmtMin(mins));
+        return parts.filter(Boolean).join(' ');
     }
-    if (t === 'proof_v2') return cell.proof_assignment_title ?? cell.value_user_name ?? '';
+    if (t === 'proof_v2' || t === 'proof_user') {
+        const name = cell.proof_assignment_title ?? cell.value_user_name ?? '';
+        const mins = cell.proof_work_minutes ?? 0;
+        const parts = [name];
+        if (cell.proof_assignment_completed || cell.completed_at) parts.push('✓');
+        if (mins) parts.push(fmtMin(mins));
+        return parts.filter(Boolean).join(' ');
+    }
     if (t === 'schedlink') return cell.schedule_name ?? '';
     if (t === 'date') return cell.value_date ?? '';
     if (t === 'bool') return cell.value_bool ? '✓' : '';
@@ -59,7 +91,7 @@ function cellDisplay(cell, col) {
 }
 
 function cellCompleted(cell) {
-    return !!(cell?.completed_at);
+    return !!(cell?.completed_at || cell?.assignment_completed || cell?.proof_assignment_completed);
 }
 </script>
 
@@ -87,50 +119,69 @@ function cellCompleted(cell) {
                 <p class="mt-0.5 text-xs text-gray-400">印刷日: {{ printDate }}</p>
             </div>
 
-            <!-- テーブル -->
-            <div v-if="!columnConfig.length" class="py-8 text-center text-gray-400">列が定義されていません。</div>
-            <table v-else class="w-full border-collapse border border-gray-400 text-xs">
-                <thead>
-                    <tr class="bg-gray-100">
-                        <th class="border border-gray-400 px-2 py-1 text-left font-semibold" style="min-width:120px;">項目 / 行</th>
-                        <th
-                            v-for="col in columnConfig"
-                            :key="col.key"
-                            class="border border-gray-400 px-2 py-1 text-center font-semibold"
-                            style="min-width:100px;"
-                        >{{ col.label }}</th>
-                        <th class="border border-gray-400 px-2 py-1 text-center font-semibold" style="width:50px;">完了</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <template v-for="row in topLevelRows" :key="row.id">
-                        <!-- グループ見出し -->
-                        <tr class="bg-gray-50">
-                            <td :colspan="columnConfig.length + 2" class="border border-gray-400 px-2 py-1 font-semibold text-gray-600">
-                                {{ row.label }}
-                                <span v-if="row.stage_id" class="ml-2 text-xs font-normal text-gray-400">[{{ stageName(row.stage_id) }}]</span>
+            <!-- テーブル（縦積みレイアウト） -->
+            <template v-if="useVerticalLayout">
+                <div v-if="!stageRows.length" class="py-8 text-center text-gray-400">列が定義されていません。</div>
+                <table v-else class="w-full border-collapse border border-gray-400 text-xs">
+                    <thead>
+                        <tr class="bg-gray-100">
+                            <th class="border border-gray-400 px-2 py-1 text-left font-semibold" style="min-width:100px;">ステージ</th>
+                            <th
+                                v-for="col in verticalColumns"
+                                :key="col.key"
+                                class="border border-gray-400 px-2 py-1 text-center font-semibold"
+                                style="min-width:90px;"
+                            >{{ col.label }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="stage in stageRows" :key="stage.key">
+                            <td class="border border-gray-400 px-2 py-1 font-semibold text-gray-700 bg-gray-50">
+                                {{ stage.item_label ? `${stage.item_label} / ${stage.label}` : stage.label }}
+                            </td>
+                            <td
+                                v-for="(colTemplate, ci) in verticalColumns"
+                                :key="colTemplate.key"
+                                class="border border-gray-400 px-2 py-1 text-center"
+                                :class="cellCompleted(getCellByStageKey(stage.children[ci]?.key)) ? 'bg-green-50' : ''"
+                            >
+                                {{ cellDisplay(getCellByStageKey(stage.children[ci]?.key), stage.children[ci]) }}
                             </td>
                         </tr>
+                    </tbody>
+                </table>
+            </template>
 
-                        <!-- 子行 -->
-                        <tr
-                            v-for="child in (childrenOf[row.id] ?? [])"
-                            :key="child.id"
-                        >
-                            <td class="border border-gray-400 py-1 pl-4 pr-2">{{ child.label }}</td>
+            <!-- テーブル（フラットレイアウト） -->
+            <template v-else>
+                <div v-if="!flatLeafCols.length" class="py-8 text-center text-gray-400">列が定義されていません。</div>
+                <table v-else class="w-full border-collapse border border-gray-400 text-xs">
+                    <thead>
+                        <tr class="bg-gray-100">
+                            <th class="border border-gray-400 px-2 py-1 text-left font-semibold" style="min-width:80px;">行</th>
+                            <th
+                                v-for="col in flatLeafCols"
+                                :key="col.key"
+                                class="border border-gray-400 px-2 py-1 text-center font-semibold"
+                                style="min-width:90px;"
+                            >{{ col.label }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="border border-gray-400 px-2 py-1 text-gray-500 bg-gray-50">—</td>
                             <td
-                                v-for="col in columnConfig"
+                                v-for="col in flatLeafCols"
                                 :key="col.key"
                                 class="border border-gray-400 px-2 py-1 text-center"
-                                :class="cellCompleted(getCell(child.id, col.key)) ? 'bg-green-50' : ''"
-                            >{{ cellDisplay(getCell(child.id, col.key), col) }}</td>
-                            <td class="border border-gray-400 px-2 py-1 text-center">
-                                <span v-if="getCell(child.id, columnConfig[0]?.key)?.completed_at">✓</span>
+                                :class="cellCompleted(getCellByStageKey(col.key)) ? 'bg-green-50' : ''"
+                            >
+                                {{ cellDisplay(getCellByStageKey(col.key), col) }}
                             </td>
                         </tr>
-                    </template>
-                </tbody>
-            </table>
+                    </tbody>
+                </table>
+            </template>
         </div>
     </div>
 </template>

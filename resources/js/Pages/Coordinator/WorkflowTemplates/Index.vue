@@ -1,5 +1,5 @@
 <template>
-    <AppLayout title="工程シートテンプレート">
+    <AppLayout title="管理シートテンプレート">
         <template #header>
             <h2 class="text-xl font-semibold text-gray-800">工程シートテンプレート管理</h2>
         </template>
