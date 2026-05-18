@@ -312,6 +312,26 @@ function downloadManifest() {
     URL.revokeObjectURL(url);
 }
 
+// ===== サンプルCSVダウンロード =====
+function downloadSampleCsv() {
+    const rows = [
+        'id,title',
+        '001,北信越の特急あさま_車窓から',
+        '002,飯山線の雪景色',
+        '003,長野駅ホーム',
+        '004,善光寺参道の朝霧',
+        '005,松本城と北アルプス',
+    ];
+    const bom  = '\uFEFF'; // BOM付きUTF-8（Excelで文字化けしないように）
+    const blob = new Blob([bom + rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = 'sample_image_rename.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
 // ===== リセット =====
 function reset() {
     step.value        = 1;
@@ -504,7 +524,19 @@ function reset() {
 
         <!-- STEP 1: CSV / Excel 読込 -->
         <div v-if="step === 1" class="rounded bg-white p-6 shadow">
-            <h3 class="mb-4 text-base font-semibold text-gray-800">Step 1 — CSVまたはExcelファイルを選択</h3>
+            <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <h3 class="text-base font-semibold text-gray-800">Step 1 — CSVまたはExcelファイルを選択</h3>
+                <button
+                    type="button"
+                    class="flex items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
+                    @click="downloadSampleCsv"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                    </svg>
+                    サンプルCSVをダウンロード
+                </button>
+            </div>
 
             <div class="mb-4 rounded-lg border-2 border-dashed border-gray-300 p-8 text-center hover:border-indigo-400">
                 <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto mb-3 h-10 w-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
