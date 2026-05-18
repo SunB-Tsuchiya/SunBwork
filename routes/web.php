@@ -893,6 +893,10 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('workflow-sheets/{sheet}', [\App\Http\Controllers\ProofCoordinator\WorkflowSheetProofController::class, 'show'])->name('workflow_sheets.show');
         Route::get('workflow-sheets/{sheet}/assign', [\App\Http\Controllers\ProofCoordinator\WorkflowSheetProofController::class, 'assignPage'])->name('workflow_sheets.assign_page');
         Route::post('workflow-sheets/{sheet}/assign', [\App\Http\Controllers\ProofCoordinator\WorkflowSheetProofController::class, 'assignStore'])->name('workflow_sheets.assign_store');
+        // 進行表（校正）
+        Route::get('progress-sheets/{sheet}', [\App\Http\Controllers\ProofCoordinator\ProgressSheetProofController::class, 'show'])->name('progress_sheets.show');
+        Route::get('progress-sheets/{sheet}/assign', [\App\Http\Controllers\ProofCoordinator\ProgressSheetProofController::class, 'assignPage'])->name('progress_sheets.assign_page');
+        Route::post('progress-sheets/{sheet}/assign', [\App\Http\Controllers\ProofCoordinator\ProgressSheetProofController::class, 'assignStore'])->name('progress_sheets.assign_store');
     });
 
 // =====================================================

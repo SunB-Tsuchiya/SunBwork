@@ -352,11 +352,13 @@ async function submitProofRequest() {
         c => c.row_id === props.defaultRowId && c.stage_key === proofModalData.value.colKey
     );
     const payload = {
-        project_job_id:   props.projectJob?.id ?? null,
-        workflow_cell_id: cell?.id ?? null,
-        title:            proofModalData.value.title,
-        deadline:         proofModalData.value.deadline,
-        note:             proofModalData.value.note,
+        project_job_id:     props.projectJob?.id ?? null,
+        workflow_cell_id:   cell?.id ?? null,
+        workflow_sheet_id:  cell ? null : (props.sheet?.id ?? null),
+        workflow_stage_key: cell ? null : (proofModalData.value.colKey ?? null),
+        title:              proofModalData.value.title,
+        deadline:           proofModalData.value.deadline,
+        note:               proofModalData.value.note,
     };
     try {
         await axios.post(route('proof_requests.store'), payload);

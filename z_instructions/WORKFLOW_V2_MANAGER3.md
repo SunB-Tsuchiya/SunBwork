@@ -38,13 +38,32 @@ Phase A（DB）→ Phase B（バックエンド）→ Phase C（フロントエ�
 | P3-07 | ProofCoordinator/WorkflowSheets/Assign.vue 更新 | ✅ 完了 | proofRequest prop・proof_request_id storeUrl付加 |
 | P3-08 | ProofCoordinatorNavigationTabs.vue 更新 | ✅ 完了 | 「管理シート（校正）」タブ削除 |
 
+### Phase P4: 進行表（ProgressSheet）からの依頼リダイレクト
+
+| # | タスク | 状態 | 備考 |
+|---|--------|------|------|
+| P4-01 | ProofRequestController::assignPage(): proof_cell_id リダイレクト追加 | ✅ 完了 | |
+| P4-02 | ProgressSheetProofController 新規作成 | ✅ 完了 | show / assignPage / assignStore |
+| P4-03 | routes/web.php: progress-sheets 3ルート追加 | ✅ 完了 | |
+| P4-04 | ProofCoordinator/ProgressSheets/Show.vue 新規作成 | ✅ 完了 | |
+| P4-05 | ProofCoordinator/ProgressSheets/Assign.vue 新規作成 | ✅ 完了 | |
+
 ### Phase D: ビルド・マイグレーション
 
 | # | タスク | 状態 | 備考 |
 |---|--------|------|------|
-| P3-09 | npm run build | ✅ 完了 | |
-| P3-10 | php artisan migrate（コンテナ内） | ⬜ 未着手 | |
-| P3-11 | 動作確認（ローカル） | ⬜ 未着手 | |
+| P3-09 | npm run build（P3+P4） | ✅ 完了 | |
+| P3-10 | php artisan migrate（コンテナ内） | ✅ 完了 | workflow_cell_id追加済み |
+| P3-11 | 動作確認（ローカル） | ✅ 完了 | ユーザー確認により全フロー OK |
+
+### Phase BF: バグ修正（2026-05-18 動作確認後）
+
+| # | タスク | 状態 | 備考 |
+|---|--------|------|------|
+| BF-01 | workflow_cell_id が null のまま保存 → firstOrCreate + fallback redirect | ✅ 完了 | ProofRequestController::store()/assignPage() + Coordinator/Show.vue |
+| BF-02 | 全行に `+ 担当者` ボタン表示 → targetProofKeys で対象校正セルを絞り込み | ✅ 完了 | WorkflowSheetProofController::show() + ProofCo/Show.vue |
+| BF-03 | WorkflowSheets/Assign.vue が一般フォームになっていた → 校正専用フォームに復元 | ✅ 完了 | Assign.vue 再実装 + SavesProofWorkSlots trait 新規追加 |
+| BF-04 | ユーザー校正ジョブ画面でクライアント空欄 | ✅ 完了 | ProofJobController eager load (.client) + _client_id 追加 |
 
 ---
 
@@ -74,3 +93,5 @@ Phase A（DB）→ Phase B（バックエンド）→ Phase C（フロントエ�
 |------|--------|------|
 | 2026-05-18 | Claude | PLAN3 / MANAGER3 / PROMPT3 作成・設計確定 |
 | 2026-05-18 | Claude | Phase A〜C 全実装・npm run build 完了 |
+| 2026-05-18 | Claude | P4（進行表リダイレクト対応）実装完了・PLAN3 設計追記 |
+| 2026-05-18 | Claude | BF-01〜04 バグ修正完了・動作確認 OK（ユーザー確認済み） |

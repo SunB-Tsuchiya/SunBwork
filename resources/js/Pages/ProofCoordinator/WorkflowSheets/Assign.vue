@@ -4,6 +4,18 @@ import { Link } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import ProofCoordinatorNavigationTabs from '@/Components/Tabs/ProofCoordinatorNavigationTabs.vue';
 import AssignmentForm from '@/Pages/Coordinator/ProjectJobs/JobAssign/AssignmentForm.vue';
+import ProofTimelinePickerModal from '@/Components/ProofTimelinePickerModal.vue';
+
+function fmtDeadline(isoStr) {
+    if (!isoStr) return '—';
+    const fmt = new Intl.DateTimeFormat('ja-JP', {
+        timeZone: 'Asia/Tokyo',
+        year: 'numeric', month: 'numeric', day: 'numeric',
+        hour: '2-digit', minute: '2-digit', hour12: false,
+    });
+    const p = Object.fromEntries(fmt.formatToParts(new Date(isoStr)).map(({ type, value }) => [type, value]));
+    return `${p.year}年${p.month}月${p.day}日 ${p.hour}時${p.minute}分`;
+}
 
 const props = defineProps({
     sheet:             { type: Object, required: true },
@@ -35,7 +47,32 @@ const storeUrl = computed(() => {
     return qsStr ? `${base}?${qsStr}` : base;
 });
 
-const assignmentFormRef = ref(null);
+// ─────────────────────────────────────────────────────────────────
+//  タイムラインピッカーモーダル
+// ─────────────────────────────────────────────────────────────────
+const assignmentFormRef  = ref(null);
+const showPickerModal    = ref(false);
+const pickerInitialUser  = ref(null);
+
+function openPicker() {
+    const uid = assignmentFormRef.value?.getSelectedUserId() ?? null;
+    pickerInitialUser.value = uid ? Number(uid) : null;
+    showPickerModal.value = true;
+}
+
+function onPickerUserSelected(userId) {
+    assignmentFormRef.value?.setSelectedUser(userId);
+}
+
+function onPickerConfirmed({ newSlots }) {
+    if (newSlots.length > 0 && !assignmentFormRef.value?.getSelectedUserId()) {
+        assignmentFormRef.value?.setSelectedUser(newSlots[0].userId);
+    }
+    for (const slot of newSlots) {
+        assignmentFormRef.value?.addExternalWorkSlot(slot);
+    }
+    showPickerModal.value = false;
+}
 </script>
 
 <template>
@@ -59,18 +96,33 @@ const assignmentFormRef = ref(null);
         </template>
 
         <div class="mx-auto max-w-3xl space-y-4">
-            <!-- 校正依頼情報パネル -->
-            <div v-if="proofRequest" class="rounded border border-pink-200 bg-pink-50 px-4 py-3 text-sm">
-                <div class="mb-1 font-semibold text-pink-700">校正依頼: {{ proofRequest.title }}</div>
-                <div class="flex flex-wrap gap-4 text-gray-600">
-                    <span v-if="proofRequest.deadline">締切: <strong>{{ proofRequest.deadline }}</strong></span>
-                    <span v-if="proofRequest.note">備考: {{ proofRequest.note }}</span>
-                </div>
+
+            <!-- 校正依頼情報（読み取り専用） -->
+            <div v-if="proofRequest" class="rounded border border-pink-100 bg-pink-50 p-4 text-sm">
+                <p class="mb-1 font-semibold text-pink-700">校正依頼情報</p>
+                <dl class="grid grid-cols-2 gap-x-6 gap-y-1 text-gray-700 sm:grid-cols-3">
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500">依頼者</dt>
+                        <dd>{{ proofRequest.requester_name ?? '—' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500">校正締め切り</dt>
+                        <dd :class="proofRequest.deadline && new Date(proofRequest.deadline) < new Date() ? 'font-bold text-red-600' : ''">
+                            {{ fmtDeadline(proofRequest.deadline) }}
+                        </dd>
+                    </div>
+                    <div v-if="proofRequest.note">
+                        <dt class="text-xs font-medium text-gray-500">備考</dt>
+                        <dd class="truncate">{{ proofRequest.note }}</dd>
+                    </div>
+                </dl>
             </div>
 
+            <!-- ジョブ割り当てフォーム -->
             <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
                 <p class="mb-4 text-sm text-gray-500">
-                    校正担当者を選択してください。選択できるのは校正チームのメンバーまたは単発派遣です。
+                    ※ 担当者を選択してください。選択できるのは校正チームのメンバーまたは単発派遣です。<br>
+                    ※ 作業詳細（種別・サイズ・ステージ等）は依頼者のジョブから引き継いでいます。必要に応じて修正してください。
                 </p>
 
                 <AssignmentForm
@@ -82,9 +134,22 @@ const assignmentFormRef = ref(null);
                     :editMode="true"
                     :hide-status="true"
                     :storeOverrideUrl="storeUrl"
+                    :show-work-slots="true"
                     :backUrl="route('proof_coordinator.workflow_sheets.show', { sheet: sheet.id })"
+                    @open-calendar="openPicker"
                 />
             </div>
+
         </div>
+
+        <!-- タイムラインピッカーモーダル（校正担当者のスケジュール確認） -->
+        <ProofTimelinePickerModal
+            :show="showPickerModal"
+            :initialUserId="pickerInitialUser"
+            @close="showPickerModal = false"
+            @user-selected="onPickerUserSelected"
+            @confirmed="onPickerConfirmed"
+        />
+
     </AppLayout>
 </template>

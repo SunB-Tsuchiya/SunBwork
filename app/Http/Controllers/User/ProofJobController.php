@@ -258,7 +258,7 @@ class ProofJobController extends Controller
         abort_if($proofRequest->proofreader_id !== $user->id, 403);
 
         // pja100 を取得
-        $pja100 = ProjectJobAssignment::with(['projectJob', 'user', 'statusModel'])
+        $pja100 = ProjectJobAssignment::with(['projectJob.client', 'user', 'statusModel'])
             ->where('project_job_id', $proofRequest->project_job_id)
             ->where('user_id', $proofRequest->proofreader_id)
             ->where('sender_id', $proofRequest->proof_coordinator_id)
@@ -294,6 +294,13 @@ class ProofJobController extends Controller
         $difficulties = \App\Models\Difficulty::orderBy('sort_order')->get(['id', 'name']);
         $companies    = \App\Models\Company::orderBy('name')->get(['id', 'name']);
 
+        $assignmentData = null;
+        if ($pja100) {
+            $arr = $pja100->toArray();
+            $arr['_client_id'] = (string) ($pja100->projectJob?->client_id ?? '');
+            $assignmentData = $arr;
+        }
+
         return Inertia::render('User/ProofJobs/Set', [
             'proofRequest' => [
                 'id'          => $proofRequest->id,
@@ -307,7 +314,7 @@ class ProofJobController extends Controller
             'assignment'        => $pja100,
             'projectJob'        => $pja100?->projectJob,
             'members'           => [['id' => $user->id, 'name' => $user->name]],
-            'assignments_data'  => $pja100 ? [$pja100->toArray()] : [],
+            'assignments_data'  => $assignmentData ? [$assignmentData] : [],
             'existingSlots'     => $existingSlots,
             'types'             => $types,
             'sizes'             => $sizes,

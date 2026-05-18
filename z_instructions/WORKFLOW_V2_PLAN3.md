@@ -274,5 +274,133 @@ ProofRequest がある場合、フォーム上部に依頼情報パネルを表�
 
 | # | 項目 | 状態 |
 |---|------|------|
-| 1 | proof_request_id を assignPage 経由で Assign.vue に渡す際、WorkflowSheetProofController::assignPage() でも ProofRequest を render に含めるか | 実装時確認 |
+| 1 | proof_request_id を assignPage 経由で Assign.vue に渡す際、WorkflowSheetProofController::assignPage() でも ProofRequest を render に含めるか | ✅ 解決: render に proofRequest prop を追加して実装済み |
 | 2 | coordinator の proof_v2 セルに証明依頼が複数存在する場合の扱い（最新1件のみ対応） | ⚠️ 暫定最新1件 |
+
+---
+
+## P4: 進行表（ProgressSheet）からの依頼リダイレクト対応
+
+追加日: 2026-05-18
+
+### 背景
+
+管理シート（WorkflowSheet）と同様に、進行表（ProgressSheet）の proof_user/proof_v2 セルから校正依頼をした場合も、
+proof_coordinator が inbox をクリックすると該当の進行表セルを表示・ハイライトしてアサインできるようにする。
+
+`ProofRequest.proof_cell_id` → `ProgressCell` → `ProgressRow` → `ProgressSheet` のチェーンを使ってリダイレクトする。
+
+### フロー
+
+```
+【proof_coordinator が受理・配置する（進行表経由依頼）】
+inbox 一覧 → 依頼をクリック
+  ├─ workflow_cell_id あり（管理シート）→ P3 の既存フロー
+  │
+  └─ proof_cell_id あり（進行表）
+       → ProofRequestController::assignPage()
+         → redirect → proof_coordinator.progress_sheets.show?proof_request_id=X
+       → Show.vue: 該当セルをハイライト + 依頼パネル表示
+       → [+ 担当者] → ProgressSheets/Assign.vue（proof_request_id 付き）
+       → assignStore: 受理(ProofRequest→in_progress) + ProgressCell.proof_assignment_id 更新
+       → inbox に戻る
+```
+
+### 実装ファイル一覧
+
+| # | ファイル | 種別 | 内容 |
+|---|---------|------|------|
+| P4-01 | `app/Http/Controllers/ProofCoordinator/ProofRequestController.php` | 更新 | assignPage(): proof_cell_id があれば progress_sheets.show へ redirect |
+| P4-02 | `app/Http/Controllers/ProofCoordinator/ProgressSheetProofController.php` | 新規 | show() / assignPage() / assignStore() |
+| P4-03 | `routes/web.php` | 更新 | proof-coordinator グループに 3 ルート追加 |
+| P4-04 | `resources/js/Pages/ProofCoordinator/ProgressSheets/Show.vue` | 新規 | proof_user/proof_v2 列ビュー・ハイライト・依頼パネル |
+| P4-05 | `resources/js/Pages/ProofCoordinator/ProgressSheets/Assign.vue` | 新規 | proofRequest context・storeUrl |
+
+### ProgressSheetProofController 仕様
+
+**show():**
+- column_config から proof_user/proof_v2 リーフを再帰抽出 → `proofColumnDefs`
+- 全 ProgressRow を取得 → `rows`
+- 全 ProgressCell（proof列のみ）を取得 → pending ProofRequest 付与
+- URL クエリ `proof_request_id` があれば ProofRequest 情報を返却
+
+**assignStore():**
+- WorkflowSheetProofController::assignStore() と同構造
+- `ProgressCell.proof_assignment_id` に assignment.id を更新
+- `ProofRequest.status` を in_progress に更新
+
+---
+
+## バグ修正ログ（2026-05-18 実装後）
+
+### BUG-01: `workflow_cell_id` が null のまま保存される
+
+**症状:** inbox から `/proof-coordinator/inbox/{id}/assign` を開いても管理シートにリダイレクトされない
+
+**原因（2パターン）:**
+
+1. **管理シートから依頼した場合:** `proof_v2` セルが DB に未作成（操作前）の場合、`localCells.find()` が undefined を返し `workflow_cell_id: null` で送信される
+2. **管理シート外（MyJobBox / coordinator アサイン画面）から依頼した場合:** `ProofRequestModal` が `workflow_cell_id` を知らないため常に null
+
+**修正内容:**
+
+- `Coordinator/WorkflowSheets/Show.vue` `submitProofRequest`: セルが未存在の場合 `workflow_sheet_id` + `workflow_stage_key` を payload に追加
+- `ProofRequestController::store()`: `workflow_sheet_id` + `workflow_stage_key` が来た場合は WorkflowCell を `firstOrCreate` して `workflow_cell_id` をセット
+- `ProofRequestController::assignPage()`: `workflow_cell_id` も `proof_cell_id` も null の場合、`project_job_id` でシートを検索してフォールバックリダイレクト
+
+```php
+// assignPage() のリダイレクト優先順位
+// 1. workflow_cell_id あり → 管理シート（セル指定）
+// 2. proof_cell_id あり    → 進行表
+// 3. project_job に管理シートあり → 管理シート（フォールバック）
+// 4. どれもなし → 従来の Inbox/Assign.vue フォーム
+```
+
+---
+
+### BUG-02: 管理シートの全セル（全行）に `+ 担当者` ボタンが表示される
+
+**症状:** proof_request_id 付きで管理シートを開くと、全ステージ行の校正欄がクリック可能になる
+
+**原因:** `targetProofKeys` が未実装で、どの行が対象か絞り込めていなかった
+
+**修正内容:**
+
+- `WorkflowSheetProofController::show()`: `proof_request_id` がある場合、source PJA → `supersedes_assignment_id` → coordinator PJA → WorkflowCell → `stage_key` → `findProofKeysForWorkerKey()` で同ステージの proof_v2 キーを取得し `targetProofKeys` として返す
+- `ProofCoordinator/WorkflowSheets/Show.vue`: `targetProofKeys` prop を追加。`isTargetCell()` で対象外セルは `—` でグレーアウト。`handleAssign` で `proofRequestId` も付与
+
+**PJA チェーン:**
+```
+ProofRequest.project_job_assignment_id (pja242: 自己割当)
+  → pja242.supersedes_assignment_id (pja241: coordinator 割当)
+    → WorkflowCell.assignment_id = 241
+      → WorkflowCell.stage_key
+        → column_config を走査 → 同ステージの proof_v2 キー群
+```
+
+---
+
+### BUG-03: `WorkflowSheets/Assign.vue` が一般フォームになっていた（校正タイムラインピッカーなし）
+
+**症状:** 割り当てフォームに校正員のタイムテーブル（ProofTimelinePickerModal）が表示されない
+
+**修正内容:**
+
+- `Concerns/SavesProofWorkSlots.php` 新規作成: `saveWorkSlots()` ロジックを trait に抽出（`ProofRequestController` と `WorkflowSheetProofController` で共有）
+- `ProofRequestController`: `SavesProofWorkSlots` trait を use、private メソッドを削除
+- `WorkflowSheetProofController`: `SavesProofWorkSlots` trait を use、`assignStore()` に work_slots 処理を追加
+- `WorkflowSheets/Assign.vue`: `ProofTimelinePickerModal` を追加、`show-work-slots="true"` + `@open-calendar` を AssignmentForm に付与、依頼情報パネルを `Inbox/Assign.vue` と同形式に統一
+- `assignPage()`: deadline を `format('Y-m-d')` → `toIso8601String()` に変更（`fmtDeadline()` が正確な時刻を表示するため）、`requester_name` を追加
+
+---
+
+### BUG-04: ユーザー校正ジョブ画面でクライアントが空欄
+
+**症状:** `/user/proof-jobs/{id}/set` でクライアントフィールドが「-」表示
+
+**原因:** `ProofJobController::setPage()` で pja100 を `with(['projectJob'])` でロードしており、`client` リレーションが未ロード。`assignments_data` にも `_client_id` が含まれていない
+
+**修正内容:**
+
+- `ProofJobController::setPage()`: `with(['projectJob.client', ...])` に変更
+- `setPage()`: `assignments_data` に `'_client_id' => (string)($pja100->projectJob?->client_id ?? '')` を明示的にセット

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\ProofCoordinator;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\SavesProofWorkSlots;
 use App\Models\ProjectJobAssignment;
 use App\Models\ProofDispatcher;
 use App\Models\ProofRequest;
@@ -18,6 +19,7 @@ use Inertia\Inertia;
 
 class WorkflowSheetProofController extends Controller
 {
+    use SavesProofWorkSlots;
     public function index(Request $request)
     {
         $search = $request->input('search', '');
@@ -134,6 +136,7 @@ class WorkflowSheetProofController extends Controller
         // URL クエリから proof_request_id を取得し、依頼情報を組み立てる
         $proofRequestId   = $request->query('proof_request_id') ? (int) $request->query('proof_request_id') : null;
         $proofRequestData = null;
+        $targetProofKeys  = null;
         if ($proofRequestId) {
             $pr = ProofRequest::with('requester:id,name')->find($proofRequestId);
             if ($pr) {
@@ -144,6 +147,28 @@ class WorkflowSheetProofController extends Controller
                     'note'           => $pr->note,
                     'requester_name' => $pr->requester?->name,
                 ];
+
+                // 組版 PJA から同一ステージグループの proof_v2 キーを特定
+                if ($pr->project_job_assignment_id) {
+                    $srcPja = ProjectJobAssignment::find($pr->project_job_assignment_id);
+                    $coordPjaId = null;
+                    if ($srcPja) {
+                        if ($srcPja->sender_id !== $srcPja->user_id) {
+                            $coordPjaId = $srcPja->id;
+                        } elseif ($srcPja->supersedes_assignment_id) {
+                            $coordPjaId = $srcPja->supersedes_assignment_id;
+                        }
+                    }
+                    if ($coordPjaId) {
+                        $workerCell = WorkflowCell::where('assignment_id', $coordPjaId)->first();
+                        if ($workerCell) {
+                            $keys = $this->findProofKeysForWorkerKey($columnConfig, $workerCell->stage_key);
+                            if (!empty($keys)) {
+                                $targetProofKeys = $keys;
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -185,6 +210,7 @@ class WorkflowSheetProofController extends Controller
             'user_department_id' => $user->department_id,
             'proofRequestId'     => $proofRequestId,
             'proofRequestData'   => $proofRequestData,
+            'targetProofKeys'    => $targetProofKeys,
         ]);
     }
 
@@ -207,10 +233,11 @@ class WorkflowSheetProofController extends Controller
             if ($proofRequest) {
                 if (!$title) $title = $proofRequest->title . '-校正';
                 $proofRequestData = [
-                    'id'       => $proofRequest->id,
-                    'title'    => $proofRequest->title,
-                    'deadline' => $proofRequest->deadline?->format('Y-m-d'),
-                    'note'     => $proofRequest->note,
+                    'id'             => $proofRequest->id,
+                    'title'          => $proofRequest->title,
+                    'deadline'       => $proofRequest->deadline?->toIso8601String(),
+                    'note'           => $proofRequest->note,
+                    'requester_name' => $proofRequest->requester?->name,
                 ];
             }
         }
@@ -360,6 +387,15 @@ class WorkflowSheetProofController extends Controller
             }
         });
 
+        // work_slots があれば ProofSchedule + pja101 + Event を作成（proof_request が必要）
+        $rawSlots = $request->input('work_slots', []);
+        if (is_array($rawSlots) && count($rawSlots) > 0 && $proofRequestId) {
+            $freshPr = ProofRequest::find($proofRequestId);
+            if ($freshPr) {
+                $this->saveWorkSlots($freshPr, $rawSlots, false);
+            }
+        }
+
         return redirect()->route('proof_coordinator.workflow_sheets.show', $sheet->id)
             ->with('success', '担当者をアサインしました。');
     }
@@ -401,6 +437,30 @@ class WorkflowSheetProofController extends Controller
             ]);
 
         return $members->concat($dispatchers);
+    }
+
+    /**
+     * workerKey（組版等）と同じステージグループ内の proof_v2 / proof_user キーを再帰取得する。
+     */
+    private function findProofKeysForWorkerKey(array $nodes, string $workerKey): array
+    {
+        foreach ($nodes as $node) {
+            if (!empty($node['children'])) {
+                $childKeys = array_column($node['children'], 'key');
+                if (in_array($workerKey, $childKeys, true)) {
+                    $proofKeys = [];
+                    foreach ($node['children'] as $child) {
+                        if (in_array($child['type'] ?? '', ['proof_v2', 'proof_user'], true)) {
+                            $proofKeys[] = $child['key'];
+                        }
+                    }
+                    return $proofKeys;
+                }
+                $found = $this->findProofKeysForWorkerKey($node['children'], $workerKey);
+                if (!empty($found)) return $found;
+            }
+        }
+        return [];
     }
 
     /**

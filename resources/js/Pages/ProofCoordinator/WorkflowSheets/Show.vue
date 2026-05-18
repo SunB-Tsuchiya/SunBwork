@@ -21,6 +21,7 @@ const props = defineProps({
     user_department_id:{ type: [Number, String], default: null },
     proofRequestId:    { type: Number, default: null },
     proofRequestData:  { type: Object, default: null },
+    targetProofKeys:   { type: Array,  default: null },
 });
 
 // 全行の proof_cols から一意の列ラベルを順序付きで収集
@@ -93,7 +94,16 @@ function isCellHighlighted(row, colLabel) {
     return col?.key === highlightedStageKey.value;
 }
 
+// proof_request_id 指定時: targetProofKeys に含まれる列のみ操作可能
+function isTargetCell(row, colLabel) {
+    if (!props.targetProofKeys) return true;
+    const col = row.proof_cols.find(c => c.label === colLabel);
+    if (!col) return false;
+    return props.targetProofKeys.includes(col.key);
+}
+
 function handleAssign(row, colLabel) {
+    if (!isTargetCell(row, colLabel)) return;
     const colKey = getColKey(row, colLabel);
     if (!colKey) return;
 
@@ -109,7 +119,11 @@ function handleAssign(row, colLabel) {
         col_key: colKey,
     };
     if (stageId) params.stage_id = stageId;
-    if (cell?.proof_request_id) params.proof_request_id = cell.proof_request_id;
+    if (cell?.proof_request_id) {
+        params.proof_request_id = cell.proof_request_id;
+    } else if (props.proofRequestId) {
+        params.proof_request_id = props.proofRequestId;
+    }
 
     router.visit(route('proof_coordinator.workflow_sheets.assign_page', params));
 }
@@ -216,6 +230,11 @@ function handleAssign(row, colLabel) {
                                     <span
                                         v-if="!getColKey(row, label)"
                                         class="text-xs text-gray-300"
+                                    >—</span>
+                                    <!-- 対象外セル（グレーアウト） -->
+                                    <span
+                                        v-else-if="!isTargetCell(row, label)"
+                                        class="text-xs text-gray-300 cursor-default select-none"
                                     >—</span>
                                     <!-- アサイン可能 -->
                                     <button
