@@ -41,7 +41,7 @@
 
                     <!-- ステータスボタン（6行 × 3列） -->
                     <div>
-                        <label class="mb-2 block text-xs font-medium text-gray-500">ステータスを選んで押してください</label>
+                        <label class="mb-2 block text-xs font-medium text-gray-500">ステータスを選んでください</label>
                         <div class="grid grid-cols-3 gap-1.5">
                             <button
                                 v-for="s in displayStatuses"
@@ -49,7 +49,7 @@
                                 type="button"
                                 class="rounded-lg px-2 py-2.5 text-xs font-medium transition-all"
                                 :class="btnClasses(s)"
-                                @click="selectStatus(s.slug)"
+                                @click="localStatus = s.slug"
                             >{{ s.label }}</button>
                         </div>
                     </div>
@@ -70,6 +70,11 @@
                     </button>
 
                     <div class="flex items-center gap-3">
+                        <button
+                            type="button"
+                            class="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 active:bg-blue-800"
+                            @click="handleSave"
+                        >更新する</button>
                         <button
                             v-if="isSelf"
                             type="button"
@@ -133,9 +138,8 @@ function btnClasses(s) {
     return getBtnClasses(s, localStatus.value === s.slug);
 }
 
-function selectStatus(slug) {
-    localStatus.value = slug;
-    emit('save', { userId: props.targetUser.id, status: slug, comment: localComment.value });
+function handleSave() {
+    emit('save', { userId: props.targetUser.id, status: localStatus.value, comment: localComment.value });
 }
 
 function handleClear() {

@@ -333,6 +333,45 @@ async function saveColumnConfig() {
     }
 }
 
+// ── Proof request modal ────────────────────────────────────────────────────────
+const showProofModal = ref(false);
+const proofModalData = ref({ colKey: '', rowId: null, title: '', deadline: '', note: '' });
+const proofModalLoading = ref(false);
+
+function handleProofRequestOpen({ rowId, colKey }) {
+    const path  = getLeafPath(colKey) ?? [];
+    const title = [props.projectJob?.title, ...path].filter(Boolean).join('_');
+    proofModalData.value = { colKey, rowId, title, deadline: '', note: '' };
+    showProofModal.value = true;
+}
+
+async function submitProofRequest() {
+    if (!proofModalData.value.deadline) { alert('締切日を入力してください'); return; }
+    proofModalLoading.value = true;
+    const cell = localCells.value.find(
+        c => c.row_id === props.defaultRowId && c.stage_key === proofModalData.value.colKey
+    );
+    const payload = {
+        project_job_id:   props.projectJob?.id ?? null,
+        workflow_cell_id: cell?.id ?? null,
+        title:            proofModalData.value.title,
+        deadline:         proofModalData.value.deadline,
+        note:             proofModalData.value.note,
+    };
+    try {
+        await axios.post(route('proof_requests.store'), payload);
+        if (cell) {
+            const idx = localCells.value.findIndex(c => c.id === cell.id);
+            if (idx >= 0) localCells.value[idx] = { ...localCells.value[idx], proof_request_pending: true };
+        }
+        showProofModal.value = false;
+    } catch (e) {
+        alert('校正依頼の送信に失敗しました');
+    } finally {
+        proofModalLoading.value = false;
+    }
+}
+
 // ── Template registration ──────────────────────────────────────────────────────
 const showTemplateModal  = ref(false);
 const templateName       = ref('');
@@ -525,6 +564,7 @@ function openPrint() {
                                     @worker-job-register="handleWorkerJobRegister"
                                     @worker-job-detail="handleWorkerJobDetail"
                                     @proof-direct-complete="handleProofDirectComplete"
+                                    @proof-request-open="handleProofRequestOpen"
                                     @schedlink-complete="handleSchedlinkComplete"
                                     @note-save="handleNoteSave"
                                 />
@@ -588,6 +628,7 @@ function openPrint() {
                                     @worker-job-register="handleWorkerJobRegister"
                                     @worker-job-detail="handleWorkerJobDetail"
                                     @proof-direct-complete="handleProofDirectComplete"
+                                    @proof-request-open="handleProofRequestOpen"
                                     @schedlink-complete="handleSchedlinkComplete"
                                     @note-save="handleNoteSave"
                                 />
@@ -604,6 +645,31 @@ function openPrint() {
                 </div>
             </div>
         </div>
+
+        <!-- ── 校正依頼モーダル ───────────────────────────────────────── -->
+        <Teleport to="body">
+            <div v-if="showProofModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showProofModal = false">
+                <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+                    <h3 class="mb-4 text-lg font-semibold text-gray-800">校正管理へ依頼</h3>
+                    <div class="mb-3">
+                        <label class="mb-1 block text-sm font-medium text-gray-700">依頼タイトル</label>
+                        <input v-model="proofModalData.title" type="text" class="w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="mb-1 block text-sm font-medium text-gray-700">締切日 <span class="text-red-500">*</span></label>
+                        <input v-model="proofModalData.deadline" type="date" class="w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+                    </div>
+                    <div class="mb-4">
+                        <label class="mb-1 block text-sm font-medium text-gray-700">備考</label>
+                        <textarea v-model="proofModalData.note" rows="3" class="w-full rounded border border-gray-300 px-3 py-2 text-sm"></textarea>
+                    </div>
+                    <div class="flex justify-end gap-3">
+                        <button type="button" class="rounded border border-gray-300 px-4 py-1.5 text-sm text-gray-600" @click="showProofModal = false">キャンセル</button>
+                        <button type="button" class="rounded bg-pink-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-pink-700 disabled:opacity-50" :disabled="proofModalLoading" @click="submitProofRequest">依頼する</button>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
 
         <!-- ── テンプレート登録モーダル ───────────────────────────────── -->
         <Teleport to="body">

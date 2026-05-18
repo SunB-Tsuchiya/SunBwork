@@ -76,9 +76,22 @@ class ProofRequestController extends Controller
      * GET /proof-coordinator/inbox/{proofRequest}/assign
      * 受理＋割り当てフォームページ（AssignmentForm.vue を流用）
      */
-    public function assignPage(ProofRequest $proofRequest): Response
+    public function assignPage(ProofRequest $proofRequest)
     {
         $proofRequest->load(['requester', 'projectJob.client', 'projectJobAssignment']);
+
+        // workflow_cell_id が設定されている場合は管理シートへリダイレクト
+        if ($proofRequest->workflow_cell_id) {
+            $wCell = \App\Models\WorkflowCell::find($proofRequest->workflow_cell_id);
+            $row   = $wCell ? \App\Models\WorkflowRow::find($wCell->row_id) : null;
+            $sheet = $row ? \App\Models\WorkflowSheet::find($row->sheet_id) : null;
+            if ($sheet) {
+                return redirect()->route('proof_coordinator.workflow_sheets.show', [
+                    'sheet'            => $sheet->id,
+                    'proof_request_id' => $proofRequest->id,
+                ]);
+            }
+        }
 
         // 校正員候補: 校正チームに登録されているメンバーのみ
         $teamUserIds = ProofTeamMember::pluck('user_id');
@@ -1024,6 +1037,7 @@ class ProofRequestController extends Controller
             'deadline'                  => ['required', 'date'],
             'note'                      => ['nullable', 'string', 'max:1000'],
             'proof_cell_id'             => ['nullable', 'exists:progress_cells,id'],
+            'workflow_cell_id'          => ['nullable', 'exists:workflow_cells,id'],
         ]);
 
         // 日付のみ（時間なし）で送信された場合は 17:30 JST をデフォルトにする

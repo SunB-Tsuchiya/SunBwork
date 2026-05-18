@@ -30,17 +30,16 @@
                     <span class="w-16 shrink-0 font-bold text-cyan-700 text-sm truncate">{{ u.name }}</span>
                     <span
                         v-if="u.comment"
-                        class="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600 whitespace-pre-line"
-                        style="max-width: 220px;"
+                        class="flex-1 min-w-0 rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600 whitespace-pre-line"
                     >{{ u.comment }}</span>
-                    <div class="flex-1" />
-                    <div class="flex items-center gap-1.5 shrink-0">
+                    <div v-else class="flex-1" />
+                    <div class="flex items-center gap-1 shrink-0">
                         <span class="h-2 w-2 rounded-full shrink-0" :class="resolveStatusDisplay(u.status).dot" />
-                        <span class="text-sm font-medium w-20 text-right" :class="resolveStatusDisplay(u.status).textColor">
+                        <span class="text-sm font-medium" :class="resolveStatusDisplay(u.status).textColor">
                             {{ resolveStatusDisplay(u.status).label }}
                         </span>
                     </div>
-                    <span class="text-xs text-gray-300 w-14 text-right shrink-0">{{ formatTime(u.updated_at) }}</span>
+                    <span class="text-xs text-gray-300 w-12 text-right shrink-0">{{ formatTime(u.updated_at) }}</span>
                 </div>
             </template>
 
@@ -58,17 +57,16 @@
                     <span class="w-16 shrink-0 font-bold text-gray-500 text-sm truncate">{{ u.name }}</span>
                     <span
                         v-if="u.comment"
-                        class="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-500 whitespace-pre-line"
-                        style="max-width: 220px;"
+                        class="flex-1 min-w-0 rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-500 whitespace-pre-line"
                     >{{ u.comment }}</span>
-                    <div class="flex-1" />
-                    <div class="flex items-center gap-1.5 shrink-0">
+                    <div v-else class="flex-1" />
+                    <div class="flex items-center gap-1 shrink-0">
                         <span class="h-2 w-2 rounded-full shrink-0" :class="resolveStatusDisplay(u.status).dot" />
-                        <span class="text-sm font-medium w-20 text-right" :class="resolveStatusDisplay(u.status).textColor">
+                        <span class="text-sm font-medium" :class="resolveStatusDisplay(u.status).textColor">
                             {{ resolveStatusDisplay(u.status).label }}
                         </span>
                     </div>
-                    <span class="text-xs text-gray-300 w-14 text-right shrink-0">{{ formatTime(u.updated_at) }}</span>
+                    <span class="text-xs text-gray-300 w-12 text-right shrink-0">{{ formatTime(u.updated_at) }}</span>
                 </div>
             </template>
 

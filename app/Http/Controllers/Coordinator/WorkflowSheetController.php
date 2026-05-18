@@ -130,7 +130,19 @@ class WorkflowSheetController extends Controller
                 ->toArray();
         }
 
-        $cells = $rawCells->map(fn($c) => $this->formatCellFull($c, $eventMinutes));
+        // pending な ProofRequest を workflow_cell_id で照合
+        $cellIds = $rawCells->pluck('id')->filter()->values()->toArray();
+        $pendingProofRequests = [];
+        if (!empty($cellIds)) {
+            $prs = \App\Models\ProofRequest::whereIn('workflow_cell_id', $cellIds)
+                ->where('status', 'pending')
+                ->get(['id', 'workflow_cell_id']);
+            foreach ($prs as $pr) {
+                $pendingProofRequests[$pr->workflow_cell_id] = $pr->id;
+            }
+        }
+
+        $cells = $rawCells->map(fn($c) => $this->formatCellFull($c, $eventMinutes, $pendingProofRequests));
 
         $memberIds  = $projectJob->teamMembers()->pluck('user_id')->toArray();
         $coIds      = $projectJob->coordinators->pluck('id')->toArray();
@@ -299,7 +311,7 @@ class WorkflowSheetController extends Controller
 
     // ─────────────────────────────────────────────────────────
 
-    private function formatCellFull(WorkflowCell $c, array $eventMinutes): array
+    private function formatCellFull(WorkflowCell $c, array $eventMinutes, array $pendingProofRequests = []): array
     {
         $workMinutes = $c->assignment_id ? ($eventMinutes[$c->assignment_id] ?? 0) : 0;
 
@@ -326,6 +338,8 @@ class WorkflowSheetController extends Controller
             'proof_assignment_title'      => $c->proofAssignment?->title,
             'proof_assignment_completed'  => $c->proofAssignment?->completed
                                              || $c->proofAssignment?->proof_completed_at !== null,
+            'proof_request_pending'       => isset($pendingProofRequests[$c->id]),
+            'proof_request_id'            => $pendingProofRequests[$c->id] ?? null,
             'schedule_id'                 => $c->schedule_id,
             'schedule_name'               => $c->schedule?->name,
             'schedule_end_date'           => $c->schedule?->end_date?->format('Y-m-d'),

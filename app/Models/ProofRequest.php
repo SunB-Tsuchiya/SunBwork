@@ -13,6 +13,7 @@ class ProofRequest extends Model
         'project_job_assignment_id',
         'project_job_id',
         'proof_cell_id',
+        'workflow_cell_id',
         'requester_id',
         'proof_coordinator_id',
         'proofreader_id',

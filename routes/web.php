@@ -888,6 +888,11 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::put('dispatchers/{dispatcher}/toggle', [\App\Http\Controllers\ProofCoordinator\ProofDispatcherController::class, 'toggle'])->name('dispatchers.toggle');
         Route::resource('dispatchers', \App\Http\Controllers\ProofCoordinator\ProofDispatcherController::class)
             ->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy']);
+        // 管理シート（校正）
+        Route::get('workflow-sheets', [\App\Http\Controllers\ProofCoordinator\WorkflowSheetProofController::class, 'index'])->name('workflow_sheets.index');
+        Route::get('workflow-sheets/{sheet}', [\App\Http\Controllers\ProofCoordinator\WorkflowSheetProofController::class, 'show'])->name('workflow_sheets.show');
+        Route::get('workflow-sheets/{sheet}/assign', [\App\Http\Controllers\ProofCoordinator\WorkflowSheetProofController::class, 'assignPage'])->name('workflow_sheets.assign_page');
+        Route::post('workflow-sheets/{sheet}/assign', [\App\Http\Controllers\ProofCoordinator\WorkflowSheetProofController::class, 'assignStore'])->name('workflow_sheets.assign_store');
     });
 
 // =====================================================
