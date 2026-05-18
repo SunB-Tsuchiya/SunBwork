@@ -208,13 +208,11 @@ class UserPresenceController extends Controller
                 return;
             }
 
-            // 手動変更済みは上書きしない
-            if (!$presence || $presence->status_source !== 'manual') {
-                UserPresenceStatus::updateOrCreate(
-                    ['user_id' => $user->id],
-                    ['status' => $targetStatus, 'status_source' => 'calendar', 'updated_by_id' => $user->id]
-                );
-            }
+            // カレンダーイベントがある場合は常に更新（手動変更より優先）
+            UserPresenceStatus::updateOrCreate(
+                ['user_id' => $user->id],
+                ['status' => $targetStatus, 'status_source' => 'calendar', 'updated_by_id' => $user->id]
+            );
         } catch (\Throwable $e) {
             Log::warning("syncCalendarStatus failed for user {$user->id}: " . $e->getMessage());
         }

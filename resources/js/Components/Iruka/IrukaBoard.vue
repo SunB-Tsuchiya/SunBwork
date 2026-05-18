@@ -180,18 +180,18 @@ function openModal(u) {
 }
 
 async function handleSave({ userId, status, comment }) {
+    showModal.value = false; // 先に閉じる（iOS Safari 対策）
     try {
         await window.axios.post(`/presence/${userId}`, { status, comment });
-        showModal.value = false;
         await fetchPresence();
         window.dispatchEvent(new CustomEvent('iruka:refresh'));
     } catch (_) {}
 }
 
 async function handleClear() {
+    showModal.value = false; // 先に閉じる（iOS Safari 対策）
     try {
         await window.axios.post('/presence/self/clear');
-        showModal.value = false;
         await fetchPresence();
         window.dispatchEvent(new CustomEvent('iruka:refresh'));
     } catch (_) {}
