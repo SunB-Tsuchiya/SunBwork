@@ -228,7 +228,7 @@ class WorkflowSheetController extends Controller
         $workerUsers      = $allUsers->concat($ghostUsers)->values();
         $coordinatorUsers = $allUsers->filter(fn ($u) => in_array($u['user_role'], ['coordinator', 'clerk', 'leader', 'admin', 'superadmin']))->values();
 
-        $subcontractors = \App\Models\Subcontractor::orderBy('name')->get(['id', 'name']);
+        $subcontractors = \App\Models\Subcontractor::managedBy($request->user()->id)->orderBy('name')->get(['id', 'name']);
 
         $userId    = $request->user()->id;
         $templates = ProgressTemplate::where(function ($q) use ($userId) {
