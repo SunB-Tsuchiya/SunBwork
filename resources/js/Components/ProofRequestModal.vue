@@ -8,6 +8,8 @@ const props = defineProps({
     projectJobAssignmentId:  { type: Number,  default: null },
     projectJobId:            { type: Number,  default: null },
     proofCellId:             { type: Number,  default: null },
+    proofRowId:              { type: Number,  default: null },
+    proofColKey:             { type: String,  default: null },
 });
 
 const emit = defineEmits(['close']);
@@ -21,6 +23,8 @@ const form = ref({
     project_job_assignment_id: null,
     project_job_id:            null,
     proof_cell_id:             null,
+    proof_row_id:              null,
+    proof_col_key:             null,
 });
 
 const submitting = ref(false);
@@ -49,6 +53,8 @@ watch(() => props.show, (val) => {
             project_job_assignment_id: props.projectJobAssignmentId,
             project_job_id:            props.projectJobId,
             proof_cell_id:             props.proofCellId,
+            proof_row_id:              props.proofRowId,
+            proof_col_key:             props.proofColKey,
         };
     }
 });
@@ -69,6 +75,8 @@ function submit() {
         project_job_assignment_id: form.value.project_job_assignment_id,
         project_job_id:            form.value.project_job_id,
         proof_cell_id:             form.value.proof_cell_id || null,
+        proof_row_id:              form.value.proof_row_id || null,
+        proof_col_key:             form.value.proof_col_key || null,
     }, {
         preserveScroll: true,
         onFinish: () => {

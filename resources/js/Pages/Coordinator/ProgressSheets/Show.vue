@@ -417,6 +417,8 @@
           @worker-job-detail="onWorkerJobDetail"
           @schedlink-complete="onSchedlinkComplete"
           @note-save="onNoteSave"
+          @proof-request-cancel="onProofRequestCancel"
+          @proof-request-extend-deadline="onProofRequestExtendDeadline"
         />
       </div>
 
@@ -481,7 +483,12 @@
               @change="onAssigneeChange"
             >
               <option :value="authUserId">自分 (MyJob)</option>
-              <option v-for="u in users" :key="u.id" :value="u.id">{{ u.name }}</option>
+              <optgroup label="メンバー">
+                <option v-for="u in users.filter(u => !u.is_ghost)" :key="u.id" :value="u.id">{{ u.name }}</option>
+              </optgroup>
+              <optgroup v-if="users.some(u => u.is_ghost)" label="テストユーザー">
+                <option v-for="u in users.filter(u => u.is_ghost)" :key="u.id" :value="u.id">{{ u.name }}</option>
+              </optgroup>
             </select>
           </div>
           <div>
@@ -684,8 +691,37 @@
       :project-job-assignment-id="proofTargetAssignment?.id || null"
       :project-job-id="projectJob?.id || null"
       :proof-cell-id="proofTargetCellId"
-      @close="showProofModal = false; proofTargetAssignment = null; proofTargetCellId = null"
+      :proof-row-id="proofTargetRowId"
+      :proof-col-key="proofTargetColKey"
+      @close="showProofModal = false; proofTargetAssignment = null; proofTargetCellId = null; proofTargetRowId = null; proofTargetColKey = null"
     />
+
+    <!-- ── 締切延長モーダル ── -->
+    <Teleport to="body">
+      <div v-if="proofDeadlineModal.show" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="proofDeadlineModal.show = false">
+        <div class="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
+          <h3 class="mb-4 text-base font-semibold text-gray-800">締切日を延長</h3>
+          <div class="mb-4">
+            <label class="mb-1 block text-sm font-medium text-gray-700">新しい締切日時 <span class="text-red-500">*</span></label>
+            <div class="flex items-center gap-2">
+              <input v-model="proofDeadlineModal.newDeadline" type="date" class="flex-1 rounded border border-gray-300 px-3 py-2 text-sm" />
+              <select v-model="proofDeadlineModal.newHour" class="rounded border border-gray-300 px-2 py-2 text-sm">
+                <option v-for="h in deadlineHours" :key="h" :value="h">{{ String(h).padStart(2, '0') }}</option>
+              </select>
+              <span class="text-sm text-gray-500">時</span>
+              <select v-model="proofDeadlineModal.newMinute" class="rounded border border-gray-300 px-2 py-2 text-sm">
+                <option v-for="min in deadlineMinutes" :key="min" :value="min">{{ String(min).padStart(2, '0') }}</option>
+              </select>
+              <span class="text-sm text-gray-500">分</span>
+            </div>
+          </div>
+          <div class="flex justify-end gap-3">
+            <button type="button" class="rounded border border-gray-300 px-4 py-1.5 text-sm text-gray-600" @click="proofDeadlineModal.show = false">キャンセル</button>
+            <button type="button" class="rounded bg-yellow-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-yellow-600 disabled:opacity-50" :disabled="proofDeadlineModal.loading" @click="submitExtendDeadline">更新する</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
     <!-- ── 項目から読み込むモーダル ── -->
     <div
@@ -753,7 +789,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import ProgressTable from '@/Components/ProgressTable.vue';
@@ -821,6 +857,8 @@ const shareLoading          = ref(false);
 const showProofModal = ref(false);
 const proofTargetAssignment = ref(null);
 const proofTargetCellId = ref(null);
+const proofTargetRowId = ref(null);
+const proofTargetColKey = ref(null);
 const registerTemplateName = ref('');
 const newRowLabel = ref('');
 const importText = ref('');
@@ -1069,7 +1107,7 @@ function openJobLinkDetail({ assignmentId, assignmentTitle, assigneeUserId, assi
   }
   if (!assigneeName) {
     const assignee = props.users.find((u) => u.id === assigneeUserId);
-    assigneeName = assignee?.name ?? null;
+    assigneeName = assignee ? assignee.name : null;
   }
   jobLinkDetailModal.value = {
     open: true,
@@ -1208,6 +1246,8 @@ function findWorkerSiblingKey(nodes, proofV2Key) {
 function onProofRequestOpen({ rowId, colKey }) {
   const cell = localCells.value.find((c) => c.row_id === rowId && c.col_key === colKey);
   proofTargetCellId.value = cell?.id ?? null;
+  proofTargetRowId.value = cell?.id ? null : rowId;
+  proofTargetColKey.value = cell?.id ? null : colKey;
 
   // column_config ツリーから同グループ内の worker 型兄弟を探す
   const workerKey = findWorkerSiblingKey(localColumnConfig.value, colKey);
@@ -1246,6 +1286,59 @@ async function onProofDirectComplete({ assignmentId }) {
       }
     }
   } catch { /* ignore */ }
+}
+
+// ── 校正依頼 削除 / 締切延長 ──────────────────────────────────
+const proofDeadlineModal = ref({ show: false, proofRequestId: null, currentDeadline: '', newDeadline: '', newHour: 17, newMinute: 30, loading: false });
+const deadlineHours = Array.from({ length: 24 }, (_, i) => i);
+const deadlineMinutes = [0, 15, 30, 45];
+
+async function onProofRequestCancel({ proofRequestId, cellId }) {
+  if (!window.confirm('この校正依頼を削除しますか？')) return;
+  try {
+    await axios.delete(route('proof_requests.destroy', { proofRequest: proofRequestId }), {
+      headers: { Accept: 'application/json' },
+    });
+    const idx = localCells.value.findIndex((c) => c.id === cellId);
+    if (idx >= 0) {
+      localCells.value.splice(idx, 1, {
+        ...localCells.value[idx],
+        proof_request_pending: false,
+        proof_request_id: null,
+        proof_request_deadline: null,
+      });
+    }
+  } catch (e) {
+    alert(e?.response?.data?.message ?? '依頼の削除に失敗しました');
+  }
+}
+
+function onProofRequestExtendDeadline({ proofRequestId, currentDeadline }) {
+  proofDeadlineModal.value = { show: true, proofRequestId, currentDeadline, newDeadline: currentDeadline ?? '', newHour: 17, newMinute: 30, loading: false };
+}
+
+async function submitExtendDeadline() {
+  if (!proofDeadlineModal.value.newDeadline) { alert('締切日を入力してください'); return; }
+  proofDeadlineModal.value.loading = true;
+  try {
+    const h = String(proofDeadlineModal.value.newHour).padStart(2, '0');
+    const m = String(proofDeadlineModal.value.newMinute).padStart(2, '0');
+    const deadline = new Date(`${proofDeadlineModal.value.newDeadline}T${h}:${m}:00+09:00`).toISOString();
+    const res = await axios.patch(route('proof_requests.update_deadline', { proofRequest: proofDeadlineModal.value.proofRequestId }), {
+      deadline,
+    });
+    const newDeadline = res.data.deadline;
+    localCells.value = localCells.value.map((c) =>
+      c.proof_request_id === proofDeadlineModal.value.proofRequestId
+        ? { ...c, proof_request_deadline: newDeadline }
+        : c
+    );
+    proofDeadlineModal.value.show = false;
+  } catch {
+    alert('締切の更新に失敗しました');
+  } finally {
+    proofDeadlineModal.value.loading = false;
+  }
 }
 
 // ── シート全体の完了率 ─────────────────────────────────────
@@ -1288,6 +1381,10 @@ const sheetCompletion = computed(() => {
 const localColumnConfig = ref(JSON.parse(JSON.stringify(props.sheet.column_config ?? [])));
 const localRows = ref(props.rows.map((r) => ({ ...r })));
 const localCells = ref(props.cells.map((c) => ({ ...c })));
+
+watch(() => props.cells, (val) => {
+  localCells.value = val.map((c) => ({ ...c }));
+});
 
 // worker/joblink 型列の作業時間集計
 const workerLeafCols = computed(() =>

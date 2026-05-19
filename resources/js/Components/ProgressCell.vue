@@ -51,8 +51,11 @@
         @change="onUserCellChange($event.target.value)"
       >
         <option value="">—</option>
-        <optgroup v-if="users.length" label="メンバー">
-          <option v-for="u in users" :key="'u_' + u.id" :value="'u_' + u.id">{{ u.name }}</option>
+        <optgroup v-if="users.filter(u => !u.is_ghost).length" label="メンバー">
+          <option v-for="u in users.filter(u => !u.is_ghost)" :key="'u_' + u.id" :value="'u_' + u.id">{{ u.name }}</option>
+        </optgroup>
+        <optgroup v-if="users.some(u => u.is_ghost)" label="テストユーザー">
+          <option v-for="u in users.filter(u => u.is_ghost)" :key="'u_' + u.id" :value="'u_' + u.id">{{ u.name }}</option>
         </optgroup>
         <optgroup v-if="subcontractors.length" label="外注先">
           <option v-for="s in subcontractors" :key="'s_' + s.id" :value="'s_' + s.id">{{ s.name }}</option>
@@ -105,7 +108,12 @@
         @change="onProofUserSimpleChange($event.target.value)"
       >
         <option value="">— 校正担当者 —</option>
-        <option v-for="u in users" :key="'u_' + u.id" :value="'u_' + u.id">{{ u.name }}</option>
+        <optgroup v-if="users.filter(u => !u.is_ghost).length" label="メンバー">
+          <option v-for="u in users.filter(u => !u.is_ghost)" :key="'u_' + u.id" :value="'u_' + u.id">{{ u.name }}</option>
+        </optgroup>
+        <optgroup v-if="users.some(u => u.is_ghost)" label="テストユーザー">
+          <option v-for="u in users.filter(u => u.is_ghost)" :key="'u_' + u.id" :value="'u_' + u.id">{{ u.name }}</option>
+        </optgroup>
       </select>
     </template>
     <template v-else>
@@ -160,6 +168,9 @@
             <span class="text-xs text-yellow-500">📋</span>
             <span class="text-sm font-medium text-yellow-700 truncate">校正管理へ依頼中</span>
           </div>
+          <span v-if="cell.proof_request_deadline" class="text-xs text-yellow-600">
+            締切: {{ cell.proof_request_deadline }}
+          </span>
         </template>
         <!-- 担当者設定済み・ジョブ未登録 -->
         <template v-else-if="cell.value_user_id || cell.value_subcontractor_id">
@@ -180,8 +191,11 @@
           >
             <option value="">— 校正担当者 —</option>
             <option value="proof_coordinator" class="font-medium text-pink-700">📋 校正管理へ依頼</option>
-            <optgroup v-if="users.length" label="直接割当（管理外）">
-              <option v-for="u in users" :key="'u_' + u.id" :value="'u_' + u.id">{{ u.name }}</option>
+            <optgroup v-if="users.filter(u => !u.is_ghost).length" label="直接割当（管理外）">
+              <option v-for="u in users.filter(u => !u.is_ghost)" :key="'u_' + u.id" :value="'u_' + u.id">{{ u.name }}</option>
+            </optgroup>
+            <optgroup v-if="users.some(u => u.is_ghost)" label="テストユーザー">
+              <option v-for="u in users.filter(u => u.is_ghost)" :key="'u_' + u.id" :value="'u_' + u.id">{{ u.name }}</option>
             </optgroup>
             <optgroup v-if="subcontractors.length" label="外注先">
               <option v-for="s in subcontractors" :key="'s_' + s.id" :value="'s_' + s.id">{{ s.name }}</option>
@@ -234,6 +248,18 @@
         <!-- 校正依頼中（pending・未受理） -->
         <template v-else-if="cell.proof_request_pending">
           <span class="rounded bg-yellow-100 px-1.5 py-0.5 text-xs text-yellow-700">📋 依頼中</span>
+          <button
+            v-if="canEdit && cell.proof_request_id"
+            type="button"
+            class="rounded bg-yellow-50 border border-yellow-300 px-1.5 py-0.5 text-xs text-yellow-700 hover:bg-yellow-100"
+            @click="emit('proof-request-extend-deadline', { proofRequestId: cell.proof_request_id, currentDeadline: cell.proof_request_deadline ?? '' })"
+          >締切延長</button>
+          <button
+            v-if="canEdit && cell.proof_request_id"
+            type="button"
+            class="rounded bg-red-50 border border-red-200 px-1.5 py-0.5 text-xs text-red-600 hover:bg-red-100"
+            @click="emit('proof-request-cancel', { proofRequestId: cell.proof_request_id, cellId: cell.id })"
+          >依頼削除</button>
         </template>
         <!-- 担当者設定済み・未登録 -->
         <template v-else-if="cell.value_user_id || cell.value_subcontractor_id">
@@ -336,8 +362,11 @@
             @change="onWorkerAssigneeChange($event.target.value)"
           >
             <option value="">— 担当者 —</option>
-            <optgroup v-if="users.length" label="メンバー">
-              <option v-for="u in users" :key="'u_' + u.id" :value="'u_' + u.id">{{ u.name }}</option>
+            <optgroup v-if="users.filter(u => !u.is_ghost).length" label="メンバー">
+              <option v-for="u in users.filter(u => !u.is_ghost)" :key="'u_' + u.id" :value="'u_' + u.id">{{ u.name }}</option>
+            </optgroup>
+            <optgroup v-if="users.some(u => u.is_ghost)" label="テストユーザー">
+              <option v-for="u in users.filter(u => u.is_ghost)" :key="'u_' + u.id" :value="'u_' + u.id">{{ u.name }}</option>
             </optgroup>
             <optgroup v-if="subcontractors.length" label="外注先">
               <option v-for="s in subcontractors" :key="'s_' + s.id" :value="'s_' + s.id">{{ s.name }}</option>
@@ -824,7 +853,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['update', 'job-link-open', 'job-link-detail', 'complete-assignment', 'proof-request-open', 'proof-direct-complete', 'worker-complete', 'worker-job-register', 'worker-job-detail', 'schedlink-complete', 'note-save']);
+const emit = defineEmits(['update', 'job-link-open', 'job-link-detail', 'complete-assignment', 'proof-request-open', 'proof-direct-complete', 'worker-complete', 'worker-job-register', 'worker-job-detail', 'schedlink-complete', 'note-save', 'proof-request-cancel', 'proof-request-extend-deadline']);
 
 // ── 作業時間ヘルパー ──────────────────────────────
 // value_text に "HH:MM|HH:MM" 形式で開始・終了を保存

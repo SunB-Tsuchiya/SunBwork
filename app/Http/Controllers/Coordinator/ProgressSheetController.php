@@ -168,11 +168,10 @@ class ProgressSheetController extends Controller
             ->get();
 
         // proof_request pending 状態（依頼済みで未受理）を一括取得
-        $pendingProofCellIds = \App\Models\ProofRequest::where('status', 'pending')
+        $pendingProofRequestMap = \App\Models\ProofRequest::where('status', 'pending')
             ->whereIn('proof_cell_id', $rawCells->pluck('id')->filter())
-            ->pluck('proof_cell_id')
-            ->flip()
-            ->toArray();
+            ->get(['id', 'proof_cell_id', 'deadline'])
+            ->keyBy('proof_cell_id');
 
         $cells = $rawCells->map(fn($c) => [
                 'id'                          => $c->id,
@@ -196,7 +195,9 @@ class ProgressSheetController extends Controller
                 'proof_assignment_id'         => $c->proof_assignment_id,
                 'proof_assignment_title'      => $c->proofAssignment?->title,
                 'proof_assignment_completed'  => $c->proofAssignment?->completed || $c->proofAssignment?->proof_completed_at !== null,
-                'proof_request_pending'       => $c->id ? isset($pendingProofCellIds[$c->id]) : false,
+                'proof_request_pending'       => $c->id ? $pendingProofRequestMap->has($c->id) : false,
+                'proof_request_id'            => $c->id ? ($pendingProofRequestMap->get($c->id)?->id ?? null) : null,
+                'proof_request_deadline'      => $c->id ? ($pendingProofRequestMap->get($c->id)?->deadline?->format('Y-m-d') ?? null) : null,
                 // V2フィールド
                 'schedule_id'                 => $c->schedule_id,
                 'schedule_name'               => $c->schedule?->name,
@@ -299,12 +300,18 @@ class ProgressSheetController extends Controller
             return $c;
         });
 
-        // 担当者選択用ユーザー一覧（案件メンバー + Coordinator）
+        // 担当者選択用ユーザー一覧（案件メンバー + Coordinator + ゴーストユーザー）
         $memberIds = $projectJob->teamMembers()->pluck('user_id')->toArray();
         $coIds = $projectJob->coordinators->pluck('id')->toArray();
         $ownerId = $projectJob->user_id;
         $userIds = array_unique(array_merge($memberIds, $coIds, [$ownerId]));
-        $users = User::whereIn('id', $userIds)->orderBy('name')->get(['id', 'name']);
+        $regularUsers = User::whereIn('id', $userIds)->orderBy('name')->get(['id', 'name'])
+            ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'is_ghost' => false]);
+        $ghostUsers = \App\Models\User::withGhosts()
+            ->where('ghost_owner_id', $request->user()->id)
+            ->orderBy('name')->get(['id', 'name'])
+            ->map(fn ($g) => ['id' => $g->id, 'name' => $g->name, 'is_ghost' => true]);
+        $users = $regularUsers->concat($ghostUsers)->values();
 
         // ログインCoordinatorが管理する外注先
         $authUser = $request->user();

@@ -149,6 +149,8 @@
                 @worker-job-detail="emit('worker-job-detail', $event)"
                 @schedlink-complete="emit('schedlink-complete', $event)"
                 @note-save="emit('note-save', $event)"
+                @proof-request-cancel="emit('proof-request-cancel', $event)"
+                @proof-request-extend-deadline="emit('proof-request-extend-deadline', $event)"
               />
             </template>
           </tr>
@@ -179,7 +181,7 @@ const props = defineProps({
   authUserId: { type: [Number, String, null], default: null },
 });
 
-const emit = defineEmits(['cell-update', 'edit-row', 'delete-row', 'job-link-open', 'job-link-detail', 'complete-assignment', 'proof-request-open', 'proof-direct-complete', 'worker-complete', 'worker-job-register', 'worker-job-detail', 'schedlink-complete', 'note-save']);
+const emit = defineEmits(['cell-update', 'edit-row', 'delete-row', 'job-link-open', 'job-link-detail', 'complete-assignment', 'proof-request-open', 'proof-direct-complete', 'worker-complete', 'worker-job-register', 'worker-job-detail', 'schedlink-complete', 'note-save', 'proof-request-cancel', 'proof-request-extend-deadline']);
 
 // ── 行ツリー展開（parent_id を使って表示順に並べる） ────────
 const displayRows = computed(() => {

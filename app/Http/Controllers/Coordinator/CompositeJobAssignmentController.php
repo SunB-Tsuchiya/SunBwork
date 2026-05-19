@@ -35,9 +35,9 @@ class CompositeJobAssignmentController extends Controller
                 'assignment_name'       => $m->user?->assignment?->name,
                 'employment_type'       => $m->user?->employment_type ?? 'regular',
                 'employment_type_label' => $m->user ? $m->user->employmentTypeLabel() : '',
-                'is_ghost'              => false,
+                'is_ghost'              => (bool) ($m->user?->is_ghost ?? false),
             ];
-        })->filter(fn($item) => $item['id'] !== null)->values();
+        })->filter(fn($item) => $item['id'] !== null && !$item['is_ghost'])->values();
         $compositeSelfId = Auth::id();
         $ghosts = \App\Models\User::withGhosts()
             ->where('ghost_owner_id', $compositeSelfId)

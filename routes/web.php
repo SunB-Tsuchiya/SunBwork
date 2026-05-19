@@ -943,6 +943,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
 Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified'])
     ->group(function () {
         Route::post('proof-requests', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'store'])->name('proof_requests.store');
+        Route::patch('proof-requests/{proofRequest}/deadline', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'updateDeadline'])->name('proof_requests.update_deadline');
         Route::delete('proof-requests/{proofRequest}', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'destroy'])->name('proof_requests.destroy');
     });
 

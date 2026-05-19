@@ -1068,6 +1068,8 @@ class ProofRequestController extends Controller
             'deadline'                  => ['required', 'date'],
             'note'                      => ['nullable', 'string', 'max:1000'],
             'proof_cell_id'             => ['nullable', 'exists:progress_cells,id'],
+            'proof_row_id'              => ['nullable', 'integer', 'exists:progress_rows,id'],
+            'proof_col_key'             => ['nullable', 'string', 'max:255'],
             'workflow_cell_id'          => ['nullable', 'exists:workflow_cells,id'],
             'workflow_sheet_id'         => ['nullable', 'exists:workflow_sheets,id'],
             'workflow_stage_key'        => ['nullable', 'string', 'max:255'],
@@ -1090,6 +1092,16 @@ class ProofRequestController extends Controller
         }
         unset($data['workflow_sheet_id'], $data['workflow_stage_key']);
 
+        // proof_cell_id が未設定でも proof_row_id + proof_col_key が揃っていれば自動作成
+        if (empty($data['proof_cell_id']) && !empty($data['proof_row_id']) && !empty($data['proof_col_key'])) {
+            $proofCell = ProgressCell::firstOrCreate(
+                ['row_id' => $data['proof_row_id'], 'col_key' => $data['proof_col_key']],
+                ['cell_type' => 'proof_v2']
+            );
+            $data['proof_cell_id'] = $proofCell->id;
+        }
+        unset($data['proof_row_id'], $data['proof_col_key']);
+
         // 日付のみ（時間なし）で送信された場合は 17:30 JST をデフォルトにする
         $rawDeadline = $request->input('deadline');
         if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $rawDeadline)) {
@@ -1111,10 +1123,10 @@ class ProofRequestController extends Controller
     }
 
     /**
-     * DELETE /proof-requests/{proofRequest}
-     * 校正依頼キャンセル（依頼者本人 & pending 時のみ）
+     * PATCH /proof-requests/{proofRequest}/deadline
+     * 校正依頼の締切延長（依頼者本人 & pending 時のみ）
      */
-    public function destroy(ProofRequest $proofRequest)
+    public function updateDeadline(ProofRequest $proofRequest, Request $request)
     {
         $user = Auth::user();
 
@@ -1123,11 +1135,42 @@ class ProofRequestController extends Controller
         }
 
         if (! $proofRequest->isPending()) {
+            return response()->json(['message' => '受理済みの依頼は変更できません。'], 422);
+        }
+
+        $validated = $request->validate([
+            'deadline' => 'required|date',
+        ]);
+
+        $proofRequest->update(['deadline' => Carbon::parse($validated['deadline'])]);
+
+        return response()->json(['success' => true, 'deadline' => $proofRequest->fresh()->deadline?->format('Y-m-d')]);
+    }
+
+    /**
+     * DELETE /proof-requests/{proofRequest}
+     * 校正依頼キャンセル（依頼者本人 & pending 時のみ）
+     */
+    public function destroy(Request $request, ProofRequest $proofRequest)
+    {
+        $user = Auth::user();
+
+        if ($proofRequest->requester_id !== $user->id && ! $user->isAdmin() && ! $user->isSuperAdmin()) {
+            abort(403);
+        }
+
+        if (! $proofRequest->isPending()) {
+            if ($request->wantsJson()) {
+                return response()->json(['message' => '受理済みの依頼はキャンセルできません。'], 422);
+            }
             return back()->with('error', '受理済みの依頼はキャンセルできません。');
         }
 
         $proofRequest->delete();
 
+        if ($request->wantsJson()) {
+            return response()->json(['success' => true]);
+        }
         return back()->with('success', '校正依頼をキャンセルしました。');
     }
 

@@ -201,9 +201,12 @@ class WorkflowSheetController extends Controller
         if (!empty($cellIds)) {
             $prs = \App\Models\ProofRequest::whereIn('workflow_cell_id', $cellIds)
                 ->where('status', 'pending')
-                ->get(['id', 'workflow_cell_id']);
+                ->get(['id', 'workflow_cell_id', 'deadline']);
             foreach ($prs as $pr) {
-                $pendingProofRequests[$pr->workflow_cell_id] = $pr->id;
+                $pendingProofRequests[$pr->workflow_cell_id] = [
+                    'id'       => $pr->id,
+                    'deadline' => $pr->deadline?->format('Y-m-d'),
+                ];
             }
         }
 
@@ -214,10 +217,16 @@ class WorkflowSheetController extends Controller
         $ownerId    = $projectJob->user_id;
         $allUserIds = array_unique(array_merge($memberIds, $coIds, [$ownerId]));
 
-        $allUsers = User::whereIn('id', $allUserIds)->orderBy('name')->get(['id', 'name', 'user_role']);
+        $allUsers = User::whereIn('id', $allUserIds)->orderBy('name')->get(['id', 'name', 'user_role'])
+            ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'user_role' => $u->user_role, 'is_ghost' => false]);
 
-        $workerUsers      = $allUsers->values();
-        $coordinatorUsers = $allUsers->whereIn('user_role', ['coordinator', 'clerk', 'leader', 'admin', 'superadmin'])->values();
+        $ghostUsers = \App\Models\User::withGhosts()
+            ->where('ghost_owner_id', $request->user()->id)
+            ->orderBy('name')->get(['id', 'name'])
+            ->map(fn ($g) => ['id' => $g->id, 'name' => $g->name, 'user_role' => 'user', 'is_ghost' => true]);
+
+        $workerUsers      = $allUsers->concat($ghostUsers)->values();
+        $coordinatorUsers = $allUsers->filter(fn ($u) => in_array($u['user_role'], ['coordinator', 'clerk', 'leader', 'admin', 'superadmin']))->values();
 
         $subcontractors = \App\Models\Subcontractor::orderBy('name')->get(['id', 'name']);
 
@@ -405,7 +414,8 @@ class WorkflowSheetController extends Controller
             'proof_assignment_completed'  => $c->proofAssignment?->completed
                                              || $c->proofAssignment?->proof_completed_at !== null,
             'proof_request_pending'       => isset($pendingProofRequests[$c->id]),
-            'proof_request_id'            => $pendingProofRequests[$c->id] ?? null,
+            'proof_request_id'            => $pendingProofRequests[$c->id]['id'] ?? null,
+            'proof_request_deadline'      => $pendingProofRequests[$c->id]['deadline'] ?? null,
             'schedule_id'                 => $c->schedule_id,
             'schedule_name'               => $c->schedule?->name,
             'schedule_end_date'           => $c->schedule?->end_date?->format('Y-m-d'),

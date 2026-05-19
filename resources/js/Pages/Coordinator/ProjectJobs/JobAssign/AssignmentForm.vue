@@ -223,6 +223,7 @@
             <!-- 割当ユーザー（概要直下に移動） -->
             <label class="mb-1 mt-3 block font-semibold">割当ユーザー</label>
             <div v-if="!editMode" class="mt-1 flex items-center gap-2 rounded border bg-gray-50 px-3 py-2 text-sm">
+                <span v-if="memberIsGhost(block.user_id)" class="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800">[テスト]</span>
                 <span>{{ memberName(block.user_id) }}</span>
                 <span
                     v-if="EMPLOYMENT_BADGE[memberEmploymentType(block.user_id)?.employment_type]"
@@ -233,6 +234,7 @@
                 </span>
             </div>
             <div v-else-if="block._locked_user" class="mt-1 flex items-center gap-2 rounded border bg-gray-100 px-3 py-2 text-sm text-gray-600">
+                <span v-if="memberIsGhost(block.user_id)" class="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800">[テスト]</span>
                 <span>{{ memberName(block.user_id) }}</span>
                 <span class="ml-2 text-xs text-gray-400">🔒 進行表から</span>
                 <span
@@ -246,10 +248,17 @@
             <div v-else>
                 <select v-model="block.user_id" class="w-full rounded border px-3 py-2" @change="onUserChange(block)">
                     <option value="">未指定</option>
-                    <option v-for="m in props.members || members" :key="m.id" :value="m.id">
-                        {{ m.is_ghost ? '[テスト] ' : '' }}{{ m.name }}{{ m.assignment_name ? '（' + m.assignment_name + '）' : '' }}
-                        {{ m.employment_type === 'proof_dispatcher' ? '【単発派遣】' : ['dispatch','outsource','contract'].includes(m.employment_type) ? '【' + m.employment_type_label + '】' : '' }}
-                    </option>
+                    <optgroup label="メンバー">
+                        <option v-for="m in (props.members || members).filter(m => !m.is_ghost)" :key="m.id" :value="m.id">
+                            {{ m.name }}{{ m.assignment_name ? '（' + m.assignment_name + '）' : '' }}
+                            {{ m.employment_type === 'proof_dispatcher' ? '【単発派遣】' : ['dispatch','outsource','contract'].includes(m.employment_type) ? '【' + m.employment_type_label + '】' : '' }}
+                        </option>
+                    </optgroup>
+                    <optgroup v-if="(props.members || members).some(m => m.is_ghost)" label="テストユーザー">
+                        <option v-for="m in (props.members || members).filter(m => m.is_ghost)" :key="m.id" :value="m.id">
+                            {{ m.name }}
+                        </option>
+                    </optgroup>
                 </select>
                 <!-- 選択後の雇用形態バッジ（派遣・業務委託のみ表示） -->
                 <div
@@ -1577,6 +1586,12 @@ function memberEmploymentType(userId) {
     if (!userId) return null;
     const membersList = props.members || [];
     return membersList.find((m) => String(m.id) === String(userId)) ?? null;
+}
+
+function memberIsGhost(userId) {
+    if (!userId) return false;
+    const m = (props.members || []).find((mm) => String(mm.id) === String(userId));
+    return m?.is_ghost ?? false;
 }
 
 const EMPLOYMENT_BADGE = {

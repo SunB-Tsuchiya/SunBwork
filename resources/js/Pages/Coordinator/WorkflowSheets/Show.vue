@@ -338,19 +338,25 @@ async function saveColumnConfig() {
 
 // ── Proof request modal ────────────────────────────────────────────────────────
 const showProofModal = ref(false);
-const proofModalData = ref({ colKey: '', rowId: null, title: '', deadline: '', note: '' });
+const proofModalData = ref({ colKey: '', rowId: null, title: '', deadlineDate: '', deadlineHour: 17, deadlineMinute: 30, note: '' });
 const proofModalLoading = ref(false);
+const proofModalHours = Array.from({ length: 24 }, (_, i) => i);
+const proofModalMinutes = [0, 15, 30, 45];
 
 function handleProofRequestOpen({ rowId, colKey }) {
     const path  = getLeafPath(colKey) ?? [];
     const title = [props.projectJob?.title, ...path].filter(Boolean).join('_');
-    proofModalData.value = { colKey, rowId, title, deadline: '', note: '' };
+    const today = new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD
+    proofModalData.value = { colKey, rowId, title, deadlineDate: today, deadlineHour: 17, deadlineMinute: 30, note: '' };
     showProofModal.value = true;
 }
 
-async function submitProofRequest() {
-    if (!proofModalData.value.deadline) { alert('締切日を入力してください'); return; }
+function submitProofRequest() {
+    if (!proofModalData.value.deadlineDate) { alert('締切日を入力してください'); return; }
     proofModalLoading.value = true;
+    const h = String(proofModalData.value.deadlineHour).padStart(2, '0');
+    const m = String(proofModalData.value.deadlineMinute).padStart(2, '0');
+    const deadline = new Date(`${proofModalData.value.deadlineDate}T${h}:${m}:00+09:00`).toISOString();
     const cell = localCells.value.find(
         c => c.row_id === props.defaultRowId && c.stage_key === proofModalData.value.colKey
     );
@@ -360,20 +366,67 @@ async function submitProofRequest() {
         workflow_sheet_id:  cell ? null : (props.sheet?.id ?? null),
         workflow_stage_key: cell ? null : (proofModalData.value.colKey ?? null),
         title:              proofModalData.value.title,
-        deadline:           proofModalData.value.deadline,
+        deadline,
         note:               proofModalData.value.note,
     };
+    router.post(route('proof_requests.store'), payload, {
+        preserveScroll: true,
+        onSuccess: () => { showProofModal.value = false; },
+        onError: () => { alert('校正依頼の送信に失敗しました'); },
+        onFinish: () => { proofModalLoading.value = false; },
+    });
+}
+
+// ── Proof request cancel / extend deadline ─────────────────────────────────────
+const proofDeadlineModal = ref({ show: false, proofRequestId: null, currentDeadline: '', newDeadline: '', newHour: 17, newMinute: 30, loading: false });
+const deadlineHours = Array.from({ length: 24 }, (_, i) => i);
+const deadlineMinutes = [0, 15, 30, 45];
+
+async function handleProofRequestCancel({ proofRequestId, cellId }) {
+    if (!window.confirm('この校正依頼を削除しますか？')) return;
     try {
-        await axios.post(route('proof_requests.store'), payload);
-        if (cell) {
-            const idx = localCells.value.findIndex(c => c.id === cell.id);
-            if (idx >= 0) localCells.value[idx] = { ...localCells.value[idx], proof_request_pending: true };
+        await axios.delete(route('proof_requests.destroy', { proofRequest: proofRequestId }), {
+            headers: { Accept: 'application/json' },
+        });
+        const idx = localCells.value.findIndex(c => c.id === cellId);
+        if (idx >= 0) {
+            localCells.value[idx] = {
+                ...localCells.value[idx],
+                proof_request_pending: false,
+                proof_request_id: null,
+                proof_request_deadline: null,
+            };
         }
-        showProofModal.value = false;
     } catch (e) {
-        alert('校正依頼の送信に失敗しました');
+        alert(e?.response?.data?.message ?? '依頼の削除に失敗しました');
+    }
+}
+
+function handleProofRequestExtendDeadline({ proofRequestId, currentDeadline }) {
+    proofDeadlineModal.value = { show: true, proofRequestId, currentDeadline, newDeadline: currentDeadline ?? '', newHour: 17, newMinute: 30, loading: false };
+}
+
+async function submitExtendDeadline() {
+    if (!proofDeadlineModal.value.newDeadline) { alert('締切日を入力してください'); return; }
+    proofDeadlineModal.value.loading = true;
+    try {
+        const h = String(proofDeadlineModal.value.newHour).padStart(2, '0');
+        const m = String(proofDeadlineModal.value.newMinute).padStart(2, '0');
+        const deadline = new Date(`${proofDeadlineModal.value.newDeadline}T${h}:${m}:00+09:00`).toISOString();
+        const res = await axios.patch(route('proof_requests.update_deadline', { proofRequest: proofDeadlineModal.value.proofRequestId }), {
+            deadline,
+        });
+        const newDeadline = res.data.deadline;
+        localCells.value = localCells.value.map(c =>
+            c.proof_request_id === proofDeadlineModal.value.proofRequestId
+                ? { ...c, proof_request_deadline: newDeadline }
+                : c
+        );
+        proofDeadlineModal.value.show = false;
+    } catch (e) {
+        alert('締切の更新に失敗しました');
     } finally {
-        proofModalLoading.value = false;
+        proofDeadlineModal.value.loading = false;
     }
 }
 
@@ -570,6 +623,8 @@ function openPrint() {
                                     @worker-job-detail="handleWorkerJobDetail"
                                     @proof-direct-complete="handleProofDirectComplete"
                                     @proof-request-open="handleProofRequestOpen"
+                                    @proof-request-cancel="handleProofRequestCancel"
+                                    @proof-request-extend-deadline="handleProofRequestExtendDeadline"
                                     @schedlink-complete="handleSchedlinkComplete"
                                     @note-save="handleNoteSave"
                                 />
@@ -634,6 +689,8 @@ function openPrint() {
                                     @worker-job-detail="handleWorkerJobDetail"
                                     @proof-direct-complete="handleProofDirectComplete"
                                     @proof-request-open="handleProofRequestOpen"
+                                    @proof-request-cancel="handleProofRequestCancel"
+                                    @proof-request-extend-deadline="handleProofRequestExtendDeadline"
                                     @schedlink-complete="handleSchedlinkComplete"
                                     @note-save="handleNoteSave"
                                 />
@@ -661,8 +718,18 @@ function openPrint() {
                         <input v-model="proofModalData.title" type="text" class="w-full rounded border border-gray-300 px-3 py-2 text-sm" />
                     </div>
                     <div class="mb-3">
-                        <label class="mb-1 block text-sm font-medium text-gray-700">締切日 <span class="text-red-500">*</span></label>
-                        <input v-model="proofModalData.deadline" type="date" class="w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+                        <label class="mb-1 block text-sm font-medium text-gray-700">締切日時 <span class="text-red-500">*</span></label>
+                        <div class="flex items-center gap-2">
+                            <input v-model="proofModalData.deadlineDate" type="date" class="flex-1 rounded border border-gray-300 px-2 py-2 text-sm" />
+                            <select v-model="proofModalData.deadlineHour" class="rounded border border-gray-300 px-2 py-2 text-sm">
+                                <option v-for="h in proofModalHours" :key="h" :value="h">{{ String(h).padStart(2, '0') }}</option>
+                            </select>
+                            <span class="text-sm text-gray-500">時</span>
+                            <select v-model="proofModalData.deadlineMinute" class="rounded border border-gray-300 px-2 py-2 text-sm">
+                                <option v-for="min in proofModalMinutes" :key="min" :value="min">{{ String(min).padStart(2, '0') }}</option>
+                            </select>
+                            <span class="text-sm text-gray-500">分</span>
+                        </div>
                     </div>
                     <div class="mb-4">
                         <label class="mb-1 block text-sm font-medium text-gray-700">備考</label>
@@ -671,6 +738,33 @@ function openPrint() {
                     <div class="flex justify-end gap-3">
                         <button type="button" class="rounded border border-gray-300 px-4 py-1.5 text-sm text-gray-600" @click="showProofModal = false">キャンセル</button>
                         <button type="button" class="rounded bg-pink-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-pink-700 disabled:opacity-50" :disabled="proofModalLoading" @click="submitProofRequest">依頼する</button>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
+
+        <!-- ── 締切延長モーダル ───────────────────────────────────────── -->
+        <Teleport to="body">
+            <div v-if="proofDeadlineModal.show" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="proofDeadlineModal.show = false">
+                <div class="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
+                    <h3 class="mb-4 text-base font-semibold text-gray-800">締切日を延長</h3>
+                    <div class="mb-4">
+                        <label class="mb-1 block text-sm font-medium text-gray-700">新しい締切日時 <span class="text-red-500">*</span></label>
+                        <div class="flex items-center gap-2">
+                            <input v-model="proofDeadlineModal.newDeadline" type="date" class="flex-1 rounded border border-gray-300 px-3 py-2 text-sm" />
+                            <select v-model="proofDeadlineModal.newHour" class="rounded border border-gray-300 px-2 py-2 text-sm">
+                                <option v-for="h in deadlineHours" :key="h" :value="h">{{ String(h).padStart(2, '0') }}</option>
+                            </select>
+                            <span class="text-sm text-gray-500">時</span>
+                            <select v-model="proofDeadlineModal.newMinute" class="rounded border border-gray-300 px-2 py-2 text-sm">
+                                <option v-for="min in deadlineMinutes" :key="min" :value="min">{{ String(min).padStart(2, '0') }}</option>
+                            </select>
+                            <span class="text-sm text-gray-500">分</span>
+                        </div>
+                    </div>
+                    <div class="flex justify-end gap-3">
+                        <button type="button" class="rounded border border-gray-300 px-4 py-1.5 text-sm text-gray-600" @click="proofDeadlineModal.show = false">キャンセル</button>
+                        <button type="button" class="rounded bg-yellow-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-yellow-600 disabled:opacity-50" :disabled="proofDeadlineModal.loading" @click="submitExtendDeadline">更新する</button>
                     </div>
                 </div>
             </div>
