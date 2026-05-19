@@ -318,16 +318,20 @@ async function handleNoteSave({ colKey, note }) {
     }
 }
 
+// ── Sheet name ────────────────────────────────────────────────────────────────
+const localSheetName = ref(props.sheet.name);
+
 // ── Column config save ─────────────────────────────────────────────────────────
 function onColumnChange(updated) {
     localColumnConfig.value = updated.slice();
 }
 
 async function saveColumnConfig() {
+    if (!localSheetName.value.trim()) { alert('シート名を入力してください'); return; }
     try {
         await axios.put(
             route('coordinator.workflow_sheets.update', { sheet: props.sheet.id }),
-            { column_config: localColumnConfig.value }
+            { column_config: localColumnConfig.value, name: localSheetName.value.trim() }
         );
         editMode.value = false;
         router.reload({ only: ['sheet'] });
@@ -505,14 +509,20 @@ function openPrint() {
 <template>
     <AppLayout :title="`管理シート: ${sheet.name}`">
         <template #header>
-            <div class="flex items-center gap-3">
-                <Link
-                    :href="route('coordinator.project_jobs.show', { projectJob: projectJob.id }) + '?tab=workflow'"
-                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300 whitespace-nowrap"
-                >← 案件に戻る</Link>
-                <div>
-                    <p class="text-xs text-gray-400">{{ projectJob.client_name }}</p>
-                    <h2 class="text-lg font-semibold text-gray-800">{{ projectJob.title }}</h2>
+            <div class="flex flex-col gap-1">
+                <div class="flex items-center gap-3">
+                    <Link
+                        :href="route('coordinator.project_jobs.show', { projectJob: projectJob.id }) + '?tab=workflow'"
+                        class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300 whitespace-nowrap"
+                    >← 案件に戻る</Link>
+                    <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">
+                        管理シート：{{ sheet.name }}
+                    </h2>
+                </div>
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-sm text-gray-600">
+                    <span v-if="projectJob.client_name" class="font-medium text-gray-700">{{ projectJob.client_name }}</span>
+                    <span v-if="projectJob.client_name && projectJob.title" class="text-gray-400">/</span>
+                    <span class="font-medium text-indigo-700">{{ projectJob.title }}</span>
                 </div>
             </div>
         </template>
@@ -523,39 +533,72 @@ function openPrint() {
 
         <div class="rounded bg-white p-4 shadow">
 
-            <!-- ── ヘッダーアクション ─────────────────────────────────── -->
-            <div class="mb-4 flex flex-wrap items-center gap-2">
-                <h1 class="mr-2 text-xl font-bold text-gray-900">{{ sheet.name }}</h1>
-                <span class="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700">管理シート</span>
+            <!-- ── ツールバー ──────────────────────────────── -->
+            <div class="mb-4 flex flex-wrap items-center gap-3">
+                <template v-if="canEdit">
+                    <button
+                        type="button"
+                        class="rounded px-3 py-1.5 text-sm font-medium"
+                        :class="editMode ? 'bg-gray-600 text-white hover:bg-gray-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'"
+                        @click="editMode = !editMode"
+                    >{{ editMode ? '編集モードを終了' : '編集モード' }}</button>
 
-                <div class="ml-auto flex flex-wrap items-center gap-2">
-                    <template v-if="canEdit">
+                    <button
+                        v-if="!editMode"
+                        type="button"
+                        class="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+                        @click="showTemplateModal = true"
+                    >テンプレートとして登録</button>
+
+                    <button
+                        type="button"
+                        class="rounded border border-red-200 bg-white px-3 py-1.5 text-sm text-red-500 hover:bg-red-50"
+                        @click="confirmDelete"
+                    >シート削除</button>
+                </template>
+
+                <button
+                    v-if="!editMode"
+                    type="button"
+                    class="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+                    @click="openPrint"
+                >印刷</button>
+
+                <template v-if="canEdit && !editMode">
+                    <button
+                        v-if="!shareToken"
+                        type="button"
+                        class="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+                        :disabled="shareLoading"
+                        @click="issueShare"
+                    >{{ shareLoading ? '発行中...' : '共有リンクを発行' }}</button>
+                    <template v-else>
                         <button
                             type="button"
-                            @click="editMode = !editMode"
-                            class="rounded border px-3 py-1.5 text-sm"
-                            :class="editMode
-                                ? 'border-gray-300 bg-gray-100 text-gray-700'
-                                : 'border-indigo-300 text-indigo-600 hover:bg-indigo-50'"
-                        >{{ editMode ? '編集完了' : '列を編集' }}</button>
-                        <button v-if="editMode" type="button" class="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50" @click="showTemplateModal = true">テンプレート登録</button>
-                        <button v-if="editMode" type="button" class="rounded border border-red-300 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50" @click="confirmDelete">削除</button>
+                            class="rounded border border-blue-300 bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-100"
+                            @click="copyShareUrl"
+                        >URLをコピー</button>
+                        <button
+                            type="button"
+                            class="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-50"
+                            :disabled="shareLoading"
+                            @click="revokeShare"
+                        >リンクを無効化</button>
                     </template>
-                    <button type="button" class="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50" @click="openPrint">印刷</button>
-                    <template v-if="canEdit">
-                        <template v-if="!shareToken">
-                            <button type="button" class="rounded border border-green-300 px-3 py-1.5 text-sm text-green-600 hover:bg-green-50" :disabled="shareLoading" @click="issueShare">共有URL発行</button>
-                        </template>
-                        <template v-else>
-                            <button type="button" class="rounded border border-blue-300 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50" @click="copyShareUrl">URLをコピー</button>
-                            <button type="button" class="rounded border border-red-300 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50" @click="revokeShare">共有を解除</button>
-                        </template>
-                    </template>
-                </div>
+                </template>
             </div>
 
-            <!-- ── 編集モード：ColumnTreeEditor ──────────────────────── -->
+            <!-- ── 編集モード：シート名 + ColumnTreeEditor ──────────── -->
             <div v-if="editMode && canEdit" class="mb-4">
+                <div class="mb-4">
+                    <label class="mb-1 block text-sm font-medium text-gray-700">シート名</label>
+                    <input
+                        v-model="localSheetName"
+                        type="text"
+                        class="w-full max-w-sm rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-indigo-400 focus:outline-none"
+                        placeholder="シート名を入力"
+                    />
+                </div>
                 <h3 class="mb-2 font-semibold text-gray-700">列・ステージ構成</h3>
                 <ColumnTreeEditor
                     :nodes="localColumnConfig"
