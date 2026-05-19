@@ -3,23 +3,39 @@
         <button
             type="button"
             class="flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
-            @click="goToStatusUpdate"
+            @click="openModal"
         >
             <span class="text-base leading-none">🐬</span>
             <span class="h-2.5 w-2.5 rounded-full shrink-0" :class="statusInfo.dot" />
             <span class="max-w-[90px] truncate">{{ statusInfo.label }}</span>
         </button>
+
+        <IrukaStatusModal
+            v-if="modalTarget"
+            :show="showModal"
+            :target-user="modalTarget"
+            :is-self="true"
+            :statuses="statuses"
+            @close="showModal = false"
+            @save="handleSave"
+            @clear="handleClear"
+        />
     </div>
 </template>
 
 <script setup>
 import { ref, computed, inject, onMounted, onUnmounted } from 'vue';
-import { router } from '@inertiajs/vue3';
 import { getStatus } from './statusConfig.js';
+import IrukaStatusModal from './IrukaStatusModal.vue';
 
 const authUser = inject('authUser', null);
 
 const currentStatus  = ref('left');
+const currentComment = ref('');
+const showModal      = ref(false);
+const modalTarget    = ref(null);
+const statuses       = ref(null);
+
 const statusInfo = computed(() => getStatus(currentStatus.value));
 
 onMounted(async () => {
@@ -36,12 +52,49 @@ async function fetchSelf() {
         const res = await window.axios.get('/presence');
         const me  = res.data.find(u => u.id === authUser?.id);
         if (me) {
-            currentStatus.value = me.status;
+            currentStatus.value  = me.status;
+            currentComment.value = me.comment ?? '';
+            if (modalTarget.value) {
+                modalTarget.value = { ...modalTarget.value, status: me.status, comment: me.comment ?? '' };
+            }
         }
     } catch (_) {}
 }
 
-function goToStatusUpdate() {
-    router.visit(route('presence.status_update'));
+async function fetchStatuses() {
+    if (statuses.value) return;
+    try {
+        const res  = await window.axios.get('/presence/statuses');
+        statuses.value = res.data;
+    } catch (_) {}
+}
+
+async function openModal() {
+    await fetchStatuses();
+    modalTarget.value = {
+        id:      authUser?.id,
+        name:    authUser?.name ?? '',
+        status:  currentStatus.value,
+        comment: currentComment.value,
+    };
+    showModal.value = true;
+}
+
+async function handleSave({ userId, status, comment }) {
+    showModal.value = false;
+    try {
+        await window.axios.post(`/presence/${userId}`, { status, comment });
+        await fetchSelf();
+        window.dispatchEvent(new CustomEvent('iruka:refresh'));
+    } catch (_) {}
+}
+
+async function handleClear() {
+    showModal.value = false;
+    try {
+        await window.axios.post('/presence/self/clear');
+        await fetchSelf();
+        window.dispatchEvent(new CustomEvent('iruka:refresh'));
+    } catch (_) {}
 }
 </script>

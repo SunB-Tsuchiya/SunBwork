@@ -1,7 +1,7 @@
 <template>
     <Teleport to="body">
         <div v-if="show" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="$emit('close')">
-            <div class="absolute inset-0 bg-black/40" @click="$emit('close')" />
+            <div class="absolute inset-0 bg-black/40 cursor-pointer" @click="$emit('close')" />
             <div class="relative w-full max-w-sm rounded-xl bg-white shadow-2xl" @click.stop>
                 <!-- タイトル -->
                 <div class="border-b border-gray-200 px-5 py-4 text-center">
@@ -49,7 +49,7 @@
                                 type="button"
                                 class="rounded-lg px-2 py-2.5 text-xs font-medium transition-all"
                                 :class="btnClasses(s)"
-                                @click="localStatus = s.slug"
+                                @click="handleStatusClick(s.slug)"
                             >{{ s.label }}</button>
                         </div>
                     </div>
@@ -136,6 +136,11 @@ watch(() => props.show, (v) => {
 
 function btnClasses(s) {
     return getBtnClasses(s, localStatus.value === s.slug);
+}
+
+function handleStatusClick(slug) {
+    localStatus.value = slug;
+    emit('save', { userId: props.targetUser.id, status: slug, comment: localComment.value });
 }
 
 function handleSave() {
