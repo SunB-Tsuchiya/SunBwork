@@ -196,8 +196,8 @@ function buildJobTitle(rowId, colKey) {
     const parentRow = row?.parent_id ? localRows.value.find((r) => r.id === row.parent_id) : null;
     const breadcrumb = findBreadcrumb(localColumnConfig.value, colKey);
     const parentPath = breadcrumb ? breadcrumb.slice(0, -1) : [];
-    const rowPart = [parentRow?.label, row?.label].filter(Boolean).join('ー');
-    const colPart = parentPath.filter(Boolean).join('ー');
+    const rowPart = [parentRow?.label, row?.label].filter(Boolean).join('_');
+    const colPart = parentPath.filter(Boolean).join('_');
     return [rowPart, colPart].filter(Boolean).join('_');
 }
 

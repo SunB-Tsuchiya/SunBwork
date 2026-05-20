@@ -54,7 +54,16 @@ class ProjectJobController extends Controller
             $query->whereYear('created_at', $y)->whereMonth('created_at', $m);
         }
 
-        $jobs = $query->orderBy('created_at', 'desc')->get();
+        $favoriteIds = \App\Models\CoordinatorProjectJobFavorite::where('user_id', $user->id)
+            ->pluck('project_job_id')
+            ->toArray();
+
+        $jobs = $query->orderBy('created_at', 'desc')->get()->map(function ($job) use ($favoriteIds) {
+            $job->is_favorite = in_array($job->id, $favoriteIds);
+            return $job;
+        });
+
+        $favoriteJobs = $jobs->filter(fn($j) => $j->is_favorite)->values();
 
         // 直近12ヶ月の月オプション
         $monthOptions = [];
@@ -70,6 +79,7 @@ class ProjectJobController extends Controller
         $registerFlags = session('register_flags', []);
         return Inertia::render('Coordinator/ProjectJobs/Index', [
             'jobs' => $jobs,
+            'favoriteJobs' => $favoriteJobs,
             'jobid' => $jobid,
             'registerFlags' => $registerFlags,
             'monthOptions' => $monthOptions,
@@ -362,6 +372,25 @@ class ProjectJobController extends Controller
         $projectJob->completed = false;
         $projectJob->save();
         return response()->json(['success' => true, 'id' => $projectJob->id]);
+    }
+
+    public function toggleFavorite(ProjectJob $projectJob)
+    {
+        $user = auth()->user();
+        $existing = \App\Models\CoordinatorProjectJobFavorite::where('user_id', $user->id)
+            ->where('project_job_id', $projectJob->id)
+            ->first();
+        if ($existing) {
+            $existing->delete();
+            $isFavorite = false;
+        } else {
+            \App\Models\CoordinatorProjectJobFavorite::create([
+                'user_id' => $user->id,
+                'project_job_id' => $projectJob->id,
+            ]);
+            $isFavorite = true;
+        }
+        return response()->json(['is_favorite' => $isFavorite]);
     }
 
     public function create()

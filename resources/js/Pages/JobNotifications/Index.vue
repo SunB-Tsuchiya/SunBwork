@@ -191,8 +191,9 @@ function formatTime(dateStr) {
     if (!dateStr) return '';
     const d = toJST(dateStr);
     if (!d) return '';
-    const h = String(d.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', hour12: false })).padStart(2, '0');
-    const m = String(d.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', minute: '2-digit' })).padStart(2, '0');
+    const jst = new Date(d.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
+    const h = String(jst.getHours()).padStart(2, '0');
+    const m = String(jst.getMinutes()).padStart(2, '0');
     return `${h}:${m}`;
 }
 

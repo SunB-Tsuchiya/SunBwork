@@ -55,14 +55,6 @@
                         @click="togglePanelEditMode"
                     >{{ panelEditMode ? '編集モードを終了' : '編集モード' }}</button>
                     <button v-if="!panelEditMode" type="button"
-                        class="rounded border border-green-600 px-3 py-1 text-xs font-medium text-green-700 hover:bg-green-50"
-                        @click="handleCsvExport"
-                    >CSV出力</button>
-                    <button v-if="!panelEditMode" type="button"
-                        class="rounded border border-indigo-500 px-3 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-50"
-                        @click="openCsvImportModal"
-                    >CSV取込</button>
-                    <button v-if="!panelEditMode" type="button"
                         :class="scheduleShowAll
                             ? 'rounded border border-orange-500 bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700 hover:bg-orange-100'
                             : 'rounded border border-gray-400 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50'"

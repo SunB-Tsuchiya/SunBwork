@@ -30,6 +30,18 @@ class ProjectJobAssignmentUserController extends Controller
             } catch (\Throwable $__e) {
                 $sourceAssignment = null;
             }
+
+            // 既に登録済みの場合はフォームを表示せずリダイレクト（ブラウザバック等による二重登録防止）
+            if ($sourceAssignment) {
+                $alreadyRegistered = $sourceAssignment->is_registered
+                    || \App\Models\ProjectJobAssignment::where('supersedes_assignment_id', $sourceAssignment->id)
+                        ->whereColumn('sender_id', 'user_id')
+                        ->exists();
+                if ($alreadyRegistered) {
+                    return redirect()->route('user.myjobbox.index')
+                        ->with('error', 'このジョブはすでにマイジョブとして登録済みです。');
+                }
+            }
         }
 
         // Build userProjects / userClients similar to EventController::createJob

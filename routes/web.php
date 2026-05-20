@@ -620,6 +620,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('project_jobs', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'store'])->name('project_jobs.store');
         Route::post('project_jobs/{projectJob}/complete', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'complete'])->name('project_jobs.complete');
         Route::post('project_jobs/{projectJob}/uncomplete', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'uncomplete'])->name('project_jobs.uncomplete');
+        Route::post('project_jobs/{projectJob}/favorite', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'toggleFavorite'])->name('project_jobs.favorite');
         Route::post('project_jobs/{projectJob}/clone', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'clone'])->name('project_jobs.clone');
         Route::post('project_jobs/{projectJob}/share', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'share'])->name('project_jobs.share');
         Route::post('project_jobs/{projectJob}/image', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'storeImage'])->name('project_jobs.image.store');

@@ -48,6 +48,7 @@ class ProjectJobAssignment extends Model
         'file_info',
         'proof_completed_at',
         'progress_cell_id',
+        'is_registered',
     ];
 
     protected $casts = [
@@ -71,6 +72,7 @@ class ProjectJobAssignment extends Model
         'file_info' => 'array',
         'proof_completed_at' => 'datetime',
         'progress_cell_id' => 'integer',
+        'is_registered' => 'boolean',
     ];
 
     protected $dates = [
@@ -246,6 +248,9 @@ class ProjectJobAssignment extends Model
             'difficulty' => $this->difficulty ?? ($this->projectJob ? ($this->projectJob->difficulty ?? null) : null),
             'desired_end_date' => $this->desired_end_date ? (method_exists($this->desired_end_date, 'format') ? $this->desired_end_date->format('Y-m-d') : (string)$this->desired_end_date) : null,
             'desired_time' => $this->desired_time ?? null,
+            'start_time'   => $this->start_time ?? null,
+            'sender_id'    => $this->sender_id ?? null,
+            'user_id'      => $this->user_id ?? null,
             'estimated_hours' => $this->estimated_hours ?? null,
             'scheduled' => Schema::hasColumn('project_job_assignments', 'scheduled') ? (bool) ($this->scheduled ?? false) : false,
             'scheduled_at' => Schema::hasColumn('project_job_assignments', 'scheduled_at') && $this->scheduled_at ? (method_exists($this->scheduled_at, 'format') ? $this->scheduled_at->format('Y-m-d H:i:s') : (string)$this->scheduled_at) : null,

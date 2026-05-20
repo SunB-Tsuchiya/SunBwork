@@ -495,9 +495,18 @@ class JobBoxController extends Controller
                 ->filter()->unique()->values()->toArray();
 
             if (!empty($allAids)) {
-                // source_assignment_id を一括取得
-                $sourceMap = \App\Models\ProjectJobAssignment::whereIn('id', $allAids)
-                    ->pluck('source_assignment_id', 'id');
+                // source_assignment_id / is_registered を一括取得
+                $assignmentMeta = \App\Models\ProjectJobAssignment::whereIn('id', $allAids)
+                    ->get(['id', 'source_assignment_id', 'is_registered'])
+                    ->keyBy('id');
+                $sourceMap = $assignmentMeta->pluck('source_assignment_id', 'id');
+
+                // is_registered 動的フォールバック: DB 列が false/null でも supersedes_assignment_id で確認
+                $supersededIds = \App\Models\ProjectJobAssignment::whereIn('supersedes_assignment_id', $allAids)
+                    ->whereColumn('sender_id', 'user_id')
+                    ->pluck('supersedes_assignment_id')
+                    ->all();
+                $supersededSet = array_flip($supersededIds);
 
                 // 全イベントを groupBy で取得（Eloquent: resolveJstCarbon で UTC/JST 混在対応）
                 $allEventsGrouped = \App\Models\Event::whereIn('project_job_assignment_id', $allAids)
@@ -507,13 +516,18 @@ class JobBoxController extends Controller
                     ->get(['id', 'project_job_assignment_id', 'starts_at', 'ends_at', 'interruption_minutes', 'project_job_assignment_id'])
                     ->groupBy('project_job_assignment_id');
 
-                $merged = array_map(function ($m) use ($sourceMap, $allEventsGrouped) {
+                $merged = array_map(function ($m) use ($sourceMap, $allEventsGrouped, $assignmentMeta, $supersededSet) {
                     $aid = (int) ($m['project_job_assignment_id'] ?? $m['project_job_assignment']['id'] ?? 0);
                     // source_assignment_id を project_job_assignment に埋め込む
                     if ($aid && isset($sourceMap[$aid])) {
                         if (isset($m['project_job_assignment']) && is_array($m['project_job_assignment'])) {
                             $m['project_job_assignment']['source_assignment_id'] = $sourceMap[$aid];
                         }
+                    }
+                    // is_registered を project_job_assignment に確実に埋め込む（DB値 + 動的フォールバック）
+                    if ($aid && isset($m['project_job_assignment']) && is_array($m['project_job_assignment'])) {
+                        $dbVal = $assignmentMeta->has($aid) ? (bool) $assignmentMeta->get($aid)->is_registered : false;
+                        $m['project_job_assignment']['is_registered'] = $dbVal || isset($supersededSet[$aid]);
                     }
                     // all_events / total_minutes
                     if ($aid && $allEventsGrouped->has($aid)) {
@@ -684,14 +698,8 @@ class JobBoxController extends Controller
             ->where('project_job_assignments.user_id', $user->id)
             // 自己割当・自分の返信を除外: メッセージ送信者が自分自身のものは表示しない
             // (受信箱として機能させる：他者から送られたメッセージのみ表示)
-            ->where('job_assignment_messages.sender_id', '!=', $user->id)
-            // マイジョブで supersedes 済みの依頼ジョブは非表示
-            ->whereNotExists(function ($sub) {
-                $sub->from('project_job_assignments as pja_self')
-                    ->whereColumn('pja_self.supersedes_assignment_id', 'project_job_assignments.id')
-                    ->whereColumn('pja_self.user_id', 'project_job_assignments.user_id')
-                    ->whereColumn('pja_self.sender_id', 'pja_self.user_id');
-            });
+            ->where('job_assignment_messages.sender_id', '!=', $user->id);
+            // 登録済みジョブも一覧に残す（フロントエンドの「登録済みを表示しない」チェックで制御）
 
         if ($q) {
             $base->where(function ($sub) use ($q) {
@@ -723,6 +731,30 @@ class JobBoxController extends Controller
         $messages = $base->with(['sender', 'message.recipients.user', 'message.fromUser', 'projectJobAssignment.projectJob.client', 'projectJobAssignment.statusModel', 'projectJobAssignment.user'])
             ->paginate($usePeriodFilter ? 500 : 50)
             ->appends(array_filter(['q' => $q, 'period' => $periodModel, 'sort' => $sort, 'dir' => $dir]));
+
+        // is_registered を動的に確定（DB列 + supersedes フォールバック）
+        try {
+            $allAssignmentIds = $messages->getCollection()
+                ->pluck('project_job_assignment_id')
+                ->filter()->unique()->values()->toArray();
+            if (!empty($allAssignmentIds)) {
+                $supersededSet = array_flip(
+                    \App\Models\ProjectJobAssignment::whereIn('supersedes_assignment_id', $allAssignmentIds)
+                        ->whereColumn('sender_id', 'user_id')
+                        ->pluck('supersedes_assignment_id')
+                        ->all()
+                );
+                $messages->getCollection()->each(function ($msg) use ($supersededSet) {
+                    if ($msg->projectJobAssignment) {
+                        $dbVal = (bool) ($msg->projectJobAssignment->is_registered ?? false);
+                        $aid   = $msg->project_job_assignment_id;
+                        $msg->projectJobAssignment->is_registered = $dbVal || isset($supersededSet[$aid]);
+                    }
+                });
+            }
+        } catch (\Throwable $__e) {
+            // non-fatal
+        }
 
         // Attach canonical `status` object to each loaded assignment so frontend getAssignmentStatus() works correctly
         try {
@@ -907,13 +939,16 @@ class JobBoxController extends Controller
                     $a->progress_col_key = null;
                 }
 
-                // ユーザーがすでにマイジョブとして登録済みかチェック（supersedes_assignment_id で紐づく自己割当の存在確認）
+                // ユーザーがすでにマイジョブとして登録済みかチェック
+                // DB カラム is_registered が true なら即確定、false なら動的クエリでフォールバック
                 try {
-                    $a->is_registered = \App\Models\ProjectJobAssignment::where('supersedes_assignment_id', $a->id)
-                        ->whereColumn('sender_id', 'user_id')
-                        ->exists();
+                    if (!$a->is_registered) {
+                        $a->is_registered = \App\Models\ProjectJobAssignment::where('supersedes_assignment_id', $a->id)
+                            ->whereColumn('sender_id', 'user_id')
+                            ->exists();
+                    }
                 } catch (\Throwable $__e) {
-                    $a->is_registered = false;
+                    // keep existing value on error
                 }
             }
         } catch (\Throwable $__e) {

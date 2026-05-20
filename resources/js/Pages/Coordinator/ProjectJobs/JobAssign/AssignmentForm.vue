@@ -315,7 +315,7 @@
                         v-model="block.work_item_type_id"
                         :disabled="props.mode === 'coordinator' ? (!hasDepartment(block) || !editMode) : !editMode"
                         @change="onInlineSelectionChange(idx)"
-                        class="mt-1 w-full rounded border px-2 py-1.5 text-sm"
+                        :class="['mt-1 w-full rounded border px-2 py-1.5 text-sm', getFieldError('assignments.0.work_item_type_id') || getFieldError('work_item_type_id') ? 'border-red-500 bg-red-50' : '']"
                     >
                         <option value="">-- 選択 --</option>
                         <template v-for="grp in typesGrouped(block.company_id, block.department_id, block._type_filter || '')" :key="grp.group">
@@ -324,6 +324,10 @@
                             </optgroup>
                         </template>
                     </select>
+                    <div v-if="getFieldError('assignments.0.work_item_type_id') || getFieldError('work_item_type_id')"
+                        class="mt-1 text-xs text-red-600">
+                        {{ getFieldError('assignments.0.work_item_type_id') || getFieldError('work_item_type_id') }}
+                    </div>
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-gray-600">ステージ（校数）</label>
@@ -336,13 +340,17 @@
                         v-model="block.stage_id"
                         :disabled="props.mode === 'coordinator' ? (!hasDepartment(block) || !editMode) : !editMode"
                         @change="onInlineSelectionChange(idx)"
-                        class="mt-1 w-full rounded border px-2 py-1.5 text-sm"
+                        :class="['mt-1 w-full rounded border px-2 py-1.5 text-sm', getFieldError('assignments.0.stage_id') || getFieldError('stage_id') ? 'border-red-500 bg-red-50' : '']"
                     >
                         <option value="">-- 選択 --</option>
                         <option v-for="st in stagesForSelect(block.company_id, block.department_id)" :key="st.id" :value="String(st.id)">
                             {{ st.name }}
                         </option>
                     </select>
+                    <div v-if="getFieldError('assignments.0.stage_id') || getFieldError('stage_id')"
+                        class="mt-1 text-xs text-red-600">
+                        {{ getFieldError('assignments.0.stage_id') || getFieldError('stage_id') }}
+                    </div>
                 </div>
             </div>
 
@@ -360,7 +368,7 @@
                         v-model="block.size_id"
                         :disabled="props.mode === 'coordinator' ? (!hasDepartment(block) || !editMode) : !editMode"
                         @change="onInlineSelectionChange(idx)"
-                        class="mt-1 w-full rounded border px-2 py-1.5 text-sm"
+                        :class="['mt-1 w-full rounded border px-2 py-1.5 text-sm', getFieldError('assignments.0.size_id') || getFieldError('size_id') ? 'border-red-500 bg-red-50' : '']"
                     >
                         <option value="">-- 選択 --</option>
                         <template v-for="grp in sizesGrouped(block.company_id, block.department_id, block._medium_filter ?? 'paper')" :key="grp.group">
@@ -369,6 +377,10 @@
                             </optgroup>
                         </template>
                     </select>
+                    <div v-if="getFieldError('assignments.0.size_id') || getFieldError('size_id')"
+                        class="mt-1 text-xs text-red-600">
+                        {{ getFieldError('assignments.0.size_id') || getFieldError('size_id') }}
+                    </div>
                 </div>
                 <!-- Status: coordinator では非表示、user では表示 -->
                 <div v-if="props.mode === 'user'">
@@ -794,8 +806,14 @@ function _calcInitStartTime() {
 const _initTime = _calcInitStartTime();
 const startTimeHour = ref(_initTime.h);
 const startTimeMin  = ref(_initTime.m);
-const endTimeHour   = ref('17');
-const endTimeMin    = ref('30');
+const _initEnd = (() => {
+    // 初期値は常に勤務形態の終業時刻（編集時の安全なデフォルト）
+    const worktypeEnd = (page.props?.auth?.user?.worktype_end_time ?? '17:30').substring(0, 5);
+    const [weh, wem] = worktypeEnd.split(':').map(Number);
+    return { h: String(weh).padStart(2, '0'), m: String(wem || 0).padStart(2, '0') };
+})();
+const endTimeHour   = ref(_initEnd.h);
+const endTimeMin    = ref(_initEnd.m);
 
 // Event overlap checking state
 const overlappingEvents = ref([]);
@@ -847,9 +865,9 @@ function handleSaveError(errors) {
         Object.keys(errors).forEach(field => {
             const fieldErrors = Array.isArray(errors[field]) ? errors[field] : [errors[field]];
             fieldErrors.forEach(message => {
-                // フィールド名を日本語に変換
                 const fieldLabel = getFieldLabel(field);
-                errorMessages.push(`${fieldLabel}: ${message}`);
+                const jpMessage = translateMessage(message);
+                errorMessages.push(`【${fieldLabel}】${jpMessage}`);
             });
         });
         
@@ -861,6 +879,41 @@ function handleSaveError(errors) {
     
     // フォールバック：詳細なエラー情報がない場合
     alert('保存に失敗しました。入力内容を確認してください。');
+}
+
+// Laravel のバリデーションメッセージを日本語に変換
+function translateMessage(msg) {
+    if (!msg) return msg;
+    // 短縮キー形式（例: "validation.exists"）
+    const keyMap = {
+        'validation.exists':       '選択した値が存在しません。選択し直してください。',
+        'validation.required':     '入力してください。',
+        'validation.string':       '文字列を入力してください。',
+        'validation.numeric':      '数値を入力してください。',
+        'validation.integer':      '整数を入力してください。',
+        'validation.date':         '正しい日付を入力してください。',
+        'validation.date_format':  '形式が正しくありません（例: HH:MM）。',
+        'validation.array':        '不正な形式です。',
+        'validation.nullable':     '',
+        'validation.in':           '選択肢にない値です。',
+        'validation.max.string':   '文字数が超過しています。',
+        'validation.min.numeric':  '最小値を下回っています。',
+        'validation.max.numeric':  '最大値を超えています。',
+    };
+    const trimmed = msg.trim();
+    if (keyMap[trimmed] !== undefined) return keyMap[trimmed];
+    // 英文フルメッセージ形式
+    return msg
+        .replace(/The .+? field is required\./i, '入力してください。')
+        .replace(/The .+? is required\./i, '入力してください。')
+        .replace(/The selected .+? is invalid\./i, '無効な値が選択されています。')
+        .replace(/The .+? must be a number\./i, '数値を入力してください。')
+        .replace(/The .+? must be at least (\d+)\./i, '$1以上の値を入力してください。')
+        .replace(/The .+? may not be greater than (\d+) characters\./i, '$1文字以内で入力してください。')
+        .replace(/The .+? format is invalid\./i, '形式が正しくありません。')
+        .replace(/The .+? must be a valid date\./i, '正しい日付を入力してください。')
+        .replace(/The .+? must be a date after .+?\./i, '日付が正しくありません。')
+        .replace(/The .+? must be between .+? and .+?\./i, '入力範囲が正しくありません。');
 }
 
 // フィールド名を日本語ラベルに変換
@@ -890,9 +943,13 @@ function getFieldLabel(fieldName) {
     return labels[fieldName] || fieldName;
 }
 
-// フィールドエラー取得関数
+// フィールドエラー取得関数（メッセージを日本語に変換して返す）
 function getFieldError(fieldName) {
-    return validationErrors.value[fieldName] ? validationErrors.value[fieldName][0] : null;
+    const val = validationErrors.value[fieldName];
+    if (!val) return null;
+    // Inertia は文字列で返す場合と配列の場合がある
+    const msg = Array.isArray(val) ? val[0] : val;
+    return msg ? translateMessage(msg) : null;
 }
 
 // エラークリア関数
@@ -1116,6 +1173,9 @@ function normalizeAssignment(a) {
             start_time_min: a.start_time
                 ? a.start_time.split(':')[1] || '30'
                 : a.start_time_min || (a.desired_time ? a.desired_time.split(':')[1] : '30'),
+            sender_id: a.sender_id ?? null,
+            start_time: a.start_time ?? null,
+            desired_time: a.desired_time ?? null,
             estimated_hours: a.estimated_hours !== undefined && a.estimated_hours !== null ? a.estimated_hours : '',
             work_item_type_id: a.work_item_type_id != null ? String(a.work_item_type_id) : null,
             size_id: a.size_id != null ? String(a.size_id) : (props.projectJob?.size_id ? String(props.projectJob.size_id) : null),
@@ -1310,17 +1370,66 @@ onMounted(() => {
             const s = normalizeToDateTimePartsLocal(ev.start || ev.desired_start_date || ev.start_time || '');
             const e = normalizeToDateTimePartsLocal(ev.end || ev.desired_end_date || ev.desired_time || '');
             workDate.value = s.date || assignments.value[0]?.desired_start_date || todayDateStr();
-            // 新規作成時は常に現在時刻の5分刻みを使用する
-            const _nowTime = _calcInitStartTime();
-            startTimeHour.value = _nowTime.h;
-            startTimeMin.value  = _nowTime.m;
-            if (e.time) {
-                const [eh, em] = String(e.time).split(':');
-                endTimeHour.value = eh || startTimeHour.value || '10';
-                endTimeMin.value = em || startTimeMin.value || '00';
-            } else if (assignments.value[0]) {
-                endTimeHour.value = assignments.value[0].desired_time_hour || startTimeHour.value || '17';
-                endTimeMin.value = assignments.value[0].desired_time_min || startTimeMin.value || '30';
+
+            // 既存の自己割当を編集中かどうか
+            const _isSelfEdit = assignments.value[0]?.id
+                && String(assignments.value[0]?.sender_id) === String(assignments.value[0]?.user_id);
+
+            if (_isSelfEdit) {
+                // ── 編集モード: 保存済みの時間をそのまま復元（変動させない）──
+                const _st = assignments.value[0]?.start_time;
+                if (_st) {
+                    const [_sh, _sm] = String(_st).split(':');
+                    startTimeHour.value = _sh || '00';
+                    startTimeMin.value  = _sm || '00';
+                } else if (s.time) {
+                    const [_sh, _sm] = String(s.time).split(':');
+                    startTimeHour.value = _sh || '00';
+                    startTimeMin.value  = _sm || '00';
+                }
+                const _dt = assignments.value[0]?.desired_time;
+                if (_dt) {
+                    const [_eh, _em] = String(_dt).split(':');
+                    endTimeHour.value = _eh || '00';
+                    endTimeMin.value  = _em || '00';
+                } else if (e.time) {
+                    const [_eh, _em] = String(e.time).split(':');
+                    endTimeHour.value = _eh || '00';
+                    endTimeMin.value  = _em || '00';
+                }
+            } else {
+                // ── 新規登録: 開始=現在時刻、終了=勤務形態ベース ──
+                const _rawStartTime = assignments.value[0]?.start_time;
+                if (assignments.value[0]?.id && _rawStartTime) {
+                    const [_sh, _sm] = String(_rawStartTime).split(':');
+                    startTimeHour.value = _sh || '00';
+                    startTimeMin.value  = _sm || '00';
+                } else if (assignments.value[0]?.id && s.time) {
+                    const [_sh, _sm] = String(s.time).split(':');
+                    startTimeHour.value = _sh || '00';
+                    startTimeMin.value  = _sm || '00';
+                } else {
+                    const _nowTime = _calcInitStartTime();
+                    startTimeHour.value = _nowTime.h;
+                    startTimeMin.value  = _nowTime.m;
+                }
+                // 終了時刻: 勤務形態ベースで計算
+                const _nt = _calcInitStartTime();
+                const _nowMins = Number(_nt.h) * 60 + Number(_nt.m);
+                const _wEnd = (page.props?.auth?.user?.worktype_end_time ?? '17:30').substring(0, 5);
+                const [_weh, _wem] = _wEnd.split(':').map(Number);
+                const _wEndMins = _weh * 60 + (_wem || 0);
+                if (_nowMins < _wEndMins) {
+                    endTimeHour.value = String(_weh).padStart(2, '0');
+                    endTimeMin.value  = String(_wem || 0).padStart(2, '0');
+                } else {
+                    let _em = Number(_nt.m) + 30;
+                    let _eh = Number(_nt.h);
+                    if (_em >= 60) { _em -= 60; _eh += 1; }
+                    if (_eh >= 24) _eh = 23;
+                    endTimeHour.value = String(_eh).padStart(2, '0');
+                    endTimeMin.value  = String(_em).padStart(2, '0');
+                }
             }
         }
     }

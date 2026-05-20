@@ -58,6 +58,17 @@ class ProjectJobAssignmentController extends Controller
         // (removed temporary debug logging)
 
         foreach ($data['assignments'] as $a) {
+            // 同一 Coordinator 割当からの二重登録を防止
+            if (!empty($a['supersedes_assignment_id'])) {
+                $supersedingExists = ProjectJobAssignment::where('supersedes_assignment_id', (int)$a['supersedes_assignment_id'])
+                    ->whereColumn('sender_id', 'user_id')
+                    ->exists();
+                if ($supersedingExists) {
+                    return redirect()->route('user.myjobbox.index')
+                        ->with('error', 'このジョブはすでにマイジョブとして登録済みです。');
+                }
+            }
+
             DB::transaction(function () use ($projectJob, $a, $user) {
                 // prefer explicit difficulty_id only
                 $difficultyId = !empty($a['difficulty_id']) ? (int) $a['difficulty_id'] : null;
@@ -117,6 +128,13 @@ class ProjectJobAssignmentController extends Controller
                     $createPayload['read_at']      = now();
                     $createPayload['scheduled_at'] = now();
                     $assignment = ProjectJobAssignment::create($createPayload);
+                }
+
+                // 元の Coordinator 割当を「登録済み」にする（ジョブ重複防止）
+                if (!empty($a['supersedes_assignment_id'])) {
+                    ProjectJobAssignment::where('id', (int)$a['supersedes_assignment_id'])
+                        ->whereColumn('user_id', '!=', 'sender_id')
+                        ->update(['is_registered' => true]);
                 }
 
                 // 進行表セルリンク: _row_id と _col_key が渡された場合（_progress_sheet_id は任意）

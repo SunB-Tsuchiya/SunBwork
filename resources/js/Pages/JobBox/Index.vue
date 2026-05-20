@@ -52,6 +52,10 @@
                     <input type="checkbox" v-model="hideCompleted" class="h-4 w-4 rounded border-gray-300" />
                     完了を表示しない
                 </label>
+                <label class="flex cursor-pointer items-center gap-2 text-sm text-gray-700 select-none">
+                    <input type="checkbox" v-model="hideRegistered" class="h-4 w-4 rounded border-gray-300" />
+                    登録済みを表示しない
+                </label>
             </div>
 
             <!-- グループ表示切替ボタン -->
@@ -126,10 +130,16 @@
                                     </template>
                                 </td>
                                 <td class="border px-3 py-2">
-                                    <span
-                                        :class="statusBadgeClass(getAssignmentStatus(m))"
-                                        class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-                                    >{{ getAssignmentStatus(m) }}</span>
+                                    <div class="flex flex-wrap gap-1">
+                                        <span
+                                            :class="statusBadgeClass(getAssignmentStatus(m))"
+                                            class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+                                        >{{ getAssignmentStatus(m) }}</span>
+                                        <span
+                                            v-if="m.project_job_assignment?.is_registered"
+                                            class="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-800"
+                                        >登録済</span>
+                                    </div>
                                 </td>
                             </tr>
                         </tbody>
@@ -142,6 +152,7 @@
                 <div class="text-sm text-gray-600">
                     表示中 {{ totalDisplayCount }} 件
                     <span v-if="hideCompleted && hiddenCompletedCount > 0" class="ml-2 text-xs text-gray-400">（完了 {{ hiddenCompletedCount }} 件を非表示）</span>
+                    <span v-if="hideRegistered && hiddenRegisteredCount > 0" class="ml-2 text-xs text-gray-400">（登録済み {{ hiddenRegisteredCount }} 件を非表示）</span>
                 </div>
             </div>
 
@@ -168,6 +179,9 @@ const monthOptions = computed(() => (Array.isArray(page.props.monthOptions) ? pa
 
 // 完了非表示フラグ（デフォルト：完了を隠す）
 const hideCompleted = useUIState('sbw_jobbox_hide_completed', true);
+
+// 登録済み非表示フラグ（デフォルト：登録済みを隠す）
+const hideRegistered = useUIState('sbw_jobbox_hide_registered', true);
 
 // グループ表示モード
 const viewMode = useUIState('sbw_jobbox_view_mode', 'date');
@@ -266,6 +280,10 @@ const displayGroups = computed(() => {
         messages = messages.filter((m) => getAssignmentStatus(m) !== '完了');
     }
 
+    if (hideRegistered.value) {
+        messages = messages.filter((m) => !m.project_job_assignment?.is_registered);
+    }
+
     const grouped = new Map();
     for (const m of messages) {
         const key = getGroupKey(m);
@@ -317,6 +335,12 @@ const hiddenCompletedCount = computed(() => {
     if (!hideCompleted.value) return 0;
     const all = deduplicateByAssignment(Array.isArray(localMessages.value) ? localMessages.value : []);
     return all.filter((m) => getAssignmentStatus(m) === '完了').length;
+});
+
+const hiddenRegisteredCount = computed(() => {
+    if (!hideRegistered.value) return 0;
+    const all = deduplicateByAssignment(Array.isArray(localMessages.value) ? localMessages.value : []);
+    return all.filter((m) => m.project_job_assignment?.is_registered).length;
 });
 
 // ===== 既存ロジック（変更なし） =====
