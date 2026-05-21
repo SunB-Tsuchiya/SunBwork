@@ -733,7 +733,7 @@ const canCreate = computed(() => {
                                     ]"
                                     @dragstart="!(col.key === 'completed' && deleteMode) && onDragStart(ticket)"
                                     @dragend="onDragEnd"
-                                    @click="col.key === 'completed' && deleteMode ? toggleSelectForDelete(ticket.id) : null"
+                                    @click="col.key === 'completed' && deleteMode ? toggleSelectForDelete(ticket.id) : openDetail(ticket)"
                                 >
                                     <!-- 削除モード選択ハイライト -->
                                     <div
@@ -899,16 +899,20 @@ const canCreate = computed(() => {
                                 <dd class="text-gray-800">{{ detail.client_name || '—' }}</dd>
                             </div>
                             <div class="flex py-2">
-                                <dt class="w-32 shrink-0 font-medium text-gray-500">案件名</dt>
-                                <dd class="text-gray-800">{{ detail.project_name || '—' }}</dd>
-                            </div>
-                            <div class="flex py-2">
                                 <dt class="w-32 shrink-0 font-medium text-gray-500">伝票番号</dt>
                                 <dd class="text-gray-800">{{ detail.jobcode || '—' }}</dd>
                             </div>
                             <div class="flex py-2">
                                 <dt class="w-32 shrink-0 font-medium text-gray-500">作成日</dt>
                                 <dd class="text-gray-800">{{ formatDate(detail.created_at) }}</dd>
+                            </div>
+                            <div class="flex py-2">
+                                <dt class="w-32 shrink-0 font-medium text-gray-500">入稿日</dt>
+                                <dd class="text-gray-800">{{ formatDate(detail.submission_date) || '—' }}</dd>
+                            </div>
+                            <div class="flex py-2">
+                                <dt class="w-32 shrink-0 font-medium text-gray-500">下版日</dt>
+                                <dd class="text-gray-800">{{ formatDate(detail.sb_delivery_date) || '—' }}</dd>
                             </div>
                             <div v-if="detail.memo" class="flex py-2">
                                 <dt class="w-32 shrink-0 font-medium text-gray-500">メモ</dt>

@@ -230,16 +230,20 @@ async function savePendingImage() {
                         <dd class="text-gray-800">{{ localTicket.client_name || '—' }}</dd>
                     </div>
                     <div class="flex py-2">
-                        <dt class="w-32 shrink-0 font-medium text-gray-500">案件名</dt>
-                        <dd class="text-gray-800">{{ localTicket.project_name || '—' }}</dd>
-                    </div>
-                    <div class="flex py-2">
                         <dt class="w-32 shrink-0 font-medium text-gray-500">伝票番号</dt>
                         <dd class="text-gray-800">{{ localTicket.jobcode || '—' }}</dd>
                     </div>
                     <div class="flex py-2">
                         <dt class="w-32 shrink-0 font-medium text-gray-500">作成日</dt>
                         <dd class="text-gray-800">{{ formatDate(localTicket.created_at) }}</dd>
+                    </div>
+                    <div class="flex py-2">
+                        <dt class="w-32 shrink-0 font-medium text-gray-500">入稿日</dt>
+                        <dd class="text-gray-800">{{ formatDate(localTicket.submission_date) || '—' }}</dd>
+                    </div>
+                    <div class="flex py-2">
+                        <dt class="w-32 shrink-0 font-medium text-gray-500">下版日</dt>
+                        <dd class="text-gray-800">{{ formatDate(localTicket.sb_delivery_date) || '—' }}</dd>
                     </div>
                     <div v-if="localTicket.memo" class="flex py-2">
                         <dt class="w-32 shrink-0 font-medium text-gray-500">メモ</dt>
