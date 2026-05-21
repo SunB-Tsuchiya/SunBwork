@@ -161,6 +161,7 @@ class ProgressSheetController extends Controller
                 'valueUser:id,name',
                 'valueSubcontractor:id,name',
                 'assignment:id,title,detail,desired_end_date,completed,proof_completed_at,user_id,sender_id,subcontractor_id',
+                'assignment.user:id,name',
                 'proofAssignment:id,title,completed,proof_completed_at,user_id,sender_id',
                 'schedule:id,name,end_date,completed_at',
                 'noteUser:id,name,user_role',
@@ -181,8 +182,8 @@ class ProgressSheetController extends Controller
                 'value_text'                  => $c->value_text,
                 'value_date'                  => $c->value_date?->format('Y-m-d'),
                 'value_bool'                  => $c->value_bool,
-                'value_user_id'               => $c->value_user_id,
-                'value_user_name'             => $c->valueUser?->name,
+                'value_user_id'               => $c->value_user_id ?? $c->assignment?->user_id,
+                'value_user_name'             => $c->valueUser?->name ?? $c->assignment?->user?->name,
                 'value_subcontractor_id'      => $c->value_subcontractor_id,
                 'value_subcontractor_name'    => $c->valueSubcontractor?->name,
                 'assignment_id'               => $c->assignment_id,
@@ -889,6 +890,7 @@ class ProgressSheetController extends Controller
                 $joblinkCells = ProgressCell::whereIn('row_id', $rowIds)
                     ->where('col_key', $joblinkColKey)
                     ->whereNotNull('assignment_id')
+                    ->with('assignment:id,user_id')
                     ->get(['id', 'row_id', 'assignment_id']);
 
                 foreach ($joblinkCells as $jc) {
@@ -899,6 +901,7 @@ class ProgressSheetController extends Controller
                     // user セル側に assignment_id が未設定の場合のみコピー（既存データ保護）
                     if (!$userCell->assignment_id) {
                         $userCell->assignment_id = $jc->assignment_id;
+                        $userCell->value_user_id = $jc->assignment?->user_id;
                         $userCell->save();
                     }
                 }
