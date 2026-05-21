@@ -29,11 +29,22 @@ const localCells        = ref(props.cells.map(c => ({ ...c })));
 const editMode          = ref(false);
 const localColumnConfig = ref(JSON.parse(JSON.stringify(props.sheet.column_config ?? [])));
 
+// 編集モード用：元の値を保存（変更検知用）
+let savedEditModeColumnConfig = null;
+let savedEditModeSheetName = null;
+
 watch(() => props.sheet.column_config, val => {
     localColumnConfig.value = JSON.parse(JSON.stringify(val ?? []));
 });
 watch(() => props.cells, val => {
     localCells.value = val.map(c => ({ ...c }));
+});
+watch(editMode, (newVal) => {
+  if (newVal) {
+    // 編集モード開始時に現在の値を保存
+    savedEditModeColumnConfig = JSON.stringify(localColumnConfig.value);
+    savedEditModeSheetName = localSheetName.value;
+  }
 });
 
 // ── Column tree helpers ────────────────────────────────────────────────────────
@@ -333,11 +344,45 @@ async function saveColumnConfig() {
             route('coordinator.workflow_sheets.update', { sheet: props.sheet.id }),
             { column_config: localColumnConfig.value, name: localSheetName.value.trim() }
         );
+        savedEditModeColumnConfig = JSON.stringify(localColumnConfig.value);
+        savedEditModeSheetName = localSheetName.value;
         editMode.value = false;
         router.reload({ only: ['sheet'] });
     } catch (e) {
         alert('保存に失敗しました');
     }
+}
+
+function hasChangesInEditMode() {
+  const columnConfigChanged = JSON.stringify(localColumnConfig.value) !== savedEditModeColumnConfig;
+  const sheetNameChanged = localSheetName.value !== savedEditModeSheetName;
+  return columnConfigChanged || sheetNameChanged;
+}
+
+async function saveAndExitEditMode() {
+    if (!localSheetName.value.trim()) { alert('シート名を入力してください'); return; }
+    try {
+        await axios.put(
+            route('coordinator.workflow_sheets.update', { sheet: props.sheet.id }),
+            { column_config: localColumnConfig.value, name: localSheetName.value.trim() }
+        );
+        editMode.value = false;
+        router.reload({ only: ['sheet'] });
+    } catch (e) {
+        alert('保存に失敗しました');
+    }
+}
+
+function exitEditModeWithoutSave() {
+  if (hasChangesInEditMode()) {
+    if (!confirm('変更内容が保存されていません。破棄して戻りますか？')) {
+      return;
+    }
+  }
+  // 元の値に戻す
+  localColumnConfig.value = JSON.parse(savedEditModeColumnConfig);
+  localSheetName.value = savedEditModeSheetName;
+  editMode.value = false;
 }
 
 // ── Proof request modal ────────────────────────────────────────────────────────
@@ -536,12 +581,24 @@ function openPrint() {
             <!-- ── ツールバー ──────────────────────────────── -->
             <div class="mb-4 flex flex-wrap items-center gap-3">
                 <template v-if="canEdit">
+                    <template v-if="editMode">
+                        <button
+                            type="button"
+                            class="rounded bg-green-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-green-700"
+                            @click="saveAndExitEditMode"
+                        >保存して終了</button>
+                        <button
+                            type="button"
+                            class="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+                            @click="exitEditModeWithoutSave"
+                        >保存しないで戻る</button>
+                    </template>
                     <button
+                        v-else
                         type="button"
-                        class="rounded px-3 py-1.5 text-sm font-medium"
-                        :class="editMode ? 'bg-gray-600 text-white hover:bg-gray-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'"
-                        @click="editMode = !editMode"
-                    >{{ editMode ? '編集モードを終了' : '編集モード' }}</button>
+                        class="rounded bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
+                        @click="editMode = true"
+                    >編集モード</button>
 
                     <button
                         v-if="!editMode"
@@ -606,10 +663,6 @@ function openPrint() {
                     :item-entries="itemEntries"
                     @change="onColumnChange"
                 />
-                <div class="mt-4 flex justify-center gap-3">
-                    <button type="button" class="rounded border border-gray-300 px-5 py-1.5 text-sm text-gray-600 hover:bg-gray-50" @click="editMode = false">キャンセル</button>
-                    <button type="button" class="rounded bg-indigo-600 px-8 py-1.5 text-sm font-medium text-white hover:bg-indigo-700" @click="saveColumnConfig">保存</button>
-                </div>
             </div>
 
             <!-- ── 通常モード：テーブル ───────────────────────────────── -->

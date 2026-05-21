@@ -27,13 +27,29 @@
       <!-- ── ツールバー ──────────────────────────────── -->
       <div class="mb-4 flex flex-wrap items-center gap-3">
         <template v-if="canEdit">
+          <template v-if="editMode">
+            <button
+              type="button"
+              class="rounded bg-green-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-green-700"
+              @click="saveAndExitEditMode"
+            >
+              保存して終了
+            </button>
+            <button
+              type="button"
+              class="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+              @click="exitEditModeWithoutSave"
+            >
+              保存しないで戻る
+            </button>
+          </template>
           <button
+            v-else
             type="button"
-            class="rounded px-3 py-1.5 text-sm font-medium"
-            :class="editMode ? 'bg-gray-600 text-white hover:bg-gray-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'"
-            @click="editMode = !editMode"
+            class="rounded bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
+            @click="editMode = true"
           >
-            {{ editMode ? '編集モードを終了' : '編集モード' }}
+            編集モード
           </button>
 
           <!-- テンプレートとして登録 -->
@@ -364,17 +380,6 @@
             @change="onColumnChange"
           />
         </div>
-      </div>
-
-      <!-- 編集モード保存ボタン -->
-      <div v-if="editMode && canEdit" class="mb-6 flex justify-center">
-        <button
-          type="button"
-          class="rounded bg-indigo-600 px-8 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-          @click="saveColumnConfig"
-        >
-          保存
-        </button>
       </div>
 
     </div>
@@ -848,6 +853,18 @@ onUnmounted(() => {
 // 列が未定義の場合は自動で編集モードを開く
 const editMode = ref(props.canEdit && (props.sheet.column_config?.length ?? 0) === 0);
 const localSheetName = ref(props.sheet.name ?? '');
+
+// 編集モード用：元の値を保存（変更検知用）
+let savedEditModeColumnConfig = null;
+let savedEditModeSheetName = null;
+
+watch(editMode, (newVal) => {
+  if (newVal) {
+    // 編集モード開始時に現在の値を保存
+    savedEditModeColumnConfig = JSON.stringify(localColumnConfig.value);
+    savedEditModeSheetName = localSheetName.value;
+  }
+});
 const showRegisterModal = ref(false);
 const showConvertModal      = ref(false);
 const convertPreviewData    = ref(null);
@@ -1489,10 +1506,48 @@ function saveColumnConfig() {
       preserveScroll: true,
       onSuccess: (page) => {
         syncRowsFromPage(page);
+        savedEditModeColumnConfig = JSON.stringify(localColumnConfig.value);
+        savedEditModeSheetName = localSheetName.value;
+      },
+    }
+  );
+}
+
+function hasChangesInEditMode() {
+  const columnConfigChanged = JSON.stringify(localColumnConfig.value) !== savedEditModeColumnConfig;
+  const sheetNameChanged = localSheetName.value !== savedEditModeSheetName;
+  return columnConfigChanged || sheetNameChanged;
+}
+
+function saveAndExitEditMode() {
+  if (pendingNewRow.value?.label?.trim()) {
+    showToast('未確定の行ラベルがあります。Enter で確定してから保存してください。', 'warning', 4000);
+    return;
+  }
+  cancelPendingRow();
+  router.put(
+    route('coordinator.progress_sheets.update', { sheet: props.sheet.id }),
+    { name: localSheetName.value, column_config: localColumnConfig.value },
+    {
+      preserveScroll: true,
+      onSuccess: (page) => {
+        syncRowsFromPage(page);
         editMode.value = false;
       },
     }
   );
+}
+
+function exitEditModeWithoutSave() {
+  if (hasChangesInEditMode()) {
+    if (!confirm('変更内容が保存されていません。破棄して戻りますか？')) {
+      return;
+    }
+  }
+  // 元の値に戻す
+  localColumnConfig.value = JSON.parse(savedEditModeColumnConfig);
+  localSheetName.value = savedEditModeSheetName;
+  editMode.value = false;
 }
 
 // ── V2 変換（既存 user/proof_user+joblink ペア → worker/proof_user 型） ──────────────────
