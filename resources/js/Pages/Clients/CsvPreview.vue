@@ -4,17 +4,19 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, useForm } from '@inertiajs/vue3';
 
 const props = defineProps({
-    csvData:    Array,
-    errors:     Array,
-    hasErrors:  Boolean,
-    prefix:     String,
-    company_id: { type: [String, Number], default: null },
-    company:    { type: Object, default: null },
+    csvData:        Array,
+    errors:         Array,
+    hasErrors:      Boolean,
+    prefix:         String,
+    company_id:     { type: [String, Number], default: null },
+    company:        { type: Object, default: null },
+    department_ids: { type: Array, default: () => [] },
 });
 
 const form = useForm({
-    clients:    props.csvData.filter((row, i) => !props.errors.some((e) => e.includes(`行 ${i + 1}:`))),
-    company_id: props.company_id,
+    clients:        props.csvData.filter((row, i) => !props.errors.some((e) => e.includes(`行 ${i + 1}:`))),
+    company_id:     props.company_id,
+    department_ids: props.department_ids,
 });
 
 const submit = () => {
@@ -56,6 +58,7 @@ const submit = () => {
                             <tr>
                                 <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">行</th>
                                 <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">クライアント名</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Client ID</th>
                                 <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">詳細</th>
                             </tr>
                         </thead>
@@ -63,6 +66,7 @@ const submit = () => {
                             <tr v-for="row in form.clients" :key="row.line" class="hover:bg-gray-50">
                                 <td class="px-4 py-2 text-sm text-gray-500">{{ row.line }}</td>
                                 <td class="px-4 py-2 text-sm font-medium text-gray-900">{{ row.name }}</td>
+                                <td class="px-4 py-2 font-mono text-sm text-gray-600">{{ row.client_code || '-' }}</td>
                                 <td class="px-4 py-2 text-sm text-gray-600">{{ row.detail || '-' }}</td>
                             </tr>
                         </tbody>
@@ -74,7 +78,7 @@ const submit = () => {
             <div class="flex items-center justify-between">
                 <Link
                     :href="route(`${prefix}.clients.csv.upload`)"
-                    class="inline-flex items-center rounded-md border border-transparent bg-gray-500 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white transition duration-150 ease-in-out hover:bg-gray-600 focus:outline-none disabled:opacity-25"
+                    class="inline-flex items-center rounded-md border border-transparent bg-gray-500 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white transition duration-150 ease-in-out hover:bg-gray-600 focus:outline-none"
                 >
                     戻る
                 </Link>

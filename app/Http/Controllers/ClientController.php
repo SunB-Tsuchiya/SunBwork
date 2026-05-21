@@ -525,9 +525,9 @@ class ClientController extends Controller
         $this->requireAdminPermission('client_management');
         $this->requireLeaderPermission('client_management');
         $rows = [
-            ['name', 'detail'],
-            ['株式会社サンプル', '詳細テキスト（省略可）'],
-            ['テスト商事', ''],
+            ['name', 'client_code', 'detail'],
+            ['株式会社サンプル', 'ABC-001', '詳細テキスト（省略可）'],
+            ['テスト商事', '', ''],
         ];
         $csv = '';
         foreach ($rows as $row) {
@@ -548,7 +548,11 @@ class ClientController extends Controller
         $companies = ($user && $user->user_role === 'superadmin')
             ? Company::orderBy('name')->get(['id', 'name'])
             : [];
-        return Inertia::render('Clients/CsvUpload', ['companies' => $companies]);
+        $departments = Department::orderBy('id')->get(['id', 'name', 'company_id']);
+        return Inertia::render('Clients/CsvUpload', [
+            'companies'   => $companies,
+            'departments' => $departments,
+        ]);
     }
 
     /** CSVプレビュー */
@@ -558,8 +562,10 @@ class ClientController extends Controller
         $this->requireLeaderPermission('client_management');
         $this->authorize('create', Client::class);
         $request->validate([
-            'csv_file'   => 'required|file|mimes:csv,txt|max:2048',
-            'company_id' => 'nullable|exists:companies,id',
+            'csv_file'       => 'required|file|mimes:csv,txt|max:2048',
+            'company_id'     => 'nullable|exists:companies,id',
+            'department_ids' => 'nullable|array',
+            'department_ids.*' => 'exists:departments,id',
         ]);
 
         $file = $request->file('csv_file');
@@ -574,7 +580,9 @@ class ClientController extends Controller
             $line = 0;
 
             if (($handle = fopen(Storage::path($path), 'r')) !== false) {
-                fgetcsv($handle, 1000, ','); // ヘッダースキップ
+                $header = fgetcsv($handle, 1000, ',');
+                // 旧形式(name,detail)と新形式(name,client_code,detail)を自動判別
+                $hasClientCode = $header && count($header) >= 2 && strtolower(trim($header[1])) === 'client_code';
                 while (($data = fgetcsv($handle, 1000, ',')) !== false) {
                     $line++;
                     if (count($data) < 1) {
@@ -582,11 +590,17 @@ class ClientController extends Controller
                         continue;
                     }
                     $name = trim($data[0]);
-                    $detail = isset($data[1]) ? trim($data[1]) : '';
+                    if ($hasClientCode) {
+                        $clientCode = isset($data[1]) ? trim($data[1]) : '';
+                        $detail     = isset($data[2]) ? trim($data[2]) : '';
+                    } else {
+                        $clientCode = '';
+                        $detail     = isset($data[1]) ? trim($data[1]) : '';
+                    }
                     if (empty($name)) {
                         $errors[] = "行 {$line}: 名前が空です";
                     }
-                    $csvData[] = ['line' => $line, 'name' => $name, 'detail' => $detail];
+                    $csvData[] = ['line' => $line, 'name' => $name, 'client_code' => $clientCode, 'detail' => $detail];
                 }
                 fclose($handle);
             }
@@ -596,14 +610,16 @@ class ClientController extends Controller
                 ? $request->company_id
                 : ($user->company_id ?? null);
             $company = $companyId ? Company::find($companyId) : null;
+            $departmentIds = $request->input('department_ids', []);
 
             return Inertia::render('Clients/CsvPreview', [
-                'csvData'    => $csvData,
-                'errors'     => $errors,
-                'hasErrors'  => count($errors) > 0,
-                'prefix'     => $this->routePrefix(),
-                'company_id' => $companyId,
-                'company'    => $company ? $company->only('id', 'name') : null,
+                'csvData'        => $csvData,
+                'errors'         => $errors,
+                'hasErrors'      => count($errors) > 0,
+                'prefix'         => $this->routePrefix(),
+                'company_id'     => $companyId,
+                'company'        => $company ? $company->only('id', 'name') : null,
+                'department_ids' => $departmentIds,
             ]);
         } catch (\Exception $e) {
             Log::error('clientCsvPreview error: ' . $e->getMessage());
@@ -618,8 +634,10 @@ class ClientController extends Controller
         $this->requireLeaderPermission('client_management');
         $this->authorize('create', Client::class);
         $request->validate([
-            'clients'    => 'required|array',
-            'company_id' => 'nullable|exists:companies,id',
+            'clients'          => 'required|array',
+            'company_id'       => 'nullable|exists:companies,id',
+            'department_ids'   => 'nullable|array',
+            'department_ids.*' => 'exists:departments,id',
         ]);
 
         $user = Auth::user();
@@ -627,15 +645,23 @@ class ClientController extends Controller
         $companyId = $isSuperOrAdmin
             ? $request->company_id
             : ($user->company_id ?? null);
-        $deptId = $isSuperOrAdmin ? 1 : ($user->department_id ?? 1);
+
+        // department_ids が送られてきた場合はそれを使用、なければユーザーの部署
+        $deptIds = $request->input('department_ids', []);
+        if (empty($deptIds)) {
+            $deptIds = $user->department_id ? [$user->department_id] : [];
+        }
 
         foreach ($request->clients as $row) {
             $client = Client::create([
-                'name'       => $row['name'],
-                'notes'      => $row['detail'] ?? null,
-                'company_id' => $companyId,
+                'name'        => $row['name'],
+                'client_code' => isset($row['client_code']) && $row['client_code'] !== '' ? $row['client_code'] : null,
+                'notes'       => $row['detail'] ?? null,
+                'company_id'  => $companyId,
             ]);
-            $client->departments()->attach($deptId);
+            if (!empty($deptIds)) {
+                $client->departments()->attach($deptIds);
+            }
         }
 
         $prefix = $this->routePrefix();
