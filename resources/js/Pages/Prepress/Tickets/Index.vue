@@ -37,18 +37,33 @@ function search()      { applyFilters(); }
 function clearSearch() { qModel.value = ''; applyFilters(); }
 
 // ── グループ表示モード ────────────────────────────
-const viewMode = ref('date');
+const viewMode = ref('submission');
 const viewModes = [
-    { key: 'date',    label: '日付ごと' },
-    { key: 'client',  label: 'クライアントごと' },
-    { key: 'project', label: '案件ごと' },
+    { key: 'submission', label: '入稿日ごと' },
+    { key: 'delivery',   label: '下版日ごと' },
+    { key: 'client',     label: 'クライアントごと' },
+    { key: 'project',    label: '案件ごと' },
 ];
+
+// ── 日付モード専用: ソート・絞込 ─────────────────
+const sortDir          = ref('asc');  // 'asc' | 'desc'
+const dateFilterNative = ref('');     // YYYY-MM-DD（ネイティブ input[type=date] の値）
+
+const dateFilterFormatted = computed(() =>
+    dateFilterNative.value ? dateFilterNative.value.replace(/-/g, '/') : ''
+);
+
+function isDateMode() {
+    return viewMode.value === 'submission' || viewMode.value === 'delivery';
+}
 
 // ── ユーティリティ ────────────────────────────────
 function formatDateLabel(dateStr) {
     if (!dateStr) return '日付なし';
     try {
-        const d   = new Date(dateStr.slice(0, 10) + 'T00:00:00');
+        // YYYY/MM/DD または YYYY-MM-DD どちらも対応
+        const normalized = String(dateStr).slice(0, 10).replace(/\//g, '-');
+        const d   = new Date(normalized + 'T00:00:00');
         const dow = ['日','月','火','水','木','金','土'][d.getDay()];
         return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日（${dow}）`;
     } catch { return dateStr; }
@@ -76,12 +91,36 @@ const displayGroups = computed(() => {
         } else if (viewMode.value === 'project') {
             key   = t.project_name || '__none__';
             label = t.project_name || '（案件名未設定）';
+        } else if (viewMode.value === 'delivery') {
+            key   = t.sb_delivery_date || '__none__';
+            label = key !== '__none__' ? formatDateLabel(key) : '下版日未設定';
         } else {
-            key   = t.created_at ? String(t.created_at).split('T')[0] : '__none__';
-            label = key !== '__none__' ? formatDateLabel(key) : '日付なし';
+            // submission（デフォルト）
+            key   = t.submission_date || '__none__';
+            label = key !== '__none__' ? formatDateLabel(key) : '入稿日未設定';
         }
         if (!map[key]) { map[key] = { key, label, items: [] }; order.push(key); }
         map[key].items.push(t);
+    }
+
+    // 日付モード: 絞込 → ソート
+    if (viewMode.value === 'submission' || viewMode.value === 'delivery') {
+        let groups = order.map((k) => map[k]);
+
+        // 日付フィルター（特定の日付のみ表示）
+        if (dateFilterFormatted.value) {
+            groups = groups.filter(g => g.key === dateFilterFormatted.value);
+        }
+
+        // 昇順 / 降順ソート（未設定は常に末尾）
+        groups.sort((a, b) => {
+            if (a.key === '__none__') return 1;
+            if (b.key === '__none__') return -1;
+            const cmp = a.key < b.key ? -1 : a.key > b.key ? 1 : 0;
+            return sortDir.value === 'asc' ? cmp : -cmp;
+        });
+
+        return groups;
     }
     return order.map((k) => map[k]);
 });
@@ -469,6 +508,38 @@ const canCreate = computed(() => {
                 >{{ mode.label }}</button>
             </div>
 
+            <!-- 日付モード専用サブツールバー -->
+            <div v-if="isDateMode()" class="mt-2 flex flex-wrap items-center gap-3">
+                <!-- ソート順 -->
+                <div class="flex gap-0.5 rounded border border-gray-200 bg-gray-50 p-0.5">
+                    <button
+                        @click="sortDir = 'asc'"
+                        :class="sortDir === 'asc' ? 'bg-white text-green-700 font-semibold shadow-sm' : 'text-gray-500 hover:text-gray-700'"
+                        class="rounded px-3 py-1 text-xs transition-all"
+                    >↑ 昇順</button>
+                    <button
+                        @click="sortDir = 'desc'"
+                        :class="sortDir === 'desc' ? 'bg-white text-green-700 font-semibold shadow-sm' : 'text-gray-500 hover:text-gray-700'"
+                        class="rounded px-3 py-1 text-xs transition-all"
+                    >↓ 降順</button>
+                </div>
+
+                <!-- 日付で絞込 -->
+                <div class="flex items-center gap-1.5">
+                    <label class="text-xs text-gray-600 whitespace-nowrap">日付で絞込:</label>
+                    <input
+                        v-model="dateFilterNative"
+                        type="date"
+                        class="rounded border border-gray-300 px-2 py-1 text-xs focus:border-green-600 focus:outline-none"
+                    />
+                    <button
+                        v-if="dateFilterNative"
+                        @click="dateFilterNative = ''"
+                        class="rounded border border-gray-200 px-2 py-1 text-xs text-gray-500 hover:bg-gray-100"
+                    >クリア</button>
+                </div>
+            </div>
+
             <!-- グループテーブル -->
             <div class="mt-4 overflow-x-auto">
                 <div v-if="displayGroups.length === 0" class="py-8 text-center text-sm text-gray-400">
@@ -482,24 +553,20 @@ const canCreate = computed(() => {
                         <span class="ml-2 text-xs font-normal text-gray-500">{{ group.items.length }} 件</span>
                     </div>
 
-                    <table class="w-full table-fixed border" style="min-width: 960px;">
+                    <table class="w-full table-fixed border" style="min-width: 580px;">
                         <colgroup>
                             <col style="width: 100px">
                             <col style="width: 100px">
-                            <col style="width: 120px">
                             <col>
-                            <col style="width: 120px">
-                            <col style="width: 150px">
-                            <col style="width: 100px">
+                            <col style="width: 130px">
+                            <col style="width: 90px">
                         </colgroup>
                         <thead>
                             <tr class="bg-gray-50">
-                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">作成者</th>
-                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">受信者</th>
-                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">作成日</th>
-                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">タイトル</th>
-                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">クライアント</th>
+                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">入稿日</th>
+                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">下版日</th>
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">案件名</th>
+                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">クライアント</th>
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">ステータス</th>
                             </tr>
                         </thead>
@@ -511,12 +578,10 @@ const canCreate = computed(() => {
                                 @click="router.get(route('prepress.tickets.show', { ticket: ticket.id }))"
                                 role="button"
                             >
-                                <td class="break-words border px-3 py-2 text-sm text-gray-700">{{ ticket.user?.name ?? '—' }}</td>
-                                <td class="break-words border px-3 py-2 text-sm text-gray-400">—</td>
-                                <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ formatDate(ticket.created_at) }}</td>
+                                <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ ticket.submission_date || '—' }}</td>
+                                <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ ticket.sb_delivery_date || '—' }}</td>
                                 <td class="break-words border px-3 py-2 text-sm font-medium text-gray-800">{{ ticket.title }}</td>
                                 <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ ticket.client_name || '—' }}</td>
-                                <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ ticket.project_name || '—' }}</td>
                                 <td class="border px-3 py-2">
                                     <span
                                         :class="statusBadgeClass(ticket.status)"

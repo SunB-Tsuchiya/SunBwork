@@ -306,15 +306,16 @@ class DashboardController extends Controller
         }
 
         return Inertia::render($component, [
-            'user'            => $user,
-            'diaries'         => $diaries,
-            'events'          => $events,
-            'jobs'            => $jobs,
-            'calendarView'    => $calendarView,
-            'defaultWorktype' => $defaultWorktype,
-            'worktypes'       => $worktypes,
-            'dailyWorktypes'  => $dailyWorktypes,
-            'departments'     => $departments,
+            'user'             => $user,
+            'diaries'          => $diaries,
+            'events'           => $events,
+            'jobs'             => $jobs,
+            'calendarView'     => $calendarView,
+            'defaultWorktype'  => $defaultWorktype,
+            'worktypes'        => $worktypes,
+            'dailyWorktypes'   => $dailyWorktypes,
+            'departments'      => $departments,
+            'userDepartmentId' => $user->department_id,
         ]);
     }
 }

@@ -68,7 +68,7 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user()
                     ? array_merge(
-                        $request->user()->only(['id', 'name', 'email', 'user_role', 'company_id', 'department_id'])
+                        $request->user()->only(['id', 'name', 'email', 'user_role', 'company_id', 'department_id', 'is_ghost'])
                             + ['worktype_end_time' => $request->user()->worktype?->end_time
                             ? substr($request->user()->worktype->end_time, 0, 5)
                             : null],

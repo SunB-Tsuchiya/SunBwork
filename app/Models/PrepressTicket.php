@@ -19,9 +19,16 @@ class PrepressTicket extends Model
         'project_name',
         'client_name',
         'memo',
+        'submission_date',
+        'sb_delivery_date',
         'status',
         'image_path',
         'original_filename',
+    ];
+
+    protected $casts = [
+        'submission_date'  => 'date:Y/m/d',
+        'sb_delivery_date' => 'date:Y/m/d',
     ];
 
     protected $appends = ['image_url'];
@@ -48,6 +55,11 @@ class PrepressTicket extends Model
     public function projectJob()
     {
         return $this->belongsTo(ProjectJob::class);
+    }
+
+    public function client()
+    {
+        return $this->belongsTo(\App\Models\Client::class);
     }
 
     public function getStatusLabelAttribute(): string

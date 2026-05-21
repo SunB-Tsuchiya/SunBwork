@@ -1,6 +1,7 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
 import OcrModal from '@/Components/Prepress/OcrModal.vue';
+import DateInput from '@/Components/Prepress/DateInput.vue';
 import { useForm } from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
 import axios from 'axios';
@@ -12,14 +13,16 @@ const props = defineProps({
 });
 
 const form = useForm({
-    client_id:   props.ticket.client_id   ?? '',
-    client_name: props.ticket.client_name ?? '',
-    jobcode:     props.ticket.jobcode     ?? '',
-    title:       props.ticket.title       ?? '',
-    memo:        props.ticket.memo        ?? '',
-    status:      props.ticket.status      ?? 'pending',
-    image:       null,
-    keep_image:  true, // 画像を変更しない場合は既存を維持
+    client_id:        props.ticket.client_id        ?? '',
+    client_name:      props.ticket.client_name      ?? '',
+    jobcode:          props.ticket.jobcode           ?? '',
+    title:            props.ticket.title             ?? '',
+    memo:             props.ticket.memo              ?? '',
+    submission_date:  props.ticket.submission_date   ?? '',
+    sb_delivery_date: props.ticket.sb_delivery_date  ?? '',
+    status:           props.ticket.status            ?? 'pending',
+    image:            null,
+    keep_image:       true,
 });
 
 // ── OCR ──────────────────────────────────────────────────
@@ -44,11 +47,21 @@ async function triggerOcr(file) {
     }
 }
 
-function onOcrApply(result) {
+async function onOcrApply(result) {
     form.jobcode     = result.jobcode     || form.jobcode;
     form.title       = result.title       || form.title;
     form.client_id   = result.client_id   || '';
     form.client_name = result.client_name || form.client_name;
+
+    // client_id が確定したら client_code を API で解決して表示
+    clientCodeInput.value = '';
+    if (result.client_id) {
+        try {
+            const res = await axios.get(route('prepress.api.clients'), { params: { id: result.client_id } });
+            if (res.data) clientCodeInput.value = res.data.client_code ?? '';
+        } catch { /* ignore */ }
+    }
+
     if (result.tmp_image_path) {
         form.image      = null;
         form.keep_image = false;
@@ -59,28 +72,23 @@ function onOcrApply(result) {
 }
 
 // ── クライアント選択 ──────────────────────────────────────
-const clientSuggestions  = ref([]);
-const showClientSuggestions = ref(false);
+// clientCodeInput: ユーザーが見る/入力する Client ID（表示専用、サーバーには送らない）
+// form.client_id : DB の内部 id（サーバーへ送る）
+const clientCodeInput        = ref(props.ticket.client_code ?? '');
+const clientSuggestions      = ref([]);
+const showClientSuggestions  = ref(false);
 const selectedSuggestionIndex = ref(-1);
 let clientSearchTimer = null;
 
-function onClientNameInput() {
-    form.client_id = '';
-    clearTimeout(clientSearchTimer);
-    if (!form.client_name.trim()) {
-        clientSuggestions.value = [];
-        showClientSuggestions.value = false;
-        return;
-    }
-    clientSearchTimer = setTimeout(async () => {
-        const res = await axios.get(route('prepress.api.clients'), { params: { q: form.client_name } });
-        clientSuggestions.value = res.data;
-        showClientSuggestions.value = true;
-        selectedSuggestionIndex.value = -1;
-    }, 250);
+function selectClientFromSuggestion(client) {
+    form.client_id        = client.id;
+    form.client_name      = client.name;
+    clientCodeInput.value = client.client_code ?? '';
+    showClientSuggestions.value   = false;
+    selectedSuggestionIndex.value = -1;
 }
 
-function onClientNameKeydown(e) {
+function handleSuggestionKeydown(e) {
     if (!showClientSuggestions.value || clientSuggestions.value.length === 0) return;
     if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -97,26 +105,44 @@ function onClientNameKeydown(e) {
     }
 }
 
-function onClientNameBlur() {
+function onClientSuggestionsBlur() {
     setTimeout(() => { showClientSuggestions.value = false; }, 200);
 }
 
-function selectClientFromSuggestion(client) {
-    form.client_id   = client.id;
-    form.client_name = client.name;
-    showClientSuggestions.value = false;
+// Client ID フィールド（client_code で検索）
+function onClientCodeInput() {
+    form.client_id   = '';
+    form.client_name = '';
+    clearTimeout(clientSearchTimer);
+    if (!clientCodeInput.value.trim()) {
+        clientSuggestions.value     = [];
+        showClientSuggestions.value = false;
+        return;
+    }
+    clientSearchTimer = setTimeout(async () => {
+        const res = await axios.get(route('prepress.api.clients'), { params: { code: clientCodeInput.value } });
+        clientSuggestions.value     = res.data;
+        showClientSuggestions.value = true;
+        selectedSuggestionIndex.value = -1;
+    }, 250);
 }
 
-let clientIdTimer = null;
-function onClientIdChange() {
-    form.client_name = '';
-    clearTimeout(clientIdTimer);
-    if (!form.client_id) return;
-    clientIdTimer = setTimeout(async () => {
-        const res = await axios.get(route('prepress.api.clients'), { params: { q: '' } });
-        const found = res.data.find(c => c.id == form.client_id);
-        if (found) form.client_name = found.name;
-    }, 400);
+// クライアント名フィールド（名前で検索）
+function onClientNameInput() {
+    form.client_id        = '';
+    clientCodeInput.value = '';
+    clearTimeout(clientSearchTimer);
+    if (!form.client_name.trim()) {
+        clientSuggestions.value = [];
+        showClientSuggestions.value = false;
+        return;
+    }
+    clientSearchTimer = setTimeout(async () => {
+        const res = await axios.get(route('prepress.api.clients'), { params: { q: form.client_name } });
+        clientSuggestions.value = res.data;
+        showClientSuggestions.value = true;
+        selectedSuggestionIndex.value = -1;
+    }, 250);
 }
 
 // ── 画像プレビュー ──────────────────────────────────────
@@ -186,16 +212,20 @@ const isMobile = computed(() => {
                     <div>
                         <label class="mb-1 block text-sm font-semibold text-gray-700">クライアント</label>
                         <div class="flex items-center gap-2">
+                            <!-- Client ID 入力（client_code で検索） -->
                             <div class="flex items-center gap-1">
-                                <label class="text-sm text-gray-500">ID:</label>
+                                <label class="shrink-0 text-sm text-gray-500">Client ID:</label>
                                 <input
-                                    v-model="form.client_id"
-                                    type="number"
-                                    placeholder="ID"
-                                    class="w-20 rounded border border-gray-300 px-2 py-2 text-sm focus:border-green-600 focus:outline-none"
-                                    @input="onClientIdChange"
+                                    v-model="clientCodeInput"
+                                    type="text"
+                                    placeholder="コードを入力"
+                                    class="w-28 rounded border border-gray-300 px-2 py-2 font-mono text-sm focus:border-green-600 focus:outline-none"
+                                    @input="onClientCodeInput"
+                                    @keydown="handleSuggestionKeydown"
+                                    @blur="onClientSuggestionsBlur"
                                 />
                             </div>
+                            <!-- 名前入力（名前で検索） -->
                             <div class="relative flex-1">
                                 <input
                                     v-model="form.client_name"
@@ -203,9 +233,10 @@ const isMobile = computed(() => {
                                     placeholder="名前を入力（オートコンプリート）"
                                     class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-600 focus:outline-none"
                                     @input="onClientNameInput"
-                                    @keydown="onClientNameKeydown"
-                                    @blur="onClientNameBlur"
+                                    @keydown="handleSuggestionKeydown"
+                                    @blur="onClientSuggestionsBlur"
                                 />
+                                <!-- 候補ドロップダウン（コード入力・名前入力 共用） -->
                                 <div
                                     v-if="showClientSuggestions && clientSuggestions.length > 0"
                                     class="absolute top-full z-50 mt-1 w-full overflow-y-auto rounded border border-gray-300 bg-white shadow-lg max-h-52"
@@ -217,9 +248,9 @@ const isMobile = computed(() => {
                                         :class="{ 'bg-blue-100': idx === selectedSuggestionIndex }"
                                         @mousedown.prevent="selectClientFromSuggestion(client)"
                                     >
-                                        <div class="flex items-center justify-between">
+                                        <div class="flex items-center justify-between gap-2">
                                             <span class="font-medium">{{ client.name }}</span>
-                                            <span class="text-xs text-gray-400">ID: {{ client.id }}</span>
+                                            <span class="shrink-0 font-mono text-xs text-gray-400">{{ client.client_code || '―' }}</span>
                                         </div>
                                         <div v-if="client.is_dormant" class="text-xs text-red-500">※ 休眠中</div>
                                     </div>
@@ -241,10 +272,10 @@ const isMobile = computed(() => {
                         <p v-if="form.errors.jobcode" class="mt-1 text-xs text-red-600">{{ form.errors.jobcode }}</p>
                     </div>
 
-                    <!-- 案件タイトル -->
+                    <!-- 案件名 -->
                     <div>
                         <label class="mb-1 block text-sm font-semibold text-gray-700">
-                            案件タイトル <span class="text-red-500">*</span>
+                            案件名 <span class="text-red-500">*</span>
                         </label>
                         <input
                             v-model="form.title"
@@ -254,6 +285,20 @@ const isMobile = computed(() => {
                             class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-600 focus:outline-none"
                         />
                         <p v-if="form.errors.title" class="mt-1 text-xs text-red-600">{{ form.errors.title }}</p>
+                    </div>
+
+                    <!-- 製版入稿日 / SB下版日 -->
+                    <div class="flex gap-4">
+                        <div class="flex-1">
+                            <label class="mb-1 block text-sm font-semibold text-gray-700">製版入稿日</label>
+                            <DateInput v-model="form.submission_date" />
+                            <p v-if="form.errors.submission_date" class="mt-1 text-xs text-red-600">{{ form.errors.submission_date }}</p>
+                        </div>
+                        <div class="flex-1">
+                            <label class="mb-1 block text-sm font-semibold text-gray-700">SB下版日</label>
+                            <DateInput v-model="form.sb_delivery_date" />
+                            <p v-if="form.errors.sb_delivery_date" class="mt-1 text-xs text-red-600">{{ form.errors.sb_delivery_date }}</p>
+                        </div>
                     </div>
 
                     <!-- ステータス -->

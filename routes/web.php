@@ -921,6 +921,9 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
         Route::get('tickets', [\App\Http\Controllers\Prepress\TicketController::class, 'index'])->name('tickets.index');
         Route::get('tickets/create', [\App\Http\Controllers\Prepress\TicketController::class, 'create'])->name('tickets.create');
         Route::post('tickets', [\App\Http\Controllers\Prepress\TicketController::class, 'store'])->name('tickets.store');
+        Route::get('tickets/{ticket}', [\App\Http\Controllers\Prepress\TicketController::class, 'show'])->name('tickets.show');
+        Route::get('tickets/{ticket}/edit', [\App\Http\Controllers\Prepress\TicketController::class, 'edit'])->name('tickets.edit');
+        Route::patch('tickets/{ticket}', [\App\Http\Controllers\Prepress\TicketController::class, 'update'])->name('tickets.update');
         Route::patch('tickets/{ticket}/status', [\App\Http\Controllers\Prepress\TicketController::class, 'updateStatus'])->name('tickets.updateStatus');
         Route::post('tickets/{ticket}/image', [\App\Http\Controllers\Prepress\TicketController::class, 'updateImage'])->name('tickets.updateImage');
         Route::delete('tickets/{ticket}', [\App\Http\Controllers\Prepress\TicketController::class, 'destroy'])->name('tickets.destroy');

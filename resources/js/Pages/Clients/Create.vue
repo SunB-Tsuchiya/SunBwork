@@ -28,14 +28,16 @@ const ownDept       = computed(() => props.departments.find(d => d.id === userDe
 
 const form = useForm({
     name:           '',
+    client_code:    '',
     detail:         '',
     department_ids: (isLeader.value || isCoordinator.value) && userDeptId.value ? [userDeptId.value] : [],
 });
 
 // ===== 重複チェック =====
-const showDuplicateModal = ref(false);
-const duplicateClients = ref([]);
-const isCheckingDuplicate = ref(false);
+// type: 'no_code_same_name' | 'diff_code_same_name' | 'same_code_diff_name' | null
+const duplicateModalType    = ref(null);
+const duplicateModalClients = ref([]);
+const isCheckingDuplicate   = ref(false);
 
 async function submit() {
     if (!form.name.trim()) return;
@@ -52,14 +54,26 @@ async function submit() {
                 'X-Requested-With': 'XMLHttpRequest',
             },
             credentials: 'same-origin',
-            body: JSON.stringify({ name: form.name }),
+            body: JSON.stringify({ name: form.name, client_code: form.client_code || null }),
         });
         if (res.ok) {
             const data = await res.json();
-            if (data.duplicates && data.duplicates.length > 0) {
-                duplicateClients.value = data.duplicates;
-                showDuplicateModal.value = true;
-                return; // 保存しない
+
+            // 優先順位: same_code_diff_name → no_code_same_name → diff_code_same_name
+            if (data.same_code_diff_name?.length > 0) {
+                duplicateModalType.value    = 'same_code_diff_name';
+                duplicateModalClients.value = data.same_code_diff_name;
+                return;
+            }
+            if (data.no_code_same_name?.length > 0) {
+                duplicateModalType.value    = 'no_code_same_name';
+                duplicateModalClients.value = data.no_code_same_name;
+                return;
+            }
+            if (data.diff_code_same_name?.length > 0) {
+                duplicateModalType.value    = 'diff_code_same_name';
+                duplicateModalClients.value = data.diff_code_same_name;
+                return;
             }
         }
     } catch {
@@ -68,11 +82,16 @@ async function submit() {
         isCheckingDuplicate.value = false;
     }
 
+    doSubmit();
+}
+
+function doSubmit() {
+    duplicateModalType.value = null;
     form.post(route(`${routePrefix.value}.clients.store`));
 }
 
-function closeDuplicateModal() {
-    showDuplicateModal.value = false;
+function closeModal() {
+    duplicateModalType.value = null;
 }
 </script>
 
@@ -111,6 +130,20 @@ function closeDuplicateModal() {
                 <div class="mb-4">
                     <label class="mb-1 block">名前</label>
                     <input v-model="form.name" type="text" required class="w-full rounded border px-2 py-1" />
+                </div>
+                <div class="mb-4">
+                    <label class="mb-1 block text-sm font-medium text-gray-700">
+                        Client ID
+                        <span class="ml-1 text-xs font-normal text-gray-400">（任意・ユニークコード）</span>
+                    </label>
+                    <input
+                        v-model="form.client_code"
+                        type="text"
+                        maxlength="64"
+                        placeholder="例: ABC-001"
+                        class="w-full rounded border px-2 py-1 font-mono text-sm"
+                    />
+                    <p v-if="form.errors.client_code" class="mt-1 text-xs text-red-600">{{ form.errors.client_code }}</p>
                 </div>
                 <div class="mb-4">
                     <label class="mb-1 block">詳細</label>
@@ -165,68 +198,134 @@ function closeDuplicateModal() {
         </div>
     </AppLayout>
 
-    <!-- 重複警告モーダル -->
+    <!-- 重複チェックモーダル -->
     <Teleport to="body">
-        <div v-if="showDuplicateModal" class="fixed inset-0 z-50 flex items-center justify-center">
-            <!-- オーバーレイ -->
-            <div class="absolute inset-0 bg-black/50" @click="closeDuplicateModal" />
+        <div v-if="duplicateModalType" class="fixed inset-0 z-50 flex items-center justify-center">
+            <div class="absolute inset-0 bg-black/50" @click="closeModal" />
 
-            <!-- モーダル本体 -->
             <div class="relative z-10 w-full max-w-lg rounded-lg bg-white shadow-xl">
                 <div class="p-6">
-                    <!-- ヘッダー -->
-                    <div class="mb-4 flex items-center gap-3">
-                        <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-yellow-100">
-                            <svg class="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-                            </svg>
+
+                    <!-- ===== パターン1: same_code_diff_name ===== -->
+                    <!-- 同じ Client ID で名前が違う → アラート（ブロック） -->
+                    <template v-if="duplicateModalType === 'same_code_diff_name'">
+                        <div class="mb-4 flex items-center gap-3">
+                            <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-red-100">
+                                <svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                                </svg>
+                            </div>
+                            <h3 class="text-lg font-semibold text-gray-900">同じ Client ID が使用中です</h3>
                         </div>
-                        <h3 class="text-lg font-semibold text-gray-900">類似クライアントが見つかりました</h3>
-                    </div>
-
-                    <!-- 本文 -->
-                    <div class="mb-5 space-y-3">
-                        <p class="text-sm text-gray-700">
-                            入力した名前 <strong class="text-gray-900">「{{ form.name }}」</strong> と似たクライアントが既に登録されています。
-                            データが重複する可能性があります。
-                        </p>
-
-                        <!-- 類似クライアント一覧 -->
-                        <div class="rounded-md bg-yellow-50 p-3">
-                            <p class="mb-2 text-xs font-medium uppercase tracking-wider text-yellow-700">既存の類似クライアント</p>
-                            <ul class="space-y-1">
-                                <li v-for="c in duplicateClients" :key="c.id" class="flex items-center gap-2 text-sm text-gray-800">
-                                    <span class="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-yellow-500" />
-                                    <span class="font-medium">{{ c.name }}</span>
-                                    <span class="text-xs text-gray-400">（ID: {{ c.id }}）</span>
-                                </li>
-                            </ul>
-                        </div>
-
-                        <p class="text-sm font-medium text-red-600">
-                            追加する場合はクライアント名を変更してから再度登録してください。
-                        </p>
-
-                        <!-- 判定ロジックの説明 -->
-                        <details class="text-xs text-gray-400">
-                            <summary class="cursor-pointer hover:text-gray-600">類似判定の基準とは？</summary>
-                            <p class="mt-1 leading-relaxed">
-                                株式会社・有限会社などの法人格を除いた社名、全角/半角の違い、スペースの有無を統一した上で比較しています。
-                                例：「株式会社ABC」「ＡＢＣ株式会社」「ABC 」は同一と判定されます。
+                        <div class="mb-5 space-y-3">
+                            <p class="text-sm text-gray-700">
+                                入力した Client ID <strong class="font-mono text-gray-900">「{{ form.client_code }}」</strong> はすでに別のクライアントに登録されています。
                             </p>
-                        </details>
-                    </div>
+                            <div class="rounded-md bg-red-50 p-3">
+                                <p class="mb-2 text-xs font-medium uppercase tracking-wider text-red-700">同じ Client ID を持つクライアント</p>
+                                <ul class="space-y-1">
+                                    <li v-for="c in duplicateModalClients" :key="c.id" class="flex items-center gap-2 text-sm text-gray-800">
+                                        <span class="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-red-500" />
+                                        <span class="font-medium">{{ c.name }}</span>
+                                        <span class="font-mono text-xs text-gray-400">{{ c.client_code }}</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            <p class="text-sm font-medium text-red-600">Client ID を変更してから再度登録してください。</p>
+                        </div>
+                        <div class="flex justify-end">
+                            <button type="button" class="rounded bg-gray-200 px-4 py-2 font-bold text-gray-700 hover:bg-gray-300" @click="closeModal">
+                                閉じる（Client ID を変更する）
+                            </button>
+                        </div>
+                    </template>
 
-                    <!-- フッター -->
-                    <div class="flex justify-end">
-                        <button
-                            type="button"
-                            class="rounded bg-gray-200 px-4 py-2 font-bold text-gray-700 whitespace-nowrap hover:bg-gray-300"
-                            @click="closeDuplicateModal"
-                        >
-                            閉じる（名前を変更する）
-                        </button>
-                    </div>
+                    <!-- ===== パターン2: no_code_same_name ===== -->
+                    <!-- Client ID 未設定で名前が一致 → 警告（ブロック） -->
+                    <template v-else-if="duplicateModalType === 'no_code_same_name'">
+                        <div class="mb-4 flex items-center gap-3">
+                            <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-yellow-100">
+                                <svg class="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                                </svg>
+                            </div>
+                            <h3 class="text-lg font-semibold text-gray-900">類似クライアントが見つかりました</h3>
+                        </div>
+                        <div class="mb-5 space-y-3">
+                            <p class="text-sm text-gray-700">
+                                入力した名前 <strong class="text-gray-900">「{{ form.name }}」</strong> と似たクライアントが既に登録されています。
+                                Client ID が設定されていないため、同一クライアントの可能性があります。
+                            </p>
+                            <div class="rounded-md bg-yellow-50 p-3">
+                                <p class="mb-2 text-xs font-medium uppercase tracking-wider text-yellow-700">既存の類似クライアント</p>
+                                <ul class="space-y-1">
+                                    <li v-for="c in duplicateModalClients" :key="c.id" class="flex items-center gap-2 text-sm text-gray-800">
+                                        <span class="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-yellow-500" />
+                                        <span class="font-medium">{{ c.name }}</span>
+                                        <span v-if="c.client_code" class="font-mono text-xs text-gray-400">{{ c.client_code }}</span>
+                                        <span v-else class="text-xs text-gray-400">（ID未設定）</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            <p class="text-sm font-medium text-red-600">
+                                別クライアントの場合は Client ID を設定した上で再度登録してください。
+                            </p>
+                            <details class="text-xs text-gray-400">
+                                <summary class="cursor-pointer hover:text-gray-600">類似判定の基準とは？</summary>
+                                <p class="mt-1 leading-relaxed">
+                                    株式会社・有限会社などの法人格を除いた社名、全角/半角の違い、スペースの有無を統一した上で比較しています。
+                                </p>
+                            </details>
+                        </div>
+                        <div class="flex justify-end">
+                            <button type="button" class="rounded bg-gray-200 px-4 py-2 font-bold text-gray-700 hover:bg-gray-300" @click="closeModal">
+                                閉じる（名前または Client ID を変更する）
+                            </button>
+                        </div>
+                    </template>
+
+                    <!-- ===== パターン3: diff_code_same_name ===== -->
+                    <!-- 両方 Client ID あり・異なる・名前が一致 → 確認（通過可能） -->
+                    <template v-else-if="duplicateModalType === 'diff_code_same_name'">
+                        <div class="mb-4 flex items-center gap-3">
+                            <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-blue-100">
+                                <svg class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
+                                </svg>
+                            </div>
+                            <h3 class="text-lg font-semibold text-gray-900">同名のクライアントが存在します</h3>
+                        </div>
+                        <div class="mb-5 space-y-3">
+                            <p class="text-sm text-gray-700">
+                                名前 <strong class="text-gray-900">「{{ form.name }}」</strong> と同名のクライアントが存在しますが、
+                                Client ID が異なるため別のクライアントとして登録できます。
+                            </p>
+                            <div class="rounded-md bg-blue-50 p-3">
+                                <p class="mb-2 text-xs font-medium uppercase tracking-wider text-blue-700">既存の同名クライアント（Client ID が異なる）</p>
+                                <ul class="space-y-1">
+                                    <li v-for="c in duplicateModalClients" :key="c.id" class="flex items-center gap-2 text-sm text-gray-800">
+                                        <span class="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-blue-500" />
+                                        <span class="font-medium">{{ c.name }}</span>
+                                        <span class="font-mono text-xs text-gray-500">{{ c.client_code }}</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            <p class="text-sm text-gray-600">Client ID が異なる別クライアントとして登録しますか？</p>
+                        </div>
+                        <div class="flex items-center justify-between gap-3">
+                            <button
+                                type="button"
+                                class="rounded bg-orange-600 px-4 py-2 font-bold text-white hover:bg-orange-700"
+                                @click="doSubmit"
+                            >
+                                このまま登録する
+                            </button>
+                            <button type="button" class="rounded bg-gray-200 px-4 py-2 font-bold text-gray-700 hover:bg-gray-300" @click="closeModal">
+                                キャンセル
+                            </button>
+                        </div>
+                    </template>
+
                 </div>
             </div>
         </div>

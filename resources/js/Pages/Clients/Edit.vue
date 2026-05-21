@@ -35,6 +35,7 @@ const ownDept    = computed(() => props.departments.find(d => d.id === userDeptI
 
 const form = useForm({
     name:           props.client.name,
+    client_code:    props.client.client_code ?? '',
     detail:         props.client.notes,
     department_ids: (props.client.departments ?? []).map(d => d.id),
 });
@@ -161,6 +162,20 @@ function executeMerge() {
                 <div class="mb-4">
                     <label class="mb-1 block">名前</label>
                     <input v-model="form.name" type="text" required class="w-full rounded border px-2 py-1" />
+                </div>
+                <div class="mb-4">
+                    <label class="mb-1 block text-sm font-medium text-gray-700">
+                        Client ID
+                        <span class="ml-1 text-xs font-normal text-gray-400">（任意・ユニークコード）</span>
+                    </label>
+                    <input
+                        v-model="form.client_code"
+                        type="text"
+                        maxlength="64"
+                        placeholder="例: ABC-001"
+                        class="w-full rounded border px-2 py-1 font-mono text-sm"
+                    />
+                    <p v-if="form.errors.client_code" class="mt-1 text-xs text-red-600">{{ form.errors.client_code }}</p>
                 </div>
                 <div class="mb-4">
                     <label class="mb-1 block">詳細</label>

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Coordinator;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\NormalizesCsvEncoding;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\ProjectSchedule;
@@ -12,6 +13,8 @@ use Illuminate\Support\Str;
 
 class ProjectSchedulesController extends Controller
 {
+    use NormalizesCsvEncoding;
+
     public function index(Request $request)
     {
         // for PoC, accept project_job_id query
@@ -215,15 +218,12 @@ class ProjectSchedulesController extends Controller
         $projectJobId = $request->input('project_job_id');
         $file = $request->file('file');
 
-        $handle = fopen($file->getRealPath(), 'r');
-        if ($handle === false) {
-            return response()->json(['status' => 'error', 'message' => 'ファイルを開けませんでした'], 422);
-        }
+        $tmpPath = $this->normalizeCsvToTemp($file);
 
-        // BOM スキップ
-        $bom = fread($handle, 3);
-        if ($bom !== "\xEF\xBB\xBF") {
-            fseek($handle, 0);
+        $handle = fopen($tmpPath, 'r');
+        if ($handle === false) {
+            @unlink($tmpPath);
+            return response()->json(['status' => 'error', 'message' => 'ファイルを開けませんでした'], 422);
         }
 
         // ヘッダー行をスキップ
@@ -280,6 +280,7 @@ class ProjectSchedulesController extends Controller
                 $row++;
             }
             fclose($handle);
+            @unlink($tmpPath);
 
             if (!empty($errors)) {
                 DB::rollBack();
@@ -291,6 +292,7 @@ class ProjectSchedulesController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             fclose($handle);
+            @unlink($tmpPath);
             return response()->json(['status' => 'error', 'message' => 'インポートに失敗しました: ' . $e->getMessage()], 500);
         }
     }

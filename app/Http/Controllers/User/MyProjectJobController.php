@@ -353,10 +353,10 @@ class MyProjectJobController extends Controller
             abort(403, '削除する権限がありません。');
         }
 
-        // ProgressCell の assignment_id を明示的にクリア（Sakura FK 非依存の救済措置）
+        // ProgressCell の assignment_id と completed_at をクリア
         try {
             \App\Models\ProgressCell::where('assignment_id', $assignment->id)
-                ->update(['assignment_id' => null]);
+                ->update(['assignment_id' => null, 'completed_at' => null]);
         } catch (\Throwable $e) {
             // progress_cells テーブルが存在しない場合は無視
         }

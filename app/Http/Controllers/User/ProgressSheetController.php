@@ -186,7 +186,10 @@ class ProgressSheetController extends Controller
 
             $cell = ProgressCell::updateOrCreate(
                 ['row_id' => $validated['row_id'], 'col_key' => $validated['col_key']],
-                ['assignment_id' => $assignment->id]
+                [
+                    'assignment_id' => $assignment->id,
+                    'value_user_id' => $user->id,
+                ]
             );
 
             // ジョブ側にも progress_cell_id を設定（双方向紐づけ）

@@ -6,14 +6,15 @@ import IrukaBoard from '@/Components/Iruka/IrukaBoard.vue';
 // User tabs remain per-page
 
 defineProps({
-    diaries:        { type: Array,  default: () => [] },
-    events:         { type: Array,  default: () => [] },
-    jobs:           { type: Array,  default: () => [] },
-    calendarView:   { type: String, default: 'timeGridWeek' },
-    defaultWorktype:{ type: Object, default: null },
-    worktypes:      { type: Array,  default: () => [] },
-    dailyWorktypes: { type: Array,  default: () => [] },
-    departments:    { type: Array,  default: () => [] },
+    diaries:          { type: Array,  default: () => [] },
+    events:           { type: Array,  default: () => [] },
+    jobs:             { type: Array,  default: () => [] },
+    calendarView:     { type: String, default: 'timeGridWeek' },
+    defaultWorktype:  { type: Object, default: null },
+    worktypes:        { type: Array,  default: () => [] },
+    dailyWorktypes:   { type: Array,  default: () => [] },
+    departments:      { type: Array,  default: () => [] },
+    userDepartmentId: { type: Number, default: null },
 });
 
 import { usePage } from '@inertiajs/vue3';
@@ -136,7 +137,7 @@ watch(activeTab, async (newTab) => {
 
         <!-- イルカ在席ボード -->
         <div v-show="activeTab === 'iruka'">
-            <IrukaBoard :departments="$page.props.departments" />
+            <IrukaBoard :departments="$page.props.departments" :default-dept-id="$page.props.userDepartmentId" />
         </div>
         <!--AI用メモ：ここまでを各ページのコンテンツとする-->
 

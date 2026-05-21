@@ -142,7 +142,7 @@ class ProjectJobAssignmentController extends Controller
                     try {
                         ProgressCell::updateOrCreate(
                             ['row_id' => (int)$a['_row_id'], 'col_key' => (string)$a['_col_key']],
-                            ['assignment_id' => $assignment->id]
+                            ['assignment_id' => $assignment->id, 'value_user_id' => $assignment->user_id]
                         );
                     } catch (\Throwable $__eCellLink) {
                         \Illuminate\Support\Facades\Log::warning('Failed to link ProgressCell after user assignment', [

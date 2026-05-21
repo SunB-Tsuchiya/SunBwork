@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\ChecksAdminPermission;
+use App\Http\Controllers\Concerns\NormalizesCsvEncoding;
 use App\Models\User;
 use App\Models\Team;
 use App\Models\Company;
@@ -22,7 +23,7 @@ use PhpParser\Node\Expr\Assign;
 
 class UserController extends Controller
 {
-    use ChecksAdminPermission;
+    use ChecksAdminPermission, NormalizesCsvEncoding;
 
     /**
      * Display a listing of users
@@ -361,6 +362,8 @@ class UserController extends Controller
             $fullPath = Storage::path($path);
             Log::info('Full path: ' . $fullPath);
             Log::info('File exists: ' . (file_exists($fullPath) ? 'yes' : 'no'));
+
+            $this->normalizeCsvStoredFile($path);
         } catch (\Exception $e) {
             Log::error('Store failed: ' . $e->getMessage());
             return back()->withErrors(['csv_file' => 'ファイルの保存に失敗しました: ' . $e->getMessage()]);

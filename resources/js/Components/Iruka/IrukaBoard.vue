@@ -96,7 +96,8 @@ import IrukaStatusModal from './IrukaStatusModal.vue';
 import { getStatus, resolveStatus } from './statusConfig.js';
 
 const props = defineProps({
-    departments: { type: Array, default: () => [] },
+    departments:   { type: Array,  default: () => [] },
+    defaultDeptId: { type: Number, default: null },
 });
 
 const authUser = inject('authUser', null);
@@ -109,13 +110,16 @@ const ABSENT_SLUGS = new Set(['left', 'paid_leave', 'special_leave', 'early_leav
 // 部署タブ（「全部署」なし、各部署のみ）
 const deptTabs = computed(() => props.departments);
 
-// localStorage から復元。null / 無効値は最初の部署 ID にフォールバック
+// localStorage から復元。無効値は defaultDeptId → 最初の部署の順でフォールバック
 const DEPT_KEY = 'iruka_active_dept';
 function initDept() {
     const saved = localStorage.getItem(DEPT_KEY);
     if (saved && saved !== 'null') {
         const n = Number(saved);
         if (props.departments.some(d => d.id === n)) return n;
+    }
+    if (props.defaultDeptId && props.departments.some(d => d.id === props.defaultDeptId)) {
+        return props.defaultDeptId;
     }
     return props.departments[0]?.id ?? null;
 }

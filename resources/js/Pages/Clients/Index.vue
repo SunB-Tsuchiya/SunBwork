@@ -97,7 +97,7 @@ function goToEdit(clientId) {
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">ID</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Client ID</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">名前</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">詳細</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">操作</th>
@@ -110,7 +110,7 @@ function goToEdit(clientId) {
                                 class="hover:bg-green-50/40 cursor-pointer"
                                 @click="goToEdit(client.id)"
                             >
-                                <td class="whitespace-nowrap px-6 py-3 text-gray-600">{{ client.id }}</td>
+                                <td class="whitespace-nowrap px-6 py-3 text-gray-500 text-xs">{{ client.client_code || '―' }}</td>
                                 <td class="whitespace-nowrap px-6 py-3 font-medium text-gray-900">
                                     {{ client.name }}
                                     <span v-if="client.is_dormant" class="ml-1 rounded-full bg-gray-200 px-2 py-0.5 text-xs text-gray-500">休眠</span>
@@ -144,7 +144,7 @@ function goToEdit(clientId) {
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">ID</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Client ID</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">名前</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">部署</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">詳細</th>
@@ -158,7 +158,7 @@ function goToEdit(clientId) {
                                 class="hover:bg-gray-50 cursor-pointer"
                                 @click="goToEdit(client.id)"
                             >
-                                <td class="whitespace-nowrap px-6 py-3 text-gray-500">{{ client.id }}</td>
+                                <td class="whitespace-nowrap px-6 py-3 text-gray-500 text-xs">{{ client.client_code || '―' }}</td>
                                 <td class="whitespace-nowrap px-6 py-3 text-gray-700">{{ client.name }}</td>
                                 <td class="px-6 py-3">
                                     <span
@@ -195,7 +195,7 @@ function goToEdit(clientId) {
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">ID</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Client ID</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">名前</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">部署</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">詳細</th>
@@ -209,7 +209,7 @@ function goToEdit(clientId) {
                                 class="hover:bg-gray-50 cursor-pointer"
                                 @click="goToEdit(client.id)"
                             >
-                                <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900">{{ client.id }}</td>
+                                <td class="whitespace-nowrap px-6 py-4 text-xs text-gray-500">{{ client.client_code || '―' }}</td>
                                 <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
                                     {{ client.name }}
                                     <span v-if="client.is_dormant" class="ml-1 rounded-full bg-gray-200 px-2 py-0.5 text-xs text-gray-500">休眠</span>

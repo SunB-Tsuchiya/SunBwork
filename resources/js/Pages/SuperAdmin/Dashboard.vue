@@ -3,8 +3,9 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import IrukaBoard from '@/Components/Iruka/IrukaBoard.vue';
 
 defineProps({
-    available_teams: { type: Array, default: () => [] },
-    departments:     { type: Array, default: () => [] },
+    available_teams:  { type: Array,  default: () => [] },
+    departments:      { type: Array,  default: () => [] },
+    userDepartmentId: { type: Number, default: null },
 });
 
 import { usePage } from '@inertiajs/vue3';
@@ -18,6 +19,6 @@ const user = page.props.user;
             <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">【スーパ管理者】{{ user?.name || 'ユーザー' }}さんのページ</h2>
         </template>
 
-        <IrukaBoard :departments="$page.props.departments" />
+        <IrukaBoard :departments="$page.props.departments" :default-dept-id="$page.props.userDepartmentId" />
     </AppLayout>
 </template>

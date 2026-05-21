@@ -54,9 +54,10 @@ class ProofRequestController extends Controller
         $pendingCount = ProofRequest::pending()->count();
 
         return Inertia::render('ProofCoordinator/Dashboard', [
-            'user'         => $user,
-            'departments'  => $departments,
-            'pendingCount' => $pendingCount,
+            'user'             => $user,
+            'departments'      => $departments,
+            'pendingCount'     => $pendingCount,
+            'userDepartmentId' => $user->department_id,
         ]);
     }
 

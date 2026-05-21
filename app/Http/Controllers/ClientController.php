@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\ChecksAdminPermission;
 use App\Http\Controllers\Concerns\ChecksLeaderPermission;
+use App\Http\Controllers\Concerns\NormalizesCsvEncoding;
 use App\Models\Client;
 use App\Models\Company;
 use App\Models\Department;
@@ -18,7 +19,7 @@ use Illuminate\Support\Facades\Auth;
 
 class ClientController extends Controller
 {
-    use ChecksAdminPermission, ChecksLeaderPermission;
+    use ChecksAdminPermission, ChecksLeaderPermission, NormalizesCsvEncoding;
 
     public function index(Request $request)
     {
@@ -88,9 +89,10 @@ class ClientController extends Controller
         $isCoordinator  = $user->isCoordinator() || $user->isClerk();
 
         $rules = [
-            'name'       => 'required|string|max:255',
-            'detail'     => 'nullable|string',
-            'company_id' => 'nullable|exists:companies,id',
+            'name'        => 'required|string|max:255',
+            'client_code' => 'nullable|string|max:64|unique:clients,client_code',
+            'detail'      => 'nullable|string',
+            'company_id'  => 'nullable|exists:companies,id',
         ];
         if ($isSuperOrAdmin) {
             $rules['department_ids']   = 'nullable|array';
@@ -108,6 +110,7 @@ class ClientController extends Controller
             $data['company_id'] = $user->company_id ?? null;
         }
 
+        $data['client_code'] = $data['client_code'] ? trim($data['client_code']) : null;
         $data['notes'] = $data['detail'] ?? null;
         unset($data['detail']);
 
@@ -146,9 +149,10 @@ class ClientController extends Controller
         $isLeader       = $user->user_role === 'leader';
 
         $rules = [
-            'name'       => 'required|string|max:255',
-            'detail'     => 'nullable|string',
-            'company_id' => 'nullable|exists:companies,id',
+            'name'        => 'required|string|max:255',
+            'client_code' => ['nullable', 'string', 'max:64', Rule::unique('clients', 'client_code')->ignore($client->id)],
+            'detail'      => 'nullable|string',
+            'company_id'  => 'nullable|exists:companies,id',
         ];
         if ($isSuperOrAdmin) {
             $rules['department_ids']   = 'nullable|array';
@@ -166,6 +170,7 @@ class ClientController extends Controller
             unset($data['company_id']);
         }
 
+        $data['client_code'] = isset($data['client_code']) && $data['client_code'] !== null ? trim($data['client_code']) : null;
         $data['notes'] = $data['detail'] ?? null;
         unset($data['detail']);
 
@@ -270,7 +275,7 @@ class ClientController extends Controller
 
         $user  = Auth::user();
         $isSuperOrAdmin = in_array($user->user_role, ['superadmin', 'admin']);
-        $query = Client::select('id', 'name', 'is_dormant');
+        $query = Client::select('id', 'name', 'client_code', 'is_dormant');
 
         if (!$isSuperOrAdmin) {
             $query->forCompany($user->company_id ?? null)
@@ -356,14 +361,16 @@ class ClientController extends Controller
         $this->requireLeaderPermission('client_management');
 
         $request->validate([
-            'name'       => 'required|string|max:255',
-            'exclude_id' => 'nullable|integer',
+            'name'        => 'required|string|max:255',
+            'client_code' => 'nullable|string|max:64',
+            'exclude_id'  => 'nullable|integer',
         ]);
 
         $inputNormalized = $this->normalizeClientName($request->name);
+        $inputCode = ($request->filled('client_code')) ? trim($request->client_code) : null;
 
         $user  = Auth::user();
-        $query = Client::select('id', 'name');
+        $query = Client::select('id', 'name', 'client_code');
 
         if (!($user && $user->user_role === 'superadmin')) {
             $query->forCompany($user->company_id ?? null);
@@ -372,12 +379,44 @@ class ClientController extends Controller
             $query->where('id', '!=', (int) $request->exclude_id);
         }
 
-        $duplicates = $query->get()
-            ->filter(fn($c) => $this->normalizeClientName($c->name) === $inputNormalized)
-            ->map(fn($c) => ['id' => $c->id, 'name' => $c->name])
-            ->values();
+        $allClients = $query->get();
 
-        return response()->json(['duplicates' => $duplicates]);
+        // 同名クライアントを client_code の状況で分類
+        $noCodeSameName   = [];
+        $diffCodeSameName = [];
+
+        foreach ($allClients as $c) {
+            if ($this->normalizeClientName($c->name) !== $inputNormalized) {
+                continue;
+            }
+            $existingCode = $c->client_code ? trim($c->client_code) : null;
+
+            if (empty($inputCode) || empty($existingCode)) {
+                // どちらかのコードが未設定 → 統合候補として警告（ブロック）
+                $noCodeSameName[] = ['id' => $c->id, 'name' => $c->name, 'client_code' => $c->client_code];
+            } elseif ($inputCode !== $existingCode) {
+                // 両方コードがあって異なる → 確認（通過可能）
+                $diffCodeSameName[] = ['id' => $c->id, 'name' => $c->name, 'client_code' => $c->client_code];
+            }
+            // コードが同じかつ名前も同じ → unique 制約でサーバー側が弾く
+        }
+
+        // 同 client_code で名前が異なるクライアント → アラート（ブロック）
+        $sameCodeDiffName = [];
+        if (!empty($inputCode)) {
+            foreach ($allClients as $c) {
+                $existingCode = $c->client_code ? trim($c->client_code) : null;
+                if (!empty($existingCode) && $existingCode === $inputCode && $this->normalizeClientName($c->name) !== $inputNormalized) {
+                    $sameCodeDiffName[] = ['id' => $c->id, 'name' => $c->name, 'client_code' => $c->client_code];
+                }
+            }
+        }
+
+        return response()->json([
+            'no_code_same_name'   => $noCodeSameName,
+            'diff_code_same_name' => $diffCodeSameName,
+            'same_code_diff_name' => $sameCodeDiffName,
+        ]);
     }
 
     /**
@@ -525,6 +564,7 @@ class ClientController extends Controller
         $tempDir = storage_path('app/private/temp_csv');
         if (!is_dir($tempDir)) mkdir($tempDir, 0755, true);
         $path = $file->store('temp_csv', 'local');
+        $this->normalizeCsvStoredFile($path);
 
         try {
             $csvData = [];

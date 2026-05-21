@@ -8,8 +8,9 @@ const page = usePage();
 const user = page.props.user;
 
 defineProps({
-    departments:  { type: Array,  default: () => [] },
-    pendingCount: { type: Number, default: 0 },
+    departments:      { type: Array,  default: () => [] },
+    pendingCount:     { type: Number, default: 0 },
+    userDepartmentId: { type: Number, default: null },
 });
 </script>
 
@@ -44,7 +45,7 @@ defineProps({
             </div>
 
             <!-- 在席ボード -->
-            <IrukaBoard :departments="departments" />
+            <IrukaBoard :departments="departments" :default-dept-id="userDepartmentId" />
         </div>
     </AppLayout>
 </template>

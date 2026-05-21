@@ -1555,7 +1555,10 @@ function onVoucherFileChange(e) {
     voucherForm.post(route('coordinator.project_jobs.image.store', { projectJob: job.id }), {
         forceFormData: true,
         preserveScroll: true,
-        onSuccess: () => { voucherForm.reset(); },
+        onSuccess: () => {
+            voucherForm.reset();
+            router.reload({ only: ['job'], preserveScroll: true });
+        },
         onError: () => { alert('画像のアップロードに失敗しました。'); },
     });
 }
@@ -1564,6 +1567,7 @@ function confirmDeleteVoucherImage() {
     if (!confirm('伝票画像を削除しますか？')) return;
     router.delete(route('coordinator.project_jobs.image.destroy', { projectJob: job.id }), {
         preserveScroll: true,
+        onSuccess: () => { router.reload({ only: ['job'], preserveScroll: true }); },
     });
 }
 

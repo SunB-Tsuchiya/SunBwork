@@ -83,12 +83,12 @@ STEP 5: 完了記録
 
 | ID | 内容 | ステータス | 備考 |
 |----|------|-----------|------|
-| R5-06 | 案件一覧に伝票番号カラム + 表示設定 | 🔲 未着手 | Index.vue + コントローラー |
-| R5-07 | スケジュール編集タブ移動統一・開始日コピー | 🔲 未着手 | ProjectCalendar.vue |
-| R5-08 | 進行表にユーザー名表示（調査・修正） | 🔲 未着手 | 要調査 |
-| R5-09 | 完了/未完了フロー修正 | 🔲 未着手 | 要調査 |
-| R5-10 | 画像登録/削除後モーダルリロード統一 | 🔲 未着手 | 要調査 |
-| R5-11 | CSV文字コード自動変換（Shift-JIS対応） | 🔲 未着手 | バックエンドのみ |
+| R5-06 | 案件一覧に伝票番号カラム + 表示設定 | ✅ 完了 | Coordinator/ProjectJobs/Index.vue |
+| R5-07 | スケジュール編集タブ移動統一・開始日コピー | ✅ 完了 | 調査の結果すでに実装済み（type="date" + @change コピー）|
+| R5-08 | 進行表にユーザー名表示（調査・修正） | ✅ 完了 | Coordinator/ProgressSheetController.php, User/ProgressSheetController.php |
+| R5-09 | 完了/未完了フロー修正 | ✅ 完了 | ProgressSheetController.php, User/MyProjectJobController.php, ProgressSheets/Show.vue |
+| R5-10 | 画像登録/削除後モーダルリロード統一 | ✅ 完了 | Coordinator/ProjectJobs/Show.vue |
+| R5-11 | CSV文字コード自動変換（Shift-JIS対応） | ✅ 完了 | ProjectSchedulesController.php（BulkProjectJobController は実装済みだった）|
 
 ### フェーズ3：大規模修正
 
@@ -138,6 +138,13 @@ STEP 5: 完了記録
 | 2026-05-20 | R5-13 | JobBox/Index.vue「登録済みを表示しない」チェックボックス追加（デフォルトON）、「登録済」バッジ追加 | Claude |
 | 2026-05-20 | R5-13 | myjob:cleanup-duplicates コマンド作成（重複削除 + is_registered 補完） | Claude |
 | 2026-05-20 | — | z_instructions/JOB_FLOW_GUIDE.md 作成（ジョブフロー全体ガイド） | Claude |
+| 2026-05-20 | R5-06 | 案件一覧に伝票番号カラム追加・表示設定ボタン（localStorage 永続化） | Claude |
+| 2026-05-20 | R5-07 | 調査の結果すでに実装済み（type="date" + @change で開始日コピー済み） | Claude |
+| 2026-05-20 | R5-11 | ProjectSchedulesController::csvImport に Shift-JIS 変換・CRLF 正規化追加 | Claude |
+| 2026-05-20 | R5-11 | NormalizesCsvEncoding トレイト作成・全5コントローラーに適用 | Claude |
+| 2026-05-20 | R5-08 | linkJob で value_user_id をセットしていなかったバグ修正（Coordinator/User 両方）| Claude |
+| 2026-05-20 | R5-09 | uncompleteAssignment で completed_at クリア・destroyAssignment も同様・フロントも修正 | Claude |
+| 2026-05-20 | R5-10 | 画像 store/delete の onSuccess に router.reload を追加 | Claude |
 
 ---
 

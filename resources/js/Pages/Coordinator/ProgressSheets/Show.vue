@@ -1129,7 +1129,11 @@ function openJobLinkDetail({ assignmentId, assignmentTitle, assigneeUserId, assi
 function updateLocalCellCompleted(assignmentId, completedValue) {
   const idx = localCells.value.findIndex((c) => c.assignment_id === assignmentId);
   if (idx >= 0) {
-    localCells.value.splice(idx, 1, { ...localCells.value[idx], assignment_completed: completedValue });
+    localCells.value.splice(idx, 1, {
+      ...localCells.value[idx],
+      assignment_completed: completedValue,
+      completed_at: completedValue ? localCells.value[idx].completed_at : null,
+    });
   }
 }
 

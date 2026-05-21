@@ -4,7 +4,8 @@ import IrukaBoard from '@/Components/Iruka/IrukaBoard.vue';
 import { Link } from '@inertiajs/vue3';
 
 defineProps({
-    departments: { type: Array, default: () => [] },
+    departments:      { type: Array,  default: () => [] },
+    userDepartmentId: { type: Number, default: null },
 });
 
 import { usePage } from '@inertiajs/vue3';
@@ -32,7 +33,7 @@ const user = page.props.user;
             </div>
 
             <!-- イルカ在席ボード -->
-            <IrukaBoard :departments="$page.props.departments" />
+            <IrukaBoard :departments="$page.props.departments" :default-dept-id="$page.props.userDepartmentId" />
         </div>
     </AppLayout>
 </template>

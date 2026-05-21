@@ -159,6 +159,36 @@ $start = $this->resolveJstCarbon($event, 'starts_at'); // JST Carbon を返す
 
 ---
 
+## CSV インポート ルール
+
+**すべての CSV インポートは Shift-JIS + CRLF + BOM に対応すること。**
+
+`NormalizesCsvEncoding` トレイトを使う:
+- ファイルパス: `app/Http/Controllers/Concerns/NormalizesCsvEncoding.php`
+- 各コントローラーで `use NormalizesCsvEncoding;` を宣言して使う
+
+| メソッド | 用途 |
+|---------|------|
+| `$this->normalizeCsvStoredFile($storagePath)` | `$file->store(...)` で保存済みのファイルをその場で正規化（上書き） |
+| `$this->normalizeCsvToTemp($file)` | UploadedFile を正規化した一時ファイルパスを返す（使用後 `@unlink` 必須）|
+| `$this->normalizeCsvContent($raw)` | バイト列を正規化した UTF-8 文字列を返す |
+
+```php
+// store() 方式のコントローラー（ClientController, Admin/UserController 等）
+$path = $file->store('temp_csv', 'local');
+$this->normalizeCsvStoredFile($path);   // ← ここを追加するだけ
+$handle = fopen(Storage::path($path), 'r');
+
+// getRealPath() 方式のコントローラー（ProjectSchedulesController 等）
+$tmpPath = $this->normalizeCsvToTemp($file);
+$handle  = fopen($tmpPath, 'r');
+// ... 処理後 ...
+fclose($handle);
+@unlink($tmpPath);
+```
+
+---
+
 ## 詳細ドキュメント参照先
 
 | ファイル | 内容 |

@@ -66,23 +66,35 @@ class BoardController extends Controller
 
     /**
      * 製版部署に紐づくクライアント一覧（JSON）
+     *
+     * ?q=    名前での部分一致検索
+     * ?code= client_code での部分一致検索（コードオートコンプリート用）
+     * ?id=   DB id で単一クライアントを返す（OCR 結果の client_code 解決用）
      */
     public function apiClients(Request $request): JsonResponse
     {
         $this->authorizePrepress($request->user());
 
-        $q    = $request->input('q', '');
-        $dept = Department::where('name', '製版')->first();
-
+        $dept  = Department::where('name', '製版')->first();
         $query = Client::query();
         if ($dept) {
             $query->whereHas('departments', fn($q) => $q->where('departments.id', $dept->id));
         }
-        if ($q) {
-            $query->where('name', 'like', '%' . $q . '%');
+
+        // DB id での単一取得（OCR → client_code 解決用）
+        if ($request->filled('id')) {
+            $client = (clone $query)->find((int) $request->id, ['id', 'name', 'client_code', 'is_dormant']);
+            return response()->json($client);
         }
 
-        $clients = $query->orderBy('name')->limit(50)->get(['id', 'name', 'is_dormant']);
+        // client_code での部分一致（コード入力オートコンプリート）
+        if ($request->filled('code')) {
+            $query->where('client_code', 'like', '%' . $request->code . '%');
+        } elseif ($request->filled('q')) {
+            $query->where('name', 'like', '%' . $request->q . '%');
+        }
+
+        $clients = $query->orderBy('name')->limit(50)->get(['id', 'name', 'client_code', 'is_dormant']);
 
         return response()->json($clients);
     }

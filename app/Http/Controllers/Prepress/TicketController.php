@@ -87,12 +87,13 @@ class TicketController extends Controller
         // 案件からの事前入力
         $prefill = [];
         if ($request->filled('project_job_id')) {
-            $job = ProjectJob::with('client')->find($request->integer('project_job_id'));
+            $job = ProjectJob::with('client:id,name,client_code')->find($request->integer('project_job_id'));
             if ($job) {
                 $prefill = [
                     'project_job_id'         => $job->id,
                     'client_id'              => $job->client_id,
                     'client_name'            => $job->client?->name,
+                    'client_code'            => $job->client?->client_code,
                     'jobcode'                => $job->jobcode,
                     'title'                  => $job->title,
                     'job_image_path'         => $job->image_path,
@@ -101,9 +102,11 @@ class TicketController extends Controller
                 ];
             }
         } elseif ($request->filled('tmp_ocr_image_path')) {
-            // OCR読み込みからの事前入力
+            // OCR読み込みからの事前入力（client_code はフロントで解決する）
+            $clientId = $request->input('client_id') ?: null;
             $prefill = [
-                'client_id'          => $request->input('client_id')          ?: null,
+                'client_id'          => $clientId,
+                'client_code'        => $clientId ? Client::find($clientId)?->client_code : null,
                 'client_name'        => $request->input('client_name',        ''),
                 'jobcode'            => $request->input('jobcode',            ''),
                 'title'              => $request->input('title',              ''),
@@ -137,11 +140,14 @@ class TicketController extends Controller
     {
         $this->authorizePrepress($request->user());
 
-        $ticket->load('user');
+        $ticket->load('user', 'client:id,client_code');
         $ticket->append('image_url');
 
+        $ticketData = $ticket->toArray();
+        $ticketData['client_code'] = $ticket->client?->client_code;
+
         return inertia('Prepress/Tickets/Edit', [
-            'ticket'   => $ticket,
+            'ticket'   => $ticketData,
             'statuses' => PrepressTicket::STATUS_LABELS,
         ]);
     }
@@ -151,14 +157,16 @@ class TicketController extends Controller
         $this->authorizePrepress($request->user());
 
         $validated = $request->validate([
-            'title'      => ['required', 'string', 'max:255'],
-            'jobcode'    => ['nullable', 'string', 'max:100'],
-            'client_id'  => ['nullable', 'integer', 'exists:clients,id'],
-            'client_name'=> ['nullable', 'string', 'max:255'],
-            'memo'       => ['nullable', 'string', 'max:5000'],
-            'status'     => ['required', Rule::in(array_keys(PrepressTicket::STATUS_LABELS))],
-            'image'      => ['nullable', 'file', 'mimes:jpg,jpeg,png,gif,webp,heic,heif,pdf', 'max:20480'],
-            'keep_image' => ['nullable', 'boolean'],
+            'title'            => ['required', 'string', 'max:255'],
+            'jobcode'          => ['nullable', 'string', 'max:100'],
+            'client_id'        => ['nullable', 'integer', 'exists:clients,id'],
+            'client_name'      => ['nullable', 'string', 'max:255'],
+            'memo'             => ['nullable', 'string', 'max:5000'],
+            'submission_date'  => ['nullable', 'date_format:Y/m/d'],
+            'sb_delivery_date' => ['nullable', 'date_format:Y/m/d'],
+            'status'           => ['required', Rule::in(array_keys(PrepressTicket::STATUS_LABELS))],
+            'image'            => ['nullable', 'file', 'mimes:jpg,jpeg,png,gif,webp,heic,heif,pdf', 'max:20480'],
+            'keep_image'       => ['nullable', 'boolean'],
         ]);
 
         $clientName = $validated['client_name'] ?? null;
@@ -166,6 +174,9 @@ class TicketController extends Controller
             $client = Client::find($validated['client_id']);
             if ($client) $clientName = $client->name;
         }
+
+        $submissionDate  = !empty($validated['submission_date'])  ? str_replace('/', '-', $validated['submission_date'])  : null;
+        $sbDeliveryDate  = !empty($validated['sb_delivery_date']) ? str_replace('/', '-', $validated['sb_delivery_date']) : null;
 
         $imagePath        = $ticket->image_path;
         $originalFilename = $ticket->original_filename;
@@ -201,6 +212,8 @@ class TicketController extends Controller
             'jobcode'           => $validated['jobcode'] ?? null,
             'client_name'       => $clientName,
             'memo'              => $validated['memo'] ?? null,
+            'submission_date'   => $submissionDate,
+            'sb_delivery_date'  => $sbDeliveryDate,
             'status'            => $validated['status'],
             'image_path'        => $imagePath,
             'original_filename' => $originalFilename,
@@ -220,6 +233,8 @@ class TicketController extends Controller
             'client_id'          => ['nullable', 'integer', 'exists:clients,id'],
             'client_name'        => ['nullable', 'string', 'max:255'],
             'memo'               => ['nullable', 'string', 'max:5000'],
+            'submission_date'    => ['nullable', 'date_format:Y/m/d'],
+            'sb_delivery_date'   => ['nullable', 'date_format:Y/m/d'],
             'status'             => ['required', Rule::in(array_keys(PrepressTicket::STATUS_LABELS))],
             'image'              => ['nullable', 'file', 'mimes:jpg,jpeg,png,gif,webp,heic,heif,pdf', 'max:20480'],
             'project_job_id'     => ['nullable', 'integer', 'exists:project_jobs,id'],
@@ -235,6 +250,9 @@ class TicketController extends Controller
                 $clientName = $client->name;
             }
         }
+
+        $submissionDate  = !empty($validated['submission_date'])  ? str_replace('/', '-', $validated['submission_date'])  : null;
+        $sbDeliveryDate  = !empty($validated['sb_delivery_date']) ? str_replace('/', '-', $validated['sb_delivery_date']) : null;
 
         // 案件の取得（画像共有のため）
         $job = !empty($validated['project_job_id'])
@@ -282,6 +300,8 @@ class TicketController extends Controller
             'project_name'      => null,
             'client_name'       => $clientName,
             'memo'              => $validated['memo'] ?? null,
+            'submission_date'   => $submissionDate,
+            'sb_delivery_date'  => $sbDeliveryDate,
             'status'            => $validated['status'],
             'image_path'        => $imagePath,
             'original_filename' => $originalFilename,

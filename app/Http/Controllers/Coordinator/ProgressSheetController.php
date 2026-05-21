@@ -475,7 +475,11 @@ class ProgressSheetController extends Controller
 
             ProgressCell::updateOrCreate(
                 ['row_id' => $validated['row_id'], 'col_key' => $validated['col_key']],
-                ['assignment_id' => $assignment->id]
+                [
+                    'assignment_id'          => $assignment->id,
+                    'value_user_id'          => $subcontractorId ? null : $assigneeId,
+                    'value_subcontractor_id' => $subcontractorId,
+                ]
             );
         });
 
@@ -659,6 +663,15 @@ class ProgressSheetController extends Controller
         $assignment->completed = false;
         $assignment->status_id = null;
         $assignment->save();
+
+        // 進行表セルの completed_at もクリア
+        try {
+            \App\Models\ProgressCell::where('assignment_id', $assignment->id)
+                ->whereNotNull('completed_at')
+                ->update(['completed_at' => null]);
+        } catch (\Throwable $__e) {
+            // non-fatal
+        }
 
         return response()->json(['success' => true, 'assignment_id' => $assignment->id]);
     }

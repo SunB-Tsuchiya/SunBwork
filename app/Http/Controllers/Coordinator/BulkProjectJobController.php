@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Coordinator;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\NormalizesCsvEncoding;
 use App\Models\Client;
 use App\Models\ProjectJob;
 use App\Models\ProjectJobTemplate;
@@ -16,6 +17,8 @@ use Inertia\Inertia;
 
 class BulkProjectJobController extends Controller
 {
+    use NormalizesCsvEncoding;
+
     /** 一括作成ハブページ */
     public function index(Request $request)
     {
@@ -239,21 +242,13 @@ class BulkProjectJobController extends Controller
     private function parseCsv(\Illuminate\Http\UploadedFile $file): array
     {
         try {
-            $content = $file->get();
-            
+            $content = $this->normalizeCsvContent($file->get() ?: '');
+
             if (empty($content)) {
                 throw new \Exception('CSVファイルが空です');
             }
 
-            // BOM 除去
-            $content = preg_replace('/^\xEF\xBB\xBF/', '', $content);
-            
-            // 文字コード変換（Shift_JIS対応）
-            if (!mb_check_encoding($content, 'UTF-8')) {
-                $content = mb_convert_encoding($content, 'UTF-8', 'SJIS-win,UTF-8,ASCII');
-            }
-            
-            $lines = preg_split('/\r\n|\r|\n/', trim($content));
+            $lines = preg_split('/\n/', trim($content));
 
             if (empty($lines)) {
                 throw new \Exception('CSVファイルにデータ行がありません');
