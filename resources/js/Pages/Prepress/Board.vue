@@ -710,10 +710,6 @@ const canCreate = computed(() => {
                                         @change="onCalendarChange(col.key, $event.target.value)"
                                     />
                                 </div>
-                                <span
-                                    v-if="columnControls[col.key].dateFilter"
-                                    class="text-xs font-medium text-teal-700"
-                                >{{ columnControls[col.key].dateFilter.slice(0,4) }}年</span>
                                 <button
                                     v-if="columnControls[col.key].dateFilter || columnControls[col.key].dateRaw"
                                     type="button"
