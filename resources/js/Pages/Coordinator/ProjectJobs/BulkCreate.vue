@@ -87,13 +87,13 @@
                         <label class="mb-1 block text-sm font-medium">クライアント（空 = CSV で入力）</label>
                         <div class="flex items-center gap-2">
                             <div class="flex items-center gap-1">
-                                <label class="text-xs">ID:</label>
-                                <input 
-                                    v-model="tplForm.fixed_fields.client_id" 
-                                    type="number" 
-                                    class="w-20 rounded border px-2 py-1 text-sm"
-                                    placeholder="ID"
-                                    @input="onClientIdChange"
+                                <label class="shrink-0 text-xs">Client ID:</label>
+                                <input
+                                    v-model="clientCodeInput"
+                                    type="text"
+                                    class="w-28 rounded border px-2 py-1 font-mono text-sm"
+                                    placeholder="コードを入力"
+                                    @input="onClientCodeInput"
                                     :disabled="isLoadingClientById" />
                                 <div v-if="isLoadingClientById" class="text-xs text-blue-600">読込中...</div>
                             </div>
@@ -116,9 +116,9 @@
                                          class="cursor-pointer px-3 py-2 text-sm hover:bg-blue-50"
                                          :class="{ 'bg-blue-100': index === selectedSuggestionIndex }"
                                          @click="selectClientFromSuggestion(client)">
-                                        <div class="flex items-center justify-between">
+                                        <div class="flex items-center justify-between gap-2">
                                             <span class="font-medium">{{ client.name }}</span>
-                                            <span class="text-xs text-gray-500">ID: {{ client.id }}</span>
+                                            <span class="shrink-0 font-mono text-xs text-gray-500">{{ client.client_code || '―' }}</span>
                                         </div>
                                         <div v-if="client.is_dormant" class="text-xs text-red-500">※ 休眠中</div>
                                     </div>
@@ -513,12 +513,12 @@
             <template #title>クライアント検索</template>
             <template #content>
                 <div class="mb-2 flex gap-4">
-                    <label><input type="radio" value="id" v-model="clientSearchMode" /> IDで検索</label>
+                    <label><input type="radio" value="id" v-model="clientSearchMode" /> Client IDで検索</label>
                     <label><input type="radio" value="name" v-model="clientSearchMode" /> 名前で検索</label>
                     <label><input type="radio" value="list" v-model="clientSearchMode" /> 一覧から検索</label>
                 </div>
                 <div v-if="clientSearchMode === 'id'" class="mb-2">
-                    <input v-model="clientSearch.id" type="number" placeholder="IDを入力" class="rounded border px-2 py-1" />
+                    <input v-model="clientSearch.id" type="text" placeholder="Client IDを入力" class="rounded border px-2 py-1 font-mono" />
                     <button class="ml-2 rounded bg-blue-500 px-2 py-1 text-white" @click="searchClientById">検索</button>
                 </div>
                 <div v-if="clientSearchMode === 'name'" class="mb-2">
@@ -527,7 +527,8 @@
                 </div>
                 <div v-if="clientSearchResult">
                     <div class="mt-2">
-                        検索結果: <span class="font-bold">{{ clientSearchResult.id }} {{ clientSearchResult.name }}</span>
+                        検索結果: <span class="font-mono font-bold">{{ clientSearchResult.client_code || '―' }}</span>
+                        <span class="ml-1 font-bold">{{ clientSearchResult.name }}</span>
                         <button class="ml-2 rounded bg-green-500 px-2 py-1 text-white" @click="selectClient(clientSearchResult)">選択</button>
                     </div>
                 </div>
@@ -544,13 +545,13 @@
                 <table class="min-w-full">
                     <thead>
                         <tr>
-                            <th class="px-4 py-2">ID</th>
+                            <th class="px-4 py-2">Client ID</th>
                             <th class="px-4 py-2">会社名</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr v-for="client in clientList" :key="client.id" @click="selectClient(client)" class="cursor-pointer hover:bg-blue-100">
-                            <td class="px-4 py-2">{{ client.id }}</td>
+                            <td class="px-4 py-2 font-mono text-sm">{{ client.client_code || '―' }}</td>
                             <td class="px-4 py-2">{{ client.name }}</td>
                         </tr>
                     </tbody>
@@ -668,6 +669,7 @@ const GROUP_LABELS = { paper: '紙媒体', digital: 'デジタル', web: 'Web', 
 
 // ── クライアント選択機能 ─────────────────────────────────────────
 const clientName = ref('');
+const clientCodeInput = ref('');
 const showClientModal = ref(false);
 const showClientListModal = ref(false);
 const clientSearchMode = ref('id');
@@ -681,72 +683,82 @@ const showNameSuggestions = ref(false);
 const isLoadingClientById = ref(false);
 const selectedSuggestionIndex = ref(-1);
 let searchTimeout = null;
+let codeSearchTimeout = null;
 
 // プリセット機能用
 const showPresetBanner = ref(false);
 const lastJobConfig = ref(null);
 
-// ID入力時の名前自動取得
-async function onClientIdChange() {
-    const clientId = tplForm.value.fixed_fields.client_id;
-    if (!clientId || clientId === '') {
+// Client Code 入力時のオートコンプリート
+function onClientCodeInput() {
+    const code = clientCodeInput.value.trim();
+    if (codeSearchTimeout) clearTimeout(codeSearchTimeout);
+
+    if (!code) {
+        tplForm.value.fixed_fields.client_id = null;
         clientName.value = '';
         return;
     }
-    
-    isLoadingClientById.value = true;
-    try {
-        const res = await fetch(
-            route('coordinator.clients.json') + '?id=' + encodeURIComponent(clientId),
-            { headers: { Accept: 'application/json' }, credentials: 'same-origin' }
-        );
-        if (res.ok) {
-            const client = await res.json();
-            if (client) {
-                clientName.value = client.name;
-                // プリセット取得も実行
-                await loadClientPreset(client);
-            } else {
-                clientName.value = '';
+
+    codeSearchTimeout = setTimeout(async () => {
+        isLoadingClientById.value = true;
+        try {
+            const res = await fetch(
+                route('coordinator.clients.json') + '?code=' + encodeURIComponent(code) + '&limit=10',
+                { headers: { Accept: 'application/json' }, credentials: 'same-origin' },
+            );
+            if (res.ok) {
+                const clients = await res.json();
+                if (Array.isArray(clients) && clients.length > 0) {
+                    clientNameSuggestions.value  = clients;
+                    showNameSuggestions.value    = true;
+                    selectedSuggestionIndex.value = -1;
+                } else {
+                    clientNameSuggestions.value = [];
+                    showNameSuggestions.value   = false;
+                    tplForm.value.fixed_fields.client_id = null;
+                    clientName.value = '';
+                }
             }
-        } else {
-            clientName.value = '';
+        } catch {
+            clientNameSuggestions.value = [];
+            showNameSuggestions.value   = false;
+        } finally {
+            isLoadingClientById.value = false;
         }
-    } catch (error) {
-        console.error('クライアント取得エラー:', error);
-        clientName.value = '';
-    } finally {
-        isLoadingClientById.value = false;
-    }
+    }, 300);
 }
 
-// クライアントIDから名前を取得（テンプレート読み込み時用）
+// クライアントIDから名前・コードを取得（テンプレート読み込み時用）
 async function loadClientNameById(clientId) {
     if (!clientId) {
-        clientName.value = '';
+        clientName.value      = '';
+        clientCodeInput.value = '';
         return;
     }
-    
+
     try {
         const res = await fetch(
             route('coordinator.clients.json') + '?id=' + encodeURIComponent(clientId),
-            { headers: { Accept: 'application/json' }, credentials: 'same-origin' }
+            { headers: { Accept: 'application/json' }, credentials: 'same-origin' },
         );
         if (res.ok) {
             const client = await res.json();
             if (client) {
-                clientName.value = client.name;
+                clientName.value      = client.name;
+                clientCodeInput.value = client.client_code ?? '';
             }
         }
-    } catch (error) {
-        console.error('クライアント名取得エラー:', error);
+    } catch {
+        /* ignore */
     }
 }
 
 // 名前入力時のオートコンプリート
 function onClientNameInput() {
+    clientCodeInput.value = '';
     const searchTerm = clientName.value;
-    
+
     // 検索をクリア
     if (searchTimeout) {
         clearTimeout(searchTimeout);
@@ -816,10 +828,11 @@ function onClientNameKeydown(event) {
 // 候補選択
 async function selectClientFromSuggestion(client) {
     tplForm.value.fixed_fields.client_id = client.id;
-    clientName.value = client.name;
-    showNameSuggestions.value = false;
+    clientName.value      = client.name;
+    clientCodeInput.value = client.client_code ?? '';
+    showNameSuggestions.value     = false;
     selectedSuggestionIndex.value = -1;
-    
+
     // プリセット取得
     await loadClientPreset(client);
 }
@@ -919,10 +932,10 @@ function closeClientListModal() {
 
 function searchClientById() {
     if (!clientSearch.value.id) return;
-    fetch(route('coordinator.clients.json') + '?id=' + encodeURIComponent(clientSearch.value.id), { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
+    fetch(route('coordinator.clients.json') + '?code=' + encodeURIComponent(clientSearch.value.id), { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
-            clientSearchResult.value = data;
+            clientSearchResult.value = Array.isArray(data) ? (data[0] ?? null) : data;
         });
 }
 
@@ -944,7 +957,8 @@ watch(clientSearchMode, (val) => {
 
 async function selectClient(client) {
     tplForm.value.fixed_fields.client_id = client.id;
-    clientName.value = client.name;
+    clientName.value      = client.name;
+    clientCodeInput.value = client.client_code ?? '';
     closeClientModal();
     closeClientListModal();
     

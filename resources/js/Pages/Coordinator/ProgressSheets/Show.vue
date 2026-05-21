@@ -1000,14 +1000,37 @@ function normalizeTitle(title) {
   return title.replace(/[ーｰ\-－—–]/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '');
 }
 
+function findNodeByKey(nodes, key) {
+  for (const node of nodes) {
+    if (node.key === key) return node;
+    if (node.children?.length) {
+      const found = findNodeByKey(node.children, key);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
 /** ジョブタイトルを自動構築：「親行ラベル_縦軸ラベル_横軸中見出し_列ラベル」 */
 function buildJobTitle(rowId, colKey) {
   const row = localRows.value.find((r) => r.id === rowId);
   const parentRow = row?.parent_id ? localRows.value.find((r) => r.id === row.parent_id) : null;
   const breadcrumb = findBreadcrumb(localColumnConfig.value, colKey); // [top, ..., leaf]
-  const parentPath = breadcrumb ? breadcrumb.slice(0, -1) : []; // leafを除く親グループパス
+  const parentPath = breadcrumb ? breadcrumb.slice(0, -1).filter(Boolean) : [];
+
+  // joblink（「登録」ボタン）は自身のラベルではなく兄弟の worker/proof ラベルを使う
+  const leafNode = findNodeByKey(localColumnConfig.value, colKey);
+  let leafLabel = '';
+  if (leafNode?.type === 'joblink') {
+    const parent = findParentGroup(localColumnConfig.value, colKey);
+    const sibling = parent?.children?.find((c) => c.key !== colKey && c.type !== 'joblink');
+    leafLabel = sibling?.label ?? '';
+  } else {
+    leafLabel = leafNode?.label ?? '';
+  }
+
+  const colPart = [...parentPath, leafLabel].filter(Boolean).join('_');
   const rowPart = [parentRow?.label, row?.label].filter(Boolean).join('_');
-  const colPart = parentPath.filter(Boolean).join('_');
   return normalizeTitle([rowPart, colPart].filter(Boolean).join('_'));
 }
 

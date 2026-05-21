@@ -1242,6 +1242,59 @@ const calendarOptions = computed(() => ({
             info.revert(); // キャンセル時は元に戻す
         }
     },
+    eventDrop: async function (info) {
+        const newStart = info.event.start;
+        const newEnd = info.event.end;
+        const startStr = info.event.startStr || (newStart ? newStart.toISOString() : null);
+        const endStr = info.event.endStr || (newEnd ? newEnd.toISOString() : null);
+        const fmtDateOnly = (iso) => (iso ? String(iso).split('T')[0] : null);
+        const displayStart = fmtDateOnly(startStr);
+        let displayEndInclusive = null;
+        if (endStr) {
+            const endDateOnly = fmtDateOnly(endStr);
+            if (info.event.allDay) {
+                const d = new Date(endDateOnly);
+                d.setDate(d.getDate() - 1);
+                displayEndInclusive = d.toISOString().split('T')[0];
+            } else {
+                displayEndInclusive = endDateOnly;
+            }
+        }
+        let confirmMessage = '';
+        if (info.event.allDay) {
+            confirmMessage = `予定を移動しますか？\n開始: ${displayStart}\n終了: ${displayEndInclusive || displayStart}`;
+        } else {
+            const startDateObj = new Date(newStart);
+            const endDateObj = newEnd ? new Date(newEnd) : null;
+            const date = startDateObj.toISOString().slice(0, 10);
+            const startHour = String(startDateObj.getHours()).padStart(2, '0');
+            const startMinute = String(startDateObj.getMinutes()).padStart(2, '0');
+            const endHour = endDateObj ? String(endDateObj.getHours()).padStart(2, '0') : undefined;
+            const endMinute = endDateObj ? String(endDateObj.getMinutes()).padStart(2, '0') : undefined;
+            confirmMessage = endHour
+                ? `予定を移動しますか？\n${date} ${startHour}:${startMinute} ～ ${endHour}:${endMinute}`
+                : `予定を移動しますか？\n${date} ${startHour}:${startMinute}`;
+        }
+        if (confirm(confirmMessage)) {
+            try {
+                const newStartObj = new Date(newStart);
+                const newEndObj = newEnd ? new Date(newEnd) : null;
+                await axios.put(`/events/${info.event.extendedProps.event_id}/calendar`, {
+                    date: displayStart,
+                    startHour: String(newStartObj.getHours()).padStart(2, '0'),
+                    startMinute: String(newStartObj.getMinutes()).padStart(2, '0'),
+                    endHour: newEndObj ? String(newEndObj.getHours()).padStart(2, '0') : '00',
+                    endMinute: newEndObj ? String(newEndObj.getMinutes()).padStart(2, '0') : '00',
+                });
+                alert('予定を更新しました');
+            } catch (e) {
+                alert('予定の更新に失敗しました');
+                info.revert();
+            }
+        } else {
+            info.revert();
+        }
+    },
     eventClick: async function (info) {
         try {
             // If the clicked event is an all-day event, prefer navigating to the corresponding show page

@@ -23,27 +23,27 @@
                     <label class="mb-1 block font-semibold">クライアント</label>
                     <div class="flex items-center gap-2">
                         <div class="flex items-center gap-1">
-                            <label class="text-sm">ID:</label>
-                            <input 
-                                v-model="form.client_id" 
-                                type="number" 
-                                class="w-20 rounded border px-3 py-2"
-                                placeholder="ID"
-                                @input="onClientIdChange"
+                            <label class="shrink-0 text-sm">Client ID:</label>
+                            <input
+                                v-model="clientCodeInput"
+                                type="text"
+                                class="w-28 rounded border px-2 py-2 font-mono text-sm"
+                                placeholder="コードを入力"
+                                @input="onClientCodeInput"
                                 :disabled="isLoadingClientById" />
                             <div v-if="isLoadingClientById" class="text-xs text-blue-600">読込中...</div>
                         </div>
-                        
+
                         <div class="relative flex-1">
-                            <input 
-                                v-model="form.client_name" 
-                                type="text" 
+                            <input
+                                v-model="form.client_name"
+                                type="text"
                                 class="w-full rounded border px-3 py-2"
                                 placeholder="名前を入力（オートコンプリート）"
                                 @input="onClientNameInput"
                                 @keydown="onClientNameKeydown"
                                 @blur="onClientNameBlur" />
-                            
+
                             <!-- オートコンプリート候補リスト -->
                             <div v-if="showNameSuggestions && clientNameSuggestions.length > 0"
                                  class="absolute top-full z-50 mt-1 w-full rounded border border-gray-300 bg-white shadow-lg max-h-60 overflow-y-auto">
@@ -52,17 +52,17 @@
                                      class="cursor-pointer px-3 py-2 text-sm hover:bg-blue-50"
                                      :class="{ 'bg-blue-100': index === selectedSuggestionIndex }"
                                      @click="selectClientFromSuggestion(client)">
-                                    <div class="flex items-center justify-between">
+                                    <div class="flex items-center justify-between gap-2">
                                         <span class="font-medium">{{ client.name }}</span>
-                                        <span class="text-xs text-gray-500">ID: {{ client.id }}</span>
+                                        <span class="shrink-0 font-mono text-xs text-gray-500">{{ client.client_code || '―' }}</span>
                                     </div>
                                     <div v-if="client.is_dormant" class="text-xs text-red-500">※ 休眠中</div>
                                 </div>
                             </div>
                         </div>
-                        
-                        <button type="button" 
-                                class="rounded bg-blue-100 px-3 py-2 text-blue-700 hover:bg-blue-200" 
+
+                        <button type="button"
+                                class="rounded bg-blue-100 px-3 py-2 text-blue-700 hover:bg-blue-200"
                                 @click="openClientModal">詳細検索</button>
                     </div>
                     <div v-if="form.errors.client_id" class="mt-1 text-sm text-red-600">{{ form.errors.client_id }}</div>
@@ -278,12 +278,12 @@
                 <template #title>クライアント検索</template>
                 <template #content>
                     <div class="mb-2 flex gap-4">
-                        <label><input type="radio" value="id" v-model="clientSearchMode" /> IDで検索</label>
+                        <label><input type="radio" value="id" v-model="clientSearchMode" /> Client IDで検索</label>
                         <label><input type="radio" value="name" v-model="clientSearchMode" /> 名前で検索</label>
                         <label><input type="radio" value="list" v-model="clientSearchMode" /> 一覧から検索</label>
                     </div>
                     <div v-if="clientSearchMode === 'id'" class="mb-2">
-                        <input v-model="clientSearch.id" type="number" placeholder="IDを入力" class="rounded border px-2 py-1" />
+                        <input v-model="clientSearch.id" type="text" placeholder="Client IDを入力" class="rounded border px-2 py-1 font-mono" />
                         <button class="ml-2 rounded bg-blue-500 px-2 py-1 text-white" @click="searchClientById">検索</button>
                     </div>
                     <div v-if="clientSearchMode === 'name'" class="mb-2">
@@ -293,7 +293,8 @@
                     <!-- clientSearchModeが'list'のときはボタンを表示せず、一覧を自動で出す -->
                     <div v-if="clientSearchResult">
                         <div class="mt-2">
-                            検索結果: <span class="font-bold">{{ clientSearchResult.id }} {{ clientSearchResult.name }}</span>
+                            検索結果: <span class="font-mono font-bold">{{ clientSearchResult.client_code || '―' }}</span>
+                            <span class="ml-1 font-bold">{{ clientSearchResult.name }}</span>
                             <button class="ml-2 rounded bg-green-500 px-2 py-1 text-white" @click="selectClient(clientSearchResult)">選択</button>
                         </div>
                     </div>
@@ -310,13 +311,13 @@
                     <table class="min-w-full">
                         <thead>
                             <tr>
-                                <th>ID</th>
+                                <th>Client ID</th>
                                 <th>会社名</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr v-for="client in clientList" :key="client.id" @click="selectClient(client)" class="cursor-pointer hover:bg-blue-100">
-                                <td>{{ client.id }}</td>
+                                <td class="font-mono text-sm">{{ client.client_code || '―' }}</td>
                                 <td>{{ client.name }}</td>
                             </tr>
                         </tbody>
@@ -598,7 +599,7 @@ async function handleVoucherFile(file) {
     }
 }
 
-function onOcrApply(result) {
+async function onOcrApply(result) {
     form.jobcode            = result.jobcode     || form.jobcode;
     form.title              = result.title       || form.title;
     form.client_id          = result.client_id   || '';
@@ -608,6 +609,21 @@ function onOcrApply(result) {
     if (result.tmp_image_path) {
         previewUrl.value  = result.image_url || previewUrl.value;
         previewName.value = result.original_filename || previewName.value;
+    }
+    // client_id が取れていれば client_code を解決して表示
+    if (result.client_id) {
+        try {
+            const res = await fetch(
+                route('coordinator.clients.json') + '?id=' + encodeURIComponent(result.client_id),
+                { headers: { Accept: 'application/json' }, credentials: 'same-origin' },
+            );
+            if (res.ok) {
+                const client = await res.json();
+                clientCodeInput.value = client?.client_code ?? '';
+            }
+        } catch { /* ignore */ }
+    } else {
+        clientCodeInput.value = '';
     }
     showOcrModal.value = false;
 }
@@ -699,11 +715,13 @@ const clientSearchResult = ref(null);
 const clientList = ref([]);
 
 // オートコンプリート用
+const clientCodeInput = ref('');
 const clientNameSuggestions = ref([]);
 const showNameSuggestions = ref(false);
 const isLoadingClientById = ref(false);
 const selectedSuggestionIndex = ref(-1);
 let searchTimeout = null;
+let codeSearchTimeout = null;
 
 // チームメンバー選択モーダル用
 const showMemberModal = ref(false);
@@ -750,10 +768,10 @@ function closeClientListModal() {
 }
 function searchClientById() {
     if (!clientSearch.value.id) return;
-    fetch(route('coordinator.clients.json') + '?id=' + encodeURIComponent(clientSearch.value.id), { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
+    fetch(route('coordinator.clients.json') + '?code=' + encodeURIComponent(clientSearch.value.id), { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
-            clientSearchResult.value = data;
+            clientSearchResult.value = Array.isArray(data) ? (data[0] ?? null) : data;
         });
 }
 function searchClientByName() {
@@ -768,8 +786,9 @@ const showPresetBanner = ref(false);
 const lastJobConfig = ref(null);
 
 async function selectClient(client) {
-    form.client_id = client.id;
-    form.client_name = client.name;
+    form.client_id        = client.id;
+    form.client_name      = client.name;
+    clientCodeInput.value = client.client_code ?? '';
     closeClientModal();
     closeClientListModal();
 
@@ -812,49 +831,57 @@ function applyPreset() {
     showPresetBanner.value = false;
 }
 
-// ID入力時の名前自動取得
-async function onClientIdChange() {
-    const clientId = form.client_id;
-    if (!clientId || clientId === '') {
+
+// Client Code 入力時のオートコンプリート
+function onClientCodeInput() {
+    const code = clientCodeInput.value.trim();
+    if (codeSearchTimeout) clearTimeout(codeSearchTimeout);
+
+    if (!code) {
+        form.client_id   = '';
         form.client_name = '';
         return;
     }
-    
-    isLoadingClientById.value = true;
-    try {
-        const res = await fetch(
-            route('coordinator.clients.json') + '?id=' + encodeURIComponent(clientId),
-            { headers: { Accept: 'application/json' }, credentials: 'same-origin' }
-        );
-        if (res.ok) {
-            const client = await res.json();
-            if (client) {
-                form.client_name = client.name;
-                // プリセット取得も実行
-                await loadClientPreset(client);
-            } else {
-                form.client_name = '';
+
+    codeSearchTimeout = setTimeout(async () => {
+        isLoadingClientById.value = true;
+        try {
+            const res = await fetch(
+                route('coordinator.clients.json') + '?code=' + encodeURIComponent(code) + '&limit=10',
+                { headers: { Accept: 'application/json' }, credentials: 'same-origin' },
+            );
+            if (res.ok) {
+                const clients = await res.json();
+                if (Array.isArray(clients) && clients.length > 0) {
+                    clientNameSuggestions.value = clients;
+                    showNameSuggestions.value   = true;
+                    selectedSuggestionIndex.value = -1;
+                } else {
+                    clientNameSuggestions.value = [];
+                    showNameSuggestions.value   = false;
+                    form.client_id   = '';
+                    form.client_name = '';
+                }
             }
-        } else {
-            form.client_name = '';
+        } catch {
+            clientNameSuggestions.value = [];
+            showNameSuggestions.value   = false;
+        } finally {
+            isLoadingClientById.value = false;
         }
-    } catch (error) {
-        console.error('クライアント取得エラー:', error);
-        form.client_name = '';
-    } finally {
-        isLoadingClientById.value = false;
-    }
+    }, 300);
 }
 
 // 名前入力時のオートコンプリート
 function onClientNameInput() {
+    clientCodeInput.value = '';
     const searchTerm = form.client_name;
-    
+
     // 検索をクリア
     if (searchTimeout) {
         clearTimeout(searchTimeout);
     }
-    
+
     if (!searchTerm || searchTerm.length < 1) {
         clientNameSuggestions.value = [];
         showNameSuggestions.value = false;
@@ -918,11 +945,12 @@ function onClientNameKeydown(event) {
 
 // 候補選択
 async function selectClientFromSuggestion(client) {
-    form.client_id = client.id;
-    form.client_name = client.name;
+    form.client_id            = client.id;
+    form.client_name          = client.name;
+    clientCodeInput.value     = client.client_code ?? '';
     showNameSuggestions.value = false;
     selectedSuggestionIndex.value = -1;
-    
+
     // プリセット取得
     await loadClientPreset(client);
 }

@@ -19,6 +19,7 @@ class BoardController extends Controller
 
         $tickets = PrepressTicket::where('status', '!=', PrepressTicket::STATUS_DELETED)->orderByDesc('updated_at')->get([
             'id', 'title', 'jobcode', 'project_name', 'client_name', 'memo', 'status', 'image_path', 'created_at',
+            'submission_date', 'sb_delivery_date',
         ])->each->append('image_url');
 
         return inertia('Prepress/Board', [

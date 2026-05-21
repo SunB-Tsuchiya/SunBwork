@@ -293,9 +293,11 @@ class ClientController extends Controller
             return $client ? response()->json($client) : response()->json(null, 404);
         }
 
-        if ($request->filled('name')) {
-            $searchName = $request->name;
-            $query->where('name', 'like', '%' . $searchName . '%');
+        // client_code での部分一致（インライン入力オートコンプリート・モーダル検索用）
+        if ($request->filled('code')) {
+            $query->where('client_code', 'like', '%' . $request->code . '%');
+        } elseif ($request->filled('name')) {
+            $query->where('name', 'like', '%' . $request->name . '%');
         }
 
         // 結果数制限（オートコンプリート用）

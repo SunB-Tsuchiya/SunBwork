@@ -1,7 +1,7 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 const DEPT_COLORS = {
     '情報出版': 'bg-blue-100 text-blue-700',
@@ -31,6 +31,23 @@ const routePrefix = computed(() => {
 });
 
 const isLeaderView = computed(() => props.unregisteredClients !== null);
+
+const searchQuery = ref('');
+
+function matchesQuery(client, q) {
+    if (!q) return true;
+    const lower = q.toLowerCase();
+    return (client.client_code ?? '').toLowerCase().includes(lower)
+        || (client.name ?? '').toLowerCase().includes(lower);
+}
+
+const filteredClients = computed(() =>
+    props.clients.filter(c => matchesQuery(c, searchQuery.value)),
+);
+
+const filteredUnregisteredClients = computed(() =>
+    (props.unregisteredClients ?? []).filter(c => matchesQuery(c, searchQuery.value)),
+);
 
 function toggleDormantView() {
     router.get(
@@ -81,17 +98,27 @@ function goToEdit(clientId) {
             </div>
         </template>
 
+        <!-- 検索ボックス -->
+        <div class="mb-4">
+            <input
+                v-model="searchQuery"
+                type="text"
+                class="w-full max-w-sm rounded border border-gray-300 px-4 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                placeholder="Client ID または名前で検索…"
+            />
+        </div>
+
         <!-- ── Leader: 2セクション表示 ── -->
         <template v-if="isLeaderView">
             <!-- 登録済み -->
             <div class="rounded bg-white shadow overflow-hidden mb-4">
                 <div class="flex items-center justify-between bg-green-50 px-6 py-3 border-b border-green-100">
                     <h3 class="font-semibold text-green-800">自部署に登録済み
-                        <span class="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-xs font-normal text-green-700">{{ props.clients.length }}</span>
+                        <span class="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-xs font-normal text-green-700">{{ filteredClients.length }}</span>
                     </h3>
                 </div>
-                <template v-if="props.clients.length === 0">
-                    <p class="px-6 py-8 text-sm text-gray-400">登録済みのクライアントはありません</p>
+                <template v-if="filteredClients.length === 0">
+                    <p class="px-6 py-8 text-sm text-gray-400">{{ searchQuery ? '該当するクライアントはありません' : '登録済みのクライアントはありません' }}</p>
                 </template>
                 <div v-else class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
@@ -105,7 +132,7 @@ function goToEdit(clientId) {
                         </thead>
                         <tbody class="divide-y divide-gray-200 bg-white">
                             <tr
-                                v-for="client in props.clients"
+                                v-for="client in filteredClients"
                                 :key="client.id"
                                 class="hover:bg-green-50/40 cursor-pointer"
                                 @click="goToEdit(client.id)"
@@ -134,11 +161,11 @@ function goToEdit(clientId) {
             <div class="rounded bg-white shadow overflow-hidden">
                 <div class="flex items-center justify-between bg-gray-50 px-6 py-3 border-b border-gray-200">
                     <h3 class="font-semibold text-gray-600">未登録（他部署のクライアント）
-                        <span class="ml-2 rounded-full bg-gray-200 px-2 py-0.5 text-xs font-normal text-gray-500">{{ props.unregisteredClients.length }}</span>
+                        <span class="ml-2 rounded-full bg-gray-200 px-2 py-0.5 text-xs font-normal text-gray-500">{{ filteredUnregisteredClients.length }}</span>
                     </h3>
                 </div>
-                <template v-if="props.unregisteredClients.length === 0">
-                    <p class="px-6 py-8 text-sm text-gray-400">未登録のクライアントはありません</p>
+                <template v-if="filteredUnregisteredClients.length === 0">
+                    <p class="px-6 py-8 text-sm text-gray-400">{{ searchQuery ? '該当するクライアントはありません' : '未登録のクライアントはありません' }}</p>
                 </template>
                 <div v-else class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
@@ -153,7 +180,7 @@ function goToEdit(clientId) {
                         </thead>
                         <tbody class="divide-y divide-gray-200 bg-white">
                             <tr
-                                v-for="client in props.unregisteredClients"
+                                v-for="client in filteredUnregisteredClients"
                                 :key="client.id"
                                 class="hover:bg-gray-50 cursor-pointer"
                                 @click="goToEdit(client.id)"
@@ -185,9 +212,9 @@ function goToEdit(clientId) {
 
         <!-- ── Admin / Coordinator など: 通常1テーブル表示 ── -->
         <div v-else class="rounded bg-white px-4 py-6 sm:p-6 shadow">
-            <template v-if="props.clients.length === 0">
+            <template v-if="filteredClients.length === 0">
                 <p class="py-8 text-gray-500">
-                    {{ props.showDormant ? '休眠クライアントはありません' : 'クライアントはまだ登録されていません' }}
+                    {{ searchQuery ? '該当するクライアントはありません' : (props.showDormant ? '休眠クライアントはありません' : 'クライアントはまだ登録されていません') }}
                 </p>
             </template>
             <template v-else>
@@ -204,7 +231,7 @@ function goToEdit(clientId) {
                         </thead>
                         <tbody class="divide-y divide-gray-200 bg-white">
                             <tr
-                                v-for="client in props.clients"
+                                v-for="client in filteredClients"
                                 :key="client.id"
                                 class="hover:bg-gray-50 cursor-pointer"
                                 @click="goToEdit(client.id)"

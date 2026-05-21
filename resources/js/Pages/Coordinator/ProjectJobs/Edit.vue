@@ -40,7 +40,8 @@
                 <div class="mb-4">
                     <label class="mb-1 block font-semibold">クライアント</label>
                     <div class="flex items-center gap-2">
-                        ID:<input v-model="form.client_id" type="number" class="w-16 rounded border bg-gray-100 px-3 py-2" readonly />
+                        <label class="shrink-0 text-sm">Client ID:</label>
+                        <span class="inline-block w-28 rounded border bg-gray-100 px-2 py-2 font-mono text-sm text-gray-700">{{ props.job.client?.client_code || '―' }}</span>
                         <input v-model="form.client_name" type="text" class="w-60 rounded border bg-gray-100 px-3 py-2" readonly />
                     </div>
                 </div>

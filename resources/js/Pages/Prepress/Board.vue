@@ -3,7 +3,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import OcrModal from '@/Components/Prepress/OcrModal.vue';
 import { router, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { route } from 'ziggy-js';
 
 const props = defineProps({
@@ -12,47 +12,39 @@ const props = defineProps({
 });
 
 const COLUMNS = [
-    { key: 'pending',     label: '準備',    color: 'border-yellow-400 bg-yellow-50', header: 'bg-yellow-100 text-yellow-800' },
-    { key: 'submitting',  label: '入稿予定', color: 'border-purple-400 bg-purple-50', header: 'bg-purple-100 text-purple-800' },
-    { key: 'in_progress', label: '作業中',  color: 'border-blue-400 bg-blue-50',     header: 'bg-blue-100 text-blue-800' },
-    { key: 'completed',   label: '完了',    color: 'border-green-500 bg-green-50',   header: 'bg-green-100 text-green-800' },
+    { key: 'pending',     label: '準備',    color: 'border-yellow-400 bg-yellow-50', header: 'bg-yellow-100 text-yellow-800', barText: 'text-yellow-800' },
+    { key: 'submitting',  label: '入稿予定', color: 'border-purple-400 bg-purple-50', header: 'bg-purple-100 text-purple-800', barText: 'text-purple-800' },
+    { key: 'in_progress', label: '作業中',  color: 'border-blue-400 bg-blue-50',     header: 'bg-blue-100 text-blue-800',     barText: 'text-blue-800'   },
+    { key: 'completed',   label: '完了',    color: 'border-green-500 bg-green-50',   header: 'bg-green-100 text-green-800',   barText: 'text-green-800'  },
 ];
 
-// 遷移ルール（準備 → 入稿予定 → 作業中 → 完了 の直線順）
-const VALID_TRANSITIONS = {
-    pending:     ['submitting'],
-    submitting:  ['pending', 'in_progress'],
-    in_progress: ['submitting', 'completed'],
-    completed:   ['in_progress'],
-};
-
-// アコーディオン: 'none' | 'ready' | 'completed'
-const openPanel = ref('none');
-
-function togglePanel(panel) {
-    openPanel.value = openPanel.value === panel ? 'none' : panel;
-}
-
-// ボードエリア外クリックでパネルを閉じる
-const boardRef = ref(null);
-function onDocumentClick(e) {
-    if (openPanel.value === 'none') return;
-    if (boardRef.value && !boardRef.value.contains(e.target)) {
-        openPanel.value = 'none';
-    }
-}
-onMounted(()    => document.addEventListener('click', onDocumentClick, true));
-onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick, true));
-
-const visibleColumnKeys = computed(() => {
-    if (openPanel.value === 'ready')     return ['pending',     'submitting'];
-    if (openPanel.value === 'completed') return ['in_progress', 'completed'];
-    return ['submitting', 'in_progress'];
-});
-
-const visibleColumns = computed(() =>
-    visibleColumnKeys.value.map(k => COLUMNS.find(c => c.key === k))
+// 遷移ルール（どの列からでも他の列へ移動可能）
+const ALL_KEYS = ['pending', 'submitting', 'in_progress', 'completed'];
+const VALID_TRANSITIONS = Object.fromEntries(
+    ALL_KEYS.map(k => [k, ALL_KEYS.filter(t => t !== k)])
 );
+
+// カラム開閉状態: デフォルトは入稿予定・作業中の2列を開く
+const openColumns = ref(new Set(['submitting', 'in_progress']));
+
+function isOpen(key) {
+    return openColumns.value.has(key);
+}
+
+function toggleColumn(key) {
+    const s = new Set(openColumns.value);
+    if (s.has(key)) {
+        s.delete(key);
+    } else {
+        if (s.size >= 2) {
+            // 一番右にある開いているカラムを自動で閉じる
+            const rightmost = COLUMNS.map(c => c.key).filter(k => s.has(k)).at(-1);
+            if (rightmost) s.delete(rightmost);
+        }
+        s.add(key);
+    }
+    openColumns.value = s;
+}
 
 // Local optimistic state
 const localTickets = ref(props.tickets.map(t => ({ ...t })));
@@ -65,6 +57,83 @@ const ticketsByStatus = computed(() => {
     });
     return map;
 });
+
+// ── カラム別 ソート・絞り込み ──────────────────────────────────
+const columnControls = ref(
+    Object.fromEntries(COLUMNS.map(c => [c.key, { order: 'asc', dateFilter: '', dateRaw: '' }]))
+);
+
+function parseToYMD(raw) {
+    if (!raw || !raw.trim()) return '';
+    const cleaned = raw.trim().replace(/[^0-9/]/g, '');
+    let month, day;
+    if (cleaned.includes('/')) {
+        const [m, d] = cleaned.split('/');
+        month = parseInt(m, 10);
+        day   = parseInt(d, 10);
+    } else {
+        if (cleaned.length < 3) return '';
+        if (cleaned.length === 3) {
+            month = parseInt(cleaned[0], 10);
+            day   = parseInt(cleaned.slice(1), 10);
+        } else {
+            month = parseInt(cleaned.slice(0, 2), 10);
+            day   = parseInt(cleaned.slice(2, 4), 10);
+        }
+    }
+    if (!month || !day || isNaN(month) || isNaN(day) || month < 1 || month > 12 || day < 1 || day > 31) return '';
+    const now  = new Date();
+    const curM = now.getMonth() + 1;
+    let year   = now.getFullYear();
+    // 今日が12月なら1月は来年
+    if (curM === 12 && month === 1) year += 1;
+    return `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+}
+
+function applyDateFilter(colKey) {
+    columnControls.value[colKey].dateFilter = parseToYMD(columnControls.value[colKey].dateRaw);
+}
+
+function clearDateFilter(colKey) {
+    columnControls.value[colKey].dateFilter = '';
+    columnControls.value[colKey].dateRaw    = '';
+}
+
+function onCalendarChange(colKey, ymd) {
+    if (!ymd) return;
+    columnControls.value[colKey].dateFilter = ymd;
+    const [, m, d] = ymd.split('-');
+    columnControls.value[colKey].dateRaw = `${parseInt(m,10)}/${parseInt(d,10)}`;
+}
+
+function formatShortDate(dateStr) {
+    if (!dateStr) return '—';
+    const d = String(dateStr).split('T')[0].split('-');
+    if (d.length < 3) return '—';
+    return `${parseInt(d[1])}/${parseInt(d[2])}`;
+}
+
+function sortedFilteredTickets(colKey) {
+    let list = ticketsByStatus.value[colKey] ?? [];
+    const ctrl = columnControls.value[colKey];
+
+    // 日付フィルター（submission_date が一致するもののみ）
+    if (ctrl.dateFilter) {
+        list = list.filter(t => {
+            const d = t.submission_date ? String(t.submission_date).split('T')[0] : '';
+            return d === ctrl.dateFilter;
+        });
+    }
+
+    // submission_date で昇順/降順ソート（未設定は末尾）
+    const dir = ctrl.order === 'asc' ? 1 : -1;
+    return [...list].sort((a, b) => {
+        const da = a.submission_date ? String(a.submission_date).split('T')[0] : '9999-99-99';
+        const db = b.submission_date ? String(b.submission_date).split('T')[0] : '9999-99-99';
+        if (da === db) return 0;
+        return (da < db ? -1 : 1) * dir;
+    });
+}
 
 // ── 削除モード ──────────────────────────────────────────────
 const deleteMode = ref(false);
@@ -485,118 +554,163 @@ const canCreate = computed(() => {
         </template>
 
         <!-- 進行表と同様 100vw 全幅に拡張 -->
-        <div ref="boardRef" style="width: 100vw; margin-left: calc(-50vw + 50%); padding-left: 1.5rem; padding-right: 1.5rem; box-sizing: border-box;">
+        <div style="width: 100vw; margin-left: calc(-50vw + 50%); padding-left: 1.5rem; padding-right: 1.5rem; box-sizing: border-box;">
 
-            <!-- アコーディオン操作バー -->
-            <div class="mb-3 flex items-center justify-between">
-                <!-- 準備BOX ボタン -->
-                <button
-                    type="button"
-                    class="flex items-center gap-1.5 rounded-lg border-2 px-5 py-2 text-sm font-semibold transition-colors"
-                    :class="openPanel === 'ready'
-                        ? 'border-yellow-500 bg-yellow-200 text-yellow-900'
-                        : 'border-yellow-400 bg-yellow-50 text-yellow-800 hover:bg-yellow-100'"
-                    @click="togglePanel('ready')"
-                >
-                    <span class="text-base">{{ openPanel === 'ready' ? '▼' : '▶' }}</span>
-                    準備BOX
-                    <span class="ml-1 rounded-full bg-white/70 px-2 py-0.5 text-xs font-medium">
-                        {{ ticketsByStatus['pending'].length }}
-                    </span>
-                </button>
-
-                <!-- 中央ラベル -->
-                <span class="text-xs text-gray-400">
-                    {{ openPanel === 'ready' ? '準備 ／ 入稿予定' : openPanel === 'completed' ? '作業中 ／ 完了' : '入稿予定 ／ 作業中' }}
-                    を表示中
-                </span>
-
-                <!-- 完了BOX ボタン -->
-                <button
-                    type="button"
-                    class="flex items-center gap-1.5 rounded-lg border-2 px-5 py-2 text-sm font-semibold transition-colors"
-                    :class="openPanel === 'completed'
-                        ? 'border-green-600 bg-green-200 text-green-900'
-                        : 'border-green-500 bg-green-50 text-green-800 hover:bg-green-100'"
-                    @click="togglePanel('completed')"
-                >
-                    完了BOX
-                    <span class="ml-1 rounded-full bg-white/70 px-2 py-0.5 text-xs font-medium">
-                        {{ ticketsByStatus['completed'].length }}
-                    </span>
-                    <span class="text-base">{{ openPanel === 'completed' ? '▼' : '◀' }}</span>
-                </button>
-            </div>
-
-            <!-- ボードエリア: 常に2列 -->
-            <div class="grid grid-cols-2 gap-6">
+            <!-- ボードエリア: 4列フレックス（折りたたみ対応） -->
+            <div class="flex gap-2" style="height: calc(100vh - 155px);">
                 <div
-                    v-for="col in visibleColumns"
+                    v-for="col in COLUMNS"
                     :key="col.key"
-                    class="flex flex-col rounded-xl border-2 transition-colors"
+                    class="flex flex-col rounded-xl border-2 overflow-hidden"
                     :class="[
                         col.color,
-                        dragOverColumn === col.key ? 'ring-2 ring-offset-1 ring-green-500' : '',
-                        draggedStatus && !canDropTo(col.key) && draggedId !== null ? 'opacity-50' : '',
+                        isOpen(col.key) ? 'flex-1 min-w-0' : 'shrink-0',
+                        dragOverColumn === col.key && canDropTo(col.key) ? 'ring-2 ring-offset-1 ring-green-500' : '',
+                        draggedStatus && !canDropTo(col.key) && draggedId !== null ? 'opacity-40' : '',
                     ]"
+                    :style="isOpen(col.key) ? {} : { width: '2.75rem' }"
                     @dragover.prevent="onDragOver(col.key)"
                     @dragleave="onDragLeave"
                     @drop="onDrop(col.key)"
                 >
-                    <!-- 列ヘッダー -->
-                    <div class="flex items-center rounded-t-lg px-4 py-3" :class="col.header">
-                        <span class="font-semibold text-base">{{ col.label }}</span>
-                        <span class="ml-2 rounded-full bg-white/60 px-2 py-0.5 text-xs font-medium">
-                            {{ ticketsByStatus[col.key].length }}
-                        </span>
-                        <!-- 完了列専用: 削除モードボタン -->
-                        <template v-if="col.key === 'completed'">
-                            <button
-                                type="button"
-                                class="ml-auto rounded px-3 py-1 text-xs font-semibold transition-colors"
-                                :class="deleteMode
-                                    ? 'bg-red-600 text-white hover:bg-red-700'
-                                    : 'bg-white/70 text-red-700 hover:bg-white'"
-                                @click="toggleDeleteMode"
-                            >{{ deleteMode ? '削除モード終了' : '削除モード' }}</button>
-                            <button
-                                v-if="deleteMode"
-                                type="button"
-                                class="ml-2 rounded bg-white/70 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-white"
-                                @click="selectAllForDelete(ticketsByStatus['completed'])"
-                            >全件チェック</button>
-                            <button
-                                v-if="deleteMode && selectedForDelete.size > 0"
-                                type="button"
-                                class="ml-2 rounded bg-red-700 px-3 py-1 text-xs font-semibold text-white hover:bg-red-800"
-                                @click="executeDelete"
-                            >削除（{{ selectedForDelete.size }}件）</button>
-                        </template>
+                    <!-- 折りたたみ時: 縦バー -->
+                    <div
+                        v-if="!isOpen(col.key)"
+                        class="flex h-full cursor-pointer flex-col items-center py-3 select-none"
+                        :class="col.header"
+                        @click="toggleColumn(col.key)"
+                    >
+                        <span class="text-xs font-bold" :class="col.barText">▶</span>
+                        <span
+                            class="mt-2 text-xs font-semibold leading-none"
+                            :class="col.barText"
+                            style="writing-mode: vertical-rl;"
+                        >{{ col.label }}</span>
+                        <span
+                            class="mt-2 rounded bg-white/80 px-1 py-0.5 text-center font-semibold leading-none min-w-[1.6rem]"
+                            style="font-size: 11px;"
+                        >{{ ticketsByStatus[col.key].length }}</span>
                     </div>
 
-                    <!-- カードグリッド: 2列 -->
-                    <div
-                        class="overflow-y-auto p-4"
-                        style="max-height: calc(100vh - 220px);"
-                    >
-                        <div class="grid grid-cols-2 gap-4">
-                            <div
-                                v-for="ticket in ticketsByStatus[col.key]"
-                                :key="ticket.id"
-                                :draggable="!(col.key === 'completed' && deleteMode)"
-                                class="relative cursor-grab rounded border border-indigo-400 bg-white shadow-sm transition-all hover:shadow-md active:cursor-grabbing select-none"
-                                :class="[
-                                    { 'opacity-50 scale-95': draggedId === ticket.id },
-                                    { 'ring-2 ring-red-500 ring-offset-1': col.key === 'completed' && deleteMode && selectedForDelete.has(ticket.id) },
-                                ]"
-                                @dragstart="!(col.key === 'completed' && deleteMode) && onDragStart(ticket)"
-                                @dragend="onDragEnd"
-                                @click="col.key === 'completed' && deleteMode ? toggleSelectForDelete(ticket.id) : null"
-                            >
-                                <!-- 削除モード選択ハイライト -->
+                    <!-- 展開時: 通常カラム -->
+                    <template v-else>
+                        <!-- 列ヘッダー -->
+                        <div class="flex shrink-0 items-center rounded-t-lg px-4 py-3" :class="col.header">
+                            <span class="font-semibold text-base">{{ col.label }}</span>
+                            <span class="ml-2 rounded-full bg-white/60 px-2 py-0.5 text-xs font-medium">
+                                {{ ticketsByStatus[col.key].length }}
+                            </span>
+                            <!-- 完了列専用: 削除モードボタン -->
+                            <template v-if="col.key === 'completed'">
+                                <button
+                                    type="button"
+                                    class="ml-auto rounded px-3 py-1 text-xs font-semibold transition-colors"
+                                    :class="deleteMode
+                                        ? 'bg-red-600 text-white hover:bg-red-700'
+                                        : 'bg-white/70 text-red-700 hover:bg-white'"
+                                    @click.stop="toggleDeleteMode"
+                                >{{ deleteMode ? '削除モード終了' : '削除モード' }}</button>
+                                <button
+                                    v-if="deleteMode"
+                                    type="button"
+                                    class="ml-2 rounded bg-white/70 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-white"
+                                    @click.stop="selectAllForDelete(ticketsByStatus['completed'])"
+                                >全件チェック</button>
+                                <button
+                                    v-if="deleteMode && selectedForDelete.size > 0"
+                                    type="button"
+                                    class="ml-2 rounded bg-red-700 px-3 py-1 text-xs font-semibold text-white hover:bg-red-800"
+                                    @click.stop="executeDelete"
+                                >削除（{{ selectedForDelete.size }}件）</button>
+                            </template>
+                            <!-- 折りたたみボタン -->
+                            <button
+                                type="button"
+                                class="rounded px-2 py-0.5 text-xs hover:bg-white/50"
+                                :class="col.key !== 'completed' ? 'ml-auto' : 'ml-2'"
+                                title="折りたたむ"
+                                @click.stop="toggleColumn(col.key)"
+                            >◀</button>
+                        </div>
+
+                        <!-- ソート・絞り込みコントロール -->
+                        <div class="shrink-0 flex flex-wrap items-center gap-2 border-b bg-white/70 px-3 py-1.5">
+                            <div class="flex gap-1">
+                                <button
+                                    type="button"
+                                    class="rounded px-2 py-0.5 text-xs font-semibold transition-colors"
+                                    :class="columnControls[col.key].order === 'asc'
+                                        ? 'bg-teal-600 text-white'
+                                        : 'border border-gray-300 text-gray-600 hover:bg-gray-50'"
+                                    @click="columnControls[col.key].order = 'asc'"
+                                >↑ 昇順</button>
+                                <button
+                                    type="button"
+                                    class="rounded px-2 py-0.5 text-xs font-semibold transition-colors"
+                                    :class="columnControls[col.key].order === 'desc'
+                                        ? 'bg-teal-600 text-white'
+                                        : 'border border-gray-300 text-gray-600 hover:bg-gray-50'"
+                                    @click="columnControls[col.key].order = 'desc'"
+                                >↓ 降順</button>
+                            </div>
+                            <span class="text-xs text-gray-500">日付で絞込:</span>
+                            <div class="flex items-center gap-1">
+                                <input
+                                    type="text"
+                                    v-model="columnControls[col.key].dateRaw"
+                                    placeholder="MM/DD"
+                                    maxlength="5"
+                                    class="w-20 rounded border border-gray-300 px-1.5 py-0.5 text-xs"
+                                    @change="applyDateFilter(col.key)"
+                                    @keydown.enter.prevent="applyDateFilter(col.key)"
+                                />
+                                <div class="relative">
+                                    <button
+                                        type="button"
+                                        class="rounded border border-gray-300 px-1.5 py-0.5 text-sm hover:bg-gray-50"
+                                        title="カレンダーから選択"
+                                    >🗓</button>
+                                    <input
+                                        type="date"
+                                        :value="columnControls[col.key].dateFilter"
+                                        class="absolute inset-0 w-full opacity-0 cursor-pointer"
+                                        tabindex="-1"
+                                        @change="onCalendarChange(col.key, $event.target.value)"
+                                    />
+                                </div>
+                                <span
+                                    v-if="columnControls[col.key].dateFilter"
+                                    class="text-xs font-medium text-teal-700"
+                                >{{ columnControls[col.key].dateFilter.slice(0,4) }}年</span>
+                                <button
+                                    v-if="columnControls[col.key].dateFilter || columnControls[col.key].dateRaw"
+                                    type="button"
+                                    class="rounded bg-gray-200 px-1.5 py-0.5 text-xs text-gray-600 hover:bg-gray-300"
+                                    @click="clearDateFilter(col.key)"
+                                >✕</button>
+                            </div>
+                        </div>
+
+                        <!-- カードグリッド: 2列 -->
+                        <div class="flex-1 min-h-0 overflow-y-auto p-4">
+                            <div class="grid grid-cols-2 gap-4">
                                 <div
-                                    v-if="col.key === 'completed' && deleteMode && selectedForDelete.has(ticket.id)"
-                                    class="pointer-events-none absolute inset-0 z-10 rounded-lg bg-red-500/20"
+                                    v-for="ticket in sortedFilteredTickets(col.key)"
+                                    :key="ticket.id"
+                                    :draggable="!(col.key === 'completed' && deleteMode)"
+                                    class="relative cursor-grab rounded border border-indigo-400 bg-white shadow-sm transition-all hover:shadow-md active:cursor-grabbing select-none"
+                                    :class="[
+                                        { 'opacity-50 scale-95': draggedId === ticket.id },
+                                        { 'ring-2 ring-red-500 ring-offset-1': col.key === 'completed' && deleteMode && selectedForDelete.has(ticket.id) },
+                                    ]"
+                                    @dragstart="!(col.key === 'completed' && deleteMode) && onDragStart(ticket)"
+                                    @dragend="onDragEnd"
+                                    @click="col.key === 'completed' && deleteMode ? toggleSelectForDelete(ticket.id) : null"
+                                >
+                                    <!-- 削除モード選択ハイライト -->
+                                    <div
+                                        v-if="col.key === 'completed' && deleteMode && selectedForDelete.has(ticket.id)"
+                                        class="pointer-events-none absolute inset-0 z-10 rounded-lg bg-red-500/20"
                                 />
                                 <!-- 削除モード チェックボックス -->
                                 <div
@@ -636,23 +750,27 @@ const canCreate = computed(() => {
                                     </div>
                                 </div>
 
-                                <!-- キャプション: 伝票番号 + 案件名 -->
+                                <!-- キャプション: 伝票番号 + 案件名 + 日付 -->
                                 <div class="rounded-b-sm border-t border-indigo-400 bg-indigo-100 px-2 py-0.5">
                                     <p class="truncate text-xs text-indigo-900 leading-tight">
                                         <span v-if="ticket.jobcode" class="font-medium text-indigo-600">#{{ ticket.jobcode }}　</span>{{ ticket.title }}
+                                    </p>
+                                    <p class="mt-0.5 text-xs text-indigo-600 leading-tight">
+                                        入稿 {{ formatShortDate(ticket.submission_date) }}：下版 {{ formatShortDate(ticket.sb_delivery_date) }}
                                     </p>
                                 </div>
                             </div>
 
                             <!-- 空エリア ドロップヒント -->
                             <div
-                                v-if="ticketsByStatus[col.key].length === 0 && draggedId !== null && canDropTo(col.key)"
+                                v-if="sortedFilteredTickets(col.key).length === 0 && draggedId !== null && canDropTo(col.key)"
                                 class="col-span-2 flex h-24 items-center justify-center rounded-lg border-2 border-dashed border-gray-300 text-sm text-gray-400"
                             >
                                 ここにドロップ
                             </div>
                         </div>
                     </div>
+                    </template>
                 </div>
             </div>
         </div>
@@ -982,7 +1100,7 @@ const canCreate = computed(() => {
                                         >
                                             <div class="flex items-center justify-between">
                                                 <span class="font-medium">{{ client.name }}</span>
-                                                <span class="text-xs text-gray-400">ID: {{ client.id }}</span>
+                                                <span class="font-mono text-xs text-gray-400">{{ client.client_code || '―' }}</span>
                                             </div>
                                             <div v-if="client.is_dormant" class="text-xs text-red-500">※ 休眠中</div>
                                         </div>
