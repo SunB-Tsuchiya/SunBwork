@@ -13,6 +13,7 @@ const props = defineProps({
 });
 
 const form = useForm({
+    _method:          'PATCH',
     client_id:        props.ticket.client_id        ?? '',
     client_name:      props.ticket.client_name      ?? '',
     jobcode:          props.ticket.jobcode           ?? '',
@@ -186,7 +187,7 @@ function removeImage() {
 
 // ── 送信 ─────────────────────────────────────────────
 function submit() {
-    form.patch(route('prepress.tickets.update', { ticket: props.ticket.id }), {
+    form.post(route('prepress.tickets.update', { ticket: props.ticket.id }), {
         forceFormData: true,
         preserveScroll: true,
     });

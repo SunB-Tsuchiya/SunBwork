@@ -118,7 +118,7 @@ function onCalendarChange(colKey, ymd) {
 
 function formatShortDate(dateStr) {
     if (!dateStr) return '—';
-    const d = String(dateStr).split('T')[0].split('-');
+    const d = String(dateStr).split('T')[0].replace(/\//g, '-').split('-');
     if (d.length < 3) return '—';
     return `${parseInt(d[1])}/${parseInt(d[2])}`;
 }
@@ -130,15 +130,15 @@ function sortedFilteredTickets(colKey) {
 
     if (ctrl.dateFilter) {
         list = list.filter(t => {
-            const d = t[field] ? String(t[field]).split('T')[0] : '';
+            const d = t[field] ? String(t[field]).split('T')[0].replace(/\//g, '-') : '';
             return d === ctrl.dateFilter;
         });
     }
 
     const dir = ctrl.order === 'asc' ? 1 : -1;
     return [...list].sort((a, b) => {
-        const da = a[field] ? String(a[field]).split('T')[0] : '9999-99-99';
-        const db = b[field] ? String(b[field]).split('T')[0] : '9999-99-99';
+        const da = a[field] ? String(a[field]).split('T')[0].replace(/\//g, '-') : '9999-99-99';
+        const db = b[field] ? String(b[field]).split('T')[0].replace(/\//g, '-') : '9999-99-99';
         if (da === db) return 0;
         return (da < db ? -1 : 1) * dir;
     });
