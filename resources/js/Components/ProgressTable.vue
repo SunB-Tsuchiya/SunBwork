@@ -1,7 +1,7 @@
 <template>
   <div>
     <!-- トグルバー -->
-    <div v-if="topLevelGroups.length > 0" class="mb-2 flex flex-wrap items-center gap-2">
+    <div v-if="topLevelGroups.length > 0" ref="toggleBarRef" class="sticky top-0 z-30 flex flex-wrap items-center gap-2 border-b border-gray-100 bg-white px-2 py-1.5">
       <span class="text-xs text-gray-500">表示切替：</span>
       <button
         v-for="grp in topLevelGroups"
@@ -19,7 +19,7 @@
 
     <table class="min-w-full border-collapse text-sm">
       <!-- ── 多段ヘッダー ── -->
-      <thead class="sticky top-0 z-20">
+      <thead class="sticky z-20" :style="{ top: theadTop }">
         <tr v-for="(headerRow, depth) in headerRows" :key="depth" class="bg-gray-50">
           <!-- 行ラベル列（最初の thead 行にのみ rowspan で表示） -->
           <th
@@ -161,7 +161,7 @@
 </template>
 
 <script setup>
-import { computed, reactive } from 'vue';
+import { computed, reactive, ref, onMounted, onUpdated } from 'vue';
 import ProgressCell from '@/Components/ProgressCell.vue';
 
 const props = defineProps({
@@ -182,6 +182,16 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['cell-update', 'edit-row', 'delete-row', 'job-link-open', 'job-link-detail', 'complete-assignment', 'proof-request-open', 'proof-direct-complete', 'worker-complete', 'worker-job-register', 'worker-job-detail', 'schedlink-complete', 'note-save', 'proof-request-cancel', 'proof-request-extend-deadline']);
+
+// トグルバーの高さ分だけ thead を下にオフセット
+const toggleBarRef = ref(null);
+const theadTop = ref('0px');
+
+function updateTheadTop() {
+  theadTop.value = toggleBarRef.value ? `${toggleBarRef.value.offsetHeight}px` : '0px';
+}
+onMounted(updateTheadTop);
+onUpdated(updateTheadTop);
 
 // ── 行ツリー展開（parent_id を使って表示順に並べる） ────────
 const displayRows = computed(() => {

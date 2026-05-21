@@ -22,7 +22,12 @@
       </div>
     </template>
 
-    <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
+    <div
+      ref="toolbarCardRef"
+      class="rounded bg-white px-4 py-4 sm:px-6 shadow"
+      :class="editMode ? '' : 'sticky z-10'"
+      :style="editMode ? undefined : toolbarStickyStyle"
+    >
 
       <!-- ── ツールバー ──────────────────────────────── -->
       <div class="mb-4 flex flex-wrap items-center gap-3">
@@ -401,7 +406,10 @@
       </div>
       <div
         v-else
-        class="overflow-x-auto rounded bg-white shadow px-4 py-2"
+        ref="tableWrapperRef"
+        class="overflow-auto rounded bg-white shadow"
+        :style="tableWrapperStyle"
+        @scroll.passive="onTableScroll"
       >
         <ProgressTable
           :rows="localRows"
@@ -861,10 +869,75 @@ const jobLinkModal = ref({ open: false, isSelfAssign: true, isSubcontractor: fal
 const jobLinkForm = ref({ title: '', detail: '', desiredEndDate: '', assigneeUserId: null, assigneeSubcontractorId: null });
 const jobLinkDetailModal = ref({ open: false, title: '', assigneeName: '', endDate: '', completed: false, assignmentId: null, completing: false, unlinking: false, rowId: null, colKey: null, isSubcontractor: false });
 
+// ── テーブルスクロール・ツールバー自動表示制御 ────────────────
+const toolbarCardRef = ref(null);
+const tableWrapperRef = ref(null);
+const toolbarHidden = ref(false);
+const tableMaxHeight = ref('');
+let tblLastScrollTop = 0;
+
+const toolbarStickyStyle = computed(() => {
+  const h = toolbarCardRef.value?.offsetHeight ?? 64;
+  return {
+    top: toolbarHidden.value ? `-${h}px` : '0px',
+    transition: 'top 0.2s ease',
+  };
+});
+
+const tableWrapperStyle = computed(() => ({
+  maxHeight: tableMaxHeight.value || 'calc(100vh - 300px)',
+  minHeight: '400px',
+}));
+
+function onTableScroll() {
+  const el = tableWrapperRef.value;
+  if (!el) return;
+  const st = el.scrollTop;
+  if (st <= 0) {
+    toolbarHidden.value = false;
+  } else if (st > tblLastScrollTop + 8) {
+    toolbarHidden.value = true;
+  } else if (st < tblLastScrollTop - 8) {
+    toolbarHidden.value = false;
+  }
+  tblLastScrollTop = st;
+}
+
+function computeTableHeight() {
+  const el = tableWrapperRef.value;
+  if (!el) return;
+  const rect = el.getBoundingClientRect();
+  const available = window.innerHeight - rect.top - 16;
+  tableMaxHeight.value = `${Math.max(available, 300)}px`;
+}
+
+function attachTableListeners() {
+  nextTick(() => {
+    computeTableHeight();
+    if (tableWrapperRef.value) {
+      tableWrapperRef.value.removeEventListener('scroll', onTableScroll);
+      tableWrapperRef.value.addEventListener('scroll', onTableScroll, { passive: true });
+    }
+  });
+}
+
+watch(editMode, (isEdit) => {
+  if (!isEdit) attachTableListeners();
+});
+
 onMounted(() => {
   if (sessionStorage.getItem('sbw_ps_create_return') === 'progress_sheet_list') {
     sessionStorage.removeItem('sbw_ps_create_return');
     router.visit(route('coordinator.progress_sheet_list.index'));
+  }
+  if (!editMode.value) attachTableListeners();
+  window.addEventListener('resize', computeTableHeight, { passive: true });
+});
+
+onUnmounted(() => {
+  window.removeEventListener('resize', computeTableHeight);
+  if (tableWrapperRef.value) {
+    tableWrapperRef.value.removeEventListener('scroll', onTableScroll);
   }
 });
 
