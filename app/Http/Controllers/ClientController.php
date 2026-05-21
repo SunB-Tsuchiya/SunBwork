@@ -610,7 +610,44 @@ class ClientController extends Controller
                 ? $request->company_id
                 : ($user->company_id ?? null);
             $company = $companyId ? Company::find($companyId) : null;
-            $departmentIds = $request->input('department_ids', []);
+            $departmentIds = array_map('intval', $request->input('department_ids', []));
+
+            // 既存クライアントとの突合（client_code 一致 → 名前正規化一致 の優先順）
+            $existingClients = Client::with('departments:id')
+                ->when($companyId, fn($q) => $q->forCompany($companyId))
+                ->get(['id', 'name', 'client_code']);
+
+            foreach ($csvData as &$row) {
+                $matched = null;
+
+                // 1. client_code による完全一致
+                if (!empty($row['client_code'])) {
+                    $matched = $existingClients->first(
+                        fn($c) => $c->client_code && trim($c->client_code) === $row['client_code']
+                    );
+                }
+
+                // 2. 名前の正規化一致（client_code が未設定または一致なし）
+                if (!$matched && !empty($row['name'])) {
+                    $normalized = $this->normalizeClientName($row['name']);
+                    $matched = $existingClients->first(
+                        fn($c) => $this->normalizeClientName($c->name) === $normalized
+                    );
+                }
+
+                if ($matched) {
+                    $existingDeptIds = $matched->departments->pluck('id')->map(fn($id) => (int)$id)->toArray();
+                    $missingDepts    = array_diff($departmentIds, $existingDeptIds);
+                    $row['matched_client_id']   = $matched->id;
+                    $row['matched_client_name'] = $matched->name;
+                    $row['status']              = empty($missingDepts) ? 'skip' : 'add_dept';
+                } else {
+                    $row['matched_client_id']   = null;
+                    $row['matched_client_name'] = null;
+                    $row['status']              = 'new';
+                }
+            }
+            unset($row);
 
             return Inertia::render('Clients/CsvPreview', [
                 'csvData'        => $csvData,
@@ -647,24 +684,45 @@ class ClientController extends Controller
             : ($user->company_id ?? null);
 
         // department_ids が送られてきた場合はそれを使用、なければユーザーの部署
-        $deptIds = $request->input('department_ids', []);
+        $deptIds = array_map('intval', $request->input('department_ids', []));
         if (empty($deptIds)) {
-            $deptIds = $user->department_id ? [$user->department_id] : [];
+            $deptIds = $user->department_id ? [(int)$user->department_id] : [];
         }
 
+        $newCount    = 0;
+        $mergedCount = 0;
+
         foreach ($request->clients as $row) {
-            $client = Client::create([
-                'name'        => $row['name'],
-                'client_code' => isset($row['client_code']) && $row['client_code'] !== '' ? $row['client_code'] : null,
-                'notes'       => $row['detail'] ?? null,
-                'company_id'  => $companyId,
-            ]);
-            if (!empty($deptIds)) {
-                $client->departments()->attach($deptIds);
+            $matchedId = isset($row['matched_client_id']) ? (int)$row['matched_client_id'] : null;
+
+            if ($matchedId) {
+                // 既存クライアントに部署を追加（重複は自動スキップ）
+                $client = Client::find($matchedId);
+                if ($client && !empty($deptIds)) {
+                    $client->departments()->syncWithoutDetaching($deptIds);
+                    $mergedCount++;
+                }
+            } else {
+                // 新規作成
+                $client = Client::create([
+                    'name'        => $row['name'],
+                    'client_code' => isset($row['client_code']) && $row['client_code'] !== '' ? $row['client_code'] : null,
+                    'notes'       => $row['detail'] ?? null,
+                    'company_id'  => $companyId,
+                ]);
+                if (!empty($deptIds)) {
+                    $client->departments()->attach($deptIds);
+                }
+                $newCount++;
             }
         }
 
+        $messages = [];
+        if ($newCount > 0)    $messages[] = "新規 {$newCount}件を登録";
+        if ($mergedCount > 0) $messages[] = "既存 {$mergedCount}件に部署を追加";
+        $summary = implode('、', $messages) . 'しました。';
+
         $prefix = $this->routePrefix();
-        return redirect()->route("{$prefix}.clients.index")->with('success', count($request->clients) . '件のクライアントを登録しました。');
+        return redirect()->route("{$prefix}.clients.index")->with('success', $summary);
     }
 }

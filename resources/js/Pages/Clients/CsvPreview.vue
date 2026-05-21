@@ -2,6 +2,7 @@
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, useForm } from '@inertiajs/vue3';
+import { computed } from 'vue';
 
 const props = defineProps({
     csvData:        Array,
@@ -13,14 +14,30 @@ const props = defineProps({
     department_ids: { type: Array, default: () => [] },
 });
 
+// skip 行と CSV エラー行を除外して登録対象とする
+const actionRows = props.csvData.filter(row =>
+    row.status !== 'skip' &&
+    !props.errors.some(e => e.includes(`行 ${row.line}:`))
+);
+const skipRows = props.csvData.filter(row => row.status === 'skip');
+const newCount     = computed(() => actionRows.filter(r => r.status === 'new').length);
+const mergeDeptCount = computed(() => actionRows.filter(r => r.status === 'add_dept').length);
+
 const form = useForm({
-    clients:        props.csvData.filter((row, i) => !props.errors.some((e) => e.includes(`行 ${i + 1}:`))),
+    clients:        actionRows,
     company_id:     props.company_id,
     department_ids: props.department_ids,
 });
 
 const submit = () => {
     form.post(route(`${props.prefix}.clients.csv.store`));
+};
+
+const statusBadge = (row) => {
+    if (row.status === 'new')      return { label: '新規登録', cls: 'bg-green-100 text-green-700' };
+    if (row.status === 'add_dept') return { label: '部署追加', cls: 'bg-blue-100 text-blue-700' };
+    if (row.status === 'skip')     return { label: '登録済み', cls: 'bg-gray-100 text-gray-500' };
+    return { label: '新規登録', cls: 'bg-green-100 text-green-700' };
 };
 </script>
 
@@ -40,7 +57,7 @@ const submit = () => {
                 <span class="text-sm text-blue-900">{{ company.name }}</span>
             </div>
 
-            <!-- エラー表示 -->
+            <!-- CSV エラー表示 -->
             <div v-if="hasErrors" class="mb-6 rounded-lg border border-red-200 bg-red-50 p-4">
                 <h3 class="mb-3 text-lg font-medium text-red-800">⚠️ エラーが検出されました</h3>
                 <ul class="space-y-1">
@@ -49,25 +66,56 @@ const submit = () => {
                 <p class="mt-2 text-sm text-red-600">エラーのある行は登録されません。</p>
             </div>
 
+            <!-- 処理サマリー -->
+            <div class="mb-4 flex flex-wrap gap-3 text-sm">
+                <span v-if="newCount > 0" class="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1 font-medium text-green-700">
+                    🆕 新規登録 {{ newCount }}件
+                </span>
+                <span v-if="mergeDeptCount > 0" class="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-3 py-1 font-medium text-blue-700">
+                    ➕ 部署追加（既存） {{ mergeDeptCount }}件
+                </span>
+                <span v-if="skipRows.length > 0" class="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 font-medium text-gray-500">
+                    ✅ 登録済みスキップ {{ skipRows.length }}件
+                </span>
+            </div>
+
             <!-- プレビューテーブル -->
             <div class="mb-6">
-                <h3 class="mb-3 text-lg font-medium text-gray-900">登録内容プレビュー（{{ form.clients.length }}件）</h3>
+                <h3 class="mb-3 text-lg font-medium text-gray-900">登録内容プレビュー（全 {{ csvData.length }}行）</h3>
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">行</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">クライアント名</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Client ID</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">詳細</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">行</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">アクション</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">クライアント名</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Client ID</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">詳細</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-200 bg-white">
-                            <tr v-for="row in form.clients" :key="row.line" class="hover:bg-gray-50">
-                                <td class="px-4 py-2 text-sm text-gray-500">{{ row.line }}</td>
-                                <td class="px-4 py-2 text-sm font-medium text-gray-900">{{ row.name }}</td>
-                                <td class="px-4 py-2 font-mono text-sm text-gray-600">{{ row.client_code || '-' }}</td>
-                                <td class="px-4 py-2 text-sm text-gray-600">{{ row.detail || '-' }}</td>
+                            <tr
+                                v-for="row in csvData"
+                                :key="row.line"
+                                class="hover:bg-gray-50"
+                                :class="{ 'opacity-50': row.status === 'skip' }"
+                            >
+                                <td class="px-3 py-2 text-sm text-gray-500">{{ row.line }}</td>
+                                <td class="px-3 py-2 text-sm">
+                                    <span
+                                        class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+                                        :class="statusBadge(row).cls"
+                                    >{{ statusBadge(row).label }}</span>
+                                    <div v-if="row.status === 'add_dept'" class="mt-0.5 text-xs text-gray-400">
+                                        既存: {{ row.matched_client_name }}
+                                    </div>
+                                    <div v-if="row.status === 'skip'" class="mt-0.5 text-xs text-gray-400">
+                                        登録済み: {{ row.matched_client_name }}
+                                    </div>
+                                </td>
+                                <td class="px-3 py-2 text-sm font-medium text-gray-900">{{ row.name }}</td>
+                                <td class="px-3 py-2 font-mono text-sm text-gray-600">{{ row.client_code || '-' }}</td>
+                                <td class="px-3 py-2 text-sm text-gray-600">{{ row.detail || '-' }}</td>
                             </tr>
                         </tbody>
                     </table>
@@ -90,8 +138,9 @@ const submit = () => {
                     @click="submit"
                 >
                     <span v-if="form.processing">登録中...</span>
-                    <span v-else>✅ {{ form.clients.length }}件を登録する</span>
+                    <span v-else>✅ {{ form.clients.length }}件を実行する</span>
                 </PrimaryButton>
+                <p v-else class="text-sm text-gray-500">実行する処理がありません（全行スキップ）</p>
             </div>
         </div>
     </AppLayout>
