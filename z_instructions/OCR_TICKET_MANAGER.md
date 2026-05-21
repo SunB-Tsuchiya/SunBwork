@@ -495,15 +495,28 @@ async function triggerOcr(file) {
 
 | タスク | ステータス | 完了日 |
 |--------|------------|--------|
-| OCR-01: DBマイグレーション（client_id追加） | 未着手 | - |
-| OCR-02: Pythonスクリプト作成 | 未着手 | - |
-| OCR-03: TicketOcrService 作成 | 未着手 | - |
-| OCR-04: TicketOcrController 作成 | 未着手 | - |
-| OCR-05: ルート追加 | 未着手 | - |
-| OCR-06: OcrModal.vue 作成 | 未着手 | - |
-| OCR-07: Create.vue 修正（OCRトリガー） | 未着手 | - |
-| OCR-08: TicketController 修正（client_id保存） | 未着手 | - |
-| OCR-09: さくらサーバーセットアップ手順 | 未着手 | - |
+| OCR-01: DBマイグレーション（client_id追加） | ✅ 完了 | 2026-05-09 |
+| OCR-02: Pythonスクリプト作成 | ⚠ 変更（Tesseract PHP実装に変更） | 2026-05-09 |
+| OCR-03: TicketOcrService 作成 | ✅ 完了（OcrSpaceService + LocalTesseractService） | 2026-05-09 |
+| OCR-04: TicketOcrController 作成 | ✅ 完了 | 2026-05-09 |
+| OCR-05: ルート追加 | ✅ 完了 | 2026-05-09 |
+| OCR-06: OcrModal.vue 作成 | ✅ 完了 | 2026-05-09 |
+| OCR-07: Create.vue 修正（OCRトリガー） | ✅ 完了 | 2026-05-09 |
+| OCR-08: TicketController 修正（client_id保存） | ✅ 完了 | 2026-05-09 |
+| OCR-09: さくらサーバーセットアップ手順 | ✅ 完了（CONSOLIDATED_10 に記録） | 2026-05-09 |
+| OCR-10: client_code 照合機能追加 | ✅ 完了 | 2026-05-21 |
+| OCR-11: 得意先コード専用クロップ（eng言語）追加 | ✅ 完了 | 2026-05-21 |
+
+---
+
+## ■ 変更ログ
+
+### 2026-05-21: client_code 照合 + 数字認識精度向上
+
+- `OcrSpaceService`: `parseClientCode()` / `searchClientByCode()` 追加。`analyze()` でコードファースト検索を採用
+- `LocalTesseractService`: `REGION_CLIENT_CODE = [0.380, 0.088, 0.570, 0.128]` を追加し、`eng` + `psm=7` で得意先コード専用OCRを実行（3-region化）。4〜6桁にならない場合は `parseClientCode(combinedRaw)` にフォールバック
+- `OcrModal.vue`: 候補リストに `client_code` を表示
+- 詳細: `CONSOLIDATED_10_ocr_local_tesseract.md` セクション 9 を参照
 
 ---
 

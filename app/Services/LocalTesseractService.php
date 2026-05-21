@@ -26,11 +26,16 @@ use Illuminate\Support\Facades\Storage;
 class LocalTesseractService extends OcrSpaceService
 {
     // 受注番号値エリア（数字専用）
-    private const REGION_JOBCODE  = [0.080, 0.088, 0.280, 0.128];
+    private const REGION_JOBCODE     = [0.080, 0.088, 0.280, 0.128];
+
+    // 得意先コードエリア（4〜6桁の数字）
+    // REGION_JOBCODE の右隣：得意先 label(x≈28-38%) の直後がコード領域
+    // eng 言語 + psm=7（1行）で数字認識精度を最大化
+    private const REGION_CLIENT_CODE = [0.380, 0.088, 0.570, 0.128];
 
     // row1 + row2 全幅（クライアント名・品名テキスト取得用）
     // 0.900 まで広げて得意先エリアをカバー（0.660 だと「文化工房」が取れない）
-    private const REGION_COMBINED = [0.003, 0.088, 0.900, 0.170];
+    private const REGION_COMBINED    = [0.003, 0.088, 0.900, 0.170];
 
     public function analyze(string $storagePath): array
     {
@@ -60,16 +65,19 @@ class LocalTesseractService extends OcrSpaceService
             $h = $imagick->getImageHeight();
 
             // 受注番号: 数字エリア（jpn+eng で数字誤読を防ぐ）
-            $jobcodeRaw  = $this->cropAndOcr($imagick, $w, $h, self::REGION_JOBCODE,  $binary, 7, 'jpn+eng');
+            $jobcodeRaw    = $this->cropAndOcr($imagick, $w, $h, self::REGION_JOBCODE,      $binary, 7, 'jpn+eng');
+            // 得意先コード: 専用クロップ（eng+psm=7）で数字認識精度を最大化
+            $clientCodeRaw = $this->cropAndOcr($imagick, $w, $h, self::REGION_CLIENT_CODE,  $binary, 7, 'eng');
             // row1+row2 全体: クライアント名・品名を同時取得（jpn 専用で日本語認識精度を上げる）
-            $combinedRaw = $this->cropAndOcr($imagick, $w, $h, self::REGION_COMBINED, $binary, 6, 'jpn');
+            $combinedRaw   = $this->cropAndOcr($imagick, $w, $h, self::REGION_COMBINED,     $binary, 6, 'jpn');
 
             $imagick->clear();
             $imagick->destroy();
 
-            Log::info('LocalTesseractService: raw OCR (2-region)', [
-                'jobcode_raw'  => $jobcodeRaw,
-                'combined_raw' => $combinedRaw,
+            Log::info('LocalTesseractService: raw OCR (3-region)', [
+                'jobcode_raw'       => $jobcodeRaw,
+                'client_code_raw'   => $clientCodeRaw,
+                'combined_raw'      => $combinedRaw,
             ]);
 
             // 受注番号: 数字のみ抽出
@@ -78,20 +86,35 @@ class LocalTesseractService extends OcrSpaceService
                 $jobcode = $this->parseJobcode($jobcodeRaw);
             }
 
+            // 得意先コード: 専用クロップ結果から数字のみ抽出
+            $clientCode = preg_replace('/[^0-9]/', '', $clientCodeRaw);
+            // 4〜6桁でなければ combined テキストからのパースにフォールバック
+            if (!preg_match('/^\d{4,6}$/', $clientCode)) {
+                $clientCode = $this->parseClientCode($combinedRaw);
+            }
+
             // クライアント名: jobcode行から数字除外 → クリーニング
             $clientName = $this->parseClientNameTesseract($combinedRaw);
 
             // 品名: 「品名」ラベル以降を抽出 → クリーニング
             $title = $this->cleanTitle($this->parseTitleTesseract($combinedRaw));
 
-            // DB検索: まず全体で、ヒットしなければ先頭を1〜3文字削って再検索
-            $matchedClients = $this->searchClientsSliding($clientName);
+            // DB検索: まず client_code で完全一致、ヒットしなければ名前で検索
+            $matchedClients = [];
+            if ($clientCode !== '') {
+                $matchedClients = $this->searchClientByCode($clientCode);
+            }
+            if (empty($matchedClients)) {
+                $matchedClients = $this->searchClientsSliding($clientName);
+            }
 
             Log::info('LocalTesseractService: OCR parsed', [
                 'jobcode'     => $jobcode,
+                'client_code' => $clientCode,
                 'client_name' => $clientName,
                 'title'       => mb_substr($title, 0, 50),
                 'db_hits'     => count($matchedClients),
+                'code_hit'    => !empty($matchedClients) && $clientCode !== '',
             ]);
 
             return [

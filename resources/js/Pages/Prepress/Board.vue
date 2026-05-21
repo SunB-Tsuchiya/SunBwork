@@ -60,8 +60,18 @@ const ticketsByStatus = computed(() => {
 
 // ── カラム別 ソート・絞り込み ──────────────────────────────────
 const columnControls = ref(
-    Object.fromEntries(COLUMNS.map(c => [c.key, { order: 'asc', dateFilter: '', dateRaw: '' }]))
+    Object.fromEntries(COLUMNS.map(c => {
+        const savedField = localStorage.getItem(`prepress_board_date_field_${c.key}`) ?? 'submission_date';
+        return [c.key, { order: 'asc', dateFilter: '', dateRaw: '', dateField: savedField }];
+    }))
 );
+
+function setDateField(colKey, field) {
+    columnControls.value[colKey].dateField = field;
+    columnControls.value[colKey].dateFilter = '';
+    columnControls.value[colKey].dateRaw    = '';
+    localStorage.setItem(`prepress_board_date_field_${colKey}`, field);
+}
 
 function parseToYMD(raw) {
     if (!raw || !raw.trim()) return '';
@@ -115,21 +125,20 @@ function formatShortDate(dateStr) {
 
 function sortedFilteredTickets(colKey) {
     let list = ticketsByStatus.value[colKey] ?? [];
-    const ctrl = columnControls.value[colKey];
+    const ctrl  = columnControls.value[colKey];
+    const field = ctrl.dateField ?? 'submission_date';
 
-    // 日付フィルター（submission_date が一致するもののみ）
     if (ctrl.dateFilter) {
         list = list.filter(t => {
-            const d = t.submission_date ? String(t.submission_date).split('T')[0] : '';
+            const d = t[field] ? String(t[field]).split('T')[0] : '';
             return d === ctrl.dateFilter;
         });
     }
 
-    // submission_date で昇順/降順ソート（未設定は末尾）
     const dir = ctrl.order === 'asc' ? 1 : -1;
     return [...list].sort((a, b) => {
-        const da = a.submission_date ? String(a.submission_date).split('T')[0] : '9999-99-99';
-        const db = b.submission_date ? String(b.submission_date).split('T')[0] : '9999-99-99';
+        const da = a[field] ? String(a[field]).split('T')[0] : '9999-99-99';
+        const db = b[field] ? String(b[field]).split('T')[0] : '9999-99-99';
         if (da === db) return 0;
         return (da < db ? -1 : 1) * dir;
     });
@@ -635,6 +644,29 @@ const canCreate = computed(() => {
 
                         <!-- ソート・絞り込みコントロール -->
                         <div class="shrink-0 flex flex-wrap items-center gap-2 border-b bg-white/70 px-3 py-1.5">
+                            <!-- 日付フィールド選択 -->
+                            <div class="flex items-center gap-2 text-xs text-gray-700">
+                                <label class="flex items-center gap-0.5 cursor-pointer select-none">
+                                    <input
+                                        type="radio"
+                                        :name="`date_field_${col.key}`"
+                                        value="submission_date"
+                                        :checked="columnControls[col.key].dateField === 'submission_date'"
+                                        class="accent-teal-600"
+                                        @change="setDateField(col.key, 'submission_date')"
+                                    />入稿日
+                                </label>
+                                <label class="flex items-center gap-0.5 cursor-pointer select-none">
+                                    <input
+                                        type="radio"
+                                        :name="`date_field_${col.key}`"
+                                        value="sb_delivery_date"
+                                        :checked="columnControls[col.key].dateField === 'sb_delivery_date'"
+                                        class="accent-teal-600"
+                                        @change="setDateField(col.key, 'sb_delivery_date')"
+                                    />下版日
+                                </label>
+                            </div>
                             <div class="flex gap-1">
                                 <button
                                     type="button"

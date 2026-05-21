@@ -261,11 +261,15 @@ PDF 内部は DCTDecode（JPEG）埋め込み、2482×3510px、DeviceRGB。
 
 ```php
 // 受注番号エリア（数字専用・狭め）
-private const REGION_JOBCODE  = [0.080, 0.088, 0.280, 0.128];
+private const REGION_JOBCODE     = [0.080, 0.088, 0.280, 0.128];
 
-// row1+row2 全幅（得意先・品名を同時取得）
+// 得意先コードエリア（4〜6桁の数字）
+// 得意先 label(x≈28-38%) の直後 → eng 言語 + psm=7（1行）で数字誤読を最小化
+private const REGION_CLIENT_CODE = [0.380, 0.088, 0.570, 0.128];
+
+// row1+row2 全幅（得意先名・品名を同時取得）
 // x=0.900 まで広げないと「文化工房」が取れない（0.660 だと欠ける）
-private const REGION_COMBINED = [0.003, 0.088, 0.900, 0.170];
+private const REGION_COMBINED    = [0.003, 0.088, 0.900, 0.170];
 ```
 
 **3-region（REGION_CLIENT / REGION_TITLE 個別クロップ）は廃止。**
@@ -411,3 +415,57 @@ step 4 で `ーー` 以降をすべて削除することで正しい品名が得
 | REGION_COMBINED x=0.003-0.660 | 「文化工房」が取れない | 得意先エリアが x≈50-75% にあるため幅不足 |
 | fallback でjobcode行以降の全行を結合 | 品名が「了、。押当者」になる | 行間ノイズ行の「ーー」で cleanTitle が切断 |
 | `parseTitleTesseract` fallback: CJK文字最多行を採用 | 正常取得 ✅ | 現在の実装 |
+
+---
+
+## 9. 変更ログ
+
+### 2026-05-21: 得意先コード（client_code）DB照合機能追加
+
+**背景:**
+- `clients` テーブルに `client_code`（ユーザー定義のユニーク識別子）カラムを追加（別タスク）
+- 伝票の「得意先」欄横の数字（4〜6桁）が `client_code` に対応すると判明
+- 従来はクライアント名（日本語 OCR）のみで DB 照合していたため、誤読による不一致が多かった
+
+**変更内容:**
+
+#### `LocalTesseractService.php`
+
+| 変更 | 内容 |
+|---|---|
+| 定数追加 | `REGION_CLIENT_CODE = [0.380, 0.088, 0.570, 0.128]` — 得意先コード専用クロップ領域 |
+| OCR 追加 | `cropAndOcr()` を `eng` 言語 + `psm=7`（1行モード）で実行 → 数字認識精度を最大化 |
+| 数字抽出 | `preg_replace('/[^0-9]/', '', ...)` で数字のみ抽出 |
+| フォールバック | 4〜6桁にならない場合 → `parseClientCode($combinedRaw)` で combined テキストから抽出 |
+| DB 検索順序 | ① `client_code` で完全一致 → ② ヒットなしなら `searchClientsSliding($clientName)` |
+| ログ | `client_code_raw`・`code_hit` をログに追加 |
+| OCR リージョン数 | 2-region（jobcode + combined）→ **3-region**（jobcode + client_code + combined）に拡張 |
+
+#### `OcrSpaceService.php`（基底クラス）
+
+| 変更 | 内容 |
+|---|---|
+| メソッド追加 | `parseClientCode(string $text): string` — OCR テキストから得意先コードを抽出 |
+| メソッド追加 | `searchClientByCode(string $code): array` — `client_code` カラムで完全一致検索 |
+| `searchClients()` 修正 | SELECT フィールドに `client_code` を追加（OCR モーダルでの表示用） |
+| `analyze()` 修正 | コードファースト検索を採用（`client_code` → 名前の順） |
+
+#### `OcrModal.vue`
+
+| 変更 | 内容 |
+|---|---|
+| 候補リスト | `ID: {{ c.id }}` → `client_code` が存在する場合は `client_code` を表示 |
+
+**`parseClientCode()` の動作:**
+1. 優先: 「得意[　\s]先」を含む行に 4〜6 桁の数字があれば採用（LocalTesseractService の combined_raw 形式に対応）
+2. フォールバック: jobcode 行（7 桁以上）以外で最初に現れる 4〜6 桁の独立数字を採用（OcrSpaceService の列読み取り形式に対応）
+
+**REGION_CLIENT_CODE の座標根拠:**
+- REGION_JOBCODE が x=0.080〜0.280（受注番号値）
+- 得意先 label は x≈0.280〜0.380
+- 得意先コード（4〜6桁）は x≈0.380〜0.570 と推定
+- 実際の伝票でズレが生じた場合は `REGION_CLIENT_CODE` の x1/x2 を調整すること
+
+**注意:**
+- `eng` 言語 + `psm=7` は純粋な数字列の認識に最適（`jpn` は数字の誤読が多い）
+- `REGION_CLIENT_CODE` がクライアント名エリアに重なると名前の一部が取れてしまうため、x2 を広げすぎないこと（目安: x2 ≤ 0.600）

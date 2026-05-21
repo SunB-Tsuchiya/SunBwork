@@ -350,7 +350,10 @@ const clientStatus = computed(() => {
                                         @click="selectMatched(idx)"
                                     >
                                         <span class="font-medium">{{ c.name }}</span>
-                                        <span class="text-xs text-gray-400">ID: {{ c.id }}<span v-if="c.is_dormant" class="ml-1 text-red-500">休眠中</span></span>
+                                        <span class="text-xs text-gray-400">
+                                            <span v-if="c.client_code" class="font-mono mr-1">{{ c.client_code }}</span>
+                                            <span v-if="c.is_dormant" class="text-red-500">休眠中</span>
+                                        </span>
                                     </button>
                                 </div>
                                 <p class="text-xs text-gray-400">一致するものがない場合 ↓</p>

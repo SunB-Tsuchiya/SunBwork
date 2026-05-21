@@ -100,13 +100,23 @@ class OcrSpaceService
             $jobcode    = $this->parseJobcode($rawText);
             $clientName = $this->parseClientName($rawText);
             $title      = $this->parseTitle($rawText);
+            $clientCode = $this->parseClientCode($rawText);
 
-            $matchedClients = $this->searchClients($clientName);
+            // DB検索: まず client_code で完全一致、ヒットしなければ名前で検索
+            $matchedClients = [];
+            if ($clientCode !== '') {
+                $matchedClients = $this->searchClientByCode($clientCode);
+            }
+            if (empty($matchedClients)) {
+                $matchedClients = $this->searchClients($clientName);
+            }
 
             Log::info('OcrSpaceService: OCR completed', [
                 'jobcode'     => $jobcode,
+                'client_code' => $clientCode,
                 'client_name' => $clientName,
                 'title'       => mb_substr($title, 0, 50),
+                'code_hit'    => !empty($matchedClients) && $clientCode !== '',
             ]);
 
             return [
@@ -310,6 +320,53 @@ class OcrSpaceService
     }
 
     /**
+     * OCR テキストから得意先コード（4〜6桁の数字）を抽出する。
+     *
+     * 検索戦略:
+     *   1. 「得意先」を含む行に4〜6桁の数字があればそれを採用
+     *   2. フォールバック: jobcode行（7桁以上）以外で最初に現れる4〜6桁の独立数字
+     */
+    protected function parseClientCode(string $text): string
+    {
+        $lines = array_values(array_filter(
+            array_map('trim', preg_split('/\r\n|\r|\n/', $text)),
+            fn($l) => $l !== ''
+        ));
+
+        // 優先: 「得意[　\s]先」を含む行から4〜6桁の数字を抽出
+        foreach ($lines as $line) {
+            if (preg_match('/得意\s*先/u', $line) && preg_match('/(?<!\d)(\d{4,6})(?!\d)/', $line, $m)) {
+                return $m[1];
+            }
+        }
+
+        // フォールバック: jobcode行（7桁以上）以外で最初に現れる4〜6桁の独立数字
+        foreach ($lines as $line) {
+            if (preg_match('/\d{7,}/', $line)) continue;
+            if (preg_match('/(?<!\d)(\d{4,6})(?!\d)/', $line, $m)) {
+                return $m[1];
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * client_code カラムで完全一致検索。
+     * ヒットした場合は1件の配列を返す。ヒットなしは空配列。
+     */
+    protected function searchClientByCode(string $code): array
+    {
+        $code = trim($code);
+        if (strlen($code) < 4) {
+            return [];
+        }
+        $client = Client::where('client_code', $code)
+            ->first(['id', 'name', 'client_code', 'is_dormant']);
+        return $client ? [$client->toArray()] : [];
+    }
+
+    /**
      * クライアント名でDB部分一致検索（最大10件）。
      *
      * 検索戦略（3段階）:
@@ -333,7 +390,7 @@ class OcrSpaceService
         $step1 = Client::where('name', 'like', '%' . $name . '%')
             ->orderBy('name')
             ->limit(10)
-            ->get(['id', 'name', 'is_dormant']);
+            ->get(['id', 'name', 'client_code', 'is_dormant']);
 
         foreach ($step1 as $c) {
             if (!in_array($c->id, $ids, true)) {
@@ -349,7 +406,7 @@ class OcrSpaceService
             $step2 = Client::where('name', 'like', '%' . $normalized . '%')
                 ->orderBy('name')
                 ->limit(10)
-                ->get(['id', 'name', 'is_dormant']);
+                ->get(['id', 'name', 'client_code', 'is_dormant']);
 
             foreach ($step2 as $c) {
                 if (!in_array($c->id, $ids, true)) {
@@ -370,7 +427,7 @@ class OcrSpaceService
             foreach ($keywords as $kw) {
                 $query->where('name', 'like', '%' . $kw . '%');
             }
-            $step3 = $query->orderBy('name')->limit(10)->get(['id', 'name', 'is_dormant']);
+            $step3 = $query->orderBy('name')->limit(10)->get(['id', 'name', 'client_code', 'is_dormant']);
 
             foreach ($step3 as $c) {
                 if (!in_array($c->id, $ids, true)) {

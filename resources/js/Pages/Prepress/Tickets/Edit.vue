@@ -186,7 +186,7 @@ function removeImage() {
 
 // ── 送信 ─────────────────────────────────────────────
 function submit() {
-    form.post(route('prepress.tickets.update', { ticket: props.ticket.id }), {
+    form.patch(route('prepress.tickets.update', { ticket: props.ticket.id }), {
         forceFormData: true,
         preserveScroll: true,
     });

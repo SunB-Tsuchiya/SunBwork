@@ -31,7 +31,7 @@
             <button
               type="button"
               class="rounded bg-green-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-green-700"
-              @click="saveAndExitEditMode"
+              @click="saveColumnConfig"
             >
               保存して終了
             </button>
@@ -47,9 +47,19 @@
             v-else
             type="button"
             class="rounded bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
-            @click="editMode = true"
+            @click="startEditMode"
           >
             編集モード
+          </button>
+
+          <!-- 作業時間表示トグル -->
+          <button
+            v-if="!editMode && workerLeafCols.length > 0"
+            type="button"
+            :class="['rounded px-3 py-1.5 text-sm font-medium', showWorkingHoursPanel ? 'bg-blue-600 text-white hover:bg-blue-700' : 'border border-gray-300 bg-white text-gray-600 hover:bg-gray-50']"
+            @click="showWorkingHoursPanel = !showWorkingHoursPanel"
+          >
+            作業時間
           </button>
 
           <!-- テンプレートとして登録 -->
@@ -391,9 +401,7 @@
       </div>
       <div
         v-else
-        ref="tableWrapRef"
-        class="overflow-auto rounded bg-white shadow px-4 py-2"
-        :style="{ height: tableHeight, minHeight: '200px', width: '100vw', marginLeft: 'calc(-50vw + 50%)' }"
+        class="overflow-x-auto rounded bg-white shadow px-4 py-2"
       >
         <ProgressTable
           :rows="localRows"
@@ -428,7 +436,7 @@
       </div>
 
       <!-- 作業時間集計サマリー -->
-      <div v-if="!editMode && workerLeafCols.length > 0" class="mt-3 overflow-auto rounded border border-gray-200 bg-white px-4 py-3 shadow">
+      <div v-if="!editMode && workerLeafCols.length > 0 && showWorkingHoursPanel" class="mt-3 overflow-auto rounded border border-gray-200 bg-white px-4 py-3 shadow">
         <div class="mb-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500">作業時間集計</div>
         <table class="border-collapse text-xs">
           <thead>
@@ -823,48 +831,10 @@ const props = defineProps({
 
 const authUserId = computed(() => usePage().props.auth?.user?.id ?? null);
 
-// ── テーブルコンテナの動的高さ計算 ──────────────────────────
-const tableWrapRef = ref(null);
-const tableHeight = ref('calc(100vh - 350px)');
-
-function calcTableHeight() {
-  if (!tableWrapRef.value) return;
-  const top = tableWrapRef.value.getBoundingClientRect().top;
-  tableHeight.value = `${window.innerHeight - top - 4}px`;
-}
-
-onMounted(() => {
-  calcTableHeight();
-  window.addEventListener('resize', calcTableHeight);
-  document.body.style.overflowX = 'hidden';
-
-  // 進行表一覧の「新規作成」フローで作成された場合、一覧へリダイレクト
-  if (sessionStorage.getItem('sbw_ps_create_return') === 'progress_sheet_list') {
-    sessionStorage.removeItem('sbw_ps_create_return');
-    router.visit(route('coordinator.progress_sheet_list.index'));
-  }
-});
-
-onUnmounted(() => {
-  window.removeEventListener('resize', calcTableHeight);
-  document.body.style.overflowX = '';
-});
-
 // 列が未定義の場合は自動で編集モードを開く
 const editMode = ref(props.canEdit && (props.sheet.column_config?.length ?? 0) === 0);
 const localSheetName = ref(props.sheet.name ?? '');
-
-// 編集モード用：元の値を保存（変更検知用）
-let savedEditModeColumnConfig = null;
-let savedEditModeSheetName = null;
-
-watch(editMode, (newVal) => {
-  if (newVal) {
-    // 編集モード開始時に現在の値を保存
-    savedEditModeColumnConfig = JSON.stringify(localColumnConfig.value);
-    savedEditModeSheetName = localSheetName.value;
-  }
-});
+const showWorkingHoursPanel = ref(false);
 const showRegisterModal = ref(false);
 const showConvertModal      = ref(false);
 const convertPreviewData    = ref(null);
@@ -890,6 +860,13 @@ const pendingNewRow = ref(null); // null | { label: string, after_id: number | n
 const jobLinkModal = ref({ open: false, isSelfAssign: true, isSubcontractor: false, rowId: null, colKey: null });
 const jobLinkForm = ref({ title: '', detail: '', desiredEndDate: '', assigneeUserId: null, assigneeSubcontractorId: null });
 const jobLinkDetailModal = ref({ open: false, title: '', assigneeName: '', endDate: '', completed: false, assignmentId: null, completing: false, unlinking: false, rowId: null, colKey: null, isSubcontractor: false });
+
+onMounted(() => {
+  if (sessionStorage.getItem('sbw_ps_create_return') === 'progress_sheet_list') {
+    sessionStorage.removeItem('sbw_ps_create_return');
+    router.visit(route('coordinator.progress_sheet_list.index'));
+  }
+});
 
 /** 列ツリーをたどってキーまでのラベルパスを返す */
 function findBreadcrumb(nodes, key, path = []) {
@@ -1493,33 +1470,31 @@ function onColumnChange(updated) {
   localColumnConfig.value = updated.slice();
 }
 
-function saveColumnConfig() {
-  if (pendingNewRow.value?.label?.trim()) {
-    showToast('未確定の行ラベルがあります。Enter で確定してから保存してください。', 'warning', 4000);
-    return;
-  }
-  cancelPendingRow();
-  router.put(
-    route('coordinator.progress_sheets.update', { sheet: props.sheet.id }),
-    { name: localSheetName.value, column_config: localColumnConfig.value },
-    {
-      preserveScroll: true,
-      onSuccess: (page) => {
-        syncRowsFromPage(page);
-        savedEditModeColumnConfig = JSON.stringify(localColumnConfig.value);
-        savedEditModeSheetName = localSheetName.value;
-      },
+let editModeSnapshot = null;
+
+function startEditMode() {
+  editModeSnapshot = {
+    columnConfig: JSON.stringify(localColumnConfig.value),
+    sheetName: localSheetName.value,
+  };
+  editMode.value = true;
+}
+
+function exitEditModeWithoutSave() {
+  if (editModeSnapshot) {
+    const configChanged = JSON.stringify(localColumnConfig.value) !== editModeSnapshot.columnConfig;
+    const nameChanged = localSheetName.value !== editModeSnapshot.sheetName;
+    if ((configChanged || nameChanged) && !confirm('変更内容が保存されていません。破棄して戻りますか？')) {
+      return;
     }
-  );
+    localColumnConfig.value = JSON.parse(editModeSnapshot.columnConfig);
+    localSheetName.value = editModeSnapshot.sheetName;
+    editModeSnapshot = null;
+  }
+  editMode.value = false;
 }
 
-function hasChangesInEditMode() {
-  const columnConfigChanged = JSON.stringify(localColumnConfig.value) !== savedEditModeColumnConfig;
-  const sheetNameChanged = localSheetName.value !== savedEditModeSheetName;
-  return columnConfigChanged || sheetNameChanged;
-}
-
-function saveAndExitEditMode() {
+function saveColumnConfig() {
   if (pendingNewRow.value?.label?.trim()) {
     showToast('未確定の行ラベルがあります。Enter で確定してから保存してください。', 'warning', 4000);
     return;
@@ -1536,18 +1511,6 @@ function saveAndExitEditMode() {
       },
     }
   );
-}
-
-function exitEditModeWithoutSave() {
-  if (hasChangesInEditMode()) {
-    if (!confirm('変更内容が保存されていません。破棄して戻りますか？')) {
-      return;
-    }
-  }
-  // 元の値に戻す
-  localColumnConfig.value = JSON.parse(savedEditModeColumnConfig);
-  localSheetName.value = savedEditModeSheetName;
-  editMode.value = false;
 }
 
 // ── V2 変換（既存 user/proof_user+joblink ペア → worker/proof_user 型） ──────────────────

@@ -46,12 +46,51 @@ const viewModes = [
 ];
 
 // ── 日付モード専用: ソート・絞込 ─────────────────
-const sortDir          = ref('asc');  // 'asc' | 'desc'
-const dateFilterNative = ref('');     // YYYY-MM-DD（ネイティブ input[type=date] の値）
+const sortDir    = ref('asc');  // 'asc' | 'desc'
+const dateRaw    = ref('');     // MM/DD テキスト入力
+const dateFilter = ref('');     // YYYY-MM-DD（フィルター適用値）
 
-const dateFilterFormatted = computed(() =>
-    dateFilterNative.value ? dateFilterNative.value.replace(/-/g, '/') : ''
-);
+function parseToYMD(raw) {
+    if (!raw || !raw.trim()) return '';
+    const cleaned = raw.trim().replace(/[^0-9/]/g, '');
+    let month, day;
+    if (cleaned.includes('/')) {
+        const [m, d] = cleaned.split('/');
+        month = parseInt(m, 10);
+        day   = parseInt(d, 10);
+    } else {
+        if (cleaned.length < 3) return '';
+        if (cleaned.length === 3) {
+            month = parseInt(cleaned[0], 10);
+            day   = parseInt(cleaned.slice(1), 10);
+        } else {
+            month = parseInt(cleaned.slice(0, 2), 10);
+            day   = parseInt(cleaned.slice(2, 4), 10);
+        }
+    }
+    if (!month || !day || isNaN(month) || isNaN(day) || month < 1 || month > 12 || day < 1 || day > 31) return '';
+    const now  = new Date();
+    const curM = now.getMonth() + 1;
+    let year   = now.getFullYear();
+    if (curM === 12 && month === 1) year += 1;
+    return `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+}
+
+function applyDateFilter() {
+    dateFilter.value = parseToYMD(dateRaw.value);
+}
+
+function clearDateFilter() {
+    dateFilter.value = '';
+    dateRaw.value    = '';
+}
+
+function onCalendarChange(ymd) {
+    if (!ymd) return;
+    dateFilter.value = ymd;
+    const [, m, d] = ymd.split('-');
+    dateRaw.value = `${parseInt(m,10)}/${parseInt(d,10)}`;
+}
 
 function isDateMode() {
     return viewMode.value === 'submission' || viewMode.value === 'delivery';
@@ -108,8 +147,11 @@ const displayGroups = computed(() => {
         let groups = order.map((k) => map[k]);
 
         // 日付フィルター（特定の日付のみ表示）
-        if (dateFilterFormatted.value) {
-            groups = groups.filter(g => g.key === dateFilterFormatted.value);
+        if (dateFilter.value) {
+            groups = groups.filter(g => {
+                const k = g.key === '__none__' ? '' : String(g.key).split('T')[0].replace(/\//g, '-');
+                return k === dateFilter.value;
+            });
         }
 
         // 昇順 / 降順ソート（未設定は常に末尾）
@@ -528,15 +570,37 @@ const canCreate = computed(() => {
                 <div class="flex items-center gap-1.5">
                     <label class="text-xs text-gray-600 whitespace-nowrap">日付で絞込:</label>
                     <input
-                        v-model="dateFilterNative"
-                        type="date"
-                        class="rounded border border-gray-300 px-2 py-1 text-xs focus:border-green-600 focus:outline-none"
+                        type="text"
+                        v-model="dateRaw"
+                        placeholder="MM/DD"
+                        maxlength="5"
+                        class="w-20 rounded border border-gray-300 px-1.5 py-1 text-xs focus:border-green-600 focus:outline-none"
+                        @change="applyDateFilter"
+                        @keydown.enter.prevent="applyDateFilter"
                     />
+                    <div class="relative">
+                        <button
+                            type="button"
+                            class="rounded border border-gray-300 px-1.5 py-1 text-sm hover:bg-gray-50"
+                            title="カレンダーから選択"
+                        >🗓</button>
+                        <input
+                            type="date"
+                            :value="dateFilter"
+                            class="absolute inset-0 w-full opacity-0 cursor-pointer"
+                            tabindex="-1"
+                            @change="onCalendarChange($event.target.value)"
+                        />
+                    </div>
+                    <span v-if="dateFilter" class="text-xs font-medium text-teal-700">
+                        {{ dateFilter.slice(0,4) }}年
+                    </span>
                     <button
-                        v-if="dateFilterNative"
-                        @click="dateFilterNative = ''"
-                        class="rounded border border-gray-200 px-2 py-1 text-xs text-gray-500 hover:bg-gray-100"
-                    >クリア</button>
+                        v-if="dateFilter || dateRaw"
+                        type="button"
+                        class="rounded bg-gray-200 px-1.5 py-0.5 text-xs text-gray-600 hover:bg-gray-300"
+                        @click="clearDateFilter"
+                    >✕</button>
                 </div>
             </div>
 
@@ -555,16 +619,16 @@ const canCreate = computed(() => {
 
                     <table class="w-full table-fixed border" style="min-width: 580px;">
                         <colgroup>
-                            <col style="width: 100px">
-                            <col style="width: 100px">
+                            <col style="width: 115px">
+                            <col style="width: 115px">
                             <col>
                             <col style="width: 130px">
                             <col style="width: 90px">
                         </colgroup>
                         <thead>
                             <tr class="bg-gray-50">
-                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">入稿日</th>
-                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">下版日</th>
+                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500 whitespace-nowrap">入稿日</th>
+                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500 whitespace-nowrap">下版日</th>
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">案件名</th>
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">クライアント</th>
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">ステータス</th>
@@ -578,8 +642,8 @@ const canCreate = computed(() => {
                                 @click="router.get(route('prepress.tickets.show', { ticket: ticket.id }))"
                                 role="button"
                             >
-                                <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ ticket.submission_date || '—' }}</td>
-                                <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ ticket.sb_delivery_date || '—' }}</td>
+                                <td class="whitespace-nowrap border px-3 py-2 text-sm text-gray-600">{{ ticket.submission_date || '—' }}</td>
+                                <td class="whitespace-nowrap border px-3 py-2 text-sm text-gray-600">{{ ticket.sb_delivery_date || '—' }}</td>
                                 <td class="break-words border px-3 py-2 text-sm font-medium text-gray-800">{{ ticket.title }}</td>
                                 <td class="break-words border px-3 py-2 text-sm text-gray-600">{{ ticket.client_name || '—' }}</td>
                                 <td class="border px-3 py-2">

@@ -387,8 +387,15 @@ class TicketController extends Controller
 
     protected function authorizePrepress($user): void
     {
-        if ($user->isSuperAdmin() || $user->isAdmin()) {
+        if ($user->isSuperAdmin()) {
             return;
+        }
+        if ($user->isAdmin()) {
+            $prepressCompanyId = \App\Models\Department::where('name', '製版')->value('company_id');
+            if (!$prepressCompanyId || $user->company_id == $prepressCompanyId) {
+                return;
+            }
+            abort(403, 'Prepress エリアは同じ会社のAdminのみアクセスできます。');
         }
         if (!$user->department || $user->department->name !== '製版') {
             abort(403, 'Prepress エリアは製版部署のみアクセスできます。');
