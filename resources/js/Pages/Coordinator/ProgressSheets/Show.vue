@@ -24,13 +24,36 @@
 
     <div
       ref="toolbarCardRef"
-      class="rounded bg-white px-4 py-4 sm:px-6 shadow"
+      class="rounded bg-white shadow overflow-hidden"
       :class="editMode ? '' : 'sticky z-10'"
       :style="editMode ? undefined : toolbarStickyStyle"
     >
+      <!-- ── 折りたたみバー（通常モードのみ） ── -->
+      <div v-if="!editMode" class="flex items-center gap-2 border-b border-gray-100 px-4 py-1 sm:px-6">
+        <button
+          type="button"
+          class="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600"
+          @click="toolbarCollapsed = !toolbarCollapsed"
+        >
+          <span>{{ toolbarCollapsed ? '▼' : '▲' }}</span>
+          <span>{{ toolbarCollapsed ? 'ツールバーを開く' : '閉じる' }}</span>
+        </button>
+        <button
+          type="button"
+          class="ml-auto flex items-center gap-1 rounded border border-gray-200 px-2 py-0.5 text-xs text-gray-500 hover:bg-gray-50"
+          title="全画面で表示"
+          @click="fullscreenMode = true"
+        >
+          <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5"/></svg>
+          全画面
+        </button>
+      </div>
+
+      <!-- ── ツールバー本体（折りたたみ対応） ── -->
+      <div v-show="editMode || !toolbarCollapsed" :class="editMode ? 'px-4 py-5 sm:px-6' : 'px-4 py-2 sm:px-6'">
 
       <!-- ── ツールバー ──────────────────────────────── -->
-      <div class="mb-4 flex flex-wrap items-center gap-3">
+      <div class="mb-3 flex flex-wrap items-center gap-3">
         <template v-if="canEdit">
           <template v-if="editMode">
             <button
@@ -397,6 +420,7 @@
         </div>
       </div>
 
+      </div><!-- /ツールバー本体 -->
     </div>
 
     <!-- ── 通常モード：進行管理表テーブル ──────────────── -->
@@ -806,6 +830,66 @@
         </template>
       </div>
     </div>
+
+    <!-- ── 全画面オーバーレイ ──────────────────────────── -->
+    <Teleport to="body">
+      <div v-if="fullscreenMode" class="fixed inset-0 z-[200] flex flex-col bg-white">
+        <!-- ミニヘッダー -->
+        <div class="flex shrink-0 items-center gap-3 border-b border-gray-200 bg-white px-4 py-2 shadow-sm">
+          <span class="font-semibold text-gray-800 truncate">{{ sheet.name }}</span>
+          <!-- 未保存セルがあれば保存ボタン -->
+          <button
+            v-if="pendingCells.length > 0"
+            type="button"
+            class="rounded bg-green-600 px-3 py-1 text-sm font-medium text-white hover:bg-green-700"
+            @click="saveCells"
+          >
+            変更を保存 ({{ pendingCells.length }})
+          </button>
+          <button
+            type="button"
+            class="ml-auto flex items-center gap-1 rounded border border-gray-300 px-3 py-1 text-sm text-gray-600 hover:bg-gray-50"
+            @click="fullscreenMode = false"
+          >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            全画面を終了
+          </button>
+        </div>
+        <!-- テーブル（残り全高さ） -->
+        <div class="overflow-auto flex-1" @scroll.passive="onFsTableScroll">
+          <ProgressTable
+            :rows="localRows"
+            :column-config="localColumnConfig"
+            :cells="localCells"
+            :users="users"
+            :subcontractors="props.subcontractors ?? []"
+            :stages="props.stages"
+            :sizes="props.sizes"
+            :assignments="props.assignments"
+            :work-item-types="props.workItemTypes"
+            :project-schedules="props.projectSchedules"
+            :can-edit="canEdit"
+            :edit-mode="false"
+            :auth-user-id="authUserId"
+            @cell-update="onCellUpdate"
+            @edit-row="onEditRow"
+            @delete-row="deleteRow"
+            @job-link-open="openJobLinkModal"
+            @job-link-detail="openJobLinkDetail"
+            @complete-assignment="onCompleteAssignmentFromCell"
+            @proof-request-open="onProofRequestOpen"
+            @proof-direct-complete="onProofDirectComplete"
+            @worker-complete="onWorkerComplete"
+            @worker-job-register="onWorkerJobRegister"
+            @worker-job-detail="onWorkerJobDetail"
+            @schedlink-complete="onSchedlinkComplete"
+            @note-save="onNoteSave"
+            @proof-request-cancel="onProofRequestCancel"
+            @proof-request-extend-deadline="onProofRequestExtendDeadline"
+          />
+        </div>
+      </div>
+    </Teleport>
   </AppLayout>
 </template>
 
@@ -868,6 +952,25 @@ const pendingNewRow = ref(null); // null | { label: string, after_id: number | n
 const jobLinkModal = ref({ open: false, isSelfAssign: true, isSubcontractor: false, rowId: null, colKey: null });
 const jobLinkForm = ref({ title: '', detail: '', desiredEndDate: '', assigneeUserId: null, assigneeSubcontractorId: null });
 const jobLinkDetailModal = ref({ open: false, title: '', assigneeName: '', endDate: '', completed: false, assignmentId: null, completing: false, unlinking: false, rowId: null, colKey: null, isSubcontractor: false });
+
+// ── ツールバー折りたたみ・全画面 ──────────────────────────────
+const toolbarCollapsed = ref(localStorage.getItem('sbw_ps_toolbar_collapsed') === '1');
+const fullscreenMode = ref(false);
+let fsLastScrollTop = 0;
+
+watch(toolbarCollapsed, (v) => {
+  localStorage.setItem('sbw_ps_toolbar_collapsed', v ? '1' : '0');
+  nextTick(computeTableHeight);
+});
+
+watch(fullscreenMode, (val) => {
+  document.body.style.overflow = val ? 'hidden' : '';
+});
+
+function onFsTableScroll(e) {
+  const st = e.target.scrollTop;
+  fsLastScrollTop = st;
+}
 
 // ── テーブルスクロール・ツールバー自動表示制御 ────────────────
 const toolbarCardRef = ref(null);
@@ -936,6 +1039,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', computeTableHeight);
+  document.body.style.overflow = '';
   if (tableWrapperRef.value) {
     tableWrapperRef.value.removeEventListener('scroll', onTableScroll);
   }
