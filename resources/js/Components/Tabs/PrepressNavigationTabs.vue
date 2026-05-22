@@ -19,9 +19,10 @@ function tryRoute(name) {
 }
 
 const tabs = computed(() => [
-    { key: 'dashboard', href: tryRoute('prepress.dashboard'), label: 'ダッシュボード' },
-    { key: 'board', href: tryRoute('prepress.board'), label: '伝票ボード' },
-    { key: 'tickets', href: tryRoute('prepress.tickets.index'), label: '伝票一覧' },
+    { key: 'dashboard',  href: tryRoute('prepress.dashboard'),        label: 'ダッシュボード' },
+    { key: 'board',      href: tryRoute('prepress.board'),            label: '伝票ボード' },
+    { key: 'tickets',    href: tryRoute('prepress.tickets.index'),    label: '伝票一覧' },
+    { key: 'sales_reps', href: tryRoute('prepress.sales_reps.index'), label: '営業担当管理' },
 ].filter(t => t.href));
 
 function onMobileSelect(e) {
@@ -58,6 +59,9 @@ function onMobileSelect(e) {
             </Link>
             <Link :href="route('prepress.tickets.index')" :class="tab('tickets')">
                 伝票一覧
+            </Link>
+            <Link :href="route('prepress.sales_reps.index')" :class="tab('sales_reps')">
+                営業担当管理
             </Link>
         </nav>
     </div>

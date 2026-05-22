@@ -17,21 +17,78 @@ const ROLE_DASHBOARD_ROUTES = {
     prepress:         'prepress.dashboard',
 };
 
-// 403/404 ページが表示されたとき、localStorageの壊れたURLをクリアしてダッシュボードへリダイレクト
-// ただしゴーストモード（coordinatorのテストユーザーモード）の 403 はリダイレクトしない
-router.on('navigate', (event) => {
-    const component = event.detail?.page?.component;
-    if (component !== 'Errors/403' && component !== 'Errors/404') return;
-    const authUser = event.detail?.page?.props?.auth?.user;
+/**
+ * フルURL・相対パス両方に対応してエリアロールを返す。
+ * 例: 'http://localhost:8000/coordinator/clients/16/edit' → 'coordinator'
+ *     '/proof-coordinator/requests/3'                    → 'proof_coordinator'
+ * 判定できない場合は null（呼び出し側で user_role にフォールバック）
+ */
+function areaFromUrl(url) {
+    if (!url) return null;
+    let pathname;
+    try {
+        // new URL() はフルURL・相対パスどちらも pathname に正規化してくれる
+        pathname = new URL(url, window.location.origin).pathname;
+    } catch {
+        pathname = url;
+    }
+    // 本番の basePath (/members など) を除去してから比較
+    const basePath = (import.meta.env.VITE_APP_BASE_PATH || '').replace(/\/$/, '');
+    if (basePath) pathname = pathname.replace(new RegExp('^' + basePath), '');
+    pathname = pathname.replace(/^\//, '');
+
+    if (pathname.startsWith('superadmin/') || pathname === 'superadmin') return 'superadmin';
+    if (pathname.startsWith('admin/') || pathname === 'admin') return 'admin';
+    if (pathname.startsWith('leader/') || pathname === 'leader' || pathname.startsWith('workload_setting/')) return 'leader';
+    // ルートプレフィックスは 'proof-coordinator'（ハイフン）だが localStorage キーは 'proof_coordinator'
+    if (pathname.startsWith('proof-coordinator/') || pathname === 'proof-coordinator') return 'proof_coordinator';
+    if (pathname.startsWith('coordinator/') || pathname === 'coordinator') return 'coordinator';
+    if (pathname.startsWith('clerk/') || pathname === 'clerk') return 'clerk';
+    if (pathname.startsWith('prepress/') || pathname === 'prepress') return 'prepress';
+    return null;
+}
+
+/**
+ * 404/403 発生時: localStorage の壊れた URL を削除してエリアの dashboard へ戻す。
+ * failedUrl から発生エリアを特定するため、SuperAdmin が coordinator エリアで踏んでも
+ * coordinator.dashboard へ戻れる。
+ */
+function redirectOnError(failedUrl, authUser) {
     if (authUser?.is_ghost) return;
-    const role = authUser?.user_role || 'user';
-    const routeName = ROLE_DASHBOARD_ROUTES[role] || 'user.dashboard';
-    try { localStorage.removeItem(`lastTab_${role}`); } catch {}
+    // URL プレフィックスで判定 → 取れなければ user_role で判定 → それも無ければ 'user'
+    const area = areaFromUrl(failedUrl) ?? authUser?.user_role ?? 'user';
+    const routeName = ROLE_DASHBOARD_ROUTES[area] || 'user.dashboard';
+    try { localStorage.removeItem(`lastTab_${area}`); } catch {}
     try {
         router.visit(route(routeName));
     } catch {
         router.visit('/');
     }
+}
+
+// Inertia JSON として 403/404 ページが描画されるケース
+router.on('navigate', (event) => {
+    const component = event.detail?.page?.component;
+    if (component !== 'Errors/403' && component !== 'Errors/404') return;
+    const authUser = event.detail?.page?.props?.auth?.user;
+    // page.url はサーバーが返した現在のページURL（リクエストした失敗URL）
+    const failedUrl = event.detail?.page?.url;
+    redirectOnError(failedUrl, authUser);
+});
+
+// サーバーが非 Inertia の HTML 404/403 を返したケース（削除済みリソースへのアクセス等）
+// Inertia はデフォルトで document.write() してSPAを破壊するため preventDefault() で防ぐ
+// axios レスポンスオブジェクトには .url はなく、XHR の responseURL か config.url を使う
+router.on('invalid', (event) => {
+    const status = event.detail?.response?.status;
+    if (status !== 404 && status !== 403) return;
+    event.preventDefault();
+    const res = event.detail?.response;
+    const failedUrl = res?.request?.responseURL   // XHR: 最終URL（フル）
+        ?? res?.config?.url                        // axios config: リクエストURL
+        ?? null;
+    const authUser = router.page?.props?.auth?.user;
+    redirectOnError(failedUrl, authUser);
 });
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';

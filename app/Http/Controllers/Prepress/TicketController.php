@@ -2,18 +2,24 @@
 
 namespace App\Http\Controllers\Prepress;
 
+use App\Http\Controllers\Concerns\NormalizesCsvEncoding;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\Department;
+use App\Models\PrepresSalesRep;
 use App\Models\PrepressTicket;
 use App\Models\ProjectJob;
+use App\Services\PrepressClientMatcher;
 use App\Services\PrepressImageService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class TicketController extends Controller
 {
+    use NormalizesCsvEncoding;
+
     public function __construct(private PrepressImageService $imageService) {}
 
     public function index(Request $request)
@@ -116,10 +122,13 @@ class TicketController extends Controller
             ];
         }
 
+        $salesReps = PrepresSalesRep::orderBy('name')->get(['id', 'name', 'company']);
+
         return inertia('Prepress/Tickets/Create', [
-            'statuses' => PrepressTicket::STATUS_LABELS,
-            'clients'  => $clients,
-            'prefill'  => $prefill,
+            'statuses'  => PrepressTicket::STATUS_LABELS,
+            'clients'   => $clients,
+            'salesReps' => $salesReps,
+            'prefill'   => $prefill,
         ]);
     }
 
@@ -127,7 +136,7 @@ class TicketController extends Controller
     {
         $this->authorizePrepress($request->user());
 
-        $ticket->load('user');
+        $ticket->load('user', 'salesRepEntry:id,name,company');
         $ticket->append('image_url');
 
         return inertia('Prepress/Tickets/Show', [
@@ -140,15 +149,18 @@ class TicketController extends Controller
     {
         $this->authorizePrepress($request->user());
 
-        $ticket->load('user', 'client:id,client_code');
+        $ticket->load('user', 'client:id,client_code', 'salesRepEntry:id,name,company');
         $ticket->append('image_url');
 
         $ticketData = $ticket->toArray();
         $ticketData['client_code'] = $ticket->client?->client_code;
 
+        $salesReps = PrepresSalesRep::orderBy('name')->get(['id', 'name', 'company']);
+
         return inertia('Prepress/Tickets/Edit', [
-            'ticket'   => $ticketData,
-            'statuses' => PrepressTicket::STATUS_LABELS,
+            'ticket'    => $ticketData,
+            'statuses'  => PrepressTicket::STATUS_LABELS,
+            'salesReps' => $salesReps,
         ]);
     }
 
@@ -161,6 +173,8 @@ class TicketController extends Controller
             'jobcode'          => ['nullable', 'string', 'max:100'],
             'client_id'        => ['nullable', 'integer', 'exists:clients,id'],
             'client_name'      => ['nullable', 'string', 'max:255'],
+            'sales_rep'        => ['nullable', 'string', 'max:100'],
+            'sales_rep_id'     => ['nullable', 'integer', 'exists:prepress_sales_reps,id'],
             'memo'             => ['nullable', 'string', 'max:5000'],
             'submission_date'  => ['nullable', 'date_format:Y/m/d'],
             'sb_delivery_date' => ['nullable', 'date_format:Y/m/d'],
@@ -211,6 +225,8 @@ class TicketController extends Controller
             'title'             => $validated['title'],
             'jobcode'           => $validated['jobcode'] ?? null,
             'client_name'       => $clientName,
+            'sales_rep'         => $validated['sales_rep'] ?? null,
+            'sales_rep_id'      => !empty($validated['sales_rep_id']) ? $validated['sales_rep_id'] : null,
             'memo'              => $validated['memo'] ?? null,
             'submission_date'   => $submissionDate,
             'sb_delivery_date'  => $sbDeliveryDate,
@@ -232,6 +248,8 @@ class TicketController extends Controller
             'jobcode'            => ['nullable', 'string', 'max:100'],
             'client_id'          => ['nullable', 'integer', 'exists:clients,id'],
             'client_name'        => ['nullable', 'string', 'max:255'],
+            'sales_rep'          => ['nullable', 'string', 'max:100'],
+            'sales_rep_id'       => ['nullable', 'integer', 'exists:prepress_sales_reps,id'],
             'memo'               => ['nullable', 'string', 'max:5000'],
             'submission_date'    => ['nullable', 'date_format:Y/m/d'],
             'sb_delivery_date'   => ['nullable', 'date_format:Y/m/d'],
@@ -299,6 +317,8 @@ class TicketController extends Controller
             'jobcode'           => $validated['jobcode'] ?? null,
             'project_name'      => null,
             'client_name'       => $clientName,
+            'sales_rep'         => $validated['sales_rep'] ?? null,
+            'sales_rep_id'      => !empty($validated['sales_rep_id']) ? $validated['sales_rep_id'] : null,
             'memo'              => $validated['memo'] ?? null,
             'submission_date'   => $submissionDate,
             'sb_delivery_date'  => $sbDeliveryDate,
@@ -383,6 +403,119 @@ class TicketController extends Controller
 
         return redirect()->route('prepress.tickets.index')
             ->with('success', '伝票を削除しました。');
+    }
+
+    /**
+     * CSV を解析してクライアントマッチング結果を返す（確認画面用）
+     */
+    public function analyzeCsv(Request $request): JsonResponse
+    {
+        $this->authorizePrepress($request->user());
+
+        $request->validate([
+            'csv' => ['required', 'file', 'mimes:csv,txt', 'max:5120'],
+        ]);
+
+        $tmpPath = $this->normalizeCsvToTemp($request->file('csv'));
+        $handle  = fopen($tmpPath, 'r');
+
+        // ヘッダー行をスキップ
+        $header = fgetcsv($handle);
+
+        // 製版部署のクライアント一覧を取得
+        $dept      = Department::where('name', '製版')->first();
+        $dbClients = Client::query()
+            ->when($dept, fn($q) => $q->whereHas('departments', fn($q2) => $q2->where('departments.id', $dept->id)))
+            ->get(['id', 'name', 'client_code']);
+
+        // 営業担当一覧を取得
+        $dbSalesReps = PrepresSalesRep::orderBy('name')->get(['id', 'name', 'company']);
+
+        $rows = [];
+        while (($line = fgetcsv($handle)) !== false) {
+            if (count($line) < 4) continue;
+
+            $jobcode        = PrepressClientMatcher::cleanField($line[1] ?? '');
+            $rawClientName  = PrepressClientMatcher::cleanField($line[2] ?? '');
+            $title          = PrepressClientMatcher::cleanField($line[3] ?? '');
+            $rawSalesRep    = PrepressClientMatcher::cleanField($line[4] ?? '');
+
+            if ($jobcode === '' && $title === '') continue;
+
+            $clientMatch   = PrepressClientMatcher::match($rawClientName, $dbClients);
+            $salesRepMatch = PrepressClientMatcher::matchSalesRep($rawSalesRep, $dbSalesReps);
+
+            $row = [
+                'jobcode'                  => $jobcode,
+                'raw_client_name'          => $rawClientName,
+                'title'                    => $title,
+                'sales_rep'                => $rawSalesRep,
+                'status'                   => $clientMatch['status'],
+                'candidates'               => $clientMatch['candidates'] ?? [],
+                'resolved_client_id'       => isset($clientMatch['client']) ? $clientMatch['client']->id   : null,
+                'resolved_client_name'     => isset($clientMatch['client']) ? $clientMatch['client']->name : null,
+                'sales_rep_status'         => $salesRepMatch['status'],
+                'sales_rep_candidates'     => $salesRepMatch['candidates'] ?? [],
+                'resolved_sales_rep_id'    => isset($salesRepMatch['rep']) ? $salesRepMatch['rep']->id   : null,
+                'resolved_sales_rep_name'  => isset($salesRepMatch['rep']) ? $salesRepMatch['rep']->name : null,
+                'showSearch'               => false,
+                'searchResults'            => [],
+                'showSalesRepSearch'       => false,
+                'salesRepSearchResults'    => [],
+            ];
+
+            $rows[] = $row;
+        }
+
+        fclose($handle);
+        @unlink($tmpPath);
+
+        return response()->json(['rows' => $rows]);
+    }
+
+    /**
+     * 確認済みの CSV データを一括保存する
+     */
+    public function importCsv(Request $request): JsonResponse
+    {
+        $this->authorizePrepress($request->user());
+
+        $request->validate([
+            'rows'                      => ['required', 'array', 'min:1', 'max:500'],
+            'rows.*.jobcode'            => ['nullable', 'string', 'max:100'],
+            'rows.*.title'              => ['required', 'string', 'max:255'],
+            'rows.*.sales_rep'          => ['nullable', 'string', 'max:100'],
+            'rows.*.sales_rep_id'       => ['nullable', 'integer', 'exists:prepress_sales_reps,id'],
+            'rows.*.client_id'          => ['nullable', 'integer', 'exists:clients,id'],
+            'rows.*.client_name'        => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $userId = $request->user()->id;
+        $now    = now();
+
+        $inserts = array_map(function ($row) use ($userId, $now) {
+            $clientName = $row['client_name'] ?? null;
+            if (!empty($row['client_id'])) {
+                $client = Client::find((int) $row['client_id']);
+                if ($client) $clientName = $client->name;
+            }
+            return [
+                'user_id'      => $userId,
+                'jobcode'      => $row['jobcode']     ?: null,
+                'title'        => $row['title'],
+                'sales_rep'    => $row['sales_rep']   ?: null,
+                'sales_rep_id' => !empty($row['sales_rep_id']) ? (int) $row['sales_rep_id'] : null,
+                'client_id'    => !empty($row['client_id']) ? (int) $row['client_id'] : null,
+                'client_name'  => $clientName,
+                'status'       => PrepressTicket::STATUS_PENDING,
+                'created_at'   => $now,
+                'updated_at'   => $now,
+            ];
+        }, $request->input('rows'));
+
+        PrepressTicket::insert($inserts);
+
+        return response()->json(['imported' => count($inserts)]);
     }
 
     protected function authorizePrepress($user): void

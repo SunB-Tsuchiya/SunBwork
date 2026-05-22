@@ -21,11 +21,11 @@
             </template>
 
             <template v-if="currentView === 'calendar'">
-                <button v-if="!props.readonly" @click="() => openEventModal()" class="rounded bg-blue-600 px-4 py-2 text-white">予定作成</button>
+                <button v-if="!props.readonly" @click="openEventModal" class="rounded bg-blue-600 px-4 py-2 text-white">予定作成</button>
                 <button
                     v-if="props.project && !props.readonly"
                     @click="schedulePanelOpen = !schedulePanelOpen"
-                    class="rounded px-4 py-2 font-medium"
+                    class="rounded px-4 py-2 text-sm font-medium"
                     :class="schedulePanelOpen ? 'bg-indigo-700 text-white' : 'bg-indigo-100 text-indigo-800 hover:bg-indigo-200'"
                 >スケジュール</button>
                 <button v-if="!props.readonly && props.showMemoButton" @click="goToDiaryCreate" class="rounded bg-orange-500 px-4 py-2 text-white">メモ作成</button>
@@ -55,51 +55,50 @@
                         @click="togglePanelEditMode"
                     >{{ panelEditMode ? '編集モードを終了' : '編集モード' }}</button>
                     <button v-if="!panelEditMode" type="button"
-                        :class="scheduleShowAll
-                            ? 'rounded border border-orange-500 bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700 hover:bg-orange-100'
-                            : 'rounded border border-gray-400 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50'"
-                        @click="scheduleShowAll = !scheduleShowAll"
-                    >{{ scheduleShowAll ? '折りたたむ' : '全件表示' }}</button>
+                        class="rounded border border-green-600 px-3 py-1 text-xs font-medium text-green-700 hover:bg-green-50"
+                        @click="handleCsvExport"
+                    >CSV出力</button>
+                    <button v-if="!panelEditMode" type="button"
+                        class="rounded border border-indigo-500 px-3 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-50"
+                        @click="openCsvImportModal"
+                    >CSV取込</button>
                 </div>
             </div>
 
             <!-- 閲覧モード -->
             <template v-if="!panelEditMode">
                 <div class="overflow-x-auto">
-                    <div :class="scheduleShowAll ? '' : 'max-h-[220px] overflow-y-auto schedule-scroll'">
-                        <table class="min-w-full border text-sm">
-                            <thead class="sticky top-0 z-10">
-                                <tr class="bg-gray-100">
-                                    <th class="cursor-pointer select-none border px-3 py-1.5 text-left text-xs font-medium text-gray-500 hover:bg-gray-200"
-                                        @click="togglePanelSort('start_date')">開始日 <span class="ml-0.5">{{ panelSortIcon('start_date') }}</span></th>
-                                    <th class="cursor-pointer select-none border px-3 py-1.5 text-left text-xs font-medium text-gray-500 hover:bg-gray-200"
-                                        @click="togglePanelSort('end_date')">終了日 <span class="ml-0.5">{{ panelSortIcon('end_date') }}</span></th>
-                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">タイトル</th>
-                                    <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">内容</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="s in panelSortedSchedules" :key="s.id" class="hover:bg-white">
-                                    <td class="border px-3 py-2 text-gray-700">{{ s.start_date ?? '-' }}</td>
-                                    <td class="border px-3 py-2 text-gray-700">{{ s.end_date ?? '-' }}</td>
-                                    <td class="border px-3 py-2 font-medium text-gray-900">{{ s.name || '-' }}</td>
-                                    <td class="border px-3 py-2 text-gray-600">{{ s.description ? String(s.description).slice(0, 40) : '' }}</td>
-                                </tr>
-                                <tr v-if="!(props.schedules || []).length">
-                                    <td colspan="4" class="border px-3 py-4 text-center text-xs text-gray-400">スケジュール未登録</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                    <table class="min-w-full border text-sm">
+                        <thead>
+                            <tr class="bg-gray-100">
+                                <th class="cursor-pointer select-none border px-3 py-1.5 text-left text-xs font-medium text-gray-500 hover:bg-gray-200"
+                                    @click="togglePanelSort('start_date')">開始日 <span class="ml-0.5">{{ panelSortIcon('start_date') }}</span></th>
+                                <th class="cursor-pointer select-none border px-3 py-1.5 text-left text-xs font-medium text-gray-500 hover:bg-gray-200"
+                                    @click="togglePanelSort('end_date')">終了日 <span class="ml-0.5">{{ panelSortIcon('end_date') }}</span></th>
+                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">タイトル</th>
+                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">内容</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="s in panelSortedSchedules" :key="s.id" class="hover:bg-white">
+                                <td class="border px-3 py-2 text-gray-700">{{ s.start_date ?? '-' }}</td>
+                                <td class="border px-3 py-2 text-gray-700">{{ s.end_date ?? '-' }}</td>
+                                <td class="border px-3 py-2 font-medium text-gray-900">{{ s.name || '-' }}</td>
+                                <td class="border px-3 py-2 text-gray-600">{{ s.description ? String(s.description).slice(0, 40) : '' }}</td>
+                            </tr>
+                            <tr v-if="!(props.schedules || []).length">
+                                <td colspan="4" class="border px-3 py-4 text-center text-xs text-gray-400">スケジュール未登録</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </template>
 
             <!-- 編集モード -->
             <template v-else>
                 <div class="overflow-x-auto">
-                    <div class="max-h-[220px] overflow-y-auto schedule-scroll">
                     <table class="min-w-full border text-sm">
-                        <thead class="sticky top-0 z-10">
+                        <thead>
                             <tr class="bg-gray-100">
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">開始日</th>
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">終了日</th>
@@ -112,7 +111,6 @@
                             <tr v-for="(row, idx) in panelEditRows" :key="row._key" class="bg-white">
                                 <td class="border px-2 py-1.5">
                                     <input type="date" v-model="row.start_date"
-                                        @change="row.end_date = row.end_date || row.start_date"
                                         class="w-36 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none" />
                                 </td>
                                 <td class="border px-2 py-1.5">
@@ -135,19 +133,17 @@
                             </tr>
                         </tbody>
                     </table>
-                    </div>
                 </div>
                 <button type="button"
                     class="mt-2 rounded border border-dashed border-gray-300 px-4 py-1.5 text-xs text-gray-500 hover:border-indigo-300 hover:text-indigo-600"
                     @click="addPanelEditRow">＋ 行を追加</button>
-                <div class="mt-3 flex flex-wrap items-center gap-2">
+                <div class="mt-3 flex gap-2">
                     <button type="button" :disabled="panelSaving"
                         class="rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
                         @click="savePanelEdits">{{ panelSaving ? '保存中…' : '保存' }}</button>
                     <button type="button" :disabled="panelSaving"
                         class="rounded bg-gray-100 px-4 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-200 disabled:opacity-50"
                         @click="cancelPanelEditMode">キャンセル</button>
-                    <span v-if="panelSaveError" class="text-xs text-red-600">{{ panelSaveError }}</span>
                 </div>
             </template>
         </div>
@@ -556,11 +552,6 @@ const scheduleEditStart = ref('');
 const scheduleEditEnd = ref('');
 const scheduleEditItemId = ref(null);
 
-// 開始日を選んだとき、終了日が未設定なら自動的に同じ日付をセット
-watch(scheduleEditStart, (val) => {
-    if (!scheduleEditEnd.value) scheduleEditEnd.value = val;
-});
-
 const page = usePage();
 // prefer server-provided helper flags if available on the user props
 // Support multiple shapes: page.props.user (proxy), page.props.value.auth.user, page.props.value.user, page.props.auth.user
@@ -702,21 +693,6 @@ watch(schedulePanelOpen, (val) => {
     }
 });
 
-// 「全件表示」状態（localStorage 保存）
-const scheduleShowAll = ref(false);
-(() => {
-    try {
-        const lsKey = props.project?.id ? `schedule_show_all_${props.project.id}` : '';
-        if (lsKey) scheduleShowAll.value = localStorage.getItem(lsKey) === 'true';
-    } catch (e) {}
-})();
-watch(scheduleShowAll, (val) => {
-    try {
-        const lsKey = props.project?.id ? `schedule_show_all_${props.project.id}` : '';
-        if (lsKey) localStorage.setItem(lsKey, String(val));
-    } catch (e) {}
-});
-
 // パネル内ソート
 const panelSortKey = ref('start_date');
 const panelSortDir = ref('asc');
@@ -745,11 +721,10 @@ function panelSortIcon(key) {
 }
 
 // パネル内編集モード
-const panelEditMode  = ref(false);
-const panelEditRows  = ref([]);
-const panelSaving    = ref(false);
-const panelSaveError = ref('');
-let   _panelKeySeq   = 0;
+const panelEditMode = ref(false);
+const panelEditRows = ref([]);
+const panelSaving   = ref(false);
+let   _panelKeySeq  = 0;
 
 function togglePanelEditMode() {
     if (panelEditMode.value) {
@@ -787,20 +762,17 @@ async function savePanelEdits() {
     if (panelSaving.value) return;
     const projectJobId = props.project?.id;
     if (!projectJobId) return;
-    panelSaving.value    = true;
-    panelSaveError.value = '';
+    panelSaving.value = true;
     const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
     const originalIds = new Set((props.schedules || []).map(s => s.id));
     const editIds     = new Set(panelEditRows.value.filter(r => r.id).map(r => r.id));
     const deletedIds  = [...originalIds].filter(id => !editIds.has(id));
-    const errors = [];
     try {
         for (const id of deletedIds) {
-            const res = await fetch(route('coordinator.project_schedules.destroy', { project_schedule: id }), {
+            await fetch(route('coordinator.project_schedules.destroy', { project_schedule: id }), {
                 method : 'DELETE',
                 headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
             });
-            if (!res.ok) errors.push(`削除失敗 (${res.status})`);
         }
         for (const row of panelEditRows.value) {
             if (!row.name.trim()) continue;
@@ -812,33 +784,18 @@ async function savePanelEdits() {
                 end_date   : row.end_date   || null,
             });
             const headers = { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' };
-            let res;
             if (row.id) {
-                res = await fetch(route('coordinator.project_schedules.update', { project_schedule: row.id }), {
+                await fetch(route('coordinator.project_schedules.update', { project_schedule: row.id }), {
                     method: 'PATCH', headers, body,
                 });
             } else {
-                res = await fetch(route('coordinator.project_schedules.store'), {
+                await fetch(route('coordinator.project_schedules.store'), {
                     method: 'POST', headers, body,
                 });
             }
-            if (!res.ok) {
-                const text = await res.text().catch(() => '');
-                let msg = `保存失敗 (${res.status})`;
-                try {
-                    const json = JSON.parse(text);
-                    if (json.message) msg += ': ' + json.message;
-                } catch (_) { /* ignore */ }
-                errors.push(msg);
-            }
         }
-        if (errors.length > 0) {
-            panelSaveError.value = errors.join(' / ');
-            return;
-        }
-        panelEditMode.value  = false;
-        panelEditRows.value  = [];
-        panelSaveError.value = '';
+        panelEditMode.value = false;
+        panelEditRows.value = [];
         // schedules プロパティのみリロードして カレンダーと一覧を更新
         router.reload({ only: ['schedules'] });
     } finally {
@@ -1200,8 +1157,6 @@ const calendarOptions = computed(() => ({
             const updated = { id, start_date: newStart, end_date: newEnd || newStart, name: ev.title, color: ev.backgroundColor };
             if (idx !== -1) localCalendarEntries.value.splice(idx, 1, updated);
             else localCalendarEntries.value.push(updated);
-            // スケジュール表も最新に更新
-            router.reload({ only: ['schedules'] });
         } catch (e) {
             console.error('eventDrop save error', e);
             alert('予定の移動保存に失敗しました');
@@ -1257,8 +1212,6 @@ const calendarOptions = computed(() => ({
                 const updated = { id, start_date: displayStart, end_date: displayEndInclusive || displayStart, name: ev.title, color: ev.backgroundColor };
                 if (idx !== -1) localCalendarEntries.value.splice(idx, 1, updated);
                 else localCalendarEntries.value.push(updated);
-                // スケジュール表も最新に更新
-                router.reload({ only: ['schedules'] });
             } else if (extended.event_id) {
                 // 汎用イベント（個人カレンダー）
                 await axios.put(`/events/${extended.event_id}/calendar`, {
@@ -1767,8 +1720,6 @@ async function submitScheduleUpdate() {
         }
         showScheduleShowModal.value = false;
         isEditingSchedule.value = false;
-        // スケジュール表も最新に更新
-        router.reload({ only: ['schedules'] });
     } catch (e) {
         console.error('submitScheduleUpdate error', e);
         alert('予定の更新に失敗しました');
@@ -2129,26 +2080,6 @@ async function submitCsvImport() {
 </script>
 
 <style scoped>
-/* 細いスクロールバー */
-.schedule-scroll::-webkit-scrollbar {
-    width: 4px;
-}
-.schedule-scroll::-webkit-scrollbar-track {
-    background: transparent;
-}
-.schedule-scroll::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
-    border-radius: 2px;
-}
-.schedule-scroll::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
-}
-/* Firefox */
-.schedule-scroll {
-    scrollbar-width: thin;
-    scrollbar-color: #cbd5e1 transparent;
-}
-
 .calendar-container {
     padding: 1rem;
 }

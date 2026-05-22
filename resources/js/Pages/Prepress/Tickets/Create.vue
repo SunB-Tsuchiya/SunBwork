@@ -7,9 +7,10 @@ import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
 
 const props = defineProps({
-    statuses: { type: Object, default: () => ({}) },
-    clients:  { type: Array,  default: () => [] },
-    prefill:  { type: Object, default: () => ({}) },
+    statuses:  { type: Object, default: () => ({}) },
+    clients:   { type: Array,  default: () => [] },
+    salesReps: { type: Array,  default: () => [] },
+    prefill:   { type: Object, default: () => ({}) },
 });
 
 const form = useForm({
@@ -17,6 +18,8 @@ const form = useForm({
     client_name:        props.prefill.client_name ?? '',
     jobcode:            props.prefill.jobcode     ?? '',
     title:              props.prefill.title       ?? '',
+    sales_rep:          '',
+    sales_rep_id:       '',
     memo:               '',
     submission_date:    '',
     sb_delivery_date:   '',
@@ -302,6 +305,28 @@ const isMobile = computed(() => {
                             class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-600 focus:outline-none"
                         />
                         <p v-if="form.errors.title" class="mt-1 text-xs text-red-600">{{ form.errors.title }}</p>
+                    </div>
+
+                    <!-- 担当営業 -->
+                    <div>
+                        <label class="mb-1 block text-sm font-semibold text-gray-700">担当営業</label>
+                        <div class="flex gap-2 items-start flex-wrap">
+                            <select
+                                v-model="form.sales_rep_id"
+                                class="w-48 rounded border border-gray-300 px-2 py-2 text-sm focus:border-green-600 focus:outline-none"
+                            >
+                                <option value="">— DBから選択 —</option>
+                                <option v-for="r in salesReps" :key="r.id" :value="r.id">{{ r.name }}</option>
+                            </select>
+                            <input
+                                v-model="form.sales_rep"
+                                type="text"
+                                placeholder="フリーテキスト（DB未登録の場合）"
+                                class="flex-1 min-w-32 rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-600 focus:outline-none"
+                            />
+                        </div>
+                        <p v-if="form.errors.sales_rep" class="mt-1 text-xs text-red-600">{{ form.errors.sales_rep }}</p>
+                        <p v-if="form.errors.sales_rep_id" class="mt-1 text-xs text-red-600">{{ form.errors.sales_rep_id }}</p>
                     </div>
 
                     <!-- 製版入稿日 / SB下版日 -->

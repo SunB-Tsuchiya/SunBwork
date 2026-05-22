@@ -28,6 +28,7 @@ function statusBadgeClass(status) {
         case 'completed':   return 'bg-yellow-100 text-yellow-800';
         case 'in_progress': return 'bg-blue-100 text-blue-800';
         case 'submitting':  return 'bg-purple-100 text-purple-800';
+        case 'outputting':  return 'bg-orange-100 text-orange-800';
         case 'pending':     return 'bg-red-100 text-red-800';
         default:            return 'bg-gray-100 text-gray-700';
     }
@@ -187,6 +188,14 @@ async function savePendingImage() {
                     >入稿予定にする</button>
 
                     <button
+                        v-if="localTicket.status !== 'outputting'"
+                        type="button"
+                        class="inline-flex items-center gap-1.5 rounded bg-orange-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-orange-600"
+                        :disabled="updatingStatus"
+                        @click="changeStatus('outputting')"
+                    >出稿中にする</button>
+
+                    <button
                         v-if="localTicket.status !== 'completed'"
                         type="button"
                         class="inline-flex items-center gap-1.5 rounded bg-yellow-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-yellow-600"
@@ -228,6 +237,17 @@ async function savePendingImage() {
                     <div class="flex py-2">
                         <dt class="w-32 shrink-0 font-medium text-gray-500">クライアント</dt>
                         <dd class="text-gray-800">{{ localTicket.client_name || '—' }}</dd>
+                    </div>
+                    <div class="flex py-2">
+                        <dt class="w-32 shrink-0 font-medium text-gray-500">担当営業</dt>
+                        <dd class="text-gray-800">
+                            <span v-if="localTicket.sales_rep_entry">
+                                {{ localTicket.sales_rep_entry.name }}
+                                <span class="ml-1 text-xs text-green-700 bg-green-50 rounded px-1 py-0.5">DB登録済</span>
+                            </span>
+                            <span v-else-if="localTicket.sales_rep">{{ localTicket.sales_rep }}</span>
+                            <span v-else>—</span>
+                        </dd>
                     </div>
                     <div class="flex py-2">
                         <dt class="w-32 shrink-0 font-medium text-gray-500">伝票番号</dt>

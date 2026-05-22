@@ -3,29 +3,31 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import OcrModal from '@/Components/Prepress/OcrModal.vue';
 import { router, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
-import { ref, computed, watch } from 'vue';
+import { ref, computed } from 'vue';
 import { route } from 'ziggy-js';
 
 const props = defineProps({
-    tickets: { type: Array, default: () => [] },
-    statuses: { type: Object, default: () => ({}) },
+    tickets:   { type: Array,  default: () => [] },
+    statuses:  { type: Object, default: () => ({}) },
+    salesReps: { type: Array,  default: () => [] },
 });
 
 const COLUMNS = [
-    { key: 'pending',     label: '準備',    color: 'border-yellow-400 bg-yellow-50', header: 'bg-yellow-100 text-yellow-800', barText: 'text-yellow-800' },
-    { key: 'submitting',  label: '入稿予定', color: 'border-purple-400 bg-purple-50', header: 'bg-purple-100 text-purple-800', barText: 'text-purple-800' },
-    { key: 'in_progress', label: '作業中',  color: 'border-blue-400 bg-blue-50',     header: 'bg-blue-100 text-blue-800',     barText: 'text-blue-800'   },
-    { key: 'completed',   label: '完了',    color: 'border-green-500 bg-green-50',   header: 'bg-green-100 text-green-800',   barText: 'text-green-800'  },
+    { key: 'pending',     label: '準備',    color: 'border-yellow-400 bg-yellow-50',  header: 'bg-yellow-100 text-yellow-800',  barText: 'text-yellow-800'  },
+    { key: 'submitting',  label: '入稿予定', color: 'border-purple-400 bg-purple-50',  header: 'bg-purple-100 text-purple-800',  barText: 'text-purple-800'  },
+    { key: 'in_progress', label: '作業中',  color: 'border-blue-400 bg-blue-50',      header: 'bg-blue-100 text-blue-800',      barText: 'text-blue-800'    },
+    { key: 'outputting',  label: '出稿中',  color: 'border-orange-400 bg-orange-50',  header: 'bg-orange-100 text-orange-800',  barText: 'text-orange-800'  },
+    { key: 'completed',   label: '完了',    color: 'border-green-500 bg-green-50',    header: 'bg-green-100 text-green-800',    barText: 'text-green-800'   },
 ];
 
 // 遷移ルール（どの列からでも他の列へ移動可能）
-const ALL_KEYS = ['pending', 'submitting', 'in_progress', 'completed'];
+const ALL_KEYS = ['pending', 'submitting', 'in_progress', 'outputting', 'completed'];
 const VALID_TRANSITIONS = Object.fromEntries(
     ALL_KEYS.map(k => [k, ALL_KEYS.filter(t => t !== k)])
 );
 
-// カラム開閉状態: デフォルトは入稿予定・作業中の2列を開く
-const openColumns = ref(new Set(['submitting', 'in_progress']));
+// カラム開閉状態: デフォルトは入稿予定・作業中・出稿中の3列を開く
+const openColumns = ref(new Set(['submitting', 'in_progress', 'outputting']));
 
 function isOpen(key) {
     return openColumns.value.has(key);
@@ -36,7 +38,7 @@ function toggleColumn(key) {
     if (s.has(key)) {
         s.delete(key);
     } else {
-        if (s.size >= 2) {
+        if (s.size >= 4) {
             // 一番右にある開いているカラムを自動で閉じる
             const rightmost = COLUMNS.map(c => c.key).filter(k => s.has(k)).at(-1);
             if (rightmost) s.delete(rightmost);
@@ -46,15 +48,50 @@ function toggleColumn(key) {
     openColumns.value = s;
 }
 
+// グローバル検索
+const boardSearch = ref('');
+
+// 準備列 表示モード（list / card）
+const pendingView = ref(localStorage.getItem('prepress_board_pending_view') ?? 'card');
+function setPendingView(mode) {
+    pendingView.value = mode;
+    localStorage.setItem('prepress_board_pending_view', mode);
+}
+
+// 準備列リスト表示 ソート
+const pendingListSort = ref({ field: 'submission_date', dir: 'asc' });
+function togglePendingSort(field) {
+    if (pendingListSort.value.field === field) {
+        pendingListSort.value.dir = pendingListSort.value.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+        pendingListSort.value = { field, dir: 'asc' };
+    }
+}
+const pendingListTickets = computed(() => {
+    const list = [...(ticketsByStatus.value['pending'] ?? [])];
+    const { field, dir } = pendingListSort.value;
+    return list.sort((a, b) => {
+        const va = a[field] ? String(a[field]).split('T')[0].replace(/\//g, '-') : '9999-99-99';
+        const vb = b[field] ? String(b[field]).split('T')[0].replace(/\//g, '-') : '9999-99-99';
+        if (va === vb) return 0;
+        return (va < vb ? -1 : 1) * (dir === 'asc' ? 1 : -1);
+    });
+});
+
 // Local optimistic state
 const localTickets = ref(props.tickets.map(t => ({ ...t })));
 
 const ticketsByStatus = computed(() => {
     const map = {};
     COLUMNS.forEach(c => { map[c.key] = []; });
-    localTickets.value.forEach(t => {
-        if (map[t.status]) map[t.status].push(t);
-    });
+    const q = boardSearch.value.trim().toLowerCase();
+    const list = q
+        ? localTickets.value.filter(t =>
+            [t.jobcode, t.client_name, String(t.client_id ?? ''), t.sales_rep, t.title]
+                .some(v => v && String(v).toLowerCase().includes(q))
+          )
+        : localTickets.value;
+    list.forEach(t => { if (map[t.status]) map[t.status].push(t); });
     return map;
 });
 
@@ -272,6 +309,7 @@ function statusBadgeClass(status) {
         case 'completed':   return 'bg-yellow-100 text-yellow-800';
         case 'in_progress': return 'bg-blue-100 text-blue-800';
         case 'submitting':  return 'bg-purple-100 text-purple-800';
+        case 'outputting':  return 'bg-orange-100 text-orange-800';
         case 'pending':     return 'bg-red-100 text-red-800';
         default:            return 'bg-gray-100 text-gray-700';
     }
@@ -377,8 +415,8 @@ async function savePendingImage() {
     }
 }
 
-// ── 伝票登録モーダル ─────────────────────────────────
-const showCreateModal = ref(false);
+// ── 伝票登録ドロップダウン + モーダル ────────────────────
+const showCreateModal  = ref(false);
 const createMode = ref('ocr');
 
 const clientId   = ref('');
@@ -398,9 +436,9 @@ const isDragOver    = ref(false);
 const showOcrModal  = ref(false);
 const ocrResult     = ref({});
 
-function openCreateModal() {
-    showCreateModal.value = true;
-    createMode.value = 'ocr';
+function openCreateModal(mode = 'ocr') {
+    showCreateModal.value  = true;
+    createMode.value       = mode;
     resetModalState();
 }
 
@@ -547,17 +585,247 @@ const canCreate = computed(() => {
     if (createMode.value === 'new') return true;
     return !!selectedJobId.value;
 });
+
+// ── CSV一括登録モーダル ────────────────────────────────
+const showCsvModal     = ref(false);
+const csvAnalyzing     = ref(false);
+const csvImporting     = ref(false);
+const csvAnalysisRows  = ref([]); // サーバー解析結果
+const csvFile          = ref(null);
+
+function openCsvModal() {
+    showCsvModal.value     = true;
+    csvFile.value          = null;
+    csvAnalyzing.value     = false;
+    csvImporting.value     = false;
+    csvAnalysisRows.value  = [];
+}
+
+function closeCsvModal() {
+    showCsvModal.value    = false;
+    csvFile.value         = null;
+    csvAnalyzing.value    = false;
+    csvImporting.value    = false;
+    csvAnalysisRows.value = [];
+}
+
+async function onCsvFileSelect(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    csvFile.value = file;
+    csvAnalyzing.value = true;
+    csvAnalysisRows.value = [];
+    const fd   = new FormData();
+    fd.append('csv', file);
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+    try {
+        const res = await axios.post(route('prepress.tickets.analyzeCsv'), fd, {
+            headers: { 'X-CSRF-TOKEN': csrf, 'Content-Type': 'multipart/form-data' },
+        });
+        csvAnalysisRows.value = res.data.rows ?? [];
+    } catch {
+        alert('CSV解析に失敗しました。ファイルを確認してください。');
+    } finally {
+        csvAnalyzing.value = false;
+        e.target.value = '';
+    }
+}
+
+function csvSelectCandidate(rowIndex, client) {
+    const row = csvAnalysisRows.value[rowIndex];
+    if (!row) return;
+    row.resolved_client_id   = client.id;
+    row.resolved_client_name = client.name;
+    row.status               = 'matched';
+}
+
+function csvSelectFromSearch(rowIndex, client) {
+    csvSelectCandidate(rowIndex, client);
+    csvAnalysisRows.value[rowIndex].showSearch = false;
+}
+
+// 営業担当選択
+function csvSelectSalesRepCandidate(rowIndex, rep) {
+    const row = csvAnalysisRows.value[rowIndex];
+    if (!row) return;
+    row.resolved_sales_rep_id   = rep.id;
+    row.resolved_sales_rep_name = rep.name;
+    row.sales_rep_status        = 'matched';
+}
+
+function csvSelectSalesRepFromSearch(rowIndex, rep) {
+    csvSelectSalesRepCandidate(rowIndex, rep);
+    csvAnalysisRows.value[rowIndex].showSalesRepSearch = false;
+}
+
+// クライアントの未解決行のみカウント（営業担当は任意なので未解決でもOK）
+const csvUnresolvedCount = computed(() =>
+    csvAnalysisRows.value.filter(r => r.status !== 'matched').length
+);
+
+const csvRowClientSearch = ref({});
+const csvRowSalesRepSearch = ref({});
+let csvSearchTimers = {};
+
+function onCsvRowSearchInput(rowIndex) {
+    clearTimeout(csvSearchTimers[`c_${rowIndex}`]);
+    const q = csvRowClientSearch.value[rowIndex] ?? '';
+    if (!q.trim()) { csvAnalysisRows.value[rowIndex].searchResults = []; return; }
+    csvSearchTimers[`c_${rowIndex}`] = setTimeout(async () => {
+        const res = await axios.get(route('prepress.api.clients'), { params: { q } });
+        if (csvAnalysisRows.value[rowIndex]) csvAnalysisRows.value[rowIndex].searchResults = res.data;
+    }, 250);
+}
+
+function onCsvRowSalesRepSearchInput(rowIndex) {
+    clearTimeout(csvSearchTimers[`s_${rowIndex}`]);
+    const q = csvRowSalesRepSearch.value[rowIndex] ?? '';
+    if (!q.trim()) { csvAnalysisRows.value[rowIndex].salesRepSearchResults = []; return; }
+    csvSearchTimers[`s_${rowIndex}`] = setTimeout(async () => {
+        const res = await axios.get(route('prepress.api.salesReps'));
+        if (csvAnalysisRows.value[rowIndex]) {
+            csvAnalysisRows.value[rowIndex].salesRepSearchResults = res.data.filter(r =>
+                r.name.includes(q)
+            );
+        }
+    }, 250);
+}
+
+// ── インライン新規登録モーダル（クライアント） ────────────────
+const showInlineClientModal = ref(false);
+const inlineCsvRowIndex     = ref(null);
+const inlineClientForm      = ref({ name: '', client_code: '' });
+const inlineClientSaving    = ref(false);
+const inlineClientNote      = ref(''); // 重複メッセージ用
+
+function openInlineClientModal(rowIndex) {
+    inlineCsvRowIndex.value = rowIndex;
+    const row = csvAnalysisRows.value[rowIndex];
+    inlineClientForm.value = { name: row?.raw_client_name ?? '', client_code: '' };
+    inlineClientNote.value = '';
+    showInlineClientModal.value = true;
+}
+
+async function saveInlineClient() {
+    if (!inlineClientForm.value.name.trim()) return;
+    inlineClientSaving.value = true;
+    inlineClientNote.value   = '';
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+    try {
+        const res = await axios.post(route('prepress.api.clientCreate'), {
+            name:        inlineClientForm.value.name,
+            client_code: inlineClientForm.value.client_code || null,
+        }, { headers: { 'X-CSRF-TOKEN': csrf } });
+        const newClient = res.data?.client;
+        if (newClient?.id) {
+            // トリガー行は無条件で更新
+            csvSelectCandidate(inlineCsvRowIndex.value, newClient);
+            // トリガー行のCSV元名称で他の未解決行も更新（完全一致）
+            const triggeredRawName = csvAnalysisRows.value[inlineCsvRowIndex.value]?.raw_client_name;
+            csvAnalysisRows.value.forEach((row, idx) => {
+                if (idx !== inlineCsvRowIndex.value && row.raw_client_name === triggeredRawName && row.status !== 'matched') {
+                    csvSelectCandidate(idx, newClient);
+                }
+            });
+            if (res.data?.was_existing) {
+                inlineClientNote.value = `「${newClient.name}」はすでにDBに登録されているクライアントです。新規登録は行いませんでした。既存のクライアントをCSVに適用しました。`;
+                // メッセージを読んでもらうためモーダルを閉じない
+            } else {
+                showInlineClientModal.value = false;
+            }
+        }
+    } catch {
+        alert('クライアント登録に失敗しました。');
+    } finally {
+        inlineClientSaving.value = false;
+    }
+}
+
+// ── インライン新規登録モーダル（営業担当） ────────────────────
+const showInlineSalesRepModal = ref(false);
+const inlineSalesRepRowIndex  = ref(null);
+const inlineSalesRepForm      = ref({ name: '', company: '' });
+const inlineSalesRepSaving    = ref(false);
+
+function openInlineSalesRepModal(rowIndex) {
+    inlineSalesRepRowIndex.value = rowIndex;
+    const row = csvAnalysisRows.value[rowIndex];
+    inlineSalesRepForm.value = { name: row?.sales_rep ?? '', company: '' };
+    showInlineSalesRepModal.value = true;
+}
+
+async function saveInlineSalesRep() {
+    if (!inlineSalesRepForm.value.name.trim()) return;
+    inlineSalesRepSaving.value = true;
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+    try {
+        const res = await axios.post(route('prepress.api.salesRepCreate'), {
+            name:    inlineSalesRepForm.value.name,
+            company: inlineSalesRepForm.value.company || null,
+        }, { headers: { 'X-CSRF-TOKEN': csrf } });
+        const newRep = res.data?.rep;
+        if (newRep?.id) {
+            csvSelectSalesRepCandidate(inlineSalesRepRowIndex.value, newRep);
+            showInlineSalesRepModal.value = false;
+        }
+    } catch {
+        alert('営業担当登録に失敗しました。');
+    } finally {
+        inlineSalesRepSaving.value = false;
+    }
+}
+
+async function executeCsvImport() {
+    if (csvUnresolvedCount.value > 0 || csvImporting.value) return;
+    csvImporting.value = true;
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+    const rows = csvAnalysisRows.value.map(r => ({
+        jobcode:      r.jobcode,
+        title:        r.title,
+        sales_rep:    r.sales_rep,
+        sales_rep_id: r.resolved_sales_rep_id ?? null,
+        client_id:    r.resolved_client_id    ?? null,
+        client_name:  r.resolved_client_name  ?? r.raw_client_name ?? null,
+    }));
+    try {
+        await axios.post(route('prepress.tickets.importCsv'), { rows }, {
+            headers: { 'X-CSRF-TOKEN': csrf },
+        });
+        closeCsvModal();
+        router.reload();
+    } catch {
+        alert('インポートに失敗しました。');
+    } finally {
+        csvImporting.value = false;
+    }
+}
 </script>
 
 <template>
     <AppLayout title="伝票ボード">
         <template #header>
-            <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3 justify-between">
                 <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">伝票ボード</h2>
+                <!-- グローバル検索ボックス -->
+                <div class="flex items-center gap-1">
+                    <input
+                        v-model="boardSearch"
+                        type="text"
+                        placeholder="ID、担当営業など"
+                        class="rounded border border-gray-300 px-3 py-1.5 text-sm w-44 focus:border-green-600 focus:outline-none"
+                    />
+                    <button
+                        v-if="boardSearch"
+                        type="button"
+                        class="rounded px-1.5 py-1 text-xs text-gray-400 hover:text-gray-600"
+                        @click="boardSearch = ''"
+                    >✕</button>
+                </div>
+                <!-- 伝票登録ボタン -->
                 <button
                     type="button"
                     class="rounded-lg bg-green-700 px-4 py-2 text-sm font-medium text-white hover:bg-green-800"
-                    @click="openCreateModal"
+                    @click="openCreateModal()"
                 >＋ 伝票登録</button>
             </div>
         </template>
@@ -642,8 +910,31 @@ const canCreate = computed(() => {
                             >◀</button>
                         </div>
 
-                        <!-- ソート・絞り込みコントロール -->
-                        <div class="shrink-0 flex flex-wrap items-center gap-2 border-b bg-white/70 px-3 py-1.5">
+                        <!-- 準備列専用: リスト/カード切替タブ -->
+                        <div v-if="col.key === 'pending'" class="shrink-0 flex border-b bg-white/70">
+                            <button
+                                type="button"
+                                class="flex-1 py-1.5 text-xs font-semibold transition-colors"
+                                :class="pendingView === 'card'
+                                    ? 'bg-yellow-200 text-yellow-900'
+                                    : 'text-gray-500 hover:bg-gray-100'"
+                                @click="setPendingView('card')"
+                            >カード</button>
+                            <button
+                                type="button"
+                                class="flex-1 py-1.5 text-xs font-semibold transition-colors"
+                                :class="pendingView === 'list'
+                                    ? 'bg-yellow-200 text-yellow-900'
+                                    : 'text-gray-500 hover:bg-gray-100'"
+                                @click="setPendingView('list')"
+                            >リスト</button>
+                        </div>
+
+                        <!-- ソート・絞り込みコントロール（リストモード時は非表示） -->
+                        <div
+                            v-if="!(col.key === 'pending' && pendingView === 'list')"
+                            class="shrink-0 flex flex-wrap items-center gap-2 border-b bg-white/70 px-3 py-1.5"
+                        >
                             <!-- 日付フィールド選択 -->
                             <div class="flex items-center gap-2 text-xs text-gray-700">
                                 <label class="flex items-center gap-0.5 cursor-pointer select-none">
@@ -717,10 +1008,62 @@ const canCreate = computed(() => {
                                     @click="clearDateFilter(col.key)"
                                 >✕</button>
                             </div>
+                        </div><!-- /ソート・絞り込みコントロール -->
+
+                        <!-- 準備列 リスト表示 -->
+                        <div
+                            v-if="col.key === 'pending' && pendingView === 'list'"
+                            class="flex-1 min-h-0 overflow-y-auto"
+                        >
+                            <table class="w-full text-xs border-collapse" style="min-width: 380px;">
+                                <thead class="sticky top-0 bg-yellow-100 z-10">
+                                    <tr>
+                                        <th
+                                            v-for="h in [
+                                                { field: 'jobcode',         label: '伝票番号' },
+                                                { field: 'client_name',     label: 'クライアント' },
+                                                { field: 'title',           label: '案件名' },
+                                                { field: 'sales_rep',       label: '担当営業' },
+                                                { field: 'submission_date', label: '入稿日' },
+                                                { field: 'sb_delivery_date',label: '下版日' },
+                                            ]"
+                                            :key="h.field"
+                                            class="cursor-pointer select-none border border-yellow-300 px-2 py-1.5 text-left font-semibold text-yellow-900 hover:bg-yellow-200 whitespace-nowrap"
+                                            @click="togglePendingSort(h.field)"
+                                        >
+                                            {{ h.label }}
+                                            <span v-if="pendingListSort.field === h.field" class="ml-0.5">
+                                                {{ pendingListSort.dir === 'asc' ? '↑' : '↓' }}
+                                            </span>
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr
+                                        v-for="ticket in pendingListTickets"
+                                        :key="ticket.id"
+                                        class="cursor-pointer hover:bg-yellow-50 even:bg-white odd:bg-yellow-50/30"
+                                        @click="openDetail(ticket)"
+                                    >
+                                        <td class="border border-yellow-200 px-2 py-1 font-mono">{{ ticket.jobcode || '—' }}</td>
+                                        <td class="border border-yellow-200 px-2 py-1 max-w-[100px] truncate">{{ ticket.client_name || '—' }}</td>
+                                        <td class="border border-yellow-200 px-2 py-1 max-w-[140px] truncate">{{ ticket.title }}</td>
+                                        <td class="border border-yellow-200 px-2 py-1 whitespace-nowrap">{{ ticket.sales_rep || '—' }}</td>
+                                        <td class="border border-yellow-200 px-2 py-1 whitespace-nowrap">{{ formatShortDate(ticket.submission_date) }}</td>
+                                        <td class="border border-yellow-200 px-2 py-1 whitespace-nowrap">{{ formatShortDate(ticket.sb_delivery_date) }}</td>
+                                    </tr>
+                                    <tr v-if="pendingListTickets.length === 0">
+                                        <td colspan="6" class="py-6 text-center text-gray-400">件数なし</td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
 
-                        <!-- カードグリッド: 2列 -->
-                        <div class="flex-1 min-h-0 overflow-y-auto p-4">
+                        <!-- カードグリッド: 2列（準備列はカードモード時のみ表示） -->
+                        <div
+                            v-if="!(col.key === 'pending' && pendingView === 'list')"
+                            class="flex-1 min-h-0 overflow-y-auto p-4"
+                        >
                             <div class="grid grid-cols-2 gap-4">
                                 <div
                                     v-for="ticket in sortedFilteredTickets(col.key)"
@@ -796,7 +1139,7 @@ const canCreate = computed(() => {
                             >
                                 ここにドロップ
                             </div>
-                        </div>
+                        </div><!-- /カードグリッド -->
                     </div>
                     </template>
                 </div>
@@ -856,6 +1199,14 @@ const canCreate = computed(() => {
                             >入稿予定にする</button>
 
                             <button
+                                v-if="detail.status !== 'outputting'"
+                                type="button"
+                                class="inline-flex items-center gap-1.5 rounded bg-orange-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-orange-600"
+                                :disabled="updatingStatus"
+                                @click="changeStatus(detail, 'outputting')"
+                            >出稿中にする</button>
+
+                            <button
                                 v-if="detail.status !== 'completed'"
                                 type="button"
                                 class="inline-flex items-center gap-1.5 rounded bg-yellow-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-yellow-600"
@@ -897,6 +1248,16 @@ const canCreate = computed(() => {
                             <div class="flex py-2">
                                 <dt class="w-32 shrink-0 font-medium text-gray-500">クライアント</dt>
                                 <dd class="text-gray-800">{{ detail.client_name || '—' }}</dd>
+                            </div>
+                            <div class="flex py-2">
+                                <dt class="w-32 shrink-0 font-medium text-gray-500">担当営業</dt>
+                                <dd class="text-gray-800">
+                                    <span v-if="detail.sales_rep_entry">
+                                        {{ detail.sales_rep_entry.name }}
+                                        <span class="ml-1 text-xs text-green-700 bg-green-50 rounded px-1 py-0.5">DB登録済</span>
+                                    </span>
+                                    <span v-else>{{ detail.sales_rep || '—' }}</span>
+                                </dd>
                             </div>
                             <div class="flex py-2">
                                 <dt class="w-32 shrink-0 font-medium text-gray-500">伝票番号</dt>
@@ -1050,6 +1411,15 @@ const canCreate = computed(() => {
                                 <span class="text-lg">📋</span>
                                 <span>案件から読み込む</span>
                             </button>
+                            <!-- CSV一括登録 -->
+                            <button
+                                type="button"
+                                class="flex w-full items-center gap-3 rounded-lg border-2 border-gray-200 bg-white px-4 py-3 text-left text-sm font-medium text-gray-600 transition-colors hover:border-gray-300"
+                                @click="closeCreateModal(); openCsvModal()"
+                            >
+                                <span class="text-lg">📊</span>
+                                <span>CSV一括登録</span>
+                            </button>
                         </div>
                     </div>
 
@@ -1197,6 +1567,293 @@ const canCreate = computed(() => {
             @apply="onOcrApplyFromBoard"
             @close="showOcrModal = false"
         />
+
+        <!-- CSV一括登録モーダル -->
+        <Teleport to="body">
+            <div
+                v-if="showCsvModal"
+                class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 px-2 py-6"
+                @click.self="closeCsvModal"
+            >
+                <div class="w-full max-w-7xl rounded-xl bg-white shadow-2xl">
+                    <div class="flex items-center justify-between border-b px-6 py-4">
+                        <h3 class="text-lg font-semibold text-gray-800">CSV一括登録</h3>
+                        <button type="button" class="text-gray-400 hover:text-gray-600" @click="closeCsvModal">✕</button>
+                    </div>
+
+                    <!-- ファイル選択（解析前） -->
+                    <div v-if="csvAnalysisRows.length === 0 && !csvAnalyzing" class="px-6 py-6">
+                        <p class="mb-3 text-sm text-gray-600">
+                            CSV形式: <code class="rounded bg-gray-100 px-1 text-xs">No, 受注No., 得意先, 品名, 営業担当</code>（CP932 / UTF-8 対応）
+                        </p>
+                        <label class="inline-flex cursor-pointer items-center gap-2 rounded-lg border-2 border-dashed border-gray-300 px-6 py-4 hover:border-green-500 hover:bg-green-50">
+                            <span class="text-2xl">📊</span>
+                            <span class="text-sm font-medium text-gray-600">CSVファイルを選択</span>
+                            <input type="file" accept=".csv,text/csv" class="hidden" @change="onCsvFileSelect" />
+                        </label>
+                    </div>
+
+                    <!-- 解析中 -->
+                    <div v-if="csvAnalyzing" class="flex items-center justify-center py-12 text-blue-600">
+                        <svg class="mr-3 h-6 w-6 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+                        </svg>
+                        解析中...
+                    </div>
+
+                    <!-- 解析結果 -->
+                    <div v-if="csvAnalysisRows.length > 0 && !csvAnalyzing" class="px-6 pb-4">
+                        <div class="mb-3 flex items-center gap-3 pt-4 flex-wrap">
+                            <span class="text-sm font-semibold text-gray-700">{{ csvAnalysisRows.length }}件</span>
+                            <span v-if="csvUnresolvedCount > 0" class="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-700">
+                                クライアント未解決 {{ csvUnresolvedCount }}件
+                            </span>
+                            <span v-else class="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-700">
+                                クライアント全件解決済み
+                            </span>
+                        </div>
+
+                        <div class="max-h-[60vh] overflow-y-auto rounded-lg border">
+                            <table class="w-full text-xs">
+                                <thead class="sticky top-0 bg-gray-100">
+                                    <tr>
+                                        <th class="border-b px-3 py-2 text-left font-medium text-gray-500 whitespace-nowrap">伝票番号</th>
+                                        <th class="border-b px-3 py-2 text-left font-medium text-gray-500 whitespace-nowrap">得意先(CSV)</th>
+                                        <th class="border-b px-3 py-2 text-left font-medium text-gray-500 whitespace-nowrap">品名</th>
+                                        <th class="border-b px-3 py-2 text-left font-medium text-gray-500 whitespace-nowrap w-52">クライアント解決</th>
+                                        <th class="border-b px-3 py-2 text-left font-medium text-gray-500 whitespace-nowrap">担当営業(CSV)</th>
+                                        <th class="border-b px-3 py-2 text-left font-medium text-gray-500 whitespace-nowrap w-52">営業担当解決</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr
+                                        v-for="(row, idx) in csvAnalysisRows"
+                                        :key="idx"
+                                        :class="row.status === 'matched' ? 'bg-white' : row.status === 'candidates' ? 'bg-yellow-50' : 'bg-red-50'"
+                                    >
+                                        <td class="border-b px-3 py-2 font-mono whitespace-nowrap">{{ row.jobcode || '—' }}</td>
+                                        <td class="border-b px-3 py-2 whitespace-nowrap">{{ row.raw_client_name || '—' }}</td>
+                                        <td class="border-b px-3 py-2 max-w-[160px] truncate">{{ row.title }}</td>
+
+                                        <!-- クライアント解決列 -->
+                                        <td class="border-b px-3 py-2">
+                                            <!-- 一致済み -->
+                                            <div v-if="row.status === 'matched'" class="flex items-center gap-1 text-green-700">
+                                                <span>✅</span>
+                                                <span class="truncate max-w-[160px]">{{ row.resolved_client_name || row.raw_client_name }}</span>
+                                            </div>
+                                            <!-- 候補あり -->
+                                            <div v-else-if="row.status === 'candidates'" class="space-y-1">
+                                                <p class="text-xs text-yellow-700 font-medium">候補を選択:</p>
+                                                <div
+                                                    v-for="c in row.candidates"
+                                                    :key="c.id"
+                                                    class="cursor-pointer rounded border border-yellow-300 bg-white px-2 py-0.5 text-xs hover:bg-yellow-100"
+                                                    @click="csvSelectCandidate(idx, c)"
+                                                >{{ c.name }}</div>
+                                                <div v-if="!row.showSearch" class="flex flex-wrap gap-1">
+                                                    <button type="button" class="text-xs text-blue-600 underline"
+                                                        @click="row.showSearch = true; csvRowClientSearch[idx] = ''">一覧から選択</button>
+                                                    <span class="text-gray-400">|</span>
+                                                    <button type="button" class="text-xs text-purple-600 underline"
+                                                        @click="openInlineClientModal(idx)">新規登録</button>
+                                                </div>
+                                                <div v-else class="mt-1">
+                                                    <input v-model="csvRowClientSearch[idx]" type="text"
+                                                        placeholder="クライアント名で検索"
+                                                        class="w-full rounded border border-gray-300 px-2 py-0.5 text-xs"
+                                                        @input="onCsvRowSearchInput(idx)" />
+                                                    <div v-for="c in (row.searchResults ?? [])" :key="c.id"
+                                                        class="cursor-pointer border-b px-2 py-0.5 text-xs hover:bg-blue-50"
+                                                        @click="csvSelectFromSearch(idx, c)">{{ c.name }}</div>
+                                                </div>
+                                            </div>
+                                            <!-- 未マッチ -->
+                                            <div v-else class="space-y-1">
+                                                <p class="text-xs text-red-600 font-medium">未マッチ</p>
+                                                <div v-if="!row.showSearch" class="flex flex-wrap gap-1">
+                                                    <button type="button" class="text-xs text-blue-600 underline"
+                                                        @click="row.showSearch = true; csvRowClientSearch[idx] = ''">一覧から選択</button>
+                                                    <span class="text-gray-400">|</span>
+                                                    <button type="button" class="text-xs text-gray-500 underline"
+                                                        @click="row.status = 'matched'; row.resolved_client_name = row.raw_client_name; row.resolved_client_id = null">名前のまま</button>
+                                                    <span class="text-gray-400">|</span>
+                                                    <button type="button" class="text-xs text-purple-600 underline"
+                                                        @click="openInlineClientModal(idx)">新規登録</button>
+                                                </div>
+                                                <div v-else class="mt-1">
+                                                    <input v-model="csvRowClientSearch[idx]" type="text"
+                                                        placeholder="クライアント名で検索"
+                                                        class="w-full rounded border border-gray-300 px-2 py-0.5 text-xs"
+                                                        @input="onCsvRowSearchInput(idx)" />
+                                                    <div v-for="c in (row.searchResults ?? [])" :key="c.id"
+                                                        class="cursor-pointer border-b px-2 py-0.5 text-xs hover:bg-blue-50"
+                                                        @click="csvSelectFromSearch(idx, c)">{{ c.name }}</div>
+                                                </div>
+                                            </div>
+                                        </td>
+
+                                        <!-- 担当営業(CSV)列 -->
+                                        <td class="border-b px-3 py-2 whitespace-nowrap">{{ row.sales_rep || '—' }}</td>
+
+                                        <!-- 営業担当解決列 -->
+                                        <td class="border-b px-3 py-2">
+                                            <div v-if="!row.sales_rep" class="text-gray-400 text-xs">—</div>
+                                            <!-- 一致済み -->
+                                            <div v-else-if="row.sales_rep_status === 'matched'" class="flex items-center gap-1 text-green-700">
+                                                <span>✅</span>
+                                                <span>{{ row.resolved_sales_rep_name }}</span>
+                                            </div>
+                                            <!-- 候補あり -->
+                                            <div v-else-if="row.sales_rep_status === 'candidates'" class="space-y-1">
+                                                <p class="text-xs text-yellow-700 font-medium">候補を選択:</p>
+                                                <div
+                                                    v-for="r in row.sales_rep_candidates"
+                                                    :key="r.id"
+                                                    class="cursor-pointer rounded border border-yellow-300 bg-white px-2 py-0.5 text-xs hover:bg-yellow-100"
+                                                    @click="csvSelectSalesRepCandidate(idx, r)"
+                                                >{{ r.name }}</div>
+                                                <div v-if="!row.showSalesRepSearch" class="flex flex-wrap gap-1">
+                                                    <button type="button" class="text-xs text-blue-600 underline"
+                                                        @click="row.showSalesRepSearch = true; csvRowSalesRepSearch[idx] = ''">一覧から選択</button>
+                                                    <span class="text-gray-400">|</span>
+                                                    <button type="button" class="text-xs text-gray-500 underline"
+                                                        @click="row.sales_rep_status = 'matched'; row.resolved_sales_rep_name = row.sales_rep; row.resolved_sales_rep_id = null">テキストのまま</button>
+                                                    <span class="text-gray-400">|</span>
+                                                    <button type="button" class="text-xs text-purple-600 underline"
+                                                        @click="openInlineSalesRepModal(idx)">新規登録</button>
+                                                </div>
+                                                <div v-else class="mt-1">
+                                                    <input v-model="csvRowSalesRepSearch[idx]" type="text" placeholder="氏名で検索"
+                                                        class="w-full rounded border border-gray-300 px-2 py-0.5 text-xs"
+                                                        @input="onCsvRowSalesRepSearchInput(idx)" />
+                                                    <div v-for="r in (row.salesRepSearchResults ?? [])" :key="r.id"
+                                                        class="cursor-pointer border-b px-2 py-0.5 text-xs hover:bg-blue-50"
+                                                        @click="csvSelectSalesRepFromSearch(idx, r)">{{ r.name }}</div>
+                                                </div>
+                                            </div>
+                                            <!-- 未マッチ -->
+                                            <div v-else class="space-y-1">
+                                                <p class="text-xs text-orange-600 font-medium">未マッチ</p>
+                                                <div v-if="!row.showSalesRepSearch" class="flex flex-wrap gap-1">
+                                                    <button type="button" class="text-xs text-blue-600 underline"
+                                                        @click="row.showSalesRepSearch = true; csvRowSalesRepSearch[idx] = ''">一覧から選択</button>
+                                                    <span class="text-gray-400">|</span>
+                                                    <button type="button" class="text-xs text-gray-500 underline"
+                                                        @click="row.sales_rep_status = 'matched'; row.resolved_sales_rep_name = row.sales_rep; row.resolved_sales_rep_id = null">テキストのまま</button>
+                                                    <span class="text-gray-400">|</span>
+                                                    <button type="button" class="text-xs text-purple-600 underline"
+                                                        @click="openInlineSalesRepModal(idx)">新規登録</button>
+                                                </div>
+                                                <div v-else class="mt-1">
+                                                    <input v-model="csvRowSalesRepSearch[idx]" type="text" placeholder="氏名で検索"
+                                                        class="w-full rounded border border-gray-300 px-2 py-0.5 text-xs"
+                                                        @input="onCsvRowSalesRepSearchInput(idx)" />
+                                                    <div v-for="r in (row.salesRepSearchResults ?? [])" :key="r.id"
+                                                        class="cursor-pointer border-b px-2 py-0.5 text-xs hover:bg-blue-50"
+                                                        @click="csvSelectSalesRepFromSearch(idx, r)">{{ r.name }}</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="mt-4 flex items-center justify-end gap-3">
+                            <button type="button"
+                                class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
+                                @click="closeCsvModal">キャンセル</button>
+                            <button type="button"
+                                class="rounded-lg bg-green-700 px-6 py-2 text-sm font-semibold text-white hover:bg-green-800 disabled:opacity-50"
+                                :disabled="csvUnresolvedCount > 0 || csvImporting"
+                                @click="executeCsvImport"
+                            >{{ csvImporting ? '保存中...' : `一括保存 (${csvAnalysisRows.length}件)` }}</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- インライン クライアント新規登録モーダル -->
+            <div
+                v-if="showInlineClientModal"
+                class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50"
+                @click.self="showInlineClientModal = false"
+            >
+                <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
+                    <h4 class="mb-4 text-base font-semibold text-gray-800">クライアント新規登録</h4>
+
+                    <!-- 重複メッセージ -->
+                    <div v-if="inlineClientNote" class="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                        {{ inlineClientNote }}
+                    </div>
+
+                    <template v-if="!inlineClientNote">
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">クライアント名 <span class="text-red-500">*</span></label>
+                                <input v-model="inlineClientForm.name" type="text"
+                                    class="w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Client ID（任意）</label>
+                                <input v-model="inlineClientForm.client_code" type="text"
+                                    class="w-full rounded border border-gray-300 px-3 py-2 text-sm font-mono" />
+                            </div>
+                        </div>
+                        <p class="mt-2 text-xs text-gray-400">※ 製版部署に紐づけて登録されます</p>
+                    </template>
+
+                    <div class="mt-4 flex gap-2 justify-end">
+                        <template v-if="inlineClientNote">
+                            <button type="button" @click="showInlineClientModal = false"
+                                class="rounded bg-blue-600 px-4 py-1.5 text-sm text-white hover:bg-blue-700">OK</button>
+                        </template>
+                        <template v-else>
+                            <button type="button" @click="showInlineClientModal = false"
+                                class="rounded border border-gray-300 px-4 py-1.5 text-sm hover:bg-gray-50">キャンセル</button>
+                            <button type="button" @click="saveInlineClient" :disabled="!inlineClientForm.name || inlineClientSaving"
+                                class="rounded bg-green-700 px-4 py-1.5 text-sm text-white hover:bg-green-800 disabled:opacity-50">
+                                {{ inlineClientSaving ? '登録中...' : '登録' }}
+                            </button>
+                        </template>
+                    </div>
+                </div>
+            </div>
+
+            <!-- インライン 営業担当新規登録モーダル -->
+            <div
+                v-if="showInlineSalesRepModal"
+                class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50"
+                @click.self="showInlineSalesRepModal = false"
+            >
+                <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
+                    <h4 class="mb-4 text-base font-semibold text-gray-800">営業担当新規登録</h4>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs text-gray-600 mb-1">氏名 <span class="text-red-500">*</span></label>
+                            <input v-model="inlineSalesRepForm.name" type="text"
+                                class="w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-600 mb-1">会社（任意）</label>
+                            <input v-model="inlineSalesRepForm.company" type="text"
+                                class="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                                placeholder="株式会社サンエー印刷 など" />
+                        </div>
+                    </div>
+                    <div class="mt-4 flex gap-2 justify-end">
+                        <button type="button" @click="showInlineSalesRepModal = false"
+                            class="rounded border border-gray-300 px-4 py-1.5 text-sm hover:bg-gray-50">キャンセル</button>
+                        <button type="button" @click="saveInlineSalesRep" :disabled="!inlineSalesRepForm.name || inlineSalesRepSaving"
+                            class="rounded bg-green-700 px-4 py-1.5 text-sm text-white hover:bg-green-800 disabled:opacity-50">
+                            {{ inlineSalesRepSaving ? '登録中...' : '登録' }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
 
     </AppLayout>
 </template>

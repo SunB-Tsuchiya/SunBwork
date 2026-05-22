@@ -915,11 +915,14 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
         Route::patch('board/{ticket}/archive', [\App\Http\Controllers\Prepress\BoardController::class, 'archiveFromCompleted'])->name('board.archiveFromCompleted');
         // 伝票登録モーダル用 API
         Route::get('api/clients', [\App\Http\Controllers\Prepress\BoardController::class, 'apiClients'])->name('api.clients');
+        Route::post('api/clients', [\App\Http\Controllers\Prepress\BoardController::class, 'apiClientCreate'])->name('api.clientCreate');
         Route::get('api/project-jobs', [\App\Http\Controllers\Prepress\BoardController::class, 'apiProjectJobs'])->name('api.projectJobs');
 
         // 伝票管理
         Route::get('tickets', [\App\Http\Controllers\Prepress\TicketController::class, 'index'])->name('tickets.index');
         Route::get('tickets/create', [\App\Http\Controllers\Prepress\TicketController::class, 'create'])->name('tickets.create');
+        Route::post('tickets/analyze-csv', [\App\Http\Controllers\Prepress\TicketController::class, 'analyzeCsv'])->name('tickets.analyzeCsv');
+        Route::post('tickets/import-csv',  [\App\Http\Controllers\Prepress\TicketController::class, 'importCsv'])->name('tickets.importCsv');
         Route::post('tickets', [\App\Http\Controllers\Prepress\TicketController::class, 'store'])->name('tickets.store');
         Route::get('tickets/{ticket}', [\App\Http\Controllers\Prepress\TicketController::class, 'show'])->name('tickets.show');
         Route::get('tickets/{ticket}/edit', [\App\Http\Controllers\Prepress\TicketController::class, 'edit'])->name('tickets.edit');
@@ -931,6 +934,15 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
         // 伝票OCR解析 API
         Route::post('ocr/analyze', [\App\Http\Controllers\Prepress\TicketOcrController::class, 'analyze'])->name('ocr.analyze');
         Route::post('ocr/clients/{client}/attach-department', [\App\Http\Controllers\Prepress\TicketOcrController::class, 'attachClientToDepartment'])->name('ocr.attach_department');
+
+        // 営業担当管理
+        Route::get('sales-reps', [\App\Http\Controllers\Prepress\SalesRepController::class, 'index'])->name('sales_reps.index');
+        Route::post('sales-reps', [\App\Http\Controllers\Prepress\SalesRepController::class, 'store'])->name('sales_reps.store');
+        Route::post('sales-reps/bulk', [\App\Http\Controllers\Prepress\SalesRepController::class, 'bulkStore'])->name('sales_reps.bulkStore');
+        Route::patch('sales-reps/{salesRep}', [\App\Http\Controllers\Prepress\SalesRepController::class, 'update'])->name('sales_reps.update');
+        Route::delete('sales-reps/{salesRep}', [\App\Http\Controllers\Prepress\SalesRepController::class, 'destroy'])->name('sales_reps.destroy');
+        Route::get('api/sales-reps',  [\App\Http\Controllers\Prepress\SalesRepController::class, 'apiList'])->name('api.salesReps');
+        Route::post('api/sales-reps', [\App\Http\Controllers\Prepress\SalesRepController::class, 'apiCreate'])->name('api.salesRepCreate');
     });
 
 // 全ロール共通（読み取り専用）

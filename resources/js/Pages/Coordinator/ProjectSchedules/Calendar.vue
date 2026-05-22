@@ -90,12 +90,12 @@ const weekPostsUrl = computed(() =>
             <div class="flex items-center gap-3">
                 <Link
                     :href="route('coordinator.project_jobs.calendar')"
-                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300"
                 >← カレンダー一覧に戻る</Link>
-                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">案件スケジュール</h2>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">案件スケジュール</h2>
             </div>
         </template>
-        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
+        <div class="rounded bg-white p-6 shadow">
                     <!-- Project header: show project name and client when available -->
                     <div class="mb-4 flex items-baseline justify-between">
                         <div>

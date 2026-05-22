@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Prepress;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\Department;
+use App\Models\PrepresSalesRep;
 use App\Models\PrepressTicket;
 use App\Models\ProjectJob;
 use Illuminate\Http\JsonResponse;
@@ -17,14 +18,21 @@ class BoardController extends Controller
     {
         $this->authorizePrepress($request->user());
 
-        $tickets = PrepressTicket::where('status', '!=', PrepressTicket::STATUS_DELETED)->orderByDesc('updated_at')->get([
-            'id', 'title', 'jobcode', 'project_name', 'client_name', 'memo', 'status', 'image_path', 'created_at',
-            'submission_date', 'sb_delivery_date',
-        ])->each->append('image_url');
+        $tickets = PrepressTicket::with('salesRepEntry:id,name,company')
+            ->where('status', '!=', PrepressTicket::STATUS_DELETED)
+            ->orderByDesc('updated_at')
+            ->get([
+                'id', 'title', 'jobcode', 'project_name', 'client_id', 'client_name',
+                'sales_rep', 'sales_rep_id', 'memo', 'status', 'image_path', 'created_at',
+                'submission_date', 'sb_delivery_date',
+            ])->each->append('image_url');
+
+        $salesReps = \App\Models\PrepresSalesRep::orderBy('name')->get(['id', 'name', 'company']);
 
         return inertia('Prepress/Board', [
-            'tickets'  => $tickets,
-            'statuses' => PrepressTicket::STATUS_LABELS,
+            'tickets'   => $tickets,
+            'statuses'  => PrepressTicket::STATUS_LABELS,
+            'salesReps' => $salesReps,
         ]);
     }
 
@@ -128,6 +136,45 @@ class BoardController extends Controller
             ->get(['id', 'title', 'jobcode']);
 
         return response()->json($jobs);
+    }
+
+    /**
+     * CSV インライン: クライアント新規登録（製版部署に紐づける）
+     */
+    public function apiClientCreate(Request $request): JsonResponse
+    {
+        $this->authorizePrepress($request->user());
+
+        $validated = $request->validate([
+            'name'        => ['required', 'string', 'max:255'],
+            'client_code' => ['nullable', 'string', 'max:50'],
+        ]);
+
+        $dept = Department::where('name', '製版')->first();
+
+        // 名前が完全一致する既存クライアントがあれば新規作成せずそれを返す
+        $existing = Client::where('name', $validated['name'])->first();
+        if ($existing) {
+            if ($dept) {
+                $existing->departments()->syncWithoutDetaching([$dept->id]);
+            }
+            return response()->json([
+                'client'       => $existing->only(['id', 'name', 'client_code']),
+                'was_existing' => true,
+            ]);
+        }
+
+        $client = Client::create([
+            'name'        => $validated['name'],
+            'client_code' => $validated['client_code'] ?? null,
+            'company_id'  => $dept?->company_id,
+        ]);
+
+        if ($dept) {
+            $client->departments()->syncWithoutDetaching([$dept->id]);
+        }
+
+        return response()->json(['client' => $client->only(['id', 'name', 'client_code'])]);
     }
 
     protected function authorizePrepress($user): void

@@ -19,7 +19,7 @@
         </template>
 
         <!-- ── スティッキーヘッダー ──────────────────────────── -->
-        <div class="sticky top-0 z-20 rounded-t bg-white px-4 sm:px-6 pt-4 sm:pt-6 pb-0 shadow-md">
+        <div class="sticky top-0 z-20 rounded-t bg-white px-6 pt-6 pb-0 shadow-md">
 
             <!-- ── タイトル行 ──────────────────────────────────── -->
             <div class="mb-4">
@@ -45,29 +45,27 @@
                 </div>
 
                 <!-- アクションボタン群（サブリーダーの下） -->
-                <div class="mt-3 flex flex-wrap items-center gap-1.5 sm:gap-2">
-                    <!-- ── 常時表示ボタン ────────────────────────── -->
+                <div class="mt-3 flex flex-wrap items-center gap-2">
                     <button
                         type="button"
                         :class="job.completed
-                            ? 'rounded bg-gray-300 px-3 py-1 sm:px-4 sm:py-1.5 text-xs sm:text-sm font-medium text-gray-400 cursor-not-allowed'
-                            : 'rounded bg-yellow-600 px-3 py-1 sm:px-4 sm:py-1.5 text-xs sm:text-sm font-medium text-white hover:bg-yellow-700'"
+                            ? 'rounded bg-gray-300 px-4 py-1.5 text-sm font-medium text-gray-400 cursor-not-allowed'
+                            : 'rounded bg-yellow-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-yellow-700'"
                         :disabled="job.completed"
                         @click="goEdit"
                     >編集</button>
-
                     <!-- 共有済バッジ or 共有ボタン -->
                     <div class="relative" ref="shareButtonRef">
                         <button
                             v-if="sharedJobs.length > 0"
                             type="button"
-                            class="rounded border border-emerald-500 bg-emerald-50 px-3 py-1 sm:px-4 sm:py-1.5 text-xs sm:text-sm font-medium text-emerald-700 hover:bg-emerald-100"
+                            class="rounded border border-emerald-500 bg-emerald-50 px-4 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-100"
                             @click.stop="toggleSharedPopup"
                         >✓ 共有済 ({{ sharedJobs.length }})</button>
                         <button
                             v-else
                             type="button"
-                            class="rounded bg-emerald-600 px-3 py-1 sm:px-4 sm:py-1.5 text-xs sm:text-sm font-medium text-white hover:bg-emerald-700"
+                            class="rounded bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-emerald-700"
                             @click="openShareModal"
                         >共有</button>
 
@@ -96,123 +94,67 @@
                             </div>
                         </div>
                     </div>
-
                     <button
                         type="button"
-                        :class="job.completed
-                            ? 'rounded bg-gray-300 px-3 py-1 sm:px-4 sm:py-1.5 text-xs sm:text-sm font-medium text-gray-400 cursor-not-allowed'
-                            : 'rounded bg-indigo-600 px-3 py-1 sm:px-4 sm:py-1.5 text-xs sm:text-sm font-medium text-white hover:bg-indigo-700'"
-                        :disabled="job.completed"
-                        @click="goJobAssign"
-                    >ジョブ割り当て</button>
-
-                    <!-- 完了 / 未完了 -->
-                    <button
-                        v-if="!job.completed"
-                        type="button"
-                        class="rounded bg-green-600 px-3 py-1 sm:px-4 sm:py-1.5 text-xs sm:text-sm font-medium text-white hover:bg-green-700"
-                        @click="completeJob"
-                    >完了にする</button>
-                    <template v-else>
-                        <span class="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 sm:px-3 sm:py-1 text-xs sm:text-sm font-medium text-yellow-800">完了済み</span>
-                        <button
-                            type="button"
-                            class="rounded bg-orange-500 px-3 py-1 sm:px-4 sm:py-1.5 text-xs sm:text-sm font-medium text-white hover:bg-orange-600"
-                            @click="uncompleteJob"
-                        >未完了に戻す</button>
-                    </template>
-
-                    <!-- ── SM以上のみ表示ボタン ─────────────────── -->
-                    <button
-                        type="button"
-                        class="hidden sm:inline-flex rounded border border-blue-400 px-4 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-50"
+                        class="rounded border border-blue-400 px-4 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-50"
                         @click="cloneJob"
                     >案件複製</button>
                     <button
                         type="button"
-                        class="hidden sm:inline-flex rounded bg-cyan-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-cyan-700"
+                        class="rounded bg-cyan-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-cyan-700"
                         @click="goMemberSchedule"
                     >メンバー予定表</button>
                     <button
                         type="button"
-                        class="hidden sm:inline-flex rounded border border-indigo-300 bg-white px-4 py-1.5 text-sm font-medium text-indigo-600 hover:bg-indigo-50"
+                        :class="job.completed
+                            ? 'rounded bg-gray-300 px-4 py-1.5 text-sm font-medium text-gray-400 cursor-not-allowed'
+                            : 'rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700'"
+                        :disabled="job.completed"
+                        @click="goJobAssign"
+                    >ジョブ割り当て</button>
+                    <button
+                        type="button"
+                        class="rounded border border-indigo-300 bg-white px-4 py-1.5 text-sm font-medium text-indigo-600 hover:bg-indigo-50"
                         @click="goAssignmentList"
                     >割り当て一覧</button>
                     <button
                         type="button"
-                        class="hidden sm:inline-flex rounded bg-teal-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-teal-700"
+                        class="rounded bg-teal-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-teal-700"
                         @click="goAnalysis"
                     >作業分析</button>
+                    <!-- 完了 / 未完了 -->
+                    <button
+                        v-if="!job.completed"
+                        type="button"
+                        class="rounded bg-green-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-green-700"
+                        @click="completeJob"
+                    >完了にする</button>
+                    <template v-else>
+                        <span class="inline-flex items-center rounded-full bg-yellow-100 px-3 py-1 text-sm font-medium text-yellow-800">完了済み</span>
+                        <button
+                            type="button"
+                            class="rounded bg-orange-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-orange-600"
+                            @click="uncompleteJob"
+                        >未完了に戻す</button>
+                    </template>
+                    <!-- 削除 -->
                     <button
                         type="button"
-                        class="hidden sm:inline-flex rounded bg-red-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-red-700"
+                        class="rounded bg-red-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-red-700"
                         @click="destroyJob"
                     >削除</button>
 
-                    <!-- ── モバイル用「その他」ドロップダウン ─── -->
-                    <div class="relative sm:hidden" ref="moreMenuRef">
-                        <button
-                            type="button"
-                            class="flex items-center gap-1 rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
-                            @click.stop="showMoreMenu = !showMoreMenu"
-                        >
-                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h.01M12 12h.01M19 12h.01" /></svg>
-                            その他
-                        </button>
-                        <div
-                            v-if="showMoreMenu"
-                            class="absolute left-0 top-full z-30 mt-1 w-40 rounded-lg border border-gray-200 bg-white shadow-lg"
-                            @click.stop
-                        >
-                            <button
-                                type="button"
-                                class="block w-full px-4 py-2.5 text-left text-sm text-blue-700 hover:bg-blue-50"
-                                @click="showMoreMenu = false; cloneJob()"
-                            >案件複製</button>
-                            <button
-                                type="button"
-                                class="block w-full px-4 py-2.5 text-left text-sm text-cyan-700 hover:bg-cyan-50"
-                                @click="showMoreMenu = false; goMemberSchedule()"
-                            >メンバー予定表</button>
-                            <button
-                                type="button"
-                                class="block w-full px-4 py-2.5 text-left text-sm text-indigo-600 hover:bg-indigo-50"
-                                @click="showMoreMenu = false; goAssignmentList()"
-                            >割り当て一覧</button>
-                            <button
-                                type="button"
-                                class="block w-full px-4 py-2.5 text-left text-sm text-teal-700 hover:bg-teal-50"
-                                @click="showMoreMenu = false; goAnalysis()"
-                            >作業分析</button>
-                            <div class="border-t border-gray-100" />
-                            <button
-                                type="button"
-                                class="block w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50"
-                                @click="showMoreMenu = false; destroyJob()"
-                            >削除</button>
-                        </div>
-                    </div>
                 </div>
             </div>
 
             <!-- ── タブバー ──────────────────────────────────────── -->
-            <!-- モバイル: セレクター -->
-            <div class="mt-2 sm:hidden border-b border-gray-200 pb-2">
-                <select
-                    v-model="activeTab"
-                    class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                >
-                    <option v-for="tab in tabs" :key="tab.key" :value="tab.key">{{ tab.label }}</option>
-                </select>
-            </div>
-            <!-- SM以上: タブボタン -->
-            <div class="mt-2 hidden sm:flex gap-1 border-b border-gray-200 overflow-x-auto">
+            <div class="mt-2 flex gap-1 border-b border-gray-200">
                 <button
                     v-for="tab in tabs"
                     :key="tab.key"
                     type="button"
                     :class="[
-                        'shrink-0 px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap',
+                        'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
                         activeTab === tab.key
                             ? 'border-indigo-500 text-indigo-700'
                             : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
@@ -223,7 +165,7 @@
         </div><!-- /sticky header -->
 
         <!-- ── タブコンテンツ ─────────────────────────────────── -->
-        <div class="rounded-b bg-white px-4 sm:px-6 pb-6 shadow-md">
+        <div class="rounded-b bg-white px-6 pb-6 shadow-md">
 
             <!-- 詳細メモ（概要タブのみ） -->
             <div
@@ -236,7 +178,6 @@
                 <!-- ── スケジュールセクション ──────────────────── -->
                 <section v-show="activeTab === 'schedule'" class="py-5">
                     <ProjectCalendar
-                        ref="projectCalendarRef"
                         :schedules="schedules"
                         :events="scheduleEvents"
                         :comments="[]"
@@ -375,105 +316,6 @@
                         </table>
                     </div>
                     <p v-else class="text-sm text-gray-400">進行管理表なし</p>
-                </section>
-
-                <!-- ── 項目リストセクション ──────────────────── -->
-                <section v-show="activeTab === 'item_list'" class="py-5">
-                    <div class="mb-3 flex items-center gap-4">
-                        <h3 class="font-semibold text-gray-800">項目リスト</h3>
-                        <button
-                            v-if="!editingItemList"
-                            type="button"
-                            class="rounded border border-indigo-300 px-3 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
-                            @click="startEditItemList"
-                        >編集</button>
-                        <template v-else>
-                            <button
-                                type="button"
-                                class="rounded bg-indigo-600 px-3 py-1 text-xs font-medium text-white hover:bg-indigo-700"
-                                @click="saveItemList"
-                                :disabled="itemListSaving"
-                            >保存</button>
-                            <button
-                                type="button"
-                                class="rounded border border-gray-300 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
-                                @click="cancelEditItemList"
-                            >キャンセル</button>
-                        </template>
-                    </div>
-
-                    <!-- 表示モード -->
-                    <div v-if="!editingItemList">
-                        <div v-if="itemEntries.length > 0">
-                            <ul class="divide-y divide-gray-100 rounded border border-gray-200 bg-white">
-                                <li
-                                    v-for="(entry, idx) in itemEntries"
-                                    :key="entry.id ?? idx"
-                                    class="px-4 py-2 text-sm text-gray-800"
-                                >{{ entry.name }}</li>
-                            </ul>
-                            <p class="mt-1 text-xs text-gray-400">{{ itemEntries.length }} 件</p>
-                        </div>
-                        <p v-else class="text-sm text-gray-400">項目リスト未登録。「編集」ボタンから入力してください。</p>
-                    </div>
-
-                    <!-- 編集モード -->
-                    <div v-else>
-                        <p class="mb-2 text-xs text-gray-500">1行に1項目を入力してください。空行は無視されます。</p>
-                        <textarea
-                            v-model="itemListText"
-                            class="w-full rounded border border-gray-300 px-3 py-2 text-sm leading-relaxed focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                            rows="12"
-                            placeholder="序章初校作成&#10;第一章レイアウトデザイン&#10;第一章初校..."
-                        ></textarea>
-                    </div>
-                </section>
-
-                <!-- ── 工程シートセクション ───────────────────── -->
-                <section v-show="activeTab === 'workflow'" class="py-5">
-                    <div class="mb-3 flex items-center gap-4">
-                        <h3 class="font-semibold text-gray-800">工程シート</h3>
-                        <button
-                            type="button"
-                            class="rounded border border-indigo-300 px-3 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
-                            @click="showCreateWorkflowModal = true"
-                        >新規作成</button>
-                        <Link
-                            :href="route('coordinator.workflow_templates.index')"
-                            class="text-xs text-gray-500 hover:underline"
-                        >テンプレート管理</Link>
-                    </div>
-
-                    <div v-if="workflowSheets.length > 0" class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">シート名</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">作成日</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">操作</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-200 bg-white">
-                                <tr
-                                    v-for="ws in workflowSheets"
-                                    :key="ws.id"
-                                    class="cursor-pointer hover:bg-indigo-50"
-                                    @click="router.get(route('coordinator.workflow_sheets.show', { sheet: ws.id }))"
-                                >
-                                    <td class="px-4 py-2 text-sm font-medium text-gray-900">{{ ws.name }}</td>
-                                    <td class="px-4 py-2 text-sm text-gray-500">{{ ws.created_at }}</td>
-                                    <td class="px-4 py-2">
-                                        <Link
-                                            :href="route('coordinator.workflow_sheets.show', { sheet: ws.id })"
-                                            class="rounded bg-indigo-600 px-3 py-1 text-xs font-medium text-white hover:bg-indigo-700"
-                                            @click.stop
-                                        >開く</Link>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <p v-else class="text-sm text-gray-400">工程シートなし</p>
                 </section>
 
                 <!-- ── ジョブ履歴セクション ───────────────────── -->
@@ -704,16 +546,14 @@
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="font-semibold text-gray-800">伝票情報</h3>
                         <!-- 画像がない場合のアップロードボタン -->
-                        <button
+                        <label
                             v-if="!job.image_url && !job.completed"
-                            type="button"
-                            class="rounded-lg border border-green-700 px-4 py-1.5 text-sm font-medium text-green-700 hover:bg-green-50 disabled:opacity-50"
-                            :disabled="isVoucherOcrLoading"
-                            @click="openVoucherOcrModal"
+                            class="cursor-pointer rounded-lg border border-green-700 px-4 py-1.5 text-sm font-medium text-green-700 hover:bg-green-50"
+                            :class="{ 'opacity-50 pointer-events-none': voucherForm.processing }"
                         >
-                            <span v-if="isVoucherOcrLoading">OCR解析中...</span>
-                            <span v-else>📎 画像をアップロード</span>
-                        </button>
+                            {{ voucherForm.processing ? 'アップロード中...' : '📎 画像をアップロード' }}
+                            <input type="file" accept="image/*,.pdf" class="hidden" :disabled="voucherForm.processing" @change="onVoucherFileChange" />
+                        </label>
                     </div>
 
                     <!-- 画像あり -->
@@ -733,23 +573,17 @@
                                 class="rounded border border-gray-300 px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-50"
                                 @click="showVoucherLightbox = true"
                             >🔍 拡大</button>
-                            <!-- 差し替えボタン（OCRモーダル経由） -->
-                            <button
-                                v-if="!job.completed"
-                                type="button"
-                                class="rounded border border-blue-400 px-2 py-0.5 text-xs text-blue-600 hover:bg-blue-50 disabled:opacity-50"
-                                :disabled="isVoucherOcrLoading"
-                                @click="openVoucherOcrModal"
-                            >
-                                <span v-if="isVoucherOcrLoading">OCR解析中...</span>
-                                <span v-else>📁 差し替え</span>
-                            </button>
+                            <!-- 差し替えボタン -->
+                            <label v-if="!job.completed" class="cursor-pointer rounded border border-blue-400 px-2 py-0.5 text-xs text-blue-600 hover:bg-blue-50" :class="{ 'opacity-50 pointer-events-none': voucherForm.processing }">
+                                {{ voucherForm.processing ? 'アップロード中...' : '📁 差し替え' }}
+                                <input type="file" accept="image/*,.pdf" class="hidden" :disabled="voucherForm.processing" @change="onVoucherFileChange" />
+                            </label>
                             <!-- 削除ボタン -->
                             <button
                                 v-if="!job.completed"
                                 type="button"
                                 class="rounded border border-red-400 px-2 py-0.5 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50"
-                                :disabled="isVoucherOcrLoading"
+                                :disabled="voucherForm.processing"
                                 @click="confirmDeleteVoucherImage"
                             >✕ 削除</button>
                         </div>
@@ -761,7 +595,7 @@
 
                 <!-- ── 連携設定タブ ──────────────────────────────── -->
                 <section v-show="activeTab === 'items'" class="py-5">
-                    <ProjectJobItemsTab :progress-sheets="progressSheets" :job-id="job.id" />
+                    <ProjectJobItemsTab :progress-sheets="progressSheets" />
                 </section>
 
                 <!-- 校正依頼履歴 -->
@@ -924,7 +758,6 @@
                                     v-model="row.start_date"
                                     type="date"
                                     :disabled="!row.selected"
-                                    @change="row.end_date = row.end_date || row.start_date"
                                     class="rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-400 focus:outline-none disabled:bg-gray-50"
                                 />
                                 <input
@@ -993,50 +826,6 @@
             <div class="flex justify-end gap-3">
                 <button type="button" class="rounded border border-gray-300 px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-50" @click="showReorderModal = false">キャンセル</button>
                 <button type="button" class="rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700" @click="saveSheetOrder">保存</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- ── 工程シート 新規作成モーダル ──────────────────────────── -->
-    <div
-        v-if="showCreateWorkflowModal"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-        @click.self="showCreateWorkflowModal = false"
-    >
-        <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-            <h3 class="mb-4 text-lg font-semibold text-gray-800">工程シートを新規作成</h3>
-            <div class="mb-4">
-                <label class="mb-1 block text-sm font-medium text-gray-700">シート名 <span class="text-red-500">*</span></label>
-                <input
-                    v-model="newWorkflowName"
-                    type="text"
-                    class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                    placeholder="例：書籍A 組版工程"
-                    @keyup.enter="submitCreateWorkflow"
-                />
-            </div>
-            <div class="mb-5">
-                <label class="mb-1 block text-sm font-medium text-gray-700">テンプレート（任意）</label>
-                <select
-                    v-model="newWorkflowTemplateId"
-                    class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
-                >
-                    <option :value="null">── テンプレートなし（デフォルト4工程）</option>
-                    <option v-for="t in workflowTemplates" :key="t.id" :value="t.id">{{ t.name }}</option>
-                </select>
-            </div>
-            <div class="flex justify-end gap-3">
-                <button
-                    type="button"
-                    class="rounded border border-gray-300 px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
-                    @click="showCreateWorkflowModal = false"
-                >キャンセル</button>
-                <button
-                    type="button"
-                    class="rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-                    :disabled="!newWorkflowName.trim() || newWorkflowCreating"
-                    @click="submitCreateWorkflow"
-                >作成</button>
             </div>
         </div>
     </div>
@@ -1133,78 +922,10 @@
         </div>
     </Teleport>
 
-    <!-- 伝票OCR ファイル選択モーダル -->
-    <Teleport to="body">
-        <div
-            v-if="showVoucherOcrModal"
-            class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-            @click.self="closeVoucherOcrModal"
-        >
-            <div class="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
-                <h3 class="mb-4 text-lg font-semibold text-gray-800">伝票画像のアップロード</h3>
-
-                <!-- ドロップゾーン -->
-                <div
-                    class="rounded-lg border-2 border-dashed transition-colors"
-                    :class="isDragOverVoucher
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-300 bg-gray-50 hover:border-gray-400'"
-                    @dragenter.prevent="isDragOverVoucher = true"
-                    @dragleave.prevent="isDragOverVoucher = false"
-                    @dragover.prevent
-                    @drop.prevent="onVoucherOcrDrop"
-                >
-                    <div class="py-10 text-center">
-                        <!-- OCR解析中 -->
-                        <div v-if="isVoucherOcrLoading" class="text-blue-600">
-                            <svg class="mx-auto mb-3 h-9 w-9 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
-                            </svg>
-                            <p class="text-sm font-medium">OCR解析中...</p>
-                            <p class="mt-1 text-xs text-gray-400">しばらくお待ちください</p>
-                        </div>
-                        <!-- 待機中 -->
-                        <div v-else>
-                            <p class="text-3xl mb-3">📥</p>
-                            <p class="text-sm font-medium text-gray-600">PDFや画像をここにドロップ</p>
-                            <p class="mt-1 text-xs text-gray-400">または</p>
-                            <label class="mt-3 inline-block cursor-pointer rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
-                                ファイルを選択
-                                <input
-                                    type="file"
-                                    class="hidden"
-                                    accept="image/*,.pdf"
-                                    @change="onVoucherOcrFileChange"
-                                />
-                            </label>
-                            <p class="mt-3 text-xs text-gray-400">対応形式: PDF, JPG, PNG, GIF, WebP</p>
-                        </div>
-                    </div>
-                </div>
-
-                <button
-                    type="button"
-                    class="mt-4 w-full rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
-                    @click="closeVoucherOcrModal"
-                >キャンセル</button>
-            </div>
-        </div>
-    </Teleport>
-
-    <!-- OCR結果モーダル -->
-    <OcrModal
-        :show="showVoucherOcrResult"
-        :ocrResult="voucherOcrResult"
-        @apply="onVoucherOcrApply"
-        @close="showVoucherOcrResult = false"
-    />
-
 </template>
 
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
-import OcrModal from '@/Components/Prepress/OcrModal.vue';
 import ProjectJobItemsTab from '@/Components/ProjectJobItemsTab.vue';
 import ProjectCalendar from '@/Components/ProjectCalendar.vue';
 import { scheduleStatusColor } from '@/Helpers/scheduleColor.js';
@@ -1414,26 +1135,19 @@ async function submitCsvImport() {
 
 // ── タブ定義 ─────────────────────────────────────────────────────────────
 const tabs = [
-    { key: 'overview',     label: '概要・メンバー' },
-    { key: 'progress',     label: '進行管理表' },
-    { key: 'item_list',    label: '項目リスト' },
-    { key: 'workflow',     label: '管理シート' },
-    { key: 'schedule',     label: 'スケジュール' },
-    { key: 'voucher',      label: '伝票情報' },
-    { key: 'items',        label: '連携設定' },
-    { key: 'history',      label: 'ジョブ履歴' },
+    { key: 'overview',  label: '概要・メンバー' },
+    { key: 'progress',  label: '進行管理表' },
+    { key: 'schedule',  label: 'スケジュール' },
+    { key: 'voucher',   label: '伝票情報' },
+    { key: 'items',     label: '連携設定' },
+    { key: 'history',   label: 'ジョブ履歴' },
 ];
-const activeTab = ref((() => {
-    const fromUrl = new URLSearchParams(window.location.search).get('tab');
-    if (fromUrl) return fromUrl;
-    try { return localStorage.getItem(`project_job_tab_${job.id}`) || 'overview'; } catch (e) { return 'overview'; }
-})());
+const activeTab = ref(new URLSearchParams(window.location.search).get('tab') || 'overview');
 
 // スケジュールタブの ProjectCalendar ref
 // 初回表示時に FullCalendar のサイズを再計算（v-showで隠された状態で mount されるため）
 const projectCalendarRef = ref(null);
 watch(activeTab, (tab) => {
-    try { localStorage.setItem(`project_job_tab_${job.id}`, tab); } catch (e) {}
     if (tab === 'schedule') {
         nextTick(() => projectCalendarRef.value?.updateCalendarSize?.());
     }
@@ -1443,110 +1157,6 @@ watch(activeTab, (tab) => {
 const showVoucherLightbox = ref(false);
 const voucherForm = useForm({ image: null });
 
-// ── 伝票OCR ──────────────────────────────────────────────────────────────────
-const showVoucherOcrModal    = ref(false); // ファイル選択モーダル
-const isVoucherOcrLoading    = ref(false);
-const isDragOverVoucher      = ref(false);
-const showVoucherOcrResult   = ref(false); // OcrModal
-const voucherOcrResult       = ref({});
-const voucherOcrFileInput    = ref(null);
-
-function openVoucherOcrModal() {
-    showVoucherOcrModal.value = true;
-}
-
-function closeVoucherOcrModal() {
-    showVoucherOcrModal.value = false;
-    isVoucherOcrLoading.value = false;
-    isDragOverVoucher.value   = false;
-}
-
-async function triggerVoucherOcr(file) {
-    // モーダルはそのまま表示（ドロップゾーン内にスピナーを出す）
-    isVoucherOcrLoading.value = true;
-    try {
-        const fd = new FormData();
-        fd.append('image', file);
-        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
-        const res = await axios.post(route('coordinator.project_jobs.ocr.analyze'), fd, {
-            headers: { 'X-CSRF-TOKEN': csrf, 'Content-Type': 'multipart/form-data' },
-        });
-        voucherOcrResult.value     = res.data;
-        showVoucherOcrModal.value  = false; // 結果モーダルを出す前に閉じる
-        showVoucherOcrResult.value = true;
-    } catch {
-        showVoucherOcrModal.value = false;
-        alert('OCR解析に失敗しました。ファイルを確認して再試行してください。');
-    } finally {
-        isVoucherOcrLoading.value = false;
-    }
-}
-
-function onVoucherOcrDrop(e) {
-    isDragOverVoucher.value = false;
-    const file = e.dataTransfer?.files?.[0];
-    if (file) triggerVoucherOcr(file);
-}
-
-async function onVoucherOcrFileChange(e) {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    await triggerVoucherOcr(file);
-}
-
-async function onVoucherOcrApply(result) {
-    showVoucherOcrResult.value = false;
-
-    // 更新が必要なフィールドを確認
-    const currentJobcode  = job.jobcode  ?? '';
-    const currentTitle    = job.title    ?? '';
-    const currentClientId = String(job.client_id ?? '');
-    const newJobcode  = result.jobcode     ?? '';
-    const newTitle    = result.title       ?? '';
-    const newClientId = String(result.client_id ?? '');
-
-    const hasFieldDiff = (newJobcode && newJobcode !== currentJobcode)
-        || (newTitle && newTitle !== currentTitle)
-        || (newClientId && newClientId !== currentClientId);
-
-    let updateFields = false;
-    if (hasFieldDiff) {
-        const changes = [];
-        if (newJobcode && newJobcode !== currentJobcode)       changes.push(`伝票番号: 「${currentJobcode || '未設定'}」→「${newJobcode}」`);
-        if (newTitle   && newTitle   !== currentTitle)         changes.push(`案件名: 「${currentTitle}」→「${newTitle}」`);
-        if (newClientId && newClientId !== currentClientId)    changes.push(`クライアント: 「${job.client?.name ?? '未設定'}」→「${result.client_name ?? ''}」`);
-        updateFields = confirm(
-            `以下の差分を案件詳細に反映しますか？\n\n` +
-            changes.join('\n') +
-            `\n\n「OK」で反映、「キャンセル」で画像のみ保存します。`
-        );
-    }
-
-    // applyOcrResult エンドポイントを呼ぶ
-    try {
-        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
-        const payload = {
-            tmp_image_path:    result.tmp_image_path,
-            original_filename: result.original_filename ?? '',
-            update_fields:     updateFields,
-        };
-        if (updateFields) {
-            if (newJobcode)  payload.jobcode   = newJobcode;
-            if (newTitle)    payload.title     = newTitle;
-            if (newClientId) payload.client_id = parseInt(newClientId, 10);
-        }
-        await axios.patch(
-            route('coordinator.project_jobs.ocr.apply', { projectJob: job.id }),
-            payload,
-            { headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' } }
-        );
-        router.reload({ preserveScroll: true });
-    } catch {
-        alert('画像の保存に失敗しました。');
-    }
-}
-
 function onVoucherFileChange(e) {
     const file = e.target.files?.[0];
     e.target.value = '';
@@ -1555,10 +1165,7 @@ function onVoucherFileChange(e) {
     voucherForm.post(route('coordinator.project_jobs.image.store', { projectJob: job.id }), {
         forceFormData: true,
         preserveScroll: true,
-        onSuccess: () => {
-            voucherForm.reset();
-            router.reload({ only: ['job'], preserveScroll: true });
-        },
+        onSuccess: () => { voucherForm.reset(); },
         onError: () => { alert('画像のアップロードに失敗しました。'); },
     });
 }
@@ -1567,7 +1174,6 @@ function confirmDeleteVoucherImage() {
     if (!confirm('伝票画像を削除しますか？')) return;
     router.delete(route('coordinator.project_jobs.image.destroy', { projectJob: job.id }), {
         preserveScroll: true,
-        onSuccess: () => { router.reload({ only: ['job'], preserveScroll: true }); },
     });
 }
 
@@ -1689,14 +1295,9 @@ const showSharedPopup = ref(false);
 function toggleSharedPopup() {
     showSharedPopup.value = !showSharedPopup.value;
 }
-// その他メニュー（モバイル用）
-const showMoreMenu = ref(false);
-// ポップアップ・メニュー外クリックで閉じる
+// ポップアップ外クリックで閉じる
 if (typeof window !== 'undefined') {
-    window.addEventListener('click', () => {
-        showSharedPopup.value = false;
-        showMoreMenu.value    = false;
-    });
+    window.addEventListener('click', () => { showSharedPopup.value = false; });
 }
 
 const showShareModal    = ref(false);
@@ -2021,80 +1622,6 @@ function saveSheetOrder() {
         router.reload({ only: ['progressSheets'] });
     });
 }
-// ── 項目リスト ────────────────────────────────────────────────────────────
-
-const itemEntries    = computed(() => Array.isArray(page.props.itemEntries) ? page.props.itemEntries : []);
-const editingItemList = ref(false);
-const itemListText   = ref('');
-const itemListSaving = ref(false);
-
-function startEditItemList() {
-    itemListText.value = itemEntries.value.map((e) => e.name).join('\n');
-    editingItemList.value = true;
-}
-
-function cancelEditItemList() {
-    editingItemList.value = false;
-    itemListText.value = '';
-}
-
-async function saveItemList() {
-    itemListSaving.value = true;
-    const names = itemListText.value
-        .split('\n')
-        .map((s) => s.trim())
-        .filter(Boolean);
-    const entries = names.map((name, idx) => ({ name, sort_order: idx }));
-    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
-    try {
-        await fetch(route('coordinator.item_entries.update', { projectJob: job.id }), {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': csrf,
-                'X-Requested-With': 'XMLHttpRequest',
-            },
-            credentials: 'same-origin',
-            body: JSON.stringify({ entries }),
-        });
-        editingItemList.value = false;
-        router.reload({ only: ['itemEntries'] });
-    } catch (e) {
-        alert('保存に失敗しました');
-    } finally {
-        itemListSaving.value = false;
-    }
-}
-
-// ── 工程シート ────────────────────────────────────────────────────────────
-
-const workflowSheets          = computed(() => Array.isArray(page.props.workflowSheets) ? page.props.workflowSheets : []);
-const workflowTemplates       = computed(() => Array.isArray(page.props.workflowTemplates) ? page.props.workflowTemplates : []);
-const showCreateWorkflowModal = ref(false);
-const newWorkflowName         = ref('');
-const newWorkflowTemplateId   = ref(null);
-const newWorkflowCreating     = ref(false);
-
-async function submitCreateWorkflow() {
-    if (!newWorkflowName.value.trim()) return;
-    newWorkflowCreating.value = true;
-    router.post(
-        route('coordinator.project_jobs.workflow_sheets.store', { projectJob: job.id }),
-        {
-            name:        newWorkflowName.value.trim(),
-            template_id: newWorkflowTemplateId.value || null,
-        },
-        {
-            onFinish: () => {
-                newWorkflowCreating.value = false;
-                showCreateWorkflowModal.value = false;
-                newWorkflowName.value = '';
-                newWorkflowTemplateId.value = null;
-            },
-        }
-    );
-}
-
 // ── ジョブ履歴 ────────────────────────────────────────────────────────────
 
 const hideHistoryCompleted = ref(false);

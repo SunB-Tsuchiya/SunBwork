@@ -18,6 +18,8 @@ class PrepressTicket extends Model
         'title',
         'project_name',
         'client_name',
+        'sales_rep',
+        'sales_rep_id',
         'memo',
         'submission_date',
         'sb_delivery_date',
@@ -36,6 +38,7 @@ class PrepressTicket extends Model
     const STATUS_PENDING     = 'pending';
     const STATUS_IN_PROGRESS = 'in_progress';
     const STATUS_SUBMITTING  = 'submitting';
+    const STATUS_OUTPUTTING  = 'outputting';
     const STATUS_COMPLETED   = 'completed';
     const STATUS_DELETED     = 'deleted';
 
@@ -43,6 +46,7 @@ class PrepressTicket extends Model
         'pending'     => '準備',
         'in_progress' => '作業中',
         'submitting'  => '入稿予定',
+        'outputting'  => '出稿中',
         'completed'   => '完了',
         'deleted'     => '削除',
     ];
@@ -60,6 +64,11 @@ class PrepressTicket extends Model
     public function client()
     {
         return $this->belongsTo(\App\Models\Client::class);
+    }
+
+    public function salesRepEntry()
+    {
+        return $this->belongsTo(PrepresSalesRep::class, 'sales_rep_id');
     }
 
     public function getStatusLabelAttribute(): string
