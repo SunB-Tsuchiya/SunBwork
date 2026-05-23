@@ -55,12 +55,11 @@ class UserController extends Controller
             $q->where('active', true);
         }])->where('active', true)->get();
 
-        $positionTitles = PositionTitle::orderBy('sort_order')->get()->groupBy('applicable_role');
+        $positionTitles = PositionTitle::orderBy('sort_order')->get(['id', 'name']);
 
         return Inertia::render('Admin/Users/Create', [
-            'companies'    => $companies,
-            'adminTitles'  => $positionTitles->get('admin',  collect())->values(),
-            'leaderTitles' => $positionTitles->get('leader', collect())->values(),
+            'companies'      => $companies,
+            'positionTitles' => $positionTitles,
         ]);
     }
 
@@ -178,13 +177,12 @@ class UserController extends Controller
             }]);
         }])->where('active', true)->get();
 
-        $positionTitles = PositionTitle::orderBy('sort_order')->get()->groupBy('applicable_role');
+        $positionTitles = PositionTitle::orderBy('sort_order')->get(['id', 'name']);
 
         return Inertia::render('Admin/Users/Edit', [
-            'user'         => $user,
-            'companies'    => $companies,
-            'adminTitles'  => $positionTitles->get('admin',  collect())->values(),
-            'leaderTitles' => $positionTitles->get('leader', collect())->values(),
+            'user'           => $user,
+            'companies'      => $companies,
+            'positionTitles' => $positionTitles,
         ]);
     }
 
@@ -462,12 +460,6 @@ class UserController extends Controller
                         $userData['employment_type'] = $employmentTypeResult['value'];
                     }
 
-                    // position_title は leader のみ設定可能
-                    if (!empty($userData['position_title']) && $userData['user_role'] !== 'leader') {
-                        $warnings[] = "行 {$line}: 役職称号はリーダーのみ設定できます（{$userData['user_role']} には無効）。役職称号を空にしました。";
-                        $userData['position_title']    = '';
-                        $userData['position_title_id'] = null;
-                    }
 
                     // CSV内重複チェック
                     if (in_array(strtolower($userData['email']), $seenEmails ?? [])) {
@@ -595,13 +587,10 @@ class UserController extends Controller
                         ->where('department_id', $department->id)
                         ->value('id');
                 }
-                // position_title_id の解決（leader のみ有効）
-                $position_title_id = null;
-                if (($userData['user_role'] ?? '') === 'leader') {
-                    $position_title_id = $userData['position_title_id'] ?? null;
-                    if (!$position_title_id && !empty($userData['position_title'])) {
-                        $position_title_id = \App\Models\PositionTitle::where('name', $userData['position_title'])->value('id');
-                    }
+                // position_title_id の解決（全ロール対応）
+                $position_title_id = $userData['position_title_id'] ?? null;
+                if (!$position_title_id && !empty($userData['position_title'])) {
+                    $position_title_id = \App\Models\PositionTitle::where('name', $userData['position_title'])->value('id');
                 }
                 $user = User::create([
                     'name'              => $userData['name'],

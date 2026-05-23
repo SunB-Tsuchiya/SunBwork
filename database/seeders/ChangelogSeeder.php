@@ -11,6 +11,37 @@ class ChangelogSeeder extends Seeder
     {
         $entries = [
             // ─────────────────────────────────────────────────────────────
+            // 0d. MISC-FIX-1 — 2026-05-24
+            // ─────────────────────────────────────────────────────────────
+            [
+                'version'      => 'misc-fix-1',
+                'title'        => '役職称号の全ロール対応・クライアント管理403修正・在席ボード名前幅拡張',
+                'released_at'  => '2026-05-24',
+                'summary'      => '役職称号（係長・主任）を admin/leader に限らず全ロールのユーザーに設定できるようにしました。クライアント管理で新規作成直後に「編集」が403になる問題を leader/coordinator/clerk を含む全ロールで修正。在席ボードのメンバー名が5文字で切れていたのを8文字程度まで表示できるよう拡張しました。',
+                'design_files' => [],
+                'claude_notes' => 'PositionTitlesSeeder に主任(sort_order=9)を追加。Admin/UserController・Leader/UserManagementController の positionTitles 渡しを全件統合し role フィルター廃止。CSV インポートの leader 限定制限も削除。ClientPolicy::view()/update() を superadmin/admin は無条件許可、leader/coordinator/clerk は company_id 一致または null の場合は通すよう変更（delete は update に委譲なので自動対応）。IrukaBoard.vue の名前 span を w-16 → w-28 に変更。',
+                'body'         => <<<'HTML'
+<section class="cl-problem">
+  <h3>背景・問題</h3>
+  <ul>
+    <li>役職称号（係長など）が admin/leader ロールのユーザーにしか設定できず、coordinator や user など他のロールには表示されなかった</li>
+    <li>クライアント管理でユーザーが新規作成したクライアントを即座に「編集」しようとすると403エラーが発生していた（company_id が null の場合にポリシーが弾いていた）。leader・coordinator でも同様の問題が起きうる状態だった</li>
+    <li>在席ボードのメンバー名が約5文字で省略されており、名前が長いメンバーのフルネームが確認できなかった</li>
+  </ul>
+</section>
+
+<section class="cl-fix">
+  <h3>修正内容</h3>
+  <ul>
+    <li>役職称号に「主任」を新規追加（係長の次）。全ロールのユーザー作成・編集フォームで選択できるようになった</li>
+    <li>クライアント管理の認可ポリシーを修正。superadmin/admin は全クライアントを管理可能、leader/coordinator/clerk は同一会社のクライアントを管理可能（company_id 未設定の場合も許可）</li>
+    <li>在席ボードのメンバー名表示幅を拡張し、7〜8文字程度まで省略なく表示されるようになった</li>
+  </ul>
+</section>
+HTML,
+            ],
+
+            // ─────────────────────────────────────────────────────────────
             // 0c. PJOB1 — 2026-05-23
             // ─────────────────────────────────────────────────────────────
             [

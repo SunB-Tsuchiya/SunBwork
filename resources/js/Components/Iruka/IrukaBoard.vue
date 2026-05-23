@@ -27,7 +27,7 @@
                     class="flex items-center gap-2 px-4 py-1.5 cursor-pointer hover:bg-blue-50 transition-colors"
                     @click="openModal(u)"
                 >
-                    <span class="w-16 shrink-0 font-bold text-cyan-700 text-sm truncate">{{ u.name }}</span>
+                    <span class="w-28 shrink-0 font-bold text-cyan-700 text-sm truncate">{{ u.name }}</span>
                     <span
                         v-if="u.comment"
                         class="flex-1 min-w-0 rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600 whitespace-pre-line"
@@ -54,7 +54,7 @@
                     class="flex items-center gap-2 px-4 py-1.5 cursor-pointer hover:bg-gray-50 transition-colors opacity-50"
                     @click="openModal(u)"
                 >
-                    <span class="w-16 shrink-0 font-bold text-gray-500 text-sm truncate">{{ u.name }}</span>
+                    <span class="w-28 shrink-0 font-bold text-gray-500 text-sm truncate">{{ u.name }}</span>
                     <span
                         v-if="u.comment"
                         class="flex-1 min-w-0 rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-500 whitespace-pre-line"

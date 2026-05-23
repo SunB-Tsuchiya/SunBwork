@@ -10,9 +10,8 @@ import { ref, computed, watch } from 'vue';
 
 // props: companies（親から渡す）
 const props = defineProps({
-    companies:    { type: Array, default: () => [] },
-    adminTitles:  { type: Array, default: () => [] },
-    leaderTitles: { type: Array, default: () => [] },
+    companies:      { type: Array, default: () => [] },
+    positionTitles: { type: Array, default: () => [] },
 });
 
 const form = useForm({
@@ -144,11 +143,7 @@ const availableAssignments = computed(() => {
 });
 
 // 選択中の user_role に応じて表示する役職称号
-const availablePositionTitles = computed(() => {
-    if (form.user_role === 'admin') return props.adminTitles;
-    if (form.user_role === 'leader') return props.leaderTitles;
-    return [];
-});
+const availablePositionTitles = computed(() => props.positionTitles);
 
 // user_role が変わったら役職称号をリセット
 watch(() => form.user_role, () => { form.position_title_id = ''; });

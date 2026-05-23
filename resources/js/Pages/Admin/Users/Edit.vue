@@ -9,10 +9,9 @@ import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 import { computed, watch } from 'vue';
 
 const props = defineProps({
-    user:         { type: Object, required: true },
-    companies:    { type: Array,  default: () => [] },
-    adminTitles:  { type: Array,  default: () => [] },
-    leaderTitles: { type: Array,  default: () => [] },
+    user:           { type: Object, required: true },
+    companies:      { type: Array,  default: () => [] },
+    positionTitles: { type: Array,  default: () => [] },
 });
 
 const EMPLOYMENT_TYPE_OPTIONS = [
@@ -65,11 +64,7 @@ const availableAssignments = computed(() => {
     return dept.assignments.filter(a => a.active);
 });
 
-const availablePositionTitles = computed(() => {
-    if (form.user_role === 'admin')  return props.adminTitles;
-    if (form.user_role === 'leader') return props.leaderTitles;
-    return [];
-});
+const availablePositionTitles = computed(() => props.positionTitles);
 
 watch(() => form.user_role,     () => { form.position_title_id = ''; });
 watch(() => form.company_id,    () => { form.department_id = ''; form.assignment_id = ''; });

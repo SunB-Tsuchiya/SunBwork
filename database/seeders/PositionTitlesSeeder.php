@@ -20,6 +20,7 @@ class PositionTitlesSeeder extends Seeder
             ['name' => '課長',     'applicable_role' => 'leader', 'sort_order' => 6],
             ['name' => '課長代理', 'applicable_role' => 'leader', 'sort_order' => 7],
             ['name' => '係長',     'applicable_role' => 'leader', 'sort_order' => 8],
+            ['name' => '主任',     'applicable_role' => 'leader', 'sort_order' => 9],
         ];
 
         foreach ($titles as $data) {

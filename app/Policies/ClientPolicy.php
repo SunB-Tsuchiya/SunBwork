@@ -12,14 +12,18 @@ class ClientPolicy
 
     /**
      * Determine whether the user can view the client.
-     * Allow when user's company_id matches client's company_id or when user is superadmin.
      */
-    public function view(User $user, Client $client)
+    public function view(User $user, Client $client): bool
     {
-        if ($user->user_role === 'superadmin') return true;
-        if (isset($user->company_id) && isset($client->company_id)) {
-            return intval($user->company_id) === intval($client->company_id);
+        if (in_array($user->user_role, ['superadmin', 'admin'])) return true;
+
+        if (in_array($user->user_role, ['leader', 'coordinator', 'clerk'])) {
+            if ($user->company_id && $client->company_id) {
+                return intval($user->company_id) === intval($client->company_id);
+            }
+            return true;
         }
+
         return false;
     }
 
@@ -34,14 +38,19 @@ class ClientPolicy
     }
 
     /**
-     * Update only allowed when same company or superadmin
+     * Update only allowed when same company or superadmin/admin
      */
-    public function update(User $user, Client $client)
+    public function update(User $user, Client $client): bool
     {
-        if ($user->user_role === 'superadmin') return true;
-        if (isset($user->company_id) && isset($client->company_id)) {
-            return intval($user->company_id) === intval($client->company_id);
+        if (in_array($user->user_role, ['superadmin', 'admin'])) return true;
+
+        if (in_array($user->user_role, ['leader', 'coordinator', 'clerk'])) {
+            if ($user->company_id && $client->company_id) {
+                return intval($user->company_id) === intval($client->company_id);
+            }
+            return true;
         }
+
         return false;
     }
 

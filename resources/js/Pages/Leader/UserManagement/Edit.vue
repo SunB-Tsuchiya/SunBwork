@@ -9,9 +9,9 @@ import { Link, useForm } from '@inertiajs/vue3';
 import { computed, watch } from 'vue';
 
 const props = defineProps({
-    editUser:     { type: Object, required: true },
-    assignments:  { type: Array,  default: () => [] },
-    leaderTitles: { type: Array,  default: () => [] },
+    editUser:       { type: Object, required: true },
+    assignments:    { type: Array,  default: () => [] },
+    positionTitles: { type: Array,  default: () => [] },
 });
 
 const EMPLOYMENT_TYPE_OPTIONS = [
@@ -36,9 +36,7 @@ const form = useForm({
     position_title_id: props.editUser.position_title_id ?? '',
 });
 
-const availablePositionTitles = computed(() =>
-    form.user_role === 'leader' ? props.leaderTitles : []
-);
+const availablePositionTitles = computed(() => props.positionTitles);
 
 watch(() => form.user_role, () => { form.position_title_id = ''; });
 

@@ -64,13 +64,11 @@ class UserManagementController extends Controller
             ->where('active', true)
             ->get(['id', 'name']);
 
-        $leaderTitles = PositionTitle::where('applicable_role', 'leader')
-            ->orderBy('sort_order')
-            ->get(['id', 'name']);
+        $positionTitles = PositionTitle::orderBy('sort_order')->get(['id', 'name']);
 
         return Inertia::render('Leader/UserManagement/Create', [
-            'assignments'  => $assignments,
-            'leaderTitles' => $leaderTitles,
+            'assignments'    => $assignments,
+            'positionTitles' => $positionTitles,
         ]);
     }
 
@@ -141,14 +139,12 @@ class UserManagementController extends Controller
             ->where('active', true)
             ->get(['id', 'name']);
 
-        $leaderTitles = PositionTitle::where('applicable_role', 'leader')
-            ->orderBy('sort_order')
-            ->get(['id', 'name']);
+        $positionTitles = PositionTitle::orderBy('sort_order')->get(['id', 'name']);
 
         return Inertia::render('Leader/UserManagement/Edit', [
-            'editUser'     => $user,
-            'assignments'  => $assignments,
-            'leaderTitles' => $leaderTitles,
+            'editUser'       => $user,
+            'assignments'    => $assignments,
+            'positionTitles' => $positionTitles,
         ]);
     }
 
