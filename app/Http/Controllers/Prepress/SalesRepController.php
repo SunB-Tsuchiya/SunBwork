@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Prepress;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\ManagesSalesReps;
 use App\Models\Department;
 use App\Models\PrepresSalesRep;
 use Illuminate\Http\JsonResponse;
@@ -11,85 +12,24 @@ use Inertia\Inertia;
 
 class SalesRepController extends Controller
 {
-    private function departments()
+    use ManagesSalesReps;
+
+    protected function salesRepsViewName(): string
     {
-        return Department::whereIn('id', [1, 2, 3])->orderBy('id')->get(['id', 'name']);
+        return 'Prepress/SalesReps/Index';
     }
 
-    public function index()
+    /** 製版部署専用ルートのため追加で権限チェックを行う */
+    protected function authorizeRoleAction($user): void
     {
-        $salesReps = PrepresSalesRep::with('departments:id,name')
-            ->orderBy('name')
-            ->get();
-
-        return Inertia::render('Prepress/SalesReps/Index', [
-            'salesReps'   => $salesReps,
-            'departments' => $this->departments(),
-        ]);
+        $this->authorizePrepress($user);
     }
 
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'name'           => ['required', 'string', 'max:100'],
-            'company'        => ['nullable', 'string', 'max:200'],
-            'department_ids' => ['nullable', 'array'],
-            'department_ids.*' => ['integer', 'exists:departments,id'],
-        ]);
-
-        $name = $this->normalizeName($validated['name']);
-
-        if (PrepresSalesRep::where('name', $name)->exists()) {
-            return back()->withErrors(['name' => '同じ名前の営業担当が既に登録されています。'])->withInput();
-        }
-
-        $rep = PrepresSalesRep::create([
-            'name'    => $name,
-            'company' => $validated['company'] ?? null,
-        ]);
-
-        if (!empty($validated['department_ids'])) {
-            $rep->departments()->sync($validated['department_ids']);
-        }
-
-        return back()->with('success', '営業担当を登録しました。');
-    }
-
-    public function update(Request $request, PrepresSalesRep $salesRep)
-    {
-        $validated = $request->validate([
-            'name'           => ['required', 'string', 'max:100'],
-            'company'        => ['nullable', 'string', 'max:200'],
-            'department_ids' => ['nullable', 'array'],
-            'department_ids.*' => ['integer', 'exists:departments,id'],
-        ]);
-
-        $name = $this->normalizeName($validated['name']);
-
-        if (PrepresSalesRep::where('name', $name)->where('id', '!=', $salesRep->id)->exists()) {
-            return back()->withErrors(['name' => '同じ名前の営業担当が既に登録されています。'])->withInput();
-        }
-
-        $salesRep->update([
-            'name'    => $name,
-            'company' => $validated['company'] ?? null,
-        ]);
-
-        $salesRep->departments()->sync($validated['department_ids'] ?? []);
-
-        return back()->with('success', '営業担当を更新しました。');
-    }
-
-    public function destroy(PrepresSalesRep $salesRep)
-    {
-        $salesRep->delete();
-        return back()->with('success', '営業担当を削除しました。');
-    }
-
+    // ── API（ボード・伝票モーダルから呼ばれる） ────────────────────────
     public function apiList()
     {
         return response()->json(
-            PrepresSalesRep::orderBy('name')->get(['id', 'name', 'company'])
+            PrepresSalesRep::orderBy('sort_order')->get(['id', 'name', 'company'])
         );
     }
 
@@ -100,60 +40,20 @@ class SalesRepController extends Controller
             'company' => ['nullable', 'string', 'max:200'],
         ]);
 
-        $name = $this->normalizeName($validated['name']);
+        $name = $this->normalizeRepName($validated['name']);
 
         if (PrepresSalesRep::where('name', $name)->exists()) {
             return response()->json(['error' => '同じ名前の営業担当が既に登録されています。'], 422);
         }
 
-        $rep = PrepresSalesRep::create(['name' => $name, 'company' => $validated['company'] ?? null]);
-
-        return response()->json(['rep' => $rep->only(['id', 'name', 'company'])]);
-    }
-
-    public function bulkStore(Request $request): JsonResponse
-    {
-        $this->authorizePrepress($request->user());
-
-        $validated = $request->validate([
-            'names'            => ['required', 'array', 'min:1'],
-            'names.*'          => ['required', 'string', 'max:100'],
-            'company'          => ['nullable', 'string', 'max:200'],
-            'department_ids'   => ['nullable', 'array'],
-            'department_ids.*' => ['integer', 'exists:departments,id'],
+        $maxOrder = PrepresSalesRep::max('sort_order') ?? 0;
+        $rep = PrepresSalesRep::create([
+            'name'       => $name,
+            'company'    => $validated['company'] ?? null,
+            'sort_order' => $maxOrder + 1,
         ]);
 
-        $names   = array_values(array_unique(array_filter(array_map(
-            fn($n) => $this->normalizeName($n),
-            $validated['names']
-        ))));
-        $company = $validated['company'] ?? null;
-        $deptIds = $validated['department_ids'] ?? [];
-
-        $existingNames = PrepresSalesRep::whereIn('name', $names)->pluck('name')->flip()->all();
-
-        $created = 0;
-        $skipped = 0;
-        foreach ($names as $name) {
-            if (!$name || array_key_exists($name, $existingNames)) {
-                $skipped++;
-                continue;
-            }
-            $rep = PrepresSalesRep::create(['name' => $name, 'company' => $company]);
-            if ($deptIds) {
-                $rep->departments()->syncWithoutDetaching($deptIds);
-            }
-            $existingNames[$name] = true;
-            $created++;
-        }
-
-        return response()->json(['created' => $created, 'skipped' => $skipped]);
-    }
-
-    /** 全角スペース → 半角、連続スペース → 1つ、前後トリム */
-    private function normalizeName(string $name): string
-    {
-        return trim(preg_replace('/[\x{3000}\s]+/u', ' ', $name));
+        return response()->json(['rep' => $rep->only(['id', 'name', 'company'])]);
     }
 
     private function authorizePrepress($user): void

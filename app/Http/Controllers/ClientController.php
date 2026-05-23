@@ -56,16 +56,19 @@ class ClientController extends Controller
             ]);
         }
 
-        // Coordinator / Clerk など: 自部署のみ
+        // Coordinator / Clerk: Leader と同様に登録済み + 未登録の2セクション表示
         $companyId = $user->company_id ?? null;
-        $query     = Client::with('departments:id,name')
-            ->forCompany($companyId)
-            ->whereHas('departments', fn($q) => $q->where('departments.id', $user->department_id));
-        $clients   = $showDormant ? $query->dormant()->get() : $query->active()->get();
+        $all = Client::with('departments:id,name')
+            ->forCompany($companyId);
+        $all = $showDormant ? $all->dormant()->get() : $all->active()->get();
+
+        $registered   = $all->filter(fn($c) => $c->departments->contains('id', $user->department_id))->values();
+        $unregistered = $all->filter(fn($c) => !$c->departments->contains('id', $user->department_id))->values();
 
         return Inertia::render('Clients/Index', [
-            'clients'     => $clients,
-            'showDormant' => $showDormant,
+            'clients'             => $registered,
+            'unregisteredClients' => $unregistered,
+            'showDormant'         => $showDormant,
         ]);
     }
 
@@ -210,12 +213,13 @@ class ClientController extends Controller
             ->with('success', $msg);
     }
 
-    /** Leader が自部署とのクライアント紐付けをトグルする */
+    /** Leader / Coordinator / Clerk が自部署とのクライアント紐付けをトグルする */
     public function toggleDepartment(Client $client)
     {
         $this->requireLeaderPermission('client_management');
         $user = Auth::user();
-        if ($user->user_role !== 'leader' || !$user->department_id) {
+        $allowedRoles = ['leader', 'coordinator', 'clerk'];
+        if (!in_array($user->user_role, $allowedRoles) || !$user->department_id) {
             abort(403);
         }
 
@@ -228,7 +232,7 @@ class ClientController extends Controller
             $msg = "「{$client->name}」を自部署に登録しました。";
         }
 
-        return redirect()->route('leader.clients.index')->with('success', $msg);
+        return redirect()->route("{$this->routePrefix()}.clients.index")->with('success', $msg);
     }
 
     public function show(Client $client)

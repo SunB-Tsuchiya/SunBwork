@@ -27,7 +27,7 @@ class BoardController extends Controller
                 'submission_date', 'sb_delivery_date',
             ])->each->append('image_url');
 
-        $salesReps = \App\Models\PrepresSalesRep::orderBy('name')->get(['id', 'name', 'company']);
+        $salesReps = \App\Models\PrepresSalesRep::orderBy('sort_order')->get(['id', 'name', 'company']);
 
         return inertia('Prepress/Board', [
             'tickets'   => $tickets,

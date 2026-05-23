@@ -538,6 +538,14 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 
         // 在席ボード管理（Leader用）
         Route::get('presence/board-settings', [App\Http\Controllers\PresenceBoardSettingsController::class, 'index'])->name('presence.board_settings');
+
+        // 営業担当管理（Leader用）
+        Route::get('sales-reps', [\App\Http\Controllers\Leader\SalesRepController::class, 'index'])->name('sales_reps.index');
+        Route::post('sales-reps', [\App\Http\Controllers\Leader\SalesRepController::class, 'store'])->name('sales_reps.store');
+        Route::post('sales-reps/bulk',    [\App\Http\Controllers\Leader\SalesRepController::class, 'bulkStore'])->name('sales_reps.bulkStore');
+        Route::post('sales-reps/reorder', [\App\Http\Controllers\Leader\SalesRepController::class, 'reorder'])->name('sales_reps.reorder');
+        Route::patch('sales-reps/{salesRep}', [\App\Http\Controllers\Leader\SalesRepController::class, 'update'])->name('sales_reps.update');
+        Route::delete('sales-reps/{salesRep}', [\App\Http\Controllers\Leader\SalesRepController::class, 'destroy'])->name('sales_reps.destroy');
     });
 
 // クライアント管理（Admin用）は上の admin グループに統合済み（重複削除）
@@ -596,6 +604,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('clients/{client}/last-job-config', [App\Http\Controllers\ClientController::class, 'lastJobConfig'])->name('clients.last_job_config');
         Route::post('clients/{client}/merge', [App\Http\Controllers\ClientController::class, 'merge'])->name('clients.merge');
         Route::post('clients/{client}/dormant', [App\Http\Controllers\ClientController::class, 'dormant'])->name('clients.dormant');
+        Route::post('clients/{client}/toggle-department', [App\Http\Controllers\ClientController::class, 'toggleDepartment'])->name('clients.toggle_department');
         Route::resource('clients', App\Http\Controllers\ClientController::class)->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
 
         // Project_job CRUD
@@ -822,6 +831,14 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('ghost-users', [App\Http\Controllers\Coordinator\GhostUserController::class, 'store'])->name('ghost_users.store');
         Route::delete('ghost-users/{ghostUserId}', [App\Http\Controllers\Coordinator\GhostUserController::class, 'destroy'])->name('ghost_users.destroy');
         Route::post('ghost-users/{ghostUserId}/switch', [App\Http\Controllers\Coordinator\GhostUserController::class, 'switch'])->name('ghost_users.switch');
+
+        // 営業担当管理（Coordinator用）
+        Route::get('sales-reps', [\App\Http\Controllers\Coordinator\SalesRepController::class, 'index'])->name('sales_reps.index');
+        Route::post('sales-reps', [\App\Http\Controllers\Coordinator\SalesRepController::class, 'store'])->name('sales_reps.store');
+        Route::post('sales-reps/bulk',    [\App\Http\Controllers\Coordinator\SalesRepController::class, 'bulkStore'])->name('sales_reps.bulkStore');
+        Route::post('sales-reps/reorder', [\App\Http\Controllers\Coordinator\SalesRepController::class, 'reorder'])->name('sales_reps.reorder');
+        Route::patch('sales-reps/{salesRep}', [\App\Http\Controllers\Coordinator\SalesRepController::class, 'update'])->name('sales_reps.update');
+        Route::delete('sales-reps/{salesRep}', [\App\Http\Controllers\Coordinator\SalesRepController::class, 'destroy'])->name('sales_reps.destroy');
     });
 
 // ゴーストセッション復帰（ghost ユーザーが呼ぶため coordinator middleware 外）
@@ -938,7 +955,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
         // 営業担当管理
         Route::get('sales-reps', [\App\Http\Controllers\Prepress\SalesRepController::class, 'index'])->name('sales_reps.index');
         Route::post('sales-reps', [\App\Http\Controllers\Prepress\SalesRepController::class, 'store'])->name('sales_reps.store');
-        Route::post('sales-reps/bulk', [\App\Http\Controllers\Prepress\SalesRepController::class, 'bulkStore'])->name('sales_reps.bulkStore');
+        Route::post('sales-reps/bulk',    [\App\Http\Controllers\Prepress\SalesRepController::class, 'bulkStore'])->name('sales_reps.bulkStore');
+        Route::post('sales-reps/reorder', [\App\Http\Controllers\Prepress\SalesRepController::class, 'reorder'])->name('sales_reps.reorder');
         Route::patch('sales-reps/{salesRep}', [\App\Http\Controllers\Prepress\SalesRepController::class, 'update'])->name('sales_reps.update');
         Route::delete('sales-reps/{salesRep}', [\App\Http\Controllers\Prepress\SalesRepController::class, 'destroy'])->name('sales_reps.destroy');
         Route::get('api/sales-reps',  [\App\Http\Controllers\Prepress\SalesRepController::class, 'apiList'])->name('api.salesReps');

@@ -662,6 +662,14 @@ function csvSelectSalesRepFromSearch(rowIndex, rep) {
 const csvUnresolvedCount = computed(() =>
     csvAnalysisRows.value.filter(r => r.status !== 'matched').length
 );
+// 受注番号重複によりスキップされる行数
+const csvDupSkipCount = computed(() =>
+    csvAnalysisRows.value.filter(r => r.jobcode_dup && r.jobcode_dup !== 'none').length
+);
+// 実際に登録される件数（重複スキップ分を除く）
+const csvImportableCount = computed(() =>
+    csvAnalysisRows.value.length - csvDupSkipCount.value
+);
 
 const csvRowClientSearch = ref({});
 const csvRowSalesRepSearch = ref({});
@@ -788,11 +796,15 @@ async function executeCsvImport() {
         client_name:  r.resolved_client_name  ?? r.raw_client_name ?? null,
     }));
     try {
-        await axios.post(route('prepress.tickets.importCsv'), { rows }, {
+        const res = await axios.post(route('prepress.tickets.importCsv'), { rows }, {
             headers: { 'X-CSRF-TOKEN': csrf },
         });
         closeCsvModal();
-        router.reload();
+        const imported = res.data?.imported ?? 0;
+        const skipped  = res.data?.skipped_dup ?? 0;
+        let msg = `${imported}件の伝票を登録しました。`;
+        if (skipped > 0) msg += `（受注番号重複により${skipped}件スキップ）`;
+        router.reload({ onSuccess: () => alert(msg) });
     } catch {
         alert('インポートに失敗しました。');
     } finally {
@@ -1612,6 +1624,9 @@ async function executeCsvImport() {
                             <span v-else class="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-700">
                                 クライアント全件解決済み
                             </span>
+                            <span v-if="csvDupSkipCount > 0" class="rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-semibold text-orange-700">
+                                受注番号重複 {{ csvDupSkipCount }}件スキップ
+                            </span>
                         </div>
 
                         <div class="max-h-[60vh] overflow-y-auto rounded-lg border">
@@ -1630,9 +1645,19 @@ async function executeCsvImport() {
                                     <tr
                                         v-for="(row, idx) in csvAnalysisRows"
                                         :key="idx"
-                                        :class="row.status === 'matched' ? 'bg-white' : row.status === 'candidates' ? 'bg-yellow-50' : 'bg-red-50'"
+                                        :class="row.jobcode_dup && row.jobcode_dup !== 'none'
+                                            ? 'bg-gray-100 opacity-60'
+                                            : row.status === 'matched' ? 'bg-white' : row.status === 'candidates' ? 'bg-yellow-50' : 'bg-red-50'"
                                     >
-                                        <td class="border-b px-3 py-2 font-mono whitespace-nowrap">{{ row.jobcode || '—' }}</td>
+                                        <td class="border-b px-3 py-2 font-mono whitespace-nowrap">
+                                            <span>{{ row.jobcode || '—' }}</span>
+                                            <span v-if="row.jobcode_dup === 'db'"
+                                                class="ml-1 inline-block rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700"
+                                                title="DBに同じ受注番号が登録済みのためスキップされます">DB重複</span>
+                                            <span v-else-if="row.jobcode_dup === 'csv'"
+                                                class="ml-1 inline-block rounded-full bg-yellow-100 px-1.5 py-0.5 text-[10px] font-semibold text-yellow-700"
+                                                title="CSV内に同じ受注番号が存在するためスキップされます">CSV重複</span>
+                                        </td>
                                         <td class="border-b px-3 py-2 whitespace-nowrap">{{ row.raw_client_name || '—' }}</td>
                                         <td class="border-b px-3 py-2 max-w-[160px] truncate">{{ row.title }}</td>
 
@@ -1769,7 +1794,10 @@ async function executeCsvImport() {
                                 class="rounded-lg bg-green-700 px-6 py-2 text-sm font-semibold text-white hover:bg-green-800 disabled:opacity-50"
                                 :disabled="csvUnresolvedCount > 0 || csvImporting"
                                 @click="executeCsvImport"
-                            >{{ csvImporting ? '保存中...' : `一括保存 (${csvAnalysisRows.length}件)` }}</button>
+                            >{{ csvImporting ? '保存中...'
+                                : csvDupSkipCount > 0
+                                    ? `一括保存 (${csvImportableCount}件) ※${csvDupSkipCount}件スキップ`
+                                    : `一括保存 (${csvAnalysisRows.length}件)` }}</button>
                         </div>
                     </div>
                 </div>

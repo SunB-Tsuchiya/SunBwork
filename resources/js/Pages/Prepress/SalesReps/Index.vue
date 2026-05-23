@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useForm, router } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import PrepressNavigationTabs from '@/Components/Tabs/PrepressNavigationTabs.vue';
@@ -15,6 +15,10 @@ const props = defineProps({
 });
 
 const PRESET_COMPANIES = ['株式会社サンエー印刷', '株式会社サン・ブレーン'];
+
+// ── ローカル並び順管理 ────────────────────────────────
+const localReps = ref([...props.salesReps]);
+watch(() => props.salesReps, (val) => { localReps.value = [...val]; });
 
 // ── 新規登録フォーム ──────────────────────────────────
 const showCreateForm = ref(false);
@@ -47,6 +51,7 @@ function submitCreate() {
             showCreateForm.value = false;
             createForm.reset();
             createCompanyMode.value = 'preset';
+            showToast('営業担当を登録しました。', 'success', 3000);
         },
         onError: (errors) => {
             showToast(errors.name ?? '登録に失敗しました。', 'error', 5000);
@@ -86,7 +91,10 @@ function submitEdit(rep) {
     };
     router.patch(route('prepress.sales_reps.update', { salesRep: rep.id }), payload, {
         preserveScroll: true,
-        onSuccess: () => { editingId.value = null; },
+        onSuccess: () => {
+            editingId.value = null;
+            showToast('更新しました。', 'success', 3000);
+        },
         onError: (errors) => {
             showToast(errors.name ?? '更新に失敗しました。', 'error', 5000);
         },
@@ -97,6 +105,7 @@ function destroy(rep) {
     if (!confirm(`「${rep.name}」を削除しますか？`)) return;
     router.delete(route('prepress.sales_reps.destroy', { salesRep: rep.id }), {
         preserveScroll: true,
+        onSuccess: () => { showToast('削除しました。', 'success', 3000); },
     });
 }
 
@@ -109,12 +118,45 @@ function deptLabel(rep) {
 const searchQ = ref('');
 const filteredReps = computed(() => {
     const q = searchQ.value.trim().toLowerCase();
-    if (!q) return props.salesReps;
-    return props.salesReps.filter(r =>
+    if (!q) return localReps.value;
+    return localReps.value.filter(r =>
         r.name.toLowerCase().includes(q) ||
         (r.company ?? '').toLowerCase().includes(q)
     );
 });
+
+// ── 並べ替え ──────────────────────────────────────────
+const reorderSaving = ref(false);
+
+async function saveOrder() {
+    reorderSaving.value = true;
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+    try {
+        await axios.post(route('prepress.sales_reps.reorder'), {
+            ids: localReps.value.map(r => r.id),
+        }, { headers: { 'X-CSRF-TOKEN': csrf } });
+    } catch {
+        showToast('並び順の保存に失敗しました。', 'error', 4000);
+    } finally {
+        reorderSaving.value = false;
+    }
+}
+
+function moveUp(idx) {
+    if (idx === 0) return;
+    const arr = [...localReps.value];
+    [arr[idx - 1], arr[idx]] = [arr[idx], arr[idx - 1]];
+    localReps.value = arr;
+    saveOrder();
+}
+
+function moveDown(idx) {
+    if (idx === localReps.value.length - 1) return;
+    const arr = [...localReps.value];
+    [arr[idx], arr[idx + 1]] = [arr[idx + 1], arr[idx]];
+    localReps.value = arr;
+    saveOrder();
+}
 
 // ── 一括挿入モード ────────────────────────────────────
 const bulkMode     = ref(false);
@@ -128,7 +170,7 @@ function toggleBulkMode() {
     bulkResult.value = null;
 }
 
-// 改行で分割・正規化（全角スペース→半角・連続スペース→1つ）して空行除去
+// 改行で分割・正規化して空行除去
 const bulkNames = computed(() =>
     bulkText.value.split('\n').map(n => normalizeName(n)).filter(n => n !== '')
 );
@@ -146,7 +188,7 @@ const bulkInternalDups = computed(() => {
 
 // DB登録済み重複
 const bulkDbDups = computed(() => {
-    const dbNames = new Set(props.salesReps.map(r => r.name));
+    const dbNames = new Set(localReps.value.map(r => r.name));
     return new Set(bulkNames.value.filter(n => dbNames.has(n)));
 });
 
@@ -171,9 +213,10 @@ async function executeBulkStore() {
         }, { headers: { 'X-CSRF-TOKEN': csrf } });
         bulkResult.value = res.data;
         bulkText.value   = '';
+        showToast(`${res.data.created}件の営業担当を登録しました。`, 'success', 4000);
         router.reload({ preserveScroll: true });
     } catch {
-        alert('登録に失敗しました。');
+        showToast('登録に失敗しました。', 'error', 4000);
     } finally {
         bulkSaving.value = false;
     }
@@ -203,6 +246,12 @@ async function executeBulkStore() {
                     @click="showCreateForm = !showCreateForm; bulkMode = false; bulkText = ''; bulkResult = null"
                     class="rounded bg-green-700 px-4 py-1.5 text-sm text-white hover:bg-green-800"
                 >+ 新規登録</button>
+                <span v-if="!searchQ && localReps.length > 1" class="text-xs text-gray-400">
+                    ↑↓ で表示順を変更できます
+                </span>
+                <span v-if="searchQ" class="text-xs text-gray-400">
+                    絞り込み中は並べ替えできません
+                </span>
             </div>
 
             <!-- 新規登録フォーム -->
@@ -326,6 +375,7 @@ async function executeBulkStore() {
                 <table class="w-full text-sm">
                     <thead class="bg-gray-50 text-xs text-gray-500 uppercase">
                         <tr>
+                            <th v-if="!searchQ" class="px-2 py-2 w-16 text-center">順序</th>
                             <th class="px-4 py-2 text-left">氏名</th>
                             <th class="px-4 py-2 text-left">会社</th>
                             <th class="px-4 py-2 text-left">部署</th>
@@ -334,12 +384,27 @@ async function executeBulkStore() {
                     </thead>
                     <tbody class="divide-y divide-gray-100">
                         <tr v-if="filteredReps.length === 0">
-                            <td colspan="4" class="px-4 py-6 text-center text-gray-400 text-sm">登録がありません</td>
+                            <td :colspan="searchQ ? 4 : 5" class="px-4 py-6 text-center text-gray-400 text-sm">登録がありません</td>
                         </tr>
 
-                        <template v-for="rep in filteredReps" :key="rep.id">
+                        <template v-for="(rep, idx) in filteredReps" :key="rep.id">
                             <!-- 通常行 -->
                             <tr v-if="editingId !== rep.id" class="hover:bg-gray-50">
+                                <!-- 並べ替えボタン（絞り込み非活性時のみ） -->
+                                <td v-if="!searchQ" class="px-2 py-1 text-center whitespace-nowrap">
+                                    <button
+                                        @click="moveUp(idx)"
+                                        :disabled="idx === 0 || reorderSaving"
+                                        class="rounded px-1 py-0.5 text-xs text-gray-500 hover:bg-gray-200 disabled:opacity-30 disabled:cursor-default"
+                                        title="上へ"
+                                    >▲</button>
+                                    <button
+                                        @click="moveDown(idx)"
+                                        :disabled="idx === localReps.length - 1 || reorderSaving"
+                                        class="rounded px-1 py-0.5 text-xs text-gray-500 hover:bg-gray-200 disabled:opacity-30 disabled:cursor-default"
+                                        title="下へ"
+                                    >▼</button>
+                                </td>
                                 <td class="px-4 py-2 font-medium">{{ rep.name }}</td>
                                 <td class="px-4 py-2 text-gray-600">{{ rep.company || '—' }}</td>
                                 <td class="px-4 py-2 text-gray-600">{{ deptLabel(rep) }}</td>
@@ -357,6 +422,7 @@ async function executeBulkStore() {
 
                             <!-- 編集行 -->
                             <tr v-else class="bg-yellow-50">
+                                <td v-if="!searchQ" class="px-2 py-1"></td>
                                 <td class="px-4 py-2">
                                     <input v-model="editForm.name" type="text"
                                         class="w-full rounded border border-gray-300 px-2 py-1 text-sm" />

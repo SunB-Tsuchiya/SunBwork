@@ -122,7 +122,7 @@ class TicketController extends Controller
             ];
         }
 
-        $salesReps = PrepresSalesRep::orderBy('name')->get(['id', 'name', 'company']);
+        $salesReps = PrepresSalesRep::orderBy('sort_order')->get(['id', 'name', 'company']);
 
         return inertia('Prepress/Tickets/Create', [
             'statuses'  => PrepressTicket::STATUS_LABELS,
@@ -155,7 +155,7 @@ class TicketController extends Controller
         $ticketData = $ticket->toArray();
         $ticketData['client_code'] = $ticket->client?->client_code;
 
-        $salesReps = PrepresSalesRep::orderBy('name')->get(['id', 'name', 'company']);
+        $salesReps = PrepresSalesRep::orderBy('sort_order')->get(['id', 'name', 'company']);
 
         return inertia('Prepress/Tickets/Edit', [
             'ticket'    => $ticketData,
@@ -182,6 +182,17 @@ class TicketController extends Controller
             'image'            => ['nullable', 'file', 'mimes:jpg,jpeg,png,gif,webp,heic,heif,pdf', 'max:20480'],
             'keep_image'       => ['nullable', 'boolean'],
         ]);
+
+        // 受注番号の重複チェック（自分自身を除く）
+        if (!empty($validated['jobcode'])) {
+            $dupExists = PrepressTicket::where('jobcode', $validated['jobcode'])
+                ->where('id', '!=', $ticket->id)
+                ->where('status', '!=', PrepressTicket::STATUS_DELETED)
+                ->exists();
+            if ($dupExists) {
+                return back()->withErrors(['jobcode' => 'この受注番号はすでに登録されています。'])->withInput();
+            }
+        }
 
         $clientName = $validated['client_name'] ?? null;
         if (!empty($validated['client_id'])) {
@@ -259,6 +270,16 @@ class TicketController extends Controller
             'use_job_image'      => ['nullable', 'boolean'],
             'tmp_ocr_image_path' => ['nullable', 'string', 'max:500'],
         ]);
+
+        // 受注番号の重複チェック
+        if (!empty($validated['jobcode'])) {
+            $dupExists = PrepressTicket::where('jobcode', $validated['jobcode'])
+                ->where('status', '!=', PrepressTicket::STATUS_DELETED)
+                ->exists();
+            if ($dupExists) {
+                return back()->withErrors(['jobcode' => 'この受注番号はすでに登録されています。'])->withInput();
+            }
+        }
 
         // client_id が指定されていれば DB から名前を取得して上書き
         $clientName = $validated['client_name'] ?? null;
@@ -429,7 +450,7 @@ class TicketController extends Controller
             ->get(['id', 'name', 'client_code']);
 
         // 営業担当一覧を取得
-        $dbSalesReps = PrepresSalesRep::orderBy('name')->get(['id', 'name', 'company']);
+        $dbSalesReps = PrepresSalesRep::orderBy('sort_order')->get(['id', 'name', 'company']);
 
         $rows = [];
         while (($line = fgetcsv($handle)) !== false) {
@@ -470,6 +491,33 @@ class TicketController extends Controller
         fclose($handle);
         @unlink($tmpPath);
 
+        // 受注番号の重複チェック（DB + CSV内）
+        $allJobcodes = array_filter(array_column($rows, 'jobcode'), fn($j) => $j !== '');
+        $dbDupJobcodes = [];
+        if (!empty($allJobcodes)) {
+            $dbDupJobcodes = PrepressTicket::whereIn('jobcode', $allJobcodes)
+                ->where('status', '!=', PrepressTicket::STATUS_DELETED)
+                ->pluck('jobcode')
+                ->flip()
+                ->all();
+        }
+        $seenInCsv = [];
+        foreach ($rows as &$row) {
+            $jc = $row['jobcode'];
+            if ($jc === '') {
+                $row['jobcode_dup'] = 'none';
+            } elseif (isset($dbDupJobcodes[$jc])) {
+                $row['jobcode_dup'] = 'db';
+                $seenInCsv[$jc]    = true;
+            } elseif (isset($seenInCsv[$jc])) {
+                $row['jobcode_dup'] = 'csv';
+            } else {
+                $row['jobcode_dup'] = 'none';
+                $seenInCsv[$jc]    = true;
+            }
+        }
+        unset($row);
+
         return response()->json(['rows' => $rows]);
     }
 
@@ -493,15 +541,41 @@ class TicketController extends Controller
         $userId = $request->user()->id;
         $now    = now();
 
-        $inserts = array_map(function ($row) use ($userId, $now) {
+        // DB側で受注番号の重複を再チェック（フロント解析後に他セッションで登録された場合も考慮）
+        $requestedJobcodes = array_filter(
+            array_map(fn($r) => $r['jobcode'] ?: null, $request->input('rows'))
+        );
+        $dbDupJobcodes = [];
+        if (!empty($requestedJobcodes)) {
+            $dbDupJobcodes = PrepressTicket::whereIn('jobcode', $requestedJobcodes)
+                ->where('status', '!=', PrepressTicket::STATUS_DELETED)
+                ->pluck('jobcode')
+                ->flip()
+                ->all();
+        }
+
+        $inserts     = [];
+        $skippedDup  = 0;
+        $seenInBatch = [];
+
+        foreach ($request->input('rows') as $row) {
+            $jc = $row['jobcode'] ?: null;
+            if ($jc !== null) {
+                if (isset($dbDupJobcodes[$jc]) || isset($seenInBatch[$jc])) {
+                    $skippedDup++;
+                    continue;
+                }
+                $seenInBatch[$jc] = true;
+            }
+
             $clientName = $row['client_name'] ?? null;
             if (!empty($row['client_id'])) {
                 $client = Client::find((int) $row['client_id']);
                 if ($client) $clientName = $client->name;
             }
-            return [
+            $inserts[] = [
                 'user_id'      => $userId,
-                'jobcode'      => $row['jobcode']     ?: null,
+                'jobcode'      => $jc,
                 'title'        => $row['title'],
                 'sales_rep'    => $row['sales_rep']   ?: null,
                 'sales_rep_id' => !empty($row['sales_rep_id']) ? (int) $row['sales_rep_id'] : null,
@@ -511,11 +585,13 @@ class TicketController extends Controller
                 'created_at'   => $now,
                 'updated_at'   => $now,
             ];
-        }, $request->input('rows'));
+        }
 
-        PrepressTicket::insert($inserts);
+        if (!empty($inserts)) {
+            PrepressTicket::insert($inserts);
+        }
 
-        return response()->json(['imported' => count($inserts)]);
+        return response()->json(['imported' => count($inserts), 'skipped_dup' => $skippedDup]);
     }
 
     protected function authorizePrepress($user): void

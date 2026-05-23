@@ -61,6 +61,10 @@ function getSettingsLink() {
     }
 }
 
+function tryRoute(name) {
+    try { return route(name); } catch { return null; }
+}
+
 function getGhostUsersLink() {
     try {
         return route('coordinator.ghost_users.index');
@@ -81,6 +85,7 @@ const tabs = computed(() => [
     { key: 'progress_report', href: getProgressReportLink(), label: '進行レポート' },
     { key: 'settings', href: getSettingsLink(), label: '設定' },
     { key: 'ghost_users', href: getGhostUsersLink(), label: 'テストユーザー' },
+    { key: 'sales_reps', href: tryRoute('coordinator.sales_reps.index'), label: '営業担当管理' },
 ].filter(t => t.href));
 
 function onMobileSelect(e) {
@@ -120,6 +125,7 @@ function onMobileSelect(e) {
             <Link :href="getProgressReportLink()" :class="tab('progress_report')"> 進行レポート </Link>
             <Link :href="getSettingsLink()" :class="tab('settings')"> 設定 </Link>
             <Link :href="getGhostUsersLink()" :class="tab('ghost_users')"> テストユーザー </Link>
+            <Link :href="route('coordinator.sales_reps.index')" :class="tab('sales_reps')"> 営業担当管理 </Link>
         </nav>
     </div>
 </template>
