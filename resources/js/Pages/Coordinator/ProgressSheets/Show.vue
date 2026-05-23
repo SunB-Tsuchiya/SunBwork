@@ -1348,8 +1348,8 @@ async function adminCompleteAssignment() {
   jobLinkDetailModal.value.completing = true;
   try {
     await callAssignmentApi(route('coordinator.progress_sheets.assignments.complete', { assignment: id }));
-    jobLinkDetailModal.value.completed = true;
     updateLocalCellCompleted(id, true);
+    jobLinkDetailModal.value.open = false;
   } catch { /* ignore */ }
   finally { jobLinkDetailModal.value.completing = false; }
 }
@@ -1360,8 +1360,8 @@ async function adminUncompleteAssignment() {
   jobLinkDetailModal.value.completing = true;
   try {
     await callAssignmentApi(route('coordinator.progress_sheets.assignments.uncomplete', { assignment: id }));
-    jobLinkDetailModal.value.completed = false;
     updateLocalCellCompleted(id, false);
+    jobLinkDetailModal.value.open = false;
   } catch { /* ignore */ }
   finally { jobLinkDetailModal.value.completing = false; }
 }

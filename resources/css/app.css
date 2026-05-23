@@ -5,3 +5,55 @@
 [x-cloak] {
     display: none;
 }
+
+/* Quill toolbar — ホバー時ツールチップ */
+.ql-toolbar button {
+    position: relative;
+}
+.ql-toolbar button[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(30, 30, 30, 0.85);
+    color: #fff;
+    padding: 3px 7px;
+    border-radius: 4px;
+    font-size: 11px;
+    white-space: nowrap;
+    z-index: 1000;
+    pointer-events: none;
+}
+.ql-toolbar .ql-picker-label[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 0;
+    background: rgba(30, 30, 30, 0.85);
+    color: #fff;
+    padding: 3px 7px;
+    border-radius: 4px;
+    font-size: 11px;
+    white-space: nowrap;
+    z-index: 1000;
+    pointer-events: none;
+}
+
+/* Quill v1 list bullets — restore after Tailwind preflight reset */
+.ql-editor li::before {
+    display: inline-block !important;
+    white-space: nowrap !important;
+    width: 1.2em !important;
+}
+.ql-editor li:not(.ql-direction-rtl)::before {
+    margin-left: -1.5em !important;
+    margin-right: 0.3em !important;
+    text-align: right !important;
+}
+.ql-editor ul > li::before {
+    content: '\2022' !important;
+}
+.ql-editor ol > li::before {
+    content: counter(list-0, decimal) '. ' !important;
+}

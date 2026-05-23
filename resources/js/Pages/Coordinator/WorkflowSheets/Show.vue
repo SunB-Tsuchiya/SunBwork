@@ -246,12 +246,105 @@ async function handleWorkerComplete({ colKey }) {
     }
 }
 
-// ── Job detail ────────────────────────────────────────────────────────────────
-function handleWorkerJobDetail({ assignmentId }) {
+// ── Job detail modal ──────────────────────────────────────────────────────────
+const jobDetailModal = ref({
+    open: false, title: '', assigneeName: '', isSubcontractor: false,
+    endDate: null, completed: false, assignmentId: null, cellId: null,
+    completing: false, unlinking: false,
+});
+
+function handleWorkerJobDetail({ assignmentId, colKey }) {
+    if (!assignmentId) return;
+    const cell = localCells.value.find(c => c.row_id === props.defaultRowId && c.stage_key === colKey);
+    let assigneeName = null;
+    if (cell?.assignment_subcontractor_id) {
+        const sub = props.subcontractors.find(s => s.id === cell.assignment_subcontractor_id);
+        assigneeName = sub ? `[外注] ${sub.name}` : null;
+    }
+    if (!assigneeName && cell?.assignment_user_id) {
+        const user = [...props.workerUsers, ...props.coordinatorUsers].find(u => u.id === cell.assignment_user_id);
+        assigneeName = user?.name ?? null;
+    }
+    jobDetailModal.value = {
+        open: true,
+        title: cell?.assignment_title ?? '(タイトルなし)',
+        assigneeName,
+        isSubcontractor: !!cell?.assignment_subcontractor_id,
+        endDate: cell?.assignment_end_date ?? null,
+        completed: !!cell?.assignment_completed,
+        assignmentId,
+        cellId: cell?.id ?? null,
+        completing: false,
+        unlinking: false,
+    };
+}
+
+function openJobAssignmentDetail(assignmentId) {
     if (!assignmentId || !props.projectJob?.id) return;
     router.visit(route('coordinator.project_jobs.assignments.show', {
         projectJob: props.projectJob.id, assignment: assignmentId,
     }));
+}
+
+async function callApiCsrf(url) {
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    const res = await fetch(url, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+}
+
+async function completeJobAssignment() {
+    const id = jobDetailModal.value.assignmentId;
+    if (!id) return;
+    jobDetailModal.value.completing = true;
+    try {
+        await callApiCsrf(route('coordinator.progress_sheets.assignments.complete', { assignment: id }));
+        const idx = localCells.value.findIndex(c => c.id === jobDetailModal.value.cellId);
+        if (idx >= 0) localCells.value[idx] = { ...localCells.value[idx], assignment_completed: true };
+        jobDetailModal.value.open = false;
+    } catch { /* ignore */ }
+    finally { jobDetailModal.value.completing = false; }
+}
+
+async function uncompleteJobAssignment() {
+    const id = jobDetailModal.value.assignmentId;
+    if (!id) return;
+    jobDetailModal.value.completing = true;
+    try {
+        await callApiCsrf(route('coordinator.progress_sheets.assignments.uncomplete', { assignment: id }));
+        const idx = localCells.value.findIndex(c => c.id === jobDetailModal.value.cellId);
+        if (idx >= 0) localCells.value[idx] = { ...localCells.value[idx], assignment_completed: false };
+        jobDetailModal.value.open = false;
+    } catch { /* ignore */ }
+    finally { jobDetailModal.value.completing = false; }
+}
+
+async function unregisterJobFromCell() {
+    const cellId = jobDetailModal.value.cellId;
+    if (!cellId) return;
+    if (!confirm('この登録情報を削除しますか？')) return;
+    jobDetailModal.value.unlinking = true;
+    try {
+        await callApiCsrf(route('coordinator.workflow_cells.unregister', { cell: cellId }));
+        const idx = localCells.value.findIndex(c => c.id === cellId);
+        if (idx >= 0) {
+            localCells.value[idx] = {
+                ...localCells.value[idx],
+                assignment_id: null, assignment_title: null,
+                assignment_completed: null, assignment_user_id: null,
+                assignment_end_date: null, completed_at: null,
+            };
+        }
+        jobDetailModal.value.open = false;
+    } catch {
+        alert('削除に失敗しました');
+    } finally {
+        jobDetailModal.value.unlinking = false;
+    }
 }
 
 // ── Job registration ──────────────────────────────────────────────────────────
@@ -861,6 +954,55 @@ function openPrint() {
                     <div class="flex justify-end gap-3">
                         <button type="button" class="rounded border border-gray-300 px-4 py-1.5 text-sm text-gray-600" @click="proofDeadlineModal.show = false">キャンセル</button>
                         <button type="button" class="rounded bg-yellow-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-yellow-600 disabled:opacity-50" :disabled="proofDeadlineModal.loading" @click="submitExtendDeadline">更新する</button>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
+
+        <!-- ── ジョブ詳細モーダル ─────────────────────────────────────── -->
+        <Teleport to="body">
+            <div v-if="jobDetailModal.open" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="jobDetailModal.open = false">
+                <div class="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
+                    <h3 class="mb-3 text-lg font-semibold text-gray-800">登録済みジョブ</h3>
+                    <dl class="space-y-2 text-sm">
+                        <div><dt class="text-xs font-medium text-gray-500">タイトル</dt><dd class="text-gray-800">{{ jobDetailModal.title }}</dd></div>
+                        <div v-if="jobDetailModal.assigneeName"><dt class="text-xs font-medium text-gray-500">担当者</dt><dd class="text-gray-800">{{ jobDetailModal.assigneeName }}</dd></div>
+                        <div v-if="jobDetailModal.endDate"><dt class="text-xs font-medium text-gray-500">期限</dt><dd class="text-gray-800">{{ jobDetailModal.endDate }}</dd></div>
+                        <div><dt class="text-xs font-medium text-gray-500">状態</dt><dd><span :class="jobDetailModal.completed ? 'text-yellow-700 font-semibold' : 'text-blue-700'">{{ jobDetailModal.completed ? '✓ 完了' : '未完了' }}</span></dd></div>
+                    </dl>
+                    <div class="mt-5 flex flex-wrap justify-end gap-2">
+                        <button
+                            v-if="jobDetailModal.assignmentId && !jobDetailModal.isSubcontractor"
+                            type="button"
+                            class="rounded bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+                            @click="openJobAssignmentDetail(jobDetailModal.assignmentId)"
+                        >ジョブ詳細を開く</button>
+                        <button
+                            v-if="canEdit && jobDetailModal.assignmentId && !jobDetailModal.completed"
+                            type="button"
+                            class="rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+                            :disabled="jobDetailModal.completing"
+                            @click="completeJobAssignment"
+                        >{{ jobDetailModal.completing ? '処理中…' : '完了にする' }}</button>
+                        <button
+                            v-if="canEdit && jobDetailModal.assignmentId && jobDetailModal.completed"
+                            type="button"
+                            class="rounded bg-orange-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-orange-600 disabled:opacity-60"
+                            :disabled="jobDetailModal.completing"
+                            @click="uncompleteJobAssignment"
+                        >{{ jobDetailModal.completing ? '処理中…' : '未完了に戻す' }}</button>
+                        <button
+                            v-if="canEdit && jobDetailModal.cellId"
+                            type="button"
+                            class="rounded bg-red-100 px-4 py-1.5 text-sm font-medium text-red-700 hover:bg-red-200 disabled:opacity-60"
+                            :disabled="jobDetailModal.unlinking"
+                            @click="unregisterJobFromCell"
+                        >{{ jobDetailModal.unlinking ? '処理中…' : '削除する' }}</button>
+                        <button
+                            type="button"
+                            class="rounded border border-gray-300 px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+                            @click="jobDetailModal.open = false"
+                        >閉じる</button>
                     </div>
                 </div>
             </div>

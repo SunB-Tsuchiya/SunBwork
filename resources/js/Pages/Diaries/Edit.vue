@@ -1,7 +1,8 @@
 <script setup>
 import useToasts from '@/Composables/useToasts';
+import TimelineDiary from '@/Components/TimelineDiary.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { router, useForm } from '@inertiajs/vue3';
+import { router, useForm, usePage } from '@inertiajs/vue3';
 import { QuillEditor } from '@vueup/vue-quill';
 import '@vueup/vue-quill/dist/vue-quill.snow.css';
 import axios from 'axios';
@@ -47,12 +48,62 @@ const initWt    = props.worktypes.find((w) => w.id === initWtId) ?? firstWt;
 const st = parseHourMinute(initStart, '08');
 const et = parseHourMinute(initEnd,   '17');
 
+// ── タイムライン ────────────────────────────────────────────────
+const pageProps = usePage().props;
+const timelineEvents = ref([]);
+
+async function fetchDayEvents(date) {
+    if (!date) return;
+    try {
+        const userId = pageProps.auth?.user?.id;
+        const resp = await axios.get(route('events.index'), { params: { date, user_id: userId } });
+        timelineEvents.value = (resp.data || []).map((e) => ({
+            id: e.id ?? e.event_id ?? null,
+            title: e.title || e.name || '(無題)',
+            start: e.start,
+            end: e.end || e.start,
+            allDay: !!e.allDay || !!e.all_day || false,
+            color: e.color || e.backgroundColor || '#2563eb',
+        }));
+    } catch {
+        // サイレントに無視
+    }
+}
+
 onMounted(() => {
-    // mounted
+    fetchDayEvents(props.diary.date?.split('T')[0] ?? props.diary.date);
 });
+
+function applyQuillJaTitles(editor) {
+    try {
+        const toolbar = editor.getModule('toolbar');
+        const container = toolbar?.container;
+        if (!container) return;
+        const btnMap = {
+            'ql-bold': '太字', 'ql-italic': '斜体', 'ql-underline': '下線',
+            'ql-strike': '取り消し線', 'ql-blockquote': '引用',
+            'ql-code-block': 'コードブロック', 'ql-clean': '書式をクリア',
+        };
+        const listMap  = { ordered: '番号付きリスト', bullet: '箇条書き' };
+        const indentMap = { '+1': 'インデントを増やす', '-1': 'インデントを減らす' };
+        const alignMap  = { '': '左揃え', center: '中央揃え', right: '右揃え', justify: '両端揃え' };
+        container.querySelectorAll('button').forEach((btn) => {
+            for (const [cls, title] of Object.entries(btnMap)) {
+                if (btn.classList.contains(cls)) { btn.setAttribute('title', title); return; }
+            }
+            const val = btn.value ?? btn.getAttribute('value') ?? '';
+            if (btn.classList.contains('ql-list'))   btn.setAttribute('title', listMap[val]   ?? 'リスト');
+            if (btn.classList.contains('ql-indent'))  btn.setAttribute('title', indentMap[val] ?? 'インデント');
+            if (btn.classList.contains('ql-align'))   btn.setAttribute('title', alignMap[val]  ?? '配置');
+        });
+        const headerLabel = container.querySelector('.ql-header .ql-picker-label');
+        if (headerLabel) headerLabel.setAttribute('title', '見出し');
+    } catch { /* ignore */ }
+}
 
 function handleEditorReady(editor) {
     editorInstance = editor;
+    applyQuillJaTitles(editor);
     const delta = editor.clipboard.convert(props.diary.content || '<p>初期値がありません</p>');
     editor.setContents(delta);
     try {
@@ -507,6 +558,18 @@ const back = () => {
                     </button>
                 </div>
             </form>
+
+            <!-- 当日タイムライン -->
+            <div v-if="timelineEvents.length > 0" class="mt-6">
+                <label class="mb-2 block text-sm font-medium text-gray-700">当日の予定</label>
+                <TimelineDiary
+                    :date="props.diary.date?.split('T')[0] ?? props.diary.date"
+                    :events="timelineEvents"
+                    :startHour="7"
+                    :endHour="21"
+                    :editable="false"
+                />
+            </div>
         </div>
     </AppLayout>
 </template>

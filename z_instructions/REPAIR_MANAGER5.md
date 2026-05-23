@@ -94,10 +94,10 @@ STEP 5: 完了記録
 
 | ID | 内容 | ステータス | 備考 |
 |----|------|-----------|------|
-| R5-12 | テンプレートから案件作成タブ追加 | 🔲 未着手 | BulkCreate.vue + コントローラー |
+| R5-12 | テンプレートから案件作成タブ追加 | ✅ 完了 | BulkCreate.vue + ProjectJobController + web.php |
 | R5-13 | ジョブ重複防止・登録済み可視化 | ✅ 完了 | JobBoxController, ProjectJobAssignmentUserController, ProjectJobAssignmentController, JobBox/Index.vue, ProjectJobAssignment.php |
-| R5-14 | 日報タイムライン表示・カレンダー連動 | 🔲 未着手 | 要調査 |
-| R5-15 | Quillエディター箇条書き修正 | 🔲 未着手 | 要調査 |
+| R5-14 | 日報タイムライン表示・カレンダー連動 | ✅ 完了 | Diaries/Create.vue, Diaries/Edit.vue |
+| R5-15 | Quillエディター箇条書き修正 | ✅ 完了 | Diaries/Create.vue (CSS import 修正), resources/css/app.css |
 
 ### 保留
 
@@ -145,6 +145,12 @@ STEP 5: 完了記録
 | 2026-05-20 | R5-08 | linkJob で value_user_id をセットしていなかったバグ修正（Coordinator/User 両方）| Claude |
 | 2026-05-20 | R5-09 | uncompleteAssignment で completed_at クリア・destroyAssignment も同様・フロントも修正 | Claude |
 | 2026-05-20 | R5-10 | 画像 store/delete の onSuccess に router.reload を追加 | Claude |
+| 2026-05-23 | R5-10 | Show.vue ライトボックスの job.image_url → jobImageUrl / jobOriginalFilename に統一 | Claude |
+| 2026-05-23 | R5-09 | adminCompleteAssignment / adminUncompleteAssignment 後に jobLinkDetailModal.open = false 追加 | Claude |
+| 2026-05-23 | R5-06 | 案件一覧の表示設定を全カラム（登録日・伝票番号・クライアント名・ステータス）対象に拡張 | Claude |
+| 2026-05-23 | R5-15 | Create.vue の Quill CSS import を正しいバージョン（vue-quill.snow.css）に修正・app.css にリスト bullet CSS 追加 | Claude |
+| 2026-05-23 | R5-14 | Diaries/Create.vue・Edit.vue に TimelineDiary 追加（当日予定をフォーム下部に表示） | Claude |
+| 2026-05-23 | R5-12 | BulkCreate.vue にテンプレートから作成タブ追加・ProjectJobController::storeFromTemplate メソッド追加・web.php にルート追加 | Claude |
 
 ---
 

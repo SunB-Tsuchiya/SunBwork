@@ -615,6 +615,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('project-jobs/bulk-create/sample', [App\Http\Controllers\Coordinator\BulkProjectJobController::class, 'downloadSample'])->name('project_jobs.bulk_create.sample');
         Route::post('project-jobs/bulk-create/preview', [App\Http\Controllers\Coordinator\BulkProjectJobController::class, 'preview'])->name('project_jobs.bulk_create.preview');
         Route::post('project-jobs/bulk-create/store', [App\Http\Controllers\Coordinator\BulkProjectJobController::class, 'store'])->name('project_jobs.bulk_create.store');
+        // テンプレートから案件1件作成
+        Route::post('project-jobs/from-template', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'storeFromTemplate'])->name('project_jobs.store_from_template');
         // 案件テンプレートCRUD（静的パスなので {projectJob} より前に定義）
         Route::get('project-job-templates', [App\Http\Controllers\Coordinator\ProjectJobTemplateController::class, 'index'])->name('project_job_templates.index');
         Route::post('project-job-templates', [App\Http\Controllers\Coordinator\ProjectJobTemplateController::class, 'store'])->name('project_job_templates.store');

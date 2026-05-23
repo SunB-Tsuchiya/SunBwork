@@ -1,11 +1,12 @@
 <script setup>
 import useToasts from '@/Composables/useToasts';
+import TimelineDiary from '@/Components/TimelineDiary.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Link, router, useForm } from '@inertiajs/vue3';
+import { Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { QuillEditor } from '@vueup/vue-quill';
 import axios from 'axios';
-import 'quill/dist/quill.snow.css';
-import { ref, watch } from 'vue';
+import '@vueup/vue-quill/dist/vue-quill.snow.css';
+import { onMounted, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
 
 // original toolbar configuration (kept for later use):
@@ -272,9 +273,61 @@ function handleDragOver(e) {
     e.dataTransfer.dropEffect = 'copy';
 }
 
+// ── タイムライン ────────────────────────────────────────────────
+const pageProps = usePage().props;
+const timelineEvents = ref([]);
+
+async function fetchDayEvents(date) {
+    if (!date) return;
+    try {
+        const userId = pageProps.auth?.user?.id;
+        const resp = await axios.get(route('events.index'), { params: { date, user_id: userId } });
+        timelineEvents.value = (resp.data || []).map((e) => ({
+            id: e.id ?? e.event_id ?? null,
+            title: e.title || e.name || '(無題)',
+            start: e.start,
+            end: e.end || e.start,
+            allDay: !!e.allDay || !!e.all_day || false,
+            color: e.color || e.backgroundColor || '#2563eb',
+        }));
+    } catch {
+        // サイレントに無視
+    }
+}
+
+onMounted(() => fetchDayEvents(form.date));
+
+function applyQuillJaTitles(editor) {
+    try {
+        const toolbar = editor.getModule('toolbar');
+        const container = toolbar?.container;
+        if (!container) return;
+        const btnMap = {
+            'ql-bold': '太字', 'ql-italic': '斜体', 'ql-underline': '下線',
+            'ql-strike': '取り消し線', 'ql-blockquote': '引用',
+            'ql-code-block': 'コードブロック', 'ql-clean': '書式をクリア',
+        };
+        const listMap  = { ordered: '番号付きリスト', bullet: '箇条書き' };
+        const indentMap = { '+1': 'インデントを増やす', '-1': 'インデントを減らす' };
+        const alignMap  = { '': '左揃え', center: '中央揃え', right: '右揃え', justify: '両端揃え' };
+        container.querySelectorAll('button').forEach((btn) => {
+            for (const [cls, title] of Object.entries(btnMap)) {
+                if (btn.classList.contains(cls)) { btn.setAttribute('title', title); return; }
+            }
+            const val = btn.value ?? btn.getAttribute('value') ?? '';
+            if (btn.classList.contains('ql-list'))   btn.setAttribute('title', listMap[val]   ?? 'リスト');
+            if (btn.classList.contains('ql-indent'))  btn.setAttribute('title', indentMap[val] ?? 'インデント');
+            if (btn.classList.contains('ql-align'))   btn.setAttribute('title', alignMap[val]  ?? '配置');
+        });
+        const headerLabel = container.querySelector('.ql-header .ql-picker-label');
+        if (headerLabel) headerLabel.setAttribute('title', '見出し');
+    } catch { /* ignore */ }
+}
+
 // Quill ready handler per ForQuillEditor guidelines
 function handleEditorReady(editor) {
     editorInstance = editor;
+    applyQuillJaTitles(editor);
     // if there is initial HTML content in props (for edit), convert and set
     if (props?.diary && props.diary.content) {
         try {
@@ -582,6 +635,18 @@ function applyPastDiary(rec) {
                         <button type="submit" class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">保存</button>
                     </div>
                 </form>
+            </div>
+
+            <!-- 当日タイムライン -->
+            <div v-if="timelineEvents.length > 0" class="mt-6">
+                <label class="mb-2 block text-sm font-medium text-gray-700">当日の予定</label>
+                <TimelineDiary
+                    :date="form.date"
+                    :events="timelineEvents"
+                    :startHour="7"
+                    :endHour="21"
+                    :editable="false"
+                />
             </div>
 
             <!-- job tab removed from Diaries.Create.vue -->

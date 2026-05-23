@@ -547,7 +547,7 @@
                         <h3 class="font-semibold text-gray-800">伝票情報</h3>
                         <!-- 画像がない場合のアップロードボタン -->
                         <label
-                            v-if="!job.image_url && !job.completed"
+                            v-if="!jobImageUrl && !job.completed"
                             class="cursor-pointer rounded-lg border border-green-700 px-4 py-1.5 text-sm font-medium text-green-700 hover:bg-green-50"
                             :class="{ 'opacity-50 pointer-events-none': voucherForm.processing }"
                         >
@@ -557,17 +557,17 @@
                     </div>
 
                     <!-- 画像あり -->
-                    <div v-if="job.image_url">
+                    <div v-if="jobImageUrl">
                         <div class="relative inline-block">
                             <img
-                                :src="job.image_url"
-                                :alt="job.original_filename ?? '伝票画像'"
+                                :src="jobImageUrl"
+                                :alt="jobOriginalFilename ?? '伝票画像'"
                                 class="h-48 w-auto cursor-pointer rounded-lg border border-gray-200 object-contain shadow-sm"
                                 @click="showVoucherLightbox = true"
                             />
                         </div>
                         <div class="mt-2 flex flex-wrap items-center gap-2">
-                            <span class="max-w-xs truncate text-xs text-gray-500">{{ job.original_filename }}</span>
+                            <span class="max-w-xs truncate text-xs text-gray-500">{{ jobOriginalFilename }}</span>
                             <button
                                 type="button"
                                 class="rounded border border-gray-300 px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-50"
@@ -903,14 +903,14 @@
     <!-- 伝票画像ライトボックス -->
     <Teleport to="body">
         <div
-            v-if="showVoucherLightbox && job.image_url"
+            v-if="showVoucherLightbox && jobImageUrl"
             class="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
             @click.self="showVoucherLightbox = false"
         >
             <div class="relative max-h-[90vh] max-w-[90vw]">
                 <img
-                    :src="job.image_url"
-                    :alt="job.original_filename ?? '伝票画像'"
+                    :src="jobImageUrl"
+                    :alt="jobOriginalFilename ?? '伝票画像'"
                     class="max-h-[85vh] max-w-[88vw] rounded-lg object-contain"
                 />
                 <button
@@ -936,6 +936,16 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue';
 const page = usePage();
 const job  = page.props.job || {};
 const schedules = computed(() => Array.isArray(page.props.schedules) ? page.props.schedules : []);
+
+// 伝票画像は router.reload で page.props.job が差し替わるため個別に追跡
+const jobImageUrl        = ref(job.image_url ?? null);
+const jobOriginalFilename = ref(job.original_filename ?? null);
+watch(() => page.props.job, (j) => {
+    if (j) {
+        jobImageUrl.value         = j.image_url ?? null;
+        jobOriginalFilename.value = j.original_filename ?? null;
+    }
+});
 
 // FullCalendar 用イベント（スケジュールタブに埋め込む ProjectCalendar 向け）
 const scheduleEvents = computed(() =>

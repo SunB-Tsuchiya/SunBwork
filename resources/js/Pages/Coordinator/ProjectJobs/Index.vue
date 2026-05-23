@@ -34,30 +34,30 @@
 
                 <table v-else class="w-full table-fixed border">
                     <colgroup>
-                        <col class="w-28" />
+                        <col v-if="showCreatedAt" class="w-28" />
                         <col v-if="showJobcode" class="w-28" />
                         <col class="w-36" />
-                        <col class="w-44" />
-                        <col class="w-24" />
+                        <col v-if="showClientName" class="w-44" />
+                        <col v-if="showStatus" class="w-24" />
                         <col class="w-12" />
                     </colgroup>
                     <thead>
                         <tr class="bg-yellow-100">
-                            <th class="border px-3 py-1.5 text-left text-xs font-medium text-yellow-900">登録日</th>
+                            <th v-if="showCreatedAt" class="border px-3 py-1.5 text-left text-xs font-medium text-yellow-900">登録日</th>
                             <th v-if="showJobcode" class="border px-3 py-1.5 text-left text-xs font-medium text-yellow-900">伝票番号</th>
                             <th class="border px-3 py-1.5 text-left text-xs font-medium text-yellow-900">案件名</th>
-                            <th class="border px-3 py-1.5 text-left text-xs font-medium text-yellow-900">クライアント名</th>
-                            <th class="border px-3 py-1.5 text-left text-xs font-medium text-yellow-900">ステータス</th>
+                            <th v-if="showClientName" class="border px-3 py-1.5 text-left text-xs font-medium text-yellow-900">クライアント名</th>
+                            <th v-if="showStatus" class="border px-3 py-1.5 text-left text-xs font-medium text-yellow-900">ステータス</th>
                             <th class="border px-3 py-1.5 text-center text-xs font-medium text-yellow-900">★</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr v-for="job in localFavoriteJobs" :key="job.id" class="cursor-pointer hover:bg-yellow-50" @click="rowClick($event, job)">
-                            <td class="border px-3 py-2 text-sm text-gray-600">{{ formatDate(job.created_at) }}</td>
+                            <td v-if="showCreatedAt" class="border px-3 py-2 text-sm text-gray-600">{{ formatDate(job.created_at) }}</td>
                             <td v-if="showJobcode" class="border px-3 py-2 text-sm text-gray-500">{{ job.jobcode || '' }}</td>
                             <td class="border px-3 py-2 text-sm font-medium text-gray-800 max-w-0 truncate" :title="job.title || job.name">{{ job.title || job.name }}</td>
-                            <td class="border px-3 py-2 text-sm text-gray-600">{{ job.client?.name || '-' }}</td>
-                            <td class="border px-3 py-2">
+                            <td v-if="showClientName" class="border px-3 py-2 text-sm text-gray-600">{{ job.client?.name || '-' }}</td>
+                            <td v-if="showStatus" class="border px-3 py-2">
                                 <span
                                     :class="job.completed ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-700'"
                                     class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
@@ -120,8 +120,20 @@
                          class="absolute right-0 top-9 z-20 w-44 rounded border bg-white p-3 shadow-lg">
                         <p class="mb-2 text-xs font-semibold text-gray-500">表示カラム</p>
                         <label class="flex cursor-pointer items-center gap-2 text-sm text-gray-700 select-none">
+                            <input type="checkbox" v-model="showCreatedAt" class="h-4 w-4 rounded border-gray-300" />
+                            登録日
+                        </label>
+                        <label class="mt-1.5 flex cursor-pointer items-center gap-2 text-sm text-gray-700 select-none">
                             <input type="checkbox" v-model="showJobcode" class="h-4 w-4 rounded border-gray-300" />
                             伝票番号
+                        </label>
+                        <label class="mt-1.5 flex cursor-pointer items-center gap-2 text-sm text-gray-700 select-none">
+                            <input type="checkbox" v-model="showClientName" class="h-4 w-4 rounded border-gray-300" />
+                            クライアント名
+                        </label>
+                        <label class="mt-1.5 flex cursor-pointer items-center gap-2 text-sm text-gray-700 select-none">
+                            <input type="checkbox" v-model="showStatus" class="h-4 w-4 rounded border-gray-300" />
+                            ステータス
                         </label>
                     </div>
                 </div>
@@ -155,28 +167,28 @@
 
                     <table class="w-full table-fixed border">
                         <colgroup>
-                            <col class="w-28" />
+                            <col v-if="showCreatedAt" class="w-28" />
                             <col v-if="showJobcode" class="w-28" />
                             <col class="w-36" />
-                            <col class="w-44" />
-                            <col class="w-24" />
+                            <col v-if="showClientName" class="w-44" />
+                            <col v-if="showStatus" class="w-24" />
                             <col class="w-12" />
                         </colgroup>
                         <thead>
                             <tr class="bg-gray-50">
-                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">
+                                <th v-if="showCreatedAt" class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">
                                     <button class="flex items-center gap-1 hover:text-gray-800" @click="toggleSort('created_at')">
                                         登録日<span class="text-gray-400">{{ sortIndicator('created_at') }}</span>
                                     </button>
                                 </th>
                                 <th v-if="showJobcode" class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">伝票番号</th>
                                 <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">案件名</th>
-                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">
+                                <th v-if="showClientName" class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">
                                     <button class="flex items-center gap-1 hover:text-gray-800" @click="toggleSort('client')">
                                         クライアント名<span class="text-gray-400">{{ sortIndicator('client') }}</span>
                                     </button>
                                 </th>
-                                <th class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">
+                                <th v-if="showStatus" class="border px-3 py-1.5 text-left text-xs font-medium text-gray-500">
                                     <button class="flex items-center gap-1 hover:text-gray-800" @click="toggleSort('status')">
                                         ステータス<span class="text-gray-400">{{ sortIndicator('status') }}</span>
                                     </button>
@@ -186,11 +198,11 @@
                         </thead>
                         <tbody>
                             <tr v-for="job in group.items" :key="job.id" class="cursor-pointer hover:bg-blue-50" @click="rowClick($event, job)">
-                                <td class="border px-3 py-2 text-sm text-gray-600">{{ formatDate(job.created_at) }}</td>
+                                <td v-if="showCreatedAt" class="border px-3 py-2 text-sm text-gray-600">{{ formatDate(job.created_at) }}</td>
                                 <td v-if="showJobcode" class="border px-3 py-2 text-sm text-gray-500">{{ job.jobcode || '' }}</td>
                                 <td class="border px-3 py-2 text-sm max-w-0 truncate" :title="job.title || job.name">{{ job.title || job.name }}</td>
-                                <td class="border px-3 py-2 text-sm text-gray-600">{{ job.client?.name || '-' }}</td>
-                                <td class="border px-3 py-2">
+                                <td v-if="showClientName" class="border px-3 py-2 text-sm text-gray-600">{{ job.client?.name || '-' }}</td>
+                                <td v-if="showStatus" class="border px-3 py-2">
                                     <span
                                         :class="job.completed ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-700'"
                                         class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
@@ -234,7 +246,10 @@ page.props.period_model = props.period || 'all';
 
 const monthOptions = computed(() => (Array.isArray(props.monthOptions) ? props.monthOptions : []));
 const hideCompleted = useUIState('sbw_coord_pj_hide_completed', true);
-const showJobcode = useUIState('coord_pj_col_jobcode', true);
+const showCreatedAt  = useUIState('coord_pj_col_created_at', true);
+const showJobcode    = useUIState('coord_pj_col_jobcode', true);
+const showClientName = useUIState('coord_pj_col_client', true);
+const showStatus     = useUIState('coord_pj_col_status', true);
 const showColumnSettings = ref(false);
 
 // ローカルコピー（完了ボタンで即時更新するため）

@@ -481,6 +481,61 @@ class ProjectJobController extends Controller
         }
     }
 
+    public function storeFromTemplate(Request $request)
+    {
+        $data = $request->validate([
+            'template_id' => 'required|exists:project_job_templates,id',
+            'title'       => 'required|string|max:255',
+            'jobcode'     => ['nullable', 'string', 'max:255', 'regex:/^[0-9\-]+$/'],
+            'client_id'   => 'nullable|exists:clients,id',
+            'user_id'     => 'nullable|exists:users,id',
+            'size_id'     => 'nullable|exists:sizes,id',
+            'page_count'  => 'nullable|integer|min:1|max:99999',
+            'detail'      => 'nullable|string',
+        ]);
+
+        $template = \App\Models\ProjectJobTemplate::findOrFail($data['template_id']);
+        $fixed = $template->fixed_fields ?? [];
+
+        $jobData = [
+            'title'      => $data['title'],
+            'jobcode'    => $data['jobcode'] ?? null,
+            'user_id'    => $fixed['user_id']    ?? $data['user_id']    ?? null,
+            'client_id'  => $fixed['client_id']  ?? $data['client_id']  ?? null,
+            'size_id'    => $fixed['size_id']    ?? $data['size_id']    ?? null,
+            'page_count' => isset($fixed['page_count']) ? $fixed['page_count'] : ($data['page_count'] ?? null),
+            'detail'     => !empty($fixed['detail']) ? $fixed['detail'] : ($data['detail'] ?? null),
+        ];
+
+        if (empty($jobData['user_id']) || empty($jobData['client_id'])) {
+            return back()->withErrors(['general' => 'リーダーとクライアントは必須です'])->withInput();
+        }
+
+        $job = ProjectJob::create($jobData);
+
+        $subIds = $fixed['sub_coordinator_ids'] ?? [];
+        $syncIds = array_values(array_filter($subIds, fn ($id) => $id != $job->user_id));
+        if (!empty($syncIds)) {
+            $job->coordinators()->sync($syncIds);
+        }
+
+        foreach ($template->team_members ?? [] as $member) {
+            ProjectTeamMember::firstOrCreate([
+                'project_job_id' => $job->id,
+                'user_id'        => (int) $member['user_id'],
+            ]);
+        }
+
+        foreach (array_unique(array_merge([(int) $job->user_id], $syncIds)) as $userId) {
+            ProjectTeamMember::firstOrCreate([
+                'project_job_id' => $job->id,
+                'user_id'        => $userId,
+            ]);
+        }
+
+        return redirect()->route('coordinator.project_jobs.show', $job->id);
+    }
+
     public function show(Request $request, ProjectJob $projectJob)
     {
         $jobid = session('jobid');

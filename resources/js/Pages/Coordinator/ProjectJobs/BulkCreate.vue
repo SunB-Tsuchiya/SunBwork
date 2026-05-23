@@ -27,6 +27,125 @@
             </div>
 
             <!-- ══════════════════════════════════════════════
+                 タブ0: テンプレートから作成
+            ══════════════════════════════════════════════ -->
+            <div v-show="activeTab === 'from_template'">
+                <!-- テンプレート選択 -->
+                <div class="mb-6">
+                    <label class="mb-1 block font-semibold">テンプレート選択</label>
+                    <select v-model="fromTplId" class="w-80 rounded border px-3 py-2 text-sm">
+                        <option :value="null">-- テンプレートを選択 --</option>
+                        <option v-for="t in localTemplates" :key="t.id" :value="t.id">{{ t.name }}</option>
+                    </select>
+                </div>
+
+                <div v-if="localTemplates.length === 0" class="mb-4 text-sm text-gray-400">
+                    テンプレートがありません。まず「テンプレート管理」タブでテンプレートを作成してください。
+                </div>
+
+                <div v-if="fromTplObj" class="space-y-5">
+                    <!-- 案件名 -->
+                    <div>
+                        <label class="mb-1 block font-semibold">案件名 <span class="text-red-500">*</span></label>
+                        <input v-model="fromTplTitle" type="text" class="w-full rounded border px-3 py-2 text-sm" placeholder="案件名を入力" />
+                    </div>
+
+                    <!-- 伝票番号 -->
+                    <div>
+                        <label class="mb-1 block font-semibold">伝票番号</label>
+                        <input v-model="fromTplJobcode" type="text" class="w-52 rounded border px-3 py-2 text-sm" placeholder="例: 12345-6（空欄可）" />
+                        <p class="mt-1 text-xs text-gray-400">数字とハイフンのみ使用できます</p>
+                    </div>
+
+                    <!-- クライアント -->
+                    <div>
+                        <label class="mb-1 block font-semibold">クライアント <span class="text-red-500">*</span></label>
+                        <div v-if="fromTplObj.fixed_fields?.client_id" class="rounded bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                            {{ fromTplFixedClientName || `ID: ${fromTplObj.fixed_fields.client_id}` }}
+                            <span class="ml-1 text-xs text-gray-400">（固定）</span>
+                        </div>
+                        <div v-else class="relative w-full max-w-sm">
+                            <input
+                                v-model="fromTplClientName"
+                                @input="fromTplOnClientNameInput"
+                                @blur="() => setTimeout(() => { fromTplShowSuggestions = false }, 200)"
+                                type="text"
+                                class="w-full rounded border px-3 py-2 text-sm"
+                                placeholder="クライアント名で検索"
+                            />
+                            <ul v-if="fromTplShowSuggestions" class="absolute z-20 w-full rounded border bg-white shadow-lg">
+                                <li
+                                    v-for="c in fromTplClientSuggestions"
+                                    :key="c.id"
+                                    @mousedown.prevent="fromTplSelectClient(c)"
+                                    class="cursor-pointer px-3 py-2 text-sm hover:bg-blue-50"
+                                >{{ c.name }}</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- リーダー -->
+                    <div>
+                        <label class="mb-1 block font-semibold">リーダー <span class="text-red-500">*</span></label>
+                        <div v-if="fromTplObj.fixed_fields?.user_id" class="rounded bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                            {{ fromTplFixedUserName || `ID: ${fromTplObj.fixed_fields.user_id}` }}
+                            <span class="ml-1 text-xs text-gray-400">（固定）</span>
+                        </div>
+                        <select v-else v-model="fromTplUserId" class="w-80 rounded border px-3 py-2 text-sm">
+                            <option :value="null">-- 選択 --</option>
+                            <option v-for="c in props.coordinatorCandidates" :key="c.id" :value="c.id">{{ c.name }}</option>
+                        </select>
+                    </div>
+
+                    <!-- サイズ -->
+                    <div>
+                        <label class="mb-1 block font-semibold">サイズ</label>
+                        <div v-if="fromTplObj.fixed_fields?.size_id" class="rounded bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                            {{ fromTplFixedSizeName || `ID: ${fromTplObj.fixed_fields.size_id}` }}
+                            <span class="ml-1 text-xs text-gray-400">（固定）</span>
+                        </div>
+                        <select v-else v-model="fromTplSizeId" class="w-80 rounded border px-3 py-2 text-sm">
+                            <option :value="null">-- なし --</option>
+                            <option v-for="s in props.sizes" :key="s.id" :value="s.id">{{ s.name }}</option>
+                        </select>
+                    </div>
+
+                    <!-- ページ数 -->
+                    <div>
+                        <label class="mb-1 block font-semibold">ページ数</label>
+                        <div v-if="fromTplObj.fixed_fields?.page_count != null" class="rounded bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                            {{ fromTplObj.fixed_fields.page_count }} ページ
+                            <span class="ml-1 text-xs text-gray-400">（固定）</span>
+                        </div>
+                        <input v-else v-model="fromTplPageCount" type="number" min="1" max="99999"
+                               class="w-36 rounded border px-3 py-2 text-sm" placeholder="未設定" />
+                    </div>
+
+                    <!-- 詳細 -->
+                    <div>
+                        <label class="mb-1 block font-semibold">詳細</label>
+                        <div v-if="fromTplObj.fixed_fields?.detail" class="rounded bg-gray-50 px-3 py-2 text-sm text-gray-600 whitespace-pre-wrap">
+                            {{ fromTplObj.fixed_fields.detail }}
+                            <span class="ml-1 text-xs text-gray-400">（固定）</span>
+                        </div>
+                        <textarea v-else v-model="fromTplDetail" rows="3" class="w-full rounded border px-3 py-2 text-sm" placeholder="詳細を入力"></textarea>
+                    </div>
+
+                    <!-- エラー -->
+                    <div v-if="fromTplError" class="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-600">{{ fromTplError }}</div>
+
+                    <!-- 送信 -->
+                    <div>
+                        <button
+                            @click="fromTplSubmit"
+                            :disabled="fromTplSubmitting"
+                            class="rounded bg-indigo-600 px-6 py-2 text-white hover:bg-indigo-700 disabled:opacity-50"
+                        >{{ fromTplSubmitting ? '作成中...' : '案件を作成' }}</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══════════════════════════════════════════════
                  タブ1: テンプレート管理
             ══════════════════════════════════════════════ -->
             <div v-show="activeTab === 'template'">
@@ -586,14 +705,123 @@ const page = usePage();
 
 // ── タブ ────────────────────────────────────────────────────
 const tabs = [
-    { key: 'template', label: 'テンプレート管理' },
-    { key: 'csv',      label: 'CSV取込' },
+    { key: 'from_template', label: 'テンプレートから作成' },
+    { key: 'template',      label: 'テンプレート管理' },
+    { key: 'csv',           label: 'CSV取込' },
 ];
-const activeTab = ref(props.previewData ? 'csv' : 'template');
+const activeTab = ref(props.previewData ? 'csv' : 'from_template');
+
+// ── テンプレート管理（fromTplObj が参照するため先に宣言）────────
+const localTemplates = ref([...props.templates]);
+
+// ── テンプレートから作成 ─────────────────────────────────────
+const fromTplId = ref(null);
+const fromTplObj = computed(() => localTemplates.value.find((t) => t.id === fromTplId.value) ?? null);
+const fromTplTitle = ref('');
+const fromTplClientId = ref(null);
+const fromTplClientName = ref('');
+const fromTplClientSuggestions = ref([]);
+const fromTplShowSuggestions = ref(false);
+const fromTplUserId = ref(null);
+const fromTplSizeId = ref(null);
+const fromTplJobcode = ref('');
+const fromTplPageCount = ref('');
+const fromTplDetail = ref('');
+const fromTplSubmitting = ref(false);
+const fromTplError = ref('');
+const fromTplFixedClientName = ref('');
+
+const fromTplFixedUserName = computed(() => {
+    if (!fromTplObj.value?.fixed_fields?.user_id) return '';
+    return props.coordinatorCandidates.find((c) => c.id === fromTplObj.value.fixed_fields.user_id)?.name ?? '';
+});
+const fromTplFixedSizeName = computed(() => {
+    if (!fromTplObj.value?.fixed_fields?.size_id) return '';
+    return props.sizes.find((s) => s.id === fromTplObj.value.fixed_fields.size_id)?.name ?? '';
+});
+
+watch(fromTplObj, async (tpl) => {
+    fromTplTitle.value = '';
+    fromTplJobcode.value = '';
+    fromTplClientId.value = null;
+    fromTplClientName.value = '';
+    fromTplUserId.value = null;
+    fromTplSizeId.value = null;
+    fromTplPageCount.value = '';
+    fromTplDetail.value = '';
+    fromTplError.value = '';
+    fromTplFixedClientName.value = '';
+    if (tpl?.fixed_fields?.client_id) {
+        try {
+            const res = await fetch(
+                route('coordinator.clients.json') + '?id=' + tpl.fixed_fields.client_id,
+                { headers: { Accept: 'application/json' }, credentials: 'same-origin' },
+            );
+            if (res.ok) {
+                const c = await res.json();
+                fromTplFixedClientName.value = c?.name ?? '';
+            }
+        } catch { /* ignore */ }
+    }
+});
+
+let fromTplSearchTimeout = null;
+async function fromTplOnClientNameInput() {
+    const term = fromTplClientName.value.trim();
+    fromTplClientId.value = null;
+    if (fromTplSearchTimeout) clearTimeout(fromTplSearchTimeout);
+    if (!term) { fromTplClientSuggestions.value = []; fromTplShowSuggestions.value = false; return; }
+    fromTplSearchTimeout = setTimeout(async () => {
+        try {
+            const res = await fetch(
+                route('coordinator.clients.json') + '?name=' + encodeURIComponent(term) + '&limit=10',
+                { headers: { Accept: 'application/json' }, credentials: 'same-origin' },
+            );
+            if (res.ok) {
+                const clients = await res.json();
+                fromTplClientSuggestions.value = Array.isArray(clients) ? clients : [];
+                fromTplShowSuggestions.value = fromTplClientSuggestions.value.length > 0;
+            }
+        } catch { /* ignore */ }
+    }, 300);
+}
+
+function fromTplSelectClient(c) {
+    fromTplClientId.value = c.id;
+    fromTplClientName.value = c.name;
+    fromTplClientSuggestions.value = [];
+    fromTplShowSuggestions.value = false;
+}
+
+async function fromTplSubmit() {
+    const tpl = fromTplObj.value;
+    if (!tpl) { fromTplError.value = 'テンプレートを選択してください'; return; }
+    if (!fromTplTitle.value.trim()) { fromTplError.value = '案件名は必須です'; return; }
+    const clientId = tpl.fixed_fields?.client_id ?? fromTplClientId.value;
+    const userId = tpl.fixed_fields?.user_id ?? fromTplUserId.value;
+    if (!clientId) { fromTplError.value = 'クライアントを選択してください'; return; }
+    if (!userId) { fromTplError.value = 'リーダーを選択してください'; return; }
+    fromTplSubmitting.value = true;
+    fromTplError.value = '';
+    router.post(route('coordinator.project_jobs.store_from_template'), {
+        template_id: tpl.id,
+        title:       fromTplTitle.value.trim(),
+        jobcode:     fromTplJobcode.value.trim() || null,
+        client_id:   clientId,
+        user_id:     userId,
+        size_id:     tpl.fixed_fields?.size_id ?? fromTplSizeId.value,
+        page_count:  tpl.fixed_fields?.page_count != null ? tpl.fixed_fields.page_count : (fromTplPageCount.value || null),
+        detail:      tpl.fixed_fields?.detail || fromTplDetail.value || null,
+    }, {
+        onError: (errors) => {
+            fromTplError.value = Object.values(errors).flat().join(' / ');
+            fromTplSubmitting.value = false;
+        },
+    });
+}
 
 // ── テンプレート管理 ─────────────────────────────────────────
 
-const localTemplates = ref([...props.templates]);
 const selectedTemplateId = ref(null);
 const savingTemplate = ref(false);
 const saveMessage = ref('');
