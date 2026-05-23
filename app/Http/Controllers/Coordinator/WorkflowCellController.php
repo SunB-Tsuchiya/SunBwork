@@ -265,8 +265,10 @@ class WorkflowCellController extends Controller
         $this->authorizeSheet($request->user(), $sheet);
 
         $cell->update([
-            'assignment_id' => null,
-            'completed_at'  => null,
+            'assignment_id'    => null,
+            'completed_at'     => null,
+            'assigned_user_id' => null,
+            'value_user_id'    => null,
         ]);
 
         $cell->load('assignedUser:id,name');

@@ -56,6 +56,9 @@
                         <option v-for="u in workerUsers" :key="u.id" :value="u.id">{{ u.name }}</option>
                     </select>
                 </template>
+                <template v-else-if="canSelfRegister && !isJoblink">
+                    <span class="text-xs text-gray-400">— 未登録 —</span>
+                </template>
                 <template v-else>
                     <span class="text-xs text-gray-300">—</span>
                 </template>
@@ -98,6 +101,11 @@
                     class="whitespace-nowrap rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 hover:bg-green-200"
                     @click="$emit('complete', { cell_id: cell?.id })"
                 >完了にする</button>
+                <a
+                    v-if="canEdit && cell?.assignment_id && detailUrl"
+                    :href="detailUrl"
+                    class="whitespace-nowrap text-xs text-indigo-500 hover:text-indigo-700"
+                >詳細</a>
                 <button
                     v-if="isCoordinator"
                     type="button"
@@ -117,6 +125,15 @@
                 >取り消す</button>
             </template>
 
+            <!-- 自己登録可 -->
+            <template v-else-if="canSelfRegister && !isJoblink">
+                <button
+                    type="button"
+                    class="whitespace-nowrap rounded border border-indigo-300 px-2 py-0.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
+                    @click="$emit('register')"
+                >＋ 登録</button>
+            </template>
+
             <!-- 未選択 -->
             <template v-else>
                 <span class="text-xs text-gray-300">┄ 未登録 ┄</span>
@@ -129,12 +146,14 @@
 import { ref, computed } from 'vue';
 
 const props = defineProps({
-    cell:          { type: Object,  default: null },
-    stage:         { type: Object,  required: true },
-    workerUsers:   { type: Array,   default: () => [] },
-    canEdit:       { type: Boolean, default: false },
-    isCoordinator: { type: Boolean, default: false },
-    linkedCell:    { type: Object,  default: null },
+    cell:            { type: Object,  default: null },
+    stage:           { type: Object,  required: true },
+    workerUsers:     { type: Array,   default: () => [] },
+    canEdit:         { type: Boolean, default: false },
+    isCoordinator:   { type: Boolean, default: false },
+    linkedCell:      { type: Object,  default: null },
+    canSelfRegister: { type: Boolean, default: false },
+    detailUrl:       { type: String,  default: null },
 });
 
 defineEmits(['register', 'complete', 'unregister']);

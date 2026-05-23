@@ -337,6 +337,7 @@ async function unregisterJobFromCell() {
                 assignment_id: null, assignment_title: null,
                 assignment_completed: null, assignment_user_id: null,
                 assignment_end_date: null, completed_at: null,
+                value_user_id: null, value_user_name: null,
             };
         }
         jobDetailModal.value.open = false;

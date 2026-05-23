@@ -43,6 +43,39 @@ class ProjectJobController extends Controller
     }
 
     /**
+     * Return JSON list of both progress sheets and workflow sheets.
+     * Used by the "進行表・管理表ジョブ" modal.
+     */
+    public function sheetsJson(Request $request, ProjectJob $projectJob)
+    {
+        $user = $request->user();
+
+        $hasAccess = $projectJob->projectJobAssignments()->where(function ($q) use ($user) {
+            $q->where('user_id', $user->id)->orWhere('sender_id', $user->id);
+        })->exists()
+            || $projectJob->teamMembers()->where('user_id', $user->id)->exists();
+
+        if (!$hasAccess) {
+            return response()->json(['progress_sheets' => [], 'workflow_sheets' => []], 403);
+        }
+
+        $progressSheets = ProgressSheet::where('project_job_id', $projectJob->id)
+            ->orderBy('sort_order')->orderBy('id')
+            ->get(['id', 'name'])
+            ->map(fn($s) => ['id' => $s->id, 'name' => $s->name]);
+
+        $workflowSheets = \App\Models\WorkflowSheet::where('project_job_id', $projectJob->id)
+            ->orderBy('sort_order')->orderBy('id')
+            ->get(['id', 'name'])
+            ->map(fn($s) => ['id' => $s->id, 'name' => $s->name]);
+
+        return response()->json([
+            'progress_sheets' => $progressSheets,
+            'workflow_sheets'  => $workflowSheets,
+        ]);
+    }
+
+    /**
      * Return JSON list of clients and projects accessible to the current user.
      * Used by the calendar modal for "ジョブ作成（進行表から）".
      */

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
+use App\Models\ProjectJobAssignment;
 use App\Models\WorkflowSheet;
 use App\Models\WorkflowRow;
 use App\Models\WorkflowCell;
@@ -65,6 +66,72 @@ class WorkflowCellController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    public function register(Request $request, WorkflowSheet $sheet)
+    {
+        $authUser   = $request->user();
+        $projectJob = $sheet->projectJob;
+        $this->authorizeUpdate($authUser, $projectJob);
+
+        $validated = $request->validate([
+            'row_id'    => 'required|integer|exists:workflow_rows,id',
+            'stage_key' => 'required|string|max:64',
+        ]);
+
+        $row = WorkflowRow::where('id', $validated['row_id'])
+            ->where('sheet_id', $sheet->id)
+            ->firstOrFail();
+
+        $cell = WorkflowCell::where('row_id', $row->id)
+            ->where('stage_key', $validated['stage_key'])
+            ->first();
+
+        if ($cell?->assignment_id) {
+            return response()->json(['error' => '既に登録済みです'], 422);
+        }
+
+        // ステージキーから列ラベルを再帰検索
+        $col      = $this->findColumnByKey($sheet->getEffectiveColumnConfig(), $validated['stage_key']);
+        $colLabel = $col['label'] ?? $validated['stage_key'];
+
+        // 行ラベルが "_default" の場合は列ラベルのみ使用
+        $rowPart = ($row->label === '_default') ? '' : " - {$row->label}";
+        $title   = "{$projectJob->title}{$rowPart}（{$colLabel}）";
+
+        $assignment = ProjectJobAssignment::create([
+            'project_job_id' => $projectJob->id,
+            'user_id'        => $authUser->id,
+            'sender_id'      => $authUser->id,
+            'title'          => $title,
+            'assigned'       => true,
+        ]);
+
+        $cell = WorkflowCell::updateOrCreate(
+            ['row_id' => $row->id, 'stage_key' => $validated['stage_key']],
+            [
+                'assigned_user_id' => $authUser->id,
+                'value_user_id'    => $authUser->id,
+                'assignment_id'    => $assignment->id,
+                'completed_at'     => null,
+            ]
+        );
+
+        $cell->load('assignedUser:id,name');
+
+        return response()->json([
+            'cell' => [
+                'id'                 => $cell->id,
+                'row_id'             => $cell->row_id,
+                'stage_key'          => $cell->stage_key,
+                'assigned_user_id'   => $cell->assigned_user_id,
+                'assigned_user_name' => $cell->assignedUser?->name,
+                'assignment_id'      => $assignment->id,
+                'work_minutes'       => 0,
+                'completed_at'       => null,
+                'cell_note'          => null,
+            ],
+        ]);
+    }
+
     public function complete(Request $request, WorkflowCell $cell)
     {
         $authUser   = $request->user();
@@ -97,6 +164,18 @@ class WorkflowCellController extends Controller
             'completed_at' => $cell->completed_at?->format('Y-m-d H:i:s'),
             'work_minutes' => $workMinutes,
         ]);
+    }
+
+    private function findColumnByKey(array $nodes, string $key): ?array
+    {
+        foreach ($nodes as $node) {
+            if (($node['key'] ?? '') === $key) return $node;
+            if (!empty($node['children'])) {
+                $found = $this->findColumnByKey($node['children'], $key);
+                if ($found) return $found;
+            }
+        }
+        return null;
     }
 
     private function authorizeUpdate($user, $projectJob): void

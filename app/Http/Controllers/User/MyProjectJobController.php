@@ -101,6 +101,33 @@ class MyProjectJobController extends Controller
                 }
                 $item->setAttribute('has_progress_cell', (bool)$has);
 
+                // Attach has_workflow_cell for frontend classification (管理表ジョブ判定)
+                $hasWf = false;
+                try {
+                    if (\Illuminate\Support\Facades\Schema::hasTable('workflow_cells')) {
+                        $hasWf = \App\Models\WorkflowCell::where('assignment_id', $item->id)->exists();
+                    }
+                } catch (\Throwable $_e) {
+                    $hasWf = false;
+                }
+                if (!$hasWf) {
+                    $cur = $item;
+                    for ($i = 0; $i < 20 && $cur && empty($hasWf); $i++) {
+                        if (empty($cur->source_assignment_id)) break;
+                        $parent = \App\Models\ProjectJobAssignment::find($cur->source_assignment_id);
+                        if (!$parent) break;
+                        try {
+                            if (\Illuminate\Support\Facades\Schema::hasTable('workflow_cells')) {
+                                $hasWf = \App\Models\WorkflowCell::where('assignment_id', $parent->id)->exists();
+                            }
+                        } catch (\Throwable $_) {
+                            $hasWf = false;
+                        }
+                        $cur = $parent;
+                    }
+                }
+                $item->setAttribute('has_workflow_cell', (bool)$hasWf);
+
                 // 先頭イベントのJST日時を付加（Vue側でのタイムゾーン変換の代わり）
                 // 校正ジョブ（job_type='proof'）は starts_at が UTC 保存のため UTC として解釈する
                 try {
@@ -360,6 +387,15 @@ class MyProjectJobController extends Controller
         } catch (\Throwable $e) {
             // progress_cells テーブルが存在しない場合は無視
         }
+
+        // WorkflowCell の assignment_id と関連フィールドをクリア
+        \App\Models\WorkflowCell::where('assignment_id', $assignment->id)
+            ->update([
+                'assignment_id'    => null,
+                'completed_at'     => null,
+                'assigned_user_id' => null,
+                'value_user_id'    => null,
+            ]);
 
         $assignment->delete();
 

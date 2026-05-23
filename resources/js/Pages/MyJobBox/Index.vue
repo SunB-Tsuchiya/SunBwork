@@ -31,7 +31,7 @@
                     <button
                         @click="openJobSheetModal"
                         class="rounded bg-purple-600 px-4 py-2 text-sm text-white"
-                    >進行表ジョブ作成</button>
+                    >進行表・管理表ジョブ作成</button>
                 </div>
             </div>
 
@@ -156,18 +156,18 @@
             </div>
         </div>
 
-        <!-- 進行表から案件選択モーダル -->
+        <!-- 進行表・管理シートから案件選択モーダル -->
         <Teleport to="body">
             <div v-if="showJobSheetModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="showJobSheetModal = false">
                 <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-                    <h2 class="mb-4 text-lg font-bold">案件を選択（進行表から）</h2>
+                    <h2 class="mb-4 text-lg font-bold">案件を選択（進行表・管理シートから）</h2>
 
                     <div v-if="jobSheetLoading" class="py-8 text-center text-sm text-gray-500">読み込み中…</div>
                     <div v-else>
                         <!-- クライアント選択 -->
                         <div class="mb-3">
                             <label class="mb-1 block text-sm font-medium text-gray-700">クライアント</label>
-                            <select v-model="jsSelectedClientId" @change="jsSelectedProjectId = ''" class="w-full rounded border border-gray-300 px-3 py-2 text-sm">
+                            <select v-model="jsSelectedClientId" @change="onClientChange" class="w-full rounded border border-gray-300 px-3 py-2 text-sm">
                                 <option value="">— 選択してください —</option>
                                 <option v-for="c in jsClients" :key="c.id" :value="String(c.id)">{{ c.name }}</option>
                             </select>
@@ -182,26 +182,53 @@
                             </select>
                         </div>
 
-                        <!-- 進行表選択（案件選択後・複数シートの場合） -->
-                        <div v-if="jsSelectedProjectId && jsProgressSheets.length > 1" class="mb-3">
-                            <label class="mb-1 block text-sm font-medium text-gray-700">進行表</label>
-                            <select v-model="jsSelectedSheetId" class="w-full rounded border border-gray-300 px-3 py-2 text-sm">
-                                <option value="">— 選択してください —</option>
-                                <option v-for="s in jsProgressSheets" :key="s.id" :value="String(s.id)">{{ s.name }}</option>
-                            </select>
-                        </div>
+                        <!-- 案件選択後のシート選択 -->
+                        <div v-if="jsSelectedProjectId">
+                            <div v-if="jsSheetsLoading" class="py-4 text-center text-sm text-gray-400">読み込み中…</div>
+                            <template v-else>
+                                <!-- 進行表セクション -->
+                                <div v-if="jsProgressSheets.length > 0" class="mb-3 rounded border border-indigo-200 bg-indigo-50 p-3">
+                                    <div class="mb-2 text-sm font-semibold text-indigo-700">進行表</div>
+                                    <div v-if="jsProgressSheets.length === 1" class="mb-2 text-sm text-gray-800">{{ jsProgressSheets[0].name }}</div>
+                                    <select v-else v-model="jsSelectedProgressSheetId" class="mb-2 w-full rounded border border-gray-300 px-3 py-2 text-sm">
+                                        <option value="">— 選択してください —</option>
+                                        <option v-for="s in jsProgressSheets" :key="s.id" :value="String(s.id)">{{ s.name }}</option>
+                                    </select>
+                                    <div class="flex justify-end">
+                                        <button
+                                            @click="goToProgressSheet"
+                                            :disabled="!canGoToProgressSheet"
+                                            :class="canGoToProgressSheet
+                                                ? 'rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700'
+                                                : 'cursor-not-allowed rounded bg-gray-300 px-4 py-1.5 text-sm font-medium text-gray-500'"
+                                        >開く</button>
+                                    </div>
+                                </div>
 
-                        <!-- 案件選択後のアクション -->
-                        <div v-if="jsSelectedProjectId" class="mt-4 flex items-center justify-end gap-2">
-                            <span v-if="jsSheetsLoading" class="text-sm text-gray-400">読み込み中…</span>
-                            <span v-else-if="jsProgressSheets.length === 0 && !jsSheetsLoading" class="text-sm text-gray-400">進行表なし</span>
-                            <button
-                                @click="goToProgressSheet"
-                                :disabled="!canGoToSheet"
-                                :class="canGoToSheet
-                                    ? 'rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700'
-                                    : 'cursor-not-allowed rounded bg-gray-300 px-4 py-2 text-sm font-medium text-gray-500'"
-                            >詳細を見る（進行表へ）</button>
+                                <!-- 管理シートセクション -->
+                                <div v-if="jsWorkflowSheets.length > 0" class="mb-3 rounded border border-purple-200 bg-purple-50 p-3">
+                                    <div class="mb-2 text-sm font-semibold text-purple-700">管理シート</div>
+                                    <div v-if="jsWorkflowSheets.length === 1" class="mb-2 text-sm text-gray-800">{{ jsWorkflowSheets[0].name }}</div>
+                                    <select v-else v-model="jsSelectedWorkflowSheetId" class="mb-2 w-full rounded border border-gray-300 px-3 py-2 text-sm">
+                                        <option value="">— 選択してください —</option>
+                                        <option v-for="s in jsWorkflowSheets" :key="s.id" :value="String(s.id)">{{ s.name }}</option>
+                                    </select>
+                                    <div class="flex justify-end">
+                                        <button
+                                            @click="goToWorkflowSheet"
+                                            :disabled="!canGoToWorkflowSheet"
+                                            :class="canGoToWorkflowSheet
+                                                ? 'rounded bg-purple-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-purple-700'
+                                                : 'cursor-not-allowed rounded bg-gray-300 px-4 py-1.5 text-sm font-medium text-gray-500'"
+                                        >開く</button>
+                                    </div>
+                                </div>
+
+                                <!-- どちらもなし -->
+                                <div v-if="jsProgressSheets.length === 0 && jsWorkflowSheets.length === 0" class="text-sm text-gray-400">
+                                    進行表・管理シートなし
+                                </div>
+                            </template>
                         </div>
                     </div>
 
@@ -222,7 +249,7 @@ import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
 
-// ─── 進行表から案件選択モーダル ───────────────────────────────────────────
+// ─── 進行表・管理シートから案件選択モーダル ─────────────────────────────────
 const showJobSheetModal = ref(false);
 const jobSheetLoading = ref(false);
 const jsClients = ref([]);
@@ -230,7 +257,9 @@ const jsProjects = ref([]);
 const jsSelectedClientId = ref('');
 const jsSelectedProjectId = ref('');
 const jsProgressSheets = ref([]);
-const jsSelectedSheetId = ref('');
+const jsWorkflowSheets = ref([]);
+const jsSelectedProgressSheetId = ref('');
+const jsSelectedWorkflowSheetId = ref('');
 const jsSheetsLoading = ref(false);
 
 const jsFilteredProjects = computed(() => {
@@ -238,17 +267,25 @@ const jsFilteredProjects = computed(() => {
     return jsProjects.value.filter((p) => String(p.client_id) === String(jsSelectedClientId.value));
 });
 
-const canGoToSheet = computed(() => {
-    if (jsSheetsLoading.value || jsProgressSheets.value.length === 0) return false;
+const canGoToProgressSheet = computed(() => {
+    if (jsProgressSheets.value.length === 0) return false;
     if (jsProgressSheets.value.length === 1) return true;
-    return !!jsSelectedSheetId.value;
+    return !!jsSelectedProgressSheetId.value;
+});
+
+const canGoToWorkflowSheet = computed(() => {
+    if (jsWorkflowSheets.value.length === 0) return false;
+    if (jsWorkflowSheets.value.length === 1) return true;
+    return !!jsSelectedWorkflowSheetId.value;
 });
 
 async function openJobSheetModal() {
     jsSelectedClientId.value = '';
     jsSelectedProjectId.value = '';
     jsProgressSheets.value = [];
-    jsSelectedSheetId.value = '';
+    jsWorkflowSheets.value = [];
+    jsSelectedProgressSheetId.value = '';
+    jsSelectedWorkflowSheetId.value = '';
     showJobSheetModal.value = true;
 
     if (jsClients.value.length === 0) {
@@ -272,20 +309,35 @@ async function openJobSheetModal() {
     }
 }
 
+function onClientChange() {
+    jsSelectedProjectId.value = '';
+    jsProgressSheets.value = [];
+    jsWorkflowSheets.value = [];
+    jsSelectedProgressSheetId.value = '';
+    jsSelectedWorkflowSheetId.value = '';
+}
+
 async function onProjectChange() {
     jsProgressSheets.value = [];
-    jsSelectedSheetId.value = '';
+    jsWorkflowSheets.value = [];
+    jsSelectedProgressSheetId.value = '';
+    jsSelectedWorkflowSheetId.value = '';
     if (!jsSelectedProjectId.value) return;
     jsSheetsLoading.value = true;
     try {
-        const res = await fetch(route('user.project_jobs.progress_sheets_json', { projectJob: jsSelectedProjectId.value }), {
+        const res = await fetch(route('user.project_jobs.sheets_json', { projectJob: jsSelectedProjectId.value }), {
             credentials: 'same-origin',
             headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
         });
         if (res.ok) {
-            jsProgressSheets.value = await res.json();
+            const data = await res.json();
+            jsProgressSheets.value = data.progress_sheets ?? [];
+            jsWorkflowSheets.value = data.workflow_sheets ?? [];
             if (jsProgressSheets.value.length === 1) {
-                jsSelectedSheetId.value = String(jsProgressSheets.value[0].id);
+                jsSelectedProgressSheetId.value = String(jsProgressSheets.value[0].id);
+            }
+            if (jsWorkflowSheets.value.length === 1) {
+                jsSelectedWorkflowSheetId.value = String(jsWorkflowSheets.value[0].id);
             }
         }
     } catch (e) {
@@ -296,13 +348,23 @@ async function onProjectChange() {
 }
 
 function goToProgressSheet() {
-    if (!canGoToSheet.value) return;
-    const sheetId = jsProgressSheets.value.length === 1
+    if (!canGoToProgressSheet.value) return;
+    const id = jsProgressSheets.value.length === 1
         ? jsProgressSheets.value[0].id
-        : jsSelectedSheetId.value;
-    if (!sheetId) return;
+        : jsSelectedProgressSheetId.value;
+    if (!id) return;
     showJobSheetModal.value = false;
-    router.visit(route('user.progress_sheets.show', { sheet: sheetId }));
+    router.visit(route('user.progress_sheets.show', { sheet: id }));
+}
+
+function goToWorkflowSheet() {
+    if (!canGoToWorkflowSheet.value) return;
+    const id = jsWorkflowSheets.value.length === 1
+        ? jsWorkflowSheets.value[0].id
+        : jsSelectedWorkflowSheetId.value;
+    if (!id) return;
+    showJobSheetModal.value = false;
+    router.visit(route('user.workflow_sheets.show', { sheet: id }));
 }
 // ──────────────────────────────────────────────────────────────────────────
 
@@ -428,9 +490,12 @@ function getProjectJobTitle(m) {
 
 /**
  * Determine assignment kind and badge color.
- * - ジョブ（依頼）: supersedes_assignment_id がある（依頼を受けて作成した応答） -> 紫
- * - ジョブ（独自）: sender_id === user_id -> インディゴ
- * - 予定: その他（予定作成など） -> エメラルド
+ * - 校正: job_type === 'proof'
+ * - ジョブ（依頼）: supersedes_assignment_id がある
+ * - 管理表ジョブ: has_workflow_cell = true
+ * - 進行表ジョブ: has_progress_cell = true
+ * - マイジョブ: sender_id === user_id
+ * - 予定: その他
  */
 function getAssignmentKind(m) {
     try {
@@ -441,17 +506,17 @@ function getAssignmentKind(m) {
         if (m.supersedes_assignment_id) {
             return { label: 'ジョブ（依頼）', color: '#7C3AED', textColor: '#FFFFFF' };
         }
-            // If linked to progress sheet, mark as progress-linked (優先)
-            if (m.has_progress_cell) {
-                return { label: 'ジョブ（進行）', color: '#7C3AED', textColor: '#FFFFFF' };
-            }
-            // sender_id may be present; compare to user or to m.user_id
-            const sender = m.sender_id ?? m.sender?.id ?? null;
-            const owner = m.user_id ?? m.user?.id ?? userId;
-            if (sender && owner && String(sender) === String(owner)) {
-                return { label: 'ジョブ（独自）', color: '#4F46E5', textColor: '#FFFFFF' };
-            }
-        // fallback to 予定
+        if (m.has_workflow_cell) {
+            return { label: '管理表ジョブ', color: '#9333EA', textColor: '#FFFFFF' };
+        }
+        if (m.has_progress_cell) {
+            return { label: '進行表ジョブ', color: '#4F46E5', textColor: '#FFFFFF' };
+        }
+        const sender = m.sender_id ?? m.sender?.id ?? null;
+        const owner = m.user_id ?? m.user?.id ?? userId;
+        if (sender && owner && String(sender) === String(owner)) {
+            return { label: 'マイジョブ', color: '#2563EB', textColor: '#FFFFFF' };
+        }
         return { label: '予定', color: '#059669', textColor: '#FFFFFF' };
     } catch (e) {
         return { label: '予定', color: '#059669', textColor: '#FFFFFF' };

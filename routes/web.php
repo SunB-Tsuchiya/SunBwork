@@ -138,6 +138,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     // 案件確認（ユーザー向け案件一覧・詳細）
     Route::get('/user/project-jobs/json', [App\Http\Controllers\User\ProjectJobController::class, 'projectsJson'])->name('user.project_jobs.json');
     Route::get('/user/project-jobs/{projectJob}/progress-sheets-json', [App\Http\Controllers\User\ProjectJobController::class, 'progressSheetsJson'])->name('user.project_jobs.progress_sheets_json');
+    Route::get('/user/project-jobs/{projectJob}/sheets-json', [App\Http\Controllers\User\ProjectJobController::class, 'sheetsJson'])->name('user.project_jobs.sheets_json');
     Route::get('/user/project-jobs', [App\Http\Controllers\User\ProjectJobController::class, 'index'])->name('user.project_jobs.index');
     Route::get('/user/project-jobs/{projectJob}', [App\Http\Controllers\User\ProjectJobController::class, 'show'])->name('user.project_jobs.show');
 
@@ -202,6 +203,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     // 工程シート（User 閲覧・セル更新）
     Route::get('/user/workflow-sheets/{sheet}', [\App\Http\Controllers\User\WorkflowSheetController::class, 'show'])->name('user.workflow_sheets.show');
     Route::put('/user/workflow-sheets/{sheet}/cells', [\App\Http\Controllers\User\WorkflowCellController::class, 'update'])->name('user.workflow_sheets.cells.update');
+    Route::post('/user/workflow-sheets/{sheet}/cells/register', [\App\Http\Controllers\User\WorkflowCellController::class, 'register'])->name('user.workflow_sheets.cells.register');
     Route::post('/user/workflow-cells/{cell}/complete', [\App\Http\Controllers\User\WorkflowCellController::class, 'complete'])->name('user.workflow_cells.complete');
 
     // チーム切り替え
