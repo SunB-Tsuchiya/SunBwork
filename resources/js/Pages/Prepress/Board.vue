@@ -988,7 +988,6 @@ async function executeCsvImport() {
                                     @click="columnControls[col.key].order = 'desc'"
                                 >↓ 降順</button>
                             </div>
-                            <span class="text-xs text-gray-500">日付で絞込:</span>
                             <div class="flex items-center gap-1">
                                 <input
                                     type="text"

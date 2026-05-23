@@ -59,6 +59,9 @@ class DatabaseSeeder extends Seeder
 
             // 「その他」クライアント・案件（EventController が参照する共通レコード）
             OtherClientProjectSeeder::class,
+
+            // 更新ログ（changelogs テーブル）
+            ChangelogSeeder::class,
         ]);
 
         // ────────────────────────────────────────────────────────

@@ -347,3 +347,140 @@ private function canEdit(User $user, ProjectJob $projectJob, ?ProgressSheet $she
 Create.vue と同等のフルフォーム。フィールド: name / email / password / company_id / department_id / assignment_id / user_role / employment_type / position_title_id。
 
 company_id → department_id → assignment_id のカスケードリセットあり。`Admin/UserController::edit()` で companies（部署・担当付き）と positionTitles を渡す。
+
+---
+
+## イルカボード（在籍ボード, 2026-05-15）
+
+**テーブル:** `user_presence_statuses`
+
+| カラム | 型 | 内容 |
+|-------|-----|------|
+| user_id | FK → users | |
+| status | enum | `in_office` / `remote` / `out` / `off` |
+| status_detail | text (nullable) | 自由記述 |
+| updated_at | timestamp | |
+
+**コントローラ:** `app/Http/Controllers/User/UserPresenceController.php`
+
+**Vue:** `resources/js/Pages/User/IrukaBoard/Index.vue`
+
+**ルート:**
+- `GET user/iruka-board` → `user.iruka_board.index`
+- `PUT user/presence` → `user.presence.update`
+
+**カレンダー連動:** FullCalendar の `eventContent` で在籍状況バッジを表示。`user_presence_statuses` を EventController と同 props に含めて渡す。
+
+---
+
+## ゴーストユーザー（テストユーザー機能, 2026-05-13）
+
+**追加カラム（`users` テーブル）:**
+- `is_ghost` — boolean, default false
+- `ghost_owner_id` — FK → users.id, nullable（どの管理者が所有するゴーストか）
+
+**用途:** テスト用・仮ユーザー。通常の一覧・割当・ワークロード集計から除外する。
+
+**管理:**
+- `Admin/UserController` — `ghost_owner_id` 経由で SuperAdmin が管理
+- `Admin/Users/Index.vue` — ゴーストユーザー表示トグル（デフォルト非表示）
+
+**スコープ:** 通常クエリには `whereIsGhost(false)` または `where('is_ghost', false)` を付けること。
+
+---
+
+## 更新ログ（Changelog, 2026-05-23）
+
+**テーブル:** `changelogs`
+
+| カラム | 型 | 内容 |
+|-------|-----|------|
+| version | varchar(30), unique | バージョンスラッグ（例: `repair-5`） |
+| title | varchar(200) | 一覧表示タイトル |
+| released_at | date | リリース日 |
+| summary | text | 一覧用概要（プレーンテキスト） |
+| body | longText | 詳細本文（HTML, DOMPurify でサニタイズ） |
+| design_files | JSON, nullable | 関連設計ファイル名の配列 |
+| claude_notes | text, nullable | Claude 向けメモ |
+
+**モデル:** `app/Models/Changelog.php`（casts: released_at → date, design_files → array）
+
+**コントローラ:** `app/Http/Controllers/ChangelogController.php`
+- `index()` — released_at 降順、id/version/title/released_at/summary のみ取得
+- `show(Changelog $changelog)` — 全カラムを Inertia で渡す
+
+**Seeder:** `ChangelogSeeder`（`updateOrCreate(['version' => ...])` で冪等性確保）
+
+**ルート（認証不要）:**
+- `GET /changelogs` → `changelogs.index`
+- `GET /changelogs/{changelog}` → `changelogs.show`
+
+**Vue:**
+- `resources/js/Pages/Changelogs/Index.vue` — カード一覧
+- `resources/js/Pages/Changelogs/Show.vue` — 詳細 + 設計ファイル折りたたみ
+
+**SuperAdmin 専用:** `auth.user.isSuperAdmin` が true の場合、`design_files` を折りたたみセクションで表示（`auth.isSuperAdmin` は存在しない — 必ず `auth.user.isSuperAdmin` を参照）
+
+**Claude 参照指示:** 概要・詳細を読み、必要なら `z_instructions/archived/` 内の設計ファイルを参照する。
+
+---
+
+## 工程シート（WorkflowSheets / Process, 2026-05-14）
+
+**テーブル:**
+- `workflow_sheets` — シート本体（project_job_id, title 等）
+- `workflow_sheet_rows` — 行定義（sheet_id, order 等）
+- `workflow_sheet_cells` — セルデータ（row_id, column_key, value 等）
+
+**コントローラ:** `app/Http/Controllers/Coordinator/WorkflowSheetController.php`
+
+**Vue:** `resources/js/Pages/Coordinator/WorkflowSheets/`
+
+---
+
+## スクリプトセクション（Scripts, 2026-05-16）
+
+**アクセス制御:** `auth.canAccessScripts`（`auth.user` 配下ではなく **`auth` 直下**）でアイコン表示制御。
+
+**実装規約:** `z_instructions/SCRIPTS_SECTION_GUIDELINES.md`（新規ツール追加時は必読）
+
+**コンポーネント:** `resources/js/Components/Scripts/` に配置。`Show.vue` の `componentMap` にキーを登録する。
+
+**AppLayout:** スパナアイコンボタンとして AppLayout ヘッダー右に配置済み（auth.canAccessScripts が true のユーザーのみ表示）。
+
+---
+
+## クライアント ID（client_code, 2026-05-21）
+
+**テーブル:** `clients`
+
+| カラム | 型 | 内容 |
+|-------|-----|------|
+| client_code | varchar(20), nullable, unique | クライアント固有ID（CSV 突合キー） |
+| is_registered | boolean, default false | CSV 登録フロー完了フラグ |
+
+**用途:**
+- CSV インポート時に `client_code` で既存クライアントを特定・突合する
+- `is_registered = false` のクライアントは未確認状態。Coordinator が確認後に `true` にする
+
+**注意:** `client_code` はさくら本番 Migration 済み。新規クライアント作成時に任意入力。
+
+---
+
+## 製版ボード（Prepress Board, 2026-04-28）
+
+**Vue:** `resources/js/Pages/Coordinator/PrepressBoard/`
+
+**ルート プレフィックス:** `coordinator.prepress_board.*`
+
+案件（ProjectJob）の製版工程を Kanban ボード形式で表示・管理する。伝票詳細モーダル・インラインクライアント表示あり。
+
+---
+
+## 一括案件登録（BulkCreate, 2026-04-20）
+
+**Vue:** `resources/js/Pages/Coordinator/BulkCreate/Index.vue`
+
+**ルート:** `coordinator.project_jobs.bulk_create`
+
+CSV から複数の ProjectJob を一括登録する機能。`NormalizesCsvEncoding` Trait を使用。

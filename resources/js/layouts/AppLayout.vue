@@ -411,6 +411,19 @@ function navigateToRole(role) {
                                 </div>
                             </div>
 
+                            <!-- 更新ログ -->
+                            <div class="group relative">
+                                <Link :href="route('changelogs.index')" class="flex h-8 w-8 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </Link>
+                                <div class="pointer-events-none absolute right-0 top-9 z-50 w-44 rounded-md bg-gray-800 px-3 py-2 text-xs text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                                    <p class="font-medium">更新ログ</p>
+                                    <p class="text-gray-300">機能追加・不具合修正の履歴</p>
+                                </div>
+                            </div>
+
                             <!-- Settings Dropdown -->
                             <div class="relative ms-1">
                                 <Dropdown align="right" width="48">

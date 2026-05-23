@@ -14,6 +14,7 @@
 6. Artisan は必ずコンテナ内: `docker compose exec laravel bash -lc "php artisan ..."`
 7. 設定変更後: `php artisan config:clear && php artisan cache:clear`
 8. EACCES エラー時: `sudo chown -R $USER:$USER public/build/ && sudo chmod -R 755 public/build/assets`
+9. **新規ページ・コンポーネントを作成する前に `z_instructions/CONSOLIDATED_01_layout_and_ui.md` を必ず確認する。** AppLayout の使い方・スロット・戻るボタン配置・NG パターンを守ること
 
 **「git にアップ」「さくらにデプロイ」を求められたとき:**
 → `z_instructions/DEPLOY_SAKURA.md` の手順に従う。VITE_APP_BASE_PATH の切り替えを必ず行うこと。
@@ -29,6 +30,11 @@
 
 命名例: `GHOST_PLAN1.md` / `GHOST_MANAGER1.md` / `GHOST1_PROMPT.md`  
 既存の例: `REPAIR_PLAN4.md` / `REPAIR_MANAGER4.md` / `REPAIR4_PROMPT.md`
+
+**作業完了後（3ファイルを作成した規模の作業が終わったとき）は以下を必ず行うこと:**
+1. **`ChangelogSeeder` に修正ログを追記する** — `updateOrCreate(['version' => ...], $entry)` 形式で追加し、`php artisan db:seed --class=ChangelogSeeder` を実行して反映する
+2. **関連する `CONSOLIDATED_*.md` を更新する** — 新機能・変更仕様を該当ファイルに追記・修正する（特に UI 変更は CONSOLIDATED_01、カレンダー系は CONSOLIDATED_05、ドメインルール追加は CONSOLIDATED_09）
+3. 完了した PLAN/MANAGER/PROMPT ファイルは `z_instructions/archived/` に移動する
 
 ---
 

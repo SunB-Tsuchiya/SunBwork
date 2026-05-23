@@ -1212,8 +1212,10 @@ onUnmounted(() => {
         </template>
 
         <template #headerExtras>
-            <Link :href="editHref" class="rounded bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700">編集</Link>
-            <button @click="deleteDiary" class="rounded bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700">削除</button>
+            <div class="flex items-center gap-2">
+                <Link :href="editHref" class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">編集</Link>
+                <button @click="deleteDiary" class="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">削除</button>
+            </div>
         </template>
 
         <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">

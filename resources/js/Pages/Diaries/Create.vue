@@ -297,6 +297,46 @@ async function fetchDayEvents(date) {
 
 onMounted(() => fetchDayEvents(form.date));
 
+async function onTimelineUpdate(payload) {
+    try {
+        await axios.put(`/events/${payload.id}/calendar`, {
+            date: payload.date,
+            startHour: payload.startHour,
+            startMinute: payload.startMinute,
+            endHour: payload.endHour,
+            endMinute: payload.endMinute,
+        });
+        await fetchDayEvents(payload.date);
+    } catch {
+        alert('予定の更新に失敗しました');
+    }
+}
+
+function onTimelineOpenCreate(payload) {
+    if (!confirm('日報の入力内容は保存されません。予定作成ページに移動しますか？')) return;
+    const returnTo = window.location.pathname + window.location.search;
+    if (payload && payload.minuteOffset !== undefined && payload.minuteOffset !== null) {
+        const totalMin = Math.round(payload.minuteOffset / 15) * 15;
+        const clamped  = Math.max(0, Math.min(totalMin, 24 * 60 - 1));
+        const hh = String(Math.floor(clamped / 60)).padStart(2, '0');
+        const mm = String(clamped % 60).padStart(2, '0');
+        router.get(route('events.create', {
+            date: form.date, startHour: hh, startMinute: mm,
+            endHour: String(Math.min(23, parseInt(hh) + 1)).padStart(2, '0'), endMinute: mm,
+            return_to: returnTo,
+        }));
+    } else {
+        router.get(route('events.create', { date: form.date, return_to: returnTo }));
+    }
+}
+
+function onTimelineOpenEdit(payload) {
+    if (!payload || !payload.id) return;
+    if (!confirm('日報の入力内容は保存されません。予定編集ページに移動しますか？')) return;
+    const returnTo = window.location.pathname + window.location.search;
+    router.get(route('events.edit', { event: payload.id, return_to: returnTo }));
+}
+
 function applyQuillJaTitles(editor) {
     try {
         const toolbar = editor.getModule('toolbar');
@@ -638,14 +678,17 @@ function applyPastDiary(rec) {
             </div>
 
             <!-- 当日タイムライン -->
-            <div v-if="timelineEvents.length > 0" class="mt-6">
+            <div class="mt-6">
                 <label class="mb-2 block text-sm font-medium text-gray-700">当日の予定</label>
                 <TimelineDiary
                     :date="form.date"
                     :events="timelineEvents"
                     :startHour="7"
                     :endHour="21"
-                    :editable="false"
+                    :editable="true"
+                    @update:events="onTimelineUpdate"
+                    @open-create="onTimelineOpenCreate"
+                    @open-edit="onTimelineOpenEdit"
                 />
             </div>
 

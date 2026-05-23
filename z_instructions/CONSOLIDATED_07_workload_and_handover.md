@@ -13,7 +13,7 @@ Workload Analyzer と AI ハンドオーバー向けの要点をまとめたド�
 AI 引き継ぎ（Handover）
 
 - AI 用のプリセット（ai_presets）と会話履歴（ai_conversations / ai_messages）の保存設計を明記。エクスポートは storage/app/exports に出力。
-- 初めて作業をする AI エージェントは `first_prompt.md` を必ず読み、レイアウト規則と DB（MySQL）に関する注意を順守すること。
+- 初めて作業をする AI エージェントは `CLAUDE.md` および `CONSOLIDATED_01_layout_and_ui.md` を必ず読み、レイアウト規則と DB（MySQL）に関する注意を順守すること。（`first_prompt.md` は archived に移動済み）
 
 参照元
 

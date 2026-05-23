@@ -15,7 +15,7 @@
 - **サムネイル**: `attachments/thumbs/` に保存。サムネイル生成は `AttachmentService::createThumbnailFromDiskPath` に集約。
 - **セキュリティ / セッション**: SPA + Sanctum の場合、StartSession と CSRF フローが前提。コンテナ内で `php artisan` を実行する運用を徹底。
 - **サニタイズ**: HTML/Markdown/ファイルメタは `HTMLPurifier` / `DOMPurify` / FileMetaSanitizer で必ず sanitize する。外部 URL は allow-list 検査。
-- **UI / レイアウト**: 全ての Inertia ページは `AppLayout` を使用し、既定の外側 div 構造（`py-12` 等）を守る。
+- **UI / レイアウト**: 全ての Inertia ページは `AppLayout` を使用。`py-12 > max-w-7xl` は AppLayout 内部提供済み — ページ側で重複しない。戻るボタンは `#header` スロット内の `div.flex.items-center.gap-3` パターンを使う。
 - **AI / チャット**: AI キーは環境変数で管理。AI が生成するコンテンツは必ずサニタイズして保存・表示する。
 - **カレンダー/JobBox**: FullCalendar には plain オブジェクトを渡す（`structuredClone` など）。日付はサーバ UTC / フロント JST の変換に注意。
 
@@ -45,6 +45,18 @@
 **ファイル**: 要点の詳細は個別ドキュメントを参照してください（例: `CONSOLIDATED_08_attachment.md`, `CONSOLIDATED_02_security_and_sessions.md` 等）。
 
 ---
+
+**2026-04-20 以降に追加された主要機能（詳細は CONSOLIDATED_09 参照）**
+
+- **一括案件登録（BulkCreate, 2026-04-20）**: CSV から複数 ProjectJob を一括登録
+- **製版ボード（Prepress Board, 2026-04-28）**: 案件の製版工程を Kanban 管理
+- **ProgressSheet v2（2026-04-27）**: JobLink / User 型セルのロック連動
+- **ゴーストユーザー（2026-05-13）**: `users.is_ghost` / `ghost_owner_id` — テスト用ユーザー
+- **工程シート（WorkflowSheets, 2026-05-14）**: `workflow_sheets` / `workflow_sheet_rows` / `workflow_sheet_cells`
+- **イルカボード（在籍ボード, 2026-05-15）**: `user_presence_statuses` テーブル、在籍状況管理
+- **スクリプトセクション（2026-05-16）**: `auth.canAccessScripts` で制御。`Components/Scripts/` に配置
+- **クライアント ID（client_code, 2026-05-21）**: `clients.client_code` / `clients.is_registered` — CSV 突合キー
+- **更新ログ（Changelog, 2026-05-23）**: `changelogs` テーブル。`changelogs.index` / `changelogs.show` ルート
 
 **2026-05 追記: マイジョブ自動完了バッチ**
 

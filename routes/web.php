@@ -112,6 +112,10 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('/{script:slug}', [App\Http\Controllers\ScriptController::class, 'show'])->name('show');
     });
 
+    // 更新ログ
+    Route::get('/changelogs', [App\Http\Controllers\ChangelogController::class, 'index'])->name('changelogs.index');
+    Route::get('/changelogs/{changelog}', [App\Http\Controllers\ChangelogController::class, 'show'])->name('changelogs.show');
+
     // Ziggy用: 明示的にuser.dashboardルートを追加
     Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
     Route::get('/user/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('user.dashboard');
