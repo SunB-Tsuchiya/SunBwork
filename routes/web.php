@@ -614,6 +614,11 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         // Project_job CRUD
         Route::get('project_jobs', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'index'])->name('project_jobs.index');
         Route::get('project_jobs/create', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'create'])->name('project_jobs.create');
+        // 案件 CSV 一括登録（静的パスなので {projectJob} より前に定義）
+        Route::get('project-jobs/csv/sample', [\App\Http\Controllers\Coordinator\ProjectJobCsvController::class, 'downloadSample'])->name('project_jobs.csv.sample');
+        Route::post('project-jobs/csv/analyze', [\App\Http\Controllers\Coordinator\ProjectJobCsvController::class, 'analyzeCsv'])->name('project_jobs.csv.analyze');
+        Route::post('project-jobs/csv/import', [\App\Http\Controllers\Coordinator\ProjectJobCsvController::class, 'importCsv'])->name('project_jobs.csv.import');
+        Route::post('project-jobs/csv/client-create', [\App\Http\Controllers\Coordinator\ProjectJobCsvController::class, 'apiClientCreate'])->name('project_jobs.csv.client_create');
         // 案件一括作成（静的パスなので {projectJob} より前に定義）
         Route::get('project-jobs/bulk-create', [App\Http\Controllers\Coordinator\BulkProjectJobController::class, 'index'])->name('project_jobs.bulk_create.index');
         Route::get('project-jobs/bulk-create/sample', [App\Http\Controllers\Coordinator\BulkProjectJobController::class, 'downloadSample'])->name('project_jobs.bulk_create.sample');
@@ -839,6 +844,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('ghost-users/{ghostUserId}/switch', [App\Http\Controllers\Coordinator\GhostUserController::class, 'switch'])->name('ghost_users.switch');
 
         // 営業担当管理（Coordinator用）
+        Route::get('sales-reps/api/list', [\App\Http\Controllers\Coordinator\SalesRepController::class, 'apiList'])->name('sales_reps.api.list');
+        Route::post('sales-reps/api/create', [\App\Http\Controllers\Coordinator\SalesRepController::class, 'apiCreate'])->name('sales_reps.api.create');
         Route::get('sales-reps', [\App\Http\Controllers\Coordinator\SalesRepController::class, 'index'])->name('sales_reps.index');
         Route::post('sales-reps', [\App\Http\Controllers\Coordinator\SalesRepController::class, 'store'])->name('sales_reps.store');
         Route::post('sales-reps/bulk',    [\App\Http\Controllers\Coordinator\SalesRepController::class, 'bulkStore'])->name('sales_reps.bulkStore');
@@ -944,6 +951,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
         // 伝票管理
         Route::get('tickets', [\App\Http\Controllers\Prepress\TicketController::class, 'index'])->name('tickets.index');
         Route::get('tickets/create', [\App\Http\Controllers\Prepress\TicketController::class, 'create'])->name('tickets.create');
+        Route::get('tickets/csv/sample', [\App\Http\Controllers\Prepress\TicketController::class, 'downloadSample'])->name('tickets.csv.sample');
         Route::post('tickets/analyze-csv', [\App\Http\Controllers\Prepress\TicketController::class, 'analyzeCsv'])->name('tickets.analyzeCsv');
         Route::post('tickets/import-csv',  [\App\Http\Controllers\Prepress\TicketController::class, 'importCsv'])->name('tickets.importCsv');
         Route::post('tickets', [\App\Http\Controllers\Prepress\TicketController::class, 'store'])->name('tickets.store');
@@ -994,3 +1002,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return Inertia::render('Debug/ApiDebug');
     })->name('debug.api');
 });
+
+// セッション Keep-Alive 用 ping エンドポイント
+Route::middleware(['auth:sanctum', config('jetstream.auth_session')])->get('/ping', function () {
+    return response()->noContent();
+})->name('ping');

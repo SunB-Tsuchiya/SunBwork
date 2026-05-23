@@ -145,6 +145,12 @@ onMounted(() => {
     } catch {
         // Echo subscribe failed (non-fatal)
     }
+
+    // セッション Keep-Alive: 10分ごとにサーバーへ ping してセッションを維持する
+    const pingInterval = setInterval(() => {
+        window.axios.get(route('ping')).catch(() => {});
+    }, 10 * 60 * 1000);
+    window.__sessionPingInterval = pingInterval;
 });
 
 onBeforeUnmount(() => {
@@ -155,6 +161,7 @@ onBeforeUnmount(() => {
             echoChannel = null;
         }
     } catch {}
+    clearInterval(window.__sessionPingInterval);
 });
 const slots = useSlots();
 // Debug logs removed for production

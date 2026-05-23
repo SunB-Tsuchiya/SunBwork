@@ -1,11 +1,18 @@
 <template>
     <AppLayout :title="`管理シート: ${sheet.name}`">
         <template #header>
-            <div class="flex items-center gap-3">
-                <h2 class="text-lg font-semibold text-gray-800">
-                    {{ projectJob.title }}
-                    <span class="ml-2 text-base font-normal text-gray-400">管理シート</span>
-                </h2>
+            <div class="flex flex-col gap-1">
+                <div class="flex items-center gap-3">
+                    <Link
+                        :href="backUrl"
+                        class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300"
+                    >← 案件詳細に戻る</Link>
+                    <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">管理シート：{{ sheet.name }}</h2>
+                </div>
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-sm text-gray-600">
+                    <span v-if="projectJob.client_name" class="font-medium text-gray-700">{{ projectJob.client_name }}</span>
+                    <span class="font-medium text-indigo-700">{{ projectJob.title }}</span>
+                </div>
             </div>
         </template>
 
@@ -75,6 +82,8 @@
 
 <script setup>
 import { ref, computed } from 'vue';
+import { Link } from '@inertiajs/vue3';
+import { route } from 'ziggy-js';
 import AppLayout from '@/layouts/AppLayout.vue';
 import WorkflowCellEditor from '@/Components/WorkflowCellEditor.vue';
 import axios from 'axios';
@@ -91,6 +100,12 @@ const props = defineProps({
 
 const localCells = ref([...props.cells]);
 const stages     = computed(() => props.sheet.column_config ?? []);
+
+const backUrl = computed(() => {
+    const base = route('user.project_jobs.show', { projectJob: props.projectJob.id });
+    const backTab = new URLSearchParams(window.location.search).get('back_tab');
+    return backTab ? `${base}?tab=${backTab}` : base;
+});
 
 // ── 行グループ化 ──────────────────────────────────────────────────────────
 const topLevelRows = computed(() => props.rows.filter((r) => !r.parent_id));

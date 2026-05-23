@@ -23,6 +23,10 @@ class ProjectJob extends Model
         'shared_from_id',
         'image_path',
         'original_filename',
+        'sales_rep',
+        'sales_rep_id',
+        'plate_submission_date',
+        'plate_down_date',
     ];
 
     protected $appends = ['image_url'];
@@ -31,6 +35,8 @@ class ProjectJob extends Model
         'schedule' => 'array',
         'completed' => 'boolean',
         'page_count' => 'integer',
+        'plate_submission_date' => 'date',
+        'plate_down_date' => 'date',
     ];
 
     public function getImageUrlAttribute(): ?string

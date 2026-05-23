@@ -81,11 +81,10 @@ function fmtDeadline(isoStr) {
     if (!isoStr) return '—';
     const fmt = new Intl.DateTimeFormat('ja-JP', {
         timeZone: 'Asia/Tokyo',
-        year: 'numeric', month: 'numeric', day: 'numeric',
-        hour: '2-digit', minute: '2-digit', hour12: false,
+        month: 'numeric', day: 'numeric',
     });
     const p = Object.fromEntries(fmt.formatToParts(new Date(isoStr)).map(({ type, value }) => [type, value]));
-    return `${p.year}年${p.month}月${p.day}日 ${p.hour}時${p.minute}分`;
+    return `${p.month}月${p.day}日 00:00`;
 }
 
 function isOverdue(req) {

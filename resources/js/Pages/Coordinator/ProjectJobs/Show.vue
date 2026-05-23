@@ -299,12 +299,12 @@
                             <tbody class="divide-y divide-gray-200 bg-white">
                                 <tr v-for="ps in progressSheets" :key="ps.id"
                                     class="cursor-pointer hover:bg-indigo-50"
-                                    @click="router.get(route('coordinator.progress_sheets.show', { sheet: ps.id }))">
+                                    @click="router.get(route('coordinator.progress_sheets.show', { sheet: ps.id }) + '?back_tab=progress')">
                                     <td class="px-4 py-2 text-sm font-medium text-gray-900">{{ ps.name }}</td>
                                     <td class="px-4 py-2 text-sm text-gray-500">{{ ps.created_at }}</td>
                                     <td class="px-4 py-2">
                                         <Link
-                                            :href="route('coordinator.progress_sheets.show', { sheet: ps.id })"
+                                            :href="route('coordinator.progress_sheets.show', { sheet: ps.id }) + '?back_tab=progress'"
                                             class="rounded bg-indigo-600 px-3 py-1 text-xs font-medium text-white hover:bg-indigo-700"
                                             @click.stop
                                         >
@@ -316,6 +316,42 @@
                         </table>
                     </div>
                     <p v-else class="text-sm text-gray-400">進行管理表なし</p>
+                </section>
+
+                <!-- ── 管理シートセクション ──────────────────────── -->
+                <section v-show="activeTab === 'workflow'" class="py-5">
+                    <div class="mb-3 flex items-center gap-4">
+                        <h3 class="font-semibold text-gray-800">管理シート</h3>
+                    </div>
+                    <div v-if="workflowSheets.length > 0" class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">シート名</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">作成日</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200 bg-white">
+                                <tr v-for="ws in workflowSheets" :key="ws.id"
+                                    class="cursor-pointer hover:bg-indigo-50"
+                                    @click="router.get(route('coordinator.workflow_sheets.show', { sheet: ws.id }) + '?back_tab=workflow')">
+                                    <td class="px-4 py-2 text-sm font-medium text-gray-900">{{ ws.name }}</td>
+                                    <td class="px-4 py-2 text-sm text-gray-500">{{ ws.created_at }}</td>
+                                    <td class="px-4 py-2">
+                                        <Link
+                                            :href="route('coordinator.workflow_sheets.show', { sheet: ws.id }) + '?back_tab=workflow'"
+                                            class="rounded bg-indigo-600 px-3 py-1 text-xs font-medium text-white hover:bg-indigo-700"
+                                            @click.stop
+                                        >
+                                            開く
+                                        </Link>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p v-else class="text-sm text-gray-400">管理シートなし</p>
                 </section>
 
                 <!-- ── ジョブ履歴セクション ───────────────────── -->
@@ -1147,6 +1183,7 @@ async function submitCsvImport() {
 const tabs = [
     { key: 'overview',  label: '概要・メンバー' },
     { key: 'progress',  label: '進行管理表' },
+    { key: 'workflow',  label: '管理シート' },
     { key: 'schedule',  label: 'スケジュール' },
     { key: 'voucher',   label: '伝票情報' },
     { key: 'items',     label: '連携設定' },
@@ -1465,7 +1502,8 @@ function truncate(text, len) {
 
 // ── 進行管理表 ───────────────────────────────────────────────────────────
 
-const progressSheets = computed(() => Array.isArray(page.props.progressSheets) ? page.props.progressSheets : []);
+const progressSheets  = computed(() => Array.isArray(page.props.progressSheets)  ? page.props.progressSheets  : []);
+const workflowSheets  = computed(() => Array.isArray(page.props.workflowSheets)   ? page.props.workflowSheets  : []);
 const sheetTemplates = computed(() => Array.isArray(page.props.sheetTemplates) ? page.props.sheetTemplates : []);
 const showCreateSheetModal = ref(false);
 const newSheetName = ref('');

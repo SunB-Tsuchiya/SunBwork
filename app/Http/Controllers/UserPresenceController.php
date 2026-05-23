@@ -8,6 +8,7 @@ use App\Models\IrukaStatusOrder;
 use App\Models\User;
 use App\Models\UserPresenceStatus;
 use App\Models\UserMonthlySchedule;
+use App\Models\UserSetting;
 use App\Models\WorkRecord;
 use App\Models\Worktype;
 use Carbon\Carbon;
@@ -232,16 +233,21 @@ class UserPresenceController extends Controller
         }
 
         try {
-            // 当日の勤務形態を user_monthly_schedules から取得
+            // 当日の勤務形態を user_monthly_schedules → UserSetting → 会社デフォルトの順で取得
             $worktypeId = UserMonthlySchedule::worktypeIdForDate($user->id, $today);
 
-            // worktype が見つからなければ会社のデフォルト（sort_order=1）を使用
+            if (!$worktypeId) {
+                $worktypeId = UserSetting::where('user_id', $user->id)->value('worktype_id');
+            }
+
             $worktype = $worktypeId
                 ? Worktype::where('company_id', $user->company_id)->find($worktypeId)
                 : Worktype::where('company_id', $user->company_id)->orderBy('sort_order')->first();
 
-            // 現在時刻（退社時刻）
-            $endTime = Carbon::now()->format('H:i');
+            // 退社時刻を5分単位（切り捨て）で丸める
+            $now     = Carbon::now();
+            $rounded = $now->minute - ($now->minute % 5);
+            $endTime = $now->copy()->minute($rounded)->second(0)->format('H:i');
 
             // 始業時間: worktype の定時
             $startTime = $worktype ? substr($worktype->start_time, 0, 5) : null;

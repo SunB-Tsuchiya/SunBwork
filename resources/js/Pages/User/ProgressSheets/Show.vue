@@ -4,7 +4,7 @@
             <div class="flex flex-col gap-1">
                 <div class="flex items-center gap-3">
                     <Link
-                        :href="route('user.project_jobs.show', { projectJob: projectJob.id })"
+                        :href="backUrl"
                         class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300"
                     >← 案件詳細に戻る</Link>
                     <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">進行管理表：{{ sheet.name }}</h2>
@@ -48,7 +48,8 @@
                     :job-link-only="true"
                     :auth-user-id="page.props.auth?.user?.id ?? null"
                     @job-link-open="openJobLink"
-                    @worker-job-register="openJobLink"
+                    @worker-job-register="onWorkerJobRegister"
+                    @worker-job-detail="onWorkerJobDetail"
                     @job-link-detail="openJobLinkDetail"
                     @complete-assignment="onCompleteAssignment"
                     @worker-complete="onWorkerComplete"
@@ -115,7 +116,7 @@
 import ProgressTable from '@/Components/ProgressTable.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
-import { ref, watch, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { route } from 'ziggy-js';
 
 const props = defineProps({
@@ -168,6 +169,12 @@ watch(
 );
 
 // ── ナビゲーション ──────────────────────────────────────────────────
+
+const backUrl = computed(() => {
+    const base = route('user.project_jobs.show', { projectJob: props.projectJob.id });
+    const backTab = new URLSearchParams(window.location.search).get('back_tab');
+    return backTab ? `${base}?tab=${backTab}` : base;
+});
 
 function backToJob() {
     try {
@@ -238,6 +245,41 @@ function buildJobTitle(rowId, colKey) {
     const colPart = [...parentPath, leafLabel].filter(Boolean).join('_');
     const rowPart = [parentRow?.label, row?.label].filter(Boolean).join('_');
     return normalizeTitle([rowPart, colPart].filter(Boolean).join('_'));
+}
+
+// ── worker型「＋ 登録」 ──────────────────────────────────────────
+// 担当者が自分自身の場合は assign() API を直接呼ぶ（フォーム不要）
+// それ以外は通常のジョブ作成フォームへ遷移
+
+function onWorkerJobRegister({ rowId, colKey, userId }) {
+    const authUserId = page.props.auth?.user?.id;
+    if (userId && authUserId && String(userId) === String(authUserId)) {
+        const cell = localCells.value.find((c) => c.row_id === rowId && c.col_key === colKey);
+        if (cell?.id) {
+            router.post(
+                route('progress_sheets.cells.assign', { sheet: props.sheet.id, cell: cell.id }),
+                {},
+                { preserveScroll: true },
+            );
+            return;
+        }
+    }
+    // 担当者未定または自分以外: ジョブ作成フォームへ
+    openJobLink({ rowId, colKey });
+}
+
+// ── worker型「詳細」モーダル ──────────────────────────────────────
+
+function onWorkerJobDetail({ assignmentId, rowId, colKey }) {
+    const cell = localCells.value.find((c) => c.row_id === rowId && c.col_key === colKey);
+    detailModal.value = {
+        open: true,
+        title: cell?.assignment_title ?? '(タイトルなし)',
+        endDate: cell?.assignment_end_date ?? null,
+        completed: !!(cell?.assignment_completed),
+        assignmentId: assignmentId ?? null,
+        completing: false,
+    };
 }
 
 // ── ジョブリンク「＋ 登録」 ───────────────────────────────────────

@@ -1302,7 +1302,13 @@ async function executeCsvImport() {
             <div class="w-full max-w-7xl rounded-xl bg-white shadow-2xl">
                 <div class="flex items-center justify-between border-b px-6 py-4">
                     <h3 class="text-lg font-semibold text-gray-800">CSV一括登録</h3>
-                    <button type="button" class="text-gray-400 hover:text-gray-600" @click="closeCsvModal">✕</button>
+                    <div class="flex items-center gap-3">
+                        <a :href="route('prepress.tickets.csv.sample')"
+                           class="rounded border border-gray-400 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50">
+                            サンプルCSVをダウンロード
+                        </a>
+                        <button type="button" class="text-gray-400 hover:text-gray-600" @click="closeCsvModal">✕</button>
+                    </div>
                 </div>
 
                 <!-- ファイル選択（解析前） -->

@@ -399,6 +399,13 @@ class ProjectJobController extends Controller
             ->get(['id', 'name', 'sort_order'])
             ->map(fn ($s) => ['id' => $s->id, 'name' => $s->name, 'sort_order' => $s->sort_order]);
 
+        // 管理シート（名前一覧のみ）
+        $workflowSheets = \App\Models\WorkflowSheet::where('project_job_id', $projectJob->id)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get(['id', 'name', 'sort_order', 'created_at'])
+            ->map(fn ($s) => ['id' => $s->id, 'name' => $s->name, 'sort_order' => $s->sort_order]);
+
         // 校正依頼済みのアサインメントIDセット（ボタン無効化用）
         $requestedAssignmentIds = [];
         try {
@@ -411,14 +418,16 @@ class ProjectJobController extends Controller
         } catch (\Throwable $e) {}
 
         return Inertia::render('User/ProjectJobs/Show', [
-            'job'                    => $projectJob,
-            'subCoordinators'        => $subCoordinators,
-            'members'                => $members,
-            'hasSchedule'            => $hasSchedule,
-            'schedules'              => $schedules,
-            'jobHistory'             => $jobHistory,
-            'progressSheets'         => $progressSheets,
-            'requestedAssignmentIds' => $requestedAssignmentIds,
+            'job'                      => $projectJob,
+            'subCoordinators'          => $subCoordinators,
+            'members'                  => $members,
+            'hasSchedule'              => $hasSchedule,
+            'schedules'                => $schedules,
+            'jobHistory'               => $jobHistory,
+            'progressSheets'           => $progressSheets,
+            'workflowSheets'           => $workflowSheets,
+            'requestedAssignmentIds'   => $requestedAssignmentIds,
+            'sheetLinkedAssignmentIds' => $sheetLinkedAssignmentIds,
         ]);
     }
 }

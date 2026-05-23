@@ -102,9 +102,45 @@
                     <div v-if="form.errors.jobcode" class="mt-1 text-sm text-red-600">{{ form.errors.jobcode }}</div>
                 </div>
                 <div class="mb-4">
-                    <label class="mb-1 block font-semibold">案件タイトル</label>
+                    <label class="mb-1 block font-semibold">案件名</label>
                     <input v-model="form.title" type="text" class="w-full rounded border px-3 py-2" required />
                     <div v-if="form.errors.title" class="mt-1 text-sm text-red-600">{{ form.errors.title }}</div>
+                </div>
+
+                <!-- 担当営業 -->
+                <div class="mb-4">
+                    <label class="mb-1 block font-semibold">担当営業</label>
+                    <div class="flex gap-2 items-start flex-wrap">
+                        <select
+                            v-model="form.sales_rep_id"
+                            class="w-48 rounded border px-2 py-2 text-sm focus:outline-none"
+                        >
+                            <option value="">— DBから選択 —</option>
+                            <option v-for="r in salesReps" :key="r.id" :value="r.id">{{ r.name }}</option>
+                        </select>
+                        <input
+                            v-model="form.sales_rep"
+                            type="text"
+                            placeholder="フリーテキスト（DB未登録の場合）"
+                            class="flex-1 min-w-32 rounded border px-3 py-2 text-sm focus:outline-none"
+                        />
+                    </div>
+                    <div v-if="form.errors.sales_rep" class="mt-1 text-sm text-red-600">{{ form.errors.sales_rep }}</div>
+                    <div v-if="form.errors.sales_rep_id" class="mt-1 text-sm text-red-600">{{ form.errors.sales_rep_id }}</div>
+                </div>
+
+                <!-- 製版入稿日 / 下版日 -->
+                <div class="mb-4 flex gap-4">
+                    <div class="flex-1">
+                        <label class="mb-1 block font-semibold">製版入稿日</label>
+                        <DateInput v-model="form.plate_submission_date" />
+                        <div v-if="form.errors.plate_submission_date" class="mt-1 text-sm text-red-600">{{ form.errors.plate_submission_date }}</div>
+                    </div>
+                    <div class="flex-1">
+                        <label class="mb-1 block font-semibold">下版日</label>
+                        <DateInput v-model="form.plate_down_date" />
+                        <div v-if="form.errors.plate_down_date" class="mt-1 text-sm text-red-600">{{ form.errors.plate_down_date }}</div>
+                    </div>
                 </div>
                 <div class="mb-4">
                     <label class="mb-1 block font-semibold">リーダー（代表Coordinator）</label>
@@ -167,7 +203,7 @@
                     <div v-if="form.errors.page_count" class="mt-1 text-sm text-red-600">{{ form.errors.page_count }}</div>
                 </div>
                 <div class="mb-4">
-                    <label class="mb-1 block font-semibold">詳細</label>
+                    <label class="mb-1 block font-semibold">メモ</label>
                     <textarea v-model="form.detail" class="w-full rounded border px-3 py-2" rows="3"></textarea>
                     <div v-if="form.errors.detail" class="mt-1 text-sm text-red-600">{{ form.errors.detail }}</div>
                 </div>
@@ -529,6 +565,7 @@
 <script setup>
 import DialogModal from '@/Components/DialogModal.vue';
 import OcrModal from '@/Components/Prepress/OcrModal.vue';
+import DateInput from '@/Components/Prepress/DateInput.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, useForm, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
@@ -540,6 +577,7 @@ const props = defineProps({
     departments: { type: Array, default: () => [] },
     assignments: { type: Array, default: () => [] },
     members: { type: Array, default: () => [] },
+    salesReps: { type: Array, default: () => [] },
 });
 
 const page = usePage();
@@ -553,6 +591,10 @@ const form = useForm({
     size_id: '',
     page_count: '',
     detail: '',
+    sales_rep: '',
+    sales_rep_id: '',
+    plate_submission_date: '',
+    plate_down_date: '',
     team_members: [],
     image: null,
     tmp_ocr_image_path: '',

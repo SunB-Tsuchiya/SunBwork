@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Coordinator;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\CalculatesEventTime;
 use App\Models\Client;
+use App\Models\PrepresSalesRep;
 use App\Services\OcrSpaceService;
 use App\Services\PrepressImageService;
 use Illuminate\Http\Request;
@@ -396,18 +397,20 @@ class ProjectJobController extends Controller
     public function create()
     {
         $sizes = \App\Models\Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group']);
-        
+
         // チームメンバー選択モーダル用のデータ
         $departments = \App\Models\Department::all();
         $assignments = \App\Models\Assignment::all();
         $members = \App\Models\User::orderBy('name')->with(['department', 'assignment'])->get();
-        
+        $salesReps = PrepresSalesRep::orderBy('sort_order')->get(['id', 'name', 'company']);
+
         return Inertia::render('Coordinator/ProjectJobs/Create', [
             'coordinatorCandidates' => $this->coordinatorCandidates(),
             'sizes' => $sizes,
             'departments' => $departments,
             'assignments' => $assignments,
             'members' => $members,
+            'salesReps' => $salesReps,
         ]);
     }
 
@@ -415,20 +418,30 @@ class ProjectJobController extends Controller
     {
         try {
             $data = $request->validate([
-                'jobcode'             => ['nullable', 'string', 'max:255', 'regex:/^[0-9\-]+$/'],
-                'title'               => 'required|string|max:255',
-                'user_id'             => 'required|exists:users,id',
-                'client_id'           => 'required|exists:clients,id',
-                'size_id'             => 'nullable|exists:sizes,id',
-                'page_count'          => 'nullable|integer|min:1|max:99999',
-                'detail'              => 'nullable|string',
-                'sub_coordinator_ids' => 'nullable|array',
-                'sub_coordinator_ids.*' => 'exists:users,id',
-                'team_members'        => 'nullable|array',
+                'jobcode'                => ['nullable', 'string', 'max:255', 'regex:/^[0-9\-]+$/'],
+                'title'                  => 'required|string|max:255',
+                'user_id'                => 'required|exists:users,id',
+                'client_id'              => 'required|exists:clients,id',
+                'size_id'                => 'nullable|exists:sizes,id',
+                'page_count'             => 'nullable|integer|min:1|max:99999',
+                'detail'                 => 'nullable|string',
+                'sales_rep'              => 'nullable|string|max:100',
+                'sales_rep_id'           => 'nullable|integer|exists:prepress_sales_reps,id',
+                'plate_submission_date'  => 'nullable|date',
+                'plate_down_date'        => 'nullable|date',
+                'sub_coordinator_ids'    => 'nullable|array',
+                'sub_coordinator_ids.*'  => 'exists:users,id',
+                'team_members'           => 'nullable|array',
                 'team_members.*.user_id' => 'required|integer|exists:users,id',
-                'image'               => ['nullable', 'file', 'mimes:jpg,jpeg,png,gif,webp,heic,heif,pdf', 'max:20480'],
-                'tmp_ocr_image_path'  => ['nullable', 'string', 'max:500'],
+                'image'                  => ['nullable', 'file', 'mimes:jpg,jpeg,png,gif,webp,heic,heif,pdf', 'max:20480'],
+                'tmp_ocr_image_path'     => ['nullable', 'string', 'max:500'],
             ]);
+
+            if (!empty($data['jobcode'])) {
+                if (ProjectJob::where('jobcode', $data['jobcode'])->exists()) {
+                    return back()->withErrors(['jobcode' => 'この受注番号はすでに登録されています。'])->withInput();
+                }
+            }
 
             $subIds = Arr::pull($data, 'sub_coordinator_ids', []);
             $teamMembers = Arr::pull($data, 'team_members', []);
@@ -1185,6 +1198,12 @@ class ProjectJobController extends Controller
                 'sub_coordinator_ids'   => 'nullable|array',
                 'sub_coordinator_ids.*' => 'exists:users,id',
             ]);
+
+            if (!empty($data['jobcode'])) {
+                if (ProjectJob::where('jobcode', $data['jobcode'])->where('id', '!=', $projectJob->id)->exists()) {
+                    return back()->withErrors(['jobcode' => 'この受注番号はすでに登録されています。'])->withInput();
+                }
+            }
 
             $subIds = Arr::pull($data, 'sub_coordinator_ids', []);
             Arr::pull($data, 'schedule'); // project_jobs テーブルに schedule カラムなし

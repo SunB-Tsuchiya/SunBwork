@@ -11,6 +11,38 @@ class ChangelogSeeder extends Seeder
     {
         $entries = [
             // ─────────────────────────────────────────────────────────────
+            // 0c. PJOB1 — 2026-05-23
+            // ─────────────────────────────────────────────────────────────
+            [
+                'version'      => 'pjob-manager-1',
+                'title'        => '案件管理強化：CSV一括登録・担当営業・セッション維持・重複チェック',
+                'released_at'  => '2026-05-23',
+                'summary'      => 'coordinator の案件新規作成フォームに担当営業・製版入稿日・下版日を追加。案件一覧から CSV 一括登録（No列自動判定・Shift-JIS対応・クライアント/営業担当インラインマッチング）が可能になりました。製版ボードにもサンプル CSV ダウンロードボタンを追加。長時間放置後の操作不能問題を解消し、受注番号の重複登録防止チェックも追加しています。',
+                'design_files' => ['PJOB_PLAN1.md', 'PJOB_MANAGER1.md'],
+                'claude_notes' => '詳細は z_instructions/archived/PJOB_PLAN1.md および PJOB_MANAGER1.md を参照。DB: project_jobs に sales_rep/sales_rep_id/plate_submission_date/plate_down_date 追加（migration 済み）。coordinator CSV ルート・コントローラーを新設（prepress とは完全分離）。No列の有無を header[0] で自動判定（detectNoColumnOffset）。Keep-Alive Ping は AppLayout.vue に 10 分間隔。coordinator store/update に jobcode 重複チェック追加（prepress は実装済み）。',
+                'body'         => <<<'HTML'
+<section class="cl-problem">
+  <h3>背景・問題</h3>
+  <p>coordinator の案件登録フォームに担当営業や製版日程を入力する手段がなく、大量の案件を CSV から一括登録する機能もありませんでした。長時間ページを開いたままにするとセッションが切れて操作できなくなる問題もありました。</p>
+</section>
+
+<section class="cl-fix">
+  <h3>追加・改善内容</h3>
+  <ul>
+    <li>coordinator 案件新規作成フォームに「担当営業」（dropdown + フリーテキスト）・「製版入稿日」・「下版日」を追加した</li>
+    <li>coordinator 案件一覧から CSV 一括登録ができるようになった（会社既存の受注 CSV をそのままアップロード可能）</li>
+    <li>CSV のクライアント名・営業担当名はファジーマッチングで自動解決。未マッチ時はその場で新規登録ができる</li>
+    <li>CSV の「No（行番号）」列はあってもなくても自動判定して正しく読み込む</li>
+    <li>Shift-JIS（Excel 保存形式）の CSV にも対応している</li>
+    <li>製版ボード（prepress）の CSV 確認画面にサンプル CSV ダウンロードボタンを追加した</li>
+    <li>長時間ページを開いたままにしてもセッションが切れなくなった（10 分ごとに自動的に接続を維持）</li>
+    <li>coordinator で案件を登録・編集する際、受注番号（伝票番号）が既存案件と重複していると警告が表示されるようになった</li>
+  </ul>
+</section>
+HTML,
+            ],
+
+            // ─────────────────────────────────────────────────────────────
             // 0a. CLIENTCODE — 2026-05-21
             // ─────────────────────────────────────────────────────────────
             [

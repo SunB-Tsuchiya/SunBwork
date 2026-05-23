@@ -13,6 +13,7 @@
                 <div class="mb-4">
                     <label class="mb-1 block font-semibold">伝票番号</label>
                     <input v-model="form.jobcode" type="text" class="w-full rounded border px-3 py-2" />
+                    <div v-if="form.errors.jobcode" class="mt-1 text-sm text-red-600">{{ form.errors.jobcode }}</div>
                 </div>
                 <div class="mb-4">
                     <label class="mb-1 block font-semibold">案件タイトル</label>

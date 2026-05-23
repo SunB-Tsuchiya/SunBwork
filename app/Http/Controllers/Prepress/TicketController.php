@@ -427,6 +427,31 @@ class TicketController extends Controller
     }
 
     /**
+     * サンプル CSV をダウンロードする
+     */
+    public function downloadSample(): \Illuminate\Http\Response
+    {
+        $rows = [
+            ['行番号', '伝票番号', 'クライアント名', '案件名', '担当営業'],
+            ['1', '2024-001', '得意先A株式会社', '〇〇テキスト 初校 組版', '田中'],
+            ['2', '2024-002', '得意先B',          '△△カタログ 再校',       ''],
+            ['3', '',         '得意先C',          '□□パンフレット',         '佐藤'],
+        ];
+
+        $csv = '';
+        foreach ($rows as $row) {
+            $csv .= implode(',', array_map(fn($v) => '"' . str_replace('"', '""', $v) . '"', $row)) . "\r\n";
+        }
+
+        $encoded = mb_convert_encoding($csv, 'SJIS-win', 'UTF-8');
+
+        return response($encoded, 200, [
+            'Content-Type'        => 'application/octet-stream',
+            'Content-Disposition' => 'attachment; filename="prepress_tickets_sample.csv"',
+        ]);
+    }
+
+    /**
      * CSV を解析してクライアントマッチング結果を返す（確認画面用）
      */
     public function analyzeCsv(Request $request): JsonResponse

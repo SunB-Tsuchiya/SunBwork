@@ -222,6 +222,12 @@ if (DB::getDriverName() === 'sqlite') return;
 - ルート: `POST coordinator/project_jobs/check-duplicate` → `coordinator.project_jobs.check_duplicate`
 - 警告モーダルは任意登録可（クライアント重複チェックと違い強制ブロックしない）
 
+**ProjectJob 登録時の受注番号（jobcode）重複チェック（2026-05-23 実装）:**
+- `store()` および `update()` でバリデーション後に jobcode の重複を確認
+- `update()` は自身を除外して判定（`where('id', '!=', $projectJob->id)`）
+- 重複時は `withErrors(['jobcode' => 'この受注番号はすでに登録されています。'])` で差し戻し（強制ブロック）
+- prepress（PrepressTicket）側は以前から同じ仕組みで実装済み
+
 **Coordinator タブメニュー:** クライアント管理 → 案件一覧 → ジョブ一覧 → 案件カレンダー
 
 **CoordinatorMiddleware:** Leader は `/coordinator/*` にアクセス不可。
