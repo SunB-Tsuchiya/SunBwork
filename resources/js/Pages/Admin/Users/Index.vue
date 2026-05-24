@@ -32,6 +32,16 @@ function onDepartmentChange() {
     selectedAssignmentId.value = '';
 }
 
+// 部署フィルターボタン用（superadmin は全部署、admin は自社部署）
+const buttonDepartments = computed(() => {
+    return filteredDepartments.value.length > 0 ? filteredDepartments.value : props.departments;
+});
+
+function selectDept(deptId) {
+    selectedDepartmentId.value = deptId;
+    selectedAssignmentId.value = '';
+}
+
 // 検索結果用usersフィルタ
 const filteredUsers = computed(() => {
     let result = props.users;
@@ -183,6 +193,24 @@ const getAssignmentText = (assignment) => {
                                         クリア
                                     </button>
                                 </div>
+                            </div>
+
+                            <!-- 部署フィルターボタン -->
+                            <div class="mb-4 flex flex-wrap gap-2">
+                                <button
+                                    type="button"
+                                    @click="selectDept('')"
+                                    :class="selectedDepartmentId === '' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
+                                    class="rounded-full px-4 py-1.5 text-sm font-medium transition-colors"
+                                >全員</button>
+                                <button
+                                    v-for="dept in buttonDepartments"
+                                    :key="dept.id"
+                                    type="button"
+                                    @click="selectDept(String(dept.id))"
+                                    :class="selectedDepartmentId === String(dept.id) ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
+                                    class="rounded-full px-4 py-1.5 text-sm font-medium transition-colors"
+                                >{{ dept.name }}</button>
                             </div>
 
                             <div class="overflow-x-auto">

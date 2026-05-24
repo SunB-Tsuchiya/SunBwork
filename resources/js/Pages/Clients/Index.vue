@@ -33,6 +33,7 @@ const routePrefix = computed(() => {
 const isLeaderView = computed(() => props.unregisteredClients !== null);
 
 const searchQuery = ref('');
+const selectedDeptId = ref('');
 
 function matchesQuery(client, q) {
     if (!q) return true;
@@ -41,12 +42,26 @@ function matchesQuery(client, q) {
         || (client.name ?? '').toLowerCase().includes(lower);
 }
 
+function matchesDept(client) {
+    if (!selectedDeptId.value) return true;
+    return (client.departments ?? []).some(d => String(d.id) === selectedDeptId.value);
+}
+
+// clients + unregisteredClients 両方から重複なし部署一覧を抽出
+const allDepartments = computed(() => {
+    const map = new Map();
+    [...(props.clients ?? []), ...(props.unregisteredClients ?? [])].forEach(c =>
+        (c.departments ?? []).forEach(d => { if (!map.has(d.id)) map.set(d.id, d); })
+    );
+    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+});
+
 const filteredClients = computed(() =>
-    props.clients.filter(c => matchesQuery(c, searchQuery.value)),
+    props.clients.filter(c => matchesQuery(c, searchQuery.value) && matchesDept(c)),
 );
 
 const filteredUnregisteredClients = computed(() =>
-    (props.unregisteredClients ?? []).filter(c => matchesQuery(c, searchQuery.value)),
+    (props.unregisteredClients ?? []).filter(c => matchesQuery(c, searchQuery.value) && matchesDept(c)),
 );
 
 function toggleDormantView() {
@@ -99,13 +114,31 @@ function goToEdit(clientId) {
         </template>
 
         <!-- 検索ボックス -->
-        <div class="mb-4">
+        <div class="mb-3">
             <input
                 v-model="searchQuery"
                 type="text"
                 class="w-full max-w-sm rounded border border-gray-300 px-4 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-300"
                 placeholder="Client ID または名前で検索…"
             />
+        </div>
+
+        <!-- 部署フィルターボタン -->
+        <div v-if="allDepartments.length > 0" class="mb-4 flex flex-wrap gap-2">
+            <button
+                type="button"
+                @click="selectedDeptId = ''"
+                :class="selectedDeptId === '' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
+                class="rounded-full px-4 py-1.5 text-sm font-medium transition-colors"
+            >全部署</button>
+            <button
+                v-for="dept in allDepartments"
+                :key="dept.id"
+                type="button"
+                @click="selectedDeptId = String(dept.id)"
+                :class="selectedDeptId === String(dept.id) ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
+                class="rounded-full px-4 py-1.5 text-sm font-medium transition-colors"
+            >{{ dept.name }}</button>
         </div>
 
         <!-- ── Leader: 2セクション表示 ── -->
