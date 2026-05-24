@@ -563,8 +563,10 @@ class ClientController extends Controller
     {
         // 全角英数字・スペース・括弧 → 半角
         $name = mb_convert_kana($name, 'as', 'UTF-8');
-        // 半角カタカナ → ひらがな、全角カタカナ → ひらがな
-        $name = mb_convert_kana($name, 'hc', 'UTF-8');
+        // 半角カタカナ → 全角ひらがな（'h' と 'c' は同時指定不可のため分割）
+        $name = mb_convert_kana($name, 'h', 'UTF-8');
+        // 全角カタカナ → 全角ひらがな
+        $name = mb_convert_kana($name, 'c', 'UTF-8');
 
         // 除去する法人格リスト（長い順に並べて部分一致を防ぐ）
         $suffixes = [
