@@ -351,6 +351,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('clients/csv/sample', [App\Http\Controllers\ClientController::class, 'csvSampleDownload'])->name('clients.csv.sample');
         Route::get('clients/json', [App\Http\Controllers\ClientController::class, 'clientsJson'])->name('clients.json');
         Route::post('clients/check-duplicate', [App\Http\Controllers\ClientController::class, 'checkDuplicate'])->name('clients.check_duplicate');
+        Route::get('clients/duplicate-check', [App\Http\Controllers\ClientController::class, 'duplicateCheckPage'])->name('clients.duplicate_check');
+        Route::post('clients/batch-merge', [App\Http\Controllers\ClientController::class, 'batchMerge'])->name('clients.batch_merge');
         Route::post('clients/{client}/merge', [App\Http\Controllers\ClientController::class, 'merge'])->name('clients.merge');
         Route::post('clients/{client}/dormant', [App\Http\Controllers\ClientController::class, 'dormant'])->name('clients.dormant');
         Route::resource('clients', App\Http\Controllers\ClientController::class)->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
@@ -490,6 +492,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('clients/csv/sample', [App\Http\Controllers\ClientController::class, 'csvSampleDownload'])->name('clients.csv.sample');
         Route::get('clients/json', [App\Http\Controllers\ClientController::class, 'clientsJson'])->name('clients.json');
         Route::post('clients/check-duplicate', [App\Http\Controllers\ClientController::class, 'checkDuplicate'])->name('clients.check_duplicate');
+        Route::get('clients/duplicate-check', [App\Http\Controllers\ClientController::class, 'duplicateCheckPage'])->name('clients.duplicate_check');
+        Route::post('clients/batch-merge', [App\Http\Controllers\ClientController::class, 'batchMerge'])->name('clients.batch_merge');
         Route::post('clients/{client}/merge', [App\Http\Controllers\ClientController::class, 'merge'])->name('clients.merge');
         Route::post('clients/{client}/dormant', [App\Http\Controllers\ClientController::class, 'dormant'])->name('clients.dormant');
         Route::post('clients/{client}/toggle-department', [App\Http\Controllers\ClientController::class, 'toggleDepartment'])->name('clients.toggle_department');
@@ -607,6 +611,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         // クライアント検索JSON（案件作成モーダル用・統合先選択用）
         Route::get('clients/json', [App\Http\Controllers\ClientController::class, 'clientsJson'])->name('clients.json');
         Route::post('clients/check-duplicate', [App\Http\Controllers\ClientController::class, 'checkDuplicate'])->name('clients.check_duplicate');
+        Route::get('clients/duplicate-check', [App\Http\Controllers\ClientController::class, 'duplicateCheckPage'])->name('clients.duplicate_check');
+        Route::post('clients/batch-merge', [App\Http\Controllers\ClientController::class, 'batchMerge'])->name('clients.batch_merge');
         Route::get('clients/{client}/last-job-config', [App\Http\Controllers\ClientController::class, 'lastJobConfig'])->name('clients.last_job_config');
         Route::post('clients/{client}/merge', [App\Http\Controllers\ClientController::class, 'merge'])->name('clients.merge');
         Route::post('clients/{client}/dormant', [App\Http\Controllers\ClientController::class, 'dormant'])->name('clients.dormant');

@@ -360,6 +360,131 @@ class ClientController extends Controller
             ->with('success', "「{$clientName}」の案件をすべて「{$mergeIntoName}」に移し、統合しました。");
     }
 
+    /** 重複ペア一覧ページ */
+    public function duplicateCheckPage()
+    {
+        $this->requireAdminPermission('client_management');
+        $this->requireLeaderPermission('client_management');
+
+        $user  = Auth::user();
+        $query = Client::withCount('projectJobs')
+            ->select('id', 'name', 'client_code', 'company_id', 'created_at');
+
+        if ($user->user_role !== 'superadmin') {
+            $query->forCompany($user->company_id ?? null);
+        }
+
+        $clients = $query->orderBy('id')->get();
+
+        $pairs = [];
+        $seenPairs = [];
+
+        foreach ($clients as $i => $a) {
+            foreach ($clients as $j => $b) {
+                if ($j <= $i) continue;
+
+                $pairKey = "{$a->id}_{$b->id}";
+                if (isset($seenPairs[$pairKey])) continue;
+                $seenPairs[$pairKey] = true;
+
+                $aNorm = $this->normalizeClientName($a->name);
+                $bNorm = $this->normalizeClientName($b->name);
+                $aCode = ($a->client_code !== null && trim($a->client_code) !== '') ? trim($a->client_code) : null;
+                $bCode = ($b->client_code !== null && trim($b->client_code) !== '') ? trim($b->client_code) : null;
+
+                $reason = null;
+                if ($aCode && $bCode && $aCode === $bCode) {
+                    $reason = 'same_code';
+                } elseif ((!$aCode || !$bCode) && $a->name === $b->name) {
+                    $reason = 'code_missing_name_match';
+                } elseif ($aNorm === $bNorm) {
+                    $reason = 'fuzzy_name';
+                }
+
+                if ($reason === null) continue;
+
+                $pairs[] = [
+                    'reason'   => $reason,
+                    'client_a' => [
+                        'id'                 => $a->id,
+                        'name'               => $a->name,
+                        'client_code'        => $a->client_code,
+                        'project_jobs_count' => $a->project_jobs_count,
+                        'created_at'         => $a->created_at?->format('Y-m-d'),
+                    ],
+                    'client_b' => [
+                        'id'                 => $b->id,
+                        'name'               => $b->name,
+                        'client_code'        => $b->client_code,
+                        'project_jobs_count' => $b->project_jobs_count,
+                        'created_at'         => $b->created_at?->format('Y-m-d'),
+                    ],
+                ];
+            }
+        }
+
+        return Inertia::render('Clients/DuplicateCheck', [
+            'pairs' => $pairs,
+        ]);
+    }
+
+    /** 複数ペアの一括統合 */
+    public function batchMerge(Request $request)
+    {
+        $this->requireAdminPermission('client_management');
+        $this->requireLeaderPermission('client_management');
+
+        $request->validate([
+            'merges'              => 'required|array|min:1',
+            'merges.*.source_id' => ['required', 'integer', Rule::exists('clients', 'id')],
+            'merges.*.target_id' => ['required', 'integer', Rule::exists('clients', 'id')],
+        ]);
+
+        $user       = Auth::user();
+        $mergeCount = 0;
+        $skipCount  = 0;
+
+        foreach ($request->merges as $merge) {
+            $sourceId = (int) $merge['source_id'];
+            $targetId = (int) $merge['target_id'];
+
+            if ($sourceId === $targetId) { $skipCount++; continue; }
+
+            $source = Client::find($sourceId);
+            $target = Client::find($targetId);
+            if (!$source || !$target) { $skipCount++; continue; }
+
+            if ($user->user_role !== 'superadmin') {
+                if ((int) ($source->company_id ?? 0) !== (int) ($target->company_id ?? 0)) {
+                    $skipCount++;
+                    continue;
+                }
+            }
+
+            try {
+                DB::transaction(function () use ($source, $target) {
+                    $source->projectJobs()->update(['client_id' => $target->id]);
+                    if (Schema::hasTable('job_requests')) {
+                        DB::table('job_requests')
+                            ->where('client_id', $source->id)
+                            ->update(['client_id' => $target->id]);
+                    }
+                    $source->delete();
+                });
+                $mergeCount++;
+            } catch (\Throwable $e) {
+                Log::error("batchMerge failed: source={$sourceId} target={$targetId}", ['error' => $e->getMessage()]);
+                $skipCount++;
+            }
+        }
+
+        $msg = "{$mergeCount}件の重複クライアントを統合しました。";
+        if ($skipCount > 0) $msg .= "（{$skipCount}件はスキップ）";
+
+        return redirect()->route("{$this->routePrefix()}.clients.duplicate_check")
+            ->with($mergeCount > 0 ? 'success' : 'error', $msg);
+    }
+
     /** 重複チェック（登録・編集前のフロント呼び出し用 JSON エンドポイント） */
     public function checkDuplicate(Request $request)
     {
@@ -436,8 +561,10 @@ class ClientController extends Controller
      */
     private function normalizeClientName(string $name): string
     {
-        // 全角英数字・スペース → 半角
+        // 全角英数字・スペース・括弧 → 半角
         $name = mb_convert_kana($name, 'as', 'UTF-8');
+        // 半角カタカナ → ひらがな、全角カタカナ → ひらがな
+        $name = mb_convert_kana($name, 'hc', 'UTF-8');
 
         // 除去する法人格リスト（長い順に並べて部分一致を防ぐ）
         $suffixes = [

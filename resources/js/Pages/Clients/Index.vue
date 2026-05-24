@@ -107,6 +107,11 @@ function goToEdit(clientId) {
                 </button>
                 <Link
                     v-if="!props.showDormant"
+                    :href="route(`${routePrefix}.clients.duplicate_check`)"
+                    class="rounded bg-yellow-600 px-4 py-2 text-sm font-medium text-white hover:bg-yellow-700"
+                >重複チェック</Link>
+                <Link
+                    v-if="!props.showDormant"
                     :href="route(`${routePrefix}.clients.create`)"
                     class="rounded bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700"
                 >新規作成</Link>
