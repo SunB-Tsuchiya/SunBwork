@@ -32,9 +32,22 @@ function onDepartmentChange() {
     selectedAssignmentId.value = '';
 }
 
+const DEPT_ORDER = ['情報出版', '製版', 'オンデマンド'];
+function sortDepts(depts) {
+    return [...depts].sort((a, b) => {
+        const ai = DEPT_ORDER.indexOf(a.name);
+        const bi = DEPT_ORDER.indexOf(b.name);
+        if (ai !== -1 && bi !== -1) return ai - bi;
+        if (ai !== -1) return -1;
+        if (bi !== -1) return 1;
+        return a.name.localeCompare(b.name, 'ja');
+    });
+}
+
 // 部署フィルターボタン用（superadmin は全部署、admin は自社部署）
 const buttonDepartments = computed(() => {
-    return filteredDepartments.value.length > 0 ? filteredDepartments.value : props.departments;
+    const base = filteredDepartments.value.length > 0 ? filteredDepartments.value : props.departments;
+    return sortDepts(base);
 });
 
 function selectDept(deptId) {

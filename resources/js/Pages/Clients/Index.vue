@@ -47,13 +47,25 @@ function matchesDept(client) {
     return (client.departments ?? []).some(d => String(d.id) === selectedDeptId.value);
 }
 
+const DEPT_ORDER = ['情報出版', '製版', 'オンデマンド'];
+function sortDepts(depts) {
+    return [...depts].sort((a, b) => {
+        const ai = DEPT_ORDER.indexOf(a.name);
+        const bi = DEPT_ORDER.indexOf(b.name);
+        if (ai !== -1 && bi !== -1) return ai - bi;
+        if (ai !== -1) return -1;
+        if (bi !== -1) return 1;
+        return a.name.localeCompare(b.name, 'ja');
+    });
+}
+
 // clients + unregisteredClients 両方から重複なし部署一覧を抽出
 const allDepartments = computed(() => {
     const map = new Map();
     [...(props.clients ?? []), ...(props.unregisteredClients ?? [])].forEach(c =>
         (c.departments ?? []).forEach(d => { if (!map.has(d.id)) map.set(d.id, d); })
     );
-    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+    return sortDepts([...map.values()]);
 });
 
 const filteredClients = computed(() =>
