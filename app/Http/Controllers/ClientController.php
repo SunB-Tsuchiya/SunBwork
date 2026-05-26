@@ -58,9 +58,13 @@ class ClientController extends Controller
         $this->authorize('create', Client::class);
         $isSuperOrAdmin = $user->isSuperAdmin() || $user->isAdmin();
 
+        $uniqueCodeRule = $isSuperOrAdmin
+            ? Rule::unique('clients', 'client_code')
+            : Rule::unique('clients', 'client_code')->where('company_id', $user->company_id);
+
         $rules = [
             'name'        => 'required|string|max:255',
-            'client_code' => 'nullable|string|max:64|unique:clients,client_code',
+            'client_code' => ['nullable', 'string', 'max:64', $uniqueCodeRule],
             'detail'      => 'nullable|string',
             'company_id'  => 'nullable|exists:companies,id',
         ];
@@ -110,9 +114,13 @@ class ClientController extends Controller
         $user = Auth::user();
         $isSuperOrAdmin = in_array($user->user_role, ['superadmin', 'admin']);
 
+        $uniqueCodeRule = $isSuperOrAdmin
+            ? Rule::unique('clients', 'client_code')->ignore($client->id)
+            : Rule::unique('clients', 'client_code')->where('company_id', $user->company_id)->ignore($client->id);
+
         $rules = [
             'name'             => 'required|string|max:255',
-            'client_code'      => ['nullable', 'string', 'max:64', Rule::unique('clients', 'client_code')->ignore($client->id)],
+            'client_code'      => ['nullable', 'string', 'max:64', $uniqueCodeRule],
             'detail'           => 'nullable|string',
             'company_id'       => 'nullable|exists:companies,id',
             'department_ids'   => 'nullable|array',
@@ -509,8 +517,8 @@ class ClientController extends Controller
     {
         // 全角英数字・スペース・括弧 → 半角
         $name = mb_convert_kana($name, 'as', 'UTF-8');
-        // 半角カタカナ → 全角ひらがな（'h' と 'c' は同時指定不可のため分割）
-        $name = mb_convert_kana($name, 'h', 'UTF-8');
+        // 半角カタカナ → 全角カタカナ（'H'）。その後 'c' で全角カタカナ → ひらがなに統一
+        $name = mb_convert_kana($name, 'H', 'UTF-8');
         // 全角カタカナ → 全角ひらがな
         $name = mb_convert_kana($name, 'c', 'UTF-8');
 
@@ -547,6 +555,9 @@ class ClientController extends Controller
 
         // スペース・全角スペース・中黒を除去
         $name = preg_replace('/[\s　・]+/u', '', $name);
+
+        // 漢字↔ひらがな の同義語を統一（「他」と「ほか」など）
+        $name = str_replace('他', 'ほか', $name);
 
         // 小文字化（英字対応）
         $name = mb_strtolower($name, 'UTF-8');
