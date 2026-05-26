@@ -28,47 +28,16 @@ class ClientController extends Controller
         $showDormant = $request->boolean('dormant', false);
         $user = Auth::user();
         $isSuperOrAdmin = in_array($user->user_role, ['superadmin', 'admin']);
-        $isLeader       = $user->user_role === 'leader';
 
-        if ($isSuperOrAdmin) {
-            $query   = Client::with('departments:id,name');
-            $clients = $showDormant ? $query->dormant()->get() : $query->active()->get();
-
-            return Inertia::render('Clients/Index', [
-                'clients'     => $clients,
-                'showDormant' => $showDormant,
-            ]);
+        $query = Client::with('departments:id,name');
+        if (!$isSuperOrAdmin) {
+            $query->forCompany($user->company_id ?? null);
         }
-
-        if ($isLeader) {
-            $companyId = $user->company_id ?? null;
-            $all = Client::with('departments:id,name')
-                ->forCompany($companyId);
-            $all = $showDormant ? $all->dormant()->get() : $all->active()->get();
-
-            $registered   = $all->filter(fn($c) => $c->departments->contains('id', $user->department_id))->values();
-            $unregistered = $all->filter(fn($c) => !$c->departments->contains('id', $user->department_id))->values();
-
-            return Inertia::render('Clients/Index', [
-                'clients'             => $registered,
-                'unregisteredClients' => $unregistered,
-                'showDormant'         => $showDormant,
-            ]);
-        }
-
-        // Coordinator / Clerk: Leader と同様に登録済み + 未登録の2セクション表示
-        $companyId = $user->company_id ?? null;
-        $all = Client::with('departments:id,name')
-            ->forCompany($companyId);
-        $all = $showDormant ? $all->dormant()->get() : $all->active()->get();
-
-        $registered   = $all->filter(fn($c) => $c->departments->contains('id', $user->department_id))->values();
-        $unregistered = $all->filter(fn($c) => !$c->departments->contains('id', $user->department_id))->values();
+        $clients = $showDormant ? $query->dormant()->get() : $query->active()->get();
 
         return Inertia::render('Clients/Index', [
-            'clients'             => $registered,
-            'unregisteredClients' => $unregistered,
-            'showDormant'         => $showDormant,
+            'clients'     => $clients,
+            'showDormant' => $showDormant,
         ]);
     }
 
@@ -88,8 +57,6 @@ class ClientController extends Controller
         $user = Auth::user();
         $this->authorize('create', Client::class);
         $isSuperOrAdmin = $user->isSuperAdmin() || $user->isAdmin();
-        $isLeader       = $user->isLeader();
-        $isCoordinator  = $user->isCoordinator() || $user->isClerk();
 
         $rules = [
             'name'        => 'required|string|max:255',
@@ -97,13 +64,8 @@ class ClientController extends Controller
             'detail'      => 'nullable|string',
             'company_id'  => 'nullable|exists:companies,id',
         ];
-        if ($isSuperOrAdmin) {
-            $rules['department_ids']   = 'nullable|array';
-            $rules['department_ids.*'] = 'exists:departments,id';
-        } elseif ($isLeader || $isCoordinator) {
-            $rules['department_ids']   = 'nullable|array';
-            $rules['department_ids.*'] = Rule::in([$user->department_id]);
-        }
+        $rules['department_ids']   = 'nullable|array';
+        $rules['department_ids.*'] = 'exists:departments,id';
 
         $data = $request->validate($rules);
         $departmentIds = $data['department_ids'] ?? null;
@@ -121,8 +83,6 @@ class ClientController extends Controller
 
         if (!empty($departmentIds)) {
             $client->departments()->attach($departmentIds);
-        } elseif (!$isSuperOrAdmin && !$isLeader && $user->department_id) {
-            $client->departments()->attach($user->department_id);
         }
 
         return redirect()->route("{$this->routePrefix()}.clients.index");
@@ -149,21 +109,15 @@ class ClientController extends Controller
 
         $user = Auth::user();
         $isSuperOrAdmin = in_array($user->user_role, ['superadmin', 'admin']);
-        $isLeader       = $user->user_role === 'leader';
 
         $rules = [
-            'name'        => 'required|string|max:255',
-            'client_code' => ['nullable', 'string', 'max:64', Rule::unique('clients', 'client_code')->ignore($client->id)],
-            'detail'      => 'nullable|string',
-            'company_id'  => 'nullable|exists:companies,id',
+            'name'             => 'required|string|max:255',
+            'client_code'      => ['nullable', 'string', 'max:64', Rule::unique('clients', 'client_code')->ignore($client->id)],
+            'detail'           => 'nullable|string',
+            'company_id'       => 'nullable|exists:companies,id',
+            'department_ids'   => 'nullable|array',
+            'department_ids.*' => 'exists:departments,id',
         ];
-        if ($isSuperOrAdmin) {
-            $rules['department_ids']   = 'nullable|array';
-            $rules['department_ids.*'] = 'exists:departments,id';
-        } elseif ($isLeader) {
-            $rules['department_ids']   = 'nullable|array';
-            $rules['department_ids.*'] = Rule::in([$user->department_id]);
-        }
 
         $data = $request->validate($rules);
         $departmentIds = $data['department_ids'] ?? null;
@@ -179,16 +133,8 @@ class ClientController extends Controller
 
         $client->update($data);
 
-        if ($isSuperOrAdmin && $request->has('department_ids')) {
+        if ($request->has('department_ids')) {
             $client->departments()->sync($departmentIds ?? []);
-        } elseif ($isLeader && $request->has('department_ids')) {
-            // 自部署のみオン/オフ（他部署の紐付けは変更しない）
-            $ownDeptId = $user->department_id;
-            if (!empty($departmentIds) && in_array($ownDeptId, $departmentIds)) {
-                $client->departments()->syncWithoutDetaching([$ownDeptId]);
-            } else {
-                $client->departments()->detach($ownDeptId);
-            }
         }
 
         return redirect()->route("{$this->routePrefix()}.clients.index");
@@ -279,7 +225,7 @@ class ClientController extends Controller
 
         $user  = Auth::user();
         $isSuperOrAdmin = in_array($user->user_role, ['superadmin', 'admin']);
-        $query = Client::select('id', 'name', 'client_code', 'is_dormant');
+        $query = Client::select('id', 'name', 'client_code', 'is_dormant')->withCount('projectJobs');
 
         if (!$isSuperOrAdmin) {
             $query->forCompany($user->company_id ?? null)

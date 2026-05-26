@@ -20,17 +20,11 @@ const routePrefix = computed(() => {
     if (['coordinator', 'clerk'].includes(role)) return 'coordinator';
     return 'leader';
 });
-const isAdmin       = computed(() => ['admin', 'superadmin'].includes(page.props.auth?.user?.user_role));
-const isLeader      = computed(() => page.props.auth?.user?.user_role === 'leader');
-const isCoordinator = computed(() => ['coordinator', 'clerk'].includes(page.props.auth?.user?.user_role));
-const userDeptId    = computed(() => page.props.auth?.user?.department_id);
-const ownDept       = computed(() => props.departments.find(d => d.id === userDeptId.value));
-
 const form = useForm({
     name:           '',
     client_code:    '',
     detail:         '',
-    department_ids: (isLeader.value || isCoordinator.value) && userDeptId.value ? [userDeptId.value] : [],
+    department_ids: [],
 });
 
 // ===== 重複チェック =====
@@ -150,8 +144,8 @@ function closeModal() {
                     <textarea v-model="form.detail" class="w-full rounded border px-2 py-1"></textarea>
                 </div>
 
-                <!-- Admin/SuperAdmin: 全部署から複数選択 -->
-                <div v-if="isAdmin" class="mb-4">
+                <!-- 部署（全ロール共通：全部署から複数選択） -->
+                <div class="mb-4">
                     <label class="mb-2 block text-sm font-medium text-gray-700">部署 <span class="text-xs text-gray-400">（複数選択可）</span></label>
                     <div class="flex flex-wrap gap-3">
                         <label
@@ -167,20 +161,6 @@ function closeModal() {
                         </label>
                     </div>
                     <p v-if="form.errors.department_ids" class="mt-1 text-xs text-red-600">{{ form.errors.department_ids }}</p>
-                </div>
-
-                <!-- Leader / Coordinator: 自部署のみオン/オフ -->
-                <div v-else-if="(isLeader || isCoordinator) && ownDept" class="mb-4">
-                    <label class="mb-2 block text-sm font-medium text-gray-700">部署</label>
-                    <label
-                        class="inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1 text-sm transition-colors"
-                        :class="form.department_ids.includes(ownDept.id)
-                            ? (DEPT_COLORS[ownDept.name] ?? 'bg-gray-100 text-gray-700') + ' border-transparent font-medium'
-                            : 'border-gray-300 text-gray-500 hover:border-gray-400'"
-                    >
-                        <input type="checkbox" :value="ownDept.id" v-model="form.department_ids" class="hidden" />
-                        {{ ownDept.name }}
-                    </label>
                 </div>
 
                 <button
