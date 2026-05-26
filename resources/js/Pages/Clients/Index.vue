@@ -158,7 +158,7 @@ function goToEdit(clientId) {
             >{{ dept.name }}</button>
         </div>
 
-        <!-- ── 2セクション表示（部署が設定されている全ロール共通） ── -->
+        <!-- ── Leader: 2セクション表示 ── -->
         <template v-if="isLeaderView">
             <!-- 登録済み -->
             <div class="rounded bg-white shadow overflow-hidden mb-4">
@@ -176,7 +176,6 @@ function goToEdit(clientId) {
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Client ID</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">名前</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">部署</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">詳細</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">操作</th>
                             </tr>
@@ -192,14 +191,6 @@ function goToEdit(clientId) {
                                 <td class="whitespace-nowrap px-6 py-3 font-medium text-gray-900">
                                     {{ client.name }}
                                     <span v-if="client.is_dormant" class="ml-1 rounded-full bg-gray-200 px-2 py-0.5 text-xs text-gray-500">休眠</span>
-                                </td>
-                                <td class="px-6 py-3">
-                                    <span
-                                        v-for="dept in (client.departments ?? [])"
-                                        :key="dept.id"
-                                        class="mr-1 inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
-                                        :class="DEPT_COLORS[dept.name] ?? 'bg-gray-100 text-gray-600'"
-                                    >{{ dept.name }}</span>
                                 </td>
                                 <td class="px-6 py-3 text-gray-600">{{ client.notes || '' }}</td>
                                 <td class="whitespace-nowrap px-6 py-3 flex items-center gap-3">
@@ -219,7 +210,7 @@ function goToEdit(clientId) {
             <!-- 未登録 -->
             <div class="rounded bg-white shadow overflow-hidden">
                 <div class="flex items-center justify-between bg-gray-50 px-6 py-3 border-b border-gray-200">
-                    <h3 class="font-semibold text-gray-600">未登録（その他のクライアント）
+                    <h3 class="font-semibold text-gray-600">未登録（他部署のクライアント）
                         <span class="ml-2 rounded-full bg-gray-200 px-2 py-0.5 text-xs font-normal text-gray-500">{{ filteredUnregisteredClients.length }}</span>
                     </h3>
                 </div>
@@ -255,13 +246,12 @@ function goToEdit(clientId) {
                                     >{{ dept.name }}</span>
                                 </td>
                                 <td class="px-6 py-3 text-gray-500">{{ client.notes || '' }}</td>
-                                <td class="whitespace-nowrap px-6 py-3 flex items-center gap-3">
+                                <td class="whitespace-nowrap px-6 py-3">
                                     <button
                                         type="button"
                                         class="rounded border border-green-600 px-3 py-1 text-xs text-green-700 hover:bg-green-50"
                                         @click.stop="toggleDepartment(client.id)"
                                     >自部署に追加</button>
-                                    <Link :href="route(`${routePrefix}.clients.edit`, { client: client.id })" class="text-blue-600 hover:text-blue-900 text-xs" @click.stop>編集</Link>
                                 </td>
                             </tr>
                         </tbody>
