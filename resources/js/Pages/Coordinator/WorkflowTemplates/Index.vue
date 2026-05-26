@@ -1,7 +1,7 @@
 <template>
     <AppLayout title="管理シートテンプレート">
         <template #header>
-            <h2 class="text-xl font-semibold text-gray-800">工程シートテンプレート管理</h2>
+            <h2 class="text-xl font-semibold text-gray-800">管理シートテンプレート管理</h2>
         </template>
 
         <div class="rounded bg-white p-6 shadow">

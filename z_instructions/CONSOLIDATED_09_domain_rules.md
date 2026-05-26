@@ -431,7 +431,7 @@ company_id → department_id → assignment_id のカスケードリセットあ
 
 ---
 
-## 工程シート（WorkflowSheets / Process, 2026-05-14）
+## 管理シート（WorkflowSheets / Process, 2026-05-14）
 
 **テーブル:**
 - `workflow_sheets` — シート本体（project_job_id, title 等）

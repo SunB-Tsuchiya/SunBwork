@@ -52,7 +52,7 @@
 - **製版ボード（Prepress Board, 2026-04-28）**: 案件の製版工程を Kanban 管理
 - **ProgressSheet v2（2026-04-27）**: JobLink / User 型セルのロック連動
 - **ゴーストユーザー（2026-05-13）**: `users.is_ghost` / `ghost_owner_id` — テスト用ユーザー
-- **工程シート（WorkflowSheets, 2026-05-14）**: `workflow_sheets` / `workflow_sheet_rows` / `workflow_sheet_cells`
+- **管理シート（WorkflowSheets, 2026-05-14）**: `workflow_sheets` / `workflow_sheet_rows` / `workflow_sheet_cells`
 - **イルカボード（在籍ボード, 2026-05-15）**: `user_presence_statuses` テーブル、在籍状況管理
 - **スクリプトセクション（2026-05-16）**: `auth.canAccessScripts` で制御。`Components/Scripts/` に配置
 - **クライアント ID（client_code, 2026-05-21）**: `clients.client_code` / `clients.is_registered` — CSV 突合キー

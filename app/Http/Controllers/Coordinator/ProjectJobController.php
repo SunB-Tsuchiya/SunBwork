@@ -274,7 +274,7 @@ class ProjectJobController extends Controller
                 ]);
             }
 
-            // 工程シート複製（行のみ・セルデータは除外）
+            // 管理シート複製（行のみ・セルデータは除外）
             $wSheets = \App\Models\WorkflowSheet::where('project_job_id', $projectJob->id)->orderBy('sort_order')->get();
             foreach ($wSheets as $wSheet) {
                 $newWSheet = \App\Models\WorkflowSheet::create([
@@ -692,7 +692,7 @@ class ProjectJobController extends Controller
                 'created_at' => $s->created_at?->format('Y-m-d'),
             ]);
 
-        // 工程シート一覧
+        // 管理シート一覧
         $workflowSheets = $projectJob->workflowSheets()
             ->select(['id', 'name', 'sort_order', 'created_at'])
             ->get()

@@ -200,7 +200,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     // 項目リスト候補（User向け：マイジョブ作成用）
     Route::get('/user/project-jobs/{projectJob}/item-entries/suggestions', [\App\Http\Controllers\User\ItemEntrySuggestController::class, 'suggestions'])->name('user.item_entries.suggestions');
 
-    // 工程シート（User 閲覧・セル更新）
+    // 管理シート（User 閲覧・セル更新）
     Route::get('/user/workflow-sheets/{sheet}', [\App\Http\Controllers\User\WorkflowSheetController::class, 'show'])->name('user.workflow_sheets.show');
     Route::put('/user/workflow-sheets/{sheet}/cells', [\App\Http\Controllers\User\WorkflowCellController::class, 'update'])->name('user.workflow_sheets.cells.update');
     Route::post('/user/workflow-sheets/{sheet}/cells/register', [\App\Http\Controllers\User\WorkflowCellController::class, 'register'])->name('user.workflow_sheets.cells.register');
@@ -355,6 +355,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('clients/batch-merge', [App\Http\Controllers\ClientController::class, 'batchMerge'])->name('clients.batch_merge');
         Route::post('clients/{client}/merge', [App\Http\Controllers\ClientController::class, 'merge'])->name('clients.merge');
         Route::post('clients/{client}/dormant', [App\Http\Controllers\ClientController::class, 'dormant'])->name('clients.dormant');
+        Route::post('clients/{client}/toggle-department', [App\Http\Controllers\ClientController::class, 'toggleDepartment'])->name('clients.toggle_department');
         Route::resource('clients', App\Http\Controllers\ClientController::class)->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
 
         // 会社管理 (会社作成/管理は SuperAdmin 側に一本化しました)
@@ -474,6 +475,31 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('workload-analyzer', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'index'])->name('workload_analyzer.index');
         Route::get('workload-analyzer/category-rank', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'index'])->name('workload_analyzer.category_rank');
         Route::get('workload-analyzer/guide', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'guide'])->name('workload_analyzer.guide');
+
+        // SuperAdmin: 請求伝票管理 > 交通費
+        Route::prefix('billing/transport')->name('billing.transport.')->group(function () {
+            // 交通費一覧（Clerk用）
+            Route::get('/list', [App\Http\Controllers\Billing\Transport\ExpenseListController::class, 'index'])->name('list');
+
+            // 請求済み一覧
+            Route::get('/billed', [App\Http\Controllers\Billing\Transport\BillingRequestController::class, 'index'])->name('billed');
+
+            // 請求データ作成
+            Route::post('/billing', [App\Http\Controllers\Billing\Transport\BillingRequestController::class, 'store'])->name('billing.store');
+
+            // 請求書 PDF / Excel
+            Route::get('/billing/{billing}/pdf',   [App\Http\Controllers\Billing\Transport\BillingRequestController::class, 'exportPdf'])->name('billing.pdf');
+            Route::get('/billing/{billing}/excel', [App\Http\Controllers\Billing\Transport\BillingRequestController::class, 'exportExcel'])->name('billing.excel');
+
+            // 個別 expense CRUD
+            Route::get('/', [App\Http\Controllers\Billing\Transport\ExpenseController::class, 'index'])->name('index');
+            Route::post('/', [App\Http\Controllers\Billing\Transport\ExpenseController::class, 'store'])->name('store');
+            Route::get('/{expense}/pdf', [App\Http\Controllers\Billing\Transport\ExpenseController::class, 'exportPdf'])->name('pdf');
+            Route::get('/{expense}/excel', [App\Http\Controllers\Billing\Transport\ExpenseController::class, 'exportExcel'])->name('excel');
+            Route::get('/{expense}', [App\Http\Controllers\Billing\Transport\ExpenseController::class, 'show'])->name('show');
+            Route::put('/{expense}', [App\Http\Controllers\Billing\Transport\ExpenseController::class, 'update'])->name('update');
+            Route::delete('/{expense}', [App\Http\Controllers\Billing\Transport\ExpenseController::class, 'destroy'])->name('destroy');
+        });
     });
 
 
@@ -818,7 +844,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::put('project_jobs/{projectJob}/item-entries', [App\Http\Controllers\Coordinator\ItemEntryController::class, 'update'])->name('item_entries.update');
         Route::get('project_jobs/{projectJob}/item-entries/suggestions', [App\Http\Controllers\Coordinator\ItemEntryController::class, 'suggestions'])->name('item_entries.suggestions');
 
-        // ── 工程シート ─────────────────────────────────────────────
+        // ── 管理シート ─────────────────────────────────────────────
         Route::post('project_jobs/{projectJob}/workflow-sheets', [App\Http\Controllers\Coordinator\WorkflowSheetController::class, 'store'])->name('project_jobs.workflow_sheets.store');
         Route::put('project_jobs/{projectJob}/workflow-sheets/reorder', [App\Http\Controllers\Coordinator\WorkflowSheetController::class, 'reorder'])->name('project_jobs.workflow_sheets.reorder');
         Route::get('workflow-sheets/{sheet}', [App\Http\Controllers\Coordinator\WorkflowSheetController::class, 'show'])->name('workflow_sheets.show');
@@ -838,7 +864,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('workflow-sheets/{sheet}/share', [App\Http\Controllers\Coordinator\WorkflowSheetController::class, 'share'])->name('workflow_sheets.share');
         Route::delete('workflow-sheets/{sheet}/share', [App\Http\Controllers\Coordinator\WorkflowSheetController::class, 'unshare'])->name('workflow_sheets.unshare');
 
-        // ── 工程シートテンプレート ──────────────────────────────────
+        // ── 管理シートテンプレート ──────────────────────────────────
         Route::get('workflow-templates', [App\Http\Controllers\Coordinator\WorkflowTemplateController::class, 'index'])->name('workflow_templates.index');
         Route::post('workflow-templates', [App\Http\Controllers\Coordinator\WorkflowTemplateController::class, 'store'])->name('workflow_templates.store');
         Route::put('workflow-templates/{template}', [App\Http\Controllers\Coordinator\WorkflowTemplateController::class, 'update'])->name('workflow_templates.update');

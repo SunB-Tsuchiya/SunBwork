@@ -27,27 +27,14 @@ class ClientController extends Controller
         $this->requireLeaderPermission('client_management');
         $showDormant = $request->boolean('dormant', false);
         $user = Auth::user();
-        $isSuperOrAdmin = in_array($user->user_role, ['superadmin', 'admin']);
-        $isLeader       = $user->user_role === 'leader';
 
-        if ($isSuperOrAdmin) {
-            $query   = Client::with('departments:id,name');
-            $clients = $showDormant ? $query->dormant()->get() : $query->active()->get();
+        $query = Client::with('departments:id,name');
+        $all   = $showDormant ? $query->dormant()->get() : $query->active()->get();
 
-            return Inertia::render('Clients/Index', [
-                'clients'     => $clients,
-                'showDormant' => $showDormant,
-            ]);
-        }
-
-        if ($isLeader) {
-            $companyId = $user->company_id ?? null;
-            $all = Client::with('departments:id,name')
-                ->forCompany($companyId);
-            $all = $showDormant ? $all->dormant()->get() : $all->active()->get();
-
-            $registered   = $all->filter(fn($c) => $c->departments->contains('id', $user->department_id))->values();
-            $unregistered = $all->filter(fn($c) => !$c->departments->contains('id', $user->department_id))->values();
+        if ($user->department_id) {
+            $deptId       = $user->department_id;
+            $registered   = $all->filter(fn($c) => $c->departments->contains('id', $deptId))->values();
+            $unregistered = $all->filter(fn($c) => !$c->departments->contains('id', $deptId))->values();
 
             return Inertia::render('Clients/Index', [
                 'clients'             => $registered,
@@ -56,19 +43,9 @@ class ClientController extends Controller
             ]);
         }
 
-        // Coordinator / Clerk: Leader と同様に登録済み + 未登録の2セクション表示
-        $companyId = $user->company_id ?? null;
-        $all = Client::with('departments:id,name')
-            ->forCompany($companyId);
-        $all = $showDormant ? $all->dormant()->get() : $all->active()->get();
-
-        $registered   = $all->filter(fn($c) => $c->departments->contains('id', $user->department_id))->values();
-        $unregistered = $all->filter(fn($c) => !$c->departments->contains('id', $user->department_id))->values();
-
         return Inertia::render('Clients/Index', [
-            'clients'             => $registered,
-            'unregisteredClients' => $unregistered,
-            'showDormant'         => $showDormant,
+            'clients'     => $all,
+            'showDormant' => $showDormant,
         ]);
     }
 
@@ -213,14 +190,13 @@ class ClientController extends Controller
             ->with('success', $msg);
     }
 
-    /** Leader / Coordinator / Clerk が自部署とのクライアント紐付けをトグルする */
+    /** 自部署とのクライアント紐付けをトグルする（全ロール共通） */
     public function toggleDepartment(Client $client)
     {
         $this->requireLeaderPermission('client_management');
         $user = Auth::user();
-        $allowedRoles = ['leader', 'coordinator', 'clerk'];
-        if (!in_array($user->user_role, $allowedRoles) || !$user->department_id) {
-            abort(403);
+        if (!$user->department_id) {
+            abort(403, '部署が設定されていません。');
         }
 
         $deptId = $user->department_id;
