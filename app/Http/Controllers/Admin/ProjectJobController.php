@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\CalculatesEventTime;
+use App\Http\Controllers\Concerns\ResolvesContextCompany;
 use App\Models\Assignment;
 use App\Models\Event;
 use App\Models\ProjectJob;
@@ -19,10 +20,16 @@ use Inertia\Inertia;
 
 class ProjectJobController extends Controller
 {
-    use CalculatesEventTime;
+    use CalculatesEventTime, ResolvesContextCompany;
+
     public function index(Request $request)
     {
-        $departments    = Team::where('team_type', 'department')->orderBy('id')->get(['id', 'name']);
+        $companyId = $this->contextCompanyId();
+
+        $departments    = Team::where('team_type', 'department')
+            ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
+            ->orderBy('id')
+            ->get(['id', 'name']);
         $selectedDeptId = (int) $request->input('department', $departments->first()?->id);
         $q              = $request->input('q', '');
         $period         = $request->input('period', 'all');
@@ -34,6 +41,7 @@ class ProjectJobController extends Controller
             ->toArray();
 
         $query = ProjectJob::with(['client', 'user'])
+            ->forCompany($companyId)
             ->where(function ($sub) use ($memberIds) {
                 $sub->whereIn('user_id', $memberIds)
                     ->orWhereHas('coordinators', fn ($c) => $c->whereIn('users.id', $memberIds));
@@ -75,6 +83,11 @@ class ProjectJobController extends Controller
 
     public function show(ProjectJob $projectJob)
     {
+        $companyId = $this->contextCompanyId();
+        if ($companyId && (int) $projectJob->company_id !== $companyId) {
+            abort(403, 'この案件は管理対象外です。');
+        }
+
         $projectJob->load(['client', 'user', 'coordinators', 'teamMembers.user']);
 
         $assignmentEvents = [];

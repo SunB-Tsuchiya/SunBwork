@@ -1,10 +1,12 @@
 <script setup>
 import { computed } from 'vue';
-import { Link, router } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 
 const props = defineProps({
     active: { type: String, default: '' },
 });
+
+const isSunbrain = computed(() => usePage().props.auth?.companyType === 'sunbrain');
 
 // User カラー: blue
 const tab = (key) => [
@@ -25,7 +27,7 @@ const tabs = computed(() => [
     { key: 'jobbox', href: tryRoute('user.jobbox.index'), label: '依頼されたジョブ' },
     { key: 'diaries', href: tryRoute('diaries.index'), label: '日報一覧' },
     { key: 'calendar', href: tryRoute('calendar.index'), label: 'カレンダー' },
-    { key: 'proof_status', href: tryRoute('user.proof.status'), label: '校正状況' },
+    { key: 'proof_status', href: tryRoute('user.proof.status'), label: '校正状況', condition: isSunbrain.value },
     { key: 'settings', href: tryRoute('user.settings.index'), label: '設定' },
 ].filter(t => t.condition !== false && t.href));
 
@@ -73,7 +75,7 @@ function onMobileSelect(e) {
             <Link :href="route('calendar.index')" :class="tab('calendar')">
                 カレンダー
             </Link>
-            <Link :href="route('user.proof.status')" :class="tab('proof_status')">
+            <Link v-if="isSunbrain" :href="route('user.proof.status')" :class="tab('proof_status')">
                 校正状況
             </Link>
             <Link :href="route('user.settings.index')" :class="tab('settings')">

@@ -16,11 +16,20 @@ class ProgressReportController extends Controller
     {
         $user = $request->user();
 
-        // スコープ: project_team_members に自分が含まれる案件のみ
-        // Admin / SuperAdmin / Clerk は全案件を参照可
-        if ($user->isAdmin() || $user->isSuperAdmin() || $user->isClerk()) {
-            $allowedJobIds = null;
+        // スコープ: SuperAdmin はグローバル参照、それ以外は自社の案件のみ
+        if ($user->isSuperAdmin()) {
+            // SuperAdmin: コンテキスト会社でスコープ（null=全社参照）
+            $companyId     = session('superadmin_context.company_id');
+            $allowedJobIds = $companyId
+                ? ProjectJob::where('company_id', $companyId)->pluck('id')->all()
+                : null;
+        } elseif ($user->isAdmin() || $user->isClerk()) {
+            // Admin / Clerk: 自社の案件のみ
+            $allowedJobIds = $user->company_id
+                ? ProjectJob::where('company_id', $user->company_id)->pluck('id')->all()
+                : [];
         } else {
+            // Coordinator など: 自分が project_team_members に含まれる案件のみ
             $allowedJobIds = ProjectTeamMember::where('user_id', $user->id)
                 ->pluck('project_job_id')
                 ->unique()

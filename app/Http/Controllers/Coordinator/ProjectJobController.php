@@ -128,7 +128,7 @@ class ProjectJobController extends Controller
         $newJob = null;
         DB::transaction(function () use ($projectJob, &$newJob) {
             $data = $projectJob->only([
-                'user_id', 'client_id', 'size_id', 'page_count', 'detail',
+                'user_id', 'client_id', 'company_id', 'size_id', 'page_count', 'detail',
             ]);
             $data['title']   = 'コピー - ' . $projectJob->title;
             $data['jobcode'] = null;
@@ -331,6 +331,7 @@ class ProjectJobController extends Controller
                 'title'             => $projectJob->title,
                 'user_id'           => $targetUser->id,
                 'client_id'         => $projectJob->client_id,
+                'company_id'        => $targetUser->company_id,
                 'size_id'           => $projectJob->size_id,
                 'page_count'        => $projectJob->page_count,
                 'detail'            => $projectJob->detail,
@@ -462,6 +463,8 @@ class ProjectJobController extends Controller
                 $data['original_filename'] = basename($tmpOcrPath);
             }
 
+            $data['company_id'] = $request->user()->company_id;
+
             $job = ProjectJob::create($data);
 
             // リーダー自身はピボットに入れない（重複回避）
@@ -515,6 +518,7 @@ class ProjectJobController extends Controller
             'jobcode'    => $data['jobcode'] ?? null,
             'user_id'    => $fixed['user_id']    ?? $data['user_id']    ?? null,
             'client_id'  => $fixed['client_id']  ?? $data['client_id']  ?? null,
+            'company_id' => $request->user()->company_id,
             'size_id'    => $fixed['size_id']    ?? $data['size_id']    ?? null,
             'page_count' => isset($fixed['page_count']) ? $fixed['page_count'] : ($data['page_count'] ?? null),
             'detail'     => !empty($fixed['detail']) ? $fixed['detail'] : ($data['detail'] ?? null),

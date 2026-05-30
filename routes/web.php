@@ -142,15 +142,18 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     Route::get('/user/project-jobs', [App\Http\Controllers\User\ProjectJobController::class, 'index'])->name('user.project_jobs.index');
     Route::get('/user/project-jobs/{projectJob}', [App\Http\Controllers\User\ProjectJobController::class, 'show'])->name('user.project_jobs.show');
 
-    // 校正状況（ユーザー自身の依頼のみ）
-    Route::get('/user/proof/status', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'userProofStatus'])->name('user.proof.status');
+    // 校正機能（サン・ブレーン専用）
+    Route::middleware('company_type:sunbrain')->group(function () {
+        // 校正状況（ユーザー自身の依頼のみ）
+        Route::get('/user/proof/status', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'userProofStatus'])->name('user.proof.status');
 
-    // 校正ジョブ（ユーザー）
-    Route::get('/user/proof-jobs', [\App\Http\Controllers\User\ProofJobController::class, 'index'])->name('user.proof_jobs.index');
-    Route::get('/user/proof-jobs/{proofRequest}', [\App\Http\Controllers\User\ProofJobController::class, 'show'])->name('user.proof_jobs.show');
-    Route::get('/user/proof-jobs/{proofRequest}/set', [\App\Http\Controllers\User\ProofJobController::class, 'setPage'])->name('user.proof_jobs.set_page');
-    Route::match(['post', 'put'], '/user/proof-jobs/{proofRequest}/set', [\App\Http\Controllers\User\ProofJobController::class, 'set'])->name('user.proof_jobs.set');
-    Route::post('/user/proof-jobs/{proofRequest}/complete', [\App\Http\Controllers\User\ProofJobController::class, 'complete'])->name('user.proof_jobs.complete');
+        // 校正ジョブ（ユーザー）
+        Route::get('/user/proof-jobs', [\App\Http\Controllers\User\ProofJobController::class, 'index'])->name('user.proof_jobs.index');
+        Route::get('/user/proof-jobs/{proofRequest}', [\App\Http\Controllers\User\ProofJobController::class, 'show'])->name('user.proof_jobs.show');
+        Route::get('/user/proof-jobs/{proofRequest}/set', [\App\Http\Controllers\User\ProofJobController::class, 'setPage'])->name('user.proof_jobs.set_page');
+        Route::match(['post', 'put'], '/user/proof-jobs/{proofRequest}/set', [\App\Http\Controllers\User\ProofJobController::class, 'set'])->name('user.proof_jobs.set');
+        Route::post('/user/proof-jobs/{proofRequest}/complete', [\App\Http\Controllers\User\ProofJobController::class, 'complete'])->name('user.proof_jobs.complete');
+    });
 
     // ユーザー設定
     Route::get('/user/settings',      [App\Http\Controllers\User\UserSettingController::class, 'index'])->name('user.settings.index');

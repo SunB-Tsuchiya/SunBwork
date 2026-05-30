@@ -24,7 +24,27 @@ class ProjectJobController extends Controller
 
         [$deptMemberIds, $unitMemberIds] = $this->getAccessibleMemberIds($user);
 
+        $monthOptions = [];
+        for ($i = 0; $i < 12; $i++) {
+            $d              = now()->subMonths($i);
+            $monthOptions[] = [
+                'value' => $d->format('Y-m'),
+                'label' => $d->format('Y年n月'),
+            ];
+        }
+
+        // チームが1件も割り当てられていない Leader は 0 件を返す（空クロージャによる全件漏洩バグ対策）
+        if (empty($deptMemberIds) && empty($unitMemberIds)) {
+            return Inertia::render('Leader/ProjectJobs/Index', [
+                'jobs'         => collect(),
+                'monthOptions' => $monthOptions,
+                'q'            => $q,
+                'period'       => $period,
+            ]);
+        }
+
         $query = ProjectJob::with(['client', 'user'])
+            ->where('company_id', $user->company_id)
             ->where(function ($sub) use ($deptMemberIds, $unitMemberIds) {
                 if (!empty($deptMemberIds)) {
                     $sub->orWhere(function ($q) use ($deptMemberIds) {
@@ -52,15 +72,6 @@ class ProjectJobController extends Controller
 
         $jobs = $query->orderBy('created_at', 'desc')->get();
 
-        $monthOptions = [];
-        for ($i = 0; $i < 12; $i++) {
-            $d              = now()->subMonths($i);
-            $monthOptions[] = [
-                'value' => $d->format('Y-m'),
-                'label' => $d->format('Y年n月'),
-            ];
-        }
-
         return Inertia::render('Leader/ProjectJobs/Index', [
             'jobs'         => $jobs,
             'monthOptions' => $monthOptions,
@@ -76,6 +87,11 @@ class ProjectJobController extends Controller
     public function show(Request $request, ProjectJob $projectJob)
     {
         $user = $request->user();
+
+        // 他社案件へのアクセスを拒否
+        if ($user->company_id && (int) $projectJob->company_id !== (int) $user->company_id) {
+            abort(403, 'この案件は管理対象外です。');
+        }
 
         [$deptMemberIds, $unitMemberIds] = $this->getAccessibleMemberIds($user);
 

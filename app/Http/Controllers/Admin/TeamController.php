@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\ChecksAdminPermission;
+use App\Http\Controllers\Concerns\ResolvesContextCompany;
 use Illuminate\Http\Request;
 use App\Models\Team;
 use Inertia\Inertia;
@@ -12,13 +13,16 @@ use Illuminate\Support\Facades\DB;
 
 class TeamController extends Controller
 {
-    use ChecksAdminPermission;
+    use ChecksAdminPermission, ResolvesContextCompany;
 
     public function index()
     {
         $this->requireAdminPermission('team_management');
-        // チーム一覧をcompany, departmentリレーション付きで取得
-        $teams = Team::with(['company', 'department'])->get();
+        $companyId = $this->contextCompanyId();
+
+        $teams = Team::with(['company', 'department'])
+            ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
+            ->get();
         return Inertia::render('Admin/Teams/Index', [
             'teams' => $teams,
         ]);

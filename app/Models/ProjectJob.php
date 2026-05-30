@@ -15,6 +15,7 @@ class ProjectJob extends Model
         'title',
         'user_id',
         'client_id',
+        'company_id',
         'detail',
         'size_id',
         'page_count',
@@ -42,6 +43,19 @@ class ProjectJob extends Model
     public function getImageUrlAttribute(): ?string
     {
         return $this->image_path ? Storage::disk('public')->url($this->image_path) : null;
+    }
+
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
+
+    public function scopeForCompany($query, ?int $companyId)
+    {
+        if ($companyId === null) {
+            return $query;
+        }
+        return $query->where('company_id', $companyId);
     }
 
     public function user()

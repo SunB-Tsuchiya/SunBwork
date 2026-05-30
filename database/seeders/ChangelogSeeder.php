@@ -744,6 +744,50 @@ HTML,
 </section>
 HTML,
             ],
+
+            // ─────────────────────────────────────────────────────────────
+            [
+                'version'      => 'tenant-1',
+                'title'        => 'マルチテナント情報隔離：会社ごとにデータを完全分離',
+                'released_at'  => '2026-05-30',
+                'summary'      => '複数会社（サン・ブレーン・サンエー印刷）が同一システムを使う際に、会社をまたいだデータ漏洩が発生する問題を修正しました。Admin・Leader の案件総覧・進行レポート・チーム管理が自社データのみに絞り込まれます。校正機能（校正状況タブ・校正ジョブ）はサン・ブレーン専用機能となり、他社ユーザーには表示されなくなりました。',
+                'design_files' => ['z_instructions/TENANT_PLAN1.md', 'z_instructions/TENANT_MANAGER1.md'],
+                'claude_notes' => '【DB】project_jobs に company_id (nullable FK → companies) を追加。backfill: client.company_id 経由で全既存レコードに反映。【モデル】ProjectJob: company_id fillable 追加 / company() BelongsTo / scopeForCompany() 追加。【重大バグ修正】Leader/ProjectJobController: deptMemberIds・unitMemberIds が両方空のとき Laravel の where クロージャが WHERE 句なしになり全案件が返る問題。チームなし Leader は早期 return で 0 件を返すよう修正。【Admin/ProjectJobController】ResolvesContextCompany trait 追加。index(): Team/ProjectJob を contextCompanyId でフィルタ。show(): job.company_id がコンテキスト会社と不一致なら 403。【Admin/TeamController】ResolvesContextCompany trait 追加。index(): company_id でフィルタ。【Coordinator/ProjectJobController】store() / storeFromTemplate() / clone() / shareToUser() の ProjectJob::create 呼び出しに company_id をセット。【Coordinator/ProgressReportController】Admin/Clerk 時も自社の project_jobs でスコープ。SuperAdmin は contextCompanyId に応じてスコープ（null=全社参照）。【Leader/ProjectJobController】index() に company_id フィルタ追加 + 空チーム早期 return。show() に 他社案件 403 チェック追加。【routes/web.php】user proof 5ルート（user.proof.status / user.proof_jobs.*）を company_type:sunbrain ミドルウェアグループで保護。【UserNavigationTabs.vue】auth.companyType === sunbrain のときのみ「校正状況」タブを表示。',
+                'body'         => <<<'HTML'
+<section class="cl-problem">
+  <h3>背景・問題</h3>
+  <ul>
+    <li>サンエー印刷を追加したところ、そのAdmin・Leaderがサン・ブレーンの案件・チーム・進行レポートを参照できる状態になっていた</li>
+    <li>チームに未所属のLeaderがログインすると全社全案件が表示されるバグが潜在していた（Laravelの空whereクロージャ問題）</li>
+    <li>校正機能（校正状況・校正ジョブ）のルートが company_type 制限なしで公開されており、他社ユーザーもアクセス可能だった</li>
+    <li>project_jobs テーブルに company_id がなく、会社単位のスコープができない構造だった</li>
+  </ul>
+</section>
+
+<section class="cl-fix">
+  <h3>改善・修正内容</h3>
+  <ul>
+    <li><strong>DB追加：</strong>project_jobs に company_id カラムを追加。既存89件はclient経由でcompany_id=2（サン・ブレーン）にバックフィル済み</li>
+    <li><strong>Admin 案件総覧：</strong>部署フィルタが自社部署のみに、案件一覧も自社案件のみに絞り込まれるよう修正。他社案件URLへの直接アクセスは403</li>
+    <li><strong>Admin チーム管理：</strong>自社チームのみ表示されるよう修正</li>
+    <li><strong>Leader 案件総覧（重大バグ修正）：</strong>チーム未割り当てのLeaderが全案件を閲覧できるバグを修正。空チーム時は0件を返す + 他社案件への直接アクセスは403</li>
+    <li><strong>進行レポート：</strong>AdminおよびClerkも自社案件のみ表示されるよう修正</li>
+    <li><strong>新規案件作成：</strong>案件作成・複製・テンプレート作成時に company_id を自動セット</li>
+    <li><strong>校正機能の会社制限：</strong>校正状況・校正ジョブの全ルートを company_type:sunbrain で保護。他社ユーザーは 403</li>
+    <li><strong>ナビゲーション：</strong>「校正状況」タブをサン・ブレーンユーザーのみに表示</li>
+  </ul>
+</section>
+
+<section class="cl-note">
+  <h3>補足</h3>
+  <ul>
+    <li>SuperAdmin はコンテキスト会社切り替えに応じて各社データを参照可能（グローバルモードは全社参照を維持）</li>
+    <li>client_id が未設定の案件（id=6「その他」）は company_id=NULL のまま。Admin 案件総覧では forCompany スコープにより表示されない</li>
+    <li>サンエー印刷の部署間隔離は「チーム単位のメンバー管理」で自然に担保される。総務チームのLeaderは総務メンバーが担当する案件のみ閲覧可能</li>
+  </ul>
+</section>
+HTML,
+            ],
         ];
 
         foreach ($entries as $entry) {
