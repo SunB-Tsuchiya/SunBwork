@@ -730,7 +730,9 @@
       </div>
     </div>
 
+    <!-- 情報出版部署のみ表示 -->
     <ProofRequestModal
+      v-if="$page.props.auth.featureFlags.proofRequest"
       :show="showProofModal"
       :initial-title="proofTargetAssignment?.title || projectJob?.title || ''"
       :project-job-assignment-id="proofTargetAssignment?.id || null"
@@ -741,9 +743,9 @@
       @close="showProofModal = false; proofTargetAssignment = null; proofTargetCellId = null; proofTargetRowId = null; proofTargetColKey = null"
     />
 
-    <!-- ── 締切延長モーダル ── -->
+    <!-- ── 締切延長モーダル（情報出版部署のみ表示） ── -->
     <Teleport to="body">
-      <div v-if="proofDeadlineModal.show" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="proofDeadlineModal.show = false">
+      <div v-if="$page.props.auth.featureFlags.proofRequest && proofDeadlineModal.show" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="proofDeadlineModal.show = false">
         <div class="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
           <h3 class="mb-4 text-base font-semibold text-gray-800">締切日を延長</h3>
           <div class="mb-4">

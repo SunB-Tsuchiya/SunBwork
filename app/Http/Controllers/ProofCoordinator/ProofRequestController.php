@@ -349,6 +349,39 @@ class ProofRequestController extends Controller
                 'status'               => 'in_progress',
             ]);
 
+            // 校正員が PC を持っており自分で受信できる場合: JobAssignmentMessage を作成して
+            // 「依頼されたジョブ」タブに表示されるようにする（単発派遣・自己proofは除外）
+            if (! $isDispatcher && $assigneeUserId !== $senderUser->id) {
+                try {
+                    $bodyLines = array_filter([
+                        '【校正依頼】',
+                        '案件: ' . ($proofRequest->projectJob?->title ?? ''),
+                        'ジョブ: ' . ($a['title'] ?? ''),
+                        ! empty($a['desired_end_date']) ? '締切: ' . $a['desired_end_date'] : null,
+                        ! empty($proofRequest->note) ? '備考: ' . $proofRequest->note : null,
+                    ]);
+                    $jam = \App\Models\JobAssignmentMessage::create([
+                        'project_job_assignment_id' => $assignment->id,
+                        'sender_id'                 => $senderUser->id,
+                        'subject'                   => $a['title'] ?? null,
+                        'body'                      => implode("\n", $bodyLines),
+                    ]);
+                    $assignment->update(['assigned' => true]);
+
+                    // WebSocket リアルタイム通知
+                    $jamLoaded = \App\Models\JobAssignmentMessage::with([
+                        'sender',
+                        'projectJobAssignment.user',
+                        'projectJobAssignment.projectJob.client',
+                    ])->find($jam->id);
+                    if ($jamLoaded) {
+                        event(new \App\Events\JobMessageCreated($jamLoaded, [$assigneeUserId], $jam->id));
+                    }
+                } catch (\Throwable $__eJam) {
+                    Log::warning('assignStore: failed to create JobAssignmentMessage', ['error' => $__eJam->getMessage()]);
+                }
+            }
+
             // 校正員への通知（単発派遣の場合はスキップ）
             if (! $isDispatcher) {
                 JobNotificationService::notifyProofAssigned($senderUser, $proofRequest->fresh());
@@ -890,11 +923,11 @@ class ProofRequestController extends Controller
         }
 
         // pja100（校正割当ジョブ）を完了にする → 進行表の proof_user セルに反映
+        // 自己proof（sender=user）も対象に含めるため sender!=user 条件は設けない
         if ($proofRequest->proofreader_id && $proofRequest->proof_coordinator_id) {
             ProjectJobAssignment::where('project_job_id', $proofRequest->project_job_id)
                 ->where('user_id', $proofRequest->proofreader_id)
                 ->where('sender_id', $proofRequest->proof_coordinator_id)
-                ->whereColumn('sender_id', '!=', 'user_id')
                 ->update(['completed' => true]);
         }
 
@@ -936,7 +969,6 @@ class ProofRequestController extends Controller
                 ProjectJobAssignment::where('project_job_id', $proofRequest->project_job_id)
                     ->where('user_id', $proofRequest->proofreader_id)
                     ->where('sender_id', $proofRequest->proof_coordinator_id)
-                    ->whereColumn('sender_id', '!=', 'user_id')
                     ->update(['completed' => false]);
             }
         });

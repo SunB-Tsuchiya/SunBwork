@@ -898,9 +898,9 @@ function openPrint() {
             </div>
         </div>
 
-        <!-- ── 校正依頼モーダル ───────────────────────────────────────── -->
+        <!-- ── 校正依頼モーダル（情報出版部署のみ） ─────────────────────── -->
         <Teleport to="body">
-            <div v-if="showProofModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showProofModal = false">
+            <div v-if="$page.props.auth.featureFlags.proofRequest && showProofModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showProofModal = false">
                 <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
                     <h3 class="mb-4 text-lg font-semibold text-gray-800">校正管理へ依頼</h3>
                     <div class="mb-3">
@@ -933,9 +933,9 @@ function openPrint() {
             </div>
         </Teleport>
 
-        <!-- ── 締切延長モーダル ───────────────────────────────────────── -->
+        <!-- ── 締切延長モーダル（情報出版部署のみ） ────────────────────── -->
         <Teleport to="body">
-            <div v-if="proofDeadlineModal.show" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="proofDeadlineModal.show = false">
+            <div v-if="$page.props.auth.featureFlags.proofRequest && proofDeadlineModal.show" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="proofDeadlineModal.show = false">
                 <div class="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
                     <h3 class="mb-4 text-base font-semibold text-gray-800">締切日を延長</h3>
                     <div class="mb-4">

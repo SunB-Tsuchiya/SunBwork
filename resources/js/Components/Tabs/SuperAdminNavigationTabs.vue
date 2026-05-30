@@ -26,6 +26,7 @@ const tabs = computed(() => [
         label: '会社の追加と管理',
         condition: typeof route === 'function' && route().has('superadmin.companies.index'),
     },
+    { key: 'all_users', href: tryRoute('superadmin.users.index'), label: 'ユーザー管理' },
     { key: 'users', href: tryRoute('superadmin.adminusers.index'), label: 'Adminユーザー管理' },
     { key: 'admin_permissions', href: tryRoute('superadmin.admin_permissions.index'), label: 'Admin権限管理' },
     { key: 'position_titles', href: tryRoute('superadmin.position_titles.index'), label: '役職称号管理' },
@@ -95,6 +96,13 @@ function onMobileSelect(e) {
                 :class="tab('companies')"
             >
                 会社の追加と管理
+            </Link>
+            <Link
+                v-if="typeof route === 'function' && route().has('superadmin.users.index')"
+                :href="route('superadmin.users.index')"
+                :class="tab('all_users')"
+            >
+                ユーザー管理
             </Link>
             <Link
                 :href="route('superadmin.adminusers.index')"

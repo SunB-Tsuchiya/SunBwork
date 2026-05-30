@@ -1484,8 +1484,9 @@ class EventController extends Controller
                 $current = $parent;
             }
 
-            // 校正ジョブ（pja101: job_type='proof' の自己割当）が完了になった場合、
-            // 対応する ProofRequest を自動完了し、pja_operator に proof_completed_at を設定する
+            // 校正ジョブが完了になった場合、対応するProofRequestを自動完了しpja_operatorにproof_completed_atを設定する
+            // 旧フロー: coordinator_assignment_id 経由（pja101 → pja100）
+            // 新フロー: supersedes_assignment_id 経由（マイジョブ → proof pja100）
             if (!empty($assignment->job_type) && $assignment->job_type === 'proof' && !empty($assignment->coordinator_assignment_id)) {
                 try {
                     $pja100 = \App\Models\ProjectJobAssignment::find($assignment->coordinator_assignment_id);
@@ -1506,18 +1507,47 @@ class EventController extends Controller
                                     ->whereNull('proof_completed_at')
                                     ->update(['proof_completed_at' => now()]);
                             }
-                            // pja100 を completed にする → 進行表の proof_user セルに反映
                             $pja100->completed = true;
                             $pja100->save();
-                            Log::info('EventController: proof job completed → ProofRequest completed + proof_completed_at set', [
+                            Log::info('EventController: proof job (coordinator_assignment_id) completed → ProofRequest completed', [
                                 'pja_id'           => $assignment->id,
                                 'proof_request_id' => $proofRequest->id,
-                                'pja_operator_id'  => $proofRequest->project_job_assignment_id,
                             ]);
                         }
                     }
                 } catch (\Throwable $__eProof) {
                     Log::warning('EventController: failed to complete ProofRequest on proof job completion', ['error' => $__eProof->getMessage()]);
+                }
+            } elseif (!empty($assignment->supersedes_assignment_id)) {
+                // 新フロー: マイジョブ（supersedes proof pja100）が完了した場合
+                try {
+                    $pja100 = \App\Models\ProjectJobAssignment::find($assignment->supersedes_assignment_id);
+                    if ($pja100 && $pja100->job_type === 'proof') {
+                        $proofRequest = \App\Models\ProofRequest::where('project_job_id', $pja100->project_job_id)
+                            ->where('proofreader_id', $pja100->user_id)
+                            ->whereIn('status', ['assigned', 'in_progress'])
+                            ->latest()
+                            ->first();
+                        if ($proofRequest) {
+                            $proofRequest->update([
+                                'status'       => 'completed',
+                                'completed_at' => now(),
+                            ]);
+                            if ($proofRequest->project_job_assignment_id) {
+                                \App\Models\ProjectJobAssignment::where('id', $proofRequest->project_job_assignment_id)
+                                    ->whereNull('proof_completed_at')
+                                    ->update(['proof_completed_at' => now()]);
+                            }
+                            $pja100->completed = true;
+                            $pja100->save();
+                            Log::info('EventController: proof job (supersedes_assignment_id) completed → ProofRequest completed', [
+                                'pja_id'           => $assignment->id,
+                                'proof_request_id' => $proofRequest->id,
+                            ]);
+                        }
+                    }
+                } catch (\Throwable $__eProofNew) {
+                    Log::warning('EventController: failed to complete ProofRequest (supersedes path)', ['error' => $__eProofNew->getMessage()]);
                 }
             }
 

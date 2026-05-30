@@ -616,6 +616,134 @@ HTML,
 </section>
 HTML,
             ],
+            // ─────────────────────────────────────────────────────────────
+            // 0g. PROOF-UNIFY-1 — 2026-05-30
+            // ─────────────────────────────────────────────────────────────
+            [
+                'version'      => 'proof-unify-1',
+                'title'        => '校正ジョブUI統合：「依頼されたジョブ」フローへの統一・完了同期修正',
+                'released_at'  => '2026-05-30',
+                'summary'      => '校正ジョブ専用タブを廃止し、通常の「依頼されたジョブ → マイジョブ」フローに統一しました。校正割当と通常割当の完了が連動しなかった問題を修正。スケジュールは校正担当者のカレンダーに直接反映されるようになりました。',
+                'design_files' => [],
+                'claude_notes' => 'ProofRequestController: complete()/uncomplete() の sender!=user 条件を削除（自己proof時の完了不具合を解消）。MyProjectJobController: completeAssignment() に maybeCompleteProofRequest() を追加（pja100直接 / supersedes_assignment_id 経由の両パターン対応）。EventController: supersedes_assignment_id パスへのproof完了フック追加。SavesProofWorkSlots: pja101作成を廃止しpja100に直接Eventを作成。ProofRequestController::assignStore(): JobAssignmentMessage 作成で「依頼されたジョブ」タブへの表示を実現。UserNavigationTabs.vue: 校正ジョブタブを削除。MyJobBox/Show.vue: proof型割当に校正依頼情報カード（依頼者・校正管理者・締切・ステータス）を追加。',
+                'body'         => <<<'HTML'
+<section class="cl-problem">
+  <h3>背景・問題</h3>
+  <ul>
+    <li>校正ジョブが「校正ジョブ」タブと「マイジョブBOX」に二重表示され、どちらかを完了にしても連動しなかった</li>
+    <li>校正管理者がセットしたスケジュールがマイジョブBOXに反映されなかった</li>
+    <li>「校正ジョブ」タブが「依頼されたジョブ」と役割が重複しており、利用者が混乱していた</li>
+    <li>校正担当者=自分（自己proof）の場合に完了ボタンが機能しなかった</li>
+  </ul>
+</section>
+
+<section class="cl-fix">
+  <h3>改善・修正内容</h3>
+  <ul>
+    <li><strong>「校正ジョブ」タブ廃止：</strong>ナビゲーションから「校正ジョブ」タブを削除。既存URLはすべて「依頼されたジョブ」へリダイレクト</li>
+    <li><strong>依頼されたジョブへ統合：</strong>校正割当時に JobAssignmentMessage が自動生成されるため、通常の「依頼されたジョブ」タブに自然に表示されるようになった</li>
+    <li><strong>完了連動の修正：</strong>マイジョブBOXから完了にすると、対応する ProofRequest も完了になり完了通知が送信される。逆に校正管理者が完了にした場合も同様に連動する</li>
+    <li><strong>スケジュール直接反映：</strong>校正管理者がセットした作業スロットが校正担当者のカレンダーに直接反映される（中間割当 pja101 を廃止）</li>
+    <li><strong>校正依頼情報カードの表示：</strong>マイジョブBOX詳細ページで校正ジョブを開くと、依頼者・校正管理者・締切・ステータス（校正待ち/校正中/校正完了）が表示されるようになった</li>
+  </ul>
+</section>
+
+<section class="cl-note">
+  <h3>補足</h3>
+  <ul>
+    <li>PCを持たない校正担当者向けの「校正管理者が代わりに完了する」フローは引き続き利用可能です</li>
+    <li>校正担当者がマイジョブにした場合（「マイジョブにする」ボタン経由）も、元の校正割当と完了が連動します</li>
+  </ul>
+</section>
+HTML,
+            ],
+            // ─────────────────────────────────────────────────────────────
+            // 0h. COTYPE-1 — 2026-05-30
+            // ─────────────────────────────────────────────────────────────
+            [
+                'version'      => 'cotype-1',
+                'title'        => '会社タイプ別機能分離：サン・ブレーン専用機能の部署制御・SuperAdmin コンテキスト管理',
+                'released_at'  => '2026-05-30',
+                'summary'      => '会社ごとに使える機能を切り分ける仕組み（COTYPE）を導入しました。サン・ブレーンでは情報出版・製版など部署ごとに専用機能を有効化できます。SuperAdmin がヘッダーから会社を切り替えて各社の管理ができるコンテキスト切り替え機能も追加しました。校正依頼ボタンや「校正管理へ依頼」オプションは情報出版部署のユーザーにのみ表示されるよう制御されています。',
+                'design_files' => ['z_instructions/COTYPE_PLAN1.md', 'z_instructions/COTYPE_MANAGER1.md'],
+                'claude_notes' => '【DB】companies.company_type(sunbrain|general), departments.module(publishing|prepress|ondemand), users.home_company_id を追加（migration 3本）。【ミドルウェア】CheckCompanyType: company_type を検証してルートを保護。ProofCoordinator・Prepress ルートに company_type:sunbrain を追加。【フロントエンド】CompanyModules レジストリ（sunbrain.js/general.js/index.js）でナビゲーションボタンの会社別制御を実現。CompanyModuleNavButtons.vue が extraRoles を動的描画（group=beforeUser/afterUser で位置制御）。SuperAdminContextSwitcher.vue でヘッダーから会社コンテキスト切り替え。【featureFlags】HandleInertiaRequests に auth.featureFlags.proofRequest/prepressBoard を追加。MyJobBox/Show・User/ProjectJobs/Show・Coordinator/ProjectJobs/Show・ProgressSheets/Show・WorkflowSheets/Show の校正依頼UIをフラグでガード。ProgressCell.vue の「校正管理へ依頼」オプションも usePage() 経由でガード。【SuperAdmin UX】DashboardController に ResolvesContextCompany を追加しイルカボードをコンテキスト会社でフィルタ。UserPresenceController も同様に対応。SuperAdmin/Users/Index.vue に会社タブ（filter_company クエリパラメータ）追加。SuperAdminNavigationTabs に「ユーザー管理」リンク追加。CompanyController に generateCode() ヘルパー追加（部署・担当の code 自動生成）。会社登録・編集フォームに code 入力欄とコード説明 Tips ボタンを追加。',
+                'body'         => <<<'HTML'
+<section class="cl-problem">
+  <h3>背景・問題</h3>
+  <ul>
+    <li>サン・ブレーンと将来のグループ各社（サンエー印刷など）が同じシステムを使うにあたり、サン・ブレーン固有の機能（校正管理・製版ボード・校正依頼ジョブフロー）が他社ユーザーにも表示されてしまっていた</li>
+    <li>SuperAdmin がどの会社の管理をしているかが画面上で分からず、ユーザー一覧や在籍ボードに全社のデータが混在していた</li>
+    <li>情報出版部署以外のユーザーが「校正依頼」ボタンを押してエラーになるケースが想定された</li>
+    <li>会社・部署・担当の新規登録時に code カラムが必須のためエラーが発生していた</li>
+  </ul>
+</section>
+
+<section class="cl-fix">
+  <h3>改善・修正内容</h3>
+  <ul>
+    <li><strong>会社タイプ制御の導入：</strong>companies テーブルに company_type（sunbrain / general）を追加。サン・ブレーン専用ルート（校正管理・製版）には company_type:sunbrain ミドルウェアを付与し、他社ユーザーは 403 でアクセス不可になった</li>
+    <li><strong>部署モジュールによる機能制御：</strong>departments テーブルに module（publishing / prepress / ondemand）を追加。ナビゲーションボタン「Proof Admin」「Prepress」の表示を部署モジュールとロールで制御。情報出版 Leader のみ「Proof Admin」が表示され、Coordinator・User には表示されない</li>
+    <li><strong>校正依頼 UI のガード：</strong>auth.featureFlags.proofRequest フラグを導入し、情報出版部署（または Admin/SuperAdmin）以外では校正依頼ボタン・セクション・「校正管理へ依頼」オプションが非表示になった。進行表・管理シートのモーダルも同様にガード済み</li>
+    <li><strong>SuperAdmin コンテキスト切り替え：</strong>ヘッダーに会社切り替えドロップダウンを追加。選択した会社に応じてユーザー一覧・在籍ボード・ナビゲーションメニューが切り替わる</li>
+    <li><strong>SuperAdmin ユーザー一覧の改善：</strong>ユーザー一覧画面に会社タブ（全て・各社）を追加。タブ切り替えで会社ごとのユーザーを確認可能。SuperAdmin タブメニューに「ユーザー管理」リンクも追加</li>
+    <li><strong>会社登録・編集フォームの改善：</strong>部署・担当の code フィールドを任意入力に（未入力時は自動生成）。「コードとは？」ボタンで説明を確認できる Tips を追加</li>
+  </ul>
+</section>
+
+<section class="cl-note">
+  <h3>補足</h3>
+  <ul>
+    <li>新しいグループ会社を追加するには SuperAdmin → 会社追加 から company_type を選択してください。sunbrain 専用機能が不要な場合は「一般」を選びます</li>
+    <li>部署に専用機能を割り当てるには会社編集画面の「機能」セレクトを使います（sunbrain タイプの会社のみ表示）</li>
+    <li>進行表・管理シートの proof_v2 セル（校正担当列）はデータを保持したまま、情報出版部署以外では「校正管理へ依頼」オプションが非表示になります</li>
+    <li>さくら本番への適用には migration 3本（company_type・module・home_company_id）をコードデプロイ前に実行する必要があります</li>
+  </ul>
+</section>
+HTML,
+            ],
+            // ─────────────────────────────────────────────────────────────
+            // 0i. ANNEX-1 — 2026-05-30
+            // ─────────────────────────────────────────────────────────────
+            [
+                'version'      => 'annex-1',
+                'title'        => 'お知らせ機能強化：会社横断送信・添付ファイル・編集削除・SuperAdmin ユーザー管理改善',
+                'released_at'  => '2026-05-30',
+                'summary'      => 'お知らせ（通知）機能を大幅に強化しました。サンエー印刷の Clerk は全会社またはグループ各社を選んで通知を送信できるようになりました。通知に PDF・画像などの添付ファイルを付けられるようになり、受信側では本文の下に画像・PDF の内容が直接表示されます。送信済み通知のタイトル・本文・添付ファイルを編集・削除できるようにもなりました。SuperAdmin のユーザー管理画面にも詳細・編集ページと会社タブを追加しています。',
+                'design_files' => ['z_instructions/ANNEX_PLAN1.md', 'z_instructions/ANNEX_MANAGER1.md'],
+                'claude_notes' => '【DB】announcements.target_company_id (nullable FK) を追加（migration 1本）。【モデル】Announcement に target_company_id fillable + attachments() morphToMany 追加。【ルート】clerk.announcements.edit / update / destroy を追加。【featureFlags】HandleInertiaRequests に crossCompanyAnnouncement フラグ追加（general タイプ会社の Clerk/Admin）。【コントローラー】Clerk/AnnouncementController: store() に会社スコープ対応（未選択=全会社 / 指定会社=その会社のみ / 一般ユーザー=自社のみ）+ AttachmentService による添付保存。edit() / update()（タイトル・本文・添付のみ、受信者変更なし）/ destroy()（添付クリーンアップ含む）追加。AnnouncementController: 受信者側 show() に attachments eager load 追加。attachments mapping: mime_type カラム名修正（$a->mime → $a->mime_type）。【フロントエンド】Create.vue: 会社チェックボックス（複数選択対応 / ソート可能）+ ドロップゾーン添付 + PDF.js サムネイル（scale 1.5/2.5）+ ライトボックス + router.post forceFormData で送信。Show.vue (Clerk): 添付インライン表示 + PDF.js で描画 + 50%幅 + ライトボックス + 編集・削除ボタンを #headerExtras へ。Edit.vue: 新規作成（タイトル・本文・既存添付削除 + 新規追加）。Announcements/Show.vue (受信側): 同様に添付インライン表示 + PDF.js 描画。【SuperAdmin ユーザー管理】SuperAdmin/Users/Show.vue・Edit.vue 新規作成（Admin 版をベースに superadmin ルートへ適用）。SuperAdmin/UserController::edit() / update() を Admin 相当に強化（companies + positionTitles 渡し / 完全バリデーション）。Index.vue に SuperAdminNavigationTabs(active=all_users) 追加。',
+                'body'         => <<<'HTML'
+<section class="cl-problem">
+  <h3>背景・問題</h3>
+  <ul>
+    <li>お知らせ機能は自社内のみの送信で、グループ会社（サンエー印刷）から他社への通知ができなかった</li>
+    <li>お知らせに添付ファイルを添付する機能がなく、PDF や画像を共有するにはメッセージ機能を使う必要があった</li>
+    <li>送信済みのお知らせを後から修正・削除できなかった</li>
+    <li>SuperAdmin のユーザー管理画面に詳細・編集ページがなく、「詳細」「編集」ボタンを押してもエラーになっていた</li>
+  </ul>
+</section>
+
+<section class="cl-fix">
+  <h3>改善・修正内容</h3>
+  <ul>
+    <li><strong>会社横断送信：</strong>サンエー印刷（グループ親会社）の Clerk は通知作成時に会社チェックボックスで送信先を選択できる。未選択で全会社、特定会社を選ぶとその会社のメンバーのみに送信</li>
+    <li><strong>添付ファイル：</strong>お知らせ作成時にドロップ兼クリック選択で複数ファイルを添付できる。画像は即時プレビュー、PDF は PDF.js でサムネイル表示。受信側では本文の下に添付内容が直接描画される</li>
+    <li><strong>PDF インライン表示：</strong>添付 PDF は PDF.js で第1ページを画像化して表示。50% 幅で表示され、クリックすると全画面ライトボックスで拡大確認できる</li>
+    <li><strong>編集・削除：</strong>送信済みお知らせのタイトル・本文・添付ファイルを編集できる（受信者は変更不可）。削除時は添付ファイルも含めて完全削除される</li>
+    <li><strong>SuperAdmin ユーザー管理強化：</strong>詳細ページ（Show.vue）・編集ページ（Edit.vue）を新規作成。Admin の編集画面と同等の項目（会社・部署・担当・権限・雇用形態・役職称号・パスワード変更）を設定可能</li>
+  </ul>
+</section>
+
+<section class="cl-note">
+  <h3>補足</h3>
+  <ul>
+    <li>会社横断送信は general タイプ会社の Clerk / Admin / SuperAdmin のみ利用可能。サン・ブレーンの Clerk は引き続き自社内のみに送信</li>
+    <li>個別選択（individual）で宛先を指定した場合、選択した会社チェックボックスに関係なく指定ユーザーのみに送信されます</li>
+    <li>編集は送信者本人のみ可能。編集しても既読状況はリセットされません</li>
+    <li>PDF サムネイルはページ読み込み後に非同期で描画されます（数秒かかる場合があります）</li>
+  </ul>
+</section>
+HTML,
+            ],
         ];
 
         foreach ($entries as $entry) {

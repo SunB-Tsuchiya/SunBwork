@@ -21,13 +21,23 @@ use Inertia\Inertia;
 class AdminUserController extends Controller
 {
     use NormalizesCsvEncoding;
+    use \App\Http\Controllers\Concerns\ResolvesContextCompany;
 
     public function index()
     {
-        // 表示対象は管理者アカウント（user_role = 'admin') のみ
-        $users = User::where('user_role', 'admin')->orderBy('created_at', 'desc')->get();
+        $companyId = $this->contextCompanyId();
+
+        // 表示対象は管理者アカウント（user_role = 'admin') のみ、コンテキスト会社でフィルタ
+        $query = User::where('user_role', 'admin')->orderBy('created_at', 'desc');
+        if ($companyId) {
+            $query->where('company_id', $companyId);
+        }
+        $users = $query->get();
+
         $assignments = \App\Models\Assignment::all();
-        $departments = Department::all();
+        $departments = $companyId
+            ? Department::where('company_id', $companyId)->get()
+            : Department::all();
         $companies = Company::all();
 
         $user = Auth::user();

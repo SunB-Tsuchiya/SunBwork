@@ -11,6 +11,43 @@
             <!-- ジョブ割り当て詳細カード -->
             <AssignmentDetailCard :assignment="assignment" />
 
+            <!-- 校正依頼情報（proof型ジョブの場合のみ表示） -->
+            <div v-if="proofRequestInfo" class="overflow-hidden rounded-lg border border-pink-200 bg-pink-50 shadow-sm">
+                <div class="border-b border-pink-200 bg-pink-100 px-5 py-3 flex items-center gap-2">
+                    <span class="rounded-full bg-pink-600 px-2 py-0.5 text-xs font-bold text-white">校正依頼</span>
+                    <h3 class="text-sm font-semibold text-pink-800">{{ proofRequestInfo.title }}</h3>
+                    <span class="ml-auto rounded-full px-2 py-0.5 text-xs font-medium"
+                        :class="{
+                            'bg-yellow-100 text-yellow-800': proofRequestInfo.status === 'assigned',
+                            'bg-blue-100 text-blue-800': proofRequestInfo.status === 'in_progress',
+                            'bg-green-100 text-green-800': proofRequestInfo.status === 'completed',
+                        }">
+                        {{ proofRequestInfo.status === 'assigned' ? '校正待ち'
+                         : proofRequestInfo.status === 'in_progress' ? '校正中'
+                         : proofRequestInfo.status === 'completed' ? '校正完了'
+                         : proofRequestInfo.status }}
+                    </span>
+                </div>
+                <div class="px-5 py-3 grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
+                    <div v-if="proofRequestInfo.requester_name">
+                        <span class="text-xs text-pink-600 font-medium">依頼者</span>
+                        <p class="text-gray-800">{{ proofRequestInfo.requester_name }}</p>
+                    </div>
+                    <div v-if="proofRequestInfo.coordinator_name">
+                        <span class="text-xs text-pink-600 font-medium">校正管理者</span>
+                        <p class="text-gray-800">{{ proofRequestInfo.coordinator_name }}</p>
+                    </div>
+                    <div v-if="proofRequestInfo.deadline">
+                        <span class="text-xs text-pink-600 font-medium">締切</span>
+                        <p class="text-gray-800">{{ new Date(proofRequestInfo.deadline).toLocaleDateString('ja-JP') }}</p>
+                    </div>
+                    <div v-if="proofRequestInfo.note" class="col-span-2">
+                        <span class="text-xs text-pink-600 font-medium">備考</span>
+                        <p class="whitespace-pre-wrap text-gray-800">{{ proofRequestInfo.note }}</p>
+                    </div>
+                </div>
+            </div>
+
             <!-- ファイル一覧（file_info があれば常に表示） -->
             <div v-if="assignment.file_info" class="mt-2">
                 <FileInfoDisplay :fileInfo="assignment.file_info" />
@@ -202,20 +239,22 @@
                     </Link>
                 </div>
 
-                <!-- 校正依頼ボタン（完了済みは非表示） -->
-                <button
-                    v-if="!isAssignmentCompleted && !proofRequested"
-                    @click="showProofModal = true"
-                    class="rounded border border-pink-300 bg-pink-50 px-3 py-1.5 text-sm font-medium text-pink-700 hover:bg-pink-100"
-                >
-                    校正依頼
-                </button>
-                <span
-                    v-else-if="!isAssignmentCompleted && proofRequested"
-                    class="rounded border border-gray-300 bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-400 cursor-not-allowed"
-                >
-                    校正依頼済み
-                </span>
+                <!-- 校正依頼ボタン（情報出版部署のみ表示・完了済みは非表示） -->
+                <template v-if="$page.props.auth.featureFlags.proofRequest">
+                    <button
+                        v-if="!isAssignmentCompleted && !proofRequested"
+                        @click="showProofModal = true"
+                        class="rounded border border-pink-300 bg-pink-50 px-3 py-1.5 text-sm font-medium text-pink-700 hover:bg-pink-100"
+                    >
+                        校正依頼
+                    </button>
+                    <span
+                        v-else-if="!isAssignmentCompleted && proofRequested"
+                        class="rounded border border-gray-300 bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-400 cursor-not-allowed"
+                    >
+                        校正依頼済み
+                    </span>
+                </template>
             </div>
         </div>
 
@@ -237,12 +276,13 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, ref } from 'vue';
 
-const { projectJob, assignment, canDelete, linkedProgressCellCount, proofRequested } = defineProps({
+const { projectJob, assignment, canDelete, linkedProgressCellCount, proofRequested, proofRequestInfo } = defineProps({
     projectJob: Object,
     assignment: Object,
     canDelete: { type: Boolean, default: false },
     linkedProgressCellCount: { type: Number, default: 0 },
     proofRequested: { type: Boolean, default: false },
+    proofRequestInfo: { type: Object, default: null },
 });
 const page = usePage();
 

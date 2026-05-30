@@ -43,22 +43,31 @@ class AnnouncementController extends Controller
     {
         $recipient = AnnouncementRecipient::where('id', $id)
             ->where('user_id', $request->user()->id)
-            ->with('announcement.sender')
+            ->with(['announcement.sender', 'announcement.attachments'])
             ->firstOrFail();
 
         if ($recipient->read_at === null) {
             $recipient->update(['read_at' => now()]);
         }
 
+        $announcement = $recipient->announcement;
+
         return Inertia::render('Announcements/Show', [
             'recipient' => [
-                'id'         => $recipient->id,
-                'title'      => $recipient->announcement->title,
-                'content'    => $recipient->announcement->content,
-                'sender'     => $recipient->announcement->sender?->name ?? '',
-                'target_type' => $recipient->announcement->target_type,
-                'created_at' => $recipient->created_at->format('Y/m/d H:i'),
-                'read_at'    => $recipient->read_at?->format('Y/m/d H:i'),
+                'id'          => $recipient->id,
+                'title'       => $announcement->title,
+                'content'     => $announcement->content,
+                'sender'      => $announcement->sender?->name ?? '',
+                'target_type' => $announcement->target_type,
+                'created_at'  => $recipient->created_at->format('Y/m/d H:i'),
+                'read_at'     => $recipient->read_at?->format('Y/m/d H:i'),
+                'attachments' => $announcement->attachments->map(fn ($a) => [
+                    'id'            => $a->id,
+                    'url'           => asset('storage/' . $a->path),
+                    'thumb_url'     => null,
+                    'original_name' => $a->original_name,
+                    'mime'          => $a->mime_type,
+                ]),
             ],
         ]);
     }

@@ -34,6 +34,7 @@ class User extends Authenticatable
         'user_role',
         'employment_type',
         'company_id',
+        'home_company_id',
         'department_id',
         'assignment_id',
         'position_title_id',
@@ -333,6 +334,14 @@ class User extends Authenticatable
     public function company(): BelongsTo
     {
         return $this->belongsTo(\App\Models\Company::class);
+    }
+
+    /**
+     * SuperAdmin の個人記録用ホーム会社
+     */
+    public function homeCompany(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Company::class, 'home_company_id');
     }
 
     /**

@@ -1,13 +1,14 @@
 <script setup>
 import DialogModal from '@/Components/DialogModal.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
+import SuperAdminNavigationTabs from '@/Components/Tabs/SuperAdminNavigationTabs.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 
 // ユーザー削除処理
 function deleteUser(id) {
     if (confirm('本当にこのアカウントを削除しますか？')) {
-        router.delete(route('superadmin.users.destroy', id), {
+        router.delete(route('superadmin.users.destroy', { user: id }), {
             onSuccess: () => {
                 router.visit(route('superadmin.users.index'));
             },
@@ -42,7 +43,16 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    filterCompanyId: {
+        type: Number,
+        default: null,
+    },
 });
+
+function switchCompany(companyId) {
+    const params = companyId ? { filter_company: companyId } : {};
+    router.get(route('superadmin.users.index'), params, { preserveState: false });
+}
 
 const filteredDepartments = computed(() => {
     return props.departments.filter((dep) => String(dep.company_id) === userCompanyId.value);
@@ -109,13 +119,35 @@ const getAssignmentName = (assignment_id) => {
         <template #header>
             <div class="flex items-center justify-between">
                 <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">ユーザー管理</h2>
-                <template v-if="myuser?.user_role === 'superadmin'">
-                    <Link :href="route('superadmin.users.create')" class="rounded bg-red-600 px-4 py-2 font-bold text-white hover:bg-red-700"
-                        >新規ユーザー登録</Link
-                    >
-                </template>
+                <Link :href="route('superadmin.users.create')" class="rounded bg-yellow-500 px-4 py-2 font-bold text-white hover:bg-yellow-600">
+                    新規ユーザー登録
+                </Link>
             </div>
         </template>
+
+        <template #tabs>
+            <SuperAdminNavigationTabs active="all_users" />
+        </template>
+
+        <!-- 会社タブ（SuperAdmin のみ表示） -->
+        <div v-if="myuser?.user_role === 'superadmin' && companies.length > 0" class="mb-4 flex flex-wrap gap-2">
+            <button
+                @click="switchCompany(null)"
+                :class="filterCompanyId === null
+                    ? 'bg-yellow-500 text-white font-semibold'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
+                class="rounded-full px-4 py-1.5 text-sm transition"
+            >全て</button>
+            <button
+                v-for="company in companies"
+                :key="company.id"
+                @click="switchCompany(company.id)"
+                :class="filterCompanyId === company.id
+                    ? 'bg-yellow-500 text-white font-semibold'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
+                class="rounded-full px-4 py-1.5 text-sm transition"
+            >{{ company.name }}</button>
+        </div>
 
         <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <div class="mb-4 flex items-center justify-between">
@@ -168,8 +200,8 @@ const getAssignmentName = (assignment_id) => {
                             <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ getCompanyName(user.company_id) }}</td>
                             <td class="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
                                 <div class="flex justify-end space-x-2">
-                                    <Link :href="route('superadmin.users.show', user.id)" class="text-blue-600 hover:text-blue-900">詳細</Link>
-                                    <Link :href="route('superadmin.users.edit', user.id)" class="text-yellow-600 hover:text-yellow-900">編集</Link>
+                                    <Link :href="route('superadmin.users.show', { user: user.id })" class="text-blue-600 hover:text-blue-900">詳細</Link>
+                                    <Link :href="route('superadmin.users.edit', { user: user.id })" class="text-yellow-600 hover:text-yellow-900">編集</Link>
                                     <button @click="deleteUser(user.id)" class="text-red-600 hover:text-red-900">削除</button>
                                 </div>
                             </td>

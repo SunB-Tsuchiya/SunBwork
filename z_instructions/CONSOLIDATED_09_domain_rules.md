@@ -318,6 +318,39 @@ private function canEdit(User $user, ProjectJob $projectJob, ?ProgressSheet $she
 
 ---
 
+## 校正ジョブフロー（2026-05-30 統合）
+
+**基本方針:** 校正ジョブ専用タブは廃止。通常の「依頼されたジョブ → マイジョブ」フローに統一。
+
+**pja100（coordinator 割当の proof ジョブ）の特徴:**
+- `job_type = 'proof'`
+- `sender_id` = 校正管理者ID、`user_id` = 校正担当者ID（sender ≠ user）
+- `coordinator_assignment_id = NULL`（旧 pja101 は廃止）
+
+**pja101（廃止）:** 旧フローの中間作業スロット割当は廃止。代わりにカレンダーイベントを pja100 に直接作成。
+
+**JobBox への表示:** `ProofRequestController::assignStore()` で `JobAssignmentMessage` を自動生成。プロが「依頼されたジョブ」タブに pja100 が自然に表示される。
+
+**スケジュール設定:** `SavesProofWorkSlots` trait が pja100 に直接 `Event` を作成（`project_job_assignment_id = pja100.id`）。
+
+**完了の連動（2パターン）:**
+1. **PCなし校正者:** 校正管理者が `ProofRequestController::complete()` で完了 → ProofRequest 完了 + 通知
+2. **PC有り校正者:** `MyProjectJobController::completeAssignment()` → `maybeCompleteProofRequest()` が ProofRequest を完了させ通知送信。supersedes_assignment_id 経由でも機能する（マイジョブにしたケース）
+
+**進行表工数集計:** pja100 直接の Events + supersededBy な pja101 の Events の両方が集計対象（変更なし）。
+
+**Coordinator 割当一覧の重複排除:**
+```php
+// job_type='proof' かつ coordinator_assignment_id IS NOT NULL（旧 pja101）を除外
+->where(function ($q) {
+    $q->where(function ($inner) {
+        $inner->where('job_type', '!=', 'proof')->orWhereNull('job_type');
+    })->orWhereNull('coordinator_assignment_id');
+})
+```
+
+---
+
 ## マイジョブ 続きジョブ連動機能（2026-04-04 実装）
 
 **`source_assignment_id`:** 日をまたいだジョブをチェーンするカラム（自己参照FK）。

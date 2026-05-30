@@ -190,7 +190,7 @@
             @change="onProofUserChange($event.target.value)"
           >
             <option value="">— 校正担当者 —</option>
-            <option value="proof_coordinator" class="font-medium text-pink-700">📋 校正管理へ依頼</option>
+            <option v-if="proofRequestEnabled" value="proof_coordinator" class="font-medium text-pink-700">📋 校正管理へ依頼</option>
             <optgroup v-if="users.filter(u => !u.is_ghost).length" label="直接割当（管理外）">
               <option v-for="u in users.filter(u => !u.is_ghost)" :key="'u_' + u.id" :value="'u_' + u.id">{{ u.name }}</option>
             </optgroup>
@@ -789,6 +789,10 @@
 
 <script setup>
 import { computed, ref } from 'vue';
+import { usePage } from '@inertiajs/vue3';
+
+const page = usePage();
+const proofRequestEnabled = computed(() => page.props.auth?.featureFlags?.proofRequest ?? false);
 
 const props = defineProps({
   cell: {

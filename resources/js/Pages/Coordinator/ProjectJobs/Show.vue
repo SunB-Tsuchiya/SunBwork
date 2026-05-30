@@ -634,8 +634,8 @@
                     <ProjectJobItemsTab :progress-sheets="progressSheets" />
                 </section>
 
-                <!-- 校正依頼履歴 -->
-                <section v-show="activeTab === 'history'" v-if="(page.props.proofHistory || []).length > 0" class="py-4">
+                <!-- 校正依頼履歴（情報出版部署のみ表示） -->
+                <section v-show="activeTab === 'history'" v-if="$page.props.auth.featureFlags.proofRequest && (page.props.proofHistory || []).length > 0" class="py-4">
                     <h3 class="mb-3 text-sm font-semibold text-gray-700">校正依頼履歴</h3>
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
                         <thead class="bg-gray-50">

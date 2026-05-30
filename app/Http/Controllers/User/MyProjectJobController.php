@@ -44,7 +44,13 @@ class MyProjectJobController extends Controller
             ->where('user_id', $user->id)
             ->get();
         // ユーザー自身が登録した「自分用割当」を取得（ページネーション）
+        // proof 作業スロット (pja101: job_type='proof' かつ coordinator_assignment_id 設定済み) は除外
         $baseAssignments = ProjectJobAssignmentByMyself::where('user_id', $user->id)
+            ->where(function ($q) {
+                $q->where(function ($inner) {
+                    $inner->where('job_type', '!=', 'proof')->orWhereNull('job_type');
+                })->orWhereNull('coordinator_assignment_id');
+            })
             ->with(['projectJob.client', 'user', 'statusModel', 'events' => function ($q) {
                 $q->orderBy('starts_at');
             }])
@@ -279,10 +285,69 @@ class MyProjectJobController extends Controller
             } catch (\Throwable $__eEvtMy) {
                 // non-fatal
             }
+
+            // proof型ジョブが完了した場合、対応するProofRequestも完了させる
+            try {
+                $this->maybeCompleteProofRequest($assignment, $user);
+            } catch (\Throwable $__eProof) {
+                \Illuminate\Support\Facades\Log::warning('completeAssignment: ProofRequest completion failed', ['error' => $__eProof->getMessage()]);
+            }
         } catch (\Throwable $__e) {
             return response()->json(['error' => $__e->getMessage()], 500);
         }
         return response()->json(['success' => true, 'assignment_id' => $assignment->id]);
+    }
+
+    /**
+     * proof型のジョブが完了した際に対応するProofRequestを完了させる。
+     *
+     * パターンA: assignment 自身が job_type='proof'（自己proof、pja100が直接完了）
+     * パターンB: assignment が proof pja100 を supersedes している（マイジョブにしたケース）
+     */
+    private function maybeCompleteProofRequest(\App\Models\ProjectJobAssignment $assignment, ?\App\Models\User $user): void
+    {
+        $pja100 = null;
+
+        if ($assignment->job_type === 'proof') {
+            // パターンA: assignment 自身が proof 割当
+            $pja100 = $assignment;
+        } elseif (!empty($assignment->supersedes_assignment_id)) {
+            // パターンB: supersede 先が proof pja100
+            $parent = \App\Models\ProjectJobAssignment::find($assignment->supersedes_assignment_id);
+            if ($parent && $parent->job_type === 'proof') {
+                $pja100 = $parent;
+                if (!$pja100->completed) {
+                    $pja100->completed = true;
+                    $pja100->save();
+                }
+            }
+        }
+
+        if (!$pja100) return;
+
+        $proofRequest = \App\Models\ProofRequest::where('project_job_id', $pja100->project_job_id)
+            ->where('proofreader_id', $pja100->user_id)
+            ->whereIn('status', ['assigned', 'in_progress'])
+            ->latest()
+            ->first();
+
+        if (!$proofRequest) return;
+
+        $proofRequest->update([
+            'status'       => 'completed',
+            'completed_at' => now(),
+        ]);
+
+        if ($proofRequest->project_job_assignment_id) {
+            \App\Models\ProjectJobAssignment::where('id', $proofRequest->project_job_assignment_id)
+                ->whereNull('proof_completed_at')
+                ->update(['proof_completed_at' => now()]);
+        }
+
+        $notifier = $user ?? \App\Models\User::find($assignment->user_id);
+        if ($notifier) {
+            \App\Services\JobNotificationService::notifyProofCompleted($notifier, $proofRequest->fresh());
+        }
     }
 
     /**
@@ -361,12 +426,48 @@ class MyProjectJobController extends Controller
                 ->exists();
         } catch (\Throwable $e) {}
 
+        // proof型割当の場合、対応するProofRequestを取得して表示に使う
+        // パターンA: assignment 自身が job_type='proof'（直接 proof 割当）
+        // パターンB: supersedes_assignment_id が proof pja100 を指している（マイジョブにしたケース）
+        $proofRequestInfo = null;
+        try {
+            $pja100 = null;
+            if ($assignment->job_type === 'proof') {
+                $pja100 = $assignment;
+            } elseif (!empty($assignment->supersedes_assignment_id)) {
+                $parent = \App\Models\ProjectJobAssignment::find($assignment->supersedes_assignment_id);
+                if ($parent && $parent->job_type === 'proof') {
+                    $pja100 = $parent;
+                }
+            }
+            if ($pja100) {
+                $pr = \App\Models\ProofRequest::with(['requester', 'proofCoordinator'])
+                    ->where('project_job_id', $pja100->project_job_id)
+                    ->where('proofreader_id', $pja100->user_id)
+                    ->whereIn('status', ['assigned', 'in_progress', 'completed'])
+                    ->latest()
+                    ->first();
+                if ($pr) {
+                    $proofRequestInfo = [
+                        'id'               => $pr->id,
+                        'title'            => $pr->title,
+                        'status'           => $pr->status,
+                        'deadline'         => $pr->deadline?->toIso8601String(),
+                        'note'             => $pr->note,
+                        'requester_name'   => $pr->requester?->name,
+                        'coordinator_name' => $pr->proofCoordinator?->name,
+                    ];
+                }
+            }
+        } catch (\Throwable $e) {}
+
         return Inertia::render('MyJobBox/Show', [
             'projectJob'              => $projectJob,
             'assignment'              => $assignment,
             'canDelete'               => $canDelete,
             'linkedProgressCellCount' => $linkedProgressCellCount,
             'proofRequested'          => $proofRequested,
+            'proofRequestInfo'        => $proofRequestInfo,
         ]);
     }
 

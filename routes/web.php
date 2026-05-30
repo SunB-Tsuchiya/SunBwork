@@ -572,6 +572,9 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('announcements/create', [App\Http\Controllers\Clerk\AnnouncementController::class, 'create'])->name('announcements.create');
         Route::post('announcements', [App\Http\Controllers\Clerk\AnnouncementController::class, 'store'])->name('announcements.store');
         Route::get('announcements/{announcement}', [App\Http\Controllers\Clerk\AnnouncementController::class, 'show'])->name('announcements.show');
+        Route::get('announcements/{announcement}/edit', [App\Http\Controllers\Clerk\AnnouncementController::class, 'edit'])->name('announcements.edit');
+        Route::put('announcements/{announcement}', [App\Http\Controllers\Clerk\AnnouncementController::class, 'update'])->name('announcements.update');
+        Route::delete('announcements/{announcement}', [App\Http\Controllers\Clerk\AnnouncementController::class, 'destroy'])->name('announcements.destroy');
     });
 
 // お知らせ受信（全認証ユーザー）
@@ -890,8 +893,9 @@ Route::get('/debug/create', function () {
 
 // =====================================================
 // ProofCoordinator Routes（校正窓口 / Admin / SuperAdmin / 部署Leader）
+// サン・ブレーン専用（company_type: sunbrain）
 // =====================================================
-Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'proof_coordinator'])
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'company_type:sunbrain', 'proof_coordinator'])
     ->prefix('proof-coordinator')
     ->name('proof_coordinator.')
     ->group(function () {
@@ -940,8 +944,9 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 
 // =====================================================
 // Prepress Routes（製版部署専用）
+// サン・ブレーン専用（company_type: sunbrain）
 // =====================================================
-Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified'])
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'company_type:sunbrain'])
     ->prefix('prepress')
     ->name('prepress.')
     ->group(function () {
@@ -1015,3 +1020,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 Route::middleware(['auth:sanctum', config('jetstream.auth_session')])->get('/ping', function () {
     return response()->noContent();
 })->name('ping');
+
+// SuperAdmin コンテキスト切り替え
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'superadmin'])
+    ->post('/superadmin/switch-context', [App\Http\Controllers\SuperAdmin\ContextController::class, 'switch'])
+    ->name('superadmin.switch_context');

@@ -49,9 +49,16 @@ class ProjectJobAssignmentsController extends Controller
 
         $hideCompleted = $request->boolean('hide_completed');
 
-        // base query（マイジョブに置き換えられた依頼ジョブは除外）
+        // base query（マイジョブに置き換えられた依頼ジョブ・校正作業スロット(pja101)は除外）
         $query = $projectJob->projectJobAssignments()->with(['user', 'statusModel'])
-            ->whereDoesntHave('supersededBy');
+            ->whereDoesntHave('supersededBy')
+            ->where(function ($q) {
+                // proof job_type でも coordinator_assignment_id=NULL (pja100) は表示する
+                // coordinator_assignment_id が設定されている proof (pja101 作業スロット) は除外
+                $q->where(function ($inner) {
+                    $inner->where('job_type', '!=', 'proof')->orWhereNull('job_type');
+                })->orWhereNull('coordinator_assignment_id');
+            });
 
         // 検索
         $q = $request->query('q', null);
@@ -139,6 +146,11 @@ class ProjectJobAssignmentsController extends Controller
         // 年月セレクター用オプション
         $monthOptions = $projectJob->projectJobAssignments()
             ->whereDoesntHave('supersededBy')
+            ->where(function ($q) {
+                $q->where(function ($inner) {
+                    $inner->where('job_type', '!=', 'proof')->orWhereNull('job_type');
+                })->orWhereNull('coordinator_assignment_id');
+            })
             ->where(function ($q2) {
                 $q2->whereNotNull('desired_end_date')->orWhereNotNull('created_at');
             })

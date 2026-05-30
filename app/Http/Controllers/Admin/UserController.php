@@ -24,6 +24,7 @@ use PhpParser\Node\Expr\Assign;
 class UserController extends Controller
 {
     use ChecksAdminPermission, NormalizesCsvEncoding;
+    use \App\Http\Controllers\Concerns\ResolvesContextCompany;
 
     /**
      * Display a listing of users
@@ -31,9 +32,19 @@ class UserController extends Controller
     public function index()
     {
         $this->requireAdminPermission('user_management');
-        $users = User::with('positionTitle')->orderBy('created_at', 'desc')->get();
+
+        $companyId = $this->contextCompanyId();
+
+        $query = User::with('positionTitle')->orderBy('created_at', 'desc');
+        if ($companyId) {
+            $query->where('company_id', $companyId);
+        }
+        $users = $query->get();
+
+        $departments = $companyId
+            ? Department::where('company_id', $companyId)->get()
+            : Department::all();
         $assignments = \App\Models\Assignment::all();
-        $departments = Department::all();
         $user = Auth::user();
 
         return Inertia::render('Admin/Users/Index', [

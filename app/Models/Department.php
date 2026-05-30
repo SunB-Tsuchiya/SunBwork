@@ -14,6 +14,7 @@ class Department extends Model
     protected $fillable = [
         'company_id',
         'name',
+        'module',
         'code',
         'description',
         'sort_order',

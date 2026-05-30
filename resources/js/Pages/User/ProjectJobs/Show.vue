@@ -119,8 +119,8 @@
                         <p v-if="!job.user && !subCoordinators.length && !coordinatorMembers.length && !userMembers.length" class="text-sm text-gray-400">メンバー未登録</p>
                     </div>
 
-                    <!-- 校正依頼 -->
-                    <div class="mt-5 border-t pt-4">
+                    <!-- 校正依頼（情報出版部署のみ表示） -->
+                    <div v-if="$page.props.auth.featureFlags.proofRequest" class="mt-5 border-t pt-4">
                         <div class="mb-2 flex items-center gap-3">
                             <h3 class="font-semibold text-gray-800">校正依頼</h3>
                             <button

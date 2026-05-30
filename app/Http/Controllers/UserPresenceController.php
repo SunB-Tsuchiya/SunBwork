@@ -19,6 +19,7 @@ use Inertia\Inertia;
 
 class UserPresenceController extends Controller
 {
+    use \App\Http\Controllers\Concerns\ResolvesContextCompany;
     /**
      * モバイル向けステータス更新ページ（Inertia）
      */
@@ -57,8 +58,13 @@ class UserPresenceController extends Controller
         // カレンダーイベントに基づいて自分のステータスを自動同期
         $this->syncCalendarStatus($authUser);
 
+        // SuperAdmin はコンテキスト会社のユーザーを表示。グローバル時は自社にフォールバック
+        $presenceCompanyId = $authUser->isSuperAdmin()
+            ? ($this->contextCompanyId() ?? $authUser->company_id)
+            : $authUser->company_id;
+
         $users = User::with(['department', 'presenceStatus'])
-            ->where('company_id', $authUser->company_id)
+            ->where('company_id', $presenceCompanyId)
             ->where('is_ghost', false)
             ->whereNull('ghost_owner_id')
             ->get();

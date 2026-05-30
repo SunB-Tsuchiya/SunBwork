@@ -1,9 +1,6 @@
 <script setup>
 import { computed } from 'vue';
-import { Link, usePage, router } from '@inertiajs/vue3';
-
-const page = usePage();
-const isProofMember = computed(() => page.props.auth?.isProofMember ?? false);
+import { Link, router } from '@inertiajs/vue3';
 
 const props = defineProps({
     active: { type: String, default: '' },
@@ -29,7 +26,6 @@ const tabs = computed(() => [
     { key: 'diaries', href: tryRoute('diaries.index'), label: '日報一覧' },
     { key: 'calendar', href: tryRoute('calendar.index'), label: 'カレンダー' },
     { key: 'proof_status', href: tryRoute('user.proof.status'), label: '校正状況' },
-    { key: 'proof_jobs', href: tryRoute('user.proof_jobs.index'), label: '校正ジョブ', condition: isProofMember.value },
     { key: 'settings', href: tryRoute('user.settings.index'), label: '設定' },
 ].filter(t => t.condition !== false && t.href));
 
@@ -79,13 +75,6 @@ function onMobileSelect(e) {
             </Link>
             <Link :href="route('user.proof.status')" :class="tab('proof_status')">
                 校正状況
-            </Link>
-            <Link
-                v-if="isProofMember"
-                :href="route('user.proof_jobs.index')"
-                :class="['rounded-md px-3 py-2 text-sm font-medium', props.active === 'proof_jobs' ? 'bg-pink-100 text-pink-700' : 'border border-pink-200 text-pink-600 hover:bg-pink-50 hover:text-pink-800']"
-            >
-                校正ジョブ
             </Link>
             <Link :href="route('user.settings.index')" :class="tab('settings')">
                 設定

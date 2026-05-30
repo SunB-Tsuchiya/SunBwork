@@ -25,38 +25,18 @@ trait SavesProofWorkSlots
             ProofSchedule::where('proof_request_id', $proofRequest->id)->delete();
         }
 
-        // pja100（coordinator が校正員に割り当てたジョブ）を特定
+        // pja100（coordinator が校正員に割り当てたジョブ）を特定してEventを直接作成する。
+        // 新フローでは pja101（作業スロット用の中間ジョブ）は作成しない。
+        // pja100 の Events + 校正者がマイジョブにした場合の pja101(supersedes) の Events
+        // の両方が進行表工数集計に含まれるため、pja100 直接で問題ない。
         $pja100 = ProjectJobAssignment::where('project_job_id', $proofRequest->project_job_id)
             ->where('user_id', $proofRequest->proofreader_id)
             ->where('sender_id', $proofRequest->proof_coordinator_id)
             ->latest()->first();
 
-        $pja101 = null;
-        if ($pja100) {
-            // 校正員自身が作成した自己割当ジョブ（pja101）を探す
-            $pja101 = ProjectJobAssignment::whereColumn('sender_id', 'user_id')
-                ->where(function ($q) use ($pja100) {
-                    $q->where('coordinator_assignment_id', $pja100->id)
-                      ->orWhere('supersedes_assignment_id', $pja100->id);
-                })->latest()->first();
-
-            // 存在しなければ作成
-            if (! $pja101 && $proofRequest->proofreader_id) {
-                $pja101 = ProjectJobAssignment::create([
-                    'project_job_id'            => $proofRequest->project_job_id,
-                    'user_id'                   => $proofRequest->proofreader_id,
-                    'sender_id'                 => $proofRequest->proofreader_id,
-                    'coordinator_assignment_id' => $pja100->id,
-                    'job_type'                  => 'proof',
-                    'title'                     => $proofRequest->title,
-                    'scheduled'                 => true,
-                    'scheduled_at'              => now(),
-                ]);
-            }
-
-            if ($replace && $pja101) {
-                Event::where('project_job_assignment_id', $pja101->id)->delete();
-            }
+        if ($replace && $pja100) {
+            // coordinator がセットしたイベントのみ削除（プロの追加イベントは残す）
+            Event::where('project_job_assignment_id', $pja100->id)->delete();
         }
 
         foreach ($slots as $slot) {
@@ -85,11 +65,12 @@ trait SavesProofWorkSlots
                 ]);
             }
 
-            if ($pja101) {
+            // pja100 に直接 Event を作成する（校正者のカレンダーに反映）
+            if ($pja100) {
                 try {
                     Event::create([
                         'user_id'                   => $proofRequest->proofreader_id,
-                        'project_job_assignment_id' => $pja101->id,
+                        'project_job_assignment_id' => $pja100->id,
                         'date'                      => $date,
                         'start'                     => "{$date} {$sH}:{$sM}:00",
                         'end'                       => "{$date} {$eH}:{$eM}:00",
@@ -98,9 +79,9 @@ trait SavesProofWorkSlots
                         'title'                     => $proofRequest->title,
                     ]);
                 } catch (\Throwable $e) {
-                    Log::warning('saveWorkSlots: failed to create Event', [
-                        'error'   => $e->getMessage(),
-                        'pja101'  => $pja101->id ?? null,
+                    Log::warning('saveWorkSlots: failed to create Event on pja100', [
+                        'error'  => $e->getMessage(),
+                        'pja100' => $pja100->id ?? null,
                     ]);
                 }
             }

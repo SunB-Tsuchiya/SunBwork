@@ -15,6 +15,8 @@ import ProofCoordinatorNavigationTabs from '@/Components/Tabs/ProofCoordinatorNa
 import SuperAdminNavigationTabs from '@/Components/Tabs/SuperAdminNavigationTabs.vue';
 import UserNavigationTabs from '@/Components/Tabs/UserNavigationTabs.vue';
 import ToastUnified from '@/Components/ToastUnified.vue';
+import CompanyModuleNavButtons from '@/Components/CompanyModuleNavButtons.vue';
+import SuperAdminContextSwitcher from '@/Components/SuperAdminContextSwitcher.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { computed, provide, ref } from 'vue';
 
@@ -431,6 +433,12 @@ function navigateToRole(role) {
                                 </div>
                             </div>
 
+                            <!-- SuperAdmin コンテキスト切り替え -->
+                            <SuperAdminContextSwitcher
+                                v-if="$page.props.auth.user.isSuperAdmin"
+                                class="mr-1"
+                            />
+
                             <!-- Settings Dropdown -->
                             <div class="relative ms-1">
                                 <Dropdown align="right" width="48">
@@ -528,9 +536,9 @@ function navigateToRole(role) {
                             <button type="button" @click="navigateToRole('leader')" :class="roleNavClass('leader')">Leader</button>
                             <button type="button" @click="navigateToRole('clerk')" :class="roleNavClass('clerk')">Clerk</button>
                             <button type="button" @click="navigateToRole('coordinator')" :class="roleNavClass('coordinator')">Coordinator</button>
-                            <button type="button" @click="navigateToRole('proof_coordinator')" :class="roleNavClass('proof_coordinator')">Proof Admin</button>
+                            <CompanyModuleNavButtons group="beforeUser" :auth="$page.props.auth" :roleNavClass="roleNavClass" @navigate="navigateToRole" />
                             <button type="button" @click="navigateToRole('user')" :class="roleNavClass('user')">User</button>
-                            <button type="button" @click="navigateToRole('prepress')" :class="roleNavClass('prepress')">Prepress</button>
+                            <CompanyModuleNavButtons group="afterUser" :auth="$page.props.auth" :roleNavClass="roleNavClass" @navigate="navigateToRole" />
                         </template>
 
                         <!-- Admin用ナビゲーション -->
@@ -539,9 +547,9 @@ function navigateToRole(role) {
                             <button type="button" @click="navigateToRole('leader')" :class="roleNavClass('leader')">Leader</button>
                             <button type="button" @click="navigateToRole('clerk')" :class="roleNavClass('clerk')">Clerk</button>
                             <button type="button" @click="navigateToRole('coordinator')" :class="roleNavClass('coordinator')">Coordinator</button>
-                            <button type="button" @click="navigateToRole('proof_coordinator')" :class="roleNavClass('proof_coordinator')">Proof Admin</button>
+                            <CompanyModuleNavButtons group="beforeUser" :auth="$page.props.auth" :roleNavClass="roleNavClass" @navigate="navigateToRole" />
                             <button type="button" @click="navigateToRole('user')" :class="roleNavClass('user')">User</button>
-                            <button type="button" @click="navigateToRole('prepress')" :class="roleNavClass('prepress')">Prepress</button>
+                            <CompanyModuleNavButtons group="afterUser" :auth="$page.props.auth" :roleNavClass="roleNavClass" @navigate="navigateToRole" />
                         </template>
 
                         <!-- Leader用ナビゲーション（部署リーダーはClerk/ProofCoordinator も表示） -->
@@ -552,41 +560,27 @@ function navigateToRole(role) {
                                 type="button" @click="navigateToRole('clerk')"
                                 :class="roleNavClass('clerk')"
                             >Clerk</button>
-                            <button
-                                v-if="$page.props.auth.user.isDepartmentLeader"
-                                type="button" @click="navigateToRole('proof_coordinator')"
-                                :class="roleNavClass('proof_coordinator')"
-                            >Proof Admin</button>
                             <button type="button" @click="navigateToRole('coordinator')" :class="roleNavClass('coordinator')">Coordinator</button>
+                            <CompanyModuleNavButtons group="beforeUser" :auth="$page.props.auth" :roleNavClass="roleNavClass" @navigate="navigateToRole" />
                             <button type="button" @click="navigateToRole('user')" :class="roleNavClass('user')">User</button>
-                            <button
-                                v-if="$page.props.auth.user.isPrepressDepartment"
-                                type="button" @click="navigateToRole('prepress')"
-                                :class="roleNavClass('prepress')"
-                            >Prepress</button>
+                            <CompanyModuleNavButtons group="afterUser" :auth="$page.props.auth" :roleNavClass="roleNavClass" @navigate="navigateToRole" />
                         </template>
 
                         <!-- Clerk用ナビゲーション（Coordinator+User権限を持つ） -->
                         <template v-else-if="$page.props.auth.user.user_role === 'clerk'">
                             <button type="button" @click="navigateToRole('clerk')" :class="roleNavClass('clerk')">Clerk</button>
                             <button type="button" @click="navigateToRole('coordinator')" :class="roleNavClass('coordinator')">Coordinator</button>
+                            <CompanyModuleNavButtons group="beforeUser" :auth="$page.props.auth" :roleNavClass="roleNavClass" @navigate="navigateToRole" />
                             <button type="button" @click="navigateToRole('user')" :class="roleNavClass('user')">User</button>
-                            <button
-                                v-if="$page.props.auth.user.isPrepressDepartment"
-                                type="button" @click="navigateToRole('prepress')"
-                                :class="roleNavClass('prepress')"
-                            >Prepress</button>
+                            <CompanyModuleNavButtons group="afterUser" :auth="$page.props.auth" :roleNavClass="roleNavClass" @navigate="navigateToRole" />
                         </template>
 
                         <!-- Coordinator用ナビゲーション -->
                         <template v-else-if="$page.props.auth.user.user_role === 'coordinator'">
                             <button type="button" @click="navigateToRole('coordinator')" :class="roleNavClass('coordinator')">Coordinator</button>
+                            <CompanyModuleNavButtons group="beforeUser" :auth="$page.props.auth" :roleNavClass="roleNavClass" @navigate="navigateToRole" />
                             <button type="button" @click="navigateToRole('user')" :class="roleNavClass('user')">User</button>
-                            <button
-                                v-if="$page.props.auth.user.isPrepressDepartment"
-                                type="button" @click="navigateToRole('prepress')"
-                                :class="roleNavClass('prepress')"
-                            >Prepress</button>
+                            <CompanyModuleNavButtons group="afterUser" :auth="$page.props.auth" :roleNavClass="roleNavClass" @navigate="navigateToRole" />
                         </template>
 
                         <!-- ProofCoordinator用ナビゲーション -->
@@ -598,11 +592,7 @@ function navigateToRole(role) {
                         <!-- 一般ユーザー用ナビゲーション -->
                         <template v-else>
                             <button type="button" @click="navigateToRole('user')" :class="roleNavClass('user')">Dashboard</button>
-                            <button
-                                v-if="$page.props.auth.user.isPrepressDepartment"
-                                type="button" @click="navigateToRole('prepress')"
-                                :class="roleNavClass('prepress')"
-                            >Prepress</button>
+                            <CompanyModuleNavButtons group="afterUser" :auth="$page.props.auth" :roleNavClass="roleNavClass" @navigate="navigateToRole" />
                         </template>
                     </div>
                 </div>
@@ -635,7 +625,7 @@ function navigateToRole(role) {
                             <ResponsiveNavLink :href="route('user.dashboard')" :active="route().current('user.dashboard')">
                                 <span class="text-blue-600">User Dashboard</span>
                             </ResponsiveNavLink>
-                            <ResponsiveNavLink :href="route('prepress.dashboard')" :active="route().current('prepress.dashboard')">
+                            <ResponsiveNavLink v-if="$page.props.auth.companyType === 'sunbrain'" :href="route('prepress.dashboard')" :active="route().current('prepress.dashboard')">
                                 <span class="text-green-700">Prepress Dashboard</span>
                             </ResponsiveNavLink>
                         </template>
@@ -654,7 +644,7 @@ function navigateToRole(role) {
                             <ResponsiveNavLink :href="route('user.dashboard')" :active="route().current('user.dashboard')">
                                 <span class="text-blue-600">User Dashboard</span>
                             </ResponsiveNavLink>
-                            <ResponsiveNavLink :href="route('prepress.dashboard')" :active="route().current('prepress.dashboard')">
+                            <ResponsiveNavLink v-if="$page.props.auth.companyType === 'sunbrain'" :href="route('prepress.dashboard')" :active="route().current('prepress.dashboard')">
                                 <span class="text-green-700">Prepress Dashboard</span>
                             </ResponsiveNavLink>
                         </template>
@@ -681,7 +671,7 @@ function navigateToRole(role) {
                                 <span class="text-blue-600">User Dashboard</span>
                             </ResponsiveNavLink>
                             <ResponsiveNavLink
-                                v-if="$page.props.auth.user.isPrepressDepartment"
+                                v-if="$page.props.auth.user.isPrepressDepartment && $page.props.auth.companyType === 'sunbrain'"
                                 :href="route('prepress.dashboard')"
                                 :active="route().current('prepress.*')"
                             >
@@ -693,7 +683,7 @@ function navigateToRole(role) {
                         <template v-else>
                             <ResponsiveNavLink :href="route('dashboard')" :active="route().current('dashboard')"> Dashboard </ResponsiveNavLink>
                             <ResponsiveNavLink
-                                v-if="$page.props.auth.user.isPrepressDepartment"
+                                v-if="$page.props.auth.user.isPrepressDepartment && $page.props.auth.companyType === 'sunbrain'"
                                 :href="route('prepress.dashboard')"
                                 :active="route().current('prepress.*')"
                             >

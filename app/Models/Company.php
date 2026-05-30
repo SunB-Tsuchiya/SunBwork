@@ -14,6 +14,7 @@ class Company extends Model
     protected $fillable = [
         'name',
         'code',
+        'company_type',
         'description',
         'active',
         'representative_id',
@@ -62,5 +63,15 @@ class Company extends Model
     public function scopeActive($query)
     {
         return $query->where('active', true);
+    }
+
+    public function isSunbrain(): bool
+    {
+        return $this->company_type === 'sunbrain';
+    }
+
+    public function isGeneral(): bool
+    {
+        return $this->company_type === 'general';
     }
 }

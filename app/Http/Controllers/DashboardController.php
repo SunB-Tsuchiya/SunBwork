@@ -18,6 +18,7 @@ use App\Models\Department;
 
 class DashboardController extends Controller
 {
+    use \App\Http\Controllers\Concerns\ResolvesContextCompany;
     public function index(Request $request)
     {
         // Eager load related models so Vue pages can safely access them without extra queries
@@ -294,13 +295,19 @@ class DashboardController extends Controller
             }
         }
 
-        // 部署一覧（イルカボード用）
+        // 部署一覧（イルカボード用）— SuperAdmin はコンテキスト会社を参照
+        // グローバルモード（contextCompanyId = null）は空配列 → Dashboard で案内メッセージを表示
         $departments = [];
         try {
-            $departments = Department::where('company_id', $user->company_id)
-                ->orderBy('sort_order')
-                ->get(['id', 'name'])
-                ->toArray();
+            $boardCompanyId = $user->isSuperAdmin()
+                ? $this->contextCompanyId()           // SuperAdmin: 明示的なコンテキストのみ
+                : $user->company_id;                  // 一般ユーザー: 自社固定
+            if ($boardCompanyId) {
+                $departments = Department::where('company_id', $boardCompanyId)
+                    ->orderBy('sort_order')
+                    ->get(['id', 'name'])
+                    ->toArray();
+            }
         } catch (\Throwable $e) {
             Log::error('DashboardController departments error: ' . $e->getMessage());
         }

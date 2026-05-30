@@ -43,6 +43,15 @@ class HandleInertiaRequests extends Middleware
         $flashMessage = session('success') ?? session('error') ?? null;
         $flashType    = session('success') ? 'success' : (session('error') ? 'error' : 'success');
 
+        // 会社タイプ取得（SuperAdmin はコンテキスト切り替えに応じた会社を参照）
+        $contextCompany = null;
+        if ($request->user()?->isSuperAdmin()) {
+            $ctxId = session('superadmin_context.company_id');
+            $contextCompany = $ctxId ? \App\Models\Company::find($ctxId) : null;
+        } else {
+            $contextCompany = $request->user()?->company;
+        }
+
         $unreadAnnouncements = 0;
         if ($request->user()) {
             $unreadAnnouncements = AnnouncementRecipient::where('user_id', $request->user()->id)
@@ -82,9 +91,11 @@ class HandleInertiaRequests extends Middleware
                             'isRepresentative'       => $request->user()->isAdmin() && $request->user()->isRepresentative(),
                             'isRepresentativeLeader' => $request->user()->isLeader() && $request->user()->isRepresentativeLeader(),
                             'isDepartmentLeader'     => $request->user()->isLeader() && $request->user()->isDepartmentLeader(),
+                            // department.module === 'prepress' で判定（名前ベースから移行）
                             'isPrepressDepartment'   => $request->user()->isSuperAdmin() || $request->user()->isAdmin()
                                 ? true
-                                : (\App\Models\Department::find($request->user()->department_id)?->name === '製版'),
+                                : (\App\Models\Department::find($request->user()->department_id)?->module === 'prepress'),
+                            'departmentModule'       => \App\Models\Department::find($request->user()->department_id)?->module,
                         ]
                     )
                     : null,
@@ -115,6 +126,38 @@ class HandleInertiaRequests extends Middleware
                 'isProofMember' => $request->user()
                     ? ProofTeamMember::where('user_id', $request->user()->id)->exists()
                     : false,
+                // 部署別ジョブフロー機能フラグ
+                // 各コンポーネントは auth.featureFlags.xxx を参照するだけ（判定ロジック不要）
+                'featureFlags' => (function () use ($request, $contextCompany) {
+                    $user = $request->user();
+                    if (! $user) {
+                        return [];
+                    }
+                    $module     = \App\Models\Department::find($user->department_id)?->module;
+                    $isSunbrain = $contextCompany?->company_type === 'sunbrain';
+                    $isAdminUp  = in_array($user->user_role, ['superadmin', 'admin']);
+                    return [
+                        'proofRequest'  => $isSunbrain && ($isAdminUp || $module === 'publishing'),
+                        'prepressBoard' => $isSunbrain && ($isAdminUp || $module === 'prepress'),
+                        // general タイプ会社の Clerk/Admin は全社に通知送信可
+                        'crossCompanyAnnouncement' => $contextCompany?->company_type === 'general'
+                            && in_array($user->user_role, ['clerk', 'admin', 'superadmin']),
+                    ];
+                })(),
+                // 会社タイプ（'sunbrain' | 'general' | 'global'）
+                // SuperAdmin はコンテキスト切り替えに応じた値。未切り替え時は 'global'
+                'companyType' => $contextCompany?->company_type ?? 'global',
+                // SuperAdmin のコンテキスト会社 ID（null = グローバル管理モード）
+                'superAdminContextId' => $request->user()?->isSuperAdmin()
+                    ? session('superadmin_context.company_id')
+                    : null,
+                // SuperAdmin のコンテキスト切り替え用会社一覧
+                'switchableCompanies' => $request->user()?->isSuperAdmin()
+                    ? \App\Models\Company::where('code', '!=', 'SUPERADMIN')
+                        ->active()
+                        ->get(['id', 'name', 'company_type'])
+                        ->toArray()
+                    : null,
             ],
         ];
     }
