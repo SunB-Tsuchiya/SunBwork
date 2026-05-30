@@ -3,16 +3,24 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 
-const DEPT_COLORS = {
-    '情報出版': 'bg-blue-100 text-blue-700',
-    '製版':     'bg-green-100 text-green-700',
-    'オンデマンド': 'bg-purple-100 text-purple-700',
-};
+// 部署バッジカラーを id の順番で循環割り当て
+const DEPT_COLOR_PALETTE = [
+    'bg-blue-100 text-blue-700',
+    'bg-green-100 text-green-700',
+    'bg-purple-100 text-purple-700',
+    'bg-orange-100 text-orange-700',
+    'bg-pink-100 text-pink-700',
+    'bg-yellow-100 text-yellow-700',
+];
+function deptColor(dept) {
+    return DEPT_COLOR_PALETTE[(dept.id - 1) % DEPT_COLOR_PALETTE.length];
+}
 
 const props = defineProps({
     clients:             Array,
     unregisteredClients: { type: Array, default: null },
     showDormant:         { type: Boolean, default: false },
+    departments:         { type: Array, default: () => [] },
 });
 
 const page = usePage();
@@ -23,7 +31,6 @@ const routePrefix = computed(() => {
         if (r.startsWith('leader.')) return 'leader';
         if (r.startsWith('coordinator.')) return 'coordinator';
     } catch {}
-    // fallback: user_role ベース
     const role = page.props.auth?.user?.user_role ?? 'leader';
     if (['admin', 'superadmin'].includes(role)) return 'admin';
     if (['coordinator', 'clerk'].includes(role)) return 'coordinator';
@@ -46,27 +53,6 @@ function matchesDept(client) {
     if (!selectedDeptId.value) return true;
     return (client.departments ?? []).some(d => String(d.id) === selectedDeptId.value);
 }
-
-const DEPT_ORDER = ['情報出版', '製版', 'オンデマンド'];
-function sortDepts(depts) {
-    return [...depts].sort((a, b) => {
-        const ai = DEPT_ORDER.indexOf(a.name);
-        const bi = DEPT_ORDER.indexOf(b.name);
-        if (ai !== -1 && bi !== -1) return ai - bi;
-        if (ai !== -1) return -1;
-        if (bi !== -1) return 1;
-        return a.name.localeCompare(b.name, 'ja');
-    });
-}
-
-// clients + unregisteredClients 両方から重複なし部署一覧を抽出
-const allDepartments = computed(() => {
-    const map = new Map();
-    [...(props.clients ?? []), ...(props.unregisteredClients ?? [])].forEach(c =>
-        (c.departments ?? []).forEach(d => { if (!map.has(d.id)) map.set(d.id, d); })
-    );
-    return sortDepts([...map.values()]);
-});
 
 const filteredClients = computed(() =>
     props.clients.filter(c => matchesQuery(c, searchQuery.value) && matchesDept(c)),
@@ -140,8 +126,8 @@ function goToEdit(clientId) {
             />
         </div>
 
-        <!-- 部署フィルターボタン -->
-        <div v-if="allDepartments.length > 0" class="mb-4 flex flex-wrap gap-2">
+        <!-- 部署フィルターボタン（サーバーから自社部署のみ受け取る） -->
+        <div v-if="props.departments.length > 0" class="mb-4 flex flex-wrap gap-2">
             <button
                 type="button"
                 @click="selectedDeptId = ''"
@@ -149,7 +135,7 @@ function goToEdit(clientId) {
                 class="rounded-full px-4 py-1.5 text-sm font-medium transition-colors"
             >全部署</button>
             <button
-                v-for="dept in allDepartments"
+                v-for="dept in props.departments"
                 :key="dept.id"
                 type="button"
                 @click="selectedDeptId = String(dept.id)"
@@ -242,7 +228,7 @@ function goToEdit(clientId) {
                                         v-for="dept in (client.departments ?? [])"
                                         :key="dept.id"
                                         class="mr-1 inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
-                                        :class="DEPT_COLORS[dept.name] ?? 'bg-gray-100 text-gray-600'"
+                                        :class="deptColor(dept)"
                                     >{{ dept.name }}</span>
                                 </td>
                                 <td class="px-6 py-3 text-gray-500">{{ client.notes || '' }}</td>
@@ -296,7 +282,7 @@ function goToEdit(clientId) {
                                         v-for="dept in (client.departments ?? [])"
                                         :key="dept.id"
                                         class="mr-1 inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
-                                        :class="DEPT_COLORS[dept.name] ?? 'bg-gray-100 text-gray-600'"
+                                        :class="deptColor(dept)"
                                     >{{ dept.name }}</span>
                                 </td>
                                 <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-700">{{ client.detail || client.notes || '' }}</td>

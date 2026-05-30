@@ -27,17 +27,23 @@ class ClientController extends Controller
         $this->requireLeaderPermission('client_management');
         $showDormant = $request->boolean('dormant', false);
         $user = Auth::user();
-        $isSuperOrAdmin = in_array($user->user_role, ['superadmin', 'admin']);
+        $isSuperAdmin = $user->user_role === 'superadmin';
 
         $query = Client::with('departments:id,name');
-        if (!$isSuperOrAdmin) {
+        if (!$isSuperAdmin) {
             $query->forCompany($user->company_id ?? null);
         }
         $clients = $showDormant ? $query->dormant()->get() : $query->active()->get();
 
+        // 部署タブは自社部署のみ（SuperAdmin は全部署）
+        $departments = $isSuperAdmin
+            ? Department::orderBy('company_id')->orderBy('id')->get(['id', 'name'])
+            : Department::where('company_id', $user->company_id)->orderBy('id')->get(['id', 'name']);
+
         return Inertia::render('Clients/Index', [
             'clients'     => $clients,
             'showDormant' => $showDormant,
+            'departments' => $departments,
         ]);
     }
 
@@ -46,7 +52,10 @@ class ClientController extends Controller
         $this->requireAdminPermission('client_management');
         $this->requireLeaderPermission('client_management');
         $this->authorize('create', Client::class);
-        $departments = Department::orderBy('id')->get(['id', 'name']);
+        $user = Auth::user();
+        $departments = $user->user_role === 'superadmin'
+            ? Department::orderBy('id')->get(['id', 'name'])
+            : Department::where('company_id', $user->company_id)->orderBy('id')->get(['id', 'name']);
         return Inertia::render('Clients/Create', ['departments' => $departments]);
     }
 
@@ -56,15 +65,12 @@ class ClientController extends Controller
         $this->requireLeaderPermission('client_management');
         $user = Auth::user();
         $this->authorize('create', Client::class);
-        $isSuperOrAdmin = $user->isSuperAdmin() || $user->isAdmin();
-
-        $uniqueCodeRule = $isSuperOrAdmin
-            ? Rule::unique('clients', 'client_code')
-            : Rule::unique('clients', 'client_code')->where('company_id', $user->company_id);
+        $isSuperAdmin = $user->isSuperAdmin();
+        $isSuperOrAdmin = $isSuperAdmin || $user->isAdmin();
 
         $rules = [
             'name'        => 'required|string|max:255',
-            'client_code' => ['nullable', 'string', 'max:64', $uniqueCodeRule],
+            'client_code' => ['nullable', 'string', 'max:64', Rule::unique('clients', 'client_code')],
             'detail'      => 'nullable|string',
             'company_id'  => 'nullable|exists:companies,id',
         ];
@@ -75,8 +81,12 @@ class ClientController extends Controller
         $departmentIds = $data['department_ids'] ?? null;
         unset($data['department_ids']);
 
-        if (!$isSuperOrAdmin) {
-            $data['company_id'] = $user->company_id ?? null;
+        $companyId = $isSuperOrAdmin
+            ? ($data['company_id'] ?? $user->company_id)
+            : ($user->company_id ?? null);
+
+        if (!$isSuperAdmin) {
+            $data['company_id'] = $companyId;
         }
 
         $data['client_code'] = $data['client_code'] ? trim($data['client_code']) : null;
@@ -84,6 +94,11 @@ class ClientController extends Controller
         unset($data['detail']);
 
         $client = Client::create($data);
+
+        // company_clients に登録
+        if ($companyId) {
+            $client->companies()->attach($companyId);
+        }
 
         if (!empty($departmentIds)) {
             $client->departments()->attach($departmentIds);
@@ -98,7 +113,10 @@ class ClientController extends Controller
         $this->requireLeaderPermission('client_management');
         $this->authorize('view', $client);
         $client->load('departments:id,name');
-        $departments = Department::orderBy('id')->get(['id', 'name']);
+        $user = Auth::user();
+        $departments = $user->user_role === 'superadmin'
+            ? Department::orderBy('id')->get(['id', 'name'])
+            : Department::where('company_id', $user->company_id)->orderBy('id')->get(['id', 'name']);
         return Inertia::render('Clients/Edit', [
             'client'      => $client,
             'departments' => $departments,
@@ -112,15 +130,11 @@ class ClientController extends Controller
         $this->authorize('update', $client);
 
         $user = Auth::user();
-        $isSuperOrAdmin = in_array($user->user_role, ['superadmin', 'admin']);
-
-        $uniqueCodeRule = $isSuperOrAdmin
-            ? Rule::unique('clients', 'client_code')->ignore($client->id)
-            : Rule::unique('clients', 'client_code')->where('company_id', $user->company_id)->ignore($client->id);
+        $isSuperAdmin = $user->user_role === 'superadmin';
 
         $rules = [
             'name'             => 'required|string|max:255',
-            'client_code'      => ['nullable', 'string', 'max:64', $uniqueCodeRule],
+            'client_code'      => ['nullable', 'string', 'max:64', Rule::unique('clients', 'client_code')->ignore($client->id)],
             'detail'           => 'nullable|string',
             'company_id'       => 'nullable|exists:companies,id',
             'department_ids'   => 'nullable|array',
@@ -131,7 +145,7 @@ class ClientController extends Controller
         $departmentIds = $data['department_ids'] ?? null;
         unset($data['department_ids']);
 
-        if (!$isSuperOrAdmin) {
+        if (!$isSuperAdmin) {
             unset($data['company_id']);
         }
 
@@ -232,16 +246,16 @@ class ClientController extends Controller
         $this->requireLeaderPermission('client_management');
 
         $user  = Auth::user();
-        $isSuperOrAdmin = in_array($user->user_role, ['superadmin', 'admin']);
+        $isSuperAdmin = $user->user_role === 'superadmin';
         $query = Client::select('id', 'name', 'client_code', 'is_dormant')->withCount('projectJobs');
 
-        if (!$isSuperOrAdmin) {
-            $query->forCompany($user->company_id ?? null)
-                  ->whereHas('departments', fn($q) => $q->where('departments.id', $user->department_id));
+        if (!$isSuperAdmin) {
+            $query->forCompany($user->company_id ?? null);
+            if ($user->department_id) {
+                $query->whereHas('departments', fn($q) => $q->where('departments.id', $user->department_id));
+            }
         }
 
-        // 案件作成等の通常用途は休眠クライアントを除外。
-        // include_dormant=1 を渡すと統合先選択など管理画面で休眠も含めて返す。
         if (!$request->boolean('include_dormant', false)) {
             $query->active();
         }
@@ -251,14 +265,12 @@ class ClientController extends Controller
             return $client ? response()->json($client) : response()->json(null, 404);
         }
 
-        // client_code での部分一致（インライン入力オートコンプリート・モーダル検索用）
         if ($request->filled('code')) {
             $query->where('client_code', 'like', '%' . $request->code . '%');
         } elseif ($request->filled('name')) {
             $query->where('name', 'like', '%' . $request->name . '%');
         }
 
-        // 結果数制限（オートコンプリート用）
         if ($request->filled('limit')) {
             $query->limit((int) $request->limit);
         }
@@ -285,26 +297,32 @@ class ClientController extends Controller
         $mergeIntoId = (int) $request->merge_into_id;
         $mergeInto   = Client::findOrFail($mergeIntoId);
 
-        // superadmin 以外は同一会社のクライアント間でのみ統合可
         $user = Auth::user();
         if ($user->user_role !== 'superadmin') {
-            if ((int) ($mergeInto->company_id ?? 0) !== (int) ($client->company_id ?? 0)) {
-                return back()->with('error', '異なる会社のクライアントには統合できません。');
+            $userCompanyId = (int) ($user->company_id ?? 0);
+            $sourceInCompany = $client->companies()->where('companies.id', $userCompanyId)->exists();
+            $targetInCompany = $mergeInto->companies()->where('companies.id', $userCompanyId)->exists();
+            if (!$sourceInCompany || !$targetInCompany) {
+                return back()->with('error', '自社に登録されていないクライアントには統合できません。');
             }
         }
 
-        $clientName   = $client->name;
+        $clientName    = $client->name;
         $mergeIntoName = $mergeInto->name;
 
         DB::transaction(function () use ($client, $mergeInto) {
-            // project_jobs の client_id を移行
             $client->projectJobs()->update(['client_id' => $mergeInto->id]);
 
-            // job_requests テーブルが存在すれば移行
             if (Schema::hasTable('job_requests')) {
                 DB::table('job_requests')
                     ->where('client_id', $client->id)
                     ->update(['client_id' => $mergeInto->id]);
+            }
+
+            // company_clients を統合先に引き継ぐ
+            $sourceCompanyIds = $client->companies()->pluck('companies.id')->toArray();
+            if (!empty($sourceCompanyIds)) {
+                $mergeInto->companies()->syncWithoutDetaching($sourceCompanyIds);
             }
 
             $client->delete();
@@ -394,9 +412,10 @@ class ClientController extends Controller
             'merges.*.target_id' => ['required', 'integer', Rule::exists('clients', 'id')],
         ]);
 
-        $user       = Auth::user();
-        $mergeCount = 0;
-        $skipCount  = 0;
+        $user         = Auth::user();
+        $isSuperAdmin = $user->user_role === 'superadmin';
+        $mergeCount   = 0;
+        $skipCount    = 0;
 
         foreach ($request->merges as $merge) {
             $sourceId = (int) $merge['source_id'];
@@ -408,11 +427,11 @@ class ClientController extends Controller
             $target = Client::find($targetId);
             if (!$source || !$target) { $skipCount++; continue; }
 
-            if ($user->user_role !== 'superadmin') {
-                if ((int) ($source->company_id ?? 0) !== (int) ($target->company_id ?? 0)) {
-                    $skipCount++;
-                    continue;
-                }
+            if (!$isSuperAdmin) {
+                $userCompanyId = (int) ($user->company_id ?? 0);
+                $sourceOk = $source->companies()->where('companies.id', $userCompanyId)->exists();
+                $targetOk = $target->companies()->where('companies.id', $userCompanyId)->exists();
+                if (!$sourceOk || !$targetOk) { $skipCount++; continue; }
             }
 
             try {
@@ -422,6 +441,10 @@ class ClientController extends Controller
                         DB::table('job_requests')
                             ->where('client_id', $source->id)
                             ->update(['client_id' => $target->id]);
+                    }
+                    $sourceCompanyIds = $source->companies()->pluck('companies.id')->toArray();
+                    if (!empty($sourceCompanyIds)) {
+                        $target->companies()->syncWithoutDetaching($sourceCompanyIds);
                     }
                     $source->delete();
                 });
@@ -457,7 +480,7 @@ class ClientController extends Controller
         $user  = Auth::user();
         $query = Client::select('id', 'name', 'client_code');
 
-        if (!($user && $user->user_role === 'superadmin')) {
+        if ($user->user_role !== 'superadmin') {
             $query->forCompany($user->company_id ?? null);
         }
         if ($request->filled('exclude_id')) {
@@ -466,7 +489,6 @@ class ClientController extends Controller
 
         $allClients = $query->get();
 
-        // 同名クライアントを client_code の状況で分類
         $noCodeSameName   = [];
         $diffCodeSameName = [];
 
@@ -477,16 +499,12 @@ class ClientController extends Controller
             $existingCode = $c->client_code ? trim($c->client_code) : null;
 
             if (empty($inputCode) || empty($existingCode)) {
-                // どちらかのコードが未設定 → 統合候補として警告（ブロック）
                 $noCodeSameName[] = ['id' => $c->id, 'name' => $c->name, 'client_code' => $c->client_code];
             } elseif ($inputCode !== $existingCode) {
-                // 両方コードがあって異なる → 確認（通過可能）
                 $diffCodeSameName[] = ['id' => $c->id, 'name' => $c->name, 'client_code' => $c->client_code];
             }
-            // コードが同じかつ名前も同じ → unique 制約でサーバー側が弾く
         }
 
-        // 同 client_code で名前が異なるクライアント → アラート（ブロック）
         $sameCodeDiffName = [];
         if (!empty($inputCode)) {
             foreach ($allClients as $c) {
@@ -506,23 +524,13 @@ class ClientController extends Controller
 
     /**
      * クライアント名を正規化して重複比較用文字列を返す。
-     *
-     * 変換内容:
-     *  1. 全角英数字・スペースを半角に変換
-     *  2. 法人格（株式会社・有限会社など、前後どちらでも）を除去
-     *  3. スペース・中黒を除去
-     *  4. 小文字化
      */
     private function normalizeClientName(string $name): string
     {
-        // 全角英数字・スペース・括弧 → 半角
         $name = mb_convert_kana($name, 'as', 'UTF-8');
-        // 半角カタカナ → 全角カタカナ（'H'）。その後 'c' で全角カタカナ → ひらがなに統一
         $name = mb_convert_kana($name, 'H', 'UTF-8');
-        // 全角カタカナ → 全角ひらがな
         $name = mb_convert_kana($name, 'c', 'UTF-8');
 
-        // 除去する法人格リスト（長い順に並べて部分一致を防ぐ）
         $suffixes = [
             '特定非営利活動法人',
             '公益社団法人',
@@ -553,13 +561,8 @@ class ClientController extends Controller
             $name   = preg_replace('/' . $quoted . '$/u', '', $name);
         }
 
-        // スペース・全角スペース・中黒を除去
         $name = preg_replace('/[\s　・]+/u', '', $name);
-
-        // 漢字↔ひらがな の同義語を統一（「他」と「ほか」など）
         $name = str_replace('他', 'ほか', $name);
-
-        // 小文字化（英字対応）
         $name = mb_strtolower($name, 'UTF-8');
 
         return $name;
@@ -578,7 +581,6 @@ class ClientController extends Controller
 
     /**
      * クライアントの直近案件設定を返す（案件作成フォームのプリセット用）
-     * GET coordinator/clients/{client}/last-job-config
      */
     public function lastJobConfig(Client $client)
     {
@@ -638,7 +640,9 @@ class ClientController extends Controller
         $companies = ($user && $user->user_role === 'superadmin')
             ? Company::orderBy('name')->get(['id', 'name'])
             : [];
-        $departments = Department::orderBy('id')->get(['id', 'name', 'company_id']);
+        $departments = $user->user_role === 'superadmin'
+            ? Department::orderBy('id')->get(['id', 'name', 'company_id'])
+            : Department::where('company_id', $user->company_id)->orderBy('id')->get(['id', 'name', 'company_id']);
         return Inertia::render('Clients/CsvUpload', [
             'companies'   => $companies,
             'departments' => $departments,
@@ -652,9 +656,9 @@ class ClientController extends Controller
         $this->requireLeaderPermission('client_management');
         $this->authorize('create', Client::class);
         $request->validate([
-            'csv_file'       => 'required|file|mimes:csv,txt|max:2048',
-            'company_id'     => 'nullable|exists:companies,id',
-            'department_ids' => 'nullable|array',
+            'csv_file'         => 'required|file|mimes:csv,txt|max:2048',
+            'company_id'       => 'nullable|exists:companies,id',
+            'department_ids'   => 'nullable|array',
             'department_ids.*' => 'exists:departments,id',
         ]);
 
@@ -671,7 +675,6 @@ class ClientController extends Controller
 
             if (($handle = fopen(Storage::path($path), 'r')) !== false) {
                 $header = fgetcsv($handle, 1000, ',');
-                // 旧形式(name,detail)と新形式(name,client_code,detail)を自動判別
                 $hasClientCode = $header && count($header) >= 2 && strtolower(trim($header[1])) === 'client_code';
                 while (($data = fgetcsv($handle, 1000, ',')) !== false) {
                     $line++;
@@ -702,7 +705,6 @@ class ClientController extends Controller
             $company = $companyId ? Company::find($companyId) : null;
             $departmentIds = array_map('intval', $request->input('department_ids', []));
 
-            // 既存クライアントとの突合（client_code 一致 → 名前正規化一致 の優先順）
             $existingClients = Client::with('departments:id')
                 ->when($companyId, fn($q) => $q->forCompany($companyId))
                 ->get(['id', 'name', 'client_code']);
@@ -710,14 +712,12 @@ class ClientController extends Controller
             foreach ($csvData as &$row) {
                 $matched = null;
 
-                // 1. client_code による完全一致
                 if (!empty($row['client_code'])) {
                     $matched = $existingClients->first(
                         fn($c) => $c->client_code && trim($c->client_code) === $row['client_code']
                     );
                 }
 
-                // 2. 名前の正規化一致（client_code が未設定または一致なし）
                 if (!$matched && !empty($row['name'])) {
                     $normalized = $this->normalizeClientName($row['name']);
                     $matched = $existingClients->first(
@@ -773,7 +773,6 @@ class ClientController extends Controller
             ? $request->company_id
             : ($user->company_id ?? null);
 
-        // department_ids が送られてきた場合はそれを使用、なければユーザーの部署
         $deptIds = array_map('intval', $request->input('department_ids', []));
         if (empty($deptIds)) {
             $deptIds = $user->department_id ? [(int)$user->department_id] : [];
@@ -786,20 +785,27 @@ class ClientController extends Controller
             $matchedId = isset($row['matched_client_id']) ? (int)$row['matched_client_id'] : null;
 
             if ($matchedId) {
-                // 既存クライアントに部署を追加（重複は自動スキップ）
                 $client = Client::find($matchedId);
-                if ($client && !empty($deptIds)) {
-                    $client->departments()->syncWithoutDetaching($deptIds);
+                if ($client) {
+                    if (!empty($deptIds)) {
+                        $client->departments()->syncWithoutDetaching($deptIds);
+                    }
+                    // 自社への紐付けがまだなければ追加
+                    if ($companyId) {
+                        $client->companies()->syncWithoutDetaching([$companyId]);
+                    }
                     $mergedCount++;
                 }
             } else {
-                // 新規作成
                 $client = Client::create([
                     'name'        => $row['name'],
                     'client_code' => isset($row['client_code']) && $row['client_code'] !== '' ? $row['client_code'] : null,
                     'notes'       => $row['detail'] ?? null,
                     'company_id'  => $companyId,
                 ]);
+                if ($companyId) {
+                    $client->companies()->attach($companyId);
+                }
                 if (!empty($deptIds)) {
                     $client->departments()->attach($deptIds);
                 }

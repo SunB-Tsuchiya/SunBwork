@@ -40,13 +40,20 @@ class Client extends Model
         return $this->belongsTo(Company::class);
     }
 
+    public function companies(): BelongsToMany
+    {
+        return $this->belongsToMany(Company::class, 'company_clients');
+    }
+
     /**
-     * Scope a query to only include clients belonging to a given company id.
+     * Scope a query to only include clients registered to a given company via company_clients.
      */
     public function scopeForCompany($query, $companyId)
     {
-        if (empty($companyId)) return $query->whereNull('company_id');
-        return $query->where('company_id', $companyId);
+        if (empty($companyId)) {
+            return $query->whereDoesntHave('companies');
+        }
+        return $query->whereHas('companies', fn($q) => $q->where('companies.id', $companyId));
     }
 
     /**
