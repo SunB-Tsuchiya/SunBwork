@@ -788,6 +788,86 @@ HTML,
 </section>
 HTML,
             ],
+            // ─────────────────────────────────────────────────────────────
+            [
+                'version'      => 'coshare-1',
+                'title'        => 'クライアント会社間データ隔離：company_clients 中間テーブル導入',
+                'released_at'  => '2026-05-30',
+                'summary'      => 'サンエー印刷のAdminがサン・ブレーンのクライアント一覧・部署タブを閲覧できてしまう問題を修正しました。company_clients 中間テーブルを導入し、各社は自社に登録されたクライアントのみ表示・操作できるようになりました。クライアントはグループ共通マスターとして管理され、複数社で共有することも、一社専用にすることも可能です。',
+                'design_files' => ['z_instructions/COSHARE_PLAN1.md', 'z_instructions/COSHARE_MANAGER1.md'],
+                'claude_notes' => '【DB】company_clients (company_id FK, client_id FK, PK複合) テーブルを新設。既存44件のクライアントを全てサン・ブレーン(id=2)として移行。clients.company_id カラムは互換性維持のため残存。【Client モデル】companies() belongsToMany 追加。scopeForCompany を clients.company_id 比較 → company_clients の whereHas に変更。【ClientPolicy】view/update/delete を client->companies()->where(companies.id, user.company_id)->exists() ベースに変更。SuperAdmin のみ全クライアント操作可。【ClientController】index(): superadmin のみ全件、それ以外は forCompany 適用。自社部署一覧を departments prop として追加 pass。create()/edit(): departments を自社のみにフィルタ。store()/csvStore(): クライアント作成時に company_clients へも attach。merge()/batchMerge(): マージ時に source の company_clients を syncWithoutDetaching で target に引き継ぐ。clientsJson()/checkDuplicate(): admin も forCompany 適用。client_code uniqueness をグローバルに統一。【Index.vue】departments prop を新設しサーバーから自社部署のみ受け取る。DEPT_COLORS ハードコード除去し id ベースのカラーパレットに変更。',
+                'body'         => <<<'HTML'
+<section class="cl-problem">
+  <h3>背景・問題</h3>
+  <ul>
+    <li>サンエー印刷のAdminがクライアント管理を開くと、サン・ブレーンの全44件と部署タブ（情報出版・製版・オンデマンド）が表示されてしまっていた</li>
+    <li>原因：ClientController::index() でadminロールはforCompanyスコープが未適用で、全クライアントを取得していた</li>
+    <li>clients.company_id カラムは「どの会社が所有するか」を表すが、グループ間で同じクライアントを共有する場合に対応できない構造だった</li>
+  </ul>
+</section>
+
+<section class="cl-fix">
+  <h3>改善・修正内容</h3>
+  <ul>
+    <li><strong>company_clients 中間テーブル導入：</strong>「どの会社がどのクライアントを使うか」を管理。既存44件はサン・ブレーン所属として一括移行済み</li>
+    <li><strong>表示スコープの修正：</strong>SuperAdmin以外は自社に登録されたクライアントのみ表示・操作可能に</li>
+    <li><strong>部署タブの修正：</strong>クライアント一覧の部署フィルタタブが自社の部署のみ表示されるよう変更</li>
+    <li><strong>クライアント作成：</strong>新規作成・CSV一括登録時に自動でcompany_clientsに登録</li>
+    <li><strong>クライアント統合：</strong>マージ時に統合元のcompany_clients（利用会社の紐付け）を統合先に引き継ぐ</li>
+    <li><strong>スケーラビリティ：</strong>将来のグループ会社追加時も、company_clientsにレコードを追加するだけで対応可能</li>
+  </ul>
+</section>
+
+<section class="cl-note">
+  <h3>補足</h3>
+  <ul>
+    <li>クライアントはグループ共通マスター。同一クライアント（同じclient_code）を複数社で使う場合はcompany_clientsに両社分のレコードを登録する</li>
+    <li>clients.company_idカラムは削除せず残存（互換性維持）</li>
+    <li>本番デプロイ時にphp artisan migrateが必要（company_clientsテーブル作成 + 既存データ移行）</li>
+  </ul>
+</section>
+HTML,
+            ],
+            // ─────────────────────────────────────────────────────────────
+            [
+                'version'      => 'coshare-2',
+                'title'        => 'クライアント共有UI拡張：編集モード・共有確認モーダル・削除ロジック改善',
+                'released_at'  => '2026-05-31',
+                'summary'      => 'クライアント管理に「編集モード」と「共有確認モーダル」を追加しました。編集モードでは Admin/Leader/Coordinator が自社部署の紐付けをワンクリックで切り替えられ、SuperAdmin はグループ全社の部署を会社ごとに色分けして一覧管理できます。また、他社が使っているクライアントIDを入力した際に「共有しますか？」の確認モーダルが表示されるようになりました。削除時も共有状態に応じて「共有解除」と「完全削除」を自動的に使い分けます。',
+                'design_files' => ['z_instructions/COSHARE_PLAN2.md', 'z_instructions/COSHARE_MANAGER2.md'],
+                'claude_notes' => '【新ルート×3】clients/{client}/share-to-my-company / toggle-dept / toggle-company（admin/leader/coordinator 各グループ）。【ClientController】checkDuplicate(): other_company_match を whereNotIn on company_clients で実装（whereDoesntHaveより確実）。store(): 他社同コードチェックを Rule::unique より先に実行しユーザーフレンドリーなエラーを返す。index(): allDepts（全社部署+会社名）を SuperAdmin 用に追加 pass。edit(): sharedWith（他社リスト）を追加。toggleDeptAdmin(): SA は全社部署を操作可 + company_clients 自動同期。destroy(): 他社共有中は company_clients detach のみ、自社専用時のみ物理削除。shareToMyCompany(): department_ids を受け取り自社部署にも紐付け。【Create.vue】checkDuplicate fetch が419のとき window.location.reload()。other_company_match 検出時に共有確認モーダル（部署選択 + 色付きバッジ付き）。DEPT_COLORS ハードコードを deptColor(dept) パレット関数に統一。【Edit.vue】sharedWith prop を受け取り confirmDelete() で「共有解除 vs 完全削除」メッセージを切り替え。【Index.vue】編集モードOFF時に router.reload({only:[clients]})。clientsState を props.clients の watch で再同期。SuperAdmin 編集モード: COMPANY_PALETTES で会社ごとの色系、legendCompanies で凡例表示、allDepts の全部署ボタンで部署トグル。',
+                'body'         => <<<'HTML'
+<section class="cl-problem">
+  <h3>背景・問題</h3>
+  <ul>
+    <li>他社のクライアントIDを入力しても何の警告もなく別クライアントとして登録できてしまっていた</li>
+    <li>クライアントを削除すると共有中でも物理削除されてしまい、他社のデータも消える問題があった</li>
+    <li>部署の紐付けや会社間共有を変更するには編集画面を個別に開く必要があり、一括管理ができなかった</li>
+    <li>SuperAdmin が別会社のクライアントを管理するには別アカウントでログインし直す必要があった</li>
+  </ul>
+</section>
+
+<section class="cl-fix">
+  <h3>改善・修正内容</h3>
+  <ul>
+    <li><strong>共有確認モーダル：</strong>クライアント新規作成時に他社が使用中のコードを入力すると「共有しますか？」モーダルを表示。部署も同時に選択して共有登録できる</li>
+    <li><strong>編集モード（Admin/Leader/Coordinator）：</strong>クライアント一覧で「編集モード」をONにすると各行に自社部署のトグルボタンが表示され、ワンクリックで部署の紐付けを変更できる</li>
+    <li><strong>編集モード（SuperAdmin）：</strong>グループ全社の部署が会社ごとに色分けされて表示され、凡例と合わせて横断的に管理可能。部署の追加・削除で company_clients も自動同期</li>
+    <li><strong>削除ロジックの改善：</strong>他社と共有中のクライアントは「共有解除（自社の紐付けのみ削除）」、自社専用の場合のみ「完全削除」。削除確認ダイアログでも状態に応じてメッセージを変更</li>
+    <li><strong>419エラー対策：</strong>CSRFタイムアウト時は自動でページリロードし、サーバーサイドでも他社同コードを事前チェックするガードを追加</li>
+  </ul>
+</section>
+
+<section class="cl-note">
+  <h3>補足</h3>
+  <ul>
+    <li>編集モードをOFFにすると画面がリロードされ、変更が即座に通常表示に反映される</li>
+    <li>SuperAdmin の編集モードでは部署名が複数社でかぶる場合も会社色で識別可能</li>
+    <li>共有解除時は自社の company_clients エントリと自社部署の紐付けのみ削除。他社のデータは保持される</li>
+  </ul>
+</section>
+HTML,
+            ],
         ];
 
         foreach ($entries as $entry) {
