@@ -3,15 +3,22 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, useForm, usePage, router } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 
-const DEPT_COLORS = {
-    '情報出版': 'bg-blue-100 text-blue-700',
-    '製版':     'bg-green-100 text-green-700',
-    'オンデマンド': 'bg-purple-100 text-purple-700',
-};
+const DEPT_COLOR_PALETTE = [
+    'bg-blue-100 text-blue-700',
+    'bg-green-100 text-green-700',
+    'bg-purple-100 text-purple-700',
+    'bg-orange-100 text-orange-700',
+    'bg-pink-100 text-pink-700',
+    'bg-yellow-100 text-yellow-700',
+];
+function deptColor(dept) {
+    return DEPT_COLOR_PALETTE[(dept.id - 1) % DEPT_COLOR_PALETTE.length];
+}
 
 const props = defineProps({
     client:      Object,
     departments: { type: Array, default: () => [] },
+    sharedWith:  { type: Array, default: () => [] },
 });
 
 const page = usePage();
@@ -88,9 +95,19 @@ function closeModal() {
     clientNameFilter.value = '';
 }
 
-// 案件なしクライアントの直接削除確認
+// 案件なしクライアントの削除 / 共有解除確認
 function confirmDelete() {
-    if (!confirm(`「${props.client.name}」を削除してもよいですか？\nこの操作は取り消せません。`)) return;
+    const isShared = props.sharedWith && props.sharedWith.length > 0;
+    if (isShared) {
+        const names = props.sharedWith.map(c => c.name).join('・');
+        if (!confirm(
+            `「${props.client.name}」は ${names} とも共有されています。\n` +
+            `自社からの共有を解除しますか？\n\n` +
+            `（他社のデータは保持されます。完全に削除はされません。）`
+        )) return;
+    } else {
+        if (!confirm(`「${props.client.name}」を完全に削除してもよいですか？\nこの操作は取り消せません。`)) return;
+    }
     router.delete(route(`${routePrefix.value}.clients.destroy`, props.client.id));
 }
 
@@ -187,7 +204,7 @@ function executeMerge() {
                             :key="dept.id"
                             class="flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1 text-sm transition-colors"
                             :class="form.department_ids.includes(dept.id)
-                                ? (DEPT_COLORS[dept.name] ?? 'bg-gray-100 text-gray-700') + ' border-transparent font-medium'
+                                ? `${deptColor(dept)} border-transparent font-medium`
                                 : 'border-gray-300 text-gray-500 hover:border-gray-400'"
                         >
                             <input type="checkbox" :value="dept.id" v-model="form.department_ids" class="hidden" />

@@ -1,13 +1,19 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Link, useForm, usePage } from '@inertiajs/vue3';
+import { Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 
-const DEPT_COLORS = {
-    '情報出版': 'bg-blue-100 text-blue-700',
-    '製版':     'bg-green-100 text-green-700',
-    'オンデマンド': 'bg-purple-100 text-purple-700',
-};
+const DEPT_COLOR_PALETTE = [
+    'bg-blue-100 text-blue-700',
+    'bg-green-100 text-green-700',
+    'bg-purple-100 text-purple-700',
+    'bg-orange-100 text-orange-700',
+    'bg-pink-100 text-pink-700',
+    'bg-yellow-100 text-yellow-700',
+];
+function deptColor(dept) {
+    return DEPT_COLOR_PALETTE[(dept.id - 1) % DEPT_COLOR_PALETTE.length];
+}
 
 const props = defineProps({
     departments: { type: Array, default: () => [] },
@@ -33,6 +39,11 @@ const duplicateModalType    = ref(null);
 const duplicateModalClients = ref([]);
 const isCheckingDuplicate   = ref(false);
 
+// ===== 他社共有確認モーダル =====
+const shareModalClient = ref(null); // { id, name, client_code, companies: [{id, name}] }
+const isSharingToCompany = ref(false);
+const shareDeptIds = ref([]);
+
 async function submit() {
     if (!form.name.trim()) return;
 
@@ -53,6 +64,11 @@ async function submit() {
         if (res.ok) {
             const data = await res.json();
 
+            // 最優先: 他社に同コードが存在 → 共有確認モーダル
+            if (data.other_company_match?.length > 0) {
+                shareModalClient.value = data.other_company_match[0];
+                return;
+            }
             // 優先順位: same_code_diff_name → no_code_same_name → diff_code_same_name
             if (data.same_code_diff_name?.length > 0) {
                 duplicateModalType.value    = 'same_code_diff_name';
@@ -86,6 +102,23 @@ function doSubmit() {
 
 function closeModal() {
     duplicateModalType.value = null;
+}
+
+// 他社クライアントを自社に共有登録する（選択した部署も紐付け）
+function shareToMyCompany() {
+    if (!shareModalClient.value) return;
+    isSharingToCompany.value = true;
+    router.post(
+        route(`${routePrefix.value}.clients.share_to_my_company`, { client: shareModalClient.value.id }),
+        { department_ids: shareDeptIds.value },
+        { onFinish: () => { isSharingToCompany.value = false; } },
+    );
+}
+
+function closeShareModal() {
+    form.client_code = '';
+    shareModalClient.value = null;
+    shareDeptIds.value = [];
 }
 </script>
 
@@ -153,7 +186,7 @@ function closeModal() {
                             :key="dept.id"
                             class="flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1 text-sm transition-colors"
                             :class="form.department_ids.includes(dept.id)
-                                ? (DEPT_COLORS[dept.name] ?? 'bg-gray-100 text-gray-700') + ' border-transparent font-medium'
+                                ? `${deptColor(dept)} border-transparent font-medium`
                                 : 'border-gray-300 text-gray-500 hover:border-gray-400'"
                         >
                             <input type="checkbox" :value="dept.id" v-model="form.department_ids" class="hidden" />
@@ -177,6 +210,70 @@ function closeModal() {
             </form>
         </div>
     </AppLayout>
+
+    <!-- 他社共有確認モーダル -->
+    <Teleport to="body">
+        <div v-if="shareModalClient" class="fixed inset-0 z-50 flex items-center justify-center">
+            <div class="absolute inset-0 bg-black/50" @click="closeShareModal" />
+            <div class="relative z-10 w-full max-w-lg rounded-lg bg-white shadow-xl">
+                <div class="p-6">
+                    <div class="mb-4 flex items-center gap-3">
+                        <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-green-100">
+                            <svg class="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.935-2.186 2.25 2.25 0 0 0-3.935 2.186Z" />
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-900">他社に登録済みのクライアントです</h3>
+                    </div>
+                    <div class="mb-5 space-y-3">
+                        <p class="text-sm text-gray-700">
+                            Client ID <strong class="font-mono text-gray-900">「{{ shareModalClient.client_code }}」</strong> は
+                            <strong class="text-gray-900">{{ shareModalClient.name }}</strong> として
+                            <span class="font-medium text-green-700">{{ shareModalClient.companies.map(c => c.name).join('・') }}</span>
+                            に登録されています。
+                        </p>
+                        <div class="rounded-md bg-green-50 p-3 text-sm text-green-800">
+                            新規作成せず、このクライアントを自社にも共有して使用しますか？
+                        </div>
+                        <!-- 部署選択（任意） -->
+                        <div v-if="props.departments.length > 0">
+                            <p class="mb-2 text-xs font-medium text-gray-600">紐付ける部署を選択（任意）</p>
+                            <div class="flex flex-wrap gap-2">
+                                <label
+                                    v-for="dept in props.departments"
+                                    :key="dept.id"
+                                    class="flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors"
+                                    :class="shareDeptIds.includes(dept.id)
+                                        ? `${deptColor(dept)} border-transparent font-medium`
+                                        : 'border-gray-300 text-gray-500 hover:border-gray-400'"
+                                >
+                                    <input type="checkbox" :value="dept.id" v-model="shareDeptIds" class="hidden" />
+                                    {{ shareDeptIds.includes(dept.id) ? '●' : '○' }} {{ dept.name }}
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between gap-3">
+                        <button
+                            type="button"
+                            :disabled="isSharingToCompany"
+                            class="rounded bg-green-600 px-4 py-2 font-bold text-white hover:bg-green-700 disabled:opacity-60"
+                            @click="shareToMyCompany"
+                        >
+                            {{ isSharingToCompany ? '処理中…' : '共有する' }}
+                        </button>
+                        <button
+                            type="button"
+                            class="rounded bg-gray-200 px-4 py-2 font-bold text-gray-700 hover:bg-gray-300"
+                            @click="closeShareModal"
+                        >
+                            キャンセル（Client ID を変更する）
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </Teleport>
 
     <!-- 重複チェックモーダル -->
     <Teleport to="body">

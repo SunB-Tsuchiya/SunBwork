@@ -1,9 +1,9 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
+import { computed, ref, reactive, watch } from 'vue';
 
-// 部署バッジカラーを id の順番で循環割り当て
+// 通常バッジカラー（非編集モード / 非SA編集モード）: dept.id 順で循環
 const DEPT_COLOR_PALETTE = [
     'bg-blue-100 text-blue-700',
     'bg-green-100 text-green-700',
@@ -16,11 +16,20 @@ function deptColor(dept) {
     return DEPT_COLOR_PALETTE[(dept.id - 1) % DEPT_COLOR_PALETTE.length];
 }
 
+// SuperAdmin 編集モード: 会社ごとの色パレット
+const COMPANY_PALETTES = [
+    { active: 'bg-blue-500 text-white border-blue-600',   inactive: 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100',   legend: 'bg-blue-100 text-blue-700 border-blue-200' },
+    { active: 'bg-red-500 text-white border-red-600',     inactive: 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100',       legend: 'bg-red-100 text-red-700 border-red-200' },
+    { active: 'bg-green-500 text-white border-green-600', inactive: 'bg-green-50 text-green-600 border-green-200 hover:bg-green-100', legend: 'bg-green-100 text-green-700 border-green-200' },
+    { active: 'bg-orange-500 text-white border-orange-600', inactive: 'bg-orange-50 text-orange-600 border-orange-200 hover:bg-orange-100', legend: 'bg-orange-100 text-orange-700 border-orange-200' },
+];
+
 const props = defineProps({
     clients:             Array,
     unregisteredClients: { type: Array, default: null },
     showDormant:         { type: Boolean, default: false },
     departments:         { type: Array, default: () => [] },
+    allDepts:            { type: Array, default: () => [] },
 });
 
 const page = usePage();
@@ -52,6 +61,86 @@ function matchesQuery(client, q) {
 function matchesDept(client) {
     if (!selectedDeptId.value) return true;
     return (client.departments ?? []).some(d => String(d.id) === selectedDeptId.value);
+}
+
+// ===== 編集モード =====
+const editMode = ref(false);
+const isSuperAdmin = computed(() => page.props.auth?.user?.user_role === 'superadmin');
+
+// クライアントのローカルコピー（楽観的更新用）
+const clientsState = reactive(
+    Object.fromEntries((props.clients ?? []).map(c => [
+        c.id,
+        { departmentIds: (c.departments ?? []).map(d => d.id) },
+    ]))
+);
+
+// props.clients が Inertia reload で更新された時に clientsState を同期
+watch(() => props.clients, (newClients) => {
+    for (const c of (newClients ?? [])) {
+        clientsState[c.id] = { departmentIds: (c.departments ?? []).map(d => d.id) };
+    }
+});
+
+// 編集モードOFF → リロードして変更を反映
+function toggleEditMode() {
+    if (editMode.value) {
+        editMode.value = false;
+        router.reload({ only: ['clients'] });
+    } else {
+        editMode.value = true;
+    }
+}
+
+function hasDept(client, deptId) {
+    return (clientsState[client.id]?.departmentIds ?? []).includes(deptId);
+}
+
+async function toggleDept(client, deptId) {
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+    const ids = clientsState[client.id].departmentIds;
+    const idx = ids.indexOf(deptId);
+    if (idx >= 0) ids.splice(idx, 1); else ids.push(deptId);
+
+    try {
+        await fetch(route(`${routePrefix.value}.clients.toggle_dept`, { client: client.id }), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ department_id: deptId }),
+        });
+    } catch {
+        if (idx >= 0) ids.push(deptId); else ids.splice(ids.indexOf(deptId), 1);
+    }
+}
+
+// SuperAdmin 用: 会社ごとの色パレットマッピング（allDepts の company_id 出現順）
+const companyColorMap = computed(() => {
+    const map = {};
+    let idx = 0;
+    for (const dept of props.allDepts) {
+        if (!(dept.company_id in map)) {
+            map[dept.company_id] = {
+                palette:      COMPANY_PALETTES[idx % COMPANY_PALETTES.length],
+                company_name: dept.company_name,
+            };
+            idx++;
+        }
+    }
+    return map;
+});
+
+// 凡例用: 会社 → パレット一覧
+const legendCompanies = computed(() =>
+    Object.entries(companyColorMap.value).map(([cid, info]) => ({
+        company_id:   parseInt(cid),
+        company_name: info.company_name,
+        palette:      info.palette,
+    }))
+);
+
+function getSaPalette(dept) {
+    return companyColorMap.value[dept.company_id]?.palette ?? COMPANY_PALETTES[0];
 }
 
 const filteredClients = computed(() =>
@@ -93,6 +182,18 @@ function goToEdit(clientId) {
         </template>
         <template #headerExtras>
             <div class="flex items-center gap-4">
+                <!-- 編集モードボタン（SuperAdmin: 会社間共有 / その他: 部署間共有） -->
+                <button
+                    v-if="!props.showDormant"
+                    type="button"
+                    class="rounded px-4 py-2 text-sm font-medium transition-colors"
+                    :class="editMode
+                        ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                        : 'bg-white border border-indigo-400 text-indigo-600 hover:bg-indigo-50'"
+                    @click="toggleEditMode"
+                >
+                    {{ editMode ? '編集モード ON' : '編集モード OFF' }}
+                </button>
                 <button
                     type="button"
                     class="rounded px-4 py-2 text-sm font-medium text-white"
@@ -115,6 +216,18 @@ function goToEdit(clientId) {
                 >新規作成</Link>
             </div>
         </template>
+
+        <!-- SuperAdmin 編集モード時の会社色凡例 -->
+        <div v-if="editMode && isSuperAdmin && legendCompanies.length > 0" class="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-2 text-sm">
+            <span class="mr-1 text-xs font-semibold text-indigo-500">会社凡例:</span>
+            <span
+                v-for="co in legendCompanies"
+                :key="co.company_id"
+                class="rounded-full border px-3 py-0.5 text-xs font-medium"
+                :class="co.palette.legend"
+            >{{ co.company_name }}</span>
+            <span class="ml-2 text-xs text-indigo-400">●=紐付き済み ○=未紐付き</span>
+        </div>
 
         <!-- 検索ボックス -->
         <div class="mb-3">
@@ -278,12 +391,45 @@ function goToEdit(clientId) {
                                     <span v-if="client.is_dormant" class="ml-1 rounded-full bg-gray-200 px-2 py-0.5 text-xs text-gray-500">休眠</span>
                                 </td>
                                 <td class="px-6 py-4 text-sm">
-                                    <span
-                                        v-for="dept in (client.departments ?? [])"
-                                        :key="dept.id"
-                                        class="mr-1 inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
-                                        :class="deptColor(dept)"
-                                    >{{ dept.name }}</span>
+                                    <!-- 通常表示: 現在紐付いている部署バッジ -->
+                                    <template v-if="!editMode">
+                                        <span
+                                            v-for="dept in (client.departments ?? [])"
+                                            :key="dept.id"
+                                            class="mr-1 inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
+                                            :class="deptColor(dept)"
+                                        >{{ dept.name }}</span>
+                                    </template>
+                                    <!-- 編集モード(SuperAdmin): 全社の部署を会社色でトグル -->
+                                    <template v-else-if="isSuperAdmin">
+                                        <button
+                                            v-for="dept in props.allDepts"
+                                            :key="dept.id"
+                                            type="button"
+                                            class="mr-1 mb-1 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium transition-colors"
+                                            :class="hasDept(client, dept.id)
+                                                ? getSaPalette(dept).active
+                                                : getSaPalette(dept).inactive"
+                                            @click.stop="toggleDept(client, dept.id)"
+                                        >
+                                            {{ hasDept(client, dept.id) ? '●' : '○' }} {{ dept.name }}
+                                        </button>
+                                    </template>
+                                    <!-- 編集モード(Admin等): 自社部署トグルボタン -->
+                                    <template v-else>
+                                        <button
+                                            v-for="dept in props.departments"
+                                            :key="dept.id"
+                                            type="button"
+                                            class="mr-1 mb-1 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium transition-colors"
+                                            :class="hasDept(client, dept.id)
+                                                ? `${deptColor(dept)} border-transparent`
+                                                : 'bg-white text-gray-400 border-gray-300 hover:border-gray-400'"
+                                            @click.stop="toggleDept(client, dept.id)"
+                                        >
+                                            {{ hasDept(client, dept.id) ? '●' : '○' }} {{ dept.name }}
+                                        </button>
+                                    </template>
                                 </td>
                                 <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-700">{{ client.detail || client.notes || '' }}</td>
                                 <td class="whitespace-nowrap px-6 py-4 text-sm">

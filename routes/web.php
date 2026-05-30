@@ -358,6 +358,9 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('clients/batch-merge', [App\Http\Controllers\ClientController::class, 'batchMerge'])->name('clients.batch_merge');
         Route::post('clients/{client}/merge', [App\Http\Controllers\ClientController::class, 'merge'])->name('clients.merge');
         Route::post('clients/{client}/dormant', [App\Http\Controllers\ClientController::class, 'dormant'])->name('clients.dormant');
+        Route::post('clients/{client}/share-to-my-company', [App\Http\Controllers\ClientController::class, 'shareToMyCompany'])->name('clients.share_to_my_company');
+        Route::post('clients/{client}/toggle-dept', [App\Http\Controllers\ClientController::class, 'toggleDeptAdmin'])->name('clients.toggle_dept');
+        Route::post('clients/{client}/toggle-company', [App\Http\Controllers\ClientController::class, 'toggleCompany'])->name('clients.toggle_company');
         Route::resource('clients', App\Http\Controllers\ClientController::class)->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
 
         // 会社管理 (会社作成/管理は SuperAdmin 側に一本化しました)
@@ -500,6 +503,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('clients/{client}/merge', [App\Http\Controllers\ClientController::class, 'merge'])->name('clients.merge');
         Route::post('clients/{client}/dormant', [App\Http\Controllers\ClientController::class, 'dormant'])->name('clients.dormant');
         Route::post('clients/{client}/toggle-department', [App\Http\Controllers\ClientController::class, 'toggleDepartment'])->name('clients.toggle_department');
+        Route::post('clients/{client}/share-to-my-company', [App\Http\Controllers\ClientController::class, 'shareToMyCompany'])->name('clients.share_to_my_company');
+        Route::post('clients/{client}/toggle-dept', [App\Http\Controllers\ClientController::class, 'toggleDeptAdmin'])->name('clients.toggle_dept');
         Route::resource('clients', App\Http\Controllers\ClientController::class)->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
         // Leader diary interactions (leader can view diaries for departments/units they lead)
         Route::get('diaryinteractions', [App\Http\Controllers\Diaries\DiaryInteractionController::class, 'index'])->name('diaryinteractions.index');
@@ -623,6 +628,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('clients/{client}/merge', [App\Http\Controllers\ClientController::class, 'merge'])->name('clients.merge');
         Route::post('clients/{client}/dormant', [App\Http\Controllers\ClientController::class, 'dormant'])->name('clients.dormant');
         Route::post('clients/{client}/toggle-department', [App\Http\Controllers\ClientController::class, 'toggleDepartment'])->name('clients.toggle_department');
+        Route::post('clients/{client}/share-to-my-company', [App\Http\Controllers\ClientController::class, 'shareToMyCompany'])->name('clients.share_to_my_company');
+        Route::post('clients/{client}/toggle-dept', [App\Http\Controllers\ClientController::class, 'toggleDeptAdmin'])->name('clients.toggle_dept');
         Route::resource('clients', App\Http\Controllers\ClientController::class)->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
 
         // Project_job CRUD

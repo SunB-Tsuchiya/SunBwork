@@ -40,10 +40,23 @@ class ClientController extends Controller
             ? Department::orderBy('company_id')->orderBy('id')->get(['id', 'name'])
             : Department::where('company_id', $user->company_id)->orderBy('id')->get(['id', 'name']);
 
+        // SuperAdmin 編集モード用: 全社全部署（Superadmin Company=id1 を除く）に会社名を付加
+        $allDepts = $isSuperAdmin
+            ? DB::table('departments')
+                ->join('companies', 'departments.company_id', '=', 'companies.id')
+                ->where('companies.id', '!=', 1)
+                ->orderBy('departments.company_id')
+                ->orderBy('departments.id')
+                ->get(['departments.id', 'departments.name', 'departments.company_id', 'companies.name as company_name'])
+                ->map(fn($d) => ['id' => $d->id, 'name' => $d->name, 'company_id' => $d->company_id, 'company_name' => $d->company_name])
+                ->values()
+            : collect();
+
         return Inertia::render('Clients/Index', [
             'clients'     => $clients,
             'showDormant' => $showDormant,
             'departments' => $departments,
+            'allDepts'    => $allDepts,
         ]);
     }
 
@@ -93,6 +106,20 @@ class ClientController extends Controller
         $data['notes'] = $data['detail'] ?? null;
         unset($data['detail']);
 
+        // 他社のクライアントと同じ client_code の場合は作成をブロック（共有機能を使うよう誘導）
+        if (!$isSuperAdmin && !empty($data['client_code'])) {
+            $cid = (int) ($companyId ?? 0);
+            $conflict = Client::where('client_code', $data['client_code'])
+                ->whereIn('id', fn($q) => $q->select('client_id')->from('company_clients'))
+                ->whereNotIn('id', fn($q) => $q->select('client_id')->from('company_clients')->where('company_id', $cid))
+                ->first(['id', 'name']);
+            if ($conflict) {
+                return back()
+                    ->withInput()
+                    ->withErrors(['client_code' => "このClient IDは「{$conflict->name}」として他社に登録済みです。クライアント新規作成画面の共有機能をご利用ください。"]);
+            }
+        }
+
         $client = Client::create($data);
 
         // company_clients に登録
@@ -114,12 +141,22 @@ class ClientController extends Controller
         $this->authorize('view', $client);
         $client->load('departments:id,name');
         $user = Auth::user();
-        $departments = $user->user_role === 'superadmin'
+        $isSuperAdmin = $user->user_role === 'superadmin';
+        $departments = $isSuperAdmin
             ? Department::orderBy('id')->get(['id', 'name'])
             : Department::where('company_id', $user->company_id)->orderBy('id')->get(['id', 'name']);
+
+        // 削除確認ダイアログ用: 自社以外に共有している会社一覧
+        $sharedWith = $isSuperAdmin
+            ? collect()
+            : $client->companies()
+                ->where('companies.id', '!=', $user->company_id)
+                ->get(['companies.id', 'companies.name']);
+
         return Inertia::render('Clients/Edit', [
             'client'      => $client,
             'departments' => $departments,
+            'sharedWith'  => $sharedWith,
         ]);
     }
 
@@ -218,6 +255,28 @@ class ClientController extends Controller
         $this->requireLeaderPermission('client_management');
         $this->authorize('delete', $client);
 
+        $user = Auth::user();
+        $isSuperAdmin = $user->user_role === 'superadmin';
+
+        // 他社でも共有されているか確認
+        $otherCompaniesCount = $isSuperAdmin ? 0 : $client->companies()
+            ->where('companies.id', '!=', $user->company_id)
+            ->count();
+
+        if (!$isSuperAdmin && $otherCompaniesCount > 0) {
+            // 他社と共有中 → 自社の company_clients と自社部署の紐付けだけ解除
+            DB::transaction(function () use ($client, $user) {
+                $client->companies()->detach($user->company_id);
+                $myDeptIds = Department::where('company_id', $user->company_id)->pluck('id');
+                if ($myDeptIds->isNotEmpty()) {
+                    $client->departments()->detach($myDeptIds->toArray());
+                }
+            });
+            return redirect()->route("{$this->routePrefix()}.clients.index")
+                ->with('success', "「{$client->name}」の共有を解除しました。他社のデータは保持されます。");
+        }
+
+        // 自社のみ（または SuperAdmin）→ 案件チェックして完全削除
         $projectJobCount = $client->projectJobs()->count();
 
         if ($projectJobCount > 0) {
@@ -515,10 +574,33 @@ class ClientController extends Controller
             }
         }
 
+        // 他社に同じ client_code が存在するが自社には未登録の場合
+        $otherCompanyMatch = [];
+        if ($request->filled('client_code') && $user->company_id && $user->user_role !== 'superadmin') {
+            $code      = trim($request->client_code);
+            $companyId = (int) $user->company_id;
+            $globalClient = Client::where('client_code', $code)
+                // 少なくとも1社の company_clients に登録されている
+                ->whereIn('id', fn($q) => $q->select('client_id')->from('company_clients'))
+                // ただし自社の company_clients には存在しない
+                ->whereNotIn('id', fn($q) => $q->select('client_id')->from('company_clients')->where('company_id', $companyId))
+                ->with('companies:id,name')
+                ->first(['id', 'name', 'client_code']);
+            if ($globalClient) {
+                $otherCompanyMatch = [[
+                    'id'          => $globalClient->id,
+                    'name'        => $globalClient->name,
+                    'client_code' => $globalClient->client_code,
+                    'companies'   => $globalClient->companies->map(fn($c) => ['id' => $c->id, 'name' => $c->name])->values(),
+                ]];
+            }
+        }
+
         return response()->json([
             'no_code_same_name'   => $noCodeSameName,
             'diff_code_same_name' => $diffCodeSameName,
             'same_code_diff_name' => $sameCodeDiffName,
+            'other_company_match' => $otherCompanyMatch,
         ]);
     }
 
@@ -566,6 +648,100 @@ class ClientController extends Controller
         $name = mb_strtolower($name, 'UTF-8');
 
         return $name;
+    }
+
+    /** 他社クライアントを自社の company_clients に追加し、選択部署にも紐付け */
+    public function shareToMyCompany(Request $request, Client $client)
+    {
+        $this->requireAdminPermission('client_management');
+        $this->requireLeaderPermission('client_management');
+        $user = Auth::user();
+        if (!$user->company_id || $user->user_role === 'superadmin') abort(403);
+
+        $request->validate([
+            'department_ids'   => 'nullable|array',
+            'department_ids.*' => 'exists:departments,id',
+        ]);
+
+        $client->companies()->syncWithoutDetaching([$user->company_id]);
+
+        // 選択された部署のうち、自社の部署のみ紐付け
+        $deptIds = array_map('intval', $request->input('department_ids', []));
+        if (!empty($deptIds)) {
+            $validIds = Department::where('company_id', $user->company_id)
+                ->whereIn('id', $deptIds)
+                ->pluck('id')
+                ->toArray();
+            if (!empty($validIds)) {
+                $client->departments()->syncWithoutDetaching($validIds);
+            }
+        }
+
+        return redirect()->route("{$this->routePrefix()}.clients.index")
+            ->with('success', "「{$client->name}」を自社に共有しました。");
+    }
+
+    /** Admin/Leader/Coordinator/SuperAdmin: 部署と client_departments をトグル（JSON） */
+    public function toggleDeptAdmin(Request $request, Client $client)
+    {
+        $this->requireAdminPermission('client_management');
+        $this->requireLeaderPermission('client_management');
+        $user = Auth::user();
+        $isSuperAdmin = $user->user_role === 'superadmin';
+
+        $request->validate(['department_id' => 'required|integer|exists:departments,id']);
+        $deptId = (int) $request->department_id;
+
+        $dept = Department::find($deptId);
+        if (!$dept) abort(404);
+
+        // SuperAdmin 以外は自社の部署のみ
+        if (!$isSuperAdmin) {
+            if (!$user->company_id || (int) $dept->company_id !== (int) $user->company_id) abort(403);
+        }
+
+        if ($client->departments()->where('department_id', $deptId)->exists()) {
+            $client->departments()->detach($deptId);
+            $attached = false;
+            // SuperAdmin: 同社の部署が全て外れた場合 company_clients からも除去
+            if ($isSuperAdmin) {
+                $remaining = $client->departments()
+                    ->whereHas('company', fn($q) => $q->where('companies.id', $dept->company_id))
+                    ->count();
+                if ($remaining === 0) {
+                    $client->companies()->detach($dept->company_id);
+                }
+            }
+        } else {
+            $client->departments()->attach($deptId);
+            $attached = true;
+            // SuperAdmin: 部署を追加したら company_clients にも登録
+            if ($isSuperAdmin) {
+                $client->companies()->syncWithoutDetaching([$dept->company_id]);
+            }
+        }
+
+        return response()->json(['attached' => $attached, 'department_id' => $deptId]);
+    }
+
+    /** SuperAdmin: 会社と company_clients をトグル（JSON） */
+    public function toggleCompany(Request $request, Client $client)
+    {
+        $user = Auth::user();
+        if ($user->user_role !== 'superadmin') abort(403);
+
+        $request->validate(['company_id' => 'required|integer|exists:companies,id']);
+        $companyId = (int) $request->company_id;
+
+        if ($client->companies()->where('companies.id', $companyId)->exists()) {
+            $client->companies()->detach($companyId);
+            $attached = false;
+        } else {
+            $client->companies()->attach($companyId);
+            $attached = true;
+        }
+
+        return response()->json(['attached' => $attached, 'company_id' => $companyId]);
     }
 
     /** ルートプレフィックスをロールから解決 */
