@@ -81,6 +81,21 @@ class ClientController extends Controller
         $isSuperAdmin = $user->isSuperAdmin();
         $isSuperOrAdmin = $isSuperAdmin || $user->isAdmin();
 
+        // ── 他社の同コードを validate() より先にチェック（unique ルールより先に弾く）──
+        if (!$isSuperAdmin && $request->filled('client_code') && $user->company_id) {
+            $rawCode = trim($request->input('client_code'));
+            $cid     = (int) $user->company_id;
+            $conflict = Client::where('client_code', $rawCode)
+                ->whereIn('id', fn($q) => $q->select('client_id')->from('company_clients'))
+                ->whereNotIn('id', fn($q) => $q->select('client_id')->from('company_clients')->where('company_id', $cid))
+                ->first(['id', 'name']);
+            if ($conflict) {
+                return back()
+                    ->withInput()
+                    ->withErrors(['client_code' => "このClient IDは「{$conflict->name}」として他社に登録済みです。クライアント新規作成画面の共有機能をご利用ください。"]);
+            }
+        }
+
         $rules = [
             'name'        => 'required|string|max:255',
             'client_code' => ['nullable', 'string', 'max:64', Rule::unique('clients', 'client_code')],
@@ -106,7 +121,7 @@ class ClientController extends Controller
         $data['notes'] = $data['detail'] ?? null;
         unset($data['detail']);
 
-        // 他社のクライアントと同じ client_code の場合は作成をブロック（共有機能を使うよう誘導）
+        // 既存の重複ガード（validate後の残存チェック、通常はここに到達しない）
         if (!$isSuperAdmin && !empty($data['client_code'])) {
             $cid = (int) ($companyId ?? 0);
             $conflict = Client::where('client_code', $data['client_code'])

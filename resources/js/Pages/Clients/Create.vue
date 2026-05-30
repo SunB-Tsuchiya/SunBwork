@@ -61,6 +61,11 @@ async function submit() {
             credentials: 'same-origin',
             body: JSON.stringify({ name: form.name, client_code: form.client_code || null }),
         });
+        if (res.status === 419) {
+            // CSRF タイムアウト → ページリロードして新鮮なトークンを取得
+            window.location.reload();
+            return;
+        }
         if (res.ok) {
             const data = await res.json();
 
