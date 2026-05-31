@@ -15,12 +15,14 @@ return new class extends Migration
             $table->index('company_id');
         });
 
-        // バックフィル: client.company_id 経由で補完
+        // バックフィル: client.company_id 経由で補完（SQLite 互換のサブクエリ形式）
         DB::statement('
-            UPDATE project_jobs pj
-            JOIN clients c ON pj.client_id = c.id
-            SET pj.company_id = c.company_id
-            WHERE pj.company_id IS NULL
+            UPDATE project_jobs
+            SET company_id = (
+                SELECT company_id FROM clients
+                WHERE clients.id = project_jobs.client_id
+            )
+            WHERE company_id IS NULL
         ');
     }
 
