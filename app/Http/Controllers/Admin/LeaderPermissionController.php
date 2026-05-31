@@ -21,6 +21,16 @@ class LeaderPermissionController extends Controller
     {
         $currentUser = Auth::user();
 
+        // SuperAdmin グローバルモード時は会社未選択警告
+        if ($currentUser->isSuperAdmin() && $this->contextCompanyId() === null) {
+            return Inertia::render('Admin/LeaderPermissions/Index', [
+                'noCompanySelected' => true,
+                'leaders'           => [],
+                'indexRoute'        => 'admin.leader_permissions.index',
+                'editRoute'         => 'admin.leader_permissions.edit',
+            ]);
+        }
+
         if ($currentUser->isAdmin() || $currentUser->isSuperAdmin()) {
             $query = User::where('user_role', 'leader')
                 ->with('leaderPermission')

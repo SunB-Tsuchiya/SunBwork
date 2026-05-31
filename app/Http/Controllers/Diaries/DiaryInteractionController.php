@@ -92,6 +92,20 @@ class DiaryInteractionController extends Controller
         $currentUser = Auth::user();
         $isAdmin = in_array($currentUser->user_role ?? '', ['admin', 'superadmin']);
 
+        // SuperAdmin グローバルモード時は会社未選択警告
+        if ($currentUser->isSuperAdmin() && $this->contextCompanyId() === null) {
+            return Inertia::render('Diaries/Interactions/Index', [
+                'noCompanySelected' => true,
+                'departments'       => [],
+                'date'              => null,
+                'meta'              => null,
+                'filters'           => ['q' => '', 'year' => null, 'month' => null, 'period' => null, 'perPage' => 20],
+                'routePrefix'       => 'admin',
+                'pageTitle'         => '管理者 日報一覧',
+                'headerTitle'       => '管理者用 日報一覧',
+            ]);
+        }
+
         $userIds = $this->buildPermittedUserIds($currentUser);
 
         if (empty($userIds)) {

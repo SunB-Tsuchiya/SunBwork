@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { router, usePage } from '@inertiajs/vue3'
+import { route } from 'ziggy-js'
 
 const page = usePage()
 const open = ref(false)
@@ -15,13 +16,22 @@ const currentLabel = computed(() => {
   return c ? c.name : 'グローバル管理'
 })
 
-function switchContext(companyId) {
+async function switchContext(companyId) {
   open.value = false
-  router.post(
-    route('superadmin.switch_context'),
-    { company_id: companyId },
-    { preserveScroll: true },
-  )
+  const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+  try {
+    await fetch(route('superadmin.switch_context'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': csrf,
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: JSON.stringify({ company_id: companyId }),
+      credentials: 'same-origin',
+    })
+  } catch (_) {}
+  router.reload({ preserveState: false, preserveScroll: false })
 }
 </script>
 

@@ -3,6 +3,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { Link } from '@inertiajs/vue3';
 
 defineProps({
+    noCompanySelected: { type: Boolean, default: false },
     leaders:    { type: Array,  default: () => [] },
     indexRoute: { type: String, default: 'admin.leader_permissions.index' },
     editRoute:  { type: String, default: 'admin.leader_permissions.edit' },
@@ -28,7 +29,20 @@ const permKeys = Object.keys(permLabels);
             </div>
         </template>
 
-        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
+        <!-- SuperAdmin グローバルモード警告 -->
+        <div v-if="noCompanySelected" class="rounded border border-yellow-300 bg-yellow-50 p-6 shadow">
+            <div class="flex items-start gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="mt-0.5 h-5 w-5 shrink-0 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                </svg>
+                <div>
+                    <p class="font-semibold text-yellow-800">会社が選択されていません</p>
+                    <p class="mt-1 text-sm text-yellow-700">右上の会社コンテキスト切り替えで表示したい会社を選択してから、このページを開いてください。</p>
+                </div>
+            </div>
+        </div>
+
+        <div v-else class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <div v-if="leaders.length === 0" class="py-8 text-center text-gray-500">
                 Leaderユーザーが登録されていません。
             </div>

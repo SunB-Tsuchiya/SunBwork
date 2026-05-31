@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\ChecksAdminPermission;
 use App\Http\Controllers\Concerns\ChecksLeaderPermission;
+use App\Http\Controllers\Concerns\ResolvesContextCompany;
 use App\Models\Company;
 use App\Models\Team;
 use App\Models\Unit;
@@ -15,7 +16,7 @@ use Inertia\Inertia;
 
 class WorkRecordController extends Controller
 {
-    use ChecksAdminPermission, ChecksLeaderPermission;
+    use ChecksAdminPermission, ChecksLeaderPermission, ResolvesContextCompany;
 
     public function index(Request $request)
     {
@@ -25,6 +26,18 @@ class WorkRecordController extends Controller
         $role         = $user->user_role ?? 'leader';
         $isSuperAdmin = $role === 'superadmin';
         $isAdmin      = $role === 'admin';
+
+        // SuperAdmin グローバルモード時は会社未選択警告
+        if ($isSuperAdmin && $this->contextCompanyId() === null) {
+            return Inertia::render('WorkRecord/Index', [
+                'noCompanySelected' => true,
+                'groups'            => [],
+                'meta'              => null,
+                'filters'           => ['days' => 30, 'perPage' => 50],
+                'routePrefix'       => 'admin',
+                'is_superadmin'     => true,
+            ]);
+        }
 
         // フィルタ: 日数ベース (デフォルト30日)
         $days    = max(1, (int) $request->input('days', 30));
@@ -78,6 +91,10 @@ class WorkRecordController extends Controller
     private function buildPermittedUserIds($user, bool $isSuperAdmin, bool $isAdmin): array
     {
         if ($isSuperAdmin) {
+            $contextCompanyId = $this->contextCompanyId();
+            if ($contextCompanyId) {
+                return User::where('company_id', $contextCompanyId)->pluck('id')->toArray();
+            }
             return User::pluck('id')->toArray();
         }
 

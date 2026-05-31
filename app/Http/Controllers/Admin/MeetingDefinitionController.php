@@ -37,6 +37,14 @@ class MeetingDefinitionController extends LeaderMeetingDefinitionController
 
     public function index()
     {
+        // SuperAdmin グローバルモード時は会社未選択警告
+        if (Auth::user()->isSuperAdmin() && $this->contextCompanyId() === null) {
+            return Inertia::render('Admin/MeetingDefinitions/Index', [
+                'noCompanySelected'  => true,
+                'meetingDefinitions' => [],
+            ]);
+        }
+
         $meetingDefinitions = MeetingDefinition::where('created_by', Auth::id())
             ->with(['members:id,name'])
             ->orderBy('created_at', 'desc')

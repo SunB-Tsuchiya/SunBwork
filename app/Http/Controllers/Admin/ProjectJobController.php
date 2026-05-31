@@ -26,6 +26,19 @@ class ProjectJobController extends Controller
     {
         $companyId = $this->contextCompanyId();
 
+        // SuperAdmin グローバルモード時は会社未選択警告
+        if (\Illuminate\Support\Facades\Auth::user()->isSuperAdmin() && $companyId === null) {
+            return \Inertia\Inertia::render('Admin/ProjectJobs/Index', [
+                'noCompanySelected'  => true,
+                'jobs'               => [],
+                'departments'        => [],
+                'selectedDepartment' => null,
+                'monthOptions'       => [],
+                'q'                  => '',
+                'period'             => 'all',
+            ]);
+        }
+
         $departments    = Team::where('team_type', 'department')
             ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
             ->orderBy('id')
