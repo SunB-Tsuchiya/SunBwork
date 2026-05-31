@@ -52,8 +52,13 @@ class ProjectJobController extends Controller
                     'isGlobalMode'  => true,
                 ]);
             }
-            // SuperAdmin + 会社選択: その会社の全案件を表示
-            $query = ProjectJob::with('client')->where('company_id', $contextId);
+            // SuperAdmin + 会社選択: 通常の coordinator フィルターを適用（全件ではなく自分が関わる案件のみ）
+            $query = ProjectJob::with('client')
+                ->where('company_id', $contextId)
+                ->where(function ($q) use ($user) {
+                    $q->where('user_id', $user->id)
+                        ->orWhereHas('coordinators', fn ($c) => $c->where('users.id', $user->id));
+                });
         } else {
             $query = ProjectJob::with('client')
                 ->where(function ($q) use ($user) {

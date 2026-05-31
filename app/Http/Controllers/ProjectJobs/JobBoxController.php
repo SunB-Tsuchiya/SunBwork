@@ -281,22 +281,21 @@ class JobBoxController extends Controller
             ->join('project_jobs', 'project_job_assignments.project_job_id', '=', 'project_jobs.id')
             ->leftJoin('users as senders', 'job_assignment_messages.sender_id', '=', 'senders.id');
 
+        // SuperAdmin も通常の coordinator フィルターを適用（全件ではなく自分が関わるもののみ）
+        $base->where(function ($qry) use ($user) {
+            $qry->where('project_job_assignments.user_id', $user->id)
+                ->orWhere('job_assignment_messages.sender_id', $user->id)
+                ->orWhere('project_jobs.user_id', $user->id)
+                ->orWhereExists(function ($sub) use ($user) {
+                    $sub->select(DB::raw(1))
+                        ->from('project_job_coordinators')
+                        ->whereColumn('project_job_coordinators.project_job_id', 'project_jobs.id')
+                        ->where('project_job_coordinators.user_id', $user->id);
+                });
+        });
+        // SuperAdmin はコンテキスト会社でさらに絞り込む
         if ($superAdminContextId) {
-            // SuperAdmin + 会社選択: その会社の全案件のジョブを表示
             $base->where('project_jobs.company_id', $superAdminContextId);
-        } else {
-            $base->where(function ($qry) use ($user) {
-                $qry->where('project_job_assignments.user_id', $user->id)
-                    ->orWhere('job_assignment_messages.sender_id', $user->id)
-                    ->orWhere('project_jobs.user_id', $user->id)
-                    // 副リーダー（サブCo）: project_job_coordinators に登録された案件の全ジョブ履歴を表示
-                    ->orWhereExists(function ($sub) use ($user) {
-                        $sub->select(DB::raw(1))
-                            ->from('project_job_coordinators')
-                            ->whereColumn('project_job_coordinators.project_job_id', 'project_jobs.id')
-                            ->where('project_job_coordinators.user_id', $user->id);
-                    });
-            });
         }
 
         $base
@@ -428,31 +427,27 @@ class JobBoxController extends Controller
                 'statusModel',
             ]);
 
+            // SuperAdmin も通常の coordinator フィルターを適用（全件ではなく自分が関わるもののみ）
+            $ownQ->where(function ($qry) use ($user) {
+                $qry->where('user_id', $user->id)
+                    ->orWhere('sender_id', $user->id)
+                    ->orWhereExists(function ($sub) use ($user) {
+                        $sub->from('project_jobs')
+                            ->whereColumn('project_jobs.id', 'project_job_assignments.project_job_id')
+                            ->where('project_jobs.user_id', $user->id);
+                    })
+                    ->orWhereExists(function ($sub) use ($user) {
+                        $sub->from('project_job_coordinators')
+                            ->whereColumn('project_job_coordinators.project_job_id', 'project_job_assignments.project_job_id')
+                            ->where('project_job_coordinators.user_id', $user->id);
+                    });
+            });
+            // SuperAdmin はコンテキスト会社でさらに絞り込む
             if ($superAdminContextId) {
-                // SuperAdmin + 会社選択: その会社の全案件のジョブ
                 $ownQ->whereExists(function ($sub) use ($superAdminContextId) {
                     $sub->from('project_jobs')
                         ->whereColumn('project_jobs.id', 'project_job_assignments.project_job_id')
                         ->where('project_jobs.company_id', $superAdminContextId);
-                });
-            } else {
-                $ownQ->where(function ($qry) use ($user) {
-                    // 自分自身のジョブ
-                    $qry->where('user_id', $user->id)
-                        // 自分が送信者（Coordinator が依頼したがJAMなし）
-                        ->orWhere('sender_id', $user->id)
-                        // 自分がオーナーの案件の全ジョブ
-                        ->orWhereExists(function ($sub) use ($user) {
-                            $sub->from('project_jobs')
-                                ->whereColumn('project_jobs.id', 'project_job_assignments.project_job_id')
-                                ->where('project_jobs.user_id', $user->id);
-                        })
-                        // 自分がサブCoの案件の全ジョブ
-                        ->orWhereExists(function ($sub) use ($user) {
-                            $sub->from('project_job_coordinators')
-                                ->whereColumn('project_job_coordinators.project_job_id', 'project_job_assignments.project_job_id')
-                                ->where('project_job_coordinators.user_id', $user->id);
-                        });
                 });
             }
 

@@ -16,13 +16,20 @@ class ProgressReportController extends Controller
     {
         $user = $request->user();
 
-        // スコープ: SuperAdmin はグローバル参照、それ以外は自社の案件のみ
+        // スコープ: SuperAdmin も通常の coordinator フィルターを適用
         if ($user->isSuperAdmin()) {
-            // SuperAdmin: コンテキスト会社でスコープ（null=全社参照）
-            $companyId     = session('superadmin_context.company_id');
-            $allowedJobIds = $companyId
-                ? ProjectJob::where('company_id', $companyId)->pluck('id')->all()
-                : null;
+            $companyId = session('superadmin_context.company_id');
+            if ($companyId === null) {
+                // グローバルモード: 自分が関わる案件のみ（会社フィルターなし）
+                $ownedIds  = ProjectJob::where('user_id', $user->id)->pluck('id')->all();
+                $memberIds = ProjectTeamMember::where('user_id', $user->id)->pluck('project_job_id')->all();
+                $allowedJobIds = array_unique(array_merge($ownedIds, $memberIds));
+            } else {
+                // コンテキスト会社 + 自分が owner or team member の案件のみ
+                $ownedIds  = ProjectJob::where('company_id', $companyId)->where('user_id', $user->id)->pluck('id')->all();
+                $memberIds = ProjectTeamMember::where('user_id', $user->id)->pluck('project_job_id')->all();
+                $allowedJobIds = array_unique(array_merge($ownedIds, $memberIds));
+            }
         } elseif ($user->isAdmin() || $user->isClerk()) {
             // Admin / Clerk: 自社の案件のみ
             $allowedJobIds = $user->company_id
