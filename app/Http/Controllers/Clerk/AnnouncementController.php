@@ -109,9 +109,11 @@ class AnnouncementController extends Controller
     {
         $user = $request->user();
 
-        // cross-company 時は全会社、それ以外は自社のみ
+        // SuperAdmin、または general タイプ会社のユーザーはクロスカンパニー送信可
+        $isCrossCompany = $user->isSuperAdmin() || $user->company?->company_type === 'general';
+
         $userQuery = User::with(['assignment', 'department'])->whereNotNull('department_id')->orderBy('name');
-        if ($user->company?->company_type !== 'general') {
+        if (! $isCrossCompany) {
             $userQuery->where('company_id', $user->company_id);
         }
         $users = $userQuery->get()->map(fn ($u) => [
@@ -122,8 +124,7 @@ class AnnouncementController extends Controller
             'employment_type' => $u->employment_type ?? 'regular',
         ]);
 
-        // cross-company 対象者: general タイプ会社のユーザーは全会社の一覧を受け取る
-        $companies = $user->company?->company_type === 'general'
+        $companies = $isCrossCompany
             ? Company::where('code', '!=', 'SUPERADMIN')->active()->ordered()->get(['id', 'name'])
             : null;
 
@@ -145,7 +146,7 @@ class AnnouncementController extends Controller
         ]);
 
         $sender = $request->user();
-        $isCrossCompanyUser = $sender->company?->company_type === 'general';
+        $isCrossCompanyUser = $sender->isSuperAdmin() || $sender->company?->company_type === 'general';
 
         // 送信先会社の決定
         // crossCompanyAnnouncement ユーザー:

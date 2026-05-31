@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>交通費自動化システム構想メモ</title>
+<style>
+    body {
+        font-family: "Segoe UI", sans-serif;
+        background: #f7f9fb;
+        margin: 0;
+        line-height: 1.6;
+    }
+    header {
+        background: #2c3e50;
+        color: white;
+        padding: 20px;
+        text-align: center;
+    }
+    .container {
+        width: 90%;
+        margin: 20px auto;
+    }
+    .section {
+        background: white;
+        padding: 20px;
+        margin-bottom: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    }
+    h2 {
+        border-left: 5px solid #3498db;
+        padding-left: 10px;
+    }
+    ul {
+        padding-left: 20px;
+    }
+    .highlight {
+        background: #eaf6ff;
+        padding: 10px;
+        border-left: 4px solid #3498db;
+    }
+    .warn {
+        background: #fff3cd;
+        padding: 10px;
+        border-left: 4px solid #f39c12;
+    }
+    .flow {
+        background: #f0f0f0;
+        padding: 10px;
+        font-family: monospace;
+    }
+</style>
+</head>
+<body>
+
+<header>
+    <h1>交通費自動管理システム 構想メモ</h1>
+    <p>Suica / PASMO × Laravel × Vue × Node</p>
+</header>
+
+<div class="container">
+
+    <div class="section">
+        <h2>■ 目的</h2>
+        <ul>
+            <li>交通費入力の手間削減</li>
+            <li>ICカードから自動取得</li>
+            <li>請求業務の効率化</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>■ システム全体構成</h2>
+        <div class="flow">
+[ICカード（Suica / PASMO）]  
+        ↓  
+[PaSoRi（カードリーダー）]  
+        ↓  
+[Node.js or Python（読み取り）]  
+        ↓ API送信  
+[Laravel（バックエンド）]  
+        ↓  
+[Vue（フロント）]  
+        ↓  
+[請求書PDF生成]
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>■ 運用イメージ</h2>
+        <ul>
+            <li>朝または帰宅時にカードをタッチ</li>
+            <li>履歴を自動取得</li>
+            <li>ユーザーアカウントに紐付け</li>
+            <li>Web画面で確認・修正</li>
+            <li>私用データを除外</li>
+            <li>月次で自動請求作成</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>■ UIでやること（Vue）</h2>
+        <ul>
+            <li>利用履歴一覧表示</li>
+            <li>業務 / 私用の切り替え</li>
+            <li>合計金額表示</li>
+            <li>請求書作成ボタン</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>■ Laravel側の役割</h2>
+        <ul>
+            <li>ユーザー管理</li>
+            <li>履歴保存</li>
+            <li>月次集計</li>
+            <li>PDF生成</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>■ 使用技術</h2>
+        <ul>
+            <li>Laravel（API / DB）</li>
+            <li>Vue.js（フロント）</li>
+            <li>Node.js（カード読み取り）</li>
+            <li>PaSoRi（RC-S380）</li>
+            <li>駅すぱあとAPI（駅名/運賃補完）</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>■ 駅すぱあとAPIの役割</h2>
+        <ul>
+            <li>駅名変換</li>
+            <li>経路補完</li>
+            <li>運賃チェック</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>■ 重要な制約</h2>
+        <div class="warn">
+            <ul>
+                <li>Suica履歴は最大約20件</li>
+                <li>定期的に読み取らないとデータ消える</li>
+                <li>公式APIで履歴取得は不可</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>■ 課題（技術的難所）</h2>
+        <ul>
+            <li>FeliCaデータ解析</li>
+            <li>履歴のデコード</li>
+            <li>バス・チャージなど例外処理</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>■ UX改善アイデア</h2>
+        <div class="highlight">
+            <ul>
+                <li>タッチだけで自動登録</li>
+                <li>定期区間は自動除外</li>
+                <li>土日は自動で私用判定</li>
+                <li>未タッチアラート通知</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>■ DBイメージ</h2>
+        <div class="flow">
+users  
+transport_logs  
+claims  
+claim_details  
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>■ 今後の拡張</h2>
+        <ul>
+            <li>Slack通知</li>
+            <li>モバイル対応</li>
+            <li>経費精算システム連携</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>■ 次にやること</h2>
+        <ol>
+            <li>PaSoRi購入</li>
+            <li>Nodeでカード読み取りPoC</li>
+            <li>Laravelにデータ送信</li>
+            <li>UI作成</li>
+        </ol>
+    </div>
+
+</div>
+
+</body>
+</html>

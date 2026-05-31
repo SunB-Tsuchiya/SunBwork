@@ -139,9 +139,9 @@ class HandleInertiaRequests extends Middleware
                     return [
                         'proofRequest'  => $isSunbrain && ($isAdminUp || $module === 'publishing'),
                         'prepressBoard' => $isSunbrain && ($isAdminUp || $module === 'prepress'),
-                        // general タイプ会社の Clerk/Admin は全社に通知送信可
-                        'crossCompanyAnnouncement' => $contextCompany?->company_type === 'general'
-                            && in_array($user->user_role, ['clerk', 'admin', 'superadmin']),
+                        // general タイプ会社の Clerk/Admin、または SuperAdmin は全社に通知送信可
+                        'crossCompanyAnnouncement' => in_array($user->user_role, ['clerk', 'admin', 'superadmin'])
+                            && ($contextCompany?->company_type === 'general' || $user->user_role === 'superadmin'),
                     ];
                 })(),
                 // 会社タイプ（'sunbrain' | 'general' | 'global'）

@@ -54,6 +54,12 @@ const tabs = computed(() => [
         label: '交通費一覧',
         condition: typeof route === 'function' && route().has('superadmin.billing.transport.list'),
     },
+    {
+        key: 'scripts',
+        href: tryRoute('superadmin.scripts.index'),
+        label: 'スクリプト管理',
+        condition: typeof route === 'function' && route().has('superadmin.scripts.index'),
+    },
     { key: 'debug', href: tryRoute('debug.api'), label: 'APIデバッグページ' },
 ].filter(t => t.condition !== false && t.href));
 
@@ -149,6 +155,13 @@ function onMobileSelect(e) {
                 :class="tab('billing_transport_list')"
             >
                 交通費一覧
+            </Link>
+            <Link
+                v-if="typeof route === 'function' && route().has('superadmin.scripts.index')"
+                :href="route('superadmin.scripts.index')"
+                :class="tab('scripts')"
+            >
+                スクリプト管理
             </Link>
             <Link
                 :href="route('debug.api')"

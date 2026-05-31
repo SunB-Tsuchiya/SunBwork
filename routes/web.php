@@ -487,6 +487,25 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('workload-analyzer', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'index'])->name('workload_analyzer.index');
         Route::get('workload-analyzer/category-rank', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'index'])->name('workload_analyzer.category_rank');
         Route::get('workload-analyzer/guide', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'guide'])->name('workload_analyzer.guide');
+
+        // SuperAdmin: 交通費管理
+        Route::prefix('billing/transport')->name('billing.transport.')->group(function () {
+            Route::get('billed', [App\Http\Controllers\Billing\Transport\BillingRequestController::class, 'index'])->name('billed');
+            Route::get('list', [App\Http\Controllers\Billing\Transport\ExpenseListController::class, 'index'])->name('list');
+            Route::get('/', [App\Http\Controllers\Billing\Transport\ExpenseController::class, 'index'])->name('index');
+            Route::post('/', [App\Http\Controllers\Billing\Transport\ExpenseController::class, 'store'])->name('store');
+            Route::put('{expense}', [App\Http\Controllers\Billing\Transport\ExpenseController::class, 'update'])->name('update');
+            Route::delete('{expense}', [App\Http\Controllers\Billing\Transport\ExpenseController::class, 'destroy'])->name('destroy');
+            Route::get('{expense}/excel', [App\Http\Controllers\Billing\Transport\ExpenseController::class, 'exportExcel'])->name('excel');
+            Route::get('{expense}/pdf', [App\Http\Controllers\Billing\Transport\ExpenseController::class, 'exportPdf'])->name('pdf');
+            Route::post('billing', [App\Http\Controllers\Billing\Transport\BillingRequestController::class, 'store'])->name('billing.store');
+            Route::get('billing/{billing}/pdf', [App\Http\Controllers\Billing\Transport\BillingRequestController::class, 'exportPdf'])->name('billing.pdf');
+            Route::get('billing/{billing}/excel', [App\Http\Controllers\Billing\Transport\BillingRequestController::class, 'exportExcel'])->name('billing.excel');
+        });
+
+        // SuperAdmin: スクリプト管理
+        Route::get('scripts', [App\Http\Controllers\SuperAdmin\ScriptManagementController::class, 'index'])->name('scripts.index');
+        Route::post('scripts/assign', [App\Http\Controllers\SuperAdmin\ScriptManagementController::class, 'assign'])->name('scripts.assign');
     });
 
 

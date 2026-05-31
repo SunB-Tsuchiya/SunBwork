@@ -32,9 +32,21 @@ class ScriptController extends Controller
     {
         $this->checkAccess();
 
-        $scripts = Script::where('is_active', true)
-            ->orderBy('sort_order')
-            ->get(['id', 'name', 'slug', 'description', 'component_key', 'sort_order']);
+        $user = Auth::user();
+        $role = $user->user_role;
+
+        if (in_array($role, ['superadmin', 'admin'])) {
+            // SuperAdmin・Admin は全アクティブスクリプトを表示
+            $scripts = Script::where('is_active', true)
+                ->orderBy('sort_order')
+                ->get(['id', 'name', 'slug', 'description', 'component_key', 'sort_order']);
+        } else {
+            // その他は個人割り当て済みスクリプトのみ
+            $scripts = Script::where('is_active', true)
+                ->whereHas('users', fn($q) => $q->where('users.id', $user->id))
+                ->orderBy('sort_order')
+                ->get(['id', 'name', 'slug', 'description', 'component_key', 'sort_order']);
+        }
 
         return Inertia::render('Scripts/Index', [
             'scripts' => $scripts,
