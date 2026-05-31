@@ -45,7 +45,12 @@ class MeetingDefinitionController extends LeaderMeetingDefinitionController
             ]);
         }
 
+        $contextCompanyId = $this->contextCompanyId();
+
         $meetingDefinitions = MeetingDefinition::where('created_by', Auth::id())
+            ->when($contextCompanyId, fn ($q, $cid) =>
+                $q->whereHas('members', fn ($mq) => $mq->where('users.company_id', $cid))
+            )
             ->with(['members:id,name'])
             ->orderBy('created_at', 'desc')
             ->get();

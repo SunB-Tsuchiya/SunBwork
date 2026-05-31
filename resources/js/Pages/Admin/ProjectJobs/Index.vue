@@ -167,7 +167,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import AdminNavigationTabs from '@/Components/Tabs/AdminNavigationTabs.vue';
 import { useUIState } from '@/Composables/useUIState';
 import { router } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 const props = defineProps({
     noCompanySelected:  { type: Boolean, default: false },
@@ -183,6 +183,9 @@ const qModel      = ref(props.q || '');
 const periodModel = ref(props.period ?? '');
 const hideCompleted = useUIState('sbw_admin_pj_hide_completed', true);
 const localJobs     = ref((props.jobs || []).map((j) => ({ ...j })));
+watch(() => props.jobs, (newJobs) => {
+    localJobs.value = (newJobs || []).map((j) => ({ ...j }));
+});
 
 const viewMode  = useUIState('sbw_admin_pj_view_mode', 'date');
 const viewModes = [
