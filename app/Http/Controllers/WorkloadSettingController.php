@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\ChecksLeaderPermission;
+use App\Http\Controllers\Concerns\ResolvesContextCompany;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -16,7 +18,7 @@ use App\Models\Difficulty;
 
 class WorkloadSettingController extends Controller
 {
-    use ChecksLeaderPermission;
+    use ChecksLeaderPermission, ResolvesContextCompany;
     /**
      * 各タイプの設定（モデル・ソートカラム・ラベル）
      */
@@ -120,7 +122,19 @@ class WorkloadSettingController extends Controller
     {
         $this->requireLeaderPermission('workload_setting');
         $user      = $request->user();
-        $companyId = $user?->company_id ?? null;
+        $companyId = $this->contextCompanyId() ?? $user?->company_id ?? null;
+
+        // SuperAdmin グローバルモード時は会社未選択警告
+        if ($user?->isSuperAdmin() && $this->contextCompanyId() === null) {
+            return Inertia::render('WorkloadSetting/Index', [
+                'noCompanySelected' => true,
+                'stages'            => [],
+                'work_item_types'   => [],
+                'sizes'             => [],
+                'statuses'          => [],
+                'difficulties'      => [],
+            ]);
+        }
 
         $stages = $this->fetchItems(Stage::class, 'order_index', $companyId);
         $workItemTypes = $this->fetchItems(WorkItemType::class, 'sort_order', $companyId);
@@ -148,7 +162,7 @@ class WorkloadSettingController extends Controller
 
         $config    = $configs[$type];
         $user      = $request->user();
-        $companyId = $user?->company_id ?? null;
+        $companyId = $this->contextCompanyId() ?? $user?->company_id ?? null;
 
         return Inertia::render('WorkloadSetting/Edit', [
             'type'        => $type,
@@ -182,7 +196,7 @@ class WorkloadSettingController extends Controller
         );
 
         $user      = $request->user();
-        $companyId = $user?->company_id ?? null;
+        $companyId = $this->contextCompanyId() ?? $user?->company_id ?? null;
         $fillable  = (new $modelClass)->getFillable();
 
         foreach ($payload['items'] ?? [] as $item) {

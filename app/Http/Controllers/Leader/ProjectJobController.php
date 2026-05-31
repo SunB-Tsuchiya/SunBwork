@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Leader;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\ResolvesContextCompany;
 use App\Models\ProjectJob;
 use App\Models\Team;
 use Illuminate\Http\Request;
@@ -11,6 +12,8 @@ use Inertia\Inertia;
 
 class ProjectJobController extends Controller
 {
+    use ResolvesContextCompany;
+
     /**
      * 部署に関係する案件をすべて表示（読み取り専用）
      * 部署リーダー/副リーダー → 部署メンバーが owner or coordinator の案件
@@ -22,8 +25,6 @@ class ProjectJobController extends Controller
         $q      = $request->input('q', '');
         $period = $request->input('period', '');
 
-        [$deptMemberIds, $unitMemberIds] = $this->getAccessibleMemberIds($user);
-
         $monthOptions = [];
         for ($i = 0; $i < 12; $i++) {
             $d              = now()->subMonths($i);
@@ -32,6 +33,41 @@ class ProjectJobController extends Controller
                 'label' => $d->format('Y年n月'),
             ];
         }
+
+        // SuperAdmin: コンテキスト会社でフィルター（グローバルモードは警告）
+        if ($user->isSuperAdmin()) {
+            $companyId = $this->contextCompanyId();
+            if ($companyId === null) {
+                return Inertia::render('Leader/ProjectJobs/Index', [
+                    'noCompanySelected' => true,
+                    'jobs'              => collect(),
+                    'monthOptions'      => $monthOptions,
+                    'q'                 => $q,
+                    'period'            => $period,
+                ]);
+            }
+            $query = ProjectJob::with(['client', 'user'])
+                ->where('company_id', $companyId);
+            if ($q) {
+                $query->where(function ($q2) use ($q) {
+                    $q2->where('title', 'like', "%{$q}%")
+                        ->orWhere('jobcode', 'like', "%{$q}%")
+                        ->orWhereHas('client', fn ($c) => $c->where('name', 'like', "%{$q}%"));
+                });
+            }
+            if ($period && $period !== 'all') {
+                [$y, $m] = explode('-', $period);
+                $query->whereYear('created_at', $y)->whereMonth('created_at', $m);
+            }
+            return Inertia::render('Leader/ProjectJobs/Index', [
+                'jobs'         => $query->orderBy('created_at', 'desc')->get(),
+                'monthOptions' => $monthOptions,
+                'q'            => $q,
+                'period'       => $period,
+            ]);
+        }
+
+        [$deptMemberIds, $unitMemberIds] = $this->getAccessibleMemberIds($user);
 
         // チームが1件も割り当てられていない Leader は 0 件を返す（空クロージャによる全件漏洩バグ対策）
         if (empty($deptMemberIds) && empty($unitMemberIds)) {

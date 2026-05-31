@@ -554,6 +554,14 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('teams', [App\Http\Controllers\Leader\UnitController::class, 'store'])->name('units.store');
         Route::resource('teams', App\Http\Controllers\Leader\TeamController::class)->only(['index', 'show', 'edit', 'update', 'destroy']);
 
+        // 勤務項目設定（Leader用 prefix）
+        Route::get('workload-setting', [App\Http\Controllers\WorkloadSettingController::class, 'index'])
+            ->name('workload_setting.index');
+        Route::get('workload-setting/edit/{type}', [App\Http\Controllers\WorkloadSettingController::class, 'edit'])
+            ->name('workload_setting.edit');
+        Route::post('workload-setting/{type}', [App\Http\Controllers\WorkloadSettingController::class, 'store'])
+            ->name('workload_setting.store');
+
         // 派遣・業務委託管理
         Route::get('dispatch-management', [App\Http\Controllers\Leader\DispatchManagementController::class, 'index'])->name('dispatch_management.index');
         Route::get('dispatch-management/{dispatchUser}/edit', [App\Http\Controllers\Leader\DispatchManagementController::class, 'edit'])->name('dispatch_management.edit');

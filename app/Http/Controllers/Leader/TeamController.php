@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Leader;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\ResolvesContextCompany;
 use App\Models\Team;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -11,13 +12,24 @@ use Inertia\Inertia;
 
 class TeamController extends Controller
 {
+    use ResolvesContextCompany;
+
     /** ユニットチーム一覧 */
     public function index()
     {
         $user  = Auth::user();
         $query = Team::with(['company', 'department'])->where('team_type', 'unit');
 
-        if (! $user->isSuperAdmin()) {
+        if ($user->isSuperAdmin()) {
+            $companyId = $this->contextCompanyId();
+            if ($companyId === null) {
+                return Inertia::render('Leader/Teams/Index', [
+                    'noCompanySelected' => true,
+                    'teams'             => [],
+                ]);
+            }
+            $query->where('company_id', $companyId);
+        } else {
             $query->where('company_id', $user->company_id);
 
             // 部署リーダー判定（department チームの leader_id が自分）

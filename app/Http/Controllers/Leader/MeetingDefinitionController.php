@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Leader;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\ResolvesContextCompany;
 use App\Models\MeetingDefinition;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -11,31 +12,61 @@ use Inertia\Inertia;
 
 class MeetingDefinitionController extends Controller
 {
-    /** 対象メンバーの取得（部署リーダーまたは Admin/SuperAdmin: 全ユーザー、それ以外: 自部署のみ） */
+    use ResolvesContextCompany;
+
+    /** 対象メンバーの取得（SuperAdmin: コンテキスト会社、Admin/部署リーダー: 全ユーザー、それ以外: 自部署のみ） */
     protected function getAvailableMembers(): \Illuminate\Support\Collection
     {
         $user = Auth::user();
-        if (in_array($user->user_role, ['admin', 'superadmin']) || $user->isDepartmentLeader()) {
-            return User::orderBy('name')->get(['id', 'name', 'department_id', 'assignment_id']);
+        if ($user->isSuperAdmin()) {
+            $companyId = $this->contextCompanyId();
+            return User::when($companyId, fn ($q) => $q->where('company_id', $companyId))
+                ->orderBy('name')
+                ->get(['id', 'name', 'department_id', 'assignment_id']);
+        }
+        if ($user->isAdmin() || $user->isDepartmentLeader()) {
+            return User::where('company_id', $user->company_id)
+                ->orderBy('name')
+                ->get(['id', 'name', 'department_id', 'assignment_id']);
         }
         return User::where('department_id', $user->department_id)
             ->orderBy('name')
             ->get(['id', 'name', 'department_id', 'assignment_id']);
     }
 
-    /** 部署一覧の取得（部署リーダー: 全部署、それ以外: 自部署のみ） */
+    /** 部署一覧の取得 */
     protected function getDepartments(): \Illuminate\Support\Collection
     {
         $user = Auth::user();
+        if ($user->isSuperAdmin()) {
+            $companyId = $this->contextCompanyId();
+            return \App\Models\Department::when($companyId, fn ($q) => $q->where('company_id', $companyId))
+                ->orderBy('name')->get();
+        }
         if ($user->isDepartmentLeader()) {
-            return \App\Models\Department::orderBy('name')->get();
+            return \App\Models\Department::where('company_id', $user->company_id)->orderBy('name')->get();
         }
         return \App\Models\Department::where('id', $user->department_id)->get();
     }
 
     public function index()
     {
+        $user = Auth::user();
+
+        // SuperAdmin グローバルモード時は会社未選択警告
+        if ($user->isSuperAdmin() && $this->contextCompanyId() === null) {
+            return Inertia::render('Leader/MeetingDefinitions/Index', [
+                'noCompanySelected'  => true,
+                'meetingDefinitions' => [],
+            ]);
+        }
+
+        $contextCompanyId = $this->contextCompanyId();
+
         $meetingDefinitions = MeetingDefinition::where('created_by', Auth::id())
+            ->when($contextCompanyId, fn ($q, $cid) =>
+                $q->whereHas('members', fn ($mq) => $mq->where('users.company_id', $cid))
+            )
             ->with(['members:id,name'])
             ->orderBy('created_at', 'desc')
             ->get();

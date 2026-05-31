@@ -272,7 +272,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link } from '@inertiajs/vue3';
 import { resolveStatus, COLOR_OPTIONS, STATUS_GROUPS } from '@/Components/Iruka/statusConfig.js';
@@ -326,6 +326,13 @@ const activeTab = ref('users');
 const localUsers   = ref(props.users.map(u => ({ ...u })));
 // 部署フィルター：初期値は最初の部署
 const selectedDept = ref(props.departments[0]?.id ?? null);
+// 会社切替時に props が更新されたらローカル状態を同期
+watch(() => props.users, (newUsers) => {
+    localUsers.value = (newUsers || []).map(u => ({ ...u }));
+});
+watch(() => props.departments, (newDepts) => {
+    selectedDept.value = (newDepts || [])[0]?.id ?? null;
+});
 const savingUsers  = ref(false);
 const savedUsers   = ref(false);
 
@@ -393,6 +400,9 @@ async function saveUsers() {
 
 // ===== ステータス設定 =====
 const localStatuses  = ref(props.statusOrders.map(s => ({ ...s })));
+watch(() => props.statusOrders, (newStatuses) => {
+    localStatuses.value = (newStatuses || []).map(s => ({ ...s }));
+});
 const savingStatuses = ref(false);
 const savedStatuses  = ref(false);
 
