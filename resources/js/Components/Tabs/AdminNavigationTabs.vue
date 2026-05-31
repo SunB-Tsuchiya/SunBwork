@@ -33,7 +33,7 @@ const tabs = computed(() => [
         condition: can('company_management') && typeof route === 'function' && route().has('admin.companies.index'),
     },
     { key: 'users', href: tryRoute('admin.users.index'), label: 'ユーザー管理', condition: can('user_management') },
-    { key: 'teams', href: tryRoute('admin.teams.index'), label: '部署管理', condition: can('team_management') },
+    { key: 'departments', href: tryRoute('admin.departments.index'), label: '部署管理', condition: can('team_management') },
     { key: 'diaries', href: tryRoute('admin.diaryinteractions.index'), label: '日報管理', condition: can('diary_management') },
     { key: 'clients', href: tryRoute('admin.clients.index'), label: 'クライアント管理', condition: can('client_management') },
     { key: 'workload', href: tryRoute('admin.workload_analyzer.index'), label: '作業量分析', condition: can('workload_analysis') },
@@ -99,8 +99,8 @@ function onMobileSelect(e) {
             </Link>
             <Link
                 v-if="can('team_management')"
-                :href="route('admin.teams.index')"
-                :class="tab('teams')"
+                :href="route('admin.departments.index')"
+                :class="tab('departments')"
             >
                 部署管理
             </Link>

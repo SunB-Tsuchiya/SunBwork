@@ -427,6 +427,11 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 
         // 在席ボード管理（Admin用）
         Route::get('presence/board-settings', [App\Http\Controllers\PresenceBoardSettingsController::class, 'index'])->name('presence.board_settings');
+
+        // 部署管理（Admin用 — SuperAdmin作成の部署も含む）
+        Route::get('departments', [App\Http\Controllers\Admin\DepartmentController::class, 'index'])->name('departments.index');
+        Route::post('departments', [App\Http\Controllers\Admin\DepartmentController::class, 'store'])->name('departments.store');
+        Route::delete('departments/{department}', [App\Http\Controllers\Admin\DepartmentController::class, 'destroy'])->name('departments.destroy');
     });
 
 

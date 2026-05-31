@@ -41,10 +41,49 @@
                 <div class="mb-4">
                     <label class="mb-1 block font-semibold">クライアント</label>
                     <div class="flex items-center gap-2">
-                        <label class="shrink-0 text-sm">Client ID:</label>
-                        <span class="inline-block w-28 rounded border bg-gray-100 px-2 py-2 font-mono text-sm text-gray-700">{{ props.job.client?.client_code || '―' }}</span>
-                        <input v-model="form.client_name" type="text" class="w-60 rounded border bg-gray-100 px-3 py-2" readonly />
+                        <div class="flex items-center gap-1">
+                            <label class="shrink-0 text-sm">Client ID:</label>
+                            <input
+                                v-model="clientCodeInput"
+                                type="text"
+                                class="w-28 rounded border px-2 py-2 font-mono text-sm"
+                                placeholder="コードを入力"
+                                @input="onClientCodeInput"
+                                :disabled="isLoadingClientById"
+                            />
+                            <div v-if="isLoadingClientById" class="text-xs text-blue-600">読込中...</div>
+                        </div>
+                        <div class="relative flex-1">
+                            <input
+                                v-model="form.client_name"
+                                type="text"
+                                class="w-full rounded border px-3 py-2"
+                                placeholder="名前を入力（オートコンプリート）"
+                                @input="onClientNameInput"
+                                @keydown="onClientNameKeydown"
+                                @blur="onClientNameBlur"
+                            />
+                            <div
+                                v-if="showNameSuggestions && clientNameSuggestions.length > 0"
+                                class="absolute top-full z-50 mt-1 w-full rounded border border-gray-300 bg-white shadow-lg max-h-60 overflow-y-auto"
+                            >
+                                <div
+                                    v-for="(client, index) in clientNameSuggestions"
+                                    :key="client.id"
+                                    class="cursor-pointer px-3 py-2 text-sm hover:bg-blue-50"
+                                    :class="{ 'bg-blue-100': index === selectedSuggestionIndex }"
+                                    @mousedown.prevent="selectClientFromSuggestion(client)"
+                                >
+                                    <div class="flex items-center justify-between gap-2">
+                                        <span class="font-medium">{{ client.name }}</span>
+                                        <span class="shrink-0 font-mono text-xs text-gray-500">{{ client.client_code || '―' }}</span>
+                                    </div>
+                                    <div v-if="client.is_dormant" class="text-xs text-red-500">※ 休眠中</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
+                    <div v-if="form.errors.client_id" class="mt-1 text-sm text-red-600">{{ form.errors.client_id }}</div>
                 </div>
                 <div class="mb-4">
                     <label class="mb-1 block font-semibold">サイズ</label>
@@ -259,6 +298,119 @@ const isMobile = computed(() => {
     return /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
 });
 
+// ── クライアント検索 ──────────────────────────────────────
+const clientCodeInput         = ref('');
+const clientNameSuggestions   = ref([]);
+const showNameSuggestions     = ref(false);
+const isLoadingClientById     = ref(false);
+const selectedSuggestionIndex = ref(-1);
+let searchTimeout    = null;
+let codeSearchTimeout = null;
+
+function onClientCodeInput() {
+    const code = clientCodeInput.value.trim();
+    if (codeSearchTimeout) clearTimeout(codeSearchTimeout);
+    if (!code) {
+        form.client_id   = '';
+        form.client_name = '';
+        return;
+    }
+    codeSearchTimeout = setTimeout(async () => {
+        isLoadingClientById.value = true;
+        try {
+            const res = await fetch(
+                route('coordinator.clients.json') + '?code=' + encodeURIComponent(code) + '&limit=10',
+                { headers: { Accept: 'application/json' }, credentials: 'same-origin' },
+            );
+            if (res.ok) {
+                const clients = await res.json();
+                if (Array.isArray(clients) && clients.length > 0) {
+                    clientNameSuggestions.value   = clients;
+                    showNameSuggestions.value     = true;
+                    selectedSuggestionIndex.value = -1;
+                } else {
+                    clientNameSuggestions.value = [];
+                    showNameSuggestions.value   = false;
+                    form.client_id   = '';
+                    form.client_name = '';
+                }
+            }
+        } catch {
+            clientNameSuggestions.value = [];
+            showNameSuggestions.value   = false;
+        } finally {
+            isLoadingClientById.value = false;
+        }
+    }, 300);
+}
+
+function onClientNameInput() {
+    clientCodeInput.value = '';
+    const searchTerm = form.client_name;
+    if (searchTimeout) clearTimeout(searchTimeout);
+    if (!searchTerm || searchTerm.length < 1) {
+        clientNameSuggestions.value = [];
+        showNameSuggestions.value   = false;
+        return;
+    }
+    searchTimeout = setTimeout(async () => {
+        try {
+            const res = await fetch(
+                route('coordinator.clients.json') + '?name=' + encodeURIComponent(searchTerm) + '&limit=10',
+                { headers: { Accept: 'application/json' }, credentials: 'same-origin' },
+            );
+            if (res.ok) {
+                const clients = await res.json();
+                clientNameSuggestions.value   = Array.isArray(clients) ? clients : [];
+                showNameSuggestions.value     = clients.length > 0;
+                selectedSuggestionIndex.value = -1;
+            }
+        } catch {
+            clientNameSuggestions.value = [];
+            showNameSuggestions.value   = false;
+        }
+    }, 300);
+}
+
+function onClientNameKeydown(event) {
+    if (!showNameSuggestions.value || clientNameSuggestions.value.length === 0) return;
+    switch (event.key) {
+        case 'ArrowDown':
+            event.preventDefault();
+            selectedSuggestionIndex.value = Math.min(selectedSuggestionIndex.value + 1, clientNameSuggestions.value.length - 1);
+            break;
+        case 'ArrowUp':
+            event.preventDefault();
+            selectedSuggestionIndex.value = Math.max(selectedSuggestionIndex.value - 1, -1);
+            break;
+        case 'Enter':
+            event.preventDefault();
+            if (selectedSuggestionIndex.value >= 0) {
+                selectClientFromSuggestion(clientNameSuggestions.value[selectedSuggestionIndex.value]);
+            }
+            break;
+        case 'Escape':
+            showNameSuggestions.value     = false;
+            selectedSuggestionIndex.value = -1;
+            break;
+    }
+}
+
+function onClientNameBlur() {
+    setTimeout(() => {
+        showNameSuggestions.value     = false;
+        selectedSuggestionIndex.value = -1;
+    }, 200);
+}
+
+function selectClientFromSuggestion(client) {
+    form.client_id            = client.id;
+    form.client_name          = client.name;
+    clientCodeInput.value     = client.client_code ?? '';
+    showNameSuggestions.value = false;
+    selectedSuggestionIndex.value = -1;
+}
+
 // ── サイズフィルター ──────────────────────────────────────
 const sizeFilter = ref('paper');
 const mediumOptions = [
@@ -307,6 +459,8 @@ const props = defineProps({
     coordinatorCandidates: { type: Array, default: () => [] },
     sizes: { type: Array, default: () => [] },
 });
+
+clientCodeInput.value = props.job.client?.client_code ?? '';
 
 // ── 伝票画像 ──────────────────────────────────────────────────────────────────
 // サーバーから渡された既存の画像 URL（router.reload で更新される）

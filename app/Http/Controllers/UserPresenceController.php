@@ -63,18 +63,20 @@ class UserPresenceController extends Controller
             ? ($this->contextCompanyId() ?? $authUser->company_id)
             : $authUser->company_id;
 
-        $users = User::with(['department', 'presenceStatus'])
+        $users = User::with(['department', 'presenceStatus', 'positionTitle'])
             ->where('company_id', $presenceCompanyId)
             ->where('is_ghost', false)
             ->whereNull('ghost_owner_id')
             ->get();
 
-        // is_hidden のユーザーを除外し、sort_order → department_id → name の順でソート
+        // BoardSettings と同じ優先順: sort_order → 役職順 → 雇用形態 → 名前
+        $employmentPriority = ['regular' => 1, 'contract' => 2, 'dispatch' => 3, 'outsource' => 4];
         $data = $users
             ->filter(fn(User $u) => !($u->presenceStatus?->is_hidden ?? false))
             ->sortBy([
                 fn($a, $b) => ($a->presenceStatus?->sort_order ?? 9999) <=> ($b->presenceStatus?->sort_order ?? 9999),
-                fn($a, $b) => ($a->department_id ?? 9999) <=> ($b->department_id ?? 9999),
+                fn($a, $b) => ($a->positionTitle?->sort_order ?? 9999) <=> ($b->positionTitle?->sort_order ?? 9999),
+                fn($a, $b) => ($employmentPriority[$a->employment_type ?? 'regular'] ?? 99) <=> ($employmentPriority[$b->employment_type ?? 'regular'] ?? 99),
                 fn($a, $b) => $a->name <=> $b->name,
             ])
             ->values()
