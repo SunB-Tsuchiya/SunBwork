@@ -19,7 +19,14 @@ class SubcontractorController extends Controller
             ->withCount('assignments');
 
         if ($user->user_role === 'superadmin') {
-            $subcontractors = $query->get();
+            $contextId = session('superadmin_context.company_id');
+            if ($contextId === null) {
+                return Inertia::render('Coordinator/Subcontractors/Index', [
+                    'subcontractors' => [],
+                    'isGlobalMode'   => true,
+                ]);
+            }
+            $subcontractors = $query->forCompany($contextId)->get();
         } else {
             $subcontractors = $query
                 ->forCompany($user->company_id)
@@ -29,6 +36,7 @@ class SubcontractorController extends Controller
 
         return Inertia::render('Coordinator/Subcontractors/Index', [
             'subcontractors' => $subcontractors,
+            'isGlobalMode'   => false,
         ]);
     }
 

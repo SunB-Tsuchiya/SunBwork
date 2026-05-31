@@ -1,5 +1,6 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
+import SuperAdminGlobalGuard from '@/Components/SuperAdminGlobalGuard.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, ref, reactive, watch } from 'vue';
 
@@ -30,6 +31,7 @@ const props = defineProps({
     showDormant:         { type: Boolean, default: false },
     departments:         { type: Array, default: () => [] },
     allDepts:            { type: Array, default: () => [] },
+    isGlobalMode:        { type: Boolean, default: false },
 });
 
 const page = usePage();
@@ -217,6 +219,7 @@ function goToEdit(clientId) {
             </div>
         </template>
 
+        <SuperAdminGlobalGuard :show="isGlobalMode">
         <!-- SuperAdmin 編集モード時の会社色凡例 -->
         <div v-if="editMode && isSuperAdmin && legendCompanies.length > 0" class="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-2 text-sm">
             <span class="mr-1 text-xs font-semibold text-indigo-500">会社凡例:</span>
@@ -441,5 +444,6 @@ function goToEdit(clientId) {
                 </div>
             </template>
         </div>
+        </SuperAdminGlobalGuard>
     </AppLayout>
 </template>

@@ -31,12 +31,13 @@ class AnnouncementController extends Controller
 
         $query = Announcement::where('sender_id', $user->id);
 
-        // SuperAdmin + 会社選択: target_company_id = 選択会社 or NULL（全社宛）に絞る
+        // SuperAdmin + 会社選択: その会社のユーザーに配信されたお知らせのみ表示
+        // target_company_id ではなく実際の受信者 company_id で判定
+        // （非クロスカンパニー送信時は target_company_id が NULL になるため）
         if ($user->isSuperAdmin()) {
             $contextId = session('superadmin_context.company_id');
-            $query->where(function ($q) use ($contextId) {
-                $q->where('target_company_id', $contextId)
-                  ->orWhereNull('target_company_id');
+            $query->whereHas('recipients', function ($q) use ($contextId) {
+                $q->whereHas('user', fn($u) => $u->where('company_id', $contextId));
             });
         }
 

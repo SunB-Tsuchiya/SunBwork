@@ -29,23 +29,39 @@ class ClientController extends Controller
         $user = Auth::user();
         $isSuperAdmin = $user->user_role === 'superadmin';
 
+        // SuperAdmin: グローバルモードでは会社を選択させる
+        if ($isSuperAdmin) {
+            $contextId = session('superadmin_context.company_id');
+            if ($contextId === null) {
+                return Inertia::render('Clients/Index', [
+                    'clients'      => [],
+                    'showDormant'  => $showDormant,
+                    'departments'  => [],
+                    'allDepts'     => [],
+                    'isGlobalMode' => true,
+                ]);
+            }
+        }
+
         $query = Client::with('departments:id,name');
-        if (!$isSuperAdmin) {
+        if ($isSuperAdmin) {
+            // SuperAdmin + 会社選択: コンテキスト会社のクライアントのみ
+            $query->forCompany($contextId);
+        } else {
             $query->forCompany($user->company_id ?? null);
         }
         $clients = $showDormant ? $query->dormant()->get() : $query->active()->get();
 
-        // 部署タブは自社部署のみ（SuperAdmin は全部署）
+        // 部署タブはコンテキスト会社の部署のみ（SuperAdmin もコンテキスト会社に絞る）
         $departments = $isSuperAdmin
-            ? Department::orderBy('company_id')->orderBy('id')->get(['id', 'name'])
+            ? Department::where('company_id', $contextId)->orderBy('id')->get(['id', 'name'])
             : Department::where('company_id', $user->company_id)->orderBy('id')->get(['id', 'name']);
 
-        // SuperAdmin 編集モード用: 全社全部署（Superadmin Company=id1 を除く）に会社名を付加
+        // SuperAdmin 編集モード用: コンテキスト会社の部署のみ
         $allDepts = $isSuperAdmin
             ? DB::table('departments')
                 ->join('companies', 'departments.company_id', '=', 'companies.id')
-                ->where('companies.id', '!=', 1)
-                ->orderBy('departments.company_id')
+                ->where('departments.company_id', $contextId)
                 ->orderBy('departments.id')
                 ->get(['departments.id', 'departments.name', 'departments.company_id', 'companies.name as company_name'])
                 ->map(fn($d) => ['id' => $d->id, 'name' => $d->name, 'company_id' => $d->company_id, 'company_name' => $d->company_name])
@@ -53,10 +69,11 @@ class ClientController extends Controller
             : collect();
 
         return Inertia::render('Clients/Index', [
-            'clients'     => $clients,
-            'showDormant' => $showDormant,
-            'departments' => $departments,
-            'allDepts'    => $allDepts,
+            'clients'      => $clients,
+            'showDormant'  => $showDormant,
+            'departments'  => $departments,
+            'allDepts'     => $allDepts,
+            'isGlobalMode' => false,
         ]);
     }
 

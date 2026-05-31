@@ -1,8 +1,12 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
+import SuperAdminGlobalGuard from '@/Components/SuperAdminGlobalGuard.vue';
 import { Link, router } from '@inertiajs/vue3';
 
-const props = defineProps({ subcontractors: Array });
+const props = defineProps({
+    subcontractors: Array,
+    isGlobalMode: { type: Boolean, default: false },
+});
 </script>
 
 <template>
@@ -16,6 +20,7 @@ const props = defineProps({ subcontractors: Array });
             </Link>
         </template>
 
+        <SuperAdminGlobalGuard :show="isGlobalMode">
         <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <template v-if="props.subcontractors.length === 0">
                 <p class="py-8 text-gray-500">外注先はまだ登録されていません</p>
@@ -57,5 +62,6 @@ const props = defineProps({ subcontractors: Array });
                 </div>
             </template>
         </div>
+        </SuperAdminGlobalGuard>
     </AppLayout>
 </template>
