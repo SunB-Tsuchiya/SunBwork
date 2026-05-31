@@ -24,6 +24,7 @@
         </template>
 
 
+        <SuperAdminGlobalGuard :show="isGlobalMode">
         <div class="space-y-4">
 
             <!-- ★ お気に入り -->
@@ -235,6 +236,7 @@
             </div>
             </div><!-- /検索・一覧 -->
         </div>
+        </SuperAdminGlobalGuard>
     </AppLayout>
 
     <!-- CSV 一括登録モーダル -->
@@ -524,12 +526,13 @@
 
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
+import SuperAdminGlobalGuard from '@/Components/SuperAdminGlobalGuard.vue';
 import { useUIState } from '@/Composables/useUIState';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, ref, watch } from 'vue';
 import axios from 'axios';
 
-const props = defineProps({ jobs: Array, favoriteJobs: { type: Array, default: () => [] }, registerFlags: Array, jobid: [Number, String], monthOptions: Array, q: String, period: String });
+const props = defineProps({ jobs: Array, favoriteJobs: { type: Array, default: () => [] }, registerFlags: Array, jobid: [Number, String], monthOptions: Array, q: String, period: String, isGlobalMode: { type: Boolean, default: false } });
 const page = usePage();
 page.props.q_model = props.q || '';
 page.props.period_model = props.period || 'all';

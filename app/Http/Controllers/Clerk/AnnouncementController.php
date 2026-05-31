@@ -16,7 +16,31 @@ class AnnouncementController extends Controller
     /** Clerk: 送信済みお知らせ一覧 */
     public function index(Request $request)
     {
-        $announcements = Announcement::where('sender_id', $request->user()->id)
+        $user = $request->user();
+
+        // SuperAdmin: グローバルモードでは会社を選択させる
+        if ($user->isSuperAdmin()) {
+            $contextId = session('superadmin_context.company_id');
+            if ($contextId === null) {
+                return Inertia::render('Clerk/Announcements/Index', [
+                    'announcements' => [],
+                    'isGlobalMode'  => true,
+                ]);
+            }
+        }
+
+        $query = Announcement::where('sender_id', $user->id);
+
+        // SuperAdmin + 会社選択: target_company_id = 選択会社 or NULL（全社宛）に絞る
+        if ($user->isSuperAdmin()) {
+            $contextId = session('superadmin_context.company_id');
+            $query->where(function ($q) use ($contextId) {
+                $q->where('target_company_id', $contextId)
+                  ->orWhereNull('target_company_id');
+            });
+        }
+
+        $announcements = $query
             ->withCount('recipients')
             ->withCount(['recipients as read_count' => fn ($q) => $q->whereNotNull('read_at')])
             ->orderByDesc('created_at')
@@ -30,7 +54,10 @@ class AnnouncementController extends Controller
                 'created_at'       => $a->created_at->format('Y/m/d H:i'),
             ]);
 
-        return Inertia::render('Clerk/Announcements/Index', compact('announcements'));
+        return Inertia::render('Clerk/Announcements/Index', [
+            'announcements' => $announcements,
+            'isGlobalMode'  => false,
+        ]);
     }
 
     /** Clerk: 送信済みお知らせ詳細（受信者一覧＋既読状況＋添付） */

@@ -1,9 +1,11 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
+import SuperAdminGlobalGuard from '@/Components/SuperAdminGlobalGuard.vue';
 import { Link, router } from '@inertiajs/vue3';
 
 defineProps({
     announcements: Array,
+    isGlobalMode: { type: Boolean, default: false },
 });
 
 const targetLabel = (type) => ({
@@ -23,6 +25,7 @@ const goToShow = (id) => {
             <h2 class="text-xl font-semibold text-gray-800">お知らせ通知</h2>
         </template>
 
+        <SuperAdminGlobalGuard :show="isGlobalMode">
         <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <div class="mb-4 flex justify-end">
                 <Link
@@ -69,5 +72,6 @@ const goToShow = (id) => {
             </table>
             </div>
         </div>
+        </SuperAdminGlobalGuard>
     </AppLayout>
 </template>

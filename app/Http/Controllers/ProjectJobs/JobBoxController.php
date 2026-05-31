@@ -233,6 +233,24 @@ class JobBoxController extends Controller
             return redirect()->route('login');
         }
 
+        // SuperAdmin: グローバルモードでは会社を選択させる
+        $superAdminContextId = null;
+        if ($user->isSuperAdmin()) {
+            $superAdminContextId = session('superadmin_context.company_id');
+            if ($superAdminContextId === null) {
+                return inertia('Coordinator/JobBox/Index', [
+                    'projectJob'   => null,
+                    'messages'     => [],
+                    'q'            => $request->input('q'),
+                    'period'       => 'all',
+                    'monthOptions' => [],
+                    'sort'         => null,
+                    'dir'          => 'desc',
+                    'isGlobalMode' => true,
+                ]);
+            }
+        }
+
         $q = $request->input('q');
         $periodParam = $request->query('period');
         $usePeriodFilter = true;
@@ -261,8 +279,13 @@ class JobBoxController extends Controller
         $base = JobAssignmentMessage::select('job_assignment_messages.*')
             ->join('project_job_assignments', 'job_assignment_messages.project_job_assignment_id', '=', 'project_job_assignments.id')
             ->join('project_jobs', 'project_job_assignments.project_job_id', '=', 'project_jobs.id')
-            ->leftJoin('users as senders', 'job_assignment_messages.sender_id', '=', 'senders.id')
-            ->where(function ($qry) use ($user) {
+            ->leftJoin('users as senders', 'job_assignment_messages.sender_id', '=', 'senders.id');
+
+        if ($superAdminContextId) {
+            // SuperAdmin + 会社選択: その会社の全案件のジョブを表示
+            $base->where('project_jobs.company_id', $superAdminContextId);
+        } else {
+            $base->where(function ($qry) use ($user) {
                 $qry->where('project_job_assignments.user_id', $user->id)
                     ->orWhere('job_assignment_messages.sender_id', $user->id)
                     ->orWhere('project_jobs.user_id', $user->id)
@@ -273,7 +296,10 @@ class JobBoxController extends Controller
                             ->whereColumn('project_job_coordinators.project_job_id', 'project_jobs.id')
                             ->where('project_job_coordinators.user_id', $user->id);
                     });
-            })
+            });
+        }
+
+        $base
             // マイジョブで supersedes 済みの依頼ジョブは非表示
             // ① supersedes_assignment_id で直接指定（新規フロー）
             // ② フォールバック: 同ユーザー・同案件・同タイトルの自己割当が別レコードとして存在する（既存データ対応）
@@ -400,8 +426,17 @@ class JobBoxController extends Controller
                 'user',
                 'sender',
                 'statusModel',
-            ])
-                ->where(function ($qry) use ($user) {
+            ]);
+
+            if ($superAdminContextId) {
+                // SuperAdmin + 会社選択: その会社の全案件のジョブ
+                $ownQ->whereExists(function ($sub) use ($superAdminContextId) {
+                    $sub->from('project_jobs')
+                        ->whereColumn('project_jobs.id', 'project_job_assignments.project_job_id')
+                        ->where('project_jobs.company_id', $superAdminContextId);
+                });
+            } else {
+                $ownQ->where(function ($qry) use ($user) {
                     // 自分自身のジョブ
                     $qry->where('user_id', $user->id)
                         // 自分が送信者（Coordinator が依頼したがJAMなし）
@@ -418,8 +453,10 @@ class JobBoxController extends Controller
                                 ->whereColumn('project_job_coordinators.project_job_id', 'project_job_assignments.project_job_id')
                                 ->where('project_job_coordinators.user_id', $user->id);
                         });
-                })
-                ->whereNotExists(function ($sub) {
+                });
+            }
+
+            $ownQ->whereNotExists(function ($sub) {
                     $sub->from('job_assignment_messages')
                         ->whereColumn('job_assignment_messages.project_job_assignment_id', 'project_job_assignments.id');
                 });
@@ -646,13 +683,14 @@ class JobBoxController extends Controller
             ->values();
 
         return inertia('Coordinator/JobBox/Index', [
-            'projectJob' => null,
-            'messages' => $messages,
-            'q' => $q,
-            'period' => $periodModel,
+            'projectJob'   => null,
+            'messages'     => $messages,
+            'q'            => $q,
+            'period'       => $periodModel,
             'monthOptions' => $monthOptions,
-            'sort' => $sort,
-            'dir' => $dir,
+            'sort'         => $sort,
+            'dir'          => $dir,
+            'isGlobalMode' => false,
         ]);
     }
 
@@ -666,6 +704,25 @@ class JobBoxController extends Controller
         $user = $request->user();
         if (! $user) {
             return redirect()->route('login');
+        }
+
+        // SuperAdmin: グローバルモードでは会社を選択させる
+        $superAdminContextId = null;
+        if ($user->isSuperAdmin()) {
+            $superAdminContextId = session('superadmin_context.company_id');
+            if ($superAdminContextId === null) {
+                return inertia('JobBox/Index', [
+                    'projectJob'   => null,
+                    'messages'     => [],
+                    'q'            => $request->input('q'),
+                    'period'       => 'all',
+                    'monthOptions' => [],
+                    'sort'         => null,
+                    'dir'          => 'desc',
+                    'routeContext' => 'user',
+                    'isGlobalMode' => true,
+                ]);
+            }
         }
 
         $q = $request->input('q');
@@ -694,12 +751,19 @@ class JobBoxController extends Controller
 
         $base = JobAssignmentMessage::select('job_assignment_messages.*')
             ->join('project_job_assignments', 'job_assignment_messages.project_job_assignment_id', '=', 'project_job_assignments.id')
-            ->leftJoin('users as senders', 'job_assignment_messages.sender_id', '=', 'senders.id')
-            ->where('project_job_assignments.user_id', $user->id)
-            // 自己割当・自分の返信を除外: メッセージ送信者が自分自身のものは表示しない
-            // (受信箱として機能させる：他者から送られたメッセージのみ表示)
-            ->where('job_assignment_messages.sender_id', '!=', $user->id);
-            // 登録済みジョブも一覧に残す（フロントエンドの「登録済みを表示しない」チェックで制御）
+            ->join('project_jobs', 'project_job_assignments.project_job_id', '=', 'project_jobs.id')
+            ->leftJoin('users as senders', 'job_assignment_messages.sender_id', '=', 'senders.id');
+
+        if ($superAdminContextId) {
+            // SuperAdmin + 会社選択: その会社の全案件への受信ジョブを表示
+            $base->where('project_jobs.company_id', $superAdminContextId);
+        } else {
+            $base->where('project_job_assignments.user_id', $user->id)
+                // 自己割当・自分の返信を除外: メッセージ送信者が自分自身のものは表示しない
+                // (受信箱として機能させる：他者から送られたメッセージのみ表示)
+                ->where('job_assignment_messages.sender_id', '!=', $user->id);
+        }
+        // 登録済みジョブも一覧に残す（フロントエンドの「登録済みを表示しない」チェックで制御）
 
         if ($q) {
             $base->where(function ($sub) use ($q) {
@@ -777,9 +841,17 @@ class JobBoxController extends Controller
             // non-fatal
         }
 
-        $monthValues = JobAssignmentMessage::join('project_job_assignments', 'job_assignment_messages.project_job_assignment_id', '=', 'project_job_assignments.id')
-            ->where('project_job_assignments.user_id', $user->id)
-            ->where('job_assignment_messages.sender_id', '!=', $user->id)
+        $monthValuesQuery = JobAssignmentMessage::join('project_job_assignments', 'job_assignment_messages.project_job_assignment_id', '=', 'project_job_assignments.id')
+            ->join('project_jobs', 'project_job_assignments.project_job_id', '=', 'project_jobs.id');
+
+        if ($superAdminContextId) {
+            $monthValuesQuery->where('project_jobs.company_id', $superAdminContextId);
+        } else {
+            $monthValuesQuery->where('project_job_assignments.user_id', $user->id)
+                ->where('job_assignment_messages.sender_id', '!=', $user->id);
+        }
+
+        $monthValues = $monthValuesQuery
             ->selectRaw("DATE_FORMAT(COALESCE(project_job_assignments.desired_end_date, job_assignment_messages.created_at), '%Y-%m') as ym")
             ->groupBy('ym')
             ->orderBy('ym', 'desc')
@@ -798,14 +870,15 @@ class JobBoxController extends Controller
             ->values();
 
         return inertia('JobBox/Index', [
-            'projectJob' => null,
-            'messages' => $messages,
-            'q' => $q,
-            'period' => $periodModel,
+            'projectJob'   => null,
+            'messages'     => $messages,
+            'q'            => $q,
+            'period'       => $periodModel,
             'monthOptions' => $monthOptions,
-            'sort' => $sort,
-            'dir' => $dir,
+            'sort'         => $sort,
+            'dir'          => $dir,
             'routeContext' => 'user',
+            'isGlobalMode' => false,
         ]);
     }
 

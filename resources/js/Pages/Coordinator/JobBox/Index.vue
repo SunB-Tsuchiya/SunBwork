@@ -11,6 +11,7 @@
             >新規作成</Link>
         </template>
 
+        <SuperAdminGlobalGuard :show="isGlobalMode">
         <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
 
             <!-- 検索・フィルター行 -->
@@ -188,16 +189,18 @@
                 <Link :href="getBackLink()" class="rounded bg-gray-200 px-4 py-2">戻る</Link>
             </div>
         </div>
+        </SuperAdminGlobalGuard>
     </AppLayout>
 </template>
 
 <script setup>
 import useToasts from '@/Composables/useToasts';
 import AppLayout from '@/layouts/AppLayout.vue';
+import SuperAdminGlobalGuard from '@/Components/SuperAdminGlobalGuard.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, ref, watch } from 'vue';
 
-const props = defineProps({ projectJob: Object, messages: Object });
+const props = defineProps({ projectJob: Object, messages: Object, isGlobalMode: { type: Boolean, default: false } });
 const page = usePage();
 page.props.q_model = page.props.q || '';
 page.props.period_model = page.props.period ?? '';

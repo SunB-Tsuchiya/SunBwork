@@ -37,11 +37,30 @@ class ProjectJobController extends Controller
         $q = $request->input('q', '');
         $period = $request->input('period', '');
 
-        $query = ProjectJob::with('client')
-            ->where(function ($q) use ($user) {
-                $q->where('user_id', $user->id)
-                    ->orWhereHas('coordinators', fn ($c) => $c->where('users.id', $user->id));
-            });
+        // SuperAdmin: グローバルモードでは会社を選択させる
+        if ($user->isSuperAdmin()) {
+            $contextId = session('superadmin_context.company_id');
+            if ($contextId === null) {
+                return Inertia::render('Coordinator/ProjectJobs/Index', [
+                    'jobs'          => [],
+                    'favoriteJobs'  => [],
+                    'jobid'         => null,
+                    'registerFlags' => [],
+                    'monthOptions'  => [],
+                    'q'             => $q,
+                    'period'        => $period,
+                    'isGlobalMode'  => true,
+                ]);
+            }
+            // SuperAdmin + 会社選択: その会社の全案件を表示
+            $query = ProjectJob::with('client')->where('company_id', $contextId);
+        } else {
+            $query = ProjectJob::with('client')
+                ->where(function ($q) use ($user) {
+                    $q->where('user_id', $user->id)
+                        ->orWhereHas('coordinators', fn ($c) => $c->where('users.id', $user->id));
+                });
+        }
 
         if ($q) {
             $query->where(function ($q2) use ($q) {
@@ -79,13 +98,14 @@ class ProjectJobController extends Controller
         $jobid = session('jobid');
         $registerFlags = session('register_flags', []);
         return Inertia::render('Coordinator/ProjectJobs/Index', [
-            'jobs' => $jobs,
-            'favoriteJobs' => $favoriteJobs,
-            'jobid' => $jobid,
+            'jobs'          => $jobs,
+            'favoriteJobs'  => $favoriteJobs,
+            'jobid'         => $jobid,
             'registerFlags' => $registerFlags,
-            'monthOptions' => $monthOptions,
-            'q' => $q,
-            'period' => $period,
+            'monthOptions'  => $monthOptions,
+            'q'             => $q,
+            'period'        => $period,
+            'isGlobalMode'  => false,
         ]);
     }
 

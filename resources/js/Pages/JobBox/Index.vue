@@ -16,6 +16,7 @@
             <UserNavigationTabs active="jobbox" />
         </template>
 
+        <SuperAdminGlobalGuard :show="isGlobalMode">
         <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
 
             <!-- 検索・フィルター行 -->
@@ -160,10 +161,12 @@
                 <Link :href="getBackLink()" class="rounded bg-gray-200 px-4 py-2">戻る</Link>
             </div>
         </div>
+        </SuperAdminGlobalGuard>
     </AppLayout>
 </template>
 
 <script setup>
+import SuperAdminGlobalGuard from '@/Components/SuperAdminGlobalGuard.vue';
 import useToasts from '@/Composables/useToasts';
 import { useUIState } from '@/Composables/useUIState';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -171,7 +174,7 @@ import UserNavigationTabs from '@/Components/Tabs/UserNavigationTabs.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, ref } from 'vue';
 
-const props = defineProps({ projectJob: Object, messages: Object, routeContext: { type: String, default: 'coordinator' } });
+const props = defineProps({ projectJob: Object, messages: Object, routeContext: { type: String, default: 'coordinator' }, isGlobalMode: { type: Boolean, default: false } });
 const page = usePage();
 page.props.q_model = page.props.q || '';
 page.props.period_model = page.props.period ?? '';
