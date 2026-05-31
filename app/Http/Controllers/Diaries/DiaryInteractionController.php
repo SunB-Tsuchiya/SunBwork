@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Diaries;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\ChecksAdminPermission;
 use App\Http\Controllers\Concerns\ChecksLeaderPermission;
+use App\Http\Controllers\Concerns\ResolvesContextCompany;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\Diary;
@@ -17,15 +18,19 @@ use Illuminate\Support\Facades\DB;
 
 class DiaryInteractionController extends Controller
 {
-    use ChecksAdminPermission, ChecksLeaderPermission;
+    use ChecksAdminPermission, ChecksLeaderPermission, ResolvesContextCompany;
     /**
      * Build the list of permitted user IDs visible to the current actor
      * (admin -> company users, leader -> department/unit members).
      */
     protected function buildPermittedUserIds($currentUser)
     {
-        // If user is superadmin, they can see all users' diaries
+        // SuperAdmin: コンテキスト会社に絞る（未選択=グローバルモードは全社）
         if (method_exists($currentUser, 'isSuperAdmin') && $currentUser->isSuperAdmin()) {
+            $contextCompanyId = $this->contextCompanyId();
+            if ($contextCompanyId) {
+                return User::where('company_id', $contextCompanyId)->pluck('id')->toArray();
+            }
             return User::pluck('id')->toArray();
         }
 
@@ -85,7 +90,7 @@ class DiaryInteractionController extends Controller
         $this->requireAdminPermission('diary_management');
         $this->requireLeaderPermission('diary_management');
         $currentUser = Auth::user();
-        $isAdmin = ($currentUser->user_role ?? '') === 'admin';
+        $isAdmin = in_array($currentUser->user_role ?? '', ['admin', 'superadmin']);
 
         $userIds = $this->buildPermittedUserIds($currentUser);
 
@@ -394,7 +399,7 @@ class DiaryInteractionController extends Controller
         $this->requireAdminPermission('diary_management');
         $this->requireLeaderPermission('diary_management');
         $currentUser = Auth::user();
-        $isAdmin = ($currentUser->user_role ?? '') === 'admin';
+        $isAdmin = in_array($currentUser->user_role ?? '', ['admin', 'superadmin']);
         $permitted = $this->buildPermittedUserIds($currentUser);
 
         if (!in_array($diary->user_id, $permitted) && !$isAdmin) {
@@ -467,7 +472,7 @@ class DiaryInteractionController extends Controller
         $this->requireAdminPermission('diary_management');
         $this->requireLeaderPermission('diary_management');
         $currentUser = Auth::user();
-        $isAdmin = ($currentUser->user_role ?? '') === 'admin';
+        $isAdmin = in_array($currentUser->user_role ?? '', ['admin', 'superadmin']);
         $permitted = $this->buildPermittedUserIds($currentUser);
 
         if (!in_array($diary->user_id, $permitted) && !$isAdmin) {

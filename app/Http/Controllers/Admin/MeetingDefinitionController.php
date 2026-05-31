@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Http\Controllers\Concerns\ResolvesContextCompany;
 use App\Http\Controllers\Leader\MeetingDefinitionController as LeaderMeetingDefinitionController;
 use App\Models\MeetingDefinition;
 use App\Models\User;
@@ -16,14 +17,22 @@ use Inertia\Inertia;
  */
 class MeetingDefinitionController extends LeaderMeetingDefinitionController
 {
+    use ResolvesContextCompany;
+
     protected function getAvailableMembers(): \Illuminate\Support\Collection
     {
-        return User::orderBy('name')->get(['id', 'name', 'department_id', 'assignment_id']);
+        $companyId = $this->contextCompanyId();
+        return User::when($companyId, fn ($q) => $q->where('company_id', $companyId))
+            ->orderBy('name')
+            ->get(['id', 'name', 'department_id', 'assignment_id']);
     }
 
     protected function getDepartments(): \Illuminate\Support\Collection
     {
-        return \App\Models\Department::orderBy('name')->get();
+        $companyId = $this->contextCompanyId();
+        return \App\Models\Department::when($companyId, fn ($q) => $q->where('company_id', $companyId))
+            ->orderBy('name')
+            ->get();
     }
 
     public function index()

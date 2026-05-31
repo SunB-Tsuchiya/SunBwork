@@ -324,9 +324,15 @@ class WorkloadAnalyzerController extends Controller
 
         $user = $request->user();
 
-        // SuperAdmin: 全会社のデータ
+        // SuperAdmin: コンテキスト会社が選択されていれば1社のみ、未選択なら全社
         if (method_exists($user, 'isSuperAdmin') ? $user->isSuperAdmin() : (($user->user_role ?? '') === 'superadmin')) {
-            $companies = Company::with(['departments.teams.members.assignment'])->ordered()->get();
+            $contextCompanyId = session('superadmin_context.company_id');
+            if ($contextCompanyId) {
+                $companies = Company::with(['departments.teams.members.assignment'])
+                    ->where('id', $contextCompanyId)->get();
+            } else {
+                $companies = Company::with(['departments.teams.members.assignment'])->ordered()->get();
+            }
         }
         // Admin: 自社の全メンバー
         elseif (method_exists($user, 'isAdmin') ? $user->isAdmin() : (($user->user_role ?? '') === 'admin')) {

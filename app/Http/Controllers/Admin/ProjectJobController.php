@@ -41,11 +41,15 @@ class ProjectJobController extends Controller
             ->toArray();
 
         $query = ProjectJob::with(['client', 'user'])
-            ->forCompany($companyId)
-            ->where(function ($sub) use ($memberIds) {
+            ->forCompany($companyId);
+
+        // 部署が未設定またはメンバーが0人の場合は部署フィルターをスキップ（全社表示）
+        if (!empty($memberIds)) {
+            $query->where(function ($sub) use ($memberIds) {
                 $sub->whereIn('user_id', $memberIds)
                     ->orWhereHas('coordinators', fn ($c) => $c->whereIn('users.id', $memberIds));
             });
+        }
 
         if ($q) {
             $query->where(function ($q2) use ($q) {

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\ResolvesContextCompany;
 use App\Models\LeaderPermission;
 use App\Models\Team;
 use App\Models\User;
@@ -13,6 +14,8 @@ use Inertia\Inertia;
 
 class LeaderPermissionController extends Controller
 {
+    use ResolvesContextCompany;
+
     /** Leader ユーザー一覧と権限を表示 */
     public function index()
     {
@@ -23,7 +26,12 @@ class LeaderPermissionController extends Controller
                 ->with('leaderPermission')
                 ->orderBy('name');
 
-            if (! $currentUser->isSuperAdmin()) {
+            if ($currentUser->isSuperAdmin()) {
+                $contextCompanyId = $this->contextCompanyId();
+                if ($contextCompanyId) {
+                    $query->where('company_id', $contextCompanyId);
+                }
+            } else {
                 $query->where('company_id', $currentUser->company_id);
             }
 
