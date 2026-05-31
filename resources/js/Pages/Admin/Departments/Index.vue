@@ -25,6 +25,30 @@ function submit() {
     });
 }
 
+async function handleCreateTeam(dept) {
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+    try {
+        const res = await fetch(route('admin.departments.create_team', { department: dept.id }), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': csrf,
+                Accept: 'application/json',
+            },
+            credentials: 'same-origin',
+        });
+        if (res.ok || res.status === 302) {
+            router.visit(route('admin.departments.index'));
+            return;
+        }
+        const data = await res.json().catch(() => ({}));
+        alert(data.message || `チーム作成に失敗しました (HTTP ${res.status})`);
+    } catch {
+        alert('チーム作成に失敗しました。');
+    }
+}
+
 async function handleDelete(dept) {
     if (!confirm(`「${dept.name}」を削除します。\n所属するチームも同時に削除されます。よろしいですか？`)) return;
     if (!confirm('本当に削除してよいですか？この操作は取り消せません。')) return;
@@ -135,6 +159,14 @@ async function handleDelete(dept) {
                                     @click="router.visit(route('admin.teams.edit', { team: dept.team_id }))"
                                 >
                                     チーム編集
+                                </button>
+                                <button
+                                    v-else
+                                    type="button"
+                                    class="mr-2 rounded border border-blue-400 px-3 py-1 text-xs text-blue-600 hover:bg-blue-50"
+                                    @click="handleCreateTeam(dept)"
+                                >
+                                    チーム作成
                                 </button>
                                 <button
                                     type="button"

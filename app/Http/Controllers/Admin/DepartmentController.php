@@ -79,6 +79,31 @@ class DepartmentController extends Controller
         return redirect()->route('admin.departments.index')->with('success', '部署を作成しました');
     }
 
+    public function createTeam(Department $department)
+    {
+        $this->requireAdminPermission('team_management');
+        $user      = Auth::user();
+        $companyId = $this->contextCompanyId() ?? $user->company_id;
+
+        if ($department->company_id !== $companyId) {
+            abort(403, 'この部署のチームを作成する権限がありません');
+        }
+
+        Team::firstOrCreate(
+            [
+                'company_id'    => $department->company_id,
+                'department_id' => $department->id,
+                'team_type'     => 'department',
+            ],
+            [
+                'name'    => $department->name,
+                'user_id' => $user->id,
+            ]
+        );
+
+        return redirect()->route('admin.departments.index')->with('success', "「{$department->name}」のチームを作成しました");
+    }
+
     public function destroy(Department $department)
     {
         $this->requireAdminPermission('team_management');
