@@ -70,8 +70,9 @@ class DepartmentController extends Controller
                     'team_type'     => 'department',
                 ],
                 [
-                    'name'    => $validated['name'],
-                    'user_id' => $user->id,
+                    'name'          => $validated['name'],
+                    'user_id'       => $user->id,
+                    'personal_team' => false,
                 ]
             );
         });
@@ -96,8 +97,9 @@ class DepartmentController extends Controller
                 'team_type'     => 'department',
             ],
             [
-                'name'    => $department->name,
-                'user_id' => $user->id,
+                'name'          => $department->name,
+                'user_id'       => $user->id,
+                'personal_team' => false,
             ]
         );
 
