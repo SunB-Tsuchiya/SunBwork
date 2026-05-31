@@ -19,7 +19,8 @@ class DepartmentController extends Controller
     public function index()
     {
         $this->requireAdminPermission('team_management');
-        $companyId = $this->contextCompanyId();
+        $user      = Auth::user();
+        $companyId = $this->contextCompanyId() ?? $user->company_id;
 
         $departments = Department::where('company_id', $companyId)
             ->orderBy('sort_order')
