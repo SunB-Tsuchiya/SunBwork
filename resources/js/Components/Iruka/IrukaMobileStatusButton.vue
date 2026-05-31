@@ -5,9 +5,9 @@
             class="flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
             @click="openModal"
         >
-            <span class="text-base leading-none">🐬</span>
-            <span class="h-2.5 w-2.5 rounded-full shrink-0" :class="statusInfo.dot" />
-            <span class="max-w-[90px] truncate">{{ statusInfo.label }}</span>
+            <span class="text-base leading-none pointer-events-none">🐬</span>
+            <span class="h-2.5 w-2.5 rounded-full shrink-0 pointer-events-none" :class="statusInfo.dot" />
+            <span class="max-w-[90px] truncate pointer-events-none">{{ statusInfo.label }}</span>
         </button>
 
         <IrukaStatusModal

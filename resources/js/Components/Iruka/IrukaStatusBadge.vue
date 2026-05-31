@@ -6,9 +6,9 @@
             class="flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium shadow-sm hover:bg-gray-50 transition-colors"
             @click="showModal = true"
         >
-            <span class="text-base leading-none">🐬</span>
-            <span class="h-2 w-2 rounded-full shrink-0" :class="statusInfo.dot" />
-            <span class="hidden sm:inline text-gray-600 max-w-[80px] truncate">{{ statusInfo.label }}</span>
+            <span class="text-base leading-none pointer-events-none">🐬</span>
+            <span class="h-2 w-2 rounded-full shrink-0 pointer-events-none" :class="statusInfo.dot" />
+            <span class="hidden sm:inline text-gray-600 max-w-[80px] truncate pointer-events-none">{{ statusInfo.label }}</span>
         </button>
 
         <!-- ステータスモーダル -->
