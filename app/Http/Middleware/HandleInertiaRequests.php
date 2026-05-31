@@ -155,6 +155,7 @@ class HandleInertiaRequests extends Middleware
                 'switchableCompanies' => $request->user()?->isSuperAdmin()
                     ? \App\Models\Company::where('code', '!=', 'SUPERADMIN')
                         ->active()
+                        ->ordered()
                         ->get(['id', 'name', 'company_type'])
                         ->toArray()
                     : null,

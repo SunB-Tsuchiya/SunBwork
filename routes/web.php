@@ -467,6 +467,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 
         // 会社管理
         Route::resource('companies', App\Http\Controllers\SuperAdmin\CompanyController::class);
+        Route::post('companies/reorder', [App\Http\Controllers\SuperAdmin\CompanyController::class, 'reorder'])->name('superadmin.companies.reorder');
 
         // チーム管理
         Route::resource('teams', App\Http\Controllers\SuperAdmin\TeamController::class);

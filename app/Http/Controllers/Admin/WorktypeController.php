@@ -22,7 +22,7 @@ class WorktypeController extends Controller
 
         if ($isSuperAdmin) {
             // 全会社を取得し、会社ごとにグループ化
-            $companies = Company::orderBy('id')->get();
+            $companies = Company::ordered()->get();
             $groups = $companies->map(function ($company) {
                 return [
                     'company_id'   => $company->id,

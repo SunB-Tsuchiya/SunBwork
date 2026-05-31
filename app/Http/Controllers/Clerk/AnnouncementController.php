@@ -96,7 +96,7 @@ class AnnouncementController extends Controller
 
         // cross-company 対象者: general タイプ会社のユーザーは全会社の一覧を受け取る
         $companies = $user->company?->company_type === 'general'
-            ? Company::where('code', '!=', 'SUPERADMIN')->active()->orderBy('name')->get(['id', 'name'])
+            ? Company::where('code', '!=', 'SUPERADMIN')->active()->ordered()->get(['id', 'name'])
             : null;
 
         return Inertia::render('Clerk/Announcements/Create', compact('users', 'companies'));

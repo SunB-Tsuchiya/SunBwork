@@ -13,7 +13,7 @@ class CompanyController extends Controller
 {
     public function index()
     {
-        $companies = Company::with(['departments.assignments', 'representative'])->get();
+        $companies = Company::with(['departments.assignments', 'representative'])->ordered()->get();
         return Inertia::render('SuperAdmin/Companies/Index', [
             'companies' => $companies,
         ]);
@@ -97,6 +97,7 @@ class CompanyController extends Controller
         $request->validate([
             'name'                     => 'required|string|max:255',
             'company_type'             => 'required|in:sunbrain,general',
+            'sort_order'               => 'nullable|integer|min:0',
             'representative_id'        => 'nullable|exists:users,id',
             'representative_leader_id' => 'nullable|exists:users,id',
             'departments'              => 'array',
@@ -109,6 +110,7 @@ class CompanyController extends Controller
         $company->update([
             'name'                     => $request->name,
             'company_type'             => $request->company_type,
+            'sort_order'               => $request->input('sort_order', 0),
             'representative_id'        => $request->input('representative_id'),
             'representative_leader_id' => $request->input('representative_leader_id'),
         ]);
@@ -148,6 +150,21 @@ class CompanyController extends Controller
     {
         $company->delete();
         return redirect()->route('superadmin.companies.index');
+    }
+
+    public function reorder(Request $request)
+    {
+        $request->validate([
+            'items'            => 'required|array',
+            'items.*.id'       => 'required|integer|exists:companies,id',
+            'items.*.sort_order' => 'required|integer|min:0',
+        ]);
+
+        foreach ($request->items as $item) {
+            Company::where('id', $item['id'])->update(['sort_order' => $item['sort_order']]);
+        }
+
+        return response()->json(['ok' => true]);
     }
 
     /**

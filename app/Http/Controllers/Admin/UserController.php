@@ -64,7 +64,7 @@ class UserController extends Controller
         // 会社ごとに部署・役職をネストして取得
         $companies = Company::with(['departments.assignments' => function($q){
             $q->where('active', true);
-        }])->where('active', true)->get();
+        }])->where('active', true)->ordered()->get();
 
         $positionTitles = PositionTitle::orderBy('sort_order')->get(['id', 'name']);
 
@@ -186,7 +186,7 @@ class UserController extends Controller
             $q->with(['assignments' => function ($q2) {
                 $q2->where('active', true);
             }]);
-        }])->where('active', true)->get();
+        }])->where('active', true)->ordered()->get();
 
         $positionTitles = PositionTitle::orderBy('sort_order')->get(['id', 'name']);
 
@@ -334,7 +334,7 @@ class UserController extends Controller
     public function csvUpload()
     {
         $this->requireAdminPermission('user_management');
-        $companies = Company::with('departments')->where('active', 1)->get();
+        $companies = Company::with('departments')->where('active', 1)->ordered()->get();
 
         return Inertia::render('Admin/Users/CsvUpload', [
             'companies' => $companies

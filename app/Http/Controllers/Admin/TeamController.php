@@ -32,7 +32,7 @@ class TeamController extends Controller
     {
         $this->requireAdminPermission('team_management');
         $team = Team::with(['company', 'department'])->findOrFail($id);
-        $companies = \App\Models\Company::active()->get(['id', 'name']);
+        $companies = \App\Models\Company::active()->ordered()->get(['id', 'name']);
         $departments = \App\Models\Department::active()->get(['id', 'name', 'company_id']);
         $props = [
             'team' => $team,

@@ -829,7 +829,7 @@ class ClientController extends Controller
         $this->authorize('create', Client::class);
         $user = Auth::user();
         $companies = ($user && $user->user_role === 'superadmin')
-            ? Company::orderBy('name')->get(['id', 'name'])
+            ? Company::ordered()->get(['id', 'name'])
             : [];
         $departments = $user->user_role === 'superadmin'
             ? Department::orderBy('id')->get(['id', 'name', 'company_id'])

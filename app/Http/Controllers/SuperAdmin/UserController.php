@@ -43,7 +43,7 @@ class UserController extends Controller
         // SuperAdmin 向け: 会社タブ用の一覧
         $companies = Company::where('code', '!=', 'SUPERADMIN')
             ->active()
-            ->orderBy('name')
+            ->ordered()
             ->get(['id', 'name', 'company_type']);
 
         return Inertia::render('SuperAdmin/Users/Index', [
@@ -60,7 +60,7 @@ class UserController extends Controller
     {
         $companies = Company::with(['departments.assignments' => function($q){
             $q->where('active', true);
-        }])->where('active', true)->get();
+        }])->where('active', true)->ordered()->get();
 
         return Inertia::render('SuperAdmin/Users/Create', [
             'companies' => $companies,
@@ -140,7 +140,7 @@ class UserController extends Controller
             $q->with(['assignments' => function ($q2) {
                 $q2->where('active', true);
             }]);
-        }])->where('active', true)->get();
+        }])->where('active', true)->ordered()->get();
 
         $positionTitles = PositionTitle::orderBy('sort_order')->get(['id', 'name']);
 

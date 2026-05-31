@@ -326,7 +326,7 @@ class WorkloadAnalyzerController extends Controller
 
         // SuperAdmin: 全会社のデータ
         if (method_exists($user, 'isSuperAdmin') ? $user->isSuperAdmin() : (($user->user_role ?? '') === 'superadmin')) {
-            $companies = Company::with(['departments.teams.members.assignment'])->get();
+            $companies = Company::with(['departments.teams.members.assignment'])->ordered()->get();
         }
         // Admin: 自社の全メンバー
         elseif (method_exists($user, 'isAdmin') ? $user->isAdmin() : (($user->user_role ?? '') === 'admin')) {

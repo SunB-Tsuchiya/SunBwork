@@ -21,7 +21,7 @@ class CompanyController extends Controller
         $user = Auth::user();
         // superadmin は全会社を閲覧可能、それ以外は所属会社のみ
         if ($user && $user->user_role === 'superadmin') {
-            $companies = Company::with(['departments.assignments', 'representative'])->get();
+            $companies = Company::with(['departments.assignments', 'representative'])->ordered()->get();
         } else {
             if ($user && $user->company_id) {
                 $companies = Company::with(['departments.assignments', 'representative'])

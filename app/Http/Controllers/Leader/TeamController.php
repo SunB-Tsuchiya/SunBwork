@@ -55,7 +55,7 @@ class TeamController extends Controller
 
         $user        = Auth::user();
         $companyId   = $team->company_id;
-        $companies   = \App\Models\Company::active()->get(['id', 'name']);
+        $companies   = \App\Models\Company::active()->ordered()->get(['id', 'name']);
         $departments = \App\Models\Department::active()->get(['id', 'name', 'company_id']);
 
         $users = $companyId

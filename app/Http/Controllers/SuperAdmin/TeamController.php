@@ -20,7 +20,7 @@ class TeamController extends Controller
     public function edit($id)
     {
         $team = Team::with(['company', 'department'])->findOrFail($id);
-        $companies = \App\Models\Company::active()->get(['id', 'name']);
+        $companies = \App\Models\Company::active()->ordered()->get(['id', 'name']);
         $departments = \App\Models\Department::active()->get(['id', 'name', 'company_id']);
         return Inertia::render('SuperAdmin/Teams/Edit', [
             'team' => $team,

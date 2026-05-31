@@ -26,6 +26,7 @@ const props = defineProps({
 const form = useForm({
     name: props.company.name,
     company_type: props.company.company_type ?? 'general',
+    sort_order: props.company.sort_order ?? 0,
     representative_id: props.company.representative_id ?? null,
     representative_leader_id: props.company.representative_leader_id ?? null,
     departments: props.company.departments?.map(dep => ({
@@ -94,6 +95,13 @@ const removeRole = (depIdx, assignmentIdx) => {
                     <div class="mb-6">
                         <InputLabel for="name" value="会社名" />
                         <TextInput id="name" v-model="form.name" type="text" class="mt-1 block w-full" required autofocus />
+                    </div>
+
+                    <!-- 並び順 -->
+                    <div class="mb-6">
+                        <InputLabel for="sort_order" value="並び順（数値が小さいほど先頭）" />
+                        <TextInput id="sort_order" v-model.number="form.sort_order" type="number" min="0" class="mt-1 block w-32" />
+                        <p class="mt-1 text-xs text-gray-500">通知の送信先選択など、会社一覧の表示順に使われます。</p>
                     </div>
 
                     <!-- 会社タイプ -->

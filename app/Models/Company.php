@@ -17,6 +17,7 @@ class Company extends Model
         'company_type',
         'description',
         'active',
+        'sort_order',
         'representative_id',
         'representative_leader_id',
     ];
@@ -63,6 +64,14 @@ class Company extends Model
     public function scopeActive($query)
     {
         return $query->where('active', true);
+    }
+
+    /**
+     * sort_order 昇順で取得（同値は id 昇順）
+     */
+    public function scopeOrdered($query)
+    {
+        return $query->orderBy('sort_order')->orderBy('id');
     }
 
     public function isSunbrain(): bool

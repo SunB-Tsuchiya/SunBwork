@@ -38,7 +38,7 @@ class AdminUserController extends Controller
         $departments = $companyId
             ? Department::where('company_id', $companyId)->get()
             : Department::all();
-        $companies = Company::all();
+        $companies = Company::ordered()->get();
 
         $user = Auth::user();
 
@@ -62,7 +62,7 @@ class AdminUserController extends Controller
 
         $companies = Company::with(['departments.assignments' => function ($q) {
             $q->where('active', true);
-        }])->where('active', true)->get();
+        }])->where('active', true)->ordered()->get();
 
         $positionTitles = PositionTitle::orderBy('sort_order')->get()->groupBy('applicable_role');
 
@@ -153,7 +153,7 @@ class AdminUserController extends Controller
 
         $companies = Company::with(['departments.assignments' => function ($q) {
             $q->where('active', true);
-        }])->where('active', true)->get();
+        }])->where('active', true)->ordered()->get();
 
         $positionTitles = PositionTitle::orderBy('sort_order')->get()->groupBy('applicable_role');
 
@@ -211,7 +211,7 @@ class AdminUserController extends Controller
      */
     public function csvUpload()
     {
-        $companies = Company::with('departments')->where('active', 1)->get();
+        $companies = Company::with('departments')->where('active', 1)->ordered()->get();
 
         return Inertia::render('SuperAdmin/AdminUsers/CsvUpload', [
             'companies' => $companies
