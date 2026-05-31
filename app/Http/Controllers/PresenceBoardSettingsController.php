@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ResolvesContextCompany;
 use App\Models\Department;
 use App\Models\IrukaStatusOrder;
 use App\Models\User;
@@ -12,15 +13,31 @@ use Inertia\Inertia;
 
 class PresenceBoardSettingsController extends Controller
 {
+    use ResolvesContextCompany;
+
     /**
      * 在席ボード管理画面
      * Admin: 全部署 / Leader: 自部署のみ
      */
     public function index()
     {
-        $authUser = Auth::user();
-        $userIds  = $this->getAllowedUserIds($authUser);
-        $isAdmin  = in_array($authUser->user_role, ['admin', 'superadmin', 'clerk']);
+        $authUser  = Auth::user();
+        $companyId = $this->contextCompanyId() ?? $authUser->company_id;
+        $isAdmin   = in_array($authUser->user_role, ['admin', 'superadmin', 'clerk']);
+
+        // SuperAdmin がグローバルモード（会社未選択）の場合は警告を返す
+        if ($authUser->isSuperAdmin() && $this->contextCompanyId() === null) {
+            return Inertia::render('Iruka/BoardSettings', [
+                'users'             => [],
+                'departments'       => [],
+                'isAdmin'           => $isAdmin,
+                'statusOrders'      => [],
+                'context'           => 'admin',
+                'noCompanySelected' => true,
+            ]);
+        }
+
+        $userIds  = $this->getAllowedUserIds($authUser, $companyId);
 
         // context: ロールに応じてフロントのカラーテーマを決定
         $context = match ($authUser->user_role) {
@@ -61,13 +78,13 @@ class PresenceBoardSettingsController extends Controller
             ]);
 
         $departments = $isAdmin
-            ? Department::where('company_id', $authUser->company_id)
+            ? Department::where('company_id', $companyId)
                 ->orderBy('sort_order')
                 ->orderBy('id')
                 ->get(['id', 'name'])
             : collect();
 
-        $statusOrders = IrukaStatusOrder::getOrCreateForCompany($authUser->company_id)
+        $statusOrders = IrukaStatusOrder::getOrCreateForCompany($companyId)
             ->map(fn ($o) => [
                 'id'           => $o->id,
                 'slug'         => $o->slug,
@@ -78,11 +95,12 @@ class PresenceBoardSettingsController extends Controller
             ]);
 
         return Inertia::render('Iruka/BoardSettings', [
-            'users'        => $users,
-            'departments'  => $departments,
-            'isAdmin'      => $isAdmin,
-            'statusOrders' => $statusOrders,
-            'context'      => $context,
+            'users'             => $users,
+            'departments'       => $departments,
+            'isAdmin'           => $isAdmin,
+            'statusOrders'      => $statusOrders,
+            'context'           => $context,
+            'noCompanySelected' => false,
         ]);
     }
 
@@ -92,8 +110,9 @@ class PresenceBoardSettingsController extends Controller
      */
     public function update(Request $request)
     {
-        $authUser = Auth::user();
-        $allowedIds = $this->getAllowedUserIds($authUser);
+        $authUser  = Auth::user();
+        $companyId = $this->contextCompanyId() ?? $authUser->company_id;
+        $allowedIds = $this->getAllowedUserIds($authUser, $companyId);
 
         $items = $request->validate([
             'items'               => 'required|array',
@@ -132,7 +151,8 @@ class PresenceBoardSettingsController extends Controller
      */
     public function updateStatuses(Request $request)
     {
-        $authUser = Auth::user();
+        $authUser  = Auth::user();
+        $companyId = $this->contextCompanyId() ?? $authUser->company_id;
 
         $items = $request->validate([
             'items'               => 'required|array',
@@ -145,7 +165,7 @@ class PresenceBoardSettingsController extends Controller
 
         foreach ($items as $item) {
             IrukaStatusOrder::updateOrCreate(
-                ['company_id' => $authUser->company_id, 'slug' => $item['slug']],
+                ['company_id' => $companyId, 'slug' => $item['slug']],
                 [
                     'sort_order'   => $item['sort_order'],
                     'is_active'    => $item['is_active'],
@@ -163,7 +183,8 @@ class PresenceBoardSettingsController extends Controller
      */
     public function createStatus(Request $request)
     {
-        $authUser = Auth::user();
+        $authUser  = Auth::user();
+        $companyId = $this->contextCompanyId() ?? $authUser->company_id;
 
         $validated = $request->validate([
             'custom_label' => 'required|string|max:50',
@@ -171,10 +192,10 @@ class PresenceBoardSettingsController extends Controller
         ]);
 
         $slug = 'cust_' . time();
-        $maxOrder = IrukaStatusOrder::where('company_id', $authUser->company_id)->max('sort_order') ?? 0;
+        $maxOrder = IrukaStatusOrder::where('company_id', $companyId)->max('sort_order') ?? 0;
 
         $record = IrukaStatusOrder::create([
-            'company_id'   => $authUser->company_id,
+            'company_id'   => $companyId,
             'slug'         => $slug,
             'sort_order'   => $maxOrder + 1,
             'is_active'    => true,
@@ -197,9 +218,10 @@ class PresenceBoardSettingsController extends Controller
      */
     public function deleteStatus(IrukaStatusOrder $statusOrder)
     {
-        $authUser = Auth::user();
+        $authUser  = Auth::user();
+        $companyId = $this->contextCompanyId() ?? $authUser->company_id;
 
-        if ($statusOrder->company_id !== $authUser->company_id) {
+        if ($statusOrder->company_id !== $companyId) {
             abort(403);
         }
 
@@ -215,13 +237,13 @@ class PresenceBoardSettingsController extends Controller
     /**
      * 操作者が管理できるユーザーIDの配列を返す
      */
-    private function getAllowedUserIds(User $authUser): array
+    private function getAllowedUserIds(User $authUser, ?int $companyId): array
     {
         $role = $authUser->user_role;
 
-        // Admin / SuperAdmin / Clerk は全部署
+        // Admin / SuperAdmin / Clerk は対象会社の全部署
         if (in_array($role, ['admin', 'superadmin', 'clerk'])) {
-            return User::where('company_id', $authUser->company_id)
+            return User::where('company_id', $companyId)
                 ->where('is_ghost', false)
                 ->whereNull('ghost_owner_id')
                 ->pluck('id')
@@ -229,13 +251,13 @@ class PresenceBoardSettingsController extends Controller
                 ->all();
         }
 
-        // Leader は自分の所属部署のメンバーのみ（全Leaderが操作可能）
+        // Leader は自分の所属部署のメンバーのみ
         if ($role === 'leader') {
             if (!$authUser->department_id) {
                 return [];
             }
 
-            return User::where('company_id', $authUser->company_id)
+            return User::where('company_id', $companyId)
                 ->where('department_id', $authUser->department_id)
                 ->where('is_ghost', false)
                 ->whereNull('ghost_owner_id')
