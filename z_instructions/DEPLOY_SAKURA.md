@@ -115,6 +115,29 @@ npm run build
 
 ---
 
+## ⚠️ public/ 直下の静的ファイルに関する注意
+
+`~/www/members/` は `~/SunBWork/public/` の**シンボリックリンクではなく実体ディレクトリ**。
+`build/` と `storage/` のみがシンボリックリンクとなっている。
+
+**影響するファイル（変更時は手動コピーが必要）:**
+- `favicon.ico`
+- `favicon.svg`
+- `apple-touch-icon.png`
+- `robots.txt`
+- `public/` 直下に置く任意の静的ファイル
+
+**コピーコマンド（さくら SSH で実行）:**
+```bash
+cp ~/SunBWork/public/favicon.ico ~/www/members/favicon.ico
+cp ~/SunBWork/public/favicon.svg ~/www/members/favicon.svg
+cp ~/SunBWork/public/apple-touch-icon.png ~/www/members/apple-touch-icon.png
+```
+
+> `public/build/` 配下のアセットはシンボリックリンク経由で自動反映されるため不要。
+
+---
+
 ## ステップ全体のフロー図
 
 ```
