@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\MorphToMany;
 
 class Announcement extends Model
 {
-    protected $fillable = ['sender_id', 'target_type', 'title', 'content', 'target_company_id'];
+    protected $fillable = ['sender_id', 'target_type', 'title', 'content', 'target_company_id', 'status'];
 
     public function sender(): BelongsTo
     {

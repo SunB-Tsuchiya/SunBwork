@@ -13,79 +13,51 @@ const props = defineProps({
 const page = usePage();
 const canCrossCompany = computed(() => page.props.auth?.featureFlags?.crossCompanyAnnouncement ?? false);
 
-// 選択中の会社 ID（複数）
 const selectedCompanyIds = ref([]);
-
-// 選択会社に絞ったユーザー一覧
 const scopedUsers = computed(() => {
     if (!canCrossCompany.value || selectedCompanyIds.value.length === 0) return props.users;
     return props.users.filter(u => selectedCompanyIds.value.includes(u.company_id));
 });
 
-const form = ref({
-    target_type: 'all',
-    title: '',
-    content: '',
-    user_ids: [],
-    attachments: [],
-});
-
+const form = ref({ target_type: 'all', title: '', content: '', user_ids: [], attachments: [] });
 const errors = ref({});
 const showModal = ref(false);
 const employmentFilter = ref('all');
-
-// 添付
-const attachmentItems = ref([]); // { file, url, isImage, name }
+const attachmentItems = ref([]);
 const lightboxUrl = ref(null);
 const isDragging = ref(false);
+const submitting = ref(false);
 
-// PDF.js で先頭ページをレンダリング
 async function pdfRender(file, scale) {
     const buf = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
-    const page = await pdf.getPage(1);
-    const vp = page.getViewport({ scale });
+    const pg = await pdf.getPage(1);
+    const vp = pg.getViewport({ scale });
     const canvas = document.createElement('canvas');
     canvas.width = vp.width; canvas.height = vp.height;
-    await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+    await pg.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
     return canvas.toDataURL('image/jpeg', 0.92);
 }
-async function pdfToThumb(file) {
-    try { return await pdfRender(file, 1.5); } catch { return null; }
-}
-async function pdfToFull(file) {
-    try { return await pdfRender(file, 2.5); } catch { return null; }
-}
+async function pdfToThumb(file) { try { return await pdfRender(file, 1.5); } catch { return null; } }
+async function pdfToFull(file)  { try { return await pdfRender(file, 2.5); } catch { return null; } }
 
-const employmentLabel = (type) => ({
-    regular: '正社員', contract: '契約社員', dispatch: '派遣', outsource: '業務委託',
-}[type] ?? type);
+const employmentLabel = (type) => ({ regular: '正社員', contract: '契約社員', dispatch: '派遣', outsource: '業務委託' }[type] ?? type);
 
-// 会社チェック toggle
 function toggleCompany(id) {
     const idx = selectedCompanyIds.value.indexOf(id);
     if (idx === -1) selectedCompanyIds.value.push(id);
     else selectedCompanyIds.value.splice(idx, 1);
-    // 会社変更時、個別選択リストをリセット
     form.value.user_ids = [];
 }
 
-// モーダルソート
-const modalSortKey = ref('name'); // 'name' | 'company'
+const modalSortKey = ref('name');
 const modalSortAsc = ref(true);
-
 function toggleSort(key) {
     if (modalSortKey.value === key) modalSortAsc.value = !modalSortAsc.value;
     else { modalSortKey.value = key; modalSortAsc.value = true; }
 }
+function companyName(id) { return props.companies?.find(c => c.id === id)?.name ?? ''; }
 
-// 会社名取得（companies prop から）
-function companyName(companyId) {
-    if (!props.companies) return '';
-    return props.companies.find(c => c.id === companyId)?.name ?? '';
-}
-
-// モーダル内絞り込み + ソート
 const filteredModalUsers = computed(() => {
     let base = scopedUsers.value;
     if (employmentFilter.value === 'employees') base = base.filter(u => ['regular', 'contract'].includes(u.employment_type));
@@ -97,19 +69,14 @@ const filteredModalUsers = computed(() => {
     });
 });
 
-watch(() => form.value.target_type, (v) => {
-    if (v !== 'individual') form.value.user_ids = [];
-});
-
+watch(() => form.value.target_type, (v) => { if (v !== 'individual') form.value.user_ids = []; });
 function toggleUser(id) {
     const idx = form.value.user_ids.indexOf(id);
-    if (idx === -1) form.value.user_ids.push(id);
-    else form.value.user_ids.splice(idx, 1);
+    if (idx === -1) form.value.user_ids.push(id); else form.value.user_ids.splice(idx, 1);
 }
 const selectAll = () => { form.value.user_ids = filteredModalUsers.value.map(u => u.id); };
-const clearAll = () => { form.value.user_ids = []; };
+const clearAll  = () => { form.value.user_ids = []; };
 
-// ─── 添付ファイル ───
 async function addFiles(files) {
     for (const file of Array.from(files)) {
         form.value.attachments.push(file);
@@ -129,31 +96,28 @@ async function addFiles(files) {
     }
 }
 function onFileInput(e) { addFiles(e.target.files); e.target.value = ''; }
-function onDrop(e) { isDragging.value = false; addFiles(e.dataTransfer.files); }
-function removeAttachment(idx) {
-    form.value.attachments.splice(idx, 1);
-    attachmentItems.value.splice(idx, 1);
-}
-function openLightbox(item) {
-    const url = item.fullUrl ?? item.url;
-    if (url) lightboxUrl.value = url;
-}
+function onDrop(e)      { isDragging.value = false; addFiles(e.dataTransfer.files); }
+function removeAttachment(idx) { form.value.attachments.splice(idx, 1); attachmentItems.value.splice(idx, 1); }
+function openLightbox(item) { const url = item.fullUrl ?? item.url; if (url) lightboxUrl.value = url; }
 
-// ─── 送信 ───
-const submitting = ref(false);
-function submit() {
-    errors.value = {};
-    submitting.value = true;
+function buildFormData(isDraft) {
     const data = new FormData();
     data.append('target_type', form.value.target_type);
     data.append('title', form.value.title);
     data.append('content', form.value.content);
+    data.append('is_draft', isDraft ? '1' : '0');
     if (canCrossCompany.value && selectedCompanyIds.value.length === 1) {
         data.append('target_company_id', selectedCompanyIds.value[0]);
     }
     form.value.user_ids.forEach(id => data.append('user_ids[]', id));
     form.value.attachments.forEach(f => data.append('attachments[]', f));
-    router.post(route('clerk.announcements.store'), data, {
+    return data;
+}
+
+function submit(isDraft) {
+    errors.value = {};
+    submitting.value = true;
+    router.post(route('clerk.announcements.store'), buildFormData(isDraft), {
         forceFormData: true,
         onError: (e) => { errors.value = e; },
         onFinish: () => { submitting.value = false; },
@@ -174,17 +138,15 @@ function submit() {
         </template>
 
         <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
-            <form @submit.prevent="submit" class="mx-auto max-w-2xl space-y-6">
+            <form @submit.prevent class="mx-auto max-w-2xl space-y-6">
 
-                <!-- ── 送信先の会社（cross-company 時のみ） ── -->
+                <!-- 送信先の会社（cross-company 時のみ） -->
                 <div v-if="canCrossCompany && companies">
                     <label class="mb-2 block text-sm font-medium text-gray-700">送信先の会社（複数選択可）</label>
                     <div class="flex flex-wrap gap-3">
                         <label v-for="c in companies" :key="c.id"
                             class="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 transition"
-                            :class="selectedCompanyIds.includes(c.id)
-                                ? 'border-purple-500 bg-purple-50 text-purple-800'
-                                : 'border-gray-200 bg-white text-gray-700 hover:border-purple-300'">
+                            :class="selectedCompanyIds.includes(c.id) ? 'border-purple-500 bg-purple-50 text-purple-800' : 'border-gray-200 bg-white text-gray-700 hover:border-purple-300'">
                             <input type="checkbox" :value="c.id" :checked="selectedCompanyIds.includes(c.id)"
                                 @change="toggleCompany(c.id)" class="text-purple-600" />
                             <span class="text-sm font-medium">{{ c.name }}</span>
@@ -195,7 +157,7 @@ function submit() {
                     </p>
                 </div>
 
-                <!-- ── 宛先 ── -->
+                <!-- 宛先 -->
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">宛先</label>
                     <div class="flex gap-4">
@@ -218,14 +180,12 @@ function submit() {
                             class="rounded border border-purple-400 px-3 py-1.5 text-sm text-purple-700 hover:bg-purple-50">
                             ユーザーを選択する
                         </button>
-                        <span v-if="form.user_ids.length > 0" class="ml-2 text-sm text-gray-600">
-                            {{ form.user_ids.length }}人選択中
-                        </span>
+                        <span v-if="form.user_ids.length > 0" class="ml-2 text-sm text-gray-600">{{ form.user_ids.length }}人選択中</span>
                         <p v-if="errors.user_ids" class="mt-1 text-xs text-red-500">{{ errors.user_ids }}</p>
                     </div>
                 </div>
 
-                <!-- ── タイトル ── -->
+                <!-- タイトル -->
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">タイトル</label>
                     <input v-model="form.title" type="text"
@@ -234,7 +194,7 @@ function submit() {
                     <p v-if="errors.title" class="mt-1 text-xs text-red-500">{{ errors.title }}</p>
                 </div>
 
-                <!-- ── 内容 ── -->
+                <!-- 内容 -->
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">内容</label>
                     <textarea v-model="form.content" rows="8"
@@ -243,61 +203,49 @@ function submit() {
                     <p v-if="errors.content" class="mt-1 text-xs text-red-500">{{ errors.content }}</p>
                 </div>
 
-                <!-- ── 添付ファイル（ドロップゾーン） ── -->
+                <!-- 添付ファイル -->
                 <div>
                     <label class="mb-2 block text-sm font-medium text-gray-700">添付ファイル（任意）</label>
-
-                    <!-- ドロップゾーン -->
                     <div class="flex flex-col items-center justify-center rounded-lg border-2 border-dashed px-6 py-8 transition-colors cursor-pointer"
                         :class="isDragging ? 'border-purple-500 bg-purple-50' : 'border-gray-300 bg-gray-50 hover:border-purple-400'"
-                        @dragover.prevent="isDragging = true"
-                        @dragleave="isDragging = false"
-                        @drop.prevent="onDrop"
-                        @click="$refs.fileInput.click()">
+                        @dragover.prevent="isDragging = true" @dragleave="isDragging = false"
+                        @drop.prevent="onDrop" @click="$refs.fileInput.click()">
                         <div class="mb-2 text-3xl text-gray-400">📎</div>
                         <p class="text-sm text-gray-600">ここにファイルをドロップ、またはクリックして選択</p>
                         <p class="mt-1 text-xs text-gray-400">JPG / PNG / PDF など（最大 20MB）</p>
                     </div>
                     <input ref="fileInput" type="file" multiple class="hidden" @change="onFileInput" />
-
-                    <!-- サムネイル一覧 -->
                     <div v-if="attachmentItems.length > 0" class="mt-4 flex flex-wrap gap-3">
                         <div v-for="(item, idx) in attachmentItems" :key="idx"
                             class="group relative rounded border border-gray-200 bg-white p-1 shadow-sm">
-                            <!-- ローディング中（PDF変換中） -->
                             <div v-if="item.loading" class="flex h-24 w-24 items-center justify-center rounded bg-gray-100">
                                 <span class="text-xs text-gray-400">変換中...</span>
                             </div>
-                            <!-- 画像 or PDF変換済みサムネイル -->
                             <img v-else-if="item.isImage" :src="item.url" :alt="item.name"
-                                class="h-24 w-24 cursor-pointer rounded object-cover transition hover:opacity-80"
-                                @click="openLightbox(item)" />
-                            <!-- その他ファイル -->
+                                class="h-24 w-24 cursor-pointer rounded object-cover transition hover:opacity-80" @click="openLightbox(item)" />
                             <div v-else class="flex h-24 w-24 flex-col items-center justify-center gap-1 text-gray-500">
                                 <span class="text-3xl">{{ item.isPdf ? '📕' : '📄' }}</span>
                                 <span class="max-w-full truncate px-1 text-center text-xs">{{ item.name }}</span>
                             </div>
-                            <!-- 削除ボタン -->
                             <button type="button" @click="removeAttachment(idx)"
-                                class="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white opacity-0 shadow transition group-hover:opacity-100 hover:bg-red-600">
-                                ✕
-                            </button>
-                            <!-- 拡大アイコン（画像のみ） -->
+                                class="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white opacity-0 shadow transition group-hover:opacity-100 hover:bg-red-600">✕</button>
                             <button v-if="item.isImage" type="button" @click="openLightbox(item)"
-                                class="absolute bottom-1 right-1 rounded bg-black/40 px-1 py-0.5 text-xs text-white opacity-0 transition group-hover:opacity-100">
-                                🔍
-                            </button>
+                                class="absolute bottom-1 right-1 rounded bg-black/40 px-1 py-0.5 text-xs text-white opacity-0 transition group-hover:opacity-100">🔍</button>
                         </div>
                     </div>
                 </div>
 
-                <!-- ── ボタン ── -->
+                <!-- ボタン -->
                 <div class="flex justify-end gap-3">
                     <Link :href="route('clerk.announcements.index')"
                         class="rounded border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">
                         キャンセル
                     </Link>
-                    <button type="submit" :disabled="submitting"
+                    <button type="button" :disabled="submitting" @click="submit(true)"
+                        class="rounded border border-yellow-400 bg-yellow-50 px-5 py-2 text-sm font-medium text-yellow-800 hover:bg-yellow-100 disabled:opacity-50">
+                        下書き保存
+                    </button>
+                    <button type="button" :disabled="submitting" @click="submit(false)"
                         class="rounded bg-purple-600 px-6 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50">
                         送信する
                     </button>
@@ -305,7 +253,7 @@ function submit() {
             </form>
         </div>
 
-        <!-- ── ユーザー選択モーダル ── -->
+        <!-- ユーザー選択モーダル -->
         <Teleport to="body">
             <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
                 <div class="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-white shadow-xl">
@@ -328,12 +276,10 @@ function submit() {
                             <thead class="sticky top-0 bg-gray-50">
                                 <tr>
                                     <th class="w-10 px-4 py-2"></th>
-                                    <th class="cursor-pointer select-none px-4 py-2 text-left text-xs font-medium text-gray-500 hover:text-gray-700"
-                                        @click="toggleSort('name')">
+                                    <th class="cursor-pointer select-none px-4 py-2 text-left text-xs font-medium text-gray-500 hover:text-gray-700" @click="toggleSort('name')">
                                         名前 <span v-if="modalSortKey==='name'">{{ modalSortAsc ? '▲' : '▼' }}</span>
                                     </th>
-                                    <th v-if="canCrossCompany" class="cursor-pointer select-none px-4 py-2 text-left text-xs font-medium text-gray-500 hover:text-gray-700"
-                                        @click="toggleSort('company')">
+                                    <th v-if="canCrossCompany" class="cursor-pointer select-none px-4 py-2 text-left text-xs font-medium text-gray-500 hover:text-gray-700" @click="toggleSort('company')">
                                         会社 <span v-if="modalSortKey==='company'">{{ modalSortAsc ? '▲' : '▼' }}</span>
                                     </th>
                                     <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">担当</th>
@@ -346,8 +292,7 @@ function submit() {
                                     :class="form.user_ids.includes(u.id) ? 'bg-purple-50' : ''"
                                     @click="toggleUser(u.id)">
                                     <td class="px-4 py-2 text-center">
-                                        <input type="checkbox" :checked="form.user_ids.includes(u.id)"
-                                            @click.stop="toggleUser(u.id)" class="rounded text-purple-600" />
+                                        <input type="checkbox" :checked="form.user_ids.includes(u.id)" @click.stop="toggleUser(u.id)" class="rounded text-purple-600" />
                                     </td>
                                     <td class="px-4 py-2 text-sm font-medium text-gray-800">{{ u.name }}</td>
                                     <td v-if="canCrossCompany" class="px-4 py-2 text-xs text-gray-500">{{ companyName(u.company_id) }}</td>
@@ -368,14 +313,11 @@ function submit() {
             </div>
         </Teleport>
 
-        <!-- ── ライトボックス ── -->
+        <!-- ライトボックス -->
         <Teleport to="body">
-            <div v-if="lightboxUrl" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/80"
-                @click="lightboxUrl = null">
-                <img :src="lightboxUrl" alt="拡大表示"
-                    class="max-h-[90vh] max-w-[90vw] rounded-lg object-contain shadow-2xl" />
-                <button class="absolute right-4 top-4 rounded-full bg-white/20 p-2 text-white hover:bg-white/40"
-                    @click.stop="lightboxUrl = null">✕</button>
+            <div v-if="lightboxUrl" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/80" @click="lightboxUrl = null">
+                <img :src="lightboxUrl" alt="拡大表示" class="max-h-[90vh] max-w-[90vw] rounded-lg object-contain shadow-2xl" />
+                <button class="absolute right-4 top-4 rounded-full bg-white/20 p-2 text-white hover:bg-white/40" @click.stop="lightboxUrl = null">✕</button>
             </div>
         </Teleport>
     </AppLayout>

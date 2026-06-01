@@ -598,6 +598,16 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('sales-reps/reorder', [\App\Http\Controllers\Leader\SalesRepController::class, 'reorder'])->name('sales_reps.reorder');
         Route::patch('sales-reps/{salesRep}', [\App\Http\Controllers\Leader\SalesRepController::class, 'update'])->name('sales_reps.update');
         Route::delete('sales-reps/{salesRep}', [\App\Http\Controllers\Leader\SalesRepController::class, 'destroy'])->name('sales_reps.destroy');
+
+        // お知らせ管理（Leader用）
+        Route::get('announcements', [App\Http\Controllers\Leader\AnnouncementController::class, 'index'])->name('announcements.index');
+        Route::get('announcements/create', [App\Http\Controllers\Leader\AnnouncementController::class, 'create'])->name('announcements.create');
+        Route::post('announcements', [App\Http\Controllers\Leader\AnnouncementController::class, 'store'])->name('announcements.store');
+        Route::get('announcements/{announcement}', [App\Http\Controllers\Leader\AnnouncementController::class, 'show'])->name('announcements.show');
+        Route::get('announcements/{announcement}/edit', [App\Http\Controllers\Leader\AnnouncementController::class, 'edit'])->name('announcements.edit');
+        Route::put('announcements/{announcement}', [App\Http\Controllers\Leader\AnnouncementController::class, 'update'])->name('announcements.update');
+        Route::delete('announcements/{announcement}', [App\Http\Controllers\Leader\AnnouncementController::class, 'destroy'])->name('announcements.destroy');
+        Route::post('announcements/{announcement}/send', [App\Http\Controllers\Leader\AnnouncementController::class, 'send'])->name('announcements.send');
     });
 
 // クライアント管理（Admin用）は上の admin グループに統合済み（重複削除）
@@ -617,6 +627,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('announcements/{announcement}/edit', [App\Http\Controllers\Clerk\AnnouncementController::class, 'edit'])->name('announcements.edit');
         Route::put('announcements/{announcement}', [App\Http\Controllers\Clerk\AnnouncementController::class, 'update'])->name('announcements.update');
         Route::delete('announcements/{announcement}', [App\Http\Controllers\Clerk\AnnouncementController::class, 'destroy'])->name('announcements.destroy');
+        Route::post('announcements/{announcement}/send', [App\Http\Controllers\Clerk\AnnouncementController::class, 'send'])->name('announcements.send');
     });
 
 // お知らせ受信（全認証ユーザー）

@@ -13,51 +13,52 @@ use Inertia\Inertia;
 
 class AnnouncementController extends Controller
 {
-    /** Clerk: 送信済みお知らせ一覧 */
+    /** Clerk: 送信済み＋下書き一覧 */
     public function index(Request $request)
     {
         $user = $request->user();
 
-        // SuperAdmin: グローバルモードでは会社を選択させる
         if ($user->isSuperAdmin()) {
             $contextId = session('superadmin_context.company_id');
             if ($contextId === null) {
                 return Inertia::render('Clerk/Announcements/Index', [
-                    'announcements' => [],
-                    'isGlobalMode'  => true,
+                    'sent'        => [],
+                    'drafts'      => [],
+                    'isGlobalMode' => true,
                 ]);
             }
         }
 
-        $query = Announcement::where('sender_id', $user->id);
+        $base = Announcement::where('sender_id', $user->id);
 
-        // SuperAdmin + 会社選択: その会社のユーザーに配信されたお知らせのみ表示
-        // target_company_id ではなく実際の受信者 company_id で判定
-        // （非クロスカンパニー送信時は target_company_id が NULL になるため）
         if ($user->isSuperAdmin()) {
             $contextId = session('superadmin_context.company_id');
-            $query->whereHas('recipients', function ($q) use ($contextId) {
+            $base->whereHas('recipients', function ($q) use ($contextId) {
                 $q->whereHas('user', fn($u) => $u->where('company_id', $contextId));
             });
         }
 
-        $announcements = $query
+        $map = fn ($a) => [
+            'id'               => $a->id,
+            'title'            => $a->title,
+            'target_type'      => $a->target_type,
+            'recipients_count' => $a->recipients_count,
+            'read_count'       => $a->read_count,
+            'created_at'       => $a->created_at->format('Y/m/d H:i'),
+        ];
+
+        $counts = fn ($q) => $q
             ->withCount('recipients')
             ->withCount(['recipients as read_count' => fn ($q) => $q->whereNotNull('read_at')])
-            ->orderByDesc('created_at')
-            ->get()
-            ->map(fn ($a) => [
-                'id'               => $a->id,
-                'title'            => $a->title,
-                'target_type'      => $a->target_type,
-                'recipients_count' => $a->recipients_count,
-                'read_count'       => $a->read_count,
-                'created_at'       => $a->created_at->format('Y/m/d H:i'),
-            ]);
+            ->orderByDesc('created_at');
+
+        $sent   = $counts((clone $base)->where('status', 'sent'))->get()->map($map);
+        $drafts = $counts((clone $base)->where('status', 'draft'))->get()->map($map);
 
         return Inertia::render('Clerk/Announcements/Index', [
-            'announcements' => $announcements,
-            'isGlobalMode'  => false,
+            'sent'         => $sent,
+            'drafts'       => $drafts,
+            'isGlobalMode' => false,
         ]);
     }
 
@@ -89,6 +90,7 @@ class AnnouncementController extends Controller
                 'title'            => $announcement->title,
                 'content'          => $announcement->content,
                 'target_type'      => $announcement->target_type,
+                'status'           => $announcement->status,
                 'recipients_count' => $recipients->count(),
                 'read_count'       => $recipients->where('is_read', true)->count(),
                 'created_at'       => $announcement->created_at->format('Y/m/d H:i'),
@@ -109,7 +111,6 @@ class AnnouncementController extends Controller
     {
         $user = $request->user();
 
-        // SuperAdmin、または general タイプ会社のユーザーはクロスカンパニー送信可
         $isCrossCompany = $user->isSuperAdmin() || $user->company?->company_type === 'general';
 
         $userQuery = User::with(['assignment', 'department'])->whereNotNull('department_id')->orderBy('name');
@@ -131,7 +132,7 @@ class AnnouncementController extends Controller
         return Inertia::render('Clerk/Announcements/Create', compact('users', 'companies'));
     }
 
-    /** Clerk: お知らせ送信 */
+    /** Clerk: お知らせ送信 or 下書き保存 */
     public function store(Request $request, AttachmentService $attachmentService)
     {
         $request->validate([
@@ -145,23 +146,19 @@ class AnnouncementController extends Controller
             'attachments.*'     => 'file|max:20480',
         ]);
 
-        $sender = $request->user();
-        $isCrossCompanyUser = $sender->isSuperAdmin() || $sender->company?->company_type === 'general';
+        $sender         = $request->user();
+        $isDraft        = $request->boolean('is_draft');
+        $isCrossCompany = $sender->isSuperAdmin() || $sender->company?->company_type === 'general';
 
-        // 送信先会社の決定
-        // crossCompanyAnnouncement ユーザー:
-        //   - 会社を指定した場合 → その会社のみ
-        //   - 会社未指定の場合 → 全会社（scopeCompanyId = null）
-        // 一般ユーザー: 自社のみ
         $targetCompanyId = null;
-        $scopeCompanyId  = $sender->company_id; // デフォルト: 自社
+        $scopeCompanyId  = $sender->company_id;
 
-        if ($isCrossCompanyUser) {
+        if ($isCrossCompany) {
             if ($request->filled('target_company_id')) {
                 $targetCompanyId = (int) $request->target_company_id;
                 $scopeCompanyId  = $targetCompanyId;
             } else {
-                $scopeCompanyId = null; // 未指定 = 全会社
+                $scopeCompanyId = null;
             }
         }
 
@@ -171,6 +168,7 @@ class AnnouncementController extends Controller
             'title'             => $request->title,
             'content'           => $request->content,
             'target_company_id' => $targetCompanyId,
+            'status'            => $isDraft ? 'draft' : 'sent',
         ]);
 
         $recipientIds = match ($request->target_type) {
@@ -180,19 +178,20 @@ class AnnouncementController extends Controller
             'employees_only' => $scopeCompanyId
                 ? User::where('company_id', $scopeCompanyId)->whereIn('employment_type', ['regular', 'contract'])->pluck('id')->toArray()
                 : User::whereIn('employment_type', ['regular', 'contract'])->pluck('id')->toArray(),
-            'individual' => $request->user_ids,
+            'individual' => $request->user_ids ?? [],
         };
 
-        $rows = array_map(fn ($uid) => [
-            'announcement_id' => $announcement->id,
-            'user_id'         => $uid,
-            'created_at'      => now(),
-            'updated_at'      => now(),
-        ], array_values($recipientIds));
+        if (! empty($recipientIds)) {
+            $rows = array_map(fn ($uid) => [
+                'announcement_id' => $announcement->id,
+                'user_id'         => $uid,
+                'created_at'      => now(),
+                'updated_at'      => now(),
+            ], array_values($recipientIds));
 
-        AnnouncementRecipient::upsert($rows, ['announcement_id', 'user_id'], ['updated_at']);
+            AnnouncementRecipient::upsert($rows, ['announcement_id', 'user_id'], ['updated_at']);
+        }
 
-        // 添付ファイルの保存
         if ($request->hasFile('attachments')) {
             foreach ($request->file('attachments') as $file) {
                 $attachmentService->storeUploadedFile(
@@ -201,8 +200,9 @@ class AnnouncementController extends Controller
             }
         }
 
-        return redirect()->route('clerk.announcements.index')
-            ->with('success', 'お知らせを送信しました。');
+        $message = $isDraft ? '下書きを保存しました。' : 'お知らせを送信しました。';
+
+        return redirect()->route('clerk.announcements.index')->with('success', $message);
     }
 
     /** Clerk: 編集フォーム */
@@ -212,11 +212,13 @@ class AnnouncementController extends Controller
 
         $announcement->load('attachments');
 
-        return Inertia::render('Clerk/Announcements/Edit', [
+        $data = [
             'announcement' => [
                 'id'      => $announcement->id,
                 'title'   => $announcement->title,
                 'content' => $announcement->content,
+                'status'  => $announcement->status,
+                'target_type' => $announcement->target_type,
                 'attachments' => $announcement->attachments->map(fn ($a) => [
                     'id'            => $a->id,
                     'url'           => asset('storage/' . $a->path),
@@ -225,36 +227,114 @@ class AnnouncementController extends Controller
                     'mime'          => $a->mime_type,
                 ]),
             ],
-        ]);
+        ];
+
+        // 下書きの場合は受信者選択UIも渡す
+        if ($announcement->status === 'draft') {
+            $user           = $request->user();
+            $isCrossCompany = $user->isSuperAdmin() || $user->company?->company_type === 'general';
+
+            $userQuery = User::with(['assignment', 'department'])->whereNotNull('department_id')->orderBy('name');
+            if (! $isCrossCompany) {
+                $userQuery->where('company_id', $user->company_id);
+            }
+            $data['users'] = $userQuery->get()->map(fn ($u) => [
+                'id'              => $u->id,
+                'name'            => $u->name,
+                'company_id'      => $u->company_id,
+                'assignment_name' => $u->assignment?->name ?? '',
+                'employment_type' => $u->employment_type ?? 'regular',
+            ]);
+
+            $data['companies'] = $isCrossCompany
+                ? Company::where('code', '!=', 'SUPERADMIN')->active()->ordered()->get(['id', 'name'])
+                : null;
+
+            $data['announcement']['recipient_ids'] = $announcement->recipients()->pluck('user_id')->toArray();
+        }
+
+        return Inertia::render('Clerk/Announcements/Edit', $data);
     }
 
-    /** Clerk: お知らせ更新（タイトル・本文・添付のみ。受信者は変更しない） */
+    /** Clerk: お知らせ更新 */
     public function update(Request $request, Announcement $announcement, AttachmentService $attachmentService)
     {
         abort_if($announcement->sender_id !== $request->user()->id, 403);
 
-        $request->validate([
-            'title'              => 'required|string|max:255',
-            'content'            => 'required|string',
-            'attachments'        => 'nullable|array|max:10',
-            'attachments.*'      => 'file|max:20480',
+        $rules = [
+            'title'                   => 'required|string|max:255',
+            'content'                 => 'required|string',
+            'attachments'             => 'nullable|array|max:10',
+            'attachments.*'           => 'file|max:20480',
             'remove_attachment_ids'   => 'nullable|array',
             'remove_attachment_ids.*' => 'integer',
-        ]);
+        ];
+
+        // 下書きは宛先変更も可能
+        if ($announcement->status === 'draft') {
+            $rules['target_type']       = 'required|in:all,employees_only,individual';
+            $rules['target_company_id'] = 'nullable|exists:companies,id';
+            $rules['user_ids']          = 'required_if:target_type,individual|array';
+            $rules['user_ids.*']        = 'integer|exists:users,id';
+        }
+
+        $request->validate($rules);
 
         $announcement->update([
             'title'   => $request->title,
             'content' => $request->content,
         ]);
 
-        // 指定された添付ファイルを削除
+        // 下書き: 宛先更新 + 送信判定
+        if ($announcement->status === 'draft') {
+            $sender         = $request->user();
+            $isCrossCompany = $sender->isSuperAdmin() || $sender->company?->company_type === 'general';
+
+            $targetCompanyId = null;
+            $scopeCompanyId  = $sender->company_id;
+
+            if ($isCrossCompany) {
+                if ($request->filled('target_company_id')) {
+                    $targetCompanyId = (int) $request->target_company_id;
+                    $scopeCompanyId  = $targetCompanyId;
+                } else {
+                    $scopeCompanyId = null;
+                }
+            }
+
+            $announcement->update([
+                'target_type'       => $request->target_type,
+                'target_company_id' => $targetCompanyId,
+            ]);
+
+            $recipientIds = match ($request->target_type) {
+                'all' => $scopeCompanyId
+                    ? User::where('company_id', $scopeCompanyId)->pluck('id')->toArray()
+                    : User::pluck('id')->toArray(),
+                'employees_only' => $scopeCompanyId
+                    ? User::where('company_id', $scopeCompanyId)->whereIn('employment_type', ['regular', 'contract'])->pluck('id')->toArray()
+                    : User::whereIn('employment_type', ['regular', 'contract'])->pluck('id')->toArray(),
+                'individual' => $request->user_ids ?? [],
+            };
+
+            $announcement->recipients()->delete();
+            if (! empty($recipientIds)) {
+                $rows = array_map(fn ($uid) => [
+                    'announcement_id' => $announcement->id,
+                    'user_id'         => $uid,
+                    'created_at'      => now(),
+                    'updated_at'      => now(),
+                ], array_values($recipientIds));
+                AnnouncementRecipient::upsert($rows, ['announcement_id', 'user_id'], ['updated_at']);
+            }
+        }
+
         if ($request->filled('remove_attachment_ids')) {
             foreach ($announcement->attachments()->whereIn('attachments.id', $request->remove_attachment_ids)->get() as $att) {
                 $attachmentService->deleteAttachment($att);
             }
         }
 
-        // 新しい添付ファイルを追加
         if ($request->hasFile('attachments')) {
             foreach ($request->file('attachments') as $file) {
                 $attachmentService->storeUploadedFile(
@@ -267,6 +347,18 @@ class AnnouncementController extends Controller
             ->with('success', 'お知らせを更新しました。');
     }
 
+    /** Clerk: 下書きを送信 */
+    public function send(Request $request, Announcement $announcement)
+    {
+        abort_if($announcement->sender_id !== $request->user()->id, 403);
+        abort_if($announcement->status !== 'draft', 422);
+
+        $announcement->update(['status' => 'sent']);
+
+        return redirect()->route('clerk.announcements.show', $announcement)
+            ->with('success', 'お知らせを送信しました。');
+    }
+
     /** Clerk: お知らせ削除 */
     public function destroy(Request $request, Announcement $announcement, AttachmentService $attachmentService)
     {
@@ -274,12 +366,10 @@ class AnnouncementController extends Controller
 
         $announcement->load('attachments');
 
-        // 添付ファイルをすべて削除
         foreach ($announcement->attachments as $att) {
             $attachmentService->deleteAttachment($att);
         }
 
-        // 受信者レコードと本体を削除
         $announcement->recipients()->delete();
         $announcement->delete();
 
