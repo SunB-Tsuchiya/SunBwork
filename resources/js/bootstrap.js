@@ -9,6 +9,13 @@ window.axios.defaults.withCredentials = true;
 window.axios.defaults.headers.common['X-CSRF-TOKEN'] =
     document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
 
+// リクエストごとに最新の CSRF トークンを取得（Inertia のナビゲーション後にトークンが更新されても対応）
+window.axios.interceptors.request.use((config) => {
+    const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    if (token) config.headers['X-CSRF-TOKEN'] = token;
+    return config;
+});
+
 // SPAでAPI認証が必要な場合、初回にCSRFクッキーを取得してから Echo を初期化
 import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
