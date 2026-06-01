@@ -7,7 +7,11 @@
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <title inertia>{{ config('app.name', 'SBWork') }}</title>
   <link rel="icon" href="{{ asset('favicon.ico') }}?v=2" sizes="any" />
+  @if(app()->environment('local'))
+  <link rel="icon" type="image/svg+xml" href="{{ asset('favicon-local.svg') }}?v=2" />
+  @else
   <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}?v=2" />
+  @endif
   <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}?v=2" />
 
   <!-- Fonts -->

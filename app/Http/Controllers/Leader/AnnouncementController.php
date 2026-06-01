@@ -41,6 +41,7 @@ class AnnouncementController extends Controller
         $map = fn ($a) => [
             'id'               => $a->id,
             'title'            => $a->title,
+            'content'          => strip_tags($a->content ?? ''),
             'target_type'      => $a->target_type,
             'recipients_count' => $a->recipients_count,
             'read_count'       => $a->read_count,

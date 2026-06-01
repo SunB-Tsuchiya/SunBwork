@@ -11,6 +11,37 @@ class ChangelogSeeder extends Seeder
     {
         $entries = [
             // ─────────────────────────────────────────────────────────────
+            // 0h. ANNOUNCEMENT-DRAFT-1 — 2026-06-01
+            // ─────────────────────────────────────────────────────────────
+            [
+                'version'      => 'announcement-draft-1',
+                'title'        => 'お知らせ通知：Leader 追加・下書き機能の追加',
+                'released_at'  => '2026-06-01',
+                'summary'      => 'Leader ロールでもお知らせ通知を送信できるようになりました。また、Clerk・Leader 両方でお知らせを「下書き」として保存し、確認後に送信できる機能を追加しました。下書き中は受信者には表示されません。',
+                'design_files' => [],
+                'claude_notes' => 'announcements テーブルに status カラム追加（draft/sent、デフォルト sent）。Leader\\AnnouncementController を新規作成（LeaderMiddleware = 全 Leader + Admin + SuperAdmin が対象、部署リーダー限定なし）。ClerkMiddleware は部署リーダーのみ許可のまま。受信者側 AnnouncementController に status=sent フィルタを追加（下書きは受信者の受信箱に表示されない）。下書き保存時も recipients テーブルに保存済みなので詳細画面で「送信予定 N 人」を事前確認できる。下書き Edit フォームは宛先変更も可能。送信は詳細画面の POST .../send で status を sent に更新するだけ。routes/web.php の leader グループと clerk グループ両方に announcements.send ルートを追加。',
+                'body'         => <<<'HTML'
+<section class="cl-problem">
+  <h3>背景・問題</h3>
+  <p>お知らせ通知機能は Clerk ロール以上にのみ存在し、Leader はお知らせを送信できませんでした。また、作成したお知らせは即時送信しかできず、事前確認してから送信するワークフローに対応していませんでした。</p>
+</section>
+
+<section class="cl-fix">
+  <h3>追加内容</h3>
+  <ul>
+    <li>Leader ロール（部署リーダーでなくても全 Leader）でお知らせ通知を送信できるようになった（leader/announcements）</li>
+    <li>作成フォームに「下書き保存」ボタンを追加。送信せずに内容を保存しておける</li>
+    <li>下書きは受信者の受信箱には表示されない。送信後に初めて相手に届く</li>
+    <li>一覧画面が「下書き」「送信済み」の2テーブルに分割された</li>
+    <li>下書き詳細画面から「送信する」ボタンで即時配信できる</li>
+    <li>下書き編集時は宛先（全員・社員のみ・個別選択）も変更可能</li>
+    <li>送信済み一覧にタイトル/内容での検索・年月フィルタを追加</li>
+  </ul>
+</section>
+HTML,
+            ],
+
+            // ─────────────────────────────────────────────────────────────
             // 0g. CLIENT-EDIT-1 — 2026-05-31
             // ─────────────────────────────────────────────────────────────
             [

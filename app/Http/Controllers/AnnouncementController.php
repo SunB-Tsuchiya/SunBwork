@@ -22,6 +22,7 @@ class AnnouncementController extends Controller
                 'id'         => $r->id,
                 'announcement_id' => $r->announcement_id,
                 'title'      => $r->announcement->title,
+                'content'    => strip_tags($r->announcement->content ?? ''),
                 'sender'     => $r->announcement->sender?->name ?? '',
                 'is_read'    => $r->read_at !== null,
                 'date'       => $r->created_at->format('Y/m/d'),

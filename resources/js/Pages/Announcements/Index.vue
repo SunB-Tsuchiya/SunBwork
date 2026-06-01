@@ -1,10 +1,57 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link } from '@inertiajs/vue3';
+import { ref, computed, watch, onMounted } from 'vue';
 
-defineProps({
+const props = defineProps({
     grouped: Array,
 });
+
+const LS_KEY = 'announcements_yearMonth';
+
+const searchInput   = ref('');
+const appliedSearch = ref('');
+const yearMonth     = ref('');
+
+onMounted(() => {
+    yearMonth.value = localStorage.getItem(LS_KEY) ?? '';
+});
+
+watch(yearMonth, (val) => {
+    if (val) localStorage.setItem(LS_KEY, val);
+    else localStorage.removeItem(LS_KEY);
+});
+
+const yearMonthOptions = computed(() => {
+    const months = new Set();
+    props.grouped.forEach(g => months.add(g.date.substring(0, 7)));
+    return Array.from(months).sort().reverse();
+});
+
+const formatYM = (ym) => {
+    const [y, m] = ym.split('/');
+    return `${y}年${parseInt(m)}月`;
+};
+
+const filteredGrouped = computed(() => {
+    return props.grouped
+        .map(g => {
+            if (yearMonth.value && !g.date.startsWith(yearMonth.value)) return null;
+            const q = appliedSearch.value;
+            const items = q
+                ? g.items.filter(i =>
+                    i.title.includes(q) ||
+                    i.sender.includes(q) ||
+                    (i.content ?? '').includes(q)
+                )
+                : g.items;
+            return items.length ? { ...g, items } : null;
+        })
+        .filter(Boolean);
+});
+
+function doSearch() { appliedSearch.value = searchInput.value; }
+function doClear()  { searchInput.value = ''; appliedSearch.value = ''; yearMonth.value = ''; }
 </script>
 
 <template>
@@ -14,12 +61,44 @@ defineProps({
         </template>
 
         <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
-            <div v-if="grouped.length === 0" class="py-12 text-center text-gray-500">
+
+            <!-- 検索・絞り込み -->
+            <div class="mb-6 space-y-2">
+                <div class="flex max-w-xl gap-2">
+                    <input
+                        v-model="searchInput"
+                        type="text"
+                        placeholder="タイトル/差出人/内容で検索"
+                        class="flex-1 min-w-0 rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+                        @keydown.enter="doSearch"
+                    />
+                    <button
+                        @click="doSearch"
+                        class="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                    >検索</button>
+                    <button
+                        @click="doClear"
+                        class="rounded border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    >クリア</button>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-sm text-gray-600">年月:</span>
+                    <select
+                        v-model="yearMonth"
+                        class="rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none"
+                    >
+                        <option value="">全期間</option>
+                        <option v-for="ym in yearMonthOptions" :key="ym" :value="ym">{{ formatYM(ym) }}</option>
+                    </select>
+                </div>
+            </div>
+
+            <div v-if="filteredGrouped.length === 0" class="py-12 text-center text-gray-500">
                 お知らせはありません
             </div>
 
             <div v-else class="space-y-6">
-                <div v-for="group in grouped" :key="group.date">
+                <div v-for="group in filteredGrouped" :key="group.date">
                     <!-- 日付ヘッダー -->
                     <div class="mb-2 flex items-center gap-3">
                         <span class="text-sm font-semibold text-gray-700">{{ group.date }}</span>
