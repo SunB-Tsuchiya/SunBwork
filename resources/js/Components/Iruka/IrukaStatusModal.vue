@@ -1,18 +1,18 @@
 <template>
     <Teleport to="body">
-        <div v-if="show" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="$emit('close')">
+        <div v-if="show" class="fixed inset-0 z-50 flex items-center justify-center p-3" @click.self="$emit('close')">
             <div class="absolute inset-0 bg-black/40 cursor-pointer" @click="$emit('close')" />
-            <div class="relative w-full max-w-sm rounded-xl bg-white shadow-2xl" @click.stop>
+            <div class="relative w-full max-w-sm rounded-xl bg-white shadow-2xl overflow-y-auto max-h-[90dvh]" @click.stop>
                 <!-- タイトル -->
-                <div class="border-b border-gray-200 px-5 py-4 text-center">
+                <div class="border-b border-gray-200 px-5 py-2.5 text-center">
                     <h2 class="text-base font-semibold text-gray-800">ステータス更新</h2>
                 </div>
 
-                <div class="space-y-4 px-5 py-4">
+                <div class="space-y-3 px-4 py-3">
                     <!-- お名前 -->
                     <div>
                         <label class="mb-1 block text-xs font-medium text-gray-500">お名前</label>
-                        <div class="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                        <div class="rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-700">
                             {{ targetUser.name }}
                         </div>
                     </div>
@@ -32,22 +32,22 @@
                             v-if="isSelf"
                             v-model="localComment"
                             rows="2"
-                            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                            class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
                         />
-                        <div v-else class="min-h-[52px] rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                        <div v-else class="min-h-[44px] rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-600">
                             {{ targetUser.comment || '（なし）' }}
                         </div>
                     </div>
 
                     <!-- ステータスボタン（6行 × 3列） -->
                     <div>
-                        <label class="mb-2 block text-xs font-medium text-gray-500">ステータスを選んでください</label>
-                        <div class="grid grid-cols-3 gap-1.5">
+                        <label class="mb-1 block text-xs font-medium text-gray-500">ステータスを選んでください</label>
+                        <div class="grid grid-cols-3 gap-1">
                             <button
                                 v-for="s in displayStatuses"
                                 :key="s.slug"
                                 type="button"
-                                class="rounded-lg px-2 py-2.5 text-xs font-medium transition-all"
+                                class="rounded-lg px-1.5 py-1.5 text-xs font-medium transition-all"
                                 :class="btnClasses(s)"
                                 @click="handleStatusClick(s.slug)"
                             >{{ s.label }}</button>
@@ -56,34 +56,34 @@
                 </div>
 
                 <!-- フッター -->
-                <div class="flex items-center justify-between border-t border-gray-100 px-5 py-3">
-                    <!-- 使い方ガイドボタン -->
+                <div class="flex items-center justify-between border-t border-gray-100 px-4 py-2">
+                    <!-- 使い方ガイドボタン（アイコンのみ） -->
                     <button
                         type="button"
-                        class="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
+                        class="flex items-center justify-center rounded-lg border border-gray-200 p-2 text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
+                        title="使い方ガイド"
                         @click="showGuide = true"
                     >
-                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        使い方ガイド
                     </button>
 
-                    <div class="flex items-center gap-3">
+                    <div class="flex items-center gap-2">
                         <button
                             type="button"
-                            class="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 active:bg-blue-800"
+                            class="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 active:bg-blue-800"
                             @click="handleSave"
                         >更新する</button>
                         <button
                             v-if="isSelf"
                             type="button"
-                            class="text-sm text-red-500 hover:text-red-700"
+                            class="text-xs text-red-500 hover:text-red-700"
                             @click="handleClear"
                         >削除する</button>
                         <button
                             type="button"
-                            class="text-sm text-gray-500 hover:text-gray-700"
+                            class="text-xs text-gray-500 hover:text-gray-700"
                             @click="$emit('close')"
                         >キャンセル</button>
                     </div>
