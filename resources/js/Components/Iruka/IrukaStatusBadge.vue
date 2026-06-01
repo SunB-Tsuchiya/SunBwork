@@ -8,7 +8,7 @@
         >
             <span class="text-base leading-none pointer-events-none">🐬</span>
             <span class="h-2 w-2 rounded-full shrink-0 pointer-events-none" :class="statusInfo.dot" />
-            <span v-if="currentStatus" class="hidden sm:inline text-gray-600 max-w-[80px] truncate pointer-events-none">{{ statusInfo.label }}</span>
+            <span class="hidden sm:inline max-w-[80px] truncate pointer-events-none" :class="currentStatus ? 'text-gray-600' : 'text-gray-400'">{{ statusInfo.label }}</span>
         </button>
 
         <!-- ステータスモーダル -->
@@ -36,7 +36,7 @@ const currentComment = ref('');
 const showModal      = ref(false);
 const statuses       = ref(null); // DB順のステータスリスト
 
-const statusInfo = computed(() => currentStatus.value ? getStatus(currentStatus.value) : { dot: 'bg-gray-300', label: '' });
+const statusInfo = computed(() => currentStatus.value ? getStatus(currentStatus.value) : { dot: 'bg-gray-300', label: '読込中' });
 
 const selfUser = computed(() => ({
     id:      authUser?.id,
