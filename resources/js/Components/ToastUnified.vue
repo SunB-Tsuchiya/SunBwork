@@ -1,8 +1,8 @@
 <template>
-    <div class="fixed left-1/2 top-4 z-50 w-full max-w-xl -translate-x-1/2 transform">
+    <div class="pointer-events-none fixed left-1/2 top-4 z-50 w-full max-w-xl -translate-x-1/2 transform">
         <!-- Shared composable toasts (calls to showToast) -->
         <transition-group name="toast" tag="div" class="w-full space-y-3">
-            <div v-for="t in composableToasts" :key="t.id" class="toast-wrapper mx-auto w-full">
+            <div v-for="t in composableToasts" :key="t.id" class="toast-wrapper pointer-events-auto mx-auto w-full">
                 <div :class="toastClass(t.type)">
                     <div class="flex items-start justify-between gap-3">
                         <div class="flex-1 leading-relaxed">{{ t.message }}</div>
@@ -27,7 +27,7 @@
                 v-for="toast in localToasts"
                 :key="toast.id"
                 v-show="toast.visible"
-                class="flex items-start gap-3 rounded-xl border p-4 shadow-md text-sm"
+                class="pointer-events-auto flex items-start gap-3 rounded-xl border p-4 shadow-md text-sm"
                 :class="toast.type === 'error'
                     ? 'bg-red-50 border-red-400 text-red-900'
                     : 'bg-teal-50 border-teal-400 text-teal-900'"

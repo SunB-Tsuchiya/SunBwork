@@ -3,7 +3,7 @@
         <!-- バッジボタン -->
         <button
             type="button"
-            class="flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium shadow-sm hover:bg-gray-50 transition-colors"
+            class="flex cursor-pointer items-center gap-1.5 rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium shadow-sm transition-colors hover:bg-gray-50"
             @click="showModal = true"
         >
             <span class="text-base leading-none pointer-events-none">🐬</span>
