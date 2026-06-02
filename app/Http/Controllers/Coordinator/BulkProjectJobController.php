@@ -22,7 +22,9 @@ class BulkProjectJobController extends Controller
     /** 一括作成ハブページ */
     public function index(Request $request)
     {
-        $userId = $request->user()->id;
+        $user      = $request->user();
+        $userId    = $user->id;
+        $companyId = $this->resolveCompanyId($user);
 
         $templates = ProjectJobTemplate::where('is_shared', true)
             ->orWhere('created_by', $userId)
@@ -38,20 +40,27 @@ class BulkProjectJobController extends Controller
                 'created_by'   => $t->created_by,
             ]);
 
-        $coordinatorCandidates = User::where('user_role', 'coordinator')
-            ->orWhere('user_role', 'clerk')
-            ->orWhereHas('assignment', fn($q) => $q->where('code', 'shinko'))
+        $coordinatorCandidates = User::where(function ($q) {
+                $q->where('user_role', 'coordinator')
+                  ->orWhere('user_role', 'clerk')
+                  ->orWhereHas('assignment', fn($q2) => $q2->where('code', 'shinko'));
+            })
+            ->when($companyId, fn($q) => $q->where('company_id', $companyId))
             ->orderBy('name')
             ->get(['id', 'name']);
 
         $sizes = Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group']);
 
-        $users = User::orderBy('name')->get(['id', 'name']);
-        
-        // チームメンバー選択モーダル用のデータ
-        $departments = \App\Models\Department::all();
+        $users = User::when($companyId, fn($q) => $q->where('company_id', $companyId))
+            ->orderBy('name')->get(['id', 'name']);
+
+        // チームメンバー選択モーダル用のデータ（同一会社のみ）
+        $departments = $companyId
+            ? \App\Models\Department::where('company_id', $companyId)->orderBy('name')->get()
+            : \App\Models\Department::all();
         $assignments = \App\Models\Assignment::all();
-        $members = User::orderBy('name')->with(['department', 'assignment'])->get();
+        $members = User::when($companyId, fn($q) => $q->where('company_id', $companyId))
+            ->orderBy('name')->with(['department', 'assignment'])->get();
 
         return Inertia::render('Coordinator/ProjectJobs/BulkCreate', [
             'templates'             => $templates,
@@ -112,9 +121,11 @@ class BulkProjectJobController extends Controller
         $template   = $templateId ? ProjectJobTemplate::find($templateId) : null;
         $fixed      = $template?->fixed_fields ?? [];
 
+        $companyId = $this->resolveCompanyId($request->user());
+
         try {
             $rows = $this->parseCsv($request->file('csv_file'));
-            
+
             // CSVが空の場合
             if (empty($rows)) {
                 return redirect()
@@ -125,7 +136,7 @@ class BulkProjectJobController extends Controller
             $results = [];
 
             foreach ($rows as $rowNum => $row) {
-                [$data, $errors, $warnings] = $this->validateRow($row, $rowNum + 1, $fixed);
+                [$data, $errors, $warnings] = $this->validateRow($row, $rowNum + 1, $fixed, $companyId);
                 $results[] = [
                     'rowNum'   => $rowNum + 1,
                     'data'     => $data,
@@ -185,10 +196,11 @@ class BulkProjectJobController extends Controller
         $fixed      = $template?->fixed_fields ?? [];
         $teamMembersFixed = $template?->team_members ?? [];
 
-        $rows    = $request->input('rows');
-        $created = [];
+        $rows      = $request->input('rows');
+        $companyId = $this->resolveCompanyId($request->user());
+        $created   = [];
 
-        DB::transaction(function () use ($rows, $fixed, $teamMembersFixed, &$created) {
+        DB::transaction(function () use ($rows, $fixed, $teamMembersFixed, $companyId, &$created) {
             foreach ($rows as $row) {
                 if (!($row['valid'] ?? false)) {
                     continue;
@@ -197,13 +209,14 @@ class BulkProjectJobController extends Controller
                 $data = $row['data'];
 
                 $jobData = [
-                    'title'     => $data['title'],
-                    'jobcode'   => $data['jobcode'] ?: null,
-                    'client_id' => (int) $data['client_id'],
-                    'user_id'   => (int) ($data['user_id'] ?? $fixed['user_id'] ?? null),
-                    'size_id'   => $data['size_id'] ? (int) $data['size_id'] : null,
-                    'page_count'=> $data['page_count'] ? (int) $data['page_count'] : null,
-                    'detail'    => $data['detail'] ?? ($fixed['detail'] ?? null),
+                    'title'      => $data['title'],
+                    'jobcode'    => $data['jobcode'] ?: null,
+                    'client_id'  => (int) $data['client_id'],
+                    'user_id'    => (int) ($data['user_id'] ?? $fixed['user_id'] ?? null),
+                    'company_id' => $companyId,
+                    'size_id'    => $data['size_id'] ? (int) $data['size_id'] : null,
+                    'page_count' => $data['page_count'] ? (int) $data['page_count'] : null,
+                    'detail'     => $data['detail'] ?? ($fixed['detail'] ?? null),
                 ];
                 Arr::pull($jobData, 'schedule'); // さくら本番: project_jobs.schedule カラムなし
 
@@ -312,7 +325,7 @@ class BulkProjectJobController extends Controller
      * 1行のバリデーション。
      * @return array{0: array, 1: string[], 2: string[]} [$data, $errors, $warnings]
      */
-    private function validateRow(array $row, int $rowNum, array $fixed): array
+    private function validateRow(array $row, int $rowNum, array $fixed, ?int $companyId = null): array
     {
         $errors   = [];
         $warnings = [];
@@ -326,7 +339,7 @@ class BulkProjectJobController extends Controller
         // client 解決（テンプレート固定を優先）
         $clientId = null;
         $clientName = null;
-        
+
         if (!empty($fixed['client_id'])) {
             $clientId = $fixed['client_id'];
             // 固定クライアントの名前を取得
@@ -336,7 +349,11 @@ class BulkProjectJobController extends Controller
             }
         } elseif (!empty($row['client_id'])) {
             $clientId = (int) $row['client_id'];
-            $client = Client::where('id', $clientId)->first(['id', 'name']);
+            $query = Client::where('id', $clientId);
+            if ($companyId) {
+                $query->forCompany($companyId);
+            }
+            $client = $query->first(['id', 'name']);
             if (!$client) {
                 $errors[] = "client_id={$clientId} が見つかりません";
                 $clientId = null;
@@ -345,7 +362,7 @@ class BulkProjectJobController extends Controller
             }
         } elseif (!empty($row['client_name'])) {
             $inputName = trim($row['client_name']);
-            $matchedClient = $this->findClientByFlexibleName($inputName);
+            $matchedClient = $this->findClientByFlexibleName($inputName, $companyId);
             
             if (!$matchedClient) {
                 $errors[] = "クライアント「{$inputName}」が見つかりません。登録されているクライアント名を確認してください";
@@ -368,7 +385,11 @@ class BulkProjectJobController extends Controller
         // user_id（テンプレート固定なければ CSV から解決）
         if (empty($fixed['user_id'])) {
             if (!empty($row['leader_name'])) {
-                $leader = User::where('name', $row['leader_name'])->first();
+                $leaderQuery = User::where('name', $row['leader_name']);
+                if ($companyId) {
+                    $leaderQuery->where('company_id', $companyId);
+                }
+                $leader = $leaderQuery->first();
                 if (!$leader) {
                     $errors[] = "リーダー「{$row['leader_name']}」が見つかりません";
                 } else {
@@ -429,18 +450,20 @@ class BulkProjectJobController extends Controller
      * 柔軟なクライアント名マッチング
      * 株式会社の有無や位置を許容し、最も適切なクライアントを返す
      */
-    private function findClientByFlexibleName(string $inputName): ?Client
+    private function findClientByFlexibleName(string $inputName, ?int $companyId = null): ?Client
     {
+        $baseQuery = fn() => $companyId ? Client::forCompany($companyId) : Client::query();
+
         // 1. 完全一致チェック
-        $client = Client::where('name', $inputName)->first(['id', 'name']);
+        $client = $baseQuery()->where('name', $inputName)->first(['id', 'name']);
         if ($client) {
             return $client;
         }
 
         // 2. 正規化した名前での完全一致チェック
         $normalizedInput = $this->normalizeClientName($inputName);
-        
-        $clients = Client::all(['id', 'name']);
+
+        $clients = $baseQuery()->get(['id', 'name']);
         foreach ($clients as $client) {
             $normalizedClient = $this->normalizeClientName($client->name);
             
@@ -575,7 +598,9 @@ class BulkProjectJobController extends Controller
     /** BulkCreate.vue に渡す共通 props */
     private function sharedProps(Request $request): array
     {
-        $userId = $request->user()->id;
+        $user      = $request->user();
+        $userId    = $user->id;
+        $companyId = $this->resolveCompanyId($user);
 
         $templates = ProjectJobTemplate::where('is_shared', true)
             ->orWhere('created_by', $userId)
@@ -593,12 +618,25 @@ class BulkProjectJobController extends Controller
 
         return [
             'templates'             => $templates,
-            'coordinatorCandidates' => User::where('user_role', 'coordinator')
-                ->orWhere('user_role', 'clerk')
-                ->orWhereHas('assignment', fn($q) => $q->where('code', 'shinko'))
+            'coordinatorCandidates' => User::where(function ($q) {
+                    $q->where('user_role', 'coordinator')
+                      ->orWhere('user_role', 'clerk')
+                      ->orWhereHas('assignment', fn($q2) => $q2->where('code', 'shinko'));
+                })
+                ->when($companyId, fn($q) => $q->where('company_id', $companyId))
                 ->orderBy('name')->get(['id', 'name']),
             'sizes'                 => Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group']),
-            'users'                 => User::orderBy('name')->get(['id', 'name']),
+            'users'                 => User::when($companyId, fn($q) => $q->where('company_id', $companyId))
+                ->orderBy('name')->get(['id', 'name']),
         ];
+    }
+
+    private function resolveCompanyId(\App\Models\User $user): ?int
+    {
+        if ($user->isSuperAdmin()) {
+            $id = (int) (session('superadmin_context.company_id') ?? $user->company_id ?? 0);
+            return $id ?: null;
+        }
+        return $user->company_id ?? null;
     }
 }

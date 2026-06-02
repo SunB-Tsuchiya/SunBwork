@@ -927,6 +927,38 @@ HTML,
 </section>
 HTML,
             ],
+            // ─────────────────────────────────────────────────────────────
+            [
+                'version'      => 'tenant-2',
+                'title'        => 'company_id フィルター漏れ修正：Coordinator/User コントローラー全域',
+                'released_at'  => '2026-06-02',
+                'summary'      => 'Coordinator ロールの案件作成・一括作成・ジョブ割り当て・進行テンプレート各画面で、リーダー/メンバー/部署/マスターデータの選択肢が他社データを含んでいた問題を修正しました。バリデーションでも他社ユーザーIDを指定できた脆弱性を塞ぎました。',
+                'design_files' => ['z_instructions/TENANT_PLAN2.md', 'z_instructions/TENANT_MANAGER2.md'],
+                'claude_notes' => '【ProjectJobController】coordinatorCandidates() に company_id フィルター追加。create()/edit() の members・departments を同一会社のみに絞り込み。【BulkProjectJobController】index()/sharedProps() の coordinatorCandidates・users・departments・members を company_id フィルター。validateRow() と findClientByFlexibleName() に companyId 引数を追加し leader 名マッチング・クライアント名マッチングを自社限定に。store() の ProjectJob::create() に company_id を追加（欠落バグ修正）。resolveCompanyId() ヘルパー追加（SuperAdmin はセッションコンテキスト参照）。【ProjectJobAssignmentsController】Rule 追加。update()/store() の user_id・sender_id バリデーションを Rule::exists() に変更し他社ユーザーID指定を防止。create()/edit()/show() の WorkItemType/Size/Stage/Status を whereNull("company_id")->orWhere("company_id", $id) でフィルター。【ProgressTemplateController】create()/edit() の Stage/Size/WorkItemType を同フィルターに修正。',
+                'body'         => <<<'HTML'
+<section class="cl-problem">
+  <h3>背景・問題</h3>
+  <ul>
+    <li>案件作成・一括作成フォームで、リーダー・サブリーダー・チームメンバーの選択肢に他社ユーザーが表示されていた</li>
+    <li>一括CSV インポート時、リーダー名マッチングが全ユーザーを対象にしており他社の同名ユーザーに誤マッチする可能性があった</li>
+    <li>一括作成で登録された案件に company_id がセットされておらず、会社フィルターが効かない状態で作成されていた（バグ修正）</li>
+    <li>ジョブ割り当て画面のバリデーションで他社ユーザーのIDをPOSTできてしまう脆弱性があった</li>
+    <li>ジョブ割り当て・進行テンプレートの各種マスター選択肢（ステージ・サイズ・作業種別・ステータス）が全社から返されていた</li>
+  </ul>
+</section>
+
+<section class="cl-fix">
+  <h3>改善・修正内容</h3>
+  <ul>
+    <li><strong>案件作成・編集：</strong>リーダー候補・メンバー・部署を自社のみに絞り込み</li>
+    <li><strong>一括作成：</strong>選択肢フィルター加えて CSV インポートのリーダー名・クライアント名マッチングも自社限定に。作成時の company_id 欠落バグも修正</li>
+    <li><strong>ジョブ割り当てバリデーション：</strong>user_id・sender_id に Rule::exists() で company_id 条件を追加</li>
+    <li><strong>マスターデータ：</strong>ステージ・サイズ・作業種別・ステータスを「全社共通(NULL) または自社」のみ返すよう変更</li>
+    <li><strong>SuperAdmin 対応：</strong>resolveCompanyId() ヘルパーでセッションコンテキストを参照</li>
+  </ul>
+</section>
+HTML,
+            ],
         ];
 
         foreach ($entries as $entry) {

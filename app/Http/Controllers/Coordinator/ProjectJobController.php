@@ -133,14 +133,21 @@ class ProjectJobController extends Controller
      * Coordinator候補:
      *   - user_role = coordinator または clerk、または
      *   - 担当(assignment.code) = 'shinko'（進行管理）のユーザー
+     * company_id が指定された場合は同一会社のユーザーのみ返す。
      */
-    private function coordinatorCandidates(): \Illuminate\Support\Collection
+    private function coordinatorCandidates(?int $companyId = null): \Illuminate\Support\Collection
     {
-        return User::where('user_role', 'coordinator')
-            ->orWhere('user_role', 'clerk')
-            ->orWhereHas('assignment', fn ($q) => $q->where('code', 'shinko'))
-            ->orderBy('name')
-            ->get(['id', 'name']);
+        $query = User::where(function ($q) {
+            $q->where('user_role', 'coordinator')
+              ->orWhere('user_role', 'clerk')
+              ->orWhereHas('assignment', fn ($q2) => $q2->where('code', 'shinko'));
+        });
+
+        if ($companyId) {
+            $query->where('company_id', $companyId);
+        }
+
+        return $query->orderBy('name')->get(['id', 'name']);
     }
 
     public function clone(Request $request, ProjectJob $projectJob)
@@ -420,18 +427,27 @@ class ProjectJobController extends Controller
         return response()->json(['is_favorite' => $isFavorite]);
     }
 
-    public function create()
+    public function create(Request $request)
     {
+        $user = $request->user();
+        $companyId = $user->isSuperAdmin()
+            ? (int) (session('superadmin_context.company_id') ?? $user->company_id ?? 0)
+            : (int) ($user->company_id ?? 0);
+
         $sizes = \App\Models\Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group']);
 
-        // チームメンバー選択モーダル用のデータ
-        $departments = \App\Models\Department::all();
+        // チームメンバー選択モーダル用のデータ（同一会社のみ）
+        $departments = $companyId
+            ? \App\Models\Department::where('company_id', $companyId)->orderBy('name')->get()
+            : \App\Models\Department::all();
         $assignments = \App\Models\Assignment::all();
-        $members = \App\Models\User::orderBy('name')->with(['department', 'assignment'])->get();
+        $members = $companyId
+            ? \App\Models\User::where('company_id', $companyId)->orderBy('name')->with(['department', 'assignment'])->get()
+            : \App\Models\User::orderBy('name')->with(['department', 'assignment'])->get();
         $salesReps = PrepresSalesRep::orderBy('sort_order')->get(['id', 'name', 'company']);
 
         return Inertia::render('Coordinator/ProjectJobs/Create', [
-            'coordinatorCandidates' => $this->coordinatorCandidates(),
+            'coordinatorCandidates' => $this->coordinatorCandidates($companyId ?: null),
             'sizes' => $sizes,
             'departments' => $departments,
             'assignments' => $assignments,
@@ -1171,7 +1187,7 @@ class ProjectJobController extends Controller
         };
     }
 
-    public function edit(ProjectJob $projectJob)
+    public function edit(Request $request, ProjectJob $projectJob)
     {
         $projectJob->load(['teamMembers.user', 'user', 'client', 'coordinators']);
 
@@ -1193,10 +1209,15 @@ class ProjectJobController extends Controller
             'sub_coordinator_ids' => $projectJob->coordinators->pluck('id')->toArray(),
         ]);
 
+        $user = $request->user();
+        $companyId = $user->isSuperAdmin()
+            ? (int) (session('superadmin_context.company_id') ?? $user->company_id ?? 0)
+            : (int) ($user->company_id ?? 0);
+
         $sizes = \App\Models\Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group']);
         return Inertia::render('Coordinator/ProjectJobs/Edit', [
             'job'                  => $jobArray,
-            'coordinatorCandidates' => $this->coordinatorCandidates(),
+            'coordinatorCandidates' => $this->coordinatorCandidates($companyId ?: null),
             'sizes' => $sizes,
         ]);
     }

@@ -44,6 +44,7 @@ const tabs = computed(() => [
     { key: 'meeting_definitions', href: tryRoute('leader.meeting_definitions.index'), label: '会議設定' },
     { key: 'presence_board_settings', href: tryRoute('leader.presence.board_settings'), label: '在席ボード管理' },
     { key: 'sales_reps', href: tryRoute('leader.sales_reps.index'), label: '営業担当管理' },
+    { key: 'announcements', href: tryRoute('leader.announcements.index'), label: 'お知らせ通知' },
 ].filter(t => t.condition !== false && t.href));
 
 function onMobileSelect(e) {
@@ -160,6 +161,12 @@ function onMobileSelect(e) {
                 :class="tab('sales_reps')"
             >
                 営業担当管理
+            </Link>
+            <Link
+                :href="route('leader.announcements.index')"
+                :class="tab('announcements')"
+            >
+                お知らせ通知
             </Link>
         </nav>
     </div>

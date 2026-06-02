@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Coordinator;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
@@ -264,10 +265,16 @@ class ProjectJobAssignmentsController extends Controller
             $companies = collect();
         }
 
-        // lookup lists for modal (types, sizes, stages, statuses)
-        $types = \App\Models\WorkItemType::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group', 'company_id', 'department_id']);
-        $sizes = \App\Models\Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group', 'width', 'height', 'unit', 'company_id', 'department_id']);
-        $stages = \App\Models\Stage::orderBy('sort_order')->orderBy('order_index')->get(['id', 'name', 'company_id', 'department_id']);
+        // lookup lists for modal (types, sizes, stages, statuses) — 自社 or 全社共通(NULL) のみ
+        $companyFilter = function ($q) use ($userCompanyId) {
+            $q->whereNull('company_id');
+            if ($userCompanyId) {
+                $q->orWhere('company_id', $userCompanyId);
+            }
+        };
+        $types = \App\Models\WorkItemType::where($companyFilter)->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group', 'company_id', 'department_id']);
+        $sizes = \App\Models\Size::where($companyFilter)->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group', 'width', 'height', 'unit', 'company_id', 'department_id']);
+        $stages = \App\Models\Stage::where($companyFilter)->orderBy('sort_order')->orderBy('order_index')->get(['id', 'name', 'company_id', 'department_id']);
         // Request key column as well when available so we can include canonical status.key in payload
         $statusCols = ['id', 'name', 'slug', 'company_id', 'department_id'];
         try {
@@ -275,7 +282,7 @@ class ProjectJobAssignmentsController extends Controller
         } catch (\Throwable $__e) {
             // ignore introspection errors
         }
-        $statuses = \App\Models\Status::orderBy('sort_order')->get($statusCols);
+        $statuses = \App\Models\Status::where($companyFilter)->orderBy('sort_order')->get($statusCols);
         // build difficulties list with either (id,name,slug) when slug exists, or (id,name) otherwise
         $difficultySelect = ['id', 'name'];
         try {
@@ -376,11 +383,17 @@ class ProjectJobAssignmentsController extends Controller
             $companies = collect();
         }
 
-        // lookup lists for modal (types, sizes, stages, statuses)
-        $types = \App\Models\WorkItemType::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group', 'company_id', 'department_id']);
-        $sizes = \App\Models\Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group', 'width', 'height', 'unit', 'company_id', 'department_id']);
-        $stages = \App\Models\Stage::orderBy('sort_order')->orderBy('order_index')->get(['id', 'name', 'company_id', 'department_id']);
-        $statuses = \App\Models\Status::orderBy('sort_order')->get(['id', 'name', 'slug', 'company_id', 'department_id']);
+        // lookup lists for modal (types, sizes, stages, statuses) — 自社 or 全社共通(NULL) のみ
+        $companyFilter = function ($q) use ($userCompanyId) {
+            $q->whereNull('company_id');
+            if ($userCompanyId) {
+                $q->orWhere('company_id', $userCompanyId);
+            }
+        };
+        $types = \App\Models\WorkItemType::where($companyFilter)->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group', 'company_id', 'department_id']);
+        $sizes = \App\Models\Size::where($companyFilter)->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group', 'width', 'height', 'unit', 'company_id', 'department_id']);
+        $stages = \App\Models\Stage::where($companyFilter)->orderBy('sort_order')->orderBy('order_index')->get(['id', 'name', 'company_id', 'department_id']);
+        $statuses = \App\Models\Status::where($companyFilter)->orderBy('sort_order')->get(['id', 'name', 'slug', 'company_id', 'department_id']);
 
         // build labels from lookups so the edit form can display current selection
         $typeLabel = null;
@@ -538,11 +551,17 @@ class ProjectJobAssignmentsController extends Controller
             $companies = collect();
         }
 
-        // lookup lists for modal (types, sizes, stages, statuses)
-        $types = \App\Models\WorkItemType::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group', 'company_id', 'department_id']);
-        $sizes = \App\Models\Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group', 'width', 'height', 'unit', 'company_id', 'department_id']);
-        $stages = \App\Models\Stage::orderBy('sort_order')->orderBy('order_index')->get(['id', 'name', 'company_id', 'department_id']);
-        $statuses = \App\Models\Status::orderBy('sort_order')->get(['id', 'name', 'slug', 'company_id', 'department_id']);
+        // lookup lists for modal (types, sizes, stages, statuses) — 自社 or 全社共通(NULL) のみ
+        $companyFilter = function ($q) use ($userCompanyId) {
+            $q->whereNull('company_id');
+            if ($userCompanyId) {
+                $q->orWhere('company_id', $userCompanyId);
+            }
+        };
+        $types = \App\Models\WorkItemType::where($companyFilter)->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group', 'company_id', 'department_id']);
+        $sizes = \App\Models\Size::where($companyFilter)->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group', 'width', 'height', 'unit', 'company_id', 'department_id']);
+        $stages = \App\Models\Stage::where($companyFilter)->orderBy('sort_order')->orderBy('order_index')->get(['id', 'name', 'company_id', 'department_id']);
+        $statuses = \App\Models\Status::where($companyFilter)->orderBy('sort_order')->get(['id', 'name', 'slug', 'company_id', 'department_id']);
 
         $typeLabel = null;
         $sizeLabel = null;
@@ -645,6 +664,15 @@ class ProjectJobAssignmentsController extends Controller
 
     public function update(Request $request, ProjectJob $projectJob, ProjectJobAssignment $assignment)
     {
+        $companyId = $request->user()->company_id;
+        $userExistsRule = ['nullable', Rule::exists('users', 'id')->where(function ($q) use ($companyId) {
+            if ($companyId) {
+                $q->where(function ($q2) use ($companyId) {
+                    $q2->where('company_id', $companyId)->orWhereNull('company_id');
+                });
+            }
+        })];
+
         $data = $request->validate([
             'title' => 'required|string|max:255',
             'detail' => 'nullable|string',
@@ -654,7 +682,7 @@ class ProjectJobAssignmentsController extends Controller
             // scheduling: desired_start_date removed
             'desired_end_date' => 'nullable|date',
             'desired_time' => 'nullable|date_format:H:i',
-            'user_id' => 'nullable|exists:users,id',
+            'user_id' => $userExistsRule,
             // lookup fields
             'work_item_type_id' => 'nullable|exists:work_item_types,id',
             'size_id' => 'nullable|exists:sizes,id',
@@ -781,6 +809,15 @@ class ProjectJobAssignmentsController extends Controller
             return response()->json(['error' => 'この案件は完了済みのため、新しいジョブを割り当てることはできません。'], 422);
         }
 
+        $companyId = $request->user()->company_id;
+        $userExistsRule = ['nullable', Rule::exists('users', 'id')->where(function ($q) use ($companyId) {
+            if ($companyId) {
+                $q->where(function ($q2) use ($companyId) {
+                    $q2->where('company_id', $companyId)->orWhereNull('company_id');
+                });
+            }
+        })];
+
         $data = $request->validate([
             'assignments' => 'required|array',
             'assignments.*.title' => 'required|string|max:255',
@@ -791,7 +828,7 @@ class ProjectJobAssignmentsController extends Controller
             // scheduling: desired_start_date removed
             'assignments.*.desired_end_date' => 'nullable|date',
             'assignments.*.desired_time' => 'nullable|date_format:H:i',
-            'assignments.*.user_id' => 'nullable|exists:users,id',
+            'assignments.*.user_id' => $userExistsRule,
             // lookup fields moved from WorkItem: clients should send these lookup ids directly on the assignment payload
             'assignments.*.work_item_type_id' => 'nullable|exists:work_item_types,id',
             'assignments.*.size_id' => 'nullable|exists:sizes,id',
@@ -801,7 +838,7 @@ class ProjectJobAssignmentsController extends Controller
             'assignments.*.stage_id' => 'nullable|exists:stages,id',
             'assignments.*.amounts' => 'nullable|integer|min:0',
             'assignments.*.amounts_unit' => 'nullable|string|in:page,file',
-            'assignments.*.sender_id' => 'nullable|exists:users,id',
+            'assignments.*.sender_id' => $userExistsRule,
             'assignments.*.title' => 'nullable|string|max:255',
             'assignments.*.description' => 'nullable|string',
             'assignments.*._progress_sheet_id'  => 'nullable|integer',

@@ -34,14 +34,22 @@ class ProgressTemplateController extends Controller
         ]);
     }
 
-    public function create()
+    public function create(Request $request)
     {
+        $companyId = $request->user()->company_id;
+        $companyFilter = function ($q) use ($companyId) {
+            $q->whereNull('company_id');
+            if ($companyId) {
+                $q->orWhere('company_id', $companyId);
+            }
+        };
+
         return Inertia::render('Coordinator/ProgressTemplates/Edit', [
-            'template'    => null,
-            'stages'      => \App\Models\Stage::orderBy('id')->get(['id', 'name']),
-            'sizes'       => \App\Models\Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group']),
-            'assignments' => \App\Models\Assignment::orderBy('name')->get(['id', 'name', 'code']),
-            'workItemTypes' => \App\Models\WorkItemType::orderBy('id')->get(['id', 'name', 'group']),
+            'template'      => null,
+            'stages'        => \App\Models\Stage::where($companyFilter)->orderBy('id')->get(['id', 'name']),
+            'sizes'         => \App\Models\Size::where($companyFilter)->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group']),
+            'assignments'   => \App\Models\Assignment::orderBy('name')->get(['id', 'name', 'code']),
+            'workItemTypes' => \App\Models\WorkItemType::where($companyFilter)->orderBy('id')->get(['id', 'name', 'group']),
         ]);
     }
 
@@ -95,6 +103,14 @@ class ProgressTemplateController extends Controller
     {
         $this->authorizeEdit($request->user(), $template);
 
+        $companyId = $request->user()->company_id;
+        $companyFilter = function ($q) use ($companyId) {
+            $q->whereNull('company_id');
+            if ($companyId) {
+                $q->orWhere('company_id', $companyId);
+            }
+        };
+
         return Inertia::render('Coordinator/ProgressTemplates/Edit', [
             'template' => [
                 'id'            => $template->id,
@@ -105,10 +121,10 @@ class ProgressTemplateController extends Controller
                 'is_shared'     => $template->is_shared,
                 'created_by'    => $template->created_by,
             ],
-            'stages'      => \App\Models\Stage::orderBy('id')->get(['id', 'name']),
-            'sizes'       => \App\Models\Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group']),
-            'assignments' => \App\Models\Assignment::orderBy('name')->get(['id', 'name', 'code']),
-            'workItemTypes' => \App\Models\WorkItemType::orderBy('id')->get(['id', 'name', 'group']),
+            'stages'        => \App\Models\Stage::where($companyFilter)->orderBy('id')->get(['id', 'name']),
+            'sizes'         => \App\Models\Size::where($companyFilter)->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group']),
+            'assignments'   => \App\Models\Assignment::orderBy('name')->get(['id', 'name', 'code']),
+            'workItemTypes' => \App\Models\WorkItemType::where($companyFilter)->orderBy('id')->get(['id', 'name', 'group']),
         ]);
     }
 
