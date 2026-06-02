@@ -504,7 +504,10 @@ class ProjectJobController extends Controller
                 $data['original_filename'] = basename($tmpOcrPath);
             }
 
-            $data['company_id'] = $request->user()->company_id;
+            $actor = $request->user();
+            $data['company_id'] = $actor->isSuperAdmin()
+                ? ((int) (session('superadmin_context.company_id') ?? $actor->company_id ?? 0) ?: null)
+                : ($actor->company_id ?? null);
 
             $job = ProjectJob::create($data);
 
@@ -554,12 +557,17 @@ class ProjectJobController extends Controller
         $template = \App\Models\ProjectJobTemplate::findOrFail($data['template_id']);
         $fixed = $template->fixed_fields ?? [];
 
+        $actor = $request->user();
+        $companyId = $actor->isSuperAdmin()
+            ? ((int) (session('superadmin_context.company_id') ?? $actor->company_id ?? 0) ?: null)
+            : ($actor->company_id ?? null);
+
         $jobData = [
             'title'      => $data['title'],
             'jobcode'    => $data['jobcode'] ?? null,
             'user_id'    => $fixed['user_id']    ?? $data['user_id']    ?? null,
             'client_id'  => $fixed['client_id']  ?? $data['client_id']  ?? null,
-            'company_id' => $request->user()->company_id,
+            'company_id' => $companyId,
             'size_id'    => $fixed['size_id']    ?? $data['size_id']    ?? null,
             'page_count' => isset($fixed['page_count']) ? $fixed['page_count'] : ($data['page_count'] ?? null),
             'detail'     => !empty($fixed['detail']) ? $fixed['detail'] : ($data['detail'] ?? null),
