@@ -1090,6 +1090,43 @@ HTML,
 </section>
 HTML,
         ],
+        [
+            'version'      => 'announce-1',
+            'title'        => 'お知らせ通知：送信権限者全員が全履歴を閲覧・編集可能に',
+            'released_at'  => '2026-06-02',
+            'summary'      => 'これまでお知らせ通知の送信履歴は「自分が送った通知のみ」が表示されていました。今後は同じ会社で送信権限を持つユーザー（Clerk・Leader・SuperAdmin）であれば、誰が送った通知でも一覧で確認し、編集・送信・削除が行えます。Aさんが下書き保存 → 上長が確認して送信、といったワークフローが可能です。また SuperAdmin が会社コンテキストを切り替えることで、各会社の通知履歴を正しく確認できるよう修正しました。',
+            'design_files' => [],
+            'claude_notes' => '【主な変更】Clerk/AnnouncementController・Leader/AnnouncementController の index/show/edit/update/destroy/send を修正。①index: sender_id = 自分 フィルターを削除し、sender.company_id = 自社（SuperAdminはコンテキスト会社）でフィルタリングに変更。②show/edit/update/destroy/send: abort_if(sender_id != user->id) を authorizeForCompany() ヘルパーに置き換え（sender.company_id を確認）。③一覧に sender_name カラム追加（コントローラーで with sender:id,name を追加、map に sender_name 追記）。④Clerk/Leader Announcements/Index.vue に「送信者」カラム追加。⑤Clerk/Leader Announcements/Show.vue に送信者名表示追加。SuperAdmin が サンエー コンテキストでサンエーAdminの通知履歴（id=3,4,5）を確認できることを curl で確認済み。',
+            'body'         => <<<'HTML'
+<section class="cl-feature">
+  <h3>改善内容</h3>
+  <ul>
+    <li><strong>共有送信履歴：</strong>同じ会社の送信権限者（Clerk・Leader）なら、誰が送ったお知らせでも一覧で確認・編集できるようになりました</li>
+    <li><strong>送信者名の表示：</strong>一覧・詳細画面に「送信者」を表示するようになりました</li>
+    <li><strong>SuperAdmin の会社別履歴：</strong>SuperAdmin が会社コンテキストを切り替えると、その会社の通知履歴が正しく表示されます（従来は自分の送信履歴しか見えなかった）</li>
+    <li><strong>ワークフロー対応：</strong>Aさんが下書き保存 → 上長が内容を確認して送信、BさんがAさんの送信履歴を参考に次の通知を作成、といった運用が可能になりました</li>
+  </ul>
+</section>
+HTML,
+        ],
+        [
+            'version'      => 'announce-2',
+            'title'        => 'お知らせ受信者一覧：会社フィルター・部署・担当・ソート機能追加',
+            'released_at'  => '2026-06-02',
+            'summary'      => 'お知らせ通知の詳細ページ（受信者一覧）を大幅に改善しました。複数会社に送信した場合は「全員 / サンエー印刷 / サン・ブレーン」のようなフィルターボタンが表示され、会社ごとの既読状況を把握できます。また、名前・会社・部署・担当・雇用形態・既読状況・既読日時の各カラムをクリックして並べ替えができるようになりました。',
+            'design_files' => [],
+            'claude_notes' => '【主な変更】Clerk/AnnouncementController・Leader/AnnouncementController の show メソッドに user.company・user.department を eager load 追加。recipients に company_id, company_name, department_name を追加。Clerk/Leader Announcements/Show.vue を全面改修：①会社フィルターボタン（isMultiCompany が true のときのみ表示）。②displayRecipients computed（フィルター＋ソート）。③filteredReadCount / readRate を displayRecipients ベースに変更（絞り込み中はバー横に「絞り込み中」表示）。④全カラムにクリックソート（toggleSort/sortIcon、↕/↑/↓）。⑤会社カラムは isMultiCompany 時のみ表示。⑥部署カラム追加。⑦データなし時の空行メッセージ。',
+            'body'         => <<<'HTML'
+<section class="cl-feature">
+  <h3>改善内容</h3>
+  <ul>
+    <li><strong>会社フィルター：</strong>複数会社に送信した通知の詳細ページに「全員 / 会社名」のフィルターボタンが表示されます。クリックするとその会社の受信者だけに絞り込まれ、既読バーもリアルタイムで更新されます</li>
+    <li><strong>部署・会社カラム追加：</strong>受信者一覧に「部署」を追加しました。複数会社への通知では「会社」カラムも表示されます</li>
+    <li><strong>ソート機能：</strong>名前・会社・部署・担当・雇用形態・既読状況・既読日時のすべての列ヘッダーをクリックして昇順・降順に並べ替えできます（↕ 未ソート / ↑ 昇順 / ↓ 降順）</li>
+  </ul>
+</section>
+HTML,
+        ],
         ];
 
         foreach ($entries as $entry) {
