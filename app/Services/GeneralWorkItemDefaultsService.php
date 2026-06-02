@@ -14,8 +14,11 @@ class GeneralWorkItemDefaultsService
      */
     public function seedForCompany(int $companyId): void
     {
-        // 会社にアイテムが1件でも存在すればスキップ（スコープ問わず）
-        $exists = WorkItemType::where('company_id', $companyId)->exists();
+        // 会社全体スコープ（department_id IS NULL）にアイテムが存在すればスキップ
+        // ※部署固有アイテムだけある会社（サン・ブレーン等）は会社全体にも追加する
+        $exists = WorkItemType::where('company_id', $companyId)
+            ->whereNull('department_id')
+            ->exists();
 
         if ($exists) {
             return;
