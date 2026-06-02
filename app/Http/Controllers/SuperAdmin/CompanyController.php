@@ -4,6 +4,7 @@ namespace App\Http\Controllers\SuperAdmin;
 use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\User;
+use App\Services\GeneralWorkItemDefaultsService;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -70,6 +71,9 @@ class CompanyController extends Controller
                 ]);
             }
         }
+
+        // 新規会社に一般作業項目デフォルトを投入
+        app(GeneralWorkItemDefaultsService::class)->seedForCompany($company->id);
 
         return redirect()->route('superadmin.companies.index');
     }
