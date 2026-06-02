@@ -1,14 +1,17 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Head } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
 
 const props = defineProps({
     noCompanySelected: { type: Boolean, default: false },
-    stages: Array,
-    work_item_types: Array,
-    sizes: Array,
-    statuses: Array,
-    difficulties: Array,
+    departments:       { type: Array, default: () => [] },
+    currentScope:      { type: String, default: 'company' },
+    canEditScope:      { type: Boolean, default: false },
+    stages:            Array,
+    work_item_types:   Array,
+    sizes:             Array,
+    statuses:          Array,
+    difficulties:      Array,
 });
 
 // グループ設定（group カラムを持つタイプのみ）
@@ -37,7 +40,6 @@ const groupConfigByType = {
 function computeGroupedSections(type, items) {
     const config = groupConfigByType[type];
     if (!config || !items) return null;
-    // ハードコード済みグループに加え、DB に存在するカスタムグループも末尾追加
     const configKeys = config.groups.map((k) => k ?? null);
     const extraKeys = [...new Set(items.map((i) => i.group ?? null))].filter(
         (k) => !configKeys.includes(k),
@@ -60,6 +62,16 @@ const sections = [
     { type: 'statuses', label: 'Statuses', items: props.statuses },
     { type: 'difficulties', label: 'Difficulties', items: props.difficulties },
 ];
+
+function switchScope(scopeKey) {
+    const params = scopeKey !== 'company' ? { dept: scopeKey } : {};
+    router.get(route('workload_setting.index'), params, { preserveState: false });
+}
+
+function editLink(type) {
+    const base = route('workload_setting.edit', { type });
+    return props.currentScope !== 'company' ? base + '?dept=' + props.currentScope : base;
+}
 </script>
 
 <template>
@@ -83,50 +95,96 @@ const sections = [
             </div>
         </div>
 
-        <div v-else class="rounded bg-white px-4 py-6 sm:p-6 shadow">
-            <div class="grid gap-6 md:grid-cols-2">
-                <div
-                    v-for="section in sections"
-                    :key="section.type"
-                    class="rounded border bg-white p-4"
-                    :class="{ 'md:col-span-2': !!computeGroupedSections(section.type, section.items) }"
-                >
-                    <div class="mb-3 flex items-center justify-between">
-                        <h2 class="text-lg font-semibold">{{ section.label }}</h2>
-                        <a
-                            :href="route('workload_setting.edit', { type: section.type })"
-                            class="inline-flex items-center rounded bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-700"
-                        >
-                            編集
-                        </a>
-                    </div>
-                    <!-- グループなし：通常リスト -->
-                    <template v-if="!computeGroupedSections(section.type, section.items)">
-                        <ul class="space-y-1 text-sm">
-                            <li v-for="item in section.items" :key="item.id" class="border-b py-1 text-gray-700">
-                                {{ item.name }}
-                                <span v-if="item.label" class="ml-2 text-gray-400">— {{ item.label }}</span>
-                            </li>
-                            <li v-if="!section.items || section.items.length === 0" class="text-gray-400">登録がありません</li>
-                        </ul>
-                    </template>
+        <div v-else class="space-y-4">
+            <!-- 部署スコープバー -->
+            <div class="rounded bg-white px-4 py-3 shadow">
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="text-xs font-medium text-gray-500 mr-1">スコープ:</span>
 
-                    <!-- グループあり：グループ別表示 -->
-                    <template v-else>
-                        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                            <div v-for="grp in computeGroupedSections(section.type, section.items)" :key="grp.key ?? 'null'">
-                                <div class="mb-1 border-b border-gray-200 pb-0.5 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                    {{ grp.label }}
-                                </div>
-                                <ul class="space-y-1 text-sm">
-                                    <li v-for="item in grp.items" :key="item.id" class="border-b py-1 text-gray-700">
-                                        {{ item.name }}
-                                        <span v-if="item.label" class="ml-2 text-gray-400">— {{ item.label }}</span>
-                                    </li>
-                                </ul>
-                            </div>
+                    <!-- 会社全体ボタン -->
+                    <button
+                        type="button"
+                        :disabled="!canEditScope && currentScope !== 'company'"
+                        :class="[
+                            'rounded px-3 py-1 text-sm font-medium transition-colors',
+                            currentScope === 'company'
+                                ? 'bg-gray-700 text-white'
+                                : canEditScope
+                                    ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    : 'bg-gray-100 text-gray-300 cursor-not-allowed',
+                        ]"
+                        @click="canEditScope && switchScope('company')"
+                    >
+                        会社全体
+                    </button>
+
+                    <!-- 部署ボタン -->
+                    <button
+                        v-for="dept in departments"
+                        :key="dept.id"
+                        type="button"
+                        :disabled="!canEditScope && currentScope !== String(dept.id)"
+                        :class="[
+                            'rounded px-3 py-1 text-sm font-medium transition-colors',
+                            currentScope === String(dept.id)
+                                ? 'bg-blue-600 text-white'
+                                : canEditScope
+                                    ? 'bg-gray-100 text-gray-600 hover:bg-blue-100 hover:text-blue-700'
+                                    : 'bg-gray-100 text-gray-300 cursor-not-allowed',
+                        ]"
+                        @click="(canEditScope || currentScope === String(dept.id)) && switchScope(String(dept.id))"
+                    >
+                        {{ dept.name }}
+                    </button>
+                </div>
+            </div>
+
+            <!-- 設定一覧 -->
+            <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
+                <div class="grid gap-6 md:grid-cols-2">
+                    <div
+                        v-for="section in sections"
+                        :key="section.type"
+                        class="rounded border bg-white p-4"
+                        :class="{ 'md:col-span-2': !!computeGroupedSections(section.type, section.items) }"
+                    >
+                        <div class="mb-3 flex items-center justify-between">
+                            <h2 class="text-lg font-semibold">{{ section.label }}</h2>
+                            <a
+                                :href="editLink(section.type)"
+                                class="inline-flex items-center rounded bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-700"
+                            >
+                                編集
+                            </a>
                         </div>
-                    </template>
+                        <!-- グループなし：通常リスト -->
+                        <template v-if="!computeGroupedSections(section.type, section.items)">
+                            <ul class="space-y-1 text-sm">
+                                <li v-for="item in section.items" :key="item.id" class="border-b py-1 text-gray-700">
+                                    {{ item.name }}
+                                    <span v-if="item.label" class="ml-2 text-gray-400">— {{ item.label }}</span>
+                                </li>
+                                <li v-if="!section.items || section.items.length === 0" class="text-gray-400">登録がありません</li>
+                            </ul>
+                        </template>
+
+                        <!-- グループあり：グループ別表示 -->
+                        <template v-else>
+                            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                <div v-for="grp in computeGroupedSections(section.type, section.items)" :key="grp.key ?? 'null'">
+                                    <div class="mb-1 border-b border-gray-200 pb-0.5 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                        {{ grp.label }}
+                                    </div>
+                                    <ul class="space-y-1 text-sm">
+                                        <li v-for="item in grp.items" :key="item.id" class="border-b py-1 text-gray-700">
+                                            {{ item.name }}
+                                            <span v-if="item.label" class="ml-2 text-gray-400">— {{ item.label }}</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
                 </div>
             </div>
         </div>

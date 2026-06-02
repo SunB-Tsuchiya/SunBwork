@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
+use App\Models\Department;
 use App\Models\Stage;
 use App\Models\Size;
 use App\Models\Status;
@@ -128,6 +129,9 @@ class WorkloadSettingController extends Controller
         if ($user?->isSuperAdmin() && $this->contextCompanyId() === null) {
             return Inertia::render('WorkloadSetting/Index', [
                 'noCompanySelected' => true,
+                'departments'       => [],
+                'currentScope'      => 'company',
+                'canEditScope'      => false,
                 'stages'            => [],
                 'work_item_types'   => [],
                 'sizes'             => [],
@@ -136,18 +140,19 @@ class WorkloadSettingController extends Controller
             ]);
         }
 
-        $stages = $this->fetchItems(Stage::class, 'order_index', $companyId);
-        $workItemTypes = $this->fetchItems(WorkItemType::class, 'sort_order', $companyId);
-        $sizes = $this->fetchItems(Size::class, 'sort_order', $companyId);
-        $statuses = $this->fetchItems(Status::class, 'sort_order', $companyId);
-        $difficulties = $this->fetchItems(Difficulty::class, 'sort_order', $companyId);
+        ['department_id' => $deptId, 'scope_key' => $scopeKey] = $this->resolveScope($request, $user, $companyId);
+        $canEditScope  = $user->isSuperAdmin() || $user->isAdmin();
+        $departments   = $this->fetchDepartments($companyId);
 
         return Inertia::render('WorkloadSetting/Index', [
-            'stages' => $stages,
-            'work_item_types' => $workItemTypes,
-            'sizes' => $sizes,
-            'statuses' => $statuses,
-            'difficulties' => $difficulties,
+            'departments'    => $departments,
+            'currentScope'   => $scopeKey,
+            'canEditScope'   => $canEditScope,
+            'stages'         => $this->fetchItems(Stage::class, 'order_index', $companyId, $deptId),
+            'work_item_types'=> $this->fetchItems(WorkItemType::class, 'sort_order', $companyId, $deptId),
+            'sizes'          => $this->fetchItems(Size::class, 'sort_order', $companyId, $deptId),
+            'statuses'       => $this->fetchItems(Status::class, 'sort_order', $companyId, $deptId),
+            'difficulties'   => $this->fetchItems(Difficulty::class, 'sort_order', $companyId, $deptId),
         ]);
     }
 
@@ -164,11 +169,18 @@ class WorkloadSettingController extends Controller
         $user      = $request->user();
         $companyId = $this->contextCompanyId() ?? $user?->company_id ?? null;
 
+        ['department_id' => $deptId, 'scope_key' => $scopeKey] = $this->resolveScope($request, $user, $companyId);
+        $canEditScope = $user->isSuperAdmin() || $user->isAdmin();
+        $departments  = $this->fetchDepartments($companyId);
+
         return Inertia::render('WorkloadSetting/Edit', [
-            'type'        => $type,
-            'typeLabel'   => $config['label'],
-            'items'       => $this->fetchItems($config['model'], $config['orderBy'], $companyId),
-            'groupOrders' => $type === 'work_item_types' ? $this->fetchGroupOrders($type, $companyId) : [],
+            'type'         => $type,
+            'typeLabel'    => $config['label'],
+            'items'        => $this->fetchItems($config['model'], $config['orderBy'], $companyId, $deptId),
+            'groupOrders'  => $type === 'work_item_types' ? $this->fetchGroupOrders($type, $companyId) : [],
+            'departments'  => $departments,
+            'currentScope' => $scopeKey,
+            'canEditScope' => $canEditScope,
         ]);
     }
 
@@ -197,7 +209,21 @@ class WorkloadSettingController extends Controller
 
         $user      = $request->user();
         $companyId = $this->contextCompanyId() ?? $user?->company_id ?? null;
-        $fillable  = (new $modelClass)->getFillable();
+
+        // scope はリクエストボディの 'scope' キーから取得（'company' or '{id}'）
+        $scopeRaw = $request->input('scope', 'company');
+
+        // Leader は自部署以外への書き込みを禁止
+        if (!$user->isSuperAdmin() && !$user->isAdmin()) {
+            $leaderDeptId  = $user->department_id;
+            $allowedScope  = $leaderDeptId ? (string) $leaderDeptId : 'company';
+            if ($scopeRaw !== $allowedScope) {
+                abort(403, '自分の部署の設定のみ編集できます。');
+            }
+        }
+
+        $deptId   = ($scopeRaw === 'company') ? null : (int) $scopeRaw;
+        $fillable = (new $modelClass)->getFillable();
 
         foreach ($payload['items'] ?? [] as $item) {
             // 既存レコードの削除
@@ -206,10 +232,10 @@ class WorkloadSettingController extends Controller
                 continue;
             }
 
-            // fillable フィールドだけ抽出（company_id は後で設定）
+            // fillable フィールドを抽出（company_id / department_id は後で設定）
             $data = [];
             foreach ($fillable as $field) {
-                if (array_key_exists($field, $item) && $field !== 'company_id') {
+                if (array_key_exists($field, $item) && !in_array($field, ['company_id', 'department_id'])) {
                     $data[$field] = $item[$field];
                 }
             }
@@ -229,9 +255,16 @@ class WorkloadSettingController extends Controller
                 $data['slug'] = $slug;
             }
 
+            $table = (new $modelClass)->getTable();
+
             // 会社スコープ
-            if ($companyId && Schema::hasColumn((new $modelClass)->getTable(), 'company_id')) {
+            if ($companyId && Schema::hasColumn($table, 'company_id')) {
                 $data['company_id'] = $companyId;
+            }
+
+            // 部署スコープ
+            if (Schema::hasColumn($table, 'department_id')) {
+                $data['department_id'] = $deptId;
             }
 
             // upsert
@@ -251,7 +284,9 @@ class WorkloadSettingController extends Controller
             $this->saveGroupOrders($type, $companyId, $groupOrders);
         }
 
-        return redirect()->route('workload_setting.index');
+        // 保存後も同じスコープに留まる
+        $redirectParams = $scopeRaw !== 'company' ? ['dept' => $scopeRaw] : [];
+        return redirect()->route('workload_setting.index', $redirectParams);
     }
 
     /**
@@ -282,16 +317,76 @@ class WorkloadSettingController extends Controller
     }
 
     /**
-     * モデルのレコードを会社スコープ付きで取得
+     * 部署一覧を取得（会社スコープ）
      */
-    private function fetchItems(string $modelClass, string $orderBy, ?int $companyId)
+    private function fetchDepartments(int $companyId)
+    {
+        return Department::where('company_id', $companyId)
+            ->where('active', true)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get(['id', 'name']);
+    }
+
+    /**
+     * スコープを解決する（department_id と scope_key を返す）
+     * - SuperAdmin / Admin: クエリパラメータ ?dept= を優先
+     * - Leader: 自部署を強制使用
+     */
+    private function resolveScope(Request $request, $user, int $companyId): array
+    {
+        if ($user->isSuperAdmin() || $user->isAdmin()) {
+            $dept = $request->query('dept', 'company');
+            if ($dept === 'company') {
+                return ['department_id' => null, 'scope_key' => 'company'];
+            }
+            $deptId = (int) $dept;
+            // 指定部署が当該会社に存在するか確認
+            $exists = Department::where('id', $deptId)
+                ->where('company_id', $companyId)
+                ->where('active', true)
+                ->exists();
+            if (!$exists) {
+                return ['department_id' => null, 'scope_key' => 'company'];
+            }
+            return ['department_id' => $deptId, 'scope_key' => (string) $deptId];
+        }
+
+        // Leader: 自分の department_id を強制使用
+        $deptId = $user->department_id;
+        return [
+            'department_id' => $deptId,
+            'scope_key'     => $deptId ? (string) $deptId : 'company',
+        ];
+    }
+
+    /**
+     * モデルのレコードをスコープ付きで取得
+     * - departmentId = null: 会社全体（department_id IS NULL）
+     * - departmentId = X:   部署固有（department_id = X）
+     */
+    private function fetchItems(string $modelClass, string $orderBy, ?int $companyId, ?int $departmentId = null)
     {
         $query = $modelClass::orderBy($orderBy);
+        $table = (new $modelClass)->getTable();
 
-        if ($companyId && Schema::hasColumn((new $modelClass)->getTable(), 'company_id')) {
-            $query->where(function ($q) use ($companyId) {
-                $q->whereNull('company_id')->orWhere('company_id', $companyId);
-            });
+        if ($companyId && Schema::hasColumn($table, 'company_id')) {
+            if ($departmentId === null) {
+                // 会社スコープ: company_id が一致するか NULL（グローバル共通レコード）
+                $query->where(function ($q) use ($companyId) {
+                    $q->whereNull('company_id')->orWhere('company_id', $companyId);
+                });
+            } else {
+                $query->where('company_id', $companyId);
+            }
+        }
+
+        if (Schema::hasColumn($table, 'department_id')) {
+            if ($departmentId === null) {
+                $query->whereNull('department_id');
+            } else {
+                $query->where('department_id', $departmentId);
+            }
         }
 
         return $query->get();

@@ -5,10 +5,13 @@ import { Head, router, usePage } from '@inertiajs/vue3';
 import { computed, reactive, ref, toRaw } from 'vue';
 
 const props = defineProps({
-    type: { type: String, required: true },
-    typeLabel: { type: String, required: true },
-    items: { type: Array, default: () => [] },
-    groupOrders: { type: Array, default: () => [] },
+    type:          { type: String, required: true },
+    typeLabel:     { type: String, required: true },
+    items:         { type: Array, default: () => [] },
+    groupOrders:   { type: Array, default: () => [] },
+    departments:   { type: Array, default: () => [] },
+    currentScope:  { type: String, default: 'company' },
+    canEditScope:  { type: Boolean, default: false },
 });
 
 // タイプ別ソートキー（順序列に使うフィールド名。null = 順序なし）
@@ -292,6 +295,11 @@ function applyGroupEdit() {
 
 const { showToast, showValidationErrors } = useToasts();
 
+function switchScope(scopeKey) {
+    const params = scopeKey !== 'company' ? { dept: scopeKey } : {};
+    router.get(route('workload_setting.edit', { type: props.type }), params, { preserveState: false });
+}
+
 function save() {
     // グループ化タイプ: 各グループに最低1件の有効な項目が必要
     if (groupConfig.value && groupedSections.value) {
@@ -305,7 +313,11 @@ function save() {
     }
     router.post(
         route('workload_setting.store', { type: props.type }),
-        { items: toRaw(state.items), group_orders: groupConfig.value ? groupConfig.value.groups.map((g) => g ?? null) : undefined },
+        {
+            items: toRaw(state.items),
+            group_orders: groupConfig.value ? groupConfig.value.groups.map((g) => g ?? null) : undefined,
+            scope: props.currentScope,
+        },
         {
             preserveState: true,
             onSuccess: () => {
@@ -331,10 +343,58 @@ function revert() {
 
         <Head :title="`${typeLabel} 編集`" />
 
+        <!-- 部署スコープバー -->
+        <div v-if="departments.length > 0" class="rounded bg-white px-4 py-3 shadow mb-4">
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="text-xs font-medium text-gray-500 mr-1">スコープ:</span>
+
+                <!-- 会社全体ボタン -->
+                <button
+                    type="button"
+                    :disabled="!canEditScope && currentScope !== 'company'"
+                    :class="[
+                        'rounded px-3 py-1 text-sm font-medium transition-colors',
+                        currentScope === 'company'
+                            ? 'bg-gray-700 text-white'
+                            : canEditScope
+                                ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                : 'bg-gray-100 text-gray-300 cursor-not-allowed',
+                    ]"
+                    @click="canEditScope && switchScope('company')"
+                >
+                    会社全体
+                </button>
+
+                <!-- 部署ボタン -->
+                <button
+                    v-for="dept in departments"
+                    :key="dept.id"
+                    type="button"
+                    :disabled="!canEditScope && currentScope !== String(dept.id)"
+                    :class="[
+                        'rounded px-3 py-1 text-sm font-medium transition-colors',
+                        currentScope === String(dept.id)
+                            ? 'bg-blue-600 text-white'
+                            : canEditScope
+                                ? 'bg-gray-100 text-gray-600 hover:bg-blue-100 hover:text-blue-700'
+                                : 'bg-gray-100 text-gray-300 cursor-not-allowed',
+                    ]"
+                    @click="(canEditScope || currentScope === String(dept.id)) && switchScope(String(dept.id))"
+                >
+                    {{ dept.name }}
+                </button>
+            </div>
+        </div>
+
         <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <!-- 戻るリンク -->
             <div class="mb-4">
-                <a :href="route('workload_setting.index')" class="text-sm text-gray-500 hover:text-gray-700"> ← 一覧に戻る </a>
+                <a
+                    :href="route('workload_setting.index') + (currentScope !== 'company' ? '?dept=' + currentScope : '')"
+                    class="text-sm text-gray-500 hover:text-gray-700"
+                >
+                    ← 一覧に戻る
+                </a>
             </div>
 
             <!-- テーブル -->
