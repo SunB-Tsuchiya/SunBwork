@@ -318,19 +318,33 @@ class WorkloadSettingController extends Controller
     {
         $deptItems = WorkItemType::where('company_id', $companyId)
             ->whereNotNull('department_id')
-            ->select('name', 'department_id')
+            ->select('id', 'name', 'department_id')
             ->get();
 
+        // name → [{dept_id, item_id}, ...]
         $nameToDeptsMap = $deptItems->groupBy('name')
-            ->map(fn($g) => $g->pluck('department_id')->unique()->values()->toArray());
+            ->map(fn($g) => $g->map(fn($i) => ['dept_id' => $i->department_id, 'item_id' => $i->id])->values());
 
         return $items->map(function ($item) use ($nameToDeptsMap, $departments) {
-            $deptIds = $nameToDeptsMap->get($item->name, []);
+            $matchingItems = $nameToDeptsMap->get($item->name, collect());
+
+            // バッジ用: 登録済み部署のみ
             $usedByDepts = $departments
-                ->filter(fn($d) => in_array($d->id, $deptIds))
+                ->filter(fn($d) => $matchingItems->contains('dept_id', $d->id))
                 ->map(fn($d) => ['id' => $d->id, 'name' => $d->name])
                 ->values();
-            return array_merge($item->toArray(), ['usedByDepts' => $usedByDepts->toArray()]);
+
+            // トグル用: 全部署に対して item_id（null=未登録）
+            $deptItemIds = [];
+            foreach ($departments as $d) {
+                $match = $matchingItems->firstWhere('dept_id', $d->id);
+                $deptItemIds[$d->id] = $match ? $match['item_id'] : null;
+            }
+
+            return array_merge($item->toArray(), [
+                'usedByDepts' => $usedByDepts->toArray(),
+                'deptItemIds' => $deptItemIds,
+            ]);
         })->values();
     }
 

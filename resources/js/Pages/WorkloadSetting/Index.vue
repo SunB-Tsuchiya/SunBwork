@@ -95,10 +95,16 @@ function buildGroupConfig(type, items, savedOrder) {
 // ─── 編集モード ON/OFF ────────────────────────────────────────────────────────
 function startEdit() {
     ALL_TYPES.forEach((type) => {
-        const items     = props[type] ?? [];
+        const items      = props[type] ?? [];
         const savedOrder = type === 'work_item_types' ? props.groupOrders : [];
         editStates[type] = {
-            items:       items.map((i) => ({ ...i })),
+            items: items.map((i) => ({
+                ...i,
+                // 部署トグル初期状態: deptItemIds から { deptId: bool } を構築
+                _deptToggles: i.deptItemIds
+                    ? Object.fromEntries(Object.entries(i.deptItemIds).map(([k, v]) => [k, v !== null]))
+                    : {},
+            })),
             groupConfig: buildGroupConfig(type, items, savedOrder),
         };
     });
@@ -293,17 +299,42 @@ async function saveType(type) {
     const groupOrders = state.groupConfig ? state.groupConfig.groups.map((g) => g ?? null) : undefined;
     const valid = state.items.filter((i) => !(i._new && i._deleted));
 
-    // スコープごとにアイテムを振り分け
-    // 既存アイテム（id あり）は現在のスコープへ、新規アイテムは _targetScope へ
+    // ① 通常スコープ保存（既存→現在スコープ、新規→_targetScope）
     const byScope = {};
     for (const item of valid) {
         const scope = item._new ? (item._targetScope ?? props.currentScope) : props.currentScope;
         (byScope[scope] ??= []).push(item);
     }
 
+    // ② 部署トグル変更の収集（既存アイテムのみ、company-wide スコープのみ）
+    const deptActions = {}; // deptId → [{action:'add'|'del', itemData}]
+    if (props.currentScope === 'company') {
+        for (const item of valid) {
+            if (item._new || !item._deptToggles) continue;
+            const original = props.deptItemIds ?? item.deptItemIds ?? {};
+            for (const [deptIdStr, isOn] of Object.entries(item._deptToggles)) {
+                const wasOn = (item.deptItemIds?.[deptIdStr] ?? null) !== null;
+                if (isOn === wasOn) continue;
+                if (!deptActions[deptIdStr]) deptActions[deptIdStr] = [];
+                if (isOn) {
+                    // 新規追加: 現在の item を複製してその部署用に
+                    const { id, _deptToggles, deptItemIds, usedByDepts, _new, _deleted, _targetScope, ...rest } = item;
+                    deptActions[deptIdStr].push({ ...rest });
+                } else {
+                    // 削除: 既存の item_id を使って削除マーク
+                    const itemId = item.deptItemIds?.[deptIdStr];
+                    if (itemId) deptActions[deptIdStr].push({ id: itemId, _deleted: true, name: item.name });
+                }
+            }
+        }
+    }
+
     try {
         for (const [scope, items] of Object.entries(byScope)) {
             await postScope(type, scope, items, groupOrders);
+        }
+        for (const [deptId, actions] of Object.entries(deptActions)) {
+            if (actions.length > 0) await postScope(type, deptId, actions, undefined);
         }
         showToast(`${TYPE_LABELS[type]} を保存しました`, 'success');
     } catch (_) {
@@ -495,11 +526,14 @@ const readSections = computed(() => ALL_TYPES.map((type) => ({
                         <table class="min-w-full divide-y divide-gray-200 text-sm">
                             <thead class="bg-gray-50">
                                 <tr>
-                                    <th class="w-16 px-2 py-2 text-left font-medium text-gray-600">順序</th>
-                                    <th v-for="col in COLUMNS_BY_TYPE[section.type]" :key="col.key" class="px-2 py-2 text-left font-medium text-gray-600">
-                                        {{ col.label }}<span v-if="col.required" class="text-red-500">*</span>
+                                    <th class="w-12 px-2 py-2 text-left font-medium text-gray-600">順序</th>
+                                    <th class="w-48 px-2 py-2 text-left font-medium text-gray-600">
+                                        名前<span class="text-red-500">*</span>
                                     </th>
-                                    <th class="px-2 py-2 text-left font-medium text-gray-600">追加先</th>
+                                    <th v-for="col in COLUMNS_BY_TYPE[section.type].filter(c => c.key !== 'name')" :key="col.key" class="px-2 py-2 text-left font-medium text-gray-600 whitespace-nowrap">
+                                        {{ col.label }}
+                                    </th>
+                                    <th class="px-2 py-2 text-left font-medium text-gray-600">部署</th>
                                     <th class="w-24 px-2 py-2 text-left font-medium text-gray-600">操作</th>
                                 </tr>
                             </thead>
@@ -515,29 +549,55 @@ const readSections = computed(() => ALL_TYPES.map((type) => ({
                                             <button type="button" :disabled="idx === (editStates[section.type]?.items ?? []).length - 1 || !!item._deleted" class="h-5 w-5 text-xs text-gray-500 hover:bg-gray-200 rounded disabled:opacity-30" @click="moveDown(section.type, item, [...(editStates[section.type]?.items ?? [])].sort((a,b) => (a[SORT_KEY_BY_TYPE[section.type]] ?? 0) - (b[SORT_KEY_BY_TYPE[section.type]] ?? 0)))">▼</button>
                                         </div>
                                     </td>
-                                    <td v-for="col in COLUMNS_BY_TYPE[section.type]" :key="col.key" class="px-2 py-1.5">
+                                    <!-- 名前列 -->
+                                    <td class="px-2 py-1.5">
+                                        <input
+                                            v-model="item['name']"
+                                            type="text"
+                                            :disabled="!!item._deleted"
+                                            placeholder="名前"
+                                            class="w-full rounded border px-2 py-1 text-sm focus:outline-none disabled:bg-gray-100"
+                                            :class="fieldError(section.type, item, 'name') ? 'border-red-400' : 'border-gray-300 focus:border-blue-400'"
+                                        />
+                                    </td>
+                                    <!-- 名前以外の列 -->
+                                    <td v-for="col in COLUMNS_BY_TYPE[section.type].filter(c => c.key !== 'name')" :key="col.key" class="px-2 py-1.5">
                                         <input
                                             v-model="item[col.key]"
                                             :type="col.inputType"
                                             :disabled="!!item._deleted"
                                             :placeholder="col.label"
                                             class="rounded border px-2 py-1 text-sm focus:outline-none disabled:bg-gray-100"
-                                            :class="[col.inputType === 'number' ? 'w-20' : 'w-full', fieldError(section.type, item, col.key) ? 'border-red-400' : 'border-gray-300 focus:border-blue-400']"
+                                            :class="[col.inputType === 'number' ? 'w-20' : 'w-32', fieldError(section.type, item, col.key) ? 'border-red-400' : 'border-gray-300 focus:border-blue-400']"
                                         />
-                                        <p v-if="fieldError(section.type, item, col.key)" class="mt-0.5 text-xs text-red-500">{{ fieldError(section.type, item, col.key) }}</p>
                                     </td>
-                                    <!-- 追加先スコープバッジ（新規行のみ変更可） -->
+                                    <!-- 部署トグル / 追加先セレクト -->
                                     <td class="px-2 py-1.5">
+                                        <!-- 新規行: 追加先セレクト -->
                                         <template v-if="item._new">
-                                            <select
-                                                v-model="item._targetScope"
-                                                class="rounded border border-gray-300 px-1.5 py-0.5 text-xs focus:border-blue-400 focus:outline-none"
-                                            >
+                                            <select v-model="item._targetScope" class="rounded border border-gray-300 px-1.5 py-0.5 text-xs focus:border-blue-400 focus:outline-none">
                                                 <option value="company">会社全体</option>
                                                 <option v-for="d in departments" :key="d.id" :value="String(d.id)">{{ d.name }}</option>
                                             </select>
                                         </template>
-                                        <span v-else class="text-xs text-gray-400">{{ scopeLabel(currentScope) }}</span>
+                                        <!-- 既存行: 部署トグルボタン -->
+                                        <template v-else-if="departments.length && currentScope === 'company'">
+                                            <div class="flex flex-wrap gap-1">
+                                                <button
+                                                    v-for="d in departments"
+                                                    :key="d.id"
+                                                    type="button"
+                                                    :disabled="!!item._deleted"
+                                                    :class="['rounded-full px-2 py-0.5 text-xs font-medium border transition-colors whitespace-nowrap',
+                                                        item._deptToggles?.[d.id]
+                                                            ? 'bg-blue-100 text-blue-700 border-blue-400 hover:bg-blue-200'
+                                                            : 'bg-gray-100 text-gray-400 border-gray-300 hover:bg-gray-200']"
+                                                    @click="item._deptToggles[d.id] = !item._deptToggles?.[d.id]"
+                                                >
+                                                    {{ d.name }}{{ item._deptToggles?.[d.id] ? ' ●' : ' ○' }}
+                                                </button>
+                                            </div>
+                                        </template>
                                     </td>
                                     <td class="min-w-[5rem] px-2 py-1.5">
                                         <button v-if="!item._deleted" type="button" class="whitespace-nowrap text-sm font-medium text-red-500 hover:underline" @click="markDelete(section.type, item)">－ 削除</button>
@@ -612,36 +672,53 @@ const readSections = computed(() => ALL_TYPES.map((type) => ({
                                                 <button type="button" :disabled="idx === grp.items.length - 1 || !!item._deleted" class="h-5 w-5 text-xs text-gray-500 hover:bg-gray-200 rounded disabled:opacity-30" @click="moveDown(section.type, item, grp.items)">▼</button>
                                             </div>
                                         </td>
-                                        <td v-for="col in COLUMNS_BY_TYPE[section.type]" :key="col.key" class="px-2 py-1.5">
+                                        <!-- 名前列 -->
+                                        <td class="px-2 py-1.5">
+                                            <input
+                                                v-model="item['name']"
+                                                type="text"
+                                                :disabled="!!item._deleted"
+                                                placeholder="名前"
+                                                class="w-full rounded border px-2 py-1 text-sm focus:outline-none disabled:bg-gray-100"
+                                                :class="fieldError(section.type, item, 'name') ? 'border-red-400' : 'border-gray-300 focus:border-blue-400'"
+                                            />
+                                        </td>
+                                        <!-- 名前以外の列 -->
+                                        <td v-for="col in COLUMNS_BY_TYPE[section.type].filter(c => c.key !== 'name')" :key="col.key" class="px-2 py-1.5">
                                             <input
                                                 v-model="item[col.key]"
                                                 :type="col.inputType"
                                                 :disabled="!!item._deleted"
                                                 :placeholder="col.label"
                                                 class="rounded border px-2 py-1 text-sm focus:outline-none disabled:bg-gray-100"
-                                                :class="[col.inputType === 'number' ? 'w-20' : 'w-full', fieldError(section.type, item, col.key) ? 'border-red-400' : 'border-gray-300 focus:border-blue-400']"
+                                                :class="[col.inputType === 'number' ? 'w-20' : 'w-32', fieldError(section.type, item, col.key) ? 'border-red-400' : 'border-gray-300 focus:border-blue-400']"
                                             />
                                         </td>
-                                        <!-- 部署バッジ or 追加先セレクト -->
+                                        <!-- 部署トグル / 追加先セレクト -->
                                         <td class="px-2 py-1.5">
                                             <!-- 新規行: 追加先セレクト -->
                                             <template v-if="item._new">
-                                                <select
-                                                    v-model="item._targetScope"
-                                                    class="rounded border border-gray-300 px-1.5 py-0.5 text-xs focus:border-blue-400 focus:outline-none"
-                                                >
+                                                <select v-model="item._targetScope" class="rounded border border-gray-300 px-1.5 py-0.5 text-xs focus:border-blue-400 focus:outline-none">
                                                     <option value="company">会社全体</option>
                                                     <option v-for="d in departments" :key="d.id" :value="String(d.id)">{{ d.name }}</option>
                                                 </select>
                                             </template>
-                                            <!-- 既存行: 使用部署バッジ（company-wide スコープのみ） -->
-                                            <template v-else-if="currentScope === 'company' && (item.usedByDepts ?? []).length">
+                                            <!-- 既存行: 部署トグルボタン（company-wide スコープのみ） -->
+                                            <template v-else-if="departments.length && currentScope === 'company'">
                                                 <div class="flex flex-wrap gap-1">
-                                                    <span
-                                                        v-for="d in item.usedByDepts"
+                                                    <button
+                                                        v-for="d in departments"
                                                         :key="d.id"
-                                                        class="inline-flex items-center rounded-full bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700"
-                                                    >{{ d.name }}</span>
+                                                        type="button"
+                                                        :disabled="!!item._deleted"
+                                                        :class="['rounded px-2.5 py-1 text-xs font-medium border transition-colors whitespace-nowrap',
+                                                            item._deptToggles?.[d.id]
+                                                                ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
+                                                                : 'bg-white text-gray-400 border-gray-300 hover:bg-gray-50 hover:text-gray-600']"
+                                                        @click="item._deptToggles[d.id] = !item._deptToggles?.[d.id]"
+                                                    >
+                                                        {{ d.name }}
+                                                    </button>
                                                 </div>
                                             </template>
                                         </td>
