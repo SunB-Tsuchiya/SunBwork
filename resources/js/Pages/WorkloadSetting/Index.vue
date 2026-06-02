@@ -14,44 +14,24 @@ const props = defineProps({
     difficulties:      Array,
 });
 
-// グループ設定（group カラムを持つタイプのみ）
-const groupConfigByType = {
-    work_item_types: {
-        groups: ['dtp', 'design', 'proof', 'mgmt', 'sales', 'common', null],
-        labels: {
-            dtp: 'DTP',
-            design: 'デザイン',
-            proof: '校正',
-            mgmt: '管理・進行',
-            sales: '営業・受発注',
-            common: '共通',
-            null: 'グループなし',
-        },
-    },
-    sizes: {
-        groups: ['paper', 'digital'],
-        labels: {
-            paper: '紙媒体',
-            digital: 'デジタル・Web',
-        },
-    },
-};
+// グループ機能を持つタイプ（プリセットなし・items から動的に構築）
+const groupTypes = ['work_item_types', 'sizes'];
 
 function computeGroupedSections(type, items) {
-    const config = groupConfigByType[type];
-    if (!config || !items) return null;
-    const configKeys = config.groups.map((k) => k ?? null);
-    const extraKeys = [...new Set(items.map((i) => i.group ?? null))].filter(
-        (k) => !configKeys.includes(k),
-    );
-    const allGroups = [...config.groups, ...extraKeys];
-    const sections = allGroups
-        .map((key) => ({
+    if (!groupTypes.includes(type) || !items || items.length === 0) return null;
+    const keys = [...new Set(items.map((i) => i.group ?? null))];
+    const nonNullKeys = keys.filter((k) => k !== null);
+    const hasNull = keys.includes(null);
+    const sections = [
+        ...nonNullKeys.map((key) => ({
             key,
-            label: config.labels[key] ?? (key !== null ? String(key) : 'グループなし'),
-            items: items.filter((i) => (i.group ?? null) === (key ?? null)),
-        }))
-        .filter((s) => s.items.length > 0);
+            label: String(key),
+            items: items.filter((i) => (i.group ?? null) === key),
+        })),
+        ...(hasNull
+            ? [{ key: null, label: 'グループなし', items: items.filter((i) => (i.group ?? null) === null) }]
+            : []),
+    ].filter((s) => s.items.length > 0);
     return sections.length > 0 ? sections : null;
 }
 

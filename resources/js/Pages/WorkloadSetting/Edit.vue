@@ -55,46 +55,30 @@ const columnsByType = {
 
 const columns = computed(() => columnsByType[props.type] ?? [{ key: 'name', label: '名前', inputType: 'text', required: true }]);
 
-// グループ設定（対象タイプのみ）
-const groupConfigByType = {
-    work_item_types: {
-        groups: ['dtp', 'design', 'proof', 'mgmt', 'sales', 'common', null],
-        labels: {
-            dtp: 'DTP',
-            design: 'デザイン',
-            proof: '校正',
-            mgmt: '管理・進行',
-            sales: '営業・受発注',
-            common: '共通',
-            null: 'グループなし',
-        },
-    },
-    sizes: {
-        groups: ['paper', 'digital'],
-        labels: {
-            paper: '紙媒体',
-            digital: 'デジタル・Web',
-        },
-    },
-};
+// グループ機能を持つタイプ（プリセットなし・DB items から動的に構築）
+const groupTypes = ['work_item_types', 'sizes'];
+const hasGroupFeature = groupTypes.includes(props.type);
 
-// groupConfig をミュータブルな ref に（カスタムグループ追加のため）
-const _init = groupConfigByType[props.type];
-const groupConfig = ref(
-    _init
-        ? { groups: [..._init.groups], labels: { ..._init.labels } }
-        : null,
-);
-
-// サーバーから保存済み順序が送られてきた場合、groupConfig.groups を並べ替える
-if (groupConfig.value && props.groupOrders && props.groupOrders.length > 0) {
-    const gc = groupConfig.value;
-    // props.groupOrders をそのまま順序として使う（カスタムグループも含む）
-    // gc.groups にあるが DB 未保存のグループは末尾に追加
-    const savedOrder = props.groupOrders.map((k) => k ?? null);
-    const rest = gc.groups.filter((g) => !savedOrder.includes(g ?? null));
-    gc.groups = [...savedOrder, ...rest];
+function buildGroupConfig(items, savedOrder) {
+    if (!hasGroupFeature) return null;
+    // items に存在するグループキーを収集
+    const fromItems = [...new Set(items.map((i) => i.group ?? null))];
+    let groups;
+    if (savedOrder && savedOrder.length > 0) {
+        const saved = savedOrder.map((k) => k ?? null);
+        const rest = fromItems.filter((k) => !saved.includes(k));
+        groups = [...saved, ...rest];
+    } else {
+        const nonNull = fromItems.filter((k) => k !== null);
+        groups = [...nonNull, null];
+    }
+    // null（グループなし）が必ず含まれるようにする
+    if (!groups.includes(null)) groups.push(null);
+    return { groups };
 }
+
+// groupConfig: プリセットなし、items + 保存済み順序から動的に生成
+const groupConfig = ref(buildGroupConfig(props.items, props.groupOrders));
 
 // グループ追加モーダル用ステート
 const showGroupModal = ref(false);
@@ -125,11 +109,10 @@ const sortedItems = computed(() => {
 });
 
 // グループ別セクション（グループ設定がある場合のみ）
-// items に存在するが groupConfig にないカスタムグループも末尾に表示する
+// items に存在するが groupConfig にないグループも末尾に表示する
 const groupedSections = computed(() => {
     if (!groupConfig.value) return null;
-    const { groups, labels } = groupConfig.value;
-    // items から groupConfig 未登録のグループを抽出して末尾追加
+    const { groups } = groupConfig.value;
     const configKeys = groups.map((g) => g ?? null);
     const extraKeys = [...new Set(state.items.map((i) => i.group ?? null))].filter(
         (k) => !configKeys.includes(k),
@@ -143,7 +126,7 @@ const groupedSections = computed(() => {
         return {
             key: normalizedKey,
             keyStr: key !== null && key !== undefined ? String(key) : 'null',
-            label: labels[key] ?? (key !== null ? String(key) : 'グループなし'),
+            label: key !== null ? String(key) : 'グループなし',
             items,
         };
     });
@@ -205,14 +188,12 @@ function addNewGroup() {
         groupModalError.value = 'グループ名を入力してください';
         return;
     }
-    // 既存グループキー（null も含む）と重複チェック
     const existing = groupConfig.value.groups.map((g) => g ?? null);
     if (existing.includes(name)) {
         groupModalError.value = '同名のグループがすでに存在します';
         return;
     }
     groupConfig.value.groups.push(name);
-    groupConfig.value.labels[name] = name;
     showGroupModal.value = false;
     newGroupName.value = '';
     groupModalError.value = '';
@@ -223,15 +204,13 @@ function addNewGroup() {
 // ---- グループ編集モーダル ----
 function openGroupEditModal() {
     if (!groupConfig.value) return;
-    // groupConfig.groups に未登録のカスタムグループ（extraKeys）も含める
     const configKeys = groupConfig.value.groups.map((g) => g ?? null);
     const extraKeys = [...new Set(state.items.map((i) => i.group ?? null))].filter(
         (k) => !configKeys.includes(k),
     );
-    const allGroups = [...groupConfig.value.groups, ...extraKeys];
-    modalGroups.value = allGroups.map((g) => ({
+    modalGroups.value = [...groupConfig.value.groups, ...extraKeys].map((g) => ({
         key: g ?? null,
-        nameInput: groupConfig.value.labels[g] ?? (g !== null ? String(g) : 'グループなし'),
+        nameInput: g !== null ? String(g) : 'グループなし',
     }));
     showGroupEditModal.value = true;
 }
@@ -262,32 +241,21 @@ function deleteModalGroup(idx) {
 
 function applyGroupEdit() {
     if (!groupConfig.value) return;
-    const originalGroupKeys = new Set((groupConfigByType[props.type]?.groups ?? []).map((g) => g ?? null));
     const newGroups = [];
-    const newLabels = { ...groupConfig.value.labels };
     for (const mg of modalGroups.value) {
         const oldKey = mg.key ?? null;
-        const inputLabel = mg.nameInput.trim();
-        const isCustom = oldKey !== null && !originalGroupKeys.has(oldKey);
-        // カスタムグループ: 名前変更 → キーも変更して items も更新（永続化のため）
-        const newKey = isCustom && inputLabel && inputLabel !== oldKey ? inputLabel : oldKey;
+        const inputName = mg.nameInput.trim();
+        // null グループ（グループなし）はキー変更不可、それ以外は全て名前変更可
+        const newKey = (oldKey !== null && inputName && inputName !== oldKey) ? inputName : oldKey;
         newGroups.push(newKey);
-        const labelKey = newKey === null ? 'null' : String(newKey);
-        newLabels[labelKey] = inputLabel || (newKey !== null ? String(newKey) : 'グループなし');
-        if (isCustom && newKey !== oldKey) {
+        if (oldKey !== null && newKey !== oldKey) {
+            // items のグループキーも更新（DB に保存されるため）
             for (const item of state.items) {
                 if ((item.group ?? null) === oldKey) item.group = newKey;
             }
-            delete newLabels[String(oldKey)];
         }
     }
-    // 削除されたグループのラベルをクリア
-    const remainingLabelKeys = new Set(newGroups.map((k) => (k === null ? 'null' : String(k))));
-    for (const k of Object.keys(newLabels)) {
-        if (!remainingLabelKeys.has(k)) delete newLabels[k];
-    }
     groupConfig.value.groups = newGroups;
-    groupConfig.value.labels = newLabels;
     showGroupEditModal.value = false;
 }
 
@@ -547,7 +515,7 @@ function revert() {
                                         class="rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-400 focus:outline-none disabled:bg-gray-100 disabled:text-gray-400"
                                     >
                                         <option v-for="g in groupConfig.groups" :key="g ?? '__null__'" :value="g">
-                                            {{ groupConfig.labels[g] ?? (g !== null ? String(g) : 'グループなし') }}
+                                            {{ g !== null ? String(g) : 'グループなし' }}
                                         </option>
                                     </select>
                                 </td>
@@ -580,18 +548,18 @@ function revert() {
                     >
                         + 行を追加
                     </button>
-                    <!-- work_item_types のみ: 新しいグループを追加 -->
+                    <!-- グループ機能あり: 新しいグループを追加 -->
                     <button
-                        v-if="groupConfig && type === 'work_item_types'"
+                        v-if="groupConfig"
                         type="button"
                         class="rounded border border-green-600 px-4 py-2 text-sm text-green-600 hover:bg-green-50"
                         @click="showGroupModal = true"
                     >
                         + グループを追加
                     </button>
-                    <!-- work_item_types のみ: グループを編集 -->
+                    <!-- グループ機能あり: グループを編集（名前変更・並べ替え・削除） -->
                     <button
-                        v-if="groupConfig && type === 'work_item_types'"
+                        v-if="groupConfig"
                         type="button"
                         class="rounded border border-indigo-500 px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50"
                         @click="openGroupEditModal"
@@ -685,12 +653,13 @@ function revert() {
                                         ▼
                                     </button>
                                 </div>
-                                <!-- 名前入力（null グループは変更不可） -->
+                                <!-- 名前入力（null=グループなし のみ変更不可、他は全て変更可） -->
                                 <input
                                     v-if="mg.key !== null"
                                     v-model="mg.nameInput"
                                     type="text"
                                     class="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-400 focus:outline-none"
+                                    placeholder="グループ名"
                                 />
                                 <span v-else class="flex-1 text-sm text-gray-400">グループなし（変更不可）</span>
                                 <!-- 削除ボタン -->
