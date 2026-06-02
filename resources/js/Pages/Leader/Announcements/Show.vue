@@ -11,14 +11,63 @@ const props = defineProps({
 });
 
 const isDraft = computed(() => props.announcement.status === 'draft');
-const targetLabel = (type) => ({ all: '全員', employees_only: '社員のみ', individual: '個別選択' }[type] ?? type);
-const employmentLabel = (type) => ({ regular: '正社員', contract: '契約社員', dispatch: '派遣', outsource: '業務委託' }[type] ?? type);
+const targetLabel = (t) => ({ all: '全員', employees_only: '社員のみ', individual: '個別選択' }[t] ?? t);
+const employmentLabel = (t) => ({ regular: '正社員', contract: '契約社員', dispatch: '派遣', outsource: '業務委託' }[t] ?? t);
 
-const readRate = computed(() => {
-    if (!props.announcement.recipients_count) return 0;
-    return Math.round(props.announcement.read_count / props.announcement.recipients_count * 100);
+// ── 会社フィルター ──
+const companies = computed(() => {
+    const map = new Map();
+    (props.recipients ?? []).forEach(r => {
+        if (r.company_id && !map.has(r.company_id)) map.set(r.company_id, r.company_name || '');
+    });
+    return [...map.entries()].map(([id, name]) => ({ id, name }));
+});
+const isMultiCompany = computed(() => companies.value.length > 1);
+const selectedCompany = ref(null); // null = 全員
+
+function companyCount(id) {
+    return (props.recipients ?? []).filter(r => r.company_id === id).length;
+}
+
+// ── ソート ──
+const sortKey = ref('');
+const sortDir = ref('asc');
+
+function toggleSort(key) {
+    if (sortKey.value === key) sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc';
+    else { sortKey.value = key; sortDir.value = 'asc'; }
+}
+
+function sortIcon(key) {
+    if (sortKey.value !== key) return '↕';
+    return sortDir.value === 'asc' ? '↑' : '↓';
+}
+
+// ── フィルター＋ソート済みリスト ──
+const displayRecipients = computed(() => {
+    let list = (props.recipients ?? []).filter(r =>
+        selectedCompany.value === null || r.company_id === selectedCompany.value
+    );
+    if (sortKey.value) {
+        list = [...list].sort((a, b) => {
+            const av = a[sortKey.value] ?? '';
+            const bv = b[sortKey.value] ?? '';
+            const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+            return sortDir.value === 'asc' ? cmp : -cmp;
+        });
+    }
+    return list;
 });
 
+const filteredReadCount = computed(() => displayRecipients.value.filter(r => r.is_read).length);
+const readRate = computed(() => {
+    const total = displayRecipients.value.length;
+    return total ? Math.round(filteredReadCount.value / total * 100) : 0;
+});
+
+const colCount = computed(() => 5 + (isMultiCompany.value ? 1 : 0) + (!isDraft.value ? 2 : 0));
+
+// ── PDF プレビュー ──
 const pdfImages = ref({});
 const lightboxUrl = ref(null);
 
@@ -35,7 +84,7 @@ onMounted(async () => {
                 canvas.width = vp.width; canvas.height = vp.height;
                 await pg.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
                 pdfImages.value[att.id] = canvas.toDataURL('image/jpeg', 0.92);
-            } catch { /* 描画失敗時はアイコン表示 */ }
+            } catch { /* ignore */ }
         }
     }
 });
@@ -123,10 +172,13 @@ function destroy() {
 
             <!-- 受信者一覧 -->
             <div class="rounded bg-white px-5 py-6 shadow">
-                <div v-if="!isDraft" class="mb-4 flex items-center gap-4">
+                <!-- 既読ヘッダー -->
+                <div v-if="!isDraft" class="mb-4 flex flex-wrap items-center gap-4">
                     <div class="text-sm text-gray-700">
-                        既読: <span class="font-bold text-green-600">{{ announcement.read_count }}</span>
-                        / {{ announcement.recipients_count }}人
+                        既読:
+                        <span class="font-bold text-green-600">{{ filteredReadCount }}</span>
+                        / {{ displayRecipients.length }}人
+                        <span v-if="selectedCompany !== null" class="ml-1 text-xs text-gray-400">（絞り込み中）</span>
                     </div>
                     <div class="flex-1 max-w-xs">
                         <div class="h-2 w-full rounded-full bg-gray-200">
@@ -139,26 +191,78 @@ function destroy() {
                     送信予定の受信者: <span class="font-bold">{{ announcement.recipients_count }}</span>人
                 </div>
 
+                <!-- 会社フィルターボタン（複数会社のみ表示） -->
+                <div v-if="isMultiCompany" class="mb-4 flex flex-wrap gap-2">
+                    <button
+                        @click="selectedCompany = null"
+                        class="rounded-full px-4 py-1.5 text-sm font-medium transition-colors"
+                        :class="selectedCompany === null
+                            ? 'bg-gray-700 text-white'
+                            : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'">
+                        全員 ({{ (recipients ?? []).length }})
+                    </button>
+                    <button v-for="co in companies" :key="co.id"
+                        @click="selectedCompany = co.id"
+                        class="rounded-full px-4 py-1.5 text-sm font-medium transition-colors"
+                        :class="selectedCompany === co.id
+                            ? 'bg-blue-600 text-white'
+                            : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'">
+                        {{ co.name }} ({{ companyCount(co.id) }})
+                    </button>
+                </div>
+
+                <!-- テーブル -->
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">名前</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">担当</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">雇用形態</th>
-                                <th v-if="!isDraft" class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">既読状況</th>
-                                <th v-if="!isDraft" class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">既読日時</th>
+                                <th @click="toggleSort('name')"
+                                    class="cursor-pointer select-none px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 whitespace-nowrap hover:bg-gray-100">
+                                    名前 <span class="ml-1 text-gray-400">{{ sortIcon('name') }}</span>
+                                </th>
+                                <th v-if="isMultiCompany" @click="toggleSort('company_name')"
+                                    class="cursor-pointer select-none px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 whitespace-nowrap hover:bg-gray-100">
+                                    会社 <span class="ml-1 text-gray-400">{{ sortIcon('company_name') }}</span>
+                                </th>
+                                <th @click="toggleSort('department_name')"
+                                    class="cursor-pointer select-none px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 whitespace-nowrap hover:bg-gray-100">
+                                    部署 <span class="ml-1 text-gray-400">{{ sortIcon('department_name') }}</span>
+                                </th>
+                                <th @click="toggleSort('assignment_name')"
+                                    class="cursor-pointer select-none px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 whitespace-nowrap hover:bg-gray-100">
+                                    担当 <span class="ml-1 text-gray-400">{{ sortIcon('assignment_name') }}</span>
+                                </th>
+                                <th @click="toggleSort('employment_type')"
+                                    class="cursor-pointer select-none px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 whitespace-nowrap hover:bg-gray-100">
+                                    雇用形態 <span class="ml-1 text-gray-400">{{ sortIcon('employment_type') }}</span>
+                                </th>
+                                <th v-if="!isDraft" @click="toggleSort('is_read')"
+                                    class="cursor-pointer select-none px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 whitespace-nowrap hover:bg-gray-100">
+                                    既読状況 <span class="ml-1 text-gray-400">{{ sortIcon('is_read') }}</span>
+                                </th>
+                                <th v-if="!isDraft" @click="toggleSort('read_at')"
+                                    class="cursor-pointer select-none px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 whitespace-nowrap hover:bg-gray-100">
+                                    既読日時 <span class="ml-1 text-gray-400">{{ sortIcon('read_at') }}</span>
+                                </th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-200 bg-white">
-                            <tr v-for="r in recipients" :key="r.id" class="hover:bg-gray-50">
+                            <tr v-if="displayRecipients.length === 0">
+                                <td :colspan="colCount" class="px-4 py-8 text-center text-sm text-gray-400">
+                                    該当する受信者はいません
+                                </td>
+                            </tr>
+                            <tr v-for="r in displayRecipients" :key="r.id" class="hover:bg-gray-50">
                                 <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ r.name }}</td>
+                                <td v-if="isMultiCompany" class="px-4 py-3 text-sm text-gray-600">{{ r.company_name }}</td>
+                                <td class="px-4 py-3 text-sm text-gray-600">{{ r.department_name }}</td>
                                 <td class="px-4 py-3 text-sm text-gray-600">{{ r.assignment_name }}</td>
                                 <td class="px-4 py-3 text-sm text-gray-600">{{ employmentLabel(r.employment_type) }}</td>
                                 <td v-if="!isDraft" class="px-4 py-3">
                                     <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
                                         :class="r.is_read ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'">
-                                        <span class="inline-block h-1.5 w-1.5 rounded-full" :class="r.is_read ? 'bg-green-500' : 'bg-gray-400'"></span>
+                                        <span class="inline-block h-1.5 w-1.5 rounded-full"
+                                            :class="r.is_read ? 'bg-green-500' : 'bg-gray-400'"></span>
                                         {{ r.is_read ? '既読' : '未読' }}
                                     </span>
                                 </td>

@@ -70,14 +70,19 @@ class AnnouncementController extends Controller
         $announcement->load(['attachments', 'sender:id,name']);
 
         $recipients = $announcement->recipients()
-            ->with('user:id,name,employment_type,assignment_id')
+            ->with('user:id,name,employment_type,assignment_id,company_id,department_id')
             ->with('user.assignment:id,name')
+            ->with('user.company:id,name')
+            ->with('user.department:id,name')
             ->orderByRaw('read_at IS NULL DESC')
             ->orderBy('read_at')
             ->get()
             ->map(fn ($r) => [
                 'id'              => $r->id,
                 'name'            => $r->user->name ?? '(削除済)',
+                'company_id'      => $r->user->company_id,
+                'company_name'    => $r->user->company?->name ?? '',
+                'department_name' => $r->user->department?->name ?? '',
                 'assignment_name' => $r->user->assignment?->name ?? '',
                 'employment_type' => $r->user->employment_type ?? '',
                 'is_read'         => $r->read_at !== null,
