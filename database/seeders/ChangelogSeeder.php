@@ -989,6 +989,33 @@ HTML,
 </section>
 HTML,
             ],
+            [
+                'version'      => 'workload-dept-1',
+                'title'        => '作業項目設定の部署スコープ対応：会社全体・部署別に独立して設定可能',
+                'released_at'  => '2026-06-02',
+                'summary'      => '作業項目設定（Stages / Work Item Types / Sizes / Statuses / Difficulties）に部署スコープ切り替え機能を追加しました。会社全体の共通設定と部署ごとの固有設定を完全に独立して登録・編集できます。また、client_id なしでも案件を登録・更新できるようバリデーションを修正しました。',
+                'design_files' => ['z_instructions/WORKLOAD_DEPT_PLAN1.md'],
+                'claude_notes' => '【WorkloadSettingController】resolveScope() / fetchDepartments() / fetchItems() を新設。Leader は自部署スコープを強制、SuperAdmin/Admin は ?dept= クエリパラメータで切り替え。store() は POST の scope パラメータから department_id を決定し、Leader が他部署スコープで送信した場合は 403。fetchItems() はスコープに応じて department_id IS NULL（会社全体）または department_id = X（部署固有）でフィルタリング。【Index.vue / Edit.vue】ページ上部に部署スコープバーを追加。Leader は自部署ボタンのみ有効（青）、会社全体・他部署はグレー・disabled。SuperAdmin/Admin は全ボタン有効で切り替え可能。【ProjectJobController】store()/update() の client_id バリデーションを required→nullable に変更。DBスキーマは nullable だったが PHP バリデーションが required のままで本番で登録不可になっていた。',
+                'body'         => <<<'HTML'
+<section class="cl-feature">
+  <h3>新機能：作業項目設定の部署スコープ</h3>
+  <ul>
+    <li>設定ページ上部に「会社全体」「部署名」のスコープ切り替えボタンを追加</li>
+    <li>会社全体（<code>department_id = NULL</code>）と部署固有（<code>department_id = X</code>）の設定が完全に独立して管理可能</li>
+    <li><strong>Leader：</strong>自分の部署ボタンのみ有効（青色）、会社全体・他部署はグレー表示で操作不可</li>
+    <li><strong>SuperAdmin / Admin：</strong>すべてのボタンをクリックして自由にスコープを切り替え可能</li>
+    <li>既存の設定データはすべて「会社全体」スコープに自動分類（互換性を維持）</li>
+  </ul>
+</section>
+
+<section class="cl-fix">
+  <h3>バグ修正</h3>
+  <ul>
+    <li><strong>案件登録・更新：</strong><code>client_id</code> が未入力の場合に登録がはじかれる問題を修正。DBは <code>nullable</code> だがPHPバリデーションが <code>required</code> になっていたことが原因</li>
+  </ul>
+</section>
+HTML,
+            ],
         ];
 
         foreach ($entries as $entry) {
