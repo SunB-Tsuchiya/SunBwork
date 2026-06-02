@@ -159,6 +159,9 @@ function getReadGroupedSections(type, items) {
     return sections.length > 0 ? sections : null;
 }
 
+// ─── ガイドモーダル ──────────────────────────────────────────────────────────
+const showGuide = ref(false);
+
 // ─── スコープラベル ──────────────────────────────────────────────────────────
 function scopeLabel(scopeKey) {
     if (!scopeKey || scopeKey === 'company') return '会社全体';
@@ -390,6 +393,19 @@ const readSections = computed(() => ALL_TYPES.map((type) => ({
                     終了
                 </button>
             </template>
+            <!-- ガイドボタン -->
+            <button
+                v-if="!noCompanySelected"
+                type="button"
+                class="ml-1 inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-500 hover:bg-gray-50"
+                title="使い方ガイド"
+                @click="showGuide = true"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008z" />
+                </svg>
+                使い方
+            </button>
         </template>
 
         <Head title="作業項目設定" />
@@ -764,6 +780,91 @@ const readSections = computed(() => ALL_TYPES.map((type) => ({
                 <div class="flex justify-end gap-2 border-t px-6 py-4">
                     <button type="button" class="rounded bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300" @click="groupAddModal.show = false">キャンセル</button>
                     <button type="button" class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700" @click="confirmAddGroup">追加</button>
+                </div>
+            </div>
+        </div>
+        <!-- 使い方ガイドモーダル -->
+        <div
+            v-if="showGuide"
+            class="fixed inset-0 z-50 flex items-start justify-center bg-black/50 overflow-y-auto py-8"
+            @click.self="showGuide = false"
+        >
+            <div class="mx-4 w-full max-w-2xl rounded-lg bg-white shadow-xl">
+                <div class="flex items-center justify-between border-b px-6 py-4">
+                    <h2 class="text-lg font-semibold text-gray-800">作業項目設定 使い方ガイド</h2>
+                    <button type="button" class="text-gray-400 hover:text-gray-600" @click="showGuide = false">✕</button>
+                </div>
+                <div class="p-6 space-y-6 text-sm text-gray-700">
+
+                    <section>
+                        <h3 class="mb-2 font-semibold text-gray-900 border-l-4 border-indigo-500 pl-2">基本的な考え方</h3>
+                        <p class="mb-2">作業項目（Work Item Types など）は <strong>「会社全体」</strong> と <strong>「部署」</strong> の2つのスコープで管理します。</p>
+                        <table class="w-full text-xs border border-gray-200 rounded">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-3 py-2 text-left font-semibold text-gray-600">スコープ</th>
+                                    <th class="px-3 py-2 text-left font-semibold text-gray-600">内容</th>
+                                    <th class="px-3 py-2 text-left font-semibold text-gray-600">マイジョブなどの選択肢</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                                <tr>
+                                    <td class="px-3 py-2 font-medium">会社全体</td>
+                                    <td class="px-3 py-2">全ユーザーが参照できる共通項目</td>
+                                    <td class="px-3 py-2">全ユーザーに表示</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-3 py-2 font-medium">部署スコープ</td>
+                                    <td class="px-3 py-2">その部署専用の追加項目</td>
+                                    <td class="px-3 py-2">その部署のユーザーのみ表示</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </section>
+
+                    <section>
+                        <h3 class="mb-2 font-semibold text-gray-900 border-l-4 border-blue-500 pl-2">推奨ワークフロー</h3>
+                        <ol class="space-y-3 list-none">
+                            <li class="flex gap-3">
+                                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">1</span>
+                                <div>
+                                    <p class="font-medium">会社全体で共通項目を登録する</p>
+                                    <p class="text-gray-500 text-xs mt-0.5">スコープバーで「会社全体」を選び、「✎ 編集モード」から共通の作業項目を追加します。複数部署で使いそうな項目（書類作成・管理、会議・打ち合わせなど）を登録しましょう。</p>
+                                </div>
+                            </li>
+                            <li class="flex gap-3">
+                                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">2</span>
+                                <div>
+                                    <p class="font-medium">部署ボタンで各部署に割り当てる</p>
+                                    <p class="text-gray-500 text-xs mt-0.5">編集モードの各項目行に部署ボタンが表示されます。<span class="inline-block rounded bg-blue-600 text-white px-1.5 py-0.5 text-xs font-medium">情報出版</span> = 登録済み（青ベタ）、<span class="inline-block rounded border border-gray-300 bg-white text-gray-400 px-1.5 py-0.5 text-xs">情報出版</span> = 未登録（白枠）。クリックで切り替えて「保存」を押すと反映されます。</p>
+                                </div>
+                            </li>
+                            <li class="flex gap-3">
+                                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">3</span>
+                                <div>
+                                    <p class="font-medium">部署スコープでカスタマイズ（任意）</p>
+                                    <p class="text-gray-500 text-xs mt-0.5">スコープバーで特定の部署を選ぶと、その部署だけの追加項目を登録できます。他部署には影響せず、部署ごとに独自の作業項目を持つことができます。</p>
+                                </div>
+                            </li>
+                        </ol>
+                    </section>
+
+                    <section>
+                        <h3 class="mb-2 font-semibold text-gray-900 border-l-4 border-green-500 pl-2">反映タイミング</h3>
+                        <ul class="space-y-1 text-xs list-disc list-inside text-gray-600">
+                            <li>「保存」ボタンを押した時点で DB に保存されます</li>
+                            <li>「編集終了」後の読み取りビューに最新の登録状態が表示されます</li>
+                            <li>マイジョブ・案件登録などのセレクターには保存後すぐに反映されます</li>
+                        </ul>
+                    </section>
+
+                    <section class="rounded bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-800">
+                        <p class="font-semibold mb-1">💡 運用のヒント</p>
+                        <p>まず会社全体で全項目を登録し、そこから部署ボタンで「どの部署が使うか」を設定するのが効率的です。各部署に必要な項目だけを割り当てることで、セレクターがすっきりします。</p>
+                    </section>
+                </div>
+                <div class="border-t px-6 py-4 text-right">
+                    <button type="button" class="rounded bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300" @click="showGuide = false">閉じる</button>
                 </div>
             </div>
         </div>

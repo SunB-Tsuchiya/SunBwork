@@ -1016,6 +1016,44 @@ HTML,
 </section>
 HTML,
             ],
+            [
+                'version'      => 'workload-ui-2',
+                'title'        => '作業項目設定 UI 大改修：インライン編集モード・部署トグルボタン・使い方ガイド',
+                'released_at'  => '2026-06-02',
+                'summary'      => '作業項目設定（workload-setting）を大幅に改修しました。別ページだった編集画面を廃止し、一覧ページ内でインライン編集できるようになりました。部署トグルボタンで会社全体の項目を各部署に割り当てる操作が直感的に行えます。また、使い方ガイドボタンも追加しました。',
+                'design_files' => ['z_instructions/WORKLOAD_UI2_PLAN1.md'],
+                'claude_notes' => '【主な変更】①Edit.vue廃止→Index.vueにインライン編集モード統合。②headerExtrasに「✎ 編集モード」ボタン。③編集モードで全5タイプのインライン編集（追加・削除・▲▼並べ替え）。④グループ化タイプでグループ追加・名前変更・削除・並べ替え。⑤既存項目行に部署トグルボタン（青ベタ=登録済、白枠=未登録）→保存時にON→部署追加/OFF→部署削除を実行。⑥会社全体スコープで部署バッジ（読み取り・編集両モード）。⑦GeneralWorkItemDefaultsService: company_id/department_id の fillable 追加、スキップ判定を会社全体スコープ（dept=NULL）の有無に修正。⑧buildGroupConfig の null 強制追加バグ修正（savedOrder フィルタリング）。⑨使い方ガイドモーダル追加。',
+                'body'         => <<<'HTML'
+<section class="cl-feature">
+  <h3>主な改善内容</h3>
+  <ul>
+    <li><strong>インライン編集モード：</strong>「✎ 編集モード」ボタンで一覧ページ内のまま全タイプを編集可能に。別ページへの遷移が不要になりました</li>
+    <li><strong>部署トグルボタン：</strong>会社全体の項目に部署ボタンが表示され、クリックで ON/OFF を切り替え。保存するとその部署への追加・削除が自動で行われます</li>
+    <li><strong>グループ管理：</strong>グループの追加・名前変更・削除・並べ替えを編集モード内で直接操作可能</li>
+    <li><strong>部署バッジ（読み取りモード）：</strong>会社全体スコープの各項目に、登録済み部署のバッジを表示</li>
+    <li><strong>使い方ガイド：</strong>ページ右上の「使い方」ボタンから操作フローを確認できます</li>
+    <li><strong>新規会社への自動登録：</strong>新しい会社を追加すると、一般的な作業項目（総務・経理・営業・管理共通）が自動で登録されます</li>
+  </ul>
+</section>
+
+<section class="cl-fix">
+  <h3>バグ修正</h3>
+  <ul>
+    <li>編集モードで未登録グループが表示される問題を修正（保存済みグループ順序と実際の項目の不一致）</li>
+    <li><code>WorkItemType</code> モデルの <code>company_id</code> / <code>department_id</code> が fillable に含まれておらず、スコープが正しく保存されなかった問題を修正</li>
+  </ul>
+</section>
+
+<section class="cl-guide">
+  <h3>推奨ワークフロー</h3>
+  <ol>
+    <li>「会社全体」スコープで共通作業項目を登録する</li>
+    <li>編集モードの部署ボタンで各部署に割り当てる（青ボタン=登録済）</li>
+    <li>必要に応じて部署スコープで独自の追加項目を登録する</li>
+  </ol>
+</section>
+HTML,
+            ],
         ];
 
         foreach ($entries as $entry) {
