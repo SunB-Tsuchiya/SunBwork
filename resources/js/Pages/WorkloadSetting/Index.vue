@@ -80,7 +80,8 @@ function buildGroupConfig(type, items, savedOrder) {
     const fromItems = [...new Set(items.map((i) => i.group ?? null))];
     let groups;
     if (savedOrder && savedOrder.length > 0) {
-        const saved = savedOrder.map((k) => k ?? null);
+        // savedOrder のうち実際にアイテムが存在するグループのみ保持
+        const saved = savedOrder.map((k) => k ?? null).filter((k) => fromItems.includes(k));
         const rest  = fromItems.filter((k) => !saved.includes(k));
         groups = [...saved, ...rest];
     } else {
