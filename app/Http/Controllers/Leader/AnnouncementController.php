@@ -29,14 +29,11 @@ class AnnouncementController extends Controller
             }
         }
 
-        $base = Announcement::where('sender_id', $user->id);
+        $companyId = $user->isSuperAdmin()
+            ? session('superadmin_context.company_id')
+            : $user->company_id;
 
-        if ($user->isSuperAdmin()) {
-            $contextId = session('superadmin_context.company_id');
-            $base->whereHas('recipients', function ($q) use ($contextId) {
-                $q->whereHas('user', fn($u) => $u->where('company_id', $contextId));
-            });
-        }
+        $base = Announcement::whereHas('sender', fn($q) => $q->where('company_id', $companyId));
 
         $map = fn ($a) => [
             'id'               => $a->id,
@@ -46,9 +43,11 @@ class AnnouncementController extends Controller
             'recipients_count' => $a->recipients_count,
             'read_count'       => $a->read_count,
             'created_at'       => $a->created_at->format('Y/m/d H:i'),
+            'sender_name'      => $a->sender?->name ?? '',
         ];
 
         $counts = fn ($q) => $q
+            ->with('sender:id,name')
             ->withCount('recipients')
             ->withCount(['recipients as read_count' => fn ($q) => $q->whereNotNull('read_at')])
             ->orderByDesc('created_at');
@@ -66,9 +65,9 @@ class AnnouncementController extends Controller
     /** Leader: 送信済みお知らせ詳細（受信者一覧＋既読状況＋添付） */
     public function show(Request $request, Announcement $announcement)
     {
-        abort_if($announcement->sender_id !== $request->user()->id, 403);
+        $this->authorizeForCompany($announcement, $request->user());
 
-        $announcement->load('attachments');
+        $announcement->load(['attachments', 'sender:id,name']);
 
         $recipients = $announcement->recipients()
             ->with('user:id,name,employment_type,assignment_id')
@@ -92,6 +91,7 @@ class AnnouncementController extends Controller
                 'content'          => $announcement->content,
                 'target_type'      => $announcement->target_type,
                 'status'           => $announcement->status,
+                'sender_name'      => $announcement->sender?->name ?? '',
                 'recipients_count' => $recipients->count(),
                 'read_count'       => $recipients->where('is_read', true)->count(),
                 'created_at'       => $announcement->created_at->format('Y/m/d H:i'),
@@ -209,7 +209,7 @@ class AnnouncementController extends Controller
     /** Leader: 編集フォーム */
     public function edit(Request $request, Announcement $announcement)
     {
-        abort_if($announcement->sender_id !== $request->user()->id, 403);
+        $this->authorizeForCompany($announcement, $request->user());
 
         $announcement->load('attachments');
 
@@ -260,7 +260,7 @@ class AnnouncementController extends Controller
     /** Leader: お知らせ更新 */
     public function update(Request $request, Announcement $announcement, AttachmentService $attachmentService)
     {
-        abort_if($announcement->sender_id !== $request->user()->id, 403);
+        $this->authorizeForCompany($announcement, $request->user());
 
         $rules = [
             'title'                   => 'required|string|max:255',
@@ -351,7 +351,7 @@ class AnnouncementController extends Controller
     /** Leader: 下書きを送信 */
     public function send(Request $request, Announcement $announcement)
     {
-        abort_if($announcement->sender_id !== $request->user()->id, 403);
+        $this->authorizeForCompany($announcement, $request->user());
         abort_if($announcement->status !== 'draft', 422);
 
         $announcement->update(['status' => 'sent']);
@@ -363,7 +363,7 @@ class AnnouncementController extends Controller
     /** Leader: お知らせ削除 */
     public function destroy(Request $request, Announcement $announcement, AttachmentService $attachmentService)
     {
-        abort_if($announcement->sender_id !== $request->user()->id, 403);
+        $this->authorizeForCompany($announcement, $request->user());
 
         $announcement->load('attachments');
 
@@ -376,5 +376,18 @@ class AnnouncementController extends Controller
 
         return redirect()->route('leader.announcements.index')
             ->with('success', 'お知らせを削除しました。');
+    }
+
+    /** 送信権限のある会社の通知かどうかを確認する */
+    private function authorizeForCompany(Announcement $announcement, \App\Models\User $user): void
+    {
+        $companyId = $user->isSuperAdmin()
+            ? session('superadmin_context.company_id')
+            : $user->company_id;
+
+        abort_if(!$companyId, 403);
+
+        $announcement->loadMissing('sender');
+        abort_if($announcement->sender?->company_id !== $companyId, 403);
     }
 }

@@ -156,6 +156,7 @@ const goToShow = (id) => router.visit(route('leader.announcements.show', { annou
                         <thead class="bg-gray-50">
                             <tr>
                                 <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">送信日時</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">送信者</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">タイトル</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">宛先</th>
                                 <th class="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">送信数</th>
@@ -170,6 +171,7 @@ const goToShow = (id) => router.visit(route('leader.announcements.show', { annou
                                 @click="goToShow(a.id)"
                             >
                                 <td class="px-4 py-3 text-sm text-gray-600">{{ a.created_at }}</td>
+                                <td class="px-4 py-3 text-sm text-gray-600">{{ a.sender_name }}</td>
                                 <td class="px-4 py-3 text-sm font-medium text-orange-700 underline">{{ a.title }}</td>
                                 <td class="px-4 py-3 text-sm text-gray-600">{{ targetLabel(a.target_type) }}</td>
                                 <td class="px-4 py-3 text-right text-sm text-gray-600">{{ a.recipients_count }}人</td>

@@ -92,6 +92,7 @@ function destroy() {
                             {{ targetLabel(announcement.target_type) }}
                         </span>
                         <span class="text-xs text-gray-500">{{ announcement.created_at }}</span>
+                        <span v-if="announcement.sender_name" class="text-xs text-gray-500">送信者: {{ announcement.sender_name }}</span>
                     </div>
                     <h3 class="mb-3 text-lg font-bold text-gray-900">{{ announcement.title }}</h3>
                     <p class="whitespace-pre-wrap text-sm text-gray-700 leading-relaxed">{{ announcement.content }}</p>
