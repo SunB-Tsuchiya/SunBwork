@@ -47,10 +47,7 @@ class MeetingDefinitionController extends LeaderMeetingDefinitionController
 
         $contextCompanyId = $this->contextCompanyId();
 
-        $meetingDefinitions = MeetingDefinition::where('created_by', Auth::id())
-            ->when($contextCompanyId, fn ($q, $cid) =>
-                $q->whereHas('members', fn ($mq) => $mq->where('users.company_id', $cid))
-            )
+        $meetingDefinitions = MeetingDefinition::where('company_id', $contextCompanyId)
             ->with(['members:id,name'])
             ->orderBy('created_at', 'desc')
             ->get();
@@ -86,6 +83,7 @@ class MeetingDefinitionController extends LeaderMeetingDefinitionController
 
         $def = MeetingDefinition::create([
             'created_by'    => Auth::id(),
+            'company_id'    => $this->contextCompanyId(),
             'title'         => $validated['title'],
             'description'   => $validated['description'] ?? null,
             'recurrence'    => $validated['recurrence'],
@@ -102,7 +100,7 @@ class MeetingDefinitionController extends LeaderMeetingDefinitionController
 
     public function edit(MeetingDefinition $meetingDefinition)
     {
-        if ($meetingDefinition->created_by !== Auth::id()) {
+        if ($meetingDefinition->company_id !== $this->contextCompanyId()) {
             abort(403);
         }
         $meetingDefinition->load('members:id,name');
@@ -117,7 +115,7 @@ class MeetingDefinitionController extends LeaderMeetingDefinitionController
 
     public function update(Request $request, MeetingDefinition $meetingDefinition)
     {
-        if ($meetingDefinition->created_by !== Auth::id()) {
+        if ($meetingDefinition->company_id !== $this->contextCompanyId()) {
             abort(403);
         }
 
@@ -150,7 +148,7 @@ class MeetingDefinitionController extends LeaderMeetingDefinitionController
 
     public function destroy(MeetingDefinition $meetingDefinition)
     {
-        if ($meetingDefinition->created_by !== Auth::id()) {
+        if ($meetingDefinition->company_id !== $this->contextCompanyId()) {
             abort(403);
         }
 

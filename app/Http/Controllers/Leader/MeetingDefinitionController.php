@@ -63,10 +63,7 @@ class MeetingDefinitionController extends Controller
 
         $contextCompanyId = $this->contextCompanyId();
 
-        $meetingDefinitions = MeetingDefinition::where('created_by', Auth::id())
-            ->when($contextCompanyId, fn ($q, $cid) =>
-                $q->whereHas('members', fn ($mq) => $mq->where('users.company_id', $cid))
-            )
+        $meetingDefinitions = MeetingDefinition::where('company_id', $contextCompanyId)
             ->with(['members:id,name'])
             ->orderBy('created_at', 'desc')
             ->get();
@@ -101,6 +98,7 @@ class MeetingDefinitionController extends Controller
 
         $def = MeetingDefinition::create([
             'created_by'    => Auth::id(),
+            'company_id'    => $this->contextCompanyId(),
             'title'         => $validated['title'],
             'description'   => $validated['description'] ?? null,
             'recurrence'    => $validated['recurrence'],
@@ -173,7 +171,7 @@ class MeetingDefinitionController extends Controller
 
     private function authorizeDefinition(MeetingDefinition $def): void
     {
-        if ($def->created_by !== Auth::id()) {
+        if ($def->company_id !== $this->contextCompanyId()) {
             abort(403);
         }
     }

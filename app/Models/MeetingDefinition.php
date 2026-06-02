@@ -13,6 +13,7 @@ class MeetingDefinition extends Model
 
     protected $fillable = [
         'created_by',
+        'company_id',
         'title',
         'description',
         'recurrence',
@@ -25,6 +26,11 @@ class MeetingDefinition extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Company::class);
     }
 
     public function members(): BelongsToMany
