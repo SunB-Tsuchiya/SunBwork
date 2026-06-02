@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Models\WorkRecord;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class WorkRecordController extends Controller
@@ -102,11 +103,18 @@ class WorkRecordController extends Controller
             return User::where('company_id', $user->company_id)->pluck('id')->toArray();
         }
 
-        // Leader: チーム配下のユーザー
+        // Leader/サブリーダー: チーム配下のユーザー
         $userIds = [];
-        $teams   = Team::where('leader_id', $user->id)
+        $leaderTeams = Team::where('leader_id', $user->id)
             ->whereIn('team_type', ['department', 'unit'])
             ->get();
+        $subLeaderTeamIds = DB::table('team_sub_leaders')
+            ->where('user_id', $user->id)
+            ->pluck('team_id');
+        $subLeaderTeams = Team::whereIn('id', $subLeaderTeamIds)
+            ->whereIn('team_type', ['department', 'unit'])
+            ->get();
+        $teams = $leaderTeams->merge($subLeaderTeams)->unique('id');
 
         foreach ($teams as $team) {
             if ($team->team_type === 'department' && $team->department_id) {

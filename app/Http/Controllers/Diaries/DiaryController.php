@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\Team;
 use App\Models\Unit;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class DiaryController extends Controller
 {
@@ -28,8 +29,18 @@ class DiaryController extends Controller
         $isLeader = false;
         $userIds = [];
 
-        // quick leader check
-        $isLeader = \App\Models\Team::where('leader_id', $currentUser->id)->whereIn('team_type', ['department', 'unit'])->exists();
+        // リーダーチェック（leader_id またはサブリーダー）
+        $leaderTeams = Team::where('leader_id', $currentUser->id)
+            ->whereIn('team_type', ['department', 'unit'])
+            ->get();
+        $subLeaderTeamIds = DB::table('team_sub_leaders')
+            ->where('user_id', $currentUser->id)
+            ->pluck('team_id');
+        $subLeaderTeams = Team::whereIn('id', $subLeaderTeamIds)
+            ->whereIn('team_type', ['department', 'unit'])
+            ->get();
+        $allTeams = $leaderTeams->merge($subLeaderTeams)->unique('id');
+        $isLeader = $allTeams->isNotEmpty();
 
         if ($isAdmin) {
             // admins see users in their company
@@ -37,12 +48,8 @@ class DiaryController extends Controller
             $users = User::where('company_id', $companyId)->get();
             $userIds = $users->pluck('id')->toArray();
         } elseif ($isLeader) {
-            // leader: gather users from teams (departments and unit members)
-            $teams = Team::where('leader_id', $currentUser->id)
-                ->whereIn('team_type', ['department', 'unit'])
-                ->get();
-
-            foreach ($teams as $team) {
+            // leader/subleader: gather users from teams (departments and unit members)
+            foreach ($allTeams as $team) {
                 if ($team->team_type === 'department' && $team->department_id) {
                     $deptUsers = User::where('company_id', $team->company_id)
                         ->where('department_id', $team->department_id)

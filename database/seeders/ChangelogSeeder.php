@@ -959,6 +959,36 @@ HTML,
 </section>
 HTML,
             ],
+            // ─────────────────────────────────────────────────────────────
+            [
+                'version'      => 'subleader-1',
+                'title'        => 'サブリーダー権限チェック漏れ修正：日報タイムテーブル・日報一覧・勤務記録',
+                'released_at'  => '2026-06-02',
+                'summary'      => '部署サブリーダーが日報詳細のタイムテーブル・日報一覧・勤務記録一覧を閲覧できなかった問題を修正しました。各コントローラーの権限チェックが teams.leader_id のみを参照しており、team_sub_leaders テーブルを考慮していないことが原因でした。',
+                'design_files' => [],
+                'claude_notes' => '【EventController】buildPermittedUserIdsForActor() に team_sub_leaders テーブル参照を追加。サブリーダーのチームもマージして permitted user ids を構築するよう修正。日報詳細ページ（Interactions/Show.vue）が events.index に user_id 付きでリクエストする際、サブリーダーは 403 になりタイムテーブルが空になっていた。【Diaries/DiaryController】index() の $isLeader 判定を team_sub_leaders 含む $allTeams.isNotEmpty() に変更。サブリーダーが leader_id に登録されていない場合 abort(403) になっていた。【WorkRecordController】buildPermittedUserIds() の Leader セクションで leader_id チームに加え team_sub_leaders 経由のチームをマージ。サブリーダーのメンバーが勤務記録一覧に表示されなかった。',
+                'body'         => <<<'HTML'
+<section class="cl-problem">
+  <h3>背景・問題</h3>
+  <ul>
+    <li>部署サブリーダーが日報詳細ページを開いてもタイムテーブル（当日の予定）が空欄のままだった</li>
+    <li>サブリーダーが日報一覧ページを開くと 403 エラーになり閲覧できなかった</li>
+    <li>勤務記録一覧でサブリーダーが管轄するメンバーのデータが表示されなかった</li>
+    <li>原因：各コントローラーの権限チェックが <code>teams.leader_id</code> のみを参照し、<code>team_sub_leaders</code> 中間テーブルを参照していなかった</li>
+  </ul>
+</section>
+
+<section class="cl-fix">
+  <h3>改善・修正内容</h3>
+  <ul>
+    <li><strong>EventController：</strong><code>buildPermittedUserIdsForActor()</code> に <code>team_sub_leaders</code> 参照を追加し、サブリーダーのチームも permitted user ids に含めるよう修正</li>
+    <li><strong>Diaries/DiaryController：</strong><code>$isLeader</code> 判定をサブリーダーチームも含む形に変更。日報一覧の 403 を解消</li>
+    <li><strong>WorkRecordController：</strong><code>buildPermittedUserIds()</code> でリーダーチームとサブリーダーチームをマージして処理するよう変更</li>
+    <li>参照実装（DiaryInteractionController の <code>buildPermittedUserIds</code>）はすでに正しく対応済みであり、これに揃える形で統一</li>
+  </ul>
+</section>
+HTML,
+            ],
         ];
 
         foreach ($entries as $entry) {
