@@ -29,9 +29,11 @@ const roleLabel = {
             <h2 class="text-xl font-semibold leading-tight text-gray-800">日報権限管理</h2>
         </template>
 
-        <div class="rounded bg-white p-6 shadow">
+        <template #tabs>
             <AdminNavigationTabs active="diary_teams" />
+        </template>
 
+        <div class="rounded bg-white p-6 shadow">
             <div class="mb-4 flex items-center justify-between">
                 <h3 class="text-lg font-semibold text-gray-700">日報権限チーム一覧</h3>
                 <Link

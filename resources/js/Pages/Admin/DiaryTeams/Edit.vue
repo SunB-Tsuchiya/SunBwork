@@ -46,12 +46,20 @@ function submit() {
 <template>
     <AppLayout title="日報権限チーム編集">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">日報権限チーム 編集</h2>
+            <div class="flex items-center gap-3">
+                <Link
+                    :href="route('admin.diary_teams.index')"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300 whitespace-nowrap"
+                >← 一覧に戻る</Link>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">日報権限チーム 編集</h2>
+            </div>
+        </template>
+
+        <template #tabs>
+            <AdminNavigationTabs active="diary_teams" />
         </template>
 
         <div class="rounded bg-white p-6 shadow">
-            <AdminNavigationTabs active="diary_teams" />
-
             <form @submit.prevent="submit" class="space-y-6 max-w-3xl">
 
                 <!-- チーム名 -->
