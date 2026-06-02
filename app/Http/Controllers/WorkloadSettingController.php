@@ -141,47 +141,42 @@ class WorkloadSettingController extends Controller
         }
 
         ['department_id' => $deptId, 'scope_key' => $scopeKey] = $this->resolveScope($request, $user, $companyId);
-        $canEditScope  = $user->isSuperAdmin() || $user->isAdmin();
-        $departments   = $this->fetchDepartments($companyId);
+        $canEditScope = $user->isSuperAdmin() || $user->isAdmin();
+        $departments  = $this->fetchDepartments($companyId);
+
+        $stages        = $this->fetchItems(Stage::class,        'order_index', $companyId, $deptId);
+        $workItemTypes = $this->fetchItems(WorkItemType::class,  'sort_order',  $companyId, $deptId);
+        $sizes         = $this->fetchItems(Size::class,         'sort_order',  $companyId, $deptId);
+        $statuses      = $this->fetchItems(Status::class,       'sort_order',  $companyId, $deptId);
+        $difficulties  = $this->fetchItems(Difficulty::class,   'sort_order',  $companyId, $deptId);
+
+        // 会社全体スコープの場合のみ部署使用情報を付与
+        if ($deptId === null && $departments->isNotEmpty()) {
+            $workItemTypes = $this->enrichWithDeptUsage($workItemTypes, $companyId, $departments);
+        }
 
         return Inertia::render('WorkloadSetting/Index', [
             'departments'    => $departments,
             'currentScope'   => $scopeKey,
             'canEditScope'   => $canEditScope,
-            'stages'         => $this->fetchItems(Stage::class, 'order_index', $companyId, $deptId),
-            'work_item_types'=> $this->fetchItems(WorkItemType::class, 'sort_order', $companyId, $deptId),
-            'sizes'          => $this->fetchItems(Size::class, 'sort_order', $companyId, $deptId),
-            'statuses'       => $this->fetchItems(Status::class, 'sort_order', $companyId, $deptId),
-            'difficulties'   => $this->fetchItems(Difficulty::class, 'sort_order', $companyId, $deptId),
+            'groupOrders'    => $this->fetchGroupOrders('work_item_types', $companyId),
+            'stages'         => $stages,
+            'work_item_types'=> $workItemTypes,
+            'sizes'          => $sizes,
+            'statuses'       => $statuses,
+            'difficulties'   => $difficulties,
         ]);
     }
 
     /**
-     * 編集ページ：指定タイプのレコードだけ返す
+     * 編集ページ：Index ページへリダイレクト（Edit は Index に統合済み）
      */
     public function edit(Request $request, string $type)
     {
         $this->requireLeaderPermission('workload_setting');
-        $configs = $this->typeConfig();
-        abort_if(!array_key_exists($type, $configs), 404);
-
-        $config    = $configs[$type];
-        $user      = $request->user();
-        $companyId = $this->contextCompanyId() ?? $user?->company_id ?? null;
-
-        ['department_id' => $deptId, 'scope_key' => $scopeKey] = $this->resolveScope($request, $user, $companyId);
-        $canEditScope = $user->isSuperAdmin() || $user->isAdmin();
-        $departments  = $this->fetchDepartments($companyId);
-
-        return Inertia::render('WorkloadSetting/Edit', [
-            'type'         => $type,
-            'typeLabel'    => $config['label'],
-            'items'        => $this->fetchItems($config['model'], $config['orderBy'], $companyId, $deptId),
-            'groupOrders'  => $type === 'work_item_types' ? $this->fetchGroupOrders($type, $companyId) : [],
-            'departments'  => $departments,
-            'currentScope' => $scopeKey,
-            'canEditScope' => $canEditScope,
-        ]);
+        $params = [];
+        if ($request->has('dept')) $params['dept'] = $request->query('dept');
+        return redirect()->route('workload_setting.index', $params);
     }
 
     /**
@@ -314,6 +309,29 @@ class WorkloadSettingController extends Controller
                 'updated_at' => now(),
             ]);
         }
+    }
+
+    /**
+     * 会社全体アイテムに「どの部署で同名アイテムが登録されているか」を付与する
+     */
+    private function enrichWithDeptUsage($items, int $companyId, $departments)
+    {
+        $deptItems = WorkItemType::where('company_id', $companyId)
+            ->whereNotNull('department_id')
+            ->select('name', 'department_id')
+            ->get();
+
+        $nameToDeptsMap = $deptItems->groupBy('name')
+            ->map(fn($g) => $g->pluck('department_id')->unique()->values()->toArray());
+
+        return $items->map(function ($item) use ($nameToDeptsMap, $departments) {
+            $deptIds = $nameToDeptsMap->get($item->name, []);
+            $usedByDepts = $departments
+                ->filter(fn($d) => in_array($d->id, $deptIds))
+                ->map(fn($d) => ['id' => $d->id, 'name' => $d->name])
+                ->values();
+            return array_merge($item->toArray(), ['usedByDepts' => $usedByDepts->toArray()]);
+        })->values();
     }
 
     /**
