@@ -153,11 +153,19 @@ function getReadGroupedSections(type, items) {
     return sections.length > 0 ? sections : null;
 }
 
+// ─── スコープラベル ──────────────────────────────────────────────────────────
+function scopeLabel(scopeKey) {
+    if (!scopeKey || scopeKey === 'company') return '会社全体';
+    const dept = props.departments.find((d) => String(d.id) === String(scopeKey));
+    return dept ? dept.name : scopeKey;
+}
+
 // ─── アイテム操作 ────────────────────────────────────────────────────────────
-function addRow(type, groupKey) {
+// targetScope: 省略時は現在のスコープ。部署ボタンで別スコープへ追加できる
+function addRow(type, groupKey, targetScope) {
     const sortKey = SORT_KEY_BY_TYPE[type];
     const items   = editStates[type].items;
-    const newRow  = { _new: true };
+    const newRow  = { _new: true, _targetScope: targetScope ?? props.currentScope };
     if (groupKey !== undefined) {
         newRow.group = groupKey;
         if (sortKey) {
@@ -262,21 +270,45 @@ function moveGroupDown(type, idx) {
 // ─── 保存 ────────────────────────────────────────────────────────────────────
 const { showToast, showValidationErrors } = useToasts();
 
-function saveType(type) {
+function postScope(type, scope, items, groupOrders) {
+    return new Promise((resolve, reject) => {
+        // 内部プロパティを除いたクリーンなデータを送信
+        const clean = items.map(({ _new, _targetScope, ...rest }) => rest);
+        router.post(
+            route('workload_setting.store', { type }),
+            { items: toRaw(clean), group_orders: groupOrders, scope },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                onSuccess: resolve,
+                onError:   (errors) => { showValidationErrors(errors); reject(errors); },
+            },
+        );
+    });
+}
+
+async function saveType(type) {
     const state = editStates[type];
     if (!state) return;
-    const items = state.items.filter((i) => !(i._new && i._deleted));
     const groupOrders = state.groupConfig ? state.groupConfig.groups.map((g) => g ?? null) : undefined;
-    router.post(
-        route('workload_setting.store', { type }),
-        { items: toRaw(items), group_orders: groupOrders, scope: props.currentScope },
-        {
-            preserveState: true,
-            preserveScroll: true,
-            onSuccess: () => { showToast(`${TYPE_LABELS[type]} を保存しました`, 'success'); },
-            onError:   (errors) => { showValidationErrors(errors); },
-        },
-    );
+    const valid = state.items.filter((i) => !(i._new && i._deleted));
+
+    // スコープごとにアイテムを振り分け
+    // 既存アイテム（id あり）は現在のスコープへ、新規アイテムは _targetScope へ
+    const byScope = {};
+    for (const item of valid) {
+        const scope = item._new ? (item._targetScope ?? props.currentScope) : props.currentScope;
+        (byScope[scope] ??= []).push(item);
+    }
+
+    try {
+        for (const [scope, items] of Object.entries(byScope)) {
+            await postScope(type, scope, items, groupOrders);
+        }
+        showToast(`${TYPE_LABELS[type]} を保存しました`, 'success');
+    } catch (_) {
+        // エラーは postScope 内で表示済み
+    }
 }
 
 // ─── スコープ切り替え ──────────────────────────────────────────────────────
@@ -381,22 +413,32 @@ const readSections = computed(() => ALL_TYPES.map((type) => ({
                 <!-- セクションヘッダー -->
                 <div class="flex items-center justify-between border-b px-4 py-3">
                     <h3 class="font-semibold text-gray-800">{{ section.label }}</h3>
-                    <div v-if="editMode" class="flex items-center gap-2">
-                        <button
-                            v-if="!editStates[section.type]?.groupConfig"
-                            type="button"
-                            class="rounded border border-blue-500 px-2 py-1 text-xs text-blue-600 hover:bg-blue-50"
-                            @click="addRow(section.type)"
-                        >＋ 追加</button>
+                    <div v-if="editMode" class="flex flex-wrap items-center gap-1.5">
+                        <!-- 非グループ型: 会社全体 + 部署ごとの追加ボタン -->
+                        <template v-if="!editStates[section.type]?.groupConfig">
+                            <button
+                                type="button"
+                                class="rounded border border-blue-500 px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 whitespace-nowrap"
+                                @click="addRow(section.type, undefined, 'company')"
+                            >＋ 会社全体</button>
+                            <button
+                                v-for="d in departments"
+                                :key="d.id"
+                                type="button"
+                                class="rounded border border-indigo-400 px-2 py-1 text-xs text-indigo-600 hover:bg-indigo-50 whitespace-nowrap"
+                                @click="addRow(section.type, undefined, String(d.id))"
+                            >＋ {{ d.name }}</button>
+                        </template>
+                        <!-- グループ型: グループ追加ボタン -->
                         <button
                             v-if="editStates[section.type]?.groupConfig"
                             type="button"
-                            class="rounded border border-green-600 px-2 py-1 text-xs text-green-600 hover:bg-green-50"
+                            class="rounded border border-green-600 px-2 py-1 text-xs text-green-600 hover:bg-green-50 whitespace-nowrap"
                             @click="openGroupAddModal(section.type)"
                         >＋ グループ追加</button>
                         <button
                             type="button"
-                            class="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700"
+                            class="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 whitespace-nowrap"
                             @click="saveType(section.type)"
                         >保存</button>
                     </div>
@@ -457,7 +499,8 @@ const readSections = computed(() => ALL_TYPES.map((type) => ({
                                     <th v-for="col in COLUMNS_BY_TYPE[section.type]" :key="col.key" class="px-2 py-2 text-left font-medium text-gray-600">
                                         {{ col.label }}<span v-if="col.required" class="text-red-500">*</span>
                                     </th>
-                                    <th class="px-2 py-2 text-left font-medium text-gray-600">操作</th>
+                                    <th class="px-2 py-2 text-left font-medium text-gray-600">追加先</th>
+                                    <th class="w-24 px-2 py-2 text-left font-medium text-gray-600">操作</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-100">
@@ -483,13 +526,26 @@ const readSections = computed(() => ALL_TYPES.map((type) => ({
                                         />
                                         <p v-if="fieldError(section.type, item, col.key)" class="mt-0.5 text-xs text-red-500">{{ fieldError(section.type, item, col.key) }}</p>
                                     </td>
-                                    <td class="whitespace-nowrap px-2 py-1.5">
-                                        <button v-if="!item._deleted" type="button" class="text-red-500 hover:underline text-xs" @click="markDelete(section.type, item)">－削除</button>
-                                        <button v-else type="button" class="text-green-600 hover:underline text-xs" @click="undoDelete(section.type, item)">元に戻す</button>
+                                    <!-- 追加先スコープバッジ（新規行のみ変更可） -->
+                                    <td class="px-2 py-1.5">
+                                        <template v-if="item._new">
+                                            <select
+                                                v-model="item._targetScope"
+                                                class="rounded border border-gray-300 px-1.5 py-0.5 text-xs focus:border-blue-400 focus:outline-none"
+                                            >
+                                                <option value="company">会社全体</option>
+                                                <option v-for="d in departments" :key="d.id" :value="String(d.id)">{{ d.name }}</option>
+                                            </select>
+                                        </template>
+                                        <span v-else class="text-xs text-gray-400">{{ scopeLabel(currentScope) }}</span>
+                                    </td>
+                                    <td class="min-w-[5rem] px-2 py-1.5">
+                                        <button v-if="!item._deleted" type="button" class="whitespace-nowrap text-sm font-medium text-red-500 hover:underline" @click="markDelete(section.type, item)">－ 削除</button>
+                                        <button v-else type="button" class="whitespace-nowrap text-sm font-medium text-green-600 hover:underline" @click="undoDelete(section.type, item)">元に戻す</button>
                                     </td>
                                 </tr>
                                 <tr v-if="!(editStates[section.type]?.items ?? []).length">
-                                    <td :colspan="COLUMNS_BY_TYPE[section.type].length + 2" class="px-2 py-4 text-center text-gray-400">登録がありません</td>
+                                    <td :colspan="COLUMNS_BY_TYPE[section.type].length + 3" class="px-2 py-4 text-center text-gray-400">登録がありません</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -529,7 +585,17 @@ const readSections = computed(() => ALL_TYPES.map((type) => ({
                                         @click="deleteGroup(section.type, grp.key)"
                                     >✕削除</button>
                                 </template>
-                                <button type="button" class="ml-2 rounded border border-blue-500 px-2 py-0.5 text-xs text-blue-600 hover:bg-blue-50" @click="addRow(section.type, grp.key)">＋追加</button>
+                                <!-- 追加ボタン: 会社全体 + 部署ごと -->
+                                <div class="ml-2 flex flex-wrap gap-1">
+                                    <button type="button" class="rounded border border-blue-500 px-2 py-0.5 text-xs text-blue-600 hover:bg-blue-50 whitespace-nowrap" @click="addRow(section.type, grp.key, 'company')">＋会社全体</button>
+                                    <button
+                                        v-for="d in departments"
+                                        :key="d.id"
+                                        type="button"
+                                        class="rounded border border-indigo-400 px-2 py-0.5 text-xs text-indigo-600 hover:bg-indigo-50 whitespace-nowrap"
+                                        @click="addRow(section.type, grp.key, String(d.id))"
+                                    >＋{{ d.name }}</button>
+                                </div>
                             </div>
 
                             <!-- グループ内アイテム -->
@@ -556,23 +622,36 @@ const readSections = computed(() => ALL_TYPES.map((type) => ({
                                                 :class="[col.inputType === 'number' ? 'w-20' : 'w-full', fieldError(section.type, item, col.key) ? 'border-red-400' : 'border-gray-300 focus:border-blue-400']"
                                             />
                                         </td>
-                                        <!-- 部署バッジ（company-wide スコープのみ） -->
-                                        <td v-if="currentScope === 'company'" class="px-2 py-1.5">
-                                            <div class="flex flex-wrap gap-1">
-                                                <span
-                                                    v-for="d in (item.usedByDepts ?? [])"
-                                                    :key="d.id"
-                                                    class="inline-flex items-center rounded-full bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700"
-                                                >{{ d.name }}</span>
-                                            </div>
+                                        <!-- 部署バッジ or 追加先セレクト -->
+                                        <td class="px-2 py-1.5">
+                                            <!-- 新規行: 追加先セレクト -->
+                                            <template v-if="item._new">
+                                                <select
+                                                    v-model="item._targetScope"
+                                                    class="rounded border border-gray-300 px-1.5 py-0.5 text-xs focus:border-blue-400 focus:outline-none"
+                                                >
+                                                    <option value="company">会社全体</option>
+                                                    <option v-for="d in departments" :key="d.id" :value="String(d.id)">{{ d.name }}</option>
+                                                </select>
+                                            </template>
+                                            <!-- 既存行: 使用部署バッジ（company-wide スコープのみ） -->
+                                            <template v-else-if="currentScope === 'company' && (item.usedByDepts ?? []).length">
+                                                <div class="flex flex-wrap gap-1">
+                                                    <span
+                                                        v-for="d in item.usedByDepts"
+                                                        :key="d.id"
+                                                        class="inline-flex items-center rounded-full bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700"
+                                                    >{{ d.name }}</span>
+                                                </div>
+                                            </template>
                                         </td>
-                                        <td class="whitespace-nowrap px-2 py-1.5">
-                                            <button v-if="!item._deleted" type="button" class="text-red-500 hover:underline text-xs" @click="markDelete(section.type, item)">－</button>
-                                            <button v-else type="button" class="text-green-600 hover:underline text-xs" @click="undoDelete(section.type, item)">戻す</button>
+                                        <td class="min-w-[5rem] px-2 py-1.5">
+                                            <button v-if="!item._deleted" type="button" class="whitespace-nowrap text-sm font-medium text-red-500 hover:underline" @click="markDelete(section.type, item)">－ 削除</button>
+                                            <button v-else type="button" class="whitespace-nowrap text-sm font-medium text-green-600 hover:underline" @click="undoDelete(section.type, item)">元に戻す</button>
                                         </td>
                                     </tr>
                                     <tr v-if="grp.items.length === 0">
-                                        <td :colspan="COLUMNS_BY_TYPE[section.type].length + 3" class="px-2 py-2 text-center text-xs text-gray-400">このグループに項目がありません</td>
+                                        <td :colspan="COLUMNS_BY_TYPE[section.type].length + 4" class="px-2 py-2 text-center text-xs text-gray-400">このグループに項目がありません</td>
                                     </tr>
                                 </tbody>
                             </table>
