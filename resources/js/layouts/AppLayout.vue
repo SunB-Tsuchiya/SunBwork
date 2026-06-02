@@ -178,6 +178,7 @@ const getTopTabActive = () => {
         if (r.includes('users') || r.includes('adminusers')) return 'users';
         if (r.includes('companies')) return 'companies';
         if (r.includes('debug') || r.includes('api')) return 'debug';
+        if (r.includes('diary_teams')) return 'diary_teams';
         if (r.includes('teams')) return 'teams';
         if (r.includes('clients')) return 'clients';
         if (r.includes('workload_setting')) return 'workload_setting';
@@ -276,6 +277,7 @@ const currentRouteContext = computed(() => {
         if (r.startsWith('proof_coordinator.')) return 'proof_coordinator';
         if (r.startsWith('clerk.')) return 'clerk';
         if (r.startsWith('prepress.')) return 'prepress';
+        if (r.startsWith('diary_manager.')) return page.props.auth?.user?.user_role || 'user';
         // user.project_jobs.* / user.jobbox.* は user エリア
         // それ以外の user.* も user エリア
         return 'user';

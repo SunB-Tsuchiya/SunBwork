@@ -433,8 +433,35 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('departments', [App\Http\Controllers\Admin\DepartmentController::class, 'store'])->name('departments.store');
         Route::post('departments/{department}/create-team', [App\Http\Controllers\Admin\DepartmentController::class, 'createTeam'])->name('departments.create_team');
         Route::delete('departments/{department}', [App\Http\Controllers\Admin\DepartmentController::class, 'destroy'])->name('departments.destroy');
+
+        // 日報権限チーム管理
+        Route::resource('diary-teams', App\Http\Controllers\Admin\DiaryTeamController::class)
+            ->names([
+                'index'   => 'diary_teams.index',
+                'create'  => 'diary_teams.create',
+                'store'   => 'diary_teams.store',
+                'edit'    => 'diary_teams.edit',
+                'update'  => 'diary_teams.update',
+                'destroy' => 'diary_teams.destroy',
+            ])
+            ->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
     });
 
+
+// DiaryManager Routes (diary_team_leaders に登録されたユーザーのみ)
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'diary_manager'])
+    ->prefix('diary-manager')
+    ->name('diary_manager.')
+    ->group(function () {
+        Route::get('diaryinteractions', [App\Http\Controllers\DiaryManager\DiaryInteractionController::class, 'index'])
+            ->name('diaryinteractions.index');
+        Route::get('diaryinteractions/{diary}', [App\Http\Controllers\DiaryManager\DiaryInteractionController::class, 'show'])
+            ->name('diaryinteractions.show');
+        Route::post('diaryinteractions/{diary}/mark-read', [App\Http\Controllers\DiaryManager\DiaryInteractionController::class, 'markRead'])
+            ->name('diaryinteractions.mark_read');
+        Route::post('diaryinteractions/mark-read-all', [App\Http\Controllers\DiaryManager\DiaryInteractionController::class, 'markReadAll'])
+            ->name('diaryinteractions.mark_read_all');
+    });
 
 // SuperAdmin Routes (SuperAdminのみアクセス可能)
 Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'superadmin'])

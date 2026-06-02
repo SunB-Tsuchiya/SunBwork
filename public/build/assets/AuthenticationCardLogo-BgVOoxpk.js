@@ -1,0 +1,1 @@
+import{c as e,w as s,a as o,e as a,s as t,o as r}from"./app-Csy44hKq.js";import{l as c}from"./header_logo-ubYpwXe9.js";const _=["src"],m={__name:"AuthenticationCardLogo",setup(l){return(n,i)=>(r(),e(a(t),{href:"/"},{default:s(()=>[o("img",{src:a(c),alt:"SB Work",class:"size-16"},null,8,_)]),_:1}))}};export{m as _};

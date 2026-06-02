@@ -1,6 +1,9 @@
 <script setup>
 import { computed } from 'vue';
-import { Link, router } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
+
+const page = usePage();
+const isDiaryManager = computed(() => page.props.auth?.isDiaryManager ?? false);
 
 const props = defineProps({
     active:       { type: String, default: '' },
@@ -31,7 +34,8 @@ const tabs = computed(() => [
     { key: 'workload', href: tryRoute('proof_coordinator.workload'), label: '校正員作業量' },
     { key: 'team', href: tryRoute('proof_coordinator.team.index'), label: '校正チーム管理' },
     { key: 'dispatchers', href: tryRoute('proof_coordinator.dispatchers.index'), label: '単発派遣管理' },
-].filter(t => t.href));
+    { key: 'diaries', href: tryRoute('diary_manager.diaryinteractions.index'), label: '日報管理', condition: isDiaryManager.value },
+].filter(t => t.condition !== false && t.href));
 
 function onMobileSelect(e) {
     const href = e.target.value;
@@ -85,6 +89,13 @@ function onMobileSelect(e) {
             </Link>
             <Link :href="route('proof_coordinator.dispatchers.index')" :class="tab('dispatchers')">
                 単発派遣管理
+            </Link>
+            <Link
+                v-if="isDiaryManager"
+                :href="route('diary_manager.diaryinteractions.index')"
+                :class="tab('diaries')"
+            >
+                日報管理
             </Link>
         </nav>
     </div>

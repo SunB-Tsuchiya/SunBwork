@@ -126,6 +126,12 @@ class HandleInertiaRequests extends Middleware
                 'isProofMember' => $request->user()
                     ? ProofTeamMember::where('user_id', $request->user()->id)->exists()
                     : false,
+                // 日報マネージャーフラグ（diary_team_leaders に登録されている場合 true）
+                'isDiaryManager' => $request->user()
+                    ? \Illuminate\Support\Facades\DB::table('diary_team_leaders')
+                        ->where('user_id', $request->user()->id)
+                        ->exists()
+                    : false,
                 // 部署別ジョブフロー機能フラグ
                 // 各コンポーネントは auth.featureFlags.xxx を参照するだけ（判定ロジック不要）
                 'featureFlags' => (function () use ($request, $contextCompany) {

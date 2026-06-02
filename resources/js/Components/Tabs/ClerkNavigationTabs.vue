@@ -1,10 +1,13 @@
 <script setup>
 import { computed } from 'vue';
-import { Link, router } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 
 const props = defineProps({
     active: { type: String, default: '' },
 });
+
+const page = usePage();
+const isDiaryManager = computed(() => page.props.auth?.isDiaryManager ?? false);
 
 // Clerk カラー: purple
 const tab = (key) => [
@@ -21,7 +24,8 @@ function tryRoute(name) {
 const tabs = computed(() => [
     { key: 'dashboard', href: tryRoute('clerk.dashboard'), label: 'ダッシュボード' },
     { key: 'announcements', href: tryRoute('clerk.announcements.index'), label: 'お知らせ通知' },
-].filter(t => t.href));
+    { key: 'diaries', href: tryRoute('diary_manager.diaryinteractions.index'), label: '日報管理', condition: isDiaryManager.value },
+].filter(t => t.condition !== false && t.href));
 
 function onMobileSelect(e) {
     const href = e.target.value;
@@ -54,6 +58,13 @@ function onMobileSelect(e) {
             </Link>
             <Link :href="route('clerk.announcements.index')" :class="tab('announcements')">
                 お知らせ通知
+            </Link>
+            <Link
+                v-if="isDiaryManager"
+                :href="route('diary_manager.diaryinteractions.index')"
+                :class="tab('diaries')"
+            >
+                日報管理
             </Link>
         </nav>
     </div>

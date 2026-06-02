@@ -461,4 +461,25 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(Script::class);
     }
+
+    public function isDiaryManager(): bool
+    {
+        return \Illuminate\Support\Facades\DB::table('diary_team_leaders')
+            ->where('user_id', $this->id)
+            ->exists();
+    }
+
+    public function diaryManagerMemberIds(): array
+    {
+        $teamIds = \Illuminate\Support\Facades\DB::table('diary_team_leaders')
+            ->where('user_id', $this->id)
+            ->pluck('diary_team_id');
+
+        return \Illuminate\Support\Facades\DB::table('diary_team_members')
+            ->whereIn('diary_team_id', $teamIds)
+            ->pluck('user_id')
+            ->unique()
+            ->values()
+            ->toArray();
+    }
 }

@@ -45,6 +45,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'ghost'          => \App\Http\Middleware\GhostUserMiddleware::class,
             'proof_coordinator' => \App\Http\Middleware\ProofCoordinatorMiddleware::class,
             'clerk'          => \App\Http\Middleware\ClerkMiddleware::class,
+            'diary_manager'  => \App\Http\Middleware\DiaryManagerMiddleware::class,
             'owner'          => \App\Http\Middleware\OwnerMiddleware::class, // 後方互換性のため残す
             'representative'        => \App\Http\Middleware\EnsureIsRepresentative::class,
             'representative_leader' => \App\Http\Middleware\EnsureIsRepresentativeLeader::class,

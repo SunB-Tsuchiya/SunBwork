@@ -1,6 +1,9 @@
 <script setup>
 import { computed } from 'vue';
-import { Link, router } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
+
+const page = usePage();
+const isDiaryManager = computed(() => page.props.auth?.isDiaryManager ?? false);
 
 const props = defineProps({
     active: { type: String, default: '' },
@@ -86,7 +89,8 @@ const tabs = computed(() => [
     { key: 'settings', href: getSettingsLink(), label: '設定' },
     { key: 'ghost_users', href: getGhostUsersLink(), label: 'テストユーザー' },
     { key: 'sales_reps', href: tryRoute('coordinator.sales_reps.index'), label: '営業担当管理' },
-].filter(t => t.href));
+    { key: 'diaries', href: tryRoute('diary_manager.diaryinteractions.index'), label: '日報管理', condition: isDiaryManager.value },
+].filter(t => t.condition !== false && t.href));
 
 function onMobileSelect(e) {
     const href = e.target.value;
@@ -126,6 +130,13 @@ function onMobileSelect(e) {
             <Link :href="getSettingsLink()" :class="tab('settings')"> 設定 </Link>
             <Link :href="getGhostUsersLink()" :class="tab('ghost_users')"> テストユーザー </Link>
             <Link :href="route('coordinator.sales_reps.index')" :class="tab('sales_reps')"> 営業担当管理 </Link>
+            <Link
+                v-if="isDiaryManager"
+                :href="route('diary_manager.diaryinteractions.index')"
+                :class="tab('diaries')"
+            >
+                日報管理
+            </Link>
         </nav>
     </div>
 </template>
