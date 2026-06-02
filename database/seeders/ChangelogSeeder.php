@@ -1056,28 +1056,34 @@ HTML,
             ],
         [
             'version'      => 'diary-team-1',
-            'title'        => '日報権限チーム機能追加：Clerk・Coordinator・校正Co が日報を閲覧可能に',
+            'title'        => '日報権限チーム機能追加・日報編集の流用ボタン修正',
             'released_at'  => '2026-06-02',
-            'summary'      => 'Admin が「日報権限チーム」を作成し、Clerk・Coordinator・校正Coordinator をチームのリーダーに任命できるようになりました。任命されたユーザーは「日報管理」メニューから担当チームのメンバーの日報を閲覧・既読・コメントできます。',
+            'summary'      => 'Admin が「日報権限チーム」を作成し、Clerk・Coordinator・校正Coordinator をチームのリーダーに任命できるようになりました。任命されたユーザーは「日報管理」メニューから担当チームのメンバーの日報を閲覧・既読・コメントできます。また、日報編集ページでも「過去データから流用」ボタンが使用できるようになりました。',
             'design_files' => ['z_instructions/DIARYTEAM_PLAN1.md'],
-            'claude_notes' => '【主な変更】①新規テーブル3つ: diary_teams / diary_team_leaders（pivot）/ diary_team_members（pivot）。②DiaryTeamモデル追加。③User::isDiaryManager() / diaryManagerMemberIds() 追加。④DiaryManagerMiddleware追加（diary_team_leadersに登録済みユーザーのみ許可）。⑤Admin/DiaryTeamController (CRUD, diary_management権限で制御, SuperAdmin対応)。⑥DiaryManager/DiaryInteractionController（buildPermittedUserIdsをdiaryManagerMemberIds()に差し替え、routePrefix=diary_manager）。⑦diary-manager. ルートグループ追加。⑧HandleInertiaRequests にisDiaryManager shared data追加。⑨AppLayout.vue: currentRouteContext に diary_manager.* 対応, getTopTabActive に diary_teams 対応。⑩Admin/DiaryTeams/{Index,Create,Edit}.vue追加。⑪Clerk/Coordinator/ProofCoordinatorNavigationTabsに「日報管理」タブ（isDiaryManager条件付き）追加。AdminNavigationTabsに「日報権限管理」タブ追加。',
+            'claude_notes' => '【主な変更】①新規テーブル3つ: diary_teams / diary_team_leaders（pivot）/ diary_team_members（pivot）。②DiaryTeamモデル追加。③User::isDiaryManager() / diaryManagerMemberIds() 追加。④DiaryManagerMiddleware追加（diary_team_leadersに登録済みユーザーのみ許可）。⑤Admin/DiaryTeamController (CRUD, diary_management権限で制御, SuperAdmin対応)。⑥DiaryManager/DiaryInteractionController（buildPermittedUserIdsをdiaryManagerMemberIds()に差し替え、routePrefix=diary_manager）。⑦diary-manager. ルートグループ追加。⑧HandleInertiaRequests にisDiaryManager shared data追加。⑨AppLayout.vue: currentRouteContext に diary_manager.* 対応, getTopTabActive に diary_teams 対応。⑩Admin/DiaryTeams/{Index,Create,Edit}.vue追加。⑪Clerk/Coordinator/ProofCoordinatorNavigationTabsに「日報管理」タブ（isDiaryManager条件付き）追加。AdminNavigationTabsに「日報権限管理」タブ追加。⑫Diaries/Edit.vue に「過去データから流用」ボタン追加（DiaryController::create() が既存日報があると edit にリダイレクトするため、Edit 側にも流用機能が必要だった）。',
             'body'         => <<<'HTML'
 <section class="cl-feature">
   <h3>新機能：日報権限チーム</h3>
   <ul>
-    <li><strong>Admin：日報権限管理：</strong>「日報権限管理」タブから日報権限チームを作成・管理できます。チームにリーダー（Clerk / Coordinator / 校正Co）と閲覧対象メンバーを設定します</li>
+    <li><strong>Admin → 日報権限管理：</strong>Admin メニューの「日報権限管理」タブから日報権限チームを作成・管理できます。チームに「日報マネージャー（Clerk / Coordinator / 校正Co）」と「閲覧対象メンバー」を設定します</li>
     <li><strong>日報マネージャー：</strong>チームのリーダーに任命されたユーザーのナビに「日報管理」ボタンが出現します</li>
     <li><strong>限定閲覧：</strong>担当チームのメンバーの日報のみ閲覧可能。既読マーク・コメントも可能です</li>
     <li><strong>複数チーム対応：</strong>1人が複数チームのリーダーを兼任する場合、全チームのメンバーの日報を閲覧できます</li>
-    <li><strong>ルート分離：</strong>Leader / Admin の日報ルートとは別に独立した <code>diary-manager</code> ルートを使用します</li>
+  </ul>
+</section>
+
+<section class="cl-fix">
+  <h3>バグ修正</h3>
+  <ul>
+    <li><strong>日報編集の「過去データから流用」ボタン：</strong>当日すでに日報を作成済みの場合、日報作成ページが編集ページにリダイレクトされますが、編集ページに流用ボタンがなかったため使用できない状態でした。編集ページにも同様の流用ボタンを追加しました</li>
   </ul>
 </section>
 
 <section class="cl-guide">
-  <h3>使い方</h3>
+  <h3>日報権限チームの使い方</h3>
   <ol>
-    <li>Admin メニューの「日報権限管理」から日報チームを作成する</li>
-    <li>リーダー（Clerk / Coordinator / 校正Co）と閲覧対象メンバーを選択して保存</li>
+    <li>Admin メニューの「日報権限管理」から日報チームを新規作成する</li>
+    <li>チーム名を入力し、日報マネージャー（Clerk / Coordinator / 校正Co）と閲覧対象メンバーを選択して保存</li>
     <li>設定されたリーダーのナビに「日報管理」ボタンが出現する</li>
     <li>「日報管理」から担当チームのメンバーの日報を閲覧・既読・コメントできる</li>
   </ol>
