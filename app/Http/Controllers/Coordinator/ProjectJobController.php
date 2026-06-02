@@ -132,22 +132,17 @@ class ProjectJobController extends Controller
     /**
      * Coordinator候補:
      *   - user_role = coordinator または clerk、または
-     *   - 担当(assignment.code) = 'shinko'（進行管理）のユーザー
      * company_id が指定された場合は同一会社のユーザーのみ返す。
      */
     private function coordinatorCandidates(?int $companyId = null): \Illuminate\Support\Collection
     {
-        $query = User::where(function ($q) {
-            $q->where('user_role', 'coordinator')
-              ->orWhere('user_role', 'clerk')
-              ->orWhereHas('assignment', fn ($q2) => $q2->where('code', 'shinko'));
-        });
-
-        if ($companyId) {
-            $query->where('company_id', $companyId);
+        if (!$companyId) {
+            return collect();
         }
 
-        return $query->orderBy('name')->get(['id', 'name']);
+        return User::where('company_id', $companyId)
+            ->orderBy('name')
+            ->get(['id', 'name']);
     }
 
     public function clone(Request $request, ProjectJob $projectJob)
