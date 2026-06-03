@@ -86,6 +86,13 @@ class EventController extends Controller
             }
         }
 
+        // 日報管理チームリーダーとして登録されているユーザーはそのチームメンバーのイベントを閲覧可能
+        // （Coordinator/Clerk が diary_team_leaders に登録されている場合に対応）
+        $diaryMemberIds = $currentUser->diaryManagerMemberIds();
+        if (!empty($diaryMemberIds)) {
+            $userIds = array_merge($userIds, $diaryMemberIds);
+        }
+
         return array_values(array_unique(array_filter($userIds)));
     }
     /**
