@@ -322,6 +322,14 @@
                 <section v-show="activeTab === 'workflow'" class="py-5">
                     <div class="mb-3 flex items-center gap-4">
                         <h3 class="font-semibold text-gray-800">管理シート</h3>
+                        <button
+                            v-if="workflowSheets.length === 0"
+                            type="button"
+                            class="rounded border border-indigo-300 px-3 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
+                            @click="showCreateWorkflowModal = true"
+                        >
+                            新規作成
+                        </button>
                     </div>
                     <div v-if="workflowSheets.length > 0" class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-gray-200">
@@ -866,6 +874,43 @@
         </div>
     </div>
 
+    <!-- ── 管理シート 新規作成モーダル ──── -->
+    <div
+        v-if="showCreateWorkflowModal"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+        @click.self="showCreateWorkflowModal = false"
+    >
+        <div class="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
+            <h3 class="mb-4 text-lg font-semibold text-gray-800">管理シートを作成</h3>
+
+            <label class="block text-sm font-medium text-gray-700">シート名 <span class="text-red-500">*</span></label>
+            <input
+                v-model="newWorkflowName"
+                type="text"
+                class="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+                placeholder="例: 工程管理"
+                @keydown.enter="createWorkflowSheet"
+            />
+
+            <div class="mt-5 flex justify-end gap-3">
+                <button
+                    type="button"
+                    class="rounded border border-gray-300 px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+                    @click="showCreateWorkflowModal = false"
+                >
+                    キャンセル
+                </button>
+                <button
+                    type="button"
+                    class="rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
+                    @click="createWorkflowSheet"
+                >
+                    作成
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- ── 共有モーダル ────────────────────────────────────────────── -->
     <Teleport to="body">
         <div
@@ -1198,6 +1243,13 @@ watch(activeTab, (tab) => {
     if (tab === 'schedule') {
         nextTick(() => projectCalendarRef.value?.updateCalendarSize?.());
     }
+    const url = new URL(window.location.href);
+    if (tab === 'overview') {
+        url.searchParams.delete('tab');
+    } else {
+        url.searchParams.set('tab', tab);
+    }
+    history.replaceState(null, '', url.toString());
 });
 
 // ── 伝票画像 ─────────────────────────────────────────────────────────────────
@@ -1635,6 +1687,28 @@ function createSheet() {
             { onSuccess: resetModal },
         );
     }
+}
+
+// ── 管理シート 新規作成 ────────────────────────────────────────────────────
+const showCreateWorkflowModal = ref(false);
+const newWorkflowName = ref('');
+
+function createWorkflowSheet() {
+    const name = newWorkflowName.value.trim();
+    if (!name) {
+        alert('シート名を入力してください。');
+        return;
+    }
+    router.post(
+        route('coordinator.project_jobs.workflow_sheets.store', { projectJob: job.id }),
+        { name },
+        {
+            onSuccess: () => {
+                showCreateWorkflowModal.value = false;
+                newWorkflowName.value = '';
+            },
+        },
+    );
 }
 
 // ── 進行管理表 並び順モーダル ──────────────────────────────────────────────
