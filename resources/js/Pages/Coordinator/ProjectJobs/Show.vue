@@ -1243,6 +1243,7 @@ watch(activeTab, (tab) => {
     if (tab === 'schedule') {
         nextTick(() => projectCalendarRef.value?.updateCalendarSize?.());
     }
+
     const url = new URL(window.location.href);
     if (tab === 'overview') {
         url.searchParams.delete('tab');
@@ -1332,6 +1333,11 @@ onMounted(() => {
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('create_sheet') === '1') {
         showCreateSheetModal.value = true;
+    }
+
+    // ?tab=schedule で直接開いた場合、watch は発火しないため onMounted でサイズ再計算
+    if (activeTab.value === 'schedule') {
+        nextTick(() => projectCalendarRef.value?.updateCalendarSize?.());
     }
 });
 
