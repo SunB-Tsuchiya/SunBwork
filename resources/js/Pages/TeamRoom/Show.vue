@@ -56,6 +56,17 @@ const roleColor = {
     user:        'bg-blue-100 text-blue-800 border-blue-200',
 };
 
+// リーダー・サブリーダーを上位ロールから除外して重複表示を防ぐ
+const filteredSubLeaders = computed(() =>
+    (props.team.sub_leaders ?? []).filter(sl => sl.id !== props.leader?.id)
+);
+const filteredMembers = computed(() => {
+    const excludeIds = new Set(
+        [props.leader?.id, ...(props.team.sub_leaders ?? []).map(sl => sl.id)].filter(Boolean)
+    );
+    return (props.team.members ?? []).filter(m => !excludeIds.has(m.id));
+});
+
 // ボードの状態（Show.vueで管理してコンポーネントに渡す）
 const board = ref(props.board);
 
@@ -135,11 +146,11 @@ function onBoardUpdated(updatedBoard) {
                         </div>
 
                         <!-- サブリーダー -->
-                        <div v-if="team.sub_leaders && team.sub_leaders.length > 0" class="flex items-start gap-2 text-sm">
+                        <div v-if="filteredSubLeaders.length > 0" class="flex items-start gap-2 text-sm">
                             <span class="w-24 shrink-0 text-xs font-semibold text-yellow-700">サブリーダー</span>
                             <div class="flex flex-wrap gap-2">
                                 <span
-                                    v-for="sl in team.sub_leaders"
+                                    v-for="sl in filteredSubLeaders"
                                     :key="sl.id"
                                     class="flex items-center gap-1.5 rounded-full border border-yellow-200 bg-yellow-50 px-3 py-1 text-sm font-medium text-gray-800"
                                 >
@@ -150,11 +161,11 @@ function onBoardUpdated(updatedBoard) {
                         </div>
 
                         <!-- メンバー -->
-                        <div v-if="team.members && team.members.length > 0" class="flex items-start gap-2 text-sm">
+                        <div v-if="filteredMembers.length > 0" class="flex items-start gap-2 text-sm">
                             <span class="w-24 shrink-0 text-xs font-semibold text-blue-700">メンバー</span>
                             <div class="flex flex-wrap gap-2">
                                 <span
-                                    v-for="m in team.members"
+                                    v-for="m in filteredMembers"
                                     :key="m.id"
                                     :class="[
                                         'flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium text-gray-800',
@@ -167,7 +178,7 @@ function onBoardUpdated(updatedBoard) {
                             </div>
                         </div>
 
-                        <p v-if="!leader && (!team.members || team.members.length === 0)" class="text-sm text-gray-400">
+                        <p v-if="!leader && filteredSubLeaders.length === 0 && filteredMembers.length === 0" class="text-sm text-gray-400">
                             メンバー未登録
                         </p>
                     </div>
