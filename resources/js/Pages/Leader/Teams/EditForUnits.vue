@@ -1,7 +1,7 @@
 <script setup>
 import DialogModal from '@/Components/DialogModal.vue';
 import { useForm, usePage } from '@inertiajs/vue3';
-import { computed, onMounted, ref } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 
 const page = usePage();
 const props = page.props;
@@ -14,12 +14,16 @@ const assignments = ref(props.assignments || []);
 const users       = ref(props.users || []);
 const leaders     = ref(props.leaders || []);
 
-// team_user を正とした初期メンバー（なければ unit.members にフォールバック）
+// team_user を正とした初期メンバー ID（文字列）
 const initMemberIds = (
     props.current_member_ids?.length
         ? props.current_member_ids
         : (unit?.members?.map((m) => String(m.id)) || [])
 ).map(String);
+
+// メンバー選択状態は useForm の配列と切り離し、独立した ref で管理
+// → Inertia reactive proxy と v-model の相性問題を回避
+const selectedIds = ref([...initMemberIds]);
 
 const form = useForm({
     name:           team.name || '',
@@ -28,7 +32,7 @@ const form = useForm({
     description:    unit?.description ?? team.description ?? '',
     leader_id:      unit?.leader_id ? String(unit.leader_id) : null,
     sub_leader_ids: (props.sub_leader_ids || []).map(String),
-    member_ids:     initMemberIds,
+    member_ids:     [...initMemberIds],
 });
 
 const availableDepartments = computed(() => {
@@ -50,42 +54,55 @@ const filterableAssignments = computed(() => {
     return assignments.value.filter((a) => String(a.department_id) === String(filterDeptId.value));
 });
 
+// admin/leader/superadmin は部署フィルター対象外（常に表示）
+const ALWAYS_VISIBLE_ROLES = ['superadmin', 'admin', 'leader'];
+
 const filteredDisplayMembers = computed(() => {
-    let list = users.value.filter((u) => !u.is_ghost);
-    if (filterDeptId.value)
-        list = list.filter((u) => String(u.department_id) === String(filterDeptId.value));
-    if (filterAssignId.value)
-        list = list.filter((u) => String(u.assignment_id) === String(filterAssignId.value));
-    return list;
+    const list = users.value;
+    if (!filterDeptId.value && !filterAssignId.value) return list;
+
+    return list.filter((u) => {
+        if (selectedIds.value.includes(String(u.id))) return true;
+        if (ALWAYS_VISIBLE_ROLES.includes(u.user_role)) return true;
+        if (filterDeptId.value && String(u.department_id) !== String(filterDeptId.value)) return false;
+        if (filterAssignId.value && String(u.assignment_id) !== String(filterAssignId.value)) return false;
+        return true;
+    });
 });
 
-const allChecked = computed(() =>
+const allFilteredChecked = computed(() =>
     filteredDisplayMembers.value.length > 0 &&
-    filteredDisplayMembers.value.every((u) => form.member_ids.includes(String(u.id))),
+    filteredDisplayMembers.value.every((u) => selectedIds.value.includes(String(u.id))),
 );
 
 function toggleAll() {
     const ids = filteredDisplayMembers.value.map((u) => String(u.id));
-    if (allChecked.value) {
-        form.member_ids = form.member_ids.filter((id) => !ids.includes(id));
+    if (allFilteredChecked.value) {
+        selectedIds.value = selectedIds.value.filter((id) => !ids.includes(id));
     } else {
-        form.member_ids = [...new Set([...form.member_ids, ...ids])];
+        selectedIds.value = [...new Set([...selectedIds.value, ...ids])];
     }
 }
 
 function toggleMember(id) {
     const sid = String(id);
-    const idx = form.member_ids.indexOf(sid);
-    if (idx === -1) form.member_ids.push(sid);
-    else            form.member_ids.splice(idx, 1);
+    if (selectedIds.value.includes(sid)) {
+        selectedIds.value = selectedIds.value.filter((m) => m !== sid);
+    } else {
+        selectedIds.value = [...selectedIds.value, sid];
+    }
+}
+
+function isSelected(id) {
+    return selectedIds.value.includes(String(id));
 }
 
 const selectedMembers = computed(() =>
-    users.value.filter((u) => form.member_ids.includes(String(u.id))),
+    users.value.filter((u) => selectedIds.value.includes(String(u.id))),
 );
 
 function removeFromSelected(id) {
-    form.member_ids = form.member_ids.filter((m) => m !== String(id));
+    selectedIds.value = selectedIds.value.filter((m) => m !== String(id));
 }
 
 function getDeptName(deptId) {
@@ -98,10 +115,23 @@ function getAssignName(assignId) {
     return a ? a.name : '';
 }
 
+const ROLE_BADGE = {
+    superadmin:  { text: 'SA',        cls: 'bg-yellow-100 text-yellow-800' },
+    admin:       { text: 'admin',     cls: 'bg-red-100 text-red-700' },
+    leader:      { text: 'リーダー', cls: 'bg-orange-100 text-orange-700' },
+    coordinator: { text: '進行',      cls: 'bg-green-100 text-green-700' },
+    clerk:       { text: '事務',      cls: 'bg-purple-100 text-purple-700' },
+};
+
+function roleBadge(role) {
+    return ROLE_BADGE[role] || null;
+}
+
 function doFilter() { showFilterModal.value = false; }
 function clearFilter() { filterDeptId.value = ''; filterAssignId.value = ''; }
 
 const submit = () => {
+    form.member_ids = [...selectedIds.value];
     form.put(route('leader.teams.update', { team: team.id }));
 };
 </script>
@@ -164,10 +194,13 @@ const submit = () => {
                 </div>
             </div>
 
-            <!-- メンバー選択（部署横断） -->
+            <!-- ── メンバー選択（部署横断） ── -->
             <div>
-                <div class="flex items-center justify-between mb-2">
-                    <label class="block text-sm font-medium text-gray-700">メンバー（複数選択可・部署横断）</label>
+                <div class="mb-2 flex items-center justify-between">
+                    <label class="block text-sm font-medium text-gray-700">
+                        メンバー（複数選択可・部署横断）
+                        <span class="ml-1 text-xs text-gray-400">※ admin/リーダーは部署フィルターを無視して常に表示</span>
+                    </label>
                     <div class="flex items-center gap-2">
                         <button type="button" @click="showFilterModal = true"
                             class="rounded bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700">絞り込み</button>
@@ -195,6 +228,7 @@ const submit = () => {
                                 <option v-for="a in filterableAssignments" :key="a.id" :value="String(a.id)">{{ a.name }}</option>
                             </select>
                         </div>
+                        <p class="mt-3 text-xs text-gray-500">※ admin/リーダーは部署フィルター対象外で常に表示されます</p>
                     </template>
                     <template #footer>
                         <button type="button" class="mr-2 rounded bg-gray-300 px-4 py-2 text-sm"
@@ -206,12 +240,14 @@ const submit = () => {
 
                 <!-- メンバー一覧テーブル -->
                 <div class="overflow-x-auto rounded border border-gray-200">
-                    <div class="border-b bg-gray-50 px-3 py-2 text-xs font-bold text-gray-600">メンバー一覧</div>
+                    <div class="border-b bg-gray-50 px-3 py-2 text-xs font-bold text-gray-600">
+                        メンバー一覧（{{ filteredDisplayMembers.length }}件表示）
+                    </div>
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="w-8 px-3 py-2 text-left">
-                                    <input type="checkbox" :checked="allChecked" @change="toggleAll" />
+                                <th class="w-8 px-3 py-2">
+                                    <input type="checkbox" :checked="allFilteredChecked" @change="toggleAll" />
                                 </th>
                                 <th class="px-3 py-2 text-left text-xs text-gray-500">名前</th>
                                 <th class="px-3 py-2 text-left text-xs text-gray-500">部署</th>
@@ -223,13 +259,23 @@ const submit = () => {
                                 v-for="u in filteredDisplayMembers"
                                 :key="u.id"
                                 class="cursor-pointer hover:bg-gray-50"
-                                :class="{ 'bg-blue-50': form.member_ids.includes(String(u.id)) }"
+                                :class="{ 'bg-blue-50': isSelected(u.id) }"
                                 @click="toggleMember(u.id)"
                             >
-                                <td class="px-3 py-2" @click.stop>
-                                    <input type="checkbox" :value="String(u.id)" v-model="form.member_ids" />
+                                <td class="px-3 py-2" @click.stop="toggleMember(u.id)">
+                                    <input
+                                        type="checkbox"
+                                        :checked="isSelected(u.id)"
+                                        @click.prevent
+                                    />
                                 </td>
-                                <td class="px-3 py-2 font-medium text-gray-900">{{ u.name }}</td>
+                                <td class="px-3 py-2 font-medium text-gray-900">
+                                    <span v-if="roleBadge(u.user_role)"
+                                        :class="['mr-1 inline-block rounded px-1 py-0.5 text-xs font-semibold', roleBadge(u.user_role).cls]">
+                                        {{ roleBadge(u.user_role).text }}
+                                    </span>
+                                    {{ u.name }}
+                                </td>
                                 <td class="px-3 py-2 text-gray-500">{{ getDeptName(u.department_id) }}</td>
                                 <td class="px-3 py-2 text-gray-500">{{ getAssignName(u.assignment_id) }}</td>
                             </tr>
@@ -256,7 +302,13 @@ const submit = () => {
                         </thead>
                         <tbody class="divide-y divide-gray-100 bg-white">
                             <tr v-for="m in selectedMembers" :key="m.id" class="hover:bg-gray-50">
-                                <td class="px-3 py-2 font-medium text-gray-900">{{ m.name }}</td>
+                                <td class="px-3 py-2 font-medium text-gray-900">
+                                    <span v-if="roleBadge(m.user_role)"
+                                        :class="['mr-1 inline-block rounded px-1 py-0.5 text-xs font-semibold', roleBadge(m.user_role).cls]">
+                                        {{ roleBadge(m.user_role).text }}
+                                    </span>
+                                    {{ m.name }}
+                                </td>
                                 <td class="px-3 py-2 text-gray-500">{{ getDeptName(m.department_id) }}</td>
                                 <td class="px-3 py-2 text-gray-500">{{ getAssignName(m.assignment_id) }}</td>
                                 <td class="px-3 py-2 text-right">
