@@ -1098,6 +1098,48 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->name('debug.api');
 });
 
+// ── チームルーム ──────────────────────────────────────────────────────────
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified'])
+    ->prefix('team-rooms')
+    ->name('team-rooms.')
+    ->group(function () {
+        Route::get('/', [\App\Http\Controllers\TeamRoom\TeamRoomController::class, 'index'])->name('index');
+        Route::get('/{team}', [\App\Http\Controllers\TeamRoom\TeamRoomController::class, 'show'])->name('show');
+
+        // スケジュール（イベント）— JSON API
+        Route::get('/{team}/events', [\App\Http\Controllers\TeamRoom\TeamEventController::class, 'index'])->name('events.index');
+        Route::post('/{team}/events', [\App\Http\Controllers\TeamRoom\TeamEventController::class, 'store'])->name('events.store');
+        Route::get('/{team}/events/csv-export', [\App\Http\Controllers\TeamRoom\TeamEventController::class, 'csvExport'])->name('events.csv_export');
+        Route::post('/{team}/events/csv-import', [\App\Http\Controllers\TeamRoom\TeamEventController::class, 'csvImport'])->name('events.csv_import');
+        Route::put('/{team}/events/{event}', [\App\Http\Controllers\TeamRoom\TeamEventController::class, 'update'])->name('events.update');
+        Route::delete('/{team}/events/{event}', [\App\Http\Controllers\TeamRoom\TeamEventController::class, 'destroy'])->name('events.destroy');
+
+        // ボード
+        Route::post('/{team}/board', [\App\Http\Controllers\TeamRoom\TeamBoardController::class, 'store'])->name('board.store');
+        Route::put('/{team}/board/columns', [\App\Http\Controllers\TeamRoom\TeamBoardController::class, 'updateColumns'])->name('board.columns.update');
+        Route::post('/{team}/board/cards', [\App\Http\Controllers\TeamRoom\TeamBoardCardController::class, 'store'])->name('board.cards.store');
+        Route::get('/{team}/board/cards/{card}', [\App\Http\Controllers\TeamRoom\TeamBoardCardController::class, 'show'])->name('board.cards.show');
+        Route::get('/{team}/board/cards/{card}/edit', [\App\Http\Controllers\TeamRoom\TeamBoardCardController::class, 'edit'])->name('board.cards.edit');
+        Route::put('/{team}/board/cards/{card}', [\App\Http\Controllers\TeamRoom\TeamBoardCardController::class, 'update'])->name('board.cards.update');
+        Route::delete('/{team}/board/cards/{card}', [\App\Http\Controllers\TeamRoom\TeamBoardCardController::class, 'destroy'])->name('board.cards.destroy');
+
+        // 会議記録
+        Route::get('/{team}/minutes', [\App\Http\Controllers\TeamRoom\TeamMeetingMinuteController::class, 'index'])->name('minutes.index');
+        Route::get('/{team}/minutes/create', [\App\Http\Controllers\TeamRoom\TeamMeetingMinuteController::class, 'create'])->name('minutes.create');
+        Route::post('/{team}/minutes', [\App\Http\Controllers\TeamRoom\TeamMeetingMinuteController::class, 'store'])->name('minutes.store');
+        Route::get('/{team}/minutes/{minute}', [\App\Http\Controllers\TeamRoom\TeamMeetingMinuteController::class, 'show'])->name('minutes.show');
+        Route::get('/{team}/minutes/{minute}/edit', [\App\Http\Controllers\TeamRoom\TeamMeetingMinuteController::class, 'edit'])->name('minutes.edit');
+        Route::put('/{team}/minutes/{minute}', [\App\Http\Controllers\TeamRoom\TeamMeetingMinuteController::class, 'update'])->name('minutes.update');
+        Route::delete('/{team}/minutes/{minute}', [\App\Http\Controllers\TeamRoom\TeamMeetingMinuteController::class, 'destroy'])->name('minutes.destroy');
+        Route::post('/{team}/minutes/{minute}/comments', [\App\Http\Controllers\TeamRoom\TeamMeetingCommentController::class, 'store'])->name('minutes.comments.store');
+        Route::delete('/{team}/minutes/{minute}/comments/{comment}', [\App\Http\Controllers\TeamRoom\TeamMeetingCommentController::class, 'destroy'])->name('minutes.comments.destroy');
+
+        // 週間掲示板
+        Route::get('/{team}/week-posts', [\App\Http\Controllers\TeamRoom\TeamWeekPostController::class, 'index'])->name('week_posts.index');
+        Route::post('/{team}/week-posts', [\App\Http\Controllers\TeamRoom\TeamWeekPostController::class, 'store'])->name('week_posts.store');
+        Route::delete('/{team}/week-posts/{post}', [\App\Http\Controllers\TeamRoom\TeamWeekPostController::class, 'destroy'])->name('week_posts.destroy');
+    });
+
 // セッション Keep-Alive 用 ping エンドポイント
 Route::middleware(['auth:sanctum', config('jetstream.auth_session')])->get('/ping', function () {
     return response()->noContent();

@@ -1,0 +1,105 @@
+<script setup>
+import AppLayout from '@/layouts/AppLayout.vue';
+import { Link, router } from '@inertiajs/vue3';
+import { route } from 'ziggy-js';
+
+const props = defineProps({
+    team:  { type: Object, required: true },
+    board: { type: Object, required: true },
+    card:  { type: Object, required: true },
+});
+
+const colorMap = {
+    yellow: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+    blue:   'bg-blue-100 text-blue-800 border-blue-300',
+    green:  'bg-green-100 text-green-800 border-green-300',
+    red:    'bg-red-100 text-red-800 border-red-300',
+    purple: 'bg-purple-100 text-purple-800 border-purple-300',
+    orange: 'bg-orange-100 text-orange-800 border-orange-300',
+    gray:   'bg-gray-100 text-gray-800 border-gray-300',
+};
+
+function colBadge(color) {
+    return colorMap[color] || colorMap.gray;
+}
+
+function formatDate(d) {
+    if (!d) return '';
+    return String(d).slice(0, 16).replace('T', ' ');
+}
+
+function deleteCard() {
+    if (!confirm('このカードを削除しますか？')) return;
+    router.delete(route('team-rooms.board.cards.destroy', { team: props.team.id, card: props.card.id }), {
+        onSuccess: () => router.get(route('team-rooms.show', { team: props.team.id }) + '?tab=board'),
+    });
+}
+</script>
+
+<template>
+    <AppLayout :title="`${team.name} - カード詳細`">
+        <template #header>
+            <div class="flex items-center gap-3">
+                <Link
+                    :href="route('team-rooms.show', { team: team.id }) + '?tab=board'"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300 whitespace-nowrap"
+                >← ボードに戻る</Link>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">カード詳細</h2>
+            </div>
+        </template>
+
+        <div class="mx-auto max-w-2xl rounded bg-white px-4 py-6 sm:p-6 shadow">
+            <!-- カラムバッジ -->
+            <div class="mb-4">
+                <span
+                    class="inline-block rounded border px-3 py-1 text-sm font-medium"
+                    :class="colBadge(card.column?.color)"
+                >{{ card.column?.name ?? '（未設定）' }}</span>
+            </div>
+
+            <!-- タイトル -->
+            <h3 class="mb-4 text-xl font-bold text-gray-900">{{ card.title }}</h3>
+
+            <!-- 説明 -->
+            <div class="mb-6">
+                <p class="mb-1 text-xs font-semibold text-gray-500">説明</p>
+                <div class="whitespace-pre-wrap rounded border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 min-h-[80px]">
+                    {{ card.description || '（説明なし）' }}
+                </div>
+            </div>
+
+            <!-- メタ情報 -->
+            <dl class="mb-6 grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                <div>
+                    <dt class="text-xs font-semibold text-gray-500">作成者</dt>
+                    <dd class="text-gray-800">{{ card.creator?.name ?? '—' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-xs font-semibold text-gray-500">作成日時</dt>
+                    <dd class="text-gray-800">{{ formatDate(card.created_at) }}</dd>
+                </div>
+                <div>
+                    <dt class="text-xs font-semibold text-gray-500">最終更新</dt>
+                    <dd class="text-gray-800">{{ formatDate(card.updated_at) }}</dd>
+                </div>
+            </dl>
+
+            <!-- ボタン -->
+            <div class="flex items-center gap-3">
+                <Link
+                    :href="route('team-rooms.board.cards.edit', { team: team.id, card: card.id })"
+                    class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                >編集</Link>
+                <Link
+                    :href="route('team-rooms.show', { team: team.id }) + '?tab=board'"
+                    class="rounded bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                >ボードに戻る</Link>
+                <button
+                    type="button"
+                    class="ml-auto rounded border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                    @click="deleteCard"
+                >削除</button>
+            </div>
+        </div>
+    </AppLayout>
+</template>

@@ -187,6 +187,7 @@ const getTopTabActive = () => {
         if (r.includes('diaryinteractions') || r.includes('diaries')) return 'diaries';
         if (r.includes('ai')) return 'ai';
         if (r.includes('calendar')) return 'calendar';
+        if (r.startsWith('team-rooms')) return 'team_rooms';
         if (r.includes('myjobbox') || r === 'dashboard') return 'myjob';
         if (r.includes('user.jobbox')) return 'jobbox';
         if (r.includes('announcements')) return 'announcements';
@@ -610,6 +611,7 @@ function navigateToRole(role) {
                             <button type="button" @click="navigateToRole('user')" :class="roleNavClass('user')">Dashboard</button>
                             <CompanyModuleNavButtons group="afterUser" :auth="$page.props.auth" :roleNavClass="roleNavClass" @navigate="navigateToRole" />
                         </template>
+
                     </div>
                 </div>
 

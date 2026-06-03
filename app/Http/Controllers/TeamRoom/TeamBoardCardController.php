@@ -1,0 +1,122 @@
+<?php
+
+namespace App\Http\Controllers\TeamRoom;
+
+use App\Http\Controllers\Controller;
+use App\Models\Attachment;
+use App\Models\Team;
+use App\Models\TeamBoard;
+use App\Models\TeamBoardCard;
+use App\Services\AttachmentService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
+
+class TeamBoardCardController extends Controller
+{
+    public function show(Team $team, TeamBoardCard $card)
+    {
+        app(TeamRoomController::class)->assertMember($team);
+        $board = TeamBoard::where('team_id', $team->id)->firstOrFail();
+        abort_unless($card->team_board_id === $board->id, 404);
+
+        $card->load('column', 'creator:id,name');
+        $board->load('columns');
+
+        return Inertia::render('TeamRoom/Board/CardShow', [
+            'team'  => $team->load('department'),
+            'board' => $board,
+            'card'  => $card,
+        ]);
+    }
+
+    public function edit(Team $team, TeamBoardCard $card)
+    {
+        app(TeamRoomController::class)->assertMember($team);
+        $board = TeamBoard::where('team_id', $team->id)->firstOrFail();
+        abort_unless($card->team_board_id === $board->id, 404);
+
+        $card->load('column', 'creator:id,name');
+        $board->load('columns');
+
+        return Inertia::render('TeamRoom/Board/CardEdit', [
+            'team'  => $team->load('department'),
+            'board' => $board,
+            'card'  => $card,
+        ]);
+    }
+
+    public function store(Request $request, Team $team)
+    {
+        app(TeamRoomController::class)->assertMember($team);
+
+        $board = TeamBoard::where('team_id', $team->id)->firstOrFail();
+
+        $validated = $request->validate([
+            'team_board_column_id' => 'required|integer|exists:team_board_columns,id',
+            'title'                => 'required|string|max:255',
+            'description'          => 'nullable|string',
+        ]);
+
+        $maxOrder = TeamBoardCard::where('team_board_column_id', $validated['team_board_column_id'])
+            ->max('sort_order') ?? -1;
+
+        $card = TeamBoardCard::create([
+            'team_board_id'        => $board->id,
+            'team_board_column_id' => $validated['team_board_column_id'],
+            'title'                => $validated['title'],
+            'description'          => $validated['description'] ?? null,
+            'sort_order'           => $maxOrder + 1,
+            'created_by'           => Auth::id(),
+        ]);
+
+        if ($request->hasFile('files')) {
+            $svc = new AttachmentService();
+            foreach ($request->file('files') as $file) {
+                try {
+                    $svc->storeUploadedFile($file, $card, Auth::id());
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('TeamBoardCard attachment failed: ' . $e->getMessage());
+                }
+            }
+        }
+
+        $card->load('attachments', 'creator:id,name');
+
+        return response()->json($card, 201);
+    }
+
+    public function update(Request $request, Team $team, TeamBoardCard $card)
+    {
+        app(TeamRoomController::class)->assertMember($team);
+
+        $board = TeamBoard::where('team_id', $team->id)->firstOrFail();
+        abort_unless($card->team_board_id === $board->id, 404);
+
+        $validated = $request->validate([
+            'team_board_column_id' => 'nullable|integer|exists:team_board_columns,id',
+            'title'                => 'nullable|string|max:255',
+            'description'          => 'nullable|string',
+            'sort_order'           => 'nullable|integer',
+        ]);
+
+        $card->update(array_filter($validated, fn($v) => $v !== null));
+
+        $card->load('attachments', 'creator:id,name', 'column:id,name,color');
+
+        return response()->json($card);
+    }
+
+    public function destroy(Team $team, TeamBoardCard $card)
+    {
+        app(TeamRoomController::class)->assertMember($team);
+
+        $board = TeamBoard::where('team_id', $team->id)->firstOrFail();
+        abort_unless($card->team_board_id === $board->id, 404);
+
+        $card->delete();
+
+        return response()->noContent();
+    }
+}

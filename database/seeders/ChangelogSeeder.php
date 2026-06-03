@@ -1127,6 +1127,25 @@ HTML,
 </section>
 HTML,
         ],
+        [
+            'version'      => 'team-room-1',
+            'title'        => 'チームルーム機能追加',
+            'released_at'  => '2026-06-03',
+            'summary'      => 'チームルーム機能を追加しました。各チームの専用ページとして「概要・メンバー」「スケジュール」「プロジェクトボード」「会議記録」の4タブを提供します。スケジュールタブは月カレンダーと週間プランナー（週単位の予定一覧＋掲示板）を切り替えられます。プロジェクトボードはカンバン形式でカードを管理でき、カラムの折り畳みやドラッグ＆ドロップに対応しています。会議記録はキーワード・年月フィルターで絞り込み検索が可能です。',
+            'design_files' => [],
+            'claude_notes' => '【主な変更】①新規テーブル: team_week_posts（チーム週間掲示板）。②TeamWeekPost モデル追加。③TeamWeekPostController 追加（GET/POST/DELETE、year/week パラメータで投稿を管理）。④TeamBoardCardController に show/edit メソッドを追加（Inertia レンダリング）。⑤routes/web.php: team-rooms グループに week_posts 3ルート・board.cards.show/edit 2ルートを追加。⑥TeamWeekPlanner.vue 新規作成（左:週ナビ+日別イベント一覧、右:週の掲示板＋スレッド返信）。⑦TeamScheduleCalendar.vue: currentView===week-planner 時に TeamWeekPlanner を表示、月カレンダーは v-show で保持。⑧TeamBoard.vue: 列を flex:1 0 240px で横幅いっぱいに展開、折り畳み時は writing-mode:vertical-rl の縦バーに、カード追加ボタンをヘッダー右上に移動、一覧ビューに詳細/編集/削除ボタン追加。⑨Pages/TeamRoom/Board/CardShow.vue・CardEdit.vue 新規作成（mx-auto max-w-2xl の白カード）。⑩TeamMinutesList.vue: 編集ボタン追加、行クリックで詳細遷移、content フィールドも検索対象に追加（HTMLタグ除去後にキーワードマッチ）。⑪TeamMeetingMinuteController・TeamRoomController の minutes クエリに content カラムを追加。⑫AppLayout.vue: 重複していたチームルームリンクボタンを削除。⑬Index.vue: テーブル行クリックでshow遷移。⑭Show.vue: ボードタブ時のみ bg-white を除去してページ背景色と統一。',
+            'body'         => <<<'HTML'
+<section class="cl-feature">
+  <h3>新機能：チームルーム</h3>
+  <ul>
+    <li><strong>概要・メンバータブ：</strong>チーム名・部署・説明とメンバー一覧（リーダー・サブリーダー・メンバー）を表示します</li>
+    <li><strong>スケジュールタブ：</strong>月カレンダーでチームの予定を管理できます。週間プランナーに切り替えると、週単位の予定一覧と「週の掲示板」（スレッド形式の投稿・返信）を表示します</li>
+    <li><strong>プロジェクトボード：</strong>カンバン形式のボードでタスクカードを管理します。カラムは折り畳み可能（縦バー表示）、カードはドラッグ＆ドロップで移動できます。カードをクリックすると詳細・編集ページに遷移します</li>
+    <li><strong>会議記録タブ：</strong>議事録の一覧をキーワード・年月フィルター・日付ソートで絞り込めます。タイトル・作成者・本文を横断検索でき、行クリックで詳細に遷移します</li>
+  </ul>
+</section>
+HTML,
+        ],
         ];
 
         foreach ($entries as $entry) {

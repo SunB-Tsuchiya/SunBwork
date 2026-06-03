@@ -27,6 +27,7 @@ const tabs = computed(() => [
     { key: 'jobbox', href: tryRoute('user.jobbox.index'), label: '依頼されたジョブ' },
     { key: 'diaries', href: tryRoute('diaries.index'), label: '日報一覧' },
     { key: 'calendar', href: tryRoute('calendar.index'), label: 'カレンダー' },
+    { key: 'team_rooms', href: tryRoute('team-rooms.index'), label: 'チームルーム' },
     { key: 'proof_status', href: tryRoute('user.proof.status'), label: '校正状況', condition: isSunbrain.value },
     { key: 'settings', href: tryRoute('user.settings.index'), label: '設定' },
 ].filter(t => t.condition !== false && t.href));
@@ -74,6 +75,9 @@ function onMobileSelect(e) {
             </Link>
             <Link :href="route('calendar.index')" :class="tab('calendar')">
                 カレンダー
+            </Link>
+            <Link :href="route('team-rooms.index')" :class="tab('team_rooms')">
+                チームルーム
             </Link>
             <Link v-if="isSunbrain" :href="route('user.proof.status')" :class="tab('proof_status')">
                 校正状況

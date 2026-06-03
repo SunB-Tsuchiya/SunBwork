@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class AuthenticatedSessionController extends Controller
 {
@@ -27,13 +28,17 @@ class AuthenticatedSessionController extends Controller
     /**
      * Handle an incoming authentication request.
      */
-    public function store(LoginRequest $request): RedirectResponse
+    public function store(LoginRequest $request): SymfonyResponse
     {
         $request->authenticate();
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        // Inertia::location() forces a full page reload on the client side.
+        // This is necessary because session()->regenerate() changes the CSRF token,
+        // and Inertia's soft navigation does not update <meta name="csrf-token">,
+        // causing all subsequent POST requests to fail with 419.
+        return Inertia::location(redirect()->intended(route('dashboard', absolute: false)));
     }
 
     /**
