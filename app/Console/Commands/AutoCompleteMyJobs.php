@@ -63,14 +63,15 @@ class AutoCompleteMyJobs extends Command
         }
 
         // ── 更新 ────────────────────────────────────────────────────────────
-        // project_job_assignments には completed_at カラムが存在しないため completed のみ更新
         $now     = Carbon::now();
 
         // 対象IDを取得してから更新（イベント更新に使うため）
         $targetIds = (clone $query)->pluck('id')->toArray();
 
+        // status_id=3（完了）も同時に更新する（completed フラグだけ立てると画面表示が不一致になるため）
         $updated = (clone $query)->update([
             'completed'  => true,
+            'status_id'  => 3,
             'updated_at' => $now,
         ]);
 
