@@ -65,13 +65,12 @@ class TeamController extends Controller
         $team = Team::with(['company', 'department'])->findOrFail($id);
         $this->authorizeTeam($team);
 
-        $user        = Auth::user();
         $companyId   = $team->company_id;
         $companies   = \App\Models\Company::active()->ordered()->get(['id', 'name']);
         $departments = \App\Models\Department::active()->get(['id', 'name', 'company_id']);
 
         $users = $companyId
-            ? \App\Models\User::select(['id', 'name', 'user_role', 'department_id', 'company_id'])
+            ? \App\Models\User::select(['id', 'name', 'user_role', 'department_id', 'company_id', 'assignment_id', 'is_ghost'])
                 ->where('company_id', $companyId)->get()
             : collect();
 
@@ -87,14 +86,26 @@ class TeamController extends Controller
             ->where('name', $team->name)
             ->first();
 
+        $assignments = \App\Models\Assignment::all(['id', 'name', 'department_id']);
+
+        $currentMemberIds = DB::table('team_user')
+            ->where('team_id', $team->id)
+            ->where(function ($q) { $q->whereNull('role')->orWhere('role', '<>', 'owner'); })
+            ->pluck('user_id')
+            ->map(fn ($v) => (string) $v)
+            ->values()
+            ->toArray();
+
         return Inertia::render('Leader/Teams/Edit', [
-            'team'           => $team,
-            'companies'      => $companies,
-            'departments'    => $departments,
-            'users'          => $users,
-            'leaders'        => $leaders,
-            'unit'           => $unit,
-            'sub_leader_ids' => $team->subLeaders()->pluck('users.id')->toArray(),
+            'team'               => $team,
+            'companies'          => $companies,
+            'departments'        => $departments,
+            'users'              => $users,
+            'leaders'            => $leaders,
+            'unit'               => $unit,
+            'sub_leader_ids'     => $team->subLeaders()->pluck('users.id')->toArray(),
+            'assignments'        => $assignments,
+            'current_member_ids' => $currentMemberIds,
         ]);
     }
 
@@ -132,26 +143,26 @@ class TeamController extends Controller
         $subIds = array_filter(array_map('intval', $validated['sub_leader_ids'] ?? []), fn($id) => $id > 0);
         $team->subLeaders()->sync($subIds);
 
-        // unit_members sync
+        // team_user sync（unit の有無に関わらず常に実行）
         $memberIds = $validated['member_ids'] ?? [];
+        DB::table('team_user')
+            ->where('team_id', $team->id)
+            ->where(function ($q) { $q->whereNull('role')->orWhere('role', '<>', 'owner'); })
+            ->delete();
+        foreach ($memberIds as $mid) {
+            DB::table('team_user')->insertOrIgnore([
+                'team_id' => $team->id, 'user_id' => $mid,
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+
+        // unit_members sync（unit が存在する場合のみ）
         $unit = \App\Models\Unit::where('company_id', $team->company_id)
             ->where('department_id', $team->department_id)
             ->where('name', $team->name)
             ->first();
-
         if ($unit) {
             $unit->members()->sync($memberIds);
-            foreach ($memberIds as $mid) {
-                DB::table('team_user')->insertOrIgnore([
-                    'team_id' => $team->id, 'user_id' => $mid,
-                    'created_at' => now(), 'updated_at' => now(),
-                ]);
-            }
-            DB::table('team_user')
-                ->where('team_id', $team->id)
-                ->where('role', '!=', 'owner')
-                ->whereNotIn('user_id', $memberIds)
-                ->delete();
         }
 
         return redirect()->route('leader.teams.index')->with('success', 'チーム情報を更新しました');

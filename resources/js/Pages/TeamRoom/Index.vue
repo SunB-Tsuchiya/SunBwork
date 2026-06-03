@@ -45,17 +45,13 @@ defineProps({
                             </span>
                             <span v-else class="text-gray-400">—</span>
                         </td>
-                        <td class="px-4 py-3">
-                            <div v-if="team.member_names && team.member_names.length > 0" class="flex flex-wrap gap-1">
-                                <span
-                                    v-for="(name, i) in team.member_names"
-                                    :key="i"
-                                    class="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs text-blue-800"
-                                >{{ name }}</span>
-                            </div>
+                        <td class="px-4 py-3 text-gray-600" style="max-width: 200px;">
+                            <span v-if="team.member_names && team.member_names.length > 0" class="block truncate text-xs">
+                                {{ team.member_names.slice(0, 6).join('、') }}{{ team.member_names.length > 6 ? `　他${team.member_names.length - 6}名` : '' }}
+                            </span>
                             <span v-else class="text-gray-400">—</span>
                         </td>
-                        <td class="px-4 py-3 text-right">
+                        <td class="px-4 py-3 text-right whitespace-nowrap">
                             <Link
                                 :href="route('team-rooms.show', { team: team.id })"
                                 class="rounded bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700"

@@ -17,22 +17,15 @@ class TeamRoomController extends Controller
     {
         $user = Auth::user();
 
-        if ($user->isSuperAdmin()) {
-            $teams = Team::with(['department'])
-                ->where('team_type', 'unit')
-                ->orderBy('name')
-                ->get();
-        } else {
-            $memberTeamIds = DB::table('team_user')
-                ->where('user_id', $user->id)
-                ->pluck('team_id');
+        $memberTeamIds = DB::table('team_user')
+            ->where('user_id', $user->id)
+            ->pluck('team_id');
 
-            $teams = Team::with(['department'])
-                ->where('team_type', 'unit')
-                ->whereIn('id', $memberTeamIds)
-                ->orderBy('name')
-                ->get();
-        }
+        $teams = Team::with(['department'])
+            ->where('team_type', 'unit')
+            ->whereIn('id', $memberTeamIds)
+            ->orderBy('name')
+            ->get();
 
         $teams->load(['members:id,name']);
 
