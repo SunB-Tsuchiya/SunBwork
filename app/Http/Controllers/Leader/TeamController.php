@@ -144,7 +144,11 @@ class TeamController extends Controller
         $team->subLeaders()->sync($subIds);
 
         // team_user sync（unit の有無に関わらず常に実行）
-        $memberIds = $validated['member_ids'] ?? [];
+        // リーダー・サブリーダーも自動的にメンバーに含める
+        $memberIds = array_values(array_unique(array_merge(
+            array_map('strval', $validated['member_ids'] ?? []),
+            array_map('strval', $subIds),
+        )));
         DB::table('team_user')
             ->where('team_id', $team->id)
             ->where(function ($q) { $q->whereNull('role')->orWhere('role', '<>', 'owner'); })

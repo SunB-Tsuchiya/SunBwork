@@ -94,11 +94,14 @@ function toggleMember(id) {
 }
 
 function isSelected(id) {
-    return selectedIds.value.includes(String(id));
+    const sid = String(id);
+    return selectedIds.value.includes(sid)
+        || (form.leader_id && String(form.leader_id) === sid)
+        || form.sub_leader_ids.map(String).includes(sid);
 }
 
 const selectedMembers = computed(() =>
-    users.value.filter((u) => selectedIds.value.includes(String(u.id))),
+    users.value.filter((u) => isSelected(u.id)),
 );
 
 function removeFromSelected(id) {
@@ -131,7 +134,11 @@ function doFilter() { showFilterModal.value = false; }
 function clearFilter() { filterDeptId.value = ''; filterAssignId.value = ''; }
 
 const submit = () => {
-    form.member_ids = [...selectedIds.value];
+    form.member_ids = [...new Set([
+        ...selectedIds.value,
+        ...(form.leader_id ? [String(form.leader_id)] : []),
+        ...form.sub_leader_ids.map(String),
+    ])];
     form.put(route('leader.teams.update', { team: team.id }));
 };
 </script>
