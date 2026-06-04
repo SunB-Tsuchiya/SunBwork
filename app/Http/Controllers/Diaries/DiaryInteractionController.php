@@ -327,13 +327,10 @@ class DiaryInteractionController extends Controller
             ->pluck('date')
             ->toArray();
 
-        $totalDates = count($dates);
-        $sliced = array_slice($dates, ($page - 1) * $perPage, $perPage);
-
         $diariesQuery = Diary::with('user.department')
             ->whereIn('user_id', $userIds)
             ->where('user_id', '!=', $currentUserId)
-            ->whereIn('date', $sliced)
+            ->whereIn('date', $dates)
             ->orderBy('date', 'desc');
 
         if ($hasUnreadParam && $unread === 1) {
@@ -386,13 +383,7 @@ class DiaryInteractionController extends Controller
             ];
         }
 
-        $lastPage = (int) ceil($totalDates / max(1, $perPage));
-        $meta = [
-            'current_page' => $page,
-            'last_page' => $lastPage,
-            'per_page' => $perPage,
-            'total' => $totalDates,
-        ];
+        $meta = null;
 
         $filters = ['q' => '', 'year' => $year, 'month' => $month, 'period' => $period, 'perPage' => $perPage, 'unread' => $hasUnreadParam ? $unread : null];
         $routePrefix = $isAdmin ? 'admin' : 'leader';

@@ -137,14 +137,12 @@ class DiaryInteractionController extends Controller
             $datesQuery->where('date', '>=', $lower)->where('date', '<=', $upper);
         }
         $this->applyUnreadFilter($datesQuery, $hasUnreadParam, $unread, $currentUserId);
-        $dates      = $datesQuery->orderBy('date', 'desc')->distinct()->pluck('date')->toArray();
-        $totalDates = count($dates);
-        $sliced     = array_slice($dates, ($page - 1) * $perPage, $perPage);
+        $dates = $datesQuery->orderBy('date', 'desc')->distinct()->pluck('date')->toArray();
 
         $diariesQuery = Diary::with('user.department')
             ->whereIn('user_id', $userIds)
             ->where('user_id', '!=', $currentUserId)
-            ->whereIn('date', $sliced)
+            ->whereIn('date', $dates)
             ->orderBy('date', 'desc');
         $this->applyUnreadFilter($diariesQuery, $hasUnreadParam, $unread, $currentUserId);
         $diaries  = $diariesQuery->get();
@@ -159,9 +157,8 @@ class DiaryInteractionController extends Controller
             ];
         }
 
-        $lastPage = (int) ceil($totalDates / max(1, $perPage));
-        $meta     = ['current_page' => $page, 'last_page' => $lastPage, 'per_page' => $perPage, 'total' => $totalDates];
-        $filters  = ['q' => '', 'year' => $year, 'month' => $month, 'period' => $period, 'perPage' => $perPage, 'unread' => $hasUnreadParam ? $unread : null];
+        $meta    = null;
+        $filters = ['q' => '', 'year' => $year, 'month' => $month, 'period' => $period, 'perPage' => $perPage, 'unread' => $hasUnreadParam ? $unread : null];
 
         return Inertia::render('Diaries/Interactions/Index', [
             'departments' => $departments,

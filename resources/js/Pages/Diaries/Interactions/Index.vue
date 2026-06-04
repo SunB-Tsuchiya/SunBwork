@@ -140,27 +140,6 @@ const groupedByDate = computed(() => {
     return ordered;
 });
 
-// pagination helpers using props.meta provided by controller
-const currentPage = computed(() => (props.meta && props.meta.current_page ? props.meta.current_page : 1));
-const lastPage = computed(() => (props.meta && props.meta.last_page ? props.meta.last_page : 1));
-const pageRange = computed(() => {
-    const cur = Number(currentPage.value || 1);
-    const last = Number(lastPage.value || 1);
-    const range = [];
-    const start = Math.max(1, cur - 2);
-    const end = Math.min(last, cur + 2);
-    for (let i = start; i <= end; i++) range.push(i);
-    return range;
-});
-
-function pageRoute(n) {
-    // build params from tableFilters (which excludes unread) and set page
-    const params = { ...getPeriodParams(), page: n };
-    if (viewMode.value === 'month') params.group = 'month';
-    if (searchQuery.value) params.q = searchQuery.value;
-    return route(routeForIndex(), params);
-}
-
 function applyFilters() {
     const params = { ...getPeriodParams(), page: 1 };
     if (viewMode.value === 'month') params.group = 'month';
@@ -294,38 +273,6 @@ function markReadAllRoute() {
                     :showIdColumn="false"
                     :showDeptColumn="false"
                 />
-            </div>
-            <!-- pagination -->
-            <div class="mt-6 flex items-center justify-between">
-                <div>
-                    <button
-                        class="mr-2 rounded border px-3 py-1"
-                        :disabled="currentPage <= 1"
-                        @click.prevent="() => Inertia.get(pageRoute(Math.max(1, currentPage - 1)))"
-                    >
-                        前
-                    </button>
-                    <button
-                        class="rounded border px-3 py-1"
-                        :disabled="currentPage >= lastPage"
-                        @click.prevent="() => Inertia.get(pageRoute(Math.min(lastPage, currentPage + 1)))"
-                    >
-                        次
-                    </button>
-                </div>
-                <div class="text-sm text-gray-600">
-                    ページ: <span class="font-medium">{{ currentPage }}</span> / {{ lastPage }}
-                </div>
-                <div class="space-x-1">
-                    <template v-for="p in pageRange" :key="p">
-                        <button
-                            @click.prevent="() => Inertia.get(pageRoute(p))"
-                            :class="['rounded px-2 py-1', p === currentPage ? 'bg-indigo-600 text-white' : 'border']"
-                        >
-                            {{ p }}
-                        </button>
-                    </template>
-                </div>
             </div>
         </div>
     </AppLayout>

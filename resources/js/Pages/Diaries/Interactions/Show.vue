@@ -382,7 +382,7 @@ async function updateComment() {
 
             <div class="space-y-5">
                 <!-- 日報本文 -->
-                <div class="max-h-52 overflow-y-auto rounded border p-3 text-sm diary-content">
+                <div class="rounded border p-3 text-sm diary-content">
                     <span v-if="!props.diary.content || !props.diary.content.trim()" class="text-gray-400 italic">日報はありません</span>
                     <div v-else v-html="props.diary.content"></div>
                 </div>
