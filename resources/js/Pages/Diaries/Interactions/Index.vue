@@ -161,14 +161,17 @@ function markReadAllRoute() {
     return `${prefix}.diaryinteractions.mark_read_all`;
 }
 
-// 既読アクション後にこのページへ戻った際のスクロール位置復元
+// このページが表示された瞬間にURLを保存（Inertia は pushState → swap の順なので
+// onBeforeUnmount 時点では URL が既に Show に変わっている。onMounted で保存するのが正解）
 onMounted(() => {
+    sessionStorage.setItem('diary_index_url', window.location.href);
+
+    // 既読アクション後に戻った場合のスクロール位置復元
     const returnFlag = sessionStorage.getItem('diary_markread_return');
     const savedScroll = sessionStorage.getItem('diary_scroll_restore');
     if (returnFlag && savedScroll !== null) {
         sessionStorage.removeItem('diary_markread_return');
         sessionStorage.removeItem('diary_scroll_restore');
-        sessionStorage.removeItem('diary_index_url');
         // ブラウザ自動スクロールより後に実行するため nextTick + rAF を使う
         nextTick(() => {
             requestAnimationFrame(() => {
@@ -178,11 +181,10 @@ onMounted(() => {
     }
 });
 
-// Inertia SPA 遷移でこのページを離れる直前にスクロール位置と現在のURLを保存
-// （月フィルター等のクエリパラメータを含む完全なURLを保存する）
+// Inertia SPA 遷移でこのページを離れる直前にスクロール位置を保存
+// （URLは onMounted で保存済みのため、ここでは scrollY のみ）
 onBeforeUnmount(() => {
     sessionStorage.setItem('diary_scroll_restore', String(window.scrollY));
-    sessionStorage.setItem('diary_index_url', window.location.href);
 });
 </script>
 
