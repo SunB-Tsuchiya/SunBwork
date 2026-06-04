@@ -71,26 +71,28 @@ const editHref = computed(() => {
     }
 });
 
-// 追加: 既読ユーザー名を安全に取り出すヘルパー
+// 既読ユーザー名を安全に取り出すヘルパー（日報の筆者は除外）
 const readerNames = computed(() => {
     const rb = props.diary?.read_by || [];
     if (!Array.isArray(rb) || rb.length === 0) return [];
+    const diaryUserId = props.diary?.user_id;
 
     return rb
+        .filter((item) => {
+            if (!diaryUserId) return true;
+            if (typeof item === 'object' && item !== null) return item.id !== diaryUserId;
+            return true;
+        })
         .map((item) => {
             if (!item && item !== 0) return String(item);
-            // 期待される形: { id, name } や { user_id, user_name } など複数パターンに対応
-
             if (typeof item === 'object') {
                 if (item.name) return item.name;
                 if (item.user_name) return item.user_name;
                 if (item.admin_name) return item.admin_name;
                 if (item.full_name) return item.full_name;
-                // フォールバック: id として表示
                 if (item.id) return `user#${item.id}`;
                 return JSON.stringify(item);
             }
-            // 単純な文字列/数値の場合
             return String(item);
         })
         .filter(Boolean);
@@ -1238,7 +1240,7 @@ onUnmounted(() => {
             <div class="grid grid-cols-1 gap-6">
                 <!-- 上から順: 日報内容 -->
                 <div class="flex flex-col gap-3">
-                    <div class="prose max-h-52 overflow-y-auto rounded border p-3 text-sm">
+                    <div class="rounded border p-3 text-sm diary-content">
                         <span v-if="!sanitizedContent || !sanitizedContent.trim()" class="text-gray-400 italic">日報はありません</span>
                         <div v-else v-html="sanitizedContent" @click="onBodyClick"></div>
                     </div>
@@ -1397,3 +1399,16 @@ onUnmounted(() => {
                 </div>
     </AppLayout>
 </template>
+
+<style scoped>
+.diary-content {
+    width: 100%;
+}
+.diary-content p {
+    margin-bottom: 1.5em;
+    line-height: 1.25;
+}
+.diary-content * {
+    line-height: 1.25;
+}
+</style>

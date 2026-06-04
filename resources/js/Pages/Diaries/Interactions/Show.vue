@@ -44,26 +44,28 @@ const editingCommentId = ref(null);
 const editingCommentText = ref('');
 const isUpdatingComment = ref(false);
 
-// 追加: 既読ユーザー名を安全に取り出すヘルパー
+// 既読ユーザー名を安全に取り出すヘルパー（日報の筆者は除外）
 const readerNames = computed(() => {
     const rb = props.diary?.read_by || [];
     if (!Array.isArray(rb) || rb.length === 0) return [];
+    const diaryUserId = props.diary?.user_id;
 
     return rb
+        .filter((item) => {
+            if (!diaryUserId) return true;
+            if (typeof item === 'object' && item !== null) return item.id !== diaryUserId;
+            return true;
+        })
         .map((item) => {
             if (!item && item !== 0) return String(item);
-            // 期待される形: { id, name } や { user_id, user_name } など複数パターンに対応
-
             if (typeof item === 'object') {
                 if (item.name) return item.name;
                 if (item.user_name) return item.user_name;
                 if (item.admin_name) return item.admin_name;
                 if (item.full_name) return item.full_name;
-                // フォールバック: id として表示
                 if (item.id) return `user#${item.id}`;
                 return JSON.stringify(item);
             }
-            // 単純な文字列/数値の場合
             return String(item);
         })
         .filter(Boolean);
