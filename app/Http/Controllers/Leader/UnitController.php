@@ -75,7 +75,7 @@ class UnitController extends Controller
                 'personal_team'  => false,
                 'team_type'      => 'unit',
                 'leader_id'      => $validated['leader_id'] ?? null,
-                'can_read_diary' => $validated['can_read_diary'] ?? true,
+                'can_read_diary' => $validated['can_read_diary'] ?? false,
             ]);
 
             if (!empty($validated['leader_id'])) {

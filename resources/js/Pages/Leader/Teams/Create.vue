@@ -29,7 +29,7 @@ const form = useForm({
     leader_id:      '',
     sub_leader_ids: [],
     member_ids:     [],
-    can_read_diary: true,
+    can_read_diary: false,
 });
 
 const availableDepartments = computed(() => {
