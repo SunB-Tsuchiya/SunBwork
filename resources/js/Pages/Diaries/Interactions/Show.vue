@@ -141,6 +141,8 @@ function markRead() {
             }
 
             // Redirect to the correct interactions index depending on prefix
+            // スクロール復元のためのフラグをセット（Index.vue の onMounted で読み取る）
+            sessionStorage.setItem('diary_markread_return', '1');
             try {
                 const indexRouteName = prefix === 'diaries' ? 'diaryinteractions.index' : `${prefix}.diaryinteractions.index`;
                 window.location.href = route(indexRouteName);

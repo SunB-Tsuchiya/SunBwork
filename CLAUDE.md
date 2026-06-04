@@ -15,6 +15,7 @@
 7. 設定変更後: `php artisan config:clear && php artisan cache:clear`
 8. EACCES エラー時: `sudo chown -R $USER:$USER public/build/ && sudo chmod -R 755 public/build/assets`
 9. **新規ページ・コンポーネントを作成する前に `z_instructions/CONSOLIDATED_01_layout_and_ui.md` を必ず確認する。** AppLayout の使い方・スロット・戻るボタン配置・NG パターンを守ること
+10. **⚠️ 日付・時刻・カレンダー周りの実装は必ず「UTC / JST 混在ルール」セクションを確認してから着手すること。** このプロジェクトは JST（Asia/Tokyo）環境で稼働しており、UTC との変換ミスが繰り返し発生している。
 
 **「git にアップ」「さくらにデプロイ」を求められたとき:**
 → `z_instructions/DEPLOY_SAKURA.md` の手順に従う。VITE_APP_BASE_PATH の切り替えを必ず行うこと。
@@ -123,6 +124,59 @@ route('coordinator.project_jobs.show', { projectJob: job.id });
 ---
 
 ## UTC / JST 混在ルール ⚠️
+
+### 大前提：このプロジェクトは JST（Asia/Tokyo）で稼働している
+
+```
+config/app.php: 'timezone' => env('APP_TIMEZONE', 'Asia/Tokyo')
+```
+
+**日付・時刻を扱う実装はすべてこの前提を念頭に置くこと。** UTC との 9 時間差で繰り返しバグが発生している。
+
+---
+
+### ① Eloquent モデルの date キャスト — シリアライズ時の UTC 変換に注意
+
+`'date'` キャストは Inertia/JSON へのシリアライズ時に `toJSON()` でUTC変換される:
+
+| キャスト | JSON シリアライズ結果 | Vue で slice(0,10) すると |
+|---|---|---|
+| `'date'` | `"2026-06-03T15:00:00.000000Z"` (UTC) | `"2026-06-03"` ← **1日ずれる！** |
+| `'date:Y-m-d'` | `"2026-06-04"` | `"2026-06-04"` ✓ |
+
+**ルール: date のみを扱うカラムのキャストは必ず `'date:Y-m-d'` を使う**
+
+```php
+// NG — JST環境でUTC変換により1日前の日付がVueに渡される
+protected function casts(): array
+{
+    return ['held_at' => 'date'];
+}
+
+// OK
+protected function casts(): array
+{
+    return ['held_at' => 'date:Y-m-d'];
+}
+```
+
+---
+
+### ② Vue 側の日付表示 — `new Date()` の UTC 問題
+
+`new Date().toISOString()` は UTC 時刻を返すため、JST の日付と1日ずれることがある:
+
+```js
+// NG — UTCで "2026-06-03" になることがある（JST 00:00〜08:59 の間）
+const today = new Date().toISOString().slice(0, 10);
+
+// OK — ローカル日付を使う
+const today = new Date().toLocaleDateString('sv-SE'); // "2026-06-04" (YYYY-MM-DD形式)
+```
+
+---
+
+### ③ events テーブルの保存形式混在（既存の注意事項）
 
 `events.starts_at / ends_at` の保存形式が2種類ある:
 

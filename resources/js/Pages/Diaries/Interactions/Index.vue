@@ -3,7 +3,7 @@ import DiaryTable from '@/Components/Diaries/DiaryTable.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Inertia } from '@inertiajs/inertia';
 import { Link } from '@inertiajs/vue3';
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 
 function formatDate(d) {
     if (!d) return '不明';
@@ -160,6 +160,27 @@ function markReadAllRoute() {
     if (prefix === 'diaries') return 'diaryinteractions.mark_read_all';
     return `${prefix}.diaryinteractions.mark_read_all`;
 }
+
+// 既読アクション後にこのページへ戻った際のスクロール位置復元
+onMounted(() => {
+    const returnFlag = sessionStorage.getItem('diary_markread_return');
+    const savedScroll = sessionStorage.getItem('diary_scroll_restore');
+    if (returnFlag && savedScroll !== null) {
+        sessionStorage.removeItem('diary_markread_return');
+        sessionStorage.removeItem('diary_scroll_restore');
+        // ブラウザ自動スクロールより後に実行するため nextTick + rAF を使う
+        nextTick(() => {
+            requestAnimationFrame(() => {
+                window.scrollTo({ top: parseInt(savedScroll, 10), behavior: 'instant' });
+            });
+        });
+    }
+});
+
+// Inertia SPA 遷移でこのページを離れる直前にスクロール位置を保存
+onBeforeUnmount(() => {
+    sessionStorage.setItem('diary_scroll_restore', String(window.scrollY));
+});
 </script>
 
 <template>
