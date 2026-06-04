@@ -34,6 +34,7 @@ const tabs = computed(() => [
     },
     { key: 'users', href: tryRoute('admin.users.index'), label: 'ユーザー管理', condition: can('user_management') },
     { key: 'departments', href: tryRoute('admin.departments.index'), label: '部署管理', condition: can('team_management') },
+    { key: 'special_teams', href: tryRoute('admin.special_teams.index'), label: '特別チーム', condition: can('team_management') },
     { key: 'diaries', href: tryRoute('admin.diaryinteractions.index'), label: '日報管理', condition: can('diary_management') },
     { key: 'diary_teams', href: tryRoute('admin.diary_teams.index'), label: '日報権限管理', condition: can('diary_management') },
     { key: 'clients', href: tryRoute('admin.clients.index'), label: 'クライアント管理', condition: can('client_management') },
@@ -104,6 +105,13 @@ function onMobileSelect(e) {
                 :class="tab('departments')"
             >
                 部署管理
+            </Link>
+            <Link
+                v-if="can('team_management')"
+                :href="route('admin.special_teams.index')"
+                :class="tab('special_teams')"
+            >
+                特別チーム
             </Link>
             <Link
                 v-if="can('diary_management')"

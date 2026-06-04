@@ -1146,6 +1146,26 @@ HTML,
 </section>
 HTML,
         ],
+        [
+            'version'      => 'team-manage-1',
+            'title'        => 'チーム管理機能の強化',
+            'released_at'  => '2026-06-04',
+            'summary'      => 'ユニットチームのリーダーに Coordinator・Clerk を選べるようにしました。チームごとにリーダーが日報を閲覧できるかどうかを設定できます（デフォルト：オフ）。副リーダー制度をユニットチームから廃止しました。チーム作成フォームを部署横断メンバー選択に刷新し、部署・会社の選択が不要になりました。Admin 画面に「特別チーム」管理を追加し、会社をまたいだメンバー構成のチームを作成できます。',
+            'design_files' => [],
+            'claude_notes' => '【主な変更】① Leader/UnitController・Leader/TeamController: リーダー候補クエリに coordinator・clerk を追加。② teams テーブルに can_read_diary（boolean, default true）カラム追加（マイグレーション: 2026_06_04_100001）。Team モデルの fillable・casts に追加。③ Leader/UnitController::store()・Leader/TeamController::update(): can_read_diary のバリデーションと保存を追加。④ DiaryInteractionController::buildPermittedUserIds(): can_read_diary=true のチームのみ日報閲覧対象に絞り込む。⑤ Leader/Teams/Create.vue・EditForUnits.vue: 日報閲覧チェックボックスを追加（デフォルト OFF）。⑥ チーム作成時デフォルトを can_read_diary=false に変更。⑦ ユニットチームの副リーダー廃止: Leader/UnitController::store() の team_sub_leaders 挿入ロジック削除、Leader/TeamController::index() のサブリーダー検索削除、Leader/TeamController::update() のサブリーダー sync 削除。Create.vue・EditForUnits.vue からサブリーダー UI を削除。さくら本番 DB の unit チームサブリーダーを削除（department チームは維持）。⑧ チーム作成フォーム刷新: UnitController::create() を部署横断対応に変更（auth_company_id・auth_department_id を渡す）、Create.vue を EditForUnits.vue と同様の絞り込みモーダル付き全社横断テーブルに刷新。⑨ Admin 特別チーム: Admin/SpecialTeamController 新規作成（team_type="special"）、routes/web.php に admin.special_teams.* 追加、Ziggy 再生成、AdminNavigationTabs.vue に「特別チーム」タブ追加、Admin/SpecialTeams/Index・Create・Edit.vue 新規作成。SuperAdmin は全会社からリーダーを選択可。',
+            'body'         => <<<'HTML'
+<section class="cl-feature">
+  <h3>チーム管理機能の強化</h3>
+  <ul>
+    <li><strong>リーダー権限の拡張：</strong>ユニットチームのリーダー・副リーダーに Coordinator（進行）・Clerk（事務）の権限を持つユーザーも設定できるようになりました</li>
+    <li><strong>日報閲覧設定：</strong>チームごとに「リーダーがメンバーの日報を閲覧できるか」を設定できます。チーム作成・編集フォームのチェックボックスで切り替えられます（デフォルト：オフ）</li>
+    <li><strong>副リーダー制度の廃止：</strong>ユニットチームの副リーダー機能を廃止しました。部署チーム（情報出版・製版など）の副リーダーは従来通り機能します</li>
+    <li><strong>チーム作成フォームの刷新：</strong>部署や会社を選ぶ手間がなくなりました。メンバーは自社の全部署から選択でき、絞り込みモーダルで部署・担当を指定して素早く絞り込めます</li>
+    <li><strong>特別チーム（Admin 新機能）：</strong>Admin メニューに「特別チーム」を追加しました。会社をまたいだメンバーで構成するチームを作成できます。会社セレクト→部署セレクトで絞り込み、複数社のメンバーをまとめて選択できます。登録されたメンバーは通常のチームと同様にチームメニューから切り替えられます</li>
+  </ul>
+</section>
+HTML,
+        ],
         ];
 
         foreach ($entries as $entry) {

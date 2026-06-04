@@ -373,6 +373,9 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         // ユニットチーム作成 (画面と保存)
         Route::get('teams/units/create', [App\Http\Controllers\Admin\UnitController::class, 'create'])->name('teams.units.create');
         Route::post('units', [App\Http\Controllers\Admin\UnitController::class, 'store'])->name('units.store');
+        // 特別チーム管理（会社横断）
+        Route::resource('special-teams', App\Http\Controllers\Admin\SpecialTeamController::class)
+            ->names('special_teams');
         // 管理者向け 日報一覧・閲覧 (centralized diary interactions)
         // Provide an admin-scoped diaries index route so admin links using
         // route('admin.diaries.index') resolve correctly in Ziggy.
