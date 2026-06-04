@@ -30,9 +30,7 @@ function formatDate(d) {
 
 function deleteCard() {
     if (!confirm('このカードを削除しますか？')) return;
-    router.delete(route('team-rooms.board.cards.destroy', { team: props.team.id, card: props.card.id }), {
-        onSuccess: () => router.get(route('team-rooms.show', { team: props.team.id }) + '?tab=board'),
-    });
+    router.delete(route('team-rooms.board.cards.destroy', { team: props.team.id, card: props.card.id }));
 }
 </script>
 

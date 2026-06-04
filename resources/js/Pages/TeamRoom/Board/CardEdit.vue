@@ -16,11 +16,7 @@ const form = useForm({
 });
 
 function save() {
-    form.put(route('team-rooms.board.cards.update', { team: props.team.id, card: props.card.id }), {
-        onSuccess: () => {
-            window.location.href = route('team-rooms.board.cards.show', { team: props.team.id, card: props.card.id });
-        },
-    });
+    form.put(route('team-rooms.board.cards.update', { team: props.team.id, card: props.card.id }));
 }
 </script>
 

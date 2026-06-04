@@ -101,14 +101,23 @@ class TeamBoardCardController extends Controller
             'sort_order'           => 'nullable|integer',
         ]);
 
-        $card->update(array_filter($validated, fn($v) => $v !== null));
+        $data = array_filter($validated, fn($v) => $v !== null);
+        // description は null（空クリア）を許可
+        if (array_key_exists('description', $validated)) {
+            $data['description'] = $validated['description'];
+        }
+        $card->update($data);
 
         $card->load('attachments', 'creator:id,name', 'column:id,name,color');
+
+        if ($request->header('X-Inertia')) {
+            return redirect()->route('team-rooms.board.cards.show', ['team' => $team->id, 'card' => $card->id]);
+        }
 
         return response()->json($card);
     }
 
-    public function destroy(Team $team, TeamBoardCard $card)
+    public function destroy(Request $request, Team $team, TeamBoardCard $card)
     {
         app(TeamRoomController::class)->assertMember($team);
 
@@ -116,6 +125,10 @@ class TeamBoardCardController extends Controller
         abort_unless($card->team_board_id === $board->id, 404);
 
         $card->delete();
+
+        if ($request->header('X-Inertia')) {
+            return redirect()->route('team-rooms.show', ['team' => $team->id]);
+        }
 
         return response()->noContent();
     }

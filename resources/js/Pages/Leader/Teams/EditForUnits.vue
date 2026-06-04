@@ -31,7 +31,6 @@ const form = useForm({
     department_id:  unit?.department_id ?? team.department_id ?? '',
     description:    unit?.description ?? team.description ?? '',
     leader_id:      unit?.leader_id ? String(unit.leader_id) : null,
-    sub_leader_ids: (props.sub_leader_ids || []).map(String),
     member_ids:     [...initMemberIds],
     can_read_diary: team.can_read_diary !== false,
 });
@@ -97,8 +96,7 @@ function toggleMember(id) {
 function isSelected(id) {
     const sid = String(id);
     return selectedIds.value.includes(sid)
-        || (form.leader_id && String(form.leader_id) === sid)
-        || form.sub_leader_ids.map(String).includes(sid);
+        || (form.leader_id && String(form.leader_id) === sid);
 }
 
 const selectedMembers = computed(() =>
@@ -138,7 +136,6 @@ const submit = () => {
     form.member_ids = [...new Set([
         ...selectedIds.value,
         ...(form.leader_id ? [String(form.leader_id)] : []),
-        ...form.sub_leader_ids.map(String),
     ])];
     form.put(route('leader.teams.update', { team: team.id }));
 };
@@ -180,26 +177,6 @@ const submit = () => {
                     <option value="">-- 選択 --</option>
                     <option v-for="u in leaders" :key="u.id" :value="String(u.id)">{{ u.name }} ({{ u.user_role }})</option>
                 </select>
-            </div>
-
-            <div>
-                <label class="block text-sm font-medium text-gray-700">サブリーダー（副代表・複数可）</label>
-                <div class="mt-2 space-y-1 rounded border border-gray-200 p-3">
-                    <div v-if="leaders.length === 0" class="text-sm text-gray-400">候補ユーザーがいません</div>
-                    <label
-                        v-for="u in leaders.filter((l) => String(l.id) !== form.leader_id)"
-                        :key="u.id"
-                        class="flex items-center gap-2 text-sm"
-                    >
-                        <input
-                            type="checkbox"
-                            :value="String(u.id)"
-                            v-model="form.sub_leader_ids"
-                            class="rounded border-gray-300 text-orange-600"
-                        />
-                        {{ u.name }} ({{ u.user_role }})
-                    </label>
-                </div>
             </div>
 
             <!-- ── メンバー選択（部署横断） ── -->
@@ -333,7 +310,7 @@ const submit = () => {
             <div>
                 <label class="flex items-center gap-3 cursor-pointer">
                     <input type="checkbox" v-model="form.can_read_diary" class="rounded border-gray-300 text-orange-600" />
-                    <span class="text-sm font-medium text-gray-700">チームリーダー・副リーダーがメンバーの日報を閲覧できる</span>
+                    <span class="text-sm font-medium text-gray-700">チームリーダーがメンバーの日報を閲覧できる</span>
                 </label>
             </div>
 

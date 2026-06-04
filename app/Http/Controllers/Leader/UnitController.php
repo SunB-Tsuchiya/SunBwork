@@ -44,8 +44,6 @@ class UnitController extends Controller
             'name'             => 'required|string|max:255',
             'description'      => 'nullable|string',
             'leader_id'        => 'nullable|exists:users,id',
-            'sub_leader_ids'   => 'array',
-            'sub_leader_ids.*' => 'exists:users,id',
             'member_ids'       => 'array',
             'member_ids.*'     => 'exists:users,id',
             'can_read_diary'   => 'boolean',
@@ -83,15 +81,6 @@ class UnitController extends Controller
                     'team_id'    => $team->id,
                     'user_id'    => $validated['leader_id'],
                     'role'       => 'owner',
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            }
-
-            foreach ($validated['sub_leader_ids'] ?? [] as $subId) {
-                DB::table('team_sub_leaders')->insertOrIgnore([
-                    'team_id'    => $team->id,
-                    'user_id'    => $subId,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);

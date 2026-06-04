@@ -2,7 +2,8 @@
 import UserTable from '@/Components/UserTable.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, useForm, usePage } from '@inertiajs/vue3';
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, watch } from 'vue';
+import { ref } from 'vue';
 
 const page = usePage();
 const props = page.props;
@@ -27,7 +28,6 @@ const form = useForm({
     name:           '',
     description:    '',
     leader_id:      '',
-    sub_leader_ids: [],
     member_ids:     [],
     can_read_diary: false,
 });
@@ -111,26 +111,6 @@ const submit = () => {
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700">サブリーダー（副代表・複数可）</label>
-                    <div class="mt-2 space-y-1 rounded border border-gray-200 p-3">
-                        <div v-if="leaderOptions.length === 0" class="text-sm text-gray-400">会社を選択してください</div>
-                        <label
-                            v-for="u in leaderOptions.filter((u) => String(u.id) !== String(form.leader_id))"
-                            :key="u.id"
-                            class="flex items-center gap-2 text-sm"
-                        >
-                            <input
-                                type="checkbox"
-                                :value="u.id"
-                                v-model="form.sub_leader_ids"
-                                class="rounded border-gray-300 text-orange-600"
-                            />
-                            {{ u.name }} ({{ u.user_role }})
-                        </label>
-                    </div>
-                </div>
-
-                <div>
                     <label class="block text-sm font-medium text-gray-700">メンバー（複数選択可）</label>
                     <div class="mt-2">
                         <div v-if="!form.department_id" class="text-sm text-gray-500">部署を選択してください</div>
@@ -153,7 +133,7 @@ const submit = () => {
                 <div>
                     <label class="flex items-center gap-3 cursor-pointer">
                         <input type="checkbox" v-model="form.can_read_diary" class="rounded border-gray-300 text-orange-600" />
-                        <span class="text-sm font-medium text-gray-700">チームリーダー・副リーダーがメンバーの日報を閲覧できる</span>
+                        <span class="text-sm font-medium text-gray-700">チームリーダーがメンバーの日報を閲覧できる</span>
                     </label>
                 </div>
 

@@ -42,15 +42,8 @@ class TeamController extends Controller
                 // 部署リーダー: 自部署のユニットチームをすべて表示
                 $query->where('department_id', $deptTeam->department_id);
             } else {
-                // 通常リーダー: 自分が leader_id または sub-leader のチームのみ
-                $subLeaderTeamIds = DB::table('team_sub_leaders')
-                    ->where('user_id', $user->id)
-                    ->pluck('team_id');
-
-                $query->where(function ($q) use ($user, $subLeaderTeamIds) {
-                    $q->where('leader_id', $user->id)
-                      ->orWhereIn('id', $subLeaderTeamIds);
-                });
+                // 通常リーダー: 自分が leader_id のチームのみ
+                $query->where('leader_id', $user->id);
             }
         }
 
@@ -103,7 +96,6 @@ class TeamController extends Controller
             'users'              => $users,
             'leaders'            => $leaders,
             'unit'               => $unit,
-            'sub_leader_ids'     => $team->subLeaders()->pluck('users.id')->toArray(),
             'assignments'        => $assignments,
             'current_member_ids' => $currentMemberIds,
         ]);
@@ -120,8 +112,6 @@ class TeamController extends Controller
             'company_id'       => 'nullable|exists:companies,id',
             'department_id'    => 'nullable|exists:departments,id',
             'leader_id'        => 'nullable|exists:users,id',
-            'sub_leader_ids'   => 'array',
-            'sub_leader_ids.*' => 'exists:users,id',
             'description'      => 'nullable|string|max:2000',
             'member_ids'       => 'array',
             'member_ids.*'     => 'exists:users,id',
@@ -140,16 +130,8 @@ class TeamController extends Controller
             );
         }
 
-        // サブリーダー sync
-        $subIds = array_filter(array_map('intval', $validated['sub_leader_ids'] ?? []), fn($id) => $id > 0);
-        $team->subLeaders()->sync($subIds);
-
-        // team_user sync（unit の有無に関わらず常に実行）
-        // リーダー・サブリーダーも自動的にメンバーに含める
-        $memberIds = array_values(array_unique(array_merge(
-            array_map('strval', $validated['member_ids'] ?? []),
-            array_map('strval', $subIds),
-        )));
+        // team_user sync
+        $memberIds = array_map('strval', $validated['member_ids'] ?? []);
         DB::table('team_user')
             ->where('team_id', $team->id)
             ->where(function ($q) { $q->whereNull('role')->orWhere('role', '<>', 'owner'); })
