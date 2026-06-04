@@ -15,22 +15,41 @@ class UnitController extends Controller
 {
     public function create()
     {
-        $user = Auth::user();
+        $user      = Auth::user();
+        $companyId = $user->company_id;
+        $deptId    = $user->department_id;
 
-        $companies   = \App\Models\Company::where('id', $user->company_id ?? 0)->get(['id', 'name']);
-        $companyIds  = $companies->pluck('id')->all();
-        $departments = \App\Models\Department::active()->whereIn('company_id', $companyIds)->get(['id', 'name', 'company_id']);
-        $users       = \App\Models\User::select(['id', 'name', 'user_role', 'department_id', 'company_id'])
-            ->whereIn('company_id', $companyIds)->get();
-        $leaders     = \App\Models\User::select(['id', 'name', 'user_role'])
-            ->whereIn('user_role', ['superadmin', 'admin', 'leader', 'coordinator', 'clerk'])
-            ->whereIn('company_id', $companyIds)->get();
+        // 全社ユーザー（メンバー選択用・部署横断）
+        $users = \App\Models\User::select(['id', 'name', 'user_role', 'department_id', 'company_id', 'assignment_id'])
+            ->where('company_id', $companyId)
+            ->get();
+
+        // リーダー候補: 同部署の leader/coordinator/clerk + 全社 admin/superadmin
+        $leaders = \App\Models\User::select(['id', 'name', 'user_role'])
+            ->where('company_id', $companyId)
+            ->where(function ($q) use ($deptId) {
+                $q->whereIn('user_role', ['admin', 'superadmin'])
+                  ->orWhere(function ($q2) use ($deptId) {
+                      $q2->whereIn('user_role', ['leader', 'coordinator', 'clerk'])
+                         ->where('department_id', $deptId);
+                  });
+            })
+            ->get();
+
+        $departments = \App\Models\Department::where('company_id', $companyId)
+            ->get(['id', 'name', 'company_id']);
+
+        $assignments = \App\Models\Assignment::where('department_id', $deptId)
+            ->orWhereNull('department_id')
+            ->get(['id', 'name', 'department_id']);
 
         return Inertia::render('Leader/Teams/Create', [
-            'companies'   => $companies,
-            'departments' => $departments,
-            'users'       => $users,
-            'leaders'     => $leaders,
+            'users'              => $users,
+            'leaders'            => $leaders,
+            'departments'        => $departments,
+            'assignments'        => $assignments,
+            'auth_company_id'    => $companyId,
+            'auth_department_id' => $deptId,
         ]);
     }
 
