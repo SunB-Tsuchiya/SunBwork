@@ -168,6 +168,7 @@ onMounted(() => {
     if (returnFlag && savedScroll !== null) {
         sessionStorage.removeItem('diary_markread_return');
         sessionStorage.removeItem('diary_scroll_restore');
+        sessionStorage.removeItem('diary_index_url');
         // ブラウザ自動スクロールより後に実行するため nextTick + rAF を使う
         nextTick(() => {
             requestAnimationFrame(() => {
@@ -177,9 +178,11 @@ onMounted(() => {
     }
 });
 
-// Inertia SPA 遷移でこのページを離れる直前にスクロール位置を保存
+// Inertia SPA 遷移でこのページを離れる直前にスクロール位置と現在のURLを保存
+// （月フィルター等のクエリパラメータを含む完全なURLを保存する）
 onBeforeUnmount(() => {
     sessionStorage.setItem('diary_scroll_restore', String(window.scrollY));
+    sessionStorage.setItem('diary_index_url', window.location.href);
 });
 </script>
 

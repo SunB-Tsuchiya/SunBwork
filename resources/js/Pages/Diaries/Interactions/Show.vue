@@ -140,14 +140,19 @@ function markRead() {
                 console.warn('optimistic read store failed', e);
             }
 
-            // Redirect to the correct interactions index depending on prefix
-            // スクロール復元のためのフラグをセット（Index.vue の onMounted で読み取る）
+            // スクロール復元・月フィルター維持のためのフラグをセット（Index.vue の onMounted で読み取る）
             sessionStorage.setItem('diary_markread_return', '1');
-            try {
-                const indexRouteName = prefix === 'diaries' ? 'diaryinteractions.index' : `${prefix}.diaryinteractions.index`;
-                window.location.href = route(indexRouteName);
-            } catch (e) {
-                window.location.href = route('diaryinteractions.interactions.index');
+            // 保存された一覧URLがあればそちらへ（月フィルター等のクエリパラメータを保持）
+            const savedIndexUrl = sessionStorage.getItem('diary_index_url');
+            if (savedIndexUrl) {
+                window.location.href = savedIndexUrl;
+            } else {
+                try {
+                    const indexRouteName = prefix === 'diaries' ? 'diaryinteractions.index' : `${prefix}.diaryinteractions.index`;
+                    window.location.href = route(indexRouteName);
+                } catch (e) {
+                    window.location.href = route('diaryinteractions.interactions.index');
+                }
             }
         } catch (e) {
             console.error('markRead fetch error', e);
