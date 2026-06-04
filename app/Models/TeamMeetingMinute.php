@@ -10,7 +10,7 @@ class TeamMeetingMinute extends Model
 
     protected function casts(): array
     {
-        return ['held_at' => 'date'];
+        return ['held_at' => 'date:Y-m-d'];
     }
 
     public function team()
