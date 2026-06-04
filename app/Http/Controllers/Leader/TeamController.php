@@ -76,7 +76,7 @@ class TeamController extends Controller
 
         $leaders = $companyId
             ? \App\Models\User::select(['id', 'name', 'user_role'])
-                ->whereIn('user_role', ['superadmin', 'admin', 'leader'])
+                ->whereIn('user_role', ['superadmin', 'admin', 'leader', 'coordinator', 'clerk'])
                 ->where('company_id', $companyId)->get()
             : collect();
 

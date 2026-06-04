@@ -23,7 +23,7 @@ class UnitController extends Controller
         $users       = \App\Models\User::select(['id', 'name', 'user_role', 'department_id', 'company_id'])
             ->whereIn('company_id', $companyIds)->get();
         $leaders     = \App\Models\User::select(['id', 'name', 'user_role'])
-            ->whereIn('user_role', ['superadmin', 'admin', 'leader'])
+            ->whereIn('user_role', ['superadmin', 'admin', 'leader', 'coordinator', 'clerk'])
             ->whereIn('company_id', $companyIds)->get();
 
         return Inertia::render('Leader/Teams/Create', [

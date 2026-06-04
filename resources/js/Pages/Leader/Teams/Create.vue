@@ -12,7 +12,7 @@ const departments = ref(props.departments || []);
 const users       = ref(props.users || []);
 
 const leaderOptions = computed(() => {
-    const roles = ['superadmin', 'admin', 'leader'];
+    const roles = ['superadmin', 'admin', 'leader', 'coordinator', 'clerk'];
     if (form.company_id) {
         return users.value.filter(
             (u) => roles.includes((u.user_role || '').toString()) && Number(u.company_id) === Number(form.company_id),
