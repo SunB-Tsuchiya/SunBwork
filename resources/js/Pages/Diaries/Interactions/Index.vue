@@ -161,10 +161,22 @@ function markReadAllRoute() {
     return `${prefix}.diaryinteractions.mark_read_all`;
 }
 
-// このページが表示された瞬間にURLを保存（Inertia は pushState → swap の順なので
-// onBeforeUnmount 時点では URL が既に Show に変わっている。onMounted で保存するのが正解）
+// スクロール保存関数（SPA遷移・フルリロード両対応）
+// - SPA遷移（Inertia）: onBeforeUnmount で呼ばれる
+// - フルリロード（window.location.href）: pagehide イベントで呼ばれる
+//   ※ DiaryTable の Inertia.get() は v0 が未初期化のため例外を投げ、
+//      フォールバックの window.location.href でナビゲートされる。
+//      フルリロード時は Vue が破棄されるため onBeforeUnmount は呼ばれない。
+const saveScrollForReturn = () => {
+    sessionStorage.setItem('diary_scroll_restore', String(window.scrollY));
+};
+
+// このページが表示された瞬間に URL を保存（onBeforeUnmount では URL が変わっている）
 onMounted(() => {
     sessionStorage.setItem('diary_index_url', window.location.href);
+
+    // フルリロードで離脱するときのために pagehide を登録
+    window.addEventListener('pagehide', saveScrollForReturn);
 
     // 既読アクション後に戻った場合のスクロール位置復元
     const returnFlag = sessionStorage.getItem('diary_markread_return');
@@ -172,7 +184,6 @@ onMounted(() => {
     if (returnFlag && savedScroll !== null) {
         sessionStorage.removeItem('diary_markread_return');
         sessionStorage.removeItem('diary_scroll_restore');
-        // ブラウザ自動スクロールより後に実行するため nextTick + rAF を使う
         nextTick(() => {
             requestAnimationFrame(() => {
                 window.scrollTo({ top: parseInt(savedScroll, 10), behavior: 'instant' });
@@ -181,10 +192,10 @@ onMounted(() => {
     }
 });
 
-// Inertia SPA 遷移でこのページを離れる直前にスクロール位置を保存
-// （URLは onMounted で保存済みのため、ここでは scrollY のみ）
+// SPA 遷移で離脱するときのスクロール保存（フルリロード時は pagehide が担う）
 onBeforeUnmount(() => {
-    sessionStorage.setItem('diary_scroll_restore', String(window.scrollY));
+    saveScrollForReturn();
+    window.removeEventListener('pagehide', saveScrollForReturn);
 });
 </script>
 
