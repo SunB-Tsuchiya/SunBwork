@@ -125,6 +125,7 @@ class TeamController extends Controller
             'description'      => 'nullable|string|max:2000',
             'member_ids'       => 'array',
             'member_ids.*'     => 'exists:users,id',
+            'can_read_diary'   => 'boolean',
         ]);
 
         $oldLeaderId = $team->leader_id;

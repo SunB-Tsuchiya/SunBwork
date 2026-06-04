@@ -27,6 +27,7 @@ class Team extends JetstreamTeam
         'team_type',
         'user_id',
         'leader_id',
+        'can_read_diary',
     ];
 
     /**
@@ -56,7 +57,8 @@ class Team extends JetstreamTeam
     protected function casts(): array
     {
         return [
-            'personal_team' => 'boolean',
+            'personal_team'  => 'boolean',
+            'can_read_diary' => 'boolean',
         ];
     }
 

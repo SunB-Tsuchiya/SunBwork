@@ -47,6 +47,7 @@ class DiaryInteractionController extends Controller
         // リーダーとして所属するチーム（leader_id）
         $leaderTeams = Team::where('leader_id', $currentUser->id)
             ->whereIn('team_type', ['department', 'unit'])
+            ->where('can_read_diary', true)
             ->get();
 
         // サブリーダーとして所属するチーム（department ならその部署全員、unit ならユニットメンバーのみ）
@@ -55,6 +56,7 @@ class DiaryInteractionController extends Controller
             ->pluck('team_id');
         $subLeaderTeams = Team::whereIn('id', $subLeaderTeamIds)
             ->whereIn('team_type', ['department', 'unit'])
+            ->where('can_read_diary', true)
             ->get();
 
         $allTeams = $leaderTeams->merge($subLeaderTeams)->unique('id');

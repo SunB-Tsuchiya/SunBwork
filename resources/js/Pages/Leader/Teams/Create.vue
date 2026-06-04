@@ -22,13 +22,14 @@ const leaderOptions = computed(() => {
 });
 
 const form = useForm({
-    company_id:    '',
-    department_id: '',
-    name:          '',
-    description:   '',
-    leader_id:     '',
+    company_id:     '',
+    department_id:  '',
+    name:           '',
+    description:    '',
+    leader_id:      '',
     sub_leader_ids: [],
-    member_ids:    [],
+    member_ids:     [],
+    can_read_diary: true,
 });
 
 const availableDepartments = computed(() => {
@@ -147,6 +148,13 @@ const submit = () => {
                             選択された部署に該当するメンバーはありません
                         </div>
                     </div>
+                </div>
+
+                <div>
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" v-model="form.can_read_diary" class="rounded border-gray-300 text-orange-600" />
+                        <span class="text-sm font-medium text-gray-700">チームリーダー・副リーダーがメンバーの日報を閲覧できる</span>
+                    </label>
                 </div>
 
                 <div class="flex justify-end">

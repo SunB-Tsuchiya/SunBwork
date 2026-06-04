@@ -48,6 +48,7 @@ class UnitController extends Controller
             'sub_leader_ids.*' => 'exists:users,id',
             'member_ids'       => 'array',
             'member_ids.*'     => 'exists:users,id',
+            'can_read_diary'   => 'boolean',
         ]);
 
         // Enforce company scope
@@ -66,14 +67,15 @@ class UnitController extends Controller
             ]);
 
             $team = Team::create([
-                'user_id'       => $validated['leader_id'] ?? ($user->id ?? null),
-                'company_id'    => $unit->company_id,
-                'department_id' => $unit->department_id,
-                'name'          => $unit->name,
-                'description'   => $unit->description,
-                'personal_team' => false,
-                'team_type'     => 'unit',
-                'leader_id'     => $validated['leader_id'] ?? null,
+                'user_id'        => $validated['leader_id'] ?? ($user->id ?? null),
+                'company_id'     => $unit->company_id,
+                'department_id'  => $unit->department_id,
+                'name'           => $unit->name,
+                'description'    => $unit->description,
+                'personal_team'  => false,
+                'team_type'      => 'unit',
+                'leader_id'      => $validated['leader_id'] ?? null,
+                'can_read_diary' => $validated['can_read_diary'] ?? true,
             ]);
 
             if (!empty($validated['leader_id'])) {
