@@ -246,7 +246,7 @@ import UserNavigationTabs from '@/Components/Tabs/UserNavigationTabs.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { useUIState } from '@/Composables/useUIState';
 import { Link, router, usePage } from '@inertiajs/vue3';
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, onMounted } from 'vue';
 import { route } from 'ziggy-js';
 
 // ─── 進行表・管理シートから案件選択モーダル ─────────────────────────────────
@@ -666,6 +666,10 @@ function clearSearch() {
     page.props.q_model = '';
     search();
 }
+
+onMounted(() => {
+    sessionStorage.setItem('myjobbox_index_url', window.location.href);
+});
 
 function getBackLink() {
     try {

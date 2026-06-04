@@ -103,7 +103,7 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import { route } from 'ziggy-js';
 
 const props = defineProps({
@@ -244,4 +244,8 @@ function clearSearch() {
     periodModel.value = '';
     search();
 }
+
+onMounted(() => {
+    sessionStorage.setItem('project_jobs_index_url', window.location.href);
+});
 </script>

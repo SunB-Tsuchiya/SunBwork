@@ -7,7 +7,7 @@ import { faCalendar } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { Inertia } from '@inertiajs/inertia';
 import { Link } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import { route } from 'ziggy-js';
 
 const props = defineProps({ diaries: Array, meta: Object, filters: Object });
@@ -83,6 +83,10 @@ function goToPage(n) {
 }
 
 const selectedPerPage = computed(() => (props.meta && props.meta.per_page ? Number(props.meta.per_page) : 20));
+
+onMounted(() => {
+    sessionStorage.setItem('diaries_index_url', window.location.href);
+});
 </script>
 
 <template>

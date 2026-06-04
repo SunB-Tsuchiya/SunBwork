@@ -2,10 +2,10 @@
     <AppLayout title="案件詳細">
         <template #header>
             <div class="flex items-center gap-3">
-                <Link
-                    :href="route('user.project_jobs.index')"
+                <button
+                    @click="goBack"
                     class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300"
-                >← 案件一覧に戻る</Link>
+                >← 案件一覧に戻る</button>
                 <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">案件詳細</h2>
             </div>
         </template>
@@ -442,6 +442,19 @@ import { computed, nextTick, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
 
 const page = usePage();
+
+function goBack() {
+    const savedUrl = sessionStorage.getItem('project_jobs_index_url');
+    if (savedUrl) {
+        window.location.href = savedUrl;
+        return;
+    }
+    try {
+        router.visit(route('user.project_jobs.index'));
+    } catch {
+        window.location.href = route('user.project_jobs.index');
+    }
+}
 const job  = page.props.job || {};
 
 const showProofModal = ref(false);

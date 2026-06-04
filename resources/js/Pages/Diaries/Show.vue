@@ -256,17 +256,20 @@ async function deleteComment(commentId, idx) {
 import {} from 'vue';
 
 const back = () => {
+    // 保存されたIndex URL（月フィルター付き）があればそちらへ
+    const savedUrl = sessionStorage.getItem('diaries_index_url');
+    if (savedUrl) {
+        window.location.href = savedUrl;
+        return;
+    }
     try {
-        // if browser history has entries, go back using Inertia
         if (window.history && window.history.length > 1) {
-            // use native browser back to replicate exact browser behavior
             window.history.back();
             return;
         }
     } catch (e) {
         // ignore
     }
-    // fallback to diaries index
     router.get(route('diaries.index'));
 };
 

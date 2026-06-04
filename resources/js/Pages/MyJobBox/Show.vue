@@ -311,6 +311,8 @@ const isAssignmentCompleted = computed(() => {
 });
 
 function routeBack() {
+    const savedUrl = sessionStorage.getItem('myjobbox_index_url');
+    if (savedUrl) return savedUrl;
     try {
         return typeof route === 'function' ? route('user.myjobbox.index') : '/myjobbox';
     } catch (e) {
@@ -535,11 +537,9 @@ async function submitComplete() {
             headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': token, 'X-Requested-With': 'XMLHttpRequest' },
         });
         if (res.ok) {
-            try {
-                router.get(typeof route === 'function' ? route('user.myjobbox.index') : '/myjobbox');
-            } catch (e) {
-                window.location.href = route('user.myjobbox.index');
-            }
+            const savedUrl = sessionStorage.getItem('myjobbox_index_url');
+            const indexUrl = savedUrl || (typeof route === 'function' ? route('user.myjobbox.index') : '/myjobbox');
+            window.location.href = indexUrl;
         } else {
             isSubmittingComplete.value = false;
             alert('完了処理に失敗しました。');
