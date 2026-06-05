@@ -1532,6 +1532,20 @@ class WorkloadAnalyzerController extends Controller
         } catch (\Throwable $e) {
             $groupUserIds = [];
         }
+
+        // 対象ユーザーの部署フィールド設定からスロットラベルを取得
+        $fieldSlotLabels = ['type' => '種別', 'stage' => 'ステージ', 'size' => 'サイズ', 'amounts' => '数量'];
+        try {
+            $deptId = $viewedUser?->department_id ?? null;
+            if ($deptId) {
+                $cfgs = \App\Models\DepartmentFieldConfig::where('department_id', $deptId)->get()->keyBy('slot');
+                foreach (['type', 'stage', 'size', 'amounts'] as $slot) {
+                    if (isset($cfgs[$slot]) && !empty($cfgs[$slot]->label)) {
+                        $fieldSlotLabels[$slot] = $cfgs[$slot]->label;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {}
         // fallback: collect users who have assignments in the period
         if (empty($groupUserIds)) {
             $p1 = ProjectJobAssignment::where(function ($q) use ($start, $end) {
@@ -1785,6 +1799,7 @@ class WorkloadAnalyzerController extends Controller
             'percentile_scores'            => $viewerPercentile ?? [],
             'category_ranks'               => $categoryRanks ?? [],
             'group_count'                  => $peerN ?? count($groupCatScores),
+            'field_slot_labels'            => $fieldSlotLabels,
             // 比較グループ情報
             'comparison_level'             => $showComparisonLevel ?? 'department',
             'peer_group_size'              => $peerN ?? count($groupCatScores),

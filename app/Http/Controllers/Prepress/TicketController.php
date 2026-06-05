@@ -422,6 +422,11 @@ class TicketController extends Controller
         }
         $ticket->delete();
 
+        // ボードからの XHR 削除（axios）は 204 を返してページ遷移させない
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->noContent();
+        }
+
         return redirect()->route('prepress.tickets.index')
             ->with('success', '伝票を削除しました。');
     }
@@ -630,6 +635,10 @@ class TicketController extends Controller
                 return;
             }
             abort(403, 'Prepress エリアは同じ会社のAdminのみアクセスできます。');
+        }
+        // Coordinator・Leader・Clerk は部署問わずアクセス可
+        if ($user->isCoordinator() || $user->isLeader() || $user->isClerk()) {
+            return;
         }
         if (!$user->department || $user->department->name !== '製版') {
             abort(403, 'Prepress エリアは製版部署のみアクセスできます。');

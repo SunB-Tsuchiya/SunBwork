@@ -68,7 +68,13 @@ function togglePendingSort(field) {
     }
 }
 const pendingListTickets = computed(() => {
-    const list = [...(ticketsByStatus.value['pending'] ?? [])];
+    let list = [...(ticketsByStatus.value['pending'] ?? [])];
+    const q = (columnControls.value['pending']?.search ?? '').trim().toLowerCase();
+    if (q) {
+        list = list.filter(t =>
+            [t.jobcode, t.title, t.client_name].some(v => v && String(v).toLowerCase().includes(q))
+        );
+    }
     const { field, dir } = pendingListSort.value;
     return list.sort((a, b) => {
         const va = a[field] ? String(a[field]).split('T')[0].replace(/\//g, '-') : '9999-99-99';
@@ -99,7 +105,7 @@ const ticketsByStatus = computed(() => {
 const columnControls = ref(
     Object.fromEntries(COLUMNS.map(c => {
         const savedField = localStorage.getItem(`prepress_board_date_field_${c.key}`) ?? 'submission_date';
-        return [c.key, { order: 'asc', dateFilter: '', dateRaw: '', dateField: savedField }];
+        return [c.key, { order: 'asc', dateFilter: '', dateRaw: '', dateField: savedField, search: '' }];
     }))
 );
 
@@ -172,6 +178,13 @@ function sortedFilteredTickets(colKey) {
         });
     }
 
+    if (ctrl.search?.trim()) {
+        const q = ctrl.search.trim().toLowerCase();
+        list = list.filter(t =>
+            [t.jobcode, t.title, t.client_name].some(v => v && String(v).toLowerCase().includes(q))
+        );
+    }
+
     const dir = ctrl.order === 'asc' ? 1 : -1;
     return [...list].sort((a, b) => {
         const da = a[field] ? String(a[field]).split('T')[0].replace(/\//g, '-') : '9999-99-99';
@@ -230,6 +243,39 @@ async function executeDelete() {
     deleteMode.value = false;
 }
 
+// ── カードカラー ───────────────────────────────────────────
+const CARD_COLORS = {
+    indigo: { swatch: 'bg-indigo-400',  border: 'border-indigo-400', bg: 'bg-indigo-100',  textMain: 'text-indigo-900', textSub: 'text-indigo-600' },
+    purple: { swatch: 'bg-purple-400',  border: 'border-purple-400', bg: 'bg-purple-100',  textMain: 'text-purple-900', textSub: 'text-purple-600' },
+    green:  { swatch: 'bg-green-500',   border: 'border-green-500',  bg: 'bg-green-100',   textMain: 'text-green-900',  textSub: 'text-green-700'  },
+    yellow: { swatch: 'bg-yellow-400',  border: 'border-yellow-400', bg: 'bg-yellow-100',  textMain: 'text-yellow-900', textSub: 'text-yellow-700' },
+    red:    { swatch: 'bg-red-400',     border: 'border-red-400',    bg: 'bg-red-100',     textMain: 'text-red-900',    textSub: 'text-red-700'    },
+    gray:   { swatch: 'bg-gray-400',    border: 'border-gray-400',   bg: 'bg-gray-200',    textMain: 'text-gray-800',   textSub: 'text-gray-600'   },
+};
+
+function cardColor(ticket) {
+    return CARD_COLORS[ticket.card_color] ?? CARD_COLORS.indigo;
+}
+
+async function setTicketColor(ticket, colorKey) {
+    const prev = ticket.card_color;
+    const idx  = localTickets.value.findIndex(t => t.id === ticket.id);
+    if (idx >= 0) localTickets.value[idx].card_color = colorKey;
+    if (detail.value?.id === ticket.id) detail.value = { ...detail.value, card_color: colorKey };
+
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    try {
+        await axios.patch(
+            route('prepress.board.updateColor', { ticket: ticket.id }),
+            { card_color: colorKey },
+            { headers: { 'X-CSRF-TOKEN': csrf } }
+        );
+    } catch {
+        if (idx >= 0) localTickets.value[idx].card_color = prev;
+        if (detail.value?.id === ticket.id) detail.value = { ...detail.value, card_color: prev };
+    }
+}
+
 // Drag & Drop
 const draggedId  = ref(null);
 const draggedStatus = ref(null);
@@ -285,7 +331,7 @@ function onDragEnd() {
 // ── 詳細モーダル (Tickets/Index.vue と同じ内容) ──────────────
 const page      = usePage();
 const authUser  = computed(() => page.props.auth?.user ?? null);
-const isAdmin   = computed(() => ['admin', 'superadmin'].includes(authUser.value?.user_role));
+const canDelete = computed(() => ['admin', 'superadmin', 'coordinator', 'leader', 'clerk'].includes(authUser.value?.user_role));
 
 const detail         = ref(null);
 const updatingStatus = ref(false);
@@ -345,12 +391,21 @@ async function changeStatus(ticket, newStatus) {
     }
 }
 
-function deleteTicket(ticket) {
+async function deleteTicket(ticket) {
     if (!confirm(`「${ticket.title}」を削除しますか？`)) return;
     deleting.value = true;
-    router.delete(route('prepress.tickets.destroy', { ticket: ticket.id }), {
-        onFinish: () => { deleting.value = false; closeDetail(); },
-    });
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    try {
+        await axios.delete(route('prepress.tickets.destroy', { ticket: ticket.id }), {
+            headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+        });
+        localTickets.value = localTickets.value.filter(t => t.id !== ticket.id);
+        closeDetail();
+    } catch {
+        alert('削除に失敗しました。');
+    } finally {
+        deleting.value = false;
+    }
 }
 
 function selectPendingFile(file) {
@@ -942,6 +997,22 @@ async function executeCsvImport() {
                             >リスト</button>
                         </div>
 
+                        <!-- 列内検索 (常に表示) -->
+                        <div class="shrink-0 flex items-center gap-1 border-b bg-white/70 px-3 py-1.5">
+                            <input
+                                v-model="columnControls[col.key].search"
+                                type="text"
+                                placeholder="受注番号・品名で絞込"
+                                class="flex-1 min-w-0 rounded border border-gray-300 px-2 py-0.5 text-xs focus:border-teal-500 focus:outline-none"
+                            />
+                            <button
+                                v-if="columnControls[col.key].search"
+                                type="button"
+                                class="shrink-0 rounded px-1 py-0.5 text-xs text-gray-400 hover:text-gray-600"
+                                @click="columnControls[col.key].search = ''"
+                            >✕</button>
+                        </div>
+
                         <!-- ソート・絞り込みコントロール（リストモード時は非表示） -->
                         <div
                             v-if="!(col.key === 'pending' && pendingView === 'list')"
@@ -1104,7 +1175,8 @@ async function executeCsvImport() {
                                         type="checkbox"
                                         :checked="selectedForDelete.has(ticket.id)"
                                         class="h-5 w-5 cursor-pointer rounded border-2 border-red-400 accent-red-600"
-                                        @change.stop="toggleSelectForDelete(ticket.id)"
+                                        @click.stop
+                                        @change="toggleSelectForDelete(ticket.id)"
                                     />
                                 </div>
                                 <!-- A4縦上半分サムネイル -->
@@ -1133,11 +1205,14 @@ async function executeCsvImport() {
                                 </div>
 
                                 <!-- キャプション: 伝票番号 + 案件名 + 日付 -->
-                                <div class="rounded-b-sm border-t border-indigo-400 bg-indigo-100 px-2 py-0.5">
-                                    <p class="truncate text-xs text-indigo-900 leading-tight">
-                                        <span v-if="ticket.jobcode" class="font-medium text-indigo-600">#{{ ticket.jobcode }}　</span>{{ ticket.title }}
+                                <div
+                                    class="rounded-b-sm border-t px-2 py-0.5"
+                                    :class="[cardColor(ticket).border, cardColor(ticket).bg]"
+                                >
+                                    <p class="truncate text-xs leading-tight" :class="cardColor(ticket).textMain">
+                                        <span v-if="ticket.jobcode" class="font-medium" :class="cardColor(ticket).textSub">#{{ ticket.jobcode }}　</span>{{ ticket.title }}
                                     </p>
-                                    <p class="mt-0.5 text-xs text-indigo-600 leading-tight">
+                                    <p class="mt-0.5 text-xs leading-tight" :class="cardColor(ticket).textSub">
                                         入稿 {{ formatShortDate(ticket.submission_date) }}：下版 {{ formatShortDate(ticket.sb_delivery_date) }}
                                     </p>
                                 </div>
@@ -1180,7 +1255,24 @@ async function executeCsvImport() {
                                         # {{ detail.jobcode }}
                                     </span>
                                 </div>
-                                <h1 class="text-base font-bold text-gray-900">{{ detail.title }}</h1>
+                                <div class="flex items-center justify-between gap-2">
+                                    <h1 class="min-w-0 flex-1 text-base font-bold text-gray-900 truncate">{{ detail.title }}</h1>
+                                    <!-- カードカラー選択スウォッチ -->
+                                    <div class="flex items-center gap-1 shrink-0">
+                                        <button
+                                            v-for="(cfg, key) in CARD_COLORS"
+                                            :key="key"
+                                            type="button"
+                                            :title="key"
+                                            :class="[
+                                                cfg.swatch,
+                                                'h-5 w-5 rounded-full border-2 transition-transform hover:scale-110',
+                                                (detail.card_color ?? 'indigo') === key ? 'border-gray-700 scale-110' : 'border-white',
+                                            ]"
+                                            @click="setTicketColor(detail, key)"
+                                        />
+                                    </div>
+                                </div>
                                 <p class="mt-0.5 text-sm text-gray-500">作成者: {{ detail.user?.name ?? '—' }}</p>
                             </div>
                         </div>
@@ -1240,7 +1332,7 @@ async function executeCsvImport() {
                                 >編集</a>
 
                                 <button
-                                    v-if="isAdmin"
+                                    v-if="canDelete"
                                     type="button"
                                     class="inline-flex items-center gap-1.5 rounded bg-red-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-600"
                                     :disabled="deleting"

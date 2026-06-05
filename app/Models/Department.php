@@ -50,6 +50,14 @@ class Department extends Model
     }
 
     /**
+     * 部署ごとのジョブフィールド設定
+     */
+    public function fieldConfigs(): HasMany
+    {
+        return $this->hasMany(DepartmentFieldConfig::class);
+    }
+
+    /**
      * アクティブな部署のみ取得
      */
     public function scopeActive($query)

@@ -436,6 +436,9 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('departments', [App\Http\Controllers\Admin\DepartmentController::class, 'store'])->name('departments.store');
         Route::post('departments/{department}/create-team', [App\Http\Controllers\Admin\DepartmentController::class, 'createTeam'])->name('departments.create_team');
         Route::delete('departments/{department}', [App\Http\Controllers\Admin\DepartmentController::class, 'destroy'])->name('departments.destroy');
+        // 部署フィールド設定
+        Route::get('departments/{department}/field-config', [App\Http\Controllers\Admin\DepartmentController::class, 'fieldConfig'])->name('departments.field_config');
+        Route::post('departments/{department}/field-config', [App\Http\Controllers\Admin\DepartmentController::class, 'updateFieldConfig'])->name('departments.field_config.update');
 
         // 日報権限チーム管理
         Route::resource('diary-teams', App\Http\Controllers\Admin\DiaryTeamController::class)
@@ -591,6 +594,10 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
             ->name('workload_setting.edit');
         Route::post('workload-setting/{type}', [App\Http\Controllers\WorkloadSettingController::class, 'store'])
             ->name('workload_setting.store');
+
+        // 部署フィールド設定（Leader用 — 自部署のみ）
+        Route::get('department-field-config', [App\Http\Controllers\Leader\DepartmentFieldConfigController::class, 'edit'])->name('department_field_config.edit');
+        Route::post('department-field-config', [App\Http\Controllers\Leader\DepartmentFieldConfigController::class, 'update'])->name('department_field_config.update');
 
         // 派遣・業務委託管理
         Route::get('dispatch-management', [App\Http\Controllers\Leader\DispatchManagementController::class, 'index'])->name('dispatch_management.index');
@@ -1040,6 +1047,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         // 伝票ボード
         Route::get('board', [\App\Http\Controllers\Prepress\BoardController::class, 'index'])->name('board');
         Route::patch('board/{ticket}/status', [\App\Http\Controllers\Prepress\BoardController::class, 'updateStatus'])->name('board.updateStatus');
+        Route::patch('board/{ticket}/color', [\App\Http\Controllers\Prepress\BoardController::class, 'updateColor'])->name('board.updateColor');
         Route::patch('board/{ticket}/archive', [\App\Http\Controllers\Prepress\BoardController::class, 'archiveFromCompleted'])->name('board.archiveFromCompleted');
         // 伝票登録モーダル用 API
         Route::get('api/clients', [\App\Http\Controllers\Prepress\BoardController::class, 'apiClients'])->name('api.clients');

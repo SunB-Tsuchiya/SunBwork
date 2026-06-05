@@ -304,83 +304,115 @@
 
             <!-- 作業種別（Type）＋ ステージ（Stage）を1行に -->
             <div class="mt-3 grid grid-cols-2 gap-3">
-                <div>
-                    <label class="block text-xs font-medium text-gray-600">作業種別</label>
-                    <div v-if="!editMode || block._locked_work_item_type" class="mt-1 w-full rounded border bg-gray-100 px-3 py-2 text-sm text-gray-500">
-                        {{ itemName('types', block.work_item_type_id) }}
-                        <span v-if="block._locked_work_item_type" class="ml-2 text-xs text-gray-400">🔒 進行表から</span>
-                    </div>
-                    <select
-                        v-else
-                        v-model="block.work_item_type_id"
-                        :disabled="props.mode === 'coordinator' ? (!hasDepartment(block) || !editMode) : !editMode"
-                        @change="onInlineSelectionChange(idx)"
-                        :class="['mt-1 w-full rounded border px-2 py-1.5 text-sm', getFieldError('assignments.0.work_item_type_id') || getFieldError('work_item_type_id') ? 'border-red-500 bg-red-50' : '']"
-                    >
-                        <option value="">-- 選択 --</option>
-                        <template v-for="grp in typesGrouped(block.company_id, block.department_id, block._type_filter || '')" :key="grp.group">
-                            <optgroup :label="grp.label">
-                                <option v-for="t in grp.items" :key="t.id" :value="String(t.id)">{{ t.name }}</option>
-                            </optgroup>
-                        </template>
-                    </select>
-                    <div v-if="getFieldError('assignments.0.work_item_type_id') || getFieldError('work_item_type_id')"
-                        class="mt-1 text-xs text-red-600">
-                        {{ getFieldError('assignments.0.work_item_type_id') || getFieldError('work_item_type_id') }}
-                    </div>
+                <!-- type スロット -->
+                <div v-if="slotEnabled(block, 'type')">
+                    <label class="block text-xs font-medium text-gray-600">{{ slotLabel(block, 'type') }}</label>
+                    <!-- カスタムソース（job_field_options）-->
+                    <template v-if="slotUsesCustom(block, 'type')">
+                        <div v-if="!editMode" class="mt-1 w-full rounded border bg-gray-100 px-3 py-2 text-sm text-gray-500">
+                            {{ (customItemsForSlot(block, 'type').find(i => String(i.id) === String(block.field_type_val)))?.name ?? '—' }}
+                        </div>
+                        <select v-else v-model="block.field_type_val" :disabled="!editMode" @change="onInlineSelectionChange(idx)"
+                            class="mt-1 w-full rounded border px-2 py-1.5 text-sm">
+                            <option value="">-- 選択 --</option>
+                            <option v-for="t in customItemsForSlot(block, 'type')" :key="t.id" :value="String(t.id)">{{ t.name }}</option>
+                        </select>
+                    </template>
+                    <!-- 既存マスタ（legacy）-->
+                    <template v-else>
+                        <div v-if="!editMode || block._locked_work_item_type" class="mt-1 w-full rounded border bg-gray-100 px-3 py-2 text-sm text-gray-500">
+                            {{ itemName('types', block.work_item_type_id) }}
+                            <span v-if="block._locked_work_item_type" class="ml-2 text-xs text-gray-400">🔒 進行表から</span>
+                        </div>
+                        <select v-else v-model="block.work_item_type_id"
+                            :disabled="props.mode === 'coordinator' ? (!hasDepartment(block) || !editMode) : !editMode"
+                            @change="onInlineSelectionChange(idx)"
+                            :class="['mt-1 w-full rounded border px-2 py-1.5 text-sm', getFieldError('assignments.0.work_item_type_id') || getFieldError('work_item_type_id') ? 'border-red-500 bg-red-50' : '']">
+                            <option value="">-- 選択 --</option>
+                            <template v-for="grp in typesGrouped(block.company_id, block.department_id, block._type_filter || '', block.department_id)" :key="grp.group">
+                                <optgroup :label="grp.label">
+                                    <option v-for="t in grp.items" :key="t.id" :value="String(t.id)">{{ t.name }}</option>
+                                </optgroup>
+                            </template>
+                        </select>
+                        <div v-if="getFieldError('assignments.0.work_item_type_id') || getFieldError('work_item_type_id')"
+                            class="mt-1 text-xs text-red-600">
+                            {{ getFieldError('assignments.0.work_item_type_id') || getFieldError('work_item_type_id') }}
+                        </div>
+                    </template>
                 </div>
-                <div>
-                    <label class="block text-xs font-medium text-gray-600">ステージ（校数）</label>
-                    <div v-if="!editMode || block._locked_stage" class="mt-1 w-full rounded border bg-gray-100 px-3 py-2 text-sm text-gray-500">
-                        {{ itemName('stages', block.stage_id) }}
-                        <span v-if="block._locked_stage" class="ml-2 text-xs text-gray-400">🔒 進行表から</span>
-                    </div>
-                    <select
-                        v-else
-                        v-model="block.stage_id"
-                        :disabled="props.mode === 'coordinator' ? (!hasDepartment(block) || !editMode) : !editMode"
-                        @change="onInlineSelectionChange(idx)"
-                        :class="['mt-1 w-full rounded border px-2 py-1.5 text-sm', getFieldError('assignments.0.stage_id') || getFieldError('stage_id') ? 'border-red-500 bg-red-50' : '']"
-                    >
-                        <option value="">-- 選択 --</option>
-                        <option v-for="st in stagesForSelect(block.company_id, block.department_id)" :key="st.id" :value="String(st.id)">
-                            {{ st.name }}
-                        </option>
-                    </select>
-                    <div v-if="getFieldError('assignments.0.stage_id') || getFieldError('stage_id')"
-                        class="mt-1 text-xs text-red-600">
-                        {{ getFieldError('assignments.0.stage_id') || getFieldError('stage_id') }}
-                    </div>
+                <!-- stage スロット -->
+                <div v-if="slotEnabled(block, 'stage')">
+                    <label class="block text-xs font-medium text-gray-600">{{ slotLabel(block, 'stage') }}</label>
+                    <template v-if="slotUsesCustom(block, 'stage')">
+                        <div v-if="!editMode" class="mt-1 w-full rounded border bg-gray-100 px-3 py-2 text-sm text-gray-500">
+                            {{ (customItemsForSlot(block, 'stage').find(i => String(i.id) === String(block.field_stage_val)))?.name ?? '—' }}
+                        </div>
+                        <select v-else v-model="block.field_stage_val" :disabled="!editMode" @change="onInlineSelectionChange(idx)"
+                            class="mt-1 w-full rounded border px-2 py-1.5 text-sm">
+                            <option value="">-- 選択 --</option>
+                            <option v-for="st in customItemsForSlot(block, 'stage')" :key="st.id" :value="String(st.id)">{{ st.name }}</option>
+                        </select>
+                    </template>
+                    <template v-else>
+                        <div v-if="!editMode || block._locked_stage" class="mt-1 w-full rounded border bg-gray-100 px-3 py-2 text-sm text-gray-500">
+                            {{ itemName('stages', block.stage_id) }}
+                            <span v-if="block._locked_stage" class="ml-2 text-xs text-gray-400">🔒 進行表から</span>
+                        </div>
+                        <select v-else v-model="block.stage_id"
+                            :disabled="props.mode === 'coordinator' ? (!hasDepartment(block) || !editMode) : !editMode"
+                            @change="onInlineSelectionChange(idx)"
+                            :class="['mt-1 w-full rounded border px-2 py-1.5 text-sm', getFieldError('assignments.0.stage_id') || getFieldError('stage_id') ? 'border-red-500 bg-red-50' : '']">
+                            <option value="">-- 選択 --</option>
+                            <option v-for="st in applyAllowedIds(stagesForSelect(block.company_id, block.department_id), block.department_id, 'stage')" :key="st.id" :value="String(st.id)">
+                                {{ st.name }}
+                            </option>
+                        </select>
+                        <div v-if="getFieldError('assignments.0.stage_id') || getFieldError('stage_id')"
+                            class="mt-1 text-xs text-red-600">
+                            {{ getFieldError('assignments.0.stage_id') || getFieldError('stage_id') }}
+                        </div>
+                    </template>
                 </div>
             </div>
 
             <!-- サイズ（Size）＋ ステータス（user モードのみ）を1行に -->
             <div class="mt-3 grid grid-cols-2 gap-3">
-                <div>
-                    <label class="block text-xs font-medium text-gray-600">サイズ</label>
-                    <div v-if="!editMode || projectJobSizeId || block._locked_size" class="mt-1 w-full rounded border bg-gray-100 px-3 py-2 text-sm text-gray-500">
-                        {{ itemName('sizes', block.size_id) || '(未設定)' }}
-                        <span v-if="projectJobSizeId" class="ml-2 text-xs text-gray-400">🔒 案件で固定</span>
-                        <span v-else-if="block._locked_size" class="ml-2 text-xs text-gray-400">🔒 進行表から</span>
-                    </div>
-                    <select
-                        v-else
-                        v-model="block.size_id"
-                        :disabled="props.mode === 'coordinator' ? (!hasDepartment(block) || !editMode) : !editMode"
-                        @change="onInlineSelectionChange(idx)"
-                        :class="['mt-1 w-full rounded border px-2 py-1.5 text-sm', getFieldError('assignments.0.size_id') || getFieldError('size_id') ? 'border-red-500 bg-red-50' : '']"
-                    >
-                        <option value="">-- 選択 --</option>
-                        <template v-for="grp in sizesGrouped(block.company_id, block.department_id, block._medium_filter ?? 'paper')" :key="grp.group">
-                            <optgroup :label="grp.label">
-                                <option v-for="s in grp.items" :key="s.id" :value="String(s.id)">{{ s.name }}</option>
-                            </optgroup>
-                        </template>
-                    </select>
-                    <div v-if="getFieldError('assignments.0.size_id') || getFieldError('size_id')"
-                        class="mt-1 text-xs text-red-600">
-                        {{ getFieldError('assignments.0.size_id') || getFieldError('size_id') }}
-                    </div>
+                <!-- size スロット -->
+                <div v-if="slotEnabled(block, 'size')">
+                    <label class="block text-xs font-medium text-gray-600">{{ slotLabel(block, 'size') }}</label>
+                    <template v-if="slotUsesCustom(block, 'size')">
+                        <div v-if="!editMode" class="mt-1 w-full rounded border bg-gray-100 px-3 py-2 text-sm text-gray-500">
+                            {{ (customItemsForSlot(block, 'size').find(i => String(i.id) === String(block.field_size_val)))?.name ?? '—' }}
+                        </div>
+                        <select v-else v-model="block.field_size_val" :disabled="!editMode" @change="onInlineSelectionChange(idx)"
+                            class="mt-1 w-full rounded border px-2 py-1.5 text-sm">
+                            <option value="">-- 選択 --</option>
+                            <option v-for="s in customItemsForSlot(block, 'size')" :key="s.id" :value="String(s.id)">{{ s.name }}</option>
+                        </select>
+                    </template>
+                    <template v-else>
+                        <div v-if="!editMode || projectJobSizeId || block._locked_size" class="mt-1 w-full rounded border bg-gray-100 px-3 py-2 text-sm text-gray-500">
+                            {{ itemName('sizes', block.size_id) || '(未設定)' }}
+                            <span v-if="projectJobSizeId" class="ml-2 text-xs text-gray-400">🔒 案件で固定</span>
+                            <span v-else-if="block._locked_size" class="ml-2 text-xs text-gray-400">🔒 進行表から</span>
+                        </div>
+                        <select v-else v-model="block.size_id"
+                            :disabled="props.mode === 'coordinator' ? (!hasDepartment(block) || !editMode) : !editMode"
+                            @change="onInlineSelectionChange(idx)"
+                            :class="['mt-1 w-full rounded border px-2 py-1.5 text-sm', getFieldError('assignments.0.size_id') || getFieldError('size_id') ? 'border-red-500 bg-red-50' : '']">
+                            <option value="">-- 選択 --</option>
+                            <template v-for="grp in sizesGrouped(block.company_id, block.department_id, block._medium_filter ?? 'paper', block.department_id)" :key="grp.group">
+                                <optgroup :label="grp.label">
+                                    <option v-for="s in grp.items" :key="s.id" :value="String(s.id)">{{ s.name }}</option>
+                                </optgroup>
+                            </template>
+                        </select>
+                        <div v-if="getFieldError('assignments.0.size_id') || getFieldError('size_id')"
+                            class="mt-1 text-xs text-red-600">
+                            {{ getFieldError('assignments.0.size_id') || getFieldError('size_id') }}
+                        </div>
+                    </template>
                 </div>
                 <!-- Status: coordinator では非表示、user では表示 -->
                 <div v-if="props.mode === 'user'">
@@ -407,7 +439,7 @@
             </div>
 
             <!-- 数量（ページ数を数値入力に変更） -->
-            <div class="mt-3 flex items-end gap-3">
+            <div v-if="slotEnabled(block, 'amounts')" class="mt-3 flex items-end gap-3">
                 <div>
                     <label class="block text-xs font-medium text-gray-600">数量</label>
                     <div v-if="!editMode" class="mt-1 rounded border bg-gray-50 px-3 py-2 text-sm">
@@ -1724,8 +1756,9 @@ const SIZE_GROUP_ORDER  = ['paper', 'digital'];
 const SIZE_GROUP_LABELS = { paper: '紙媒体', digital: 'デジタル' };
 
 // typeFilter: '' = 全部表示、それ以外 = そのグループのみ表示
-function typesGrouped(companyId, departmentId, typeFilter) {
-    const list     = typesForSelect(companyId, departmentId);
+function typesGrouped(companyId, departmentId, typeFilter, filterDeptId) {
+    const raw      = typesForSelect(companyId, departmentId);
+    const list     = applyAllowedIds(raw, filterDeptId ?? departmentId, 'type');
     const filtered = typeFilter ? list.filter((t) => (t.group || 'common') === typeFilter) : list;
     if (typeFilter) {
         // 単一グループ → optgroup 不要のフラット表示用に 1グループとして返す
@@ -1746,8 +1779,9 @@ function typesGrouped(companyId, departmentId, typeFilter) {
 }
 
 // mediumFilter: '' = 全表示、'paper' = 紙媒体のみ、'digital' = デジタルのみ
-function sizesGrouped(companyId, departmentId, mediumFilter) {
-    const list     = sizesForSelect(companyId, departmentId);
+function sizesGrouped(companyId, departmentId, mediumFilter, filterDeptId) {
+    const raw      = sizesForSelect(companyId, departmentId);
+    const list     = applyAllowedIds(raw, filterDeptId ?? departmentId, 'size');
     const filtered = mediumFilter ? list.filter((s) => (s.group || 'paper') === mediumFilter) : list;
     if (mediumFilter) {
         return [{ group: mediumFilter, label: SIZE_GROUP_LABELS[mediumFilter] || mediumFilter, items: filtered }];
@@ -1825,6 +1859,59 @@ function statusesForSelect(companyId, departmentId) {
         const deptMatch = !st.department_id || tDept === sDept || sDept === '';
         return compMatch && deptMatch;
     });
+}
+
+// ─── 部署フィールド設定（department_field_configs）────────────────────────────
+const DEFAULT_SLOT_LABELS = {
+    type:    '作業種別',
+    stage:   'ステージ（校数）',
+    size:    'サイズ',
+    amounts: '数量',
+};
+
+// スロットごとの legacy v-model キー（source=null 時に使うカラム）
+const SLOT_LEGACY_MODEL = { type: 'work_item_type_id', stage: 'stage_id', size: 'size_id' };
+// source='job_field_options' 時に使うカラム
+const SLOT_FIELD_MODEL  = { type: 'field_type_val', stage: 'field_stage_val', size: 'field_size_val' };
+
+function getSlotConfig(departmentId, slot) {
+    const configs = page.props.departmentFieldConfigs ?? [];
+    return configs.find(
+        (c) => String(c.department_id) === String(departmentId) && c.slot === slot
+    ) ?? { enabled: true, label: DEFAULT_SLOT_LABELS[slot], allowed_item_ids: null, source: null, source_group: null };
+}
+
+function slotEnabled(block, slot) {
+    if (!block.department_id) return true;
+    return getSlotConfig(block.department_id, slot).enabled !== false;
+}
+
+function slotLabel(block, slot) {
+    if (!block.department_id) return DEFAULT_SLOT_LABELS[slot];
+    return getSlotConfig(block.department_id, slot).label || DEFAULT_SLOT_LABELS[slot];
+}
+
+// source='job_field_options' かどうか
+function slotUsesCustom(block, slot) {
+    if (!block.department_id) return false;
+    return getSlotConfig(block.department_id, slot).source === 'job_field_options';
+}
+
+// カスタムソース時のアイテム一覧（source_group でフィルタ）
+function customItemsForSlot(block, slot) {
+    const cfg   = getSlotConfig(block.department_id, slot);
+    const all   = page.props.jobFieldOptions ?? [];
+    const group = cfg.source_group;
+    return group ? all.filter((i) => i.group_key === group) : all;
+}
+
+function applyAllowedIds(items, departmentId, slot) {
+    if (!departmentId) return items;
+    const cfg = getSlotConfig(departmentId, slot);
+    if (cfg.source === 'job_field_options') return items; // カスタム時は source_group でフィルタ済み
+    if (!cfg.allowed_item_ids || cfg.allowed_item_ids.length === 0) return items;
+    const allowed = cfg.allowed_item_ids.map(String);
+    return items.filter((i) => allowed.includes(String(i.id)));
 }
 
 function openInlineSelector(idx) {

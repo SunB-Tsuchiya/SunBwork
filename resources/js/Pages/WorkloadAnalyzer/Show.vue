@@ -72,7 +72,11 @@ const props = defineProps({
     comparison_level:  { type: String, default: 'department' }, // 'role' | 'department'
     peer_group_size:   { type: Number, default: 0 },
     peer_assignment:   { type: String, default: '' },
+    // 部署カスタムスロットラベル
+    field_slot_labels: { type: Object, default: () => ({ type: '種別', stage: 'ステージ', size: 'サイズ', amounts: '数量' }) },
 });
+
+const slotLabel = (slot) => props.field_slot_labels?.[slot] ?? { type: '種別', stage: 'ステージ', size: 'サイズ' }[slot] ?? slot;
 
 // combined totals (assigned + self)
 const combinedTotals = computed(() => {
@@ -226,7 +230,7 @@ const buildSummaryCharts = () => {
         radarInstance = new Chart(radarChartRef.value, {
             type: 'radar',
             data: {
-                labels: ['ステージ', 'サイズ', '種別', '難易度', 'イベント', '残業'],
+                labels: [slotLabel('stage'), slotLabel('size'), slotLabel('type'), '難易度', 'イベント', '残業'],
                 datasets: [{
                     label: 'パーセンタイル',
                     data: allZero ? [0, 0, 0, 0, 0, 0] : radarData,
@@ -395,9 +399,9 @@ onMounted(() => {
                             <div class="mt-4 border-t pt-4">
                                 <h4 class="mb-2 text-sm font-medium text-gray-600">カテゴリ別パーセンタイル（各100点満点）</h4>
                                 <div class="grid grid-cols-2 gap-x-8 gap-y-1 text-sm md:grid-cols-6">
-                                    <div>ステージ: <span class="font-semibold">{{ (props.percentile_scores?.stage ?? 0).toFixed(1) }}</span></div>
-                                    <div>サイズ: <span class="font-semibold">{{ (props.percentile_scores?.size ?? 0).toFixed(1) }}</span></div>
-                                    <div>種別: <span class="font-semibold">{{ (props.percentile_scores?.type ?? 0).toFixed(1) }}</span></div>
+                                    <div>{{ slotLabel('stage') }}: <span class="font-semibold">{{ (props.percentile_scores?.stage ?? 0).toFixed(1) }}</span></div>
+                                    <div>{{ slotLabel('size') }}: <span class="font-semibold">{{ (props.percentile_scores?.size ?? 0).toFixed(1) }}</span></div>
+                                    <div>{{ slotLabel('type') }}: <span class="font-semibold">{{ (props.percentile_scores?.type ?? 0).toFixed(1) }}</span></div>
                                     <div>難易度: <span class="font-semibold">{{ (props.percentile_scores?.difficulty ?? 0).toFixed(1) }}</span></div>
                                     <div>イベント: <span class="font-semibold">{{ (props.percentile_scores?.event ?? 0).toFixed(1) }}</span></div>
                                     <div>残業: <span class="font-semibold">{{ (props.percentile_scores?.overtime ?? 0).toFixed(1) }}</span></div>
@@ -406,7 +410,7 @@ onMounted(() => {
                         </div>
 
                         <AnalysisPanel
-                            title="ステージ"
+                            :title="slotLabel('stage')"
                             scheme="blue"
                             :labels="props.stage_labels"
                             :data="props.stage_data"
@@ -419,7 +423,7 @@ onMounted(() => {
                         />
 
                         <AnalysisPanel
-                            title="サイズ"
+                            :title="slotLabel('size')"
                             scheme="green"
                             :labels="props.size_labels"
                             :data="props.size_data"
@@ -432,7 +436,7 @@ onMounted(() => {
                         />
 
                         <AnalysisPanel
-                            title="種別"
+                            :title="slotLabel('type')"
                             scheme="amber"
                             :labels="props.type_labels"
                             :data="props.type_data"

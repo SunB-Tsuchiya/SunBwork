@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use App\Models\Department;
+use App\Models\JobFieldOption;
 use App\Models\Stage;
 use App\Models\Size;
 use App\Models\Status;
@@ -51,6 +52,11 @@ class WorkloadSettingController extends Controller
                 'orderBy' => 'sort_order',
                 'label'   => 'Difficulties',
             ],
+            'job_field_options' => [
+                'model'   => JobFieldOption::class,
+                'orderBy' => 'sort_order',
+                'label'   => 'カスタム項目',
+            ],
         ];
     }
 
@@ -72,6 +78,7 @@ class WorkloadSettingController extends Controller
             'stages' => [
                 'items.*.order_index' => 'nullable|integer|min:0',
                 'items.*.description' => 'nullable|string|max:1000',
+                'items.*.group'       => 'nullable|string|max:50',
             ],
             'work_item_types' => [
                 'items.*.sort_order'  => 'nullable|integer|min:0',
@@ -89,6 +96,10 @@ class WorkloadSettingController extends Controller
             'difficulties' => [
                 'items.*.sort_order'  => 'nullable|integer|min:0',
                 'items.*.description' => 'nullable|string|max:1000',
+            ],
+            'job_field_options' => [
+                'items.*.sort_order' => 'nullable|integer|min:0',
+                'items.*.group_key'  => 'nullable|string|max:100',
             ],
             default => [],
         };
@@ -137,6 +148,7 @@ class WorkloadSettingController extends Controller
                 'sizes'             => [],
                 'statuses'          => [],
                 'difficulties'      => [],
+                'job_field_options' => [],
             ]);
         }
 
@@ -144,11 +156,13 @@ class WorkloadSettingController extends Controller
         $canEditScope = $user->isSuperAdmin() || $user->isAdmin();
         $departments  = $this->fetchDepartments($companyId);
 
-        $stages        = $this->fetchItems(Stage::class,        'order_index', $companyId, $deptId);
-        $workItemTypes = $this->fetchItems(WorkItemType::class,  'sort_order',  $companyId, $deptId);
-        $sizes         = $this->fetchItems(Size::class,         'sort_order',  $companyId, $deptId);
-        $statuses      = $this->fetchItems(Status::class,       'sort_order',  $companyId, $deptId);
-        $difficulties  = $this->fetchItems(Difficulty::class,   'sort_order',  $companyId, $deptId);
+        $stages           = $this->fetchItems(Stage::class,          'order_index', $companyId, $deptId);
+        $workItemTypes    = $this->fetchItems(WorkItemType::class,   'sort_order',  $companyId, $deptId);
+        $sizes            = $this->fetchItems(Size::class,           'sort_order',  $companyId, $deptId);
+        $statuses         = $this->fetchItems(Status::class,         'sort_order',  $companyId, $deptId);
+        $difficulties     = $this->fetchItems(Difficulty::class,     'sort_order',  $companyId, $deptId);
+        $jobFieldOptions  = $this->fetchItems(JobFieldOption::class, 'sort_order',  $companyId, $deptId)
+            ->map(fn($item) => array_merge($item->toArray(), ['group' => $item->group_key]));
 
         // 会社全体スコープの場合のみ部署使用情報を付与
         if ($deptId === null && $departments->isNotEmpty()) {
@@ -156,15 +170,16 @@ class WorkloadSettingController extends Controller
         }
 
         return Inertia::render('WorkloadSetting/Index', [
-            'departments'    => $departments,
-            'currentScope'   => $scopeKey,
-            'canEditScope'   => $canEditScope,
-            'groupOrders'    => $this->fetchGroupOrders('work_item_types', $companyId),
-            'stages'         => $stages,
-            'work_item_types'=> $workItemTypes,
-            'sizes'          => $sizes,
-            'statuses'       => $statuses,
-            'difficulties'   => $difficulties,
+            'departments'       => $departments,
+            'currentScope'      => $scopeKey,
+            'canEditScope'      => $canEditScope,
+            'groupOrders'       => $this->fetchGroupOrders('work_item_types', $companyId),
+            'stages'            => $stages,
+            'work_item_types'   => $workItemTypes,
+            'sizes'             => $sizes,
+            'statuses'          => $statuses,
+            'difficulties'      => $difficulties,
+            'job_field_options' => $jobFieldOptions,
         ]);
     }
 
@@ -233,6 +248,11 @@ class WorkloadSettingController extends Controller
                 if (array_key_exists($field, $item) && !in_array($field, ['company_id', 'department_id'])) {
                     $data[$field] = $item[$field];
                 }
+            }
+
+            // job_field_options: 'group' または 'group_key' のどちらで届いても group_key を確実にセット
+            if ($modelClass === JobFieldOption::class) {
+                $data['group_key'] = ($item['group'] ?? null) ?? ($item['group_key'] ?? '');
             }
 
             // slug が必要なモデルで未指定の場合は name から自動生成（重複時サフィックス付与）

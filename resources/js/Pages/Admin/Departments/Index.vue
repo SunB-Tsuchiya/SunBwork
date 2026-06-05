@@ -170,6 +170,13 @@ async function handleDelete(dept) {
                                 </button>
                                 <button
                                     type="button"
+                                    class="mr-2 rounded border border-purple-400 px-3 py-1 text-xs text-purple-600 hover:bg-purple-50"
+                                    @click="router.visit(route('admin.departments.field_config', { department: dept.id }))"
+                                >
+                                    フィールド設定
+                                </button>
+                                <button
+                                    type="button"
                                     class="rounded bg-red-600 px-3 py-1 text-xs font-bold text-white hover:bg-red-700"
                                     @click="handleDelete(dept)"
                                 >

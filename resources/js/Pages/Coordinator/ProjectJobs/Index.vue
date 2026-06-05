@@ -88,7 +88,7 @@
             <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div class="flex items-center gap-2">
                     <input
-                        v-model="page.props.q_model"
+                        v-model="qModel"
                         @keyup.enter="search"
                         placeholder="案件名/クライアントで検索"
                         class="w-full sm:w-72 rounded border px-3 py-2 text-sm"
@@ -103,7 +103,7 @@
                 <div class="flex items-center gap-2">
                     <label class="text-sm text-gray-700">年月:</label>
                     <select
-                        v-model="page.props.period_model"
+                        v-model="periodModel"
                         @change="search"
                         class="rounded border px-3 py-2 text-sm"
                         style="width: 9.5em"
@@ -534,8 +534,8 @@ import axios from 'axios';
 
 const props = defineProps({ jobs: Array, favoriteJobs: { type: Array, default: () => [] }, registerFlags: Array, jobid: [Number, String], monthOptions: Array, q: String, period: String, isGlobalMode: { type: Boolean, default: false } });
 const page = usePage();
-page.props.q_model = props.q || '';
-page.props.period_model = props.period || 'all';
+const qModel = ref(props.q || '');
+const periodModel = ref(props.period || 'all');
 
 const monthOptions = computed(() => (Array.isArray(props.monthOptions) ? props.monthOptions : []));
 const hideCompleted = useUIState('sbw_coord_pj_hide_completed', true);
@@ -705,11 +705,11 @@ function rowClick(event, job) {
 // ===== 検索 =====
 
 function search() {
-    router.get(route('coordinator.project_jobs.index'), { q: page.props.q_model, period: page.props.period_model }, { preserveState: false });
+    router.get(route('coordinator.project_jobs.index'), { q: qModel.value, period: periodModel.value }, { preserveState: false });
 }
 
 function clearSearch() {
-    page.props.q_model = '';
+    qModel.value = '';
     search();
 }
 

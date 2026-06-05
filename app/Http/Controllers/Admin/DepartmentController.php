@@ -6,7 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\ChecksAdminPermission;
 use App\Http\Controllers\Concerns\ResolvesContextCompany;
 use App\Models\Department;
+use App\Models\DepartmentFieldConfig;
 use App\Models\Team;
+use App\Models\WorkItemType;
+use App\Models\Stage;
+use App\Models\Size;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -104,6 +108,78 @@ class DepartmentController extends Controller
         );
 
         return redirect()->route('admin.departments.index')->with('success', "「{$department->name}」のチームを作成しました");
+    }
+
+    public function fieldConfig(Department $department)
+    {
+        $this->requireAdminPermission('team_management');
+        $user      = Auth::user();
+        $companyId = $this->contextCompanyId() ?? $user->company_id;
+
+        if ($department->company_id !== $companyId) {
+            abort(403);
+        }
+
+        $configs = DepartmentFieldConfig::where('department_id', $department->id)
+            ->get()
+            ->keyBy('slot');
+
+        return Inertia::render('Admin/Departments/FieldConfig', [
+            'department' => $department->only('id', 'name'),
+            'configs'    => $configs,
+            'masters'    => $this->buildMasters($companyId),
+        ]);
+    }
+
+    public function updateFieldConfig(Request $request, Department $department)
+    {
+        $this->requireAdminPermission('team_management');
+        $user      = Auth::user();
+        $companyId = $this->contextCompanyId() ?? $user->company_id;
+
+        if ($department->company_id !== $companyId) {
+            abort(403);
+        }
+
+        $request->validate([
+            'slots'                    => 'required|array',
+            'slots.*.slot'             => 'required|in:type,stage,size,amounts',
+            'slots.*.label'            => 'nullable|string|max:100',
+            'slots.*.enabled'          => 'boolean',
+            'slots.*.allowed_item_ids'   => 'nullable|array',
+            'slots.*.allowed_item_ids.*' => 'integer',
+            'slots.*.source'             => 'nullable|string|max:50',
+            'slots.*.source_group'       => 'nullable|string|max:100',
+        ]);
+
+        foreach ($request->input('slots') as $slotData) {
+            DepartmentFieldConfig::updateOrCreate(
+                ['department_id' => $department->id, 'slot' => $slotData['slot']],
+                [
+                    'label'            => $slotData['label'] ?? '',
+                    'enabled'          => $slotData['enabled'] ?? true,
+                    'source'           => $slotData['source'] ?: null,
+                    'source_group'     => $slotData['source_group'] ?: null,
+                    'allowed_item_ids' => empty($slotData['allowed_item_ids']) ? null : $slotData['allowed_item_ids'],
+                ]
+            );
+        }
+
+        return redirect()->route('admin.departments.index')
+            ->with('success', "「{$department->name}」のフィールド設定を保存しました");
+    }
+
+    private function buildMasters(int $companyId): array
+    {
+        $types  = WorkItemType::where('company_id', $companyId)->orderBy('sort_order')->get(['id', 'name', 'group']);
+        $stages = Stage::where(function ($q) use ($companyId) {
+            $q->where('company_id', $companyId)->orWhereNull('company_id');
+        })->orderBy('order_index')->get(['id', 'name', 'group']);
+        $sizes  = Size::where(function ($q) use ($companyId) {
+            $q->where('company_id', $companyId)->orWhereNull('company_id');
+        })->orderBy('sort_order')->get(['id', 'name', 'group']);
+
+        return compact('types', 'stages', 'sizes');
     }
 
     public function destroy(Department $department)

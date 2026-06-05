@@ -66,9 +66,27 @@ class HandleInertiaRequests extends Middleware
                 ->count();
         }
 
+        // 部署フィールド設定（会社内全部署分、AssignmentForm で利用）
+        $departmentFieldConfigs = [];
+        $jobFieldOptions        = [];
+        if ($request->user() && $contextCompany?->id) {
+            $companyId = $contextCompany->id;
+            $deptIds   = \App\Models\Department::where('company_id', $companyId)->pluck('id');
+            $departmentFieldConfigs = \App\Models\DepartmentFieldConfig::whereIn('department_id', $deptIds)
+                ->get(['id', 'department_id', 'slot', 'label', 'enabled', 'allowed_item_ids', 'source', 'source_group'])
+                ->toArray();
+            $jobFieldOptions = \App\Models\JobFieldOption::where('company_id', $companyId)
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['id', 'name', 'group_key', 'company_id', 'coefficient'])
+                ->toArray();
+        }
+
         return [
             ...parent::share($request),
             'flash' => $flashMessage ? ['message' => $flashMessage, 'type' => $flashType] : null,
+            'departmentFieldConfigs' => $departmentFieldConfigs,
+            'jobFieldOptions'        => $jobFieldOptions,
             'clientDeleteError' => session('clientDeleteError'),
             'subcontractorDeleteError' => session('subcontractorDeleteError'),
             'unreadAnnouncements' => $unreadAnnouncements,

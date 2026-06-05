@@ -33,6 +33,10 @@ class ProjectJobAssignment extends Model
         'amounts',
         'amounts_unit',
         'difficulty_id',
+        // 汎用フィールド値（job_field_options 参照、FK なし）
+        'field_type_val',
+        'field_stage_val',
+        'field_size_val',
         // starts_at/ends_at removed from fillable
         'sender_id',
         'read_at',

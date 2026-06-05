@@ -23,7 +23,7 @@ class BoardController extends Controller
             ->orderByDesc('updated_at')
             ->get([
                 'id', 'title', 'jobcode', 'project_name', 'client_id', 'client_name',
-                'sales_rep', 'sales_rep_id', 'memo', 'status', 'image_path', 'created_at',
+                'sales_rep', 'sales_rep_id', 'memo', 'status', 'image_path', 'card_color', 'created_at',
                 'submission_date', 'sb_delivery_date',
             ])->each->append('image_url');
 
@@ -45,6 +45,19 @@ class BoardController extends Controller
         ]);
 
         $ticket->update(['status' => $request->status]);
+
+        return response()->noContent();
+    }
+
+    public function updateColor(Request $request, PrepressTicket $ticket)
+    {
+        $this->authorizePrepress($request->user());
+
+        $request->validate([
+            'card_color' => ['nullable', 'string', 'max:20'],
+        ]);
+
+        $ticket->update(['card_color' => $request->card_color ?: null]);
 
         return response()->noContent();
     }
@@ -188,6 +201,10 @@ class BoardController extends Controller
                 return;
             }
             abort(403, 'Prepress エリアは同じ会社のAdminのみアクセスできます。');
+        }
+        // Coordinator・Leader・Clerk は部署問わずアクセス可
+        if ($user->isCoordinator() || $user->isLeader() || $user->isClerk()) {
+            return;
         }
         if (!$user->department || $user->department->name !== '製版') {
             abort(403, 'Prepress エリアは製版部署のみアクセスできます。');

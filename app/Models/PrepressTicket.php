@@ -26,6 +26,7 @@ class PrepressTicket extends Model
         'status',
         'image_path',
         'original_filename',
+        'card_color',
     ];
 
     protected $casts = [

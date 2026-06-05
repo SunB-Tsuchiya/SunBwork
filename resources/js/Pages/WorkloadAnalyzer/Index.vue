@@ -10,6 +10,16 @@ defineProps({
 });
 // read selected_ym and auth user from server-provided props (defensive)
 const page = usePage();
+
+// 自部署のスロットラベル（departmentFieldConfigs は HandleInertiaRequests で共有済み）
+const DEFAULT_SLOT_LABELS = { type: '種別', stage: 'ステージ', size: 'サイズ' };
+function getSlotLabelForDept(deptId, slot) {
+    const configs = page.props.departmentFieldConfigs ?? [];
+    const cfg = configs.find((c) => String(c.department_id) === String(deptId) && c.slot === slot);
+    return cfg?.label || DEFAULT_SLOT_LABELS[slot];
+}
+const myDeptId = computed(() => page.props.auth?.user?.department_id ?? null);
+const slotLabel = (slot) => getSlotLabelForDept(myDeptId.value, slot);
 // helper: current month in YYYY-MM
 const currentMonth = (() => {
     const d = new Date();
@@ -578,9 +588,9 @@ function diffMinutes(estimated, actual) {
                                                         </td>
                                                         <td style="width: 26%" class="hidden px-6 py-4 text-sm text-gray-500 sm:table-cell">
                                                             <div class="text-xs text-gray-600">
-                                                                <div>ステージ: {{ row.aggregates?.percentile_scores?.stage ?? 0 }}pt</div>
-                                                                <div>サイズ: {{ row.aggregates?.percentile_scores?.size ?? 0 }}pt</div>
-                                                                <div>種別: {{ row.aggregates?.percentile_scores?.type ?? 0 }}pt</div>
+                                                                <div>{{ slotLabel('stage') }}: {{ row.aggregates?.percentile_scores?.stage ?? 0 }}pt</div>
+                                                                <div>{{ slotLabel('size') }}: {{ row.aggregates?.percentile_scores?.size ?? 0 }}pt</div>
+                                                                <div>{{ slotLabel('type') }}: {{ row.aggregates?.percentile_scores?.type ?? 0 }}pt</div>
                                                                 <div>難易度: {{ row.aggregates?.percentile_scores?.difficulty ?? 0 }}pt</div>
                                                                 <div>イベント: {{ row.aggregates?.percentile_scores?.event ?? 0 }}pt</div>
                                                                 <div>残業: {{ row.aggregates?.percentile_scores?.overtime ?? 0 }}pt</div>
@@ -644,9 +654,9 @@ function diffMinutes(estimated, actual) {
                                                         </td>
                                                         <td style="width: 26%" class="hidden px-6 py-4 text-sm text-gray-500 sm:table-cell">
                                                             <div class="text-xs text-gray-600">
-                                                                <div>ステージ: {{ row.aggregates?.percentile_scores?.stage ?? 0 }}pt</div>
-                                                                <div>サイズ: {{ row.aggregates?.percentile_scores?.size ?? 0 }}pt</div>
-                                                                <div>種別: {{ row.aggregates?.percentile_scores?.type ?? 0 }}pt</div>
+                                                                <div>{{ slotLabel('stage') }}: {{ row.aggregates?.percentile_scores?.stage ?? 0 }}pt</div>
+                                                                <div>{{ slotLabel('size') }}: {{ row.aggregates?.percentile_scores?.size ?? 0 }}pt</div>
+                                                                <div>{{ slotLabel('type') }}: {{ row.aggregates?.percentile_scores?.type ?? 0 }}pt</div>
                                                                 <div>難易度: {{ row.aggregates?.percentile_scores?.difficulty ?? 0 }}pt</div>
                                                                 <div>イベント: {{ row.aggregates?.percentile_scores?.event ?? 0 }}pt</div>
                                                                 <div>残業: {{ row.aggregates?.percentile_scores?.overtime ?? 0 }}pt</div>

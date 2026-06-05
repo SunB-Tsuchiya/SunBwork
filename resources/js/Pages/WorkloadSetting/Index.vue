@@ -2,7 +2,7 @@
 import useToasts from '@/Composables/useToasts';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Head, router, usePage } from '@inertiajs/vue3';
-import { computed, reactive, ref, toRaw } from 'vue';
+import { computed, onMounted, onBeforeUnmount, reactive, ref, toRaw } from 'vue';
 
 const props = defineProps({
     noCompanySelected: { type: Boolean, default: false },
@@ -15,23 +15,26 @@ const props = defineProps({
     sizes:             { type: Array,   default: () => [] },
     statuses:          { type: Array,   default: () => [] },
     difficulties:      { type: Array,   default: () => [] },
+    job_field_options: { type: Array,   default: () => [] },
 });
 
 // ─── 定数 ────────────────────────────────────────────────────────────────────
 const TYPE_LABELS = {
-    stages:          'Stages',
-    work_item_types: 'Work Item Types',
-    sizes:           'Sizes',
-    statuses:        'Statuses',
-    difficulties:    'Difficulties',
+    stages:             'Stages',
+    work_item_types:    'Work Item Types',
+    sizes:              'Sizes',
+    statuses:           'Statuses',
+    difficulties:       'Difficulties',
+    job_field_options:  'カスタム項目',
 };
 
 const SORT_KEY_BY_TYPE = {
-    stages:          'order_index',
-    work_item_types: 'sort_order',
-    sizes:           'sort_order',
-    statuses:        'sort_order',
-    difficulties:    'sort_order',
+    stages:             'order_index',
+    work_item_types:    'sort_order',
+    sizes:              'sort_order',
+    statuses:           'sort_order',
+    difficulties:       'sort_order',
+    job_field_options:  'sort_order',
 };
 
 const COLUMNS_BY_TYPE = {
@@ -58,11 +61,15 @@ const COLUMNS_BY_TYPE = {
         { key: 'coefficient', label: '係数', inputType: 'number' },
         { key: 'description', label: '説明', inputType: 'text' },
     ],
+    job_field_options: [
+        { key: 'name', label: '名前', inputType: 'text', required: true },
+        { key: 'coefficient', label: '係数', inputType: 'number' },
+    ],
 };
 
-const GROUP_TYPES = ['work_item_types', 'sizes'];
+const GROUP_TYPES = ['work_item_types', 'sizes', 'stages', 'job_field_options'];
 
-const ALL_TYPES = ['stages', 'work_item_types', 'sizes', 'statuses', 'difficulties'];
+const ALL_TYPES = ['stages', 'work_item_types', 'sizes', 'statuses', 'difficulties', 'job_field_options'];
 
 // ─── 編集モード状態 ───────────────────────────────────────────────────────────
 const editMode = ref(false);
@@ -72,16 +79,19 @@ const editStates = reactive({});
 const groupAddModal = reactive({ show: false, type: null, name: '', error: '' });
 
 // グループ名インライン編集（タイプ共通）
-const groupRenameState = reactive({ type: null, groupKey: null, input: '' });
+const groupRenameState = reactive({ type: null, groupKey: null, input: '', error: '' });
 
 // ─── グループ設定ビルド（BUG FIX: null を強制追加しない）────────────────────
+// 空文字・null・undefined を全て null に正規化するヘルパー
+const normalizeGroupKey = (g) => (g != null && g !== '') ? g : null;
+
 function buildGroupConfig(type, items, savedOrder) {
     if (!GROUP_TYPES.includes(type)) return null;
-    const fromItems = [...new Set(items.map((i) => i.group ?? null))];
+    const fromItems = [...new Set(items.map((i) => normalizeGroupKey(i.group)))];
     let groups;
     if (savedOrder && savedOrder.length > 0) {
         // savedOrder のうち実際にアイテムが存在するグループのみ保持
-        const saved = savedOrder.map((k) => k ?? null).filter((k) => fromItems.includes(k));
+        const saved = savedOrder.map((k) => normalizeGroupKey(k)).filter((k) => fromItems.includes(k));
         const rest  = fromItems.filter((k) => !saved.includes(k));
         groups = [...saved, ...rest];
     } else {
@@ -124,16 +134,16 @@ function getGroupedSections(type) {
     if (!gc) return null;
     const { groups } = gc;
     const items = editStates[type].items;
-    const configKeys = groups.map((g) => g ?? null);
-    const extraKeys  = [...new Set(items.map((i) => i.group ?? null))].filter((k) => !configKeys.includes(k));
+    const configKeys = groups.map(normalizeGroupKey);
+    const extraKeys  = [...new Set(items.map((i) => normalizeGroupKey(i.group)))].filter((k) => !configKeys.includes(k));
     const sortKey    = SORT_KEY_BY_TYPE[type];
     return [...groups, ...extraKeys].map((key) => {
-        const nk = key ?? null;
+        const nk = normalizeGroupKey(key);
         return {
             key: nk,
             keyStr: nk !== null ? String(nk) : '__null__',
-            label: nk !== null ? String(nk) : 'グループなし',
-            items: items.filter((i) => (i.group ?? null) === nk)
+            label: nk ? String(nk) : '（名前未設定）',
+            items: items.filter((i) => normalizeGroupKey(i.group) === nk)
                         .sort((a, b) => (a[sortKey] ?? 0) - (b[sortKey] ?? 0)),
         };
     });
@@ -216,20 +226,6 @@ function openGroupAddModal(type) {
     groupAddModal.error = '';
 }
 
-function confirmAddGroup() {
-    const name = groupAddModal.name.trim();
-    if (!name) { groupAddModal.error = 'グループ名を入力してください'; return; }
-    const gc = editStates[groupAddModal.type]?.groupConfig;
-    if (!gc) return;
-    if (gc.groups.map((g) => g ?? null).includes(name)) {
-        groupAddModal.error = '同名のグループが既に存在します';
-        return;
-    }
-    gc.groups.push(name);
-    addRow(groupAddModal.type, name);
-    groupAddModal.show = false;
-}
-
 function startRenameGroup(type, groupKey) {
     groupRenameState.type     = type;
     groupRenameState.groupKey = groupKey;
@@ -238,30 +234,35 @@ function startRenameGroup(type, groupKey) {
 
 function confirmRenameGroup(type, oldKey) {
     const newName = groupRenameState.input.trim();
-    if (!newName || newName === (oldKey ?? '')) {
-        groupRenameState.type = null;
+    if (!newName) {
+        groupRenameState.error = 'グループ名を入力してください';
         return;
     }
+    groupRenameState.error = '';
     const gc    = editStates[type]?.groupConfig;
     const items = editStates[type]?.items;
     if (!gc || !items) { groupRenameState.type = null; return; }
-    const idx = gc.groups.findIndex((g) => (g ?? null) === (oldKey ?? null));
+    const nOld = normalizeGroupKey(oldKey);
+    const idx = gc.groups.findIndex((g) => normalizeGroupKey(g) === nOld);
     if (idx >= 0) gc.groups[idx] = newName;
-    items.forEach((item) => { if ((item.group ?? null) === (oldKey ?? null)) item.group = newName; });
-    groupRenameState.type = null;
+    items.forEach((item) => { if (normalizeGroupKey(item.group) === nOld) item.group = newName; });
+    groupRenameState.type  = null;
+    groupRenameState.error = '';
 }
 
 function deleteGroup(type, groupKey) {
     const gc    = editStates[type]?.groupConfig;
     const items = editStates[type]?.items;
     if (!gc || !items) return;
-    const inUse = items.some((i) => !i._deleted && (i.group ?? null) === (groupKey ?? null));
+    const nk = normalizeGroupKey(groupKey);
+    const inUse = items.some((i) => !i._deleted && normalizeGroupKey(i.group) === nk);
     if (inUse) return;
-    gc.groups = gc.groups.filter((g) => (g ?? null) !== (groupKey ?? null));
+    gc.groups = gc.groups.filter((g) => normalizeGroupKey(g) !== nk);
 }
 
 function isGroupInUse(type, groupKey) {
-    return editStates[type]?.items.some((i) => !i._deleted && (i.group ?? null) === (groupKey ?? null)) ?? false;
+    const nk = normalizeGroupKey(groupKey);
+    return editStates[type]?.items.some((i) => !i._deleted && normalizeGroupKey(i.group) === nk) ?? false;
 }
 
 function moveGroupUp(type, idx) {
@@ -345,6 +346,53 @@ async function saveType(type) {
     }
 }
 
+// ─── カスタム項目: 確定後の自動保存（グループ名確定後にサーバーへ保存）───────
+function confirmAddGroup() {
+    const name = groupAddModal.name.trim();
+    if (!name) { groupAddModal.error = 'グループ名を入力してください'; return; }
+    const gc = editStates[groupAddModal.type]?.groupConfig;
+    if (!gc) return;
+    if (gc.groups.map((g) => g ?? null).includes(name)) {
+        groupAddModal.error = '同名のグループが既に存在します';
+        return;
+    }
+    gc.groups.push(name);
+    addRow(groupAddModal.type, name);
+    groupAddModal.show = false;
+    // job_field_options はグループ追加後に自動保存（空グループを確定させるため）
+    if (groupAddModal.type === 'job_field_options') {
+        saveType('job_field_options');
+    }
+}
+
+// ─── ナビゲーション前に job_field_options を自動保存 ──────────────────────────
+let _navSaving = false;
+let _removeNavHandler = null;
+
+onMounted(() => {
+    _removeNavHandler = router.on('before', (event) => {
+        const visit = event.detail?.visit;
+        // POST/PUT/DELETE（saveType の送信など）は対象外。GET ページ遷移のみ捕捉
+        if (!visit || (visit.method ?? 'get').toLowerCase() !== 'get') return;
+        if (_navSaving || !editMode.value) return;
+        const state = editStates['job_field_options'];
+        if (!state) return;
+        const saveable = (state.items ?? []).filter((i) => !(i._new && i._deleted) && i.name?.trim());
+        if (!saveable.length) return;
+        _navSaving = true;
+        const targetUrl = visit.url ?? null;
+        event.preventDefault();
+        saveType('job_field_options').finally(() => {
+            _navSaving = false;
+            if (targetUrl) router.visit(targetUrl instanceof URL ? targetUrl.href : targetUrl);
+        });
+    });
+});
+
+onBeforeUnmount(() => {
+    if (_removeNavHandler) _removeNavHandler();
+});
+
 // ─── スコープ切り替え ──────────────────────────────────────────────────────
 function switchScope(scopeKey) {
     if (editMode.value) cancelEdit();
@@ -366,6 +414,23 @@ const readSections = computed(() => ALL_TYPES.map((type) => ({
     label: TYPE_LABELS[type],
     items: props[type] ?? [],
 })));
+
+// job_field_options は個別レンダリングするため通常ループから除外
+const readSectionsMain = computed(() => readSections.value.filter((s) => s.type !== 'job_field_options'));
+
+// job_field_options のグループ一覧（読み取り用）
+const customReadGroups = computed(() => {
+    const items = props.job_field_options ?? [];
+    if (!items.length) return [];
+    const groups = {};
+    for (const item of items) {
+        const rawG = item.group || item.group_key;
+        const g = rawG || '（名前未設定）';
+        if (!groups[g]) groups[g] = { label: g, items: [] };
+        groups[g].items.push(item);
+    }
+    return Object.values(groups);
+});
 </script>
 
 <template>
@@ -451,9 +516,9 @@ const readSections = computed(() => ALL_TYPES.map((type) => ({
                 </div>
             </div>
 
-            <!-- タイプ別セクション -->
+            <!-- タイプ別セクション（job_field_options を除く通常セクション） -->
             <div
-                v-for="section in readSections"
+                v-for="section in readSectionsMain"
                 :key="section.type"
                 class="rounded bg-white shadow"
             >
@@ -754,6 +819,186 @@ const readSections = computed(() => ALL_TYPES.map((type) => ({
                     </template>
                 </div>
             </div>
+
+            <!-- ═══ カスタム項目（job_field_options）: グループを独立ブロックとして表示 ═══ -->
+
+            <!-- カスタム項目セクションタイトル（読み取り時のみ） -->
+            <div v-if="!editMode && customReadGroups.length > 0" class="flex items-center px-1 pt-2">
+                <span class="text-xs font-semibold uppercase tracking-wide text-gray-400">カスタム項目</span>
+            </div>
+
+            <!-- 読み取りモード: グループがない場合のプレースホルダー -->
+            <div v-if="!editMode && customReadGroups.length === 0" class="rounded bg-white shadow">
+                <div class="flex items-center justify-between border-b px-4 py-3">
+                    <h3 class="font-semibold text-gray-800">カスタム項目</h3>
+                </div>
+                <div class="px-4 py-4 text-sm text-gray-400">カスタム項目はまだ登録されていません。</div>
+            </div>
+
+            <!-- 読み取りモード: 各グループを独立ブロックで表示 -->
+            <template v-if="!editMode">
+                <div
+                    v-for="grp in customReadGroups"
+                    :key="grp.label"
+                    class="rounded bg-white shadow"
+                >
+                    <div class="flex items-center justify-between border-b px-4 py-3">
+                        <h3 class="font-semibold text-gray-800">
+                            カスタム項目：<span :class="grp.label === '（名前未設定）' ? 'text-gray-400 italic text-sm' : ''">{{ grp.label }}</span>
+                        </h3>
+                        <span class="text-xs text-gray-400">名前変更・削除は編集モードで</span>
+                    </div>
+                    <div class="px-4 py-4">
+                        <ul class="divide-y divide-gray-100 text-sm">
+                            <li v-for="item in grp.items" :key="item.id" class="flex items-center gap-2 py-1.5">
+                                <span class="flex-1 text-gray-700">{{ item.name }}</span>
+                                <span v-if="item.coefficient != null" class="text-xs text-gray-400">係数 {{ item.coefficient }}</span>
+                            </li>
+                            <li v-if="!grp.items.length" class="py-2 text-sm text-gray-400">登録がありません</li>
+                        </ul>
+                    </div>
+                </div>
+            </template>
+
+            <!-- 編集モード: 各グループを独立ブロックで表示 -->
+            <template v-if="editMode">
+                <div
+                    v-for="(grp, grpIdx) in getGroupedSections('job_field_options')"
+                    :key="grp.keyStr"
+                    class="rounded bg-white shadow"
+                >
+                    <!-- グループカードヘッダー -->
+                    <div class="flex items-center gap-2 border-b bg-purple-50 px-4 py-3">
+                        <!-- グループ名（インライン編集） -->
+                        <template v-if="groupRenameState.type === 'job_field_options' && String(groupRenameState.groupKey ?? '') === String(grp.key ?? '')">
+                            <span class="shrink-0 font-semibold text-purple-800">カスタム項目：</span>
+                            <div class="flex flex-1 flex-col gap-0.5">
+                                <input
+                                    v-model="groupRenameState.input"
+                                    type="text"
+                                    placeholder="グループ名を入力"
+                                    class="w-full rounded border px-2 py-1 text-sm focus:outline-none focus:ring-1"
+                                    :class="groupRenameState.error ? 'border-red-400 focus:ring-red-400' : 'border-purple-300 focus:ring-purple-400'"
+                                    @keydown.enter.prevent="confirmRenameGroup('job_field_options', grp.key)"
+                                    @keydown.escape="groupRenameState.type = null; groupRenameState.error = ''"
+                                />
+                                <p v-if="groupRenameState.error" class="text-xs text-red-600">{{ groupRenameState.error }}</p>
+                            </div>
+                            <button type="button" class="rounded bg-purple-600 px-2 py-1 text-xs text-white" @click="confirmRenameGroup('job_field_options', grp.key)">確定</button>
+                            <button type="button" class="rounded border px-2 py-1 text-xs text-gray-600" @click="groupRenameState.type = null; groupRenameState.error = ''">キャンセル</button>
+                        </template>
+                        <template v-else>
+                            <h3 class="flex-1 font-semibold text-purple-800">
+                                カスタム項目：<span :class="!grp.key ? 'text-gray-400 italic' : ''">{{ grp.key ? grp.label : '（名前未設定 — 名前変更で設定してください）' }}</span>
+                            </h3>
+                            <button type="button" class="rounded px-2 py-0.5 text-xs text-purple-600 hover:bg-purple-100" @click="startRenameGroup('job_field_options', grp.key)">✎ 名前変更</button>
+                            <button
+                                type="button"
+                                :disabled="isGroupInUse('job_field_options', grp.key)"
+                                class="rounded px-2 py-0.5 text-xs text-red-500 hover:bg-red-50 disabled:text-gray-300 disabled:cursor-not-allowed"
+                                :title="isGroupInUse('job_field_options', grp.key) ? '項目があるため削除できません' : ''"
+                                @click="deleteGroup('job_field_options', grp.key)"
+                            >✕ 削除</button>
+                        </template>
+                        <!-- 項目追加ボタン -->
+                        <div class="ml-auto flex flex-wrap gap-1">
+                            <button type="button" class="rounded border border-blue-500 px-2 py-0.5 text-xs text-blue-600 hover:bg-blue-50 whitespace-nowrap" @click="addRow('job_field_options', grp.key, 'company')">＋会社全体</button>
+                            <button
+                                v-for="d in departments"
+                                :key="d.id"
+                                type="button"
+                                class="rounded border border-indigo-400 px-2 py-0.5 text-xs text-indigo-600 hover:bg-indigo-50 whitespace-nowrap"
+                                @click="addRow('job_field_options', grp.key, String(d.id))"
+                            >＋{{ d.name }}</button>
+                        </div>
+                    </div>
+
+                    <!-- 項目テーブル（Difficulties と同じ構造） -->
+                    <div class="px-4 py-3">
+                        <table class="min-w-full divide-y divide-gray-100 text-sm">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="w-12 px-2 py-2 text-left font-medium text-gray-600">順序</th>
+                                    <th class="w-48 px-2 py-2 text-left font-medium text-gray-600">名前<span class="text-red-500">*</span></th>
+                                    <th class="px-2 py-2 text-left font-medium text-gray-600">係数</th>
+                                    <th class="px-2 py-2 text-left font-medium text-gray-600">部署</th>
+                                    <th class="w-24 px-2 py-2 text-left font-medium text-gray-600">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                                <tr
+                                    v-for="(item, idx) in grp.items"
+                                    :key="item.id ?? 'new-' + grp.keyStr + '-' + idx"
+                                    :class="item._deleted ? 'bg-red-50 opacity-60' : 'hover:bg-gray-50'"
+                                >
+                                    <td class="w-14 px-2 py-1.5">
+                                        <div class="flex flex-col gap-0.5">
+                                            <button type="button" :disabled="idx === 0 || !!item._deleted" class="h-5 w-5 text-xs text-gray-500 hover:bg-gray-200 rounded disabled:opacity-30" @click="moveUp('job_field_options', item, grp.items)">▲</button>
+                                            <button type="button" :disabled="idx === grp.items.length - 1 || !!item._deleted" class="h-5 w-5 text-xs text-gray-500 hover:bg-gray-200 rounded disabled:opacity-30" @click="moveDown('job_field_options', item, grp.items)">▼</button>
+                                        </div>
+                                    </td>
+                                    <td class="px-2 py-1.5">
+                                        <input v-model="item['name']" type="text" :disabled="!!item._deleted" placeholder="名前"
+                                            class="w-full rounded border px-2 py-1 text-sm focus:outline-none disabled:bg-gray-100"
+                                            :class="fieldError('job_field_options', item, 'name') ? 'border-red-400' : 'border-gray-300 focus:border-blue-400'" />
+                                    </td>
+                                    <td class="px-2 py-1.5">
+                                        <input v-model="item['coefficient']" type="number" :disabled="!!item._deleted" placeholder="係数"
+                                            class="w-20 rounded border px-2 py-1 text-sm focus:outline-none disabled:bg-gray-100 border-gray-300 focus:border-blue-400" />
+                                    </td>
+                                    <td class="px-2 py-1.5">
+                                        <template v-if="item._new">
+                                            <select v-model="item._targetScope" class="rounded border border-gray-300 px-1.5 py-0.5 text-xs focus:border-blue-400 focus:outline-none">
+                                                <option value="company">会社全体</option>
+                                                <option v-for="d in departments" :key="d.id" :value="String(d.id)">{{ d.name }}</option>
+                                            </select>
+                                        </template>
+                                        <template v-else-if="departments.length && currentScope === 'company'">
+                                            <div class="flex flex-wrap gap-1">
+                                                <button
+                                                    v-for="d in departments" :key="d.id" type="button" :disabled="!!item._deleted"
+                                                    :class="['rounded px-2.5 py-1 text-xs font-medium border transition-colors whitespace-nowrap',
+                                                        item._deptToggles?.[d.id] ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700' : 'bg-white text-gray-400 border-gray-300 hover:bg-gray-50 hover:text-gray-600']"
+                                                    @click="item._deptToggles[d.id] = !item._deptToggles?.[d.id]"
+                                                >{{ d.name }}</button>
+                                            </div>
+                                        </template>
+                                    </td>
+                                    <td class="min-w-[5rem] px-2 py-1.5">
+                                        <button v-if="!item._deleted" type="button" class="whitespace-nowrap text-sm font-medium text-red-500 hover:underline" @click="markDelete('job_field_options', item)">－ 削除</button>
+                                        <button v-else type="button" class="whitespace-nowrap text-sm font-medium text-green-600 hover:underline" @click="undoDelete('job_field_options', item)">元に戻す</button>
+                                    </td>
+                                </tr>
+                                <tr v-if="grp.items.length === 0">
+                                    <td colspan="5" class="px-2 py-4 text-center text-sm text-gray-400">項目がありません。「＋ 追加」ボタンで追加してください</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- グループなし時のプレースホルダー -->
+                <div v-if="!(editStates['job_field_options']?.groupConfig?.groups ?? []).length" class="rounded bg-white shadow">
+                    <div class="px-4 py-6 text-center text-sm text-gray-400">
+                        カスタム項目がありません。「＋ カスタム項目を追加」ボタンでグループを作成してください。
+                    </div>
+                </div>
+
+                <!-- フッター: 追加ボタン + 保存ボタン -->
+                <div class="flex items-center justify-between rounded bg-gray-50 px-4 py-3">
+                    <button
+                        type="button"
+                        class="rounded border border-purple-500 px-3 py-1.5 text-sm text-purple-600 hover:bg-purple-50"
+                        @click="openGroupAddModal('job_field_options')"
+                    >＋ カスタム項目を追加</button>
+                    <button
+                        type="button"
+                        class="rounded bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+                        @click="saveType('job_field_options')"
+                    >カスタム項目を保存</button>
+                </div>
+            </template>
+
         </div>
 
         <!-- グループ追加モーダル -->
