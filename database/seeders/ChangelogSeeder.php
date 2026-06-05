@@ -1166,6 +1166,25 @@ HTML,
 </section>
 HTML,
         ],
+        [
+            'version'      => 'workload-group-1',
+            'title'        => '作業項目設定のグループ・カスタム項目強化',
+            'released_at'  => '2026-06-05',
+            'summary'      => '作業項目設定のカスタム項目（job_field_options）でグループ名が保存されない不具合を修正しました。グループ機能を Difficulties にも追加し、「グループなしで追加」ボタンによりグループ不要な項目も登録できます。カスタム項目には「カスタム設計名」をスコープ別に保存する機能を追加し、セクションヘッダーに「カスタム項目：○○」と表示されます。Statuses セクションは他機能と連動しているため表示のみに変更しました。',
+            'design_files' => [],
+            'claude_notes' => '【主な変更】① job_field_options の group_key が保存されないバグを2層修正（Vue の v-if 条件除去 + Controller の validationRules に items.*.group 追加）。② workload_custom_field_configs テーブル新規作成（マイグレーション: 2026_06_05_100001）、WorkloadCustomFieldConfig モデル追加。カスタム設計名を company_id + department_id の UNIQUE キーで保存。③ difficulties テーブルに group_key カラム追加（マイグレーション: 2026_06_05_100002）。Difficulty モデルの fillable に group_key 追加。④ WorkloadSettingController: enrichWithDeptUsage を汎用化（$modelClass パラメータ追加）、difficulties・job_field_options にも部署使用状況を付与。index() で customFieldLabel・difficultiesGroupOrders を props に追加。store() で Difficulty の group_key 保存・difficulties の group_orders 保存に対応。⑤ Index.vue: GROUP_TYPES に difficulties 追加。READ_ONLY_TYPES に statuses 追加（編集不可バッジ表示）。カスタム設計名インライン編集バー（blur で確定）。グループヘッダーに紫/インディゴの帯。グループなし null キーのラベルを「グループなし」に統一。ヘッダーに「グループなしで追加」ボタン追加（group=null で addRow）。項目追加ボタンを「＋追加」に簡素化。difficultiesGroupOrders prop 追加。',
+            'body'         => <<<'HTML'
+<section class="cl-feature">
+  <h3>作業項目設定の強化</h3>
+  <ul>
+    <li><strong>グループ名保存の不具合修正：</strong>カスタム項目（カスタム設計）のグループ名が保存されなかった不具合を修正しました</li>
+    <li><strong>Difficulties にグループ機能追加：</strong>Difficulties にもグループを作成して項目を整理できるようになりました。「グループなしで追加」ボタンでグループに属さない項目も登録できます</li>
+    <li><strong>カスタム設計名の保存：</strong>カスタム項目のセクション名（例：「カスタム項目：営業進捗」）を会社・部署スコープごとに保存できます。セクションヘッダーに設定した名前が表示されます</li>
+    <li><strong>Statuses セクションの表示専用化：</strong>ジョブ依頼の進行状態と連動しているため、Statuses は閲覧のみとなりました（「他機能と連動・設定不可」バッジで明示）</li>
+  </ul>
+</section>
+HTML,
+        ],
         ];
 
         foreach ($entries as $entry) {

@@ -17,6 +17,7 @@ use App\Models\Size;
 use App\Models\Status;
 use App\Models\WorkItemType;
 use App\Models\Difficulty;
+use App\Models\WorkloadCustomFieldConfig;
 
 class WorkloadSettingController extends Controller
 {
@@ -96,10 +97,12 @@ class WorkloadSettingController extends Controller
             'difficulties' => [
                 'items.*.sort_order'  => 'nullable|integer|min:0',
                 'items.*.description' => 'nullable|string|max:1000',
+                'items.*.group'       => 'nullable|string|max:100',
             ],
             'job_field_options' => [
                 'items.*.sort_order' => 'nullable|integer|min:0',
                 'items.*.group_key'  => 'nullable|string|max:100',
+                'items.*.group'      => 'nullable|string|max:100',
             ],
             default => [],
         };
@@ -161,25 +164,42 @@ class WorkloadSettingController extends Controller
         $sizes            = $this->fetchItems(Size::class,           'sort_order',  $companyId, $deptId);
         $statuses         = $this->fetchItems(Status::class,         'sort_order',  $companyId, $deptId);
         $difficulties     = $this->fetchItems(Difficulty::class,     'sort_order',  $companyId, $deptId);
-        $jobFieldOptions  = $this->fetchItems(JobFieldOption::class, 'sort_order',  $companyId, $deptId)
-            ->map(fn($item) => array_merge($item->toArray(), ['group' => $item->group_key]));
+        $jobFieldOptions = $this->fetchItems(JobFieldOption::class, 'sort_order', $companyId, $deptId);
+
+        $customFieldConfig = WorkloadCustomFieldConfig::where('company_id', $companyId)
+            ->where(fn($q) => $deptId === null ? $q->whereNull('department_id') : $q->where('department_id', $deptId))
+            ->first();
 
         // 会社全体スコープの場合のみ部署使用情報を付与
         if ($deptId === null && $departments->isNotEmpty()) {
-            $workItemTypes = $this->enrichWithDeptUsage($workItemTypes, $companyId, $departments);
+            $workItemTypes   = $this->enrichWithDeptUsage($workItemTypes, $companyId, $departments);
+            $jobFieldOptions = $this->enrichWithDeptUsage($jobFieldOptions, $companyId, $departments, JobFieldOption::class);
+            $difficulties    = $this->enrichWithDeptUsage($difficulties,    $companyId, $departments, Difficulty::class);
         }
 
+        // group フィールドを付与（enrichWithDeptUsage 済みなら配列、未処理なら Eloquent モデル）
+        $jobFieldOptions = $jobFieldOptions->map(function ($item) {
+            $base = is_array($item) ? $item : $item->toArray();
+            return array_merge($base, ['group' => $base['group_key'] ?? '']);
+        });
+        $difficulties = $difficulties->map(function ($item) {
+            $base = is_array($item) ? $item : $item->toArray();
+            return array_merge($base, ['group' => $base['group_key'] ?? null]);
+        });
+
         return Inertia::render('WorkloadSetting/Index', [
-            'departments'       => $departments,
-            'currentScope'      => $scopeKey,
-            'canEditScope'      => $canEditScope,
-            'groupOrders'       => $this->fetchGroupOrders('work_item_types', $companyId),
-            'stages'            => $stages,
-            'work_item_types'   => $workItemTypes,
-            'sizes'             => $sizes,
-            'statuses'          => $statuses,
-            'difficulties'      => $difficulties,
-            'job_field_options' => $jobFieldOptions,
+            'departments'              => $departments,
+            'currentScope'             => $scopeKey,
+            'canEditScope'             => $canEditScope,
+            'groupOrders'              => $this->fetchGroupOrders('work_item_types', $companyId),
+            'difficultiesGroupOrders'  => $this->fetchGroupOrders('difficulties',    $companyId),
+            'customFieldLabel'         => $customFieldConfig?->label ?? '',
+            'stages'                   => $stages,
+            'work_item_types'          => $workItemTypes,
+            'sizes'                    => $sizes,
+            'statuses'                 => $statuses,
+            'difficulties'             => $difficulties,
+            'job_field_options'        => $jobFieldOptions,
         ]);
     }
 
@@ -250,9 +270,12 @@ class WorkloadSettingController extends Controller
                 }
             }
 
-            // job_field_options: 'group' または 'group_key' のどちらで届いても group_key を確実にセット
+            // group_key を持つモデル: 'group' または 'group_key' のどちらで届いても確実にセット
             if ($modelClass === JobFieldOption::class) {
                 $data['group_key'] = ($item['group'] ?? null) ?? ($item['group_key'] ?? '');
+            }
+            if ($modelClass === Difficulty::class) {
+                $data['group_key'] = ($item['group'] ?? null) ?: null;
             }
 
             // slug が必要なモデルで未指定の場合は name から自動生成（重複時サフィックス付与）
@@ -293,10 +316,21 @@ class WorkloadSettingController extends Controller
             $modelClass::create($data);
         }
 
-        // グループ表示順を保存（work_item_types のみ、group_orders が送られてきた場合）
+        // グループ表示順を保存（work_item_types / difficulties、group_orders が送られてきた場合）
         $groupOrders = $request->input('group_orders');
-        if ($type === 'work_item_types' && is_array($groupOrders) && count($groupOrders) > 0) {
+        if (in_array($type, ['work_item_types', 'difficulties']) && is_array($groupOrders) && count($groupOrders) > 0) {
             $this->saveGroupOrders($type, $companyId, $groupOrders);
+        }
+
+        // カスタム設計名を保存（job_field_options のみ）
+        if ($type === 'job_field_options') {
+            $label = $request->input('custom_field_label');
+            if ($label !== null) {
+                WorkloadCustomFieldConfig::updateOrCreate(
+                    ['company_id' => $companyId, 'department_id' => $deptId],
+                    ['label' => trim($label)],
+                );
+            }
         }
 
         // 保存後も同じスコープに留まる
@@ -334,9 +368,9 @@ class WorkloadSettingController extends Controller
     /**
      * 会社全体アイテムに「どの部署で同名アイテムが登録されているか」を付与する
      */
-    private function enrichWithDeptUsage($items, int $companyId, $departments)
+    private function enrichWithDeptUsage($items, int $companyId, $departments, string $modelClass = WorkItemType::class)
     {
-        $deptItems = WorkItemType::where('company_id', $companyId)
+        $deptItems = $modelClass::where('company_id', $companyId)
             ->whereNotNull('department_id')
             ->select('id', 'name', 'department_id')
             ->get();

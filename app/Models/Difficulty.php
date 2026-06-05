@@ -10,7 +10,7 @@ class Difficulty extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'sort_order', 'description', 'company_id', 'department_id', 'coefficient'];
+    protected $fillable = ['name', 'group_key', 'sort_order', 'description', 'company_id', 'department_id', 'coefficient'];
 
     /**
      * Difficulty の会社
