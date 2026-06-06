@@ -1149,6 +1149,18 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
         Route::get('/{team}/week-posts', [\App\Http\Controllers\TeamRoom\TeamWeekPostController::class, 'index'])->name('week_posts.index');
         Route::post('/{team}/week-posts', [\App\Http\Controllers\TeamRoom\TeamWeekPostController::class, 'store'])->name('week_posts.store');
         Route::delete('/{team}/week-posts/{post}', [\App\Http\Controllers\TeamRoom\TeamWeekPostController::class, 'destroy'])->name('week_posts.destroy');
+
+        // 係・当番表
+        Route::get('/{team}/duty-tables/create', [\App\Http\Controllers\TeamRoom\TeamDutyTableController::class, 'create'])->name('duty-tables.create');
+        Route::post('/{team}/duty-tables/preview', [\App\Http\Controllers\TeamRoom\TeamDutyTableController::class, 'preview'])->name('duty-tables.preview');
+        Route::post('/{team}/duty-tables', [\App\Http\Controllers\TeamRoom\TeamDutyTableController::class, 'store'])->name('duty-tables.store');
+        Route::delete('/{team}/duty-tables/{dutyTable}', [\App\Http\Controllers\TeamRoom\TeamDutyTableController::class, 'destroy'])->name('duty-tables.destroy');
+
+        // メモ・連絡
+        Route::get('/{team}/memo-posts', [\App\Http\Controllers\TeamRoom\TeamMemoPostController::class, 'index'])->name('memo-posts.index');
+        Route::post('/{team}/memo-posts', [\App\Http\Controllers\TeamRoom\TeamMemoPostController::class, 'store'])->name('memo-posts.store');
+        Route::put('/{team}/memo-posts/{memoPost}', [\App\Http\Controllers\TeamRoom\TeamMemoPostController::class, 'update'])->name('memo-posts.update');
+        Route::delete('/{team}/memo-posts/{memoPost}', [\App\Http\Controllers\TeamRoom\TeamMemoPostController::class, 'destroy'])->name('memo-posts.destroy');
     });
 
 // セッション Keep-Alive 用 ping エンドポイント

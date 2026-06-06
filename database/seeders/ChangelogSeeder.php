@@ -1185,6 +1185,61 @@ HTML,
 </section>
 HTML,
         ],
+        [
+            'version'      => 'team-room-2',
+            'title'        => 'チームルーム一覧に部署チーム・特別チームを追加',
+            'released_at'  => '2026-06-06',
+            'summary'      => 'チームルーム一覧ページ（team-rooms）に、部署チームと特別チームを表示するセクションを追加しました。部署チームは薄青の枠、特別チームは薄緑の枠で上部に表示されます。各セクション内でチームをドラッグ＆ドロップで並べ替えられ、順序は端末ごとに localStorage へ保存されます。',
+            'design_files' => [],
+            'claude_notes' => '【主な変更】① TeamRoomController::index(): team_type を unit のみから department/special/unit の3種に拡張。departmentTeams / specialTeams / unitTeams の3プロパティに分けて Inertia に返す。② TeamRoomController::assertMember(): team_type !== unit の 404 チェックを in_array([unit, department, special]) に変更し、部署・特別チームルームへのアクセスを許可。③ Pages/TeamRoom/Index.vue 全面刷新: 3セクション構成（部署=bg-blue-50/border-blue-200、特別=bg-green-50/border-green-200、一般=bg-white）。onMounted で localStorage の保存順序を適用。HTML5 drag-and-drop（dragstart/dragover/dragend）でセクション内並べ替えを実装し、dragend 時に localStorage へ保存。localStorage キー: team-rooms-order-dept / team-rooms-order-special / team-rooms-order-unit。各行左端に ⠿ グリップアイコン。一般チームセクションのヘッダー「一般チーム」は部署か特別チームが存在する場合のみ表示。',
+            'body'         => <<<'HTML'
+<section class="cl-feature">
+  <h3>チームルーム一覧の強化</h3>
+  <ul>
+    <li><strong>部署チームを一覧に追加：</strong>自分が所属する部署チームを薄青の枠で一覧の最上部に表示します。チーム名をクリックしてチームルームに入れます</li>
+    <li><strong>特別チームを一覧に追加：</strong>Admin が設定した特別チーム（会社横断チーム）は薄緑の枠で中段に表示されます</li>
+    <li><strong>ドラッグ＆ドロップ並べ替え：</strong>各セクション内でチームをドラッグして順序を変更できます。設定した順序は端末ごとに保存され、ページを再読み込みしても維持されます</li>
+  </ul>
+</section>
+HTML,
+        ],
+        [
+            'version'      => 'team-room-3',
+            'title'        => 'チームルーム：係・当番表タブを追加',
+            'released_at'  => '2026-06-06',
+            'summary'      => 'チームルームに「係・当番」タブを追加しました。CSV または Excel ファイルをアップロードすると HTML 表に変換してプレビュー表示し、確定すると表が保存されます。保存した表はタイトル行の「再読み込み」「削除」ボタンで管理できます。CSV は Shift-JIS・BOM 付きに対応し、Excel は PhpSpreadsheet で読み込みます。',
+            'design_files' => [],
+            'claude_notes' => '【主な変更】① マイグレーション 2026_06_06_100001: team_duty_tables テーブル（id/team_id/user_id/title/description/html_content）を新規作成。② TeamDutyTable モデル追加。③ TeamDutyTableController: create（フォーム表示）/ preview（ファイル→HTML変換・プレビュー返却）/ store（html_content を DB 保存）/ destroy。NormalizesCsvEncoding トレイトで CSV Shift-JIS 対応、PhpSpreadsheet で xlsx/xls/ods 対応。④ routes/web.php: duty-tables.create / preview / store / destroy の4ルートを team-rooms グループに追加。Ziggy 再生成。⑤ TeamRoomController::show() に dutyTables prop 追加。⑥ Pages/TeamRoom/DutyTable/Create.vue: タイトル・説明・ファイル入力 → プレビューフォーム送信 → HTML プレビュー表示 → 確定保存の2ステップ。失敗時は赤枠エラーメッセージ。⑦ Pages/TeamRoom/Show.vue: 「係・当番」タブ追加、duty-table-content CSS クラスでテーブルスタイル。',
+            'body'         => <<<'HTML'
+<section class="cl-feature">
+  <h3>チームルーム：係・当番表タブ</h3>
+  <ul>
+    <li><strong>ファイルから表を登録：</strong>CSV（Shift-JIS 可）または Excel（.xlsx/.xls）をアップロードすると、内容を HTML 表に変換してプレビュー表示します。表示を確認してから「確定して保存」で登録できます</li>
+    <li><strong>再読み込み・削除：</strong>登録済みの表はタイトル行右端の「再読み込み」ボタンで新しいファイルに差し替え、「削除」ボタンで削除できます</li>
+    <li><strong>ファイル読み込みエラー時：</strong>ファイルが壊れている場合やサポート外の形式の場合は赤いエラーメッセージで通知し、ファイルを修正して再アップロードするよう案内します</li>
+  </ul>
+</section>
+HTML,
+        ],
+        [
+            'version'      => 'team-room-4',
+            'title'        => 'チームルーム：メモ・連絡タブを追加',
+            'released_at'  => '2026-06-06',
+            'summary'      => 'チームルームに「メモ・連絡」タブを追加しました。週間プランナーの掲示板と同様のスレッド形式で投稿・返信ができます。自分の投稿はインライン編集と削除が可能です。投稿者名・返信者名・内容のキーワード検索と年月フィルターを搭載し、新しい投稿が上に表示されます。',
+            'design_files' => [],
+            'claude_notes' => '【主な変更】① マイグレーション 2026_06_06_100002: team_memo_posts テーブル（id/team_id/user_id/body/parent_id）を新規作成。parent_id は自己参照 FK（cascade）。② TeamMemoPost モデル追加。③ TeamMemoPostController: index（JSON）/ store（JSON）/ update（JSON、投稿者 or SuperAdmin のみ）/ destroy（JSON、同）。④ routes/web.php: memo-posts.index / store / update / destroy の4ルートを team-rooms グループに追加。Ziggy 再生成。⑤ Components/TeamRoom/TeamMemoBoard.vue 新規作成: axios で JSON API を呼び出し。スレッドツリー表示（parent_id を辿って深さ計算）。ルート投稿は新しい順、返信は古い順。キーワード検索（スレッド単位ヒット）・年月フィルター・キーワードハイライト（mark タグ）。インライン編集・削除（確認ダイアログ）。Enter 送信（isComposing チェックで IME 対応、Shift+Enter で改行）。⑥ Pages/TeamRoom/Show.vue: 「メモ・連絡」タブ追加、TeamMemoBoard コンポーネント組み込み。',
+            'body'         => <<<'HTML'
+<section class="cl-feature">
+  <h3>チームルーム：メモ・連絡タブ</h3>
+  <ul>
+    <li><strong>掲示板形式の投稿：</strong>チームメンバーが自由にメモや連絡事項を投稿できます。投稿への返信もスレッド形式で表示されます（↳ でインデント）</li>
+    <li><strong>編集・削除：</strong>自分の投稿はインラインで編集でき、削除ボタンから削除できます（返信も連動削除）</li>
+    <li><strong>検索・絞り込み：</strong>投稿者名・返信者名・本文のキーワード検索と年月フィルターで過去の投稿を探せます。キーワードは黄色くハイライト表示されます</li>
+    <li><strong>Enter で送信：</strong>日本語入力（IME）の変換確定後に Enter を押すと投稿できます。Shift+Enter で改行できます</li>
+  </ul>
+</section>
+HTML,
+        ],
         ];
 
         foreach ($entries as $entry) {

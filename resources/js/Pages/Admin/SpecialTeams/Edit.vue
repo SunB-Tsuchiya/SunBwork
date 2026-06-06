@@ -20,7 +20,38 @@ const form = useForm({
     member_ids:  [...initMemberIds],
 });
 
-// ── 絞り込み ──
+// ── リーダー絞り込み ──
+const leaderFilterCompanyId = ref('');
+const leaderFilterDeptId    = ref('');
+
+const leaderFilteredDepts = computed(() => {
+    if (!leaderFilterCompanyId.value) return [];
+    return departments.value.filter((d) => String(d.company_id) === String(leaderFilterCompanyId.value));
+});
+
+const filteredLeaders = computed(() => {
+    return leaders.value.filter((u) => {
+        if (leaderFilterCompanyId.value && String(u.company_id) !== String(leaderFilterCompanyId.value)) return false;
+        if (leaderFilterDeptId.value && String(u.department_id) !== String(leaderFilterDeptId.value)) return false;
+        return true;
+    });
+});
+
+watch(() => leaderFilterCompanyId.value, () => {
+    leaderFilterDeptId.value = '';
+    if (form.leader_id) {
+        const still = filteredLeaders.value.find((u) => String(u.id) === String(form.leader_id));
+        if (!still) form.leader_id = '';
+    }
+});
+watch(() => leaderFilterDeptId.value, () => {
+    if (form.leader_id) {
+        const still = filteredLeaders.value.find((u) => String(u.id) === String(form.leader_id));
+        if (!still) form.leader_id = '';
+    }
+});
+
+// ── メンバー絞り込み ──
 const filterCompanyId = ref('');
 const filterDeptId    = ref('');
 
@@ -134,10 +165,27 @@ const submit = () => {
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700">リーダー</label>
-                    <select v-model="form.leader_id" class="input mt-1 w-full">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">リーダー</label>
+                    <div class="mb-2 flex flex-wrap gap-3 rounded bg-gray-50 p-3">
+                        <div class="flex-1 min-w-[160px]">
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">会社で絞り込み</label>
+                            <select v-model="leaderFilterCompanyId" class="w-full rounded border px-2 py-1.5 text-sm">
+                                <option value="">— すべての会社 —</option>
+                                <option v-for="c in companies" :key="c.id" :value="String(c.id)">{{ c.name }}</option>
+                            </select>
+                        </div>
+                        <div class="flex-1 min-w-[160px]">
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">部署で絞り込み</label>
+                            <select v-model="leaderFilterDeptId" class="w-full rounded border px-2 py-1.5 text-sm"
+                                :disabled="!leaderFilterCompanyId">
+                                <option value="">— 部署を選択 —</option>
+                                <option v-for="d in leaderFilteredDepts" :key="d.id" :value="String(d.id)">{{ d.name }}</option>
+                            </select>
+                        </div>
+                    </div>
+                    <select v-model="form.leader_id" class="input w-full">
                         <option value="">-- 選択 --</option>
-                        <option v-for="u in leaders" :key="u.id" :value="String(u.id)">
+                        <option v-for="u in filteredLeaders" :key="u.id" :value="String(u.id)">
                             {{ u.name }} ({{ u.user_role }})
                         </option>
                     </select>

@@ -56,7 +56,7 @@ class SpecialTeamController extends Controller
             ? Company::active()->pluck('id')
             : [$companyId];
 
-        $leaders = User::select(['id', 'name', 'user_role'])
+        $leaders = User::select(['id', 'name', 'user_role', 'company_id', 'department_id'])
             ->whereIn('company_id', $leaderCompanyIds)
             ->orderBy('name')
             ->get();
@@ -155,7 +155,7 @@ class SpecialTeamController extends Controller
             ? Company::active()->pluck('id')
             : [$user->company_id];
 
-        $leaders = User::select(['id', 'name', 'user_role'])
+        $leaders = User::select(['id', 'name', 'user_role', 'company_id', 'department_id'])
             ->whereIn('company_id', $leaderCompanyIds)
             ->orderBy('name')
             ->get();

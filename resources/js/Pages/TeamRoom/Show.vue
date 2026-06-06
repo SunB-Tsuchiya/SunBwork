@@ -6,6 +6,7 @@ import { route } from 'ziggy-js';
 import TeamScheduleCalendar from '@/Components/TeamRoom/TeamScheduleCalendar.vue';
 import TeamBoard from '@/Components/TeamRoom/TeamBoard.vue';
 import TeamMinutesList from '@/Components/TeamRoom/TeamMinutesList.vue';
+import TeamMemoBoard from '@/Components/TeamRoom/TeamMemoBoard.vue';
 
 const props = defineProps({
     team:          { type: Object, required: true },
@@ -15,6 +16,7 @@ const props = defineProps({
     activeTab:     { type: String, default: 'overview' },
     // minutesタブ用（minutes.index から渡される場合）
     minutes:       { type: Array, default: null },
+    dutyTables:    { type: Array, default: () => [] },
 });
 
 const tabs = [
@@ -22,6 +24,8 @@ const tabs = [
     { key: 'schedule',  label: 'スケジュール' },
     { key: 'board',     label: 'プロジェクトボード' },
     { key: 'minutes',   label: '会議記録' },
+    { key: 'duty',      label: '係・当番' },
+    { key: 'memo',      label: 'メモ・連絡' },
 ];
 
 const activeTab = ref(new URLSearchParams(window.location.search).get('tab') || props.activeTab);
@@ -69,6 +73,11 @@ const filteredMembers = computed(() => {
 
 // ボードの状態（Show.vueで管理してコンポーネントに渡す）
 const board = ref(props.board);
+
+function confirmDelete(dt) {
+    if (!confirm(`「${dt.title}」を削除しますか？`)) return;
+    router.delete(route('team-rooms.duty-tables.destroy', { team: props.team.id, dutyTable: dt.id }));
+}
 
 function onBoardCreated(newBoard) {
     board.value = newBoard;
@@ -215,6 +224,83 @@ function onBoardUpdated(updatedBoard) {
                 />
             </section>
 
+            <!-- ── 係・当番 ── -->
+            <section v-show="activeTab === 'duty'" class="py-5">
+                <div class="mb-4 flex items-center justify-between">
+                    <h3 class="font-semibold text-gray-800">係・当番表</h3>
+                    <Link
+                        :href="route('team-rooms.duty-tables.create', { team: team.id })"
+                        class="rounded bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700"
+                    >＋ 新規登録</Link>
+                </div>
+
+                <div v-if="dutyTables.length === 0" class="py-10 text-center text-sm text-gray-400">
+                    係・当番表が登録されていません
+                </div>
+
+                <div v-else class="space-y-6">
+                    <div
+                        v-for="dt in dutyTables"
+                        :key="dt.id"
+                        class="rounded border border-gray-200 bg-white shadow-sm"
+                    >
+                        <!-- タイトル行 -->
+                        <div class="flex items-center justify-between border-b border-gray-100 bg-gray-50 px-4 py-2">
+                            <div>
+                                <span class="font-semibold text-gray-800 text-sm">{{ dt.title }}</span>
+                                <span v-if="dt.description" class="ml-3 text-xs text-gray-500">{{ dt.description }}</span>
+                            </div>
+                            <div class="flex items-center gap-2 shrink-0">
+                                <Link
+                                    :href="route('team-rooms.duty-tables.create', { team: team.id })"
+                                    class="rounded border border-indigo-300 px-2 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
+                                >再読み込み</Link>
+                                <Link
+                                    :href="route('team-rooms.duty-tables.destroy', { team: team.id, dutyTable: dt.id })"
+                                    method="delete"
+                                    as="button"
+                                    class="rounded border border-red-300 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
+                                    @click.prevent="confirmDelete(dt)"
+                                >削除</Link>
+                            </div>
+                        </div>
+                        <!-- テーブル本体 -->
+                        <div class="overflow-x-auto p-3 duty-table-content" v-html="dt.html_content"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ── メモ・連絡 ── -->
+            <section v-show="activeTab === 'memo'" class="py-5">
+                <TeamMemoBoard
+                    :team-id="team.id"
+                    :auth-user-id="authUser?.id"
+                    :is-super-admin="authUser?.user_role === 'superadmin'"
+                />
+            </section>
+
         </div>
     </AppLayout>
 </template>
+
+<style>
+.duty-table-content table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.85rem;
+}
+.duty-table-content th,
+.duty-table-content td {
+    border: 1px solid #d1d5db;
+    padding: 6px 10px;
+    text-align: left;
+    white-space: nowrap;
+}
+.duty-table-content th {
+    background-color: #f3f4f6;
+    font-weight: 600;
+}
+.duty-table-content tr:nth-child(even) td {
+    background-color: #f9fafb;
+}
+</style>
