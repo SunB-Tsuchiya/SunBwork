@@ -188,13 +188,6 @@ function getReadGroupedSections(type, items) {
 // ─── ガイドモーダル ──────────────────────────────────────────────────────────
 const showGuide = ref(false);
 
-// ─── スコープラベル ──────────────────────────────────────────────────────────
-function scopeLabel(scopeKey) {
-    if (!scopeKey || scopeKey === 'company') return '会社全体';
-    const dept = props.departments.find((d) => String(d.id) === String(scopeKey));
-    return dept ? dept.name : scopeKey;
-}
-
 // ─── アイテム操作 ────────────────────────────────────────────────────────────
 // targetScope: 省略時は現在のスコープ。部署ボタンで別スコープへ追加できる
 function addRow(type, groupKey, targetScope) {
@@ -331,14 +324,13 @@ async function saveType(type) {
     if (props.currentScope === 'company') {
         for (const item of valid) {
             if (item._new || !item._deptToggles) continue;
-            const original = props.deptItemIds ?? item.deptItemIds ?? {};
             for (const [deptIdStr, isOn] of Object.entries(item._deptToggles)) {
                 const wasOn = (item.deptItemIds?.[deptIdStr] ?? null) !== null;
                 if (isOn === wasOn) continue;
                 if (!deptActions[deptIdStr]) deptActions[deptIdStr] = [];
                 if (isOn) {
                     // 新規追加: 現在の item を複製してその部署用に
-                    const { id, _deptToggles, deptItemIds, usedByDepts, _new, _deleted, _targetScope, ...rest } = item;
+                    const { id: _id, _deptToggles: _dt, deptItemIds: _dii, usedByDepts: _ubd, _new: _n, _deleted: _del, _targetScope: _ts, ...rest } = item;
                     deptActions[deptIdStr].push({ ...rest });
                 } else {
                     // 削除: 既存の item_id を使って削除マーク

@@ -48,7 +48,7 @@ const logout = () => {
 
 import useToasts from '@/Composables/useToasts';
 import { usePage } from '@inertiajs/vue3';
-import { onBeforeUnmount, onMounted, useSlots, ref as vueRef, watch } from 'vue';
+import { onBeforeUnmount, onMounted, ref as vueRef, watch } from 'vue';
 
 const page = usePage();
 // shared toast API (shared composable)
@@ -165,7 +165,6 @@ onBeforeUnmount(() => {
     } catch {}
     clearInterval(window.__sessionPingInterval);
 });
-const slots = useSlots();
 // Debug logs removed for production
 
 // Determine an "active" key for top tabs based on current route name

@@ -176,13 +176,7 @@ const backUrl = computed(() => {
     return backTab ? `${base}?tab=${backTab}` : base;
 });
 
-function backToJob() {
-    try {
-        router.visit(route('user.project_jobs.show', { projectJob: props.projectJob.id }));
-    } catch {
-        window.location.href = route('user.project_jobs.show', { projectJob: props.projectJob.id });
-    }
-}
+
 
 // ── ジョブタイトル構築ヘルパー ────────────────────────────────────
 

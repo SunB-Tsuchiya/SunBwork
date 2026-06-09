@@ -206,29 +206,6 @@ function changeYm() {
     window.location.href = url.toString();
 }
 
-// Flatten company structure into rows for table display
-function flattenCompanyRows(company) {
-    const rows = [];
-    const seen = new Set();
-    (company.departments || []).forEach((d) => {
-        (d.members || []).forEach((m) => {
-            const key = `u:${m.id}`;
-            if (seen.has(key)) return;
-            seen.add(key);
-            rows.push({ id: m.id, name: m.name, department: d.name, assignment_name: m.assignment_name || '', employment_type: m.employment_type || 'regular', employment_type_label: m.employment_type_label || '', aggregates: m.aggregates || {} });
-        });
-        (d.teams || []).forEach((t) => {
-            (t.members || []).forEach((m) => {
-                const key = `u:${m.id}`;
-                if (seen.has(key)) return;
-                seen.add(key);
-                rows.push({ id: m.id, name: m.name, department: d.name, assignment_name: m.assignment_name || '', employment_type: m.employment_type || 'regular', employment_type_label: m.employment_type_label || '', aggregates: m.aggregates || {} });
-            });
-        });
-    });
-    return rows;
-}
-
 // Flatten a single department into table rows (department column not needed)
 function flattenDepartmentRows(dept) {
     const rows = [];
@@ -268,13 +245,6 @@ function onMemberRowClick(row) {
     const base = rolePrefix || '/leader';
     const encodedYm = encodeURIComponent(ym);
     window.location.href = `${base}/workload-analyzer/${row.id}?ym=${encodedYm}`;
-}
-
-function formatHour(h) {
-    if (typeof h === 'undefined' || h === null) return 0;
-    const n = Number(h) || 0;
-    // show with one decimal if needed
-    return Number.isInteger(n) ? String(n) : String(Math.round(n * 10) / 10);
 }
 
 // 表示モード: 'total' = 部署全体, 'by_role' = 役割ごと
@@ -350,13 +320,7 @@ function formatOvertimeMinutes(min) {
     return h > 0 ? `${h}h${m > 0 ? m + 'm' : ''}` : `${m}m`;
 }
 
-function diffMinutes(estimated, actual) {
-    const e = Number(estimated) || 0;
-    const a = Number(actual) || 0;
-    const diffHours = e - a; // hours
-    const diffMinutes = Math.round(diffHours * 60);
-    return diffMinutes;
-}
+
 </script>
 
 <template>

@@ -90,31 +90,6 @@ const combinedTotals = computed(() => {
     };
 });
 
-// Combined per-stage totals: prefer server-provided stage_data if present,
-// otherwise distribute the combined pages across known stages evenly.
-const combinedStageTotals = computed(() => {
-    const stages = (props.stage_labels || []).length;
-    const stageData = (props.stage_data || []).map((v) => Number(v || 0));
-    const combinedPages = Number(combinedTotals.value.pages || 0);
-
-    if (stageData.length === stages && stageData.reduce((a, b) => a + b, 0) === combinedPages) {
-        // already matches combined pages
-        return stageData;
-    }
-
-    if (stageData.length === stages && stageData.reduce((a, b) => a + b, 0) > 0) {
-        // prefer existing stage breakdown if it has positive totals
-        return stageData;
-    }
-
-    // fallback: distribute combinedPages evenly across stages
-    if (stages === 0) return [];
-    const base = Math.floor(combinedPages / stages);
-    const rest = combinedPages - base * stages;
-    const out = Array.from({ length: stages }, (_, i) => base + (i < rest ? 1 : 0));
-    return out;
-});
-
 // chart refs for summary section
 const radarChartRef = ref(null);
 const rankingChartRef = ref(null);

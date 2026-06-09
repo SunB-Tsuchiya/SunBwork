@@ -34,12 +34,12 @@ function applyOrder(teams, savedIds) {
 
 const deptTeams = ref([]);
 const specTeams = ref([]);
-const unitTeams = ref([]);
+const unitTeamList = ref([]);
 
 onMounted(() => {
     deptTeams.value = applyOrder(props.departmentTeams, loadOrder(STORAGE_KEYS.department));
     specTeams.value = applyOrder(props.specialTeams,    loadOrder(STORAGE_KEYS.special));
-    unitTeams.value = applyOrder(props.unitTeams,       loadOrder(STORAGE_KEYS.unit));
+    unitTeamList.value = applyOrder(props.unitTeams,       loadOrder(STORAGE_KEYS.unit));
 });
 
 // ─── drag & drop ────────────────────────────────────────────────
@@ -47,7 +47,7 @@ let dragFromIndex = -1;
 let dragSection   = null;
 
 function getList(section) {
-    return { department: deptTeams, special: specTeams, unit: unitTeams }[section];
+    return { department: deptTeams, special: specTeams, unit: unitTeamList }[section];
 }
 
 function onDragStart(idx, section, event) {
@@ -195,7 +195,7 @@ function goToRoom(teamId) {
             <!-- 一般チーム -->
             <div class="rounded bg-white p-6 shadow">
                 <h3 v-if="deptTeams.length > 0 || specTeams.length > 0" class="mb-3 text-sm font-semibold text-gray-500">一般チーム</h3>
-                <div v-if="unitTeams.length === 0" class="py-12 text-center text-gray-400">
+                <div v-if="unitTeamList.length === 0" class="py-12 text-center text-gray-400">
                     所属しているチームがありません
                 </div>
                 <table v-else class="min-w-full divide-y divide-gray-200 text-sm">
@@ -211,7 +211,7 @@ function goToRoom(teamId) {
                     </thead>
                     <tbody class="divide-y divide-gray-100 bg-white">
                         <tr
-                            v-for="(team, idx) in unitTeams"
+                            v-for="(team, idx) in unitTeamList"
                             :key="team.id"
                             draggable="true"
                             class="cursor-pointer hover:bg-gray-50"

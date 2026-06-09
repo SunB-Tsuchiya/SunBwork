@@ -11,8 +11,6 @@ const props = defineProps({
     canEdit:  { type: Boolean, default: false },
 });
 
-const page = { props: {} };
-
 // コメントフォーム
 const commentForm = useForm({ comment: '' });
 
@@ -40,7 +38,7 @@ function formatDateTime(d) {
     return String(d).replace('T', ' ').slice(0, 16);
 }
 
-const authUser = computed(() => window.__inertia_page?.props?.auth?.user);
+
 </script>
 
 <template>

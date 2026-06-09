@@ -168,39 +168,7 @@ function getDeptRanking(dept) {
     });
 }
 
-// 全社横断フラット（全部署）でランキング
-function getCompanyRanking(company) {
-    const seen = new Set();
-    const members = [];
-    (company.departments ?? []).forEach((d) => {
-        (d.members ?? []).forEach((m) => {
-            if (!seen.has(m.id)) { seen.add(m.id); members.push({ ...m, _dept: d.name }); }
-        });
-        (d.teams ?? []).forEach((t) => {
-            (t.members ?? []).forEach((m) => {
-                if (!seen.has(m.id)) { seen.add(m.id); members.push({ ...m, _dept: d.name }); }
-            });
-        });
-    });
 
-    const getValue = currentCategory.value.getValue;
-    const scored = members.map((m) => ({ ...m, _score: getValue(m) }));
-    scored.sort((a, b) => b._score - a._score);
-
-    let rank = 0;
-    let prevScore = null;
-    let prevRank = 0;
-    return scored.map((m, i) => {
-        if (m._score !== prevScore) {
-            rank = i + 1;
-            prevRank = rank;
-        } else {
-            rank = prevRank;
-        }
-        prevScore = m._score;
-        return { ...m, _rank: rank };
-    });
-}
 
 const rankBadgeClass = (rank) => {
     if (rank === 1) return 'bg-yellow-400 text-yellow-900';

@@ -43,14 +43,6 @@ watch(activeTab, (tab) => {
 const page = usePage();
 const authUser = computed(() => page.props.auth?.user);
 
-const roleLabel = {
-    superadmin:  'SuperAdmin',
-    admin:       'Admin',
-    leader:      'Leader',
-    coordinator: 'Coordinator',
-    clerk:       'Clerk',
-    user:        'User',
-};
 const roleColor = {
     superadmin:  'bg-yellow-100 text-yellow-800 border-yellow-200',
     admin:       'bg-red-100 text-red-800 border-red-200',
