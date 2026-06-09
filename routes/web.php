@@ -1168,6 +1168,29 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session')])->get('/pin
     return response()->noContent();
 })->name('ping');
 
+// ラベルマスタ CRUD API（全ログインユーザー）
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified'])->prefix('label-masters')->group(function () {
+    Route::get('/schools',              [\App\Http\Controllers\LabelMasterController::class, 'schoolsIndex']);
+    Route::post('/schools',             [\App\Http\Controllers\LabelMasterController::class, 'schoolsStore']);
+    Route::put('/schools/{school}',     [\App\Http\Controllers\LabelMasterController::class, 'schoolsUpdate']);
+    Route::delete('/schools/{school}',  [\App\Http\Controllers\LabelMasterController::class, 'schoolsDestroy']);
+
+    Route::get('/test-names',                [\App\Http\Controllers\LabelMasterController::class, 'testNamesIndex']);
+    Route::post('/test-names',               [\App\Http\Controllers\LabelMasterController::class, 'testNamesStore']);
+    Route::put('/test-names/{testName}',     [\App\Http\Controllers\LabelMasterController::class, 'testNamesUpdate']);
+    Route::delete('/test-names/{testName}',  [\App\Http\Controllers\LabelMasterController::class, 'testNamesDestroy']);
+
+    Route::get('/subjects',              [\App\Http\Controllers\LabelMasterController::class, 'subjectsIndex']);
+    Route::post('/subjects',             [\App\Http\Controllers\LabelMasterController::class, 'subjectsStore']);
+    Route::put('/subjects/{subject}',    [\App\Http\Controllers\LabelMasterController::class, 'subjectsUpdate']);
+    Route::delete('/subjects/{subject}', [\App\Http\Controllers\LabelMasterController::class, 'subjectsDestroy']);
+
+    Route::get('/item-types',               [\App\Http\Controllers\LabelMasterController::class, 'itemTypesIndex']);
+    Route::post('/item-types',              [\App\Http\Controllers\LabelMasterController::class, 'itemTypesStore']);
+    Route::put('/item-types/{itemType}',    [\App\Http\Controllers\LabelMasterController::class, 'itemTypesUpdate']);
+    Route::delete('/item-types/{itemType}', [\App\Http\Controllers\LabelMasterController::class, 'itemTypesDestroy']);
+});
+
 // SuperAdmin コンテキスト切り替え
 Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'superadmin'])
     ->post('/superadmin/switch-context', [App\Http\Controllers\SuperAdmin\ContextController::class, 'switch'])

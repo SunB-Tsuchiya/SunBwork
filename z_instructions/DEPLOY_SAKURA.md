@@ -98,19 +98,33 @@ npm run build
 ---
 
 ## 6. ユーザーへ伝えるメッセージ（コピペ用）
-### sshの指示は可能ならワンライナーで表示。
 
+**SSH 接続先:** `silverlamb759@silverlamb759.sakura.ne.jp`
+
+### マイグレーションあり（テーブル追加・カラム変更がある場合）
+
+```bash
+git push origin main
 ```
-【あなたの操作が必要です】
 
-1. git push origin main
+```bash
+ssh silverlamb759@silverlamb759.sakura.ne.jp "cd ~/SunBWork && git pull && php artisan migrate && php artisan config:clear && php artisan cache:clear"
+```
 
-2. さくら SSH でデプロイ:　できればワインラインで。
-   cd ~/SunBWork
-   git pull
-   php artisan migrate          ← マイグレーションがない場合は省略可
-   php artisan config:clear
-   php artisan cache:clear
+### マイグレーションなし（JS/CSS/PHP のみ変更の場合）
+
+```bash
+git push origin main
+```
+
+```bash
+ssh silverlamb759@silverlamb759.sakura.ne.jp "cd ~/SunBWork && git pull && php artisan config:clear && php artisan cache:clear"
+```
+
+### ChangelogSeeder も反映する場合（末尾に追加）
+
+```bash
+ssh silverlamb759@silverlamb759.sakura.ne.jp "cd ~/SunBWork && git pull && php artisan migrate && php artisan config:clear && php artisan cache:clear && php artisan db:seed --class=ChangelogSeeder"
 ```
 
 ---

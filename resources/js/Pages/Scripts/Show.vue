@@ -14,6 +14,9 @@ const componentMap = {
     ImageRenamer: defineAsyncComponent(() =>
         import('@/Components/Scripts/ImageRenamer.vue')
     ),
+    LabelGenerator: defineAsyncComponent(() =>
+        import('@/Components/Scripts/LabelGenerator.vue')
+    ),
 };
 
 const CurrentTool = computed(() => componentMap[props.script.component_key] ?? null);
