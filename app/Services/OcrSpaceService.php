@@ -441,6 +441,57 @@ class OcrSpaceService
         return array_slice($results, 0, 10);
     }
 
+    /**
+     * 画像ファイルの全ページOCR（アイテムPDF / スキャン画像用）。
+     * クロップなしで全体を認識して生テキストを返す。
+     */
+    public function recognizeFullPage(string $imagePath): string
+    {
+        $apiKey = config('services.ocr_space.api_key');
+        if (!$apiKey) {
+            Log::error('OcrSpaceService::recognizeFullPage: OCR_SPACE_API_KEY not configured');
+            return '';
+        }
+
+        if (!file_exists($imagePath)) {
+            Log::error('OcrSpaceService::recognizeFullPage: file not found', ['path' => $imagePath]);
+            return '';
+        }
+
+        try {
+            $base64 = base64_encode(file_get_contents($imagePath));
+
+            $response = Http::timeout(30)->asForm()->post(self::API_URL, [
+                'apikey'            => $apiKey,
+                'base64Image'       => 'data:image/jpeg;base64,' . $base64,
+                'language'          => 'jpn',
+                'OCREngine'         => '2',
+                'isOverlayRequired' => 'false',
+                'scale'             => 'true',
+                'isTable'           => 'false',
+            ]);
+
+            if (!$response->successful()) {
+                Log::warning('OcrSpaceService::recognizeFullPage: API error', ['status' => $response->status()]);
+                return '';
+            }
+
+            $data = $response->json();
+            if ($data['IsErroredOnProcessing'] ?? false) {
+                Log::warning('OcrSpaceService::recognizeFullPage: processing error', ['data' => $data]);
+                return '';
+            }
+
+            $text = $data['ParsedResults'][0]['ParsedText'] ?? '';
+            Log::info('OcrSpaceService::recognizeFullPage: done', ['chars' => mb_strlen($text)]);
+            return $text;
+
+        } catch (\Throwable $e) {
+            Log::error('OcrSpaceService::recognizeFullPage: exception', ['message' => $e->getMessage()]);
+            return '';
+        }
+    }
+
     private function emptyResult(): array
     {
         return [

@@ -1191,6 +1191,11 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::delete('/item-types/{itemType}', [\App\Http\Controllers\LabelMasterController::class, 'itemTypesDestroy']);
 });
 
+// ラベルアイテムPDF OCR 解析（全ログインユーザー）
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified'])
+    ->post('/label-ocr/analyze', [\App\Http\Controllers\LabelOcrController::class, 'analyze'])
+    ->name('label-ocr.analyze');
+
 // SuperAdmin コンテキスト切り替え
 Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'superadmin'])
     ->post('/superadmin/switch-context', [App\Http\Controllers\SuperAdmin\ContextController::class, 'switch'])

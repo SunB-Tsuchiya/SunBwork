@@ -293,6 +293,18 @@ const gradeOptions   = ref([]);
 const selectedGrade  = ref('');
 const selectedPreset        = ref('A');
 const detectedItems         = ref([]);
+const confirmedItems        = ref([]);   // OCR確認済みアイテム（最優先）
+const confirmedTests        = ref([]);   // OCR確認済みテスト一覧
+const ichishikiFlag         = ref(false);
+const itemPdfName           = ref('');
+const ocrStep               = ref('idle');   // 'idle' | 'uploading' | 'done'
+const showOcrModal          = ref(false);
+const ocrRawText            = ref('');
+const modalTests            = ref([]);
+const modalItems            = ref([]);
+const modalIchishiki        = ref(false);
+const ocrError              = ref('');
+const pdfInputRef           = ref(null);
 const gradeLabelOverrides   = ref({});
 const gradeTestNameOverrides = ref({});
 const gradeDateOverrides     = ref({});
@@ -1194,11 +1206,18 @@ function downloadFile(f) {
 
 const presetItems = computed(() => PRESETS[selectedPreset.value]?.items ?? []);
 
-// Excel凡例から検出したアイテム、なければPRESETフォールバック
+// OCR確認済み > Excel検出 > PRESET の優先順
 const activeItems = computed(() =>
-    detectedItems.value.length > 0
-        ? detectedItems.value
-        : (PRESETS[selectedPreset.value]?.items ?? [])
+    confirmedItems.value.length > 0
+        ? confirmedItems.value
+        : (detectedItems.value.length > 0
+            ? detectedItems.value
+            : (PRESETS[selectedPreset.value]?.items ?? []))
+);
+
+// アイテム編集エディタが操作するリスト（confirmedItems 優先、なければ detectedItems）
+const activeEditItems = computed(() =>
+    confirmedItems.value.length > 0 ? confirmedItems.value : detectedItems.value
 );
 
 const canGenerate = computed(() =>
@@ -1247,6 +1266,13 @@ const datesWithIchishiki = computed(() =>
         .concat(sheetsData.value['__common']?.['ichishiki'] ? ['（共通）'] : [])
 );
 
+// シートログ表示用（「原本」シートと TS除外シートは非表示）
+const visibleSheetLog = computed(() =>
+    sheetLog.value.filter(s =>
+        !s.originalName.normalize('NFKC').includes('原本') && s.key !== 'exclude'
+    )
+);
+
 function toggleArea(key) {
     const arr = [...selectedAreas.value];
     const idx = arr.indexOf(key);
@@ -1262,9 +1288,105 @@ function clearAllAreas()   { selectedAreas.value = []; }
 
 function gradeDisplayLabel(g) { return gradeLabelOverrides.value[g] || g; }
 function addItemRow() {
-    detectedItems.value.push({ num: '', subject: '', itemLabel: '', maxBox: 100, sheetKey: 'kokusan' });
+    const target = confirmedItems.value.length > 0 ? confirmedItems : detectedItems;
+    target.value.push({ num: '', subject: '', itemLabel: '', maxBox: 100, sheetKey: 'kokusan' });
 }
-function removeItemRow(idx) { detectedItems.value.splice(idx, 1); }
+function removeItemRow(idx) {
+    const target = confirmedItems.value.length > 0 ? confirmedItems : detectedItems;
+    target.value.splice(idx, 1);
+}
+
+// ============================================================
+// アイテムPDF OCR
+// ============================================================
+
+function inferSheetKeyFromItem(text) {
+    const n = (text || '').normalize('NFKC');
+    if (/DI答案|答案用紙/.test(n)) {
+        return /社会|社理|理科/.test(n) ? 'shashiri_di' : 'kokusan_di';
+    }
+    if (/国算/.test(n)) return 'kokusan';
+    if (/社理|社会|理科/.test(n)) return 'shashiri';
+    return 'main';
+}
+
+async function handlePdfDrop(e) {
+    const file = e.dataTransfer?.files?.[0];
+    if (file) await uploadItemPdf(file);
+}
+
+async function handlePdfSelect(e) {
+    const file = e.target?.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    await uploadItemPdf(file);
+}
+
+async function uploadItemPdf(file) {
+    itemPdfName.value = file.name;
+    ocrStep.value     = 'uploading';
+    ocrError.value    = '';
+
+    const fd = new FormData();
+    fd.append('file', file);
+
+    try {
+        const { data } = await axios.post('/label-ocr/analyze', fd);
+        ocrRawText.value     = data.ocr_text || '';
+        modalTests.value     = (data.tests  || []).map(t => ({ ...t }));
+        modalItems.value     = (data.items  || []).map(item => ({
+            ...item,
+            sheetKey: inferSheetKeyFromItem(item.text_raw || ''),
+        }));
+        modalIchishiki.value = data.ichishiki || false;
+        showOcrModal.value   = true;
+    } catch (e) {
+        ocrError.value    = `OCRエラー: ${e.response?.data?.error || e.message}`;
+        ocrStep.value     = 'idle';
+        itemPdfName.value = '';
+    }
+}
+
+function confirmOcrResult() {
+    confirmedItems.value = modalItems.value.map(item => {
+        const text = (item.text_raw || '').normalize('NFKC');
+        const { subject, itemLabel } = parseItemLabel('①' + text);
+        return {
+            num:       item.num,
+            subject,
+            itemLabel: itemLabel || text,
+            maxBox:    item.max_box,
+            sheetKey:  item.sheetKey,
+        };
+    });
+    confirmedTests.value = modalTests.value.map(t => ({ ...t }));
+    ichishikiFlag.value  = modalIchishiki.value;
+
+    if (!testNameVal.value && modalTests.value.length > 0) {
+        testNameVal.value = modalTests.value[0].name_raw;
+    }
+
+    showOcrModal.value = false;
+    ocrStep.value      = 'done';
+}
+
+function selectModalTestName(idx, name) {
+    modalTests.value[idx] = { ...modalTests.value[idx], name_raw: name };
+}
+
+function addModalItem() {
+    modalItems.value.push({ num: '', text_raw: '', max_box: 100, sheetKey: 'kokusan' });
+}
+function removeModalItem(idx) { modalItems.value.splice(idx, 1); }
+
+function clearOcr() {
+    confirmedItems.value = [];
+    confirmedTests.value = [];
+    ichishikiFlag.value  = false;
+    ocrStep.value        = 'idle';
+    itemPdfName.value    = '';
+    ocrRawText.value     = '';
+}
 </script>
 
 <template>
@@ -1502,6 +1624,52 @@ function removeItemRow(idx) { detectedItems.value.splice(idx, 1); }
         <div v-if="step === 1" class="rounded-lg bg-orange-50 border border-orange-200 shadow p-6 space-y-5">
             <h3 class="text-base font-semibold text-orange-900">宛先ラベル出力設定</h3>
 
+            <!-- ── アイテムPDF OCR ── -->
+            <div class="space-y-2">
+                <label class="block text-xs font-medium text-gray-600">
+                    アイテムPDF <span class="text-gray-400">（テスト名・アイテムをOCRで自動検出）</span>
+                    <span class="ml-1 text-gray-400">省略可 — 省略時はExcel凡例またはプリセットを使用</span>
+                </label>
+
+                <!-- 確認済み -->
+                <div v-if="ocrStep === 'done'" class="flex flex-wrap items-center gap-2 rounded border border-green-200 bg-green-50 px-3 py-2 text-xs">
+                    <span class="text-green-700 font-medium">✔ {{ itemPdfName }}</span>
+                    <span class="text-green-600">— {{ confirmedItems.length }} 件のアイテムを確認済み</span>
+                    <button @click="showOcrModal = true" type="button"
+                        class="ml-auto text-xs text-blue-600 hover:underline">再編集</button>
+                    <button @click="clearOcr" type="button"
+                        class="text-xs text-gray-400 hover:text-red-500">× クリア</button>
+                </div>
+
+                <!-- アップロード中 -->
+                <div v-else-if="ocrStep === 'uploading'"
+                    class="flex items-center gap-3 rounded border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-700">
+                    <svg class="animate-spin h-4 w-4 text-orange-500 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    OCR解析中... （{{ itemPdfName }}）
+                </div>
+
+                <!-- ドロップゾーン -->
+                <div v-else
+                    class="relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-orange-300 bg-white px-6 py-5 transition hover:border-orange-400 hover:bg-orange-50 cursor-pointer"
+                    @dragover.prevent
+                    @drop.prevent="handlePdfDrop"
+                    @click="pdfInputRef?.click()">
+                    <svg class="h-7 w-7 text-orange-300 mb-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <p class="text-sm text-orange-700 font-medium">アイテムPDFをドロップ</p>
+                    <p class="text-xs text-gray-400 mt-0.5">またはクリックしてファイルを選択（PDF / スキャン画像）</p>
+                    <input ref="pdfInputRef" type="file" accept=".pdf,image/*" class="hidden"
+                        @change="handlePdfSelect" />
+                </div>
+
+                <p v-if="ocrError" class="text-xs text-red-600">{{ ocrError }}</p>
+            </div>
+
             <!-- ファイル選択 -->
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
@@ -1540,8 +1708,11 @@ function removeItemRow(idx) { detectedItems.value.splice(idx, 1); }
                 class="rounded border border-green-200 bg-green-50 px-4 py-3 space-y-2">
                 <p class="text-xs font-semibold text-green-800">✔ Excelを読み込みました — 以下の設定を自動適用しました</p>
                 <div class="grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-green-900">
-                    <div v-if="detectedItems.length > 0">
-                        アイテム: <strong class="text-green-700">{{ detectedItems.length }}件（Excel凡例から自動検出）</strong>
+                    <div v-if="confirmedItems.length > 0">
+                        アイテム: <strong class="text-green-700">{{ confirmedItems.length }}件（アイテムPDF確認済み）</strong>
+                    </div>
+                    <div v-else-if="detectedItems.length > 0">
+                        アイテム: <strong class="text-green-700">{{ detectedItems.length }}件（Excel凡例から検出）</strong>
                     </div>
                     <div v-else>プリセット: <strong>{{ PRESETS[selectedPreset]?.label ?? '—' }}</strong></div>
                     <div>対象学年: <strong>{{ gradeOptions.join('、') || '未検出（下で入力）' }}</strong></div>
@@ -1603,7 +1774,8 @@ function removeItemRow(idx) { detectedItems.value.splice(idx, 1); }
                 <div class="flex items-center justify-between">
                     <label class="text-xs font-medium text-gray-600">
                         出力アイテム
-                        <span v-if="detectedItems.length > 0" class="ml-1 text-green-700 font-normal">（Excel凡例から自動検出）</span>
+                        <span v-if="confirmedItems.length > 0" class="ml-1 text-green-700 font-normal">（アイテムPDF確認済み）</span>
+                        <span v-else-if="detectedItems.length > 0" class="ml-1 text-green-700 font-normal">（Excel凡例から検出）</span>
                         <span v-else class="ml-1 text-orange-600 font-normal">（プリセット: {{ PRESETS[selectedPreset]?.label ?? '—' }}）</span>
                     </label>
                     <button @click="showItemEditor = !showItemEditor" type="button"
@@ -1614,15 +1786,18 @@ function removeItemRow(idx) { detectedItems.value.splice(idx, 1); }
 
                 <!-- 編集モード -->
                 <div v-if="showItemEditor" class="rounded border border-blue-200 bg-blue-50 p-3 space-y-2">
-                    <div v-for="(item, idx) in detectedItems" :key="idx"
+                    <div v-if="activeEditItems.length === 0" class="text-xs text-gray-400 italic">
+                        アイテムがありません。「+ アイテムを追加」で手動入力できます。
+                    </div>
+                    <div v-for="(item, idx) in activeEditItems" :key="idx"
                         class="flex items-center gap-1.5 text-xs">
-                        <input v-model="detectedItems[idx].num" type="text" placeholder="①"
+                        <input v-model="activeEditItems[idx].num" type="text" placeholder="①"
                             class="w-8 rounded border border-gray-300 px-1 py-0.5 text-center" />
-                        <input v-model="detectedItems[idx].subject" type="text" placeholder="科目"
+                        <input v-model="activeEditItems[idx].subject" type="text" placeholder="科目"
                             class="w-16 rounded border border-gray-300 px-1 py-0.5" />
-                        <input v-model="detectedItems[idx].itemLabel" type="text" placeholder="内容"
+                        <input v-model="activeEditItems[idx].itemLabel" type="text" placeholder="内容"
                             class="flex-1 rounded border border-gray-300 px-1 py-0.5" />
-                        <select v-model="detectedItems[idx].sheetKey"
+                        <select v-model="activeEditItems[idx].sheetKey"
                             class="w-28 rounded border border-gray-300 px-1 py-0.5 text-xs">
                             <option value="kokusan">kokusan</option>
                             <option value="shashiri">shashiri</option>
@@ -1633,7 +1808,7 @@ function removeItemRow(idx) { detectedItems.value.splice(idx, 1); }
                             <option value="nika">nika</option>
                             <option value="main">main</option>
                         </select>
-                        <input v-model.number="detectedItems[idx].maxBox" type="number" min="1"
+                        <input v-model.number="activeEditItems[idx].maxBox" type="number" min="1"
                             class="w-14 rounded border border-gray-300 px-1 py-0.5" />
                         <button @click="removeItemRow(idx)" type="button"
                             class="text-red-400 hover:text-red-600 px-1">✕</button>
@@ -1722,8 +1897,8 @@ function removeItemRow(idx) { detectedItems.value.splice(idx, 1); }
                         出力時は全学年（{{ gradeOptions.join('・') }}）を生成します
                     </p>
                 </div>
-                <div v-if="detectedItems.length === 0">
-                    <label class="block text-xs font-medium text-gray-600 mb-1">テスト種別 <span class="text-gray-400">（Excelから検出できない場合に使用）</span></label>
+                <div v-if="confirmedItems.length === 0 && detectedItems.length === 0">
+                    <label class="block text-xs font-medium text-gray-600 mb-1">テスト種別 <span class="text-gray-400">（OCR / Excel未使用の場合のフォールバック）</span></label>
                     <select v-model="selectedPreset"
                         class="w-full rounded border border-orange-300 bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400">
                         <option v-for="(preset, key) in PRESETS" :key="key" :value="key">{{ preset.label }}</option>
@@ -1734,11 +1909,11 @@ function removeItemRow(idx) { detectedItems.value.splice(idx, 1); }
             <!-- 検出シート詳細 -->
             <details v-if="sheetLog.length > 0" class="text-xs">
                 <summary class="cursor-pointer text-xs font-medium text-gray-500 hover:text-gray-700">
-                    検出シート詳細（{{ sheetLog.length }}枚）
-                    <span v-if="excludedCodes.size > 0" class="ml-2 text-red-500">除外: {{ excludedCodes.size }} 件</span>
+                    検出シート詳細（{{ visibleSheetLog.length }}枚表示 / 合計{{ sheetLog.length }}枚）
+                    <span v-if="excludedCodes.size > 0" class="ml-2 text-red-500">TS除外: {{ excludedCodes.size }} 件</span>
                 </summary>
                 <div class="mt-1 rounded border border-orange-100 bg-white divide-y divide-gray-50">
-                    <div v-for="s in sheetLog" :key="s.originalName"
+                    <div v-for="s in visibleSheetLog" :key="s.originalName"
                         class="flex items-start gap-2 px-3 py-1.5"
                         :class="{ 'opacity-50': !s.isFirst && s.key !== 'exclude' && s.key !== 'ichishiki' }">
                         <span class="font-medium text-gray-800 truncate max-w-[200px] flex-shrink-0">{{ s.originalName }}</span>
@@ -1891,5 +2066,119 @@ function removeItemRow(idx) { detectedItems.value.splice(idx, 1); }
         </div>
 
         </div><!-- /activeTab === 'tool' -->
+
+        <!-- ============ OCR 確認モーダル ============ -->
+        <Teleport to="body">
+            <div v-if="showOcrModal"
+                class="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 overflow-y-auto"
+                @click.self="showOcrModal = false">
+                <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl my-8">
+                    <!-- ヘッダー -->
+                    <div class="flex items-center justify-between px-6 pt-5 pb-3 border-b">
+                        <h3 class="text-base font-semibold text-gray-900">アイテムPDF解析結果</h3>
+                        <span class="text-xs text-gray-400 truncate max-w-xs">{{ itemPdfName }}</span>
+                    </div>
+
+                    <div class="px-6 py-4 space-y-4 max-h-[70vh] overflow-y-auto">
+                        <!-- OCR 生テキスト（折りたたみ） -->
+                        <details class="text-xs">
+                            <summary class="cursor-pointer text-gray-500 hover:text-gray-700">OCR生テキスト（確認用）</summary>
+                            <pre class="mt-1 bg-gray-50 border rounded p-2 whitespace-pre-wrap max-h-36 overflow-y-auto text-gray-600">{{ ocrRawText || '（テキストなし）' }}</pre>
+                        </details>
+
+                        <!-- テスト一覧 -->
+                        <div>
+                            <p class="text-xs font-medium text-gray-700 mb-2">検出されたテスト</p>
+                            <div v-if="modalTests.length === 0"
+                                class="text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded p-2">
+                                テストを検出できませんでした。OCR生テキストを確認してください。
+                            </div>
+                            <div v-for="(test, ti) in modalTests" :key="ti"
+                                class="rounded border border-gray-200 bg-gray-50 p-3 space-y-2 mb-2">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xs text-gray-500 w-14 flex-shrink-0">実施日</span>
+                                    <input v-model="modalTests[ti].date_raw" type="text" placeholder="3/21"
+                                        class="w-24 rounded border border-gray-300 px-1.5 py-0.5 text-xs" />
+                                    <span v-if="test.grade_raw" class="text-xs text-gray-500 ml-2">学年</span>
+                                    <input v-if="test.grade_raw" v-model="modalTests[ti].grade_raw" type="text"
+                                        class="w-20 rounded border border-gray-300 px-1.5 py-0.5 text-xs" />
+                                </div>
+                                <div class="space-y-1">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs text-gray-500 w-14 flex-shrink-0">テスト名</span>
+                                        <input v-model="modalTests[ti].name_raw" type="text"
+                                            class="flex-1 rounded border border-gray-300 px-1.5 py-0.5 text-xs" />
+                                    </div>
+                                    <!-- DB候補ボタン -->
+                                    <div v-if="test.matched_test_names && test.matched_test_names.length > 0"
+                                        class="flex flex-wrap gap-1 ml-16">
+                                        <button v-for="m in test.matched_test_names" :key="m.id"
+                                            @click.prevent="selectModalTestName(ti, m.name)"
+                                            type="button"
+                                            class="px-2 py-0.5 text-xs rounded-full bg-orange-100 text-orange-700 hover:bg-orange-200 border border-orange-200">
+                                            {{ m.name }} <span class="text-orange-400 text-xs">{{ m.score }}%</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- アイテム一覧 -->
+                        <div>
+                            <p class="text-xs font-medium text-gray-700 mb-2">検出されたアイテム</p>
+                            <div v-if="modalItems.length === 0"
+                                class="text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded p-2 mb-2">
+                                アイテムを検出できませんでした。「+ 追加」で手動入力してください。
+                            </div>
+                            <div v-for="(item, ii) in modalItems" :key="ii"
+                                class="flex items-center gap-1.5 text-xs mb-1">
+                                <input v-model="modalItems[ii].num" type="text" placeholder="①"
+                                    class="w-8 rounded border border-gray-300 px-1 py-0.5 text-center flex-shrink-0" />
+                                <input v-model="modalItems[ii].text_raw" type="text" placeholder="国算 解答"
+                                    class="flex-1 rounded border border-gray-300 px-1 py-0.5 min-w-0" />
+                                <select v-model="modalItems[ii].sheetKey"
+                                    class="w-28 rounded border border-gray-300 px-1 py-0.5 text-xs flex-shrink-0">
+                                    <option value="kokusan">kokusan</option>
+                                    <option value="shashiri">shashiri</option>
+                                    <option value="kokusan_di">kokusan_di</option>
+                                    <option value="shashiri_di">shashiri_di</option>
+                                    <option value="kokusan_kaitou">kokusan_kaitou</option>
+                                    <option value="yonka">yonka</option>
+                                    <option value="nika">nika</option>
+                                    <option value="main">main</option>
+                                </select>
+                                <input v-model.number="modalItems[ii].max_box" type="number" min="1"
+                                    class="w-14 rounded border border-gray-300 px-1 py-0.5 flex-shrink-0" placeholder="100" />
+                                <button @click="removeModalItem(ii)" type="button"
+                                    class="text-red-400 hover:text-red-600 px-1 flex-shrink-0">✕</button>
+                            </div>
+                            <button @click="addModalItem" type="button"
+                                class="text-xs text-orange-600 hover:underline mt-1">+ アイテムを追加</button>
+                            <p class="text-xs text-gray-400 mt-1">sheetKey: Excelシートの分類 / 最大部数: 箱分割の上限（解答100・問題50・DI答案250）</p>
+                        </div>
+
+                        <!-- 一式フラグ -->
+                        <label class="flex items-center gap-2 text-sm cursor-pointer">
+                            <input type="checkbox" v-model="modalIchishiki"
+                                class="rounded border-gray-300 text-orange-500" />
+                            <span class="text-gray-700">部署分で一式ラベルあり</span>
+                        </label>
+                    </div>
+
+                    <!-- フッター -->
+                    <div class="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-xl">
+                        <button @click="showOcrModal = false; ocrStep = 'idle'; itemPdfName = '';" type="button"
+                            class="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100">
+                            キャンセル
+                        </button>
+                        <button @click="confirmOcrResult" type="button"
+                            class="px-6 py-2 text-sm font-semibold text-white bg-orange-500 rounded-lg hover:bg-orange-600 shadow">
+                            確定してExcelを読み込む
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
+
     </div>
 </template>

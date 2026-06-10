@@ -97,6 +97,18 @@ watch(
 let echoChannel = null;
 
 onMounted(() => {
+    // ゴーストモード中にブラウザ/タブを閉じたとき自動でセッション終了
+    if (isGhostMode.value) {
+        const handlePageHide = (event) => {
+            if (event.persisted) return;
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            if (!csrf) return;
+            navigator.sendBeacon(route('coordinator.ghost.exit'), new URLSearchParams({ _token: csrf }));
+        };
+        window.addEventListener('pagehide', handlePageHide);
+        window.__ghostPageHideHandler = handlePageHide;
+    }
+
     // AppLayout mounted
     try {
         // minimal mount handling; avoid verbose console output
@@ -156,6 +168,10 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+    if (window.__ghostPageHideHandler) {
+        window.removeEventListener('pagehide', window.__ghostPageHideHandler);
+        delete window.__ghostPageHideHandler;
+    }
     try {
         if (echoChannel && window.Echo) {
             window.Echo.leavePrivate('jobrequests.' + authUser.id);

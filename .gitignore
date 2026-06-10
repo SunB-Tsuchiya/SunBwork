@@ -1,6 +1,7 @@
 # ローカル環境固有ファイル（git 管理外）
 docker-compose.override.yml
 Dockerfile.amd64
+/z_shimizu_seihan
 
 /.phpunit.cache
 /bootstrap/ssr

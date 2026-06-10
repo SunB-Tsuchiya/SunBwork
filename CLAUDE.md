@@ -17,6 +17,22 @@
 9. **新規ページ・コンポーネントを作成する前に `z_instructions/CONSOLIDATED_01_layout_and_ui.md` を必ず確認する。** AppLayout の使い方・スロット・戻るボタン配置・NG パターンを守ること
 10. **⚠️ 日付・時刻・カレンダー周りの実装は必ず「UTC / JST 混在ルール」セクションを確認してから着手すること。** このプロジェクトは JST（Asia/Tokyo）環境で稼働しており、UTC との変換ミスが繰り返し発生している。
 
+**「git pull」「環境を合わせて」「最新にして」を求められたとき（ローカルをリモートに同期する場合）:**
+以下の順番を必ず守ること。`git status` の「up to date」表示は fetch 前の古い情報なので信用しない。
+
+```
+1. git fetch origin
+2. git log --oneline HEAD..origin/main   # コミット差を必ず確認してからユーザーに報告
+3. git pull origin main
+4. docker compose exec laravel bash -lc "composer install --no-interaction"
+5. docker compose exec laravel bash -lc "php artisan migrate --force"
+6. docker compose exec laravel bash -lc "php artisan config:clear && php artisan cache:clear && php artisan route:clear && php artisan view:clear"
+7. npm install   # package.json が変わっている可能性があるので必ず実行
+8. npm run build
+```
+
+⚠️ **pull 前に `npm run build` を実行してはいけない。** 古いソースでビルドした後に push すると、さくらの最新ビルドを上書きして機能が消える危険がある。
+
 **「git にアップ」「さくらにデプロイ」を求められたとき:**
 → `z_instructions/DEPLOY_SAKURA.md` の手順に従う。VITE_APP_BASE_PATH の切り替えを必ず行うこと。
 
