@@ -656,6 +656,7 @@ const simpleEventStartDate = ref(getTodayString());
 const simpleEventEndDate = ref(getTodayString());
 const simpleEventMemo = ref('');
 const calendarRef = ref(null);
+const didForceAddEvents = ref(false);
 // plain (non-proxied) events copy for FullCalendar to avoid Proxy/reactivity issues
 const plainCalendarEvents = ref([]);
 

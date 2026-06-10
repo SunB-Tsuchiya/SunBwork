@@ -178,6 +178,7 @@
                 <!-- ── スケジュールセクション ──────────────────── -->
                 <section v-show="activeTab === 'schedule'" class="py-5">
                     <ProjectCalendar
+                        ref="projectCalendarRef"
                         :schedules="schedules"
                         :events="scheduleEvents"
                         :comments="[]"
@@ -1336,8 +1337,13 @@ onMounted(() => {
     }
 
     // ?tab=schedule で直接開いた場合、watch は発火しないため onMounted でサイズ再計算
+    // FullCalendar は v-show で隠れた状態でマウントされるとグリッドが描画されないため
+    // nextTick（DOM更新後）と setTimeout（描画完了後）の2段階で updateSize を呼ぶ
     if (activeTab.value === 'schedule') {
-        nextTick(() => projectCalendarRef.value?.updateCalendarSize?.());
+        nextTick(() => {
+            projectCalendarRef.value?.updateCalendarSize?.();
+            setTimeout(() => projectCalendarRef.value?.updateCalendarSize?.(), 50);
+        });
     }
 });
 
