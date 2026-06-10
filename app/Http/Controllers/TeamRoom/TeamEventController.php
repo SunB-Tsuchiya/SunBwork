@@ -30,7 +30,9 @@ class TeamEventController extends Controller
                 ? $e->starts_at->format('Y-m-d')
                 : $e->starts_at->format('Y-m-d\TH:i:s'),
             'end'         => $e->ends_at
-                ? ($e->all_day ? $e->ends_at->format('Y-m-d') : $e->ends_at->format('Y-m-d\TH:i:s'))
+                ? ($e->all_day
+                    ? $e->ends_at->copy()->addDay()->format('Y-m-d')
+                    : $e->ends_at->format('Y-m-d\TH:i:s'))
                 : null,
             'allDay'      => $e->all_day,
             'description' => $e->description,

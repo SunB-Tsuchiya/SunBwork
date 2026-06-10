@@ -109,7 +109,7 @@ function togglePanelEditMode() {
             _key:        e.id,
             id:          e.id,
             start_date:  String(e.start ?? '').split('T')[0],
-            end_date:    e.end ? String(e.end).split('T')[0] : '',
+            end_date:    e.end ? (e.allDay ? subOneDayStr(String(e.end)) : String(e.end).split('T')[0]) : '',
             name:        e.title ?? '',
             description: e.description ?? '',
         }));
@@ -512,7 +512,7 @@ const calendarOptions = {
                         <tbody>
                             <tr v-for="e in panelSortedEvents" :key="e.id" class="hover:bg-white">
                                 <td class="border px-3 py-2 text-gray-700">{{ e.start ? String(e.start).split('T')[0] : '-' }}</td>
-                                <td class="border px-3 py-2 text-gray-700">{{ e.end ? String(e.end).split('T')[0] : '-' }}</td>
+                                <td class="border px-3 py-2 text-gray-700">{{ e.end ? (e.allDay ? subOneDayStr(String(e.end)) : String(e.end).split('T')[0]) : '-' }}</td>
                                 <td class="border px-3 py-2 font-medium text-gray-900">{{ e.title || '-' }}</td>
                                 <td class="border px-3 py-2 text-gray-600">{{ e.description ? String(e.description).slice(0, 40) : '' }}</td>
                             </tr>

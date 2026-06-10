@@ -143,6 +143,8 @@ const AREAS = [
     { key: 'tokai_staff', label: '東海本部職員' },
 ];
 
+const GRADE_OPTIONS = ['3年', '4年', '5年', '6年', '新3年', '新4年', '新5年', '新6年'];
+
 // sheetKey ごとのフォールバック順（DI系が見つからない場合に非DI版を試す）
 const SHEET_FALLBACKS = {
     kokusan_di:      ['kokusan',  'main'],
@@ -262,6 +264,35 @@ function dateValToMMDD(dateStr) {
     const m = dateStr.match(/(\d+)月(\d+)/);
     if (!m) return '';
     return m[1].padStart(2, '0') + m[2].padStart(2, '0');
+}
+
+// OCR日付文字列（"3/21" や "3/21・22"）→ ISO 日付配列 ["2026-03-21", ...]
+function dateRawToIso(dateRaw) {
+    if (!dateRaw) return [''];
+    const year = new Date().getFullYear();
+    const segs = dateRaw.split(/[・〜~]/);
+    const results = [];
+    let lastMonth = null;
+    for (const seg of segs) {
+        const t = seg.trim();
+        const mmd = t.match(/^(\d{1,2})\/(\d{1,2})$/);
+        const dd  = t.match(/^(\d{1,2})$/);
+        if (mmd) {
+            lastMonth = mmd[1].padStart(2, '0');
+            results.push(`${year}-${lastMonth}-${mmd[2].padStart(2, '0')}`);
+        } else if (dd && lastMonth) {
+            results.push(`${year}-${lastMonth}-${dd[1].padStart(2, '0')}`);
+        }
+    }
+    return results.length > 0 ? results : [''];
+}
+
+// ISO日付 "YYYY-MM-DD" → 日本語日付文字列 "YYYY年M月D日"
+function isoToJapanese(iso) {
+    if (!iso) return '';
+    const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return iso;
+    return `${m[1]}年${parseInt(m[2])}月${parseInt(m[3])}日`;
 }
 
 // ============================================================
@@ -543,12 +574,15 @@ async function processExcelFile(file) {
     sheetLog.value = [];
     gradeOptions.value = [];
     excludedCodes.value = new Set();
-    testNameVal.value = '';
-    testDateVal.value = '';
     shortNameVal.value = '';
     selectedGrade.value = '';
-    gradeTestNameOverrides.value = {};
-    gradeDateOverrides.value = {};
+    // OCR確認済みの場合はテスト名・実施日・グレード設定を保持
+    if (!confirmedTests.value.length) {
+        testNameVal.value            = '';
+        testDateVal.value            = '';
+        gradeTestNameOverrides.value = {};
+        gradeDateOverrides.value     = {};
+    }
     try {
         const ab = await file.arrayBuffer();
         const wb = XLSX.read(ab, { type: 'array', codepage: 932 });
@@ -647,12 +681,18 @@ function parseWorkbook(wb) {
         (a, b) => CIRCLED_NUMS.indexOf(a.num) - CIRCLED_NUMS.indexOf(b.num)
     );
     gradeLabelOverrides.value = {};
-    gradeTestNameOverrides.value = {};
-    gradeDateOverrides.value = {};
+    // OCR確認済みの場合はグレード設定を保持
+    if (!confirmedTests.value.length) {
+        gradeTestNameOverrides.value = {};
+        gradeDateOverrides.value     = {};
+    }
 
     if (detectedGrades.length > 0) selectedGrade.value = detectedGrades[0];
-    if (detectedName) testNameVal.value = detectedName;
-    if (detectedDate) testDateVal.value = detectedDate;
+    // OCR確認済みの場合はExcel検出で上書きしない
+    if (!confirmedTests.value.length) {
+        if (detectedName) testNameVal.value = detectedName;
+        if (detectedDate) testDateVal.value = detectedDate;
+    }
     // 略称の自動生成（テスト名から日付・余分な語を除去・8文字以内）
     if (detectedName && !shortNameVal.value) {
         const auto = detectedName
@@ -1333,7 +1373,12 @@ async function uploadItemPdf(file) {
     try {
         const { data } = await axios.post('/label-ocr/analyze', fd);
         ocrRawText.value     = data.ocr_text || '';
-        modalTests.value     = (data.tests  || []).map(t => ({ ...t }));
+        modalTests.value     = (data.tests  || []).map(t => ({
+            name_raw:           t.name_raw || '',
+            dates:              dateRawToIso(t.date_raw || ''),
+            grades:             t.grade_raw ? [t.grade_raw] : [],
+            matched_test_names: t.matched_test_names || [],
+        }));
         modalItems.value     = (data.items  || []).map(item => ({
             ...item,
             sheetKey: inferSheetKeyFromItem(item.text_raw || ''),
@@ -1362,6 +1407,20 @@ function confirmOcrResult() {
     confirmedTests.value = modalTests.value.map(t => ({ ...t }));
     ichishikiFlag.value  = modalIchishiki.value;
 
+    // 学年別テスト名・実施日オーバーライドをOCR結果から設定
+    const newTestNameOverrides = {};
+    const newDateOverrides     = {};
+    for (const test of modalTests.value) {
+        const name    = test.name_raw || '';
+        const jpDates = (test.dates || []).map(d => isoToJapanese(d)).filter(Boolean);
+        for (const grade of (test.grades || [])) {
+            if (name)           newTestNameOverrides[grade] = name;
+            if (jpDates.length) newDateOverrides[grade]     = jpDates[0];
+        }
+    }
+    if (Object.keys(newTestNameOverrides).length > 0) gradeTestNameOverrides.value = newTestNameOverrides;
+    if (Object.keys(newDateOverrides).length > 0)     gradeDateOverrides.value     = newDateOverrides;
+
     if (!testNameVal.value && modalTests.value.length > 0) {
         testNameVal.value = modalTests.value[0].name_raw;
     }
@@ -1371,7 +1430,30 @@ function confirmOcrResult() {
 }
 
 function selectModalTestName(idx, name) {
-    modalTests.value[idx] = { ...modalTests.value[idx], name_raw: name };
+    modalTests.value[idx].name_raw = name;
+}
+
+function toggleModalGrade(testIdx, grade) {
+    const grades = modalTests.value[testIdx].grades;
+    const i = grades.indexOf(grade);
+    if (i >= 0) grades.splice(i, 1); else grades.push(grade);
+}
+
+function addModalDate(testIdx) {
+    modalTests.value[testIdx].dates.push('');
+}
+
+function removeModalDate(testIdx, dateIdx) {
+    if (modalTests.value[testIdx].dates.length <= 1) return;
+    modalTests.value[testIdx].dates.splice(dateIdx, 1);
+}
+
+function addModalTest() {
+    modalTests.value.push({ name_raw: '', dates: [''], grades: [], matched_test_names: [] });
+}
+
+function removeModalTest(testIdx) {
+    modalTests.value.splice(testIdx, 1);
 }
 
 function addModalItem() {
@@ -2091,25 +2173,22 @@ function clearOcr() {
                             <p class="text-xs font-medium text-gray-700 mb-2">検出されたテスト</p>
                             <div v-if="modalTests.length === 0"
                                 class="text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded p-2">
-                                テストを検出できませんでした。OCR生テキストを確認してください。
+                                テストを検出できませんでした。「+ テストを追加」で手動入力してください。
                             </div>
                             <div v-for="(test, ti) in modalTests" :key="ti"
-                                class="rounded border border-gray-200 bg-gray-50 p-3 space-y-2 mb-2">
-                                <div class="flex items-center gap-2">
-                                    <span class="text-xs text-gray-500 w-14 flex-shrink-0">実施日</span>
-                                    <input v-model="modalTests[ti].date_raw" type="text" placeholder="3/21"
-                                        class="w-24 rounded border border-gray-300 px-1.5 py-0.5 text-xs" />
-                                    <span v-if="test.grade_raw" class="text-xs text-gray-500 ml-2">学年</span>
-                                    <input v-if="test.grade_raw" v-model="modalTests[ti].grade_raw" type="text"
-                                        class="w-20 rounded border border-gray-300 px-1.5 py-0.5 text-xs" />
-                                </div>
+                                class="rounded border border-gray-200 bg-gray-50 p-3 space-y-2.5 mb-2">
+
+                                <!-- テスト名 + DB候補 -->
                                 <div class="space-y-1">
                                     <div class="flex items-center gap-2">
                                         <span class="text-xs text-gray-500 w-14 flex-shrink-0">テスト名</span>
                                         <input v-model="modalTests[ti].name_raw" type="text"
+                                            placeholder="マイファーストテスト"
                                             class="flex-1 rounded border border-gray-300 px-1.5 py-0.5 text-xs" />
+                                        <button @click.prevent="removeModalTest(ti)" type="button"
+                                            class="text-red-400 hover:text-red-600 text-xs px-1 flex-shrink-0"
+                                            title="このテストを削除">✕</button>
                                     </div>
-                                    <!-- DB候補ボタン -->
                                     <div v-if="test.matched_test_names && test.matched_test_names.length > 0"
                                         class="flex flex-wrap gap-1 ml-16">
                                         <button v-for="m in test.matched_test_names" :key="m.id"
@@ -2120,7 +2199,44 @@ function clearOcr() {
                                         </button>
                                     </div>
                                 </div>
+
+                                <!-- 学年（トグルボタン・別行） -->
+                                <div>
+                                    <span class="text-xs text-gray-500 block mb-1">学年</span>
+                                    <div class="flex flex-wrap gap-1">
+                                        <button v-for="g in GRADE_OPTIONS" :key="g"
+                                            @click.prevent="toggleModalGrade(ti, g)"
+                                            type="button"
+                                            class="px-2.5 py-0.5 text-xs rounded-full border transition"
+                                            :class="test.grades.includes(g)
+                                                ? 'bg-orange-500 text-white border-orange-500 font-medium'
+                                                : 'bg-white text-gray-600 border-gray-300 hover:bg-orange-50'">
+                                            {{ g }}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- 実施日（カレンダー入力・複数可・別行） -->
+                                <div>
+                                    <span class="text-xs text-gray-500 block mb-1">実施日</span>
+                                    <div class="space-y-1">
+                                        <div v-for="(d, di) in test.dates" :key="di"
+                                            class="flex items-center gap-1.5">
+                                            <input v-model="modalTests[ti].dates[di]" type="date"
+                                                class="rounded border border-gray-300 px-1.5 py-0.5 text-xs" />
+                                            <button v-if="test.dates.length > 1"
+                                                @click.prevent="removeModalDate(ti, di)" type="button"
+                                                class="text-red-400 hover:text-red-600 text-xs px-1">✕</button>
+                                        </div>
+                                        <button @click.prevent="addModalDate(ti)" type="button"
+                                            class="text-xs text-orange-600 hover:underline">+ 日付を追加</button>
+                                    </div>
+                                </div>
                             </div>
+
+                            <!-- テスト追加ボタン -->
+                            <button @click.prevent="addModalTest" type="button"
+                                class="text-xs text-orange-600 hover:underline font-medium">+ テストを追加</button>
                         </div>
 
                         <!-- アイテム一覧 -->
