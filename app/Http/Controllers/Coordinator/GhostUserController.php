@@ -90,7 +90,11 @@ class GhostUserController extends Controller
         // causing a mismatch-logout on the very next request.
         Auth::guard('sanctum')->setUser($ghost);
 
-        return redirect()->route('user.myjobbox.index');
+        // login() migrates the session (new session ID). On Sakura, XSRF-TOKEN cookie
+        // is not issued, so soft navigation cannot refresh the CSRF meta tag.
+        // Inertia::location() forces a full page reload so app.blade.php re-renders
+        // with the new CSRF token — same pattern as AuthenticatedSessionController.
+        return Inertia::location(route('user.myjobbox.index'));
     }
 
     public function exit()
@@ -111,6 +115,7 @@ class GhostUserController extends Controller
         // so the tap() closure would write ghost's hash. Override it here.
         Auth::guard('sanctum')->setUser($coordinator);
 
-        return redirect()->route('coordinator.project_jobs.index');
+        // Same as switch(): force full reload to refresh CSRF token in meta tag.
+        return Inertia::location(route('coordinator.project_jobs.index'));
     }
 }

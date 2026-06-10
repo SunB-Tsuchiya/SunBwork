@@ -84,6 +84,10 @@ class HandleInertiaRequests extends Middleware
 
         return [
             ...parent::share($request),
+            // CSRF トークンをすべての Inertia レスポンスで共有する。
+            // セッション移行（login() / regenerate()）後も soft navigation で
+            // meta[name="csrf-token"] が更新されるよう AppLayout が参照している。
+            'csrf_token' => csrf_token(),
             'flash' => $flashMessage ? ['message' => $flashMessage, 'type' => $flashType] : null,
             'departmentFieldConfigs' => $departmentFieldConfigs,
             'jobFieldOptions'        => $jobFieldOptions,
