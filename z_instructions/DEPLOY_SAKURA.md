@@ -101,6 +101,9 @@ npm run build
 
 **SSH 接続先:** `silverlamb759@silverlamb759.sakura.ne.jp`
 
+> ⚠️ **`php artisan migrate` / `php artisan db:seed` はワンライナー SSH で実行すると対話確認を求められて失敗する。**
+> 必ず `--force` を付けること。シーダーは `--force` が不要だが migrate は必須。
+
 ### マイグレーションあり（テーブル追加・カラム変更がある場合）
 
 ```bash
@@ -108,7 +111,7 @@ git push origin main
 ```
 
 ```bash
-ssh silverlamb759@silverlamb759.sakura.ne.jp "cd ~/SunBWork && git pull && php artisan migrate && php artisan config:clear && php artisan cache:clear"
+ssh silverlamb759@silverlamb759.sakura.ne.jp "cd ~/SunBWork && git pull && php artisan migrate --force && php artisan config:clear && php artisan cache:clear"
 ```
 
 ### マイグレーションなし（JS/CSS/PHP のみ変更の場合）
@@ -121,11 +124,27 @@ git push origin main
 ssh silverlamb759@silverlamb759.sakura.ne.jp "cd ~/SunBWork && git pull && php artisan config:clear && php artisan cache:clear"
 ```
 
-### ChangelogSeeder も反映する場合（末尾に追加）
+### ChangelogSeeder も反映する場合
 
 ```bash
-ssh silverlamb759@silverlamb759.sakura.ne.jp "cd ~/SunBWork && git pull && php artisan migrate && php artisan config:clear && php artisan cache:clear && php artisan db:seed --class=ChangelogSeeder"
+ssh silverlamb759@silverlamb759.sakura.ne.jp "cd ~/SunBWork && git pull && php artisan migrate --force && php artisan config:clear && php artisan cache:clear && php artisan db:seed --class=ChangelogSeeder"
 ```
+
+### LabelMasterSeeder など任意のシーダーも反映する場合
+
+```bash
+ssh silverlamb759@silverlamb759.sakura.ne.jp "cd ~/SunBWork && git pull && php artisan migrate --force && php artisan config:clear && php artisan cache:clear && php artisan db:seed --class=LabelMasterSeeder"
+```
+
+> **ワンライナーが失敗する場合の代替手順:** SSH でログインしてから実行する
+> ```bash
+> ssh silverlamb759@silverlamb759.sakura.ne.jp
+> cd ~/SunBWork
+> git pull
+> php artisan migrate --force
+> php artisan db:seed --class=LabelMasterSeeder
+> php artisan config:clear && php artisan cache:clear
+> ```
 
 ---
 
@@ -226,9 +245,23 @@ git commit -m "fix: Ziggy 再生成"
 **対処:** さくら SSH でマイグレーションを実行:
 ```bash
 cd ~/SunBWork
-php artisan migrate
+php artisan migrate --force
 php artisan config:clear
 ```
+
+### ミス5（追加）: SSH ワンライナーで migrate が対話確認を求めて失敗する
+
+**症状:** `ssh ... "... && php artisan migrate && ..."` を実行すると、本番環境保護の確認入力を求めて止まる。
+
+**対処:** `--force` を付ける（ワンライナー時は必須）:
+```bash
+# NG
+ssh host "cd ~/SunBWork && php artisan migrate && ..."
+
+# OK
+ssh host "cd ~/SunBWork && php artisan migrate --force && ..."
+```
+または SSH でログインしてから対話的に実行する。
 
 ---
 
