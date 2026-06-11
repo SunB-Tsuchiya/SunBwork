@@ -1367,18 +1367,27 @@ async function uploadItemPdf(file) {
     ocrStep.value     = 'uploading';
     ocrError.value    = '';
 
-    const fd = new FormData();
+    const fd   = new FormData();
     fd.append('file', file);
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
 
     try {
-        const { data } = await axios.post('/label-ocr/analyze', fd);
-        ocrRawText.value     = data.ocr_text || '';
-        modalTests.value     = (data.tests  || []).map(t => ({
-            name_raw:           t.name_raw || '',
-            dates:              dateRawToIso(t.date_raw || ''),
-            grades:             t.grade_raw ? [t.grade_raw] : [],
-            matched_test_names: t.matched_test_names || [],
-        }));
+        const { data } = await axios.post('/label-ocr/analyze', fd, {
+            headers: { 'X-CSRF-TOKEN': csrf, 'Content-Type': 'multipart/form-data' },
+        });
+        ocrRawText.value = data.ocr_text || '';
+        modalTests.value = (data.tests || []).map(t => {
+            const ocrDates   = t.date_raw ? dateRawToIso(t.date_raw) : [];
+            const initGrades = t.grade_raw ? [t.grade_raw] : [];
+            const gradeDates = {};
+            initGrades.forEach(g => { gradeDates[g] = ocrDates[0] || ''; });
+            return {
+                name_raw:           t.name_raw || '',
+                grades:             initGrades,
+                gradeDates,
+                matched_test_names: t.matched_test_names || [],
+            };
+        });
         modalItems.value     = (data.items  || []).map(item => ({
             ...item,
             sheetKey: inferSheetKeyFromItem(item.text_raw || ''),
@@ -1411,11 +1420,11 @@ function confirmOcrResult() {
     const newTestNameOverrides = {};
     const newDateOverrides     = {};
     for (const test of modalTests.value) {
-        const name    = test.name_raw || '';
-        const jpDates = (test.dates || []).map(d => isoToJapanese(d)).filter(Boolean);
+        const name = test.name_raw || '';
         for (const grade of (test.grades || [])) {
-            if (name)           newTestNameOverrides[grade] = name;
-            if (jpDates.length) newDateOverrides[grade]     = jpDates[0];
+            if (name) newTestNameOverrides[grade] = name;
+            const jpDate = isoToJapanese((test.gradeDates || {})[grade] || '');
+            if (jpDate) newDateOverrides[grade] = jpDate;
         }
     }
     if (Object.keys(newTestNameOverrides).length > 0) gradeTestNameOverrides.value = newTestNameOverrides;
@@ -1434,22 +1443,21 @@ function selectModalTestName(idx, name) {
 }
 
 function toggleModalGrade(testIdx, grade) {
-    const grades = modalTests.value[testIdx].grades;
-    const i = grades.indexOf(grade);
-    if (i >= 0) grades.splice(i, 1); else grades.push(grade);
-}
-
-function addModalDate(testIdx) {
-    modalTests.value[testIdx].dates.push('');
-}
-
-function removeModalDate(testIdx, dateIdx) {
-    if (modalTests.value[testIdx].dates.length <= 1) return;
-    modalTests.value[testIdx].dates.splice(dateIdx, 1);
+    const test = modalTests.value[testIdx];
+    const i    = test.grades.indexOf(grade);
+    if (i >= 0) {
+        test.grades.splice(i, 1);
+        delete test.gradeDates[grade];
+    } else {
+        test.grades.push(grade);
+        // 既存の日付があれば最初のものを初期値として使用
+        const existing = Object.values(test.gradeDates).find(d => d) || '';
+        test.gradeDates[grade] = existing;
+    }
 }
 
 function addModalTest() {
-    modalTests.value.push({ name_raw: '', dates: [''], grades: [], matched_test_names: [] });
+    modalTests.value.push({ name_raw: '', grades: [], gradeDates: {}, matched_test_names: [] });
 }
 
 function removeModalTest(testIdx) {
@@ -1714,13 +1722,29 @@ function clearOcr() {
                 </label>
 
                 <!-- 確認済み -->
-                <div v-if="ocrStep === 'done'" class="flex flex-wrap items-center gap-2 rounded border border-green-200 bg-green-50 px-3 py-2 text-xs">
-                    <span class="text-green-700 font-medium">✔ {{ itemPdfName }}</span>
-                    <span class="text-green-600">— {{ confirmedItems.length }} 件のアイテムを確認済み</span>
-                    <button @click="showOcrModal = true" type="button"
-                        class="ml-auto text-xs text-blue-600 hover:underline">再編集</button>
-                    <button @click="clearOcr" type="button"
-                        class="text-xs text-gray-400 hover:text-red-500">× クリア</button>
+                <div v-if="ocrStep === 'done'" class="rounded border border-green-200 bg-green-50 px-3 py-2 text-xs space-y-1.5">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="text-green-700 font-medium">✔ {{ itemPdfName }}</span>
+                        <span class="text-green-600">— {{ confirmedItems.length }} 件のアイテムを確認済み</span>
+                        <button @click="showOcrModal = true" type="button"
+                            class="ml-auto text-xs text-blue-600 hover:underline">再編集</button>
+                        <button @click="clearOcr" type="button"
+                            class="text-xs text-gray-400 hover:text-red-500">× クリア</button>
+                    </div>
+                    <!-- テスト・学年・日付 サマリー -->
+                    <div v-if="confirmedTests.some(t => t.grades && t.grades.length > 0)"
+                        class="pt-1 border-t border-green-200 space-y-0.5">
+                        <template v-for="test in confirmedTests" :key="test.name_raw">
+                            <div v-for="g in (test.grades || [])" :key="g"
+                                class="flex items-center gap-1.5">
+                                <span class="text-gray-500 w-24 flex-shrink-0">
+                                    {{ isoToJapanese((test.gradeDates || {})[g] || '') || '日付未設定' }}
+                                </span>
+                                <span class="text-orange-600 font-medium">{{ g }}</span>
+                                <span class="text-gray-600">{{ test.name_raw }}</span>
+                            </div>
+                        </template>
+                    </div>
                 </div>
 
                 <!-- アップロード中 -->
@@ -2216,21 +2240,19 @@ function clearOcr() {
                                     </div>
                                 </div>
 
-                                <!-- 実施日（カレンダー入力・複数可・別行） -->
+                                <!-- 実施日（学年ごとにリアルタイム表示） -->
                                 <div>
                                     <span class="text-xs text-gray-500 block mb-1">実施日</span>
-                                    <div class="space-y-1">
-                                        <div v-for="(d, di) in test.dates" :key="di"
-                                            class="flex items-center gap-1.5">
-                                            <input v-model="modalTests[ti].dates[di]" type="date"
+                                    <div v-if="test.grades.length > 0" class="space-y-1">
+                                        <div v-for="g in test.grades" :key="g"
+                                            class="flex items-center gap-2 text-xs">
+                                            <input v-model="modalTests[ti].gradeDates[g]" type="date"
                                                 class="rounded border border-gray-300 px-1.5 py-0.5 text-xs" />
-                                            <button v-if="test.dates.length > 1"
-                                                @click.prevent="removeModalDate(ti, di)" type="button"
-                                                class="text-red-400 hover:text-red-600 text-xs px-1">✕</button>
+                                            <span class="text-orange-600 font-medium">{{ g }}</span>
+                                            <span class="text-gray-400 truncate">{{ test.name_raw || '（テスト名未設定）' }}</span>
                                         </div>
-                                        <button @click.prevent="addModalDate(ti)" type="button"
-                                            class="text-xs text-orange-600 hover:underline">+ 日付を追加</button>
                                     </div>
+                                    <p v-else class="text-xs text-gray-400 italic">← 学年を選択すると実施日を設定できます</p>
                                 </div>
                             </div>
 

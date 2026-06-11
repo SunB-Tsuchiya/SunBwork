@@ -12,13 +12,15 @@ class LabelSchoolMaster extends Model
         'area',
         'route',
         'stop_order',
+        'default_qty',
         'is_active',
         'notes',
     ];
 
     protected $casts = [
-        'is_active'  => 'boolean',
-        'stop_order' => 'integer',
+        'is_active'   => 'boolean',
+        'stop_order'  => 'integer',
+        'default_qty' => 'integer',
     ];
 
     public function scopeActive($query)

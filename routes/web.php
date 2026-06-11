@@ -1189,6 +1189,17 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::post('/item-types',              [\App\Http\Controllers\LabelMasterController::class, 'itemTypesStore']);
     Route::put('/item-types/{itemType}',    [\App\Http\Controllers\LabelMasterController::class, 'itemTypesUpdate']);
     Route::delete('/item-types/{itemType}', [\App\Http\Controllers\LabelMasterController::class, 'itemTypesDestroy']);
+
+    // 社内便ルートマスタ
+    Route::get('/routes',                        [\App\Http\Controllers\LabelMasterController::class, 'routesIndex']);
+    Route::post('/routes',                       [\App\Http\Controllers\LabelMasterController::class, 'routesStore']);
+    Route::put('/routes/{route}',                [\App\Http\Controllers\LabelMasterController::class, 'routesUpdate']);
+    Route::delete('/routes/{route}',             [\App\Http\Controllers\LabelMasterController::class, 'routesDestroy']);
+    Route::post('/routes/{route}/stops',              [\App\Http\Controllers\LabelMasterController::class, 'stopsStore']);
+    Route::post('/routes/{route}/stops/insert-at',   [\App\Http\Controllers\LabelMasterController::class, 'stopsInsertAt']);
+    Route::put('/route-stops/{routeStop}',            [\App\Http\Controllers\LabelMasterController::class, 'stopsUpdate']);
+    Route::delete('/route-stops/{routeStop}',         [\App\Http\Controllers\LabelMasterController::class, 'stopsDestroy']);
+    Route::delete('/route-stops/{routeStop}/shift',   [\App\Http\Controllers\LabelMasterController::class, 'stopsDestroyShift']);
 });
 
 // ラベルアイテムPDF OCR 解析（全ログインユーザー）

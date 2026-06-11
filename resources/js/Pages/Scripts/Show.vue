@@ -17,6 +17,9 @@ const componentMap = {
     LabelGenerator: defineAsyncComponent(() =>
         import('@/Components/Scripts/LabelGenerator.vue')
     ),
+    LabelGeneratorV2: defineAsyncComponent(() =>
+        import('@/Components/Scripts/LabelGeneratorV2.vue')
+    ),
 };
 
 const CurrentTool = computed(() => componentMap[props.script.component_key] ?? null);

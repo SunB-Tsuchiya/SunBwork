@@ -1,1 +1,0 @@
-import{q as e,y as t,d as o,o as r}from"./app-DEKpD5mZ.js";const _={__name:"Edit",setup(a){return e(()=>{t.get(route("workload_setting.index"),{},{replace:!0})}),(n,s)=>(r(),o("div"))}};export{_ as default};
