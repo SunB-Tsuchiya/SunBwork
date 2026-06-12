@@ -215,6 +215,7 @@ const getTopTabActive = () => {
         if (r.includes('work_records')) return 'work_records';
         if (r.includes('leader_permissions')) return 'leader_permissions';
         if (r.includes('meeting_definitions')) return 'meeting_definitions';
+        if (r.includes('meeting-rooms') || r.includes('meeting_rooms')) return 'meeting_rooms';
         if (r.includes('dispatch')) return 'dispatch';
         if (r.startsWith('user.settings')) return 'settings';
         return '';
@@ -412,6 +413,21 @@ function navigateToRole(role) {
                                 </div>
                             </div>
 
+                            <!-- 予定表（SuperAdminのみ・開発中フィルター） -->
+                            <template v-if="authUser?.user_role === 'superadmin'">
+                                <div class="group relative">
+                                    <Link :href="route('schedule.index')" class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                                        </svg>
+                                    </Link>
+                                    <div class="pointer-events-none absolute right-0 top-9 z-50 w-32 rounded-md bg-gray-800 px-3 py-2 text-xs text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                                        <p class="font-medium">予定表</p>
+                                        <p class="text-gray-300">スケジュール管理</p>
+                                    </div>
+                                </div>
+                            </template>
+
                             <!-- 使い方ガイド -->
                             <div class="group relative">
                                 <Link :href="route('guide.index')" class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700">
@@ -528,6 +544,14 @@ function navigateToRole(role) {
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
                                 </svg>
                                 <span v-if="unreadJobNotifications > 0" class="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[10px] text-white pointer-events-none">{{ unreadJobNotifications }}</span>
+                            </Link>
+
+                            <!-- 予定表（SuperAdminのみ・開発中フィルター） -->
+                            <Link v-if="authUser?.user_role === 'superadmin'" :href="route('schedule.index')"
+                                class="relative flex h-9 w-9 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                                </svg>
                             </Link>
 
                             <button

@@ -1,0 +1,301 @@
+<script setup>
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+
+const props = defineProps({
+    startDate: { type: String, required: true },  // YYYY-MM-DD (週の最初の日)
+    events:    { type: Array,  default: () => [] },
+});
+
+const emit = defineEmits(['create', 'update', 'event-click']);
+
+// ── 定数 ──────────────────────────────────────────────────────
+const START_HOUR = 7;
+const END_HOUR   = 22;
+const HOUR_H     = 64;   // px/hour（1分 = 64/60 px）
+const SNAP       = 15;   // 分スナップ
+const TOTAL_H    = (END_HOUR - START_HOUR) * HOUR_H;
+const HEADER_H   = 40;
+const DAYS_JA    = ['日', '月', '火', '水', '木', '金', '土'];
+
+const days = computed(() => {
+    const base = new Date(props.startDate + 'T00:00:00');
+    return Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(base);
+        d.setDate(base.getDate() + i);
+        return d;
+    });
+});
+
+const hours = computed(() =>
+    Array.from({ length: END_HOUR - START_HOUR }, (_, i) => START_HOUR + i)
+);
+
+function dateStr(d) { return d.toLocaleDateString('sv-SE'); }
+function isToday(d) { return dateStr(d) === new Date().toLocaleDateString('sv-SE'); }
+
+// ── イベント位置計算 ───────────────────────────────────────────
+// starts_at は Eloquent datetime cast → UTC ISO 文字列。
+// new Date() でパースすると JS の Date になり、getHours()/getMinutes() は
+// ブラウザのローカル時刻（日本では JST）を返す。
+function localMin(isoStr) {
+    const d = new Date(isoStr);
+    return d.getHours() * 60 + d.getMinutes();
+}
+
+function eventsForDay(d) {
+    const ds = dateStr(d);
+    return props.events.filter(ev => new Date(ev.starts_at).toLocaleDateString('sv-SE') === ds);
+}
+
+function evTop(ev) {
+    return Math.max(0, (localMin(ev.starts_at) - START_HOUR * 60)) * (HOUR_H / 60);
+}
+function evHeight(ev) {
+    return Math.max(18, (localMin(ev.ends_at) - localMin(ev.starts_at)) * (HOUR_H / 60));
+}
+
+const PALETTE = [
+    { bg: '#3b82f6', text: '#fff', border: '#2563eb' },
+    { bg: '#10b981', text: '#fff', border: '#059669' },
+    { bg: '#8b5cf6', text: '#fff', border: '#7c3aed' },
+    { bg: '#f97316', text: '#fff', border: '#ea580c' },
+    { bg: '#0ea5e9', text: '#fff', border: '#0284c7' },
+];
+function evColor(ev) {
+    if (!ev.is_own) return { bg: '#e5e7eb', text: '#374151', border: '#d1d5db' };
+    return PALETTE[(ev.id ?? 0) % PALETTE.length];
+}
+function fmtTime(isoStr) {
+    return new Date(isoStr).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+// ── グリッド DOM refs ─────────────────────────────────────────
+const gridRefs = ref([]);
+function setGridRef(el, i) { if (el) gridRefs.value[i] = el; }
+
+function yToMin(colIndex, clientY) {
+    const el = gridRefs.value[colIndex];
+    if (!el) return START_HOUR * 60;
+    const rect = el.getBoundingClientRect();
+    const raw  = Math.round(((clientY - rect.top) / (HOUR_H / 60)) / SNAP) * SNAP + START_HOUR * 60;
+    return Math.max(START_HOUR * 60, Math.min(END_HOUR * 60, raw));
+}
+
+function clientXToCol(clientX) {
+    for (let i = 0; i < gridRefs.value.length; i++) {
+        const el = gridRefs.value[i];
+        if (!el) continue;
+        const r = el.getBoundingClientRect();
+        if (clientX >= r.left && clientX <= r.right) return i;
+    }
+    return null;
+}
+
+// ── ドラッグ状態 ──────────────────────────────────────────────
+const selecting = ref(null);
+// { colIndex, startMin, currentMin }
+
+const dragging = ref(null);
+// { type: 'move'|'resize-top'|'resize-bot', ev, colIndex, startMin, endMin, offsetMin }
+
+// ── グリッド空白 mousedown → 選択開始 ────────────────────────
+function onGridMousedown(colIndex, e) {
+    if (e.button !== 0 || dragging.value) return;
+    e.preventDefault();
+    const min = yToMin(colIndex, e.clientY);
+    selecting.value = { colIndex, startMin: min, currentMin: min };
+}
+
+// ── イベント mousedown → ドラッグ開始 ────────────────────────
+function onEventMousedown(ev, type, e) {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const evDate = new Date(ev.starts_at).toLocaleDateString('sv-SE');
+    const colIndex = days.value.findIndex(d => dateStr(d) === evDate);
+    const startMin = localMin(ev.starts_at);
+    const endMin   = localMin(ev.ends_at);
+    const clickMin = yToMin(colIndex, e.clientY);
+    dragging.value = {
+        type, ev: { ...ev }, colIndex,
+        startMin, endMin,
+        offsetMin: type === 'move' ? clickMin - startMin : 0,
+    };
+}
+
+// ── グローバル mousemove ───────────────────────────────────────
+function onMousemove(e) {
+    if (selecting.value) {
+        selecting.value = { ...selecting.value, currentMin: yToMin(selecting.value.colIndex, e.clientY) };
+        return;
+    }
+    if (!dragging.value) return;
+    const d = dragging.value;
+    if (d.type === 'move') {
+        const newCol = clientXToCol(e.clientX) ?? d.colIndex;
+        const anchor = yToMin(newCol, e.clientY) - d.offsetMin;
+        const dur    = d.endMin - d.startMin;
+        const start  = Math.max(START_HOUR * 60, Math.min(END_HOUR * 60 - dur, anchor));
+        dragging.value = { ...d, colIndex: newCol, startMin: start, endMin: start + dur };
+    } else if (d.type === 'resize-top') {
+        const m = yToMin(d.colIndex, e.clientY);
+        dragging.value = { ...d, startMin: Math.min(m, d.endMin - SNAP) };
+    } else {
+        const m = yToMin(d.colIndex, e.clientY);
+        dragging.value = { ...d, endMin: Math.max(m, d.startMin + SNAP) };
+    }
+}
+
+// ── グローバル mouseup → 確定 ─────────────────────────────────
+function onMouseup() {
+    if (selecting.value) {
+        const { colIndex, startMin, currentMin } = selecting.value;
+        const sMin = Math.min(startMin, currentMin);
+        const eMin = Math.max(startMin, currentMin);
+        if (eMin - sMin >= SNAP) {
+            emit('create', { date: dateStr(days.value[colIndex]), startMin: sMin, endMin: eMin });
+        }
+        selecting.value = null;
+        return;
+    }
+    if (dragging.value) {
+        const { colIndex, startMin, endMin, ev } = dragging.value;
+        const pad  = (n) => String(n).padStart(2, '0');
+        const toHm = (m) => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
+        const date = dateStr(days.value[colIndex]);
+        emit('update', {
+            id: ev.id,
+            starts_at: `${date} ${toHm(startMin)}:00`,
+            ends_at:   `${date} ${toHm(endMin)}:00`,
+        });
+        dragging.value = null;
+    }
+}
+
+onMounted(() => {
+    window.addEventListener('mousemove', onMousemove);
+    window.addEventListener('mouseup',   onMouseup);
+});
+onUnmounted(() => {
+    window.removeEventListener('mousemove', onMousemove);
+    window.removeEventListener('mouseup',   onMouseup);
+});
+
+// ── テンプレート用ヘルパー ─────────────────────────────────────
+function selStyle(colIndex) {
+    if (!selecting.value || selecting.value.colIndex !== colIndex) return null;
+    const { startMin, currentMin } = selecting.value;
+    const top    = (Math.min(startMin, currentMin) - START_HOUR * 60) * (HOUR_H / 60);
+    const height = Math.abs(currentMin - startMin) * (HOUR_H / 60);
+    return height > 2 ? { top: `${top}px`, height: `${height}px` } : null;
+}
+
+function evStyle(ev) {
+    return {
+        top:         `${evTop(ev)}px`,
+        height:      `${evHeight(ev)}px`,
+        background:  evColor(ev).bg,
+        color:       evColor(ev).text,
+        borderColor: evColor(ev).border,
+        opacity:     (dragging.value?.ev?.id === ev.id && dragging.value.type === 'move') ? '0.3' : '1',
+    };
+}
+
+function dragStyle(colIndex) {
+    if (!dragging.value || dragging.value.colIndex !== colIndex) return null;
+    const { startMin, endMin, ev } = dragging.value;
+    return {
+        top:         `${(startMin - START_HOUR * 60) * (HOUR_H / 60)}px`,
+        height:      `${(endMin - startMin) * (HOUR_H / 60)}px`,
+        background:  evColor(ev).bg,
+        color:       evColor(ev).text,
+        borderColor: evColor(ev).border,
+    };
+}
+</script>
+
+<template>
+    <div class="flex overflow-hidden rounded-lg border border-gray-200 bg-white select-none" style="min-height: 0">
+        <!-- 時刻ラベル列 -->
+        <div class="shrink-0 bg-gray-50 border-r border-gray-200" style="width: 44px">
+            <div :style="{ height: HEADER_H + 'px' }" class="border-b border-gray-200" />
+            <div :style="{ height: TOTAL_H + 'px' }" class="relative">
+                <div v-for="h in hours" :key="h"
+                    class="absolute right-1 text-[10px] text-gray-400 leading-none"
+                    :style="{ top: `${(h - START_HOUR) * HOUR_H - 6}px` }">
+                    {{ String(h).padStart(2, '0') }}:00
+                </div>
+            </div>
+        </div>
+
+        <!-- 日列 × 7 -->
+        <div class="flex flex-1 overflow-x-auto">
+            <div v-for="(day, di) in days" :key="di"
+                class="relative flex flex-col border-r border-gray-200 last:border-r-0"
+                style="min-width: 80px; flex: 1">
+
+                <!-- 曜日ヘッダー -->
+                <div :style="{ height: HEADER_H + 'px' }"
+                    class="flex shrink-0 flex-col items-center justify-center border-b border-gray-200"
+                    :class="isToday(day) ? 'bg-blue-50' : 'bg-white'">
+                    <span class="text-[10px] font-semibold"
+                        :class="di === 0 ? 'text-red-500' : di === 6 ? 'text-blue-500' : 'text-gray-500'">
+                        {{ DAYS_JA[day.getDay()] }}
+                    </span>
+                    <span class="flex h-5 w-5 items-center justify-center text-xs font-bold leading-none"
+                        :class="[
+                            isToday(day) ? 'rounded-full bg-blue-600 text-white' : 'text-gray-800',
+                            di === 0 && !isToday(day) ? 'text-red-500' : '',
+                            di === 6 && !isToday(day) ? 'text-blue-500' : '',
+                        ]">
+                        {{ day.getDate() }}
+                    </span>
+                </div>
+
+                <!-- タイムグリッド -->
+                <div :ref="el => setGridRef(el, di)"
+                    :style="{ height: TOTAL_H + 'px' }"
+                    class="relative cursor-crosshair"
+                    :class="isToday(day) ? 'bg-blue-50/20' : ''"
+                    @mousedown="onGridMousedown(di, $event)">
+
+                    <!-- 時間グリッド線 -->
+                    <div v-for="h in hours" :key="h"
+                        class="pointer-events-none absolute inset-x-0 border-t border-gray-100"
+                        :style="{ top: `${(h - START_HOUR) * HOUR_H}px` }" />
+                    <div v-for="h in hours" :key="'h' + h"
+                        class="pointer-events-none absolute inset-x-0 border-t border-gray-50"
+                        :style="{ top: `${(h - START_HOUR) * HOUR_H + HOUR_H / 2}px` }" />
+
+                    <!-- 選択プレビュー -->
+                    <div v-if="selStyle(di)"
+                        class="pointer-events-none absolute inset-x-0.5 rounded bg-blue-300/40 border border-blue-400"
+                        :style="selStyle(di)" />
+
+                    <!-- イベント -->
+                    <div v-for="ev in eventsForDay(day)" :key="ev.id"
+                        class="absolute inset-x-0.5 overflow-hidden rounded border px-1 pt-0.5 text-xs cursor-grab"
+                        :style="evStyle(ev)"
+                        @mousedown.stop="onEventMousedown(ev, 'move', $event)"
+                        @click.stop="$emit('event-click', ev)">
+                        <!-- リサイズ上端 -->
+                        <div class="absolute inset-x-0 top-0 h-2 cursor-n-resize"
+                            @mousedown.stop="onEventMousedown(ev, 'resize-top', $event)" />
+                        <div class="pointer-events-none font-semibold leading-tight line-clamp-2">{{ ev.title }}</div>
+                        <div class="pointer-events-none text-[10px] opacity-80">{{ fmtTime(ev.starts_at) }}</div>
+                        <!-- リサイズ下端 -->
+                        <div class="absolute inset-x-0 bottom-0 h-2 cursor-s-resize"
+                            @mousedown.stop="onEventMousedown(ev, 'resize-bot', $event)" />
+                    </div>
+
+                    <!-- ドラッグ中プレビュー -->
+                    <div v-if="dragStyle(di)"
+                        class="pointer-events-none absolute inset-x-0.5 overflow-hidden rounded border px-1 pt-0.5 text-xs opacity-90 shadow-lg ring-2 ring-white"
+                        :style="dragStyle(di)">
+                        <div class="font-semibold leading-tight">{{ dragging.ev.title }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>

@@ -28,15 +28,20 @@ class Event extends Model
         'end',
         'description',
         'interruption_minutes',
+        // 予定表機能追加カラム
+        'is_company_event',
+        'visibility',
+        'organizer_id',
+        'room_reservation_id',
     ];
 
     // Ensure accessor-backed attributes are included when the model is converted to array/JSON
     protected $appends = ['start', 'end', 'description', 'date'];
 
-    // Cast DB timestamp columns to DateTime objects
     protected $casts = [
-        'starts_at' => 'datetime',
-        'ends_at' => 'datetime',
+        'starts_at'        => 'datetime',
+        'ends_at'          => 'datetime',
+        'is_company_event' => 'boolean',
     ];
 
     public function eventItemType()
@@ -64,6 +69,21 @@ class Event extends Model
     public function projectJob(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(ProjectJob::class);
+    }
+
+    public function organizer()
+    {
+        return $this->belongsTo(User::class, 'organizer_id');
+    }
+
+    public function roomReservation()
+    {
+        return $this->belongsTo(RoomReservation::class);
+    }
+
+    public function attendees()
+    {
+        return $this->hasMany(ScheduleAttendee::class);
     }
 
     public function projectJobAssignmentByMyself()

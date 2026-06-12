@@ -1258,6 +1258,10 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::delete('/events/{event}/attendees/{user}', [\App\Http\Controllers\Schedule\ScheduleAttendeeController::class, 'destroy'])
             ->name('attendees.destroy');
 
+        // ユーザー検索 (JSON)
+        Route::get('/users', [\App\Http\Controllers\Schedule\ScheduleController::class, 'users'])
+            ->name('users.search');
+
         // 会議室一覧 (JSON)
         Route::get('/rooms', [\App\Http\Controllers\Schedule\ScheduleController::class, 'rooms'])
             ->name('rooms.index');
