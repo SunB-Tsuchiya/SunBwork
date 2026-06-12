@@ -117,6 +117,24 @@ class TeamBoardCardController extends Controller
         return response()->json($card);
     }
 
+    public function reorder(Request $request, Team $team)
+    {
+        app(TeamRoomController::class)->assertMember($team);
+
+        $request->validate([
+            'ids'   => 'required|array',
+            'ids.*' => 'integer',
+        ]);
+
+        DB::transaction(function () use ($request) {
+            foreach ($request->ids as $i => $id) {
+                TeamBoardCard::where('id', $id)->update(['sort_order' => $i]);
+            }
+        });
+
+        return response()->json(['ok' => true]);
+    }
+
     public function updateColor(Request $request, Team $team, TeamBoardCard $card)
     {
         app(TeamRoomController::class)->assertMember($team);

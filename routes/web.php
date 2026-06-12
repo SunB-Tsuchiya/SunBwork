@@ -1129,6 +1129,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
         Route::post('/{team}/board', [\App\Http\Controllers\TeamRoom\TeamBoardController::class, 'store'])->name('board.store');
         Route::put('/{team}/board/columns', [\App\Http\Controllers\TeamRoom\TeamBoardController::class, 'updateColumns'])->name('board.columns.update');
         Route::post('/{team}/board/cards', [\App\Http\Controllers\TeamRoom\TeamBoardCardController::class, 'store'])->name('board.cards.store');
+        Route::patch('/{team}/board/cards/reorder', [\App\Http\Controllers\TeamRoom\TeamBoardCardController::class, 'reorder'])->name('board.cards.reorder');
         Route::get('/{team}/board/cards/{card}', [\App\Http\Controllers\TeamRoom\TeamBoardCardController::class, 'show'])->name('board.cards.show');
         Route::get('/{team}/board/cards/{card}/edit', [\App\Http\Controllers\TeamRoom\TeamBoardCardController::class, 'edit'])->name('board.cards.edit');
         Route::put('/{team}/board/cards/{card}', [\App\Http\Controllers\TeamRoom\TeamBoardCardController::class, 'update'])->name('board.cards.update');
@@ -1227,3 +1228,104 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
 Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'superadmin'])
     ->post('/superadmin/switch-context', [App\Http\Controllers\SuperAdmin\ContextController::class, 'switch'])
     ->name('superadmin.switch_context');
+
+// ========================================
+// 予定表機能（開発中: SuperAdmin のみ）
+// ========================================
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'superadmin'])
+    ->prefix('schedule')
+    ->name('schedule.')
+    ->group(function () {
+        // 予定表メインページ
+        Route::get('/', [\App\Http\Controllers\Schedule\ScheduleController::class, 'index'])
+            ->name('index');
+
+        // 予定イベント CRUD
+        Route::post('/events', [\App\Http\Controllers\Schedule\ScheduleEventController::class, 'store'])
+            ->name('events.store');
+        Route::put('/events/{event}', [\App\Http\Controllers\Schedule\ScheduleEventController::class, 'update'])
+            ->name('events.update');
+        Route::delete('/events/{event}', [\App\Http\Controllers\Schedule\ScheduleEventController::class, 'destroy'])
+            ->name('events.destroy');
+        Route::get('/events/{event}', [\App\Http\Controllers\Schedule\ScheduleEventController::class, 'show'])
+            ->name('events.show');
+        Route::get('/events', [\App\Http\Controllers\Schedule\ScheduleEventController::class, 'range'])
+            ->name('events.range');
+
+        // 参加者
+        Route::post('/events/{event}/attendees', [\App\Http\Controllers\Schedule\ScheduleAttendeeController::class, 'store'])
+            ->name('attendees.store');
+        Route::delete('/events/{event}/attendees/{user}', [\App\Http\Controllers\Schedule\ScheduleAttendeeController::class, 'destroy'])
+            ->name('attendees.destroy');
+
+        // 会議室一覧 (JSON)
+        Route::get('/rooms', [\App\Http\Controllers\Schedule\ScheduleController::class, 'rooms'])
+            ->name('rooms.index');
+
+        // 会議室予約
+        Route::post('/rooms/{room}/reservations', [\App\Http\Controllers\Schedule\ScheduleRoomReservationController::class, 'store'])
+            ->name('room-reservations.store');
+        Route::put('/room-reservations/{reservation}', [\App\Http\Controllers\Schedule\ScheduleRoomReservationController::class, 'update'])
+            ->name('room-reservations.update');
+        Route::delete('/room-reservations/{reservation}', [\App\Http\Controllers\Schedule\ScheduleRoomReservationController::class, 'destroy'])
+            ->name('room-reservations.destroy');
+
+        // オーバーレイ設定
+        Route::get('/overlays', [\App\Http\Controllers\Schedule\ScheduleOverlayController::class, 'index'])
+            ->name('overlays.index');
+        Route::post('/overlays', [\App\Http\Controllers\Schedule\ScheduleOverlayController::class, 'store'])
+            ->name('overlays.store');
+        Route::delete('/overlays/{overlay}', [\App\Http\Controllers\Schedule\ScheduleOverlayController::class, 'destroy'])
+            ->name('overlays.destroy');
+
+        // 通知
+        Route::get('/notifications', [\App\Http\Controllers\Schedule\ScheduleNotificationController::class, 'index'])
+            ->name('notifications.index');
+        Route::put('/notifications/{notification}/read', [\App\Http\Controllers\Schedule\ScheduleNotificationController::class, 'read'])
+            ->name('notifications.read');
+    });
+
+// 予定表 Admin 設定（開発中: SuperAdmin のみ）
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'superadmin'])
+    ->prefix('admin')
+    ->name('admin.')
+    ->group(function () {
+        // 会議室マスタ管理
+        Route::get('/meeting-rooms', [\App\Http\Controllers\Admin\MeetingRoomController::class, 'index'])
+            ->name('meeting-rooms.index');
+        Route::get('/meeting-rooms/create', [\App\Http\Controllers\Admin\MeetingRoomController::class, 'create'])
+            ->name('meeting-rooms.create');
+        Route::post('/meeting-rooms', [\App\Http\Controllers\Admin\MeetingRoomController::class, 'store'])
+            ->name('meeting-rooms.store');
+        Route::get('/meeting-rooms/{room}/edit', [\App\Http\Controllers\Admin\MeetingRoomController::class, 'edit'])
+            ->name('meeting-rooms.edit');
+        Route::put('/meeting-rooms/{room}', [\App\Http\Controllers\Admin\MeetingRoomController::class, 'update'])
+            ->name('meeting-rooms.update');
+        Route::delete('/meeting-rooms/{room}', [\App\Http\Controllers\Admin\MeetingRoomController::class, 'destroy'])
+            ->name('meeting-rooms.destroy');
+
+        // 予定表権限設定
+        Route::get('/schedule-settings', [\App\Http\Controllers\Admin\SchedulePermissionController::class, 'edit'])
+            ->name('schedule-settings.edit');
+        Route::put('/schedule-settings', [\App\Http\Controllers\Admin\SchedulePermissionController::class, 'update'])
+            ->name('schedule-settings.update');
+    });
+
+// グループ会社設定 SuperAdmin（開発中: SuperAdmin のみ）
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'superadmin'])
+    ->prefix('super-admin/company-groups')
+    ->name('super-admin.company-groups.')
+    ->group(function () {
+        Route::get('/', [\App\Http\Controllers\SuperAdmin\CompanyGroupController::class, 'index'])
+            ->name('index');
+        Route::get('/create', [\App\Http\Controllers\SuperAdmin\CompanyGroupController::class, 'create'])
+            ->name('create');
+        Route::post('/', [\App\Http\Controllers\SuperAdmin\CompanyGroupController::class, 'store'])
+            ->name('store');
+        Route::get('/{companyGroup}/edit', [\App\Http\Controllers\SuperAdmin\CompanyGroupController::class, 'edit'])
+            ->name('edit');
+        Route::put('/{companyGroup}', [\App\Http\Controllers\SuperAdmin\CompanyGroupController::class, 'update'])
+            ->name('update');
+        Route::delete('/{companyGroup}', [\App\Http\Controllers\SuperAdmin\CompanyGroupController::class, 'destroy'])
+            ->name('destroy');
+    });

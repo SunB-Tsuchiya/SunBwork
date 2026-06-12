@@ -153,35 +153,89 @@ function onBoardUpdated(updatedBoard) {
 }
 
 // ────────────────── ドラッグ＆ドロップ ──────────────────
-const draggedCard   = ref(null);
-const dragOverColId = ref(null);
+const draggedCard    = ref(null);
+const dragOverColId  = ref(null);
+const dragOverCardId = ref(null);
 
 function onDragStart(card) {
     draggedCard.value = card;
 }
 
 function onDragOver(colId) {
-    if (draggedCard.value && draggedCard.value.team_board_column_id !== colId) {
+    if (!draggedCard.value) return;
+    if (draggedCard.value.team_board_column_id !== colId) {
+        dragOverColId.value = colId;
+    } else {
         dragOverColId.value = colId;
     }
 }
 
+function onDragOverCard(card, colId) {
+    if (!draggedCard.value) return;
+    if (draggedCard.value.team_board_column_id === colId) {
+        dragOverCardId.value = card.id;
+    }
+}
+
 function onDragLeave() {
-    dragOverColId.value = null;
+    dragOverColId.value  = null;
+    dragOverCardId.value = null;
 }
 
 async function onDrop(colId) {
     dragOverColId.value = null;
+    const overCardId = dragOverCardId.value;
+    dragOverCardId.value = null;
     if (!draggedCard.value) return;
-    if (draggedCard.value.team_board_column_id === colId) { draggedCard.value = null; return; }
+
     const card = draggedCard.value;
     draggedCard.value = null;
+
+    // 同カラム内並び替え
+    if (card.team_board_column_id === colId) {
+        if (overCardId !== null && overCardId !== card.id) {
+            await reorderCards(card, colId, overCardId);
+        }
+        return;
+    }
+
+    // 別カラムへ移動
     await moveCard(card, colId);
 }
 
 function onDragEnd() {
-    draggedCard.value   = null;
-    dragOverColId.value = null;
+    draggedCard.value    = null;
+    dragOverColId.value  = null;
+    dragOverCardId.value = null;
+}
+
+// ────────────────── カード並び替え ──────────────────
+async function reorderCards(movingCard, colId, targetCardId) {
+    const col = props.board?.columns.find(c => c.id === colId);
+    if (!col || !col.cards) return;
+
+    const cards = [...col.cards];
+    const fromIdx = cards.findIndex(c => c.id === movingCard.id);
+    if (fromIdx === -1) return;
+
+    cards.splice(fromIdx, 1);
+    const toIdx = cards.findIndex(c => c.id === targetCardId);
+    if (toIdx === -1) {
+        cards.push(movingCard);
+    } else {
+        cards.splice(toIdx, 0, movingCard);
+    }
+
+    col.cards = cards;
+
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    try {
+        await axios.patch(
+            route('team-rooms.board.cards.reorder', { team: props.team.id }),
+            { ids: cards.map(c => c.id) },
+            { headers: { 'X-CSRF-TOKEN': csrf } }
+        );
+    } catch { /* no-op */ }
 }
 
 // ────────────────── 一覧ビュー ──────────────────
@@ -355,8 +409,12 @@ function resetListFilters() {
                                         draggable="true"
                                         @dragstart="onDragStart(card)"
                                         @dragend="onDragEnd"
+                                        @dragover.prevent="onDragOverCard(card, col.id)"
                                         @click="router.get(route('team-rooms.board.cards.show', { team: team.id, card: card.id }))"
-                                        class="cursor-pointer"
+                                        class="cursor-grab active:cursor-grabbing"
+                                        :class="dragOverCardId === card.id && draggedCard?.team_board_column_id === col.id && draggedCard?.id !== card.id
+                                            ? 'ring-2 ring-indigo-400 ring-offset-1 rounded'
+                                            : ''"
                                     >
                                         <TeamBoardCard
                                             :card="card"
