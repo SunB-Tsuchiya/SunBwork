@@ -246,10 +246,14 @@ async function executeDelete() {
 // ── カードカラー ───────────────────────────────────────────
 const CARD_COLORS = {
     indigo: { swatch: 'bg-indigo-400',  border: 'border-indigo-400', bg: 'bg-indigo-100',  textMain: 'text-indigo-900', textSub: 'text-indigo-600' },
-    purple: { swatch: 'bg-purple-400',  border: 'border-purple-400', bg: 'bg-purple-100',  textMain: 'text-purple-900', textSub: 'text-purple-600' },
+    blue:   { swatch: 'bg-blue-400',    border: 'border-blue-400',   bg: 'bg-blue-100',    textMain: 'text-blue-900',   textSub: 'text-blue-600'   },
+    teal:   { swatch: 'bg-teal-500',    border: 'border-teal-500',   bg: 'bg-teal-100',    textMain: 'text-teal-900',   textSub: 'text-teal-700'   },
     green:  { swatch: 'bg-green-500',   border: 'border-green-500',  bg: 'bg-green-100',   textMain: 'text-green-900',  textSub: 'text-green-700'  },
     yellow: { swatch: 'bg-yellow-400',  border: 'border-yellow-400', bg: 'bg-yellow-100',  textMain: 'text-yellow-900', textSub: 'text-yellow-700' },
+    orange: { swatch: 'bg-orange-400',  border: 'border-orange-400', bg: 'bg-orange-100',  textMain: 'text-orange-900', textSub: 'text-orange-700' },
     red:    { swatch: 'bg-red-400',     border: 'border-red-400',    bg: 'bg-red-100',     textMain: 'text-red-900',    textSub: 'text-red-700'    },
+    pink:   { swatch: 'bg-pink-400',    border: 'border-pink-400',   bg: 'bg-pink-100',    textMain: 'text-pink-900',   textSub: 'text-pink-700'   },
+    purple: { swatch: 'bg-purple-400',  border: 'border-purple-400', bg: 'bg-purple-100',  textMain: 'text-purple-900', textSub: 'text-purple-600' },
     gray:   { swatch: 'bg-gray-400',    border: 'border-gray-400',   bg: 'bg-gray-200',    textMain: 'text-gray-800',   textSub: 'text-gray-600'   },
 };
 

@@ -1190,6 +1190,21 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
     Route::put('/item-types/{itemType}',    [\App\Http\Controllers\LabelMasterController::class, 'itemTypesUpdate']);
     Route::delete('/item-types/{itemType}', [\App\Http\Controllers\LabelMasterController::class, 'itemTypesDestroy']);
 
+    // 並べ替え（試験名 / アイテム / 一式宛先 共通）
+    Route::post('/reorder', [\App\Http\Controllers\LabelMasterController::class, 'reorder']);
+
+    // エリアマスタ
+    Route::get('/area-masters',                [\App\Http\Controllers\LabelMasterController::class, 'areaMastersIndex']);
+    Route::post('/area-masters',               [\App\Http\Controllers\LabelMasterController::class, 'areaMastersStore']);
+    Route::put('/area-masters/{area}',         [\App\Http\Controllers\LabelMasterController::class, 'areaMastersUpdate']);
+    Route::delete('/area-masters/{area}',      [\App\Http\Controllers\LabelMasterController::class, 'areaMastersDestroy']);
+
+    // 一式宛先マスタ
+    Route::get('/isshiki-destinations',                  [\App\Http\Controllers\LabelMasterController::class, 'isshikiIndex']);
+    Route::post('/isshiki-destinations',                 [\App\Http\Controllers\LabelMasterController::class, 'isshikiStore']);
+    Route::put('/isshiki-destinations/{isshiki}',        [\App\Http\Controllers\LabelMasterController::class, 'isshikiUpdate']);
+    Route::delete('/isshiki-destinations/{isshiki}',     [\App\Http\Controllers\LabelMasterController::class, 'isshikiDestroy']);
+
     // 社内便ルートマスタ
     Route::get('/routes',                        [\App\Http\Controllers\LabelMasterController::class, 'routesIndex']);
     Route::post('/routes',                       [\App\Http\Controllers\LabelMasterController::class, 'routesStore']);

@@ -6,6 +6,8 @@ use App\Models\LabelSchoolMaster;
 use App\Models\LabelTestName;
 use App\Models\LabelSubject;
 use App\Models\LabelItemType;
+use App\Models\LabelIsshikiDestination;
+use App\Models\LabelAreaMaster;
 use App\Models\LabelRoute;
 use App\Models\LabelRouteStop;
 use Illuminate\Http\Request;
@@ -167,6 +169,107 @@ class LabelMasterController extends Controller
     public function itemTypesDestroy(LabelItemType $itemType)
     {
         $itemType->delete();
+        return response()->json(null, 204);
+    }
+
+    // ================================================================
+    // 並べ替え（試験名 / アイテム / 一式宛先 共通）
+    // ================================================================
+
+    public function reorder(Request $request)
+    {
+        $data = $request->validate([
+            'type' => 'required|in:testNames,itemTypes,isshikiDestinations,areaMasters',
+            'ids'  => 'required|array',
+            'ids.*' => 'integer',
+        ]);
+
+        $modelMap = [
+            'testNames'            => LabelTestName::class,
+            'itemTypes'            => LabelItemType::class,
+            'isshikiDestinations'  => LabelIsshikiDestination::class,
+            'areaMasters'          => LabelAreaMaster::class,
+        ];
+        $model = $modelMap[$data['type']];
+
+        \DB::transaction(function () use ($model, $data) {
+            foreach ($data['ids'] as $i => $id) {
+                $model::where('id', $id)->update(['sort_order' => $i + 1]);
+            }
+        });
+
+        return response()->json(['ok' => true]);
+    }
+
+    // ================================================================
+    // 一式宛先マスタ
+    // ================================================================
+
+    public function isshikiIndex()
+    {
+        return response()->json(LabelIsshikiDestination::orderBy('sort_order')->orderBy('id')->get());
+    }
+
+    public function isshikiStore(Request $request)
+    {
+        $data = $request->validate([
+            'name'       => 'required|string|max:200',
+            'sort_order' => 'integer',
+            'is_active'  => 'boolean',
+        ]);
+        return response()->json(LabelIsshikiDestination::create($data), 201);
+    }
+
+    public function isshikiUpdate(Request $request, LabelIsshikiDestination $isshiki)
+    {
+        $data = $request->validate([
+            'name'       => 'required|string|max:200',
+            'sort_order' => 'integer',
+            'is_active'  => 'boolean',
+        ]);
+        $isshiki->update($data);
+        return response()->json($isshiki);
+    }
+
+    public function isshikiDestroy(LabelIsshikiDestination $isshiki)
+    {
+        $isshiki->delete();
+        return response()->json(null, 204);
+    }
+
+    // ================================================================
+    // エリアマスタ
+    // ================================================================
+
+    public function areaMastersIndex()
+    {
+        return response()->json(LabelAreaMaster::orderBy('sort_order')->orderBy('id')->get());
+    }
+
+    public function areaMastersStore(Request $request)
+    {
+        $data = $request->validate([
+            'name'       => 'required|string|max:100|unique:label_area_masters,name',
+            'sort_order' => 'integer',
+            'is_active'  => 'boolean',
+        ]);
+        return response()->json(LabelAreaMaster::create($data), 201);
+    }
+
+    public function areaMastersUpdate(Request $request, LabelAreaMaster $area)
+    {
+        $data = $request->validate([
+            'name'       => 'required|string|max:100|unique:label_area_masters,name,' . $area->id,
+            'sort_order' => 'integer',
+            'is_active'  => 'boolean',
+        ]);
+        $area->update($data);
+        return response()->json($area);
+    }
+
+    public function areaMastersDestroy(LabelAreaMaster $area)
+    {
+        $area->delete();
         return response()->json(null, 204);
     }
 

@@ -174,6 +174,25 @@ function parseSchoolRows(data, gradeCols) {
             }
         }
     }
+    // Pass 1: 小計行からエリア境界を収集
+    const BOUNDARY_RE = /^(.+?)(?:小計|本部計)$/;
+    const boundaries = [];
+    for (let r = dataStart; r < data.length; r++) {
+        const row = data[r] || [];
+        for (const c of [0, 1, 2]) {
+            const cell = String(row[c] || '').trim();
+            const m = cell.match(BOUNDARY_RE);
+            if (m) { boundaries.push({ rowIdx: r, area: m[1] }); break; }
+        }
+    }
+    // Pass 2: 各教室に最も近い次の境界のエリアを割り当て
+    if (boundaries.length > 0) {
+        for (const school of Object.values(schools)) {
+            const boundary = boundaries.find(b => b.rowIdx > school.rowIdx);
+            if (boundary) school.area = boundary.area;
+        }
+    }
+
     return schools;
 }
 // 一式シート（シート名に「一式」を含む）の黄色セル行を抽出
@@ -265,11 +284,13 @@ function buildLabelsFromEntry(symEntry, grade, group) {
 }
 
 // ── マスタ管理（DB API）──────────────────────────────────────
-const schoolMaster    = ref([]);
-const testNameMaster  = ref([]);
-const itemTypeMaster  = ref([]);
-const routeMaster     = ref([]);  // 社内便ルートマスタ
-const masterLoading   = ref(false);
+const schoolMaster          = ref([]);
+const testNameMaster        = ref([]);
+const itemTypeMaster        = ref([]);
+const isshikiMaster         = ref([]);  // 一式宛先マスタ
+const areaMaster            = ref([]);  // エリアマスタ
+const routeMaster           = ref([]);  // 社内便ルートマスタ
+const masterLoading         = ref(false);
 
 const mapSchool    = s => ({
     id: s.id, code: s.code, name: s.display_name,
@@ -277,19 +298,25 @@ const mapSchool    = s => ({
 });
 const mapTestName  = t => ({ id: t.id, name: t.name, isActive: t.is_active !== false });
 const mapItemType  = t => ({ id: t.id, name: t.name, isActive: t.is_active !== false });
+const mapIsshiki   = t => ({ id: t.id, name: t.name, sortOrder: t.sort_order, isActive: t.is_active !== false });
+const mapArea      = t => ({ id: t.id, name: t.name, sortOrder: t.sort_order, isActive: t.is_active !== false });
 
 async function loadMasters() {
     masterLoading.value = true;
     try {
-        const [sch, tn, it, rt] = await Promise.all([
+        const [sch, tn, it, ish, ar, rt] = await Promise.all([
             axios.get('/label-masters/schools'),
             axios.get('/label-masters/test-names'),
             axios.get('/label-masters/item-types'),
+            axios.get('/label-masters/isshiki-destinations'),
+            axios.get('/label-masters/area-masters'),
             axios.get('/label-masters/routes'),
         ]);
         schoolMaster.value    = sch.data.map(mapSchool);
         testNameMaster.value  = tn.data.map(mapTestName);
         itemTypeMaster.value  = it.data.map(mapItemType);
+        isshikiMaster.value   = ish.data.map(mapIsshiki);
+        areaMaster.value      = ar.data.map(mapArea);
         routeMaster.value     = rt.data;
     } catch (e) {
         console.error('マスタ読み込みエラー', e);
@@ -539,6 +566,18 @@ async function masterSaveEdit(tab) {
             });
             const idx = itemTypeMaster.value.findIndex(t => t.id === data.id);
             if (idx >= 0) itemTypeMaster.value[idx] = mapItemType(data);
+        } else if (tab === 'isshikiDestinations') {
+            const { data } = await axios.put(`/label-masters/isshiki-destinations/${row.id}`, {
+                name: row.name, sort_order: row.sortOrder ?? 0, is_active: row.isActive !== false,
+            });
+            const idx = isshikiMaster.value.findIndex(t => t.id === data.id);
+            if (idx >= 0) isshikiMaster.value[idx] = mapIsshiki(data);
+        } else if (tab === 'areaMasters') {
+            const { data } = await axios.put(`/label-masters/area-masters/${row.id}`, {
+                name: row.name, sort_order: row.sortOrder ?? 0, is_active: row.isActive !== false,
+            });
+            const idx = areaMaster.value.findIndex(t => t.id === data.id);
+            if (idx >= 0) areaMaster.value[idx] = mapArea(data);
         } else {
             const { data } = await axios.put(`/label-masters/test-names/${row.id}`, {
                 name: row.name, sort_order: 0, is_active: row.isActive !== false,
@@ -555,7 +594,11 @@ function masterStartAdd() {
         ? { _tab: 'schools',    code: '', name: '', route: '', stopOrder: '' }
         : masterTab.value === 'itemTypes'
             ? { _tab: 'itemTypes', name: '' }
-            : { _tab: 'testNames', name: '' };
+            : masterTab.value === 'isshikiDestinations'
+                ? { _tab: 'isshikiDestinations', name: '' }
+                : masterTab.value === 'areaMasters'
+                    ? { _tab: 'areaMasters', name: '' }
+                    : { _tab: 'testNames', name: '' };
 }
 function masterCancelAdd() { masterAddingRow.value = null; }
 async function masterSaveAdd() {
@@ -580,6 +623,22 @@ async function masterSaveAdd() {
                 name: masterAddingRow.value.name.trim(), sort_order: 0, is_active: true,
             });
             itemTypeMaster.value.push(mapItemType(data));
+        } else if (_tab === 'isshikiDestinations') {
+            if (!masterAddingRow.value.name?.trim()) return;
+            const nextOrder = isshikiMaster.value.length > 0
+                ? Math.max(...isshikiMaster.value.map(t => t.sortOrder)) + 1 : 1;
+            const { data } = await axios.post('/label-masters/isshiki-destinations', {
+                name: masterAddingRow.value.name.trim(), sort_order: nextOrder, is_active: true,
+            });
+            isshikiMaster.value.push(mapIsshiki(data));
+        } else if (_tab === 'areaMasters') {
+            if (!masterAddingRow.value.name?.trim()) return;
+            const nextOrder = areaMaster.value.length > 0
+                ? Math.max(...areaMaster.value.map(t => t.sortOrder)) + 1 : 1;
+            const { data } = await axios.post('/label-masters/area-masters', {
+                name: masterAddingRow.value.name.trim(), sort_order: nextOrder, is_active: true,
+            });
+            areaMaster.value.push(mapArea(data));
         } else {
             if (!masterAddingRow.value.name?.trim()) return;
             const { data } = await axios.post('/label-masters/test-names', {
@@ -599,6 +658,18 @@ async function masterToggleActive(item, tab = 'testNames') {
             });
             const idx = itemTypeMaster.value.findIndex(t => t.id === item.id);
             if (idx >= 0) itemTypeMaster.value[idx] = mapItemType(data);
+        } else if (tab === 'isshikiDestinations') {
+            const { data } = await axios.put(`/label-masters/isshiki-destinations/${item.id}`, {
+                name: item.name, sort_order: item.sortOrder ?? 0, is_active: newVal,
+            });
+            const idx = isshikiMaster.value.findIndex(t => t.id === item.id);
+            if (idx >= 0) isshikiMaster.value[idx] = mapIsshiki(data);
+        } else if (tab === 'areaMasters') {
+            const { data } = await axios.put(`/label-masters/area-masters/${item.id}`, {
+                name: item.name, sort_order: item.sortOrder ?? 0, is_active: newVal,
+            });
+            const idx = areaMaster.value.findIndex(t => t.id === item.id);
+            if (idx >= 0) areaMaster.value[idx] = mapArea(data);
         } else {
             const { data } = await axios.put(`/label-masters/test-names/${item.id}`, {
                 name: item.name, sort_order: 0, is_active: newVal,
@@ -617,11 +688,68 @@ async function masterDelete(tab, id) {
         } else if (tab === 'itemTypes') {
             await axios.delete(`/label-masters/item-types/${id}`);
             itemTypeMaster.value = itemTypeMaster.value.filter(r => r.id !== id);
+        } else if (tab === 'isshikiDestinations') {
+            await axios.delete(`/label-masters/isshiki-destinations/${id}`);
+            isshikiMaster.value = isshikiMaster.value.filter(r => r.id !== id);
+        } else if (tab === 'areaMasters') {
+            await axios.delete(`/label-masters/area-masters/${id}`);
+            areaMaster.value = areaMaster.value.filter(r => r.id !== id);
         } else {
             await axios.delete(`/label-masters/test-names/${id}`);
             testNameMaster.value = testNameMaster.value.filter(r => r.id !== id);
         }
     } catch (e) { alert('削除エラー: ' + e.message); }
+}
+
+function masterListForTab(tab) {
+    if (tab === 'testNames')           return testNameMaster;
+    if (tab === 'itemTypes')           return itemTypeMaster;
+    if (tab === 'isshikiDestinations') return isshikiMaster;
+    if (tab === 'areaMasters')         return areaMaster;
+    return null;
+}
+
+// 並べ替えモード
+const reorderMode     = ref(null); // null | 'testNames' | 'itemTypes' | 'isshikiDestinations' | 'areaMasters'
+const reorderSnapshot = ref(null); // 元の配列のバックアップ
+
+function masterStartReorder(tab) {
+    const list = masterListForTab(tab);
+    if (!list) return;
+    reorderSnapshot.value = list.value.map(item => ({ ...item }));
+    reorderMode.value = tab;
+    masterAddingRow.value = null;
+}
+async function masterSaveReorder(tab) {
+    const list = masterListForTab(tab);
+    if (!list) return;
+    try {
+        await axios.post('/label-masters/reorder', {
+            type: tab,
+            ids: list.value.map(t => t.id),
+        });
+        list.value.forEach((item, i) => { item.sortOrder = i + 1; });
+        reorderMode.value = null;
+        reorderSnapshot.value = null;
+    } catch (e) { alert('並べ替え保存エラー: ' + e.message); }
+}
+function masterCancelReorder(tab) {
+    const list = masterListForTab(tab);
+    if (!list || !reorderSnapshot.value) return;
+    list.value = reorderSnapshot.value;
+    reorderMode.value = null;
+    reorderSnapshot.value = null;
+}
+function masterMoveItem(tab, index, direction) {
+    const list = masterListForTab(tab);
+    if (!list) return;
+    const arr = list.value;
+    const swapIdx = index + direction;
+    if (swapIdx < 0 || swapIdx >= arr.length) return;
+    const tmp = arr[index];
+    arr[index] = arr[swapIdx];
+    arr[swapIdx] = tmp;
+    list.value = [...arr];
 }
 
 // ── 試験項目 ──────────────────────────────────────────────
@@ -662,6 +790,7 @@ const gradeItemMapRef   = ref({});    // { '3年': ['①','②','③','④'], '4
 const ichishikiDetected  = ref(false); // 一式シートまたは黄色セルが存在するか
 const isshikiDestCount   = ref(0);    // Excel から検出した一式宛先数
 const symDataRef         = ref({});   // { dateCode → { sym → { schools, subject, itemLabel, maxBox } } }
+const sheetDataRef       = ref([]);   // [{ name, grades, schools }] — データ照会用シート別データ
 
 function handleExcelUpload(e) {
     const file = e.target.files?.[0];
@@ -675,6 +804,8 @@ function handleExcelUpload(e) {
     ichishikiDetected.value = false;
     isshikiDestCount.value  = 0;
     symDataRef.value        = {};
+    sheetDataRef.value      = [];
+    dataviewSheet.value     = 0;
 
     const reader = new FileReader();
     reader.onload = ev => {
@@ -693,6 +824,7 @@ function parseWorkbook(wb) {
     const dateSet      = new Set();
     let hasIchishiki   = false;
     const newSymData   = {};  // { dateCode → { sym → { schools, subject, itemLabel, maxBox } } }
+    const newSheetList = [];  // データ照会用 [{ name, grades, schools }]
 
     for (const sn of wb.SheetNames) {
         const n  = sn.normalize('NFKC');
@@ -751,6 +883,14 @@ function parseWorkbook(wb) {
         // ── 凡例（NFKC-safe）と教室データを抽出して symData に格納 ──
         const legendItems = extractLegendItemsV2(data);
         const schools     = parseSchoolRows(data, gradeCols);
+
+        // データ照会用: シート単位のデータを収集
+        newSheetList.push({
+            name:    sn,
+            grades:  GRADE_ORDER.filter(g => gradesInSheet.has(g)),
+            schools,
+        });
+
         const bucket      = dc ?? '__common';
         if (!newSymData[bucket]) newSymData[bucket] = {};
         for (const li of legendItems) {
@@ -770,6 +910,9 @@ function parseWorkbook(wb) {
     detectedDates.value     = [...dateSet].sort();
     ichishikiDetected.value = hasIchishiki;
     symDataRef.value        = newSymData;
+    sheetDataRef.value      = newSheetList;
+    dataviewSheet.value     = 0;
+    dataviewGrade.value     = newSheetList[0]?.grades[0] ?? detectedGrades.value[0] ?? '';
     const allIsshikiDests = Object.values(newSymData).flatMap(b => b._isshikiDestinations ?? []);
     isshikiDestCount.value = allIsshikiDests.length;
 
@@ -1067,13 +1210,22 @@ async function generatePdfs() {
                     let pageCount = 1;
 
                     if (file.isIchishiki) {
-                        // 一式ラベル：一式シートの黄色セル宛先を通常ラベルと同じ形式で1枚ずつ生成
-                        const isshikiDests = symDataRef.value[group.mmdd]?._isshikiDestinations
+                        // 一式ラベル：黄色セル宛先を抽出し、一式マスタの sort_order 順に並べて出力
+                        const rawIsshikiDests = symDataRef.value[group.mmdd]?._isshikiDestinations
                             ?? symDataRef.value['__common']?._isshikiDestinations
                             ?? [];
+                        // マスタの sort_order で並べ替え（マスタにない宛先は末尾）
+                        const masterOrder = isshikiMaster.value;
+                        const sortedDests = [...rawIsshikiDests].sort((a, b) => {
+                            const ai = masterOrder.findIndex(m => m.name === a.name);
+                            const bi = masterOrder.findIndex(m => m.name === b.name);
+                            const aOrder = ai >= 0 ? masterOrder[ai].sortOrder : 99999;
+                            const bOrder = bi >= 0 ? masterOrder[bi].sortOrder : 99999;
+                            return aOrder - bOrder;
+                        });
                         const dateDisplay = dateCodeToDisplay(group.mmdd);
                         const isshikiLabels = [];
-                        for (const dest of isshikiDests) {
+                        for (const dest of sortedDests) {
                             const qty = dest.grades?.[grade] ?? 0;
                             if (!qty || qty <= 0) continue;
                             isshikiLabels.push({
@@ -1187,6 +1339,62 @@ function closePreview()    { previewTarget.value = null; }
 function backToConfig()    { currentView.value = 'config'; }
 
 const canGenerate = computed(() => pdfGroups.value.some(g => g.grades.length > 0));
+
+// ── データ照会 / 部数集計 ─────────────────────────────────────
+const showDataviewModal  = ref(false);
+const showSummaryModal   = ref(false);
+const dataviewGrade      = ref('');
+const dataviewSheet      = ref(0);  // sheetDataRef のインデックス
+
+const dataviewRows = computed(() => {
+    if (!excelLoaded.value || !sheetDataRef.value.length) return [];
+    const sheet = sheetDataRef.value[dataviewSheet.value];
+    if (!sheet?.schools) return [];
+
+    const grade = dataviewGrade.value;
+    // 教室マスタの順番でソート
+    const schoolOrderMap = new Map();
+    schoolMaster.value.forEach((s, i) => schoolOrderMap.set(s.code, i));
+
+    const rows = [];
+    for (const school of Object.values(sheet.schools)) {
+        rows.push({
+            code: school.code,
+            name: school.name,
+            area: school.area || '',
+            qty:  grade ? (school.grades?.[grade] ?? 0) : 0,
+        });
+    }
+    rows.sort((a, b) => {
+        const ai = schoolOrderMap.has(a.code) ? schoolOrderMap.get(a.code) : 9999;
+        const bi = schoolOrderMap.has(b.code) ? schoolOrderMap.get(b.code) : 9999;
+        if (ai !== bi) return ai - bi;
+        return a.code.localeCompare(b.code);
+    });
+    return rows;
+});
+
+const summaryData = computed(() => {
+    const areaOrder = areaMaster.value.map(a => a.name);
+    const areaMap = new Map();
+    for (const row of dataviewRows.value) {
+        const area = row.area || '未分類';
+        if (!areaMap.has(area)) areaMap.set(area, 0);
+        areaMap.set(area, areaMap.get(area) + (row.qty || 0));
+    }
+    const result = [...areaMap.entries()].map(([area, qty]) => ({
+        area, qty,
+        sortOrder: areaOrder.indexOf(area),
+    }));
+    result.sort((a, b) => {
+        const ao = a.sortOrder >= 0 ? a.sortOrder : 9999;
+        const bo = b.sortOrder >= 0 ? b.sortOrder : 9999;
+        return ao - bo;
+    });
+    return result;
+});
+
+const summaryTotal = computed(() => summaryData.value.reduce((s, r) => s + r.qty, 0));
 </script>
 
 <template>
@@ -1210,9 +1418,17 @@ const canGenerate = computed(() => pdfGroups.value.some(g => g.grades.length > 0
                     class="px-3 py-1.5 text-xs border border-gray-300 rounded hover:bg-orange-50 hover:border-orange-300 text-gray-600 transition">
                     アイテムマスタ（{{ itemTypeMaster.length }}件）
                 </button>
+                <button @click="openMasterModal('isshikiDestinations')" type="button"
+                    class="px-3 py-1.5 text-xs border border-gray-300 rounded hover:bg-orange-50 hover:border-orange-300 text-gray-600 transition">
+                    一式マスタ（{{ isshikiMaster.length }}件）
+                </button>
                 <button @click="openMasterModal('routes')" type="button"
                     class="px-3 py-1.5 text-xs border border-gray-300 rounded hover:bg-blue-50 hover:border-blue-300 text-gray-600 transition">
                     社内便マスタ（{{ routeMaster.length }}ルート）
+                </button>
+                <button @click="openMasterModal('areaMasters')" type="button"
+                    class="px-3 py-1.5 text-xs border border-gray-300 rounded hover:bg-orange-50 hover:border-orange-300 text-gray-600 transition">
+                    エリアマスタ（{{ areaMaster.length }}件）
                 </button>
             </div>
 
@@ -1316,6 +1532,12 @@ const canGenerate = computed(() => pdfGroups.value.some(g => g.grades.length > 0
                     <p v-if="!detectedDates.length" class="text-yellow-600 mt-1">
                         ※ シート名に日付なし（パターンB）。試験項目の試験日を手動設定してください。
                     </p>
+                    <div class="flex gap-2 mt-3">
+                        <button @click="showDataviewModal=true" type="button"
+                            class="px-4 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition">
+                            データ照会
+                        </button>
+                    </div>
                 </div>
                 <p v-else class="text-xs text-gray-400">Shift-JIS .xls / .xlsx 対応</p>
             </div>
@@ -1448,10 +1670,20 @@ const canGenerate = computed(() => pdfGroups.value.some(g => g.grades.length > 0
                                 :class="masterTab==='itemTypes' ? 'bg-orange-500 text-white' : 'text-gray-600 hover:bg-gray-100'">
                                 アイテムマスタ
                             </button>
+                            <button @click="masterTab='isshikiDestinations'" type="button"
+                                class="px-4 py-1.5 text-sm rounded-full font-medium transition"
+                                :class="masterTab==='isshikiDestinations' ? 'bg-orange-500 text-white' : 'text-gray-600 hover:bg-gray-100'">
+                                一式マスタ
+                            </button>
                             <button @click="masterTab='routes'; editingStop=null; editingRoute=null" type="button"
                                 class="px-4 py-1.5 text-sm rounded-full font-medium transition"
                                 :class="masterTab==='routes' ? 'bg-orange-500 text-white' : 'text-gray-600 hover:bg-gray-100'">
                                 社内便マスタ
+                            </button>
+                            <button @click="masterTab='areaMasters'" type="button"
+                                class="px-4 py-1.5 text-sm rounded-full font-medium transition"
+                                :class="masterTab==='areaMasters' ? 'bg-orange-500 text-white' : 'text-gray-600 hover:bg-gray-100'">
+                                エリアマスタ
                             </button>
                         </div>
                         <button @click="showMasterModal=false" type="button"
@@ -1460,11 +1692,19 @@ const canGenerate = computed(() => pdfGroups.value.some(g => g.grades.length > 0
 
                     <!-- 試験名マスタ -->
                     <div v-if="masterTab==='testNames'" class="flex-1 overflow-y-auto p-5 space-y-2">
-                        <div class="flex justify-end mb-1">
-                            <button @click="masterStartAdd" type="button"
-                                class="px-3 py-1.5 text-xs bg-orange-500 text-white rounded hover:bg-orange-600 transition">
-                                + 追加
-                            </button>
+                        <div class="flex justify-end gap-2 mb-1">
+                            <template v-if="reorderMode==='testNames'">
+                                <button @click="masterSaveReorder('testNames')" type="button"
+                                    class="px-3 py-1.5 text-xs bg-green-600 text-white rounded hover:bg-green-700">保存</button>
+                                <button @click="masterCancelReorder('testNames')" type="button"
+                                    class="px-3 py-1.5 text-xs border rounded text-gray-500 hover:bg-gray-100">キャンセル</button>
+                            </template>
+                            <template v-else>
+                                <button @click="masterStartReorder('testNames')" type="button"
+                                    class="px-3 py-1.5 text-xs border border-gray-300 rounded text-gray-600 hover:bg-gray-50">並べ替え</button>
+                                <button @click="masterStartAdd" type="button"
+                                    class="px-3 py-1.5 text-xs bg-orange-500 text-white rounded hover:bg-orange-600 transition">+ 追加</button>
+                            </template>
                         </div>
                         <!-- 追加フォーム -->
                         <div v-if="masterAddingRow?._tab==='testNames'"
@@ -1478,8 +1718,17 @@ const canGenerate = computed(() => pdfGroups.value.some(g => g.grades.length > 0
                                 class="px-3 py-1 text-xs border rounded text-gray-500">取消</button>
                         </div>
                         <!-- リスト -->
-                        <div v-for="item in testNameMaster" :key="item.id"
+                        <div v-for="(item, idx) in testNameMaster" :key="item.id"
                             class="flex gap-2 items-center py-1.5 border-b border-gray-100 last:border-0">
+                            <!-- 並べ替えボタン（並べ替えモードのみ） -->
+                            <div v-if="reorderMode==='testNames'" class="flex flex-col gap-0.5 shrink-0">
+                                <button @click="masterMoveItem('testNames', idx, -1)" type="button"
+                                    :disabled="idx===0"
+                                    class="w-5 h-4 text-xs leading-none border rounded text-gray-400 hover:bg-gray-100 disabled:opacity-20 disabled:cursor-not-allowed">▲</button>
+                                <button @click="masterMoveItem('testNames', idx, 1)" type="button"
+                                    :disabled="idx===testNameMaster.length-1"
+                                    class="w-5 h-4 text-xs leading-none border rounded text-gray-400 hover:bg-gray-100 disabled:opacity-20 disabled:cursor-not-allowed">▼</button>
+                            </div>
                             <!-- 常時表示：表示チェックボックス -->
                             <label class="flex items-center gap-1 text-xs text-gray-500 whitespace-nowrap cursor-pointer shrink-0"
                                 :title="item.isActive ? 'クリックで非表示' : 'クリックで表示'">
@@ -1513,9 +1762,21 @@ const canGenerate = computed(() => pdfGroups.value.some(g => g.grades.length > 0
                     <!-- アイテムマスタ -->
                     <div v-if="masterTab==='itemTypes'" class="flex-1 overflow-y-auto p-5 space-y-2">
                         <div class="flex items-center justify-between mb-3">
-                            <h3 class="text-sm font-semibold text-gray-700">アイテムマスタ（{{ itemTypeMaster.length }}件 / 表示中: {{ itemTypeMaster.filter(t=>t.isActive).length }}件）</h3>
-                            <button @click="masterStartAdd" type="button"
-                                class="px-3 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">+ 追加</button>
+                            <h3 class="text-sm font-semibold text-gray-700">アイテムマスタ（{{ itemTypeMaster.length }}件）</h3>
+                            <div class="flex gap-2">
+                                <template v-if="reorderMode==='itemTypes'">
+                                    <button @click="masterSaveReorder('itemTypes')" type="button"
+                                        class="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700">保存</button>
+                                    <button @click="masterCancelReorder('itemTypes')" type="button"
+                                        class="px-3 py-1 text-xs border rounded text-gray-500 hover:bg-gray-100">キャンセル</button>
+                                </template>
+                                <template v-else>
+                                    <button @click="masterStartReorder('itemTypes')" type="button"
+                                        class="px-3 py-1 text-xs border border-gray-300 rounded text-gray-600 hover:bg-gray-50">並べ替え</button>
+                                    <button @click="masterStartAdd" type="button"
+                                        class="px-3 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">+ 追加</button>
+                                </template>
+                            </div>
                         </div>
                         <div v-if="masterAddingRow?._tab==='itemTypes'"
                             class="flex items-center gap-2 p-2 border border-orange-300 rounded bg-orange-50">
@@ -1527,8 +1788,17 @@ const canGenerate = computed(() => pdfGroups.value.some(g => g.grades.length > 0
                             <button @click="masterCancelAdd" type="button"
                                 class="px-2 py-0.5 text-xs border rounded text-gray-500">取消</button>
                         </div>
-                        <div v-for="item in itemTypeMaster" :key="item.id"
+                        <div v-for="(item, idx) in itemTypeMaster" :key="item.id"
                             class="flex items-center gap-2 px-3 py-2 border rounded hover:bg-gray-50">
+                            <!-- 並べ替えボタン（並べ替えモードのみ） -->
+                            <div v-if="reorderMode==='itemTypes'" class="flex flex-col gap-0.5 shrink-0">
+                                <button @click="masterMoveItem('itemTypes', idx, -1)" type="button"
+                                    :disabled="idx===0"
+                                    class="w-5 h-4 text-xs leading-none border rounded text-gray-400 hover:bg-gray-100 disabled:opacity-20 disabled:cursor-not-allowed">▲</button>
+                                <button @click="masterMoveItem('itemTypes', idx, 1)" type="button"
+                                    :disabled="idx===itemTypeMaster.length-1"
+                                    class="w-5 h-4 text-xs leading-none border rounded text-gray-400 hover:bg-gray-100 disabled:opacity-20 disabled:cursor-not-allowed">▼</button>
+                            </div>
                             <input type="checkbox" :checked="item.isActive"
                                 @change="masterToggleActive(item, 'itemTypes')" class="rounded" />
                             <template v-if="masterEditingId===item.id">
@@ -1550,6 +1820,136 @@ const canGenerate = computed(() => pdfGroups.value.some(g => g.grades.length > 0
                         </div>
                         <p v-if="!itemTypeMaster.length" class="text-xs text-gray-400 text-center py-4">
                             アイテムが登録されていません。「+ 追加」から登録してください。
+                        </p>
+                    </div>
+
+                    <!-- 一式マスタ -->
+                    <div v-if="masterTab==='isshikiDestinations'" class="flex-1 overflow-y-auto p-5 space-y-2">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-sm font-semibold text-gray-700">一式宛先マスタ（{{ isshikiMaster.length }}件）</h3>
+                            <div class="flex gap-2">
+                                <template v-if="reorderMode==='isshikiDestinations'">
+                                    <button @click="masterSaveReorder('isshikiDestinations')" type="button"
+                                        class="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700">保存</button>
+                                    <button @click="masterCancelReorder('isshikiDestinations')" type="button"
+                                        class="px-3 py-1 text-xs border rounded text-gray-500 hover:bg-gray-100">キャンセル</button>
+                                </template>
+                                <template v-else>
+                                    <button @click="masterStartReorder('isshikiDestinations')" type="button"
+                                        class="px-3 py-1 text-xs border border-gray-300 rounded text-gray-600 hover:bg-gray-50">並べ替え</button>
+                                    <button @click="masterStartAdd" type="button"
+                                        class="px-3 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">+ 追加</button>
+                                </template>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-400 mb-2">一式PDFの宛先ラベルはこの順番で出力されます。</p>
+                        <div v-if="masterAddingRow?._tab==='isshikiDestinations'"
+                            class="flex items-center gap-2 p-2 border border-orange-300 rounded bg-orange-50">
+                            <input v-model="masterAddingRow.name" placeholder="宛先名を入力"
+                                class="flex-1 text-sm border rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-400"
+                                @keyup.enter="masterSaveAdd" @keyup.escape="masterCancelAdd" autofocus />
+                            <button @click="masterSaveAdd" type="button"
+                                class="px-2 py-0.5 text-xs bg-orange-500 text-white rounded">追加</button>
+                            <button @click="masterCancelAdd" type="button"
+                                class="px-2 py-0.5 text-xs border rounded text-gray-500">取消</button>
+                        </div>
+                        <div v-for="(item, idx) in isshikiMaster" :key="item.id"
+                            class="flex items-center gap-2 px-3 py-2 border rounded hover:bg-gray-50">
+                            <!-- 並べ替えボタン（並べ替えモードのみ） -->
+                            <div v-if="reorderMode==='isshikiDestinations'" class="flex flex-col gap-0.5 shrink-0">
+                                <button @click="masterMoveItem('isshikiDestinations', idx, -1)" type="button"
+                                    :disabled="idx===0"
+                                    class="w-5 h-4 text-xs leading-none border rounded text-gray-400 hover:bg-gray-100 disabled:opacity-20 disabled:cursor-not-allowed">▲</button>
+                                <button @click="masterMoveItem('isshikiDestinations', idx, 1)" type="button"
+                                    :disabled="idx===isshikiMaster.length-1"
+                                    class="w-5 h-4 text-xs leading-none border rounded text-gray-400 hover:bg-gray-100 disabled:opacity-20 disabled:cursor-not-allowed">▼</button>
+                            </div>
+                            <input type="checkbox" :checked="item.isActive"
+                                @change="masterToggleActive(item, 'isshikiDestinations')" class="rounded" />
+                            <template v-if="masterEditingId===item.id">
+                                <input v-model="masterEditingRow.name" class="flex-1 text-sm border rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-orange-400"
+                                    @keyup.enter="masterSaveEdit('isshikiDestinations')" @keyup.escape="masterCancelEdit" />
+                                <button @click="masterSaveEdit('isshikiDestinations')" type="button"
+                                    class="px-2 py-0.5 text-xs bg-green-500 text-white rounded">保存</button>
+                                <button @click="masterCancelEdit" type="button"
+                                    class="px-2 py-0.5 text-xs border rounded text-gray-500">取消</button>
+                            </template>
+                            <template v-else>
+                                <span class="flex-1 text-sm"
+                                    :class="item.isActive ? 'text-gray-800' : 'text-gray-400 line-through'">{{ item.name }}</span>
+                                <button @click="masterStartEdit(item)" type="button"
+                                    class="px-2 py-0.5 text-xs border border-gray-300 rounded text-gray-600 hover:bg-gray-50">編集</button>
+                                <button @click="masterDelete('isshikiDestinations', item.id)" type="button"
+                                    class="px-2 py-0.5 text-xs border border-red-200 text-red-400 rounded hover:bg-red-50">削除</button>
+                            </template>
+                        </div>
+                        <p v-if="!isshikiMaster.length" class="text-xs text-gray-400 text-center py-4">
+                            宛先が登録されていません。「+ 追加」から登録してください。
+                        </p>
+                    </div>
+
+                    <!-- エリアマスタ -->
+                    <div v-if="masterTab==='areaMasters'" class="flex-1 overflow-y-auto p-5 space-y-2">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-sm font-semibold text-gray-700">エリアマスタ（{{ areaMaster.length }}件）</h3>
+                            <div class="flex gap-2">
+                                <template v-if="reorderMode==='areaMasters'">
+                                    <button @click="masterSaveReorder('areaMasters')" type="button"
+                                        class="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700">保存</button>
+                                    <button @click="masterCancelReorder('areaMasters')" type="button"
+                                        class="px-3 py-1 text-xs border rounded text-gray-500 hover:bg-gray-100">キャンセル</button>
+                                </template>
+                                <template v-else>
+                                    <button @click="masterStartReorder('areaMasters')" type="button"
+                                        class="px-3 py-1 text-xs border border-gray-300 rounded text-gray-600 hover:bg-gray-50">並べ替え</button>
+                                    <button @click="masterStartAdd" type="button"
+                                        class="px-3 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">+ 追加</button>
+                                </template>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-400 mb-2">部数集計のエリア別集計はこの順番で表示されます。</p>
+                        <div v-if="masterAddingRow?._tab==='areaMasters'"
+                            class="flex items-center gap-2 p-2 border border-orange-300 rounded bg-orange-50">
+                            <input v-model="masterAddingRow.name" placeholder="エリア名を入力"
+                                class="flex-1 text-sm border rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-400"
+                                @keyup.enter="masterSaveAdd" @keyup.escape="masterCancelAdd" autofocus />
+                            <button @click="masterSaveAdd" type="button"
+                                class="px-2 py-0.5 text-xs bg-orange-500 text-white rounded">追加</button>
+                            <button @click="masterCancelAdd" type="button"
+                                class="px-2 py-0.5 text-xs border rounded text-gray-500">取消</button>
+                        </div>
+                        <div v-for="(item, idx) in areaMaster" :key="item.id"
+                            class="flex items-center gap-2 px-3 py-2 border rounded hover:bg-gray-50">
+                            <!-- 並べ替えボタン（並べ替えモードのみ） -->
+                            <div v-if="reorderMode==='areaMasters'" class="flex flex-col gap-0.5 shrink-0">
+                                <button @click="masterMoveItem('areaMasters', idx, -1)" type="button"
+                                    :disabled="idx===0"
+                                    class="w-5 h-4 text-xs leading-none border rounded text-gray-400 hover:bg-gray-100 disabled:opacity-20 disabled:cursor-not-allowed">▲</button>
+                                <button @click="masterMoveItem('areaMasters', idx, 1)" type="button"
+                                    :disabled="idx===areaMaster.length-1"
+                                    class="w-5 h-4 text-xs leading-none border rounded text-gray-400 hover:bg-gray-100 disabled:opacity-20 disabled:cursor-not-allowed">▼</button>
+                            </div>
+                            <input type="checkbox" :checked="item.isActive"
+                                @change="masterToggleActive(item, 'areaMasters')" class="rounded" />
+                            <template v-if="masterEditingId===item.id">
+                                <input v-model="masterEditingRow.name" class="flex-1 text-sm border rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-orange-400"
+                                    @keyup.enter="masterSaveEdit('areaMasters')" @keyup.escape="masterCancelEdit" />
+                                <button @click="masterSaveEdit('areaMasters')" type="button"
+                                    class="px-2 py-0.5 text-xs bg-green-500 text-white rounded">保存</button>
+                                <button @click="masterCancelEdit" type="button"
+                                    class="px-2 py-0.5 text-xs border rounded text-gray-500">取消</button>
+                            </template>
+                            <template v-else>
+                                <span class="flex-1 text-sm"
+                                    :class="item.isActive ? 'text-gray-800' : 'text-gray-400 line-through'">{{ item.name }}</span>
+                                <button @click="masterStartEdit(item)" type="button"
+                                    class="px-2 py-0.5 text-xs border border-gray-300 rounded text-gray-600 hover:bg-gray-50">編集</button>
+                                <button @click="masterDelete('areaMasters', item.id)" type="button"
+                                    class="px-2 py-0.5 text-xs border border-red-200 text-red-400 rounded hover:bg-red-50">削除</button>
+                            </template>
+                        </div>
+                        <p v-if="!areaMaster.length" class="text-xs text-gray-400 text-center py-4">
+                            エリアが登録されていません。「+ 追加」から登録してください。
                         </p>
                     </div>
 
@@ -1755,6 +2155,127 @@ const canGenerate = computed(() => pdfGroups.value.some(g => g.grades.length > 0
                         </div>
                     </div>
 
+                </div>
+            </div>
+        </Teleport>
+
+        <!-- ━━ データ照会モーダル ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+        <Teleport to="body">
+            <div v-if="showDataviewModal"
+                class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+                @click.self="showDataviewModal=false">
+                <div class="bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden"
+                    style="width:92vw; max-width:900px; height:88vh;">
+                    <!-- ヘッダー -->
+                    <div class="flex flex-col px-5 pt-3 pb-0 border-b bg-gray-50 flex-shrink-0">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm font-semibold text-gray-800">データ照会</span>
+                                <span class="text-xs text-gray-400">{{ dataviewRows.length }}件</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button @click="showSummaryModal=true" type="button"
+                                    class="px-4 py-1.5 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition font-medium">
+                                    部数集計
+                                </button>
+                                <button @click="showDataviewModal=false" type="button"
+                                    class="text-gray-400 hover:text-gray-700 text-xl leading-none px-2">✕</button>
+                            </div>
+                        </div>
+                        <!-- シート選択 -->
+                        <div class="flex gap-1 flex-wrap pb-2">
+                            <button v-for="(sheet, idx) in sheetDataRef" :key="idx"
+                                @click="dataviewSheet=idx; dataviewGrade=sheet.grades[0]??''" type="button"
+                                class="px-3 py-1 text-xs rounded-full font-medium border transition"
+                                :class="dataviewSheet===idx ? 'bg-blue-600 text-white border-blue-600' : 'text-gray-600 border-gray-300 hover:bg-gray-100'">
+                                {{ sheet.name }}
+                            </button>
+                        </div>
+                        <!-- 学年ボタン -->
+                        <div class="flex gap-1 flex-wrap pb-2">
+                            <button v-for="g in (sheetDataRef[dataviewSheet]?.grades ?? [])" :key="g"
+                                @click="dataviewGrade=g" type="button"
+                                class="px-3 py-1 text-xs rounded-full font-medium border transition"
+                                :class="dataviewGrade===g ? 'bg-orange-500 text-white border-orange-500' : 'text-gray-600 border-gray-300 hover:bg-gray-100'">
+                                {{ g }}
+                            </button>
+                        </div>
+                    </div>
+                    <!-- テーブル -->
+                    <div class="flex-1 overflow-y-auto">
+                        <table class="w-full text-xs border-collapse">
+                            <thead class="sticky top-0 bg-gray-100 z-10">
+                                <tr>
+                                    <th class="px-3 py-2 text-left font-semibold text-gray-600 border-b w-16">コード</th>
+                                    <th class="px-3 py-2 text-left font-semibold text-gray-600 border-b">教室名印刷</th>
+                                    <th class="px-3 py-2 text-left font-semibold text-gray-600 border-b w-28">エリア</th>
+                                    <th class="px-3 py-2 text-right font-semibold text-gray-600 border-b w-16">部数</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="row in dataviewRows" :key="row.code"
+                                    class="border-b border-gray-100 hover:bg-gray-50">
+                                    <td class="px-3 py-1.5 font-mono text-gray-700">{{ row.code }}</td>
+                                    <td class="px-3 py-1.5 text-gray-800">{{ row.name }}</td>
+                                    <td class="px-3 py-1.5 text-gray-500">{{ row.area }}</td>
+                                    <td class="px-3 py-1.5 text-right font-medium"
+                                        :class="row.qty === 0 ? 'bg-red-100 text-red-600' : 'text-gray-800'">
+                                        {{ row.qty === 0 ? '' : row.qty }}
+                                    </td>
+                                </tr>
+                                <tr v-if="!dataviewRows.length">
+                                    <td colspan="4" class="px-3 py-8 text-center text-gray-400">データがありません</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
+
+        <!-- ━━ 部数集計モーダル ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+        <Teleport to="body">
+            <div v-if="showSummaryModal"
+                class="fixed inset-0 z-[60] flex items-center justify-center bg-black/60"
+                @click.self="showSummaryModal=false">
+                <div class="bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden"
+                    style="width:400px; max-width:95vw; max-height:80vh;">
+                    <!-- ヘッダー -->
+                    <div class="flex items-center justify-between px-5 py-3 border-b bg-gray-50 flex-shrink-0">
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm font-semibold text-gray-800">部数集計</span>
+                            <span class="text-xs text-gray-500">（{{ dataviewGrade }}）</span>
+                        </div>
+                        <button @click="showSummaryModal=false" type="button"
+                            class="text-gray-400 hover:text-gray-700 text-xl leading-none px-2">✕</button>
+                    </div>
+                    <!-- テーブル -->
+                    <div class="flex-1 overflow-y-auto">
+                        <table class="w-full text-sm border-collapse">
+                            <thead class="sticky top-0 bg-gray-100 z-10">
+                                <tr>
+                                    <th class="px-4 py-2 text-left font-semibold text-gray-600 border-b">エリア</th>
+                                    <th class="px-4 py-2 text-right font-semibold text-gray-600 border-b w-20">部数</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="row in summaryData" :key="row.area"
+                                    class="border-b border-gray-100 hover:bg-gray-50">
+                                    <td class="px-4 py-2 text-gray-800">{{ row.area }}</td>
+                                    <td class="px-4 py-2 text-right font-medium text-gray-800">{{ row.qty }}</td>
+                                </tr>
+                                <tr v-if="!summaryData.length">
+                                    <td colspan="2" class="px-4 py-6 text-center text-gray-400">データがありません</td>
+                                </tr>
+                            </tbody>
+                            <tfoot class="sticky bottom-0 bg-gray-50">
+                                <tr class="border-t-2 border-gray-300">
+                                    <td class="px-4 py-2 font-bold text-gray-800">総計</td>
+                                    <td class="px-4 py-2 text-right font-bold text-gray-800">{{ summaryTotal }}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
                 </div>
             </div>
         </Teleport>
