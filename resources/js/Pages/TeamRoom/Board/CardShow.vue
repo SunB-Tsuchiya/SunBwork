@@ -37,16 +37,16 @@ function deleteCard() {
 
 // ── カードカラー ──────────────────────────────────────────────────
 const CARD_COLORS = {
-    indigo: { swatch: 'bg-indigo-400',  border: 'border-t-indigo-400', bg: 'bg-indigo-50'  },
-    blue:   { swatch: 'bg-blue-400',    border: 'border-t-blue-400',   bg: 'bg-blue-50'    },
-    teal:   { swatch: 'bg-teal-500',    border: 'border-t-teal-500',   bg: 'bg-teal-50'    },
-    green:  { swatch: 'bg-green-500',   border: 'border-t-green-500',  bg: 'bg-green-50'   },
-    yellow: { swatch: 'bg-yellow-400',  border: 'border-t-yellow-400', bg: 'bg-yellow-50'  },
-    orange: { swatch: 'bg-orange-400',  border: 'border-t-orange-400', bg: 'bg-orange-50'  },
-    red:    { swatch: 'bg-red-400',     border: 'border-t-red-400',    bg: 'bg-red-50'     },
-    pink:   { swatch: 'bg-pink-400',    border: 'border-t-pink-400',   bg: 'bg-pink-50'    },
-    purple: { swatch: 'bg-purple-400',  border: 'border-t-purple-400', bg: 'bg-purple-50'  },
-    gray:   { swatch: 'bg-gray-400',    border: 'border-t-gray-400',   bg: 'bg-gray-100'   },
+    indigo: { swatch: 'bg-indigo-400',  border: 'border-l-indigo-400' },
+    blue:   { swatch: 'bg-blue-400',    border: 'border-l-blue-400'   },
+    teal:   { swatch: 'bg-teal-500',    border: 'border-l-teal-500'   },
+    green:  { swatch: 'bg-green-500',   border: 'border-l-green-500'  },
+    yellow: { swatch: 'bg-yellow-400',  border: 'border-l-yellow-400' },
+    orange: { swatch: 'bg-orange-400',  border: 'border-l-orange-400' },
+    red:    { swatch: 'bg-red-400',     border: 'border-l-red-400'    },
+    pink:   { swatch: 'bg-pink-400',    border: 'border-l-pink-400'   },
+    purple: { swatch: 'bg-purple-400',  border: 'border-l-purple-400' },
+    gray:   { swatch: 'bg-gray-400',    border: 'border-l-gray-400'   },
 };
 
 const currentColor = ref(props.card.card_color ?? null);
@@ -68,7 +68,7 @@ async function setColor(key) {
 
 function cardBorderClass() {
     const c = currentColor.value;
-    return c && CARD_COLORS[c] ? ['border-t-4', CARD_COLORS[c].border, CARD_COLORS[c].bg] : '';
+    return c && CARD_COLORS[c] ? CARD_COLORS[c].border : 'border-l-gray-200';
 }
 </script>
 
@@ -84,7 +84,7 @@ function cardBorderClass() {
             </div>
         </template>
 
-        <div class="mx-auto max-w-2xl rounded px-4 py-6 sm:p-6 shadow transition-colors" :class="cardBorderClass() || 'bg-white'">
+        <div class="mx-auto max-w-2xl rounded bg-white px-4 py-6 sm:p-6 shadow border-l-4 transition-colors" :class="cardBorderClass()">
             <!-- カラムバッジ + カードカラー選択 -->
             <div class="mb-4 flex items-center justify-between gap-3">
                 <span

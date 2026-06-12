@@ -11,30 +11,28 @@ const emit = defineEmits(['move', 'delete']);
 const showDetail = ref(false);
 
 const CARD_COLORS = {
-    indigo: { border: 'border-t-indigo-400', bg: 'bg-indigo-50'  },
-    blue:   { border: 'border-t-blue-400',   bg: 'bg-blue-50'    },
-    teal:   { border: 'border-t-teal-500',   bg: 'bg-teal-50'    },
-    green:  { border: 'border-t-green-500',  bg: 'bg-green-50'   },
-    yellow: { border: 'border-t-yellow-400', bg: 'bg-yellow-50'  },
-    orange: { border: 'border-t-orange-400', bg: 'bg-orange-50'  },
-    red:    { border: 'border-t-red-400',    bg: 'bg-red-50'     },
-    pink:   { border: 'border-t-pink-400',   bg: 'bg-pink-50'    },
-    purple: { border: 'border-t-purple-400', bg: 'bg-purple-50'  },
-    gray:   { border: 'border-t-gray-400',   bg: 'bg-gray-100'   },
+    indigo: 'border-l-indigo-400',
+    blue:   'border-l-blue-400',
+    teal:   'border-l-teal-500',
+    green:  'border-l-green-500',
+    yellow: 'border-l-yellow-400',
+    orange: 'border-l-orange-400',
+    red:    'border-l-red-400',
+    pink:   'border-l-pink-400',
+    purple: 'border-l-purple-400',
+    gray:   'border-l-gray-400',
 };
 
-function cardStyle() {
+function cardLeftBorder() {
     const c = props.card.card_color;
-    return c && CARD_COLORS[c] ? CARD_COLORS[c] : null;
+    return c && CARD_COLORS[c] ? CARD_COLORS[c] : 'border-l-gray-200';
 }
 </script>
 
 <template>
     <div
-        class="group rounded border border-gray-200 p-3 shadow-sm transition-colors"
-        :class="cardStyle()
-            ? ['border-t-4', cardStyle().border, cardStyle().bg]
-            : 'bg-white'"
+        class="group rounded border border-gray-200 bg-white p-3 shadow-sm border-l-4 transition-colors"
+        :class="cardLeftBorder()"
     >
         <div class="flex items-start justify-between gap-2">
             <span class="text-sm font-medium text-gray-800">{{ card.title }}</span>

@@ -153,9 +153,10 @@ function onBoardUpdated(updatedBoard) {
 }
 
 // ────────────────── ドラッグ＆ドロップ ──────────────────
-const draggedCard    = ref(null);
-const dragOverColId  = ref(null);
-const dragOverCardId = ref(null);
+const draggedCard       = ref(null);
+const dragOverColId     = ref(null);
+const dragOverCardId    = ref(null);
+const dragInsertPosition = ref(null); // 'before' | 'after'
 
 function onDragStart(card) {
     draggedCard.value = card;
@@ -163,29 +164,29 @@ function onDragStart(card) {
 
 function onDragOver(colId) {
     if (!draggedCard.value) return;
-    if (draggedCard.value.team_board_column_id !== colId) {
-        dragOverColId.value = colId;
-    } else {
-        dragOverColId.value = colId;
-    }
+    dragOverColId.value = colId;
 }
 
-function onDragOverCard(card, colId) {
+function onDragOverCard(event, card, colId) {
     if (!draggedCard.value) return;
-    if (draggedCard.value.team_board_column_id === colId) {
-        dragOverCardId.value = card.id;
-    }
+    if (draggedCard.value.team_board_column_id !== colId) return;
+    dragOverCardId.value = card.id;
+    const rect = event.currentTarget.getBoundingClientRect();
+    dragInsertPosition.value = event.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
 }
 
 function onDragLeave() {
-    dragOverColId.value  = null;
-    dragOverCardId.value = null;
+    dragOverColId.value      = null;
+    dragOverCardId.value     = null;
+    dragInsertPosition.value = null;
 }
 
 async function onDrop(colId) {
-    dragOverColId.value = null;
+    dragOverColId.value  = null;
     const overCardId = dragOverCardId.value;
-    dragOverCardId.value = null;
+    const insertPos  = dragInsertPosition.value;
+    dragOverCardId.value     = null;
+    dragInsertPosition.value = null;
     if (!draggedCard.value) return;
 
     const card = draggedCard.value;
@@ -194,7 +195,7 @@ async function onDrop(colId) {
     // 同カラム内並び替え
     if (card.team_board_column_id === colId) {
         if (overCardId !== null && overCardId !== card.id) {
-            await reorderCards(card, colId, overCardId);
+            await reorderCards(card, colId, overCardId, insertPos ?? 'before');
         }
         return;
     }
@@ -204,13 +205,14 @@ async function onDrop(colId) {
 }
 
 function onDragEnd() {
-    draggedCard.value    = null;
-    dragOverColId.value  = null;
-    dragOverCardId.value = null;
+    draggedCard.value        = null;
+    dragOverColId.value      = null;
+    dragOverCardId.value     = null;
+    dragInsertPosition.value = null;
 }
 
 // ────────────────── カード並び替え ──────────────────
-async function reorderCards(movingCard, colId, targetCardId) {
+async function reorderCards(movingCard, colId, targetCardId, position) {
     const col = props.board?.columns.find(c => c.id === colId);
     if (!col || !col.cards) return;
 
@@ -219,10 +221,11 @@ async function reorderCards(movingCard, colId, targetCardId) {
     if (fromIdx === -1) return;
 
     cards.splice(fromIdx, 1);
-    const toIdx = cards.findIndex(c => c.id === targetCardId);
+    let toIdx = cards.findIndex(c => c.id === targetCardId);
     if (toIdx === -1) {
         cards.push(movingCard);
     } else {
+        if (position === 'after') toIdx += 1;
         cards.splice(toIdx, 0, movingCard);
     }
 
@@ -409,11 +412,11 @@ function resetListFilters() {
                                         draggable="true"
                                         @dragstart="onDragStart(card)"
                                         @dragend="onDragEnd"
-                                        @dragover.prevent="onDragOverCard(card, col.id)"
+                                        @dragover.prevent="onDragOverCard($event, card, col.id)"
                                         @click="router.get(route('team-rooms.board.cards.show', { team: team.id, card: card.id }))"
                                         class="cursor-grab active:cursor-grabbing"
-                                        :class="dragOverCardId === card.id && draggedCard?.team_board_column_id === col.id && draggedCard?.id !== card.id
-                                            ? 'ring-2 ring-indigo-400 ring-offset-1 rounded'
+                                        :class="dragOverCardId === card.id && draggedCard?.id !== card.id && draggedCard?.team_board_column_id === col.id
+                                            ? (dragInsertPosition === 'before' ? 'border-t-2 border-t-indigo-500' : 'border-b-2 border-b-indigo-500')
                                             : ''"
                                     >
                                         <TeamBoardCard
