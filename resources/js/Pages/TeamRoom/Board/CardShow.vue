@@ -2,6 +2,8 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router } from '@inertiajs/vue3';
 import { route } from 'ziggy-js';
+import { ref } from 'vue';
+import axios from 'axios';
 
 const props = defineProps({
     team:  { type: Object, required: true },
@@ -32,6 +34,42 @@ function deleteCard() {
     if (!confirm('このカードを削除しますか？')) return;
     router.delete(route('team-rooms.board.cards.destroy', { team: props.team.id, card: props.card.id }));
 }
+
+// ── カードカラー ──────────────────────────────────────────────────
+const CARD_COLORS = {
+    indigo: { swatch: 'bg-indigo-400',  border: 'border-l-indigo-400', bg: 'bg-indigo-50'  },
+    blue:   { swatch: 'bg-blue-400',    border: 'border-l-blue-400',   bg: 'bg-blue-50'    },
+    teal:   { swatch: 'bg-teal-500',    border: 'border-l-teal-500',   bg: 'bg-teal-50'    },
+    green:  { swatch: 'bg-green-500',   border: 'border-l-green-500',  bg: 'bg-green-50'   },
+    yellow: { swatch: 'bg-yellow-400',  border: 'border-l-yellow-400', bg: 'bg-yellow-50'  },
+    orange: { swatch: 'bg-orange-400',  border: 'border-l-orange-400', bg: 'bg-orange-50'  },
+    red:    { swatch: 'bg-red-400',     border: 'border-l-red-400',    bg: 'bg-red-50'     },
+    pink:   { swatch: 'bg-pink-400',    border: 'border-l-pink-400',   bg: 'bg-pink-50'    },
+    purple: { swatch: 'bg-purple-400',  border: 'border-l-purple-400', bg: 'bg-purple-50'  },
+    gray:   { swatch: 'bg-gray-400',    border: 'border-l-gray-400',   bg: 'bg-gray-100'   },
+};
+
+const currentColor = ref(props.card.card_color ?? null);
+
+async function setColor(key) {
+    const prev = currentColor.value;
+    currentColor.value = key;
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    try {
+        await axios.patch(
+            route('team-rooms.board.cards.updateColor', { team: props.team.id, card: props.card.id }),
+            { card_color: key },
+            { headers: { 'X-CSRF-TOKEN': csrf } }
+        );
+    } catch {
+        currentColor.value = prev;
+    }
+}
+
+function cardBorderClass() {
+    const c = currentColor.value;
+    return c && CARD_COLORS[c] ? [CARD_COLORS[c].border, CARD_COLORS[c].bg] : 'border-l-gray-200';
+}
 </script>
 
 <template>
@@ -46,13 +84,37 @@ function deleteCard() {
             </div>
         </template>
 
-        <div class="mx-auto max-w-2xl rounded bg-white px-4 py-6 sm:p-6 shadow">
-            <!-- カラムバッジ -->
-            <div class="mb-4">
+        <div class="mx-auto max-w-2xl rounded bg-white px-4 py-6 sm:p-6 shadow border-l-4 transition-colors" :class="cardBorderClass()">
+            <!-- カラムバッジ + カードカラー選択 -->
+            <div class="mb-4 flex items-center justify-between gap-3">
                 <span
                     class="inline-block rounded border px-3 py-1 text-sm font-medium"
                     :class="colBadge(card.column?.color)"
                 >{{ card.column?.name ?? '（未設定）' }}</span>
+
+                <!-- カードカラー選択スウォッチ -->
+                <div class="flex items-center gap-1">
+                    <span class="mr-1 text-xs text-gray-400">カード色：</span>
+                    <button
+                        v-for="(cfg, key) in CARD_COLORS"
+                        :key="key"
+                        type="button"
+                        :title="key"
+                        :class="[
+                            cfg.swatch,
+                            'h-5 w-5 rounded-full border-2 transition-transform hover:scale-110',
+                            currentColor === key ? 'border-gray-700 scale-110' : 'border-white',
+                        ]"
+                        @click="setColor(key)"
+                    />
+                    <button
+                        v-if="currentColor"
+                        type="button"
+                        class="ml-1 rounded border border-gray-200 px-1.5 py-0.5 text-xs text-gray-400 hover:bg-gray-100"
+                        title="色をリセット"
+                        @click="setColor(null)"
+                    >×</button>
+                </div>
             </div>
 
             <!-- タイトル -->

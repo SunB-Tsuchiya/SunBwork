@@ -117,6 +117,22 @@ class TeamBoardCardController extends Controller
         return response()->json($card);
     }
 
+    public function updateColor(Request $request, Team $team, TeamBoardCard $card)
+    {
+        app(TeamRoomController::class)->assertMember($team);
+
+        $board = TeamBoard::where('team_id', $team->id)->firstOrFail();
+        abort_unless($card->team_board_id === $board->id, 404);
+
+        $validated = $request->validate([
+            'card_color' => 'nullable|string|max:30',
+        ]);
+
+        $card->update(['card_color' => $validated['card_color'] ?? null]);
+
+        return response()->json(['ok' => true]);
+    }
+
     public function destroy(Request $request, Team $team, TeamBoardCard $card)
     {
         app(TeamRoomController::class)->assertMember($team);

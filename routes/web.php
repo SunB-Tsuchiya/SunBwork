@@ -1133,6 +1133,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
         Route::get('/{team}/board/cards/{card}/edit', [\App\Http\Controllers\TeamRoom\TeamBoardCardController::class, 'edit'])->name('board.cards.edit');
         Route::put('/{team}/board/cards/{card}', [\App\Http\Controllers\TeamRoom\TeamBoardCardController::class, 'update'])->name('board.cards.update');
         Route::delete('/{team}/board/cards/{card}', [\App\Http\Controllers\TeamRoom\TeamBoardCardController::class, 'destroy'])->name('board.cards.destroy');
+        Route::patch('/{team}/board/cards/{card}/color', [\App\Http\Controllers\TeamRoom\TeamBoardCardController::class, 'updateColor'])->name('board.cards.updateColor');
 
         // 会議記録
         Route::get('/{team}/minutes', [\App\Http\Controllers\TeamRoom\TeamMeetingMinuteController::class, 'index'])->name('minutes.index');

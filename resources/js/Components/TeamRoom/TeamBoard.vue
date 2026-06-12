@@ -114,6 +114,22 @@ async function moveCard(card, targetColumnId) {
     }
 }
 
+// ────────────────── カードカラー変更 ──────────────────
+async function changeCardColor(card, colorKey) {
+    const prev = card.card_color;
+    card.card_color = colorKey;
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    try {
+        await axios.patch(
+            route('team-rooms.board.cards.updateColor', { team: props.team.id, card: card.id }),
+            { card_color: colorKey },
+            { headers: { 'X-CSRF-TOKEN': csrf } }
+        );
+    } catch {
+        card.card_color = prev;
+    }
+}
+
 // ────────────────── カード削除 ──────────────────
 async function deleteCard(card) {
     if (!confirm('このカードを削除しますか？')) return;
@@ -347,6 +363,7 @@ function resetListFilters() {
                                             :columns="board.columns"
                                             @move="moveCard"
                                             @delete="deleteCard"
+                                            @color-change="changeCardColor"
                                         />
                                     </div>
                                 </div>

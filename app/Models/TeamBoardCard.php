@@ -10,7 +10,7 @@ class TeamBoardCard extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'team_board_id', 'team_board_column_id', 'title', 'description', 'sort_order', 'created_by',
+        'team_board_id', 'team_board_column_id', 'title', 'description', 'sort_order', 'card_color', 'created_by',
     ];
 
     public function board()
