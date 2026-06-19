@@ -60,6 +60,12 @@ const tabs = computed(() => [
         label: 'スクリプト管理',
         condition: typeof route === 'function' && route().has('superadmin.scripts.index'),
     },
+    {
+        key: 'demo_pages',
+        href: tryRoute('superadmin.demo_pages.index'),
+        label: 'デモページ管理',
+        condition: typeof route === 'function' && route().has('superadmin.demo_pages.index'),
+    },
     { key: 'debug', href: tryRoute('debug.api'), label: 'APIデバッグページ' },
 ].filter(t => t.condition !== false && t.href));
 
@@ -162,6 +168,13 @@ function onMobileSelect(e) {
                 :class="tab('scripts')"
             >
                 スクリプト管理
+            </Link>
+            <Link
+                v-if="typeof route === 'function' && route().has('superadmin.demo_pages.index')"
+                :href="route('superadmin.demo_pages.index')"
+                :class="tab('demo_pages')"
+            >
+                デモページ管理
             </Link>
             <Link
                 :href="route('debug.api')"

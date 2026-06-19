@@ -1,0 +1,2898 @@
+[
+  {
+    "code": "SS",
+    "display_name": "日能研札幌",
+    "print_name": "日能研札幌",
+    "area": "本部",
+    "area_sort_order": 11,
+    "route": null
+  },
+  {
+    "code": "DL",
+    "display_name": "赤羽",
+    "print_name": "赤羽校",
+    "area": "本部",
+    "area_sort_order": 20,
+    "route": "A1"
+  },
+  {
+    "code": "DX",
+    "display_name": "春日部",
+    "print_name": "春日部校",
+    "area": "関東",
+    "area_sort_order": 22,
+    "route": "A1"
+  },
+  {
+    "code": "DM",
+    "display_name": "新越谷",
+    "print_name": "新越谷校",
+    "area": "関東",
+    "area_sort_order": 31,
+    "route": "A1"
+  },
+  {
+    "code": "DH",
+    "display_name": "草加",
+    "print_name": "草加校",
+    "area": "関東",
+    "area_sort_order": 41,
+    "route": "A1"
+  },
+  {
+    "code": "CP",
+    "display_name": "竹ノ塚",
+    "print_name": "竹ノ塚校",
+    "area": "本部",
+    "area_sort_order": 51,
+    "route": "A1"
+  },
+  {
+    "code": "CJ",
+    "display_name": "千住",
+    "print_name": "千住校",
+    "area": "本部",
+    "area_sort_order": 61,
+    "route": "A1"
+  },
+  {
+    "code": "AL",
+    "display_name": "成城学園前",
+    "print_name": "成城学園前校",
+    "area": "本部",
+    "area_sort_order": 70,
+    "route": "B1"
+  },
+  {
+    "code": "AK",
+    "display_name": "経堂",
+    "print_name": "経堂校",
+    "area": "本部",
+    "area_sort_order": 80,
+    "route": "B1"
+  },
+  {
+    "code": "AM",
+    "display_name": "明大前",
+    "print_name": "明大前校",
+    "area": "関東",
+    "area_sort_order": 90,
+    "route": "B1"
+  },
+  {
+    "code": "AE",
+    "display_name": "下北沢",
+    "print_name": "下北沢校",
+    "area": "本部",
+    "area_sort_order": 100,
+    "route": "B1"
+  },
+  {
+    "code": "AS",
+    "display_name": "渋谷",
+    "print_name": "渋谷校",
+    "area": "本部",
+    "area_sort_order": 110,
+    "route": "B1"
+  },
+  {
+    "code": "AS",
+    "display_name": "表参道",
+    "print_name": "表参道校",
+    "area": "本部",
+    "area_sort_order": 115,
+    "route": "B1"
+  },
+  {
+    "code": "AB",
+    "display_name": "目黒",
+    "print_name": "目黒校",
+    "area": "本部",
+    "area_sort_order": 120,
+    "route": "B1"
+  },
+  {
+    "code": "AY",
+    "display_name": "品川",
+    "print_name": "品川校",
+    "area": "関東",
+    "area_sort_order": 130,
+    "route": "B1"
+  },
+  {
+    "code": "DT",
+    "display_name": "所沢",
+    "print_name": "所沢校",
+    "area": "関東",
+    "area_sort_order": 140,
+    "route": "C1"
+  },
+  {
+    "code": "DK",
+    "display_name": "川越",
+    "print_name": "川越校",
+    "area": "関東",
+    "area_sort_order": 150,
+    "route": "C1"
+  },
+  {
+    "code": "DC",
+    "display_name": "志木",
+    "print_name": "志木校",
+    "area": "関東",
+    "area_sort_order": 160,
+    "route": "C1"
+  },
+  {
+    "code": "DR",
+    "display_name": "成増",
+    "print_name": "成増校",
+    "area": "関東",
+    "area_sort_order": 170,
+    "route": "C1"
+  },
+  {
+    "code": "AG",
+    "display_name": "荻窪",
+    "print_name": "荻窪校",
+    "area": "関東",
+    "area_sort_order": 180,
+    "route": "C1"
+  },
+  {
+    "code": "CD",
+    "display_name": "浦安",
+    "print_name": "浦安校",
+    "area": "本部",
+    "area_sort_order": 200,
+    "route": "D1"
+  },
+  {
+    "code": "CB",
+    "display_name": "深川",
+    "print_name": "深川校",
+    "area": "本部",
+    "area_sort_order": 210,
+    "route": "D1"
+  },
+  {
+    "code": "CN",
+    "display_name": "錦糸町",
+    "print_name": "錦糸町校",
+    "area": "本部",
+    "area_sort_order": 220,
+    "route": "D1"
+  },
+  {
+    "code": "CX",
+    "display_name": "浅草橋",
+    "print_name": "浅草橋校",
+    "area": "関東",
+    "area_sort_order": 225,
+    "route": "D1"
+  },
+  {
+    "code": "AC",
+    "display_name": "お茶の水",
+    "print_name": "お茶の水校",
+    "area": "本部",
+    "area_sort_order": 230,
+    "route": "D1"
+  },
+  {
+    "code": "AN",
+    "display_name": "西日暮里",
+    "print_name": "西日暮里校",
+    "area": "本部",
+    "area_sort_order": 240,
+    "route": "D1"
+  },
+  {
+    "code": "DE",
+    "display_name": "久喜",
+    "print_name": "久喜校",
+    "area": "関東",
+    "area_sort_order": 250,
+    "route": "E1"
+  },
+  {
+    "code": "DO",
+    "display_name": "上尾",
+    "print_name": "上尾校",
+    "area": "関東",
+    "area_sort_order": 260,
+    "route": "E1"
+  },
+  {
+    "code": "DA",
+    "display_name": "大宮",
+    "print_name": "大宮校",
+    "area": "関東",
+    "area_sort_order": 270,
+    "route": "E1"
+  },
+  {
+    "code": "DS",
+    "display_name": "南浦和",
+    "print_name": "南浦和校",
+    "area": "関東",
+    "area_sort_order": 280,
+    "route": "E1"
+  },
+  {
+    "code": "DY",
+    "display_name": "東川口",
+    "print_name": "東川口校",
+    "area": "関東",
+    "area_sort_order": 285,
+    "route": "E1"
+  },
+  {
+    "code": "FI",
+    "display_name": "湘南台教室",
+    "print_name": "湘南台教室",
+    "area": "本部",
+    "area_sort_order": 300,
+    "route": "F1"
+  },
+  {
+    "code": "FR",
+    "display_name": "藤沢",
+    "print_name": "藤沢校",
+    "area": "本部",
+    "area_sort_order": 310,
+    "route": "F1"
+  },
+  {
+    "code": "FF",
+    "display_name": "大船",
+    "print_name": "大船校",
+    "area": "本部",
+    "area_sort_order": 320,
+    "route": "F1"
+  },
+  {
+    "code": "FT",
+    "display_name": "戸塚",
+    "print_name": "戸塚校",
+    "area": "本部",
+    "area_sort_order": 330,
+    "route": "F1"
+  },
+  {
+    "code": "FE",
+    "display_name": "東戸塚教室",
+    "print_name": "東戸塚教室",
+    "area": "本部",
+    "area_sort_order": 340,
+    "route": "F1"
+  },
+  {
+    "code": "EI",
+    "display_name": "センター北",
+    "print_name": "センター北校",
+    "area": "関東",
+    "area_sort_order": 350,
+    "route": "G1"
+  },
+  {
+    "code": "EA",
+    "display_name": "横 浜",
+    "print_name": "横浜校",
+    "area": "本部",
+    "area_sort_order": 370,
+    "route": "G1"
+  },
+  {
+    "code": "EB",
+    "display_name": "みなとみらい教室",
+    "print_name": "みなとみらい教室",
+    "area": "本部",
+    "area_sort_order": 380,
+    "route": "G1"
+  },
+  {
+    "code": "CI",
+    "display_name": "取手",
+    "print_name": "取手校",
+    "area": "本部",
+    "area_sort_order": 390,
+    "route": "H1"
+  },
+  {
+    "code": "CK",
+    "display_name": "柏",
+    "print_name": "柏校",
+    "area": "本部",
+    "area_sort_order": 400,
+    "route": "H1"
+  },
+  {
+    "code": "CH",
+    "display_name": "おおたかの森",
+    "print_name": "おおたかの森校",
+    "area": "本部",
+    "area_sort_order": 402,
+    "route": "H1"
+  },
+  {
+    "code": "DJ",
+    "display_name": "三郷中央",
+    "print_name": "三郷中央校",
+    "area": "関東",
+    "area_sort_order": 405,
+    "route": "H1"
+  },
+  {
+    "code": "CM",
+    "display_name": "松戸",
+    "print_name": "松戸校",
+    "area": "本部",
+    "area_sort_order": 410,
+    "route": "H1"
+  },
+  {
+    "code": "CT",
+    "display_name": "青戸",
+    "print_name": "青戸校",
+    "area": "本部",
+    "area_sort_order": 420,
+    "route": "H1"
+  },
+  {
+    "code": "BC",
+    "display_name": "調布",
+    "print_name": "調布校",
+    "area": "関東",
+    "area_sort_order": 430,
+    "route": "I1"
+  },
+  {
+    "code": "BF",
+    "display_name": "府中",
+    "print_name": "府中校",
+    "area": "関東",
+    "area_sort_order": 440,
+    "route": "I1"
+  },
+  {
+    "code": "BT",
+    "display_name": "立川",
+    "print_name": "立川校",
+    "area": "関東",
+    "area_sort_order": 450,
+    "route": "I1"
+  },
+  {
+    "code": "BM",
+    "display_name": "八王子",
+    "print_name": "八王子校",
+    "area": "関東",
+    "area_sort_order": 460,
+    "route": "I1"
+  },
+  {
+    "code": "EL",
+    "display_name": "相模原",
+    "print_name": "相模原校",
+    "area": "本部",
+    "area_sort_order": 465,
+    "route": "I1"
+  },
+  {
+    "code": "EG",
+    "display_name": "町田",
+    "print_name": "町田校",
+    "area": "本部",
+    "area_sort_order": 468,
+    "route": "I1"
+  },
+  {
+    "code": "BI",
+    "display_name": "多摩センター",
+    "print_name": "多摩センター校",
+    "area": "関東",
+    "area_sort_order": 500,
+    "route": "A2"
+  },
+  {
+    "code": "EH",
+    "display_name": "新百合ヶ丘",
+    "print_name": "新百合ヶ丘校",
+    "area": "関東",
+    "area_sort_order": 510,
+    "route": "A2"
+  },
+  {
+    "code": "EK",
+    "display_name": "たまプラーザ",
+    "print_name": "たまプラーザ校",
+    "area": "関東",
+    "area_sort_order": 520,
+    "route": "A2"
+  },
+  {
+    "code": "EJ",
+    "display_name": "武蔵小杉",
+    "print_name": "武蔵小杉校",
+    "area": "関東",
+    "area_sort_order": 540,
+    "route": "A2"
+  },
+  {
+    "code": "EF",
+    "display_name": "新川崎",
+    "print_name": "新川崎校",
+    "area": "関東",
+    "area_sort_order": 545,
+    "route": "A2"
+  },
+  {
+    "code": "EC",
+    "display_name": "日吉",
+    "print_name": "日吉校",
+    "area": "関東",
+    "area_sort_order": 550,
+    "route": "A2"
+  },
+  {
+    "code": "GA",
+    "display_name": "小田原",
+    "print_name": "日能研小田原",
+    "area": "本部",
+    "area_sort_order": 560,
+    "route": "B2"
+  },
+  {
+    "code": "FB",
+    "display_name": "茅ヶ崎",
+    "print_name": "茅ヶ崎校",
+    "area": "本部",
+    "area_sort_order": 570,
+    "route": "B2"
+  },
+  {
+    "code": "EP",
+    "display_name": "海老名",
+    "print_name": "海老名校",
+    "area": "本部",
+    "area_sort_order": 582,
+    "route": "B2"
+  },
+  {
+    "code": "EY",
+    "display_name": "中央林間",
+    "print_name": "中央林間校",
+    "area": "本部",
+    "area_sort_order": 590,
+    "route": "B2"
+  },
+  {
+    "code": "AD",
+    "display_name": "巣鴨",
+    "print_name": "巣鴨校",
+    "area": "関東",
+    "area_sort_order": 610,
+    "route": "C2"
+  },
+  {
+    "code": "AI",
+    "display_name": "池袋",
+    "print_name": "池袋校",
+    "area": "関東",
+    "area_sort_order": 620,
+    "route": "C2"
+  },
+  {
+    "code": "AA",
+    "display_name": "高田馬場",
+    "print_name": "高田馬場校",
+    "area": "本部",
+    "area_sort_order": 630,
+    "route": "C2"
+  },
+  {
+    "code": "AP",
+    "display_name": "中野坂上",
+    "print_name": "中野坂上校",
+    "area": "関東",
+    "area_sort_order": 640,
+    "route": "C2"
+  },
+  {
+    "code": "AP",
+    "display_name": "新中野",
+    "print_name": "新中野校",
+    "area": "関東",
+    "area_sort_order": 642,
+    "route": "C2"
+  },
+  {
+    "code": "AR",
+    "display_name": "中目黒",
+    "print_name": "中目黒校",
+    "area": "関東",
+    "area_sort_order": 645,
+    "route": "C2"
+  },
+  {
+    "code": "CW",
+    "display_name": "豊洲",
+    "print_name": "豊洲校",
+    "area": "本部",
+    "area_sort_order": 650,
+    "route": "D2"
+  },
+  {
+    "code": "CO",
+    "display_name": "勝どき",
+    "print_name": "勝どき校",
+    "area": "本部",
+    "area_sort_order": 655,
+    "route": "D2"
+  },
+  {
+    "code": "AU",
+    "display_name": "麻布十番",
+    "print_name": "麻布十番校",
+    "area": "関東",
+    "area_sort_order": 660,
+    "route": "D2"
+  },
+  {
+    "code": "AX",
+    "display_name": "三田",
+    "print_name": "三田校",
+    "area": "関東",
+    "area_sort_order": 670,
+    "route": "D2"
+  },
+  {
+    "code": "AO",
+    "display_name": "大井町",
+    "print_name": "大井町校",
+    "area": "関東",
+    "area_sort_order": 680,
+    "route": "D2"
+  },
+  {
+    "code": "AT",
+    "display_name": "蒲田",
+    "print_name": "蒲田校",
+    "area": "関東",
+    "area_sort_order": 690,
+    "route": "D2"
+  },
+  {
+    "code": "EX",
+    "display_name": "川崎",
+    "print_name": "川崎校",
+    "area": "関東",
+    "area_sort_order": 700,
+    "route": "D2"
+  },
+  {
+    "code": "DN",
+    "display_name": "練馬",
+    "print_name": "練馬校",
+    "area": "本部",
+    "area_sort_order": 720,
+    "route": "E2"
+  },
+  {
+    "code": "BS",
+    "display_name": "上石神井",
+    "print_name": "上石神井校",
+    "area": "本部",
+    "area_sort_order": 730,
+    "route": "E2"
+  },
+  {
+    "code": "BK",
+    "display_name": "吉祥寺",
+    "print_name": "吉祥寺校",
+    "area": "本部",
+    "area_sort_order": 740,
+    "route": "E2"
+  },
+  {
+    "code": "BN",
+    "display_name": "田無",
+    "print_name": "田無校",
+    "area": "関東",
+    "area_sort_order": 750,
+    "route": "E2"
+  },
+  {
+    "code": "BR",
+    "display_name": "ひばりが丘",
+    "print_name": "ひばりが丘校",
+    "area": "本部",
+    "area_sort_order": 760,
+    "route": "E2"
+  },
+  {
+    "code": "BJ",
+    "display_name": "国分寺",
+    "print_name": "国分寺校",
+    "area": "本部",
+    "area_sort_order": 770,
+    "route": "E2"
+  },
+  {
+    "code": "FY",
+    "display_name": "横須賀中央",
+    "print_name": "横須賀中央校",
+    "area": "本部",
+    "area_sort_order": 780,
+    "route": "F2"
+  },
+  {
+    "code": "EE",
+    "display_name": "二俣川",
+    "print_name": "二俣川校",
+    "area": "本部",
+    "area_sort_order": 785,
+    "route": "F2"
+  },
+  {
+    "code": "FS",
+    "display_name": "金沢文庫",
+    "print_name": "金沢文庫校",
+    "area": "本部",
+    "area_sort_order": 790,
+    "route": "F2"
+  },
+  {
+    "code": "FK",
+    "display_name": "港南台",
+    "print_name": "港南台校",
+    "area": "本部",
+    "area_sort_order": 795,
+    "route": "F2"
+  },
+  {
+    "code": "FJ",
+    "display_name": "上大岡",
+    "print_name": "上大岡校",
+    "area": "本部",
+    "area_sort_order": 798,
+    "route": "F2"
+  },
+  {
+    "code": "EN",
+    "display_name": "菊名",
+    "print_name": "菊名校",
+    "area": "本部",
+    "area_sort_order": 800,
+    "route": "F2"
+  },
+  {
+    "code": "ET",
+    "display_name": "鶴見",
+    "print_name": "鶴見校",
+    "area": "本部",
+    "area_sort_order": 805,
+    "route": "F2"
+  },
+  {
+    "code": "ED",
+    "display_name": "中山",
+    "print_name": "中山校",
+    "area": "本部",
+    "area_sort_order": 810,
+    "route": "G2"
+  },
+  {
+    "code": "ES",
+    "display_name": "センター南",
+    "print_name": "センター南校",
+    "area": "本部",
+    "area_sort_order": 815,
+    "route": "G2"
+  },
+  {
+    "code": "CC",
+    "display_name": "千葉",
+    "print_name": "千葉校",
+    "area": "本部",
+    "area_sort_order": 840,
+    "route": "H2"
+  },
+  {
+    "code": "CL",
+    "display_name": "海浜幕張",
+    "print_name": "海浜幕張校",
+    "area": "本部",
+    "area_sort_order": 850,
+    "route": "H2"
+  },
+  {
+    "code": "CA",
+    "display_name": "津田沼",
+    "print_name": "津田沼校",
+    "area": "本部",
+    "area_sort_order": 860,
+    "route": "H2"
+  },
+  {
+    "code": "CF",
+    "display_name": "西船橋",
+    "print_name": "西船橋校",
+    "area": "本部",
+    "area_sort_order": 870,
+    "route": "H2"
+  },
+  {
+    "code": "CY",
+    "display_name": "本八幡",
+    "print_name": "本八幡校",
+    "area": "本部",
+    "area_sort_order": 880,
+    "route": "H2"
+  },
+  {
+    "code": "CU",
+    "display_name": "新浦安",
+    "print_name": "新浦安校",
+    "area": "本部",
+    "area_sort_order": 885,
+    "route": "H2"
+  },
+  {
+    "code": "AW",
+    "display_name": "駒沢大学",
+    "print_name": "駒沢大学校",
+    "area": "関東",
+    "area_sort_order": 890,
+    "route": "I2"
+  },
+  {
+    "code": "AH",
+    "display_name": "旗の台",
+    "print_name": "旗の台校",
+    "area": "関東",
+    "area_sort_order": 900,
+    "route": "I2"
+  },
+  {
+    "code": "AJ",
+    "display_name": "自由が丘",
+    "print_name": "自由が丘校",
+    "area": "関東",
+    "area_sort_order": 910,
+    "route": "I2"
+  },
+  {
+    "code": "AF",
+    "display_name": "二子玉川",
+    "print_name": "二子玉川校",
+    "area": "関東",
+    "area_sort_order": 920,
+    "route": "I2"
+  },
+  {
+    "code": "EO",
+    "display_name": "向ヶ丘遊園",
+    "print_name": "向ヶ丘遊園校",
+    "area": "関東",
+    "area_sort_order": 930,
+    "route": "I2"
+  },
+  {
+    "code": "ER",
+    "display_name": "宮前平",
+    "print_name": "宮前平校",
+    "area": "関東",
+    "area_sort_order": 935,
+    "route": "I2"
+  },
+  {
+    "code": "EM",
+    "display_name": "青葉台",
+    "print_name": "青葉台校",
+    "area": "関東",
+    "area_sort_order": 940,
+    "route": "I2"
+  },
+  {
+    "code": "",
+    "display_name": "本部自宅用",
+    "print_name": "自宅用（本部）",
+    "area": "本部",
+    "area_sort_order": 970,
+    "route": null
+  },
+  {
+    "code": "TA",
+    "display_name": "名古屋駅前",
+    "print_name": "名駅校",
+    "area": "東海本部",
+    "area_sort_order": 10,
+    "route": null
+  },
+  {
+    "code": "TB",
+    "display_name": "千種",
+    "print_name": "千種校",
+    "area": "東海本部",
+    "area_sort_order": 20,
+    "route": null
+  },
+  {
+    "code": "TC",
+    "display_name": "一社",
+    "print_name": "一社校",
+    "area": "東海本部",
+    "area_sort_order": 30,
+    "route": null
+  },
+  {
+    "code": "TD",
+    "display_name": "御器所",
+    "print_name": "御器所校",
+    "area": "東海本部",
+    "area_sort_order": 40,
+    "route": null
+  },
+  {
+    "code": "TK",
+    "display_name": "刈谷",
+    "print_name": "刈谷校",
+    "area": "東海本部",
+    "area_sort_order": 55,
+    "route": null
+  },
+  {
+    "code": "TL",
+    "display_name": "豊田",
+    "print_name": "豊田校",
+    "area": "東海本部",
+    "area_sort_order": 60,
+    "route": null
+  },
+  {
+    "code": "TM",
+    "display_name": "岐阜",
+    "print_name": "岐阜校",
+    "area": "東海本部",
+    "area_sort_order": 70,
+    "route": null
+  },
+  {
+    "code": "TE",
+    "display_name": "本山",
+    "print_name": "本山校",
+    "area": "東海本部",
+    "area_sort_order": 43,
+    "route": null
+  },
+  {
+    "code": "TF",
+    "display_name": "植田",
+    "print_name": "植田校",
+    "area": "東海本部",
+    "area_sort_order": 45,
+    "route": null
+  },
+  {
+    "code": "TG",
+    "display_name": "浄心",
+    "print_name": "浄心校",
+    "area": "東海本部",
+    "area_sort_order": 48,
+    "route": null
+  },
+  {
+    "code": "TZ",
+    "display_name": "千種校Z教室",
+    "print_name": "千種校Z教室",
+    "area": "東海本部",
+    "area_sort_order": 76,
+    "route": null
+  },
+  {
+    "code": "TH",
+    "display_name": "藤が丘",
+    "print_name": "藤が丘校",
+    "area": "東海本部",
+    "area_sort_order": 49,
+    "route": null
+  },
+  {
+    "code": "TS",
+    "display_name": "一宮",
+    "print_name": "一宮校",
+    "area": "東海本部",
+    "area_sort_order": 72,
+    "route": null
+  },
+  {
+    "code": "TI",
+    "display_name": "新瑞",
+    "print_name": "新瑞校",
+    "area": "東海本部",
+    "area_sort_order": 75,
+    "route": null
+  },
+  {
+    "code": "TR",
+    "display_name": "勝川",
+    "print_name": "勝川校",
+    "area": "東海本部",
+    "area_sort_order": 50,
+    "route": null
+  },
+  {
+    "code": "TT",
+    "display_name": "江南",
+    "print_name": "江南校",
+    "area": "東海本部",
+    "area_sort_order": 74,
+    "route": null
+  },
+  {
+    "code": "TJ",
+    "display_name": "東山教室",
+    "print_name": "東山教室",
+    "area": "東海本部",
+    "area_sort_order": 53,
+    "route": null
+  },
+  {
+    "code": "TO",
+    "display_name": "岡崎",
+    "print_name": "岡崎校",
+    "area": "東海本部",
+    "area_sort_order": 78,
+    "route": null
+  },
+  {
+    "code": "TP",
+    "display_name": "金山",
+    "print_name": "金山校",
+    "area": "東海本部",
+    "area_sort_order": 79,
+    "route": null
+  },
+  {
+    "code": "TU",
+    "display_name": "多治見",
+    "print_name": "多治見校",
+    "area": "東海本部",
+    "area_sort_order": 85,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "NTS6F三橋",
+    "print_name": "NTS6F三橋",
+    "area": "本部部署分",
+    "area_sort_order": 10,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "教室支援",
+    "print_name": "教室支援",
+    "area": "本部部署分",
+    "area_sort_order": 20,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "本館受付",
+    "print_name": "本館受付",
+    "area": "本部部署分",
+    "area_sort_order": 30,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "学習支援課（菊名）",
+    "print_name": "学習支援課（菊名）",
+    "area": "本部部署分",
+    "area_sort_order": 40,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "学習支援課（西日暮里）",
+    "print_name": "学習支援課（西日暮里）",
+    "area": "本部部署分",
+    "area_sort_order": 50,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "研究開発",
+    "print_name": "研究開発",
+    "area": "本部部署分",
+    "area_sort_order": 60,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "調査開発室",
+    "print_name": "調査開発室",
+    "area": "本部部署分",
+    "area_sort_order": 80,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "物流",
+    "print_name": "物流",
+    "area": "本部部署分",
+    "area_sort_order": 90,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "進学情報センター（松浦様）",
+    "print_name": "進学情報センター（松浦様）",
+    "area": "本部部署分",
+    "area_sort_order": 100,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "企画部",
+    "print_name": "企画部",
+    "area": "本部部署分",
+    "area_sort_order": 110,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "NTS総務",
+    "print_name": "NTS総務",
+    "area": "本部部署分",
+    "area_sort_order": 120,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "エヌ・ティ・エス",
+    "print_name": "エヌ・ティ・エス",
+    "area": "本部部署分",
+    "area_sort_order": 130,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "コンセプト企画室",
+    "print_name": "コンセプト企画室",
+    "area": "本部部署分",
+    "area_sort_order": 140,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "コバ（向学館ユリウス）",
+    "print_name": "コバ（向学館ユリウス）",
+    "area": "本部部署分",
+    "area_sort_order": 150,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "NTS恵比寿7F",
+    "print_name": "NTS恵比寿7F",
+    "area": "本部部署分",
+    "area_sort_order": 160,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "人材育成",
+    "print_name": "人材育成",
+    "area": "本部部署分",
+    "area_sort_order": 170,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "塾用セット分",
+    "print_name": "塾用セット分",
+    "area": "本部部署分",
+    "area_sort_order": 180,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "教務課",
+    "print_name": "教務課",
+    "area": "本部部署分",
+    "area_sort_order": 190,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "生徒支援室",
+    "print_name": "生徒支援室",
+    "area": "本部部署分",
+    "area_sort_order": 200,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "進学情報センター",
+    "print_name": "進学情報センター",
+    "area": "本部部署分",
+    "area_sort_order": 210,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "新横浜通信",
+    "print_name": "新横浜通信",
+    "area": "本部部署分",
+    "area_sort_order": 220,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "河合塾",
+    "print_name": "河合塾",
+    "area": "本部部署分",
+    "area_sort_order": 230,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "センター事務局",
+    "print_name": "センター事務局",
+    "area": "本部部署分",
+    "area_sort_order": 250,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "名古屋女子大学",
+    "print_name": "名古屋女子大学",
+    "area": "本部部署分",
+    "area_sort_order": 260,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "会場分",
+    "print_name": "会場分",
+    "area": "本部部署分",
+    "area_sort_order": 270,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "Nリーグ用",
+    "print_name": "Nリーグ用",
+    "area": "本部部署分",
+    "area_sort_order": 280,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "予備",
+    "print_name": "予備",
+    "area": "本部部署分",
+    "area_sort_order": 290,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "DTP",
+    "print_name": "DTP",
+    "area": "本部部署分",
+    "area_sort_order": 300,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "ロジ",
+    "print_name": "ロジ",
+    "area": "本部部署分",
+    "area_sort_order": 310,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "センター模試事務局",
+    "print_name": "センター模試事務局",
+    "area": "本部部署分",
+    "area_sort_order": 320,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "コンセプト(新卒教務）",
+    "print_name": "コンセプト（新卒教務）",
+    "area": "本部部署分",
+    "area_sort_order": 145,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "ミッション推進室",
+    "print_name": "ミッション推進室",
+    "area": "本部部署分",
+    "area_sort_order": 330,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "サービス推進本部2F",
+    "print_name": "サービス推進本部2F",
+    "area": "本部部署分",
+    "area_sort_order": 340,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "フェリスPJ横浜校",
+    "print_name": "フェリスPJ横浜校",
+    "area": "本部部署分",
+    "area_sort_order": 350,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "ミッション推進室(教務候補生）",
+    "print_name": "ミッション推進室(教務候補生）",
+    "area": "本部部署分",
+    "area_sort_order": 360,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "日能研本部予備",
+    "print_name": "日能研本部予備",
+    "area": "本部部署分",
+    "area_sort_order": 370,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "町田予備問題のみ",
+    "print_name": "町田予備問題のみ",
+    "area": "本部部署分",
+    "area_sort_order": 380,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "ユリウス・アトラス分",
+    "print_name": "ユリウス・アトラス分",
+    "area": "本部部署分",
+    "area_sort_order": 390,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "教務候補生",
+    "print_name": "教務候補生",
+    "area": "本部部署分",
+    "area_sort_order": 400,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "NTSテスト採点用",
+    "print_name": "NTSテスト採点用",
+    "area": "本部部署分",
+    "area_sort_order": 410,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "町田納品問題バラ分",
+    "print_name": "町田納品問題バラ分",
+    "area": "本部部署分",
+    "area_sort_order": 420,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "日能研事務局",
+    "print_name": "日能研事務局",
+    "area": "本部部署分",
+    "area_sort_order": 430,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "業務支援",
+    "print_name": "業務支援",
+    "area": "本部部署分",
+    "area_sort_order": 440,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "Nガーディアン田中様",
+    "print_name": "Nガーディアン田中様",
+    "area": "本部部署分",
+    "area_sort_order": 450,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "町田2Fコールセンター",
+    "print_name": "町田2Fコールセンター",
+    "area": "本部部署分",
+    "area_sort_order": 460,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "エヌガーディアン田中様",
+    "print_name": "エヌガーディアン田中様",
+    "area": "本部部署分",
+    "area_sort_order": 470,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "ロジ(海外分封入セット）",
+    "print_name": "ロジ海外分封入セット",
+    "area": "本部部署分",
+    "area_sort_order": 5,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "本部3F人材開発",
+    "print_name": "本部3F人材開発",
+    "area": "本部部署分",
+    "area_sort_order": 480,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "別館6Fコールセンター",
+    "print_name": "別館6Fコールセンター",
+    "area": "本部部署分",
+    "area_sort_order": 490,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "調査開発室分室",
+    "print_name": "調査開発室分室",
+    "area": "本部部署分",
+    "area_sort_order": 35,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "人材開発センター3F",
+    "print_name": "人材開発センター3F",
+    "area": "本部部署分",
+    "area_sort_order": 510,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "恵比寿9F五十嵐",
+    "print_name": "恵比寿9F五十嵐様",
+    "area": "本部部署分",
+    "area_sort_order": 205,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "調査開発室分室教務候補生分",
+    "print_name": "調査開発室分室 教務候補生分",
+    "area": "本部部署分",
+    "area_sort_order": 33,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "教務候補生室本館4F",
+    "print_name": "教務候補生室本館4F",
+    "area": "本部部署分",
+    "area_sort_order": 404,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "人材サポートセンター3F",
+    "print_name": "人材サポートセンター3F",
+    "area": "本部部署分",
+    "area_sort_order": 54,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "業務支援久保様",
+    "print_name": "業務支援 久保様",
+    "area": "本部部署分",
+    "area_sort_order": 495,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "本部２Ｆ久保様",
+    "print_name": "本部２Ｆ久保様",
+    "area": "本部部署分",
+    "area_sort_order": 560,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "本部２F茂呂様",
+    "print_name": "本部２F茂呂様",
+    "area": "本部部署分",
+    "area_sort_order": 570,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "本部2F武井様",
+    "print_name": "本部2F武井様",
+    "area": "本部部署分",
+    "area_sort_order": 580,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "本部２階　新卒研修用　２月～６月",
+    "print_name": "本部２階　新卒研修用　２月～６月",
+    "area": "本部部署分",
+    "area_sort_order": 590,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "本部２階教務候補生用７月～１月",
+    "print_name": "本部２階教務候補生用７月～１月",
+    "area": "本部部署分",
+    "area_sort_order": 600,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "NTSテストサービス",
+    "print_name": "NTSテストサービス",
+    "area": "本部部署分",
+    "area_sort_order": 135,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "調査開発室分室新卒研修",
+    "print_name": "調査開発室分室新卒研修",
+    "area": "本部部署分",
+    "area_sort_order": 36,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "公開模試事務局",
+    "print_name": "公開模試事務局",
+    "area": "本部部署分",
+    "area_sort_order": 325,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "テストサービス",
+    "print_name": "テストサービス",
+    "area": "本部部署分",
+    "area_sort_order": 620,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "エヌ・ティ・エス設定用",
+    "print_name": "エヌ・ティ・エス設定用",
+    "area": "本部部署分",
+    "area_sort_order": 133,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "NTSテストサービス（採点用）",
+    "print_name": "NTSテストサービス（採点用）",
+    "area": "本部部署分",
+    "area_sort_order": 650,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "NTSテストサービス（設定用）",
+    "print_name": "NTSテストサービス（設定用）",
+    "area": "本部部署分",
+    "area_sort_order": 660,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "西日暮里(集合難問）",
+    "print_name": "西日暮里（集合難問）",
+    "area": "本部部署分",
+    "area_sort_order": 670,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "本部２階　教務候補生用　７月～１月",
+    "print_name": "本部2階教務候補生用7〜1月",
+    "area": "本部部署分",
+    "area_sort_order": 595,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "本部２階　新卒研修用　７月～１月",
+    "print_name": "本部２階　新卒研修用　７月～１月",
+    "area": "本部部署分",
+    "area_sort_order": 610,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "新横浜本部(集合難問）",
+    "print_name": "新横浜本部（集合難問）",
+    "area": "本部部署分",
+    "area_sort_order": 665,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "※NTSテストサービス（準備用）",
+    "print_name": "NTSテストサービス（準備用）",
+    "area": "本部部署分",
+    "area_sort_order": 996,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "子どもの学合推部",
+    "print_name": "子どもの学合推部",
+    "area": "本部部署分",
+    "area_sort_order": 25,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "緊急対応用",
+    "print_name": "緊急対応用",
+    "area": "本部部署分",
+    "area_sort_order": 700,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "向学館本部",
+    "print_name": "向学館本部",
+    "area": "本部部署分",
+    "area_sort_order": 710,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "緊急対応用（サンエー保管）",
+    "print_name": "緊急対応用（サンエー保管）",
+    "area": "本部部署分",
+    "area_sort_order": 701,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "自宅用予備",
+    "print_name": "自宅用予備",
+    "area": "本部部署分",
+    "area_sort_order": 720,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "本部２階新卒研修用　2月～6月",
+    "print_name": "本部２階新卒研修用　2月～6月",
+    "area": "本部部署分",
+    "area_sort_order": 615,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "緊急対応用（エヌガーディアン納品）",
+    "print_name": "緊急対応用（エヌガーディアン納品）",
+    "area": "本部部署分",
+    "area_sort_order": 702,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "本部４階　教務候補生用　７月～１月",
+    "print_name": "本部４階　教務候補生用　７月～１月",
+    "area": "本部部署分",
+    "area_sort_order": 617,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "本部４階教務候補生用７月～１月",
+    "print_name": "本部４階教務候補生用７月～１月",
+    "area": "本部部署分",
+    "area_sort_order": 618,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "緊急対応用（エヌガーディアン）",
+    "print_name": "緊急対応用（エヌガーディアン）",
+    "area": "本部部署分",
+    "area_sort_order": 703,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "勝どき校（二つ折り）",
+    "print_name": "勝どき校（二つ折り）",
+    "area": "本部部署分",
+    "area_sort_order": 730,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "湘南台教務",
+    "print_name": "湘南台教務",
+    "area": "本部部署分",
+    "area_sort_order": 740,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "西日暮里教務",
+    "print_name": "西日暮里教務",
+    "area": "本部部署分",
+    "area_sort_order": 735,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "総務本部",
+    "print_name": "総務本部",
+    "area": "本部部署分",
+    "area_sort_order": 750,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "総務人材　鈴木様",
+    "print_name": "総務人材　鈴木様",
+    "area": "本部部署分",
+    "area_sort_order": 760,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "本部　総務本部",
+    "print_name": "本部　総務本部",
+    "area": "本部部署分",
+    "area_sort_order": 752,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "本部4階　教務室　松村様",
+    "print_name": "本部4階　教務室　松村様",
+    "area": "本部部署分",
+    "area_sort_order": 770,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "教務室",
+    "print_name": "教務室",
+    "area": "本部部署分",
+    "area_sort_order": 195,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "教務室　武田さま",
+    "print_name": "教務室　武田様",
+    "area": "本部部署分",
+    "area_sort_order": 776,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "本部4階教務室松村様",
+    "print_name": "本部4階教務室松村様",
+    "area": "本部部署分",
+    "area_sort_order": 771,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "本部４階　教務室　教務候補生用",
+    "print_name": "本部４階　教務室　教務候補生用",
+    "area": "本部部署分",
+    "area_sort_order": 619,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "西日暮里教務松村様",
+    "print_name": "西日暮里教務 松村様",
+    "area": "本部部署分",
+    "area_sort_order": 736,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "本部4階　教務室　武田様",
+    "print_name": "本部4階　教務室　武田様",
+    "area": "本部部署分",
+    "area_sort_order": 774,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "西日暮里教務　松村様",
+    "print_name": "西日暮里教務　松村様",
+    "area": "本部部署分",
+    "area_sort_order": 737,
+    "route": null
+  },
+  {
+    "code": "DG",
+    "display_name": "川口",
+    "print_name": "川口校",
+    "area": "関東",
+    "area_sort_order": 25,
+    "route": "A1"
+  },
+  {
+    "code": "",
+    "display_name": "ｸﾘｴｲﾃｨﾌﾞｽﾀｯﾌ高田馬場",
+    "print_name": "関東教務高田馬場",
+    "area": "関東スタッフ",
+    "area_sort_order": 30,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "営業企画6F",
+    "print_name": "営業企画6F",
+    "area": "関東スタッフ",
+    "area_sort_order": 40,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "関東物流",
+    "print_name": "関東物流",
+    "area": "関東スタッフ",
+    "area_sort_order": 50,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "ｸﾘｴｲﾃｨﾌﾞｽﾀｯﾌ池袋",
+    "print_name": "ｸﾘｴｲﾃｨﾌﾞｽﾀｯﾌ池袋",
+    "area": "関東スタッフ",
+    "area_sort_order": 60,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "関東総務管理課",
+    "print_name": "関東総務管理課",
+    "area": "関東スタッフ",
+    "area_sort_order": 70,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "関東自宅用",
+    "print_name": "自宅用（関東）",
+    "area": "関東スタッフ",
+    "area_sort_order": 115,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "関東教務池袋",
+    "print_name": "関東教務池袋",
+    "area": "関東スタッフ",
+    "area_sort_order": 110,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "関東教務",
+    "print_name": "関東教務",
+    "area": "関東スタッフ",
+    "area_sort_order": 80,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "関東物流行（AP西新宿分）",
+    "print_name": "関東物流（AP西新宿分）",
+    "area": "関東スタッフ",
+    "area_sort_order": 120,
+    "route": null
+  },
+  {
+    "code": "HA",
+    "display_name": "広島本部",
+    "print_name": "広島本部",
+    "area": "関西",
+    "area_sort_order": 21,
+    "route": null
+  },
+  {
+    "code": "HB",
+    "display_name": "己斐",
+    "print_name": "己斐校",
+    "area": "関西",
+    "area_sort_order": 25,
+    "route": null
+  },
+  {
+    "code": "HD",
+    "display_name": "岡山",
+    "print_name": "岡山校",
+    "area": "関西",
+    "area_sort_order": 30,
+    "route": null
+  },
+  {
+    "code": "KF",
+    "display_name": "宝塚",
+    "print_name": "宝塚校",
+    "area": "関西",
+    "area_sort_order": 40,
+    "route": null
+  },
+  {
+    "code": "KG",
+    "display_name": "学園都市",
+    "print_name": "学園都市校",
+    "area": "関西",
+    "area_sort_order": 50,
+    "route": null
+  },
+  {
+    "code": "KH",
+    "display_name": "姫路",
+    "print_name": "姫路校",
+    "area": "関西",
+    "area_sort_order": 60,
+    "route": null
+  },
+  {
+    "code": "KI",
+    "display_name": "塚口",
+    "print_name": "塚口校",
+    "area": "関西",
+    "area_sort_order": 70,
+    "route": null
+  },
+  {
+    "code": "KV",
+    "display_name": "西宮北口駅ビル",
+    "print_name": "西宮北口駅ビル校",
+    "area": "関西",
+    "area_sort_order": 80,
+    "route": null
+  },
+  {
+    "code": "KJ",
+    "display_name": "西宮北口本校",
+    "print_name": "西宮北口本校",
+    "area": "関西",
+    "area_sort_order": 90,
+    "route": null
+  },
+  {
+    "code": "KK",
+    "display_name": "元町",
+    "print_name": "元町校",
+    "area": "関西",
+    "area_sort_order": 100,
+    "route": null
+  },
+  {
+    "code": "KL",
+    "display_name": "明石",
+    "print_name": "明石校",
+    "area": "関西",
+    "area_sort_order": 110,
+    "route": null
+  },
+  {
+    "code": "KM",
+    "display_name": "岡本",
+    "print_name": "岡本校",
+    "area": "関西",
+    "area_sort_order": 120,
+    "route": null
+  },
+  {
+    "code": "KR",
+    "display_name": "川西",
+    "print_name": "川西校",
+    "area": "関西",
+    "area_sort_order": 130,
+    "route": null
+  },
+  {
+    "code": "KS",
+    "display_name": "鈴蘭台",
+    "print_name": "鈴蘭台校",
+    "area": "関西",
+    "area_sort_order": 140,
+    "route": null
+  },
+  {
+    "code": "LA",
+    "display_name": "天王寺",
+    "print_name": "天王寺校",
+    "area": "関西",
+    "area_sort_order": 150,
+    "route": null
+  },
+  {
+    "code": "LI",
+    "display_name": "堺東",
+    "print_name": "堺東校",
+    "area": "関西",
+    "area_sort_order": 170,
+    "route": null
+  },
+  {
+    "code": "LM",
+    "display_name": "南森町",
+    "print_name": "南森町校",
+    "area": "関西",
+    "area_sort_order": 180,
+    "route": null
+  },
+  {
+    "code": "LO",
+    "display_name": "上本町",
+    "print_name": "上本町校",
+    "area": "関西",
+    "area_sort_order": 190,
+    "route": null
+  },
+  {
+    "code": "LP",
+    "display_name": "高槻",
+    "print_name": "高槻校",
+    "area": "関西",
+    "area_sort_order": 200,
+    "route": null
+  },
+  {
+    "code": "LS",
+    "display_name": "千里中央",
+    "print_name": "千里中央校",
+    "area": "関西",
+    "area_sort_order": 210,
+    "route": null
+  },
+  {
+    "code": "LT",
+    "display_name": "豊中",
+    "print_name": "豊中校",
+    "area": "関西",
+    "area_sort_order": 220,
+    "route": null
+  },
+  {
+    "code": "MA",
+    "display_name": "京都桂",
+    "print_name": "京都桂校",
+    "area": "関西",
+    "area_sort_order": 230,
+    "route": null
+  },
+  {
+    "code": "MB",
+    "display_name": "京都烏丸",
+    "print_name": "京都烏丸校",
+    "area": "関西",
+    "area_sort_order": 240,
+    "route": null
+  },
+  {
+    "code": "MC",
+    "display_name": "京都桃山",
+    "print_name": "京都桃山校",
+    "area": "関西",
+    "area_sort_order": 250,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "関西本部",
+    "print_name": "日能研関西本部",
+    "area": "関西",
+    "area_sort_order": 3,
+    "route": null
+  },
+  {
+    "code": "LH",
+    "display_name": "枚方",
+    "print_name": "枚方駅前校",
+    "area": "関西",
+    "area_sort_order": 161,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "関西本部企画営業部岡本",
+    "print_name": "関西本部企画営業部岡本",
+    "area": "関西",
+    "area_sort_order": 6,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "関西本部7F",
+    "print_name": "関西本部7F",
+    "area": "関西",
+    "area_sort_order": 8,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "関西本部7F岡本",
+    "print_name": "関西本部7F岡本",
+    "area": "関西",
+    "area_sort_order": 7,
+    "route": null
+  },
+  {
+    "code": "LK",
+    "display_name": "北野田",
+    "print_name": "北野田校",
+    "area": "関西",
+    "area_sort_order": 175,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "関西採点用",
+    "print_name": "関西採点用",
+    "area": "関西",
+    "area_sort_order": 2,
+    "route": null
+  },
+  {
+    "code": "KW",
+    "display_name": "甲子園",
+    "print_name": "甲子園校",
+    "area": "関西",
+    "area_sort_order": 95,
+    "route": null
+  },
+  {
+    "code": "KA",
+    "display_name": "加古川",
+    "print_name": "加古川校",
+    "area": "関西",
+    "area_sort_order": 35,
+    "route": null
+  },
+  {
+    "code": "KB",
+    "display_name": "西神南",
+    "print_name": "西神南校",
+    "area": "関西",
+    "area_sort_order": 53,
+    "route": null
+  },
+  {
+    "code": "MB",
+    "display_name": "北大路会場",
+    "print_name": "北大路会場",
+    "area": "関西",
+    "area_sort_order": 270,
+    "route": null
+  },
+  {
+    "code": "KP",
+    "display_name": "芦屋",
+    "print_name": "芦屋校",
+    "area": "関西",
+    "area_sort_order": 65,
+    "route": null
+  },
+  {
+    "code": "MA",
+    "display_name": "京都駅前会場",
+    "print_name": "京都駅前会場",
+    "area": "関西",
+    "area_sort_order": 260,
+    "route": null
+  },
+  {
+    "code": "LM",
+    "display_name": "福島会場",
+    "print_name": "福島会場",
+    "area": "関西",
+    "area_sort_order": 280,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "関西本部志水様",
+    "print_name": "関西本部志水様",
+    "area": "関西",
+    "area_sort_order": 12,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "関西本部（西川様）",
+    "print_name": "関西本部（西川様）",
+    "area": "関西",
+    "area_sort_order": 9,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "関西本部西川様\r\n関西本部西川様",
+    "print_name": "関西本部西川様",
+    "area": "関西",
+    "area_sort_order": 10,
+    "route": null
+  },
+  {
+    "code": "HA",
+    "display_name": "広島",
+    "print_name": "広島校",
+    "area": "関西",
+    "area_sort_order": 20,
+    "route": null
+  },
+  {
+    "code": "MB",
+    "display_name": "草津会場",
+    "print_name": "草津会場",
+    "area": "関西",
+    "area_sort_order": 235,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "関西本部7階大越様",
+    "print_name": "関西本部7階大越様",
+    "area": "関西",
+    "area_sort_order": 11,
+    "route": null
+  },
+  {
+    "code": "JG",
+    "display_name": "学園前",
+    "print_name": "学園前校",
+    "area": "関西",
+    "area_sort_order": 225,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "関西本部6F志水様",
+    "print_name": "関西本部6F志水様",
+    "area": "関西",
+    "area_sort_order": 13,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "関西本部7F栗林様",
+    "print_name": "関西本部7F栗林様",
+    "area": "関西",
+    "area_sort_order": 14,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "関西本部（大越様）",
+    "print_name": "関西本部（大越様）\r\n関西本部大越様",
+    "area": "関西",
+    "area_sort_order": 290,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "関西自宅用",
+    "print_name": "自宅用（関西）",
+    "area": "関西",
+    "area_sort_order": 300,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "関西本部（7F門田宛）",
+    "print_name": "関西本部（7F門田様）",
+    "area": "関西",
+    "area_sort_order": 4,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "関西本部7F門田様",
+    "print_name": "関西本部(7F門田様）",
+    "area": "関西",
+    "area_sort_order": 5,
+    "route": null
+  },
+  {
+    "code": "LB",
+    "display_name": "茨木校(関西本部7F橋本宛）",
+    "print_name": "茨木校（関西本部7F橋本様）",
+    "area": "関西",
+    "area_sort_order": 1,
+    "route": null
+  },
+  {
+    "code": "LB",
+    "display_name": "茨木",
+    "print_name": "茨木校",
+    "area": "関西",
+    "area_sort_order": 155,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "関西本部(7F廣瀬さま宛）",
+    "print_name": "関西本部7F廣瀬様",
+    "area": "関西",
+    "area_sort_order": 16,
+    "route": null
+  },
+  {
+    "code": "LF",
+    "display_name": "四ツ橋",
+    "print_name": "四ツ橋校",
+    "area": "関西",
+    "area_sort_order": 158,
+    "route": null
+  },
+  {
+    "code": "",
+    "display_name": "関西本部6F廣瀬様",
+    "print_name": "関西本部6F廣瀬様",
+    "area": "関西",
+    "area_sort_order": 17,
+    "route": null
+  },
+  {
+    "code": "PK",
+    "display_name": "高知",
+    "print_name": "高知校",
+    "area": "九州",
+    "area_sort_order": 10,
+    "route": null
+  },
+  {
+    "code": "PM",
+    "display_name": "松山",
+    "print_name": "松山校",
+    "area": "九州",
+    "area_sort_order": 20,
+    "route": null
+  },
+  {
+    "code": "PT",
+    "display_name": "高松",
+    "print_name": "高松校",
+    "area": "九州",
+    "area_sort_order": 30,
+    "route": null
+  },
+  {
+    "code": "RA",
+    "display_name": "小倉",
+    "print_name": "小倉校",
+    "area": "九州",
+    "area_sort_order": 40,
+    "route": null
+  },
+  {
+    "code": "RB",
+    "display_name": "姪浜校",
+    "print_name": "姪浜校",
+    "area": "九州",
+    "area_sort_order": 50,
+    "route": null
+  },
+  {
+    "code": "RD",
+    "display_name": "鹿児島",
+    "print_name": "鹿児島校",
+    "area": "九州",
+    "area_sort_order": 60,
+    "route": null
+  },
+  {
+    "code": "RE",
+    "display_name": "長崎",
+    "print_name": "長崎校",
+    "area": "九州",
+    "area_sort_order": 70,
+    "route": null
+  },
+  {
+    "code": "RF",
+    "display_name": "九州本部",
+    "print_name": "九州本部校",
+    "area": "九州",
+    "area_sort_order": 80,
+    "route": null
+  },
+  {
+    "code": "RH",
+    "display_name": "大分",
+    "print_name": "大分校",
+    "area": "九州",
+    "area_sort_order": 90,
+    "route": null
+  },
+  {
+    "code": "RI",
+    "display_name": "沖縄",
+    "print_name": "沖縄校",
+    "area": "九州",
+    "area_sort_order": 100,
+    "route": null
+  },
+  {
+    "code": "RK",
+    "display_name": "熊本",
+    "print_name": "熊本校",
+    "area": "九州",
+    "area_sort_order": 110,
+    "route": null
+  },
+  {
+    "code": "RM",
+    "display_name": "宮崎",
+    "print_name": "宮崎校",
+    "area": "九州",
+    "area_sort_order": 120,
+    "route": null
+  },
+  {
+    "code": "RN",
+    "display_name": "久留米",
+    "print_name": "久留米校",
+    "area": "九州",
+    "area_sort_order": 130,
+    "route": null
+  },
+  {
+    "code": "RO",
+    "display_name": "大橋",
+    "print_name": "大橋校",
+    "area": "九州",
+    "area_sort_order": 140,
+    "route": null
+  },
+  {
+    "code": "RS",
+    "display_name": "川内",
+    "print_name": "川内校",
+    "area": "九州",
+    "area_sort_order": 150,
+    "route": null
+  },
+  {
+    "code": "RT",
+    "display_name": "谷山",
+    "print_name": "谷山校",
+    "area": "九州",
+    "area_sort_order": 160,
+    "route": null
+  },
+  {
+    "code": "RW",
+    "display_name": "西新",
+    "print_name": "西新校",
+    "area": "九州",
+    "area_sort_order": 170,
+    "route": null
+  },
+  {
+    "code": "RO",
+    "display_name": "福岡大橋",
+    "print_name": "福岡大橋校",
+    "area": "九州",
+    "area_sort_order": 180,
+    "route": null
+  },
+  {
+    "code": "PA",
+    "display_name": "徳島",
+    "print_name": "徳島校",
+    "area": "九州",
+    "area_sort_order": 190,
+    "route": null
+  },
+  {
+    "code": "RJ",
+    "display_name": "中部",
+    "print_name": "中部校",
+    "area": "九州",
+    "area_sort_order": 105,
+    "route": null
+  },
+  {
+    "code": "RC",
+    "display_name": "千早",
+    "print_name": "千早校",
+    "area": "九州",
+    "area_sort_order": 55,
+    "route": null
+  },
+  {
+    "code": "RR",
+    "display_name": "豊見城",
+    "print_name": "豊見城校",
+    "area": "九州",
+    "area_sort_order": 155,
+    "route": null
+  },
+  {
+    "code": "RI",
+    "display_name": "沖縄本部",
+    "print_name": "沖縄本部",
+    "area": "九州",
+    "area_sort_order": 102,
+    "route": null
+  },
+  {
+    "code": "PM",
+    "display_name": "松山 中村様",
+    "print_name": "松山 中村様",
+    "area": "九州",
+    "area_sort_order": 21,
+    "route": null
+  },
+  {
+    "code": "RL",
+    "display_name": "浦添",
+    "print_name": "浦添校",
+    "area": "九州",
+    "area_sort_order": 103,
+    "route": null
+  },
+  {
+    "code": "AA",
+    "display_name": "高田馬場校  職員分",
+    "print_name": "高田馬場校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 10,
+    "route": "C2"
+  },
+  {
+    "code": "AB",
+    "display_name": "目黒校  職員分",
+    "print_name": "目黒校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 20,
+    "route": "C2"
+  },
+  {
+    "code": "AC",
+    "display_name": "お茶の水校  職員分",
+    "print_name": "お茶の水校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 30,
+    "route": "D1"
+  },
+  {
+    "code": "AE",
+    "display_name": "下北沢校  職員分",
+    "print_name": "下北沢校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 40,
+    "route": "B1"
+  },
+  {
+    "code": "AK",
+    "display_name": "経堂校  職員分",
+    "print_name": "経堂校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 50,
+    "route": "B1"
+  },
+  {
+    "code": "AN",
+    "display_name": "西日暮里校  職員分",
+    "print_name": "西日暮里校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 60,
+    "route": "D1"
+  },
+  {
+    "code": "AS",
+    "display_name": "渋谷校  職員分",
+    "print_name": "渋谷校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 70,
+    "route": "B1"
+  },
+  {
+    "code": "BJ",
+    "display_name": "国分寺校  職員分",
+    "print_name": "国分寺校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 80,
+    "route": "E2"
+  },
+  {
+    "code": "BK",
+    "display_name": "吉祥寺校  職員分",
+    "print_name": "吉祥寺校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 90,
+    "route": "E2"
+  },
+  {
+    "code": "BR",
+    "display_name": "ひばりが丘校  職員分",
+    "print_name": "ひばりが丘校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 100,
+    "route": "E2"
+  },
+  {
+    "code": "BS",
+    "display_name": "上石神井校  職員分",
+    "print_name": "上石神井校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 110,
+    "route": "E2"
+  },
+  {
+    "code": "CA",
+    "display_name": "津田沼校  職員分",
+    "print_name": "津田沼校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 120,
+    "route": "H2"
+  },
+  {
+    "code": "CB",
+    "display_name": "深川校  職員分",
+    "print_name": "深川校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 130,
+    "route": "D1"
+  },
+  {
+    "code": "CC",
+    "display_name": "千葉校  職員分",
+    "print_name": "千葉校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 140,
+    "route": "H2"
+  },
+  {
+    "code": "CD",
+    "display_name": "浦安校  職員分",
+    "print_name": "浦安校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 150,
+    "route": "D1"
+  },
+  {
+    "code": "CF",
+    "display_name": "西船橋校  職員分",
+    "print_name": "西船橋校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 160,
+    "route": "H2"
+  },
+  {
+    "code": "CI",
+    "display_name": "取手校  職員分",
+    "print_name": "取手校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 170,
+    "route": "H1"
+  },
+  {
+    "code": "CJ",
+    "display_name": "千住校  職員分",
+    "print_name": "千住校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 180,
+    "route": "A1"
+  },
+  {
+    "code": "CK",
+    "display_name": "柏校  職員分",
+    "print_name": "柏校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 190,
+    "route": "H1"
+  },
+  {
+    "code": "CL",
+    "display_name": "海浜幕張校  職員分",
+    "print_name": "海浜幕張校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 200,
+    "route": "H2"
+  },
+  {
+    "code": "CM",
+    "display_name": "松戸校  職員分",
+    "print_name": "松戸校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 210,
+    "route": "H1"
+  },
+  {
+    "code": "CN",
+    "display_name": "錦糸町校  職員分",
+    "print_name": "錦糸町校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 220,
+    "route": "D1"
+  },
+  {
+    "code": "CP",
+    "display_name": "竹ノ塚校  職員分",
+    "print_name": "竹ノ塚校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 230,
+    "route": "A1"
+  },
+  {
+    "code": "CT",
+    "display_name": "青戸校  職員分",
+    "print_name": "青戸校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 240,
+    "route": "H1"
+  },
+  {
+    "code": "CU",
+    "display_name": "新浦安校  職員分",
+    "print_name": "新浦安校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 250,
+    "route": "D1"
+  },
+  {
+    "code": "CW",
+    "display_name": "豊洲校  職員分",
+    "print_name": "豊洲校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 260,
+    "route": "D2"
+  },
+  {
+    "code": "CY",
+    "display_name": "本八幡校  職員分",
+    "print_name": "本八幡校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 270,
+    "route": "H2"
+  },
+  {
+    "code": "DL",
+    "display_name": "赤羽校  職員分",
+    "print_name": "赤羽校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 280,
+    "route": "C2"
+  },
+  {
+    "code": "DN",
+    "display_name": "練馬校  職員分",
+    "print_name": "練馬校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 290,
+    "route": "E2"
+  },
+  {
+    "code": "EA",
+    "display_name": "横浜校  職員分",
+    "print_name": "横浜校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 300,
+    "route": "A2"
+  },
+  {
+    "code": "ED",
+    "display_name": "十日市場校  職員分",
+    "print_name": "十日市場校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 310,
+    "route": "F2"
+  },
+  {
+    "code": "EE",
+    "display_name": "二俣川校  職員分",
+    "print_name": "二俣川校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 320,
+    "route": "G2"
+  },
+  {
+    "code": "EG",
+    "display_name": "町田校  職員分",
+    "print_name": "町田校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 330,
+    "route": "B2"
+  },
+  {
+    "code": "EL",
+    "display_name": "相模原校  職員分",
+    "print_name": "相模原校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 340,
+    "route": "J1"
+  },
+  {
+    "code": "EN",
+    "display_name": "菊名校  職員分",
+    "print_name": "菊名校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 350,
+    "route": "A2"
+  },
+  {
+    "code": "EP",
+    "display_name": "本厚木校  職員分",
+    "print_name": "本厚木校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 360,
+    "route": "B2"
+  },
+  {
+    "code": "ES",
+    "display_name": "センター南校  職員分",
+    "print_name": "センター南校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 370,
+    "route": "G1"
+  },
+  {
+    "code": "ET",
+    "display_name": "鶴見校  職員分",
+    "print_name": "鶴見校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 380,
+    "route": "D2"
+  },
+  {
+    "code": "EY",
+    "display_name": "中央林間校  職員分",
+    "print_name": "中央林間校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 390,
+    "route": "B2"
+  },
+  {
+    "code": "FB",
+    "display_name": "茅ヶ崎校  職員分",
+    "print_name": "茅ヶ崎校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 400,
+    "route": "B2"
+  },
+  {
+    "code": "FF",
+    "display_name": "大船校  職員分",
+    "print_name": "大船校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 410,
+    "route": "F1"
+  },
+  {
+    "code": "FJ",
+    "display_name": "上大岡校  職員分",
+    "print_name": "上大岡校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 420,
+    "route": "J1"
+  },
+  {
+    "code": "FK",
+    "display_name": "港南台校  職員分",
+    "print_name": "港南台校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 430,
+    "route": "J1"
+  },
+  {
+    "code": "FR",
+    "display_name": "藤沢校  職員分",
+    "print_name": "藤沢校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 440,
+    "route": "F1"
+  },
+  {
+    "code": "FI",
+    "display_name": "湘南台校  職員分",
+    "print_name": "湘南台校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 450,
+    "route": "F1"
+  },
+  {
+    "code": "FS",
+    "display_name": "金沢文庫校  職員分",
+    "print_name": "金沢文庫校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 460,
+    "route": "F2"
+  },
+  {
+    "code": "FT",
+    "display_name": "戸塚校  職員分",
+    "print_name": "戸塚校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 470,
+    "route": "F1"
+  },
+  {
+    "code": "FE",
+    "display_name": "東戸塚校 職員分",
+    "print_name": "東戸塚校 職員分",
+    "area": "本部職員",
+    "area_sort_order": 480,
+    "route": "F1"
+  },
+  {
+    "code": "FY",
+    "display_name": "横須賀中央校  職員分",
+    "print_name": "横須賀中央校  職員分",
+    "area": "本部職員",
+    "area_sort_order": 490,
+    "route": "F2"
+  },
+  {
+    "code": "GA",
+    "display_name": "日能研小田原  職員分",
+    "print_name": "日能研小田原  職員分",
+    "area": "本部職員",
+    "area_sort_order": 500,
+    "route": "B2"
+  },
+  {
+    "code": "SS",
+    "display_name": "日能研札幌  職員分",
+    "print_name": "日能研札幌  職員分",
+    "area": "本部職員",
+    "area_sort_order": 510,
+    "route": null
+  }
+]

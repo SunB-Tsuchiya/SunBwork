@@ -1,6 +1,6 @@
 # LABEL_ALGORITHM.md — 宛先ラベルPDF生成ツール アルゴリズム・ルール集
 
-更新日: 2026-06-11  
+更新日: 2026-06-12  
 担当: Claude Code  
 対象: LabelGenerator.vue / LabelGeneratorV2.vue
 
@@ -219,24 +219,63 @@ const gradeItemMap = {
 
 ---
 
-## 7. 一式PDF
+## 7. 一式PDF と 内部部署等の分離（重要ルール）
 
-### 7-1. 一式対象の判定
+### 7-1. 一式の概念
 
-- Excelに `一式` という名前のシートが存在する → `ichishiki: true`
-- 一式シートには教室コードと教室名のみ（部数なし）
+「一式」とは、教室ではなく本部スタッフがアイテム確認・手元保管のために配達する必要部数。  
+小ロットをバルクで一回配送し、配送先で仕訳ける。
 
-### 7-2. 一式ラベル内容
+- **一式シート** (`一式` を含むシート名): 一式宛先ごとの部数を黄色セルで記録
+- **DI/原本等のシート**: 一式分は除外され、教室への配達数のみ記録
+- 一式の総合計 = 各教室の配達総合計と一致する（別途検証可能）
 
-- 品名: 「一式 N部」
-- 「校」サフィックス: 一般教室は付加。本部内部部署は付加しない
-- 一式対象外（個別アイテムラベルを受け取る）: コバ（向学館ユリウス）、関東物流、予備
+### 7-2. シート種別と処理の分離（⚠️ 混同禁止）
 
-### 7-3. V2での扱い
+| シート種別 | 処理関数 | 目的 | 黄色判定 |
+|---|---|---|---|
+| 一式シート（名前に「一式」含む） | `parseIsshikiRows` | PDF宛先ラベル生成 + データ照会 | **要**（fgColor.rgb=FFFF00） |
+| 通常シート（DI・原本等） | `parseExtraLeftRows` | 内部部署等の部数集計 | **不要**（位置ベース検出） |
+
+**⚠️ なぜ分離するか:**
+- 黄色セルはファイルによって存在しない場合がある
+- 通常シートの合計行や集計行も黄色で着色されることがある（総合計等）
+- `.xls` 形式ではインデックスカラーで保存され `fgColor.rgb` が取れないケースがある
+- `parseIsshikiRows` を通常シートに適用すると誤検出・誤集計が起きる
+
+### 7-3. `parseIsshikiRows` — 一式シート専用（黄色セルベース）
+
+```js
+// 一式シートのみに適用
+// 左ブロック: nameCol=2, 学年cols=3-7（gradeMin:2, gradeMax:7）
+// 右ブロック: nameCol=8, 学年cols=9-13（gradeMin:8, gradeMax:13）
+// fgColor.rgb === 'FFFF00' の行のみ抽出
+// 戻り値: [{ name: '総務本部', grades: {'4年':5, ...} }, ...]
+```
+
+用途:
+1. `symDataRef[bucket]._isshikiDestinations` に格納 → 一式PDF生成時に使用
+2. `sheetDataRef` に `type:'isshiki'` エントリとして追加 → データ照会タブ表示
+
+### 7-4. `parseExtraLeftRows` — 通常シート専用（位置ベース）
+
+```js
+// 通常シート（DI・原本等）の 内部部署等行 を取得
+// 条件: col0/col1 に学校コード(AA等)がない + col2 に名前 + col3-7 に数量
+// 「小計・合計・本部計」等はSKIP。parseSchoolRows 取得済み名前は除外。
+// 戻り値: [{ name: 'ロジ', grades: {'4年':10} }, ...]
+```
+
+取得対象の例: ロジ、西日暮里教務、湘南台教務 等  
+→ `sheetDataRef[i].yellowRows` に格納  
+→ `dataviewRows` で area='日能研本部' として追加（naibuグループ）
+
+### 7-5. 一式PDF
 
 - ユーザーが「一式」チェックボックスをONにする → 一式PDF生成フラグ
-- Excelの一式シート検出は `ichishikiDetected` として情報表示に使用
+- 一式シート検出: `ichishikiDetected` ref（情報表示用）
 - 一式PDF名: `{MMDD}{略称}{学年}一式.pdf`
+- 一式対象外（個別ラベルを受け取る）: コバ、向学館ユリウス、関東物流、予備
 
 ---
 
@@ -345,6 +384,9 @@ const auto = detectedName
 | 5 | テスト名に日付が残る（"21・22日"） | mDate2正規表現が`21・22日`にマッチしない | mDateRange を先に評価 |
 | 6 | ①しか検出されない（V2） | セル値に `.normalize('NFKC')` を適用すると ①(U+2460)→1(U+0031) に変換される | 記号スキャンループ内では normalize しない（生文字列 `String(row[c] \|\| '')` で検索）。学年名の全角→半角変換には NFKC を使うが、ITEM_SYMBOLS チェック前には使わないこと |
 | 7 | 教室データが0件（V2） | `parseSchoolRows` が `[0, 6]` 列を検索していたが、このExcelは col 0 が空欄・col 1 にコード・col 7 に右ブロックコードの構造だった | `[0, 1, 6, 7]` を全て試し、同一行内の重複を `seenCodes` Set で排除する（V1と同じ） |
+| 8 | 内部部署等（ロジ等）が部数集計に入らない | `parseIsshikiRows`（黄色セルベース）を通常シートに適用したが `.xls` のインデックスカラーでは `fgColor.rgb` が未設定 | 通常シートは色判定しない `parseExtraLeftRows`（位置ベース: col2に名前 + col3-7に数量 + コードなし）に切り替え |
+| 9 | 関西本部が関西の部数集計に入らない | 境界「関西本部小計」→ area='関西本部' が `SUMMARY_AREA_GROUP` 未登録で 'other'扱い | `SUMMARY_AREA_GROUP` に '関西本部' → 'kansei' を追加（九州本部・日能研関東/関西/九州も同様に追加） |
+| 10 | 一式シートがデータ照会タブに表示されない | `parseWorkbook` の一式ブロックが `newSheetList` に追加せず `continue` していた | 一式シートも `newSheetList` に `type:'isshiki'` で追加するよう変更 |
 
 ---
 
@@ -530,9 +572,73 @@ stop_order = route.sort_order * 100 + stop.stop_order
 
 ---
 
-## 17. 未実装事項（今後のフェーズ）
+## 17. データ照会（sheetDataRef / dataviewRows）
 
-- [ ] 一式シートの内容読み取りと一式PDFの内容生成
+### 17-1. sheetDataRef 構造
+
+```js
+sheetDataRef = [
+  { name: '春期原本',         grades: ['3年','4年','5年'], schools: {...}, yellowRows: [...] },
+  { name: '春期3月30日一式',  grades: ['4年','5年'],       schools: {}, isshikiDests: [...], type:'isshiki' },
+  { name: '春期3月30日DI',    grades: ['4年','5年','6年'], schools: {...}, yellowRows: [...] },
+  ...
+]
+```
+
+- テストサービスシート（`/テストサービス|TS宛紙不要|\bTS\b/`）は含まない（PDF生成対象外）
+- 一式シートのみ `type:'isshiki'` が付く
+
+### 17-2. dataviewRows の切り替え
+
+- `type !== 'isshiki'`: school rows + yellowRows（area='日能研本部'として追加）
+- `type === 'isshiki'`: isshikiDests をそのまま表示（area='一式'）
+
+---
+
+## 18. 部数集計（summaryStructured）
+
+### 18-1. エリアグループマッピング（SUMMARY_AREA_GROUP）
+
+| area（マスタ or 境界検出） | グループ |
+|---|---|
+| 本部 | honbu |
+| 東海本部, 東海本部職員, 東海, 日能研東海 | tokai |
+| 日能研本部, 本部職員, 本部部署分 | naibu |
+| 関東, 関東スタッフ, 日能研関東 | kanto |
+| 関西, 関西本部, 日能研関西 | kansei |
+| 九州, 九州本部, 日能研九州 | kyushu |
+
+**境界検出エリア名の発生源**: `parseSchoolRows` の Pass2（`/^(.+?)(?:小計|本部計)$/`）  
+例: "日能研関西小計" → area='日能研関西' → kansei グループ
+
+### 18-2. 表示構造（通常シート）
+
+```
+本部              [honbu学校群]
+日能研東海         [tokai: area='東海本部' 学校群]
+東海本部           [tokai: area='日能研東海' $tokai特殊エントリ]
+日能研東海 小計    [tokai合計、2種類以上ある場合のみ]
+本部+東海 累計     [honbu+tokai、両方ある場合のみ]
+内部部署等         [naibu: $julius($30) + $yobi($1001) + ロジ等(yellowRows)]
+日能研本部 合計    [honbu+tokai+naibu]
+関東              [kanto学校群]
+関東 合計
+関西              [kansei学校群]
+関西 合計
+九州              [kyushu学校群]
+九州 合計
+（other群: 未分類）
+─────────────
+総計（tfoot）
+```
+
+- 一式シート表示時: 宛先ごとの部数リストのみ（階層なし）
+- 総合計（summaryTotal）は data行のみ合算（subtotal行は除く）
+
+---
+
+## 19. 未実装事項（今後のフェーズ）
+
 - [ ] 学年ラベルオーバーライド（マイファースト → 新3年 等）
 - [ ] 教室表示名のオーバーライド（例: GA → 日能研小田原）
 - [ ] V2 と DB の本格連携: ラベル生成時に label_route_stops から routeCode/stop を取得（現状は FALLBACK_ROUTE_MAP 固定）

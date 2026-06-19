@@ -195,6 +195,75 @@ function parseSchoolRows(data, gradeCols) {
 
     return schools;
 }
+// 通常シートの「コードなし宛先行」を追加取得（ロジ・西日暮里・関西本部等）
+//
+// 設計原則: コードの有無ではなく「教室名があって右に数字があるか」で判断する。
+// 一式ルート（内部部署・関西本部等）はそもそも配送コードを持たない。
+// 重複防止は capturedNames（parseSchoolRows が取得済みの名前）で行う。
+//
+// returns [{ name, grades: { '3年': N, ... }, area }]
+function parseExtraLeftRows(data, gradeCols, capturedNames) {
+    const SKIP = /小計|合計|本部計|総合計|テストサービス|NTSテスト/;
+    const BOUNDARY_RE = /^(.+?)(?:小計|本部計)$/;
+    const dataStart = detectDataStartRow(data);
+
+    // 左右ブロック境界を独立して収集（混合するとエリア誤割当が起きる）
+    const leftBoundaries = [];   // cols 0-2（parseSchoolRows と同じ）
+    const rightBoundaries = [];  // cols 7-9（右ブロック）
+    for (let r = dataStart; r < data.length; r++) {
+        const row = data[r] || [];
+        for (const c of [0, 1, 2]) {
+            const cell = String(row[c] || '').normalize('NFKC').trim();
+            const m = cell.match(BOUNDARY_RE);
+            if (m) { leftBoundaries.push({ rowIdx: r, area: m[1] }); break; }
+        }
+        for (const c of [7, 8, 9]) {
+            const cell = String(row[c] || '').normalize('NFKC').trim();
+            const m = cell.match(BOUNDARY_RE);
+            if (m) { rightBoundaries.push({ rowIdx: r, area: m[1] }); break; }
+        }
+    }
+
+    const extra = [];
+    for (let r = dataStart; r < data.length; r++) {
+        const row = data[r] || [];
+        // 行内のどのセルにも 小計/合計 等があれば行全体をスキップ
+        if (row.some(cell => SKIP.test(String(cell || '').normalize('NFKC').trim()))) continue;
+        const rowNames = new Set();
+
+        // 教室名が存在しうる列 [1,2] (左) と [7,8] (右) を走査
+        // コードの有無は関係なし: 名前があって右隣に数字があれば取得
+        for (const nameCol of [1, 2, 7, 8]) {
+            const raw = String(row[nameCol] || '').normalize('NFKC').trim();
+            if (!raw || SKIP.test(raw) || /^\d+$/.test(raw)) continue;
+            // parseSchoolRows が取得済みの名前はスキップ（重複防止）
+            if (capturedNames.has(raw) || rowNames.has(raw)) continue;
+
+            // 右方向 relPos 1-6 の学年列に数量があるか確認
+            const grades = {};
+            for (const [absColStr, gradeLabel] of Object.entries(gradeCols)) {
+                const absCol = Number(absColStr);
+                const relPos = absCol - nameCol;
+                if (relPos < 1 || relPos > 6) continue;
+                const qty = parseInt(String(row[absCol] || '').replace(/,/g, ''), 10);
+                if (!isNaN(qty) && qty > 0) grades[gradeLabel] = qty;
+            }
+            if (Object.keys(grades).length === 0) continue;
+            if (extra.find(e => e.name === raw)) continue;
+
+            // 左右ブロック独立の境界からエリアを取得
+            const boundary = nameCol >= 6
+                ? rightBoundaries.find(b => b.rowIdx > r)
+                : leftBoundaries.find(b => b.rowIdx > r);
+            const area = boundary?.area ?? '';
+
+            extra.push({ name: raw, grades, area });
+            rowNames.add(raw);
+        }
+    }
+    return extra;
+}
+
 // 一式シート（シート名に「一式」を含む）の黄色セル行を抽出
 // 左ブロック（名前col=2, 学年col=3-7）・右ブロック（名前col=8, 学年col=9-13）両方を対象
 // returns [{ name, grades: { '3年': N, ... } }, ...]
@@ -293,8 +362,14 @@ const routeMaster           = ref([]);  // 社内便ルートマスタ
 const masterLoading         = ref(false);
 
 const mapSchool    = s => ({
-    id: s.id, code: s.code, name: s.display_name,
-    route: s.route || '', stopOrder: s.stop_order || '',
+    id:            s.id,
+    code:          s.code || '',
+    name:          s.display_name,
+    printName:     s.print_name || s.display_name,
+    area:          s.area || '',
+    areaSortOrder: s.area_sort_order || 0,
+    route:         s.route || '',
+    stopOrder:     s.stop_order || '',
 });
 const mapTestName  = t => ({ id: t.id, name: t.name, isActive: t.is_active !== false });
 const mapItemType  = t => ({ id: t.id, name: t.name, isActive: t.is_active !== false });
@@ -532,6 +607,50 @@ const sortedSchoolMaster = computed(() => {
     return arr;
 });
 
+// エリアごとのグループ化（検索なし時）
+const schoolMasterByArea = computed(() => {
+    const areaOrder = areaMaster.value.map(a => a.name);
+    const groups = {};
+    for (const s of schoolMaster.value) {
+        const area = s.area || '未分類';
+        if (!groups[area]) groups[area] = [];
+        groups[area].push(s);
+    }
+    for (const area of Object.keys(groups)) {
+        groups[area].sort((a, b) => {
+            const ao = a.areaSortOrder ?? 9999;
+            const bo = b.areaSortOrder ?? 9999;
+            if (ao !== bo) return ao - bo;
+            return a.code.localeCompare(b.code);
+        });
+    }
+    const result = [];
+    const seen = new Set();
+    for (const areaName of areaOrder) {
+        if (groups[areaName]) {
+            result.push({ area: areaName, schools: groups[areaName] });
+            seen.add(areaName);
+        }
+    }
+    for (const area of Object.keys(groups)) {
+        if (!seen.has(area)) result.push({ area, schools: groups[area] });
+    }
+    return result;
+});
+
+// フラット OR エリアグループ化されたビュー行
+const schoolMasterRows = computed(() => {
+    if (masterSchoolSearch.value.trim()) {
+        return sortedSchoolMaster.value.map(s => ({ type: 'school', data: s }));
+    }
+    const rows = [];
+    for (const group of schoolMasterByArea.value) {
+        rows.push({ type: 'header', area: group.area, count: group.schools.length });
+        for (const s of group.schools) rows.push({ type: 'school', data: s });
+    }
+    return rows;
+});
+
 function openMasterModal(tab = 'testNames') {
     masterTab.value = tab;
     masterEditingId.value = null;
@@ -553,7 +672,8 @@ async function masterSaveEdit(tab) {
             const { data } = await axios.put(`/label-masters/schools/${row.id}`, {
                 code:         normCode(row.code),
                 display_name: row.name || '',
-                area:         '',
+                print_name:   row.printName || null,
+                area:         row.area || '',
                 route:        row.route || null,
                 stop_order:   row.stopOrder ? Number(row.stopOrder) : null,
                 is_active:    true,
@@ -836,7 +956,7 @@ function parseWorkbook(wb) {
         const ws   = wb.Sheets[sn];
         const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
 
-        // 一式シート: 黄色セルの宛先と部数を抽出して格納し、通常処理はスキップ
+        // 一式シート: 黄色セルの宛先と部数を抽出して symData に格納し、データ照会タブにも追加
         if (/一式/.test(n)) {
             hasIchishiki = true;
             const gradeCols    = detectGradeCols(data);
@@ -846,6 +966,17 @@ function parseWorkbook(wb) {
                 if (!newSymData[bucket]) newSymData[bucket] = {};
                 newSymData[bucket]._isshikiDestinations = isshikiDests;
             }
+            const gradesInIsshiki = new Set();
+            for (const d of isshikiDests) {
+                for (const g of Object.keys(d.grades)) gradesInIsshiki.add(g);
+            }
+            newSheetList.push({
+                name:         sn,
+                grades:       GRADE_ORDER.filter(g => gradesInIsshiki.has(g)),
+                schools:      {},
+                isshikiDests,
+                type:         'isshiki',
+            });
             continue;
         }
 
@@ -884,11 +1015,16 @@ function parseWorkbook(wb) {
         const legendItems = extractLegendItemsV2(data);
         const schools     = parseSchoolRows(data, gradeCols);
 
+        // 内部部署等を追加取得（ロジ・西日暮里教務等）— 色判定なし・位置ベース
+        const capturedNames = new Set(Object.values(schools).map(s => s.name.normalize('NFKC')));
+        const yellowRows = parseExtraLeftRows(data, gradeCols, capturedNames);
+
         // データ照会用: シート単位のデータを収集
         newSheetList.push({
-            name:    sn,
-            grades:  GRADE_ORDER.filter(g => gradesInSheet.has(g)),
+            name:      sn,
+            grades:    GRADE_ORDER.filter(g => gradesInSheet.has(g)),
             schools,
+            yellowRows,
         });
 
         const bucket      = dc ?? '__common';
@@ -1346,55 +1482,175 @@ const showSummaryModal   = ref(false);
 const dataviewGrade      = ref('');
 const dataviewSheet      = ref(0);  // sheetDataRef のインデックス
 
+// 教室マスタから (コード+名前) で逆引き
+function lookupMasterEntry(code, excelName) {
+    const entries = schoolMaster.value.filter(s => s.code === code);
+    if (!entries.length) return null;
+    if (entries.length === 1) return entries[0];
+    // 複数ある場合は教室名で最も近いものを選ぶ
+    const exact = entries.find(s =>
+        s.name === excelName || s.printName === excelName ||
+        s.printName?.replace(/校$/, '') === excelName ||
+        s.name?.replace(/校$/, '') === excelName
+    );
+    return exact ?? entries[0];
+}
+
 const dataviewRows = computed(() => {
     if (!excelLoaded.value || !sheetDataRef.value.length) return [];
     const sheet = sheetDataRef.value[dataviewSheet.value];
-    if (!sheet?.schools) return [];
+    if (!sheet) return [];
 
     const grade = dataviewGrade.value;
-    // 教室マスタの順番でソート
-    const schoolOrderMap = new Map();
-    schoolMaster.value.forEach((s, i) => schoolOrderMap.set(s.code, i));
+
+    // 一式シート: 宛先リストを返す（grade未選択時は全学年合計）
+    if (sheet.type === 'isshiki') {
+        return (sheet.isshikiDests ?? []).map((d, i) => ({
+            code:           '',
+            name:           d.name,
+            area:           '一式',
+            areaSortOrder:  i,
+            areaGroupOrder: -1,
+            qty:            grade
+                ? (d.grades?.[grade] ?? 0)
+                : Object.values(d.grades ?? {}).reduce((s, v) => s + v, 0),
+        }));
+    }
+
+    if (!sheet.schools) return [];
+    const areaOrder = areaMaster.value.map(a => a.name);
 
     const rows = [];
     for (const school of Object.values(sheet.schools)) {
+        const master = lookupMasterEntry(school.code, school.name);
+        const area         = master?.area || school.area || '';
+        const areaSortOrder = master?.areaSortOrder ?? 9999;
+        const areaIdx       = areaOrder.indexOf(area);
         rows.push({
-            code: school.code,
-            name: school.name,
-            area: school.area || '',
-            qty:  grade ? (school.grades?.[grade] ?? 0) : 0,
+            code:           school.code,
+            name:           master?.printName || school.name,
+            area,
+            areaSortOrder,
+            areaGroupOrder: areaIdx >= 0 ? areaIdx : 9999,
+            qty:            grade ? (school.grades?.[grade] ?? 0) : 0,
         });
     }
+    // 追加行（内部部署等・関西本部等）を追加: parseExtraLeftRows で取得した各行
+    // d.area は境界検出で付与済みのため、summaryStructured の正しいグループに振り分け可能
+    for (const d of (sheet.yellowRows ?? [])) {
+        const qty = grade ? (d.grades?.[grade] ?? 0) : 0;
+        const rowArea = d.area || '日能研本部';
+        const areaIdx_d = areaOrder.indexOf(rowArea);
+        rows.push({
+            code:           '',
+            name:           d.name,
+            area:           rowArea,
+            areaSortOrder:  9990,
+            areaGroupOrder: areaIdx_d >= 0 ? areaIdx_d : 9999,
+            qty,
+        });
+    }
+
+    // エリアマスタ順 → エリア内の area_sort_order 順
     rows.sort((a, b) => {
-        const ai = schoolOrderMap.has(a.code) ? schoolOrderMap.get(a.code) : 9999;
-        const bi = schoolOrderMap.has(b.code) ? schoolOrderMap.get(b.code) : 9999;
-        if (ai !== bi) return ai - bi;
+        if (a.areaGroupOrder !== b.areaGroupOrder) return a.areaGroupOrder - b.areaGroupOrder;
+        if (a.areaSortOrder  !== b.areaSortOrder)  return a.areaSortOrder  - b.areaSortOrder;
         return a.code.localeCompare(b.code);
     });
     return rows;
 });
 
-const summaryData = computed(() => {
-    const areaOrder = areaMaster.value.map(a => a.name);
-    const areaMap = new Map();
+// 部数集計: エクセル左側構造に合わせた階層表示
+// エリア → グループのマッピング
+const SUMMARY_AREA_GROUP = {
+    '本部':         'honbu',
+    '東海本部':      'tokai',   // 東海本部20シートから正規インポート
+    '東海本部職員':  'tokai',   // 旧マスタ互換（残存データ用）
+    '東海':         'tokai',
+    '日能研東海':    'tokai',   // 境界検出で付く（$tokai特殊エントリ）
+    '日能研本部':    'naibu',   // 境界検出で付く（$julius/$yobi・黄色セル内部部署）
+    '本部職員':      'naibu',
+    '本部部署分':    'naibu',
+    '関東':         'kanto',
+    '関東スタッフ':  'kanto',
+    '日能研関東':    'kanto',   // マスタ未登録校の境界検出エリア
+    '関西':         'kansei',
+    '関西本部':      'kansei',  // 境界「関西本部小計」から検出される
+    '日能研関西':    'kansei',  // マスタ未登録校の境界検出エリア
+    '九州':         'kyushu',
+    '九州本部':      'kyushu',  // 境界「九州本部小計」から検出される可能性
+    '日能研九州':    'kyushu',  // マスタ未登録校の境界検出エリア
+};
+
+const summaryStructured = computed(() => {
+    const currentSheet = sheetDataRef.value[dataviewSheet.value];
+
+    // 一式シート: 宛先ごとの部数をそのまま一覧表示
+    if (currentSheet?.type === 'isshiki') {
+        return dataviewRows.value
+            .filter(r => r.qty > 0)
+            .map(r => ({ label: r.name, qty: r.qty, type: 'data' }));
+    }
+
+    // area→qty を集計
+    const q = {};
     for (const row of dataviewRows.value) {
         const area = row.area || '未分類';
-        if (!areaMap.has(area)) areaMap.set(area, 0);
-        areaMap.set(area, areaMap.get(area) + (row.qty || 0));
+        q[area] = (q[area] || 0) + (row.qty || 0);
     }
-    const result = [...areaMap.entries()].map(([area, qty]) => ({
-        area, qty,
-        sortOrder: areaOrder.indexOf(area),
-    }));
-    result.sort((a, b) => {
-        const ao = a.sortOrder >= 0 ? a.sortOrder : 9999;
-        const bo = b.sortOrder >= 0 ? b.sortOrder : 9999;
-        return ao - bo;
-    });
-    return result;
+    // グループ別集計
+    const groupQty = { honbu: 0, tokai: 0, naibu: 0, kanto: 0, kansei: 0, kyushu: 0, other: 0 };
+    const areaRows = {}; // group → [{label, qty}]
+    for (const [area, qty] of Object.entries(q)) {
+        const grp = SUMMARY_AREA_GROUP[area] ?? 'other';
+        groupQty[grp] += qty;
+        if (!areaRows[grp]) areaRows[grp] = [];
+        areaRows[grp].push({ label: area, qty });
+    }
+
+    const rows = [];
+    const push = (label, qty, type = 'data') => rows.push({ label, qty, type });
+    const pushSub = (label, qty) => { if (qty || rows.length) rows.push({ label, qty, type: 'subtotal' }); };
+
+    // 本部 (学校)
+    for (const r of (areaRows.honbu ?? [])) push(r.label, r.qty);
+
+    // 東海 (東海本部 が主、境界検出の 日能研東海 は $tokai 等の残分)
+    const tokaiRows = areaRows.tokai ?? [];
+    const tokaiHonbu  = tokaiRows.find(r => r.label === '東海本部');
+    const tokaiLegacy = tokaiRows.find(r => r.label === '東海本部職員');
+    const tokaiOther  = tokaiRows.filter(r => r.label !== '東海本部' && r.label !== '東海本部職員');
+    if (tokaiHonbu)  push('日能研東海', tokaiHonbu.qty);   // area='東海本部' 学校群 → 日能研東海と表示
+    if (tokaiLegacy) push('東海本部職員', tokaiLegacy.qty);
+    for (const r of tokaiOther) push('東海本部', r.qty);  // area='日能研東海' $tokai特殊エントリ → 東海本部と表示
+    if (groupQty.tokai > 0 && tokaiRows.length > 1) pushSub('日能研東海 小計', groupQty.tokai);
+
+    // 本部+東海 累計 (両方あるときのみ)
+    const ruikei = groupQty.honbu + groupQty.tokai;
+    if (groupQty.honbu > 0 && groupQty.tokai > 0) pushSub('本部+東海 累計', ruikei);
+
+    // 内部部署等
+    for (const r of (areaRows.naibu ?? [])) push(r.label === '日能研本部' ? '内部部署等' : r.label, r.qty);
+
+    // 日能研本部 合計 (左側合計)
+    const honbuGoukei = ruikei + groupQty.naibu;
+    if (honbuGoukei > 0) pushSub('日能研本部 合計', honbuGoukei);
+
+    // 右側セクション（各ブロックに合計行）
+    for (const r of (areaRows.kanto ?? [])) push(r.label, r.qty);
+    if (groupQty.kanto > 0) pushSub('関東 合計', groupQty.kanto);
+    for (const r of (areaRows.kansei ?? [])) push(r.label, r.qty);
+    if (groupQty.kansei > 0) pushSub('関西 合計', groupQty.kansei);
+    for (const r of (areaRows.kyushu ?? [])) push(r.label, r.qty);
+    if (groupQty.kyushu > 0) pushSub('九州 合計', groupQty.kyushu);
+    if (groupQty.other > 0) {
+        for (const r of (areaRows.other ?? [])) push(r.label, r.qty);
+    }
+
+    return rows;
 });
 
-const summaryTotal = computed(() => summaryData.value.reduce((s, r) => s + r.qty, 0));
+const summaryTotal = computed(() => summaryStructured.value.filter(r => r.type === 'data').reduce((s, r) => s + r.qty, 0));
 </script>
 
 <template>
@@ -1964,10 +2220,10 @@ const summaryTotal = computed(() => summaryData.value.reduce((s, r) => s + r.qty
                                 + 追加
                             </button>
                         </div>
-                        <div class="overflow-y-auto flex-1 space-y-0.5 text-xs">
+                        <div class="overflow-y-auto flex-1 text-xs">
                             <!-- 追加フォーム -->
                             <div v-if="masterAddingRow?._tab==='schools'"
-                                class="flex gap-1.5 items-center bg-orange-50 border border-orange-200 rounded p-2 mb-1">
+                                class="flex gap-1.5 items-center bg-orange-50 border border-orange-200 rounded p-2 mb-1 mx-1 mt-1">
                                 <input v-model="masterAddingRow.code" placeholder="コード" maxlength="3"
                                     class="w-14 shrink-0 border rounded px-1 py-0.5 font-mono uppercase bg-white" />
                                 <input v-model="masterAddingRow.name" placeholder="教室名"
@@ -1983,8 +2239,9 @@ const summaryTotal = computed(() => summaryData.value.reduce((s, r) => s + r.qty
                                         class="px-2 py-0.5 border rounded text-gray-500">取消</button>
                                 </div>
                             </div>
-                            <!-- ヘッダ行 -->
-                            <div class="flex gap-1.5 items-center py-1 border-b border-gray-300 font-semibold text-gray-500 sticky top-0 bg-white select-none">
+                            <!-- ヘッダ行（検索時のみ表示） -->
+                            <div v-if="masterSchoolSearch.trim()"
+                                class="flex gap-1.5 items-center py-1 px-1 border-b border-gray-300 font-semibold text-gray-500 sticky top-0 bg-white select-none">
                                 <button @click="schoolToggleSort('code')" type="button"
                                     class="w-14 shrink-0 text-left hover:text-orange-500 transition-colors">
                                     コード<span class="ml-0.5 text-xs">{{ schoolSortKey==='code' ? (schoolSortDir==='asc'?'▲':'▼') : '' }}</span>
@@ -2003,38 +2260,52 @@ const summaryTotal = computed(() => summaryData.value.reduce((s, r) => s + r.qty
                                 </button>
                                 <span class="w-24 shrink-0"></span>
                             </div>
-                            <!-- リスト -->
-                            <div v-for="s in sortedSchoolMaster" :key="s.id"
-                                class="flex gap-1.5 items-center py-1 border-b border-gray-50 hover:bg-gray-50">
-                                <template v-if="masterEditingId===s.id">
-                                    <input v-model="masterEditingRow.code" maxlength="3"
-                                        class="w-14 shrink-0 border rounded px-1 py-0.5 font-mono uppercase" />
-                                    <input v-model="masterEditingRow.name"
-                                        class="flex-1 min-w-0 border rounded px-1 py-0.5" />
-                                    <input v-model="masterEditingRow.route"
-                                        class="w-16 shrink-0 border rounded px-1 py-0.5 font-mono" />
-                                    <input v-model="masterEditingRow.stopOrder" type="number"
-                                        class="w-16 shrink-0 border rounded px-1 py-0.5 text-right" />
-                                    <div class="w-24 shrink-0 flex gap-1">
-                                        <button @click="masterSaveEdit('schools')" type="button"
-                                            class="px-2 py-0.5 bg-green-500 text-white rounded">保存</button>
-                                        <button @click="masterCancelEdit" type="button"
-                                            class="px-2 py-0.5 border rounded text-gray-500">取消</button>
-                                    </div>
-                                </template>
-                                <template v-else>
-                                    <span class="w-14 shrink-0 font-mono font-semibold text-orange-600">{{ s.code }}</span>
-                                    <span class="flex-1 min-w-0 truncate text-gray-700">{{ s.name || '' }}</span>
-                                    <span class="w-16 shrink-0 font-mono text-blue-600">{{ s.route }}</span>
-                                    <span class="w-16 shrink-0 text-right text-gray-400">{{ s.stopOrder }}</span>
-                                    <div class="w-24 shrink-0 flex gap-1">
-                                        <button @click="masterStartEdit(s)" type="button"
-                                            class="px-1.5 py-0.5 border rounded hover:bg-gray-100 text-gray-600">編集</button>
-                                        <button @click="masterDelete('schools', s.id)" type="button"
-                                            class="px-1.5 py-0.5 border border-red-200 text-red-400 rounded hover:bg-red-50">削除</button>
-                                    </div>
-                                </template>
-                            </div>
+                            <!-- エリアグループ or フラットリスト -->
+                            <template v-for="row in schoolMasterRows" :key="row.type==='header' ? 'h_'+row.area : row.data.id">
+                                <!-- エリアヘッダー -->
+                                <div v-if="row.type==='header'"
+                                    class="sticky top-0 z-10 flex items-center gap-2 px-2 py-1 bg-orange-50 border-y border-orange-200 font-semibold text-orange-700 select-none">
+                                    <span>{{ row.area }}</span>
+                                    <span class="text-xs font-normal text-orange-400">{{ row.count }}件</span>
+                                </div>
+                                <!-- 教室行 -->
+                                <div v-else
+                                    class="flex gap-1.5 items-center py-1 px-1 border-b border-gray-50 hover:bg-gray-50">
+                                    <template v-if="masterEditingId===row.data.id">
+                                        <input v-model="masterEditingRow.code" maxlength="3"
+                                            class="w-14 shrink-0 border rounded px-1 py-0.5 font-mono uppercase" />
+                                        <input v-model="masterEditingRow.name"
+                                            class="flex-1 min-w-0 border rounded px-1 py-0.5" />
+                                        <input v-model="masterEditingRow.route"
+                                            class="w-16 shrink-0 border rounded px-1 py-0.5 font-mono" />
+                                        <input v-model="masterEditingRow.stopOrder" type="number"
+                                            class="w-16 shrink-0 border rounded px-1 py-0.5 text-right" />
+                                        <div class="w-24 shrink-0 flex gap-1">
+                                            <button @click="masterSaveEdit('schools')" type="button"
+                                                class="px-2 py-0.5 bg-green-500 text-white rounded">保存</button>
+                                            <button @click="masterCancelEdit" type="button"
+                                                class="px-2 py-0.5 border rounded text-gray-500">取消</button>
+                                        </div>
+                                    </template>
+                                    <template v-else>
+                                        <span class="w-14 shrink-0 font-mono font-semibold text-orange-600">{{ row.data.code }}</span>
+                                        <span class="flex-1 min-w-0 truncate text-gray-700">{{ row.data.name || row.data.printName || '' }}</span>
+                                        <!-- 検索時だけエリアバッジを表示 -->
+                                        <span v-if="masterSchoolSearch.trim() && row.data.area"
+                                            class="shrink-0 px-1 py-0.5 text-[10px] rounded bg-orange-100 text-orange-600 max-w-20 truncate">
+                                            {{ row.data.area }}
+                                        </span>
+                                        <span class="w-16 shrink-0 font-mono text-blue-600">{{ row.data.route }}</span>
+                                        <span class="w-16 shrink-0 text-right text-gray-400">{{ row.data.stopOrder }}</span>
+                                        <div class="w-24 shrink-0 flex gap-1">
+                                            <button @click="masterStartEdit(row.data)" type="button"
+                                                class="px-1.5 py-0.5 border rounded hover:bg-gray-100 text-gray-600">編集</button>
+                                            <button @click="masterDelete('schools', row.data.id)" type="button"
+                                                class="px-1.5 py-0.5 border border-red-200 text-red-400 rounded hover:bg-red-50">削除</button>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
                         </div>
                     </div>
 
@@ -2213,7 +2484,7 @@ const summaryTotal = computed(() => summaryData.value.reduce((s, r) => s + r.qty
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr v-for="row in dataviewRows" :key="row.code"
+                                <tr v-for="(row, ri) in dataviewRows" :key="row.code || ri"
                                     class="border-b border-gray-100 hover:bg-gray-50">
                                     <td class="px-3 py-1.5 font-mono text-gray-700">{{ row.code }}</td>
                                     <td class="px-3 py-1.5 text-gray-800">{{ row.name }}</td>
@@ -2259,12 +2530,20 @@ const summaryTotal = computed(() => summaryData.value.reduce((s, r) => s + r.qty
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr v-for="row in summaryData" :key="row.area"
-                                    class="border-b border-gray-100 hover:bg-gray-50">
-                                    <td class="px-4 py-2 text-gray-800">{{ row.area }}</td>
-                                    <td class="px-4 py-2 text-right font-medium text-gray-800">{{ row.qty }}</td>
-                                </tr>
-                                <tr v-if="!summaryData.length">
+                                <template v-for="(row, i) in summaryStructured" :key="i">
+                                    <!-- 小計行 -->
+                                    <tr v-if="row.type === 'subtotal'"
+                                        class="border-t border-gray-300 bg-gray-50">
+                                        <td class="px-4 py-1.5 font-semibold text-gray-700 pl-6">{{ row.label }}</td>
+                                        <td class="px-4 py-1.5 text-right font-bold text-gray-800">{{ row.qty }}</td>
+                                    </tr>
+                                    <!-- データ行 -->
+                                    <tr v-else class="border-b border-gray-100 hover:bg-gray-50">
+                                        <td class="px-4 py-2 text-gray-800">{{ row.label }}</td>
+                                        <td class="px-4 py-2 text-right font-medium text-gray-800">{{ row.qty }}</td>
+                                    </tr>
+                                </template>
+                                <tr v-if="!summaryStructured.length">
                                     <td colspan="2" class="px-4 py-6 text-center text-gray-400">データがありません</td>
                                 </tr>
                             </tbody>

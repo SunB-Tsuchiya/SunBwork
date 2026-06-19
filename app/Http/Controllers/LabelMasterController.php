@@ -29,13 +29,15 @@ class LabelMasterController extends Controller
     public function schoolsStore(Request $request)
     {
         $data = $request->validate([
-            'code'         => 'required|string|max:20|unique:label_school_masters,code',
-            'display_name' => 'required|string|max:150',
-            'area'         => 'nullable|string|max:50',
-            'route'        => 'nullable|string|max:10',
-            'stop_order'   => 'nullable|integer|min:1|max:65535',
-            'is_active'    => 'boolean',
-            'notes'        => 'nullable|string',
+            'code'             => 'nullable|string|max:20',
+            'display_name'     => 'required|string|max:150',
+            'print_name'       => 'nullable|string|max:150',
+            'area'             => 'nullable|string|max:50',
+            'area_sort_order'  => 'nullable|integer',
+            'route'            => 'nullable|string|max:10',
+            'stop_order'       => 'nullable|integer|min:1|max:65535',
+            'is_active'        => 'boolean',
+            'notes'            => 'nullable|string',
         ]);
         $data['area'] = $data['area'] ?? '';
         $school = LabelSchoolMaster::create($data);
@@ -45,13 +47,15 @@ class LabelMasterController extends Controller
     public function schoolsUpdate(Request $request, LabelSchoolMaster $school)
     {
         $data = $request->validate([
-            'code'         => 'required|string|max:20|unique:label_school_masters,code,' . $school->id,
-            'display_name' => 'required|string|max:150',
-            'area'         => 'nullable|string|max:50',
-            'route'        => 'nullable|string|max:10',
-            'stop_order'   => 'nullable|integer|min:1|max:65535',
-            'is_active'    => 'boolean',
-            'notes'        => 'nullable|string',
+            'code'             => 'nullable|string|max:20',
+            'display_name'     => 'required|string|max:150',
+            'print_name'       => 'nullable|string|max:150',
+            'area'             => 'nullable|string|max:50',
+            'area_sort_order'  => 'nullable|integer',
+            'route'            => 'nullable|string|max:10',
+            'stop_order'       => 'nullable|integer|min:1|max:65535',
+            'is_active'        => 'boolean',
+            'notes'            => 'nullable|string',
         ]);
         $data['area'] = $data['area'] ?? '';
         $school->update($data);

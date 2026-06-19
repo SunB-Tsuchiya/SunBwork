@@ -30,3 +30,11 @@ yarn-error.log
 
 .env.copied_by_agent
 .env.deploy.bak
+
+# NDBSAMPLE デモ用大量ファイル（git管理外）
+/storage/app/private/n_import/
+/public/n_images/
+/public/n_sample.css
+
+# N_DBSystem ローカル参照用Excel（元データはGit管理しない）
+/z_NDBSystem/*.xlsx*

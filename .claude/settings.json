@@ -3,7 +3,8 @@
     "allow": [
       "Bash(grep -v \"^--$\")",
       "Bash(sudo chmod:*)",
-      "Bash(grep -n password_reset /home/w229/SunBwork/database/migrations/*.php)"
+      "Bash(grep -n password_reset /home/w229/SunBwork/database/migrations/*.php)",
+      "Bash(node -e ' *)"
     ]
   }
 }

@@ -12,6 +12,8 @@ use Carbon\Carbon;
 require __DIR__ . '/debug.php';
 // チャット用ルート
 require __DIR__ . '/chat.php';
+// NSystem デモ用ルート（削除時は下記行と routes/nsystem.php を削除）
+require __DIR__ . '/nsystem.php';
 
 
 
@@ -476,6 +478,16 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     ->group(function () {
         // Ziggy用: 明示的にsuperadmin.dashboardルートを追加
         Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
+
+        // デモページ管理
+        Route::prefix('demo-pages')->name('demo_pages.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\SuperAdmin\DemoPagesController::class, 'index'])->name('index');
+            Route::get('/{demoPage}', [\App\Http\Controllers\SuperAdmin\DemoPagesController::class, 'show'])->name('show');
+            Route::patch('/{demoPage}', [\App\Http\Controllers\SuperAdmin\DemoPagesController::class, 'update'])->name('update');
+            Route::patch('/{demoPage}/password', [\App\Http\Controllers\SuperAdmin\DemoPagesController::class, 'updatePassword'])->name('update_password');
+            Route::post('/{demoPage}/emails', [\App\Http\Controllers\SuperAdmin\DemoPagesController::class, 'storeEmail'])->name('emails.store');
+            Route::delete('/{demoPage}/emails/{email}', [\App\Http\Controllers\SuperAdmin\DemoPagesController::class, 'destroyEmail'])->name('emails.destroy');
+        });
 
         // ユーザー管理
         // existing users resource (general)

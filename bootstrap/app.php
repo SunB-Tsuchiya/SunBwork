@@ -53,5 +53,18 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        // CSRF 419 デバッグ用（ゲストログイン 419 原因調査）
+        $exceptions->renderable(function (\Illuminate\Session\TokenMismatchException $e, $request) {
+            \Illuminate\Support\Facades\Log::warning('CSRF 419 発生', [
+                'url'          => $request->fullUrl(),
+                'method'       => $request->method(),
+                'session_id'   => $request->session()->getId(),
+                'has_session_token' => (bool) $request->session()->token(),
+                'has_form_token'    => $request->filled('_token'),
+                'xsrf_header'  => $request->header('X-XSRF-TOKEN') ? '[present]' : null,
+                'has_session_cookie' => $request->hasCookie('laravel_session'),
+            ]);
+            // 元の動作（419 ページ表示）に戻す
+            return null;
+        });
     })->create();

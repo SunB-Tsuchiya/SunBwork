@@ -10,6 +10,32 @@ class ChangelogSeeder extends Seeder
     public function run(): void
     {
         $entries = [
+            // NSystem client demo search - 2026-06-19
+            [
+                'version'      => 'nsystem-search-1',
+                'title'        => '入試問題DBデモ：検索精度とリアルタイム検索を改善',
+                'released_at'  => '2026-06-19',
+                'summary'      => 'クライアント提案用の入試問題DBデモで、入力語を含まない問題まで表示される全文検索の誤ヒットを解消しました。入力中のリアルタイム検索、一致箇所の前後表示、検索方法・科目・学校・カテゴリの絞り込み、対象大問への直接移動を追加しました。',
+                'design_files' => ['NSEARCH_PLAN1.md', 'NSEARCH_MANAGER1.md'],
+                'claude_notes' => 'NQuestionSearchServiceでMySQL ngram FULLTEXTを候補抽出に限定し、エスケープ済みリテラルLIKEで最終一致を保証。exact/all/anyの3モード、20件ページング、安全なbefore/match/afterスニペットを実装。検索画面をNSystem専用レイアウトのInertia/Vueページへ移行し、300ms debounce、IME composition、AbortController、URL状態保持を追加。社内AppLayoutは外部ゲスト向けデモには使用していない。',
+                'body'         => <<<'HTML'
+<section class="cl-problem">
+  <h3>背景・問題</h3>
+  <p>日本語全文検索のngram分割により、「平安時代」の検索で「大正時代」など、入力した文字列そのものを含まない問題も表示されていました。また、結果には本文先頭部分しか表示されず、どこが一致したのか確認しにくい状態でした。</p>
+</section>
+<section class="cl-fix">
+  <h3>改善内容</h3>
+  <ul>
+    <li>入力した文字列が実際に問題本文へ存在することを確認してから結果を表示</li>
+    <li>入力中に結果を更新するリアルタイム検索と20件ごとのページ表示</li>
+    <li>「そのまま含む」「すべての語」「いずれかの語」の3検索方法</li>
+    <li>科目・学校・カテゴリによる絞り込み</li>
+    <li>一致語を中心に前後の本文を表示し、該当箇所を強調</li>
+    <li>検索結果から該当する学校・科目・大問へ直接移動</li>
+  </ul>
+</section>
+HTML,
+            ],
             // ─────────────────────────────────────────────────────────────
             // 0h. ANNOUNCEMENT-DRAFT-1 — 2026-06-01
             // ─────────────────────────────────────────────────────────────

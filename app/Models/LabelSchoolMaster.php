@@ -9,7 +9,9 @@ class LabelSchoolMaster extends Model
     protected $fillable = [
         'code',
         'display_name',
+        'print_name',
         'area',
+        'area_sort_order',
         'route',
         'stop_order',
         'default_qty',
@@ -18,9 +20,10 @@ class LabelSchoolMaster extends Model
     ];
 
     protected $casts = [
-        'is_active'   => 'boolean',
-        'stop_order'  => 'integer',
-        'default_qty' => 'integer',
+        'is_active'       => 'boolean',
+        'stop_order'      => 'integer',
+        'default_qty'     => 'integer',
+        'area_sort_order' => 'integer',
     ];
 
     public function scopeActive($query)

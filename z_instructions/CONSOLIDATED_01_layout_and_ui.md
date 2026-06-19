@@ -138,3 +138,17 @@ route('coordinator.project_jobs.show', job.id)  // 第2引数に直接 ID
 ## ToastUnified
 
 AppLayout 内にグローバル配置済み。各ページで重複させない。
+
+---
+
+## 外部クライアント向け独立デモの例外
+
+`/n-demo` のように、社外クライアントへ提示する独立したゲストデモのInertiaページでは、社内ナビゲーション・通知・Echo購読・keep-aliveを含む `AppLayout` を使用しない。
+
+- デモ専用レイアウトを使い、社内機能やロール構造を表示しない
+- コンテンツ幅と余白は専用レイアウト側で一元管理する
+- ページ側の `main`、`py-12`、`max-w-*` 重複ラッパー禁止は継続する
+- Ziggy `route()`、レスポンシブ、安全なテキスト描画などの一般規則は継続する
+- 例外は明確に分離されたクライアント向けデモに限定し、通常の社内Inertiaページには適用しない
+
+現在の対象: `resources/js/Pages/NSystem/`（`NSystemDemoLayout.vue` を使用）
