@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -17,8 +18,11 @@ return new class extends Migration
             $table->text('body_text');
             $table->timestamps();
             $table->unique(['school_id', 'subject', 'daimon_index']);
-            $table->fullText('body_text');
         });
+
+        if (DB::connection()->getDriverName() === 'mysql') {
+            DB::statement('ALTER TABLE n_questions_daimon ADD FULLTEXT INDEX n_questions_daimon_body_text_fulltext (body_text)');
+        }
     }
 
     public function down(): void

@@ -133,8 +133,11 @@ return new class extends Migration
             $table->text('body_text');
             $table->timestamps();
             $table->unique(['exam_document_id', 'daimon_index']);
-            $table->fullText('body_text', 'n_exam_daimons_body_text_fulltext', 'ngram');
         });
+
+        if (DB::connection()->getDriverName() === 'mysql') {
+            DB::statement('ALTER TABLE n_exam_daimons ADD FULLTEXT INDEX n_exam_daimons_body_text_fulltext (body_text) WITH PARSER ngram');
+        }
 
         Schema::create('n_import_batches', function (Blueprint $table) {
             $table->id();

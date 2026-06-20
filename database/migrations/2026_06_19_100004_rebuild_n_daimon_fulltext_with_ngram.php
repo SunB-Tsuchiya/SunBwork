@@ -7,6 +7,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (DB::connection()->getDriverName() !== 'mysql') {
+            return;
+        }
+
         DB::statement('ALTER TABLE n_questions_daimon DROP INDEX n_questions_daimon_body_text_fulltext');
         DB::statement('ALTER TABLE n_questions_daimon ADD FULLTEXT INDEX n_questions_daimon_body_text_fulltext (body_text) WITH PARSER ngram');
 
@@ -16,6 +20,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (DB::connection()->getDriverName() !== 'mysql') {
+            return;
+        }
+
         DB::statement('ALTER TABLE n_questions_daimon DROP INDEX n_questions_daimon_body_text_fulltext');
         DB::statement('ALTER TABLE n_questions_daimon ADD FULLTEXT INDEX n_questions_daimon_body_text_fulltext (body_text)');
 
