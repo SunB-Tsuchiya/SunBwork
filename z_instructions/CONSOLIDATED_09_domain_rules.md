@@ -153,13 +153,10 @@ Vue ページ: `CsvUpload.vue`（ファイル選択）→ `CsvPreview.vue`（確
 ## CI（GitHub Actions）ルール
 
 - `.github/workflows/lint.yml`: PHP Pint + Prettier + ESLint
-- `.github/workflows/tests.yml`: Pest テスト（SQLite使用）
+- `.github/workflows/tests.yml`: Pest テスト（MySQL `sunbwork_testing` DB を使用）
 
-**MySQL固有マイグレーションには SQLite ガード必須:**
-```php
-if (DB::getDriverName() === 'sqlite') return;
-```
-`MODIFY`・`DROP FOREIGN KEY`・`AUTO_INCREMENT`・`information_schema` 参照を含むマイグレーションに追加。
+> **⚠️ SQLite は 2026-06-20 にプロジェクトから完全廃止。** `phpunit.xml` は `DB_CONNECTION=mysql` / `DB_DATABASE=sunbwork_testing`。  
+> MySQL 固有マイグレーション（`INNER JOIN UPDATE`・FULLTEXT 等）に SQLite ガードは不要。
 
 ---
 
@@ -523,3 +520,130 @@ company_id → department_id → assignment_id のカスケードリセットあ
 **ルート:** `coordinator.project_jobs.bulk_create`
 
 CSV から複数の ProjectJob を一括登録する機能。`NormalizesCsvEncoding` Trait を使用。
+
+---
+
+## NSystem デモページ アーキテクチャ（2026-06-20 更新）
+
+NSystem の各ページは Blade と Vue/Inertia が混在している。**新規実装は Vue を使うこと。**
+
+| ルート | 画面 | 実装 |
+|---|---|---|
+| `/n-demo` | 学校一覧 | Blade（`index.blade.php`） |
+| `/n-demo/school/{id}` | 問題・解答表示 | **Vue** `Pages/NSystem/School.vue` ★2026-06-20 移行 |
+| `/n-demo/search` | 全文検索 | **Vue** `Pages/NSystem/Search.vue` |
+| `/guest/login` | ゲストログイン | Blade（`login.blade.php`） |
+
+すべてのページで `NSystemDemoLayout.vue`（Vue）または `layout.blade.php`（Blade）が使われる。  
+SunBwork 本体の `AppLayout` は使用しない（社内通知・認証ヘッダーを含むため）。
+
+### School.vue のスクロール連動ナビ
+
+科目タブ（国語/算数/社会/理科）と問題/解答切替ボタンは通常フローで表示（sticky なし）。  
+タブが画面外に消えた状態で**上スクロールしたときだけ**、コンパクトな固定バーが上部にスライドイン。  
+`window.addEventListener('scroll', ...)` で `navRef.value.getBoundingClientRect().bottom < 0` を検出し、  
+`fixedNavVisible` を制御する。`<Transition name="slide-nav">` で `transform: translateY(-100%)` アニメーション。
+
+### 画像パスの扱い（import → DB → 表示）
+
+```
+import コマンド:  src="images/xxx.png"  →  src="/n_images/xxx.png"  としてDB保存
+                                               ↑ 絶対パス（/始まり）のまま保存
+NdemoController::school():
+    $assetBase = asset('n_images/');
+    // ローカル: http://localhost:8000/n_images/
+    // さくら:   https://sun-brain.co.jp/members/n_images/
+    str_replace('src="/n_images/', 'src="' . $assetBase, $d->body_html)
+    → Inertia props として Vue に渡す
+```
+
+**DBのデータ（`/n_images/` パス）を変更してはいけない。** コントローラーで `asset()` を使って環境差を吸収している。  
+FULLTEXT 検索の snippets は `body_text` から生成するため、画像パスの影響を受けない。
+
+### さくら本番の静的ファイル配置
+
+`public/n_images/`（4485枚）と `public/n_sample.css` は git 管理外のため git push で届かない。
+
+- `n_images/` → `~/www/members/n_images` → `~/SunBWork/public/n_images` へのシンボリックリンク（設定済み）
+- `n_sample.css` → `~/www/members/n_sample.css` に実体ファイルを `scp` で配置（設定済み）
+
+画像追加時は `rsync -az public/n_images/ silverlamb759@silverlamb759.sakura.ne.jp:~/SunBWork/public/n_images/` で差分転送。
+
+---
+
+## テスト規則（2026-06-20 更新）
+
+### テスト環境
+
+- **テスト DB:** `sunbwork_testing`（Docker MySQL 上の専用 DB）
+- **設定:** `phpunit.xml` → `DB_CONNECTION=mysql` / `DB_DATABASE=sunbwork_testing`
+- **SQLite は使用しない。** 過去に GitHub Copilot が導入したが、MySQL 専用構文（FULLTEXT、JOIN UPDATE 等）と非互換のため完全廃止済み
+- テスト DB を再構築する場合: `DB_DATABASE=sunbwork_testing php artisan migrate:fresh --force`
+
+### 通常のテスト（非 NSystem）
+
+`RefreshDatabase` をそのまま使用してよい（トランザクション巻き戻しで各テストが独立）。
+
+### NSystem テスト（全文検索を含む場合）⚠️
+
+**`tests/Feature/NSystem/` 内のテストは `RefreshDatabase` と TRUNCATE を組み合わせた特殊方式を使う。**
+
+#### なぜトランザクション方式が使えないか
+
+MySQL InnoDB の FULLTEXT インデックスはトランザクション内の**未コミットデータを検索できない**。  
+通常の `RefreshDatabase`（トランザクション巻き戻し）だと MATCH AGAINST の結果が常に 0 になる。
+
+#### NSystem テストの書き方
+
+```php
+class MyNSystemTest extends TestCase
+{
+    use RefreshDatabase;
+
+    // トランザクションラップを無効化（FULLTEXT に必要）
+    protected $connectionsToTransact = [];
+
+    private static array $nSystemTables = [
+        'n_exam_daimons', 'n_exam_documents', 'n_source_school_rows',
+        'n_import_batches', 'n_publication_entries', 'n_publication_editions',
+        'n_exams', 'n_exam_series', 'n_school_years', 'n_schools',
+    ];
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->wipeNSystemTables(); // TRUNCATE でクリーン状態にする
+        // ← ここからテストデータを INSERT（TRUNCATE の暗黙コミット後なので即座にコミット済み）
+    }
+
+    protected function tearDown(): void
+    {
+        $this->wipeNSystemTables(); // 次のテストのためにクリア
+        parent::tearDown();
+    }
+
+    private function wipeNSystemTables(): void
+    {
+        DB::statement('SET FOREIGN_KEY_CHECKS=0');
+        foreach (self::$nSystemTables as $table) {
+            DB::statement("TRUNCATE TABLE `{$table}`");
+        }
+        DB::statement('SET FOREIGN_KEY_CHECKS=1');
+    }
+}
+```
+
+#### 注意事項
+
+- **TRUNCATE は DDL → 暗黙コミット発生。** SET FOREIGN_KEY_CHECKS=0 は DDL ではないのでコミットしない
+- `n_questions_daimon` / `n_answers_daimon` は normalize マイグレーション（2026_06_19_130001）で `n_legacy_*` にリネームされているため、クリーンアップリストに含めない
+- コントローラー（`NdemoController`）は `whereHas('exam.documents')` で絞り込むため、setUp で **`n_exam_documents` にも 1 件以上挿入** しないと学校一覧が空になる
+- インポートサービスを呼ぶテストは `NImportBatch::create()` がトランザクション外で実行されるため、RefreshDatabase の rollback では残骸が残る。これも TRUNCATE 方式で対処する
+
+#### 既存テストファイル
+
+| ファイル | 対象 |
+|---------|------|
+| `tests/Feature/NSystem/NQuestionSearchTest.php` | 全文検索 API・デモ画面の動作確認 |
+| `tests/Feature/NSystem/NPublicationCatalogImportTest.php` | 目録 CSV インポートサービスのロジック検証 |
+| `tests/Unit/NSystem/NQuestionSearchServiceTest.php` | 検索サービスの単体テスト |

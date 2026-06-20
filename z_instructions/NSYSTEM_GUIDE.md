@@ -67,24 +67,27 @@ config/nsystem.php             ゲスト認証情報（.envから読む）
 # ルート
 routes/nsystem.php             NSystem専用ルート定義
 
-# ビュー
+# ビュー（Blade — index / login のみ残留）
 resources/views/n_system/
   demo/
-    layout.blade.php           共通レイアウト（ヘッダー・ログアウトボタン）
+    layout.blade.php           共通レイアウト（ヘッダー・ログアウトボタン）※Blade ページ用
     index.blade.php            学校一覧（カテゴリ別グリッド）
-    school.blade.php           科目タブ + 大問body_html描画
-    search.blade.php           旧全文検索画面（現在は未使用・移行確認後に削除可）
+    search.blade.php           旧全文検索 Blade 版（未使用・削除候補）
   guest/
     login.blade.php            ゲスト専用ログイン画面
 
-# Vue / Inertia（検索画面）
+# Vue / Inertia（検索・問題表示）
 resources/js/
-  layouts/NSystemDemoLayout.vue
-  Pages/NSystem/Search.vue
+  layouts/NSystemDemoLayout.vue   NSystem 専用ヘッダー（学校一覧リンク・ログアウト）
+  Pages/NSystem/
+    Search.vue                 全文検索画面（Inertia ページ）
+    School.vue                 問題・解答表示画面（Inertia ページ）★2026-06-20 Blade から移行
   Components/NSystem/
     SearchFilters.vue
     SearchResultCard.vue
     SearchPagination.vue
+
+# ⚠️ school.blade.php は 2026-06-20 に削除済み。School.vue が後継。
 
 # Artisanコマンド
 app/Console/Commands/NSystem/NSystemImport.php   n-system:import コマンド
@@ -236,7 +239,10 @@ docker compose exec laravel bash -lc "php artisan n-system:import --force"
 処理内容:
 1. `schools_index.json`から学校、年度別学校情報、試験系列、年度・Nコード付き試験をupsert
 2. `storage/app/private/n_import/*.json` を走査（ファイル名パターン: `{code4}{year4}__{Q|A}{Ko|Sa|Sh|Ri}.json`）
-3. `body_html` 内の `src="images/` を `src="/n_images/` に置換
+3. `body_html` 内の `src="images/` を `src="/n_images/` に置換してDBへ保存
+   → **ローカルではそのまま動く。さくら本番では `/n_images/` が `/members/n_images/` と解釈されず壊れる。**
+   → **NdemoController::school() がInertiaへ渡す際に `asset('n_images/')` で正しいURLへ書き換えている。**
+     DBのデータを直接書き換える必要はない。
 4. 2022～2026の `Nコードリスト*.xlsx` をヘッダー名で読み込み、`n_publication_editions` / `n_publication_entries` にupsert
 5. `2025/2026 M109` は `4551` と `4751` の2掲載行へ正規化し、`2026 M106 4331 → 4335` は `4331` として採用
 6. 実行結果と監査元行を `n_import_batches` / `n_source_school_rows` に記録
@@ -247,6 +253,46 @@ docker compose exec laravel bash -lc "php artisan n-system:import --force"
 - 年度ボタンは「問題文書が存在する年度」だけを表示
 - Mコード履歴自体は2022～2026の5年度分をDBへ保持
 - 現状、問題文書があるのは2024年度のみなので年度ボタンは2024のみ表示
+
+---
+
+## 7.5 静的ファイル（画像・CSS）のさくらデプロイ
+
+### 初回または画像が増えたとき
+
+**ローカル → さくら転送（4485枚 PNG + CSS）:**
+
+```bash
+# 画像（rsync で差分転送）
+rsync -az /home/w229/SunBwork/public/n_images/ \
+  silverlamb759@silverlamb759.sakura.ne.jp:~/SunBWork/public/n_images/
+
+# CSS（更新時のみ）
+scp /home/w229/SunBwork/public/n_sample.css \
+  silverlamb759@silverlamb759.sakura.ne.jp:~/www/members/n_sample.css
+```
+
+### さくら側のシンボリックリンク（初回のみ）
+
+さくらの `~/www/members/` は `~/SunBWork/public/` の実体ではなく別ディレクトリ。  
+`n_images/` は `public/n_images/` へのシンボリックリンクで提供する:
+
+```bash
+# 初回のみ（既に設定済み: 2026-06-20）
+ln -s ~/SunBWork/public/n_images ~/www/members/n_images
+```
+
+`n_sample.css` はシンボリックリンクにせず `~/www/members/n_sample.css` に実体ファイルを置く（`scp` でコピー）。
+
+### 画像パスの仕組み（変更時の注意）
+
+| 層 | 内容 |
+|---|---|
+| DB保存値 | `src="/n_images/xxxxx.png"` — import 時に `src="images/` から変換してそのまま保存 |
+| コントローラー | `NdemoController::school()` が Inertia に渡す直前に `str_replace('src="/n_images/', 'src="' . asset('n_images/'), ...)` で書き換え |
+| ブラウザ受信 | ローカル: `http://localhost:8000/n_images/...` / さくら: `https://sun-brain.co.jp/members/n_images/...` |
+
+DBのデータを直接変更してはいけない。コントローラー側の `asset()` 変換で環境差を吸収している。
 
 ---
 
