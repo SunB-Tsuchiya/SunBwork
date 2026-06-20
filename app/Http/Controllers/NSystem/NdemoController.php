@@ -62,10 +62,10 @@ class NdemoController extends Controller
         ]);
     }
 
-    public function school(Request $request, int $id)
+    public function school(Request $request, int $id): Response
     {
         $exam = NExam::with(['examSeries.school.schoolYears'])->findOrFail($id);
-        $school = $this->examView($exam);
+        $schoolObj = $this->examView($exam);
 
         $tab = $request->get('tab', 'Ko');
         $mode = $request->get('mode', 'Q');
@@ -96,14 +96,28 @@ class NdemoController extends Controller
             ->values()
             ->all();
 
-        return view('n_system.demo.school', [
-            'school'            => $school,
-            'daimons'           => $daimons,
+        $assetBase = asset('n_images/');
+
+        return Inertia::render('NSystem/School', [
+            'school' => [
+                'id'        => $schoolObj->id,
+                'school_id' => $schoolObj->school_id,
+                'code'      => $schoolObj->code,
+                'name'      => $schoolObj->name,
+                'year'      => $schoolObj->year,
+                'category'  => $schoolObj->category,
+            ],
+            'daimons' => $daimons->map(fn ($d) => [
+                'id'           => $d->id,
+                'daimon_index' => $d->daimon_index,
+                'body_html'    => str_replace('src="/n_images/', 'src="' . $assetBase, $d->body_html),
+            ])->values(),
             'tab'               => $tab,
             'mode'              => $mode,
             'subjectLabels'     => self::SUBJECT_LABELS,
             'availableSubjects' => $availableSubjects,
             'highlightTerms'    => $highlightTerms,
+            'isGuest'           => ! auth()->check(),
         ]);
     }
 
