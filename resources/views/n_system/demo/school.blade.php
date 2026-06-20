@@ -109,7 +109,7 @@
 @foreach($daimons as $daimon)
 <div class="daimon-block" id="daimon-{{ $daimon->daimon_index }}">
     <div class="daimon-label">大問 {{ $daimon->daimon_index }}</div>
-    {!! $daimon->body_html !!}
+    {!! str_replace('src="/n_images/', 'src="' . asset('n_images/'), $daimon->body_html) !!}
 </div>
 @endforeach
 @endif
