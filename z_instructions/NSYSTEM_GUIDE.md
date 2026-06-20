@@ -361,15 +361,145 @@ Route::prefix('another-demo')->name('another-demo.')->middleware(GuestAuth::clas
 
 ---
 
-## 10. さくら本番への注意
+## 10. さくら本番へのデータデプロイ手順
 
-NSystem は現在**ローカル環境のみ**に存在する。  
-さくら本番にデプロイする場合は:
+NSystem のデータ（JSON・Excel）は `.gitignore` 管理外のため **git push では本番に届かない**。  
+ローカルでデータを調整した後、以下の手順でさくらに反映する。
 
-1. 本番 `.env` に `NSYSTEM_GUEST_EMAIL` / `NSYSTEM_GUEST_PASSWORD` を追加
-2. `n_images/`（4485枚）と `n_import/`（1352件）を本番サーバーにアップロード  
-   → 容量が大きいため rsync か scp を使う
-3. `php artisan migrate --force` で `n_*` テーブルを作成
-4. `php artisan n-system:import --force` でデータ投入
+### 前提確認
 
-**⚠️ 現時点ではクライアントへのデモURLを共有する前に上記作業が必要。**
+- さくら本番 `.env` に `NSYSTEM_GUEST_EMAIL` / `NSYSTEM_GUEST_PASSWORD` が設定済みであること  
+  （未設定の場合は追加して `php artisan config:clear` を実行）
+- `php artisan migrate --force` 済みで `n_*` テーブルが存在すること
+
+---
+
+### ステップ 1: JSON ファイルを転送（問題・解答・学校インデックス）
+
+```bash
+# ローカルの WSL 上で実行
+rsync -az /home/w229/SunBwork/storage/app/private/n_import/ \
+  silverlamb759@silverlamb759.sakura.ne.jp:~/SunBWork/storage/app/private/n_import/
+```
+
+> ⚠️ パスは必ず `storage/app/private/n_import/`。  
+> Laravel 11 で `Storage::disk('local')` のルートが `storage/app/private` に変更されたため、  
+> `storage/app/n_import/` に置いても import コマンドから参照されない。
+
+---
+
+### ステップ 2: Excel ファイルを転送（Mコードリスト）
+
+```bash
+scp /home/w229/SunBwork/z_NDBSystem/Nコードリスト*.xlsx \
+  silverlamb759@silverlamb759.sakura.ne.jp:~/SunBWork/z_NDBSystem/
+```
+
+> さくら側に `~/SunBWork/z_NDBSystem/` ディレクトリがない場合は先に作成:  
+> `ssh silverlamb759@silverlamb759.sakura.ne.jp "mkdir -p ~/SunBWork/z_NDBSystem"`
+
+---
+
+### ステップ 3: phpspreadsheet の確認とインストール
+
+さくらは PHP 8.2 のため、通常の `composer install` では phpspreadsheet がインストールされない  
+（依存する `maennchen/zipstream-php` が PHP 8.3 以上を要求するため）。
+
+```bash
+# さくら SSH で実行（phpspreadsheet が vendor に存在するか確認）
+ssh silverlamb759@silverlamb759.sakura.ne.jp \
+  "cd ~/SunBWork && php -r \"require 'vendor/autoload.php'; new PhpOffice\PhpSpreadsheet\Spreadsheet;\" 2>&1"
+```
+
+エラーが出る場合は `--ignore-platform-reqs` でインストール:
+
+```bash
+ssh silverlamb759@silverlamb759.sakura.ne.jp \
+  "cd ~/SunBWork && composer install --no-interaction --ignore-platform-reqs 2>&1 | tail -5"
+```
+
+> `git pull` 後に `composer install` を実行すると phpspreadsheet が外れることがある。  
+> import を実行する前に必ず上記確認を行うこと。
+
+---
+
+### ステップ 4: import コマンド実行
+
+```bash
+ssh silverlamb759@silverlamb759.sakura.ne.jp \
+  "cd ~/SunBWork && php artisan n-system:import --force 2>&1"
+```
+
+成功時の出力例:
+```
+学校: 159件 / 問題: 2455件 / 解答: 2376件
+年度版Mコード: 894掲載行 / 監査元行: 892件
+スキップ: 132ファイル / エラー: 0ファイル
+```
+
+---
+
+### よくあるエラーと対処
+
+| エラー | 原因 | 対処 |
+|---|---|---|
+| `schools_index.json が見つかりません: .../storage/app/private/n_import/...` | JSON を `storage/app/n_import/` に置いた | ステップ1の正しいパスで再転送 |
+| `Class "PhpOffice\PhpSpreadsheet\IOFactory" not found` | phpspreadsheet が未インストール | ステップ3の `--ignore-platform-reqs` でインストール |
+| `Table 'n_import_batches' doesn't exist` | migration 130001 が記録のみで未実行 | 下記「テーブル手動作成」を参照 |
+
+#### テーブル手動作成（`n_import_batches` / `n_source_school_rows` が存在しない場合）
+
+migration 130001 をさくらで手動マークした場合など、これら2テーブルが作成されないことがある。  
+その場合は MySQL で直接作成する:
+
+```bash
+ssh silverlamb759@silverlamb759.sakura.ne.jp 'mysql -h mysql3114.db.sakura.ne.jp \
+  -u silverlamb759_sunbwork -p2024sunb11 silverlamb759_sunbwork <<'"'"'SQL'"'"'
+CREATE TABLE IF NOT EXISTS `n_import_batches` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `import_type` varchar(50) NOT NULL,
+  `source_filename` varchar(255) NOT NULL,
+  `source_year` smallint unsigned DEFAULT NULL,
+  `file_hash` varchar(64) DEFAULT NULL,
+  `imported_at` timestamp NULL DEFAULT NULL,
+  `status` varchar(20) NOT NULL,
+  `summary_json` json DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `n_source_school_rows` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `import_batch_id` bigint unsigned NOT NULL,
+  `source_row_number` smallint unsigned DEFAULT NULL,
+  `admission_year` smallint unsigned NOT NULL,
+  `raw_mikuni_code` varchar(50) DEFAULT NULL,
+  `raw_n_code` varchar(100) DEFAULT NULL,
+  `raw_school_name` text,
+  `raw_exam_label` varchar(200) DEFAULT NULL,
+  `parsed_json` json DEFAULT NULL,
+  `resolution_status` varchar(20) NOT NULL,
+  `resolution_notes` text,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  CONSTRAINT `n_source_school_rows_import_batch_id_foreign`
+    FOREIGN KEY (`import_batch_id`) REFERENCES `n_import_batches` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+SQL
+'
+```
+
+---
+
+### データ確認
+
+```bash
+ssh silverlamb759@silverlamb759.sakura.ne.jp 'mysql -h mysql3114.db.sakura.ne.jp \
+  -u silverlamb759_sunbwork -p2024sunb11 silverlamb759_sunbwork -e "
+SELECT \"n_schools\" as tbl, COUNT(*) as cnt FROM n_schools
+UNION ALL SELECT \"n_exams\", COUNT(*) FROM n_exams
+UNION ALL SELECT \"n_exam_daimons\", COUNT(*) FROM n_exam_daimons
+UNION ALL SELECT \"n_publication_entries\", COUNT(*) FROM n_publication_entries;" 2>/dev/null'
+```

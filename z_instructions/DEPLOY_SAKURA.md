@@ -374,5 +374,38 @@ ls -la ~/www/members/
 
 ---
 
+---
+
+## NSystem データのデプロイ（JSON・Excel）
+
+NSystem の問題データと Mコードリスト Excel は `.gitignore` 管理外のため  
+**git push では本番に届かない**。ローカルでデータを更新した後は別途転送が必要。
+
+詳細手順は `z_instructions/NSYSTEM_GUIDE.md` のセクション10を参照。
+
+**ショートカット手順（全部まとめて実行する場合）:**
+
+```bash
+# 1. JSON 転送（36MB・1352件）
+rsync -az /home/w229/SunBwork/storage/app/private/n_import/ \
+  silverlamb759@silverlamb759.sakura.ne.jp:~/SunBWork/storage/app/private/n_import/
+
+# 2. Excel 転送（5ファイル）
+scp /home/w229/SunBwork/z_NDBSystem/Nコードリスト*.xlsx \
+  silverlamb759@silverlamb759.sakura.ne.jp:~/SunBWork/z_NDBSystem/
+
+# 3. phpspreadsheet 確認（PHP 8.2 のため --ignore-platform-reqs が必要）
+ssh silverlamb759@silverlamb759.sakura.ne.jp \
+  "cd ~/SunBWork && composer install --no-interaction --ignore-platform-reqs 2>&1 | tail -3"
+
+# 4. import 実行
+ssh silverlamb759@silverlamb759.sakura.ne.jp \
+  "cd ~/SunBWork && php artisan n-system:import --force 2>&1"
+```
+
+> ⚠️ JSON は `storage/app/private/n_import/`（`private` が必須）。`storage/app/n_import/` では動かない。
+
+---
+
 *このドキュメントは `/home/tchirosb/SunBWork/CLAUDE.md` のデプロイセクションをもとに作成。*
 *最新情報は CLAUDE.md を正とすること。*
