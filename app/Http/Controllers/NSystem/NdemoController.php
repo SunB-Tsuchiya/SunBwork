@@ -96,7 +96,7 @@ class NdemoController extends Controller
             ->values()
             ->all();
 
-        $assetBase = asset('n_images/');
+        $assetBase = asset('n_images');
 
         return Inertia::render('NSystem/School', [
             'school' => [
@@ -110,7 +110,7 @@ class NdemoController extends Controller
             'daimons' => $daimons->map(fn ($d) => [
                 'id'           => $d->id,
                 'daimon_index' => $d->daimon_index,
-                'body_html'    => str_replace('src="/n_images/', 'src="' . $assetBase, $d->body_html),
+                'body_html'    => str_replace('src="/n_images/', 'src="' . $assetBase . '/', $d->body_html),
             ])->values(),
             'tab'               => $tab,
             'mode'              => $mode,
