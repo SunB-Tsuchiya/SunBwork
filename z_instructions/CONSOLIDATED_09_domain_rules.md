@@ -153,10 +153,23 @@ Vue ページ: `CsvUpload.vue`（ファイル選択）→ `CsvPreview.vue`（確
 ## CI（GitHub Actions）ルール
 
 - `.github/workflows/lint.yml`: PHP Pint + Prettier + ESLint
-- `.github/workflows/tests.yml`: Pest テスト（MySQL `sunbwork_testing` DB を使用）
+- `.github/workflows/tests.yml`: Pest テスト — **CI は SQLite 使用**（MySQL サービス未設定）
 
-> **⚠️ SQLite は 2026-06-20 にプロジェクトから完全廃止。** `phpunit.xml` は `DB_CONNECTION=mysql` / `DB_DATABASE=sunbwork_testing`。  
-> MySQL 固有マイグレーション（`INNER JOIN UPDATE`・FULLTEXT 等）に SQLite ガードは不要。
+**ローカル（Docker）と CI で DB が異なる:**
+
+| 環境 | DB | 設定 |
+|---|---|---|
+| ローカル Docker テスト | MySQL `sunbwork_testing` | `phpunit.xml` の `DB_CONNECTION=mysql` |
+| GitHub Actions CI | SQLite（インメモリ） | `.env.example` に DB 設定なし → デフォルト動作 |
+
+**MySQL 固有構文を含むマイグレーションには SQLite ガード必須:**
+```php
+// MySQL専用 JOIN UPDATE など
+if (Schema::hasTable('n_publication_entry_exams') && DB::getDriverName() !== 'sqlite') {
+    DB::statement('UPDATE ... INNER JOIN ...');
+}
+```
+`MODIFY`・`DROP FOREIGN KEY`・`AUTO_INCREMENT`・`information_schema` 参照・JOIN UPDATE を含むマイグレーションに追加。
 
 ---
 

@@ -23,7 +23,7 @@ return new class extends Migration
             }
         });
 
-        if (Schema::hasTable('n_publication_entry_exams')) {
+        if (Schema::hasTable('n_publication_entry_exams') && DB::getDriverName() !== 'sqlite') {
             DB::statement(
                 'UPDATE n_publication_entries pe
                 INNER JOIN n_publication_entry_exams pee ON pee.publication_entry_id = pe.id
