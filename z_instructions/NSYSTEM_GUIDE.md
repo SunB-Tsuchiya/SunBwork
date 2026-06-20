@@ -178,10 +178,41 @@ MySQL ngram FULLTEXTは候補抽出に使用するが、最終的なヒット判
 
 JSON APIは検索結果に `body_html` を含めず、表示に必要な学校情報、科目、大問番号、安全なスニペットだけを返す。
 
-### 検索テスト
+### NSystem テストの注意点
 
 ```bash
 docker compose exec laravel bash -lc "php artisan test tests/Unit/NSystem/NQuestionSearchServiceTest.php tests/Feature/NSystem/NQuestionSearchTest.php"
+```
+
+#### ① Inertia ページのテストは assertInertia を使う
+
+`school()` などの Inertia レスポンスは Vue がブラウザで描画するため、`assertSee('Nコード A001')` は失敗する（サーバーは JSON props しか返さない）。**Blade から Inertia に移行したページのテストは必ず `assertInertia` に書き換える。**
+
+```php
+// NG — Inertia ページでは動かない
+->assertSee('Nコード A001')
+->assertSee('非公開HTML')
+
+// OK — Inertia props を直接検証する
+->assertInertia(fn (Assert $page) => $page
+    ->component('NSystem/School', false)
+    ->where('school.code', 'A001')
+    ->has('daimons', 1, fn (Assert $daimon) => $daimon
+        ->where('body_html', fn ($html) => str_contains($html, '非公開HTML'))
+        ->etc()
+    )
+);
+```
+
+#### ② ローカル限定テストは markTestSkipped でガード
+
+`z_NDBSystem/Nコードリスト*.xlsx` は git 管理外のため CI（GitHub Actions）には存在しない。  
+これらのファイルを必要とするテストは先頭で存在チェックしてスキップする:
+
+```php
+if (! is_file(base_path('z_NDBSystem/Nコードリスト2025.xlsx'))) {
+    $this->markTestSkipped('z_NDBSystem/Nコードリスト2025.xlsx が存在しないためスキップ');
+}
 ```
 
 ---
@@ -289,10 +320,28 @@ ln -s ~/SunBWork/public/n_images ~/www/members/n_images
 | 層 | 内容 |
 |---|---|
 | DB保存値 | `src="/n_images/xxxxx.png"` — import 時に `src="images/` から変換してそのまま保存 |
-| コントローラー | `NdemoController::school()` が Inertia に渡す直前に `str_replace('src="/n_images/', 'src="' . asset('n_images/'), ...)` で書き換え |
+| コントローラー | `NdemoController::school()` が Inertia に渡す直前に `str_replace` で絶対 URL に書き換え |
 | ブラウザ受信 | ローカル: `http://localhost:8000/n_images/...` / さくら: `https://sun-brain.co.jp/members/n_images/...` |
 
 DBのデータを直接変更してはいけない。コントローラー側の `asset()` 変換で環境差を吸収している。
+
+#### ⚠️ asset() の末尾スラッシュ問題
+
+Laravel の `asset($path)` は内部で `trim($path, '/')` を実行するため、**`asset('n_images/')` は末尾スラッシュが取り除かれた `https://.../n_images`（スラッシュなし）を返す**。
+
+これにより `str_replace('src="/n_images/', 'src="' . asset('n_images/'), ...)` を書くと:
+- 置換後: `src="https://sun-brain.co.jp/members/n_images` + `11712024QSa03.png"` → スラッシュなしで404
+
+**正しい書き方（現在の実装）:**
+
+```php
+// asset() はパスのスラッシュをトリムするため、末尾 / は別途付加する
+$assetBase = asset('n_images');  // → https://sun-brain.co.jp/members/n_images
+str_replace('src="/n_images/', 'src="' . $assetBase . '/', $d->body_html);
+// 結果: src="https://sun-brain.co.jp/members/n_images/11712024QSa03.png" ✓
+```
+
+間違えやすい点なので変更時は注意すること。
 
 ---
 
