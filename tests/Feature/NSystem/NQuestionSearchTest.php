@@ -122,8 +122,14 @@ class NQuestionSearchTest extends TestCase
         $this->withoutMiddleware(GuestAuth::class)
             ->get(route('n-demo.school', ['id' => 1, 'tab' => 'Ko', 'mode' => 'Q']))
             ->assertOk()
-            ->assertSee('Nコード A001')
-            ->assertSee('非公開HTML');
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('NSystem/School', false)
+                ->where('school.code', 'A001')
+                ->has('daimons', 1, fn (Assert $daimon) => $daimon
+                    ->where('body_html', fn ($html) => str_contains($html, '非公開HTML'))
+                    ->etc()
+                )
+            );
     }
 
     public function test_all_and_any_modes_have_distinct_meanings(): void

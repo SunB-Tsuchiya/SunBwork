@@ -44,6 +44,10 @@ class NPublicationCatalogImportTest extends TestCase
 
     public function test_import_splits_shared_m109_and_keeps_2026_edogawa_as_4331(): void
     {
+        if (! is_file(base_path('z_NDBSystem/Nコードリスト2025.xlsx'))) {
+            $this->markTestSkipped('z_NDBSystem/Nコードリスト2025.xlsx が存在しないためスキップ');
+        }
+
         $summary = app(NPublicationCatalogImportService::class)->import([2025, 2026]);
 
         $this->assertSame(356, $summary['entries']);
