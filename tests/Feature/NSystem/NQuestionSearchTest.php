@@ -3,111 +3,56 @@
 namespace Tests\Feature\NSystem;
 
 use App\Http\Middleware\NSystem\GuestAuth;
-use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class NQuestionSearchTest extends TestCase
 {
+    use RefreshDatabase;
+
+    // MySQL InnoDB FULLTEXT はトランザクション内の未コミットデータを検索できないため
+    // トランザクションラップを無効化し、TRUNCATE で各テストのクリーンアップを行う
+    protected $connectionsToTransact = [];
+
+    private static array $nSystemTables = [
+        'n_exam_daimons', 'n_exam_documents', 'n_source_school_rows',
+        'n_import_batches', 'n_publication_entries', 'n_publication_editions',
+        'n_exams', 'n_exam_series', 'n_school_years', 'n_schools',
+    ];
+
     protected function setUp(): void
     {
         parent::setUp();
-
-        Schema::create('n_schools', function (Blueprint $table) {
-            $table->id();
-            $table->string('n_code_prefix');
-            $table->string('canonical_name');
-            $table->boolean('is_active')->default(true);
-            $table->timestamps();
-        });
-
-        Schema::create('n_school_years', function (Blueprint $table) {
-            $table->id();
-            $table->unsignedBigInteger('school_id');
-            $table->unsignedSmallInteger('admission_year');
-            $table->string('school_name');
-            $table->string('normalized_name');
-            $table->string('gender_type');
-            $table->timestamps();
-        });
-
-        Schema::create('n_exam_series', function (Blueprint $table) {
-            $table->id();
-            $table->unsignedBigInteger('school_id');
-            $table->string('series_key');
-            $table->timestamps();
-        });
-
-        Schema::create('n_exams', function (Blueprint $table) {
-            $table->id();
-            $table->unsignedBigInteger('exam_series_id');
-            $table->unsignedSmallInteger('admission_year');
-            $table->string('n_code');
-            $table->timestamps();
-        });
-
-        Schema::create('n_publication_editions', function (Blueprint $table) {
-            $table->id();
-            $table->unsignedSmallInteger('admission_year');
-            $table->string('title');
-            $table->string('source_filename')->nullable();
-            $table->timestamps();
-        });
-
-        Schema::create('n_publication_entries', function (Blueprint $table) {
-            $table->id();
-            $table->unsignedBigInteger('publication_edition_id');
-            $table->unsignedBigInteger('school_id')->nullable();
-            $table->unsignedBigInteger('exam_id')->nullable();
-            $table->unsignedSmallInteger('mikuni_code');
-            $table->string('publication_section');
-            $table->unsignedSmallInteger('sort_order');
-            $table->string('printed_school_name');
-            $table->string('printed_exam_label')->nullable();
-            $table->unsignedSmallInteger('source_row_number')->nullable();
-            $table->text('source_notes')->nullable();
-            $table->timestamps();
-        });
-
-        Schema::create('n_exam_documents', function (Blueprint $table) {
-            $table->id();
-            $table->unsignedBigInteger('exam_id');
-            $table->string('subject', 5);
-            $table->char('document_type', 1);
-            $table->timestamps();
-        });
-
-        Schema::create('n_exam_daimons', function (Blueprint $table) {
-            $table->id();
-            $table->unsignedBigInteger('exam_document_id');
-            $table->unsignedTinyInteger('daimon_index');
-            $table->text('body_html');
-            $table->text('body_text');
-            $table->timestamps();
-        });
+        $this->wipeNSystemTables();
 
         $this->insertSchool(1, 'A001', '青空中学校', '共学');
         $this->insertSchool(2, 'B001', '白雲中学校', '男子');
         $this->insertPublicationEdition(1, 2024);
         $this->insertPublicationEntry(1, 1, 1, 102, '共学', 2, '青空中学校');
         $this->insertPublicationEntry(2, 1, 2, 101, '共学', 1, '白雲中学校');
-        $this->insertQuestion(101, 1, 'Ko', 1, '青空の問題');
-        $this->insertQuestion(102, 2, 'Ko', 1, '白雲の問題');
+
+        // コントローラーが whereHas('exam.documents') で絞り込むため、各校に document が必要
+        DB::table('n_exam_documents')->insert([
+            ['id' => 10, 'exam_id' => 1, 'subject' => 'Ko', 'document_type' => 'Q', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 20, 'exam_id' => 2, 'subject' => 'Ko', 'document_type' => 'Q', 'created_at' => now(), 'updated_at' => now()],
+        ]);
     }
 
     protected function tearDown(): void
     {
-        Schema::dropIfExists('n_exam_daimons');
-        Schema::dropIfExists('n_exam_documents');
-        Schema::dropIfExists('n_publication_entries');
-        Schema::dropIfExists('n_publication_editions');
-        Schema::dropIfExists('n_exams');
-        Schema::dropIfExists('n_exam_series');
-        Schema::dropIfExists('n_school_years');
-        Schema::dropIfExists('n_schools');
+        $this->wipeNSystemTables();
         parent::tearDown();
+    }
+
+    private function wipeNSystemTables(): void
+    {
+        DB::statement('SET FOREIGN_KEY_CHECKS=0');
+        foreach (self::$nSystemTables as $table) {
+            DB::statement("TRUNCATE TABLE `{$table}`");
+        }
+        DB::statement('SET FOREIGN_KEY_CHECKS=1');
     }
 
     public function test_unauthenticated_user_is_redirected_from_results_api(): void

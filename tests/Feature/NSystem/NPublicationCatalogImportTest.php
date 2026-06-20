@@ -3,121 +3,43 @@
 namespace Tests\Feature\NSystem;
 
 use App\Services\NSystem\NPublicationCatalogImportService;
-use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class NPublicationCatalogImportTest extends TestCase
 {
+    use RefreshDatabase;
+
+    // MySQL InnoDB FULLTEXT はトランザクション内の未コミットデータを検索できないため
+    // トランザクションラップを無効化し、TRUNCATE で各テストのクリーンアップを行う
+    protected $connectionsToTransact = [];
+
+    private static array $nSystemTables = [
+        'n_exam_daimons', 'n_exam_documents', 'n_source_school_rows',
+        'n_import_batches', 'n_publication_entries', 'n_publication_editions',
+        'n_exams', 'n_exam_series', 'n_school_years', 'n_schools',
+    ];
+
     protected function setUp(): void
     {
         parent::setUp();
-
-        Schema::create('n_schools', function (Blueprint $table) {
-            $table->id();
-            $table->string('n_code_prefix');
-            $table->string('canonical_name');
-            $table->string('prefecture')->nullable();
-            $table->boolean('is_active')->default(true);
-            $table->unsignedBigInteger('merged_into_id')->nullable();
-            $table->timestamps();
-        });
-
-        Schema::create('n_school_years', function (Blueprint $table) {
-            $table->id();
-            $table->unsignedBigInteger('school_id');
-            $table->unsignedSmallInteger('admission_year');
-            $table->string('school_name');
-            $table->string('normalized_name');
-            $table->string('gender_type');
-            $table->string('prefecture')->nullable();
-            $table->text('notes')->nullable();
-            $table->timestamps();
-        });
-
-        Schema::create('n_exam_series', function (Blueprint $table) {
-            $table->id();
-            $table->unsignedBigInteger('school_id');
-            $table->string('series_key');
-            $table->string('canonical_label')->nullable();
-            $table->boolean('is_active')->default(true);
-            $table->timestamps();
-        });
-
-        Schema::create('n_exams', function (Blueprint $table) {
-            $table->id();
-            $table->unsignedBigInteger('exam_series_id');
-            $table->unsignedSmallInteger('admission_year');
-            $table->string('n_code');
-            $table->string('exam_label')->nullable();
-            $table->text('source_notes')->nullable();
-            $table->timestamps();
-        });
-
-        Schema::create('n_publication_editions', function (Blueprint $table) {
-            $table->id();
-            $table->unsignedSmallInteger('admission_year');
-            $table->string('title');
-            $table->string('source_filename')->nullable();
-            $table->timestamps();
-        });
-
-        Schema::create('n_publication_entries', function (Blueprint $table) {
-            $table->id();
-            $table->unsignedBigInteger('publication_edition_id');
-            $table->unsignedBigInteger('school_id')->nullable();
-            $table->unsignedBigInteger('exam_id')->nullable();
-            $table->unsignedSmallInteger('mikuni_code');
-            $table->string('publication_section');
-            $table->unsignedSmallInteger('sort_order');
-            $table->string('printed_school_name');
-            $table->string('printed_exam_label')->nullable();
-            $table->unsignedSmallInteger('source_row_number')->nullable();
-            $table->text('source_notes')->nullable();
-            $table->timestamps();
-        });
-
-        Schema::create('n_import_batches', function (Blueprint $table) {
-            $table->id();
-            $table->string('import_type');
-            $table->string('source_filename');
-            $table->unsignedSmallInteger('source_year')->nullable();
-            $table->string('file_hash')->nullable();
-            $table->timestamp('imported_at')->nullable();
-            $table->string('status');
-            $table->json('summary_json')->nullable();
-            $table->timestamps();
-        });
-
-        Schema::create('n_source_school_rows', function (Blueprint $table) {
-            $table->id();
-            $table->unsignedBigInteger('import_batch_id');
-            $table->unsignedSmallInteger('source_row_number')->nullable();
-            $table->unsignedSmallInteger('admission_year');
-            $table->string('raw_mikuni_code')->nullable();
-            $table->string('raw_n_code')->nullable();
-            $table->text('raw_school_name')->nullable();
-            $table->string('raw_exam_label')->nullable();
-            $table->json('parsed_json')->nullable();
-            $table->string('resolution_status');
-            $table->text('resolution_notes')->nullable();
-            $table->timestamps();
-        });
+        $this->wipeNSystemTables();
     }
 
     protected function tearDown(): void
     {
-        Schema::dropIfExists('n_source_school_rows');
-        Schema::dropIfExists('n_import_batches');
-        Schema::dropIfExists('n_publication_entries');
-        Schema::dropIfExists('n_publication_editions');
-        Schema::dropIfExists('n_exams');
-        Schema::dropIfExists('n_exam_series');
-        Schema::dropIfExists('n_school_years');
-        Schema::dropIfExists('n_schools');
-
+        $this->wipeNSystemTables();
         parent::tearDown();
+    }
+
+    private function wipeNSystemTables(): void
+    {
+        DB::statement('SET FOREIGN_KEY_CHECKS=0');
+        foreach (self::$nSystemTables as $table) {
+            DB::statement("TRUNCATE TABLE `{$table}`");
+        }
+        DB::statement('SET FOREIGN_KEY_CHECKS=1');
     }
 
     public function test_import_splits_shared_m109_and_keeps_2026_edogawa_as_4331(): void

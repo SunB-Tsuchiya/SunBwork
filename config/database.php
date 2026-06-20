@@ -32,23 +32,6 @@ return [
 
     'connections' => [
 
-        // SQLite connection (kept for backward compatibility / local dev). The
-        // 'database' value here uses database_path('database.sqlite') as a
-        // sensible default, but the actual connection in use is controlled by
-        // the `DB_CONNECTION` environment variable (see top-level 'default').
-        // In production or when `.env` sets DB_CONNECTION=mysql this block
-        // is ignored.
-        'sqlite' => [
-            'driver' => 'sqlite',
-            'url' => env('DB_URL'),
-            'database' => env('DB_DATABASE', database_path('database.sqlite')),
-            'prefix' => '',
-            'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
-            'busy_timeout' => null,
-            'journal_mode' => null,
-            'synchronous' => null,
-        ],
-
         'mysql' => [
             'driver' => 'mysql',
             'url' => env('DB_URL'),
