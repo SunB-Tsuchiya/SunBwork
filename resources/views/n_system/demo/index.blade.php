@@ -37,13 +37,51 @@
         padding-left: 10px;
     }
     .total-info { font-size: 0.85rem; color: #6b7280; margin-bottom: 16px; }
+    .year-filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 18px;
+    }
+    .year-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 88px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        border: 1px solid #bfdbfe;
+        background: #eff6ff;
+        color: #1d4ed8;
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-decoration: none;
+    }
+    .year-button.active {
+        background: #1d4ed8;
+        border-color: #1d4ed8;
+        color: #fff;
+    }
 </style>
 
 <p class="total-info">
+    表示年度: <strong>{{ $selectedYear }}年度</strong>
+    &nbsp;|&nbsp;
     登録校: <strong>{{ $grouped->flatten()->count() }}</strong> 校
     &nbsp;|&nbsp;
     <a href="{{ route('n-demo.search') }}">全文検索はこちら</a>
 </p>
+
+@if($availableYears->isNotEmpty())
+<div class="year-filters">
+    @foreach($availableYears as $year)
+    <a
+        href="{{ route('n-demo.index', ['year' => $year]) }}"
+        class="year-button {{ (int) $year === (int) $selectedYear ? 'active' : '' }}"
+    >{{ $year }}年度</a>
+    @endforeach
+</div>
+@endif
 
 @foreach($grouped as $category => $schools)
 <div class="category-section">
@@ -55,7 +93,7 @@
         @foreach($schools as $school)
         <a href="{{ route('n-demo.school', $school->id) }}" class="school-card">
             <span class="school-card-name">{{ $school->name }}</span>
-            <span class="school-card-meta">{{ $school->year }}年度</span>
+            <span class="school-card-meta">{{ $school->year }}年度 / Mコード {{ $school->mikuni_code }} / Nコード {{ $school->code }}</span>
         </a>
         @endforeach
     </div>

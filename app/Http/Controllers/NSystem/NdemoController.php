@@ -4,8 +4,9 @@ namespace App\Http\Controllers\NSystem;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\NSystem\NQuestionSearchRequest;
-use App\Models\NSystem\NAnswersDaimon;
-use App\Models\NSystem\NQuestionsDaimon;
+use App\Models\NSystem\NExam;
+use App\Models\NSystem\NPublicationEdition;
+use App\Models\NSystem\NPublicationEntry;
 use App\Models\NSystem\NSchool;
 use App\Services\NSystem\NQuestionSearchService;
 use Illuminate\Http\Request;
@@ -25,7 +26,28 @@ class NdemoController extends Controller
 
     public function index(Request $request)
     {
-        $schools = NSchool::orderBy('name')->get();
+        $availableYears = NPublicationEdition::query()
+            ->whereHas('publicationEntries.exam.documents')
+            ->orderBy('admission_year')
+            ->pluck('admission_year')
+            ->values();
+
+        $selectedYear = (int) $request->integer('year', (int) ($availableYears->last() ?? 2024));
+        if (! $availableYears->contains($selectedYear)) {
+            $selectedYear = (int) ($availableYears->last() ?? 2024);
+        }
+
+        $schools = NPublicationEntry::query()
+            ->with([
+                'exam',
+                'school.schoolYears' => fn ($query) => $query->where('admission_year', $selectedYear),
+            ])
+            ->whereHas('publicationEdition', fn ($query) => $query->where('admission_year', $selectedYear))
+            ->whereHas('exam.documents')
+            ->orderBy('mikuni_code')
+            ->orderBy('sort_order')
+            ->get()
+            ->map(fn (NPublicationEntry $entry) => $this->publicationEntryView($entry, $selectedYear));
 
         $grouped = collect(self::CATEGORY_ORDER)
             ->mapWithKeys(function ($cat) use ($schools) {
@@ -33,12 +55,17 @@ class NdemoController extends Controller
             })
             ->filter(fn($list) => $list->isNotEmpty());
 
-        return view('n_system.demo.index', compact('grouped'));
+        return view('n_system.demo.index', [
+            'grouped' => $grouped,
+            'availableYears' => $availableYears,
+            'selectedYear' => $selectedYear,
+        ]);
     }
 
     public function school(Request $request, int $id)
     {
-        $school = NSchool::findOrFail($id);
+        $exam = NExam::with(['examSeries.school.schoolYears'])->findOrFail($id);
+        $school = $this->examView($exam);
 
         $tab = $request->get('tab', 'Ko');
         $mode = $request->get('mode', 'Q');
@@ -46,15 +73,18 @@ class NdemoController extends Controller
             $tab = 'Ko';
         }
 
-        $availableSubjects = $school->questions()
+        $availableSubjects = $exam->documents()
+            ->where('document_type', 'Q')
             ->select('subject')
             ->distinct()
             ->pluck('subject')
             ->toArray();
 
-        $daimons = $mode === 'A'
-            ? $school->answers()->where('subject', $tab)->orderBy('daimon_index')->get()
-            : $school->questions()->where('subject', $tab)->orderBy('daimon_index')->get();
+        $document = $exam->documents()
+            ->where('document_type', $mode === 'A' ? 'A' : 'Q')
+            ->where('subject', $tab)
+            ->first();
+        $daimons = $document?->daimons()->orderBy('daimon_index')->get() ?? collect();
 
         $highlightInput = $request->input('highlight', []);
         $highlightTerms = collect(is_array($highlightInput) ? $highlightInput : [$highlightInput])
@@ -84,7 +114,7 @@ class NdemoController extends Controller
         return Inertia::render('NSystem/Search', [
             'initialFilters' => $filters,
             'initialResults' => $searchService->search($filters),
-            'schools' => NSchool::orderBy('name')->get(['id', 'name', 'year', 'category']),
+            'schools' => $this->searchSchools(),
             'subjectLabels' => self::SUBJECT_LABELS,
             'categories' => self::CATEGORY_ORDER,
             'isGuest' => ! auth()->check(),
@@ -94,5 +124,76 @@ class NdemoController extends Controller
     public function searchResults(NQuestionSearchRequest $request, NQuestionSearchService $searchService)
     {
         return response()->json($searchService->search($request->searchFilters()));
+    }
+
+    private function searchSchools()
+    {
+        return NSchool::query()
+            ->whereHas('examSeries.exams.documents')
+            ->with([
+                'schoolYears' => fn ($query) => $query->orderByDesc('admission_year'),
+                'examSeries.exams' => fn ($query) => $query
+                    ->select(['id', 'exam_series_id', 'admission_year'])
+                    ->whereHas('documents'),
+            ])
+            ->orderBy('canonical_name')
+            ->get()
+            ->map(function (NSchool $school) {
+                $documentYear = $school->examSeries
+                    ->flatMap(fn ($series) => $series->exams)
+                    ->pluck('admission_year')
+                    ->filter()
+                    ->sortDesc()
+                    ->first();
+                $schoolYear = $school->schoolYears->firstWhere('admission_year', $documentYear) ?? $school->schoolYears->first();
+
+                return [
+                    'id' => $school->id,
+                    'name' => $schoolYear?->school_name ?? $school->canonical_name,
+                    'year' => $schoolYear?->admission_year,
+                    'category' => $this->categoryLabel($schoolYear?->gender_type),
+                ];
+            });
+    }
+
+    private function examView(NExam $exam): object
+    {
+        $school = $exam->examSeries->school;
+        $schoolYear = $school->schoolYears->firstWhere('admission_year', $exam->admission_year);
+
+        return (object) [
+            'id' => $exam->id,
+            'school_id' => $school->id,
+            'code' => $exam->n_code,
+            'name' => $schoolYear?->school_name ?? $school->canonical_name,
+            'year' => $exam->admission_year,
+            'category' => $this->categoryLabel($schoolYear?->gender_type),
+        ];
+    }
+
+    private function publicationEntryView(NPublicationEntry $entry, int $year): object
+    {
+        $school = $entry->school;
+        $schoolYear = $school?->schoolYears->firstWhere('admission_year', $year);
+
+        return (object) [
+            'id' => $entry->exam_id,
+            'school_id' => $entry->school_id,
+            'code' => $entry->exam?->n_code,
+            'name' => $schoolYear?->school_name ?? $entry->printed_school_name ?? $school?->canonical_name,
+            'year' => $year,
+            'mikuni_code' => $entry->mikuni_code,
+            'category' => $entry->publication_section,
+        ];
+    }
+
+    private function categoryLabel(?string $genderType): string
+    {
+        return match ($genderType) {
+            'coed' => '共学',
+            'boys' => '男子',
+            'girls' => '女子',
+            default => '地方',
+        };
     }
 }

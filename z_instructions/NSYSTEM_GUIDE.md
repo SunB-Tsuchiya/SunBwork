@@ -27,7 +27,7 @@ Windows ワークスペース `C:\Users\W229\Desktop\N_DBSystem\` で生成し�
 | `output/css/style.css` | `public/n_sample.css` |
 
 これらのファイルは `.gitignore` に登録済みで git 管理外。  
-再取り込みが必要な場合は `php artisan n:import --force` を実行する（後述）。
+再取り込みが必要な場合は `php artisan n-system:import --force` を実行する（後述）。
 
 ---
 
@@ -53,9 +53,13 @@ app/Http/Middleware/NSystem/
 
 # モデル
 app/Models/NSystem/
-  NSchool.php                  n_schools テーブル
-  NQuestionsDaimon.php         n_questions_daimon テーブル
-  NAnswersDaimon.php           n_answers_daimon テーブル
+  NSchool.php                  恒久学校マスター
+  NSchoolYear.php              年度別学校情報
+  NExamSeries.php / NExam.php  入試系列 / 年度別試験
+  NExamDocument.php            科目別の問題・解答文書
+  NExamDaimon.php              大問本文
+  NPublication*.php            年度版書籍・掲載行
+  NImportBatch.php             取込監査
 
 # コンフィグ
 config/nsystem.php             ゲスト認証情報（.envから読む）
@@ -83,7 +87,7 @@ resources/js/
     SearchPagination.vue
 
 # Artisanコマンド
-app/Console/Commands/NImport.php   n:import コマンド
+app/Console/Commands/NSystem/NSystemImport.php   n-system:import コマンド
 ```
 
 ### SunBwork 本体側への変更点（最小限）
@@ -103,15 +107,25 @@ NSystem を追加するにあたり SunBwork 本体で変更したファイル�
 
 | テーブル | 内容 | 件数（2024年度） |
 |---|---|---|
-| `n_schools` | 学校マスタ（code, year, name, category） | 159件 |
-| `n_questions_daimon` | 問題の大問単位HTML・テキスト | 2,247件 |
-| `n_answers_daimon` | 解答の大問単位HTML・テキスト | 2,376件 |
+| `n_schools` / `n_school_years` | 恒久学校 / 年度別名称・属性 | 148 / 148件 |
+| `n_exam_series` / `n_exams` | 入試系列 / 年度・Nコード付き試験 | 158 / 158件 |
+| `n_exam_documents` | 試験の科目別問題・解答 | 1,219件 |
+| `n_exam_daimons` | 問題・解答の大問本文 | 4,620件 |
+| `n_publication_editions` / `n_publication_entries` | 年度版書籍 / Mコード掲載行 | 5 / 894件 |
+| `n_import_batches` / `n_source_school_rows` | 取込履歴 / 元行・例外監査 | 実行回数に応じて増加 |
+| `n_legacy_*` | 移行前3テーブル。検証完了まで削除禁止 | 旧件数を保持 |
 
 マイグレーションファイル:
 - `2026_06_19_100001_create_n_schools_table.php`
 - `2026_06_19_100002_create_n_questions_daimon_table.php`
 - `2026_06_19_100003_create_n_answers_daimon_table.php`
 - `2026_06_19_100004_rebuild_n_daimon_fulltext_with_ngram.php`（MySQL 8.0 ngram全文検索）
+- `2026_06_19_130001_normalize_n_system_tables.php`（正規化・2024年度データ移行）
+- `2026_06_19_130002_rebuild_n_exam_daimons_fulltext_with_ngram.php`（新大問テーブルのngram索引）
+
+年度の正は `n_exams.admission_year`、Nコード全体は `n_exams.n_code`、学校照合用の先頭3文字は `n_schools.n_code_prefix`。Mコードは年度版ごとに変わるため `n_publication_entries` 以外では学校識別に使用しない。`n_publication_entries` は `school_id` と `exam_id` を直接保持し、1掲載行=1校=1試験として扱う。
+
+2024年の仮コード `464F` は学校リストの `464N` と同一試験にせず、`n_source_school_rows` に未解決として記録した。該当する問題3件は `n_legacy_questions_daimon` に保持している。2025/2026の `M109` は `4551 / 4751` の正式共有例外として2掲載行へ分割し、2026の `4331 → 4335` は監査注記を残したうえで現状運用どおり `4331` として登録する。
 
 ---
 
@@ -213,17 +227,26 @@ config/nsystem.php:
 
 ```bash
 # 通常実行（確認プロンプトあり）
-docker compose exec laravel bash -lc "php artisan n:import"
+docker compose exec laravel bash -lc "php artisan n-system:import"
 
 # 確認スキップ
-docker compose exec laravel bash -lc "php artisan n:import --force"
+docker compose exec laravel bash -lc "php artisan n-system:import --force"
 ```
 
 処理内容:
-1. `storage/app/private/n_import/schools_index.json` → `n_schools` に upsert
+1. `schools_index.json`から学校、年度別学校情報、試験系列、年度・Nコード付き試験をupsert
 2. `storage/app/private/n_import/*.json` を走査（ファイル名パターン: `{code4}{year4}__{Q|A}{Ko|Sa|Sh|Ri}.json`）
 3. `body_html` 内の `src="images/` を `src="/n_images/` に置換
-4. `n_questions_daimon` または `n_answers_daimon` に upsert
+4. 2022～2026の `Nコードリスト*.xlsx` をヘッダー名で読み込み、`n_publication_editions` / `n_publication_entries` にupsert
+5. `2025/2026 M109` は `4551` と `4751` の2掲載行へ正規化し、`2026 M106 4331 → 4335` は `4331` として採用
+6. 実行結果と監査元行を `n_import_batches` / `n_source_school_rows` に記録
+
+### 学校一覧の年度表示
+
+- `/n-demo` のカード順は選択年度の `n_publication_entries.mikuni_code` 昇順
+- 年度ボタンは「問題文書が存在する年度」だけを表示
+- Mコード履歴自体は2022～2026の5年度分をDBへ保持
+- 現状、問題文書があるのは2024年度のみなので年度ボタンは2024のみ表示
 
 ---
 
@@ -254,20 +277,22 @@ rm -rf tests/Feature/NSystem/
 rm -rf tests/Unit/NSystem/
 rm     config/nsystem.php
 rm     routes/nsystem.php
-rm     app/Console/Commands/NImport.php
+rm -rf app/Console/Commands/NSystem/
 ```
 
 ### Step 3: DBテーブルとマイグレーションを削除
 
 ```bash
-# マイグレーション rollback（n_ テーブル4本が落ちる）
-docker compose exec laravel bash -lc "php artisan migrate:rollback --step=4 --force"
+# 正規化マイグレーションを含めてrollbackする。実行前にmigrate:statusで対象を確認する
+docker compose exec laravel bash -lc "php artisan migrate:rollback --step=6 --force"
 
 # マイグレーションファイル削除
 rm database/migrations/2026_06_19_100001_create_n_schools_table.php
 rm database/migrations/2026_06_19_100002_create_n_questions_daimon_table.php
 rm database/migrations/2026_06_19_100003_create_n_answers_daimon_table.php
 rm database/migrations/2026_06_19_100004_rebuild_n_daimon_fulltext_with_ngram.php
+rm database/migrations/2026_06_19_130001_normalize_n_system_tables.php
+rm database/migrations/2026_06_19_130002_rebuild_n_exam_daimons_fulltext_with_ngram.php
 ```
 
 ### Step 4: 大量ファイルを削除
@@ -345,6 +370,6 @@ NSystem は現在**ローカル環境のみ**に存在する。
 2. `n_images/`（4485枚）と `n_import/`（1352件）を本番サーバーにアップロード  
    → 容量が大きいため rsync か scp を使う
 3. `php artisan migrate --force` で `n_*` テーブルを作成
-4. `php artisan n:import --force` でデータ投入
+4. `php artisan n-system:import --force` でデータ投入
 
 **⚠️ 現時点ではクライアントへのデモURLを共有する前に上記作業が必要。**

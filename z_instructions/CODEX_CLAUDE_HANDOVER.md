@@ -103,6 +103,86 @@
 
 <!-- 新しい記録をこのコメントの直後へ追加する -->
 
+### 2026-06-19 18:53:57 JST - Codex → Claude
+
+**依頼・目的**
+
+- `/n-demo` の学校カードを年度別Mコード順で表示したい。
+- Mコードは年度ごとの中核データとしてDBへ保持し、年度ボタンで表示年度を切り替えたい。
+- 同年度のNコード重複はエラー扱いとしつつ、2025年度以降の `M109` だけ `4551 / 開智中学校` と `4751 / 開智所沢中等教育学校` の正式共有例外として扱いたい。
+- `2026 M106 4331 → 4335` は現状運用に合わせて `4331` 扱いにしたい。
+
+**完了した作業**
+
+- `n_publication_entries` を「1掲載行 = 1校 = 1試験」に寄せる追補migrationを追加し、`n_publication_entry_exams` を廃止した。
+- `NPublicationCatalogImportService` を新規実装し、`z_NDBSystem/Nコードリスト2022.xlsx` ～ `2026.xlsx` をヘッダー名で解決して取り込むようにした。
+- `2025/2026 M109` は `4551` と `4751` の2掲載行へ分割して保存するよう実装した。
+- `2026 M106 4331 → 4335` は監査注記を残しつつ、登録値は `4331` を採用するよう実装した。
+- `n-system:import` を拡張し、既存の問題JSON取込に加えて5年度Mコード取込も同時に実行するようにした。
+- `/n-demo` 一覧を、選択年度の `n_publication_entries.mikuni_code` 昇順で表示するよう変更した。
+- `/n-demo` に年度ボタンを追加し、問題文書が存在する年度だけ表示するようにした。現状のローカルDBでは `2024` のみ表示される。
+- `NDBSCHEMA_PLAN1.md`、`NDBSCHEMA_MANAGER1.md`、`NDBSCHEMA1_PROMPT.md`、`NSYSTEM_GUIDE.md`、`ChangelogSeeder.php` を更新した。
+- `nsystem-schema-2` を `ChangelogSeeder` に追加し、ローカルDBへseedした。
+
+**未完了・次に行う作業**
+
+- 年度・入試系列フィルターのUI追加は未着手。
+- `z_instructions/CODEX_CLAUDE_HANDOVER.md` 以外の設計3ファイルは更新済みだが、全体完了ではないため `archived/` へは移していない。
+- さくら本番デプロイ、Gitコミット、PR化は未実施。
+
+**変更ファイル**
+
+- `database/migrations/2026_06_19_183000_make_n_publication_entries_one_school_one_exam.php`: `n_publication_entries` へ `school_id` / `exam_id` を追加し、旧pivotを廃止。
+- `app/Services/NSystem/NPublicationCatalogImportService.php`: 5年度ExcelのMコード・学校監査取込、M109例外、2026 M106の4331採用。
+- `app/Console/Commands/NSystem/NSystemImport.php`: 問題JSON取込後に5年度Mコード取込も行うよう拡張。
+- `app/Http/Controllers/NSystem/NdemoController.php`: `/n-demo` 一覧の年度選択とMコード順表示。
+- `resources/views/n_system/demo/index.blade.php`: 年度ボタン追加、Mコード表示追加。
+- `app/Models/NSystem/NPublicationEntry.php`: `publicationEdition` / `school` / `exam` リレーション追加。
+- `app/Models/NSystem/NPublicationEdition.php`: `publicationEntries` リレーション追加。
+- `app/Models/NSystem/NExam.php`: `publicationEntries` リレーション追加。
+- `app/Models/NSystem/NSchool.php`: `publicationEntries` リレーション追加。
+- `tests/Feature/NSystem/NPublicationCatalogImportTest.php`: 5年度Mコード取込と例外処理のテスト。
+- `tests/Feature/NSystem/NQuestionSearchTest.php`: `/n-demo` の年度ボタンとMコード順表示のテスト追加。
+- `z_instructions/NDBSCHEMA_PLAN1.md`: 2026 M106の扱いと実装済み状態を反映。
+- `z_instructions/NDBSCHEMA_MANAGER1.md`: 実装完了状況、ローカル反映、テスト結果を追記。
+- `z_instructions/NDBSCHEMA1_PROMPT.md`: 再開時の最新状態を更新。
+- `z_instructions/NSYSTEM_GUIDE.md`: Mコード取込、年度表示、件数を更新。
+- `database/seeders/ChangelogSeeder.php`: `nsystem-schema-2` を追加。
+
+**DB・設定・コマンド実行**
+
+- `docker compose exec laravel bash -lc "php artisan migrate --force"` 実行済み。
+- `docker compose exec laravel bash -lc "php artisan n-system:import --force"` 実行済み。
+- `docker compose exec laravel bash -lc "php artisan db:seed --class=ChangelogSeeder --force"` 実行済み。
+- ローカルDB確認:
+  - `n_publication_editions` = 5件（2022-2026）
+  - `n_publication_entries` = 894件
+  - `/n-demo` の表示対象年度 = 2024のみ
+
+**検証結果**
+
+- テスト: `tests/Feature/NSystem/NPublicationCatalogImportTest.php`、`tests/Feature/NSystem/NQuestionSearchTest.php`、`tests/Unit/NSystem/NQuestionSearchServiceTest.php` の合計16件・64 assertions成功。
+- Lint: 未実施。
+- Build: 未実施。今回の変更はPHP / Blade / migration / docsのみ。
+- 手動確認:
+  - `n-system:import --force` 実行後、Mコード掲載行が5年度分入ることを確認。
+  - `publicationEntries.exam.documents` を基準に、年度ボタンが2024のみになることをtinkerで確認。
+
+**注意点・判断事項**
+
+- `2026 M106 4331 → 4335` は、ユーザー判断により「監査原文は残すが登録値は4331」が正。`4335` へ切り替えないこと。
+- `M109` 共有は 2025年度以降の `4551 / 4751` だけを許可する正式例外。その他の同年度Mコード重複はエラー扱い。
+- `n-system:import --force` の結果、問題は `2422` 件、解答は `2376` 件、スキップは `132` ファイルだった。既存JSONの不足により5年度問題文書が揃っているわけではない。
+- `/n-demo` の年度ボタンは「掲載履歴がある年度」ではなく「問題文書がある年度」だけ表示する実装。
+- worktree には今回以前から untracked / modified が混在している。特に `public/build` の既存差分は戻さないこと。
+
+**関連資料**
+
+- `z_instructions/NDBSCHEMA_PLAN1.md`
+- `z_instructions/NDBSCHEMA_MANAGER1.md`
+- `z_instructions/NDBSCHEMA1_PROMPT.md`
+- `z_instructions/NSYSTEM_GUIDE.md`
+
 ### 2026-06-19 12:04:53 JST - Codex → Claude
 
 **依頼・目的**
@@ -175,4 +255,3 @@
 - `z_instructions/archived/NSEARCH_PLAN1.md`
 - `z_instructions/archived/NSEARCH_MANAGER1.md`
 - `z_instructions/archived/NSEARCH1_PROMPT.md`
-

@@ -2,7 +2,7 @@
 
 namespace App\Services\NSystem;
 
-use App\Models\NSystem\NQuestionsDaimon;
+use App\Models\NSystem\NExamDaimon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
@@ -20,9 +20,9 @@ class NQuestionSearchService
         }
 
         $terms = $this->terms($queryText, $mode);
-        $query = NQuestionsDaimon::query()
-            ->select('n_questions_daimon.*')
-            ->with('school:id,name,year,category');
+        $query = NExamDaimon::query()
+            ->select('n_exam_daimons.*')
+            ->with('document.exam.examSeries.school.schoolYears');
 
         $this->applyFilters($query, $filters);
         $fullTextQuery = $this->applyFullTextCandidateFilter($query, $terms, $mode);
@@ -30,34 +30,42 @@ class NQuestionSearchService
 
         if ($fullTextQuery !== null) {
             $query->selectRaw(
-                'MATCH(n_questions_daimon.body_text) AGAINST (? IN BOOLEAN MODE) AS relevance',
+                'MATCH(n_exam_daimons.body_text) AGAINST (? IN BOOLEAN MODE) AS relevance',
                 [$fullTextQuery]
             );
         }
 
-        $subjectOrder = "CASE subject WHEN 'Ko' THEN 1 WHEN 'Sa' THEN 2 WHEN 'Sh' THEN 3 WHEN 'Ri' THEN 4 ELSE 5 END";
+        $subjectOrder = "CASE n_exam_documents.subject WHEN 'Ko' THEN 1 WHEN 'Sa' THEN 2 WHEN 'Sh' THEN 3 WHEN 'Ri' THEN 4 ELSE 5 END";
         $paginator = $query
-            ->join('n_schools', 'n_schools.id', '=', 'n_questions_daimon.school_id')
+            ->join('n_exam_documents', 'n_exam_documents.id', '=', 'n_exam_daimons.exam_document_id')
+            ->join('n_exams', 'n_exams.id', '=', 'n_exam_documents.exam_id')
+            ->join('n_exam_series', 'n_exam_series.id', '=', 'n_exams.exam_series_id')
+            ->join('n_schools', 'n_schools.id', '=', 'n_exam_series.school_id')
+            ->where('n_exam_documents.document_type', 'Q')
             ->when($fullTextQuery !== null, fn (Builder $builder) => $builder->orderByDesc('relevance'))
-            ->orderBy('n_schools.name')
+            ->orderBy('n_schools.canonical_name')
             ->orderByRaw($subjectOrder)
             ->orderBy('daimon_index')
             ->paginate(self::PER_PAGE, ['*'], 'page', $filters['page'] ?? 1);
 
-        $items = $paginator->getCollection()->map(function (NQuestionsDaimon $question) use ($terms) {
+        $items = $paginator->getCollection()->map(function (NExamDaimon $question) use ($terms) {
+            $document = $question->document;
+            $exam = $document->exam;
+            $school = $exam->examSeries->school;
+            $schoolYear = $school->schoolYears->firstWhere('admission_year', $exam->admission_year);
             return [
                 'id' => $question->id,
                 'school' => [
-                    'id' => $question->school->id,
-                    'name' => $question->school->name,
-                    'year' => $question->school->year,
-                    'category' => $question->school->category,
+                    'id' => $school->id,
+                    'name' => $schoolYear?->school_name ?? $school->canonical_name,
+                    'year' => $exam->admission_year,
+                    'category' => $this->categoryLabel($schoolYear?->gender_type),
                 ],
-                'subject' => $question->subject,
+                'subject' => $document->subject,
                 'daimon_index' => $question->daimon_index,
                 'url' => route('n-demo.school', [
-                    'id' => $question->school->id,
-                    'tab' => $question->subject,
+                    'id' => $exam->id,
+                    'tab' => $document->subject,
                     'mode' => 'Q',
                     'highlight' => $terms,
                 ]) . '#daimon-' . $question->daimon_index,
@@ -132,10 +140,13 @@ class NQuestionSearchService
     private function applyFilters(Builder $query, array $filters): void
     {
         $query
-            ->when($filters['subject'] ?? null, fn (Builder $builder, string $subject) => $builder->where('subject', $subject))
-            ->when($filters['school_id'] ?? null, fn (Builder $builder, int $schoolId) => $builder->where('school_id', $schoolId))
+            ->when($filters['subject'] ?? null, fn (Builder $builder, string $subject) => $builder->whereHas('document', fn (Builder $document) => $document->where('subject', $subject)))
+            ->when($filters['school_id'] ?? null, fn (Builder $builder, int $schoolId) => $builder->whereHas('document.exam.examSeries', fn (Builder $series) => $series->where('school_id', $schoolId)))
             ->when($filters['category'] ?? null, function (Builder $builder, string $category) {
-                $builder->whereHas('school', fn (Builder $school) => $school->where('category', $category));
+                $genderType = match ($category) {
+                    '共学' => 'coed', '男子' => 'boys', '女子' => 'girls', default => 'unknown',
+                };
+                $builder->whereHas('document.exam.examSeries.school.schoolYears', fn (Builder $year) => $year->where('gender_type', $genderType));
             });
     }
 
@@ -145,7 +156,7 @@ class NQuestionSearchService
 
         $query->where(function (Builder $builder) use ($terms, $method) {
             foreach ($terms as $term) {
-                $builder->{$method}("n_questions_daimon.body_text LIKE ? ESCAPE '!'", ['%' . $this->escapeLike($term) . '%']);
+                $builder->{$method}("n_exam_daimons.body_text LIKE ? ESCAPE '!'", ['%' . $this->escapeLike($term) . '%']);
             }
         });
     }
@@ -169,7 +180,7 @@ class NQuestionSearchService
             ? implode(' ', array_map(fn (string $term) => '+' . $term, $quotedTerms))
             : implode(' ', $quotedTerms);
 
-        $query->whereRaw('MATCH(n_questions_daimon.body_text) AGAINST (? IN BOOLEAN MODE)', [$booleanQuery]);
+        $query->whereRaw('MATCH(n_exam_daimons.body_text) AGAINST (? IN BOOLEAN MODE)', [$booleanQuery]);
 
         return $booleanQuery;
     }
@@ -188,5 +199,12 @@ class NQuestionSearchService
             ],
             'filters' => $filters,
         ];
+    }
+
+    private function categoryLabel(?string $genderType): string
+    {
+        return match ($genderType) {
+            'coed' => '共学', 'boys' => '男子', 'girls' => '女子', default => '地方',
+        };
     }
 }

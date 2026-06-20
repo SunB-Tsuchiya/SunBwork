@@ -9,15 +9,20 @@ class NSchool extends Model
 {
     protected $table = 'n_schools';
 
-    protected $fillable = ['code', 'year', 'name', 'category'];
+    protected $fillable = ['n_code_prefix', 'canonical_name', 'prefecture', 'is_active', 'merged_into_id'];
 
-    public function questions(): HasMany
+    public function schoolYears(): HasMany
     {
-        return $this->hasMany(NQuestionsDaimon::class, 'school_id');
+        return $this->hasMany(NSchoolYear::class, 'school_id');
     }
 
-    public function answers(): HasMany
+    public function examSeries(): HasMany
     {
-        return $this->hasMany(NAnswersDaimon::class, 'school_id');
+        return $this->hasMany(NExamSeries::class, 'school_id');
+    }
+
+    public function publicationEntries(): HasMany
+    {
+        return $this->hasMany(NPublicationEntry::class, 'school_id');
     }
 }

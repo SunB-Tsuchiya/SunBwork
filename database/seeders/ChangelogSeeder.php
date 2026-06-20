@@ -10,6 +10,27 @@ class ChangelogSeeder extends Seeder
     public function run(): void
     {
         $entries = [
+            // NSystem normalized database - 2026-06-19
+            [
+                'version'      => 'nsystem-schema-1',
+                'title'        => '入試問題DBデモ：5年度対応のデータベース構造へ更新',
+                'released_at'  => '2026-06-19',
+                'summary'      => '学校、年度、試験、Nコード、問題・解答を分離したNSystem専用テーブルへ移行しました。既存の問題は2024年度として登録し、将来5年度分を同じ学校・試験系列で比較できる構造にしました。',
+                'design_files' => ['NDBSCHEMA_PLAN1.md', 'NDBSCHEMA_MANAGER1.md'],
+                'claude_notes' => 'NSystemテーブルをn_プレフィックスの11テーブルへ正規化。学校は内部IDとNコード先頭3文字、試験は年度とNコード全体、問題・解答はdocument_typeで管理。旧3テーブルはn_legacy_*へ退避。2024年の有効158試験、問題2244件、解答2376件を移行。仮コード464Fは464Nへ誤統合せず監査テーブルで未解決として保持。検索・一覧・大問表示を新構造へ切替。',
+                'body'         => <<<'HTML'
+<section class="cl-fix">
+  <h3>変更内容</h3>
+  <ul>
+    <li>学校マスターと年度別学校名を分離し、名称変更を履歴として保存可能にした</li>
+    <li>Nコード全体を年度別試験へ登録し、問題・解答を試験へ紐付けた</li>
+    <li>2024年度の既存データを新テーブルへ移行した</li>
+    <li>旧データは検証用のlegacyテーブルへ保持した</li>
+    <li>取込元の不明コードを監査テーブルで追跡できるようにした</li>
+  </ul>
+</section>
+HTML,
+            ],
             // NSystem client demo search - 2026-06-19
             [
                 'version'      => 'nsystem-search-1',
@@ -32,6 +53,26 @@ class ChangelogSeeder extends Seeder
     <li>科目・学校・カテゴリによる絞り込み</li>
     <li>一致語を中心に前後の本文を表示し、該当箇所を強調</li>
     <li>検索結果から該当する学校・科目・大問へ直接移動</li>
+  </ul>
+</section>
+HTML,
+            ],
+            [
+                'version'      => 'nsystem-schema-2',
+                'title'        => '入試問題DBデモ：年度別Mコードと学校一覧の年度切替に対応',
+                'released_at'  => '2026-06-19',
+                'summary'      => '5年度分のMコード掲載順を年度ごとに取り込み、学校一覧を選択年度のMコード順で表示するよう改善しました。問題文書がある年度だけ切り替えボタンを表示するため、現状のデモでは2024年度のみ選択できます。',
+                'design_files' => ['NDBSCHEMA_PLAN1.md', 'NDBSCHEMA_MANAGER1.md'],
+                'claude_notes' => 'n_publication_entriesへschool_idとexam_idを直接追加し、n_publication_entry_examsを廃止。NPublicationCatalogImportServiceで2022-2026 Excelをヘッダー名で読込み、2025/2026 M109は4551/4751の2行へ分割、2026 M106 4331→4335は監査注記を残して4331で登録。/n-demo一覧は選択年度のmikuni_code昇順、年度ボタンはpublicationEntries.exam.documentsが存在する年度のみ表示。',
+                'body'         => <<<'HTML'
+<section class="cl-fix">
+  <h3>追加内容</h3>
+  <ul>
+    <li>2022年度から2026年度までのMコード掲載順を年度別に取り込めるようにした</li>
+    <li>学校一覧は選択年度のMコード順で並ぶようになった</li>
+    <li>年度ボタンは問題文書が登録済みの年度だけを表示するため、現状は2024年度のみ表示する</li>
+    <li>2025年以降の開智中学校と開智所沢中等教育学校のM109共有を正式例外として保持する</li>
+    <li>2026年の江戸川学園取手の表記変更は監査用に残しつつ、現状運用に合わせて4331で扱う</li>
   </ul>
 </section>
 HTML,

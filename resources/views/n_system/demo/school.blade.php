@@ -80,6 +80,7 @@
     <div class="school-header-meta">
         <span class="ndemo-badge badge-{{ $school->category }}">{{ $school->category }}</span>
         <span>{{ $school->year }}年度</span>
+        <span>Nコード {{ $school->code }}</span>
     </div>
 </div>
 
