@@ -52,7 +52,6 @@ function removeEmail(emailId) {
     }));
 }
 
-// パスワード表示切替
 const showPw = ref(false);
 const showPwConfirm = ref(false);
 </script>
@@ -61,28 +60,27 @@ const showPwConfirm = ref(false);
     <AppLayout :title="demoPage.name + ' — デモページ管理'">
         <template #header>
             <div class="flex items-center gap-3">
-                <Link :href="route('superadmin.demo_pages.index')" class="text-yellow-600 hover:text-yellow-800 text-sm">
-                    ← 一覧に戻る
-                </Link>
-                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">
-                    {{ demoPage.name }}
-                </h2>
+                <Link
+                    :href="route('superadmin.demo_pages.index')"
+                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300 whitespace-nowrap"
+                >← 一覧に戻る</Link>
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">{{ demoPage.name }}</h2>
             </div>
         </template>
         <template #tabs>
             <SuperAdminNavigationTabs active="demo_pages" />
         </template>
 
-        <!-- フラッシュ -->
-        <div v-if="flash.success" class="mb-4 rounded-md bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700 flex items-start gap-2">
-            <span class="mt-0.5">✔</span>
-            <span>{{ flash.success }}</span>
-        </div>
-
         <div class="space-y-6">
 
+            <!-- フラッシュ -->
+            <div v-if="flash.success" class="rounded-md bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700 flex items-center gap-2">
+                <span>✔</span>
+                <span>{{ flash.success }}</span>
+            </div>
+
             <!-- ── セクション 1: 基本情報 ── -->
-            <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
+            <div class="rounded bg-white p-6 shadow">
                 <h3 class="text-base font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-200">基本情報</h3>
 
                 <form @submit.prevent="saveInfo" class="space-y-4">
@@ -101,6 +99,15 @@ const showPwConfirm = ref(false);
                         <p class="text-xs text-gray-400 mt-1">スラッグは作成後変更できません（URLに使用）</p>
                     </div>
 
+                    <div v-if="demoPage.page_url">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">デモページURL</label>
+                        <a :href="demoPage.page_url" target="_blank" rel="noopener noreferrer"
+                            class="inline-flex items-center gap-1 rounded-md bg-yellow-50 border border-yellow-200 px-3 py-1.5 text-sm font-mono text-yellow-700 hover:bg-yellow-100 hover:text-yellow-900 transition-colors">
+                            {{ demoPage.page_url }}
+                            <span class="text-xs opacity-60">↗</span>
+                        </a>
+                    </div>
+
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">説明・メモ</label>
                         <textarea v-model="infoForm.description" rows="3"
@@ -111,9 +118,7 @@ const showPwConfirm = ref(false);
                     <div class="flex items-center gap-3">
                         <label class="text-sm font-medium text-gray-700">公開状態</label>
                         <button type="button"
-                            :class="infoForm.is_active
-                                ? 'bg-green-500 hover:bg-green-600'
-                                : 'bg-gray-300 hover:bg-gray-400'"
+                            :class="infoForm.is_active ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-300 hover:bg-gray-400'"
                             class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
                             @click="infoForm.is_active = !infoForm.is_active">
                             <span :class="infoForm.is_active ? 'translate-x-6' : 'translate-x-1'"
@@ -149,7 +154,7 @@ const showPwConfirm = ref(false);
             </div>
 
             <!-- ── セクション 2: パスワード変更 ── -->
-            <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
+            <div class="rounded bg-white p-6 shadow">
                 <h3 class="text-base font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-200">パスワード変更</h3>
                 <p class="text-sm text-gray-500 mb-4">
                     クライアントがデモページにログインする際に使用するパスワードです（全許可メールアドレス共通）。
@@ -190,7 +195,7 @@ const showPwConfirm = ref(false);
             </div>
 
             <!-- ── セクション 3: 許可メールアドレス ── -->
-            <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
+            <div class="rounded bg-white p-6 shadow">
                 <h3 class="text-base font-semibold text-gray-800 mb-1 pb-2 border-b border-gray-200">
                     許可メールアドレス
                     <span class="ml-2 text-sm font-normal text-gray-400">（{{ demoPage.emails.length }} 件）</span>
@@ -199,7 +204,6 @@ const showPwConfirm = ref(false);
                     ここに登録されたメールアドレスのみがログインできます。追加・削除ごとに SuperAdmin にメール通知が送信されます。
                 </p>
 
-                <!-- 追加フォーム -->
                 <form @submit.prevent="addEmail" class="flex flex-wrap gap-2 items-end mb-5">
                     <div>
                         <label class="block text-xs font-medium text-gray-600 mb-1">メールアドレス <span class="text-red-500">*</span></label>
@@ -218,8 +222,7 @@ const showPwConfirm = ref(false);
                     <p v-if="emailForm.errors.email" class="w-full text-xs text-red-500 mt-1">{{ emailForm.errors.email }}</p>
                 </form>
 
-                <!-- メール一覧 -->
-                <div v-if="demoPage.emails.length === 0" class="text-sm text-gray-400 py-4 text-center">
+                <div v-if="demoPage.emails.length === 0" class="py-6 text-center text-sm text-gray-400">
                     許可メールアドレスが登録されていません。
                 </div>
                 <table v-else class="min-w-full divide-y divide-gray-200 text-sm">
@@ -227,16 +230,16 @@ const showPwConfirm = ref(false);
                         <tr>
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">メールアドレス</th>
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">メモ</th>
-                            <th class="px-4 py-2 text-xs font-medium text-gray-500"></th>
+                            <th class="px-4 py-2"></th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
                         <tr v-for="e in demoPage.emails" :key="e.id" class="hover:bg-gray-50">
-                            <td class="px-4 py-2 text-gray-800 font-mono text-xs">{{ e.email }}</td>
-                            <td class="px-4 py-2 text-gray-500">{{ e.label ?? '—' }}</td>
+                            <td class="px-4 py-2 font-mono text-xs text-gray-800">{{ e.email }}</td>
+                            <td class="px-4 py-2 text-gray-500 text-sm">{{ e.label ?? '—' }}</td>
                             <td class="px-4 py-2 text-right">
                                 <button type="button" @click="removeEmail(e.id)"
-                                    class="text-red-400 hover:text-red-600 text-xs font-medium">
+                                    class="text-xs font-medium text-red-400 hover:text-red-600">
                                     削除
                                 </button>
                             </td>

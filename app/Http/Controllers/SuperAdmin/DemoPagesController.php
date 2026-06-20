@@ -46,6 +46,7 @@ class DemoPagesController extends Controller
                 'description' => $demoPage->description,
                 'is_active'   => $demoPage->is_active,
                 'expires_at'  => $demoPage->expires_at?->format('Y-m-d\TH:i'),
+                'page_url'    => rescue(fn() => route($demoPage->slug . '.index'), null, false),
                 'emails'      => $demoPage->emails->map(fn($e) => [
                     'id'    => $e->id,
                     'email' => $e->email,
