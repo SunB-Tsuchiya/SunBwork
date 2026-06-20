@@ -8,10 +8,13 @@ const props = defineProps({
 });
 
 const csrfToken = computed(() => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '');
+const basePath = import.meta.env.VITE_APP_BASE_PATH ?? '';
 </script>
 
 <template>
-    <Head :title="`${props.title} | N_DB SAMPLE`" />
+    <Head :title="`${props.title} | N_DB SAMPLE`">
+        <link rel="stylesheet" :href="`${basePath}/n_sample.css`" />
+    </Head>
 
     <div class="min-h-screen bg-gray-100 text-gray-800">
         <header class="bg-[#1a3a6b] text-white shadow-sm">
