@@ -39,6 +39,18 @@
 | CR3-4 | `respond()` の辞退通知が二重作成されるバグ修正 → `ScheduleNotification::create()` を `firstOrCreate()` に変更 | ScheduleAttendeeController.php |
 | CR3-5 | `filterAttendeesByPermission()` デッドコード削除（実際には `validateAttendeeScope()` が動いており未使用） | ScheduleEventController.php |
 
+### Calendar UX Fix (2026-06-21) — 現在時刻スクロール・固定ヘッダー
+
+| # | 内容 | 変更ファイル |
+|---|------|-------------|
+| CUX-1 | 共用カレンダーシェルの高さをビューポート内に確定し、時刻グリッドが内部スクロールするよう `min-height: 0` を設定 | CalendarShell.vue |
+| CUX-2 | week の初回表示・タブ遷移・day/week 切替時に、JSTの現在時刻（対象期間外は8:00）へスクロール。描画競合対策としてスクロール可能になるまで最大6フレーム再試行 | WeekView.vue |
+| CUX-3 | `/calendar` day の内部タイムラインを確定高にし、初回表示・日付変更時の現在時刻スクロールを最大6フレーム再試行 | Calendar/UserDayView.vue |
+| CUX-4 | week の曜日・日付・勤務形態ヘッダーを上部固定し、時刻列を左固定 | WeekView.vue |
+| CUX-5 | `/calendar` day の日付ヘッダーを上部固定 | Calendar/UserDayView.vue |
+| CUX-6 | `/schedule` day の各カラムヘッダーを上部固定し、日付・勤務形態・時刻列を左上固定 | DayView.vue |
+| CUX-7 | `npm run build` 実行成功 | public/build/* |
+
 ### Round 3 (2026-06-13)
 
 | # | 内容 | 変更ファイル |

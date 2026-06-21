@@ -34,7 +34,7 @@ function onMobileSelect(e) {
 </script>
 
 <template>
-    <div class="mb-6">
+    <div class="mb-4">
         <!-- モバイル: ドロップダウン -->
         <div class="sm:hidden">
             <select

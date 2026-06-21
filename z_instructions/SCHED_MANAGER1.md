@@ -29,6 +29,7 @@
 | 動作確認 | 4項目ブラウザ動作確認（承認バッジ・辞退除外・通知・pending継続） | ✅ 完了 | 2026-06-21 |
 | Codex R3 | 第3回コードレビュー指摘修正（5件） | ✅ 完了 | 2026-06-21 |
 | バナー | 会議室予約テスト中バナーを予定表ページ上部に表示 | ✅ 完了 | 2026-06-21 |
+| Calendar UX | 現在時刻スクロール安定化・week/day 固定ヘッダー | ✅ 完了 | 2026-06-21 |
 | **デプロイ** | **さくら本番デプロイ** | 🔄 作業中 | DEPLOY_SAKURA.md 手順 |
 | **リリース** | **SuperAdmin 限定解除・全ユーザー開放** | ⬜ 未着手 | routes/web.php + AppLayout.vue |
 
@@ -257,3 +258,5 @@
 | 2026-06-21 | ブラウザ動作確認（4項目）全て OK: 承認後バッジ・辞退後カレンダー除外・辞退者名つき通知・pending 継続表示 |
 | 2026-06-21 | Codex 第3回コードレビュー実施・5件修正: ①destroy()が既存リンクイベントを削除するバグ（event_owned カラム追加・migration）②update()参加者リビルドが accepted をリセットするバグ（差分更新に変更）③conflicts()が参加者イベントを見落とすバグ（attendee JOIN 追加）④respond()重複通知バグ（firstOrCreate に変更）⑤filterAttendeesByPermission()デッドコード削除 |
 | 2026-06-21 | Pages/Schedule/Index.vue 上部に「会議室予約はテスト機能・Outlook を使用してください」バナーを追加 |
+| 2026-06-21 | Calendar UX 修正: CalendarShell の高さと内部スクロールを確定。week と `/calendar` day の現在時刻スクロールを描画完了まで最大6フレーム再試行し、初回ロード・タブ遷移・day/week 切替時の不安定動作を解消。JST判定は `toLocaleDateString('sv-SE')` とローカル時刻を使用。 |
+| 2026-06-21 | Calendar UX 修正: week の曜日・日付・勤務形態を上部固定、時刻列を左固定。`/calendar` day の日付ヘッダー、および `/schedule` day のカラムヘッダー・日付・勤務形態・時刻列も sticky 化。中間の `overflow-x-auto` は sticky の基準を奪うため除去し、縦横スクロールを CalendarShell に集約。`npm run build` 成功。 |

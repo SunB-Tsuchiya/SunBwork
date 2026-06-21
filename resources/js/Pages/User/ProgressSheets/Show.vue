@@ -120,9 +120,10 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { route } from 'ziggy-js';
 
 const props = defineProps({
-    sheet: Object,
-    projectJob: Object,
-    users: { type: Array, default: () => [] },
+    sheet:           Object,
+    projectJob:      Object,
+    users:           { type: Array,  default: () => [] },
+    calendarPrefill: { type: Object, default: null }, // カレンダーからのドラッグ時間プリフィル
 });
 
 const page = usePage();
@@ -288,6 +289,13 @@ function openJobLink({ rowId, colKey }) {
         col_key: colKey,
     };
     if (props.projectJob.client_id) params.client_id = props.projectJob.client_id;
+    // カレンダードラッグ選択から来た場合、日付・時間をプリフィル
+    const pf = props.calendarPrefill;
+    if (pf?.date)        params.date        = pf.date;
+    if (pf?.startHour)   params.startHour   = pf.startHour;
+    if (pf?.startMinute) params.startMinute = pf.startMinute;
+    if (pf?.endHour)     params.endHour     = pf.endHour;
+    if (pf?.endMinute)   params.endMinute   = pf.endMinute;
     try {
         router.visit(route('events.create_job', params));
     } catch {

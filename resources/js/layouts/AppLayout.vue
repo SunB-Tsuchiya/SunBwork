@@ -871,11 +871,11 @@ function navigateToRole(role) {
             <!-- Page Content -->
             <!-- Toasts -->
             <ToastUnified />
-            <div class="py-6">
+            <div class="py-2">
                 <!-- ここにページ固有のタブが入ります（必要なければ中央の役割ベースタブが表示されます） -->
                 <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
                     <!-- Role-specific tabs (centralized for Admin/SuperAdmin to avoid duplicates) -->
-                    <div class="mx-auto mt-6 max-w-7xl sm:px-6 lg:px-8">
+                    <div class="mx-auto mt-1 max-w-7xl sm:px-6 lg:px-8">
                         <!-- Allow pages to provide their own tabs via named slot 'tabs'. Falls back to centralized role tabs. -->
                         <slot name="tabs">
                             <!-- Role-specific navigation tabs (centralized, based on current route area) -->

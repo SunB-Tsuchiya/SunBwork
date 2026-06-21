@@ -10,6 +10,9 @@ defineProps({
     meetingDefinitions: { type: Array,  default: () => [] },
     companies:          { type: Array,  default: () => [] },
     departments:        { type: Array,  default: () => [] },
+    worktypes:          { type: Array,  default: () => [] },
+    dailyWorktypes:     { type: Array,  default: () => [] },
+    defaultWorktype:    { type: Object, default: null },
 });
 </script>
 
@@ -35,7 +38,10 @@ defineProps({
                 :meeting-definitions="meetingDefinitions"
                 :rooms="rooms"
                 :companies="companies"
-                :departments="departments" />
+                :departments="departments"
+                :worktypes="worktypes"
+                :daily-worktypes="dailyWorktypes"
+                :default-worktype="defaultWorktype" />
         </div>
     </AppLayout>
 </template>

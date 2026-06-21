@@ -37,6 +37,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     Route::post('/chat/rooms/{id}/messages', [App\Http\Controllers\Chat\ChatController::class, 'sendRoomMessage'])->name('chat.rooms.messages.send');
     // カレンダー画面
     Route::get('/calendar', [App\Http\Controllers\CalendarController::class, 'index'])->name('calendar.index');
+    // カレンダー個人イベント API（ジョブ・日報等）
+    Route::get('/calendar/events/range', [App\Http\Controllers\CalendarEventsController::class, 'range'])->name('calendar.events.range');
     // カレンダーからのイベント時間変更用
     Route::put('/events/{id}/calendar', [App\Http\Controllers\EventController::class, 'update_from_calendar'])->name('events.update_from_calendar');
 
@@ -1277,6 +1279,10 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
         // ユーザー検索 (JSON)
         Route::get('/users', [\App\Http\Controllers\Schedule\ScheduleController::class, 'users'])
             ->name('users.search');
+
+        // クライアント一覧 (JSON) — EventModal の候補取得用
+        Route::get('/clients', [\App\Http\Controllers\Schedule\ScheduleController::class, 'clients'])
+            ->name('clients.index');
 
         // 会議室一覧 (JSON)
         Route::get('/rooms', [\App\Http\Controllers\Schedule\ScheduleController::class, 'rooms'])

@@ -1,5 +1,6 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, onMounted } from 'vue';
+import { useJapaneseHolidays } from '@/Composables/useJapaneseHolidays';
 
 const props = defineProps({
     year:         { type: Number, required: true },
@@ -10,6 +11,9 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['date-click', 'event-click', 'room-click']);
+
+const { isHoliday, holidayName, fetchHolidays } = useJapaneseHolidays();
+onMounted(fetchHolidays);
 
 const DAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
@@ -53,9 +57,14 @@ function isToday(d) {
 }
 
 function eventColor(e) {
+    if (e._custom_color) return 'text-white';  // 色はインラインスタイルで設定
     if (!e.is_own) return 'bg-gray-200 text-gray-600';
     const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500'];
     return colors[(e.id ?? 0) % colors.length] + ' text-white';
+}
+
+function eventStyle(e) {
+    return e._custom_color ? { backgroundColor: e._custom_color } : {};
 }
 
 function reservationsOnDate(d) {
@@ -106,9 +115,10 @@ function fmtResTime(isoStr) {
                 <div v-if="day" class="mb-1 flex h-6 w-6 items-center justify-center text-xs font-medium"
                     :class="[
                         isToday(day) ? 'rounded-full bg-blue-600 text-white' : '',
-                        di === 0 ? 'text-red-500' : di === 6 ? 'text-blue-500' : 'text-gray-700',
+                        di === 0 || (!isToday(day) && isHoliday(dateStr(day))) ? 'text-red-500' : di === 6 ? 'text-blue-500' : 'text-gray-700',
                         isToday(day) ? '!text-white' : '',
-                    ]">
+                    ]"
+                    :title="holidayName(dateStr(day)) ?? undefined">
                     {{ day.getDate() }}
                 </div>
 
@@ -116,6 +126,7 @@ function fmtResTime(isoStr) {
                 <div v-for="ev in eventsOnDate(day)" :key="ev.id"
                     class="mb-0.5 cursor-pointer truncate rounded px-1 text-xs"
                     :class="eventColor(ev)"
+                    :style="eventStyle(ev)"
                     @click.stop="$emit('event-click', ev)">
                     {{ ev.title }}
                 </div>

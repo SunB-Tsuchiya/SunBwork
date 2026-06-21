@@ -73,6 +73,23 @@ class ProgressSheetController extends Controller
         $userIds   = array_unique(array_merge($memberIds, $coIds, [$ownerId]));
         $users     = User::whereIn('id', $userIds)->orderBy('name')->get(['id', 'name']);
 
+        // カレンダーからのドラッグ選択で遷移した場合、時間プリフィルを引き継ぐ
+        $calendarPrefill = null;
+        $calDate    = $request->query('date');
+        $startHour  = $request->query('startHour');
+        $startMin   = $request->query('startMinute');
+        $endHour    = $request->query('endHour');
+        $endMin     = $request->query('endMinute');
+        if ($calDate || $startHour) {
+            $calendarPrefill = [
+                'date'        => $calDate,
+                'startHour'   => $startHour,
+                'startMinute' => $startMin,
+                'endHour'     => $endHour,
+                'endMinute'   => $endMin,
+            ];
+        }
+
         return Inertia::render('User/ProgressSheets/Show', [
             'sheet'      => [
                 'id'            => $sheet->id,
@@ -90,6 +107,7 @@ class ProgressSheetController extends Controller
                 'size_name'   => $projectJob->size?->name ?? null,
                 'page_count'  => $projectJob->page_count ?? null,
             ],
+            'calendarPrefill' => $calendarPrefill,
         ]);
     }
 

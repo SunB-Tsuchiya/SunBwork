@@ -8,8 +8,9 @@ import EventModal             from './EventModal.vue';
 import EventDetailModal       from './EventDetailModal.vue';
 import RoomReservationModal   from './RoomReservationModal.vue';
 import OverlayPanel           from './OverlayPanel.vue';
-import MiniCalendar           from './MiniCalendar.vue';
+import CalendarShell          from './CalendarShell.vue';
 import NotificationPanel      from './NotificationPanel.vue';
+import { useCalendarCore }    from './useCalendarCore.js';
 
 const props = defineProps({
     initialDate:        { type: String, default: '' },
@@ -19,56 +20,17 @@ const props = defineProps({
     rooms:              { type: Array,  default: () => [] },
     companies:          { type: Array,  default: () => [] },
     departments:        { type: Array,  default: () => [] },
+    worktypes:          { type: Array,  default: () => [] },
+    dailyWorktypes:     { type: Array,  default: () => [] },
+    defaultWorktype:    { type: Object, default: null },
 });
 
 const CSRF     = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 const authUser = inject('authUser', null);
 
-// ── ビューモード・基準日 ──────────────────────────────────────
-const STORAGE_KEY_VIEW_MODE = 'schedule_view_mode';
-const viewMode    = ref(localStorage.getItem(STORAGE_KEY_VIEW_MODE) || 'week');
-watch(viewMode, (v) => localStorage.setItem(STORAGE_KEY_VIEW_MODE, v));
-const currentDate = ref(props.initialDate || new Date().toLocaleDateString('sv-SE'));
-
-// ── 週の月曜日を計算 ──────────────────────────────────────────
-const weekStart = computed(() => {
-    const d   = new Date(currentDate.value + 'T00:00:00');
-    const dow = d.getDay();                     // 0=日
-    const mon = new Date(d);
-    mon.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1));  // 月曜に揃える
-    return mon.toLocaleDateString('sv-SE');
-});
-
-const viewYear  = computed(() => new Date(currentDate.value + 'T00:00:00').getFullYear());
-const viewMonth = computed(() => new Date(currentDate.value + 'T00:00:00').getMonth() + 1);
-
-// ── ラベル ────────────────────────────────────────────────────
-const viewLabel = computed(() => {
-    const d = new Date(currentDate.value + 'T00:00:00');
-    if (viewMode.value === 'month') {
-        return `${d.getFullYear()}年${d.getMonth() + 1}月`;
-    }
-    if (viewMode.value === 'week') {
-        const mon = new Date(weekStart.value + 'T00:00:00');
-        const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-        return `${mon.getFullYear()}年${mon.getMonth()+1}月${mon.getDate()}日 – ${sun.getMonth()+1}月${sun.getDate()}日`;
-    }
-    const DAYS_JA = ['日', '月', '火', '水', '木', '金', '土'];
-    return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日（${DAYS_JA[d.getDay()]}）`;
-});
-
-// ── ナビゲーション ────────────────────────────────────────────
-function navigate(dir) {
-    const d = new Date(currentDate.value + 'T00:00:00');
-    if (viewMode.value === 'month') d.setMonth(d.getMonth() + dir);
-    else if (viewMode.value === 'week') d.setDate(d.getDate() + dir * 7);
-    else d.setDate(d.getDate() + dir);
-    currentDate.value = d.toLocaleDateString('sv-SE');
-}
-
-function goToday() {
-    currentDate.value = new Date().toLocaleDateString('sv-SE');
-}
+// ── ビューモード・基準日（共通コンポーザブル） ────────────────
+const { viewMode, currentDate, weekStart, viewYear, viewMonth, viewLabel, navigate, goToday, loadRange } =
+    useCalendarCore({ storageKey: 'schedule_view_mode', initialDate: props.initialDate });
 
 // ── オーバーレイ状態（reactive） ──────────────────────────────
 const overlays = ref([...props.initialOverlays]);
@@ -86,22 +48,6 @@ function onOverlayRemove(id)    { overlays.value = overlays.value.filter(o => o.
 const events       = ref([]);
 const reservations = ref([]);
 const loading      = ref(false);
-
-const loadRange = computed(() => {
-    const d = new Date(currentDate.value + 'T00:00:00');
-    if (viewMode.value === 'month') {
-        return {
-            start: new Date(d.getFullYear(), d.getMonth(), 1).toLocaleDateString('sv-SE'),
-            end:   new Date(d.getFullYear(), d.getMonth() + 1, 0).toLocaleDateString('sv-SE'),
-        };
-    }
-    if (viewMode.value === 'week') {
-        const mon = new Date(weekStart.value + 'T00:00:00');
-        const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-        return { start: weekStart.value, end: sun.toLocaleDateString('sv-SE') };
-    }
-    return { start: currentDate.value, end: currentDate.value };
-});
 
 async function loadEvents() {
     loading.value = true;
@@ -321,14 +267,18 @@ watch(showMonthRooms, (v) => localStorage.setItem(STORAGE_KEY_MONTH_ROOMS, Strin
 </script>
 
 <template>
-    <!-- 2ペインレイアウト: 左サイドバー + 右メイン -->
-    <div class="flex" style="min-height: calc(100vh - 150px)">
+    <CalendarShell
+        :current-date="currentDate"
+        :view-mode="viewMode"
+        :view-label="viewLabel"
+        :loading="loading"
+        @navigate="navigate"
+        @go-today="goToday"
+        @view-mode-change="viewMode = $event"
+        @mini-cal-select="onMiniCalSelect">
 
-        <!-- ── 左サイドバー ──────────────────────────────────────── -->
-        <div class="w-52 shrink-0 border-r border-gray-200 bg-gray-50 flex flex-col overflow-y-auto">
-            <!-- ミニカレンダー -->
-            <MiniCalendar :date="currentDate" @select="onMiniCalSelect" />
-
+        <!-- ── 左サイドバー追加コンテンツ ────────────────────────── -->
+        <template #sidebar>
             <!-- 今日の会議室予約 -->
             <div v-if="todayReservations.length > 0" class="px-2 pt-2 pb-1">
                 <div class="mb-1 text-xs font-semibold text-gray-500 uppercase tracking-wide">今日の会議室</div>
@@ -346,117 +296,81 @@ watch(showMonthRooms, (v) => localStorage.setItem(STORAGE_KEY_MONTH_ROOMS, Strin
                 </button>
             </div>
 
-            <!-- 区切り -->
-            <div class="mx-3 my-1 border-t border-gray-200" />
-
             <!-- オーバーレイパネル -->
-            <div class="px-1 py-1 flex-1">
-                <OverlayPanel
-                    :overlays="overlays"
-                    :companies="companies"
-                    :departments="departments"
-                    @add="onOverlayAdd"
-                    @remove="onOverlayRemove" />
-            </div>
-        </div>
+            <OverlayPanel
+                :overlays="overlays"
+                :companies="companies"
+                :departments="departments"
+                @add="onOverlayAdd"
+                @remove="onOverlayRemove" />
+        </template>
 
-        <!-- ── 右メインエリア ─────────────────────────────────────── -->
-        <div class="flex flex-1 min-w-0 flex-col">
-            <!-- ツールバー -->
-            <div class="flex flex-wrap items-center gap-2 border-b border-gray-200 bg-white px-4 py-2">
-                <!-- prev / next / today -->
-                <div class="flex items-center gap-1">
-                    <button
-                        class="rounded border border-gray-300 bg-white px-2.5 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 active:bg-gray-100"
-                        @click="navigate(-1)">‹</button>
-                    <button
-                        class="rounded border border-gray-300 bg-white px-2.5 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 active:bg-gray-100"
-                        @click="navigate(1)">›</button>
-                    <button
-                        class="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                        @click="goToday">today</button>
-                </div>
+        <!-- ── ツールバー追加要素 ──────────────────────────────────── -->
+        <template #toolbar-extra>
+            <!-- 月ビュー: 会議室予約表示トグル -->
+            <label v-if="viewMode === 'month' && rooms.length"
+                class="flex cursor-pointer items-center gap-1.5 text-xs text-gray-600 select-none">
+                <input type="checkbox" v-model="showMonthRooms"
+                    class="h-3.5 w-3.5 rounded border-gray-300 text-blue-600" />
+                会議室予約を表示
+            </label>
 
-                <!-- 期間ラベル -->
-                <div class="flex-1 text-center text-base font-semibold text-gray-800">
-                    {{ viewLabel }}
-                </div>
+            <!-- 通知パネル -->
+            <NotificationPanel />
 
-                <!-- month / week / day タブ -->
-                <div class="flex overflow-hidden rounded border border-gray-300">
-                    <button v-for="m in ['month', 'week', 'day']" :key="m"
-                        class="px-3 py-1.5 text-sm font-medium transition-colors"
-                        :class="viewMode === m
-                            ? 'bg-gray-700 text-white'
-                            : 'bg-white text-gray-700 hover:bg-gray-50'"
-                        @click="viewMode = m">
-                        {{ { month: '月', week: '週', day: '日' }[m] }}
-                    </button>
-                </div>
+            <!-- 予定追加ボタン -->
+            <button
+                class="rounded bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+                @click="openCreate()">
+                + 予定を追加
+            </button>
 
-                <!-- 月ビュー: 会議室予約表示トグル -->
-                <label v-if="viewMode === 'month' && rooms.length"
-                    class="flex cursor-pointer items-center gap-1.5 text-xs text-gray-600 select-none">
-                    <input type="checkbox" v-model="showMonthRooms"
-                        class="h-3.5 w-3.5 rounded border-gray-300 text-blue-600" />
-                    会議室予約を表示
-                </label>
+            <!-- 会議室予約ボタン -->
+            <button
+                v-if="rooms.length"
+                class="rounded border border-gray-300 bg-white px-4 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                @click="openRoomCreate()">
+                🏢 会議室予約
+            </button>
+        </template>
 
-                <!-- 通知パネル -->
-                <NotificationPanel />
+        <!-- ── カレンダー本体 ──────────────────────────────────────── -->
+        <MonthView v-if="viewMode === 'month'"
+            :year="viewYear" :month="viewMonth" :events="events"
+            :reservations="showMonthRooms ? reservations : []"
+            :rooms="showMonthRooms ? rooms : []"
+            @date-click="onDateClick"
+            @event-click="openDetail"
+            @room-click="openRoomEdit" />
 
-                <!-- 予定追加ボタン -->
-                <button
-                    class="rounded bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
-                    @click="openCreate()">
-                    + 予定を追加
-                </button>
+        <WeekView v-else-if="viewMode === 'week'"
+            :start-date="weekStart" :events="events"
+            :reservations="reservations" :rooms="rooms"
+            :worktypes="worktypes"
+            :daily-worktypes="dailyWorktypes"
+            :default-worktype="defaultWorktype"
+            @create="openCreate"
+            @update="onUpdate"
+            @event-click="openDetail"
+            @room-click="openRoomEdit" />
 
-                <!-- 会議室予約ボタン -->
-                <button
-                    v-if="rooms.length"
-                    class="rounded border border-gray-300 bg-white px-4 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                    @click="openRoomCreate()">
-                    🏢 会議室予約
-                </button>
-            </div>
+        <DayView v-else
+            :date="currentDate"
+            :events="events"
+            :reservations="reservations"
+            :overlay-users="overlayUsers"
+            :rooms="rooms"
+            :worktypes="worktypes"
+            :daily-worktypes="dailyWorktypes"
+            :default-worktype="defaultWorktype"
+            @create="openCreate"
+            @update="onUpdate"
+            @event-click="openDetail"
+            @room-create="openRoomCreate"
+            @room-click="openRoomEdit"
+            @room-update="onRoomUpdate" />
 
-            <!-- ローディング -->
-            <div v-if="loading" class="flex-1 py-12 text-center text-sm text-gray-400">読み込み中…</div>
-
-            <!-- カレンダー本体 -->
-            <div v-else class="flex-1 overflow-auto p-3">
-                <MonthView v-if="viewMode === 'month'"
-                    :year="viewYear" :month="viewMonth" :events="events"
-                    :reservations="showMonthRooms ? reservations : []"
-                    :rooms="showMonthRooms ? rooms : []"
-                    @date-click="onDateClick"
-                    @event-click="openDetail"
-                    @room-click="openRoomEdit" />
-
-                <WeekView v-else-if="viewMode === 'week'"
-                    :start-date="weekStart" :events="events"
-                    :reservations="reservations" :rooms="rooms"
-                    @create="openCreate"
-                    @update="onUpdate"
-                    @event-click="openDetail"
-                    @room-click="openRoomEdit" />
-
-                <DayView v-else
-                    :date="currentDate"
-                    :events="events"
-                    :reservations="reservations"
-                    :overlay-users="overlayUsers"
-                    :rooms="rooms"
-                    @create="openCreate"
-                    @update="onUpdate"
-                    @event-click="openDetail"
-                    @room-create="openRoomCreate"
-                    @room-click="openRoomEdit"
-                    @room-update="onRoomUpdate" />
-            </div>
-        </div>
-    </div>
+    </CalendarShell>
 
     <!-- モーダル（Teleport to body なので位置は影響なし） -->
     <EventModal

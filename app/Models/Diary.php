@@ -15,7 +15,7 @@ class Diary extends Model
     ];
 
     protected $casts = [
-        'date' => 'date',
+        'date' => 'date:Y-m-d',
         'read_by' => 'array',
     ];
 

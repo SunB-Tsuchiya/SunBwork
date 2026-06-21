@@ -1430,7 +1430,7 @@ onMounted(() => {
                     endTimeMin.value  = _em || '00';
                 }
             } else {
-                // ── 新規登録: 開始=現在時刻、終了=勤務形態ベース ──
+                // ── 新規登録: 開始=prefillEvent 時間 or 現在時刻、終了=prefillEvent or 勤務形態ベース ──
                 const _rawStartTime = assignments.value[0]?.start_time;
                 if (assignments.value[0]?.id && _rawStartTime) {
                     const [_sh, _sm] = String(_rawStartTime).split(':');
@@ -1440,27 +1440,38 @@ onMounted(() => {
                     const [_sh, _sm] = String(s.time).split(':');
                     startTimeHour.value = _sh || '00';
                     startTimeMin.value  = _sm || '00';
+                } else if (s.time) {
+                    // カレンダードラッグ選択からの prefillEvent に時間がある場合
+                    const [_sh, _sm] = String(s.time).split(':');
+                    startTimeHour.value = _sh || '00';
+                    startTimeMin.value  = _sm || '00';
                 } else {
                     const _nowTime = _calcInitStartTime();
                     startTimeHour.value = _nowTime.h;
                     startTimeMin.value  = _nowTime.m;
                 }
-                // 終了時刻: 勤務形態ベースで計算
-                const _nt = _calcInitStartTime();
-                const _nowMins = Number(_nt.h) * 60 + Number(_nt.m);
-                const _wEnd = (page.props?.auth?.user?.worktype_end_time ?? '17:30').substring(0, 5);
-                const [_weh, _wem] = _wEnd.split(':').map(Number);
-                const _wEndMins = _weh * 60 + (_wem || 0);
-                if (_nowMins < _wEndMins) {
-                    endTimeHour.value = String(_weh).padStart(2, '0');
-                    endTimeMin.value  = String(_wem || 0).padStart(2, '0');
+                // 終了時刻: prefillEvent に終了時間があればそれを使う、なければ勤務形態ベース
+                if (e.time) {
+                    const [_eh, _em] = String(e.time).split(':');
+                    endTimeHour.value = _eh || '00';
+                    endTimeMin.value  = _em || '00';
                 } else {
-                    let _em = Number(_nt.m) + 30;
-                    let _eh = Number(_nt.h);
-                    if (_em >= 60) { _em -= 60; _eh += 1; }
-                    if (_eh >= 24) _eh = 23;
-                    endTimeHour.value = String(_eh).padStart(2, '0');
-                    endTimeMin.value  = String(_em).padStart(2, '0');
+                    const _nt = _calcInitStartTime();
+                    const _nowMins = Number(_nt.h) * 60 + Number(_nt.m);
+                    const _wEnd = (page.props?.auth?.user?.worktype_end_time ?? '17:30').substring(0, 5);
+                    const [_weh, _wem] = _wEnd.split(':').map(Number);
+                    const _wEndMins = _weh * 60 + (_wem || 0);
+                    if (_nowMins < _wEndMins) {
+                        endTimeHour.value = String(_weh).padStart(2, '0');
+                        endTimeMin.value  = String(_wem || 0).padStart(2, '0');
+                    } else {
+                        let _em = Number(_nt.m) + 30;
+                        let _eh = Number(_nt.h);
+                        if (_em >= 60) { _em -= 60; _eh += 1; }
+                        if (_eh >= 24) _eh = 23;
+                        endTimeHour.value = String(_eh).padStart(2, '0');
+                        endTimeMin.value  = String(_em).padStart(2, '0');
+                    }
                 }
             }
         }

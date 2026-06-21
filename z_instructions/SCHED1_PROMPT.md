@@ -1,6 +1,6 @@
 # SCHED1_PROMPT.md — 予定表機能 新セッション開始用プロンプト
 
-最終更新: 2026-06-21（Codex R3 修正・動作確認・テスト中バナー追加 完了後）
+最終更新: 2026-06-21（Codex R3・現在時刻スクロール安定化・固定ヘッダー対応 完了後）
 
 ---
 
@@ -35,6 +35,7 @@
 | BugFix | 参加者保存・会議室認識・権限チェック・予約時間 | ✅ 完了 |
 | 動作確認 | 承認バッジ・辞退除外・辞退者通知・pending継続 | ✅ 完了 |
 | バナー | 「会議室予約はテスト機能・Outlook を使用」バナー追加 | ✅ 完了 |
+| Calendar UX | 現在時刻スクロール安定化・week/day 固定ヘッダー | ✅ 完了 |
 
 ### 残タスク（優先順）
 
@@ -121,6 +122,16 @@
 ---
 
 ## 重要な実装上の注意点（引き継ぎ事項）
+
+### カレンダーのスクロールと sticky ヘッダー
+
+- `CalendarShell.vue` が week と `/schedule` day の縦横スクロールコンテナ。`height: calc(100vh - 150px)` と Flex 子の `min-height: 0` を維持する
+- `WeekView.vue` は inject した `calendarScrollEl` をスクロールする。初回ロード・タブ遷移・週変更では、DOMがスクロール可能になるまで最大6フレーム再試行する
+- `/calendar` の `UserDayView.vue` は CalendarShell ではなく、自身の `timelineRef` をスクロールする。ルートの `h-full min-h-0` とタイムラインの `min-h-0` を維持する
+- 現在日を含む week/day はブラウザのローカルJST現在時刻へ、対象外の日付・週は8:00付近へ移動する
+- `WeekView.vue` の曜日・勤務形態ヘッダー、`UserDayView.vue` の日付ヘッダー、`DayView.vue` のカラムヘッダーは sticky 済み
+- sticky 対象と CalendarShell の間に `overflow-x-auto` / `overflow-y-auto` / `overflow-hidden` を追加しない。中間要素が sticky の基準になるため、固定が効かなくなる。クリップが必要なら `overflow-clip` を使う
+- week の時刻列と `/schedule` day の時刻列は `sticky left-0`。ヘッダーの `z-index` は予定ブロックより上を維持する
 
 ### EventModal → 会議室予約の統合フロー（重要）
 

@@ -10,6 +10,9 @@ use App\Models\MeetingDefinition;
 use App\Models\MeetingRoom;
 use App\Models\ScheduleCalendarOverlay;
 use App\Models\User;
+use App\Models\UserMonthlyBreak;
+use App\Models\UserMonthlySchedule;
+use App\Models\Worktype;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -42,6 +45,46 @@ class ScheduleController extends Controller
         $companies   = Company::orderBy('name')->get(['id', 'name']);
         $departments = Department::orderBy('sort_order')->get(['id', 'name', 'company_id']);
 
+        // 日程行（worktype）表示用
+        $worktypes       = [];
+        $dailyWorktypes  = [];
+        $defaultWorktype = null;
+
+        try {
+            $wq = Worktype::orderBy('sort_order');
+            if ($user->company_id) $wq->where('company_id', $user->company_id);
+            $worktypes = $wq->get(['id', 'name', 'start_time', 'end_time'])->toArray();
+        } catch (\Throwable $e) {
+            Log::error('ScheduleController worktypes: ' . $e->getMessage());
+        }
+
+        try {
+            $setting = $user->userSetting()->with('worktype')->first();
+            if ($setting?->worktype) {
+                $defaultWorktype = [
+                    'id'   => $setting->worktype->id,
+                    'name' => $setting->worktype->name,
+                ];
+            }
+        } catch (\Throwable $e) { /* non-fatal */ }
+
+        try {
+            $fromYm = now()->subMonths(3)->format('Y-m');
+            $toYm   = now()->addMonths(3)->format('Y-m');
+            UserMonthlySchedule::where('user_id', $user->id)
+                ->whereBetween('year_month', [$fromYm, $toYm])
+                ->get(['year_month', 'schedule'])
+                ->each(function ($ms) use (&$dailyWorktypes) {
+                    foreach (($ms->schedule ?? []) as $dd => $worktypeId) {
+                        if ($worktypeId) {
+                            $dailyWorktypes[] = ['date' => $ms->year_month . '-' . $dd, 'worktype_id' => (int) $worktypeId];
+                        }
+                    }
+                });
+        } catch (\Throwable $e) {
+            Log::error('ScheduleController dailyWorktypes: ' . $e->getMessage());
+        }
+
         return Inertia::render('Schedule/Index', [
             'initialDate'        => now()->toDateString(),
             'overlays'           => $overlays,
@@ -50,6 +93,9 @@ class ScheduleController extends Controller
             'meetingDefinitions' => $meetingDefinitions,
             'companies'          => $companies,
             'departments'        => $departments,
+            'worktypes'          => $worktypes,
+            'dailyWorktypes'     => $dailyWorktypes,
+            'defaultWorktype'    => $defaultWorktype,
         ]);
     }
 

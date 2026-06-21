@@ -1,24 +1,32 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, inject, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { evColor } from '@/Composables/useEventTypeColors';
+import { useJapaneseHolidays } from '@/Composables/useJapaneseHolidays';
 
 const props = defineProps({
-    startDate:    { type: String, required: true },  // YYYY-MM-DD (週の最初の日)
-    events:       { type: Array,  default: () => [] },
-    reservations: { type: Array,  default: () => [] },
-    rooms:        { type: Array,  default: () => [] },
+    startDate:       { type: String,  required: true },
+    events:          { type: Array,   default: () => [] },
+    reservations:    { type: Array,   default: () => [] },
+    rooms:           { type: Array,   default: () => [] },
+    worktypes:       { type: Array,   default: () => [] },
+    dailyWorktypes:  { type: Array,   default: () => [] },
+    defaultWorktype: { type: Object,  default: null },
+    clickToCreate:   { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['create', 'update', 'event-click', 'room-click']);
 
 // ── 定数 ──────────────────────────────────────────────────────
-const START_HOUR = 7;
-const END_HOUR   = 22;
-const HOUR_H     = 64;   // px/hour（1分 = 64/60 px）
-const SNAP       = 15;   // 分スナップ
-const TOTAL_H    = (END_HOUR - START_HOUR) * HOUR_H;
-const HEADER_H   = 40;
+const START_HOUR  = 7;
+const END_HOUR    = 22;
+const HOUR_H      = 64;
+const SNAP        = 15;
+const TOTAL_H     = (END_HOUR - START_HOUR) * HOUR_H;
+const HEADER_H    = 40;
+const WORKTYPE_H  = 22;  // 日程行の高さ（px）
 const DAYS_JA    = ['日', '月', '火', '水', '木', '金', '土'];
+
+const { isHoliday, holidayName, fetchHolidays } = useJapaneseHolidays();
 
 const days = computed(() => {
     const base = new Date(props.startDate + 'T00:00:00');
@@ -35,6 +43,13 @@ const hours = computed(() =>
 
 function dateStr(d) { return d.toLocaleDateString('sv-SE'); }
 function isToday(d) { return dateStr(d) === new Date().toLocaleDateString('sv-SE'); }
+
+function worktypeForDay(d) {
+    const ds  = dateStr(d);
+    const hit = props.dailyWorktypes.find(dw => dw.date === ds);
+    const id  = hit?.worktype_id ?? props.defaultWorktype?.id ?? null;
+    return id ? (props.worktypes.find(wt => wt.id === id) ?? null) : props.defaultWorktype ?? null;
+}
 
 // ── イベント位置計算 ───────────────────────────────────────────
 // starts_at は Eloquent datetime cast → UTC ISO 文字列。
@@ -63,7 +78,45 @@ function fmtTime(isoStr) {
 
 // ── グリッド DOM refs ─────────────────────────────────────────
 const gridRefs = ref([]);
+const scrollEl = inject('calendarScrollEl', null);
 function setGridRef(el, i) { if (el) gridRefs.value[i] = el; }
+
+// ── 現在時刻ライン ────────────────────────────────────────────
+const nowMin = ref(new Date().getHours() * 60 + new Date().getMinutes());
+let nowTimer = null;
+
+function nowTop() {
+    const m = nowMin.value - START_HOUR * 60;
+    if (m < 0 || m > (END_HOUR - START_HOUR) * 60) return null;
+    return `${m * (HOUR_H / 60)}px`;
+}
+
+function scrollToTime() {
+    const container = scrollEl?.value;
+    if (!container || container.scrollHeight <= container.clientHeight) return false;
+
+    const now       = new Date();
+    const today     = now.toLocaleDateString('sv-SE');
+    const hasToday  = days.value.some(d => dateStr(d) === today);
+    const targetMin = hasToday ? now.getHours() * 60 + now.getMinutes() : 8 * 60;
+    const gridTop   = 12 + HEADER_H + WORKTYPE_H;
+
+    container.scrollTop = Math.max(
+        0,
+        gridTop + (targetMin - START_HOUR * 60) * (HOUR_H / 60) - 160,
+    );
+    return true;
+}
+
+async function scheduleScrollToTime() {
+    await nextTick();
+    let attempts = 0;
+    const tryScroll = () => {
+        if (scrollToTime() || attempts++ >= 5) return;
+        requestAnimationFrame(tryScroll);
+    };
+    requestAnimationFrame(tryScroll);
+}
 
 function yToMin(colIndex, clientY) {
     const el = gridRefs.value[colIndex];
@@ -147,6 +200,9 @@ function onMouseup() {
         const eMin = Math.max(startMin, currentMin);
         if (eMin - sMin >= SNAP) {
             emit('create', { date: dateStr(days.value[colIndex]), startMin: sMin, endMin: eMin });
+        } else if (props.clickToCreate) {
+            const endClamped = Math.min(sMin + 60, END_HOUR * 60);
+            emit('create', { date: dateStr(days.value[colIndex]), startMin: sMin, endMin: endClamped });
         }
         selecting.value = null;
         return;
@@ -165,14 +221,24 @@ function onMouseup() {
     }
 }
 
-onMounted(() => {
+onMounted(async () => {
+    fetchHolidays();
     window.addEventListener('mousemove', onMousemove);
     window.addEventListener('mouseup',   onMouseup);
+
+    nowTimer = setInterval(() => {
+        nowMin.value = new Date().getHours() * 60 + new Date().getMinutes();
+    }, 60_000);
+
+    scheduleScrollToTime();
 });
 onUnmounted(() => {
     window.removeEventListener('mousemove', onMousemove);
     window.removeEventListener('mouseup',   onMouseup);
+    clearInterval(nowTimer);
 });
+
+watch(() => props.startDate, scheduleScrollToTime);
 
 // ── 会議室セクション ───────────────────────────────────────────
 const showRoomSection = ref(true);
@@ -224,10 +290,13 @@ function dragStyle(colIndex) {
 </script>
 
 <template>
-    <div class="flex overflow-hidden rounded-lg border border-gray-200 bg-white select-none" style="min-height: 0">
+    <div class="flex overflow-clip rounded-lg border border-gray-200 bg-white select-none" style="min-height: 0">
         <!-- 時刻ラベル列 -->
-        <div class="shrink-0 bg-gray-50 border-r border-gray-200" style="width: 44px">
-            <div :style="{ height: HEADER_H + 'px' }" class="border-b border-gray-200" />
+        <div class="sticky left-0 z-30 shrink-0 bg-gray-50 border-r border-gray-200" style="width: 44px">
+            <div :style="{ height: HEADER_H + 'px' }" class="sticky top-0 z-30 border-b border-gray-200 bg-gray-50" />
+            <!-- 日程行スペース -->
+            <div :style="{ height: WORKTYPE_H + 'px', top: HEADER_H + 'px' }"
+                class="sticky z-30 border-b border-gray-200 bg-gray-100" />
             <div :style="{ height: TOTAL_H + 'px' }" class="relative">
                 <div v-for="h in hours" :key="h"
                     class="absolute right-1 text-[10px] text-gray-400 leading-none"
@@ -238,26 +307,35 @@ function dragStyle(colIndex) {
         </div>
 
         <!-- 日列 × 7 -->
-        <div class="flex flex-1 overflow-x-auto">
+        <div class="flex flex-1">
             <div v-for="(day, di) in days" :key="di"
                 class="relative flex flex-col border-r border-gray-200 last:border-r-0"
                 style="min-width: 80px; flex: 1">
 
                 <!-- 曜日ヘッダー -->
                 <div :style="{ height: HEADER_H + 'px' }"
-                    class="flex shrink-0 flex-col items-center justify-center border-b border-gray-200"
-                    :class="isToday(day) ? 'bg-blue-50' : 'bg-white'">
+                    class="sticky top-0 z-20 flex shrink-0 flex-col items-center justify-center border-b border-gray-200"
+                    :class="isToday(day) ? 'bg-blue-50' : 'bg-white'"
+                    :title="holidayName(dateStr(day)) ?? undefined">
                     <span class="text-[10px] font-semibold"
-                        :class="di === 0 ? 'text-red-500' : di === 6 ? 'text-blue-500' : 'text-gray-500'">
+                        :class="di === 0 || isHoliday(dateStr(day)) ? 'text-red-500' : di === 6 ? 'text-blue-500' : 'text-gray-500'">
                         {{ DAYS_JA[day.getDay()] }}
                     </span>
                     <span class="flex h-5 w-5 items-center justify-center text-xs font-bold leading-none"
                         :class="[
                             isToday(day) ? 'rounded-full bg-blue-600 text-white' : 'text-gray-800',
-                            di === 0 && !isToday(day) ? 'text-red-500' : '',
-                            di === 6 && !isToday(day) ? 'text-blue-500' : '',
+                            (di === 0 || isHoliday(dateStr(day))) && !isToday(day) ? 'text-red-500' : '',
+                            di === 6 && !isHoliday(dateStr(day)) && !isToday(day) ? 'text-blue-500' : '',
                         ]">
                         {{ day.getDate() }}
+                    </span>
+                </div>
+
+                <!-- 日程行（worktype） -->
+                <div :style="{ height: WORKTYPE_H + 'px', top: HEADER_H + 'px' }"
+                    class="sticky z-20 flex items-center justify-center border-b border-gray-200 bg-gray-100 px-0.5">
+                    <span class="truncate text-[10px] font-medium text-gray-600">
+                        {{ worktypeForDay(day)?.name ?? '' }}
                     </span>
                 </div>
 
@@ -275,6 +353,13 @@ function dragStyle(colIndex) {
                     <div v-for="h in hours" :key="'h' + h"
                         class="pointer-events-none absolute inset-x-0 border-t border-gray-50"
                         :style="{ top: `${(h - START_HOUR) * HOUR_H + HOUR_H / 2}px` }" />
+
+                    <!-- 現在時刻ライン（今日の列） -->
+                    <div v-if="isToday(day) && nowTop() !== null"
+                        class="pointer-events-none absolute inset-x-0 z-10 border-t-2 border-red-400"
+                        :style="{ top: nowTop() }">
+                        <div class="absolute -left-1 -top-1.5 h-3 w-3 rounded-full bg-red-400" />
+                    </div>
 
                     <!-- 選択プレビュー -->
                     <div v-if="selStyle(di)"

@@ -22,11 +22,11 @@ function tryRoute(name) {
 
 const tabs = computed(() => [
     { key: 'dashboard', href: tryRoute('user.dashboard'), label: 'ダッシュボード' },
+    { key: 'calendar', href: tryRoute('calendar.index'), label: 'カレンダー' },
     { key: 'project_jobs', href: tryRoute('user.project_jobs.index'), label: '案件確認' },
     { key: 'myjob', href: tryRoute('user.myjobbox.index'), label: 'マイジョブBOX' },
     { key: 'jobbox', href: tryRoute('user.jobbox.index'), label: '依頼されたジョブ' },
     { key: 'diaries', href: tryRoute('diaries.index'), label: '日報一覧' },
-    { key: 'calendar', href: tryRoute('calendar.index'), label: 'カレンダー' },
     { key: 'team_rooms', href: tryRoute('team-rooms.index'), label: 'チームルーム' },
     { key: 'proof_status', href: tryRoute('user.proof.status'), label: '校正状況', condition: isSunbrain.value },
     { key: 'settings', href: tryRoute('user.settings.index'), label: '設定' },
@@ -39,7 +39,7 @@ function onMobileSelect(e) {
 </script>
 
 <template>
-    <div class="mb-6">
+    <div class="mb-4">
         <!-- モバイル: ドロップダウン -->
         <div class="sm:hidden">
             <select
@@ -61,6 +61,9 @@ function onMobileSelect(e) {
             <Link :href="route('user.dashboard')" :class="tab('dashboard')">
                 ダッシュボード
             </Link>
+            <Link :href="route('calendar.index')" :class="tab('calendar')">
+                カレンダー
+            </Link>
             <Link :href="route('user.project_jobs.index')" :class="tab('project_jobs')">
                 案件確認
             </Link>
@@ -72,9 +75,6 @@ function onMobileSelect(e) {
             </Link>
             <Link :href="route('diaries.index')" :class="tab('diaries')">
                 日報一覧
-            </Link>
-            <Link :href="route('calendar.index')" :class="tab('calendar')">
-                カレンダー
             </Link>
             <Link :href="route('team-rooms.index')" :class="tab('team_rooms')">
                 チームルーム

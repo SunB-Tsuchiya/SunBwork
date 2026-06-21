@@ -1,19 +1,23 @@
 <script setup>
-import { ref, computed, inject, onMounted, onUnmounted } from 'vue';
+import { ref, computed, inject, onMounted, onUnmounted, nextTick } from 'vue';
 import useToasts from '@/Composables/useToasts';
 import { evColor } from '@/Composables/useEventTypeColors';
 
 const props = defineProps({
-    date:         { type: String, required: true },
-    events:       { type: Array,  default: () => [] },
-    reservations: { type: Array,  default: () => [] }, // [{id, meeting_room_id, ...}]
-    overlayUsers: { type: Array,  default: () => [] }, // [{id, name}]
-    rooms:        { type: Array,  default: () => [] }, // [{id, name, color, available_from, available_to}]
+    date:            { type: String, required: true },
+    events:          { type: Array,  default: () => [] },
+    reservations:    { type: Array,  default: () => [] },
+    overlayUsers:    { type: Array,  default: () => [] },
+    rooms:           { type: Array,  default: () => [] },
+    worktypes:       { type: Array,  default: () => [] },
+    dailyWorktypes:  { type: Array,  default: () => [] },
+    defaultWorktype: { type: Object, default: null },
 });
 
 const emit = defineEmits(['create', 'update', 'event-click', 'room-create', 'room-click', 'room-update']);
 
-const authUser = inject('authUser', null);
+const authUser  = inject('authUser', null);
+const scrollEl  = inject('calendarScrollEl', null);
 
 // ── 予約不可メッセージ（Toast） ───────────────────────────────
 const { showToast } = useToasts();
@@ -41,6 +45,12 @@ const hours = computed(() =>
 function isToday() {
     return props.date === new Date().toLocaleDateString('sv-SE');
 }
+
+const todayWorktype = computed(() => {
+    const hit = props.dailyWorktypes.find(dw => dw.date === props.date);
+    const id  = hit?.worktype_id ?? props.defaultWorktype?.id ?? null;
+    return id ? (props.worktypes.find(wt => wt.id === id) ?? null) : props.defaultWorktype ?? null;
+});
 
 // ── カラム定義（順序: own → rooms → overlayUsers）─────────────
 const baseColumns = computed(() => [
@@ -213,7 +223,8 @@ function fmtTime(isoStr) {
 function nowTop() {
     const now = new Date();
     const m = now.getHours() * 60 + now.getMinutes() - START_HOUR * 60;
-    return `${Math.max(0, m * (HOUR_H / 60))}px`;
+    if (m < 0 || m > (END_HOUR - START_HOUR) * 60) return null;
+    return `${m * (HOUR_H / 60)}px`;
 }
 
 // ── 自分カラム: ドラッグ選択・移動・リサイズ ──────────────────
@@ -412,9 +423,26 @@ function onMouseup() {
     }
 }
 
-onMounted(() => {
+onMounted(async () => {
     window.addEventListener('mousemove', onMousemove);
     window.addEventListener('mouseup',   onMouseup);
+
+    // レイアウト確定後に現在時刻付近へスクロール
+    await nextTick();
+    requestAnimationFrame(() => {
+        const container = scrollEl?.value;
+        if (!container) return;
+
+        const now = new Date();
+        const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        const targetMin = (props.date === ymd(now))
+            ? now.getHours() * 60 + now.getMinutes()
+            : 8 * 60;
+
+        // CalendarShell p-3(12px) + DayView ヘッダー(HEADER_H)
+        const gridTop = 12 + HEADER_H;
+        container.scrollTop = Math.max(0, gridTop + (targetMin - START_HOUR * 60) * (HOUR_H / 60) - 160);
+    });
 });
 onUnmounted(() => {
     window.removeEventListener('mousemove', onMousemove);
@@ -456,21 +484,24 @@ function dragStyle() {
 </script>
 
 <template>
-    <!-- overflow-x-auto で多カラム時に横スクロール -->
-    <div class="select-none overflow-x-auto rounded-lg border border-gray-200 bg-white"
+    <!-- 多カラム時の縦横スクロールは CalendarShell が担当 -->
+    <div class="select-none overflow-clip rounded-lg border border-gray-200 bg-white"
         style="min-height: 520px">
 
         <div class="flex" :style="{ minWidth: `${TIME_W + columns.reduce((s, c) => s + (isClosed(c) ? COL_W_CLOSED : COL_W), 0)}px` }">
 
             <!-- ── 時刻列（sticky left）─────────────────────────── -->
-            <div class="sticky left-0 z-20 shrink-0 border-r border-gray-200 bg-gray-50"
+            <div class="sticky left-0 z-30 shrink-0 border-r border-gray-200 bg-gray-50"
                 :style="{ width: TIME_W + 'px' }">
 
                 <!-- ヘッダー空白 -->
                 <div :style="{ height: HEADER_H + 'px' }"
-                    class="flex items-end justify-end border-b border-gray-200 pb-1 pr-1">
+                    class="sticky top-0 z-30 flex flex-col items-end justify-end border-b border-gray-200 bg-gray-50 pb-1 pr-1 gap-0.5">
                     <span class="text-[9px] text-gray-400">
                         {{ new Date(date + 'T00:00:00').toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' }) }}
+                    </span>
+                    <span v-if="todayWorktype" class="text-[9px] font-medium text-indigo-600 leading-none">
+                        {{ todayWorktype.name }}
                     </span>
                 </div>
 
@@ -497,7 +528,7 @@ function dragStyle() {
 
                 <!-- カラムヘッダー -->
                 <div :style="{ height: HEADER_H + 'px', borderBottom: `3px solid ${col.color}` }"
-                    class="group relative flex shrink-0 items-center justify-between gap-1 px-1.5 bg-white"
+                    class="group sticky top-0 z-20 flex shrink-0 items-center justify-between gap-1 px-1.5 bg-white"
                     :title="isClosed(col) ? col.label : undefined">
 
                     <template v-if="!isClosed(col)">
@@ -555,7 +586,7 @@ function dragStyle() {
                         </template>
 
                         <!-- 現在時刻ライン（全カラムに横断） -->
-                        <div v-if="isToday()"
+                        <div v-if="isToday() && nowTop() !== null"
                             class="pointer-events-none absolute inset-x-0 z-10 border-t-2 border-red-400"
                             :style="{ top: nowTop() }">
                             <div v-if="ci === 0"

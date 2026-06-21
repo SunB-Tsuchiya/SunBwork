@@ -1,10 +1,14 @@
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
+import { useJapaneseHolidays } from '@/Composables/useJapaneseHolidays';
 
 const props = defineProps({
     date: { type: String, required: true }, // YYYY-MM-DD (選択中の日付)
 });
 const emit = defineEmits(['select']);
+
+const { isHoliday, holidayName, fetchHolidays } = useJapaneseHolidays();
+onMounted(fetchHolidays);
 
 const today = new Date().toLocaleDateString('sv-SE');
 
@@ -32,13 +36,13 @@ const monthLabel = computed(() =>
     `${viewYear.value}年 ${viewMonth.value + 1}月`
 );
 
-// カレンダーグリッド（6行×7列、月曜始まり）
+// カレンダーグリッド（6行×7列、日曜始まり）
 const grid = computed(() => {
     const year  = viewYear.value;
     const month = viewMonth.value;
     const first = new Date(year, month, 1);
-    // 月曜を0とした開始オフセット (日=0 → 6, 月=1 → 0, ...)
-    const offset = (first.getDay() + 6) % 7;
+    // 日曜を0とした開始オフセット (日=0, 月=1, ..., 土=6)
+    const offset = first.getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const cells = [];
     for (let i = 0; i < offset; i++) cells.push(null);
@@ -56,7 +60,13 @@ const grid = computed(() => {
 function dayNum(dateStr) { return dateStr ? parseInt(dateStr.slice(8)) : ''; }
 function isSelected(d) { return d === props.date; }
 function isToday(d)    { return d === today; }
-function isWeekend(colIdx) { return colIdx === 5 || colIdx === 6; } // 土=5, 日=6 (月始まり)
+
+// 列インデックス (日曜始まり): 0=日 → 赤、6=土 → 青
+function dayColor(ci, d) {
+    if (ci === 0 || (d && isHoliday(d))) return 'text-red-500';
+    if (ci === 6) return 'text-blue-500';
+    return 'text-gray-700';
+}
 </script>
 
 <template>
@@ -74,9 +84,9 @@ function isWeekend(colIdx) { return colIdx === 5 || colIdx === 6; } // 土=5, �
 
         <!-- 曜日ヘッダー -->
         <div class="mb-0.5 grid grid-cols-7 text-center">
-            <span v-for="(w, wi) in ['月','火','水','木','金','土','日']" :key="w"
+            <span v-for="(w, wi) in ['日','月','火','水','木','金','土']" :key="w"
                 class="text-[10px] font-medium"
-                :class="wi >= 5 ? 'text-blue-400' : 'text-gray-400'">{{ w }}</span>
+                :class="wi === 0 ? 'text-red-400' : wi === 6 ? 'text-blue-400' : 'text-gray-400'">{{ w }}</span>
         </div>
 
         <!-- 日付グリッド -->
@@ -93,10 +103,11 @@ function isWeekend(colIdx) { return colIdx === 5 || colIdx === 6; } // 土=5, �
                             : isToday(d)
                                 ? 'bg-blue-100 font-semibold text-blue-700'
                                 : d
-                                    ? (isWeekend(ci) ? 'text-blue-500 hover:bg-gray-100' : 'text-gray-700 hover:bg-gray-100')
+                                    ? dayColor(ci, d) + ' hover:bg-gray-100'
                                     : '',
                     ]"
                     :disabled="!d"
+                    :title="d && holidayName(d) ? holidayName(d) : undefined"
                     @click="d && $emit('select', d)">
                     {{ dayNum(d) }}
                 </button>
