@@ -62,12 +62,13 @@ class CalendarEventsController extends Controller
 
             try {
                 $rows = ProjectJobAssignment::whereIn('id', $assignmentIds)
-                    ->get(['id', 'sender_id', 'source_assignment_id', 'supersedes_assignment_id']);
+                    ->get(['id', 'sender_id', 'source_assignment_id', 'supersedes_assignment_id', 'completed']);
                 foreach ($rows as $r) {
                     $senderMap[(int)$r->id] = $r->sender_id === null ? null : (int)$r->sender_id;
                     $flagMap[(int)$r->id] = [
                         'has_source'     => !empty($r->source_assignment_id),
                         'has_supersedes' => !empty($r->supersedes_assignment_id),
+                        'completed'      => (bool) ($r->completed ?? false),
                     ];
                 }
             } catch (\Throwable $e) {
@@ -118,6 +119,10 @@ class CalendarEventsController extends Controller
             $slug = $e->eventItemType?->slug;
             $eventRoute = ($slug && in_array($slug, $internalSlugs, true)) ? 'internal' : 'client';
 
+            $completed = $pjId && isset($flagMap[(int)$pjId])
+                ? $flagMap[(int)$pjId]['completed']
+                : false;
+
             return [
                 'id'            => $e->id,
                 'title'         => $e->title,
@@ -128,6 +133,7 @@ class CalendarEventsController extends Controller
                 '_source'       => 'personal',
                 '_custom_color' => $color,
                 '_event_route'  => $eventRoute,
+                'completed'     => $completed,
                 'project_job_assignment_id' => $pjId,
             ];
         })->filter()->values();

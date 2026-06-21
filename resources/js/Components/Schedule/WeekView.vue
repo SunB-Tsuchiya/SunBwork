@@ -266,13 +266,14 @@ function selStyle(colIndex) {
 }
 
 function evStyle(ev) {
+    const isDragging = dragging.value?.ev?.id === ev.id && dragging.value.type === 'move';
     return {
         top:         `${evTop(ev)}px`,
         height:      `${evHeight(ev)}px`,
         background:  evColor(ev).bg,
         color:       evColor(ev).text,
         borderColor: evColor(ev).border,
-        opacity:     (dragging.value?.ev?.id === ev.id && dragging.value.type === 'move') ? '0.3' : '1',
+        opacity:     isDragging ? '0.3' : ev.completed ? '0.45' : '1',
     };
 }
 

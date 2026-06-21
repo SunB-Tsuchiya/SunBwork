@@ -64,7 +64,9 @@ function eventColor(e) {
 }
 
 function eventStyle(e) {
-    return e._custom_color ? { backgroundColor: e._custom_color } : {};
+    const style = e._custom_color ? { backgroundColor: e._custom_color } : {};
+    if (e.completed) style.opacity = '0.45';
+    return style;
 }
 
 function reservationsOnDate(d) {
