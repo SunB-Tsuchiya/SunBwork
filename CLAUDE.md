@@ -47,7 +47,25 @@
 ⚠️ **pull 前に `npm run build` を実行してはいけない。** 古いソースでビルドした後に push すると、さくらの最新ビルドを上書きして機能が消える危険がある。
 
 **「git にアップ」「さくらにデプロイ」を求められたとき:**
-→ `z_instructions/DEPLOY_SAKURA.md` の手順に従う。VITE_APP_BASE_PATH の切り替えを必ず行うこと。
+→ `z_instructions/DEPLOY_SAKURA.md` の手順に従う。**急ぎの場合でも手順を省略してはいけない。**
+
+> ### 🚨 さくらデプロイ最重要ルール — VITE_APP_BASE_PATH
+>
+> **Vue/JS ファイルを変更してさくらにデプロイする場合、必ず以下の順序を守ること。**  
+> この手順を守らずにビルドすると、さくら本番のアセットがローカル用のパスで上書きされ、全画面で 404 エラーが発生する（過去に実際に発生した）。
+>
+> ```
+> ① sed -i 's/^VITE_APP_BASE_PATH=$/VITE_APP_BASE_PATH=\/members/' .env
+> ② npm run build
+> ③ git add public/build/ && git commit && git push
+> ④ ssh でさくらに git pull
+> ⑤ sed -i 's/^VITE_APP_BASE_PATH=\/members$/VITE_APP_BASE_PATH=/' .env
+> ⑥ npm run build   ← このビルドはコミットしない（ローカル専用）
+> ```
+>
+> - ① を忘れてローカル用（空パス）のままビルドして push → さくら全画面 404
+> - ⑤⑥ を忘れると次回のローカル開発ビルドが `/members` パスになりローカルが壊れる
+> - **「急いでいる」「バグ修正だけ」などの理由でこの手順をスキップしてはいけない**
 
 **さくら SSH 接続について:**
 - SSH 接続先情報は `z_instructions/DEPLOY_SAKURA.md` に記載されている。

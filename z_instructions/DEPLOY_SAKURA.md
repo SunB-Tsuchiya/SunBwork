@@ -2,6 +2,31 @@
 
 > この手順書は **AI Agent が迷わず安全にデプロイできること** を目的としています。
 > 各ステップを上から順に実行し、スキップしないでください。
+> **急ぎの場合・小さな修正の場合でも、この手順を省略してはいけません。**
+
+---
+
+## 🚨 最重要警告 — VITE_APP_BASE_PATH ビルドミス
+
+**過去に実際に発生した障害:** Vue/JS ファイルを修正後、VITE_APP_BASE_PATH を切り替えずにローカル用（空）のままビルドして git push → さくら本番の全アセットが `/build/assets/xxx.js`（`/members` なし）のパスで上書きされ、全画面で 404 エラーが発生した。
+
+### さくらデプロイ時のビルドは必ずこの 6 ステップ
+
+| ステップ | コマンド | 目的 |
+|---|---|---|
+| ① | `sed -i 's/^VITE_APP_BASE_PATH=$/VITE_APP_BASE_PATH=\/members/' .env` | さくら用に切り替え |
+| ② | `npm run build` | `/members` ベースパスでビルド |
+| ③ | `git add public/build/ && git commit && git push` | さくら用アセットをコミット |
+| ④ | `ssh ... "git pull"` | さくらに反映 |
+| ⑤ | `sed -i 's/^VITE_APP_BASE_PATH=\/members$/VITE_APP_BASE_PATH=/' .env` | ローカル用に戻す |
+| ⑥ | `npm run build` | ローカル用にリビルド（**コミットしない**） |
+
+**禁止パターン:**
+- ❌ ①を飛ばして `npm run build` → push（さくら全画面 404）
+- ❌ ⑤⑥を省略（次回ローカル開発が `/members` パスになり壊れる）
+- ❌ 「バグ修正だけだから」「急いでいるから」を理由に手順を省略
+
+**ビルドせずに PHP/Blade のみ変更した場合は ①〜⑥ 不要。** Vue/JS ファイルに変更がない場合は、ソースファイルのみコミットして push → さくらで `git pull` のみでよい。
 
 ---
 
@@ -46,13 +71,19 @@ docker compose exec laravel bash -lc "php artisan ziggy:generate resources/js/zi
 
 ---
 
-## 3. さくら用ビルド
+## 3. さくら用ビルド（Vue/JS を変更した場合のみ）
 
-### ⚠️ VITE_APP_BASE_PATH の切り替えは **必ずこの順序**で行う
+> **Vue/JS ファイルを変更していない場合（PHP/Blade/migration のみ）はこのステップを飛ばしてステップ4へ。**
+
+### 🚨 VITE_APP_BASE_PATH の切り替えは **必ずこの順序** で行う — 省略厳禁
 
 ```bash
-# ① .env を さくら用 に切り替え（/members を設定）
-sed -i 's/^VITE_APP_BASE_PATH=$/VITE_APP_BASE_PATH=\/members/' /home/tchirosb/SunBWork/.env
+# ① .env を さくら用 に切り替え（/members を設定）← これを忘れると本番が全画面 404 になる
+sed -i 's/^VITE_APP_BASE_PATH=$/VITE_APP_BASE_PATH=\/members/' /home/w229/SunBwork/.env
+
+# 切り替え確認（必ず確認すること）
+grep VITE_APP_BASE_PATH /home/w229/SunBwork/.env
+# → VITE_APP_BASE_PATH=/members  と表示されることを確認
 
 # ② さくら用ビルド実行
 npm run build
@@ -60,8 +91,7 @@ npm run build
 # ③ ビルド成功を確認してからコミットへ進む
 ```
 
-> **注意:** `sed -i` はWSL/Linux環境。さくらサーバ上では BSD版のため `-i ''` が必要だが、
-> ここはローカルでの操作なので `-i`（引数なし）で正しい。
+> **注意:** `sed -i` はWSL/Linux環境（ローカル操作）なので `-i` 引数なしで正しい。さくらサーバ上（BSD）では `-i ''` が必要だが、ここはローカルでの操作。
 
 ---
 
@@ -81,19 +111,23 @@ git commit -m "feat/fix/build: <変更内容の説明>"
 
 ---
 
-## 5. ローカル用ビルドへ戻す（コミット直後に必ず実行）
+## 5. ローカル用ビルドへ戻す（Vue/JS を変更した場合のみ・コミット直後に必ず実行）
 
-### ⚠️ これを忘れると次回の開発ビルドが `/members` ベースパスになり、ローカル環境が壊れる
+### 🚨 これを忘れると次回の開発ビルドが `/members` ベースパスになり、ローカル環境が壊れる
 
 ```bash
 # .env をローカル用に戻す（/members を空にする）
-sed -i 's/^VITE_APP_BASE_PATH=\/members$/VITE_APP_BASE_PATH=/' /home/tchirosb/SunBWork/.env
+sed -i 's/^VITE_APP_BASE_PATH=\/members$/VITE_APP_BASE_PATH=/' /home/w229/SunBwork/.env
+
+# 戻し確認（必ず確認すること）
+grep VITE_APP_BASE_PATH /home/w229/SunBwork/.env
+# → VITE_APP_BASE_PATH=  （空）と表示されることを確認
 
 # ローカル用ビルドを実行
 npm run build
 ```
 
-> **このビルドはコミットしない。** ローカル専用のビルドです。
+> **このビルドはコミットしない。** ローカル専用のビルドです。さくら用アセットを上書きしてしまう。
 
 ---
 
