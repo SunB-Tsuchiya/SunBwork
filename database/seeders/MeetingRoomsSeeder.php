@@ -21,13 +21,13 @@ class MeetingRoomsSeeder extends Seeder
         }
 
         $rooms = [
-            ['name' => '田端会議室',     'sort_order' => 1, 'color' => '#3b82f6'],
-            ['name' => '田端多目的ルーム', 'sort_order' => 2, 'color' => '#10b981'],
-            ['name' => '田端応接室',      'sort_order' => 3, 'color' => '#8b5cf6'],
+            ['name' => '田端会議室',     'sort_order' => 1, 'color' => '#3b82f6', 'available_from' => '09:00:00', 'available_to' => '17:00:00'],
+            ['name' => '田端多目的ルーム', 'sort_order' => 2, 'color' => '#10b981', 'available_from' => '09:00:00', 'available_to' => '17:00:00'],
+            ['name' => '田端応接室',      'sort_order' => 3, 'color' => '#8b5cf6', 'available_from' => '09:00:00', 'available_to' => '17:00:00'],
         ];
 
         foreach ($rooms as $room) {
-            MeetingRoom::firstOrCreate(
+            MeetingRoom::updateOrCreate(
                 ['company_id' => $company->id, 'name' => $room['name']],
                 array_merge($room, ['company_id' => $company->id, 'active' => true])
             );

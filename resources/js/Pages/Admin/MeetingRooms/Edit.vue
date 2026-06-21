@@ -1,6 +1,5 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
-import AdminNavigationTabs from '@/Components/Tabs/AdminNavigationTabs.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import TextInput from '@/Components/TextInput.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
@@ -11,12 +10,14 @@ const props = defineProps({
 });
 
 const form = useForm({
-    name:        props.room.name,
-    capacity:    props.room.capacity ?? '',
-    description: props.room.description ?? '',
-    color:       props.room.color ?? '#6b7280',
-    active:      props.room.active,
-    sort_order:  props.room.sort_order ?? 0,
+    name:           props.room.name,
+    capacity:       props.room.capacity ?? '',
+    description:    props.room.description ?? '',
+    color:          props.room.color ?? '#6b7280',
+    active:         props.room.active,
+    sort_order:     props.room.sort_order ?? 0,
+    available_from: props.room.available_from ? props.room.available_from.slice(0, 5) : '',
+    available_to:   props.room.available_to   ? props.room.available_to.slice(0, 5)   : '',
 });
 
 function submit() {
@@ -29,8 +30,6 @@ function submit() {
         <template #header>
             <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">会議室編集</h2>
         </template>
-
-        <AdminNavigationTabs active="meeting_rooms" />
 
         <div class="mx-auto max-w-xl rounded bg-white px-4 py-6 sm:p-6 shadow">
             <form @submit.prevent="submit" class="space-y-5">
@@ -76,6 +75,19 @@ function submit() {
                         id="sort_order" v-model="form.sort_order" type="number"
                         class="mt-1 block w-24" min="0"
                     />
+                </div>
+
+                <div>
+                    <InputLabel value="予約可能時間（空欄=制限なし）" />
+                    <div class="mt-1 flex items-center gap-2">
+                        <input v-model="form.available_from" type="time" step="900"
+                            class="rounded-md border-gray-300 text-sm shadow-sm focus:border-red-500 focus:ring-red-500" />
+                        <span class="text-sm text-gray-500">〜</span>
+                        <input v-model="form.available_to" type="time" step="900"
+                            class="rounded-md border-gray-300 text-sm shadow-sm focus:border-red-500 focus:ring-red-500" />
+                    </div>
+                    <p v-if="form.errors.available_from" class="mt-1 text-xs text-red-600">{{ form.errors.available_from }}</p>
+                    <p v-if="form.errors.available_to" class="mt-1 text-xs text-red-600">{{ form.errors.available_to }}</p>
                 </div>
 
                 <div class="flex items-center gap-3">

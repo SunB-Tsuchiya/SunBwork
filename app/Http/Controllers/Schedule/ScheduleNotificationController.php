@@ -11,7 +11,7 @@ class ScheduleNotificationController extends Controller
     public function index()
     {
         $notifications = ScheduleNotification::where('user_id', Auth::id())
-            ->with('event:id,title,starts_at,ends_at')
+            ->with(['event:id,title,starts_at,ends_at', 'fromUser:id,name'])
             ->orderByDesc('scheduled_at')
             ->limit(50)
             ->get();

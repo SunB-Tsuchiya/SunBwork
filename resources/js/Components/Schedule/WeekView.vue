@@ -1,12 +1,15 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { evColor } from '@/Composables/useEventTypeColors';
 
 const props = defineProps({
-    startDate: { type: String, required: true },  // YYYY-MM-DD (週の最初の日)
-    events:    { type: Array,  default: () => [] },
+    startDate:    { type: String, required: true },  // YYYY-MM-DD (週の最初の日)
+    events:       { type: Array,  default: () => [] },
+    reservations: { type: Array,  default: () => [] },
+    rooms:        { type: Array,  default: () => [] },
 });
 
-const emit = defineEmits(['create', 'update', 'event-click']);
+const emit = defineEmits(['create', 'update', 'event-click', 'room-click']);
 
 // ── 定数 ──────────────────────────────────────────────────────
 const START_HOUR = 7;
@@ -54,17 +57,6 @@ function evHeight(ev) {
     return Math.max(18, (localMin(ev.ends_at) - localMin(ev.starts_at)) * (HOUR_H / 60));
 }
 
-const PALETTE = [
-    { bg: '#3b82f6', text: '#fff', border: '#2563eb' },
-    { bg: '#10b981', text: '#fff', border: '#059669' },
-    { bg: '#8b5cf6', text: '#fff', border: '#7c3aed' },
-    { bg: '#f97316', text: '#fff', border: '#ea580c' },
-    { bg: '#0ea5e9', text: '#fff', border: '#0284c7' },
-];
-function evColor(ev) {
-    if (!ev.is_own) return { bg: '#e5e7eb', text: '#374151', border: '#d1d5db' };
-    return PALETTE[(ev.id ?? 0) % PALETTE.length];
-}
 function fmtTime(isoStr) {
     return new Date(isoStr).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
@@ -108,6 +100,7 @@ function onGridMousedown(colIndex, e) {
 
 // ── イベント mousedown → ドラッグ開始 ────────────────────────
 function onEventMousedown(ev, type, e) {
+    if (!ev.is_own) return;
     if (e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
@@ -180,6 +173,22 @@ onUnmounted(() => {
     window.removeEventListener('mousemove', onMousemove);
     window.removeEventListener('mouseup',   onMouseup);
 });
+
+// ── 会議室セクション ───────────────────────────────────────────
+const showRoomSection = ref(true);
+
+function reservationsForRoomAndDay(roomId, day) {
+    const ds = dateStr(day);
+    return props.reservations.filter(r =>
+        r.meeting_room_id === roomId &&
+        new Date(r.starts_at).toLocaleDateString('sv-SE') === ds
+    );
+}
+
+function fmtResTime(isoStr) {
+    const d = new Date(isoStr);
+    return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
 
 // ── テンプレート用ヘルパー ─────────────────────────────────────
 function selStyle(colIndex) {
@@ -274,17 +283,18 @@ function dragStyle(colIndex) {
 
                     <!-- イベント -->
                     <div v-for="ev in eventsForDay(day)" :key="ev.id"
-                        class="absolute inset-x-0.5 overflow-hidden rounded border px-1 pt-0.5 text-xs cursor-grab"
+                        class="absolute inset-x-0.5 overflow-hidden rounded border px-1 pt-0.5 text-xs"
+                        :class="ev.is_own ? 'cursor-grab' : 'cursor-default'"
                         :style="evStyle(ev)"
                         @mousedown.stop="onEventMousedown(ev, 'move', $event)"
                         @click.stop="$emit('event-click', ev)">
-                        <!-- リサイズ上端 -->
-                        <div class="absolute inset-x-0 top-0 h-2 cursor-n-resize"
+                        <!-- リサイズ上端（自分の予定のみ） -->
+                        <div v-if="ev.is_own" class="absolute inset-x-0 top-0 h-2 cursor-n-resize"
                             @mousedown.stop="onEventMousedown(ev, 'resize-top', $event)" />
                         <div class="pointer-events-none font-semibold leading-tight line-clamp-2">{{ ev.title }}</div>
                         <div class="pointer-events-none text-[10px] opacity-80">{{ fmtTime(ev.starts_at) }}</div>
-                        <!-- リサイズ下端 -->
-                        <div class="absolute inset-x-0 bottom-0 h-2 cursor-s-resize"
+                        <!-- リサイズ下端（自分の予定のみ） -->
+                        <div v-if="ev.is_own" class="absolute inset-x-0 bottom-0 h-2 cursor-s-resize"
                             @mousedown.stop="onEventMousedown(ev, 'resize-bot', $event)" />
                     </div>
 
@@ -293,6 +303,44 @@ function dragStyle(colIndex) {
                         class="pointer-events-none absolute inset-x-0.5 overflow-hidden rounded border px-1 pt-0.5 text-xs opacity-90 shadow-lg ring-2 ring-white"
                         :style="dragStyle(di)">
                         <div class="font-semibold leading-tight">{{ dragging.ev.title }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 会議室セクション（rooms が存在するときのみ表示） -->
+    <div v-if="rooms.length" class="mt-2 overflow-hidden rounded-lg border border-gray-200 bg-white select-none">
+        <!-- トグルヘッダー -->
+        <button
+            class="flex w-full items-center gap-1 border-b border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100"
+            @click="showRoomSection = !showRoomSection">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
+            </svg>
+            会議室予約
+            <svg xmlns="http://www.w3.org/2000/svg" class="ml-auto h-3.5 w-3.5 transition-transform" :class="showRoomSection ? '' : '-rotate-90'" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+            </svg>
+        </button>
+
+        <div v-if="showRoomSection">
+            <!-- 行: 室 × 列: 曜日 -->
+            <div v-for="room in rooms" :key="room.id"
+                class="grid border-b border-gray-100 last:border-b-0"
+                style="grid-template-columns: 56px repeat(7, 1fr)">
+                <!-- 室名ラベル -->
+                <div class="flex items-center justify-end border-r border-gray-200 bg-gray-50 px-1.5 py-1 text-[10px] font-medium text-gray-600 leading-tight">
+                    {{ room.name }}
+                </div>
+                <!-- 曜日セル -->
+                <div v-for="(day, di) in days" :key="di"
+                    class="min-h-8 border-r border-gray-100 p-0.5 last:border-r-0">
+                    <div v-for="res in reservationsForRoomAndDay(room.id, day)" :key="res.id"
+                        class="mb-0.5 cursor-pointer truncate rounded px-1 py-0.5 text-[10px] text-white leading-tight"
+                        :style="{ background: room.color || '#6b7280' }"
+                        @click="$emit('room-click', res)">
+                        {{ fmtResTime(res.starts_at) }} {{ res.title }}
                     </div>
                 </div>
             </div>

@@ -4,6 +4,19 @@
 
 ---
 
+## Windows パス → WSL2 パス 自動変換ルール
+
+ユーザーが `C:\...` 形式の Windows パスを貼り付けた場合、Claude は自動的に WSL2 パスに変換して読み取ること。
+
+| Windows パス例 | WSL2 パス |
+|---|---|
+| `C:\Users\foo\Pictures\screenshot.png` | `/mnt/c/Users/foo/Pictures/screenshot.png` |
+| `C:\temp\image.jpg` | `/mnt/c/temp/image.jpg` |
+
+**変換ルール:** `C:\` → `/mnt/c/`、以降の `\` はすべて `/` に置換する。D ドライブなら `D:\` → `/mnt/d/`。
+
+---
+
 ## 作業ルール（最重要）
 
 1. **作業前に必ず関連コードを読む。** 既存の実装を確認してから変更・追加する

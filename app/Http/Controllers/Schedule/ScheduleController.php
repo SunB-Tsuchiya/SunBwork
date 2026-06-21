@@ -6,11 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\Department;
 use App\Models\EventItemType;
+use App\Models\MeetingDefinition;
 use App\Models\MeetingRoom;
 use App\Models\ScheduleCalendarOverlay;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class ScheduleController extends Controller
@@ -27,21 +30,26 @@ class ScheduleController extends Controller
         $rooms = MeetingRoom::where('company_id', $user->company_id)
             ->active()
             ->orderBy('sort_order')
-            ->get(['id', 'name', 'color']);
+            ->get(['id', 'name', 'color', 'available_from', 'available_to']);
 
-        $eventItemTypes = EventItemType::orderBy('id')->get(['id', 'name']);
+        $eventItemTypes = EventItemType::orderBy('id')->get(['id', 'name', 'slug']);
+
+        $meetingDefinitions = MeetingDefinition::where('company_id', $user->company_id)
+            ->with('members:id,name')
+            ->get(['id', 'title', 'description', 'recurrence', 'day_of_week', 'week_of_month', 'start_time', 'end_time']);
 
         // 参加者ピッカー用: 全会社・全部署（company_id 付き）
         $companies   = Company::orderBy('name')->get(['id', 'name']);
         $departments = Department::orderBy('sort_order')->get(['id', 'name', 'company_id']);
 
         return Inertia::render('Schedule/Index', [
-            'initialDate'    => now()->toDateString(),
-            'overlays'       => $overlays,
-            'rooms'          => $rooms,
-            'eventItemTypes' => $eventItemTypes,
-            'companies'      => $companies,
-            'departments'    => $departments,
+            'initialDate'        => now()->toDateString(),
+            'overlays'           => $overlays,
+            'rooms'              => $rooms,
+            'eventItemTypes'     => $eventItemTypes,
+            'meetingDefinitions' => $meetingDefinitions,
+            'companies'          => $companies,
+            'departments'        => $departments,
         ]);
     }
 
@@ -51,25 +59,93 @@ class ScheduleController extends Controller
         $rooms = MeetingRoom::where('company_id', $user->company_id)
             ->active()
             ->orderBy('sort_order')
-            ->get(['id', 'name', 'color', 'capacity']);
+            ->get(['id', 'name', 'color', 'capacity', 'available_from', 'available_to']);
 
         return response()->json($rooms);
     }
 
+    public function clients(Request $request)
+    {
+        $user = Auth::user();
+
+        try {
+            $ptms = \App\Models\ProjectTeamMember::with(['projectJob.client'])
+                ->where('user_id', $user->id)
+                ->get();
+            $jobsFromTeam = $ptms->map(fn($ptm) => $ptm->projectJob)->filter();
+
+            $jobsAsLeader = \App\Models\ProjectJob::with('client')
+                ->where('user_id', $user->id)
+                ->where('completed', false)
+                ->get();
+
+            $jobsAsSubLeader = \App\Models\ProjectJob::with('client')
+                ->whereHas('coordinators', fn($q) => $q->where('users.id', $user->id))
+                ->where('completed', false)
+                ->get();
+
+            $jobs = $jobsFromTeam->merge($jobsAsLeader)->merge($jobsAsSubLeader)->unique('id');
+
+            $clients = $jobs->map(fn($job) => $job->client)
+                ->filter()
+                ->unique('id')
+                ->map(fn($c) => ['id' => $c->id, 'name' => $c->name ?? ''])
+                ->values();
+        } catch (\Throwable $e) {
+            Log::warning('ScheduleController::clients() failed', ['error' => $e->getMessage()]);
+            $clients = collect();
+        }
+
+        return response()->json($clients);
+    }
+
     public function users(Request $request)
     {
-        $selfId    = Auth::id();
+        $user      = Auth::user();
+        $selfId    = $user->id;
         $q         = trim($request->get('q', ''));
         $companyId = $request->get('company_id');
         $deptId    = $request->get('department_id');
 
+        // 自社またはグループ会社のユーザーのみ返す
+        $allowedCompanyIds = $this->allowedCompanyIds((int) $user->company_id);
+
+        // 指定 company_id が許可リスト外なら空を返す
+        if ($companyId && !in_array((int) $companyId, $allowedCompanyIds)) {
+            return response()->json([]);
+        }
+
         $users = User::where('id', '!=', $selfId)
-            ->when($companyId, fn ($query) => $query->where('company_id', $companyId))
-            ->when($deptId,    fn ($query) => $query->where('department_id', $deptId))
-            ->when($q !== '',  fn ($query) => $query->where('name', 'like', "%{$q}%"))
+            ->when(
+                $companyId,
+                fn ($query) => $query->where('company_id', $companyId),
+                fn ($query) => $query->whereIn('company_id', $allowedCompanyIds)
+            )
+            ->when($deptId,   fn ($query) => $query->where('department_id', $deptId))
+            ->when($q !== '', fn ($query) => $query->where('name', 'like', "%{$q}%"))
             ->orderBy('name')
             ->get(['id', 'name', 'user_role', 'department_id', 'company_id']);
 
         return response()->json($users);
+    }
+
+    /** 自社と同グループの全 company_id を返す */
+    private function allowedCompanyIds(int $companyId): array
+    {
+        $groupIds = DB::table('company_group_members')
+            ->where('company_id', $companyId)
+            ->pluck('company_group_id');
+
+        if ($groupIds->isEmpty()) {
+            return [$companyId];
+        }
+
+        return DB::table('company_group_members')
+            ->whereIn('company_group_id', $groupIds)
+            ->pluck('company_id')
+            ->push($companyId)
+            ->unique()
+            ->values()
+            ->all();
     }
 }

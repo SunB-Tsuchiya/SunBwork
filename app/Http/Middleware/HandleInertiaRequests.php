@@ -7,6 +7,7 @@ use App\Models\AnnouncementRecipient;
 use App\Models\JobNotification;
 use App\Models\LeaderPermission;
 use App\Models\ProofTeamMember;
+use App\Models\ScheduleNotification;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -66,6 +67,13 @@ class HandleInertiaRequests extends Middleware
                 ->count();
         }
 
+        $unreadScheduleNotifications = 0;
+        if ($request->user()) {
+            $unreadScheduleNotifications = ScheduleNotification::where('user_id', $request->user()->id)
+                ->whereNull('read_at')
+                ->count();
+        }
+
         // 部署フィールド設定（会社内全部署分、AssignmentForm で利用）
         $departmentFieldConfigs = [];
         $jobFieldOptions        = [];
@@ -95,6 +103,7 @@ class HandleInertiaRequests extends Middleware
             'subcontractorDeleteError' => session('subcontractorDeleteError'),
             'unreadAnnouncements' => $unreadAnnouncements,
             'unreadJobNotifications' => $unreadJobNotifications,
+            'unreadScheduleNotifications' => $unreadScheduleNotifications,
             // Share authenticated user basic info and helper role flags for frontend permission checks
             'auth' => [
                 'user' => $request->user()

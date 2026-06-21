@@ -2,12 +2,14 @@
 import { computed } from 'vue';
 
 const props = defineProps({
-    year:   { type: Number, required: true },
-    month:  { type: Number, required: true },  // 1-12
-    events: { type: Array,  default: () => [] },
+    year:         { type: Number, required: true },
+    month:        { type: Number, required: true },  // 1-12
+    events:       { type: Array,  default: () => [] },
+    reservations: { type: Array,  default: () => [] },
+    rooms:        { type: Array,  default: () => [] },
 });
 
-const emit = defineEmits(['date-click', 'event-click']);
+const emit = defineEmits(['date-click', 'event-click', 'room-click']);
 
 const DAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
@@ -55,6 +57,29 @@ function eventColor(e) {
     const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500'];
     return colors[(e.id ?? 0) % colors.length] + ' text-white';
 }
+
+function reservationsOnDate(d) {
+    if (!d) return [];
+    const ds = dateStr(d);
+    return props.reservations.filter(r =>
+        new Date(r.starts_at).toLocaleDateString('sv-SE') === ds
+    );
+}
+
+function roomColor(res) {
+    const room = props.rooms.find(r => r.id === res.meeting_room_id);
+    return room?.color || '#6b7280';
+}
+
+function roomName(res) {
+    const room = props.rooms.find(r => r.id === res.meeting_room_id);
+    return room?.name ?? '会議室';
+}
+
+function fmtResTime(isoStr) {
+    const d = new Date(isoStr);
+    return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
 </script>
 
 <template>
@@ -93,6 +118,14 @@ function eventColor(e) {
                     :class="eventColor(ev)"
                     @click.stop="$emit('event-click', ev)">
                     {{ ev.title }}
+                </div>
+
+                <!-- 会議室予約 -->
+                <div v-for="res in reservationsOnDate(day)" :key="'r' + res.id"
+                    class="mb-0.5 cursor-pointer truncate rounded px-1 text-[10px] text-white"
+                    :style="{ background: roomColor(res) }"
+                    @click.stop="$emit('room-click', res)">
+                    🏢 {{ fmtResTime(res.starts_at) }} [{{ roomName(res) }}] {{ res.title }}
                 </div>
             </div>
         </div>

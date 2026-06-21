@@ -1,6 +1,5 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
-import AdminNavigationTabs from '@/Components/Tabs/AdminNavigationTabs.vue';
 import { Link, router } from '@inertiajs/vue3';
 
 defineProps({
@@ -19,8 +18,6 @@ function confirmDelete(id) {
         <template #header>
             <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">会議室管理</h2>
         </template>
-
-        <AdminNavigationTabs active="meeting_rooms" />
 
         <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <div class="mb-4 flex items-center justify-between">
@@ -45,6 +42,7 @@ function confirmDelete(id) {
                             <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">会議室名</th>
                             <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">定員</th>
                             <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">色</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">予約可能時間</th>
                             <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">状態</th>
                             <th class="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">操作</th>
                         </tr>
@@ -66,6 +64,12 @@ function confirmDelete(id) {
                                     :title="room.color"
                                 ></span>
                                 <span v-else class="text-sm text-gray-400">—</span>
+                            </td>
+                            <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-700">
+                                <template v-if="room.available_from && room.available_to">
+                                    {{ room.available_from.slice(0,5) }}〜{{ room.available_to.slice(0,5) }}
+                                </template>
+                                <span v-else class="text-gray-400">制限なし</span>
                             </td>
                             <td class="whitespace-nowrap px-4 py-3">
                                 <span

@@ -15,3 +15,6 @@ Schedule::command('auto-complete:my-jobs')->dailyAt('00:05');
 
 // AIサマリーのディスパッチを5分毎に実行
 Schedule::command('ai:dispatch-summaries')->everyFiveMinutes();
+
+// 予定表: 当日の朝まとめ通知を毎朝8:00に登録
+Schedule::command('schedule:send-notifications')->dailyAt('08:00');

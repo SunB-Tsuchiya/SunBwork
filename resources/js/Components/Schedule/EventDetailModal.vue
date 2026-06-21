@@ -1,12 +1,17 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
+import axios from 'axios';
+import useToasts from '@/Composables/useToasts';
 
 const props = defineProps({
     show:  { type: Boolean, default: false },
     event: { type: Object, default: null },
 });
 
-const emit = defineEmits(['close', 'edit']);
+const emit = defineEmits(['close', 'edit', 'open-room-reserve', 'responded']);
+
+const { showToast } = useToasts();
+const responding = ref(false);
 
 function formatDatetime(str) {
     if (!str) return '';
@@ -20,6 +25,28 @@ function formatDatetime(str) {
 const visibilityLabel = computed(() => ({
     private: '非公開', company: '社内', group: 'グループ', public: '全体',
 }[props.event?.visibility] ?? ''));
+
+const CSRF = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+async function respond(status) {
+    if (responding.value) return;
+    responding.value = true;
+    try {
+        await axios.put(
+            route('schedule.attendees.respond', { event: props.event.id }),
+            { status },
+            { headers: { 'X-CSRF-TOKEN': CSRF() } },
+        );
+        const label = status === 'accepted' ? '承認しました' : '辞退しました';
+        showToast(label, status === 'accepted' ? 'success' : 'info', 3000);
+        emit('responded', { eventId: props.event.id, status });
+        emit('close');
+    } catch {
+        showToast('操作に失敗しました', 'error', 3000);
+    } finally {
+        responding.value = false;
+    }
+}
 </script>
 
 <template>
@@ -48,9 +75,34 @@ const visibilityLabel = computed(() => ({
                     </div>
                 </div>
 
+                <!-- 招待イベントの承認/辞退（pending のときのみ） -->
+                <div v-if="event.as_attendee && event.my_attendee_status === 'pending'"
+                    class="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                    <p class="mb-2 text-sm text-amber-800">この予定に招待されています。</p>
+                    <div class="flex gap-2">
+                        <button
+                            class="rounded-md bg-green-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-60"
+                            :disabled="responding"
+                            @click="respond('accepted')">承認</button>
+                        <button
+                            class="rounded-md bg-red-50 px-4 py-1.5 text-sm font-medium text-red-600 hover:bg-red-100 disabled:opacity-60"
+                            :disabled="responding"
+                            @click="respond('declined')">辞退</button>
+                    </div>
+                </div>
+
+                <!-- 承認済みバッジ -->
+                <div v-else-if="event.as_attendee && event.my_attendee_status === 'accepted'"
+                    class="mb-4 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+                    ✓ 承認済み
+                </div>
+
                 <div class="flex justify-end gap-2">
                     <button class="rounded-md border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50"
                         @click="$emit('close')">閉じる</button>
+                    <button v-if="event.is_own && !event.room_reservation_id"
+                        class="rounded-md border border-blue-400 px-4 py-2 text-sm text-blue-600 hover:bg-blue-50"
+                        @click="$emit('open-room-reserve', event)">会議室を予約</button>
                     <button v-if="event.is_own"
                         class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
                         @click="$emit('edit', event)">編集</button>

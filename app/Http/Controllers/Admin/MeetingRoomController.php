@@ -28,12 +28,14 @@ class MeetingRoomController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name'        => 'required|string|max:100',
-            'capacity'    => 'nullable|integer|min:1|max:999',
-            'description' => 'nullable|string',
-            'color'       => 'nullable|string|regex:/^#[0-9a-fA-F]{6}$/',
-            'active'      => 'boolean',
-            'sort_order'  => 'integer|min:0',
+            'name'           => 'required|string|max:100',
+            'capacity'       => 'nullable|integer|min:1|max:999',
+            'description'    => 'nullable|string',
+            'color'          => 'nullable|string|regex:/^#[0-9a-fA-F]{6}$/',
+            'active'         => 'boolean',
+            'sort_order'     => 'integer|min:0',
+            'available_from' => 'nullable|date_format:H:i',
+            'available_to'   => 'nullable|date_format:H:i|after:available_from',
         ]);
 
         $user = Auth::user();
@@ -45,18 +47,22 @@ class MeetingRoomController extends Controller
 
     public function edit(MeetingRoom $room)
     {
+        $this->authorizeRoomScope($room);
         return Inertia::render('Admin/MeetingRooms/Edit', ['room' => $room]);
     }
 
     public function update(Request $request, MeetingRoom $room)
     {
+        $this->authorizeRoomScope($room);
         $validated = $request->validate([
-            'name'        => 'sometimes|string|max:100',
-            'capacity'    => 'nullable|integer|min:1|max:999',
-            'description' => 'nullable|string',
-            'color'       => 'nullable|string|regex:/^#[0-9a-fA-F]{6}$/',
-            'active'      => 'boolean',
-            'sort_order'  => 'integer|min:0',
+            'name'           => 'sometimes|string|max:100',
+            'capacity'       => 'nullable|integer|min:1|max:999',
+            'description'    => 'nullable|string',
+            'color'          => 'nullable|string|regex:/^#[0-9a-fA-F]{6}$/',
+            'active'         => 'boolean',
+            'sort_order'     => 'integer|min:0',
+            'available_from' => 'nullable|date_format:H:i',
+            'available_to'   => 'nullable|date_format:H:i|after:available_from',
         ]);
 
         $room->update($validated);
@@ -67,9 +73,19 @@ class MeetingRoomController extends Controller
 
     public function destroy(MeetingRoom $room)
     {
+        $this->authorizeRoomScope($room);
         $room->delete();
 
         return redirect()->route('admin.meeting-rooms.index')
             ->with('success', '会議室を削除しました');
+    }
+
+    private function authorizeRoomScope(MeetingRoom $room): void
+    {
+        $user = Auth::user();
+        if ($user->isSuperAdmin()) return;
+        if ((int) $room->company_id !== (int) $user->company_id) {
+            abort(403, 'この会議室へのアクセス権がありません');
+        }
     }
 }

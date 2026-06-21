@@ -1242,9 +1242,9 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     ->name('superadmin.switch_context');
 
 // ========================================
-// 予定表機能（開発中: SuperAdmin のみ）
+// 予定表機能（全ロール共通）
 // ========================================
-Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'superadmin'])
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified'])
     ->prefix('schedule')
     ->name('schedule.')
     ->group(function () {
@@ -1263,10 +1263,14 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
             ->name('events.show');
         Route::get('/events', [\App\Http\Controllers\Schedule\ScheduleEventController::class, 'range'])
             ->name('events.range');
+        Route::get('/events-conflicts', [\App\Http\Controllers\Schedule\ScheduleEventController::class, 'conflicts'])
+            ->name('events.conflicts');
 
         // 参加者
         Route::post('/events/{event}/attendees', [\App\Http\Controllers\Schedule\ScheduleAttendeeController::class, 'store'])
             ->name('attendees.store');
+        Route::put('/events/{event}/attendees/respond', [\App\Http\Controllers\Schedule\ScheduleAttendeeController::class, 'respond'])
+            ->name('attendees.respond');
         Route::delete('/events/{event}/attendees/{user}', [\App\Http\Controllers\Schedule\ScheduleAttendeeController::class, 'destroy'])
             ->name('attendees.destroy');
 

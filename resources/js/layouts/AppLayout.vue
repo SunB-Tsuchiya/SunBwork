@@ -22,10 +22,7 @@ import { computed, provide, ref } from 'vue';
 
 defineProps({
     title: String,
-    // user: {
-    //     type: Object,
-    //     required: true,
-    // },
+    fluid: { type: Boolean, default: false },
 });
 
 const showingNavigationDropdown = ref(false);
@@ -85,6 +82,12 @@ const unreadJobNotifications = vueRef(page.props.unreadJobNotifications || 0);
 watch(
     () => page.props.unreadJobNotifications,
     (v) => { unreadJobNotifications.value = v || 0; },
+);
+// 予定表通知未読数
+const unreadScheduleNotifications = vueRef(page.props.unreadScheduleNotifications || 0);
+watch(
+    () => page.props.unreadScheduleNotifications,
+    (v) => { unreadScheduleNotifications.value = v || 0; },
 );
 
 // keep reactive when Inertia page props update
@@ -413,20 +416,19 @@ function navigateToRole(role) {
                                 </div>
                             </div>
 
-                            <!-- 予定表（SuperAdminのみ・開発中フィルター） -->
-                            <template v-if="authUser?.user_role === 'superadmin'">
-                                <div class="group relative">
-                                    <Link :href="route('schedule.index')" class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
-                                        </svg>
-                                    </Link>
-                                    <div class="pointer-events-none absolute right-0 top-9 z-50 w-32 rounded-md bg-gray-800 px-3 py-2 text-xs text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-                                        <p class="font-medium">予定表</p>
-                                        <p class="text-gray-300">スケジュール管理</p>
-                                    </div>
+                            <!-- 予定表 -->
+                            <div class="group relative">
+                                <Link :href="route('schedule.index')" class="relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                                    </svg>
+                                    <span v-if="unreadScheduleNotifications > 0" class="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-green-500 text-[10px] text-white pointer-events-none">{{ unreadScheduleNotifications > 9 ? '9+' : unreadScheduleNotifications }}</span>
+                                </Link>
+                                <div class="pointer-events-none absolute right-0 top-9 z-50 w-32 rounded-md bg-gray-800 px-3 py-2 text-xs text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                                    <p class="font-medium">予定表</p>
+                                    <p class="text-gray-300">スケジュール管理</p>
                                 </div>
-                            </template>
+                            </div>
 
                             <!-- 使い方ガイド -->
                             <div class="group relative">
@@ -546,12 +548,13 @@ function navigateToRole(role) {
                                 <span v-if="unreadJobNotifications > 0" class="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[10px] text-white pointer-events-none">{{ unreadJobNotifications }}</span>
                             </Link>
 
-                            <!-- 予定表（SuperAdminのみ・開発中フィルター） -->
-                            <Link v-if="authUser?.user_role === 'superadmin'" :href="route('schedule.index')"
+                            <!-- 予定表（モバイル） -->
+                            <Link :href="route('schedule.index')"
                                 class="relative flex h-9 w-9 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
                                 </svg>
+                                <span v-if="unreadScheduleNotifications > 0" class="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-green-500 text-[10px] text-white pointer-events-none">{{ unreadScheduleNotifications > 9 ? '9+' : unreadScheduleNotifications }}</span>
                             </Link>
 
                             <button
@@ -892,10 +895,15 @@ function navigateToRole(role) {
                             </div>
                         </slot>
                     </div>
-                    <main>
+                    <!-- 通常レイアウト: max-w-7xl 内 -->
+                    <main v-if="!fluid">
                         <slot />
                     </main>
                 </div>
+                <!-- 全幅レイアウト: max-w-7xl 外 -->
+                <main v-if="fluid" class="mt-2 px-3 sm:px-4">
+                    <slot />
+                </main>
             </div>
         </div>
     </div>

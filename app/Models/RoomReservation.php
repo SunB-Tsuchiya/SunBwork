@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class RoomReservation extends Model
 {
-    protected $fillable = ['meeting_room_id', 'user_id', 'event_id', 'title', 'starts_at', 'ends_at', 'notes'];
+    protected $fillable = ['meeting_room_id', 'user_id', 'event_id', 'event_owned', 'title', 'starts_at', 'ends_at', 'notes'];
 
     protected $casts = [
         'starts_at' => 'datetime',

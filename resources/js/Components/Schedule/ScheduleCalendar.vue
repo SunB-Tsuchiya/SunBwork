@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, inject, onMounted } from 'vue';
 import axios from 'axios';
 import MonthView              from './MonthView.vue';
 import WeekView               from './WeekView.vue';
@@ -8,20 +8,26 @@ import EventModal             from './EventModal.vue';
 import EventDetailModal       from './EventDetailModal.vue';
 import RoomReservationModal   from './RoomReservationModal.vue';
 import OverlayPanel           from './OverlayPanel.vue';
+import MiniCalendar           from './MiniCalendar.vue';
+import NotificationPanel      from './NotificationPanel.vue';
 
 const props = defineProps({
-    initialDate:    { type: String, default: '' },
-    eventItemTypes: { type: Array,  default: () => [] },
-    initialOverlays: { type: Array, default: () => [] }, // 初期オーバーレイ一覧（full object）
-    rooms:          { type: Array,  default: () => [] }, // [{id, name, color}]
-    companies:      { type: Array,  default: () => [] },
-    departments:    { type: Array,  default: () => [] },
+    initialDate:        { type: String, default: '' },
+    eventItemTypes:     { type: Array,  default: () => [] },
+    meetingDefinitions: { type: Array,  default: () => [] },
+    initialOverlays:    { type: Array,  default: () => [] },
+    rooms:              { type: Array,  default: () => [] },
+    companies:          { type: Array,  default: () => [] },
+    departments:        { type: Array,  default: () => [] },
 });
 
-const CSRF = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+const CSRF     = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+const authUser = inject('authUser', null);
 
 // ── ビューモード・基準日 ──────────────────────────────────────
-const viewMode    = ref('week');
+const STORAGE_KEY_VIEW_MODE = 'schedule_view_mode';
+const viewMode    = ref(localStorage.getItem(STORAGE_KEY_VIEW_MODE) || 'week');
+watch(viewMode, (v) => localStorage.setItem(STORAGE_KEY_VIEW_MODE, v));
 const currentDate = ref(props.initialDate || new Date().toLocaleDateString('sv-SE'));
 
 // ── 週の月曜日を計算 ──────────────────────────────────────────
@@ -135,6 +141,11 @@ function openEdit(ev) {
 }
 
 function openDetail(ev) {
+    // 会議室予約に紐づくイベントは予約モーダルで開く
+    if (ev.room_reservation_id) {
+        const reservation = reservations.value.find(r => String(r.id) === String(ev.room_reservation_id));
+        if (reservation) { openRoomEdit(reservation); return; }
+    }
     detailTarget.value = ev;
     showDetail.value   = true;
 }
@@ -144,10 +155,7 @@ function onSaved()   { editTarget.value = null; loadEvents(); }
 function onDeleted() { editTarget.value = null; loadEvents(); }
 
 function onModalClose() {
-    // 編集モードで閉じた場合は再取得（ライブモードの参加者変更を反映）
-    if (editTarget.value) {
-        loadEvents();
-    }
+    loadEvents();
     editTarget.value = null;
     showCreate.value = false;
 }
@@ -157,6 +165,8 @@ async function onUpdate({ id, starts_at, ends_at }) {
     // 楽観的更新（UI即反映）
     const idx = events.value.findIndex(e => e.id === id);
     if (idx >= 0) {
+        // 会議室予約に紐づくイベントはドラッグ移動不可
+        if (events.value[idx].room_reservation_id) return;
         const orig = { ...events.value[idx] };
         events.value[idx] = { ...orig, starts_at, ends_at };
         try {
@@ -175,6 +185,25 @@ async function onUpdate({ id, starts_at, ends_at }) {
     }
 }
 
+// ── 会議室予約ドラッグ更新 ────────────────────────────────────
+async function onRoomUpdate({ id, starts_at, ends_at }) {
+    const idx = reservations.value.findIndex(r => r.id === id);
+    if (idx < 0) return;
+    const orig = { ...reservations.value[idx] };
+    reservations.value[idx] = { ...orig, starts_at, ends_at };
+    try {
+        await axios.put(
+            route('schedule.room-reservations.update', { reservation: id }),
+            { starts_at, ends_at },
+            { headers: { 'X-CSRF-TOKEN': CSRF() } }
+        );
+        loadEvents();
+    } catch (e) {
+        reservations.value[idx] = orig;
+        alert('会議室予約の更新に失敗しました');
+    }
+}
+
 // ── 月ビューのイベントクリック ────────────────────────────────
 function onDateClick(date) {
     currentDate.value = date;
@@ -182,141 +211,297 @@ function onDateClick(date) {
 }
 
 // ── 会議室予約モーダル ────────────────────────────────────────
-const showRoomModal      = ref(false);
-const roomModalTarget    = ref(null); // 既存予約 or null（新規）
-const roomModalDefaults  = ref({ date: '', startMin: null, endMin: null });
+const showRoomModal        = ref(false);
+const roomModalTarget      = ref(null); // 既存予約 or null（新規）
+const roomModalDefaults    = ref({ date: '', startMin: null, endMin: null, roomId: null });
+const roomModalReadOnly    = ref(false);
+const roomModalLinkEventId = ref(null); // 既存イベントへのリンク用
+const roomModalPreset      = ref(null); // { title, attendees, typeId } — EventDetailModal から引き継ぎ
 
-function openRoomCreate({ date, startMin = null, endMin = null } = {}) {
+function canEditReservation(reservation) {
+    const u = authUser?.value ?? authUser;
+    if (!u) return false;
+    if (u.user_role === 'superadmin' || u.user_role === 'admin') return true;
+    return String(reservation.user_id) === String(u.id);
+}
+
+function openRoomCreate({ date, startMin = null, endMin = null, roomId = null } = {}) {
     roomModalTarget.value   = null;
-    roomModalDefaults.value = { date: date || currentDate.value, startMin, endMin };
+    roomModalReadOnly.value = false;
+    roomModalDefaults.value = { date: date || currentDate.value, startMin, endMin, roomId };
     showRoomModal.value     = true;
 }
 
 function openRoomEdit(reservation) {
     roomModalTarget.value  = reservation;
+    roomModalReadOnly.value = !canEditReservation(reservation);
     showRoomModal.value    = true;
 }
 
-function onRoomSaved()  { loadEvents(); }
-function onRoomDeleted() { loadEvents(); }
+function onRoomSaved()   { roomModalLinkEventId.value = null; roomModalPreset.value = null; loadEvents(); }
+function onRoomDeleted() { roomModalLinkEventId.value = null; roomModalPreset.value = null; loadEvents(); }
+
+function onRoomModalClose() {
+    showRoomModal.value        = false;
+    roomModalLinkEventId.value = null;
+    roomModalPreset.value      = null;
+}
+
+// 既存予定から会議室予約を後から追加（EventDetailModal の「会議室を予約」ボタン）
+function openRoomReserveForEvent(ev) {
+    showDetail.value            = false;
+    roomModalTarget.value       = null;
+    roomModalReadOnly.value     = false;
+    roomModalLinkEventId.value  = ev.id;
+    const s = new Date(ev.starts_at);
+    const e = new Date(ev.ends_at);
+    const u = authUser?.value ?? authUser;
+    const others = (ev.attendees ?? [])
+        .filter(a => String(a.user?.id ?? a.user_id) !== String(u?.id))
+        .map(a => ({ id: a.user?.id ?? a.user_id, name: a.user?.name ?? '' }));
+    roomModalDefaults.value = {
+        date:     s.toLocaleDateString('sv-SE'),
+        startMin: s.getHours() * 60 + s.getMinutes(),
+        endMin:   e.getHours() * 60 + e.getMinutes(),
+        roomId:   null,
+    };
+    roomModalPreset.value = {
+        title:       ev.title,
+        attendees:   others,
+        typeId:      ev.event_item_type_id ?? null,
+        destination: ev.destination ?? '',
+        notes:       ev.body ?? '',
+    };
+    showRoomModal.value = true;
+}
+
+// ミニカレンダーから日付を選択したとき → 日ビューで表示
+function onMiniCalSelect(d) {
+    currentDate.value = d;
+    viewMode.value    = 'day';
+}
+
+// ── 今日の会議室予約（サイドバー） ───────────────────────────
+const todayStr         = new Date().toLocaleDateString('sv-SE');
+const todayReservations = ref([]);
+
+async function loadTodayReservations() {
+    try {
+        const res = await axios.get(route('schedule.events.range'), {
+            params: { start: todayStr, end: todayStr },
+        });
+        const uid = String((authUser?.value ?? authUser)?.id ?? '');
+        todayReservations.value = (res.data.reservations ?? [])
+            .filter(r => {
+                if (String(r.user_id) === uid) return true;
+                return (r.event?.attendees ?? []).some(a => String(a.user_id) === uid);
+            })
+            .sort((a, b) => (a.starts_at > b.starts_at ? 1 : -1));
+    } catch (e) {
+        // サイドバーなので静かに失敗
+    }
+}
+
+onMounted(loadTodayReservations);
+
+function onTodayResClick(reservation) {
+    currentDate.value = todayStr;
+    viewMode.value    = 'day';
+    openRoomEdit(reservation);
+}
+
+function fmtSidebarTime(isoStr) {
+    return new Date(isoStr).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+// 月ビュー: 会議室予約表示トグル（localStorage 保存・デフォルト OFF）
+const STORAGE_KEY_MONTH_ROOMS = 'schedule_month_show_rooms';
+const showMonthRooms = ref(localStorage.getItem(STORAGE_KEY_MONTH_ROOMS) === 'true');
+watch(showMonthRooms, (v) => localStorage.setItem(STORAGE_KEY_MONTH_ROOMS, String(v)));
 </script>
 
 <template>
-    <div class="flex flex-col gap-3">
-        <!-- ツールバー（既存カレンダーと同スタイル） -->
-        <div class="flex flex-wrap items-center gap-2">
-            <!-- prev / next / today -->
-            <div class="flex items-center gap-1">
-                <button
-                    class="rounded border border-gray-300 bg-white px-2.5 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 active:bg-gray-100"
-                    @click="navigate(-1)">‹</button>
-                <button
-                    class="rounded border border-gray-300 bg-white px-2.5 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 active:bg-gray-100"
-                    @click="navigate(1)">›</button>
-                <button
-                    class="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                    @click="goToday">today</button>
-            </div>
+    <!-- 2ペインレイアウト: 左サイドバー + 右メイン -->
+    <div class="flex" style="min-height: calc(100vh - 150px)">
 
-            <!-- 期間ラベル -->
-            <div class="flex-1 text-center text-base font-semibold text-gray-800">
-                {{ viewLabel }}
-            </div>
+        <!-- ── 左サイドバー ──────────────────────────────────────── -->
+        <div class="w-52 shrink-0 border-r border-gray-200 bg-gray-50 flex flex-col overflow-y-auto">
+            <!-- ミニカレンダー -->
+            <MiniCalendar :date="currentDate" @select="onMiniCalSelect" />
 
-            <!-- month / week / day タブ（既存カレンダーのボタン群スタイル） -->
-            <div class="flex overflow-hidden rounded border border-gray-300">
-                <button v-for="m in ['month', 'week', 'day']" :key="m"
-                    class="px-3 py-1.5 text-sm font-medium transition-colors"
-                    :class="viewMode === m
-                        ? 'bg-gray-700 text-white'
-                        : 'bg-white text-gray-700 hover:bg-gray-50'"
-                    @click="viewMode = m">
-                    {{ { month: 'month', week: 'week', day: 'day' }[m] }}
+            <!-- 今日の会議室予約 -->
+            <div v-if="todayReservations.length > 0" class="px-2 pt-2 pb-1">
+                <div class="mb-1 text-xs font-semibold text-gray-500 uppercase tracking-wide">今日の会議室</div>
+                <button
+                    v-for="r in todayReservations"
+                    :key="r.id"
+                    class="mb-1 w-full text-left rounded-md px-2 py-1 text-xs hover:bg-gray-100 transition-colors"
+                    :style="{ borderLeft: `3px solid ${r.meeting_room?.color ?? '#9ca3af'}` }"
+                    @click="onTodayResClick(r)">
+                    <div class="font-medium text-gray-800 truncate">{{ r.title }}</div>
+                    <div class="text-gray-500">
+                        {{ fmtSidebarTime(r.starts_at) }}–{{ fmtSidebarTime(r.ends_at) }}
+                        <span class="ml-1 text-gray-400">{{ r.meeting_room?.name }}</span>
+                    </div>
                 </button>
             </div>
 
-            <!-- 予定追加ボタン -->
-            <button
-                class="rounded bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
-                @click="openCreate()">
-                + 予定を追加
-            </button>
+            <!-- 区切り -->
+            <div class="mx-3 my-1 border-t border-gray-200" />
 
-            <!-- 会議室予約ボタン（会議室が1件以上ある場合のみ） -->
-            <button
-                v-if="rooms.length"
-                class="rounded border border-gray-300 bg-white px-4 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                @click="openRoomCreate()">
-                🏢 会議室予約
-            </button>
+            <!-- オーバーレイパネル -->
+            <div class="px-1 py-1 flex-1">
+                <OverlayPanel
+                    :overlays="overlays"
+                    :companies="companies"
+                    :departments="departments"
+                    @add="onOverlayAdd"
+                    @remove="onOverlayRemove" />
+            </div>
         </div>
 
-        <!-- ローディング -->
-        <div v-if="loading" class="py-6 text-center text-sm text-gray-400">読み込み中…</div>
+        <!-- ── 右メインエリア ─────────────────────────────────────── -->
+        <div class="flex flex-1 min-w-0 flex-col">
+            <!-- ツールバー -->
+            <div class="flex flex-wrap items-center gap-2 border-b border-gray-200 bg-white px-4 py-2">
+                <!-- prev / next / today -->
+                <div class="flex items-center gap-1">
+                    <button
+                        class="rounded border border-gray-300 bg-white px-2.5 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 active:bg-gray-100"
+                        @click="navigate(-1)">‹</button>
+                    <button
+                        class="rounded border border-gray-300 bg-white px-2.5 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 active:bg-gray-100"
+                        @click="navigate(1)">›</button>
+                    <button
+                        class="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                        @click="goToday">today</button>
+                </div>
 
-        <!-- カレンダー本体 -->
-        <template v-else>
-            <MonthView v-if="viewMode === 'month'"
-                :year="viewYear" :month="viewMonth" :events="events"
-                @date-click="onDateClick"
-                @event-click="openDetail" />
+                <!-- 期間ラベル -->
+                <div class="flex-1 text-center text-base font-semibold text-gray-800">
+                    {{ viewLabel }}
+                </div>
 
-            <WeekView v-else-if="viewMode === 'week'"
-                :start-date="weekStart" :events="events"
-                @create="openCreate"
-                @update="onUpdate"
-                @event-click="openDetail" />
+                <!-- month / week / day タブ -->
+                <div class="flex overflow-hidden rounded border border-gray-300">
+                    <button v-for="m in ['month', 'week', 'day']" :key="m"
+                        class="px-3 py-1.5 text-sm font-medium transition-colors"
+                        :class="viewMode === m
+                            ? 'bg-gray-700 text-white'
+                            : 'bg-white text-gray-700 hover:bg-gray-50'"
+                        @click="viewMode = m">
+                        {{ { month: '月', week: '週', day: '日' }[m] }}
+                    </button>
+                </div>
 
-            <DayView v-else
-                :date="currentDate"
-                :events="events"
-                :reservations="reservations"
-                :overlay-users="overlayUsers"
-                :rooms="rooms"
-                @create="openCreate"
-                @update="onUpdate"
-                @event-click="openDetail"
-                @room-create="openRoomCreate"
-                @room-click="openRoomEdit" />
-        </template>
+                <!-- 月ビュー: 会議室予約表示トグル -->
+                <label v-if="viewMode === 'month' && rooms.length"
+                    class="flex cursor-pointer items-center gap-1.5 text-xs text-gray-600 select-none">
+                    <input type="checkbox" v-model="showMonthRooms"
+                        class="h-3.5 w-3.5 rounded border-gray-300 text-blue-600" />
+                    会議室予約を表示
+                </label>
 
-        <!-- オーバーレイパネル -->
-        <OverlayPanel
-            :overlays="overlays"
-            :companies="companies"
-            :departments="departments"
-            @add="onOverlayAdd"
-            @remove="onOverlayRemove" />
+                <!-- 通知パネル -->
+                <NotificationPanel />
 
-        <!-- モーダル -->
-        <EventModal
-            :show="showCreate"
-            :event="editTarget"
-            :default-date="createDef.date"
-            :default-start-min="createDef.startMin"
-            :default-end-min="createDef.endMin"
-            :event-item-types="eventItemTypes"
-            :companies="companies"
-            :departments="departments"
-            @close="onModalClose"
-            @saved="onSaved"
-            @deleted="onDeleted" />
+                <!-- 予定追加ボタン -->
+                <button
+                    class="rounded bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+                    @click="openCreate()">
+                    + 予定を追加
+                </button>
 
-        <EventDetailModal
-            :show="showDetail"
-            :event="detailTarget"
-            @close="showDetail = false"
-            @edit="openEdit" />
+                <!-- 会議室予約ボタン -->
+                <button
+                    v-if="rooms.length"
+                    class="rounded border border-gray-300 bg-white px-4 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    @click="openRoomCreate()">
+                    🏢 会議室予約
+                </button>
+            </div>
 
-        <RoomReservationModal
-            :show="showRoomModal"
-            :reservation="roomModalTarget"
-            :rooms="rooms"
-            :default-date="roomModalDefaults.date"
-            :default-start-min="roomModalDefaults.startMin"
-            :default-end-min="roomModalDefaults.endMin"
-            @close="showRoomModal = false"
-            @saved="onRoomSaved"
-            @deleted="onRoomDeleted" />
+            <!-- ローディング -->
+            <div v-if="loading" class="flex-1 py-12 text-center text-sm text-gray-400">読み込み中…</div>
+
+            <!-- カレンダー本体 -->
+            <div v-else class="flex-1 overflow-auto p-3">
+                <MonthView v-if="viewMode === 'month'"
+                    :year="viewYear" :month="viewMonth" :events="events"
+                    :reservations="showMonthRooms ? reservations : []"
+                    :rooms="showMonthRooms ? rooms : []"
+                    @date-click="onDateClick"
+                    @event-click="openDetail"
+                    @room-click="openRoomEdit" />
+
+                <WeekView v-else-if="viewMode === 'week'"
+                    :start-date="weekStart" :events="events"
+                    :reservations="reservations" :rooms="rooms"
+                    @create="openCreate"
+                    @update="onUpdate"
+                    @event-click="openDetail"
+                    @room-click="openRoomEdit" />
+
+                <DayView v-else
+                    :date="currentDate"
+                    :events="events"
+                    :reservations="reservations"
+                    :overlay-users="overlayUsers"
+                    :rooms="rooms"
+                    @create="openCreate"
+                    @update="onUpdate"
+                    @event-click="openDetail"
+                    @room-create="openRoomCreate"
+                    @room-click="openRoomEdit"
+                    @room-update="onRoomUpdate" />
+            </div>
+        </div>
     </div>
+
+    <!-- モーダル（Teleport to body なので位置は影響なし） -->
+    <EventModal
+        :show="showCreate"
+        :event="editTarget"
+        :default-date="createDef.date"
+        :default-start-min="createDef.startMin"
+        :default-end-min="createDef.endMin"
+        :event-item-types="eventItemTypes"
+        :meeting-definitions="meetingDefinitions"
+        :rooms="rooms"
+        :companies="companies"
+        :departments="departments"
+        @close="onModalClose"
+        @saved="onSaved"
+        @deleted="onDeleted" />
+
+    <EventDetailModal
+        :show="showDetail"
+        :event="detailTarget"
+        @close="showDetail = false"
+        @edit="openEdit"
+        @open-room-reserve="openRoomReserveForEvent"
+        @responded="() => { showDetail = false; loadEvents(); }" />
+
+    <RoomReservationModal
+        :show="showRoomModal"
+        :reservation="roomModalTarget"
+        :rooms="rooms"
+        :event-item-types="eventItemTypes"
+        :meeting-definitions="meetingDefinitions"
+        :default-date="roomModalDefaults.date"
+        :default-start-min="roomModalDefaults.startMin"
+        :default-end-min="roomModalDefaults.endMin"
+        :default-room-id="roomModalDefaults.roomId"
+        :default-title="roomModalPreset?.title ?? ''"
+        :default-attendees="roomModalPreset?.attendees ?? []"
+        :default-type-id="roomModalPreset?.typeId ?? null"
+        :default-destination="roomModalPreset?.destination ?? ''"
+        :default-notes="roomModalPreset?.notes ?? ''"
+        :link-event-id="roomModalLinkEventId"
+        :read-only="roomModalReadOnly"
+        :companies="companies"
+        :departments="departments"
+        @close="onRoomModalClose"
+        @saved="onRoomSaved"
+        @deleted="onRoomDeleted" />
 </template>
