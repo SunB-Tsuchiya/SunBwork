@@ -108,6 +108,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('/leader', [App\Http\Controllers\GuideController::class, 'leader'])->name('leader');
         Route::get('/admin', [App\Http\Controllers\GuideController::class, 'admin'])->name('admin');
         Route::get('/proof-coordinator', [App\Http\Controllers\GuideController::class, 'proofCoordinator'])->name('proof_coordinator');
+        Route::get('/schedule', [App\Http\Controllers\GuideController::class, 'schedule'])->name('schedule');
     });
 
     // スクリプトツール
@@ -347,6 +348,9 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('users/csv/preview', [App\Http\Controllers\Admin\UserController::class, 'csvPreview'])->name('users.csv.preview');
         Route::post('users/csv/store', [App\Http\Controllers\Admin\UserController::class, 'csvStore'])->name('users.csv.store');
         Route::get('users/csv/sample', [App\Http\Controllers\Admin\UserController::class, 'csvSampleDownload'])->name('users.csv.sample');
+
+        // ユーザー並び替え保存（リソースルートより前に配置）
+        Route::put('users/reorder', [App\Http\Controllers\Admin\UserController::class, 'reorder'])->name('users.reorder');
 
         // ユーザー管理
         Route::resource('users', App\Http\Controllers\Admin\UserController::class);

@@ -56,4 +56,9 @@ class GuideController extends Controller
 
         return Inertia::render('Guide/ProofCoordinator');
     }
+
+    public function schedule()
+    {
+        return Inertia::render('Guide/Schedule');
+    }
 }

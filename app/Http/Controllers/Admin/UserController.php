@@ -35,7 +35,7 @@ class UserController extends Controller
 
         $companyId = $this->contextCompanyId();
 
-        $query = User::with('positionTitle')->orderBy('created_at', 'desc');
+        $query = User::with('positionTitle')->ordered();
         if ($companyId) {
             $query->where('company_id', $companyId);
         }
@@ -53,6 +53,31 @@ class UserController extends Controller
             'departments' => $departments,
             'user' => $user,
         ]);
+    }
+
+    /**
+     * ユーザーのソート順を一括保存
+     */
+    public function reorder(Request $request)
+    {
+        $this->requireAdminPermission('user_management');
+
+        $request->validate([
+            'ordered_ids'   => 'required|array',
+            'ordered_ids.*' => 'integer|exists:users,id',
+        ]);
+
+        $companyId = $this->contextCompanyId();
+
+        foreach ($request->ordered_ids as $i => $userId) {
+            $query = User::where('id', $userId);
+            if ($companyId) {
+                $query->where('company_id', $companyId);
+            }
+            $query->update(['sort_order' => $i + 1]);
+        }
+
+        return back()->with('success', 'ソート順を保存しました');
     }
 
     /**

@@ -77,6 +77,16 @@ const getAssignmentName = (assignment_id) => {
     return assignment ? assignment.name : '';
 };
 
+const getEmploymentTypeLabel = (type) => {
+    switch (type) {
+        case 'regular':   return '正社員';
+        case 'contract':  return '契約社員';
+        case 'dispatch':  return '派遣社員';
+        case 'outsource': return '業務委託';
+        default:          return '正社員';
+    }
+};
+
 const getAssignmentBadgeClass = (assignment) => {
     switch (assignment) {
         case 'superadmin':

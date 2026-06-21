@@ -106,6 +106,35 @@ class ScheduleEventController extends Controller
                 ->with(['eventItemType:id,name,slug'])
                 ->get()
                 ->map(fn ($e) => array_merge($e->toArray(), ['is_own' => false]));
+
+            // オーバーレイユーザーが参加者（pending/accepted）として招待されているイベントも
+            // そのユーザーのカラムに表示する（overlay_user_id タグで識別）
+            $overlayAttendeeRows = DB::table('schedule_attendees')
+                ->whereIn('user_id', $allOverlayUserIds)
+                ->where('status', '!=', 'declined')
+                ->get(['event_id', 'user_id']);
+
+            if ($overlayAttendeeRows->isNotEmpty()) {
+                $attendeeEventIds = $overlayAttendeeRows->pluck('event_id')->unique();
+
+                $attendeeEventsForOverlay = Event::whereIn('id', $attendeeEventIds)
+                    ->where('is_company_event', true)
+                    ->whereBetween('starts_at', [$start, $end])
+                    ->with(['eventItemType:id,name,slug'])
+                    ->get();
+
+                foreach ($attendeeEventsForOverlay as $ae) {
+                    $invitedRows = $overlayAttendeeRows->filter(fn ($r) => $r->event_id == $ae->id);
+                    foreach ($invitedRows as $row) {
+                        // オーナーと同じユーザーは overlayEvents 側に既にある → スキップ
+                        if ($ae->user_id == $row->user_id) continue;
+                        $overlayEvents->push(array_merge($ae->toArray(), [
+                            'is_own'          => false,
+                            'overlay_user_id' => (int) $row->user_id,
+                        ]));
+                    }
+                }
+            }
         }
 
         // 参加者として招待されたイベント（自分が作成していないもの・辞退済みは除外）

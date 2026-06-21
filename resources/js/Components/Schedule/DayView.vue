@@ -152,7 +152,11 @@ function eventsForCol(col) {
         if (new Date(ev.starts_at).toLocaleDateString('sv-SE') !== props.date) return false;
         if (col.type === 'own')  return ev.is_own === true || ev.as_attendee === true;
         // as_attendee イベントは own カラムのみ表示（overlay カラムに重複させない）
-        if (col.type === 'user') return !ev.is_own && !ev.as_attendee && String(ev.user_id) === String(col.id);
+        // overlay_user_id が付いたイベントはそのユーザーのカラムに表示（他ユーザー招待イベント）
+        if (col.type === 'user') return (
+            (!ev.is_own && !ev.as_attendee && String(ev.user_id) === String(col.id)) ||
+            (ev.overlay_user_id != null && String(ev.overlay_user_id) === String(col.id))
+        );
         return false;
     });
 }

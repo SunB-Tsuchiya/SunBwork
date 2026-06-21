@@ -1,6 +1,7 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
 import ScheduleCalendar from '@/Components/Schedule/ScheduleCalendar.vue';
+import { Link } from '@inertiajs/vue3';
 
 defineProps({
     initialDate:        { type: String, default: '' },
@@ -19,7 +20,12 @@ defineProps({
 <template>
     <AppLayout title="予定表" :fluid="true">
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">予定表</h2>
+            <div class="flex items-center justify-between">
+                <h2 class="text-xl font-semibold leading-tight text-gray-800">予定表</h2>
+                <Link :href="route('guide.schedule')" class="inline-flex items-center gap-1 rounded-lg border border-teal-200 bg-teal-50 px-3 py-1 text-xs font-medium text-teal-700 hover:bg-teal-100">
+                    📖 使い方ガイド
+                </Link>
+            </div>
         </template>
 
         <!-- 会議室予約テスト中バナー -->

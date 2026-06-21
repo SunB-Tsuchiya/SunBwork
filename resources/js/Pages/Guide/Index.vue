@@ -96,6 +96,21 @@ const guides = computed(() => {
             iconBg: 'bg-blue-100',
             visible: true,
         },
+        {
+            key: 'schedule',
+            title: '予定表（スケジュール）ガイド',
+            subtitle: 'Schedule',
+            description: '会議・打合せ・イベントの共有カレンダー「予定表」の使い方。会議室予約・他の人の予定表示など。',
+            icon: '📅',
+            route: 'guide.schedule',
+            bgFrom: 'from-teal-50',
+            bgTo: 'to-cyan-50',
+            border: 'border-teal-200',
+            badge: 'bg-teal-100 text-teal-700',
+            btn: 'bg-teal-500 hover:bg-teal-600 text-white',
+            iconBg: 'bg-teal-100',
+            visible: true,
+        },
     ];
     return all.filter((g) => g.visible);
 });
@@ -123,6 +138,7 @@ const guides = computed(() => {
                     'grid-cols-1 md:grid-cols-2': guides.length === 2,
                     'grid-cols-1 md:grid-cols-3': guides.length === 3,
                     'grid-cols-1 md:grid-cols-2 lg:grid-cols-4': guides.length === 4,
+                    'grid-cols-1 md:grid-cols-2 lg:grid-cols-3': guides.length >= 5,
                 }"
             >
                 <Link

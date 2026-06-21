@@ -42,6 +42,7 @@ class User extends Authenticatable
         'is_ghost',
         'ghost_owner_id',
         'ghost_expires_at',
+        'sort_order',
     ];
 
     /**
@@ -88,6 +89,11 @@ class User extends Authenticatable
     public function scopeWithGhosts($query)
     {
         return $query->withoutGlobalScope('no_ghost');
+    }
+
+    public function scopeOrdered($query)
+    {
+        return $query->orderBy('sort_order')->orderBy('name');
     }
 
     public function ghostOwner()
