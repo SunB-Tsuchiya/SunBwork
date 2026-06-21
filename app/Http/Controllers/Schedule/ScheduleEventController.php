@@ -132,9 +132,23 @@ class ScheduleEventController extends Controller
                 ]));
         }
 
+        // 個人カレンダー側の行事イベント（旧形式: is_company_event=false/null かつ event_item_type あり）
+        // 会議・打合せ・外出等を Schedule にも表示するため追加
+        $personalMeetingEvents = Event::where('user_id', $user->id)
+            ->where(function ($q) {
+                $q->whereNull('is_company_event')->orWhere('is_company_event', false);
+            })
+            ->whereNotNull('event_item_type_id')
+            ->whereNull('project_job_assignment_id')
+            ->whereBetween('starts_at', [$start, $end])
+            ->with(['eventItemType:id,name,slug'])
+            ->get()
+            ->map(fn ($e) => array_merge($e->toArray(), ['is_own' => true]));
+
         $events = $ownEvents->map(fn ($e) => array_merge($e->toArray(), ['is_own' => true]))
             ->concat($attendeeEvents)
-            ->concat($overlayEvents);
+            ->concat($overlayEvents)
+            ->concat($personalMeetingEvents);
 
         // 会議室予約（自分の会社の会議室のみ）
         $reservations = RoomReservation::whereHas(
