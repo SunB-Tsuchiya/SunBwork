@@ -100,7 +100,11 @@ async function checkConflicts() {
                 starts_at:        `${date} ${startTime}:00`,
                 ends_at:          `${date} ${endTime}:00`,
                 user_ids:         userIds,
-                ...(props.reservation?.event_id ? { exclude_event_id: props.reservation.event_id } : {}),
+                ...(props.reservation?.event_id
+                    ? { exclude_event_id: props.reservation.event_id }
+                    : props.linkEventId
+                        ? { exclude_event_id: props.linkEventId }
+                        : {}),
             },
         });
         conflictWarnings.value = res.data;
