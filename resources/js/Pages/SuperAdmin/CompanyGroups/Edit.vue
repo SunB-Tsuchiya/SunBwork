@@ -17,12 +17,12 @@ const form = useForm({
 });
 
 function submit() {
-    form.put(route('superadmin.company-groups.update', props.group.id));
+    form.put(route('super-admin.company-groups.update', props.group.id));
 }
 
 function confirmDelete() {
     if (confirm('このグループを削除してもよろしいですか？')) {
-        router.delete(route('superadmin.company-groups.destroy', props.group.id));
+        router.delete(route('super-admin.company-groups.destroy', props.group.id));
     }
 }
 </script>
@@ -32,7 +32,7 @@ function confirmDelete() {
         <template #header>
             <div class="flex items-center gap-3">
                 <Link
-                    :href="route('superadmin.company-groups.index')"
+                    :href="route('super-admin.company-groups.index')"
                     class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300 whitespace-nowrap"
                 >← 一覧に戻る</Link>
                 <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">グループ会社 編集</h2>
@@ -119,7 +119,7 @@ function confirmDelete() {
 
                         <div class="flex items-center gap-3">
                             <Link
-                                :href="route('superadmin.company-groups.index')"
+                                :href="route('super-admin.company-groups.index')"
                                 class="rounded border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
                             >キャンセル</Link>
                             <button

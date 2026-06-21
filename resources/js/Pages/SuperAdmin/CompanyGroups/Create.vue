@@ -16,7 +16,7 @@ const form = useForm({
 });
 
 function submit() {
-    form.post(route('superadmin.company-groups.store'));
+    form.post(route('super-admin.company-groups.store'));
 }
 </script>
 
@@ -25,7 +25,7 @@ function submit() {
         <template #header>
             <div class="flex items-center gap-3">
                 <Link
-                    :href="route('superadmin.company-groups.index')"
+                    :href="route('super-admin.company-groups.index')"
                     class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300 whitespace-nowrap"
                 >← 一覧に戻る</Link>
                 <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">グループ会社 新規登録</h2>
@@ -113,7 +113,7 @@ function submit() {
                             class="rounded bg-yellow-600 px-5 py-2 text-sm font-bold text-white hover:bg-yellow-700 disabled:opacity-50"
                         >{{ form.processing ? '登録中...' : '登録' }}</button>
                         <Link
-                            :href="route('superadmin.company-groups.index')"
+                            :href="route('super-admin.company-groups.index')"
                             class="rounded border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
                         >キャンセル</Link>
                     </div>

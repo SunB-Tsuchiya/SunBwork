@@ -9,7 +9,7 @@ defineProps({
 
 function confirmDelete(id) {
     if (confirm('このグループを削除してもよろしいですか？')) {
-        router.delete(route('superadmin.company-groups.destroy', id));
+        router.delete(route('super-admin.company-groups.destroy', id));
     }
 }
 </script>
@@ -20,7 +20,7 @@ function confirmDelete(id) {
             <div class="flex items-center justify-between">
                 <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">グループ会社設定</h2>
                 <Link
-                    :href="route('superadmin.company-groups.create')"
+                    :href="route('super-admin.company-groups.create')"
                     class="rounded bg-yellow-600 px-4 py-2 text-sm font-bold text-white hover:bg-yellow-700"
                 >
                     新規グループ登録
@@ -75,7 +75,7 @@ function confirmDelete(id) {
                             </td>
                             <td class="whitespace-nowrap px-4 py-3 text-center">
                                 <Link
-                                    :href="route('superadmin.company-groups.edit', group.id)"
+                                    :href="route('super-admin.company-groups.edit', group.id)"
                                     class="mr-2 rounded bg-yellow-600 px-3 py-1 text-xs font-bold text-white hover:bg-yellow-700"
                                 >編集</Link>
                                 <button
