@@ -49,7 +49,7 @@ class CompanyGroupController extends Controller
             $group->companies()->attach($validated['company_ids']);
         }
 
-        return redirect()->route('superadmin.company-groups.index')
+        return redirect()->route('super-admin.company-groups.index')
             ->with('success', 'グループ会社を登録しました');
     }
 
@@ -81,7 +81,7 @@ class CompanyGroupController extends Controller
             $companyGroup->companies()->sync($validated['company_ids']);
         }
 
-        return redirect()->route('superadmin.company-groups.index')
+        return redirect()->route('super-admin.company-groups.index')
             ->with('success', 'グループ会社を更新しました');
     }
 
@@ -89,7 +89,7 @@ class CompanyGroupController extends Controller
     {
         $companyGroup->delete();
 
-        return redirect()->route('superadmin.company-groups.index')
+        return redirect()->route('super-admin.company-groups.index')
             ->with('success', 'グループ会社を削除しました');
     }
 }
