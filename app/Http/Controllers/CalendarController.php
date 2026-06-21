@@ -114,7 +114,7 @@ class CalendarController extends Controller
 
             try {
                 $meetingDefinitions = MeetingDefinition::where('company_id', $user->company_id)
-                    ->orderBy('sort_order')
+                    ->orderBy('id')
                     ->get()
                     ->toArray();
             } catch (\Throwable $e) {
