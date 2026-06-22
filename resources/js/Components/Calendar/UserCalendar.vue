@@ -155,10 +155,16 @@ function openDetail(ev) {
         return;
     }
     if (ev._source === 'personal') {
-        // ジョブ連動イベント → アサインジョブ詳細ページへ遷移
+        // ジョブ連動イベント → 種別に応じた詳細ページへ遷移
         if (ev.project_job_assignment_id) {
             try {
-                router.get(route('user.assigned-jobs.show', { id: ev.project_job_assignment_id }));
+                if (ev._is_self_assigned) {
+                    // マイジョブ（自己割当）→ MyJobBox 詳細
+                    router.get(route('user.myjobbox.show', { assignment: ev.project_job_assignment_id }));
+                } else if (ev._project_job_id) {
+                    // Coordinator 割当 → その案件の JobBox 一覧
+                    router.get(route('user.project_jobs.jobbox.index', { projectJob: ev._project_job_id }));
+                }
             } catch {
                 // ルート解決失敗時は何もしない
             }

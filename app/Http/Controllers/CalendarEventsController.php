@@ -62,13 +62,14 @@ class CalendarEventsController extends Controller
 
             try {
                 $rows = ProjectJobAssignment::whereIn('id', $assignmentIds)
-                    ->get(['id', 'sender_id', 'source_assignment_id', 'supersedes_assignment_id', 'completed']);
+                    ->get(['id', 'sender_id', 'source_assignment_id', 'supersedes_assignment_id', 'completed', 'project_job_id']);
                 foreach ($rows as $r) {
                     $senderMap[(int)$r->id] = $r->sender_id === null ? null : (int)$r->sender_id;
                     $flagMap[(int)$r->id] = [
                         'has_source'     => !empty($r->source_assignment_id),
                         'has_supersedes' => !empty($r->supersedes_assignment_id),
                         'completed'      => (bool) ($r->completed ?? false),
+                        'project_job_id' => (int) $r->project_job_id,
                     ];
                 }
             } catch (\Throwable $e) {
@@ -124,17 +125,19 @@ class CalendarEventsController extends Controller
                 : false;
 
             return [
-                'id'            => $e->id,
-                'title'         => $e->title,
-                'starts_at'     => $startsAt,
-                'ends_at'       => $endsAt,
-                'body'          => $e->body,
-                'is_own'        => true,
-                '_source'       => 'personal',
-                '_custom_color' => $color,
-                '_event_route'  => $eventRoute,
-                'completed'     => $completed,
+                'id'                        => $e->id,
+                'title'                     => $e->title,
+                'starts_at'                 => $startsAt,
+                'ends_at'                   => $endsAt,
+                'body'                      => $e->body,
+                'is_own'                    => true,
+                '_source'                   => 'personal',
+                '_custom_color'             => $color,
+                '_event_route'              => $eventRoute,
+                'completed'                 => $completed,
                 'project_job_assignment_id' => $pjId,
+                '_is_self_assigned'         => $isSelf,
+                '_project_job_id'           => $pjId && isset($flagMap[(int)$pjId]) ? $flagMap[(int)$pjId]['project_job_id'] : null,
             ];
         })->filter()->values();
 
