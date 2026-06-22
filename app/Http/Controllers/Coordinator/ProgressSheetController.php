@@ -306,11 +306,11 @@ class ProgressSheetController extends Controller
         $coIds = $projectJob->coordinators->pluck('id')->toArray();
         $ownerId = $projectJob->user_id;
         $userIds = array_unique(array_merge($memberIds, $coIds, [$ownerId]));
-        $regularUsers = User::whereIn('id', $userIds)->orderBy('name')->get(['id', 'name'])
+        $regularUsers = User::whereIn('id', $userIds)->ordered()->get(['id', 'name'])
             ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'is_ghost' => false]);
         $ghostUsers = \App\Models\User::withGhosts()
             ->where('ghost_owner_id', $request->user()->id)
-            ->orderBy('name')->get(['id', 'name'])
+            ->ordered()->get(['id', 'name'])
             ->map(fn ($g) => ['id' => $g->id, 'name' => $g->name, 'is_ghost' => true]);
         $users = $regularUsers->concat($ghostUsers)->values();
 

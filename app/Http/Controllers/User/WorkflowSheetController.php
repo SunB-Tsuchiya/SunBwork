@@ -59,7 +59,7 @@ class WorkflowSheetController extends Controller
         $allUserIds = array_unique(array_merge($memberIds, $coIds, [$ownerId]));
 
         $allUsers = User::whereIn('id', $allUserIds)
-            ->orderBy('name')
+            ->ordered()
             ->get(['id', 'name', 'user_role']);
 
         $workerUsers      = $allUsers->values();

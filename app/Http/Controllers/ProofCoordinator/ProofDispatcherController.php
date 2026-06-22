@@ -20,7 +20,7 @@ class ProofDispatcherController extends Controller
         }
 
         return Inertia::render('ProofCoordinator/Dispatchers/Index', [
-            'dispatchers' => $query->orderBy('name')->get(),
+            'dispatchers' => $query->ordered()->get(),
         ]);
     }
 

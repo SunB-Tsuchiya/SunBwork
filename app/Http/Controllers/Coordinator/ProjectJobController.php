@@ -141,7 +141,7 @@ class ProjectJobController extends Controller
         }
 
         return User::where('company_id', $companyId)
-            ->orderBy('name')
+            ->ordered()
             ->get(['id', 'name']);
     }
 
@@ -437,8 +437,8 @@ class ProjectJobController extends Controller
             : \App\Models\Department::all();
         $assignments = \App\Models\Assignment::all();
         $members = $companyId
-            ? \App\Models\User::where('company_id', $companyId)->orderBy('name')->with(['department', 'assignment'])->get()
-            : \App\Models\User::orderBy('name')->with(['department', 'assignment'])->get();
+            ? \App\Models\User::where('company_id', $companyId)->ordered()->with(['department', 'assignment'])->get()
+            : \App\Models\User::ordered()->with(['department', 'assignment'])->get();
         $salesReps = PrepresSalesRep::orderBy('sort_order')->get(['id', 'name', 'company']);
 
         return Inertia::render('Coordinator/ProjectJobs/Create', [
@@ -999,7 +999,7 @@ class ProjectJobController extends Controller
             ->map(function ($dept) {
                 $users = \App\Models\User::where('department_id', $dept->id)
                     ->whereIn('user_role', ['leader', 'coordinator', 'clerk'])
-                    ->orderBy('name')
+                    ->ordered()
                     ->get(['id', 'name', 'user_role', 'department_id']);
                 return [
                     'id'    => $dept->id,

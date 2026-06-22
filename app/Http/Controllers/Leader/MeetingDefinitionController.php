@@ -21,16 +21,16 @@ class MeetingDefinitionController extends Controller
         if ($user->isSuperAdmin()) {
             $companyId = $this->contextCompanyId();
             return User::when($companyId, fn ($q) => $q->where('company_id', $companyId))
-                ->orderBy('name')
+                ->ordered()
                 ->get(['id', 'name', 'department_id', 'assignment_id']);
         }
         if ($user->isAdmin() || $user->isDepartmentLeader()) {
             return User::where('company_id', $user->company_id)
-                ->orderBy('name')
+                ->ordered()
                 ->get(['id', 'name', 'department_id', 'assignment_id']);
         }
         return User::where('department_id', $user->department_id)
-            ->orderBy('name')
+            ->ordered()
             ->get(['id', 'name', 'department_id', 'assignment_id']);
     }
 

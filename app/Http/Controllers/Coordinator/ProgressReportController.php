@@ -138,7 +138,7 @@ class ProgressReportController extends Controller
             ->unique()
             ->all();
 
-        $users = User::whereIn('id', $userIds)->orderBy('name')->get(['id', 'name']);
+        $users = User::whereIn('id', $userIds)->ordered()->get(['id', 'name']);
 
         return Inertia::render('Coordinator/ProgressReport/Index', [
             'cells'       => $cells,

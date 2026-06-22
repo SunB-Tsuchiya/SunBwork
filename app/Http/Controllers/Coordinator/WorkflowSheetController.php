@@ -217,12 +217,12 @@ class WorkflowSheetController extends Controller
         $ownerId    = $projectJob->user_id;
         $allUserIds = array_unique(array_merge($memberIds, $coIds, [$ownerId]));
 
-        $allUsers = User::whereIn('id', $allUserIds)->orderBy('name')->get(['id', 'name', 'user_role'])
+        $allUsers = User::whereIn('id', $allUserIds)->ordered()->get(['id', 'name', 'user_role'])
             ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'user_role' => $u->user_role, 'is_ghost' => false]);
 
         $ghostUsers = \App\Models\User::withGhosts()
             ->where('ghost_owner_id', $request->user()->id)
-            ->orderBy('name')->get(['id', 'name'])
+            ->ordered()->get(['id', 'name'])
             ->map(fn ($g) => ['id' => $g->id, 'name' => $g->name, 'user_role' => 'user', 'is_ghost' => true]);
 
         $workerUsers      = $allUsers->concat($ghostUsers)->values();

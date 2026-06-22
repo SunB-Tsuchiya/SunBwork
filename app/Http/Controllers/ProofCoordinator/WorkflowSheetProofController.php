@@ -410,7 +410,7 @@ class WorkflowSheetProofController extends Controller
 
         $members = User::whereIn('id', $teamUserIds)
             ->with('assignment:id,name,code')
-            ->orderBy('name')
+            ->ordered()
             ->get()
             ->map(fn($u) => [
                 'id'                    => $u->id,

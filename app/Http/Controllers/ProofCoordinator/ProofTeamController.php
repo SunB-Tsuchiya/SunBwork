@@ -33,7 +33,7 @@ class ProofTeamController extends Controller
         $memberUserIds = ProofTeamMember::pluck('user_id');
         $candidates = User::whereNotIn('id', $memberUserIds)
             ->whereNotIn('user_role', ['superadmin'])
-            ->orderBy('name')
+            ->ordered()
             ->get(['id', 'name', 'email']);
 
         return Inertia::render('ProofCoordinator/Team/Index', [

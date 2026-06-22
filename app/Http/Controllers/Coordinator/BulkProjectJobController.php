@@ -46,13 +46,13 @@ class BulkProjectJobController extends Controller
                   ->orWhereHas('assignment', fn($q2) => $q2->where('code', 'shinko'));
             })
             ->when($companyId, fn($q) => $q->where('company_id', $companyId))
-            ->orderBy('name')
+            ->ordered()
             ->get(['id', 'name']);
 
         $sizes = Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group']);
 
         $users = User::when($companyId, fn($q) => $q->where('company_id', $companyId))
-            ->orderBy('name')->get(['id', 'name']);
+            ->ordered()->get(['id', 'name']);
 
         // チームメンバー選択モーダル用のデータ（同一会社のみ）
         $departments = $companyId
@@ -60,7 +60,7 @@ class BulkProjectJobController extends Controller
             : \App\Models\Department::all();
         $assignments = \App\Models\Assignment::all();
         $members = User::when($companyId, fn($q) => $q->where('company_id', $companyId))
-            ->orderBy('name')->with(['department', 'assignment'])->get();
+            ->ordered()->with(['department', 'assignment'])->get();
 
         return Inertia::render('Coordinator/ProjectJobs/BulkCreate', [
             'templates'             => $templates,
@@ -624,10 +624,10 @@ class BulkProjectJobController extends Controller
                       ->orWhereHas('assignment', fn($q2) => $q2->where('code', 'shinko'));
                 })
                 ->when($companyId, fn($q) => $q->where('company_id', $companyId))
-                ->orderBy('name')->get(['id', 'name']),
+                ->ordered()->get(['id', 'name']),
             'sizes'                 => Size::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'group']),
             'users'                 => User::when($companyId, fn($q) => $q->where('company_id', $companyId))
-                ->orderBy('name')->get(['id', 'name']),
+                ->ordered()->get(['id', 'name']),
         ];
     }
 

@@ -19,7 +19,7 @@ class AdminPermissionController extends Controller
 
         $query = User::where('user_role', 'admin')
             ->with('adminPermission')
-            ->orderBy('name');
+            ->ordered();
 
         // 代表者 Admin は自社の Admin のみ表示
         if (! $isSuperAdmin) {

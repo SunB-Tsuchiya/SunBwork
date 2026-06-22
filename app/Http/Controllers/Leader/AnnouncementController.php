@@ -119,7 +119,7 @@ class AnnouncementController extends Controller
 
         $isCrossCompany = $user->isSuperAdmin() || $user->company?->company_type === 'general';
 
-        $userQuery = User::with(['assignment', 'department'])->whereNotNull('department_id')->orderBy('name');
+        $userQuery = User::with(['assignment', 'department'])->whereNotNull('department_id')->ordered();
         if (! $isCrossCompany) {
             $userQuery->where('company_id', $user->company_id);
         }
@@ -240,7 +240,7 @@ class AnnouncementController extends Controller
             $user           = $request->user();
             $isCrossCompany = $user->isSuperAdmin() || $user->company?->company_type === 'general';
 
-            $userQuery = User::with(['assignment', 'department'])->whereNotNull('department_id')->orderBy('name');
+            $userQuery = User::with(['assignment', 'department'])->whereNotNull('department_id')->ordered();
             if (! $isCrossCompany) {
                 $userQuery->where('company_id', $user->company_id);
             }

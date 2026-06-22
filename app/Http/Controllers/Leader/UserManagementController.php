@@ -42,7 +42,7 @@ class UserManagementController extends Controller
             ->where('department_id', $deptTeam->department_id)
             ->with(['assignment'])
             ->orderByRaw("FIELD(user_role, 'leader', 'coordinator', 'user')")
-            ->orderBy('name')
+            ->ordered()
             ->get();
 
         $assignments = Assignment::where('department_id', $deptTeam->department_id)

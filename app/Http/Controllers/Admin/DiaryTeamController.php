@@ -137,12 +137,12 @@ class DiaryTeamController extends Controller
         $leaderCandidates = User::select(['id', 'name', 'user_role'])
             ->whereIn('user_role', ['clerk', 'coordinator', 'proof_coordinator'])
             ->when($companyId, fn($q) => $q->where('company_id', $companyId))
-            ->orderBy('name')
+            ->ordered()
             ->get();
 
         $memberCandidates = User::select(['id', 'name', 'user_role'])
             ->when($companyId, fn($q) => $q->where('company_id', $companyId))
-            ->orderBy('name')
+            ->ordered()
             ->get();
 
         return [$leaderCandidates, $memberCandidates];

@@ -58,7 +58,7 @@ class SpecialTeamController extends Controller
 
         $leaders = User::select(['id', 'name', 'user_role', 'company_id', 'department_id'])
             ->whereIn('company_id', $leaderCompanyIds)
-            ->orderBy('name')
+            ->ordered()
             ->get();
 
         // 全会社（メンバー選択用）
@@ -71,7 +71,7 @@ class SpecialTeamController extends Controller
         // 全ユーザー（会社・部署フィルター用）
         $users = User::select(['id', 'name', 'user_role', 'department_id', 'company_id'])
             ->whereIn('company_id', $companies->pluck('id'))
-            ->orderBy('name')
+            ->ordered()
             ->get();
 
         return Inertia::render('Admin/SpecialTeams/Create', [
@@ -157,7 +157,7 @@ class SpecialTeamController extends Controller
 
         $leaders = User::select(['id', 'name', 'user_role', 'company_id', 'department_id'])
             ->whereIn('company_id', $leaderCompanyIds)
-            ->orderBy('name')
+            ->ordered()
             ->get();
 
         $companies   = Company::active()->ordered()->get(['id', 'name']);
@@ -165,7 +165,7 @@ class SpecialTeamController extends Controller
             ->get(['id', 'name', 'company_id']);
         $users = User::select(['id', 'name', 'user_role', 'department_id', 'company_id'])
             ->whereIn('company_id', $companies->pluck('id'))
-            ->orderBy('name')
+            ->ordered()
             ->get();
 
         return Inertia::render('Admin/SpecialTeams/Edit', [

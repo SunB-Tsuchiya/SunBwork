@@ -71,7 +71,7 @@ class ProgressSheetController extends Controller
         $coIds     = $projectJob->coordinators->pluck('id')->toArray();
         $ownerId   = $projectJob->user_id;
         $userIds   = array_unique(array_merge($memberIds, $coIds, [$ownerId]));
-        $users     = User::whereIn('id', $userIds)->orderBy('name')->get(['id', 'name']);
+        $users     = User::whereIn('id', $userIds)->ordered()->get(['id', 'name']);
 
         // カレンダーからのドラッグ選択で遷移した場合、時間プリフィルを引き継ぐ
         $calendarPrefill = null;

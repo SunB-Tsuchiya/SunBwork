@@ -23,7 +23,7 @@ class MeetingDefinitionController extends LeaderMeetingDefinitionController
     {
         $companyId = $this->contextCompanyId();
         return User::when($companyId, fn ($q) => $q->where('company_id', $companyId))
-            ->orderBy('name')
+            ->ordered()
             ->get(['id', 'name', 'department_id', 'assignment_id']);
     }
 

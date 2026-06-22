@@ -30,7 +30,7 @@ class DispatchManagementController extends Controller
         $users = User::whereIn('id', $userIds)
             ->with(['assignment', 'department', 'employmentSetting', 'dispatchProfile'])
             ->orderBy('department_id')
-            ->orderBy('name')
+            ->ordered()
             ->get()
             ->map(fn($u) => [
                 'id'                  => $u->id,

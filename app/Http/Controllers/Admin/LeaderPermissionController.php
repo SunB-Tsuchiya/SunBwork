@@ -34,7 +34,7 @@ class LeaderPermissionController extends Controller
         if ($currentUser->isAdmin() || $currentUser->isSuperAdmin()) {
             $query = User::where('user_role', 'leader')
                 ->with('leaderPermission')
-                ->orderBy('name');
+                ->ordered();
 
             if ($currentUser->isSuperAdmin()) {
                 $contextCompanyId = $this->contextCompanyId();
@@ -58,7 +58,7 @@ class LeaderPermissionController extends Controller
         if ($currentUser->isLeader()) {
             $ids     = $this->getManageableLeaderIds($currentUser);
             $leaders = $this->formatLeaders(
-                User::whereIn('id', $ids)->with('leaderPermission')->orderBy('name')->get()
+                User::whereIn('id', $ids)->with('leaderPermission')->ordered()->get()
             );
 
             return Inertia::render('Admin/LeaderPermissions/Index', [

@@ -129,7 +129,7 @@ class ProofRequestController extends Controller
         $teamUserIds = ProofTeamMember::pluck('user_id');
         $members = User::whereIn('id', $teamUserIds)
             ->with('assignment:id,name,code')
-            ->orderBy('name')
+            ->ordered()
             ->get()
             ->map(fn($u) => [
                 'id'                    => $u->id,
@@ -443,7 +443,7 @@ class ProofRequestController extends Controller
               ->orWhereIn('id', $teamUserIds);
         })
             ->with('assignment:id,name,code')
-            ->orderBy('name')
+            ->ordered()
             ->get()
             ->map(fn($u) => [
                 'id'                    => $u->id,
@@ -795,7 +795,7 @@ class ProofRequestController extends Controller
             $q->whereHas('assignment', fn($q2) => $q2->where('code', 'kousei'))
               ->orWhereIn('id', $teamUserIds);
         })
-            ->orderBy('name')
+            ->ordered()
             ->get(['id', 'name']);
 
         return Inertia::render('ProofCoordinator/Assignments/Index', [
@@ -1026,7 +1026,7 @@ class ProofRequestController extends Controller
                     ->whereIn('status', ['assigned', 'in_progress'])
                     ->whereYear('deadline', $year)->whereMonth('deadline', $month),
             ])
-            ->orderBy('name')
+            ->ordered()
             ->get(['id', 'name']);
 
         return Inertia::render('ProofCoordinator/Workload/Index', [
