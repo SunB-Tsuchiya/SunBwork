@@ -155,8 +155,15 @@ function openDetail(ev) {
         return;
     }
     if (ev._source === 'personal') {
-        // ジョブ連動イベントはイベント編集に送らない（詳細表示なし・クリック無効）
-        if (ev.project_job_assignment_id) return;
+        // ジョブ連動イベント → アサインジョブ詳細ページへ遷移
+        if (ev.project_job_assignment_id) {
+            try {
+                router.get(route('user.assigned-jobs.show', { id: ev.project_job_assignment_id }));
+            } catch {
+                // ルート解決失敗時は何もしない
+            }
+            return;
+        }
         // 旧手動作成イベントのみ編集ページへ
         if (ev.id) {
             try {
