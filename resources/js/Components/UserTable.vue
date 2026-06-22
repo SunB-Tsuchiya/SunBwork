@@ -55,7 +55,7 @@ const toggleAll = () => {
     else emit('update:selected', allIds.value.slice());
 };
 
-const sortKey = ref('position_title');
+const sortKey = ref('sort_order');
 const sortDesc = ref(false);
 const changeSort = (key) => {
     if (sortKey.value === key) {
@@ -165,6 +165,9 @@ const sortedUsers = computed(() => {
             const rank = { regular: 1, contract: 2, dispatch: 3, outsource: 4 };
             va = rank[a.employment_type ?? 'regular'] ?? 5;
             vb = rank[b.employment_type ?? 'regular'] ?? 5;
+        } else if (key === 'sort_order') {
+            va = a.sort_order || 999999;
+            vb = b.sort_order || 999999;
         } else {
             va = a[key];
             vb = b[key];
@@ -194,6 +197,18 @@ const sortedUsers = computed(() => {
                 <tr>
                     <th v-if="props.selectable" class="px-2 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                         <input type="checkbox" :checked="allSelected" @change.prevent="toggleAll" />
+                    </th>
+                    <th
+                        @click.prevent="changeSort('sort_order')"
+                        class="cursor-pointer px-2 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                    >
+                        順
+                        <span class="ml-1 inline-block w-4 text-center text-xs" aria-hidden="true">
+                            <template v-if="sortKey === 'sort_order'">
+                                <span v-if="!sortDesc">▲</span>
+                                <span v-else>▼</span>
+                            </template>
+                        </span>
                     </th>
                     <th
                         @click.prevent="changeSort('id')"
@@ -290,6 +305,7 @@ const sortedUsers = computed(() => {
                     <td v-if="props.selectable" class="whitespace-nowrap px-2 py-4 text-sm text-gray-500">
                         <input type="checkbox" :checked="isSelected(user.id)" @change.prevent="toggleSelection(user.id)" />
                     </td>
+                    <td class="whitespace-nowrap px-2 py-4 text-sm text-gray-400">{{ user.sort_order || '-' }}</td>
                     <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ user.id }}</td>
                     <td class="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">{{ user.name }}</td>
                     <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ getDepartmentName(user.department_id) }}</td>

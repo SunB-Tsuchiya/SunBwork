@@ -153,7 +153,11 @@ const getEmploymentTypeLabel = (type) => {
 };
 
 function enterReorderMode() {
-    allReorderList.value = [...props.users].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+    allReorderList.value = [...props.users].sort((a, b) => {
+        const sa = a.sort_order || 999999;
+        const sb = b.sort_order || 999999;
+        return sa - sb;
+    });
     reorderDeptId.value = selectedDepartmentId.value;
     reorderMode.value = true;
 }
