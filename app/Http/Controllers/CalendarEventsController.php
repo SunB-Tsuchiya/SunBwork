@@ -107,7 +107,10 @@ class CalendarEventsController extends Controller
                        && $senderMap[(int)$pjId] === $user->id;
             }
 
-            if ($pjId) {
+            // 割り当てが削除済みの孤立イベント（senderMap に存在しない）
+            $isOrphaned = $pjId && !isset($senderMap[(int)$pjId]);
+
+            if ($pjId && !$isOrphaned) {
                 if ($hasProgress) $color = '#7C3AED';
                 elseif ($isProof) $color = '#DB2777';
                 elseif ($isSelf)  $color = '#4F46E5';
@@ -117,8 +120,15 @@ class CalendarEventsController extends Controller
             }
 
             $internalSlugs = ['meeting_internal', 'conference', 'other'];
+            $clientSlugs   = ['client_visit', 'customer_visit', 'outing'];
             $slug = $e->eventItemType?->slug;
-            $eventRoute = ($slug && in_array($slug, $internalSlugs, true)) ? 'internal' : 'client';
+            if ($slug && in_array($slug, $internalSlugs, true)) {
+                $eventRoute = 'internal';
+            } elseif ($slug && in_array($slug, $clientSlugs, true)) {
+                $eventRoute = 'client';
+            } else {
+                $eventRoute = 'generic';
+            }
 
             $completed = $pjId && isset($flagMap[(int)$pjId])
                 ? $flagMap[(int)$pjId]['completed']
@@ -135,7 +145,7 @@ class CalendarEventsController extends Controller
                 '_custom_color'             => $color,
                 '_event_route'              => $eventRoute,
                 'completed'                 => $completed,
-                'project_job_assignment_id' => $pjId,
+                'project_job_assignment_id' => $isOrphaned ? null : $pjId,
                 '_is_self_assigned'         => $isSelf,
                 '_project_job_id'           => $pjId && isset($flagMap[(int)$pjId]) ? $flagMap[(int)$pjId]['project_job_id'] : null,
             ];

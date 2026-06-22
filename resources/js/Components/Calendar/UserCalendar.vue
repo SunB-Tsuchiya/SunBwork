@@ -170,12 +170,14 @@ function openDetail(ev) {
             }
             return;
         }
-        // 旧手動作成イベントのみ編集ページへ
+        // 手動作成イベント → 種別に応じた編集ページへ
         if (ev.id) {
             try {
                 const editRoute = ev._event_route === 'internal'
                     ? route('events.internal-event.edit', { event: ev.id })
-                    : route('events.client-event.edit', { event: ev.id });
+                    : ev._event_route === 'client'
+                        ? route('events.client-event.edit', { event: ev.id })
+                        : route('events.edit', { event: ev.id });
                 router.get(editRoute);
             } catch {
                 // ルート解決失敗時は何もしない

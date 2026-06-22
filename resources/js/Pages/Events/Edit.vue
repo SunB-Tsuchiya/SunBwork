@@ -7,6 +7,14 @@ import { route } from 'ziggy-js';
 const props = defineProps({ event: Object });
 
 const content = ref(props.event.description || '');
+
+function deleteEvent() {
+    if (!confirm('この予定を削除しますか？この操作は取り消せません。')) return;
+    router.delete(route('events.destroy', { event: props.event.id }), {
+        data: returnTo && returnTo !== '' ? { return_to: returnTo } : {},
+        onError: () => alert('削除に失敗しました。'),
+    });
+}
 const form = useForm({
     title: props.event.title || '',
     description: props.event.description || '',
@@ -162,11 +170,16 @@ const submit = () => {
                         </div>
                     </div>
                 </div>
-                <div class="mt-6 flex justify-end gap-3">
-                    <Link :href="returnTo && returnTo !== '' ? returnTo : route('calendar.index')"
-                        class="rounded bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300"
-                    >キャンセル</Link>
-                    <button type="submit" class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">更新</button>
+                <div class="mt-6 flex justify-between gap-3">
+                    <button type="button" @click="deleteEvent"
+                        class="rounded bg-red-100 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-200"
+                    >削除</button>
+                    <div class="flex gap-3">
+                        <Link :href="returnTo && returnTo !== '' ? returnTo : route('calendar.index')"
+                            class="rounded bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300"
+                        >キャンセル</Link>
+                        <button type="submit" class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">更新</button>
+                    </div>
                 </div>
             </form>
         </div>

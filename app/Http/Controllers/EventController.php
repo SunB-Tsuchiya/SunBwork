@@ -951,6 +951,10 @@ class EventController extends Controller
 
         // If this request came from Inertia, return a redirect (Inertia expects a redirect/Inertia response).
         if (request()->header('X-Inertia')) {
+            $returnTo = request()->input('return_to');
+            if ($returnTo && str_starts_with((string)$returnTo, '/')) {
+                return redirect($returnTo);
+            }
             return redirect()->route('calendar.index');
         }
         return response()->json(['message' => 'deleted']);
@@ -2279,6 +2283,11 @@ class EventController extends Controller
             if (Schema::hasColumn('events', 'project_job_assignment_id') && $event->project_job_assignment_id) {
                 // events.project_job_assignment_id は project_job_assignment_by_myself の FK
                 $assignment = ProjectJobAssignmentByMyself::with(['projectJob.client', 'projectJob'])->find($event->project_job_assignment_id);
+
+                // 孤立イベント（割り当て削除済み）→ 汎用編集ページへ
+                if (!$assignment) {
+                    return Inertia::render('Events/Edit', ['event' => $event]);
+                }
 
                 // Gather same lookup lists as create/createJob so the form has selects
                 $user = request()->user();

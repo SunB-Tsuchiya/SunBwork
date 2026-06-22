@@ -498,6 +498,15 @@ class MyProjectJobController extends Controller
                 'value_user_id'    => null,
             ]);
 
+        // 関連するカレンダーイベントを削除（削除後の幽霊イベントを防ぐ）
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasColumn('events', 'project_job_assignment_id')) {
+                \App\Models\Event::where('project_job_assignment_id', $assignment->id)->delete();
+            }
+        } catch (\Throwable $e) {
+            // ignore
+        }
+
         $assignment->delete();
 
         return redirect()->route('user.myjobbox.index')

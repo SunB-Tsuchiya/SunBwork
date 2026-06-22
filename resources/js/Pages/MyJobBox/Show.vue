@@ -70,6 +70,7 @@
                                 <th class="pb-2 text-left font-medium">作業時間合計</th>
                                 <th v-if="hasDeductions" class="pb-2 text-left font-medium text-orange-600">控除時間</th>
                                 <th v-if="hasDeductions" class="pb-2 text-left font-medium text-blue-700">実作業時間</th>
+                                <th v-if="isAssignee" class="pb-2 text-left font-medium"></th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
@@ -90,6 +91,12 @@
                                 </td>
                                 <td v-if="hasDeductions" class="py-2 font-bold text-blue-700">
                                     {{ formatDurationFromMinutes(ev.actualMinutes) }}
+                                </td>
+                                <td v-if="isAssignee" class="py-2 pl-2">
+                                    <Link
+                                        :href="eventEditHref(ev)"
+                                        class="rounded bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
+                                    >編集</Link>
                                 </td>
                             </tr>
                         </tbody>
@@ -191,7 +198,7 @@
 
                 <template v-if="isAssignee">
                     <Link
-                        v-if="assignment.scheduled || assignment.scheduled_at"
+                        v-if="eventsLoaded && (assignment.scheduled || assignment.scheduled_at) && formattedEvents.length > 0"
                         :href="editHref"
                         class="inline-flex items-center rounded bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
                     >
@@ -332,6 +339,7 @@ function deleteAssignment() {
 
 // ---- 予定（events）関連 ----
 const events = ref([]);
+const eventsLoaded = ref(false);
 const isSubmittingComplete = ref(false);
 
 // ---- チェーン（続きジョブ）関連 ----
@@ -360,6 +368,7 @@ onMounted(async () => {
                 events.value = evs;
             }
         }
+        eventsLoaded.value = true;
 
         // チェーン全体を取得
         if (assignment?.id) {
@@ -551,20 +560,30 @@ async function submitComplete() {
 }
 
 // ---- 予定編集リンク ----
-const editDate = computed(() => {
-    if (Array.isArray(events.value) && events.value.length > 0) {
-        const ev = events.value[0];
-        if (ev.date) return ev.date;
-        if (ev.start) return new Date(ev.start).toISOString().slice(0, 10);
-        if (ev.starts_at) return new Date(ev.starts_at).toISOString().slice(0, 10);
+function eventEditHref(ev) {
+    try {
+        const returnTo = typeof route === 'function'
+            ? route('user.myjobbox.show', { assignment: assignment?.id })
+            : `/myjobbox/${assignment?.id}`;
+        return route('events.edit', { event: ev.id }) + '?return_to=' + encodeURIComponent(returnTo);
+    } catch (_) {
+        return '#';
     }
-    if (assignment?.scheduled_at) return new Date(assignment.scheduled_at).toISOString().slice(0, 10);
-    if (assignment?.date) return assignment.date;
-    return new Date().toISOString().slice(0, 10);
-});
+}
 
 const editHref = computed(() => {
+    const firstEvent = Array.isArray(events.value) && events.value.length > 0 ? events.value[0] : null;
+    if (firstEvent && firstEvent.id) {
+        try {
+            const returnTo = typeof route === 'function'
+                ? route('user.myjobbox.show', { assignment: assignment?.id })
+                : `/myjobbox/${assignment?.id}`;
+            return route('events.edit', { event: firstEvent.id }) + '?return_to=' + encodeURIComponent(returnTo);
+        } catch (_) {
+            // fallback below
+        }
+    }
     const base = typeof route === 'function' ? route('calendar.index') : '/calendar';
-    return base + '?date=' + encodeURIComponent(editDate.value) + '&user_id=' + encodeURIComponent(assignment.user?.id || '');
+    return base;
 });
 </script>
