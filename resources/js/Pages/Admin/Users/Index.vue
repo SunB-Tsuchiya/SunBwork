@@ -131,8 +131,16 @@ function doSearch() {
 
 // ---- 並び替えモード ----
 const reorderMode = ref(false);
-const reorderList = ref([]);
+const allReorderList = ref([]);   // グローバルマスターリスト
+const reorderDeptId = ref('');    // 並び替えモード内の部署タブ
 const reorderProcessing = ref(false);
+
+// 部署タブで絞り込んだ表示リスト
+const reorderDisplayList = computed(() =>
+    reorderDeptId.value
+        ? allReorderList.value.filter(u => String(u.department_id) === reorderDeptId.value)
+        : allReorderList.value
+);
 
 const getEmploymentTypeLabel = (type) => {
     switch (type) {
@@ -145,33 +153,70 @@ const getEmploymentTypeLabel = (type) => {
 };
 
 function enterReorderMode() {
-    reorderList.value = [...props.users].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+    allReorderList.value = [...props.users].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+    reorderDeptId.value = selectedDepartmentId.value;
     reorderMode.value = true;
+}
+
+function switchReorderDept(deptId) {
+    reorderDeptId.value = deptId;
 }
 
 function cancelReorder() {
     reorderMode.value = false;
-    reorderList.value = [];
+    allReorderList.value = [];
+    reorderDeptId.value = '';
 }
 
+// 表示リスト上の idx を受け取り、マスターリスト内で swap
 function moveUp(idx) {
     if (idx <= 0) return;
-    const list = reorderList.value;
-    [list[idx - 1], list[idx]] = [list[idx], list[idx - 1]];
+    const userA = reorderDisplayList.value[idx - 1];
+    const userB = reorderDisplayList.value[idx];
+    const iA = allReorderList.value.indexOf(userA);
+    const iB = allReorderList.value.indexOf(userB);
+    [allReorderList.value[iA], allReorderList.value[iB]] = [allReorderList.value[iB], allReorderList.value[iA]];
 }
 
 function moveDown(idx) {
-    const list = reorderList.value;
-    if (idx >= list.length - 1) return;
-    [list[idx], list[idx + 1]] = [list[idx + 1], list[idx]];
+    const displayed = reorderDisplayList.value;
+    if (idx >= displayed.length - 1) return;
+    const userA = displayed[idx];
+    const userB = displayed[idx + 1];
+    const iA = allReorderList.value.indexOf(userA);
+    const iB = allReorderList.value.indexOf(userB);
+    [allReorderList.value[iA], allReorderList.value[iB]] = [allReorderList.value[iB], allReorderList.value[iA]];
+}
+
+const EMPLOYMENT_RANK = { regular: 1, contract: 2, dispatch: 3, outsource: 4 };
+
+// 表示中ユーザーを役職→雇用形態→名前で自動整列し、マスターリストの元スロットに挿入
+function quickSort() {
+    const displayed = reorderDisplayList.value;
+    const sorted = [...displayed].sort((a, b) => {
+        const pa = a.position_title?.sort_order ?? 999;
+        const pb = b.position_title?.sort_order ?? 999;
+        if (pa !== pb) return pa - pb;
+        const ea = EMPLOYMENT_RANK[a.employment_type ?? 'regular'] ?? 5;
+        const eb = EMPLOYMENT_RANK[b.employment_type ?? 'regular'] ?? 5;
+        if (ea !== eb) return ea - eb;
+        return (a.name ?? '').localeCompare(b.name ?? '', 'ja');
+    });
+    // 元の位置（マスター内のインデックス）を昇順に取得し、sorted を順番に埋める
+    const positions = displayed
+        .map(u => allReorderList.value.indexOf(u))
+        .sort((a, b) => a - b);
+    const newList = [...allReorderList.value];
+    positions.forEach((pos, i) => { newList[pos] = sorted[i]; });
+    allReorderList.value = newList;
 }
 
 function submitReorder() {
     reorderProcessing.value = true;
     router.put(route('admin.users.reorder'), {
-        ordered_ids: reorderList.value.map(u => u.id),
+        ordered_ids: allReorderList.value.map(u => u.id),
     }, {
-        onSuccess: () => { reorderMode.value = false; reorderList.value = []; },
+        onSuccess: () => { reorderMode.value = false; allReorderList.value = []; reorderDeptId.value = ''; },
         onFinish:  () => { reorderProcessing.value = false; },
     });
 }
@@ -255,10 +300,39 @@ const getAssignmentText = (assignment) => {
 
             <!-- 並び替えモード -->
             <template v-if="reorderMode">
-                <div class="mb-4 flex items-center justify-between">
+                <!-- ヘッダー行 -->
+                <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
                     <h3 class="text-lg font-medium text-gray-900">並び替え</h3>
-                    <p class="text-sm text-gray-500">▲▼ で順番を変更し、保存してください</p>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button
+                            type="button"
+                            @click="quickSort"
+                            class="rounded border border-blue-300 bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-100"
+                        >
+                            簡易ソート（役職→雇用形態→名前）
+                        </button>
+                        <span class="text-sm text-gray-400">▲▼ で微調整 → 保存</span>
+                    </div>
                 </div>
+
+                <!-- 部署タブ -->
+                <div class="mb-4 flex flex-wrap gap-2">
+                    <button
+                        type="button"
+                        @click="switchReorderDept('')"
+                        :class="reorderDeptId === '' ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
+                        class="rounded-full px-4 py-1.5 text-sm font-medium transition-colors"
+                    >全員 ({{ allReorderList.length }})</button>
+                    <button
+                        v-for="dept in buttonDepartments"
+                        :key="dept.id"
+                        type="button"
+                        @click="switchReorderDept(String(dept.id))"
+                        :class="reorderDeptId === String(dept.id) ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
+                        class="rounded-full px-4 py-1.5 text-sm font-medium transition-colors"
+                    >{{ dept.name }} ({{ allReorderList.filter(u => String(u.department_id) === String(dept.id)).length }})</button>
+                </div>
+
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
                         <thead class="bg-gray-50">
@@ -267,17 +341,20 @@ const getAssignmentText = (assignment) => {
                                 <th class="px-3 py-2 text-left font-medium text-gray-600">名前</th>
                                 <th class="px-3 py-2 text-left font-medium text-gray-600">部署</th>
                                 <th class="px-3 py-2 text-left font-medium text-gray-600">雇用形態</th>
+                                <th class="px-3 py-2 text-left font-medium text-gray-600">役職</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
                             <tr
-                                v-for="(user, idx) in reorderList"
+                                v-for="(user, idx) in reorderDisplayList"
                                 :key="user.id"
                                 class="hover:bg-gray-50"
                             >
                                 <td class="px-3 py-2">
                                     <div class="flex items-center gap-1">
-                                        <span class="w-6 text-right text-gray-700">{{ idx + 1 }}</span>
+                                        <span class="w-6 text-right text-xs text-gray-400">
+                                            {{ allReorderList.indexOf(user) + 1 }}
+                                        </span>
                                         <div class="flex flex-col">
                                             <button
                                                 type="button"
@@ -287,7 +364,7 @@ const getAssignmentText = (assignment) => {
                                             >▲</button>
                                             <button
                                                 type="button"
-                                                :disabled="idx === reorderList.length - 1"
+                                                :disabled="idx === reorderDisplayList.length - 1"
                                                 class="flex h-5 w-5 items-center justify-center rounded text-gray-500 hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-30"
                                                 @click="moveDown(idx)"
                                             >▼</button>
@@ -297,6 +374,7 @@ const getAssignmentText = (assignment) => {
                                 <td class="px-3 py-2 font-medium text-gray-900">{{ user.name }}</td>
                                 <td class="px-3 py-2 text-gray-500">{{ getDepartmentName(user.department_id) }}</td>
                                 <td class="px-3 py-2 text-gray-500">{{ getEmploymentTypeLabel(user.employment_type) }}</td>
+                                <td class="px-3 py-2 text-gray-500">{{ user.position_title?.name ?? '-' }}</td>
                             </tr>
                         </tbody>
                     </table>
@@ -315,7 +393,7 @@ const getAssignmentText = (assignment) => {
                         :disabled="reorderProcessing"
                         class="rounded bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50"
                     >
-                        保存
+                        保存（全{{ allReorderList.length }}件）
                     </button>
                 </div>
             </template>

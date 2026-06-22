@@ -105,7 +105,7 @@ const props = defineProps({
     endHour: { type: Number, default: 20 },
     editable: { type: Boolean, default: true },
     pxPerMinute: { type: Number, default: 1.5 },
-    laneToleranceMinutes: { type: Number, default: 5 },
+    laneToleranceMinutes: { type: Number, default: 0 },
 });
 
 const emit = defineEmits(['update:events', 'open-create', 'open-edit']);

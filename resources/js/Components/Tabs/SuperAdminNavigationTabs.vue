@@ -32,6 +32,12 @@ const tabs = computed(() => [
         label: 'グループ会社設定',
         condition: typeof route === 'function' && route().has('super-admin.company-groups.index'),
     },
+    {
+        key: 'membership',
+        href: tryRoute('superadmin.membership.edit'),
+        label: '会社・部署設定',
+        condition: typeof route === 'function' && route().has('superadmin.membership.edit'),
+    },
     { key: 'all_users', href: tryRoute('superadmin.users.index'), label: 'ユーザー管理' },
     { key: 'users', href: tryRoute('superadmin.adminusers.index'), label: 'Adminユーザー管理' },
     { key: 'admin_permissions', href: tryRoute('superadmin.admin_permissions.index'), label: 'Admin権限管理' },
@@ -121,6 +127,13 @@ function onMobileSelect(e) {
                 :class="tab('company_groups')"
             >
                 グループ会社設定
+            </Link>
+            <Link
+                v-if="typeof route === 'function' && route().has('superadmin.membership.edit')"
+                :href="route('superadmin.membership.edit')"
+                :class="tab('membership')"
+            >
+                会社・部署設定
             </Link>
             <Link
                 v-if="typeof route === 'function' && route().has('superadmin.users.index')"

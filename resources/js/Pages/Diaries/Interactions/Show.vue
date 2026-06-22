@@ -92,6 +92,10 @@ function routeForIndex(date) {
     return `${prefix}.diaryinteractions.index`;
 }
 
+const indexUrl = computed(() => route(routeForIndex(), {
+    date: formatJstDate(props.diary.date),
+}));
+
 function markRead() {
     // Post mark-read (and optional comment) then navigate to the index page for the diary's date
     const prefix = props.routePrefix || 'diaries';
@@ -160,22 +164,6 @@ function markRead() {
     })();
 }
 
-function goIndex() {
-    // Navigate back to the diary interactions index for the given prefix
-    const prefix = props.routePrefix || 'diaries';
-    const routeName = prefix === 'diaries' ? 'diaryinteractions.interactions.index' : `${prefix}.diaryinteractions.index`;
-    try {
-        // prefer Ziggy route resolution when available on the page
-        const url = route(routeName);
-        window.location.href = url;
-        return;
-    } catch (e) {
-        // fallback to explicit prefix paths
-    }
-
-    window.location.href = route('diaryinteractions.interactions.index');
-}
-
 // --- events timetable state for interactions show (read-only) ---
 const events = ref([]);
 
@@ -201,7 +189,7 @@ onMounted(async () => {
         const resp = await axios.get(route('events.index'), { params: { date, user_id: props.diary.user_id } });
         events.value = (resp.data || []).map((e) => ({
             id: e.id ?? e.event_id ?? e._id ?? null,
-            title: e.title || e.name || '(無題)',
+            title: (e.title || e.name || '(無題)').replace(/^【完了】\s*/, ''),
             start: e.start,
             end: e.end || e.start,
             allDay: !!e.allDay || !!e.all_day || false,
@@ -357,7 +345,7 @@ async function updateComment() {
     <AppLayout title="日報表示">
         <template #header>
             <div class="flex items-center gap-3">
-                <button @click="goIndex" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300">← 一覧に戻る</button>
+                <a :href="indexUrl" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300">← 一覧に戻る</a>
                 <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">日報詳細</h2>
             </div>
         </template>

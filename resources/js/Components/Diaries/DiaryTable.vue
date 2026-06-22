@@ -1,8 +1,8 @@
 <script setup>
-import DOMPurify from 'dompurify';
 import { Inertia } from '@inertiajs/inertia';
 import { usePage } from '@inertiajs/vue3';
-import { computed, onMounted, ref, watch } from 'vue';
+import DOMPurify from 'dompurify';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 const props = defineProps({
     diaries: { type: Array, default: () => [] },
@@ -39,6 +39,9 @@ const emit = defineEmits(['update:selected', 'selection-change']);
 const selected = ref([]);
 // expanded rows for "もっと見る" (array of diary ids)
 const expanded = ref([]);
+const overflowing = ref(new Set());
+const descriptionElements = new Map();
+let descriptionResizeObserver = null;
 
 // expose selected changes
 watch(selected, (v) => {
@@ -271,6 +274,7 @@ function sanitizeHtml(html) {
 function toggleExpand(id) {
     if (expanded.value.includes(id)) {
         expanded.value = expanded.value.filter((i) => i !== id);
+        nextTick(() => measureDescription(id));
     } else {
         expanded.value = [...expanded.value, id];
     }
@@ -278,6 +282,40 @@ function toggleExpand(id) {
 
 function isExpanded(id) {
     return expanded.value.includes(id);
+}
+
+function measureDescription(id) {
+    if (typeof id === 'undefined' || isExpanded(id)) return;
+
+    const el = descriptionElements.get(id);
+    if (!el) return;
+
+    const isOverflowing = el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1;
+    if (overflowing.value.has(id) === isOverflowing) return;
+
+    const next = new Set(overflowing.value);
+    if (isOverflowing) next.add(id);
+    else next.delete(id);
+    overflowing.value = next;
+}
+
+function setDescriptionElement(id, el) {
+    const previous = descriptionElements.get(id);
+    if (previous && previous !== el) descriptionResizeObserver?.unobserve(previous);
+
+    if (!el) {
+        descriptionElements.delete(id);
+        return;
+    }
+
+    el.__diaryId = id;
+    descriptionElements.set(id, el);
+    descriptionResizeObserver?.observe(el);
+    nextTick(() => measureDescription(id));
+}
+
+function canToggleDescription(id) {
+    return isExpanded(id) || overflowing.value.has(id);
 }
 
 function onRowClick(d, event) {
@@ -340,6 +378,20 @@ function cleanupOptimisticReads(diaries) {
 onMounted(() => {
     // remove optimistic ids that are already confirmed read by server
     cleanupOptimisticReads(props.diaries);
+
+    descriptionResizeObserver = new ResizeObserver((entries) => {
+        entries.forEach((entry) => measureDescription(entry.target.__diaryId));
+    });
+    descriptionElements.forEach((el, id) => {
+        el.__diaryId = id;
+        descriptionResizeObserver.observe(el);
+        measureDescription(id);
+    });
+});
+
+onBeforeUnmount(() => {
+    descriptionResizeObserver?.disconnect();
+    descriptionElements.clear();
 });
 
 watch(
@@ -355,6 +407,7 @@ watch(
     () => props.diaries,
     (v) => {
         cleanupOptimisticReads(v);
+        nextTick(() => descriptionElements.forEach((_el, id) => measureDescription(id)));
     },
     { deep: true },
 );
@@ -386,7 +439,10 @@ watch(
                                 </span>
                             </button>
                         </th>
-                        <th v-if="!props.compact && props.showIdColumn" class="w-12 px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                        <th
+                            v-if="!props.compact && props.showIdColumn"
+                            class="w-12 px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                        >
                             <button class="inline-flex items-center text-xs font-medium" @click.prevent="setSort('id')">
                                 <span>ID</span>
                                 <span v-if="sortKey === 'id'" class="ml-1 text-xs" aria-hidden>
@@ -454,19 +510,13 @@ watch(
                                     : 'overflow-hidden px-4 py-4 text-sm text-gray-500'
                             "
                         >
-                            <div
-                                v-if="props.fullContent"
-                                class="diary-full-content"
-                                v-html="sanitizeHtml(d.content ?? d.description ?? '')"
-                            ></div>
+                            <div v-if="props.fullContent" class="diary-full-content" v-html="sanitizeHtml(d.content ?? d.description ?? '')"></div>
                             <div v-else>
                                 <!-- Use configured line-clamp for truncation; keep expand toggle for long content -->
-                                <div :class="isExpanded(d.id) ? '' : descriptionClassFor()">{{ getContentText(d) }}</div>
-                                <button
-                                    v-if="(getContentText(d) || '').length > 200"
-                                    @click.prevent="toggleExpand(d.id)"
-                                    class="mt-1 text-xs text-blue-600"
-                                >
+                                <div :ref="(el) => setDescriptionElement(d.id, el)" :class="isExpanded(d.id) ? '' : descriptionClassFor()">
+                                    {{ getContentText(d) }}
+                                </div>
+                                <button v-if="canToggleDescription(d.id)" @click.prevent="toggleExpand(d.id)" class="mt-1 text-xs text-blue-600">
                                     {{ isExpanded(d.id) ? '閉じる' : 'もっと見る' }}
                                 </button>
                             </div>
@@ -478,12 +528,7 @@ watch(
                         <!-- removed 操作/詳細 buttons; entire row is clickable to show -->
                     </tr>
                     <tr v-if="filtered.length === 0">
-                        <td
-                            :colspan="totalColumns"
-                            class="px-6 py-4 text-sm text-gray-500"
-                        >
-                            日報はありません
-                        </td>
+                        <td :colspan="totalColumns" class="px-6 py-4 text-sm text-gray-500">日報はありません</td>
                     </tr>
                 </tbody>
             </table>

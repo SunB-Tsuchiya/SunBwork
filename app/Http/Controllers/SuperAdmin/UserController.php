@@ -3,21 +3,102 @@
 namespace App\Http\Controllers\SuperAdmin;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
-use App\Models\Team;
 use App\Models\Company;
 use App\Models\Department;
 use App\Models\PositionTitle;
+use App\Models\Team;
+use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules;
 use Inertia\Inertia;
 
 class UserController extends Controller
 {
     use \App\Http\Controllers\Concerns\ResolvesContextCompany;
+
+    public function editMembership()
+    {
+        $user = Auth::user();
+        $companies = Company::with(['departments' => function ($query) {
+            $query->active()->orderBy('sort_order')->orderBy('id');
+        }])
+            ->where('code', '!=', 'SUPERADMIN')
+            ->active()
+            ->ordered()
+            ->get(['id', 'name']);
+
+        return Inertia::render('SuperAdmin/Membership/Edit', [
+            'membership' => [
+                'company_id' => $user->home_company_id ?? $user->company_id,
+                'department_id' => $user->department_id,
+            ],
+            'companies' => $companies,
+        ]);
+    }
+
+    public function updateMembership(Request $request)
+    {
+        $validated = $request->validate([
+            'company_id' => [
+                'required',
+                'integer',
+                Rule::exists('companies', 'id')->where(fn ($query) => $query
+                    ->where('active', true)
+                    ->where('code', '!=', 'SUPERADMIN')),
+            ],
+            'department_id' => [
+                'required',
+                'integer',
+                Rule::exists('departments', 'id')->where(fn ($query) => $query
+                    ->where('company_id', $request->integer('company_id'))
+                    ->where('active', true)),
+            ],
+        ]);
+
+        $user = Auth::user();
+
+        DB::transaction(function () use ($user, $validated) {
+            $organizationTeamIds = Team::whereIn('team_type', ['company', 'department'])
+                ->whereHas('users', fn ($query) => $query->where('users.id', $user->id))
+                ->pluck('teams.id');
+
+            if ($organizationTeamIds->isNotEmpty()) {
+                $user->teams()->detach($organizationTeamIds);
+            }
+
+            $companyTeam = Team::where('company_id', $validated['company_id'])
+                ->where('team_type', 'company')
+                ->first();
+            $departmentTeam = Team::where('department_id', $validated['department_id'])
+                ->where('team_type', 'department')
+                ->first();
+
+            $teamIds = collect([$companyTeam?->id, $departmentTeam?->id])->filter()->all();
+            foreach ($teamIds as $teamId) {
+                $user->teams()->syncWithoutDetaching([$teamId => ['role' => 'viewer']]);
+            }
+
+            $assignmentId = $user->assignment()
+                ->where('department_id', $validated['department_id'])
+                ->value('assignments.id');
+
+            $user->forceFill([
+                'company_id' => $validated['company_id'],
+                'home_company_id' => $validated['company_id'],
+                'department_id' => $validated['department_id'],
+                'assignment_id' => $assignmentId,
+                'current_team_id' => $departmentTeam?->id ?? $companyTeam?->id,
+            ])->save();
+        });
+
+        return redirect()->route('superadmin.membership.edit')
+            ->with('success', '会社・部署設定を更新しました。');
+    }
 
     public function index(\Illuminate\Http\Request $request)
     {
@@ -47,18 +128,18 @@ class UserController extends Controller
             ->get(['id', 'name', 'company_type']);
 
         return Inertia::render('SuperAdmin/Users/Index', [
-            'users'             => $users,
-            'assignments'       => $assignments,
-            'departments'       => $departments,
-            'user'              => $user,
-            'companies'         => $companies,
-            'filterCompanyId'   => $filterCompanyId,
+            'users' => $users,
+            'assignments' => $assignments,
+            'departments' => $departments,
+            'user' => $user,
+            'companies' => $companies,
+            'filterCompanyId' => $filterCompanyId,
         ]);
     }
 
     public function create()
     {
-        $companies = Company::with(['departments.assignments' => function($q){
+        $companies = Company::with(['departments.assignments' => function ($q) {
             $q->where('active', true);
         }])->where('active', true)->ordered()->get();
 
@@ -69,8 +150,8 @@ class UserController extends Controller
 
     public function store(Request $request)
     {
-    $current = Auth::user();
-    if ($request->input('user_role') === 'admin' && (! $current || $current->user_role !== 'superadmin')) {
+        $current = Auth::user();
+        if ($request->input('user_role') === 'admin' && (! $current || $current->user_role !== 'superadmin')) {
             return redirect()->route('superadmin.users.index')
                 ->with('error', '管理者の作成は許可されていません。');
         }
@@ -83,12 +164,12 @@ class UserController extends Controller
                 'assignment_id' => 'required|exists:assignments,id',
                 'user_role' => [
                     'required',
-                    function($attribute, $value, $fail) {
+                    function ($attribute, $value, $fail) {
                         $allowed = ['admin', 'leader', 'coordinator', 'user'];
-                        if (!in_array($value, $allowed)) {
-                            $fail("{$attribute} の値 '{$value}' は許可されていません（許可値: " . implode(',', $allowed) . ")");
+                        if (! in_array($value, $allowed)) {
+                            $fail("{$attribute} の値 '{$value}' は許可されていません（許可値: ".implode(',', $allowed).')');
                         }
-                    }
+                    },
                 ],
             ]);
 
@@ -145,8 +226,8 @@ class UserController extends Controller
         $positionTitles = PositionTitle::orderBy('sort_order')->get(['id', 'name']);
 
         return Inertia::render('SuperAdmin/Users/Edit', [
-            'user'           => $user,
-            'companies'      => $companies,
+            'user' => $user,
+            'companies' => $companies,
             'positionTitles' => $positionTitles,
         ]);
     }
@@ -154,13 +235,13 @@ class UserController extends Controller
     public function update(Request $request, User $user)
     {
         $rules = [
-            'name'              => 'required|string|max:255',
-            'email'             => 'required|string|lowercase|email|max:255|unique:users,email,' . $user->id,
-            'user_role'         => 'required|string|in:admin,leader,coordinator,proof_coordinator,clerk,user',
-            'company_id'        => 'required|exists:companies,id',
-            'department_id'     => 'required|exists:departments,id',
-            'assignment_id'     => 'required|exists:assignments,id',
-            'employment_type'   => 'nullable|string|in:regular,contract,dispatch,outsource',
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|lowercase|email|max:255|unique:users,email,'.$user->id,
+            'user_role' => 'required|string|in:admin,leader,coordinator,proof_coordinator,clerk,user',
+            'company_id' => 'required|exists:companies,id',
+            'department_id' => 'required|exists:departments,id',
+            'assignment_id' => 'required|exists:assignments,id',
+            'employment_type' => 'nullable|string|in:regular,contract,dispatch,outsource',
             'position_title_id' => 'nullable|exists:position_titles,id',
         ];
 
@@ -171,13 +252,13 @@ class UserController extends Controller
         $request->validate($rules);
 
         $updateData = [
-            'name'              => $request->name,
-            'email'             => $request->email,
-            'user_role'         => $request->user_role,
-            'company_id'        => $request->company_id,
-            'department_id'     => $request->department_id,
-            'assignment_id'     => $request->assignment_id,
-            'employment_type'   => $request->input('employment_type', 'regular'),
+            'name' => $request->name,
+            'email' => $request->email,
+            'user_role' => $request->user_role,
+            'company_id' => $request->company_id,
+            'department_id' => $request->department_id,
+            'assignment_id' => $request->assignment_id,
+            'employment_type' => $request->input('employment_type', 'regular'),
             'position_title_id' => $request->input('position_title_id') ?: null,
         ];
 
@@ -188,7 +269,7 @@ class UserController extends Controller
         $user->update($updateData);
 
         // 会社・部署チームの同期
-        $companyTeam    = Team::where('company_id', $request->company_id)->where('team_type', 'company')->first();
+        $companyTeam = Team::where('company_id', $request->company_id)->where('team_type', 'company')->first();
         $departmentTeam = Team::where('department_id', $request->department_id)->first();
         $role = ($request->user_role === 'admin') ? 'admin' : 'viewer';
 

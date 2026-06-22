@@ -161,6 +161,10 @@ const sortedUsers = computed(() => {
         } else if (key === 'position_title') {
             va = a.position_title?.sort_order ?? 999;
             vb = b.position_title?.sort_order ?? 999;
+        } else if (key === 'employment_type') {
+            const rank = { regular: 1, contract: 2, dispatch: 3, outsource: 4 };
+            va = rank[a.employment_type ?? 'regular'] ?? 5;
+            vb = rank[b.employment_type ?? 'regular'] ?? 5;
         } else {
             va = a[key];
             vb = b[key];
