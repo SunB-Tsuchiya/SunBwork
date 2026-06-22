@@ -169,8 +169,8 @@ class ScheduleController extends Controller
             )
             ->when($deptId,   fn ($query) => $query->where('department_id', $deptId))
             ->when($q !== '', fn ($query) => $query->where('name', 'like', "%{$q}%"))
-            ->orderBy('name')
-            ->get(['id', 'name', 'user_role', 'department_id', 'company_id']);
+            ->ordered()
+            ->get(['id', 'name', 'user_role', 'department_id', 'company_id', 'sort_order']);
 
         return response()->json($users);
     }

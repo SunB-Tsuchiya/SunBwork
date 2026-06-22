@@ -69,12 +69,15 @@ class UserController extends Controller
 
         $companyId = $this->contextCompanyId();
 
+        // コンテキスト会社が未設定の superadmin は並び替え不可
+        if (! $companyId) {
+            return back()->withErrors(['ordered_ids' => 'コンテキスト会社を選択してください']);
+        }
+
         foreach ($request->ordered_ids as $i => $userId) {
-            $query = User::where('id', $userId);
-            if ($companyId) {
-                $query->where('company_id', $companyId);
-            }
-            $query->update(['sort_order' => $i + 1]);
+            User::where('id', $userId)
+                ->where('company_id', $companyId)
+                ->update(['sort_order' => $i + 1]);
         }
 
         return back()->with('success', 'ソート順を保存しました');

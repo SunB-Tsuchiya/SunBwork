@@ -252,6 +252,18 @@ const sortedUsers = computed(() => {
                         </span>
                     </th>
                     <th
+                        @click.prevent="changeSort('employment_type')"
+                        class="cursor-pointer px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                    >
+                        雇用形態
+                        <span class="ml-2 inline-block w-4 text-center text-xs" aria-hidden="true">
+                            <template v-if="sortKey === 'employment_type'">
+                                <span v-if="!sortDesc">▲</span>
+                                <span v-else>▼</span>
+                            </template>
+                        </span>
+                    </th>
+                    <th
                         @click.prevent="changeSort('user_role')"
                         class="cursor-pointer px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
                     >
@@ -279,6 +291,7 @@ const sortedUsers = computed(() => {
                     <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ getDepartmentName(user.department_id) }}</td>
                     <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ user.position_title?.name || '-' }}</td>
                     <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ getAssignmentName(user.assignment_id) }}</td>
+                    <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ getEmploymentTypeLabel(user.employment_type) }}</td>
                     <td class="whitespace-nowrap px-6 py-4">
                         <span :class="getAssignmentBadgeClass(user.user_role)" class="inline-flex rounded-full px-2 py-1 text-xs font-semibold">{{
                             getAssignmentText(user.user_role)

@@ -498,6 +498,10 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         // ユーザー管理
         // existing users resource (general)
         Route::resource('users', App\Http\Controllers\SuperAdmin\UserController::class);
+        Route::get('membership', [App\Http\Controllers\SuperAdmin\UserController::class, 'editMembership'])
+            ->name('membership.edit');
+        Route::put('membership', [App\Http\Controllers\SuperAdmin\UserController::class, 'updateMembership'])
+            ->name('membership.update');
         // adminusers: superadmin が管理する "admin" ユーザー用 CRUD (単一定義)
         Route::resource('adminusers', App\Http\Controllers\SuperAdmin\AdminUserController::class);
 
