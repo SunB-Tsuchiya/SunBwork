@@ -297,9 +297,6 @@ class DiaryInteractionController extends Controller
                 // unread=1 -> only diaries NOT read by current user
                 // treat NULL read_by as empty array
                 $query->whereRaw("JSON_CONTAINS(COALESCE(read_by, JSON_ARRAY()), JSON_ARRAY(?)) = 0", [$currentUserId]);
-            } elseif ($hasUnreadParam && $unread === 0) {
-                // unread=0 -> only diaries read by current user
-                $query->whereRaw("JSON_CONTAINS(COALESCE(read_by, JSON_ARRAY()), JSON_ARRAY(?)) = 1", [$currentUserId]);
             }
 
             $collection = $query->orderBy('date', 'desc')
@@ -351,8 +348,6 @@ class DiaryInteractionController extends Controller
 
             if ($hasUnreadParam && $unread === 1) {
                 $diariesQuery->whereRaw("JSON_CONTAINS(COALESCE(read_by, JSON_ARRAY()), JSON_ARRAY(?)) = 0", [$currentUserId]);
-            } elseif ($hasUnreadParam && $unread === 0) {
-                $diariesQuery->whereRaw("JSON_CONTAINS(COALESCE(read_by, JSON_ARRAY()), JSON_ARRAY(?)) = 1", [$currentUserId]);
             }
 
             $diaries = $diariesQuery->get();
@@ -399,8 +394,6 @@ class DiaryInteractionController extends Controller
 
         if ($hasUnreadParam && $unread === 1) {
             $datesQuery->whereRaw("JSON_CONTAINS(COALESCE(read_by, JSON_ARRAY()), JSON_ARRAY(?)) = 0", [$currentUserId]);
-        } elseif ($hasUnreadParam && $unread === 0) {
-            $datesQuery->whereRaw("JSON_CONTAINS(COALESCE(read_by, JSON_ARRAY()), JSON_ARRAY(?)) = 1", [$currentUserId]);
         }
 
         $diaryDates = $datesQuery->orderBy('date', 'desc')
@@ -409,16 +402,14 @@ class DiaryInteractionController extends Controller
             ->toArray();
 
         $workRecordDates = collect();
-        if (!($hasUnreadParam && $unread === 0)) {
-            $workRecordDatesQuery = WorkRecord::whereIn('user_id', $userIds)
-                ->where('user_id', '!=', $currentUserId);
-            if ($lower !== null) {
-                $workRecordDatesQuery->where('date', '>=', $lower)->where('date', '<=', $upper);
-            }
-            $workRecordDates = $workRecordDatesQuery->orderBy('date', 'desc')
-                ->distinct()
-                ->pluck('date');
+        $workRecordDatesQuery = WorkRecord::whereIn('user_id', $userIds)
+            ->where('user_id', '!=', $currentUserId);
+        if ($lower !== null) {
+            $workRecordDatesQuery->where('date', '>=', $lower)->where('date', '<=', $upper);
         }
+        $workRecordDates = $workRecordDatesQuery->orderBy('date', 'desc')
+            ->distinct()
+            ->pluck('date');
 
         $dates = collect($diaryDates)
             ->merge($workRecordDates)
@@ -440,8 +431,6 @@ class DiaryInteractionController extends Controller
 
         if ($hasUnreadParam && $unread === 1) {
             $diariesQuery->whereRaw("JSON_CONTAINS(COALESCE(read_by, JSON_ARRAY()), JSON_ARRAY(?)) = 0", [$currentUserId]);
-        } elseif ($hasUnreadParam && $unread === 0) {
-            $diariesQuery->whereRaw("JSON_CONTAINS(COALESCE(read_by, JSON_ARRAY()), JSON_ARRAY(?)) = 1", [$currentUserId]);
         }
 
         $diaries = $diariesQuery->get();
@@ -450,9 +439,7 @@ class DiaryInteractionController extends Controller
         $existingDiaryKeys = $diaries->mapWithKeys(function ($d) {
             return [$d->user_id . '|' . $d->date->toDateString() => true];
         })->all();
-        $workRecordOnlyRows = ($hasUnreadParam && $unread === 0)
-            ? collect()
-            : $this->workRecordOnlyRows($existingDiaryKeys, $userIds, $currentUserId, $lower, $upper);
+        $workRecordOnlyRows = $this->workRecordOnlyRows($existingDiaryKeys, $userIds, $currentUserId, $lower, $upper);
 
         // group by date
         $rows = $diaries->map(fn ($d) => $this->diaryRow($d, $namesMap))

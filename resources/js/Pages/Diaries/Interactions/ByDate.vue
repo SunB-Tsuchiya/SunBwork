@@ -132,7 +132,6 @@ async function showAll(event, date) {
 const groupedByDepartment = computed(() => {
     const departments = {};
     const page = usePage();
-    const showOnlyRead = Boolean(props.filters && (props.filters.unread === 0 || props.filters.unread === '0' || props.filters.unread === false));
     // Determine current user id: prefer authenticated user, fall back to page.props.user
     // AppLayout supplies `page.props.user`, but prefer `page.props.auth.user` when present.
     const currentUserId = page.props?.auth?.user?.id ?? page.props?.user?.id ?? null;
@@ -160,9 +159,6 @@ const groupedByDepartment = computed(() => {
             // debug diary logging removed
             // if server requested unread-only, skip diaries already read by current user
             if (displayedUnread.value && isReadByCurrentUser(d)) return;
-            // if server requested read-only (unread === 0), skip diaries NOT read by current user
-            // Only apply this client-side filter when we actually know the current user id.
-            if (showOnlyRead && currentUserId !== null && !isReadByCurrentUser(d)) return;
             const department = d.department || d.department_name || (d.user && d.user.department && d.user.department.name) || '未所属';
             if (!departments[department]) departments[department] = [];
             departments[department].push(d);
