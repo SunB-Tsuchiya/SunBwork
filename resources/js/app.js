@@ -6,6 +6,10 @@ import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createApp, h } from 'vue';
 import { ZiggyVue } from '../../vendor/tightenco/ziggy';
 
+function csrfToken() {
+    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+}
+
 const ROLE_DASHBOARD_ROUTES = {
     superadmin:       'superadmin.dashboard',
     admin:            'admin.dashboard',
@@ -65,6 +69,16 @@ function redirectOnError(failedUrl, authUser) {
         router.visit('/');
     }
 }
+
+router.on('before', (event) => {
+    const token = csrfToken();
+    if (!token) return;
+
+    event.detail.visit.headers = {
+        ...event.detail.visit.headers,
+        'X-CSRF-TOKEN': token,
+    };
+});
 
 // Inertia JSON として 403/404 ページが描画されるケース
 router.on('navigate', (event) => {
