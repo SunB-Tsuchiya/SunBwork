@@ -137,6 +137,17 @@ function sendForm() {
     }
 }
 
+function deleteEvent() {
+    if (!confirm('この予定を削除しますか？この操作は取り消せません。')) return;
+    const returnTo = (() => {
+        try { return new URLSearchParams(window.location.search).get('return_to') || null; } catch { return null; }
+    })();
+    router.delete(route('events.destroy', { event: props.event.id }), {
+        data: returnTo ? { return_to: returnTo } : {},
+        onError: () => alert('削除に失敗しました。'),
+    });
+}
+
 const submit = () => {
     errorMessage.value = '';
     const newStart = new Date(`${form.date}T${form.startHour}:${form.startMinute}:00`);
@@ -327,17 +338,25 @@ const submit = () => {
                 </div>
 
                 <!-- 送信ボタン -->
-                <div class="flex gap-3 pt-2">
+                <div class="flex justify-between gap-3 pt-2">
                     <button
-                        type="submit"
-                        :disabled="form.processing"
-                        class="rounded bg-emerald-600 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-                    >
-                        {{ form.processing ? '保存中...' : (isEdit ? '更新する' : '登録する') }}
-                    </button>
-                    <Link :href="route('calendar.index')" class="rounded border px-5 py-2 text-sm text-gray-600 hover:bg-gray-50">
-                        キャンセル
-                    </Link>
+                        v-if="isEdit"
+                        type="button"
+                        @click="deleteEvent"
+                        class="rounded bg-red-100 px-5 py-2 text-sm font-medium text-red-700 hover:bg-red-200"
+                    >削除</button>
+                    <div class="flex gap-3">
+                        <button
+                            type="submit"
+                            :disabled="form.processing"
+                            class="rounded bg-emerald-600 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                        >
+                            {{ form.processing ? '保存中...' : (isEdit ? '更新する' : '登録する') }}
+                        </button>
+                        <Link :href="route('calendar.index')" class="rounded border px-5 py-2 text-sm text-gray-600 hover:bg-gray-50">
+                            キャンセル
+                        </Link>
+                    </div>
                 </div>
 
             </form>
