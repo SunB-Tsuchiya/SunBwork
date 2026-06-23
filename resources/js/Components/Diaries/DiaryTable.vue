@@ -319,6 +319,8 @@ function canToggleDescription(id) {
 }
 
 function onRowClick(d, event) {
+    if (!d || !d.id) return;
+
     // ignore clicks that originated from interactive controls inside the row
     const el = event && (event.target || event.currentTarget);
     if (el) {
@@ -488,10 +490,13 @@ watch(
                 <tbody class="divide-y divide-gray-200 bg-white">
                     <tr
                         v-for="d in paginated"
-                        :key="d.id"
-                        class="cursor-pointer transition-colors hover:bg-green-50"
-                        role="link"
-                        tabindex="0"
+                        :key="d.row_key || d.id"
+                        :class="[
+                            'transition-colors',
+                            d.id ? 'cursor-pointer hover:bg-green-50' : 'cursor-default bg-gray-50',
+                        ]"
+                        :role="d.id ? 'link' : undefined"
+                        :tabindex="d.id ? 0 : undefined"
                         @click="onRowClick(d, $event)"
                         @keydown.enter="onRowClick(d, $event)"
                     >
@@ -522,7 +527,8 @@ watch(
                             </div>
                         </td>
                         <td v-if="props.showReadColumn && !props.compact" class="px-4 py-4 text-sm text-gray-500">
-                            <span v-if="isReadByCurrentUser(d)" class="font-semibold text-green-600">既読</span>
+                            <span v-if="!d.has_diary" class="font-semibold text-gray-500">日報なし</span>
+                            <span v-else-if="isReadByCurrentUser(d)" class="font-semibold text-green-600">既読</span>
                             <span v-else class="font-semibold text-red-600">未読</span>
                         </td>
                         <!-- removed 操作/詳細 buttons; entire row is clickable to show -->

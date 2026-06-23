@@ -87,6 +87,128 @@ class DiaryInteractionController extends Controller
         return array_values(array_unique(array_filter($userIds)));
     }
 
+    private function buildNamesMap($diaries): array
+    {
+        $allReadIds = [];
+        foreach ($diaries as $d) {
+            if (!empty($d->read_by) && is_array($d->read_by)) {
+                $allReadIds = array_merge($allReadIds, $d->read_by);
+            }
+        }
+
+        $allReadIds = array_values(array_unique($allReadIds));
+        if (empty($allReadIds)) {
+            return [];
+        }
+
+        return User::whereIn('id', $allReadIds)->pluck('name', 'id')->toArray();
+    }
+
+    private function diaryRow(Diary $d, array $namesMap, bool $includeContent = false): array
+    {
+        $readBy = $d->read_by ?? [];
+        $readByNames = array_map(function ($id) use ($namesMap) {
+            return $namesMap[$id] ?? ('ID:' . $id);
+        }, is_array($readBy) ? $readBy : []);
+
+        $row = [
+            'id' => $d->id,
+            'row_key' => 'diary-' . $d->id,
+            'user_id' => $d->user_id,
+            'name' => $d->user->name ?? '',
+            'description' => strip_tags($d->content ?? ''),
+            'date' => $d->date->toDateString(),
+            'read_by' => $readBy,
+            'read_by_names' => $readByNames,
+            'department' => $d->user && $d->user->department ? $d->user->department->name : '未所属',
+            'has_diary' => true,
+            'has_work_record' => false,
+        ];
+
+        if ($includeContent) {
+            $row['content'] = $d->content ?? '';
+        }
+
+        return $row;
+    }
+
+    private function normalizeWorkRecordDate(WorkRecord $record): string
+    {
+        return $record->date instanceof \Carbon\CarbonInterface
+            ? $record->date->toDateString()
+            : date('Y-m-d', strtotime((string) $record->date));
+    }
+
+    private function workRecordDescription(WorkRecord $record): string
+    {
+        $start = $record->start_time ? substr($record->start_time, 0, 5) : null;
+        $end = $record->end_time ? substr($record->end_time, 0, 5) : null;
+        $parts = [];
+        if ($record->worktype?->name) {
+            $parts[] = $record->worktype->name;
+        }
+        if ($start || $end) {
+            $parts[] = trim(($start ? '開始 ' . $start : '') . ' ' . ($end ? '終了 ' . $end : ''));
+        }
+
+        return implode(' / ', $parts);
+    }
+
+    private function workRecordRow($records): array
+    {
+        $records = collect($records)->values();
+        $record = $records->first();
+        $date = $this->normalizeWorkRecordDate($record);
+        $details = $records
+            ->map(fn ($item) => $this->workRecordDescription($item))
+            ->filter()
+            ->unique()
+            ->values();
+        $description = '日報本文なし（タイムテーブルあり）';
+        if ($details->isNotEmpty()) {
+            $description .= ' / ' . $details->implode('、');
+        }
+
+        return [
+            'id' => null,
+            'row_key' => 'work-record-' . $record->user_id . '-' . $date,
+            'user_id' => $record->user_id,
+            'name' => $record->user->name ?? '',
+            'content' => $description,
+            'description' => $description,
+            'date' => $date,
+            'read_by' => [],
+            'read_by_names' => [],
+            'department' => $record->user && $record->user->department ? $record->user->department->name : '未所属',
+            'has_diary' => false,
+            'has_work_record' => true,
+        ];
+    }
+
+    private function workRecordOnlyRows(array $existingDiaryKeys, array $userIds, int $currentUserId, ?string $lower, ?string $upper, ?string $date = null)
+    {
+        $query = WorkRecord::with('user.department', 'worktype')
+            ->whereIn('user_id', $userIds)
+            ->where('user_id', '!=', $currentUserId);
+
+        if ($date !== null) {
+            $query->where('date', $date);
+        } elseif ($lower !== null) {
+            $query->where('date', '>=', $lower)->where('date', '<=', $upper);
+        }
+
+        return $query->orderBy('date', 'desc')
+            ->orderBy('user_id')
+            ->get()
+            ->filter(function ($record) use ($existingDiaryKeys) {
+                $date = $this->normalizeWorkRecordDate($record);
+                return !isset($existingDiaryKeys[$record->user_id . '|' . $date]);
+            })
+            ->groupBy(fn ($record) => $record->user_id . '|' . $this->normalizeWorkRecordDate($record))
+            ->map(fn ($records) => $this->workRecordRow($records))
+            ->values();
+    }
+
     public function index(Request $request)
     {
         $this->requireAdminPermission('diary_management');
@@ -184,35 +306,8 @@ class DiaryInteractionController extends Controller
                 ->orderBy('id', 'desc')
                 ->get();
 
-            $allReadIds = [];
-            foreach ($collection as $d) {
-                if (!empty($d->read_by) && is_array($d->read_by)) {
-                    $allReadIds = array_merge($allReadIds, $d->read_by);
-                }
-            }
-            $allReadIds = array_values(array_unique($allReadIds));
-            $namesMap = [];
-            if (!empty($allReadIds)) {
-                $namesMap = User::whereIn('id', $allReadIds)->pluck('name', 'id')->toArray();
-            }
-
-            $diariesArr = $collection->map(function ($d) use ($namesMap) {
-                $readBy = $d->read_by ?? [];
-                $readByNames = array_map(function ($id) use ($namesMap) {
-                    return $namesMap[$id] ?? ('ID:' . $id);
-                }, is_array($readBy) ? $readBy : []);
-
-                return [
-                    'id' => $d->id,
-                    'user_id' => $d->user_id,
-                    'name' => $d->user->name ?? '',
-                    'description' => strip_tags($d->content ?? ''),
-                    'date' => $d->date->toDateString(),
-                    'read_by' => $readBy,
-                    'read_by_names' => $readByNames,
-                    'department' => $d->user->department ? $d->user->department->name : '未所属',
-                ];
-            })->values();
+            $namesMap = $this->buildNamesMap($collection);
+            $diariesArr = $collection->map(fn ($d) => $this->diaryRow($d, $namesMap))->values();
 
             $departments = [
                 [
@@ -262,39 +357,22 @@ class DiaryInteractionController extends Controller
 
             $diaries = $diariesQuery->get();
 
-            $allReadIds = [];
-            foreach ($diaries as $d) {
-                if (!empty($d->read_by) && is_array($d->read_by)) {
-                    $allReadIds = array_merge($allReadIds, $d->read_by);
-                }
-            }
-            $allReadIds = array_values(array_unique($allReadIds));
-            $namesMap = [];
-            if (!empty($allReadIds)) {
-                $namesMap = User::whereIn('id', $allReadIds)->pluck('name', 'id')->toArray();
-            }
+            $namesMap = $this->buildNamesMap($diaries);
+            $existingDiaryKeys = $diaries->mapWithKeys(function ($d) {
+                return [$d->user_id . '|' . $d->date->toDateString() => true];
+            })->all();
+            $rows = $diaries->map(fn ($d) => $this->diaryRow($d, $namesMap, true))
+                ->concat($this->workRecordOnlyRows($existingDiaryKeys, $userIds, $currentUserId, null, null, $onlyDate))
+                ->sortBy([
+                    ['department', 'asc'],
+                    ['name', 'asc'],
+                ])
+                ->values();
 
             $departments = [
                 [
                     'department' => $onlyDate,
-                    'diaries' => $diaries->map(function ($d) use ($namesMap) {
-                        $readBy = $d->read_by ?? [];
-                        $readByNames = array_map(function ($id) use ($namesMap) {
-                            return $namesMap[$id] ?? ('ID:' . $id);
-                        }, is_array($readBy) ? $readBy : []);
-
-                        return [
-                            'id' => $d->id,
-                            'user_id' => $d->user_id,
-                            'name' => $d->user->name ?? '',
-                            'content' => $d->content ?? '',
-                            'description' => strip_tags($d->content ?? ''),
-                            'date' => $d->date->toDateString(),
-                            'read_by' => $readBy,
-                            'read_by_names' => $readByNames,
-                            'department' => $d->user && $d->user->department ? $d->user->department->name : '未所属',
-                        ];
-                    })->values(),
+                    'diaries' => $rows,
                 ],
             ];
 
@@ -325,9 +403,33 @@ class DiaryInteractionController extends Controller
             $datesQuery->whereRaw("JSON_CONTAINS(COALESCE(read_by, JSON_ARRAY()), JSON_ARRAY(?)) = 1", [$currentUserId]);
         }
 
-        $dates = $datesQuery->orderBy('date', 'desc')
+        $diaryDates = $datesQuery->orderBy('date', 'desc')
             ->distinct()
             ->pluck('date')
+            ->toArray();
+
+        $workRecordDates = collect();
+        if (!($hasUnreadParam && $unread === 0)) {
+            $workRecordDatesQuery = WorkRecord::whereIn('user_id', $userIds)
+                ->where('user_id', '!=', $currentUserId);
+            if ($lower !== null) {
+                $workRecordDatesQuery->where('date', '>=', $lower)->where('date', '<=', $upper);
+            }
+            $workRecordDates = $workRecordDatesQuery->orderBy('date', 'desc')
+                ->distinct()
+                ->pluck('date');
+        }
+
+        $dates = collect($diaryDates)
+            ->merge($workRecordDates)
+            ->map(function ($date) {
+                return $date instanceof \Carbon\CarbonInterface
+                    ? $date->toDateString()
+                    : date('Y-m-d', strtotime((string) $date));
+            })
+            ->unique()
+            ->sortDesc()
+            ->values()
             ->toArray();
 
         $diariesQuery = Diary::with('user.department')
@@ -344,45 +446,27 @@ class DiaryInteractionController extends Controller
 
         $diaries = $diariesQuery->get();
 
-        // resolve read_by for these diaries
-        $allReadIds = [];
-        foreach ($diaries as $d) {
-            if (!empty($d->read_by) && is_array($d->read_by)) {
-                $allReadIds = array_merge($allReadIds, $d->read_by);
-            }
-        }
-        $allReadIds = array_values(array_unique($allReadIds));
-        $namesMap = [];
-        if (!empty($allReadIds)) {
-            $namesMap = User::whereIn('id', $allReadIds)->pluck('name', 'id')->toArray();
-        }
+        $namesMap = $this->buildNamesMap($diaries);
+        $existingDiaryKeys = $diaries->mapWithKeys(function ($d) {
+            return [$d->user_id . '|' . $d->date->toDateString() => true];
+        })->all();
+        $workRecordOnlyRows = ($hasUnreadParam && $unread === 0)
+            ? collect()
+            : $this->workRecordOnlyRows($existingDiaryKeys, $userIds, $currentUserId, $lower, $upper);
 
         // group by date
-        $grouped = $diaries->groupBy(function ($d) {
-            return $d->date->toDateString();
-        });
+        $rows = $diaries->map(fn ($d) => $this->diaryRow($d, $namesMap))
+            ->concat($workRecordOnlyRows)
+            ->sortByDesc('date')
+            ->values();
+
+        $grouped = $rows->groupBy('date');
 
         $departments = [];
         foreach ($grouped as $dateKey => $list) {
             $departments[] = [
                 'department' => $dateKey,
-                'diaries' => $list->map(function ($d) use ($namesMap) {
-                    $readBy = $d->read_by ?? [];
-                    $readByNames = array_map(function ($id) use ($namesMap) {
-                        return $namesMap[$id] ?? ('ID:' . $id);
-                    }, is_array($readBy) ? $readBy : []);
-
-                    return [
-                        'id' => $d->id,
-                        'user_id' => $d->user_id,
-                        'name' => $d->user->name ?? '',
-                        'description' => strip_tags($d->content ?? ''),
-                        'date' => $d->date->toDateString(),
-                        'read_by' => $readBy,
-                        'read_by_names' => $readByNames,
-                        'department' => $d->user && $d->user->department ? $d->user->department->name : '未所属',
-                    ];
-                })->values(),
+                'diaries' => $list->values(),
             ];
         }
 
