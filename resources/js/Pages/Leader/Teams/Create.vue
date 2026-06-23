@@ -2,7 +2,7 @@
 import DialogModal from '@/Components/DialogModal.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, useForm, usePage } from '@inertiajs/vue3';
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 const page = usePage();
 const props = page.props;
@@ -31,61 +31,73 @@ watch(
     },
 );
 
-// ── フィルターモーダル ──
-const showFilterModal = ref(false);
-const filterDeptId   = ref('');
-const filterAssignId = ref('');
+// ── メンバー選択モーダル ──
+const showMemberModal  = ref(false);
+const modalFilterDeptId   = ref('');
+const modalFilterAssignId = ref('');
+const modalTempIds    = ref([]);
 
-const filterableAssignments = computed(() => {
-    if (!filterDeptId.value) return [];
-    return assignments.value.filter((a) => String(a.department_id) === String(filterDeptId.value));
+const modalFilterableAssignments = computed(() => {
+    if (!modalFilterDeptId.value) return [];
+    return assignments.value.filter((a) => String(a.department_id) === String(modalFilterDeptId.value));
 });
 
-const ALWAYS_VISIBLE_ROLES = ['superadmin', 'admin'];
-
-const filteredDisplayMembers = computed(() => {
+const filteredModalMembers = computed(() => {
     const list = users.value.filter((u) => String(u.id) !== String(form.leader_id));
-    if (!filterDeptId.value && !filterAssignId.value) return list;
-
+    if (!modalFilterDeptId.value && !modalFilterAssignId.value) return list;
     return list.filter((u) => {
-        if (form.member_ids.includes(String(u.id))) return true;
-        if (ALWAYS_VISIBLE_ROLES.includes(u.user_role)) return true;
-        if (filterDeptId.value && String(u.department_id) !== String(filterDeptId.value)) return false;
-        if (filterAssignId.value && String(u.assignment_id) !== String(filterAssignId.value)) return false;
+        if (modalFilterDeptId.value && String(u.department_id) !== String(modalFilterDeptId.value)) return false;
+        if (modalFilterAssignId.value && String(u.assignment_id) !== String(modalFilterAssignId.value)) return false;
         return true;
     });
 });
 
-const allFilteredChecked = computed(() =>
-    filteredDisplayMembers.value.length > 0 &&
-    filteredDisplayMembers.value.every((u) => form.member_ids.includes(String(u.id))),
+const allModalChecked = computed(() =>
+    filteredModalMembers.value.length > 0 &&
+    filteredModalMembers.value.every((u) => modalTempIds.value.includes(String(u.id))),
 );
 
-function toggleAll() {
-    const ids = filteredDisplayMembers.value.map((u) => String(u.id));
-    if (allFilteredChecked.value) {
-        form.member_ids = form.member_ids.filter((id) => !ids.includes(id));
+function openMemberModal() {
+    modalTempIds.value = [...form.member_ids];
+    showMemberModal.value = true;
+}
+
+function closeMemberModal() {
+    showMemberModal.value = false;
+    modalFilterDeptId.value   = '';
+    modalFilterAssignId.value = '';
+}
+
+function clearModalFilters() {
+    modalFilterDeptId.value   = '';
+    modalFilterAssignId.value = '';
+}
+
+function toggleAllModal() {
+    const ids = filteredModalMembers.value.map((u) => String(u.id));
+    if (allModalChecked.value) {
+        modalTempIds.value = modalTempIds.value.filter((id) => !ids.includes(id));
     } else {
-        form.member_ids = [...new Set([...form.member_ids, ...ids])];
+        modalTempIds.value = [...new Set([...modalTempIds.value, ...ids])];
     }
 }
 
 function toggleMember(id) {
     const sid = String(id);
-    if (form.member_ids.includes(sid)) {
-        form.member_ids = form.member_ids.filter((m) => m !== sid);
+    if (modalTempIds.value.includes(sid)) {
+        modalTempIds.value = modalTempIds.value.filter((m) => m !== sid);
     } else {
-        form.member_ids = [...form.member_ids, sid];
+        modalTempIds.value = [...modalTempIds.value, sid];
     }
 }
 
-function isSelected(id) {
-    const sid = String(id);
-    return form.member_ids.includes(sid) || (form.leader_id && String(form.leader_id) === sid);
+function confirmMemberSelection() {
+    form.member_ids = [...modalTempIds.value];
+    closeMemberModal();
 }
 
 const selectedMembers = computed(() =>
-    users.value.filter((u) => isSelected(u.id)),
+    users.value.filter((u) => form.member_ids.includes(String(u.id))),
 );
 
 function removeFromSelected(id) {
@@ -113,9 +125,6 @@ const ROLE_BADGE = {
 function roleBadge(role) {
     return ROLE_BADGE[role] || null;
 }
-
-function doFilter() { showFilterModal.value = false; }
-function clearFilter() { filterDeptId.value = ''; filterAssignId.value = ''; }
 
 const submit = () => {
     form.member_ids = [...new Set([
@@ -156,132 +165,123 @@ const submit = () => {
                     </select>
                 </div>
 
-                <!-- ── メンバー選択（部署横断） ── -->
+                <!-- ── メンバー選択 ── -->
                 <div>
-                    <div class="mb-2 flex items-center justify-between">
-                        <label class="block text-sm font-medium text-gray-700">
-                            メンバー（複数選択可・部署横断）
-                        </label>
-                        <div class="flex items-center gap-2">
-                            <button type="button" @click="showFilterModal = true"
-                                class="rounded bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700">絞り込み</button>
-                            <button type="button" @click="clearFilter"
-                                class="rounded bg-gray-300 px-3 py-1.5 text-xs font-bold text-gray-800 hover:bg-gray-400">クリア</button>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">メンバー（複数選択可・部署横断）</label>
+
+                    <button type="button" @click="openMemberModal"
+                        class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+                        メンバーを選択
+                    </button>
+
+                    <!-- 選択済みメンバー chips -->
+                    <div v-if="selectedMembers.length > 0" class="mt-3 rounded border border-gray-200 bg-gray-50 px-3 py-2">
+                        <div class="mb-1 text-xs font-bold text-gray-600">選択中のメンバー（{{ selectedMembers.length }}名）</div>
+                        <div class="flex flex-wrap gap-1">
+                            <span v-for="m in selectedMembers" :key="m.id"
+                                class="inline-flex items-center gap-1 rounded bg-blue-100 px-2 py-1 text-xs text-blue-800">
+                                <span v-if="roleBadge(m.user_role)"
+                                    :class="['inline-block rounded px-1 text-xs font-semibold', roleBadge(m.user_role).cls]">
+                                    {{ roleBadge(m.user_role).text }}
+                                </span>
+                                {{ m.name }}
+                                <button type="button" @click="removeFromSelected(m.id)"
+                                    class="ml-0.5 text-blue-400 hover:text-red-600 font-bold leading-none">×</button>
+                            </span>
                         </div>
                     </div>
+                    <p v-else class="mt-2 text-sm text-gray-400">メンバーが選択されていません</p>
+                </div>
 
-                    <DialogModal :show="showFilterModal" @close="showFilterModal = false">
-                        <template #title>メンバー絞り込み</template>
-                        <template #content>
-                            <div class="mb-4">
-                                <label class="mb-1 block text-sm font-semibold">部署</label>
-                                <select v-model="filterDeptId" class="w-full rounded border px-3 py-2 text-sm"
-                                    @change="filterAssignId = ''">
-                                    <option value="">-- 部署を選択 --</option>
+                <!-- チームメンバー選択モーダル -->
+                <DialogModal :show="showMemberModal" @close="closeMemberModal">
+                    <template #title>チームメンバー選択</template>
+                    <template #content>
+                        <!-- フィルター -->
+                        <div class="mb-4 flex items-end gap-3">
+                            <div class="flex-1">
+                                <label class="mb-1 block text-sm font-medium">部署</label>
+                                <select v-model="modalFilterDeptId" class="w-full rounded border px-3 py-2 text-sm"
+                                    @change="modalFilterAssignId = ''">
+                                    <option value="">-- 全部署 --</option>
                                     <option v-for="d in departments" :key="d.id" :value="String(d.id)">{{ d.name }}</option>
                                 </select>
                             </div>
-                            <div>
-                                <label class="mb-1 block text-sm font-semibold">担当</label>
-                                <select v-model="filterAssignId" class="w-full rounded border px-3 py-2 text-sm"
-                                    :disabled="!filterDeptId">
-                                    <option value="">-- 担当を選択 --</option>
-                                    <option v-for="a in filterableAssignments" :key="a.id" :value="String(a.id)">{{ a.name }}</option>
+                            <div class="flex-1">
+                                <label class="mb-1 block text-sm font-medium">担当</label>
+                                <select v-model="modalFilterAssignId" class="w-full rounded border px-3 py-2 text-sm"
+                                    :disabled="!modalFilterDeptId">
+                                    <option value="">-- 全担当 --</option>
+                                    <option v-for="a in modalFilterableAssignments" :key="a.id" :value="String(a.id)">{{ a.name }}</option>
                                 </select>
                             </div>
-                        </template>
-                        <template #footer>
-                            <button type="button" class="mr-2 rounded bg-gray-300 px-4 py-2 text-sm"
-                                @click="showFilterModal = false">閉じる</button>
-                            <button type="button" class="rounded bg-indigo-600 px-4 py-2 text-sm text-white"
-                                @click="doFilter">絞り込み</button>
-                        </template>
-                    </DialogModal>
-
-                    <!-- メンバー一覧テーブル -->
-                    <div class="overflow-x-auto rounded border border-gray-200">
-                        <div class="border-b bg-gray-50 px-3 py-2 text-xs font-bold text-gray-600">
-                            メンバー一覧（{{ filteredDisplayMembers.length }}件表示）
+                            <div>
+                                <button type="button"
+                                    class="rounded bg-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-400"
+                                    @click="clearModalFilters">クリア</button>
+                            </div>
                         </div>
-                        <table class="min-w-full divide-y divide-gray-200 text-sm">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="w-8 px-3 py-2">
-                                        <input type="checkbox" :checked="allFilteredChecked" @change="toggleAll" />
-                                    </th>
-                                    <th class="px-3 py-2 text-left text-xs text-gray-500">名前</th>
-                                    <th class="px-3 py-2 text-left text-xs text-gray-500">部署</th>
-                                    <th class="px-3 py-2 text-left text-xs text-gray-500">担当</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-100 bg-white">
-                                <tr
-                                    v-for="u in filteredDisplayMembers"
-                                    :key="u.id"
-                                    class="cursor-pointer hover:bg-gray-50"
-                                    :class="{ 'bg-blue-50': form.member_ids.includes(String(u.id)) }"
-                                    @click="toggleMember(u.id)"
-                                >
-                                    <td class="px-3 py-2">
-                                        <input
-                                            type="checkbox"
-                                            :value="String(u.id)"
-                                            v-model="form.member_ids"
-                                            @click.stop
-                                        />
-                                    </td>
-                                    <td class="px-3 py-2 font-medium text-gray-900">
-                                        <span v-if="roleBadge(u.user_role)"
-                                            :class="['mr-1 inline-block rounded px-1 py-0.5 text-xs font-semibold', roleBadge(u.user_role).cls]">
-                                            {{ roleBadge(u.user_role).text }}
-                                        </span>
-                                        {{ u.name }}
-                                    </td>
-                                    <td class="px-3 py-2 text-gray-500">{{ getDeptName(u.department_id) }}</td>
-                                    <td class="px-3 py-2 text-gray-500">{{ getAssignName(u.assignment_id) }}</td>
-                                </tr>
-                                <tr v-if="filteredDisplayMembers.length === 0">
-                                    <td colspan="4" class="px-3 py-4 text-center text-sm text-gray-400">該当するメンバーがいません</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
 
-                    <!-- 選択中のメンバー -->
-                    <div class="mt-3 overflow-x-auto rounded border border-gray-200">
-                        <div class="border-b bg-gray-50 px-3 py-2 text-xs font-bold text-gray-600">
-                            選択中のメンバー（{{ selectedMembers.length }}名）
+                        <!-- メンバー一覧 -->
+                        <div class="max-h-96 overflow-y-auto rounded border border-gray-200">
+                            <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                <thead class="sticky top-0 bg-gray-50">
+                                    <tr>
+                                        <th class="w-8 px-3 py-2">
+                                            <input type="checkbox" :checked="allModalChecked" @change="toggleAllModal" />
+                                        </th>
+                                        <th class="px-3 py-2 text-left text-xs text-gray-500">名前</th>
+                                        <th class="px-3 py-2 text-left text-xs text-gray-500">部署</th>
+                                        <th class="px-3 py-2 text-left text-xs text-gray-500">担当</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 bg-white">
+                                    <tr v-for="u in filteredModalMembers" :key="u.id"
+                                        class="cursor-pointer hover:bg-gray-50"
+                                        :class="{ 'bg-blue-50': modalTempIds.includes(String(u.id)) }"
+                                        @click="toggleMember(u.id)">
+                                        <td class="px-3 py-2" @click.stop>
+                                            <input type="checkbox" :value="String(u.id)" v-model="modalTempIds" />
+                                        </td>
+                                        <td class="whitespace-nowrap px-3 py-2 font-medium text-gray-900">
+                                            <span v-if="roleBadge(u.user_role)"
+                                                :class="['mr-1 inline-block rounded px-1 py-0.5 text-xs font-semibold', roleBadge(u.user_role).cls]">
+                                                {{ roleBadge(u.user_role).text }}
+                                            </span>
+                                            {{ u.name }}
+                                        </td>
+                                        <td class="whitespace-nowrap px-3 py-2 text-gray-500">{{ getDeptName(u.department_id) }}</td>
+                                        <td class="whitespace-nowrap px-3 py-2 text-gray-500">{{ getAssignName(u.assignment_id) }}</td>
+                                    </tr>
+                                    <tr v-if="filteredModalMembers.length === 0">
+                                        <td colspan="4" class="px-3 py-6 text-center text-sm text-gray-400">該当するメンバーがいません</td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
-                        <table v-if="selectedMembers.length > 0" class="min-w-full divide-y divide-gray-200 text-sm">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-3 py-2 text-left text-xs text-gray-500">名前</th>
-                                    <th class="px-3 py-2 text-left text-xs text-gray-500">部署</th>
-                                    <th class="px-3 py-2 text-left text-xs text-gray-500">担当</th>
-                                    <th class="px-3 py-2"></th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-100 bg-white">
-                                <tr v-for="m in selectedMembers" :key="m.id" class="hover:bg-gray-50">
-                                    <td class="px-3 py-2 font-medium text-gray-900">
-                                        <span v-if="roleBadge(m.user_role)"
-                                            :class="['mr-1 inline-block rounded px-1 py-0.5 text-xs font-semibold', roleBadge(m.user_role).cls]">
-                                            {{ roleBadge(m.user_role).text }}
-                                        </span>
-                                        {{ m.name }}
-                                    </td>
-                                    <td class="px-3 py-2 text-gray-500">{{ getDeptName(m.department_id) }}</td>
-                                    <td class="px-3 py-2 text-gray-500">{{ getAssignName(m.assignment_id) }}</td>
-                                    <td class="px-3 py-2 text-right">
-                                        <button type="button" class="text-xs text-red-600 hover:text-red-800"
-                                            @click="removeFromSelected(m.id)">削除</button>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                        <p v-else class="px-3 py-3 text-sm text-gray-400">選択されていません</p>
-                    </div>
-                </div>
+
+                        <!-- 選択中 -->
+                        <div v-if="modalTempIds.length > 0" class="mt-3 rounded bg-blue-50 p-3">
+                            <div class="text-sm font-medium text-blue-700">{{ modalTempIds.length }}人選択中</div>
+                            <div class="mt-1 flex flex-wrap gap-1">
+                                <span v-for="sid in modalTempIds" :key="sid"
+                                    class="inline-flex rounded bg-blue-100 px-2 py-1 text-xs text-blue-700">
+                                    {{ users.find(u => String(u.id) === sid)?.name }}
+                                </span>
+                            </div>
+                        </div>
+                    </template>
+                    <template #footer>
+                        <button type="button"
+                            class="mr-3 rounded border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                            @click="closeMemberModal">キャンセル</button>
+                        <button type="button"
+                            class="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+                            @click="confirmMemberSelection">
+                            追加（{{ modalTempIds.length }}人）
+                        </button>
+                    </template>
+                </DialogModal>
 
                 <div>
                     <label class="flex items-center gap-3 cursor-pointer">
