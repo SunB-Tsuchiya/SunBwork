@@ -113,6 +113,19 @@ const allDepts = computed(() => {
     return Array.from(set).sort();
 });
 
+const deptCounts = computed(() => {
+    const counts = {};
+    (props.departments || []).forEach((group) => {
+        (group.diaries || []).forEach((d) => {
+            const dept = d.department || (d.user && d.user.department && d.user.department.name) || '未所属';
+            counts[dept] = (counts[dept] || 0) + 1;
+        });
+    });
+    return counts;
+});
+
+const totalDiaryCount = computed(() => Object.values(deptCounts.value).reduce((sum, count) => sum + count, 0));
+
 const groupedByDepartment = computed(() => {
     const departments = {};
     (props.departments || []).forEach((group) => {
@@ -257,13 +270,22 @@ onBeforeUnmount(() => {
                 <button
                     @click="selectedDept = null"
                     :class="['rounded px-3 py-1 text-sm font-medium transition-colors', selectedDept === null ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200']"
-                >全部署</button>
+                >全部署 ({{ totalDiaryCount }})</button>
                 <button
                     v-for="dept in allDepts"
                     :key="dept"
                     @click="selectedDept = selectedDept === dept ? null : dept"
                     :class="['rounded px-3 py-1 text-sm font-medium transition-colors', selectedDept === dept ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200']"
-                >{{ dept }}</button>
+                >{{ dept }} ({{ deptCounts[dept] || 0 }})</button>
+            </div>
+
+            <div v-if="selectedDept === null && allDepts.length > 1" class="mb-4 rounded border border-indigo-100 bg-indigo-50 px-3 py-2 text-sm text-indigo-900">
+                <span class="font-semibold">全部署:</span>
+                <span class="ml-2">
+                    <template v-for="(dept, index) in allDepts" :key="dept">
+                        <span>{{ dept }} {{ deptCounts[dept] || 0 }}件</span><span v-if="index < allDepts.length - 1"> / </span>
+                    </template>
+                </span>
             </div>
 
             <div class="mb-4 flex items-center justify-between">
