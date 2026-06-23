@@ -107,7 +107,7 @@ class UserController extends Controller
             ? (int) $request->query('filter_company')
             : $this->contextCompanyId();
 
-        $query = User::orderBy('created_at', 'desc');
+        $query = User::ordered();
         if ($filterCompanyId) {
             $query->where('company_id', $filterCompanyId);
         }

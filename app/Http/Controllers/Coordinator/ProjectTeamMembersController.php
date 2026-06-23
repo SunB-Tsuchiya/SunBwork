@@ -51,7 +51,7 @@ class ProjectTeamMembersController extends Controller
     }
     public function index()
     {
-        $members = User::orderBy('created_at', 'desc')->with(['department', 'assignment'])->get();
+        $members = User::ordered()->with(['department', 'assignment'])->get();
         $departments = Department::all();
         $assignments = Assignment::all();
         $user = Auth::user();
@@ -91,7 +91,7 @@ class ProjectTeamMembersController extends Controller
         }
 
         // リーダーの部署でメンバーを絞り込む（project_job_idがない場合は全員表示）
-        $membersQuery = User::orderBy('created_at', 'desc')->with(['department', 'assignment']);
+        $membersQuery = User::ordered()->with(['department', 'assignment']);
         if ($leaderDepartmentId) {
             $membersQuery->where('department_id', $leaderDepartmentId);
         }

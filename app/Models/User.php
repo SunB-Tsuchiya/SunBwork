@@ -93,7 +93,9 @@ class User extends Authenticatable
 
     public function scopeOrdered($query)
     {
-        return $query->orderBy('sort_order')->orderBy('name');
+        return $query
+            ->orderByRaw('CASE WHEN sort_order = 0 THEN 999999 ELSE sort_order END')
+            ->orderBy('name');
     }
 
     public function ghostOwner()

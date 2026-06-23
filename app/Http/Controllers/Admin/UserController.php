@@ -143,6 +143,8 @@ class UserController extends Controller
 
             $positionTitleId = $request->input('position_title_id') ?: null;
 
+            $maxSortOrder = User::where('company_id', $request->company_id)->max('sort_order') ?? 0;
+
             $user = User::create([
                 'name'              => $request->name,
                 'email'             => $request->email,
@@ -155,6 +157,7 @@ class UserController extends Controller
                 'user_role'         => $request->user_role,
                 'employment_type'   => $request->input('employment_type', 'regular'),
                 'email_verified_at' => now(),
+                'sort_order'        => $maxSortOrder + 1,
             ]);
 
             $role = ($request->user_role === 'admin') ? 'admin' : 'viewer';
@@ -631,6 +634,7 @@ class UserController extends Controller
                 if (!$position_title_id && !empty($userData['position_title'])) {
                     $position_title_id = \App\Models\PositionTitle::where('name', $userData['position_title'])->value('id');
                 }
+                $csvMaxSortOrder = User::where('company_id', $userData['company_id'])->max('sort_order') ?? 0;
                 $user = User::create([
                     'name'              => $userData['name'],
                     'email'             => $userData['email'],
@@ -642,6 +646,7 @@ class UserController extends Controller
                     'user_role'         => $userData['user_role'],
                     'employment_type'   => $userData['employment_type'] ?? 'regular',
                     'current_team_id'   => $departmentTeam ? $departmentTeam->id : null,
+                    'sort_order'        => $csvMaxSortOrder + 1,
                 ]);
                 $role = ($userData['user_role'] === 'admin') ? 'admin' : 'viewer';
                 // 会社チームに登録

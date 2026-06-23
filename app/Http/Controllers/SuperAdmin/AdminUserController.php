@@ -28,7 +28,7 @@ class AdminUserController extends Controller
         $companyId = $this->contextCompanyId();
 
         // 表示対象は管理者アカウント（user_role = 'admin') のみ、コンテキスト会社でフィルタ
-        $query = User::where('user_role', 'admin')->orderBy('created_at', 'desc');
+        $query = User::where('user_role', 'admin')->ordered();
         if ($companyId) {
             $query->where('company_id', $companyId);
         }
