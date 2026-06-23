@@ -128,7 +128,7 @@ class DiaryInteractionController extends Controller
             ]);
         }
 
-        // server-side filters and pagination
+        // server-side filters
         $year   = $request->input('year', null);
         $month  = $request->input('month', null);
         $period = $request->input('period', null);
@@ -155,7 +155,7 @@ class DiaryInteractionController extends Controller
         $hasUnreadParam = $request->has('unread');
         $onlyDate = $request->input('date', null);
 
-        // free-text query -> diary-level pagination
+        // free-text query -> full diary list
         if ($q !== '') {
             $query = Diary::with('user.department')
                 ->whereIn('user_id', $userIds)
@@ -180,8 +180,9 @@ class DiaryInteractionController extends Controller
                 $query->whereRaw("JSON_CONTAINS(COALESCE(read_by, JSON_ARRAY()), JSON_ARRAY(?)) = 1", [$currentUserId]);
             }
 
-            $paginator = $query->orderBy('date', 'desc')->paginate(intval($request->input('perPage', 20)))->withQueryString();
-            $collection = $paginator->getCollection();
+            $collection = $query->orderBy('date', 'desc')
+                ->orderBy('id', 'desc')
+                ->get();
 
             $allReadIds = [];
             foreach ($collection as $d) {
@@ -220,7 +221,7 @@ class DiaryInteractionController extends Controller
                 ],
             ];
 
-            $meta = $paginator->toArray()['meta'] ?? null;
+            $meta = null;
             $filters = [
                 'q' => $q,
                 'year' => $year,

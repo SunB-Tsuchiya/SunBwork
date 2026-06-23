@@ -129,8 +129,8 @@ async function showAll(event, date) {
     navigateWithParams(date, null);
 }
 
-const groupedByDate = computed(() => {
-    const map = {};
+const groupedByDepartment = computed(() => {
+    const departments = {};
     const page = usePage();
     const showOnlyRead = Boolean(props.filters && (props.filters.unread === 0 || props.filters.unread === '0' || props.filters.unread === false));
     // Determine current user id: prefer authenticated user, fall back to page.props.user
@@ -163,22 +163,25 @@ const groupedByDate = computed(() => {
             // if server requested read-only (unread === 0), skip diaries NOT read by current user
             // Only apply this client-side filter when we actually know the current user id.
             if (showOnlyRead && currentUserId !== null && !isReadByCurrentUser(d)) return;
-            const date = d.date || '不明';
-            if (!map[date]) map[date] = [];
-            map[date].push(d);
+            const department = d.department || d.department_name || (d.user && d.user.department && d.user.department.name) || '未所属';
+            if (!departments[department]) departments[department] = [];
+            departments[department].push(d);
         });
     });
-    Object.keys(map).forEach((k) => {
-        map[k].sort((a, b) => b.id - a.id);
-    });
-    const ordered = {};
-    Object.keys(map)
-        .sort((a, b) => (a < b ? 1 : a > b ? -1 : 0))
-        .forEach((k) => {
-            ordered[k] = map[k];
+
+    return Object.keys(departments)
+        .sort((a, b) => {
+            if (a === '未所属') return 1;
+            if (b === '未所属') return -1;
+            return a.localeCompare(b, 'ja');
+        })
+        .map((department) => {
+            const diaries = departments[department].slice().sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
+            return { department, diaries };
         });
-    return ordered;
 });
+
+const hasGroupedDiaries = computed(() => groupedByDepartment.value.some((group) => group.diaries.length > 0));
 </script>
 
 <template>
@@ -195,25 +198,30 @@ const groupedByDate = computed(() => {
 
         <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
 
-        <div v-for="(list, date) in groupedByDate" :key="date" class="mb-8">
+        <div v-if="!hasGroupedDiaries" class="rounded border border-gray-200 bg-gray-50 px-4 py-6 text-sm text-gray-600">
+            日報はありません
+        </div>
+
+        <div v-for="group in groupedByDepartment" :key="group.department" class="mb-8">
                     <div class="mb-2">
                         <h3 class="flex items-center gap-2 text-lg font-bold">
-                            <span>{{ formatDate(date) }}</span>
+                            <span>{{ group.department }}</span>
+                            <span class="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">{{ group.diaries.length }}件</span>
                             <div class="flex gap-2 text-sm">
                                 <button
-                                    @click.prevent="(e) => showUnread(e, date)"
+                                    @click.prevent="(e) => showUnread(e, props.date)"
                                     class="rounded border bg-white px-2 py-1 text-xs hover:bg-gray-50"
                                 >
                                     未読のみ表示
                                 </button>
-                                <button @click.prevent="(e) => showAll(e, date)" class="rounded border bg-white px-2 py-1 text-xs hover:bg-gray-50">
+                                <button @click.prevent="(e) => showAll(e, props.date)" class="rounded border bg-white px-2 py-1 text-xs hover:bg-gray-50">
                                     全件表示
                                 </button>
                             </div>
 
                             <button
-                                v-if="props.date === date"
-                                @click.prevent="() => Inertia.post(route(markReadAllRoute()), { date: date })"
+                                v-if="props.date"
+                                @click.prevent="() => Inertia.post(route(markReadAllRoute()), { date: props.date })"
                                 class="ml-2 inline-flex items-center rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700"
                             >
                                 全部既読にする
@@ -221,14 +229,16 @@ const groupedByDate = computed(() => {
                         </h3>
                     </div>
                     <DiaryTable
-                        :diaries="list"
+                        :diaries="group.diaries"
                         :routePrefix="props.routePrefix"
                         :serverMode="true"
-                        :meta="props.meta"
+                        :meta="null"
                         :filters="props.filters"
                         :maxDescriptionLines="5"
-                        :fullContent="props.date === date"
+                        :hidePagination="true"
+                        :fullContent="true"
                         :useInteractionRoutes="true"
+                        :showDeptColumn="false"
                     />
                 </div>
         </div>

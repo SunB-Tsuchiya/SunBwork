@@ -113,32 +113,58 @@ const allDepts = computed(() => {
     return Array.from(set).sort();
 });
 
-const groupedByDate = computed(() => {
-    const map = {};
+const groupedByDepartment = computed(() => {
+    const departments = {};
     (props.departments || []).forEach((group) => {
         (group.diaries || []).forEach((d) => {
-            // 部署フィルター適用
+            const deptName = d.department || (d.user && d.user.department && d.user.department.name) || '未所属';
             if (selectedDept.value) {
-                const deptName = d.department || (d.user && d.user.department && d.user.department.name) || '';
                 if (deptName !== selectedDept.value) return;
             }
             const raw = d.date || '不明';
             const date = viewMode.value === 'month' ? raw.slice(0, 7) : raw;
-            if (!map[date]) map[date] = [];
-            map[date].push(d);
+            if (!departments[deptName]) departments[deptName] = {};
+            if (!departments[deptName][date]) departments[deptName][date] = [];
+            departments[deptName][date].push(d);
         });
     });
-    Object.keys(map).forEach((k) => {
-        map[k].sort((a, b) => b.id - a.id);
-    });
-    const ordered = {};
-    Object.keys(map)
-        .sort((a, b) => (a < b ? 1 : a > b ? -1 : 0))
-        .forEach((k) => {
-            ordered[k] = map[k];
+
+    return Object.keys(departments)
+        .sort((a, b) => {
+            if (a === '未所属') return 1;
+            if (b === '未所属') return -1;
+            return a.localeCompare(b, 'ja');
+        })
+        .map((department) => {
+            const dateGroups = departments[department];
+            const buckets = Object.keys(dateGroups)
+                .sort((a, b) => (a < b ? 1 : a > b ? -1 : 0))
+                .map((date) => {
+                    const diaries = dateGroups[date].slice().sort((a, b) => {
+                        const dateCompare = String(b.date || '').localeCompare(String(a.date || ''));
+                        return dateCompare !== 0 ? dateCompare : Number(b.id || 0) - Number(a.id || 0);
+                    });
+
+                    return { date, diaries };
+                });
+
+            return {
+                department,
+                buckets,
+                total: buckets.reduce((sum, bucket) => sum + bucket.diaries.length, 0),
+            };
         });
-    return ordered;
 });
+
+const hasGroupedDiaries = computed(() => groupedByDepartment.value.some((group) => group.total > 0));
+
+const dateLinkParams = (date) => {
+    return { date };
+};
+
+const canOpenDateDetail = (date) => {
+    return viewMode.value === 'day' && /^\d{4}-\d{2}-\d{2}$/.test(date);
+};
 
 function applyFilters() {
     const params = { ...getPeriodParams(), page: 1 };
@@ -265,51 +291,64 @@ onBeforeUnmount(() => {
                 </div>
             </div>
 
-            <div v-for="(list, date) in groupedByDate" :key="date" class="mb-8">
-                <div class="mb-2">
-                    <h3 class="flex items-center gap-2 text-lg font-bold">
-                        <span>{{ formatDate(date) }}</span>
-                        <Link
-                            :href="route(routeForIndex(), { date: date })"
-                            class="inline-flex items-center rounded border bg-white px-2 py-1 text-xs hover:bg-gray-50"
-                            aria-label="全件表示"
-                        >
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke-width="2"
-                                stroke="currentColor"
-                                class="mr-1 h-4 w-4"
-                            >
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-                            </svg>
-                            <span class="text-xs">全件表示</span>
-                        </Link>
+            <div v-if="!hasGroupedDiaries" class="rounded border border-gray-200 bg-gray-50 px-4 py-6 text-sm text-gray-600">
+                日報はありません
+            </div>
 
-                        <button
-                            v-if="props.date === date"
-                            @click.prevent="() => Inertia.post(route(markReadAllRoute()), { date: date })"
-                            class="ml-2 inline-flex items-center rounded bg-indigo-600 px-2 py-1 text-xs text-white hover:bg-indigo-700"
-                        >
-                            全部既読にする
-                        </button>
-                    </h3>
+            <div v-for="departmentGroup in groupedByDepartment" :key="departmentGroup.department" class="mb-10">
+                <div class="mb-4 flex items-center gap-3 border-b border-gray-200 pb-2">
+                    <h3 class="text-lg font-bold text-gray-800">{{ departmentGroup.department }}</h3>
+                    <span class="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">{{ departmentGroup.total }}件</span>
                 </div>
-                <DiaryTable
-                    :diaries="list"
-                    :routePrefix="props.routePrefix"
-                    :serverMode="true"
-                    :meta="props.meta"
-                    :filters="tableFilters"
-                    :searchable="false"
-                    :maxDescriptionLines="1"
-                    :showUnreadToggle="false"
-                    :fullContent="props.date === date"
-                    :useInteractionRoutes="true"
-                    :showIdColumn="false"
-                    :showDeptColumn="false"
-                />
+
+                <div v-for="bucket in departmentGroup.buckets" :key="`${departmentGroup.department}-${bucket.date}`" class="mb-6">
+                    <div class="mb-2">
+                        <h4 class="flex items-center gap-2 text-base font-bold text-gray-700">
+                            <span>{{ formatDate(bucket.date) }}</span>
+                            <Link
+                                v-if="canOpenDateDetail(bucket.date)"
+                                :href="route(routeForIndex(), dateLinkParams(bucket.date))"
+                                class="inline-flex items-center rounded border bg-white px-2 py-1 text-xs hover:bg-gray-50"
+                                aria-label="全件表示"
+                            >
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke-width="2"
+                                    stroke="currentColor"
+                                    class="mr-1 h-4 w-4"
+                                >
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                                </svg>
+                                <span class="text-xs">全件表示</span>
+                            </Link>
+
+                            <button
+                                v-if="props.date === bucket.date"
+                                @click.prevent="() => Inertia.post(route(markReadAllRoute()), { date: bucket.date })"
+                                class="ml-2 inline-flex items-center rounded bg-indigo-600 px-2 py-1 text-xs text-white hover:bg-indigo-700"
+                            >
+                                全部既読にする
+                            </button>
+                        </h4>
+                    </div>
+                    <DiaryTable
+                        :diaries="bucket.diaries"
+                        :routePrefix="props.routePrefix"
+                        :serverMode="true"
+                        :meta="null"
+                        :filters="tableFilters"
+                        :searchable="false"
+                        :maxDescriptionLines="1"
+                        :showUnreadToggle="false"
+                        :hidePagination="true"
+                        :fullContent="props.date === bucket.date"
+                        :useInteractionRoutes="true"
+                        :showIdColumn="false"
+                        :showDeptColumn="false"
+                    />
+                </div>
             </div>
         </div>
     </AppLayout>
