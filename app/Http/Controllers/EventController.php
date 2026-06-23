@@ -100,7 +100,7 @@ class EventController extends Controller
      */
     public function update_from_calendar(Request $request, $id)
     {
-        $event = Event::findOrFail($id);
+        $event = Event::where('user_id', Auth::id())->findOrFail($id);
         $validated = $request->validate([
             'date' => ['required', 'date'],
             'startHour' => ['required', 'regex:/^\\d{2}$/'],

@@ -202,22 +202,47 @@ function onMonthDateClick(date) {
     openActionSheet({ date });
 }
 
-// ── ドラッグ更新（会社イベントのみ） ──────────────────────────
+// ── ドラッグ更新（会社イベント・個人イベント両対応） ──────────
 async function onUpdate({ id, starts_at, ends_at }) {
-    const idx = companyEvents.value.findIndex(e => e.id === id);
-    if (idx < 0) return;
-    if (companyEvents.value[idx].room_reservation_id) return;
-    const orig = { ...companyEvents.value[idx] };
-    companyEvents.value[idx] = { ...orig, starts_at, ends_at };
+    // 会社イベント（Schedule 系）
+    const cIdx = companyEvents.value.findIndex(e => e.id === id);
+    if (cIdx >= 0) {
+        if (companyEvents.value[cIdx].room_reservation_id) return;
+        const orig = { ...companyEvents.value[cIdx] };
+        companyEvents.value[cIdx] = { ...orig, starts_at, ends_at };
+        try {
+            await axios.put(
+                route('schedule.events.update', { event: id }),
+                { starts_at, ends_at },
+                { headers: { 'X-CSRF-TOKEN': CSRF() } }
+            );
+            loadEvents();
+        } catch {
+            companyEvents.value[cIdx] = orig;
+            alert('更新に失敗しました');
+        }
+        return;
+    }
+
+    // 個人イベント（ジョブ連動・手動作成）
+    const pIdx = personalEvents.value.findIndex(e => e.id === id);
+    if (pIdx < 0) return;
+    const orig = { ...personalEvents.value[pIdx] };
+    personalEvents.value[pIdx] = { ...orig, starts_at, ends_at };
     try {
+        // starts_at = "YYYY-MM-DD HH:mm:ss" 形式をパース
+        const [datePart, startTime] = starts_at.split(' ');
+        const [startHour, startMinute] = startTime.split(':');
+        const [, endTime] = ends_at.split(' ');
+        const [endHour, endMinute] = endTime.split(':');
         await axios.put(
-            route('schedule.events.update', { event: id }),
-            { starts_at, ends_at },
+            route('events.update_from_calendar', { id }),
+            { date: datePart, startHour, startMinute, endHour, endMinute },
             { headers: { 'X-CSRF-TOKEN': CSRF() } }
         );
         loadEvents();
     } catch {
-        companyEvents.value[idx] = orig;
+        personalEvents.value[pIdx] = orig;
         alert('更新に失敗しました');
     }
 }
