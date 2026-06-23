@@ -64,13 +64,13 @@ class TeamController extends Controller
 
         $users = $companyId
             ? \App\Models\User::select(['id', 'name', 'user_role', 'department_id', 'company_id', 'assignment_id', 'is_ghost'])
-                ->where('company_id', $companyId)->get()
+                ->where('company_id', $companyId)->ordered()->get()
             : collect();
 
         $leaders = $companyId
             ? \App\Models\User::select(['id', 'name', 'user_role'])
                 ->whereIn('user_role', ['superadmin', 'admin', 'leader', 'coordinator', 'clerk'])
-                ->where('company_id', $companyId)->get()
+                ->where('company_id', $companyId)->ordered()->get()
             : collect();
 
         $unit = \App\Models\Unit::with(['members:id,name'])

@@ -247,11 +247,12 @@ const submit = () => {
                                 :class="{ 'bg-blue-50': isSelected(u.id) }"
                                 @click="toggleMember(u.id)"
                             >
-                                <td class="px-3 py-2" @click.stop="toggleMember(u.id)">
+                                <td class="px-3 py-2">
                                     <input
                                         type="checkbox"
-                                        :checked="isSelected(u.id)"
-                                        @click.prevent
+                                        :value="String(u.id)"
+                                        v-model="selectedIds"
+                                        @click.stop
                                     />
                                 </td>
                                 <td class="px-3 py-2 font-medium text-gray-900">

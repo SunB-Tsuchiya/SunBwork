@@ -114,7 +114,7 @@ class ChatController extends Controller
     // ルーム作成画面
     public function createRoom(Request $request)
     {
-        $users = \App\Models\User::select('id', 'name', 'department_id', 'assignment_id')->get();
+        $users = \App\Models\User::select('id', 'name', 'department_id', 'assignment_id')->ordered()->get();
         $departments = \App\Models\Department::select('id', 'name')->get();
         $assignments = \App\Models\Assignment::select('id', 'name', 'department_id')->get();
         $user = $request->user();

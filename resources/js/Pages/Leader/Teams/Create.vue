@@ -219,11 +219,16 @@ const submit = () => {
                                     v-for="u in filteredDisplayMembers"
                                     :key="u.id"
                                     class="cursor-pointer hover:bg-gray-50"
-                                    :class="{ 'bg-blue-50': isSelected(u.id) }"
+                                    :class="{ 'bg-blue-50': form.member_ids.includes(String(u.id)) }"
                                     @click="toggleMember(u.id)"
                                 >
-                                    <td class="px-3 py-2" @click.stop="toggleMember(u.id)">
-                                        <input type="checkbox" :checked="isSelected(u.id)" @click.prevent />
+                                    <td class="px-3 py-2">
+                                        <input
+                                            type="checkbox"
+                                            :value="String(u.id)"
+                                            v-model="form.member_ids"
+                                            @click.stop
+                                        />
                                     </td>
                                     <td class="px-3 py-2 font-medium text-gray-900">
                                         <span v-if="roleBadge(u.user_role)"

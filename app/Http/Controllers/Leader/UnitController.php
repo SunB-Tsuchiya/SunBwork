@@ -22,6 +22,7 @@ class UnitController extends Controller
         // 全社ユーザー（メンバー選択用・部署横断）
         $users = \App\Models\User::select(['id', 'name', 'user_role', 'department_id', 'company_id', 'assignment_id'])
             ->where('company_id', $companyId)
+            ->ordered()
             ->get();
 
         // リーダー候補: 同部署の leader/coordinator/clerk + 全社 admin/superadmin
@@ -34,6 +35,7 @@ class UnitController extends Controller
                          ->where('department_id', $deptId);
                   });
             })
+            ->ordered()
             ->get();
 
         $departments = \App\Models\Department::where('company_id', $companyId)
