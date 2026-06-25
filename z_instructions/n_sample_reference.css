@@ -1,0 +1,289 @@
+/* N_DBSystem IDML→HTML 出力用CSS */
+/* style-l.css（_archives/sample/151225/style-l.css）をベースに独自タグのスタイルを追加 */
+
+/* リセット */
+html, body, div, span, h1, h2, h3, h4, h5, h6, p,
+table, caption, tbody, tfoot, thead, tr, th, td,
+dl, dt, dd, ol, ul, li, ruby, rt, rp, rb {
+  margin: 0; padding: 0; border: 0;
+  font-size: 100%; vertical-align: baseline;
+}
+body { line-height: 1; }
+table { border-collapse: collapse; border-spacing: 0; }
+sub { font-size: 0.83em; vertical-align: sub; }
+sup { font-size: 0.83em; vertical-align: super; }
+
+/* ページ全体 */
+body {
+  margin: 16px;
+  font-family: "游明朝", YuMincho, "ヒラギノ明朝 ProN", "Hiragino Mincho ProN",
+               "MS 明朝", serif;
+  font-size: 15px;
+  color: #222;
+  background: #f8f8f8;
+}
+.page {
+  max-width: 800px;
+  margin: 0 auto;
+  background: #fff;
+  padding: 24px 32px 48px 32px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+}
+
+/* ヘッダー */
+.page-header {
+  margin-bottom: 20px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #444;
+}
+.page-header h1 {
+  font-size: 1.1em;
+  font-weight: bold;
+  line-height: 1.6;
+}
+.page-header .meta {
+  font-size: 0.85em;
+  color: #666;
+  margin-top: 4px;
+}
+
+/* 大問 */
+.q_dai {
+  clear: both;
+  margin-top: 20px;
+  line-height: 1.7;
+}
+/* clearfix: right-figure フロートを q_dai 内に収める */
+.q_dai::after {
+  content: '';
+  display: block;
+  clear: both;
+}
+.q_dai > h3 {
+  display: block;
+  margin-top: 2px;
+  font-weight: bold;
+  font-size: 1em;
+}
+.q_dai > p {
+  margin-left: 0.5em;
+}
+
+/* アンカー図版（↓0_アンカー用* 由来）: InDesign での右ヨセ配置を再現 */
+/* width:30% 固定でページ幅の3割を確保し右端に密着させる。画像は 100% !important でコンテナを満たす */
+.right-figure {
+  float: right;
+  clear: right;
+  width: 30%;
+  margin: 0 0 0.5em 1em;
+}
+.right-figure .inline-figure {
+  display: block;
+  clear: none;
+  margin: 0;
+  width: 100% !important;
+  height: auto;
+}
+
+/* 中問 */
+.q_chu {
+  clear: both;
+  margin: 1.2em 0 0 1.5em;
+  line-height: 1.7;
+}
+.q_chu > h4 {
+  display: block;
+  font-weight: normal;
+  margin-bottom: 0.2em;
+}
+/* 中問間の前置き文節（_凹 アキN スタイル由来）*/
+.q_chu + p {
+  margin-top: 1.5em;
+}
+.q_chu > p {
+  margin-left: 1.5em;
+}
+
+/* 小問 */
+.q_sho {
+  clear: both;
+  margin: 1em 0 0 3em;
+  line-height: 1.7;
+}
+.q_sho > h5 {
+  float: left;
+  margin-right: 0.8em;
+  font-weight: normal;
+}
+.q_sho > p {
+  margin-left: 0.5em;
+  overflow: hidden;
+}
+
+/* 解答 */
+.a_all {
+  line-height: 1.7;
+}
+.a_block {
+  clear: both;
+  margin-top: 16px;
+}
+.a_block > h3 {
+  float: left;
+  margin-top: 2px;
+  margin-right: 0.5em;
+  font-weight: bold;
+}
+.a_block > p {
+  margin-left: 0.5em;
+  overflow: hidden;
+}
+.a_score {
+  margin-top: 12px;
+  padding: 4px 8px;
+  background: #f0f0f0;
+  font-size: 0.85em;
+  color: #555;
+  line-height: 1.6;
+}
+
+/* 画像（InDesignリンクファイル → 書き出しPNG） */
+.inline-figure {
+  display: block;
+  clear: both;
+  max-width: 100%;
+  height: auto;
+  margin: 0.5em 0;
+}
+
+/* 画像プレースホルダ */
+.img-placeholder {
+  display: inline-block;
+  margin: 4px 2px;
+  padding: 2px 6px;
+  border: 1px dashed #aaa;
+  color: #888;
+  font-size: 0.8em;
+  background: #fafafa;
+}
+
+/* 独自タグ由来のスタイル（tagToHtml.jsの変換対象） */
+.square {
+  display: inline-block;
+  vertical-align: text-bottom;
+  margin: 0 2px;
+  width: 1.2em;
+  height: 1.2em;
+  border: solid 0.1em #333;
+  background: #fff;
+  font-size: 0.833em;
+  line-height: 1.1em;
+  text-align: center;
+}
+.blank {
+  display: inline-block;
+  vertical-align: text-bottom;
+  margin: 0 2px;
+  min-width: 3.6em;
+  height: 1.2em;
+  border: solid 0.1em #333;
+  background: #fff;
+  font-size: 0.833em;
+  line-height: 1.1em;
+  text-align: center;
+}
+.round {
+  display: inline-block;
+  vertical-align: text-bottom;
+  margin: 0 1px;
+  text-align: center;
+  font-size: 0.75em;
+  line-height: 1.333em;
+  width: 1.333em;
+  height: 1.333em;
+  border: 0.1em solid #333;
+  border-radius: 50%;
+}
+.inline-box {
+  display: inline-block;
+  vertical-align: text-bottom;
+  margin: 0 2px;
+  min-width: 1.2em;
+  height: 1.2em;
+  border: solid 0.12em #333;
+  background: #fff;
+  font-size: 0.9em;
+  line-height: 1.2em;
+  text-align: center;
+  padding: 0 2px;
+}
+.fraction {
+  display: inline-flex;
+  flex-direction: column;
+  vertical-align: middle;
+  text-align: center;
+  font-size: 0.85em;
+  margin: 0 2px;
+}
+.numerator {
+  border-bottom: 1px solid #333;
+  padding: 0 2px;
+  line-height: 1.4;
+}
+.denominator {
+  padding: 0 2px;
+  line-height: 1.4;
+}
+strong.underline {
+  font-weight: normal;
+  border-bottom: solid 1px #333;
+  line-height: 1;
+}
+strong.wavyline {
+  font-weight: normal;
+  text-decoration: underline wavy;
+}
+.encircle {
+  display: block;
+  margin: 0.5em 0;
+  padding: 0.5em 0.8em;
+  border: solid 0.1em #333;
+  background: #fff;
+}
+
+/* 表 */
+.idml-table {
+  margin: 0.5em 0 0.5em 1em;
+  border-collapse: collapse;
+  font-size: 0.95em;
+  line-height: 1.5;
+}
+.idml-table td {
+  padding: 3px 6px;
+  min-width: 2em;
+}
+
+/* ルビ */
+ruby { ruby-align: center; }
+rt { font-size: 0.5em; }
+
+/* 傍点（圏点）: text-emphasis でゴマ点を文字の上に付加 */
+.kenten {
+  -webkit-text-emphasis: filled sesame;
+  text-emphasis: filled sesame;
+  -webkit-text-emphasis-position: over right;
+  text-emphasis-position: over right;
+}
+/* 丸型傍点 */
+.kenten.kenten-maru {
+  -webkit-text-emphasis: filled circle;
+  text-emphasis: filled circle;
+}
+
+/* 大かっこ（分数と同じ高さになる拡大括弧）: 縦200%スケール相当の大きさに調整 */
+.big-paren {
+  display: inline-block;
+  font-size: 2em;
+  line-height: 1;
+  vertical-align: middle;
+}

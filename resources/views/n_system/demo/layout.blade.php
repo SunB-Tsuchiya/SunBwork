@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>@yield('title', '入試データ デモ') | N_DB SAMPLE</title>
-    <link rel="stylesheet" href="{{ asset('n_sample.css') }}">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <style>
         * { box-sizing: border-box; }

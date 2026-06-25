@@ -12,9 +12,7 @@ const basePath = import.meta.env.VITE_APP_BASE_PATH ?? '';
 </script>
 
 <template>
-    <Head :title="`${props.title} | N_DB SAMPLE`">
-        <link rel="stylesheet" :href="`${basePath}/n_sample.css`" />
-    </Head>
+    <Head :title="`${props.title} | N_DB SAMPLE`" />
 
     <div class="min-h-screen bg-gray-100 text-gray-800">
         <header class="bg-[#1a3a6b] text-white shadow-sm">

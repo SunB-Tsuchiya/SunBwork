@@ -8,6 +8,7 @@ use App\Models\NSystem\NExam;
 use App\Models\NSystem\NPublicationEdition;
 use App\Models\NSystem\NPublicationEntry;
 use App\Models\NSystem\NSchool;
+use App\Services\HtmlStyleInliner;
 use App\Services\NSystem\NQuestionSearchService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -110,7 +111,9 @@ class NdemoController extends Controller
             'daimons' => $daimons->map(fn ($d) => [
                 'id'           => $d->id,
                 'daimon_index' => $d->daimon_index,
-                'body_html'    => str_replace('src="/n_images/', 'src="' . $assetBase . '/', $d->body_html),
+                'body_html'    => HtmlStyleInliner::process(
+                        str_replace('src="/n_images/', 'src="' . $assetBase . '/', $d->body_html)
+                    ),
             ])->values(),
             'tab'               => $tab,
             'mode'              => $mode,
