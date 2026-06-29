@@ -305,14 +305,16 @@ class DiaryInteractionController extends Controller
         $readBy      = $d->read_by ?? [];
         $readByNames = array_map(fn($id) => $namesMap[$id] ?? ('ID:' . $id), is_array($readBy) ? $readBy : []);
         return [
-            'id'            => $d->id,
-            'user_id'       => $d->user_id,
-            'name'          => $d->user->name ?? '',
-            'description'   => strip_tags($d->content ?? ''),
-            'date'          => $d->date->toDateString(),
-            'read_by'       => $readBy,
-            'read_by_names' => $readByNames,
-            'department'    => $d->user?->department?->name ?? '未所属',
+            'id'              => $d->id,
+            'user_id'         => $d->user_id,
+            'name'            => $d->user->name ?? '',
+            'description'     => strip_tags($d->content ?? ''),
+            'date'            => $d->date->toDateString(),
+            'read_by'         => $readBy,
+            'read_by_names'   => $readByNames,
+            'department'      => $d->user?->department?->name ?? '未所属',
+            'has_diary'       => true,
+            'has_work_record' => false,
         ];
     }
 }
