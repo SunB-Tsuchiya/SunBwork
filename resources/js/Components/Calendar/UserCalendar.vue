@@ -159,8 +159,8 @@ function openDetail(ev) {
         if (ev.project_job_assignment_id) {
             try {
                 if (ev._is_self_assigned) {
-                    // マイジョブ（自己割当）→ MyJobBox 詳細
-                    router.get(route('user.myjobbox.show', { assignment: ev.project_job_assignment_id }));
+                    // マイジョブ（自己割当）→ 作業時間や重複予定も確認できる予定詳細
+                    router.get(route('events.show', { event: ev.id }));
                 } else if (ev._project_job_id) {
                     // Coordinator 割当 → その案件の JobBox 一覧
                     router.get(route('user.project_jobs.jobbox.index', { projectJob: ev._project_job_id }));
@@ -541,6 +541,13 @@ async function saveWeekBreaks() {
 
         <!-- ── ツールバー追加ボタン ──────────────────────────────── -->
         <template #toolbar-extra>
+            <!-- 予定を登録ボタン -->
+            <button
+                class="rounded border border-emerald-500 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-100"
+                @click="openActionSheet({ date: new Date().toLocaleDateString('sv-SE') })">
+                ＋ 予定を登録
+            </button>
+
             <!-- ⚙ 設定ドロップダウン -->
             <div class="relative">
                 <button
@@ -612,6 +619,7 @@ async function saveWeekBreaks() {
         :rooms="rooms"
         :companies="companies"
         :departments="departments"
+        :existing-events="personalEvents"
         @close="onModalClose"
         @saved="onSaved"
         @deleted="onDeleted" />

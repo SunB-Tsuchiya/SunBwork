@@ -61,8 +61,14 @@ function localMin(isoStr) {
     return d.getHours() * 60 + d.getMinutes();
 }
 
+function eventDuration(ev) {
+    return Math.max(0, new Date(ev.ends_at).getTime() - new Date(ev.starts_at).getTime());
+}
+
 const dayEvents = computed(() =>
-    props.events.filter(ev => new Date(ev.starts_at).toLocaleDateString('sv-SE') === props.date)
+    props.events
+        .filter(ev => new Date(ev.starts_at).toLocaleDateString('sv-SE') === props.date)
+        .sort((a, b) => eventDuration(b) - eventDuration(a))
 );
 
 function evTop(ev)    { return Math.max(0, localMin(ev.starts_at) - START_HOUR * 60) * (HOUR_H / 60); }
@@ -219,6 +225,7 @@ function evStyle(ev) {
     return {
         top:         `${evTop(ev)}px`,
         height:      `${evHeight(ev)}px`,
+        zIndex:      Math.max(1, Math.round(86_400_000 / Math.max(1, eventDuration(ev)))),
         background:  evColor(ev).bg,
         color:       evColor(ev).text,
         borderColor: evColor(ev).border,
@@ -232,6 +239,7 @@ const dragStyle = computed(() => {
     return {
         top:         `${(startMin - START_HOUR * 60) * (HOUR_H / 60)}px`,
         height:      `${(endMin - startMin) * (HOUR_H / 60)}px`,
+        zIndex:      1100,
         background:  evColor(ev).bg,
         color:       evColor(ev).text,
         borderColor: evColor(ev).border,
@@ -317,7 +325,8 @@ const dragStyle = computed(() => {
                     </div>
 
                     <!-- 現在時刻ライン -->
-                    <div v-if="nowStyle" class="pointer-events-none absolute inset-x-0 z-10" :style="nowStyle">
+                    <div v-if="nowStyle" class="pointer-events-none absolute inset-x-0"
+                        :style="{ ...nowStyle, zIndex: 1000 }">
                         <div class="absolute -left-0.5 -top-[5px] h-2.5 w-2.5 rounded-full bg-red-500" />
                         <div class="absolute inset-x-2 h-px bg-red-400" />
                     </div>

@@ -24,6 +24,7 @@ const props = defineProps({
     rooms:              { type: Array,   default: () => [] },
     companies:          { type: Array,   default: () => [] },
     departments:        { type: Array,   default: () => [] },
+    existingEvents:     { type: Array,   default: () => [] }, // 個人ジョブ予定との重複チェック用
 });
 
 const emit = defineEmits(['close', 'saved', 'deleted']);
@@ -73,12 +74,30 @@ const errors        = ref({});
 const loading       = ref(false);
 const formAttendees = ref([]);
 
+// スペース区切り JST 文字列を ISO 形式に正規化（Safari 対応）
+function normDateStr(s) { return s ? s.replace(' ', 'T') : s; }
+
+// ── 自分のジョブ予定との重複チェック ──────────────────────────
+const selfConflicts = computed(() => {
+    const { date, startTime, endTime } = form.value;
+    if (!date || !startTime || !endTime || startTime >= endTime) return [];
+    const newStart = new Date(`${date}T${startTime}:00`).getTime();
+    const newEnd   = new Date(`${date}T${endTime}:00`).getTime();
+    return props.existingEvents.filter(ev => {
+        if (props.event && ev.id === props.event.id) return false;
+        if (!ev.starts_at || !ev.ends_at) return false;
+        const evStart = new Date(normDateStr(ev.starts_at)).getTime();
+        const evEnd   = new Date(normDateStr(ev.ends_at)).getTime();
+        return evStart < newEnd && evEnd > newStart;
+    });
+});
+
 // ── 参加者競合チェック ─────────────────────────────────────────
 const conflictWarnings = ref([]);
 let conflictTimer = null;
 
 function fmtConflictTime(isoStr) {
-    const d = new Date(isoStr);
+    const d = new Date(normDateStr(isoStr));
     return d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
@@ -266,6 +285,51 @@ const editAttendees = computed(() => {
     })).filter(a => a.id);
 });
 
+// ── 重複確認ダイアログ（新規作成時のみ） ────────────────────
+// CreateInternalEvent.vue と同様に events.index?date= を fetch してから confirm() を表示する。
+// 実際の interruption_minutes 更新はサーバーサイド（recalcInterruptionMinutes）が行う。
+async function confirmOverlap(date, newStart, newEnd) {
+    const newDuration = newEnd - newStart;
+    let events;
+    try {
+        const evUrl = route('events.index') + `?date=${encodeURIComponent(date)}`;
+        const res = await fetch(evUrl, {
+            headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin',
+        });
+        if (!res.ok) return true; // fetch 失敗時は素通し
+        events = await res.json();
+    } catch {
+        return true;
+    }
+
+    const overlapping = events.filter(ev => {
+        const evStart = new Date(normDateStr(ev.start ?? ev.starts_at)).getTime();
+        const evEnd   = new Date(normDateStr(ev.end   ?? ev.ends_at)).getTime();
+        return evStart < newEnd && evEnd > newStart;
+    });
+    if (!overlapping.length) return true;
+
+    const lines = overlapping.map(ev => {
+        const evStart    = new Date(normDateStr(ev.start ?? ev.starts_at)).getTime();
+        const evEnd      = new Date(normDateStr(ev.end   ?? ev.ends_at)).getTime();
+        const evDuration = evEnd - evStart;
+        const overlapStart = Math.max(newStart, evStart);
+        const overlapEnd   = Math.min(newEnd, evEnd);
+        const overlapMins  = Math.max(0, Math.round((overlapEnd - overlapStart) / 60000));
+        const sStr = new Date(evStart).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
+        const eStr = new Date(evEnd).toLocaleTimeString('ja-JP',   { hour: '2-digit', minute: '2-digit', hour12: false });
+        if (newDuration >= evDuration) {
+            return `「${ev.title}」(${sStr}〜${eStr}) → ${overlapMins}分間重複（今回の会議から差し引き）`;
+        } else {
+            return `「${ev.title}」(${sStr}〜${eStr}) → ${overlapMins}分間重複（既存の予定から差し引き）`;
+        }
+    });
+
+    const msg = `以下の予定と時間が重複しています。登録しますか？\n\n${lines.join('\n')}\n\n【OK】を押すと、時間の長い方の予定から重複時間が差し引かれます。`;
+    return confirm(msg);
+}
+
 // ── 送信 ──────────────────────────────────────────────────────
 async function submit() {
     if (form.value.startTime >= form.value.endTime) {
@@ -276,6 +340,16 @@ async function submit() {
         showToast('参加者に時間が重複する予定があります。内容を確認してください。', 'error', 5000);
         return;
     }
+
+    // 新規作成時のみ: ジョブ予定との重複を確認ダイアログで知らせる
+    if (!props.event) {
+        const { date, startTime, endTime } = form.value;
+        const newStart = new Date(`${date}T${startTime}:00`).getTime();
+        const newEnd   = new Date(`${date}T${endTime}:00`).getTime();
+        const ok = await confirmOverlap(date, newStart, newEnd);
+        if (!ok) return;
+    }
+
     loading.value = true;
     errors.value  = {};
 
@@ -631,6 +705,17 @@ function fmtResTime(isoStr) {
                             :departments="departments"
                             @change="v => formAttendees = v"
                         />
+                    </div>
+
+                    <!-- 自分のジョブ予定との時間重複警告（保存は可能） -->
+                    <div v-if="selfConflicts.length"
+                        class="rounded-md border border-orange-300 bg-orange-50 px-3 py-2 text-sm text-orange-800">
+                        <div class="mb-1 font-medium">⚠ この時間帯に別の予定があります</div>
+                        <ul class="space-y-0.5 text-xs">
+                            <li v-for="ev in selfConflicts" :key="ev.id">
+                                「{{ ev.title }}」（{{ fmtConflictTime(ev.starts_at) }}〜{{ fmtConflictTime(ev.ends_at) }}）
+                            </li>
+                        </ul>
                     </div>
 
                     <!-- 参加者スケジュール競合警告 -->

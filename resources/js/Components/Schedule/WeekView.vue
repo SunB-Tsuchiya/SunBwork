@@ -62,7 +62,13 @@ function localMin(isoStr) {
 
 function eventsForDay(d) {
     const ds = dateStr(d);
-    return props.events.filter(ev => new Date(ev.starts_at).toLocaleDateString('sv-SE') === ds);
+    return props.events
+        .filter(ev => new Date(ev.starts_at).toLocaleDateString('sv-SE') === ds)
+        .sort((a, b) => eventDuration(b) - eventDuration(a));
+}
+
+function eventDuration(ev) {
+    return Math.max(0, new Date(ev.ends_at).getTime() - new Date(ev.starts_at).getTime());
 }
 
 function evTop(ev) {
@@ -270,6 +276,7 @@ function evStyle(ev) {
     return {
         top:         `${evTop(ev)}px`,
         height:      `${evHeight(ev)}px`,
+        zIndex:      Math.max(1, Math.round(86_400_000 / Math.max(1, eventDuration(ev)))),
         background:  evColor(ev).bg,
         color:       evColor(ev).text,
         borderColor: evColor(ev).border,
@@ -283,6 +290,7 @@ function dragStyle(colIndex) {
     return {
         top:         `${(startMin - START_HOUR * 60) * (HOUR_H / 60)}px`,
         height:      `${(endMin - startMin) * (HOUR_H / 60)}px`,
+        zIndex:      1100,
         background:  evColor(ev).bg,
         color:       evColor(ev).text,
         borderColor: evColor(ev).border,
@@ -357,8 +365,8 @@ function dragStyle(colIndex) {
 
                     <!-- 現在時刻ライン（今日の列） -->
                     <div v-if="isToday(day) && nowTop() !== null"
-                        class="pointer-events-none absolute inset-x-0 z-10 border-t-2 border-red-400"
-                        :style="{ top: nowTop() }">
+                        class="pointer-events-none absolute inset-x-0 border-t-2 border-red-400"
+                        :style="{ top: nowTop(), zIndex: 1000 }">
                         <div class="absolute -left-1 -top-1.5 h-3 w-3 rounded-full bg-red-400" />
                     </div>
 

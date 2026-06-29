@@ -22,7 +22,7 @@ function labelText() {
 }
 
 const ACTIONS = [
-    { key: 'add-event', icon: '📅', label: '予定を追加',         color: 'border-emerald-400 bg-emerald-50 text-emerald-800 hover:bg-emerald-100' },
+    { key: 'add-event', icon: '📅', label: '会議などの予定を追加', color: 'border-emerald-400 bg-emerald-50 text-emerald-800 hover:bg-emerald-100' },
     { key: 'my-job',    icon: '💼', label: 'マイジョブ登録',     color: 'border-indigo-400  bg-indigo-50  text-indigo-800  hover:bg-indigo-100'  },
     { key: 'sheet-job', icon: '📋', label: '進行表・管理表ジョブ', color: 'border-violet-400  bg-violet-50  text-violet-800  hover:bg-violet-100'  },
     { key: 'diary',     icon: '📝', label: '日報入力',            color: 'border-orange-400  bg-orange-50  text-orange-800  hover:bg-orange-100'  },

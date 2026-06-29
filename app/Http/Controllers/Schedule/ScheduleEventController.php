@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Schedule;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\CalculatesEventTime;
 use App\Models\Event;
 use App\Models\RoomReservation;
 use App\Models\ScheduleAttendee;
@@ -14,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 
 class ScheduleEventController extends Controller
 {
+    use CalculatesEventTime;
     public function range(Request $request)
     {
         $request->validate([
@@ -318,6 +320,9 @@ class ScheduleEventController extends Controller
 
         $event->load(['eventItemType:id,name', 'attendees.user:id,name']);
 
+        // 他イベントとの重複時間を再計算（「多い予定から引く」ルール）
+        $this->recalcInterruptionMinutes($event);
+
         return response()->json(array_merge($event->toArray(), ['is_own' => true]), 201);
     }
 
@@ -352,8 +357,14 @@ class ScheduleEventController extends Controller
 
         $this->checkSameDay($starts, $ends);
 
+        $oldStart = $event->getRawOriginal('starts_at');
+        $oldEnd   = $event->getRawOriginal('ends_at');
+
         $event->update($validated);
         $event->load(['eventItemType:id,name', 'attendees.user:id,name']);
+
+        // 時間変更による重複の再計算（旧時間帯の解除も含む）
+        $this->recalcInterruptionMinutes($event, $oldStart, $oldEnd);
 
         return response()->json(array_merge($event->toArray(), ['is_own' => true]));
     }
@@ -368,7 +379,31 @@ class ScheduleEventController extends Controller
             abort(422, 'この予定は会議室予約に紐づいています。会議室予約から削除してください');
         }
 
+        // 削除前に重複していたイベントを記録（削除後の波及再計算に使用）
+        $overlappingBeforeDelete = collect();
+        try {
+            $rawS = $event->getRawOriginal('starts_at');
+            $rawE = $event->getRawOriginal('ends_at');
+            if ($rawS && $rawE) {
+                $windowS = Carbon::parse($rawS)->subDay()->toDateTimeString();
+                $windowE = Carbon::parse($rawE)->addDay()->toDateTimeString();
+                $overlappingBeforeDelete = Event::where('user_id', $event->user_id)
+                    ->where('id', '!=', $event->id)
+                    ->whereNotNull('starts_at')
+                    ->whereNotNull('ends_at')
+                    ->where('starts_at', '<', $windowE)
+                    ->where('ends_at', '>', $windowS)
+                    ->with('projectJobAssignment:id,job_type')
+                    ->get(['id', 'starts_at', 'ends_at', 'project_job_assignment_id']);
+            }
+        } catch (\Throwable $e) { /* non-fatal */ }
+
         $event->delete();
+
+        // 削除後の波及再計算（重複していたイベントの interruption_minutes を更新）
+        foreach ($overlappingBeforeDelete as $ov) {
+            $this->recalcSingleStoredInterruption($ov);
+        }
 
         return response()->json(['ok' => true]);
     }
