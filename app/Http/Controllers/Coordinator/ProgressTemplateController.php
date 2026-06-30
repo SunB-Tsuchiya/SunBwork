@@ -15,8 +15,14 @@ class ProgressTemplateController extends Controller
         $userId = $request->user()->id;
 
         $templates = ProgressTemplate::with('creator:id,name')
-            ->where('is_shared', true)
-            ->orWhere('created_by', $userId)
+            ->where(function ($query) use ($userId) {
+                $query->where('is_shared', true)
+                    ->orWhere('created_by', $userId);
+            })
+            ->where(function ($query) {
+                $query->whereNull('sheet_type')
+                    ->orWhere('sheet_type', 'progress');
+            })
             ->orderByDesc('updated_at')
             ->get()
             ->map(fn ($t) => [
@@ -68,6 +74,7 @@ class ProgressTemplateController extends Controller
             'description'   => $validated['description'] ?? null,
             'column_config' => $validated['column_config'],
             'row_config'    => $validated['row_config'] ?? [],
+            'sheet_type'    => 'progress',
             'created_by'    => $request->user()->id,
             'is_shared'     => $validated['is_shared'] ?? false,
         ]);
@@ -78,6 +85,8 @@ class ProgressTemplateController extends Controller
 
     public function show(Request $request, ProgressTemplate $template)
     {
+        $this->ensureProgressTemplate($template);
+
         $userId = $request->user()->id;
         $isOwner = $template->created_by === $userId;
         $isAdmin = in_array($request->user()->user_role, ['admin', 'superadmin']);
@@ -101,6 +110,7 @@ class ProgressTemplateController extends Controller
 
     public function edit(Request $request, ProgressTemplate $template)
     {
+        $this->ensureProgressTemplate($template);
         $this->authorizeEdit($request->user(), $template);
 
         $companyId = $request->user()->company_id;
@@ -130,6 +140,7 @@ class ProgressTemplateController extends Controller
 
     public function update(Request $request, ProgressTemplate $template)
     {
+        $this->ensureProgressTemplate($template);
         $this->authorizeEdit($request->user(), $template);
 
         $validated = $request->validate([
@@ -147,6 +158,7 @@ class ProgressTemplateController extends Controller
 
     public function destroy(Request $request, ProgressTemplate $template)
     {
+        $this->ensureProgressTemplate($template);
         $this->authorizeEdit($request->user(), $template);
 
         $template->delete();
@@ -156,6 +168,11 @@ class ProgressTemplateController extends Controller
     }
 
     // ─────
+
+    private function ensureProgressTemplate(ProgressTemplate $template): void
+    {
+        abort_if($template->sheet_type === 'management', 404);
+    }
 
     private function authorizeEdit(User $user, ProgressTemplate $template): void
     {

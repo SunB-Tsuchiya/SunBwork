@@ -961,8 +961,21 @@ class ProjectJobController extends Controller
 
         // テンプレート一覧（シート作成モーダル用）
         $userId = $request->user()->id;
-        $sheetTemplates = \App\Models\ProgressTemplate::where('is_shared', true)
-            ->orWhere('created_by', $userId)
+        $accessibleTemplates = \App\Models\ProgressTemplate::where(function ($query) use ($userId) {
+            $query->where('is_shared', true)
+                ->orWhere('created_by', $userId);
+        });
+
+        $sheetTemplates = (clone $accessibleTemplates)
+            ->where(function ($query) {
+                $query->whereNull('sheet_type')
+                    ->orWhere('sheet_type', 'progress');
+            })
+            ->orderByDesc('updated_at')
+            ->get(['id', 'name']);
+
+        $managementTemplates = (clone $accessibleTemplates)
+            ->where('sheet_type', 'management')
             ->orderByDesc('updated_at')
             ->get(['id', 'name']);
 
@@ -1026,6 +1039,7 @@ class ProjectJobController extends Controller
             'jobHistory' => $jobHistory,
             'progressSheets'  => $progressSheets,
             'sheetTemplates'  => $sheetTemplates,
+            'managementTemplates' => $managementTemplates,
             'workflowSheets'  => $workflowSheets,
             'itemEntries'     => $itemEntries,
             'workflowTemplates' => \App\Models\WorkflowTemplate::orderByDesc('updated_at')->get(['id', 'name']),

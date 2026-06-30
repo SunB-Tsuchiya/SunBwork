@@ -11,6 +11,7 @@ class ProgressTemplate extends Model
         'description',
         'column_config',
         'row_config',
+        'sheet_type',
         'created_by',
         'is_shared',
     ];

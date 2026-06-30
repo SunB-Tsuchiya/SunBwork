@@ -424,6 +424,7 @@ class ProgressSheetController extends Controller
         ProgressTemplate::create([
             'name'          => $validated['name'],
             'column_config' => $sheet->column_config,
+            'sheet_type'    => 'progress',
             'created_by'    => $request->user()->id,
             'is_shared'     => true,
         ]);

@@ -101,6 +101,21 @@ watch(() => form.date, (newDate) => {
 
 ---
 
+## 管理シートテンプレート（2026-06-30）
+
+- 管理シート用テンプレートの正規データは `progress_templates` の `sheet_type = management`
+- 専用画面: `/coordinator/management-templates`
+- Controller: `Coordinator/ManagementTemplateController`
+- Inertiaページ: `Coordinator/ManagementTemplates/Index.vue`, `Edit.vue`
+- 一覧には共有テンプレート、またはログインユーザー自身が作成したテンプレートを表示
+- 編集・削除は作成者、Admin、SuperAdminのみ可能
+- 管理シート作成時は `column_config` をコピーし、`workflow_sheets.template_id` には保存しない
+  - `workflow_sheets.template_id` は旧 `workflow_templates` への外部キーであり、`progress_templates.id` を保存してはいけない
+- 旧 `WorkflowTemplate` / `workflow_templates` は `stage_config` 形式の別系統。互換性維持のため残すが、新しい管理シートテンプレート機能には接続しない
+- `sheet_type = null` または `progress` は進行管理表側、`management` は管理シート側として一覧と作成モーダルを分離する
+
+---
+
 ## CSV インポート（NormalizesCsvEncoding Trait）
 
 **全 CSV インポートは Shift-JIS + CRLF + BOM に対応すること。**

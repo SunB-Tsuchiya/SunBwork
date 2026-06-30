@@ -29,8 +29,18 @@ class WorkflowSheetController extends Controller
         $columnConfig = null;
 
         if (!empty($validated['template_id'])) {
-            $template = ProgressTemplate::find($validated['template_id']);
-            if ($template?->column_config) {
+            $template = ProgressTemplate::query()
+                ->whereKey($validated['template_id'])
+                ->where('sheet_type', 'management')
+                ->where(function ($query) use ($request) {
+                    $query->where('is_shared', true)
+                        ->orWhere('created_by', $request->user()->id);
+                })
+                ->first();
+
+            abort_unless($template, 403);
+
+            if ($template->column_config) {
                 $columnConfig = $template->column_config;
             }
         }
@@ -54,7 +64,9 @@ class WorkflowSheetController extends Controller
 
         $sheet = WorkflowSheet::create([
             'project_job_id' => $projectJob->id,
-            'template_id'    => $validated['template_id'] ?? null,
+            // This column references the legacy workflow_templates table.
+            // ProgressTemplate is copied into column_config instead of linked here.
+            'template_id'    => null,
             'name'           => $validated['name'],
             'stage_config'   => ['stages' => []],
             'column_config'  => $columnConfig,

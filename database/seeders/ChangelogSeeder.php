@@ -10,6 +10,26 @@ class ChangelogSeeder extends Seeder
     public function run(): void
     {
         $entries = [
+            [
+                'version'      => 'management-template-1',
+                'title'        => '管理シート：テンプレート管理機能を追加',
+                'released_at'  => '2026-06-30',
+                'summary'      => '管理シート用テンプレートを一覧・新規作成・編集・削除できる専用画面を追加しました。案件詳細の管理シートタブから開き、保存した列構成を新しい管理シートへ適用できます。',
+                'design_files' => ['MANAGEMENT_TEMPLATE_PLAN1.md', 'MANAGEMENT_TEMPLATE_MANAGER1.md'],
+                'claude_notes' => 'ProgressTemplateのsheet_type=managementを正として専用ManagementTemplateControllerとInertia画面を追加。旧WorkflowTemplateは互換性維持のため存置し、新機能には接続しない。進行管理用と管理シート用のテンプレート一覧・作成モーダルを種別分離し、本人作成または共有テンプレートのみ参照可能、編集削除は本人またはAdmin/SuperAdminに限定。',
+                'body'         => <<<'HTML'
+<section class="cl-feature">
+  <h3>管理シートテンプレート管理</h3>
+  <ul>
+    <li>管理シートタブの「テンプレート管理」から専用一覧を開けるようになった</li>
+    <li>テンプレート名・説明・共有設定・列とステージの構成を新規作成・編集できる</li>
+    <li>不要になったテンプレートを一覧から削除できる</li>
+    <li>作成したテンプレートを管理シートの新規作成時に選択して列構成を引き継げる</li>
+    <li>進行管理表用テンプレートと管理シート用テンプレートを分けて表示するようになった</li>
+  </ul>
+</section>
+HTML,
+            ],
             // NSystem normalized database - 2026-06-19
             [
                 'version'      => 'nsystem-schema-1',

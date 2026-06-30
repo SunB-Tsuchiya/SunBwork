@@ -871,6 +871,14 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::put('progress-templates/{template}', [App\Http\Controllers\Coordinator\ProgressTemplateController::class, 'update'])->name('progress_templates.update');
         Route::delete('progress-templates/{template}', [App\Http\Controllers\Coordinator\ProgressTemplateController::class, 'destroy'])->name('progress_templates.destroy');
 
+        // ── 管理シートテンプレート ────────────────────────────────
+        Route::get('management-templates', [App\Http\Controllers\Coordinator\ManagementTemplateController::class, 'index'])->name('management_templates.index');
+        Route::get('management-templates/create', [App\Http\Controllers\Coordinator\ManagementTemplateController::class, 'create'])->name('management_templates.create');
+        Route::post('management-templates', [App\Http\Controllers\Coordinator\ManagementTemplateController::class, 'store'])->name('management_templates.store');
+        Route::get('management-templates/{template}/edit', [App\Http\Controllers\Coordinator\ManagementTemplateController::class, 'edit'])->name('management_templates.edit');
+        Route::put('management-templates/{template}', [App\Http\Controllers\Coordinator\ManagementTemplateController::class, 'update'])->name('management_templates.update');
+        Route::delete('management-templates/{template}', [App\Http\Controllers\Coordinator\ManagementTemplateController::class, 'destroy'])->name('management_templates.destroy');
+
         // ── 進行管理シート ────────────────────────────────────────
         Route::post('project_jobs/{projectJob}/progress-sheets', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'store'])->name('project_jobs.progress_sheets.store');
         Route::put('project_jobs/{projectJob}/progress-sheets/reorder', [App\Http\Controllers\Coordinator\ProgressSheetController::class, 'reorderSheets'])->name('project_jobs.progress_sheets.reorder');

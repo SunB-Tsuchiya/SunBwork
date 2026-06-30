@@ -324,13 +324,18 @@
                     <div class="mb-3 flex items-center gap-4">
                         <h3 class="font-semibold text-gray-800">管理シート</h3>
                         <button
-                            v-if="workflowSheets.length === 0"
                             type="button"
                             class="rounded border border-indigo-300 px-3 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
                             @click="showCreateWorkflowModal = true"
                         >
                             新規作成
                         </button>
+                        <Link
+                            :href="route('coordinator.management_templates.index')"
+                            class="text-xs text-gray-500 hover:underline"
+                        >
+                            テンプレート管理
+                        </Link>
                     </div>
                     <div v-if="workflowSheets.length > 0" class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-gray-200">
@@ -892,6 +897,15 @@
                 placeholder="例: 工程管理"
                 @keydown.enter="createWorkflowSheet"
             />
+
+            <label class="mt-4 block text-sm font-medium text-gray-700">テンプレート（任意）</label>
+            <select
+                v-model="newWorkflowTemplateId"
+                class="mt-1 w-full rounded border border-gray-300 px-2 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+            >
+                <option :value="null">— 使用しない —</option>
+                <option v-for="t in managementTemplates" :key="t.id" :value="t.id">{{ t.name }}</option>
+            </select>
 
             <div class="mt-5 flex justify-end gap-3">
                 <button
@@ -1569,6 +1583,7 @@ function truncate(text, len) {
 const progressSheets  = computed(() => Array.isArray(page.props.progressSheets)  ? page.props.progressSheets  : []);
 const workflowSheets  = computed(() => Array.isArray(page.props.workflowSheets)   ? page.props.workflowSheets  : []);
 const sheetTemplates = computed(() => Array.isArray(page.props.sheetTemplates) ? page.props.sheetTemplates : []);
+const managementTemplates = computed(() => Array.isArray(page.props.managementTemplates) ? page.props.managementTemplates : []);
 const showCreateSheetModal = ref(false);
 const newSheetName = ref('');
 const newSheetTemplateId = ref(null);
@@ -1704,6 +1719,7 @@ function createSheet() {
 // ── 管理シート 新規作成 ────────────────────────────────────────────────────
 const showCreateWorkflowModal = ref(false);
 const newWorkflowName = ref('');
+const newWorkflowTemplateId = ref(null);
 
 function createWorkflowSheet() {
     const name = newWorkflowName.value.trim();
@@ -1713,11 +1729,12 @@ function createWorkflowSheet() {
     }
     router.post(
         route('coordinator.project_jobs.workflow_sheets.store', { projectJob: job.id }),
-        { name },
+        { name, template_id: newWorkflowTemplateId.value ?? null },
         {
             onSuccess: () => {
                 showCreateWorkflowModal.value = false;
                 newWorkflowName.value = '';
+                newWorkflowTemplateId.value = null;
             },
         },
     );
