@@ -13,7 +13,7 @@ for (let h = 0; h < 24; h++) {
     }
 }
 
-const recurrenceLabel = { weekly: '毎週', biweekly: '隔週', monthly: '毎月' };
+const recurrenceLabel = { weekly: '毎週', biweekly: '隔週', monthly: '毎月', custom_dates: 'カレンダー指定' };
 const dayLabel = ['日', '月', '火', '水', '木', '金', '土'];
 
 const props = defineProps({
@@ -338,7 +338,7 @@ async function deleteReservation() {
                             class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
                             <option :value="null">— 選択なし —</option>
                             <option v-for="m in meetingDefinitions" :key="m.id" :value="m.id">
-                                {{ m.title }}（{{ recurrenceLabel[m.recurrence] }}・{{ dayLabel[m.day_of_week] }}曜）
+                                {{ m.title }}（{{ recurrenceLabel[m.recurrence] }}{{ m.recurrence === 'custom_dates' ? `・${m.custom_dates?.length ?? 0}日選択` : `・${dayLabel[m.day_of_week]}曜` }}）
                             </option>
                         </select>
                     </div>

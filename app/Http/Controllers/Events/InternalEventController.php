@@ -35,7 +35,7 @@ class InternalEventController extends Controller
         $meetingDefinitions = Schema::hasTable('meeting_definitions')
             ? MeetingDefinition::whereHas('members', function ($q) {
                 $q->where('user_id', Auth::id());
-            })->get(['id', 'title', 'description', 'recurrence', 'day_of_week', 'start_time', 'end_time'])
+            })->get(['id', 'title', 'description', 'recurrence', 'day_of_week', 'week_of_month', 'custom_dates', 'start_time', 'end_time'])
             : collect();
 
         return Inertia::render('Events/CreateInternalEvent', [
@@ -133,7 +133,7 @@ class InternalEventController extends Controller
         $meetingDefinitions = Schema::hasTable('meeting_definitions')
             ? MeetingDefinition::whereHas('members', function ($q) {
                 $q->where('user_id', Auth::id());
-            })->get(['id', 'title', 'description', 'recurrence', 'day_of_week', 'start_time', 'end_time'])
+            })->get(['id', 'title', 'description', 'recurrence', 'day_of_week', 'week_of_month', 'custom_dates', 'start_time', 'end_time'])
             : collect();
 
         return Inertia::render('Events/CreateInternalEvent', [

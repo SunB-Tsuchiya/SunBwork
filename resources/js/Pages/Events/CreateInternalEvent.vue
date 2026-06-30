@@ -88,6 +88,24 @@ function calcNextMonthlyDate(dayOfWeek, weekOfMonth, startHour, startMinute) {
     return '';
 }
 
+function calcNextCustomDate(customDates, startHour, startMinute) {
+    if (!Array.isArray(customDates) || customDates.length === 0) return '';
+    const sorted = [...customDates].sort((a, b) => a.localeCompare(b));
+    const today = new Date().toLocaleDateString('sv-SE');
+    const now = new Date();
+
+    for (const dateValue of sorted) {
+        if (dateValue > today) return dateValue;
+        if (dateValue === today) {
+            const meetingStart = new Date();
+            meetingStart.setHours(parseInt(startHour, 10), parseInt(startMinute, 10), 0, 0);
+            if (now < meetingStart) return dateValue;
+        }
+    }
+
+    return sorted[0] ?? '';
+}
+
 watch(selectedMeetingId, (id) => {
     if (!id) return;
     const meeting = props.meetingDefinitions.find((m) => m.id === id);
@@ -101,7 +119,9 @@ watch(selectedMeetingId, (id) => {
     form.startMinute  = String(meeting.start_time).split(':')[1].padStart(2, '0');
     form.endHour      = String(meeting.end_time).split(':')[0].padStart(2, '0');
     form.endMinute    = String(meeting.end_time).split(':')[1].padStart(2, '0');
-    if (meeting.recurrence === 'monthly' && meeting.week_of_month) {
+    if (meeting.recurrence === 'custom_dates') {
+        form.date = calcNextCustomDate(meeting.custom_dates, form.startHour, form.startMinute);
+    } else if (meeting.recurrence === 'monthly' && meeting.week_of_month) {
         form.date = calcNextMonthlyDate(meeting.day_of_week, meeting.week_of_month, form.startHour, form.startMinute);
     } else {
         form.date = calcNextDate(meeting.day_of_week, form.startHour, form.startMinute);
@@ -271,7 +291,7 @@ const submit = () => {
         });
 };
 
-const recurrenceLabel = { weekly: '毎週', biweekly: '隔週', monthly: '毎月' };
+const recurrenceLabel = { weekly: '毎週', biweekly: '隔週', monthly: '毎月', custom_dates: 'カレンダー指定' };
 const dayLabel = ['日', '月', '火', '水', '木', '金', '土'];
 </script>
 
@@ -310,7 +330,7 @@ const dayLabel = ['日', '月', '火', '水', '木', '金', '土'];
                     <select v-model="selectedMeetingId" class="w-full rounded border p-2 text-sm">
                         <option :value="null">— 選択なし —</option>
                         <option v-for="m in meetingDefinitions" :key="m.id" :value="m.id">
-                            {{ m.title }}（{{ recurrenceLabel[m.recurrence] }}・{{ dayLabel[m.day_of_week] }}曜）
+                            {{ m.title }}（{{ recurrenceLabel[m.recurrence] }}{{ m.recurrence === 'custom_dates' ? `・${m.custom_dates?.length ?? 0}日選択` : `・${dayLabel[m.day_of_week]}曜` }}）
                         </option>
                     </select>
                 </div>

@@ -19,8 +19,13 @@ class MeetingDefinition extends Model
         'recurrence',
         'day_of_week',
         'week_of_month',
+        'custom_dates',
         'start_time',
         'end_time',
+    ];
+
+    protected $casts = [
+        'custom_dates' => 'array',
     ];
 
     public function creator(): BelongsTo

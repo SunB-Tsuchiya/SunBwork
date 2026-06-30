@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\ResolvesContextCompany;
 use App\Http\Controllers\Leader\MeetingDefinitionController as LeaderMeetingDefinitionController;
 use App\Models\MeetingDefinition;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -72,14 +73,28 @@ class MeetingDefinitionController extends LeaderMeetingDefinitionController
         $validated = $request->validate([
             'title'         => 'required|string|max:255',
             'description'   => 'nullable|string',
-            'recurrence'    => 'required|in:weekly,biweekly,monthly',
-            'day_of_week'   => 'required|integer|min:0|max:6',
-            'week_of_month' => 'nullable|integer|min:1|max:5',
+            'recurrence'    => 'required|in:weekly,biweekly,monthly,custom_dates',
+            'day_of_week'   => 'required_unless:recurrence,custom_dates|integer|min:0|max:6',
+            'week_of_month' => 'nullable|integer|min:1|max:5|required_if:recurrence,monthly',
+            'custom_dates'  => 'nullable|array|min:1|required_if:recurrence,custom_dates',
+            'custom_dates.*'=> 'date_format:Y-m-d|distinct',
             'start_time'    => 'required|date_format:H:i',
             'end_time'      => 'required|date_format:H:i|after:start_time',
             'members'       => 'required|array|min:1',
             'members.*'     => 'exists:users,id',
         ]);
+
+        $customDates = collect($validated['custom_dates'] ?? [])
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+
+        $dayOfWeek = $validated['day_of_week'] ?? null;
+        if ($validated['recurrence'] === 'custom_dates' && !empty($customDates)) {
+            $dayOfWeek = Carbon::parse($customDates[0])->dayOfWeek;
+        }
 
         $def = MeetingDefinition::create([
             'created_by'    => Auth::id(),
@@ -87,8 +102,9 @@ class MeetingDefinitionController extends LeaderMeetingDefinitionController
             'title'         => $validated['title'],
             'description'   => $validated['description'] ?? null,
             'recurrence'    => $validated['recurrence'],
-            'day_of_week'   => $validated['day_of_week'],
+            'day_of_week'   => $dayOfWeek ?? 0,
             'week_of_month' => $validated['recurrence'] === 'monthly' ? ($validated['week_of_month'] ?? null) : null,
+            'custom_dates'  => $validated['recurrence'] === 'custom_dates' ? $customDates : null,
             'start_time'    => $validated['start_time'],
             'end_time'      => $validated['end_time'],
         ]);
@@ -122,21 +138,36 @@ class MeetingDefinitionController extends LeaderMeetingDefinitionController
         $validated = $request->validate([
             'title'         => 'required|string|max:255',
             'description'   => 'nullable|string',
-            'recurrence'    => 'required|in:weekly,biweekly,monthly',
-            'day_of_week'   => 'required|integer|min:0|max:6',
-            'week_of_month' => 'nullable|integer|min:1|max:5',
+            'recurrence'    => 'required|in:weekly,biweekly,monthly,custom_dates',
+            'day_of_week'   => 'required_unless:recurrence,custom_dates|integer|min:0|max:6',
+            'week_of_month' => 'nullable|integer|min:1|max:5|required_if:recurrence,monthly',
+            'custom_dates'  => 'nullable|array|min:1|required_if:recurrence,custom_dates',
+            'custom_dates.*'=> 'date_format:Y-m-d|distinct',
             'start_time'    => 'required|date_format:H:i',
             'end_time'      => 'required|date_format:H:i|after:start_time',
             'members'       => 'required|array|min:1',
             'members.*'     => 'exists:users,id',
         ]);
 
+        $customDates = collect($validated['custom_dates'] ?? [])
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+
+        $dayOfWeek = $validated['day_of_week'] ?? null;
+        if ($validated['recurrence'] === 'custom_dates' && !empty($customDates)) {
+            $dayOfWeek = Carbon::parse($customDates[0])->dayOfWeek;
+        }
+
         $meetingDefinition->update([
             'title'         => $validated['title'],
             'description'   => $validated['description'] ?? null,
             'recurrence'    => $validated['recurrence'],
-            'day_of_week'   => $validated['day_of_week'],
+            'day_of_week'   => $dayOfWeek ?? 0,
             'week_of_month' => $validated['recurrence'] === 'monthly' ? ($validated['week_of_month'] ?? null) : null,
+            'custom_dates'  => $validated['recurrence'] === 'custom_dates' ? $customDates : null,
             'start_time'    => $validated['start_time'],
             'end_time'      => $validated['end_time'],
         ]);

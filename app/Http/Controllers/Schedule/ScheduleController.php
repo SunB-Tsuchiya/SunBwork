@@ -39,7 +39,7 @@ class ScheduleController extends Controller
 
         $meetingDefinitions = MeetingDefinition::where('company_id', $user->company_id)
             ->with('members:id,name')
-            ->get(['id', 'title', 'description', 'recurrence', 'day_of_week', 'week_of_month', 'start_time', 'end_time']);
+            ->get(['id', 'title', 'description', 'recurrence', 'day_of_week', 'week_of_month', 'custom_dates', 'start_time', 'end_time']);
 
         // 参加者ピッカー用: 全会社・全部署（company_id 付き）
         $companies   = Company::orderBy('name')->get(['id', 'name']);

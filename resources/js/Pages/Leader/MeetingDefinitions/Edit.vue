@@ -19,6 +19,7 @@ const recurrenceOptions = [
     { value: 'weekly',   label: '毎週' },
     { value: 'biweekly', label: '隔週' },
     { value: 'monthly',  label: '毎月' },
+    { value: 'custom_dates', label: 'カレンダーから選ぶ' },
 ];
 const dayOfWeekOptions = [
     { value: 0, label: '日' }, { value: 1, label: '月' }, { value: 2, label: '火' },
@@ -34,10 +35,13 @@ const form = useForm({
     recurrence:    props.meetingDefinition.recurrence ?? 'weekly',
     day_of_week:   props.meetingDefinition.day_of_week ?? 1,
     week_of_month: props.meetingDefinition.week_of_month ?? null,
+    custom_dates:  [...(props.meetingDefinition.custom_dates ?? [])],
     start_time:    props.meetingDefinition.start_time?.slice(0, 5) ?? '10:00',
     end_time:      props.meetingDefinition.end_time?.slice(0, 5) ?? '11:00',
     members:       [...initMemberIds],
 });
+
+const customDateInput = ref(new Date().toLocaleDateString('sv-SE'));
 
 const startHour   = ref(form.start_time.split(':')[0]);
 const startMinute = ref(form.start_time.split(':')[1]);
@@ -47,6 +51,26 @@ const endMinute   = ref(form.end_time.split(':')[1]);
 function syncTimes() {
     form.start_time = `${startHour.value}:${startMinute.value}`;
     form.end_time   = `${endHour.value}:${endMinute.value}`;
+}
+
+function customDateSort(a, b) {
+    return a.localeCompare(b);
+}
+
+function addCustomDate(dateValue = customDateInput.value) {
+    if (!dateValue) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) return;
+    if (form.custom_dates.includes(dateValue)) return;
+    form.custom_dates = [...form.custom_dates, dateValue].sort(customDateSort);
+}
+
+function removeCustomDate(dateValue) {
+    form.custom_dates = form.custom_dates.filter((d) => d !== dateValue);
+}
+
+function ymdDayOfWeek(dateValue) {
+    const parts = dateValue.split('-').map((v) => Number(v));
+    return new Date(parts[0], parts[1] - 1, parts[2]).getDay();
 }
 
 // メンバー選択モーダル
@@ -145,6 +169,11 @@ const errorMessage = ref('');
 
 function submit() {
     syncTimes();
+    if (form.recurrence === 'custom_dates') {
+        if (form.custom_dates.length > 0) {
+            form.day_of_week = ymdDayOfWeek(form.custom_dates[0]);
+        }
+    }
     form.put(route('leader.meeting_definitions.update', { meeting_definition: props.meetingDefinition.id }), {
         onError: () => { errorMessage.value = '保存に失敗しました。'; },
     });
@@ -194,13 +223,38 @@ function submit() {
                     </select>
                     <p v-if="form.errors.week_of_month" class="mt-1 text-xs text-red-500">{{ form.errors.week_of_month }}</p>
                 </div>
-                <div>
+                <div v-if="form.recurrence !== 'custom_dates'">
                     <label class="mb-1 block text-sm font-medium text-gray-700">曜日 <span class="text-red-500">*</span></label>
                     <div class="flex gap-3">
                         <label v-for="opt in dayOfWeekOptions" :key="opt.value" class="flex items-center gap-1 cursor-pointer text-sm">
                             <input type="radio" :value="opt.value" v-model="form.day_of_week" class="accent-orange-600" />{{ opt.label }}
                         </label>
                     </div>
+                    <p v-if="form.errors.day_of_week" class="mt-1 text-xs text-red-500">{{ form.errors.day_of_week }}</p>
+                </div>
+                <div v-else>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">開催日を選択 <span class="text-red-500">*</span></label>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <input
+                            v-model="customDateInput"
+                            type="date"
+                            class="rounded border p-2 text-sm"
+                            @change="addCustomDate(customDateInput)"
+                        />
+                        <button type="button" class="rounded border border-orange-400 px-3 py-1.5 text-sm text-orange-600 hover:bg-orange-50" @click="addCustomDate(customDateInput)">
+                            日付を追加
+                        </button>
+                    </div>
+                    <p class="mt-1 text-xs text-gray-500">カレンダーで選んだ日付を複数登録できます。</p>
+                    <div class="mt-2 flex flex-wrap gap-1">
+                        <span v-for="dateValue in form.custom_dates" :key="dateValue" class="inline-flex items-center gap-1 rounded bg-orange-100 px-2 py-0.5 text-xs text-orange-700">
+                            {{ dateValue }}
+                            <button type="button" class="font-semibold" @click="removeCustomDate(dateValue)">×</button>
+                        </span>
+                        <span v-if="form.custom_dates.length === 0" class="text-xs text-gray-400">未選択</span>
+                    </div>
+                    <p v-if="form.errors.custom_dates" class="mt-1 text-xs text-red-500">{{ form.errors.custom_dates }}</p>
+                    <p v-if="form.errors['custom_dates.0']" class="mt-1 text-xs text-red-500">{{ form.errors['custom_dates.0'] }}</p>
                 </div>
                 <div class="flex flex-wrap gap-6">
                     <div>

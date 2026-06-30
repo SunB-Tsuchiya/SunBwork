@@ -8,7 +8,7 @@ const props = defineProps({
     meetingDefinitions: { type: Array, default: () => [] },
 });
 
-const recurrenceLabel = { weekly: '毎週', biweekly: '隔週', monthly: '毎月' };
+const recurrenceLabel = { weekly: '毎週', biweekly: '隔週', monthly: '毎月', custom_dates: 'カレンダー指定' };
 const dayLabel = ['日', '月', '火', '水', '木', '金', '土'];
 
 function destroy(id) {
@@ -69,8 +69,8 @@ function destroy(id) {
                     >
                         <td class="py-2 pr-4 font-medium">{{ def.title }}</td>
                         <td class="py-2 pr-4">{{ recurrenceLabel[def.recurrence] }}</td>
-                        <td class="py-2 pr-4">{{ def.recurrence === 'monthly' && def.week_of_month ? `第${def.week_of_month}週` : '—' }}</td>
-                        <td class="py-2 pr-4">{{ dayLabel[def.day_of_week] }}曜</td>
+                        <td class="py-2 pr-4">{{ def.recurrence === 'monthly' && def.week_of_month ? `第${def.week_of_month}週` : (def.recurrence === 'custom_dates' ? `${def.custom_dates?.length ?? 0}日選択` : '—') }}</td>
+                        <td class="py-2 pr-4">{{ def.recurrence === 'custom_dates' ? '選択日' : `${dayLabel[def.day_of_week]}曜` }}</td>
                         <td class="py-2 pr-4">{{ def.start_time.slice(0,5) }}〜{{ def.end_time.slice(0,5) }}</td>
                         <td class="py-2 pr-4">{{ def.members?.length ?? 0 }}名</td>
                         <td class="py-2 flex gap-2">
