@@ -29,13 +29,16 @@ const STATUS_COLORS_HEX = {
     assigned:    '#3b82f6',
     in_progress: '#f97316',
     completed:   '#22c55e',
+    reservation: '#db2777',
 };
 
 const calendarEvents = computed(() =>
     props.monthEvents.map(e => ({
-        id:    String(e.id),
+        id:    `${e.type ?? 'proof_request'}_${e.id}`,
         title: `${e.title}${e.proofreader ? ' (' + e.proofreader + ')' : ''}`,
         start: e.start,
+        end: e.end || undefined,
+        allDay: true,
         color: STATUS_COLORS_HEX[e.status] ?? '#9ca3af',
         extendedProps: e,
     }))
@@ -54,6 +57,14 @@ const calendarOptions = computed(() => ({
     eventContent: (arg) => ({
         html: `<div class="overflow-hidden text-ellipsis whitespace-nowrap px-1 text-xs">${arg.event.title}</div>`,
     }),
+    eventClick: (info) => {
+        const event = info.event.extendedProps;
+        if (event.type === 'proof_reservation') {
+            router.get(route('proof_coordinator.reservations.show', { reservation: event.id }));
+            return;
+        }
+        router.get(route('proof_coordinator.assignments.show', { proofRequest: event.id }));
+    },
 }));
 
 // ─────────────────────────────────────────────────────────────────

@@ -65,16 +65,17 @@ class ProofRequestController extends Controller
      * GET /proof-coordinator/inbox
      * 未受理（pending）の校正依頼一覧
      */
-    public function inbox(): Response
+    public function inbox(Request $request): Response
     {
+        $sortOrder = $request->input('sort_order') === 'asc' ? 'asc' : 'desc';
         $requests = ProofRequest::with(['requester', 'projectJob'])
             ->pending()
-            ->orderBy('deadline')
-            ->orderBy('created_at')
+            ->orderBy('created_at', $sortOrder)
             ->get();
 
         return Inertia::render('ProofCoordinator/Inbox/Index', [
             'proofRequests' => $requests,
+            'sortOrder' => $sortOrder,
         ]);
     }
 
@@ -814,6 +815,7 @@ class ProofRequestController extends Controller
         $search    = $request->input('search', '');
         $period    = $request->input('period', '');
         $dateField = $request->input('date_field', 'created_at'); // 'created_at' | 'deadline'
+        $sortOrder = $request->input('sort_order') === 'asc' ? 'asc' : 'desc';
 
         $applyFilters = function ($query) use ($search, $period, $dateField) {
             if ($search) {
@@ -831,14 +833,14 @@ class ProofRequestController extends Controller
         // 進行中（assigned + in_progress）
         $activeQuery = ProofRequest::with(['requester', 'proofCoordinator', 'proofreader', 'projectJob'])
             ->whereIn('status', ['assigned', 'in_progress'])
-            ->orderBy('deadline');
+            ->orderBy('created_at', $sortOrder);
         $applyFilters($activeQuery);
         $activeRequests = $activeQuery->get();
 
         // 完了（completed）
         $completedQuery = ProofRequest::with(['requester', 'proofCoordinator', 'proofreader', 'projectJob'])
             ->where('status', 'completed')
-            ->orderByDesc('completed_at');
+            ->orderBy('created_at', $sortOrder);
         $applyFilters($completedQuery);
         // 年月未指定時は直近3か月のみ表示
         if (! $period) {
@@ -865,6 +867,7 @@ class ProofRequestController extends Controller
             'search'            => $search,
             'period'            => $period,
             'dateField'         => $dateField,
+            'sortOrder'         => $sortOrder,
             'monthOptions'      => $monthOptions,
         ]);
     }

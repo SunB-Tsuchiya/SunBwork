@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\ProjectJobAssignment;
 use App\Models\ProofRequest;
+use App\Models\ProofReservation;
 use App\Models\ProofSchedule;
 use App\Models\ProofTeamMember;
 use App\Models\User;
@@ -359,19 +360,61 @@ class CalendarController extends Controller
 
     private function getMonthEvents(): array
     {
-        return ProofRequest::with(['proofreader', 'projectJob'])
+        $proofRequests = ProofRequest::with(['proofreader', 'projectJob'])
             ->whereNotNull('deadline')
             ->get()
             ->map(fn ($r) => [
                 'id'          => $r->id,
+                'type'        => 'proof_request',
                 'title'       => $r->title,
                 'start'       => Carbon::parse($r->getRawOriginal('deadline'), 'UTC')
                                     ->setTimezone('Asia/Tokyo')->toDateString(),
+                'end'         => null,
                 'status'      => $r->status,
                 'proofreader' => $r->proofreader?->name,
                 'job_title'   => $r->projectJob?->title,
             ])
             ->toArray();
+
+        $reservations = ProofReservation::with('projectJob')
+            ->whereNotNull('calendar_registered_at')
+            ->where('status', '!=', 'deleted')
+            ->where('requested_at_mode', 'datetime')
+            ->where('deadline_mode', 'datetime')
+            ->whereNotNull('requested_at')
+            ->whereNotNull('deadline_at')
+            ->get()
+            ->map(function ($reservation) {
+                $start = Carbon::createFromFormat(
+                    'Y-m-d H:i:s',
+                    $reservation->getRawOriginal('requested_at'),
+                    'UTC',
+                )->setTimezone('Asia/Tokyo');
+                $deadline = Carbon::createFromFormat(
+                    'Y-m-d H:i:s',
+                    $reservation->getRawOriginal('deadline_at'),
+                    'UTC',
+                )->setTimezone('Asia/Tokyo');
+
+                return [
+                    'id' => $reservation->id,
+                    'type' => 'proof_reservation',
+                    'title' => $reservation->title,
+                    'start' => $start->toDateString(),
+                    // FullCalendar の all-day end は排他的。締切日を含めるため翌日を渡す。
+                    'end' => $deadline->copy()->addDay()->toDateString(),
+                    'status' => match ($reservation->status) {
+                        'in_progress' => 'in_progress',
+                        'completed' => 'completed',
+                        default => 'reservation',
+                    },
+                    'proofreader' => null,
+                    'job_title' => $reservation->projectJob?->title,
+                ];
+            })
+            ->toArray();
+
+        return array_merge($proofRequests, $reservations);
     }
 
     /** DB に UTC で保存された datetime を UTC ISO 文字列として返す */

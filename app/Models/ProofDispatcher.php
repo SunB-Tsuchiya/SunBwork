@@ -27,4 +27,11 @@ class ProofDispatcher extends Model
     {
         return $query->where('is_active', true);
     }
+
+    public function scopeOrdered($query)
+    {
+        return $query
+            ->orderByDesc('is_active')
+            ->orderBy('name');
+    }
 }

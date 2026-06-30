@@ -12,6 +12,7 @@ const props = defineProps({
     search:            { type: String, default: '' },
     period:            { type: String, default: '' },
     dateField:         { type: String, default: 'created_at' },
+    sortOrder:         { type: String, default: 'desc' },
     monthOptions:      { type: Array,  default: () => [] },
 });
 
@@ -19,6 +20,7 @@ const currentTab      = ref(props.tab);
 const searchInput     = ref(props.search);
 const periodInput     = ref(props.period);
 const dateFieldInput  = ref(props.dateField);
+const sortOrderInput  = ref(props.sortOrder);
 const groupMode       = useUIState('sbw_proof_jobs_group_mode', 'deadline'); // 'project' | 'proofreader' | 'deadline'
 
 const statusLabel = {
@@ -90,7 +92,7 @@ const groupedRows = computed(() => {
                 const m = s.match(/(\d+)年(\d+)月(\d+)日/);
                 return m ? new Date(m[1], m[2] - 1, m[3]) : new Date(0);
             };
-            return toDate(a) - toDate(b);
+            return sortOrderInput.value === 'asc' ? toDate(a) - toDate(b) : toDate(b) - toDate(a);
         }
         return a.localeCompare(b, 'ja');
     });
@@ -103,6 +105,7 @@ function doSearch() {
         search:     searchInput.value,
         period:     periodInput.value,
         date_field: dateFieldInput.value,
+        sort_order: sortOrderInput.value,
     }, { preserveState: false, replace: true });
 }
 
@@ -110,6 +113,7 @@ function clearFilters() {
     searchInput.value    = '';
     periodInput.value    = '';
     dateFieldInput.value = 'created_at';
+    sortOrderInput.value = 'desc';
     doSearch();
 }
 
@@ -168,6 +172,15 @@ function uncomplete(id) {
                         @click="clearFilters"
                         class="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50"
                     >クリア</button>
+                    <select
+                        v-model="sortOrderInput"
+                        class="rounded border-gray-300 text-sm"
+                        aria-label="依頼日の並べ替え"
+                        @change="doSearch"
+                    >
+                        <option value="desc">日付：新しい順</option>
+                        <option value="asc">日付：古い順</option>
+                    </select>
                 </div>
 
                 <!-- 日付フィールド選択 + 年月フィルター -->

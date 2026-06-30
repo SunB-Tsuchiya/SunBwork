@@ -1349,6 +1349,28 @@ HTML,
 </section>
 HTML,
         ],
+        [
+            'version'      => 'proof-reservation-1',
+            'title'        => '案件に紐づく校正予約と校正カレンダー連携',
+            'released_at'  => '2026-06-30',
+            'summary'      => '案件一覧から校正予約を送れるようになりました。依頼予定と締め切りは日時または自由記述で入力でき、確定日時の予約は校正カレンダーに期間予定として登録できます。予約モーダルから送信済み予約を確認でき、タイトルまたは日程が重複する場合は送信前に確認します。予約受付・校正中・完了・削除の状態管理と、proof-admin一覧の日付順切替にも対応しました。',
+            'design_files' => ['PROOFRESV_PLAN1.md'],
+            'claude_notes' => '【DB】proof_reservations を新設し、通常の proof_requests と予約を分離。status（reserved/in_progress/completed/deleted）を追加。【案件一覧】ステータス右に校正予約ボタン、専用モーダルで依頼予定・締め切りを日時/テキスト切替入力。モーダル右上の送信予約一覧で案件別履歴を表示。【重複確認】同一案件でタイトル一致、または依頼予定日・締切日の両方一致（時間無視）をAPIとstoreの両方で判定し、confirm承認後のみ送信。【proof-admin】校正予約一覧タブ、ジョブ管理相当の検索・年月絞り込み・グループ表示、予約詳細を追加。詳細から予約受付・校正中・完了・削除へ変更可能。一覧の完了非表示はデフォルトONでlocalStorage保存。受信箱・予約一覧・ジョブ管理にcreated_at基準の新しい順/古い順を追加（デフォルトdesc）。【カレンダー】詳細の登録ボタンで calendar_registered_at を記録し、月表示へ requested_at〜deadline_at の期間ストリップを表示。自由記述を含む予約は登録不可。deletedはカレンダーから除外。【修正】ProofReservationのAttributeヘルパーがEloquentのアクセサとして誤認識される500エラーを修正。ProofDispatcherControllerが存在しないorderedスコープを呼んで単発派遣管理が500になる問題を、ProofDispatcher::scopeOrdered追加で修正。旧実装の proof_requests 流用、通常 ProofRequestModal 流用、不要な予約CRUDを撤去。',
+            'body'         => <<<'HTML'
+<section class="cl-feature">
+  <h3>校正予約</h3>
+  <ul>
+    <li><strong>案件から予約：</strong>案件一覧の「校正予約」ボタンから、案件に紐づく校正予約を送れます</li>
+    <li><strong>未確定日程にも対応：</strong>依頼予定と締め切りは、カレンダーと時刻だけでなく自由なテキストでも入力できます</li>
+    <li><strong>送信予約一覧・重複確認：</strong>予約モーダルから同じ案件の送信履歴を確認できます。同じタイトル、または同じ依頼予定日・締め切り日の予約がある場合は送信前に確認します</li>
+    <li><strong>ステータス管理：</strong>予約詳細から「予約受付」「校正中」「完了」「削除」を切り替えられます。予約一覧では完了した予約を非表示にできます</li>
+    <li><strong>日付順の切替：</strong>校正依頼受信・校正予約一覧・ジョブ管理を、依頼日の新しい順または古い順で表示できます</li>
+    <li><strong>予約一覧・詳細：</strong>proof-admin の「校正予約一覧」で検索・年月絞り込みを行い、予約内容を詳細画面で確認できます</li>
+    <li><strong>校正カレンダー連携：</strong>開始・終了が確定している予約は、校正カレンダーへ1本の期間予定として登録できます</li>
+  </ul>
+</section>
+HTML,
+        ],
         ];
 
         foreach ($entries as $entry) {

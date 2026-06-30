@@ -46,6 +46,7 @@
                         <col class="w-36" />
                         <col v-if="showClientName" class="w-44" />
                         <col v-if="showStatus" class="w-24" />
+                        <col v-if="showProofReservation" class="w-28" />
                         <col class="w-12" />
                     </colgroup>
                     <thead>
@@ -55,6 +56,7 @@
                             <th class="border px-3 py-1.5 text-left text-xs font-medium text-yellow-900">案件名</th>
                             <th v-if="showClientName" class="border px-3 py-1.5 text-left text-xs font-medium text-yellow-900">クライアント名</th>
                             <th v-if="showStatus" class="border px-3 py-1.5 text-left text-xs font-medium text-yellow-900">ステータス</th>
+                            <th v-if="showProofReservation" class="border px-3 py-1.5 text-center text-xs font-medium text-yellow-900">校正予約</th>
                             <th class="border px-3 py-1.5 text-center text-xs font-medium text-yellow-900">★</th>
                         </tr>
                     </thead>
@@ -69,6 +71,13 @@
                                     :class="job.completed ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-700'"
                                     class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
                                 >{{ job.completed ? '完了' : '進行中' }}</span>
+                            </td>
+                            <td v-if="showProofReservation" class="border px-3 py-2 text-center" @click.stop>
+                                <button
+                                    type="button"
+                                    class="rounded bg-pink-600 px-2 py-1 text-xs font-medium text-white hover:bg-pink-700"
+                                    @click="openProofReservationModal(job)"
+                                >校正予約</button>
                             </td>
                             <td class="border px-3 py-2 text-center" @click.stop>
                                 <button
@@ -179,6 +188,7 @@
                             <col class="w-36" />
                             <col v-if="showClientName" class="w-44" />
                             <col v-if="showStatus" class="w-24" />
+                            <col v-if="showProofReservation" class="w-28" />
                             <col class="w-12" />
                         </colgroup>
                         <thead>
@@ -200,6 +210,7 @@
                                         ステータス<span class="text-gray-400">{{ sortIndicator('status') }}</span>
                                     </button>
                                 </th>
+                                <th v-if="showProofReservation" class="border px-3 py-1.5 text-center text-xs font-medium text-gray-500">校正予約</th>
                                 <th class="border px-3 py-1.5 text-center text-xs font-medium text-gray-500">★</th>
                             </tr>
                         </thead>
@@ -214,6 +225,13 @@
                                         :class="job.completed ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-700'"
                                         class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
                                     >{{ job.completed ? '完了' : '進行中' }}</span>
+                                </td>
+                                <td v-if="showProofReservation" class="border px-3 py-2 text-center" @click.stop>
+                                    <button
+                                        type="button"
+                                        class="rounded bg-pink-600 px-2 py-1 text-xs font-medium text-white hover:bg-pink-700"
+                                        @click="openProofReservationModal(job)"
+                                    >校正予約</button>
                                 </td>
                                 <td class="border px-3 py-2 text-center" @click.stop>
                                     <button
@@ -238,6 +256,14 @@
         </div>
         </SuperAdminGlobalGuard>
     </AppLayout>
+
+    <ProofReservationModal
+        v-if="showProofReservation"
+        :show="showProofModal"
+        :initial-title="proofTargetJob?.title || ''"
+        :project-job-id="proofTargetJob?.id || null"
+        @close="closeProofReservationModal"
+    />
 
     <!-- CSV 一括登録モーダル -->
     <Teleport to="body">
@@ -526,6 +552,7 @@
 
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
+import ProofReservationModal from '@/Components/ProofReservationModal.vue';
 import SuperAdminGlobalGuard from '@/Components/SuperAdminGlobalGuard.vue';
 import { useUIState } from '@/Composables/useUIState';
 import { Link, router, usePage } from '@inertiajs/vue3';
@@ -544,6 +571,20 @@ const showJobcode    = useUIState('coord_pj_col_jobcode', true);
 const showClientName = useUIState('coord_pj_col_client', true);
 const showStatus     = useUIState('coord_pj_col_status', true);
 const showColumnSettings = ref(false);
+const showProofReservation = computed(() => !!page.props.auth?.featureFlags?.proofRequest);
+
+const showProofModal = ref(false);
+const proofTargetJob = ref(null);
+
+function openProofReservationModal(job) {
+    proofTargetJob.value = job;
+    showProofModal.value = true;
+}
+
+function closeProofReservationModal() {
+    showProofModal.value = false;
+    proofTargetJob.value = null;
+}
 
 // ローカルコピー（完了ボタンで即時更新するため）
 const localJobs = ref((props.jobs || []).map((j) => ({ ...j })));

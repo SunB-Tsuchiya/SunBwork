@@ -7,9 +7,11 @@ import { ref, computed } from 'vue';
 
 const props = defineProps({
     proofRequests: { type: Array, default: () => [] },
+    sortOrder: { type: String, default: 'desc' },
 });
 
 const searchInput = ref('');
+const sortOrderInput = ref(props.sortOrder);
 const groupMode   = useUIState('sbw_proof_inbox_group_mode', 'deadline'); // 'deadline' | 'created_at' | 'project'
 
 const groupModeOptions = [
@@ -75,11 +77,17 @@ const groupedRows = computed(() => {
             const m = s.match(/(\d+)年(\d+)月(\d+)日/);
             return m ? new Date(m[1], m[2] - 1, m[3]) : new Date(0);
         };
-        return toDate(a) - toDate(b);
+        return sortOrderInput.value === 'asc' ? toDate(a) - toDate(b) : toDate(b) - toDate(a);
     });
 
     return keys.map(key => ({ key, rows: map.get(key) }));
 });
+
+function changeSortOrder() {
+    router.get(route('proof_coordinator.inbox'), {
+        sort_order: sortOrderInput.value,
+    }, { preserveState: false, replace: true });
+}
 </script>
 
 <template>
@@ -106,6 +114,15 @@ const groupedRows = computed(() => {
                     @click="searchInput = ''"
                     class="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50"
                 >クリア</button>
+                <select
+                    v-model="sortOrderInput"
+                    class="rounded border-gray-300 text-sm"
+                    aria-label="依頼日の並べ替え"
+                    @change="changeSortOrder"
+                >
+                    <option value="desc">日付：新しい順</option>
+                    <option value="asc">日付：古い順</option>
+                </select>
             </div>
 
             <!-- グループ表示ピル -->

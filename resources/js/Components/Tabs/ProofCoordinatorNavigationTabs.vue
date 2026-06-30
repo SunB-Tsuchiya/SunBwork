@@ -29,6 +29,7 @@ const tabs = computed(() => [
         href: tryRoute('proof_coordinator.inbox'),
         label: '校正依頼受信' + (props.pendingCount > 0 ? ` (${props.pendingCount}件)` : ''),
     },
+    { key: 'reservations', href: tryRoute('proof_coordinator.reservations.index'), label: '校正予約一覧' },
     { key: 'jobs', href: tryRoute('proof_coordinator.jobs'), label: 'ジョブ管理' },
     { key: 'calendar', href: tryRoute('proof_coordinator.calendar'), label: '校正カレンダー' },
     { key: 'workload', href: tryRoute('proof_coordinator.workload'), label: '校正員作業量' },
@@ -74,6 +75,9 @@ function onMobileSelect(e) {
                 >
                     {{ pendingCount }}
                 </span>
+            </Link>
+            <Link :href="route('proof_coordinator.reservations.index')" :class="tab('reservations')">
+                校正予約一覧
             </Link>
             <Link :href="route('proof_coordinator.jobs')" :class="tab('jobs')">
                 ジョブ管理

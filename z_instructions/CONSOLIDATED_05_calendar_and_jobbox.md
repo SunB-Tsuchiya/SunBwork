@@ -101,6 +101,28 @@ watch(() => form.date, (newDate) => {
 
 ---
 
+## 校正予約（2026-06-30）
+
+- Coordinator 案件一覧から案件に紐づく校正予約を送信する。
+- 通常校正依頼の `proof_requests` とは分離し、`proof_reservations` を正規データとする。
+- 依頼予定と締め切りは、それぞれ `datetime` または自由記述 `text` を選択できる。
+- 日時入力はJSTとして受け取り、`requested_at` / `deadline_at` にUTC文字列で保存する。
+- 両方が日時入力かつ依頼予定 < 締め切りの場合のみ、予約詳細から校正カレンダーへ登録できる。
+- 登録状態は `calendar_registered_at` で管理する。`proof_schedules` は校正員別の日次作業枠なので予約期間の保存には流用しない。
+- 校正カレンダー月表示では、依頼予定日を開始、締め切り日を終了とする1本の期間ストリップを表示する。
+- FullCalendar の all-day `end` は排他的なので、締め切り日の翌日を描画用 `end` として渡す。
+- 期間ストリップをクリックすると `proof_coordinator.reservations.show` へ遷移する。
+- 予約モーダルの「送信予約一覧」は、同じ案件に送信済みの予約を依頼予定・締め切り・カレンダー登録状態とともに表示する。
+- 同じ案件で「タイトルが一致」または「依頼予定日と締め切り日の両方が一致（時間は無視）」する予約を重複候補とする。
+- 重複確認は事前確認APIだけでなく保存処理でも再判定し、`duplicate_confirmed=true` の場合のみ重複候補を送信できる。
+- 予約ステータスは `reserved`（予約受付）/ `in_progress`（校正中）/ `completed`（完了）/ `deleted`（削除）の4状態。
+- 削除は履歴を保つ論理状態であり、レコードを物理削除しない。削除状態の予約は校正カレンダーに表示しない。
+- 予約一覧の「完了を表示しない」はデフォルトONで、`sbw_proof_reservations_hide_completed` としてlocalStorageへ保存する。
+- proof-admin の受信箱・校正予約一覧・ジョブ管理は、`created_at` を基準に新しい順/古い順を切り替える。指定がない場合は新しい順（`desc`）。
+- 検索・年月・タブ切替時も `sort_order` をクエリへ引き継ぐ。
+
+---
+
 ## 管理シートテンプレート（2026-06-30）
 
 - 管理シート用テンプレートの正規データは `progress_templates` の `sheet_type = management`

@@ -766,6 +766,9 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::post('project_jobs/{projectJob}/complete', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'complete'])->name('project_jobs.complete');
         Route::post('project_jobs/{projectJob}/uncomplete', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'uncomplete'])->name('project_jobs.uncomplete');
         Route::post('project_jobs/{projectJob}/favorite', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'toggleFavorite'])->name('project_jobs.favorite');
+        Route::get('project_jobs/{projectJob}/proof-reservations', [\App\Http\Controllers\ProofCoordinator\ProofReservationController::class, 'sent'])->name('proof_reservations.sent');
+        Route::post('project_jobs/{projectJob}/proof-reservations/check-duplicate', [\App\Http\Controllers\ProofCoordinator\ProofReservationController::class, 'checkDuplicate'])->name('proof_reservations.check_duplicate');
+        Route::post('project_jobs/{projectJob}/proof-reservations', [\App\Http\Controllers\ProofCoordinator\ProofReservationController::class, 'store'])->name('proof_reservations.store');
         Route::post('project_jobs/{projectJob}/clone', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'clone'])->name('project_jobs.clone');
         Route::post('project_jobs/{projectJob}/share', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'share'])->name('project_jobs.share');
         Route::post('project_jobs/{projectJob}/image', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'storeImage'])->name('project_jobs.image.store');
@@ -1035,6 +1038,10 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::put('assignments/{proofRequest}/start', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'start'])->name('assignments.start');
         Route::put('assignments/{proofRequest}/complete', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'complete'])->name('assignments.complete');
         Route::put('assignments/{proofRequest}/uncomplete', [\App\Http\Controllers\ProofCoordinator\ProofRequestController::class, 'uncomplete'])->name('assignments.uncomplete');
+        Route::get('reservations', [\App\Http\Controllers\ProofCoordinator\ProofReservationController::class, 'index'])->name('reservations.index');
+        Route::get('reservations/{reservation}', [\App\Http\Controllers\ProofCoordinator\ProofReservationController::class, 'show'])->name('reservations.show');
+        Route::post('reservations/{reservation}/calendar', [\App\Http\Controllers\ProofCoordinator\ProofReservationController::class, 'registerCalendar'])->name('reservations.register_calendar');
+        Route::patch('reservations/{reservation}/status', [\App\Http\Controllers\ProofCoordinator\ProofReservationController::class, 'updateStatus'])->name('reservations.update_status');
         Route::get('calendar', [\App\Http\Controllers\ProofCoordinator\CalendarController::class, 'index'])->name('calendar');
         Route::get('calendar/data', [\App\Http\Controllers\ProofCoordinator\CalendarController::class, 'data'])->name('calendar.data');
         Route::get('calendar/picker-data', [\App\Http\Controllers\ProofCoordinator\CalendarController::class, 'pickerData'])->name('calendar.picker_data');
