@@ -249,6 +249,7 @@ async function executeDelete() {
 const CARD_COLORS = {
     indigo: { swatch: 'bg-indigo-400',  border: 'border-indigo-400', bg: 'bg-indigo-100',  textMain: 'text-indigo-900', textSub: 'text-indigo-600' },
     blue:   { swatch: 'bg-blue-400',    border: 'border-blue-400',   bg: 'bg-blue-100',    textMain: 'text-blue-900',   textSub: 'text-blue-600'   },
+    cyan:   { swatch: 'bg-cyan-400',    border: 'border-cyan-400',   bg: 'bg-cyan-100',    textMain: 'text-cyan-900',   textSub: 'text-cyan-700'   },
     teal:   { swatch: 'bg-teal-500',    border: 'border-teal-500',   bg: 'bg-teal-100',    textMain: 'text-teal-900',   textSub: 'text-teal-700'   },
     green:  { swatch: 'bg-green-500',   border: 'border-green-500',  bg: 'bg-green-100',   textMain: 'text-green-900',  textSub: 'text-green-700'  },
     yellow: { swatch: 'bg-yellow-400',  border: 'border-yellow-400', bg: 'bg-yellow-100',  textMain: 'text-yellow-900', textSub: 'text-yellow-700' },
