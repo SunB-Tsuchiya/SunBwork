@@ -6,10 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\Department;
 use App\Models\PrepresSalesRep;
+use App\Models\PrepressColorAssignment;
 use App\Models\PrepressTicket;
 use App\Models\ProjectJob;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class BoardController extends Controller
@@ -25,14 +28,29 @@ class BoardController extends Controller
                 'id', 'title', 'jobcode', 'project_name', 'client_id', 'client_name',
                 'sales_rep', 'sales_rep_id', 'memo', 'status', 'image_path', 'card_color', 'created_at',
                 'submission_date', 'sb_delivery_date',
+                'check_finish_size', 'check_trim_marks', 'check_imposition',
+                'check_color_count', 'check_screen_ruling', 'check_n_mark_trap', 'check_color_correction',
+                'indesign_version', 'illustrator_version', 'check_memo',
             ])->each->append('image_url');
 
         $salesReps = \App\Models\PrepresSalesRep::orderBy('sort_order')->get(['id', 'name', 'company']);
 
+        $prepressDept   = Department::where('name', '製版')->first();
+        $prepressUsers  = $prepressDept
+            ? User::where('department_id', $prepressDept->id)
+                ->where('is_ghost', false)
+                ->orderBy('name')
+                ->get(['id', 'name'])
+            : collect();
+
+        $colorAssignments = PrepressColorAssignment::orderBy('sort_order')->get(['id', 'color_key', 'user_id', 'sort_order']);
+
         return inertia('Prepress/Board', [
-            'tickets'   => $tickets,
-            'statuses'  => PrepressTicket::STATUS_LABELS,
-            'salesReps' => $salesReps,
+            'tickets'          => $tickets,
+            'statuses'         => PrepressTicket::STATUS_LABELS,
+            'salesReps'        => $salesReps,
+            'prepressUsers'    => $prepressUsers,
+            'colorAssignments' => $colorAssignments,
         ]);
     }
 
@@ -47,6 +65,64 @@ class BoardController extends Controller
         $ticket->update(['status' => $request->status]);
 
         return response()->noContent();
+    }
+
+    public function updateColorAssignment(Request $request, string $colorKey): JsonResponse
+    {
+        $this->authorizePrepress($request->user());
+
+        $request->validate([
+            'user_id' => ['nullable', 'integer', 'exists:users,id'],
+        ]);
+
+        PrepressColorAssignment::where('color_key', $colorKey)
+            ->update(['user_id' => $request->user_id ?: null]);
+
+        return response()->json(['ok' => true]);
+    }
+
+    public function reorderColorAssignments(Request $request): JsonResponse
+    {
+        $this->authorizePrepress($request->user());
+
+        $request->validate([
+            'orders'               => ['required', 'array'],
+            'orders.*.color_key'   => ['required', 'string', 'max:20'],
+            'orders.*.sort_order'  => ['required', 'integer', 'min:0'],
+        ]);
+
+        DB::transaction(function () use ($request) {
+            foreach ($request->orders as $item) {
+                PrepressColorAssignment::where('color_key', $item['color_key'])
+                    ->update(['sort_order' => $item['sort_order']]);
+            }
+        });
+
+        return response()->json(['ok' => true]);
+    }
+
+    public function updateChecks(Request $request, PrepressTicket $ticket): \Illuminate\Http\JsonResponse
+    {
+        $this->authorizePrepress($request->user());
+
+        $validated = $request->validate([
+            'check_finish_size'      => ['sometimes', 'boolean'],
+            'check_trim_marks'       => ['sometimes', 'boolean'],
+            'check_imposition'       => ['sometimes', 'boolean'],
+            'check_color_count'      => ['sometimes', 'boolean'],
+            'check_screen_ruling'    => ['sometimes', 'boolean'],
+            'check_n_mark_trap'      => ['sometimes', 'boolean'],
+            'check_color_correction' => ['sometimes', 'boolean'],
+            'indesign_version'       => ['sometimes', 'nullable', 'string', 'max:20'],
+            'illustrator_version'    => ['sometimes', 'nullable', 'string', 'max:20'],
+            'check_memo'             => ['sometimes', 'nullable', 'string', 'max:2000'],
+        ]);
+
+        abort_if(empty($validated), 422, '保存するフィールドが指定されていません');
+
+        $ticket->update($validated);
+
+        return response()->json(['ok' => true]);
     }
 
     public function updateColor(Request $request, PrepressTicket $ticket)

@@ -48,7 +48,14 @@ class HandleInertiaRequests extends Middleware
         $contextCompany = null;
         if ($request->user()?->isSuperAdmin()) {
             $ctxId = session('superadmin_context.company_id');
-            $contextCompany = $ctxId ? \App\Models\Company::find($ctxId) : null;
+            if ($ctxId) {
+                // 明示的にコンテキスト会社を選択している場合はその会社を使う
+                $contextCompany = \App\Models\Company::find($ctxId);
+            } else {
+                // コンテキスト未選択時は SuperAdmin 自身の所属会社をフォールバックとして使う
+                // （SuperAdmin が sunbrain 会社に所属している場合は Prepress 等の機能が有効になる）
+                $contextCompany = $request->user()->company;
+            }
         } else {
             $contextCompany = $request->user()?->company;
         }
@@ -182,7 +189,7 @@ class HandleInertiaRequests extends Middleware
                     ];
                 })(),
                 // 会社タイプ（'sunbrain' | 'general' | 'global'）
-                // SuperAdmin はコンテキスト切り替えに応じた値。未切り替え時は 'global'
+                // SuperAdmin はコンテキスト切り替えに応じた値。未切り替え時は所属会社タイプ（自社未設定時のみ 'global'）
                 'companyType' => $contextCompany?->company_type ?? 'global',
                 // SuperAdmin のコンテキスト会社 ID（null = グローバル管理モード）
                 'superAdminContextId' => $request->user()?->isSuperAdmin()

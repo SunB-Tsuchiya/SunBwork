@@ -3,13 +3,15 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import OcrModal from '@/Components/Prepress/OcrModal.vue';
 import { router, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { route } from 'ziggy-js';
 
 const props = defineProps({
-    tickets:   { type: Array,  default: () => [] },
-    statuses:  { type: Object, default: () => ({}) },
-    salesReps: { type: Array,  default: () => [] },
+    tickets:          { type: Array,  default: () => [] },
+    statuses:         { type: Object, default: () => ({}) },
+    salesReps:        { type: Array,  default: () => [] },
+    prepressUsers:    { type: Array,  default: () => [] },
+    colorAssignments: { type: Array,  default: () => [] },
 });
 
 const COLUMNS = [
@@ -261,6 +263,18 @@ function cardColor(ticket) {
     return CARD_COLORS[ticket.card_color] ?? CARD_COLORS.indigo;
 }
 
+const CHECK_ITEMS = [
+    { key: 'check_finish_size',      label: '仕上がりサイズ' },
+    { key: 'check_trim_marks',       label: 'トンボ' },
+    { key: 'check_imposition',       label: '面付' },
+    { key: 'check_color_count',      label: '色数' },
+    { key: 'check_screen_ruling',    label: '線数' },
+    { key: 'check_n_mark_trap',      label: 'Nマークのトラップ処理' },
+    { key: 'check_color_correction', label: '色調補正' },
+];
+
+const APP_VERSIONS = ['CC', 'CC 2014', 'CC 2015', 'CC 2017', 'CC 2018', 'CC 2019', '2020', '2021', '2022', '2023', '2024', '2025', '2026'];
+
 async function setTicketColor(ticket, colorKey) {
     const prev = ticket.card_color;
     const idx  = localTickets.value.findIndex(t => t.id === ticket.id);
@@ -278,6 +292,91 @@ async function setTicketColor(ticket, colorKey) {
         if (idx >= 0) localTickets.value[idx].card_color = prev;
         if (detail.value?.id === ticket.id) detail.value = { ...detail.value, card_color: prev };
     }
+}
+
+// ── 色担当管理 ───────────────────────────────────────────
+const localColorAssignments = ref(
+    [...props.colorAssignments].sort((a, b) => a.sort_order - b.sort_order).map(a => ({ ...a }))
+);
+watch(() => props.colorAssignments, (val) => {
+    localColorAssignments.value = [...val].sort((a, b) => a.sort_order - b.sort_order).map(a => ({ ...a }));
+});
+const showColorAssignPanel  = ref(false);
+const colorPanelKey     = ref(0);
+const dragSrcColorIdx   = ref(null);
+const dragOverColorIdx  = ref(null);
+
+const sortedColorKeys = computed(() =>
+    localColorAssignments.value.map(a => a.color_key).filter(k => !!CARD_COLORS[k])
+);
+
+function colorUserName(key) {
+    const a = localColorAssignments.value.find(a => a.color_key === key);
+    if (!a?.user_id) return null;
+    const u = props.prepressUsers.find(u => u.id === a.user_id);
+    if (!u) return null;
+    return u.name.split(/[\s　]+/)[0]; // 苗字のみ
+}
+
+async function setColorUser(colorKey, userId) {
+    const a = localColorAssignments.value.find(a => a.color_key === colorKey);
+    if (!a) return;
+
+    const newUserId = userId ? parseInt(userId) : null;
+
+    // 重複チェック（同じ人が別の色にすでに割り当てられていないか）
+    if (newUserId) {
+        const dup = localColorAssignments.value.find(
+            x => x.color_key !== colorKey && x.user_id === newUserId
+        );
+        if (dup) {
+            const u = props.prepressUsers.find(u => u.id === newUserId);
+            alert(`「${u?.name ?? '選択した担当者'}」はすでに別の色に設定されています。`);
+            // a.user_id は変えていないが select の DOM が先行しているため強制再レンダリング
+            colorPanelKey.value++;
+            return;
+        }
+    }
+
+    const prev = a.user_id;
+    a.user_id = newUserId;
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    try {
+        await axios.patch(
+            route('prepress.board.colorAssignment.update', { colorKey }),
+            { user_id: a.user_id },
+            { headers: { 'X-CSRF-TOKEN': csrf } }
+        );
+    } catch {
+        a.user_id = prev;
+    }
+}
+
+function onColorDragStart(idx) { dragSrcColorIdx.value = idx; }
+function onColorDragOver(idx)  { dragOverColorIdx.value = idx; }
+function onColorDragEnd()      { dragSrcColorIdx.value = null; dragOverColorIdx.value = null; }
+
+async function onColorDrop(targetIdx) {
+    const srcIdx = dragSrcColorIdx.value;
+    dragSrcColorIdx.value  = null;
+    dragOverColorIdx.value = null;
+    if (srcIdx === null || srcIdx === targetIdx) return;
+
+    const arr = [...localColorAssignments.value];
+    const [moved] = arr.splice(srcIdx, 1);
+    arr.splice(targetIdx, 0, moved);
+    arr.forEach((a, i) => { a.sort_order = i; });
+    localColorAssignments.value = arr;
+
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    const orders = arr.map((a, i) => ({ color_key: a.color_key, sort_order: i }));
+    try {
+        await axios.post(
+            route('prepress.board.colorAssignment.reorder'),
+            { orders },
+            { headers: { 'X-CSRF-TOKEN': csrf } }
+        );
+    } catch { /* ignore */ }
 }
 
 // Drag & Drop
@@ -338,6 +437,7 @@ const authUser  = computed(() => page.props.auth?.user ?? null);
 const canDelete = computed(() => ['admin', 'superadmin', 'coordinator', 'leader', 'clerk'].includes(authUser.value?.user_role));
 
 const detail         = ref(null);
+const localChecks    = ref({});
 const updatingStatus = ref(false);
 const deleting       = ref(false);
 const uploadingImage = ref(false);
@@ -345,8 +445,56 @@ const uploadError    = ref('');
 const pendingFile    = ref(null);
 const pendingPreview = ref(null);
 
-function openDetail(ticket) { detail.value = ticket; cancelPendingFile(); }
-function closeDetail()      { detail.value = null;  cancelPendingFile(); }
+function openDetail(ticket) {
+    detail.value = ticket;
+    localChecks.value = {
+        check_finish_size:      !!ticket.check_finish_size,
+        check_trim_marks:       !!ticket.check_trim_marks,
+        check_imposition:       !!ticket.check_imposition,
+        check_color_count:      !!ticket.check_color_count,
+        check_screen_ruling:    !!ticket.check_screen_ruling,
+        check_n_mark_trap:      !!ticket.check_n_mark_trap,
+        check_color_correction: !!ticket.check_color_correction,
+        indesign_version:       ticket.indesign_version ?? '2021',
+        illustrator_version:    ticket.illustrator_version ?? '2021',
+        check_memo:             ticket.check_memo ?? '',
+    };
+    cancelPendingFile();
+}
+function closeDetail() {
+    clearTimeout(checkMemoTimer);
+    detail.value = null;
+    showColorAssignPanel.value = false;
+    cancelPendingFile();
+}
+
+let checkMemoTimer = null;
+
+async function saveCheck(field) {
+    if (!detail.value) return;
+    const ticketId = detail.value.id;
+    const val      = localChecks.value[field];
+    const idx      = localTickets.value.findIndex(t => t.id === ticketId);
+    const prev     = idx >= 0 ? localTickets.value[idx][field] : undefined;
+    const csrf     = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    try {
+        await axios.patch(
+            route('prepress.board.updateChecks', { ticket: ticketId }),
+            { [field]: val },
+            { headers: { 'X-CSRF-TOKEN': csrf } }
+        );
+        if (idx >= 0) localTickets.value[idx][field] = val;
+    } catch {
+        if (prev !== undefined && detail.value?.id === ticketId) {
+            localChecks.value[field] = prev;
+        }
+    }
+}
+
+function saveCheckMemoDebounced() {
+    clearTimeout(checkMemoTimer);
+    checkMemoTimer = setTimeout(() => saveCheck('check_memo'), 800);
+}
 
 function formatDate(dateStr) {
     if (!dateStr) return '—';
@@ -1259,24 +1407,82 @@ async function executeCsvImport() {
                                         # {{ detail.jobcode }}
                                     </span>
                                 </div>
-                                <div class="flex items-center justify-between gap-2">
+                                <div class="flex items-start justify-between gap-2">
                                     <h1 class="min-w-0 flex-1 text-base font-bold text-gray-900 truncate">{{ detail.title }}</h1>
-                                    <!-- カードカラー選択スウォッチ -->
-                                    <div class="flex items-center gap-1 shrink-0">
+                                    <!-- カードカラー選択スウォッチ＋担当色変更 -->
+                                    <div class="flex flex-col items-end gap-1 shrink-0">
+                                        <!-- 色丸＋担当者名 -->
+                                        <div class="flex items-end gap-1.5">
+                                            <div
+                                                v-for="key in sortedColorKeys"
+                                                :key="key"
+                                                class="flex flex-col items-center gap-0.5"
+                                            >
+                                                <button
+                                                    type="button"
+                                                    :title="colorUserName(key) ?? key"
+                                                    :class="[
+                                                        CARD_COLORS[key].swatch,
+                                                        'h-5 w-5 rounded-full border-2 transition-transform hover:scale-110',
+                                                        (detail.card_color ?? 'indigo') === key ? 'border-gray-700 scale-110' : 'border-white',
+                                                    ]"
+                                                    @click="setTicketColor(detail, key)"
+                                                />
+                                                <span
+                                                    v-if="colorUserName(key)"
+                                                    :title="colorUserName(key)"
+                                                    class="max-w-[2.6rem] truncate text-center text-[9px] leading-none text-gray-500"
+                                                >{{ colorUserName(key) }}</span>
+                                            </div>
+                                        </div>
+                                        <!-- 担当色変更ボタン -->
                                         <button
-                                            v-for="(cfg, key) in CARD_COLORS"
-                                            :key="key"
                                             type="button"
-                                            :title="key"
-                                            :class="[
-                                                cfg.swatch,
-                                                'h-5 w-5 rounded-full border-2 transition-transform hover:scale-110',
-                                                (detail.card_color ?? 'indigo') === key ? 'border-gray-700 scale-110' : 'border-white',
-                                            ]"
-                                            @click="setTicketColor(detail, key)"
-                                        />
+                                            class="text-[10px] text-gray-400 underline hover:text-gray-600"
+                                            @click.stop="showColorAssignPanel = !showColorAssignPanel"
+                                        >担当色変更</button>
                                     </div>
                                 </div>
+
+                                <!-- 担当色変更パネル（インライン展開） -->
+                                <div
+                                    v-if="showColorAssignPanel"
+                                    :key="colorPanelKey"
+                                    class="mt-2 rounded-lg border border-gray-200 bg-white p-3 shadow-sm"
+                                    @click.stop
+                                >
+                                    <div class="mb-2 text-xs font-semibold text-gray-600">担当色の設定（ドラッグで並び替え可）</div>
+                                    <div class="flex flex-wrap gap-x-2 gap-y-1">
+                                        <div
+                                            v-for="(assignment, idx) in localColorAssignments"
+                                            :key="assignment.color_key"
+                                            draggable="true"
+                                            class="flex items-center gap-1.5 rounded px-2 py-1 cursor-grab select-none border"
+                                            :class="dragOverColorIdx === idx ? 'border-blue-400 bg-blue-50' : 'border-gray-200 bg-gray-50 hover:bg-white'"
+                                            @dragstart="onColorDragStart(idx)"
+                                            @dragover.prevent="onColorDragOver(idx)"
+                                            @drop="onColorDrop(idx)"
+                                            @dragend="onColorDragEnd"
+                                        >
+                                            <span class="text-gray-300 text-xs select-none">⠿</span>
+                                            <span :class="[CARD_COLORS[assignment.color_key]?.swatch, 'h-3.5 w-3.5 rounded-full shrink-0']"></span>
+                                            <select
+                                                :value="assignment.user_id ?? ''"
+                                                class="rounded border border-gray-200 py-0.5 pl-1.5 pr-5 text-xs text-gray-700 focus:border-indigo-400 focus:outline-none"
+                                                @change="setColorUser(assignment.color_key, $event.target.value)"
+                                            >
+                                                <option value="">— 未選択 —</option>
+                                                <option v-for="u in prepressUsers" :key="u.id" :value="u.id">{{ u.name }}</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        class="mt-2 rounded border border-gray-300 px-3 py-0.5 text-xs text-gray-600 hover:bg-gray-50"
+                                        @click="showColorAssignPanel = false"
+                                    >閉じる</button>
+                                </div>
+
                                 <p class="mt-0.5 text-sm text-gray-500">作成者: {{ detail.user?.name ?? '—' }}</p>
                             </div>
                         </div>
@@ -1382,6 +1588,66 @@ async function executeCsvImport() {
                                 <dt class="w-32 shrink-0 font-medium text-gray-500">下版日</dt>
                                 <dd class="text-gray-800">{{ formatDate(detail.sb_delivery_date) || '—' }}</dd>
                             </div>
+
+                            <!-- 作業チェック -->
+                            <div class="py-2.5">
+                                <div class="mb-1.5 text-xs font-medium text-gray-500">作業チェック</div>
+                                <div class="flex flex-wrap gap-x-7 gap-y-2">
+                                    <label
+                                        v-for="item in CHECK_ITEMS"
+                                        :key="item.key"
+                                        class="flex cursor-pointer select-none items-center gap-1"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            v-model="localChecks[item.key]"
+                                            class="h-3.5 w-3.5 rounded accent-indigo-600"
+                                            @change="saveCheck(item.key)"
+                                        />
+                                        <span class="text-xs text-gray-700">{{ item.label }}</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- アプリバージョン -->
+                            <div class="flex flex-wrap items-center gap-5 py-2">
+                                <div class="flex items-center gap-2">
+                                    <span class="shrink-0 text-xs font-medium text-gray-500">InDesign</span>
+                                    <select
+                                        v-model="localChecks.indesign_version"
+                                        class="rounded border border-gray-300 py-1 pl-2 pr-6 text-xs focus:border-indigo-400 focus:outline-none"
+                                        @change="saveCheck('indesign_version')"
+                                    >
+                                        <option value="">—</option>
+                                        <option v-for="v in APP_VERSIONS" :key="v" :value="v">{{ v }}</option>
+                                    </select>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="shrink-0 text-xs font-medium text-gray-500">Illustrator</span>
+                                    <select
+                                        v-model="localChecks.illustrator_version"
+                                        class="rounded border border-gray-300 py-1 pl-2 pr-6 text-xs focus:border-indigo-400 focus:outline-none"
+                                        @change="saveCheck('illustrator_version')"
+                                    >
+                                        <option value="">—</option>
+                                        <option v-for="v in APP_VERSIONS" :key="v" :value="v">{{ v }}</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- 備考 -->
+                            <div class="py-2">
+                                <div class="mb-1 text-xs font-medium text-gray-500">備考</div>
+                                <textarea
+                                    v-model="localChecks.check_memo"
+                                    rows="2"
+                                    placeholder="メモを入力…"
+                                    class="w-full rounded border border-gray-300 px-2 py-1.5 text-xs text-gray-800 focus:border-indigo-400 focus:outline-none resize-none"
+                                    @input="saveCheckMemoDebounced"
+                                    @blur="saveCheck('check_memo')"
+                                ></textarea>
+                            </div>
+
                             <div v-if="detail.memo" class="flex py-2">
                                 <dt class="w-32 shrink-0 font-medium text-gray-500">メモ</dt>
                                 <dd class="whitespace-pre-wrap text-gray-800">{{ detail.memo }}</dd>

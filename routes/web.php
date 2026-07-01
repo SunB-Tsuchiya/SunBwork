@@ -1083,8 +1083,11 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 
         // 伝票ボード
         Route::get('board', [\App\Http\Controllers\Prepress\BoardController::class, 'index'])->name('board');
+        Route::patch('board/color-assignments/{colorKey}', [\App\Http\Controllers\Prepress\BoardController::class, 'updateColorAssignment'])->name('board.colorAssignment.update');
+        Route::post('board/color-assignments/reorder', [\App\Http\Controllers\Prepress\BoardController::class, 'reorderColorAssignments'])->name('board.colorAssignment.reorder');
         Route::patch('board/{ticket}/status', [\App\Http\Controllers\Prepress\BoardController::class, 'updateStatus'])->name('board.updateStatus');
         Route::patch('board/{ticket}/color', [\App\Http\Controllers\Prepress\BoardController::class, 'updateColor'])->name('board.updateColor');
+        Route::patch('board/{ticket}/checks', [\App\Http\Controllers\Prepress\BoardController::class, 'updateChecks'])->name('board.updateChecks');
         Route::patch('board/{ticket}/archive', [\App\Http\Controllers\Prepress\BoardController::class, 'archiveFromCompleted'])->name('board.archiveFromCompleted');
         // 伝票登録モーダル用 API
         Route::get('api/clients', [\App\Http\Controllers\Prepress\BoardController::class, 'apiClients'])->name('api.clients');
