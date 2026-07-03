@@ -17,6 +17,25 @@
 
 ---
 
+## Codex にレビューさせる手順
+
+ユーザーが「codexにレビューさせて」「codexでレビューして」等と言ったとき、Claude は以下の手順で Codex CLI（非対話モード）を実行してレビューを取得すること。
+
+```bash
+export PATH="$HOME/.npm-global/bin:$PATH"   # WSL には sudo なしでこのパスにインストール済み
+cd /home/w229/SunBwork
+codex exec review --uncommitted --title "<変更内容の簡潔な説明>"
+```
+
+**注意点:**
+- `--uncommitted` は staged / unstaged / untracked のすべての差分をレビュー対象にする。特定コミットをレビューしたい場合は `--commit <SHA>`、ブランチ差分なら `--base <branch>` を使う。
+- `public/build/assets/` 配下の大量の削除/追加ファイル（Vite のコンテンツハッシュ変更によるもの）が `git diff` に混ざり、出力が非常に大きくなる（1MB超）。ツール側で自動的にファイル保存されるので、末尾（`tail`）や `grep -n "Review comment\|\[P[0-9]\]"` で指摘部分だけを抽出して確認すること。
+- 指摘内容は `[P1]`〜`[P3]` のような優先度付きで返る。**指摘を鵜呑みにせず、実際にコードを確認してから対応要否を判断すること**（過去に `updated_at` の誤用を正しく指摘した実績あり）。
+- レビュー後に修正した場合は、Vue/JS ファイルを変更していれば `npm run build` を忘れずに実行する。
+- Codex 実行には OpenAI API（ChatGPT ログイン経由）への通信が発生する点に留意。
+
+---
+
 ## 作業ルール（最重要）
 
 1. **作業前に必ず関連コードを読む。** 既存の実装を確認してから変更・追加する

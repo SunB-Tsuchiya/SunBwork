@@ -13,6 +13,7 @@ class UserPresenceStatus extends Model
         'comment',
         'updated_by_id',
         'status_source',
+        'status_changed_at',
         'sort_order',
         'is_hidden',
     ];
@@ -20,6 +21,7 @@ class UserPresenceStatus extends Model
     protected $casts = [
         'is_hidden' => 'boolean',
         'sort_order' => 'integer',
+        'status_changed_at' => 'datetime',
     ];
 
     public function user(): BelongsTo

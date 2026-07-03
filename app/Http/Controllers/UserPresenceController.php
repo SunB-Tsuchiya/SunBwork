@@ -112,9 +112,10 @@ class UserPresenceController extends Controller
         ]);
 
         $data = [
-            'status'         => $validated['status'],
-            'updated_by_id'  => $authUser->id,
-            'status_source'  => 'manual',
+            'status'            => $validated['status'],
+            'updated_by_id'     => $authUser->id,
+            'status_source'     => 'manual',
+            'status_changed_at' => now(),
         ];
 
         if ($isSelf) {
@@ -144,10 +145,11 @@ class UserPresenceController extends Controller
         UserPresenceStatus::updateOrCreate(
             ['user_id' => $user->id],
             [
-                'status'        => 'left',
-                'comment'       => '',
-                'updated_by_id' => $user->id,
-                'status_source' => 'manual',
+                'status'            => 'left',
+                'comment'           => '',
+                'updated_by_id'     => $user->id,
+                'status_source'     => 'manual',
+                'status_changed_at' => now(),
             ]
         );
 
@@ -198,6 +200,18 @@ class UserPresenceController extends Controller
                 if ($presence && $presence->status_source === 'calendar') {
                     $presence->update(['status' => 'present', 'status_source' => 'manual']);
                 }
+                return;
+            }
+
+            // この予定の開始後に手動でステータス変更していれば、それを優先し自動上書きしない
+            // (status_changed_at は手動変更時のみ更新される。updated_at は board 設定保存等でも
+            //  更新されてしまうため、手動変更の判定には使わない)
+            if (
+                $presence
+                && $presence->status_source === 'manual'
+                && $presence->status_changed_at
+                && $presence->status_changed_at->gte(Carbon::parse($event->starts_at))
+            ) {
                 return;
             }
 

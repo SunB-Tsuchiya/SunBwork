@@ -27,7 +27,9 @@
 import { ref, computed, inject, onMounted, onUnmounted } from 'vue';
 import { getStatus } from './statusConfig.js';
 import IrukaStatusModal from './IrukaStatusModal.vue';
+import useToasts from '@/Composables/useToasts';
 
+const { showToast } = useToasts();
 const authUser = inject('authUser', null);
 
 const currentStatus  = ref('left');
@@ -81,20 +83,24 @@ async function openModal() {
 }
 
 async function handleSave({ userId, status, comment }) {
-    showModal.value = false;
+    showModal.value = false; // 先に閉じる（iOS Safari 対策）
     try {
         await window.axios.post(`/presence/${userId}`, { status, comment });
         await fetchSelf();
         window.dispatchEvent(new CustomEvent('iruka:refresh'));
-    } catch (_) {}
+    } catch (_) {
+        showToast('ステータスの更新に失敗しました', 'error');
+    }
 }
 
 async function handleClear() {
-    showModal.value = false;
+    showModal.value = false; // 先に閉じる（iOS Safari 対策）
     try {
         await window.axios.post('/presence/self/clear');
         await fetchSelf();
         window.dispatchEvent(new CustomEvent('iruka:refresh'));
-    } catch (_) {}
+    } catch (_) {
+        showToast('ステータスの更新に失敗しました', 'error');
+    }
 }
 </script>

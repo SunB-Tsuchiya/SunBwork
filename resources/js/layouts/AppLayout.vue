@@ -667,6 +667,10 @@ function navigateToRole(role) {
                                 (typeof route === 'function' ? route().has('superadmin.dashboard') : false)
                             "
                         >
+                            <div class="flex items-center gap-2 px-4 py-2">
+                                <span class="text-xs font-medium text-gray-500">会社切替:</span>
+                                <SuperAdminContextSwitcher />
+                            </div>
                             <ResponsiveNavLink :href="route('superadmin.dashboard')" :active="route().current('superadmin.dashboard')">
                                 <span class="text-yellow-600">SuperAdmin Dashboard</span>
                             </ResponsiveNavLink>
