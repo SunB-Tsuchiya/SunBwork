@@ -136,7 +136,7 @@ npm run build
 **SSH 接続先:** `silverlamb759@silverlamb759.sakura.ne.jp`
 
 > ⚠️ **`php artisan migrate` / `php artisan db:seed` はワンライナー SSH で実行すると対話確認を求められて失敗する。**
-> 必ず `--force` を付けること。シーダーは `--force` が不要だが migrate は必須。
+> **どちらも必ず `--force` を付けること。** `db:seed` も APP_ENV=production では確認プロンプトが出るため、`--force` なしだとワンライナーが `Command cancelled` で失敗する（2026-07-03 に実際に発生）。
 
 ### マイグレーションあり（テーブル追加・カラム変更がある場合）
 
@@ -161,13 +161,13 @@ ssh silverlamb759@silverlamb759.sakura.ne.jp "cd ~/SunBWork && git pull && php a
 ### ChangelogSeeder も反映する場合
 
 ```bash
-ssh silverlamb759@silverlamb759.sakura.ne.jp "cd ~/SunBWork && git pull && php artisan migrate --force && php artisan config:clear && php artisan cache:clear && php artisan db:seed --class=ChangelogSeeder"
+ssh silverlamb759@silverlamb759.sakura.ne.jp "cd ~/SunBWork && git pull && php artisan migrate --force && php artisan config:clear && php artisan cache:clear && php artisan db:seed --class=ChangelogSeeder --force"
 ```
 
 ### LabelMasterSeeder など任意のシーダーも反映する場合
 
 ```bash
-ssh silverlamb759@silverlamb759.sakura.ne.jp "cd ~/SunBWork && git pull && php artisan migrate --force && php artisan config:clear && php artisan cache:clear && php artisan db:seed --class=LabelMasterSeeder"
+ssh silverlamb759@silverlamb759.sakura.ne.jp "cd ~/SunBWork && git pull && php artisan migrate --force && php artisan config:clear && php artisan cache:clear && php artisan db:seed --class=LabelMasterSeeder --force"
 ```
 
 > **ワンライナーが失敗する場合の代替手順:** SSH でログインしてから実行する
