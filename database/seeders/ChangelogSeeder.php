@@ -11,6 +11,34 @@ class ChangelogSeeder extends Seeder
     {
         $entries = [
             [
+                'version'      => 'actual-copy-1',
+                'title'        => 'カレンダー：招待された会議を「実績」として自分の予定にコピーできるように',
+                'released_at'  => '2026-07-03',
+                'summary'      => '他の人が主催する会議に招待された場合、これまではカレンダー・予定表のどちらからも編集・削除ができませんでした。今回、招待された会議の詳細画面に「実績として記録する」ボタンを追加し、押すとその会議の内容をコピーした自分専用の予定を作成できるようにしました。以後は普通のカレンダー予定として自由に時刻や内容を編集・削除でき、元の会議が主催者側で変更・削除されても影響を受けません。',
+                'design_files' => ['ACTUALCOPY_PLAN1.md', 'ACTUALCOPY_MANAGER1.md'],
+                'claude_notes' => 'events テーブルに source_schedule_event_id（nullable, onDelete set null）と is_materialized_copy（bool, 独立フラグ）を追加し、ScheduleEventController::materialize() で自分名義の events 行を複製する方式を採用。当初検討した「別テーブルでの表示オーバーレイ方式」は、WorkloadAnalyzerController が Event::where(user_id, ...) で自分名義のイベントのみ集計する実装のため、複製方式でないと工数分析に反映されないと判明し不採用とした。range() 側で自分が既にコピー済みの元イベントを attendeeEvents から除外し重複表示を防止。生成トリガーはユーザーの希望により手動ボタンのみ（自動生成なし）。ユーザー報告の具体事例（本番DB調査）はDB上の孤児レコードではなく、フロント側にスケジュール変更のリアルタイム反映機構が無いことによる表示遅延の可能性が高いと判断し、今回のスコープ外とした。' . "\n\n" . 'カレンダー/スケジュール全体の多角的レビュー（Codex複数回・計6ラウンド）で以下の不具合も発見し修正: ①ScheduleCalendar.vue に materialized イベントハンドラ未実装で /schedule 側の表示が更新されない、②materialize() が meeting_definition_id/destination をコピーしていなかった、③event_item_type_id が null な複製が /schedule に出ない、④authorizeView() が private 可視性の招待イベントを弾いていた（attendee チェックのみに変更）、⑤materialize() で recalcInterruptionMinutes() を呼んでおらず重複時間が反映されなかった、⑥【重要・既存バグ】CalculatesEventTime トレイトの recalcInterruptionMinutes()/EventController・ScheduleEventController の destroy() 内候補クエリが user_id を SELECT していなかったため、重複相手側イベントの interruption_minutes 再計算が常に 0 にリセットされてしまう不具合が本機能と無関係に既存していた（3箇所で get([\'id\',\'starts_at\',\'ends_at\',\'project_job_assignment_id\']) に user_id を追加して修正）、⑦UserCalendar.vue の allEvents で companyEvents と personalEvents の id 重複除去がなく、event_item_type_id 付きの個人予定が /calendar で二重表示される既存バグも発見し dedup ロジックを追加、⑧source_schedule_event_id が nullOnDelete で消えると複製判定ができなくなる問題を is_materialized_copy の独立カラムで解消、⑨materialize() の同時リクエストでの unique 制約違反(500)を catch して 422 に変換、⑩辞退済み(status=declined)の attendee が materialize できてしまう穴を修正。また EventController::update()/destroy()/update_from_calendar() に room_reservation_id の編集不可ガードが無く、ScheduleEventController 側にしか無かった不整合も発見し同様のガードを追加した。',
+                'body'         => <<<'HTML'
+<section class="cl-problem">
+  <h3>背景・問題</h3>
+  <ul>
+    <li>カレンダーは自分の1日の作業タイムテーブルを記録するものだが、他人が主催する会議に招待された予定は編集・削除ができず、実際は30分で終わったのに60分の会議として表示され続けるなど、実態と合わない状態になっていた</li>
+    <li>主催者が予定を変更・削除しない限り、招待された側では一切手を出せなかった</li>
+  </ul>
+</section>
+
+<section class="cl-feature">
+  <h3>追加した機能</h3>
+  <ul>
+    <li>招待された会議の詳細画面に「実績として記録する」ボタンを追加（隣の？アイコンで説明を表示）</li>
+    <li>押すと、その会議の内容をコピーした自分専用の予定が作成される</li>
+    <li>以後はコピーした予定を通常のカレンダー予定として自由に時刻・内容を編集・削除できる</li>
+    <li>元の会議（スケジュール側）が後で変更・削除されても、既にコピーした自分の実績には影響しない</li>
+    <li>コピー済みの会議は工数分析・レポートにも自分の作業時間として正しく反映される</li>
+  </ul>
+</section>
+HTML,
+            ],
+            [
                 'version'      => 'iruka-board-fix-1',
                 'title'        => '在籍ボード：ステータス反映不具合・モバイル会社切替・更新時刻表示を改善',
                 'released_at'  => '2026-07-03',

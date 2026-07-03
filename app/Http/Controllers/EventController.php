@@ -101,6 +101,12 @@ class EventController extends Controller
     public function update_from_calendar(Request $request, $id)
     {
         $event = Event::where('user_id', Auth::id())->findOrFail($id);
+
+        // 会議室予約に紐づく予定はこの経路では扱わない（ScheduleEventController と同様のガード）
+        if ($event->room_reservation_id) {
+            abort(422, 'この予定は会議室予約に紐づいています。会議室予約から編集してください');
+        }
+
         $validated = $request->validate([
             'date' => ['required', 'date'],
             'startHour' => ['required', 'regex:/^\\d{2}$/'],
@@ -730,6 +736,10 @@ class EventController extends Controller
     {
         // debug logging removed
         $this->authorize('update', $event);
+        // 会議室予約に紐づく予定はこの汎用編集経路では扱わない（ScheduleEventController と同様のガード）
+        if ($event->room_reservation_id) {
+            abort(422, 'この予定は会議室予約に紐づいています。会議室予約から編集してください');
+        }
         // debug logging removed
         // $request->get()は引数必須のため削除
         $data = $request->validate([
@@ -842,6 +852,12 @@ class EventController extends Controller
     {
         $this->authorize('delete', $event);
 
+        // 会議室予約に紐づく予定はこの汎用削除経路では扱わない（ScheduleEventController と同様のガード）
+        // room_reservations.event_id には FK が無いため、ガード無しで削除すると孤立レコードが残る
+        if ($event->room_reservation_id) {
+            abort(422, 'この予定は会議室予約に紐づいています。会議室予約から削除してください');
+        }
+
         // Q-02: 削除前に重複していたイベントIDを記録（削除後の波及再計算に使用）
         $overlappingBeforeDelete = collect();
         try {
@@ -856,7 +872,7 @@ class EventController extends Controller
                         ->where('starts_at', '<', Carbon::parse($rawE)->addDay()->toDateTimeString())
                         ->where('ends_at', '>', Carbon::parse($rawS)->subDay()->toDateTimeString())
                         ->with('projectJobAssignment:id,job_type')
-                        ->get(['id', 'starts_at', 'ends_at', 'project_job_assignment_id']);
+                        ->get(['id', 'user_id', 'starts_at', 'ends_at', 'project_job_assignment_id']);
                 }
             }
         } catch (\Throwable $e) { /* non-fatal */ }

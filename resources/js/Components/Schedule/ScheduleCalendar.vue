@@ -394,7 +394,8 @@ watch(showMonthRooms, (v) => localStorage.setItem(STORAGE_KEY_MONTH_ROOMS, Strin
         @close="showDetail = false"
         @edit="openEdit"
         @open-room-reserve="openRoomReserveForEvent"
-        @responded="() => { showDetail = false; loadEvents(); }" />
+        @responded="() => { showDetail = false; loadEvents(); }"
+        @materialized="() => { showDetail = false; loadEvents(); }" />
 
     <RoomReservationModal
         :show="showRoomModal"

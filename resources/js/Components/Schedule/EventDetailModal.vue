@@ -8,10 +8,11 @@ const props = defineProps({
     event: { type: Object, default: null },
 });
 
-const emit = defineEmits(['close', 'edit', 'open-room-reserve', 'responded']);
+const emit = defineEmits(['close', 'edit', 'open-room-reserve', 'responded', 'materialized']);
 
 const { showToast } = useToasts();
 const responding = ref(false);
+const materializing = ref(false);
 
 function formatDatetime(str) {
     if (!str) return '';
@@ -45,6 +46,25 @@ async function respond(status) {
         showToast('操作に失敗しました', 'error', 3000);
     } finally {
         responding.value = false;
+    }
+}
+
+async function materialize() {
+    if (materializing.value) return;
+    materializing.value = true;
+    try {
+        await axios.post(
+            route('schedule.events.materialize', { event: props.event.id }),
+            {},
+            { headers: { 'X-CSRF-TOKEN': CSRF() } },
+        );
+        showToast('実績として記録しました', 'success', 3000);
+        emit('materialized');
+        emit('close');
+    } catch {
+        showToast('操作に失敗しました', 'error', 3000);
+    } finally {
+        materializing.value = false;
     }
 }
 </script>
@@ -95,6 +115,22 @@ async function respond(status) {
                 <div v-else-if="event.as_attendee && event.my_attendee_status === 'accepted'"
                     class="mb-4 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
                     ✓ 承認済み
+                </div>
+
+                <!-- 実績として記録する（招待された会議のみ・自分名義にコピーして以後自由編集できるようにする） -->
+                <div v-if="!event.is_own && event.as_attendee" class="mb-4 flex items-center gap-1.5">
+                    <button
+                        class="rounded-md border border-emerald-400 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
+                        :disabled="materializing"
+                        @click="materialize">実績として記録する</button>
+                    <div class="group relative flex">
+                        <span
+                            class="flex h-4 w-4 cursor-help items-center justify-center rounded-full border border-gray-300 text-[10px] font-bold text-gray-500">？</span>
+                        <div
+                            class="pointer-events-none absolute left-1/2 top-6 z-50 w-64 -translate-x-1/2 rounded-md bg-gray-800 px-3 py-2 text-xs leading-relaxed text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                            この会議の内容をコピーして、あなた専用の予定として複製します。複製後は時刻や内容を自由に編集・削除でき、元の会議が変更・削除されても複製には影響しません。
+                        </div>
+                    </div>
                 </div>
 
                 <div class="flex justify-end gap-2">

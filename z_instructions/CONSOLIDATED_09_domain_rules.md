@@ -121,6 +121,21 @@ scopeCoordinatorAssigned() // sender_id != user_id OR sender_id IS NULL
 - `EventController::complete()`: `project_job_assignments.completed` のみ更新
 - Events/Show.vue パンくずバー: `events.project_job_assignment_id` は `project_job_assignments` への FK
 
+**カレンダー（/calendar）とスケジュール（/schedule）の関係:**
+- 両者は同一の `events` テーブルを共有。編集・削除権限は `event.user_id === 自分` のみで判定（`EventPolicy` / `ScheduleEventController::authorizeEdit()`）。`events.organizer_id` カラムは存在するが `store()` で一度もセットされておらず未使用。
+- 他人が主催する会議に招待されただけの人は、その予定をカレンダー・スケジュールどちらからも編集・削除できない（意図された挙動）。辞退（`ScheduleAttendeeController::respond`, status=declined）すれば自分の一覧から除外されるが、これは「無かったことにする」だけで実績記録にはならない。
+- **実績として自分名義にコピーする機能**（`ScheduleEventController::materialize()`）: 招待された会議の詳細（`EventDetailModal.vue`）で「実績として記録する」を押すと、`events.source_schedule_event_id` で元イベントを参照した自分名義の新規 `events` 行が複製される。以後は通常のカレンダー予定として自由に編集・削除でき、元イベントの変更・削除には一切影響されない（`source_schedule_event_id` は `onDelete('set null')`）。認可条件は「`schedule_attendees` に `status != declined` の行があること」のみ（`authorizeView()` の visibility チェックは使わない — private 会議でも招待されていれば複製できるべきため）。
+- 複製イベントは `is_materialized_copy`（bool, 独立カラム）で判定する。`source_schedule_event_id` は元イベント削除時に `null` 化されるため、「複製かどうか」の判定に使ってはいけない。
+- `ScheduleEventController::range()` は、自分が既に実績コピー済みの元イベントを「招待イベント」表示から自動的に除外する（二重表示防止）。
+- 工数分析（`WorkloadAnalyzerController`）は `Event::where('user_id', ...)` のみ集計するため、招待されただけ（コピー未作成）の会議時間はカウントされない。コピー後は自分名義の通常イベントとして自然にカウントされる。
+- スケジュール側の変更・削除をカレンダー画面にリアルタイム反映する仕組み（Echo/WebSocket・ポーリング）は現状無い。日付範囲変更やページ再読み込みで再フェッチされるまでは、別画面で行った変更が反映されないことがある。
+
+**`/calendar` ページの表示重複に注意:** `UserCalendar.vue` の `allEvents` は `companyEvents`（`schedule.events.range`）と `personalEvents`（`calendar.events.range`）を統合するが、`event_item_type_id` を持つ個人イベントは両方の API から返るため、**id ベースで重複除去してから統合する**（`allEvents` computed 内で実施済み）。この2エンドポイントを個別に触る場合は重複表示が再発しないか必ず確認すること。
+
+**`interruption_minutes`（重複時間）再計算のトラップ:** `CalculatesEventTime::recalcInterruptionMinutes()` / `EventController::destroy()` / `ScheduleEventController::destroy()` 内で、重複相手のイベントを取得する際に **`get([...])` へ `user_id` を含めないと、その相手イベントに対する `recalcSingleStoredInterruption()` の再計算が `user_id` 欠如により常に 0 にリセットされる**（2026-07-03 に発見・修正済み）。同様のパターンで候補イベントを取得し `recalcSingleStoredInterruption()` に渡す新規コードを書く場合は、`select` に必ず `user_id` を含めること。
+
+**`room_reservation_id` が紐づくイベントの編集・削除ガード:** 会議室予約に紐づく `events` 行は、`ScheduleEventController::update()/destroy()` だけでなく **`EventController::update()/destroy()/update_from_calendar()` にも同じガード（`room_reservation_id` があれば 422）が必要**。`room_reservations.event_id` には FK 制約が無いため、ガード無しで削除すると `room_reservations` 側に孤立レコードが残る（2026-07-03 に発見・修正済み）。
+
 ---
 
 ## CSV アップロード実装パターン

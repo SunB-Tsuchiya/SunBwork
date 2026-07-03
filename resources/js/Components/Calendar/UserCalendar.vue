@@ -52,11 +52,17 @@ const diaryEvents = computed(() =>
 );
 
 // MonthView/WeekView/DayView に渡すイベント統合
-const allEvents = computed(() => [
-    ...companyEvents.value,
-    ...personalEvents.value,
-    ...diaryEvents.value,
-]);
+// companyEvents（schedule.events.range）は「行事イベント」として自分の個人予定も一部含むため、
+// personalEvents（calendar.events.range、自分の個人予定を網羅）と id が重複するものを除外する
+const allEvents = computed(() => {
+    const personalIds = new Set(personalEvents.value.map(e => e.id));
+    const dedupedCompanyEvents = companyEvents.value.filter(e => !personalIds.has(e.id));
+    return [
+        ...dedupedCompanyEvents,
+        ...personalEvents.value,
+        ...diaryEvents.value,
+    ];
+});
 
 // WeekView/DayView では日報マーカーを除外（時刻グリッドでは不要）
 const timedEvents = computed(() => allEvents.value.filter(e => !e._is_diary));
@@ -630,7 +636,8 @@ async function saveWeekBreaks() {
         @close="showDetail = false"
         @edit="openEdit"
         @open-room-reserve="showDetail = false"
-        @responded="() => { showDetail = false; loadEvents(); }" />
+        @responded="() => { showDetail = false; loadEvents(); }"
+        @materialized="() => { showDetail = false; loadEvents(); }" />
 
     <ActionSheet
         :show="showActionSheet"
@@ -646,7 +653,7 @@ async function saveWeekBreaks() {
     <!-- ── 進行表・管理シートモーダル ─────────────────────────── -->
     <div
         v-if="showJobSheetModal"
-        class="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-50"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
         @click.self="showJobSheetModal = false">
         <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
             <h2 class="mb-4 text-lg font-bold">案件を選択（進行表・管理シートから）</h2>

@@ -148,9 +148,15 @@ class ScheduleEventController extends Controller
         $attendeeEventIds   = $myAttendeeRows->pluck('event_id');
         $myAttendeeStatusMap = $myAttendeeRows->keyBy('event_id')->map(fn ($r) => $r->status);
 
+        // 既に「実績」として自分名義にコピー済みの会議は、招待イベント側の表示から除外する
+        $myMaterializedSourceIds = Event::where('user_id', $user->id)
+            ->whereNotNull('source_schedule_event_id')
+            ->pluck('source_schedule_event_id');
+
         $attendeeEvents = collect();
         if ($attendeeEventIds->isNotEmpty()) {
             $attendeeEvents = Event::whereIn('id', $attendeeEventIds)
+                ->whereNotIn('id', $myMaterializedSourceIds)
                 ->where('user_id', '!=', $user->id)
                 ->where('is_company_event', true)
                 ->whereBetween('starts_at', [$start, $end])
@@ -165,11 +171,18 @@ class ScheduleEventController extends Controller
 
         // 個人カレンダー側の行事イベント（旧形式: is_company_event=false/null かつ event_item_type あり）
         // 会議・打合せ・外出等を Schedule にも表示するため追加
+        // ＋ 実績として複製したイベント（is_materialized_copy）は event_item_type_id が null でも
+        //   常に表示する（複製元の会議に event_item_type が設定されていない場合があるため）。
+        //   複製元イベントが後で削除され source_schedule_event_id が null化されても
+        //   is_materialized_copy は独立したフラグなので影響を受けない。
         $personalMeetingEvents = Event::where('user_id', $user->id)
             ->where(function ($q) {
                 $q->whereNull('is_company_event')->orWhere('is_company_event', false);
             })
-            ->whereNotNull('event_item_type_id')
+            ->where(function ($q) {
+                $q->whereNotNull('event_item_type_id')
+                  ->orWhere('is_materialized_copy', true);
+            })
             ->whereNull('project_job_assignment_id')
             ->whereBetween('starts_at', [$start, $end])
             ->with(['eventItemType:id,name,slug'])
@@ -252,6 +265,62 @@ class ScheduleEventController extends Controller
         }
 
         return response()->json($result);
+    }
+
+    // 招待された会議を「実績」として自分名義にコピーする（以後は元イベントと無関係に自由編集・削除できる）
+    public function materialize(Event $event)
+    {
+        $user = Auth::user();
+
+        if ($event->user_id === $user->id) {
+            abort(422, 'このイベントは既に自分の予定です');
+        }
+
+        // 招待されている（schedule_attendees に status != declined の行がある）ことが唯一の認可条件。
+        // visibility='private' な会議でも招待されていれば複製できるべきなので authorizeView() は使わない。
+        // 辞退済み（declined）の場合は他の Schedule 表示からも除外されるのと同様、実績記録も許可しない。
+        $isAttendee = ScheduleAttendee::where('event_id', $event->id)
+            ->where('user_id', $user->id)
+            ->where('status', '!=', 'declined')
+            ->exists();
+        if (!$isAttendee) {
+            abort(403);
+        }
+
+        $existing = Event::where('user_id', $user->id)
+            ->where('source_schedule_event_id', $event->id)
+            ->first();
+        if ($existing) {
+            abort(422, 'この会議は既に実績として記録済みです');
+        }
+
+        try {
+            $copy = Event::create([
+                'user_id'                  => $user->id,
+                'title'                    => $event->title,
+                'starts_at'                => $event->starts_at,
+                'ends_at'                  => $event->ends_at,
+                'event_item_type_id'       => $event->event_item_type_id,
+                'meeting_definition_id'    => $event->meeting_definition_id,
+                'destination'              => $event->destination,
+                'body'                     => $event->body,
+                'is_company_event'         => false,
+                'visibility'               => 'private',
+                'source_schedule_event_id' => $event->id,
+                'is_materialized_copy'     => true,
+            ]);
+        } catch (\Illuminate\Database\QueryException $e) {
+            // 複数タブ等からの同時リクエストで unique 制約に抵触した場合は 422 として扱う
+            if ((int) ($e->errorInfo[1] ?? 0) === 1062) {
+                abort(422, 'この会議は既に実績として記録済みです');
+            }
+            throw $e;
+        }
+
+        // 他の自分のイベントとの重複時間を再計算（store() と同様）
+        $this->recalcInterruptionMinutes($copy);
+
+        return response()->json(array_merge($copy->toArray(), ['is_own' => true]), 201);
     }
 
     public function show(Event $event)
@@ -394,7 +463,7 @@ class ScheduleEventController extends Controller
                     ->where('starts_at', '<', $windowE)
                     ->where('ends_at', '>', $windowS)
                     ->with('projectJobAssignment:id,job_type')
-                    ->get(['id', 'starts_at', 'ends_at', 'project_job_assignment_id']);
+                    ->get(['id', 'user_id', 'starts_at', 'ends_at', 'project_job_assignment_id']);
             }
         } catch (\Throwable $e) { /* non-fatal */ }
 

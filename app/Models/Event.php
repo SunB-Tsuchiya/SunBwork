@@ -33,15 +33,18 @@ class Event extends Model
         'visibility',
         'organizer_id',
         'room_reservation_id',
+        'source_schedule_event_id',
+        'is_materialized_copy',
     ];
 
     // Ensure accessor-backed attributes are included when the model is converted to array/JSON
     protected $appends = ['start', 'end', 'description', 'date'];
 
     protected $casts = [
-        'starts_at'        => 'datetime',
-        'ends_at'          => 'datetime',
-        'is_company_event' => 'boolean',
+        'starts_at'            => 'datetime',
+        'ends_at'              => 'datetime',
+        'is_company_event'     => 'boolean',
+        'is_materialized_copy' => 'boolean',
     ];
 
     public function eventItemType()
@@ -84,6 +87,16 @@ class Event extends Model
     public function attendees()
     {
         return $this->hasMany(ScheduleAttendee::class);
+    }
+
+    public function sourceScheduleEvent()
+    {
+        return $this->belongsTo(Event::class, 'source_schedule_event_id');
+    }
+
+    public function personalCopies()
+    {
+        return $this->hasMany(Event::class, 'source_schedule_event_id');
     }
 
     public function projectJobAssignmentByMyself()

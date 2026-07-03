@@ -116,7 +116,7 @@
         <!-- 進行表・管理シートから案件選択モーダル -->
         <div
             v-if="showJobSheetModal"
-            class="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-50"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
             @click.self="showJobSheetModal = false"
         >
             <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">

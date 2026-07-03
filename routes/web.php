@@ -1293,6 +1293,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
             ->name('events.range');
         Route::get('/events-conflicts', [\App\Http\Controllers\Schedule\ScheduleEventController::class, 'conflicts'])
             ->name('events.conflicts');
+        Route::post('/events/{event}/materialize', [\App\Http\Controllers\Schedule\ScheduleEventController::class, 'materialize'])
+            ->name('events.materialize');
 
         // 参加者
         Route::post('/events/{event}/attendees', [\App\Http\Controllers\Schedule\ScheduleAttendeeController::class, 'store'])

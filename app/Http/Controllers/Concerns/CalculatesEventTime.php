@@ -100,7 +100,7 @@ trait CalculatesEventTime
                 ->where('starts_at', '<', $windowEnd)
                 ->where('ends_at', '>', $windowStart)
                 ->with('projectJobAssignment:id,job_type')
-                ->get(['id', 'starts_at', 'ends_at', 'project_job_assignment_id']);
+                ->get(['id', 'user_id', 'starts_at', 'ends_at', 'project_job_assignment_id']);
 
             // PHP 側で JST 変換してから重複判定（DB 文字列比較に依存しない）
             $overlapsWithCarbon = [];
@@ -144,7 +144,7 @@ trait CalculatesEventTime
                     ->where('starts_at', '<', $oldWindowEnd)
                     ->where('ends_at', '>', $oldWindowStart)
                     ->with('projectJobAssignment:id,job_type')
-                    ->get(['id', 'starts_at', 'ends_at', 'project_job_assignment_id']);
+                    ->get(['id', 'user_id', 'starts_at', 'ends_at', 'project_job_assignment_id']);
 
                 $oldOverlaps = $oldCandidates->filter(function ($ov) use ($oldS, $oldE) {
                     $ovS = $this->resolveJstCarbon($ov, 'starts_at');
