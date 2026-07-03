@@ -18,8 +18,9 @@
         <div class="divide-y divide-gray-100">
             <!-- 出社中グループ -->
             <template v-if="presentUsers.length > 0">
-                <div class="bg-green-50 px-4 py-1.5">
+                <div class="flex items-center justify-between bg-green-50 px-4 py-1.5">
                     <span class="text-xs font-medium text-green-600">出社中 {{ presentUsers.length }}人</span>
+                    <span class="text-xs font-medium text-green-600 w-12 text-right shrink-0">最終更新</span>
                 </div>
                 <div
                     v-for="u in presentUsers"
@@ -39,7 +40,7 @@
                             {{ resolveStatusDisplay(u.status).label }}
                         </span>
                     </div>
-                    <span class="text-xs text-gray-300 w-12 text-right shrink-0">{{ formatTime(u.updated_at) }}</span>
+                    <span class="text-xs text-black/80 w-12 text-right shrink-0">{{ formatTime(u.updated_at) }}</span>
                 </div>
             </template>
 
@@ -66,7 +67,7 @@
                             {{ resolveStatusDisplay(u.status).label }}
                         </span>
                     </div>
-                    <span class="text-xs text-gray-300 w-12 text-right shrink-0">{{ formatTime(u.updated_at) }}</span>
+                    <span class="text-xs text-black/80 w-12 text-right shrink-0">{{ formatTime(u.updated_at) }}</span>
                 </div>
             </template>
 
@@ -203,18 +204,18 @@ async function handleClear() {
 
 function formatTime(dt) {
     if (!dt) return '未更新';
-    const d      = new Date(dt);
-    const now    = new Date();
-    const diffMs = now - d;
-    const diffMin = Math.floor(diffMs / 60000);
-    if (diffMin < 1)  return 'たった今';
-    if (diffMin < 60) return `${diffMin}分前`;
-    const diffH = Math.floor(diffMin / 60);
-    if (diffH < 24)  return `${diffH}時間前`;
+    const d   = new Date(dt);
+    const now = new Date();
+    const hh  = String(d.getHours()).padStart(2, '0');
+    const mi  = String(d.getMinutes()).padStart(2, '0');
+
+    const isToday = d.getFullYear() === now.getFullYear()
+        && d.getMonth() === now.getMonth()
+        && d.getDate() === now.getDate();
+    if (isToday) return `${hh}:${mi}`;
+
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
-    const hh = String(d.getHours()).padStart(2, '0');
-    const mi = String(d.getMinutes()).padStart(2, '0');
     return `${mm}/${dd} ${hh}:${mi}`;
 }
 </script>
