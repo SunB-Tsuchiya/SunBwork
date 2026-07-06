@@ -1457,6 +1457,29 @@ HTML,
 </section>
 HTML,
         ],
+        [
+            'version'      => 'schedule-overlay-fix-1',
+            'title'        => 'カレンダー・予定表：他人の予定オーバーレイの表示範囲を修正',
+            'released_at'  => '2026-07-07',
+            'summary'      => '個人カレンダーおよび予定表の月・週表示で、オーバーレイ登録した他人の予定が自分の予定と混在して表示され、招待されていない予定まで確定済みの予定のように見えてしまう不具合を修正しました。オーバーレイ表示は予定表の日表示（担当者ごとのカラム表示）でのみ有効になります。',
+            'design_files' => [],
+            'claude_notes' => '【原因】ScheduleEventController::range() が生成する overlayEvents（個人/会社/部署オーバーレイおよびオーバーレイ対象ユーザーの参加会議）が、is_own=false 以外の区別タグを持たないまま events 配列に混在していたため、カラム分割のない MonthView/WeekView や /calendar（UserCalendar.vue）でも他人の予定がそのまま表示されていた。【修正】① ScheduleEventController::range(): overlayEvents の全エントリに is_overlay=true フラグを付与（overlay_user_id タグはDay view用に維持）。② ScheduleCalendar.vue: MonthView/WeekView へ渡す events から is_overlay を除外した nonOverlayEvents を新設し使用。DayView へは従来通り全件渡し、担当者別カラム表示は維持。③ UserCalendar.vue: companyEvents から is_overlay を除外してから合成し、/calendar の月/週/日すべてでオーバーレイを非表示化。DBマイグレーションなし。',
+            'body'         => <<<'HTML'
+<section class="cl-problem">
+  <h3>背景・問題</h3>
+  <p>予定表で他人の予定をオーバーレイ表示する設定をしていると、個人カレンダー（/calendar）や予定表の月・週表示にもその人の予定が自分の予定と混ざって表示されてしまい、実際には招待されていない予定なのに「承認・辞退できない確定済みの予定」のように見えてしまう問題がありました。</p>
+</section>
+
+<section class="cl-fix">
+  <h3>修正内容</h3>
+  <ul>
+    <li>個人カレンダー（/calendar）の月・週・日表示から、他人のオーバーレイ予定を非表示にしました</li>
+    <li>予定表（/schedule）の月・週表示からも、他人のオーバーレイ予定を非表示にしました</li>
+    <li>予定表の日表示のみ、これまで通りオーバーレイ登録した人の予定を専用カラムで確認できます</li>
+  </ul>
+</section>
+HTML,
+        ],
         ];
 
         foreach ($entries as $entry) {
