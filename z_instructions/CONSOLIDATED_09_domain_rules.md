@@ -553,6 +553,41 @@ company_id → department_id → assignment_id のカスケードリセットあ
 
 ---
 
+## 製版伝票ボード（Prepress Ticket Board, 2026-07-06 更新）
+
+**上記の「製版ボード」（Coordinator配下・ProjectJob由来）とは別の画面。** こちらは `PrepressTicket`（製版伝票、CSV/OCRで登録される独立レコード）を管理する。
+
+**Vue:** `resources/js/Pages/Prepress/Board.vue`（単一ファイルにモーダルを含む大型コンポーネント）
+
+**ルート プレフィックス:** `prepress.board.*`
+
+**Controller:** `App\Http\Controllers\Prepress\BoardController`
+
+**アクセス範囲:** SuperAdmin全社 / Admin同一会社 / Coordinator・Leader・Clerkは部署問わず / それ以外は製版部署ユーザーのみ（`authorizePrepress()`）
+
+### 作業チェック（工程別、2026-07-06 実装）
+
+伝票詳細モーダルの「作業チェック」は、初校・再校・三校・下版の4工程に分かれており、各工程が以下を持つ:
+- 同じ7項目チェックボックス（仕上がりサイズ・トンボ・面付・色数・線数・Nマークのトラップ処理・色調補正）
+- 工程ごとの作業者セレクター（製版部署ユーザーから1名選択、`department.name === '製版'` で絞り込み）
+
+**DB:** `prepress_ticket_stage_checks` テーブル（`prepress_ticket_id` + `stage` enum(初校/再校/三校/下版) でユニーク）。旧 `prepress_tickets.check_*` 7カラムは廃止済み（2026-07-06 migrationで初校行へデータ移行後に削除）。`indesign_version` / `illustrator_version` / `check_memo` は工程共通のため `prepress_tickets` に残置。
+
+**Model:** `App\Models\PrepressTicketStageCheck`（`STAGES` 定数配列を持つ）。`PrepressTicket::stageChecks()` で hasMany。
+
+**ルート:**
+```
+PATCH prepress/board/{ticket}/meta                  prepress.board.updateMeta          (indesign/illustrator/memo)
+PATCH prepress/board/{ticket}/stage-checks/{stage}   prepress.board.updateStageCheck    (7チェック + user_id)
+```
+
+**実装上の注意:**
+- 工程の行は初回チェック時に `firstOrCreate` で遅延作成（全チケットに4行を事前作成しない）。同時保存でのunique制約競合は`QueryException`を捕捉して再取得するリトライで対応済み
+- フロント側は保存成功時に `detail.value.stage_checks`（`localTickets` と同一参照）へも反映する。これを怠るとモーダルを閉じて開き直した際に保存前の値へ戻ったように見える（2026-07-06 codexレビューで検出・修正済み）
+- CSRFトークン期限切れ（419）を検知した場合は `window.location.reload()` で再取得を促す（`Clients/Create.vue` と同じパターン）
+
+---
+
 ## 一括案件登録（BulkCreate, 2026-04-20）
 
 **Vue:** `resources/js/Pages/Coordinator/BulkCreate/Index.vue`

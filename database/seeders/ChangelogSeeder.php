@@ -11,6 +11,33 @@ class ChangelogSeeder extends Seeder
     {
         $entries = [
             [
+                'version'      => 'prepress-stage-check-1',
+                'title'        => '製版伝票ボード：作業チェックを初校/再校/三校/下版の4工程に対応',
+                'released_at'  => '2026-07-06',
+                'summary'      => '製版伝票ボードの詳細モーダルにある「作業チェック」を、これまでの単一チェックリストから初校・再校・三校・下版の4工程に分けました。各工程で同じ7項目（仕上がりサイズ・トンボ・面付・色数・線数・Nマークのトラップ処理・色調補正）をチェックできるほか、工程ごとに担当した製版部署の作業者を選択できるようになりました。既存のチェック内容はすべて初校工程に引き継がれています。',
+                'design_files' => ['STAGECHECK_PLAN1.md', 'STAGECHECK_MANAGER1.md'],
+                'claude_notes' => 'prepress_ticket_stage_checks テーブルを新設（prepress_ticket_id + stage enum のunique）し、旧 prepress_tickets.check_* 7カラムはデータを初校行へ移行後に削除。indesign_version/illustrator_version/check_memoは工程共通のためprepress_ticketsに残置。工程行は初回チェック時にfirstOrCreateで遅延作成し、事前に4行を一括生成しない方針。BoardController::updateChecks()をupdateMeta()（indesign/illustrator/memo）とupdateStageCheck()（7チェック+作業者user_id、stage別）に分割。作業者セレクターは既存の「担当色変更」パネルと同じprepressUsers（department.name===\'製版\'）を再利用。codexレビューで3件検出し修正: ①保存成功時にlocalStageChecksのみ更新しticket.stage_checksに反映していなかったためモーダル再オープン時に表示が戻る不具合→syncStageCheckToTicket()で同期、②同一工程への初回チェックが同時に飛ぶとfirstOrCreateがunique制約で競合する可能性→QueryExceptionを捕捉して再取得するリトライを追加、③migration rollback時に旧カラムをfalseで復元し既存チェック値を失う問題→down()内でprepress_ticket_stage_checksの初校行（この時点では未削除）から値を復元するよう修正し、実際にrollback→migrateのラウンドトリップでデータ保持を確認。さくら本番デプロイ時も移行前後でチェック件数（23件）が完全一致することを確認済み。あわせて詳細モーダルのラベル/値間隔をw-32固定幅からgap-2に変更し「1文字アキ」程度に詰め、作成日・入稿日・下版日を1行にまとめた。419（CSRFトークン期限切れ）検知時はwindow.location.reload()で再試行を促すガードも追加。',
+                'body'         => <<<'HTML'
+<section class="cl-problem">
+  <h3>背景・問題</h3>
+  <ul>
+    <li>製版伝票ボードの「作業チェック」は工程の区別がなく、初校〜下版までの作業状況を1セットのチェックボックスでしか記録できなかった</li>
+    <li>誰がその工程を担当したかを記録する手段がなかった</li>
+  </ul>
+</section>
+
+<section class="cl-feature">
+  <h3>追加した機能</h3>
+  <ul>
+    <li>作業チェックを「初校」「再校」「三校」「下版」の4工程に分割し、それぞれ同じ7項目をチェックできるようにした</li>
+    <li>工程ごとに、担当した製版部署の作業者を選択できるようにした</li>
+    <li>既存のチェック済みデータはすべて「初校」工程に引き継がれ、消えることはない</li>
+    <li>詳細モーダルのラベルと値の間隔を詰め、作成日・入稿日・下版日を1行にまとめて見やすくした</li>
+  </ul>
+</section>
+HTML,
+            ],
+            [
                 'version'      => 'actual-copy-1',
                 'title'        => 'カレンダー：招待された会議を「実績」として自分の予定にコピーできるように',
                 'released_at'  => '2026-07-03',
