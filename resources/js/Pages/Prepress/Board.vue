@@ -465,8 +465,8 @@ const pendingPreview  = ref(null);
 function openDetail(ticket) {
     detail.value = ticket;
     localMeta.value = {
-        indesign_version:    ticket.indesign_version ?? '2021',
-        illustrator_version: ticket.illustrator_version ?? '2021',
+        indesign_version:    ticket.indesign_version ?? '',
+        illustrator_version: ticket.illustrator_version ?? '',
         check_memo:          ticket.check_memo ?? '',
     };
     const byStage = {};
