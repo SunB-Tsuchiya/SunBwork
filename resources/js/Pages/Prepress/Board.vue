@@ -274,6 +274,21 @@ const CHECK_ITEMS = [
     { key: 'check_color_correction', label: '色調補正' },
 ];
 
+const STAGES = ['初校', '再校', '三校', '下版'];
+
+function emptyStageCheck() {
+    return {
+        check_finish_size: false,
+        check_trim_marks: false,
+        check_imposition: false,
+        check_color_count: false,
+        check_screen_ruling: false,
+        check_n_mark_trap: false,
+        check_color_correction: false,
+        user_id: null,
+    };
+}
+
 const APP_VERSIONS = ['CC', 'CC 2014', 'CC 2015', 'CC 2017', 'CC 2018', 'CC 2019', '2020', '2021', '2022', '2023', '2024', '2025', '2026'];
 
 async function setTicketColor(ticket, colorKey) {
@@ -437,29 +452,44 @@ const page      = usePage();
 const authUser  = computed(() => page.props.auth?.user ?? null);
 const canDelete = computed(() => ['admin', 'superadmin', 'coordinator', 'leader', 'clerk'].includes(authUser.value?.user_role));
 
-const detail         = ref(null);
-const localChecks    = ref({});
-const updatingStatus = ref(false);
-const deleting       = ref(false);
-const uploadingImage = ref(false);
-const uploadError    = ref('');
-const pendingFile    = ref(null);
-const pendingPreview = ref(null);
+const detail          = ref(null);
+const localMeta       = ref({});
+const localStageChecks = ref({});
+const updatingStatus  = ref(false);
+const deleting        = ref(false);
+const uploadingImage  = ref(false);
+const uploadError     = ref('');
+const pendingFile     = ref(null);
+const pendingPreview  = ref(null);
 
 function openDetail(ticket) {
     detail.value = ticket;
-    localChecks.value = {
-        check_finish_size:      !!ticket.check_finish_size,
-        check_trim_marks:       !!ticket.check_trim_marks,
-        check_imposition:       !!ticket.check_imposition,
-        check_color_count:      !!ticket.check_color_count,
-        check_screen_ruling:    !!ticket.check_screen_ruling,
-        check_n_mark_trap:      !!ticket.check_n_mark_trap,
-        check_color_correction: !!ticket.check_color_correction,
-        indesign_version:       ticket.indesign_version ?? '2021',
-        illustrator_version:    ticket.illustrator_version ?? '2021',
-        check_memo:             ticket.check_memo ?? '',
+    localMeta.value = {
+        indesign_version:    ticket.indesign_version ?? '2021',
+        illustrator_version: ticket.illustrator_version ?? '2021',
+        check_memo:          ticket.check_memo ?? '',
     };
+    const byStage = {};
+    for (const sc of (ticket.stage_checks ?? [])) {
+        byStage[sc.stage] = sc;
+    }
+    const stageChecks = {};
+    for (const stage of STAGES) {
+        const sc = byStage[stage];
+        stageChecks[stage] = sc
+            ? {
+                check_finish_size:      !!sc.check_finish_size,
+                check_trim_marks:       !!sc.check_trim_marks,
+                check_imposition:       !!sc.check_imposition,
+                check_color_count:      !!sc.check_color_count,
+                check_screen_ruling:    !!sc.check_screen_ruling,
+                check_n_mark_trap:      !!sc.check_n_mark_trap,
+                check_color_correction: !!sc.check_color_correction,
+                user_id:                sc.user_id ?? null,
+            }
+            : emptyStageCheck();
+    }
+    localStageChecks.value = stageChecks;
     cancelPendingFile();
 }
 function closeDetail() {
@@ -471,30 +501,92 @@ function closeDetail() {
 
 let checkMemoTimer = null;
 
-async function saveCheck(field) {
+async function saveMeta(field) {
     if (!detail.value) return;
     const ticketId = detail.value.id;
-    const val      = localChecks.value[field];
+    const val      = localMeta.value[field];
     const idx      = localTickets.value.findIndex(t => t.id === ticketId);
     const prev     = idx >= 0 ? localTickets.value[idx][field] : undefined;
     const csrf     = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
     try {
         await axios.patch(
-            route('prepress.board.updateChecks', { ticket: ticketId }),
+            route('prepress.board.updateMeta', { ticket: ticketId }),
             { [field]: val },
             { headers: { 'X-CSRF-TOKEN': csrf } }
         );
         if (idx >= 0) localTickets.value[idx][field] = val;
-    } catch {
+    } catch (e) {
+        if (e?.response?.status === 419) {
+            window.location.reload();
+            return;
+        }
         if (prev !== undefined && detail.value?.id === ticketId) {
-            localChecks.value[field] = prev;
+            localMeta.value[field] = prev;
         }
     }
 }
 
 function saveCheckMemoDebounced() {
     clearTimeout(checkMemoTimer);
-    checkMemoTimer = setTimeout(() => saveCheck('check_memo'), 800);
+    checkMemoTimer = setTimeout(() => saveMeta('check_memo'), 800);
+}
+
+// localStageChecks の内容を detail(=localTickets内の該当チケット) の stage_checks にも反映する。
+// これをしないと、モーダルを閉じて開き直した際に openDetail() が古い ticket.stage_checks から
+// 再構築してしまい、保存済みの値が一瞬で元に戻ったように見える。
+function syncStageCheckToTicket(stage) {
+    if (!detail.value) return;
+    if (!Array.isArray(detail.value.stage_checks)) detail.value.stage_checks = [];
+    const data     = localStageChecks.value[stage];
+    const existing = detail.value.stage_checks.find(sc => sc.stage === stage);
+    if (existing) {
+        Object.assign(existing, data);
+    } else {
+        detail.value.stage_checks.push({ stage, ...data });
+    }
+}
+
+async function saveStageCheckField(stage, field) {
+    if (!detail.value) return;
+    const val  = localStageChecks.value[stage][field];
+    const prev = !val;
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    try {
+        await axios.patch(
+            route('prepress.board.updateStageCheck', { ticket: detail.value.id, stage }),
+            { [field]: val },
+            { headers: { 'X-CSRF-TOKEN': csrf } }
+        );
+        syncStageCheckToTicket(stage);
+    } catch (e) {
+        if (e?.response?.status === 419) {
+            window.location.reload();
+            return;
+        }
+        localStageChecks.value[stage][field] = prev;
+    }
+}
+
+async function saveStageUser(stage, userId) {
+    if (!detail.value) return;
+    const newUserId = userId ? parseInt(userId) : null;
+    const prev      = localStageChecks.value[stage].user_id;
+    localStageChecks.value[stage].user_id = newUserId;
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    try {
+        await axios.patch(
+            route('prepress.board.updateStageCheck', { ticket: detail.value.id, stage }),
+            { user_id: newUserId },
+            { headers: { 'X-CSRF-TOKEN': csrf } }
+        );
+        syncStageCheckToTicket(stage);
+    } catch (e) {
+        if (e?.response?.status === 419) {
+            window.location.reload();
+            return;
+        }
+        localStageChecks.value[stage].user_id = prev;
+    }
 }
 
 function formatDate(dateStr) {
@@ -1559,12 +1651,12 @@ async function executeCsvImport() {
                             <h2 class="text-sm font-semibold text-gray-700">伝票詳細</h2>
                         </div>
                         <dl class="divide-y divide-gray-100 px-5 py-2 text-sm">
-                            <div class="flex py-2">
-                                <dt class="w-32 shrink-0 font-medium text-gray-500">クライアント</dt>
+                            <div class="flex items-baseline gap-2 py-2">
+                                <dt class="shrink-0 font-medium text-gray-500">クライアント</dt>
                                 <dd class="text-gray-800">{{ detail.client_name || '—' }}</dd>
                             </div>
-                            <div class="flex py-2">
-                                <dt class="w-32 shrink-0 font-medium text-gray-500">担当営業</dt>
+                            <div class="flex items-baseline gap-2 py-2">
+                                <dt class="shrink-0 font-medium text-gray-500">担当営業</dt>
                                 <dd class="text-gray-800">
                                     <span v-if="detail.sales_rep_entry">
                                         {{ detail.sales_rep_entry.name }}
@@ -1573,26 +1665,42 @@ async function executeCsvImport() {
                                     <span v-else>{{ detail.sales_rep || '—' }}</span>
                                 </dd>
                             </div>
-                            <div class="flex py-2">
-                                <dt class="w-32 shrink-0 font-medium text-gray-500">伝票番号</dt>
+                            <div class="flex items-baseline gap-2 py-2">
+                                <dt class="shrink-0 font-medium text-gray-500">伝票番号</dt>
                                 <dd class="text-gray-800">{{ detail.jobcode || '—' }}</dd>
                             </div>
-                            <div class="flex py-2">
-                                <dt class="w-32 shrink-0 font-medium text-gray-500">作成日</dt>
-                                <dd class="text-gray-800">{{ formatDate(detail.created_at) }}</dd>
-                            </div>
-                            <div class="flex py-2">
-                                <dt class="w-32 shrink-0 font-medium text-gray-500">入稿日</dt>
-                                <dd class="text-gray-800">{{ formatDate(detail.submission_date) || '—' }}</dd>
-                            </div>
-                            <div class="flex py-2">
-                                <dt class="w-32 shrink-0 font-medium text-gray-500">下版日</dt>
-                                <dd class="text-gray-800">{{ formatDate(detail.sb_delivery_date) || '—' }}</dd>
+                            <div class="flex flex-wrap items-baseline gap-x-6 gap-y-1 py-2">
+                                <div class="flex items-baseline gap-2">
+                                    <dt class="shrink-0 font-medium text-gray-500">作成日</dt>
+                                    <dd class="text-gray-800">{{ formatDate(detail.created_at) }}</dd>
+                                </div>
+                                <div class="flex items-baseline gap-2">
+                                    <dt class="shrink-0 font-medium text-gray-500">入稿日</dt>
+                                    <dd class="text-gray-800">{{ formatDate(detail.submission_date) || '—' }}</dd>
+                                </div>
+                                <div class="flex items-baseline gap-2">
+                                    <dt class="shrink-0 font-medium text-gray-500">下版日</dt>
+                                    <dd class="text-gray-800">{{ formatDate(detail.sb_delivery_date) || '—' }}</dd>
+                                </div>
                             </div>
 
-                            <!-- 作業チェック -->
-                            <div class="py-2.5">
-                                <div class="mb-1.5 text-xs font-medium text-gray-500">作業チェック</div>
+                            <!-- 作業チェック（工程別） -->
+                            <div
+                                v-for="stage in STAGES"
+                                :key="stage"
+                                class="py-2.5"
+                            >
+                                <div class="mb-1.5 flex flex-wrap items-center gap-2">
+                                    <span class="text-xs font-medium text-gray-500">作業チェック：{{ stage }}</span>
+                                    <select
+                                        :value="localStageChecks[stage]?.user_id ?? ''"
+                                        class="rounded border border-gray-300 py-0.5 pl-1.5 pr-5 text-xs text-gray-700 focus:border-indigo-400 focus:outline-none"
+                                        @change="saveStageUser(stage, $event.target.value)"
+                                    >
+                                        <option value="">— 作業者未選択 —</option>
+                                        <option v-for="u in prepressUsers" :key="u.id" :value="u.id">{{ u.name }}</option>
+                                    </select>
+                                </div>
                                 <div class="flex flex-wrap gap-x-7 gap-y-2">
                                     <label
                                         v-for="item in CHECK_ITEMS"
@@ -1601,9 +1709,9 @@ async function executeCsvImport() {
                                     >
                                         <input
                                             type="checkbox"
-                                            v-model="localChecks[item.key]"
+                                            v-model="localStageChecks[stage][item.key]"
                                             class="h-3.5 w-3.5 rounded accent-indigo-600"
-                                            @change="saveCheck(item.key)"
+                                            @change="saveStageCheckField(stage, item.key)"
                                         />
                                         <span class="text-xs text-gray-700">{{ item.label }}</span>
                                     </label>
@@ -1615,9 +1723,9 @@ async function executeCsvImport() {
                                 <div class="flex items-center gap-2">
                                     <span class="shrink-0 text-xs font-medium text-gray-500">InDesign</span>
                                     <select
-                                        v-model="localChecks.indesign_version"
+                                        v-model="localMeta.indesign_version"
                                         class="rounded border border-gray-300 py-1 pl-2 pr-6 text-xs focus:border-indigo-400 focus:outline-none"
-                                        @change="saveCheck('indesign_version')"
+                                        @change="saveMeta('indesign_version')"
                                     >
                                         <option value="">—</option>
                                         <option v-for="v in APP_VERSIONS" :key="v" :value="v">{{ v }}</option>
@@ -1626,9 +1734,9 @@ async function executeCsvImport() {
                                 <div class="flex items-center gap-2">
                                     <span class="shrink-0 text-xs font-medium text-gray-500">Illustrator</span>
                                     <select
-                                        v-model="localChecks.illustrator_version"
+                                        v-model="localMeta.illustrator_version"
                                         class="rounded border border-gray-300 py-1 pl-2 pr-6 text-xs focus:border-indigo-400 focus:outline-none"
-                                        @change="saveCheck('illustrator_version')"
+                                        @change="saveMeta('illustrator_version')"
                                     >
                                         <option value="">—</option>
                                         <option v-for="v in APP_VERSIONS" :key="v" :value="v">{{ v }}</option>
@@ -1640,12 +1748,12 @@ async function executeCsvImport() {
                             <div class="py-2">
                                 <div class="mb-1 text-xs font-medium text-gray-500">備考</div>
                                 <textarea
-                                    v-model="localChecks.check_memo"
+                                    v-model="localMeta.check_memo"
                                     rows="2"
                                     placeholder="メモを入力…"
                                     class="w-full rounded border border-gray-300 px-2 py-1.5 text-xs text-gray-800 focus:border-indigo-400 focus:outline-none resize-none"
                                     @input="saveCheckMemoDebounced"
-                                    @blur="saveCheck('check_memo')"
+                                    @blur="saveMeta('check_memo')"
                                 ></textarea>
                             </div>
 

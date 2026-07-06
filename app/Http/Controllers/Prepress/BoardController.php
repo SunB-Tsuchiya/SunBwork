@@ -8,6 +8,7 @@ use App\Models\Department;
 use App\Models\PrepresSalesRep;
 use App\Models\PrepressColorAssignment;
 use App\Models\PrepressTicket;
+use App\Models\PrepressTicketStageCheck;
 use App\Models\ProjectJob;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -21,15 +22,13 @@ class BoardController extends Controller
     {
         $this->authorizePrepress($request->user());
 
-        $tickets = PrepressTicket::with('salesRepEntry:id,name,company')
+        $tickets = PrepressTicket::with(['salesRepEntry:id,name,company', 'stageChecks'])
             ->where('status', '!=', PrepressTicket::STATUS_DELETED)
             ->orderByDesc('updated_at')
             ->get([
                 'id', 'title', 'jobcode', 'project_name', 'client_id', 'client_name',
                 'sales_rep', 'sales_rep_id', 'memo', 'status', 'image_path', 'card_color', 'created_at',
                 'submission_date', 'sb_delivery_date',
-                'check_finish_size', 'check_trim_marks', 'check_imposition',
-                'check_color_count', 'check_screen_ruling', 'check_n_mark_trap', 'check_color_correction',
                 'indesign_version', 'illustrator_version', 'check_memo',
             ])->each->append('image_url');
 
@@ -101,9 +100,28 @@ class BoardController extends Controller
         return response()->json(['ok' => true]);
     }
 
-    public function updateChecks(Request $request, PrepressTicket $ticket): \Illuminate\Http\JsonResponse
+    public function updateMeta(Request $request, PrepressTicket $ticket): \Illuminate\Http\JsonResponse
     {
         $this->authorizePrepress($request->user());
+
+        $validated = $request->validate([
+            'indesign_version'    => ['sometimes', 'nullable', 'string', 'max:20'],
+            'illustrator_version' => ['sometimes', 'nullable', 'string', 'max:20'],
+            'check_memo'          => ['sometimes', 'nullable', 'string', 'max:2000'],
+        ]);
+
+        abort_if(empty($validated), 422, '保存するフィールドが指定されていません');
+
+        $ticket->update($validated);
+
+        return response()->json(['ok' => true]);
+    }
+
+    public function updateStageCheck(Request $request, PrepressTicket $ticket, string $stage): \Illuminate\Http\JsonResponse
+    {
+        $this->authorizePrepress($request->user());
+
+        abort_unless(in_array($stage, PrepressTicketStageCheck::STAGES, true), 404);
 
         $validated = $request->validate([
             'check_finish_size'      => ['sometimes', 'boolean'],
@@ -113,14 +131,22 @@ class BoardController extends Controller
             'check_screen_ruling'    => ['sometimes', 'boolean'],
             'check_n_mark_trap'      => ['sometimes', 'boolean'],
             'check_color_correction' => ['sometimes', 'boolean'],
-            'indesign_version'       => ['sometimes', 'nullable', 'string', 'max:20'],
-            'illustrator_version'    => ['sometimes', 'nullable', 'string', 'max:20'],
-            'check_memo'             => ['sometimes', 'nullable', 'string', 'max:2000'],
+            'user_id'                => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
         ]);
 
         abort_if(empty($validated), 422, '保存するフィールドが指定されていません');
 
-        $ticket->update($validated);
+        // 同一チケット・工程への初回保存が同時に飛ぶと firstOrCreate 同士が unique 制約でぶつかる
+        // ことがあるため、競合時は再取得してリトライする
+        try {
+            $stageCheck = $ticket->stageChecks()->firstOrCreate(['stage' => $stage]);
+        } catch (\Illuminate\Database\QueryException $e) {
+            $stageCheck = $ticket->stageChecks()->where('stage', $stage)->first();
+            if (!$stageCheck) {
+                throw $e;
+            }
+        }
+        $stageCheck->update($validated);
 
         return response()->json(['ok' => true]);
     }

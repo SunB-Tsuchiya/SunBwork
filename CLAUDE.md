@@ -48,6 +48,7 @@ codex exec review --uncommitted --title "<変更内容の簡潔な説明>"
 8. EACCES エラー時: `sudo chown -R $USER:$USER public/build/ && sudo chmod -R 755 public/build/assets`
 9. **新規ページ・コンポーネントを作成する前に `z_instructions/CONSOLIDATED_01_layout_and_ui.md` を必ず確認する。** AppLayout の使い方・スロット・戻るボタン配置・NG パターンを守ること
 10. **⚠️ 日付・時刻・カレンダー周りの実装は必ず「UTC / JST 混在ルール」セクションを確認してから着手すること。** このプロジェクトは JST（Asia/Tokyo）環境で稼働しており、UTC との変換ミスが繰り返し発生している。
+11. **ブラウザでの動作確認はユーザー自身が行う。** Claude は実装・`npm run build`・migrate までを行い、ブラウザを操作した動作確認はユーザーから明示的に依頼された場合のみ行うこと（Playwright起動などを勝手に行わない）。
 
 **「git pull」「環境を合わせて」「最新にして」を求められたとき（ローカルをリモートに同期する場合）:**
 以下の順番を必ず守ること。`git status` の「up to date」表示は fetch 前の古い情報なので信用しない。

@@ -23,13 +23,6 @@ class PrepressTicket extends Model
         'memo',
         'submission_date',
         'sb_delivery_date',
-        'check_finish_size',
-        'check_trim_marks',
-        'check_imposition',
-        'check_color_count',
-        'check_screen_ruling',
-        'check_n_mark_trap',
-        'check_color_correction',
         'indesign_version',
         'illustrator_version',
         'check_memo',
@@ -40,15 +33,8 @@ class PrepressTicket extends Model
     ];
 
     protected $casts = [
-        'submission_date'        => 'date:Y/m/d',
-        'sb_delivery_date'       => 'date:Y/m/d',
-        'check_finish_size'      => 'boolean',
-        'check_trim_marks'       => 'boolean',
-        'check_imposition'       => 'boolean',
-        'check_color_count'      => 'boolean',
-        'check_screen_ruling'    => 'boolean',
-        'check_n_mark_trap'      => 'boolean',
-        'check_color_correction' => 'boolean',
+        'submission_date'  => 'date:Y/m/d',
+        'sb_delivery_date' => 'date:Y/m/d',
     ];
 
     protected $appends = ['image_url'];
@@ -87,6 +73,11 @@ class PrepressTicket extends Model
     public function salesRepEntry()
     {
         return $this->belongsTo(PrepresSalesRep::class, 'sales_rep_id');
+    }
+
+    public function stageChecks()
+    {
+        return $this->hasMany(PrepressTicketStageCheck::class, 'prepress_ticket_id');
     }
 
     public function getStatusLabelAttribute(): string
