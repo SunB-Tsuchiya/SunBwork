@@ -107,7 +107,7 @@ class ScheduleEventController extends Controller
                 ->whereBetween('starts_at', [$start, $end])
                 ->with(['eventItemType:id,name,slug'])
                 ->get()
-                ->map(fn ($e) => array_merge($e->toArray(), ['is_own' => false]));
+                ->map(fn ($e) => array_merge($e->toArray(), ['is_own' => false, 'is_overlay' => true]));
 
             // オーバーレイユーザーが参加者（pending/accepted）として招待されているイベントも
             // そのユーザーのカラムに表示する（overlay_user_id タグで識別）
@@ -133,6 +133,7 @@ class ScheduleEventController extends Controller
                         $overlayEvents->push(array_merge($ae->toArray(), [
                             'is_own'          => false,
                             'overlay_user_id' => (int) $row->user_id,
+                            'is_overlay'      => true,
                         ]));
                     }
                 }

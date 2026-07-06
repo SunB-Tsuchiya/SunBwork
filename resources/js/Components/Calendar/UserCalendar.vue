@@ -54,9 +54,13 @@ const diaryEvents = computed(() =>
 // MonthView/WeekView/DayView に渡すイベント統合
 // companyEvents（schedule.events.range）は「行事イベント」として自分の個人予定も一部含むため、
 // personalEvents（calendar.events.range、自分の個人予定を網羅）と id が重複するものを除外する
+// ＋ オーバーレイ（他人の予定を重ねて見る機能）は /schedule の日表示専用なので、
+//   個人カレンダーには一切表示しない
 const allEvents = computed(() => {
     const personalIds = new Set(personalEvents.value.map(e => e.id));
-    const dedupedCompanyEvents = companyEvents.value.filter(e => !personalIds.has(e.id));
+    const dedupedCompanyEvents = companyEvents.value
+        .filter(e => !e.is_overlay)
+        .filter(e => !personalIds.has(e.id));
     return [
         ...dedupedCompanyEvents,
         ...personalEvents.value,

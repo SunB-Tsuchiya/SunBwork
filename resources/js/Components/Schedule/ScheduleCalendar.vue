@@ -67,6 +67,9 @@ async function loadEvents() {
 watch(loadRange, loadEvents, { immediate: true });
 watch(overlays, loadEvents, { deep: true });
 
+// 月表示・週表示ではオーバーレイ（他人の予定）を出さない — 日表示のカラム機能のみで使う
+const nonOverlayEvents = computed(() => events.value.filter(e => !e.is_overlay));
+
 // ── モーダル制御 ───────────────────────────────────────────────
 const showCreate    = ref(false);
 const editTarget    = ref(null);
@@ -336,7 +339,7 @@ watch(showMonthRooms, (v) => localStorage.setItem(STORAGE_KEY_MONTH_ROOMS, Strin
 
         <!-- ── カレンダー本体 ──────────────────────────────────────── -->
         <MonthView v-if="viewMode === 'month'"
-            :year="viewYear" :month="viewMonth" :events="events"
+            :year="viewYear" :month="viewMonth" :events="nonOverlayEvents"
             :reservations="showMonthRooms ? reservations : []"
             :rooms="showMonthRooms ? rooms : []"
             @date-click="onDateClick"
@@ -344,7 +347,7 @@ watch(showMonthRooms, (v) => localStorage.setItem(STORAGE_KEY_MONTH_ROOMS, Strin
             @room-click="openRoomEdit" />
 
         <WeekView v-else-if="viewMode === 'week'"
-            :start-date="weekStart" :events="events"
+            :start-date="weekStart" :events="nonOverlayEvents"
             :reservations="reservations" :rooms="rooms"
             :worktypes="worktypes"
             :daily-worktypes="dailyWorktypes"
