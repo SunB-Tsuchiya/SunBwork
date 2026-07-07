@@ -356,10 +356,7 @@ async function submit() {
         errors.value = { startTime: ['終了時刻は開始時刻より後に設定してください'] };
         return;
     }
-    if (conflictWarnings.value.length > 0) {
-        showToast('参加者に時間が重複する予定があります。内容を確認してください。', 'error', 5000);
-        return;
-    }
+    // 参加者のスケジュール競合は上部バナーで警告のみ表示し、保存はブロックしない
 
     // 新規作成時のみ: ジョブ予定との重複を確認ダイアログで知らせる
     if (!props.event) {
@@ -843,7 +840,7 @@ function fmtResTime(isoStr) {
                                 @click="$emit('close')">キャンセル</button>
                             <button type="submit"
                                 class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
-                                :disabled="loading || conflictWarnings.length > 0">
+                                :disabled="loading">
                                 {{ isEdit ? '更新' : '作成' }}
                             </button>
                         </div>

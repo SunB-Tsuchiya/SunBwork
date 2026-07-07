@@ -2407,6 +2407,10 @@ async function save(sendImmediately = true) {
     if (!props.editMode) {
         return;
     }
+    // 連打・二重送信防止（保存処理が完了するまで再入を防ぐ）
+    if (saving.value) {
+        return;
+    }
 
     // バリデーションエラーをクリア
     clearValidationErrors();

@@ -900,6 +900,18 @@ class ProjectJobAssignmentsController extends Controller
 
                 // (debug logs removed)
 
+                // 二重送信ガード: 同一案件・同一担当者・同一タイトルの割当が直近数秒以内に
+                // 既に作成されていれば、フロントの連打・二重送信とみなして作成をスキップする
+                $isDuplicateSubmit = ProjectJobAssignment::where('project_job_id', $projectJob->id)
+                    ->where('user_id', $createData['user_id'])
+                    ->where('sender_id', $createData['sender_id'])
+                    ->where('title', $createData['title'])
+                    ->where('created_at', '>=', now()->subSeconds(15))
+                    ->exists();
+                if ($isDuplicateSubmit) {
+                    return;
+                }
+
                 $assignment = ProjectJobAssignment::create($createData);
 
                 // assignment_file_stats に upsert

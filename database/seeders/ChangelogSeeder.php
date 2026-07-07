@@ -1480,6 +1480,50 @@ HTML,
 </section>
 HTML,
         ],
+        [
+            'version'      => 'schedule-conflict-block-fix-1',
+            'title'        => '予定表：参加者の予定重複で保存できない不具合を修正',
+            'released_at'  => '2026-07-07',
+            'summary'      => '予定表で会議・打ち合わせや会議室予約を作成する際、招待した参加者に既存の予定がある場合、これまでは警告が出た上で保存自体ができなくなっていました。使い方ガイドの案内どおり、警告バナーは表示しつつ保存できるように修正しました。',
+            'design_files' => [],
+            'claude_notes' => '【原因】resources/js/Components/Schedule/EventModal.vue と RoomReservationModal.vue の submit() が、schedule.events.conflicts の結果(conflictWarnings)が1件でもあると早期returnしてPOST自体を送信せず、保存ボタンも disabled にしていた。一方、自分自身のジョブ予定との重複は confirmOverlap() の confirm() ダイアログで警告するだけで保存継続でき、使い方ガイド(Guide/Schedule.vue)にも「参加者に競合予定がある場合は黄色いバナーで通知されます」→保存ボタンを押す、と案内されており、参加者側だけ保存不可になっていたのは実装上の不整合だった。【修正】EventModal.vue submit()・RoomReservationModal.vue submit() から conflictWarnings によるハードブロック(早期returnと保存ボタンのdisabled条件)を削除。警告バナー自体の表示は維持。RoomReservationModal.vue で不要になった showToast/useToasts のimportも削除。DBマイグレーションなし。',
+            'body'         => <<<'HTML'
+<section class="cl-problem">
+  <h3>背景・問題</h3>
+  <p>予定表で会議・打ち合わせや会議室予約を作成する際、招待した参加者に既存の予定が少しでも重なっていると、警告バナーが出るだけでなく保存ボタンが押せなくなり、予定を登録できないという問題がありました。</p>
+</section>
+
+<section class="cl-fix">
+  <h3>修正内容</h3>
+  <ul>
+    <li>参加者の予定が重複している場合、これまで通り黄色い警告バナーは表示されます</li>
+    <li>警告が出ていても保存ボタンで登録できるようになりました（内容を確認のうえ登録してください）</li>
+  </ul>
+</section>
+HTML,
+        ],
+        [
+            'version'      => 'job-assign-dup-notify-1',
+            'title'        => 'ジョブ依頼：保存の連打で割当・通知が重複する不具合を修正',
+            'released_at'  => '2026-07-07',
+            'summary'      => 'ジョブ割り当てフォームで保存ボタンを連打するなど短時間に二重送信された場合、同じ内容のジョブ割り当てが2件作成され、依頼通知も2重に届いてしまう不具合を修正しました。',
+            'design_files' => [],
+            'claude_notes' => '【原因】resources/js/Pages/Coordinator/ProjectJobs/JobAssign/AssignmentForm.vue の save() に多重実行を防ぐガードが無く、保存ボタンは :disabled="saving" のみで save() 冒頭に再入防止チェックが無かった。二重に呼ばれると Coordinator/ProjectJobAssignmentsController::store() が assignments 配列を無条件に create() するため、同一内容の project_job_assignments が2件作成され、notifyNewJob() も2回呼ばれて通知が重複していた（実データで確認: 同一秒に作成された重複レコード2組を本番DBで特定）。【修正】① AssignmentForm.vue save() の冒頭に `if (saving.value) return;` を追加しフロント側で二重実行を防止。② ProjectJobAssignmentsController::store() に保険的ガードを追加: 同一 project_job_id・user_id・sender_id・title の割当が直近15秒以内に作成済みなら二重送信とみなして作成・通知をスキップ。DBマイグレーションなし。',
+            'body'         => <<<'HTML'
+<section class="cl-problem">
+  <h3>背景・問題</h3>
+  <p>ジョブ割り当てフォームで保存ボタンを連打するなどして短時間に二重送信されると、同じジョブ割り当てが2件登録され、依頼された側に同じ内容の通知が2件届いてしまうことがありました。</p>
+</section>
+
+<section class="cl-fix">
+  <h3>修正内容</h3>
+  <ul>
+    <li>保存処理が完了するまでは、連打しても二重に送信されないようにしました</li>
+    <li>万一二重送信された場合も、サーバー側で同一内容の直近の重複登録を検知してスキップするようにしました</li>
+  </ul>
+</section>
+HTML,
+        ],
         ];
 
         foreach ($entries as $entry) {

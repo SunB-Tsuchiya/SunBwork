@@ -3,7 +3,6 @@ import { ref, watch, computed, onMounted } from 'vue';
 import axios from 'axios';
 import { usePage } from '@inertiajs/vue3';
 import AttendeeSelector from './AttendeeSelector.vue';
-import useToasts from '@/Composables/useToasts';
 
 // 15分刻みの時刻オプション (00:00〜23:45)
 const timeOptions = [];
@@ -61,7 +60,6 @@ const emit = defineEmits(['close', 'saved', 'deleted']);
 
 const CSRF     = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 const authUser = usePage().props.auth?.user;
-const { showToast } = useToasts();
 
 const form = ref({
     meeting_room_id:    null,
@@ -222,10 +220,7 @@ async function submit() {
         errors.value = { _general: '参加者を1名以上選択してください' };
         return;
     }
-    if (conflictWarnings.value.length > 0) {
-        showToast('参加者に時間が重複する予定があります。内容を確認してください。', 'error', 5000);
-        return;
-    }
+    // 参加者のスケジュール競合は上部バナーで警告のみ表示し、保存はブロックしない
     loading.value = true;
     errors.value  = {};
     try {
@@ -478,7 +473,7 @@ async function deleteReservation() {
                                 @click="$emit('close')">{{ readOnly ? '閉じる' : 'キャンセル' }}</button>
                             <button v-if="!readOnly" type="submit"
                                 class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
-                                :disabled="loading || conflictWarnings.length > 0">{{ loading ? '保存中…' : '保存' }}</button>
+                                :disabled="loading">{{ loading ? '保存中…' : '保存' }}</button>
                         </div>
                     </div>
                 </form>
