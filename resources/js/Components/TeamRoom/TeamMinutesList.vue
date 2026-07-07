@@ -154,7 +154,7 @@ function formatDate(d) {
             <thead class="bg-gray-50">
                 <tr>
                     <th class="whitespace-nowrap px-4 py-2 text-left text-xs font-medium text-gray-500">日付</th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">会議名</th>
+                    <th class="whitespace-nowrap px-4 py-2 text-left text-xs font-medium text-gray-500">会議名</th>
                     <th class="whitespace-nowrap px-4 py-2 text-left text-xs font-medium text-gray-500">作成者</th>
                     <th class="px-4 py-2"></th>
                 </tr>
@@ -167,7 +167,7 @@ function formatDate(d) {
                     @click="router.get(route('team-rooms.minutes.show', { team: team.id, minute: minute.id }))"
                 >
                     <td class="whitespace-nowrap px-4 py-2 text-gray-600">{{ formatDate(minute.held_at) }}</td>
-                    <td class="px-4 py-2 font-medium text-gray-800">{{ minute.title }}</td>
+                    <td class="whitespace-nowrap px-4 py-2 font-medium text-gray-800">{{ minute.title }}</td>
                     <td class="whitespace-nowrap px-4 py-2 text-gray-500">{{ minute.user?.name }}</td>
                     <td class="whitespace-nowrap px-4 py-2" @click.stop>
                         <div class="flex items-center justify-end gap-2">
