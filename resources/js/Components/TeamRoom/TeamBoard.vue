@@ -507,13 +507,14 @@ function resetListFilters() {
                     {{ allCards.length === 0 ? 'カードがありません' : '条件に一致するカードがありません' }}
                 </div>
 
-                <table v-else class="min-w-full divide-y divide-gray-200 text-sm">
+                <div v-else class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 text-sm">
                     <thead class="bg-gray-50">
                         <tr>
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">タイトル</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">ステータス</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">作成日</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">操作</th>
+                            <th class="whitespace-nowrap px-4 py-2 text-left text-xs font-medium text-gray-500">ステータス</th>
+                            <th class="whitespace-nowrap px-4 py-2 text-left text-xs font-medium text-gray-500">作成日</th>
+                            <th class="whitespace-nowrap px-4 py-2 text-left text-xs font-medium text-gray-500">操作</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 bg-white">
@@ -527,13 +528,13 @@ function resetListFilters() {
                                 <div>{{ card.title }}</div>
                                 <div v-if="card.description" class="mt-0.5 text-xs text-gray-400">{{ String(card.description).slice(0, 60) }}</div>
                             </td>
-                            <td class="px-4 py-2">
+                            <td class="whitespace-nowrap px-4 py-2">
                                 <span class="rounded border px-2 py-0.5 text-xs font-medium" :class="colStyle(card.columnColor).header">
                                     {{ card.columnName }}
                                 </span>
                             </td>
-                            <td class="px-4 py-2 text-xs text-gray-500">{{ card.created_at ? String(card.created_at).slice(0, 10) : '-' }}</td>
-                            <td class="px-4 py-2" @click.stop>
+                            <td class="whitespace-nowrap px-4 py-2 text-xs text-gray-500">{{ card.created_at ? String(card.created_at).slice(0, 10) : '-' }}</td>
+                            <td class="whitespace-nowrap px-4 py-2" @click.stop>
                                 <div class="flex items-center gap-2">
                                     <Link
                                         :href="route('team-rooms.board.cards.show', { team: team.id, card: card.id })"
@@ -553,6 +554,7 @@ function resetListFilters() {
                         </tr>
                     </tbody>
                 </table>
+                </div>
             </template>
 
         </template>

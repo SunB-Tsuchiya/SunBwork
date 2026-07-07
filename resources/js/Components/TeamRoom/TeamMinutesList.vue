@@ -149,12 +149,13 @@ function formatDate(d) {
             {{ displayMinutes.length === 0 ? '会議記録がありません' : '条件に一致する会議記録がありません' }}
         </div>
 
-        <table v-else class="min-w-full divide-y divide-gray-200 text-sm">
+        <div v-else class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200 text-sm">
             <thead class="bg-gray-50">
                 <tr>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">日付</th>
+                    <th class="whitespace-nowrap px-4 py-2 text-left text-xs font-medium text-gray-500">日付</th>
                     <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">会議名</th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">作成者</th>
+                    <th class="whitespace-nowrap px-4 py-2 text-left text-xs font-medium text-gray-500">作成者</th>
                     <th class="px-4 py-2"></th>
                 </tr>
             </thead>
@@ -165,10 +166,10 @@ function formatDate(d) {
                     class="cursor-pointer hover:bg-gray-50"
                     @click="router.get(route('team-rooms.minutes.show', { team: team.id, minute: minute.id }))"
                 >
-                    <td class="px-4 py-2 text-gray-600">{{ formatDate(minute.held_at) }}</td>
+                    <td class="whitespace-nowrap px-4 py-2 text-gray-600">{{ formatDate(minute.held_at) }}</td>
                     <td class="px-4 py-2 font-medium text-gray-800">{{ minute.title }}</td>
-                    <td class="px-4 py-2 text-gray-500">{{ minute.user?.name }}</td>
-                    <td class="px-4 py-2" @click.stop>
+                    <td class="whitespace-nowrap px-4 py-2 text-gray-500">{{ minute.user?.name }}</td>
+                    <td class="whitespace-nowrap px-4 py-2" @click.stop>
                         <div class="flex items-center justify-end gap-2">
                             <Link
                                 :href="route('team-rooms.minutes.show', { team: team.id, minute: minute.id })"
@@ -189,6 +190,7 @@ function formatDate(d) {
                 </tr>
             </tbody>
         </table>
+        </div>
 
         <!-- 最近5件表示時のリンク -->
         <div v-if="minutes === null && recentMinutes.length > 0" class="mt-4 text-right">

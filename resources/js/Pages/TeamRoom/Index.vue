@@ -89,6 +89,7 @@ function goToRoom(teamId) {
                 <div class="bg-blue-50 px-4 py-2">
                     <h3 class="text-sm font-semibold text-blue-700">部署チーム</h3>
                 </div>
+                <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200 text-sm">
                     <thead class="bg-blue-50">
                         <tr>
@@ -112,9 +113,9 @@ function goToRoom(teamId) {
                             @click="goToRoom(team.id)"
                         >
                             <td class="px-2 py-3 text-gray-300 select-none">⠿</td>
-                            <td class="px-4 py-3 font-medium text-gray-900">{{ team.name }}</td>
-                            <td class="px-4 py-3 text-gray-600">{{ team.department?.name ?? '—' }}</td>
-                            <td class="px-4 py-3 text-gray-600">
+                            <td class="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{{ team.name }}</td>
+                            <td class="px-4 py-3 text-gray-600 whitespace-nowrap">{{ team.department?.name ?? '—' }}</td>
+                            <td class="px-4 py-3 text-gray-600 whitespace-nowrap">
                                 <span v-if="team.leader_name" class="flex items-center gap-1">
                                     <span class="inline-block h-2 w-2 rounded-full bg-orange-400"></span>
                                     {{ team.leader_name }}
@@ -136,6 +137,7 @@ function goToRoom(teamId) {
                         </tr>
                     </tbody>
                 </table>
+                </div>
             </div>
 
             <!-- 特別チーム -->
@@ -143,6 +145,7 @@ function goToRoom(teamId) {
                 <div class="bg-green-50 px-4 py-2">
                     <h3 class="text-sm font-semibold text-green-700">特別チーム</h3>
                 </div>
+                <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200 text-sm">
                     <thead class="bg-green-50">
                         <tr>
@@ -166,9 +169,9 @@ function goToRoom(teamId) {
                             @click="goToRoom(team.id)"
                         >
                             <td class="px-2 py-3 text-gray-300 select-none">⠿</td>
-                            <td class="px-4 py-3 font-medium text-gray-900">{{ team.name }}</td>
-                            <td class="px-4 py-3 text-gray-600">{{ team.department?.name ?? '—' }}</td>
-                            <td class="px-4 py-3 text-gray-600">
+                            <td class="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{{ team.name }}</td>
+                            <td class="px-4 py-3 text-gray-600 whitespace-nowrap">{{ team.department?.name ?? '—' }}</td>
+                            <td class="px-4 py-3 text-gray-600 whitespace-nowrap">
                                 <span v-if="team.leader_name" class="flex items-center gap-1">
                                     <span class="inline-block h-2 w-2 rounded-full bg-orange-400"></span>
                                     {{ team.leader_name }}
@@ -190,6 +193,7 @@ function goToRoom(teamId) {
                         </tr>
                     </tbody>
                 </table>
+                </div>
             </div>
 
             <!-- 一般チーム -->
@@ -198,7 +202,8 @@ function goToRoom(teamId) {
                 <div v-if="unitTeamList.length === 0" class="py-12 text-center text-gray-400">
                     所属しているチームがありません
                 </div>
-                <table v-else class="min-w-full divide-y divide-gray-200 text-sm">
+                <div v-else class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 text-sm">
                     <thead class="bg-gray-50">
                         <tr>
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500"></th>
@@ -221,9 +226,9 @@ function goToRoom(teamId) {
                             @click="goToRoom(team.id)"
                         >
                             <td class="px-2 py-3 text-gray-300 select-none">⠿</td>
-                            <td class="px-4 py-3 font-medium text-gray-900">{{ team.name }}</td>
-                            <td class="px-4 py-3 text-gray-600">{{ team.department?.name ?? '—' }}</td>
-                            <td class="px-4 py-3 text-gray-600">
+                            <td class="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{{ team.name }}</td>
+                            <td class="px-4 py-3 text-gray-600 whitespace-nowrap">{{ team.department?.name ?? '—' }}</td>
+                            <td class="px-4 py-3 text-gray-600 whitespace-nowrap">
                                 <span v-if="team.leader_name" class="flex items-center gap-1">
                                     <span class="inline-block h-2 w-2 rounded-full bg-orange-400"></span>
                                     {{ team.leader_name }}
@@ -245,6 +250,7 @@ function goToRoom(teamId) {
                         </tr>
                     </tbody>
                 </table>
+                </div>
             </div>
         </div>
     </AppLayout>
