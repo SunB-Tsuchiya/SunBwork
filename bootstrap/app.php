@@ -53,6 +53,16 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
+        $exceptions->renderable(function (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $e, $request) {
+            if ($e->getStatusCode() !== 403 || $request->expectsJson()) {
+                return null;
+            }
+
+            return \Inertia\Inertia::render('Errors/403')
+                ->toResponse($request)
+                ->setStatusCode(403);
+        });
+
         // CSRF 419 デバッグ用（ゲストログイン 419 原因調査）
         $exceptions->renderable(function (\Illuminate\Session\TokenMismatchException $e, $request) {
             \Illuminate\Support\Facades\Log::warning('CSRF 419 発生', [

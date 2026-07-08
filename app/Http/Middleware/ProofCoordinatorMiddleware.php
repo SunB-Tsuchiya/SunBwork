@@ -15,7 +15,6 @@ class ProofCoordinatorMiddleware
      * 許可:
      *   - proof_coordinator ロール
      *   - admin / superadmin
-     *   - leader のうち 部署リーダー（isDepartmentLeader）のみ
      */
     public function handle(Request $request, Closure $next): Response
     {
@@ -28,8 +27,7 @@ class ProofCoordinatorMiddleware
         $allowed =
             $user->isProofCoordinator() ||
             $user->isAdmin() ||
-            $user->isSuperAdmin() ||
-            ($user->isLeader() && $user->isDepartmentLeader());
+            $user->isSuperAdmin();
 
         if (! $allowed) {
             abort(403, 'ProofCoordinator access required.');

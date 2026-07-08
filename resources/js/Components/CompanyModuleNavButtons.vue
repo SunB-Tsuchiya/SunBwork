@@ -10,12 +10,31 @@ const props = defineProps({
 
 const emit = defineEmits(['navigate'])
 
+const moduleKeys = computed(() => {
+  const keys = []
+  const companyType = props.auth.companyType
+
+  if (companyType && companyModules[companyType]) {
+    keys.push(companyType)
+  }
+
+  if (props.auth.user?.isSuperAdmin && !keys.includes('sunbrain')) {
+    keys.push('sunbrain')
+  }
+
+  return keys
+})
+
 const extraRoles = computed(() => {
-  const mod = companyModules[props.auth.companyType]
-  if (!mod || !mod.extraRoles) return []
-  return mod.extraRoles.filter((r) => {
+  const seen = new Set()
+
+  return moduleKeys.value.flatMap((key) => companyModules[key]?.extraRoles ?? []).filter((r) => {
+    if (seen.has(r.role)) return false
     if (props.group && r.group !== props.group) return false
-    return r.visibilityCheck ? r.visibilityCheck(props.auth) : true
+    if (r.visibilityCheck && !r.visibilityCheck(props.auth)) return false
+
+    seen.add(r.role)
+    return true
   })
 })
 </script>

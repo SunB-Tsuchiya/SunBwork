@@ -10,6 +10,13 @@ function csrfToken() {
     return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 }
 
+function reloadForStaleSession() {
+    if (window.__sbwStaleSessionReloading) return;
+
+    window.__sbwStaleSessionReloading = true;
+    window.location.reload();
+}
+
 const ROLE_DASHBOARD_ROUTES = {
     superadmin:       'superadmin.dashboard',
     admin:            'admin.dashboard',
@@ -80,10 +87,20 @@ router.on('before', (event) => {
     };
 });
 
-// Inertia JSON として 403/404 ページが描画されるケース
+function fullPageVisit(url) {
+    if (!url) {
+        window.location.reload();
+        return;
+    }
+
+    window.location.href = new URL(url, window.location.origin).toString();
+}
+
+// Inertia JSON として 404 ページが描画されるケース
 router.on('navigate', (event) => {
     const component = event.detail?.page?.component;
-    if (component !== 'Errors/403' && component !== 'Errors/404') return;
+    // 403 は権限なしページをそのまま表示する。
+    if (component !== 'Errors/404') return;
     const authUser = event.detail?.page?.props?.auth?.user;
     // page.url はサーバーが返した現在のページURL（リクエストした失敗URL）
     const failedUrl = event.detail?.page?.url;
@@ -95,7 +112,24 @@ router.on('navigate', (event) => {
 // axios レスポンスオブジェクトには .url はなく、XHR の responseURL か config.url を使う
 router.on('invalid', (event) => {
     const status = event.detail?.response?.status;
-    if (status !== 404 && status !== 403) return;
+
+    if (status === 419 || status === 401) {
+        event.preventDefault();
+        reloadForStaleSession();
+        return;
+    }
+
+    if (status === 403) {
+        event.preventDefault();
+        const res = event.detail?.response;
+        const failedUrl = res?.request?.responseURL
+            ?? res?.config?.url
+            ?? window.location.href;
+        fullPageVisit(failedUrl);
+        return;
+    }
+
+    if (status !== 404) return;
     event.preventDefault();
     const res = event.detail?.response;
     const failedUrl = res?.request?.responseURL   // XHR: 最終URL（フル）

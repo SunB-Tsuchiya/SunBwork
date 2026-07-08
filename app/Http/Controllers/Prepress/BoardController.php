@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Prepress;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Prepress\Concerns\AuthorizesPrepress;
 use App\Models\Client;
 use App\Models\Department;
 use App\Models\PrepresSalesRep;
@@ -18,9 +19,11 @@ use Illuminate\Validation\Rule;
 
 class BoardController extends Controller
 {
+    use AuthorizesPrepress;
+
     public function index(Request $request)
     {
-        $this->authorizePrepress($request->user());
+        $this->authorizePrepress($request->user(), allowOperationalRoles: true);
 
         $tickets = PrepressTicket::with(['salesRepEntry:id,name,company', 'stageChecks'])
             ->where('status', '!=', PrepressTicket::STATUS_DELETED)
@@ -55,7 +58,7 @@ class BoardController extends Controller
 
     public function updateStatus(Request $request, PrepressTicket $ticket)
     {
-        $this->authorizePrepress($request->user());
+        $this->authorizePrepress($request->user(), allowOperationalRoles: true);
 
         $request->validate([
             'status' => ['required', Rule::in(array_keys(PrepressTicket::STATUS_LABELS))],
@@ -68,7 +71,7 @@ class BoardController extends Controller
 
     public function updateColorAssignment(Request $request, string $colorKey): JsonResponse
     {
-        $this->authorizePrepress($request->user());
+        $this->authorizePrepress($request->user(), allowOperationalRoles: true);
 
         $request->validate([
             'user_id' => ['nullable', 'integer', 'exists:users,id'],
@@ -82,7 +85,7 @@ class BoardController extends Controller
 
     public function reorderColorAssignments(Request $request): JsonResponse
     {
-        $this->authorizePrepress($request->user());
+        $this->authorizePrepress($request->user(), allowOperationalRoles: true);
 
         $request->validate([
             'orders'               => ['required', 'array'],
@@ -102,7 +105,7 @@ class BoardController extends Controller
 
     public function updateMeta(Request $request, PrepressTicket $ticket): \Illuminate\Http\JsonResponse
     {
-        $this->authorizePrepress($request->user());
+        $this->authorizePrepress($request->user(), allowOperationalRoles: true);
 
         $validated = $request->validate([
             'indesign_version'    => ['sometimes', 'nullable', 'string', 'max:20'],
@@ -119,7 +122,7 @@ class BoardController extends Controller
 
     public function updateStageCheck(Request $request, PrepressTicket $ticket, string $stage): \Illuminate\Http\JsonResponse
     {
-        $this->authorizePrepress($request->user());
+        $this->authorizePrepress($request->user(), allowOperationalRoles: true);
 
         abort_unless(in_array($stage, PrepressTicketStageCheck::STAGES, true), 404);
 
@@ -153,7 +156,7 @@ class BoardController extends Controller
 
     public function updateColor(Request $request, PrepressTicket $ticket)
     {
-        $this->authorizePrepress($request->user());
+        $this->authorizePrepress($request->user(), allowOperationalRoles: true);
 
         $request->validate([
             'card_color' => ['nullable', 'string', 'max:20'],
@@ -169,7 +172,7 @@ class BoardController extends Controller
      */
     public function archiveFromCompleted(Request $request, PrepressTicket $ticket)
     {
-        $this->authorizePrepress($request->user());
+        $this->authorizePrepress($request->user(), allowOperationalRoles: true);
 
         if ($ticket->status !== PrepressTicket::STATUS_COMPLETED) {
             return response()->json(['message' => '完了ステータスの伝票のみ削除できます。'], 422);
@@ -197,7 +200,7 @@ class BoardController extends Controller
      */
     public function apiClients(Request $request): JsonResponse
     {
-        $this->authorizePrepress($request->user());
+        $this->authorizePrepress($request->user(), allowOperationalRoles: true);
 
         $dept  = Department::where('name', '製版')->first();
         $query = Client::query();
@@ -228,7 +231,7 @@ class BoardController extends Controller
      */
     public function apiProjectJobs(Request $request): JsonResponse
     {
-        $this->authorizePrepress($request->user());
+        $this->authorizePrepress($request->user(), allowOperationalRoles: true);
 
         $clientId = $request->integer('client_id');
         if (!$clientId) {
@@ -258,7 +261,7 @@ class BoardController extends Controller
      */
     public function apiClientCreate(Request $request): JsonResponse
     {
-        $this->authorizePrepress($request->user());
+        $this->authorizePrepress($request->user(), allowOperationalRoles: true);
 
         $validated = $request->validate([
             'name'        => ['required', 'string', 'max:255'],
@@ -292,24 +295,4 @@ class BoardController extends Controller
         return response()->json(['client' => $client->only(['id', 'name', 'client_code'])]);
     }
 
-    protected function authorizePrepress($user): void
-    {
-        if ($user->isSuperAdmin()) {
-            return;
-        }
-        if ($user->isAdmin()) {
-            $prepressCompanyId = \App\Models\Department::where('name', '製版')->value('company_id');
-            if (!$prepressCompanyId || $user->company_id == $prepressCompanyId) {
-                return;
-            }
-            abort(403, 'Prepress エリアは同じ会社のAdminのみアクセスできます。');
-        }
-        // Coordinator・Leader・Clerk は部署問わずアクセス可
-        if ($user->isCoordinator() || $user->isLeader() || $user->isClerk()) {
-            return;
-        }
-        if (!$user->department || $user->department->name !== '製版') {
-            abort(403, 'Prepress エリアは製版部署のみアクセスできます。');
-        }
-    }
 }

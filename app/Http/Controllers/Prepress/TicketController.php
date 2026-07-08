@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Prepress;
 
 use App\Http\Controllers\Concerns\NormalizesCsvEncoding;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Prepress\Concerns\AuthorizesPrepress;
 use App\Models\Client;
 use App\Models\Department;
 use App\Models\PrepresSalesRep;
@@ -18,13 +19,14 @@ use Illuminate\Validation\Rule;
 
 class TicketController extends Controller
 {
+    use AuthorizesPrepress;
     use NormalizesCsvEncoding;
 
     public function __construct(private PrepressImageService $imageService) {}
 
     public function index(Request $request)
     {
-        $this->authorizePrepress($request->user());
+        $this->authorizePrepress($request->user(), allowOperationalRoles: true);
 
         $q      = $request->input('q', '');
         $period = $request->input('period', '');
@@ -81,7 +83,7 @@ class TicketController extends Controller
 
     public function create(Request $request)
     {
-        $this->authorizePrepress($request->user());
+        $this->authorizePrepress($request->user(), allowOperationalRoles: true);
 
         // 製版部署に紐づくクライアント一覧
         $dept    = Department::where('name', '製版')->first();
@@ -134,7 +136,7 @@ class TicketController extends Controller
 
     public function show(Request $request, PrepressTicket $ticket)
     {
-        $this->authorizePrepress($request->user());
+        $this->authorizePrepress($request->user(), allowOperationalRoles: true);
 
         $ticket->load('user', 'salesRepEntry:id,name,company');
         $ticket->append('image_url');
@@ -147,7 +149,7 @@ class TicketController extends Controller
 
     public function edit(Request $request, PrepressTicket $ticket)
     {
-        $this->authorizePrepress($request->user());
+        $this->authorizePrepress($request->user(), allowOperationalRoles: true);
 
         $ticket->load('user', 'client:id,client_code', 'salesRepEntry:id,name,company');
         $ticket->append('image_url');
@@ -166,7 +168,7 @@ class TicketController extends Controller
 
     public function update(Request $request, PrepressTicket $ticket)
     {
-        $this->authorizePrepress($request->user());
+        $this->authorizePrepress($request->user(), allowOperationalRoles: true);
 
         $validated = $request->validate([
             'title'            => ['required', 'string', 'max:255'],
@@ -252,7 +254,7 @@ class TicketController extends Controller
 
     public function store(Request $request)
     {
-        $this->authorizePrepress($request->user());
+        $this->authorizePrepress($request->user(), allowOperationalRoles: true);
 
         $validated = $request->validate([
             'title'              => ['required', 'string', 'max:255'],
@@ -354,7 +356,7 @@ class TicketController extends Controller
 
     public function updateStatus(Request $request, PrepressTicket $ticket)
     {
-        $this->authorizePrepress($request->user());
+        $this->authorizePrepress($request->user(), allowOperationalRoles: true);
 
         $request->validate([
             'status' => ['required', Rule::in(array_keys(PrepressTicket::STATUS_LABELS))],
@@ -367,7 +369,7 @@ class TicketController extends Controller
 
     public function updateImage(Request $request, PrepressTicket $ticket)
     {
-        $this->authorizePrepress($request->user());
+        $this->authorizePrepress($request->user(), allowOperationalRoles: true);
 
         $request->validate([
             'image' => ['required', 'file', 'mimes:jpg,jpeg,png,gif,webp,heic,heif,pdf', 'max:20480'],
@@ -411,7 +413,7 @@ class TicketController extends Controller
 
     public function destroy(Request $request, PrepressTicket $ticket)
     {
-        $this->authorizePrepress($request->user());
+        $this->authorizePrepress($request->user(), allowOperationalRoles: true);
 
         // 案件と共有している画像は削除しない
         $sharedWithJob = $ticket->project_job_id
@@ -461,7 +463,7 @@ class TicketController extends Controller
      */
     public function analyzeCsv(Request $request): JsonResponse
     {
-        $this->authorizePrepress($request->user());
+        $this->authorizePrepress($request->user(), allowOperationalRoles: true);
 
         $request->validate([
             'csv' => ['required', 'file', 'mimes:csv,txt', 'max:5120'],
@@ -556,7 +558,7 @@ class TicketController extends Controller
      */
     public function importCsv(Request $request): JsonResponse
     {
-        $this->authorizePrepress($request->user());
+        $this->authorizePrepress($request->user(), allowOperationalRoles: true);
 
         $request->validate([
             'rows'                      => ['required', 'array', 'min:1', 'max:500'],
@@ -624,24 +626,4 @@ class TicketController extends Controller
         return response()->json(['imported' => count($inserts), 'skipped_dup' => $skippedDup]);
     }
 
-    protected function authorizePrepress($user): void
-    {
-        if ($user->isSuperAdmin()) {
-            return;
-        }
-        if ($user->isAdmin()) {
-            $prepressCompanyId = \App\Models\Department::where('name', '製版')->value('company_id');
-            if (!$prepressCompanyId || $user->company_id == $prepressCompanyId) {
-                return;
-            }
-            abort(403, 'Prepress エリアは同じ会社のAdminのみアクセスできます。');
-        }
-        // Coordinator・Leader・Clerk は部署問わずアクセス可
-        if ($user->isCoordinator() || $user->isLeader() || $user->isClerk()) {
-            return;
-        }
-        if (!$user->department || $user->department->name !== '製版') {
-            abort(403, 'Prepress エリアは製版部署のみアクセスできます。');
-        }
-    }
 }

@@ -115,8 +115,10 @@ class ProjectJobMemberScheduleController extends Controller
             ->map(fn ($v) => (int) $v)
             ->all();
 
-        // 該当日のEventsを取得
+        // 該当日のEventsを取得（event_item_type が付いた「会議/外出等の絶対に作業できない予定」のみ。
+        // マイジョブ等の project_job_assignment 由来イベントは event_item_type_id を持たないため除外される）
         $eventModels = Event::whereIn('user_id', $memberIds)
+            ->whereNotNull('event_item_type_id')
             ->where(function ($q) use ($dayStart, $dayEnd) {
                 $q->whereBetween('starts_at', [$dayStart, $dayEnd])
                   ->orWhereBetween('ends_at', [$dayStart, $dayEnd])

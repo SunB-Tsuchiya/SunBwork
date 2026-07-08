@@ -55,6 +55,12 @@ useToasts();
 // resource being viewed when it's not the logged-in user.
 const user = page.props.user;
 const authUser = page.props.auth && page.props.auth.user ? page.props.auth.user : page.props.user;
+const canShowPrepressNav = computed(() => {
+    if (authUser?.isSuperAdmin) return true;
+
+    return page.props.auth?.companyType === 'sunbrain'
+        && (authUser?.isAdmin || authUser?.isPrepressDepartment);
+});
 
 // Provide `authUser` and `user` to descendant components via Vue's provide/inject
 // so components like AssignmentForm_user.vue can access them even when
@@ -689,7 +695,7 @@ function navigateToRole(role) {
                             <ResponsiveNavLink :href="route('user.dashboard')" :active="route().current('user.dashboard')">
                                 <span class="text-blue-600">User Dashboard</span>
                             </ResponsiveNavLink>
-                            <ResponsiveNavLink v-if="$page.props.auth.companyType === 'sunbrain'" :href="route('prepress.dashboard')" :active="route().current('prepress.dashboard')">
+                            <ResponsiveNavLink v-if="canShowPrepressNav" :href="route('prepress.dashboard')" :active="route().current('prepress.*')">
                                 <span class="text-green-700">Prepress Dashboard</span>
                             </ResponsiveNavLink>
                         </template>
@@ -708,7 +714,7 @@ function navigateToRole(role) {
                             <ResponsiveNavLink :href="route('user.dashboard')" :active="route().current('user.dashboard')">
                                 <span class="text-blue-600">User Dashboard</span>
                             </ResponsiveNavLink>
-                            <ResponsiveNavLink v-if="$page.props.auth.companyType === 'sunbrain'" :href="route('prepress.dashboard')" :active="route().current('prepress.dashboard')">
+                            <ResponsiveNavLink v-if="canShowPrepressNav" :href="route('prepress.dashboard')" :active="route().current('prepress.*')">
                                 <span class="text-green-700">Prepress Dashboard</span>
                             </ResponsiveNavLink>
                         </template>
@@ -735,7 +741,7 @@ function navigateToRole(role) {
                                 <span class="text-blue-600">User Dashboard</span>
                             </ResponsiveNavLink>
                             <ResponsiveNavLink
-                                v-if="$page.props.auth.user.isPrepressDepartment && $page.props.auth.companyType === 'sunbrain'"
+                                v-if="canShowPrepressNav"
                                 :href="route('prepress.dashboard')"
                                 :active="route().current('prepress.*')"
                             >
@@ -747,7 +753,7 @@ function navigateToRole(role) {
                         <template v-else>
                             <ResponsiveNavLink :href="route('dashboard')" :active="route().current('dashboard')"> Dashboard </ResponsiveNavLink>
                             <ResponsiveNavLink
-                                v-if="$page.props.auth.user.isPrepressDepartment && $page.props.auth.companyType === 'sunbrain'"
+                                v-if="canShowPrepressNav"
                                 :href="route('prepress.dashboard')"
                                 :active="route().current('prepress.*')"
                             >

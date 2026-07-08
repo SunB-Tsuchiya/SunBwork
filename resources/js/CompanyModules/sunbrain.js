@@ -9,11 +9,9 @@ export default {
       routePrefix: 'proof_coordinator.',
       activeColor: 'bg-pink-600 text-white font-semibold',
       textColor: 'text-pink-600 hover:text-pink-800',
-      // SuperAdmin / Admin / proof_coordinator ロール、または情報出版部署の Leader のみ
-      // Coordinator・User は情報出版所属でも非表示
+      // SuperAdmin / Admin / proof_coordinator ロールのみ
       visibilityCheck: (auth) =>
-        ['superadmin', 'admin', 'proof_coordinator'].includes(auth.user.user_role) ||
-        (auth.user.user_role === 'leader' && auth.user.departmentModule === 'publishing'),
+        ['superadmin', 'admin', 'proof_coordinator'].includes(auth.user.user_role),
     },
     {
       role: 'prepress',

@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers\Prepress;
 
+use App\Http\Controllers\Prepress\Concerns\AuthorizesPrepress;
 use App\Http\Controllers\Controller;
 use App\Models\Department;
 use Illuminate\Http\Request;
 
 class PrepressDashboardController extends Controller
 {
+    use AuthorizesPrepress;
+
     public function index(Request $request)
     {
         $user = $request->user()->load('department');
@@ -31,20 +34,4 @@ class PrepressDashboardController extends Controller
         ]);
     }
 
-    protected function authorizePrepress($user): void
-    {
-        if ($user->isSuperAdmin()) {
-            return;
-        }
-        if ($user->isAdmin()) {
-            $prepressCompanyId = \App\Models\Department::where('name', '製版')->value('company_id');
-            if (!$prepressCompanyId || $user->company_id == $prepressCompanyId) {
-                return;
-            }
-            abort(403, 'Prepress エリアは同じ会社のAdminのみアクセスできます。');
-        }
-        if (!$user->department || $user->department->name !== '製版') {
-            abort(403, 'Prepress エリアは製版部署のみアクセスできます。');
-        }
-    }
 }

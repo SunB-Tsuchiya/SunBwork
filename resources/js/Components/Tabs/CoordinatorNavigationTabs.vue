@@ -83,6 +83,7 @@ const tabs = computed(() => [
     { key: 'projects', href: getAssignmentsLink(), label: '案件一覧' },
     { key: 'jobs', href: getJobboxLink(), label: 'ジョブ一覧' },
     { key: 'calendar', href: getCalendarLink(), label: '案件カレンダー' },
+    { key: 'operator_calendar', href: tryRoute('coordinator.operator_calendar.index'), label: 'オペレーターカレンダー' },
     { key: 'progress_sheet_list', href: getProgressSheetListLink(), label: '進行表一覧' },
     { key: 'workflow_sheet_list', href: getWorkflowSheetListLink(), label: '管理シート一覧' },
     { key: 'progress_report', href: getProgressReportLink(), label: '進行レポート' },
@@ -124,6 +125,11 @@ function onMobileSelect(e) {
             <Link :href="getAssignmentsLink()" :class="tab('projects')"> 案件一覧 </Link>
             <Link :href="getJobboxLink()" :class="tab('jobs')"> ジョブ一覧 </Link>
             <Link :href="getCalendarLink()" :class="tab('calendar')"> 案件カレンダー </Link>
+            <Link
+                v-if="tryRoute('coordinator.operator_calendar.index')"
+                :href="tryRoute('coordinator.operator_calendar.index')"
+                :class="tab('operator_calendar')"
+            > オペレーターカレンダー </Link>
             <Link :href="getProgressSheetListLink()" :class="tab('progress_sheet_list')"> 進行表一覧 </Link>
             <Link :href="getWorkflowSheetListLink()" :class="tab('workflow_sheet_list')"> 管理シート一覧 </Link>
             <Link :href="getProgressReportLink()" :class="tab('progress_report')"> 進行レポート </Link>

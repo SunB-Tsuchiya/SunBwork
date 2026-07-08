@@ -941,6 +941,27 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('settings/data', [App\Http\Controllers\Coordinator\CoordinatorSettingController::class, 'show'])->name('settings.data');
         Route::put('settings', [App\Http\Controllers\Coordinator\CoordinatorSettingController::class, 'update'])->name('settings.update');
 
+        // ── オペレーターカレンダー ─────────────────────────────────
+        Route::prefix('operator-calendar')->name('operator_calendar.')->group(function () {
+            Route::get('/',     [App\Http\Controllers\Coordinator\OperatorCalendarController::class, 'index'])->name('index');
+            Route::get('/data', [App\Http\Controllers\Coordinator\OperatorCalendarController::class, 'data'])->name('data');
+            Route::get('/all',  [App\Http\Controllers\Coordinator\OperatorCalendarController::class, 'all'])->name('all');
+
+            Route::post('/members',          [App\Http\Controllers\Coordinator\OperatorCalendarController::class, 'storeMember'])->name('members.store');
+            Route::delete('/members/{user}', [App\Http\Controllers\Coordinator\OperatorCalendarController::class, 'destroyMember'])->name('members.destroy');
+
+            Route::post('/reservations', [App\Http\Controllers\Coordinator\OperatorCalendarController::class, 'store'])->name('reservations.store');
+            Route::put('/reservations/{operatorReservation}', [App\Http\Controllers\Coordinator\OperatorCalendarController::class, 'update'])->name('reservations.update');
+            Route::delete('/reservations/{operatorReservation}', [App\Http\Controllers\Coordinator\OperatorCalendarController::class, 'destroy'])->name('reservations.destroy');
+
+            Route::patch('/color-assignments/{colorKey}', [App\Http\Controllers\Coordinator\OperatorCalendarController::class, 'updateColorAssignment'])->name('color_assignments.update');
+
+            Route::get('/notifications', [App\Http\Controllers\Coordinator\OperatorCalendarController::class, 'notifications'])->name('notifications.index');
+            Route::put('/notifications/{operatorReservationNotification}/read', [App\Http\Controllers\Coordinator\OperatorCalendarController::class, 'markNotificationRead'])->name('notifications.read');
+            Route::post('/requests', [App\Http\Controllers\Coordinator\OperatorCalendarController::class, 'storeRequest'])->name('requests.store');
+            Route::put('/requests/{operatorReservationRequest}/respond', [App\Http\Controllers\Coordinator\OperatorCalendarController::class, 'respondRequest'])->name('requests.respond');
+        });
+
         // ── 項目リスト ─────────────────────────────────────────────
         Route::get('project_jobs/{projectJob}/item-entries', [App\Http\Controllers\Coordinator\ItemEntryController::class, 'index'])->name('item_entries.index');
         Route::put('project_jobs/{projectJob}/item-entries', [App\Http\Controllers\Coordinator\ItemEntryController::class, 'update'])->name('item_entries.update');
@@ -1017,7 +1038,7 @@ Route::get('/debug/create', function () {
 // (temporary debug routes removed)
 
 // =====================================================
-// ProofCoordinator Routes（校正窓口 / Admin / SuperAdmin / 部署Leader）
+// ProofCoordinator Routes（校正窓口 / Admin / SuperAdmin）
 // サン・ブレーン専用（company_type: sunbrain）
 // =====================================================
 Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'company_type:sunbrain', 'proof_coordinator'])

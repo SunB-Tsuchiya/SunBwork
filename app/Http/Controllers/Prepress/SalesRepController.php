@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Prepress;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\ManagesSalesReps;
-use App\Models\Department;
+use App\Http\Controllers\Prepress\Concerns\AuthorizesPrepress;
 use App\Models\PrepresSalesRep;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,6 +12,7 @@ use Inertia\Inertia;
 
 class SalesRepController extends Controller
 {
+    use AuthorizesPrepress;
     use ManagesSalesReps;
 
     protected function salesRepsViewName(): string
@@ -56,20 +57,4 @@ class SalesRepController extends Controller
         return response()->json(['rep' => $rep->only(['id', 'name', 'company'])]);
     }
 
-    private function authorizePrepress($user): void
-    {
-        if ($user->isSuperAdmin()) {
-            return;
-        }
-        if ($user->isAdmin()) {
-            $prepressCompanyId = \App\Models\Department::where('name', '製版')->value('company_id');
-            if (!$prepressCompanyId || $user->company_id == $prepressCompanyId) {
-                return;
-            }
-            abort(403);
-        }
-        if (!$user->department || $user->department->name !== '製版') {
-            abort(403);
-        }
-    }
 }

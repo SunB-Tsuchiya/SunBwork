@@ -3,14 +3,16 @@
 namespace App\Http\Controllers\Prepress;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Prepress\Concerns\AuthorizesPrepress;
 use App\Models\Client;
-use App\Models\Department;
 use App\Services\OcrSpaceService;
 use App\Services\PrepressImageService;
 use Illuminate\Http\Request;
 
 class TicketOcrController extends Controller
 {
+    use AuthorizesPrepress;
+
     public function __construct(
         private PrepressImageService $imageService,
         private OcrSpaceService $ocrService,
@@ -101,32 +103,4 @@ class TicketOcrController extends Controller
         return response()->json(['ok' => true, 'client_name' => $client->name]);
     }
 
-    /**
-     * Prepress コンテキストで使うべき department_id を返す。
-     * Admin/SuperAdmin はユーザー部署ではなく「製版」部署を使う（authorizePrepress と同じ基準）。
-     */
-    private function getPrepressDeptId($user): ?int
-    {
-        if ($user->isSuperAdmin() || $user->isAdmin()) {
-            return Department::where('name', '製版')->value('id');
-        }
-        return $user->department_id;
-    }
-
-    protected function authorizePrepress($user): void
-    {
-        if ($user->isSuperAdmin()) {
-            return;
-        }
-        if ($user->isAdmin()) {
-            $prepressCompanyId = \App\Models\Department::where('name', '製版')->value('company_id');
-            if (!$prepressCompanyId || $user->company_id == $prepressCompanyId) {
-                return;
-            }
-            abort(403, 'Prepress エリアは同じ会社のAdminのみアクセスできます。');
-        }
-        if (!$user->department || $user->department->name !== '製版') {
-            abort(403, 'Prepress エリアは製版部署のみアクセスできます。');
-        }
-    }
 }

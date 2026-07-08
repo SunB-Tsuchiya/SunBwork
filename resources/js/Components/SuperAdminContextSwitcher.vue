@@ -1,10 +1,12 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { router, usePage } from '@inertiajs/vue3'
+import { usePage } from '@inertiajs/vue3'
 import { route } from 'ziggy-js'
+import axios from 'axios'
 
 const page = usePage()
 const open = ref(false)
+const switching = ref(false)
 
 const auth = computed(() => page.props.auth)
 const companies = computed(() => auth.value.switchableCompanies ?? [])
@@ -17,21 +19,17 @@ const currentLabel = computed(() => {
 })
 
 async function switchContext(companyId) {
+  if (switching.value) return
+
   open.value = false
-  const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+  switching.value = true
+
   try {
-    await fetch(route('superadmin.switch_context'), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-TOKEN': csrf,
-        'X-Requested-With': 'XMLHttpRequest',
-      },
-      body: JSON.stringify({ company_id: companyId }),
-      credentials: 'same-origin',
-    })
-  } catch (_) {}
-  router.reload({ preserveState: false, preserveScroll: false })
+    await axios.post(route('superadmin.switch_context'), { company_id: companyId })
+    window.location.reload()
+  } catch (_) {
+    switching.value = false
+  }
 }
 </script>
 
@@ -40,6 +38,7 @@ async function switchContext(companyId) {
     <button
       type="button"
       class="flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
+      :disabled="switching"
       @click="open = !open"
     >
       <!-- 地球アイコン -->
@@ -63,6 +62,7 @@ async function switchContext(companyId) {
         type="button"
         class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm hover:bg-gray-50"
         :class="!currentContextId ? 'font-semibold text-gray-900' : 'text-gray-700'"
+        :disabled="switching"
         @click="switchContext(null)"
       >
         <span>🌐</span>
@@ -77,6 +77,7 @@ async function switchContext(companyId) {
           type="button"
           class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm hover:bg-gray-50"
           :class="currentContextId === company.id ? 'font-semibold text-gray-900' : 'text-gray-700'"
+          :disabled="switching"
           @click="switchContext(company.id)"
         >
           <span>👤</span>
