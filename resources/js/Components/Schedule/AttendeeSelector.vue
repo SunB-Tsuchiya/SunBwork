@@ -181,7 +181,7 @@ function deptName(did) {
 
     <!-- ピッカーモーダル -->
     <Teleport to="body">
-        <div v-if="showPicker" class="fixed inset-0 z-[60] flex items-center justify-center">
+        <div v-if="showPicker" class="fixed inset-0 z-[2001] flex items-center justify-center">
             <div class="absolute inset-0 bg-black/50" @click="showPicker = false" />
             <div class="relative z-10 flex w-full max-w-lg flex-col rounded-xl bg-white shadow-2xl"
                 style="max-height: 82vh">

@@ -324,12 +324,21 @@ const ROLE_DASHBOARD_ROUTE = {
     prepress:         'prepress.dashboard',
 };
 
+// プレフィックスなしの /dashboard はロール判定用の中継ルートで、
+// アクセスするとサーバー側でユーザーのuser_roleに応じて自動的に
+// role別ダッシュボードへ302リダイレクトされる。このURLを「最後にいた
+// ページ」として保存・使用してしまうと、常に元のロールへ戻される
+// リダイレクトループのように見える不具合になるため除外する。
+function pathnameOf(url) {
+    try { return new URL(url, window.location.origin).pathname; } catch { return url; }
+}
+
 // ページ遷移時に現ロールの最終URLをlocalStorageに保存
 watch(
     () => page.url,
     (url) => {
         const role = currentRouteContext.value;
-        if (role && url) {
+        if (role && url && pathnameOf(url) !== '/dashboard') {
             try { localStorage.setItem(`lastTab_${role}`, url); } catch {}
         }
     },
@@ -337,10 +346,18 @@ watch(
 );
 
 // ロールボタン押下: 保存済みURL → なければdashboard
+// ただし現在いるロールエリア自身のタブを押した場合、lastTabは直前の
+// watchで現在URLに上書きされ「今のページに戻る」だけになり無反応に見えるため、
+// 常にそのロールのダッシュボードへ遷移させる
 function navigateToRole(role) {
     try {
+        if (role === currentRouteContext.value) {
+            router.get(route(ROLE_DASHBOARD_ROUTE[role]));
+            return;
+        }
         const saved = localStorage.getItem(`lastTab_${role}`);
-        if (saved) {
+        // 過去に汚染されて保存された /dashboard は使わず、自己修復する
+        if (saved && pathnameOf(saved) !== '/dashboard') {
             router.get(saved);
         } else {
             router.get(route(ROLE_DASHBOARD_ROUTE[role]));

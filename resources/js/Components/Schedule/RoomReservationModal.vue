@@ -285,7 +285,7 @@ async function deleteReservation() {
 
 <template>
     <Teleport to="body">
-        <div v-if="show" class="fixed inset-0 z-50 flex items-center justify-center">
+        <div v-if="show" class="fixed inset-0 z-[2000] flex items-center justify-center">
             <div class="absolute inset-0 bg-black/40" @click="$emit('close')" />
 
             <div class="relative z-10 w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl overflow-y-auto" style="max-height: 90vh">

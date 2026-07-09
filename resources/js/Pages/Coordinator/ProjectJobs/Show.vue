@@ -895,7 +895,7 @@
                 type="text"
                 class="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
                 placeholder="例: 工程管理"
-                @keydown.enter="createWorkflowSheet"
+                @keydown.enter="onWorkflowNameEnter"
             />
 
             <label class="mt-4 block text-sm font-medium text-gray-700">テンプレート（任意）</label>
@@ -1720,6 +1720,14 @@ function createSheet() {
 const showCreateWorkflowModal = ref(false);
 const newWorkflowName = ref('');
 const newWorkflowTemplateId = ref(null);
+
+function onWorkflowNameEnter(event) {
+    // IME変換確定のEnterでは作成処理を発火させない
+    if (event.isComposing) {
+        return;
+    }
+    createWorkflowSheet();
+}
 
 function createWorkflowSheet() {
     const name = newWorkflowName.value.trim();

@@ -38,7 +38,7 @@ const ACTIONS = [
             leave-active-class="transition duration-100 ease-in"
             leave-from-class="opacity-100 translate-y-0"
             leave-to-class="opacity-0 translate-y-2">
-            <div v-if="show" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+            <div v-if="show" class="fixed inset-0 z-[2000] flex items-end sm:items-center justify-center">
                 <div class="absolute inset-0 bg-black/30" @click="$emit('close')" />
                 <div class="relative z-10 w-full max-w-xs mx-4 mb-6 sm:mb-0 overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-gray-200">
                     <!-- 日時ラベル -->

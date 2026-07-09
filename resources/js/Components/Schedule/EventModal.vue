@@ -5,12 +5,13 @@ import { router } from '@inertiajs/vue3';
 import AttendeeSelector from './AttendeeSelector.vue';
 import useToasts from '@/Composables/useToasts';
 
-// 15分刻みの時刻オプション (00:00〜23:45)
-const timeOptions = [];
-for (let h = 0; h < 24; h++) {
-    for (let m = 0; m < 60; m += 15) {
-        timeOptions.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
-    }
+// 時・分セレクタ用オプション（5分刻み）
+const hourOptions = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
+const baseMinOptions = ['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'];
+// 現在値が5分刻み外の場合は動的に追加
+function minOptionsFor(currentVal) {
+    if (!currentVal || baseMinOptions.includes(currentVal)) return baseMinOptions;
+    return [...baseMinOptions, currentVal].sort((a, b) => Number(a) - Number(b));
 }
 
 const props = defineProps({
@@ -134,8 +135,48 @@ watch([formAttendees, () => form.value.date, () => form.value.startTime, () => f
 function pad(n) { return String(n).padStart(2, '0'); }
 
 function minToTime(min) {
-    const snapped = Math.round(min / 15) * 15;
+    const snapped = Math.round(min / 5) * 5;
     return `${pad(Math.floor(snapped / 60))}:${pad(snapped % 60)}`;
+}
+
+// ── 開始・終了時刻の時/分セレクタ（form.startTime / endTime の "HH:MM" 文字列と同期） ──
+function splitTime(t) {
+    const [h, m] = (t || '00:00').split(':');
+    return { h: h || '00', m: m || '00' };
+}
+const startHour = computed({
+    get: () => splitTime(form.value.startTime).h,
+    set: (h) => { form.value.startTime = `${h}:${splitTime(form.value.startTime).m}`; },
+});
+const startMin = computed({
+    get: () => splitTime(form.value.startTime).m,
+    set: (m) => { form.value.startTime = `${splitTime(form.value.startTime).h}:${m}`; },
+});
+const endHour = computed({
+    get: () => splitTime(form.value.endTime).h,
+    set: (h) => { form.value.endTime = `${h}:${splitTime(form.value.endTime).m}`; },
+});
+const endMin = computed({
+    get: () => splitTime(form.value.endTime).m,
+    set: (m) => { form.value.endTime = `${splitTime(form.value.endTime).h}:${m}`; },
+});
+
+// 現在時刻（JST）を分丸めなしでセット
+function setCurrentTime(target) {
+    const now = new Date();
+    const jstParts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Tokyo',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+    }).formatToParts(now);
+    const h = jstParts.find((p) => p.type === 'hour').value.padStart(2, '0');
+    const m = jstParts.find((p) => p.type === 'minute').value.padStart(2, '0');
+    if (target === 'start') {
+        form.value.startTime = `${h}:${m}`;
+    } else {
+        form.value.endTime = `${h}:${m}`;
+    }
 }
 
 function toDateParts(d) {
@@ -595,7 +636,7 @@ function fmtResTime(isoStr) {
 
 <template>
     <Teleport to="body">
-        <div v-if="show" class="fixed inset-0 z-50 flex items-center justify-center">
+        <div v-if="show" class="fixed inset-0 z-[2000] flex items-center justify-center">
             <div class="absolute inset-0 bg-black/40" @click="$emit('close')" />
             <div class="relative z-10 w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl overflow-y-auto" style="max-height: 90vh">
                 <h2 class="mb-4 text-lg font-semibold text-gray-800">
@@ -661,19 +702,37 @@ function fmtResTime(isoStr) {
                     <div class="grid grid-cols-2 gap-3">
                         <div>
                             <label class="block text-sm font-medium text-gray-700">開始時刻 <span class="text-red-500">*</span></label>
-                            <select v-model="form.startTime" required
-                                class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
-                                <option v-for="t in timeOptions" :key="t" :value="t">{{ t }}</option>
-                            </select>
+                            <div class="mt-1 flex items-center gap-1">
+                                <select v-model="startHour" required
+                                    class="block w-full rounded-md border border-gray-300 px-2 py-2 text-sm focus:border-blue-500 focus:outline-none">
+                                    <option v-for="h in hourOptions" :key="h" :value="h">{{ h }}</option>
+                                </select>
+                                <span class="text-sm text-gray-500">:</span>
+                                <select v-model="startMin" required
+                                    class="block w-full rounded-md border border-gray-300 px-2 py-2 text-sm focus:border-blue-500 focus:outline-none">
+                                    <option v-for="m in minOptionsFor(startMin)" :key="m" :value="m">{{ m }}</option>
+                                </select>
+                                <button type="button" @click="setCurrentTime('start')"
+                                    class="shrink-0 rounded border border-gray-300 bg-gray-50 px-2 py-1.5 text-xs text-gray-600 hover:bg-gray-100">現在時刻</button>
+                            </div>
                             <p v-if="errors.startTime" class="mt-1 text-xs text-red-500">{{ errors.startTime[0] }}</p>
                             <p v-if="errors.starts_at" class="mt-1 text-xs text-red-500">{{ errors.starts_at[0] }}</p>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700">終了時刻 <span class="text-red-500">*</span></label>
-                            <select v-model="form.endTime" required
-                                class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
-                                <option v-for="t in timeOptions" :key="t" :value="t">{{ t }}</option>
-                            </select>
+                            <div class="mt-1 flex items-center gap-1">
+                                <select v-model="endHour" required
+                                    class="block w-full rounded-md border border-gray-300 px-2 py-2 text-sm focus:border-blue-500 focus:outline-none">
+                                    <option v-for="h in hourOptions" :key="h" :value="h">{{ h }}</option>
+                                </select>
+                                <span class="text-sm text-gray-500">:</span>
+                                <select v-model="endMin" required
+                                    class="block w-full rounded-md border border-gray-300 px-2 py-2 text-sm focus:border-blue-500 focus:outline-none">
+                                    <option v-for="m in minOptionsFor(endMin)" :key="m" :value="m">{{ m }}</option>
+                                </select>
+                                <button type="button" @click="setCurrentTime('end')"
+                                    class="shrink-0 rounded border border-gray-300 bg-gray-50 px-2 py-1.5 text-xs text-gray-600 hover:bg-gray-100">現在時刻</button>
+                            </div>
                         </div>
                     </div>
 

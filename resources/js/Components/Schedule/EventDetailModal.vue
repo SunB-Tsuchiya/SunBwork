@@ -71,7 +71,7 @@ async function materialize() {
 
 <template>
     <Teleport to="body">
-        <div v-if="show && event" class="fixed inset-0 z-50 flex items-center justify-center">
+        <div v-if="show && event" class="fixed inset-0 z-[2000] flex items-center justify-center">
             <div class="absolute inset-0 bg-black/40" @click="$emit('close')" />
             <div class="relative z-10 w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
                 <h2 class="mb-1 text-lg font-semibold text-gray-800">{{ event.title }}</h2>

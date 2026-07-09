@@ -225,7 +225,7 @@ function evStyle(ev) {
     return {
         top:         `${evTop(ev)}px`,
         height:      `${evHeight(ev)}px`,
-        zIndex:      Math.max(1, Math.round(86_400_000 / Math.max(1, eventDuration(ev)))),
+        zIndex:      Math.min(900, Math.max(1, Math.round(86_400_000 / Math.max(1, eventDuration(ev))))),
         background:  evColor(ev).bg,
         color:       evColor(ev).text,
         borderColor: evColor(ev).border,

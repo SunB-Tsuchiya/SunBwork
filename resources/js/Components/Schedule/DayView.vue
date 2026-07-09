@@ -474,7 +474,7 @@ function evStyle(ev) {
     return {
         top:         `${(s - START_HOUR * 60) * (HOUR_H / 60)}px`,
         height:      `${Math.max(18, (e - s) * (HOUR_H / 60))}px`,
-        zIndex:      Math.max(1, Math.round(86_400_000 / Math.max(1, eventDuration(ev)))),
+        zIndex:      Math.min(900, Math.max(1, Math.round(86_400_000 / Math.max(1, eventDuration(ev))))),
         background:  evColor(ev).bg,
         color:       evColor(ev).text,
         borderColor: evColor(ev).border,

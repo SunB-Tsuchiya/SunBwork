@@ -657,7 +657,7 @@ async function saveWeekBreaks() {
     <!-- ── 進行表・管理シートモーダル ─────────────────────────── -->
     <div
         v-if="showJobSheetModal"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+        class="fixed inset-0 z-[2000] flex items-center justify-center bg-black bg-opacity-50"
         @click.self="showJobSheetModal = false">
         <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
             <h2 class="mb-4 text-lg font-bold">案件を選択（進行表・管理シートから）</h2>
@@ -725,7 +725,7 @@ async function saveWeekBreaks() {
     </div>
 
     <!-- ── 週間日程設定モーダル ───────────────────────────────── -->
-    <div v-if="showScheduleModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+    <div v-if="showScheduleModal" class="fixed inset-0 z-[2000] flex items-center justify-center bg-black bg-opacity-50">
         <div class="w-full max-w-sm rounded-lg bg-white p-6 shadow-lg">
             <h2 class="mb-4 text-lg font-bold">週間日程設定</h2>
             <p class="mb-3 text-xs text-gray-500">空白はデフォルト設定を使用します。</p>
@@ -769,7 +769,7 @@ async function saveWeekBreaks() {
     </div>
 
     <!-- ── 週間休憩設定モーダル ───────────────────────────────── -->
-    <div v-if="showBreakModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+    <div v-if="showBreakModal" class="fixed inset-0 z-[2000] flex items-center justify-center bg-black bg-opacity-50">
         <div class="w-full max-w-lg rounded-lg bg-white p-6 shadow-lg">
             <h2 class="mb-1 text-lg font-bold">週間休憩設定</h2>
             <p class="mb-3 text-xs text-gray-500">チェックを入れた日に休憩時間が適用されます。時間を変更するとチェックが自動で入ります。</p>
