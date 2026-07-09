@@ -74,6 +74,7 @@ const drag = ref(null);
 const selecting = ref(null);
 
 const showAddMemberPanel = ref(false);
+const sortMode           = ref(false);
 const showColorPanel     = ref(false);
 const showJobListPanel   = ref(false);
 const jobListLoading     = ref(false);
@@ -523,6 +524,13 @@ function assignableUserName(userId) {
     return props.assignableUsers.find(u => u.id === userId)?.name ?? '—';
 }
 
+// 色担当一覧表示用: フルネームから苗字のみを取り出す（製版ボードのカードと同じ表記）
+function colorUserFamilyName(userId) {
+    const u = props.assignableUsers.find(u => u.id === userId);
+    if (!u) return null;
+    return u.name.split(/[\s　]+/)[0];
+}
+
 // ─────────────────────────────────────────────────────────────────
 //  メンバー追加・削除
 // ─────────────────────────────────────────────────────────────────
@@ -545,6 +553,39 @@ async function removeMember(member) {
         localCandidates.value.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
     } catch (err) {
         alert('メンバー削除に失敗しました: ' + err.message);
+    }
+}
+
+// カレンダー行の並べ替え（登録済みメンバーのみ対象。未登録行は常に末尾に表示される）
+function isFirstMember(member) {
+    return localMembers.value.length > 0 && localMembers.value[0].id === member.id;
+}
+function isLastMember(member) {
+    return localMembers.value.length > 0 && localMembers.value[localMembers.value.length - 1].id === member.id;
+}
+function moveMemberUp(member) {
+    const idx = localMembers.value.findIndex(m => m.id === member.id);
+    if (idx <= 0) return;
+    const arr = [...localMembers.value];
+    [arr[idx - 1], arr[idx]] = [arr[idx], arr[idx - 1]];
+    localMembers.value = arr;
+    persistMemberOrder();
+}
+function moveMemberDown(member) {
+    const idx = localMembers.value.findIndex(m => m.id === member.id);
+    if (idx === -1 || idx >= localMembers.value.length - 1) return;
+    const arr = [...localMembers.value];
+    [arr[idx + 1], arr[idx]] = [arr[idx], arr[idx + 1]];
+    localMembers.value = arr;
+    persistMemberOrder();
+}
+async function persistMemberOrder() {
+    try {
+        await apiPut(route('coordinator.operator_calendar.members.reorder'), {
+            order: localMembers.value.map(m => m.id),
+        });
+    } catch (err) {
+        alert('並べ替えの保存に失敗しました: ' + err.message);
     }
 }
 
@@ -860,12 +901,11 @@ onUnmounted(() => {
                         :class="showAddMemberPanel ? 'bg-green-700 text-white' : 'bg-green-100 text-green-800 hover:bg-green-200'">
                     ＋メンバー
                 </button>
-                <button @click="showColorPanel = !showColorPanel"
+                <button @click="sortMode = !sortMode" title="カレンダー行の並べ替え"
                         class="rounded px-3 py-1.5 text-sm font-medium"
-                        :class="showColorPanel ? 'bg-indigo-700 text-white' : 'bg-indigo-100 text-indigo-800 hover:bg-indigo-200'">
-                    色設定
+                        :class="sortMode ? 'bg-purple-700 text-white' : 'bg-purple-100 text-purple-800 hover:bg-purple-200'">
+                    並べ替え{{ sortMode ? '終了' : '' }}
                 </button>
-
                 <div class="relative ml-auto">
                     <button @click="toggleNotifDropdown" title="通知"
                             class="relative rounded px-3 py-1.5 text-sm font-medium bg-orange-100 text-orange-800 hover:bg-orange-200">
@@ -1017,6 +1057,27 @@ onUnmounted(() => {
                 </div>
             </div>
 
+            <!-- ─── 色担当一覧（製版ボードのカードと同じ表記） ───────── -->
+            <div class="flex flex-col items-end gap-1 border-b border-gray-200 bg-white px-4 py-3 sm:px-6 lg:px-8">
+                <div class="flex flex-wrap items-end gap-3">
+                    <div v-for="a in localColorAssignments" :key="a.color_key"
+                         class="flex flex-col items-center gap-0.5">
+                        <span class="h-5 w-5 rounded-full border-2 border-white shadow"
+                              :style="{ backgroundColor: COLOR_HEX[a.color_key] }"
+                              :title="colorUserFamilyName(a.user_id) ?? a.color_key"></span>
+                        <span v-if="colorUserFamilyName(a.user_id)"
+                              :title="colorUserFamilyName(a.user_id)"
+                              class="max-w-[3.5rem] truncate text-center text-[10px] leading-none text-gray-500">
+                            {{ colorUserFamilyName(a.user_id) }}
+                        </span>
+                    </div>
+                </div>
+                <button type="button" class="text-[11px] text-gray-400 underline hover:text-gray-600"
+                        @click="showColorPanel = !showColorPanel">
+                    担当色変更
+                </button>
+            </div>
+
             <!-- ─── タイムライン ───────────────────────────────────── -->
             <div class="timeline-wrapper overflow-x-auto" style="user-select: none;">
                 <div :style="{ minWidth: (MEMBER_W + 700) + 'px' }">
@@ -1042,6 +1103,12 @@ onUnmounted(() => {
                         <div class="sticky left-0 z-10 flex flex-shrink-0 items-center justify-between gap-1 border-r border-gray-200 px-3"
                              :style="{ width: MEMBER_W + 'px' }"
                              :class="idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'">
+                            <div v-if="sortMode && member.registered" class="flex shrink-0 flex-col leading-none">
+                                <button @click="moveMemberUp(member)" :disabled="isFirstMember(member)" title="上へ"
+                                        class="text-[10px] text-gray-400 hover:text-gray-700 disabled:opacity-20">▲</button>
+                                <button @click="moveMemberDown(member)" :disabled="isLastMember(member)" title="下へ"
+                                        class="text-[10px] text-gray-400 hover:text-gray-700 disabled:opacity-20">▼</button>
+                            </div>
                             <span class="truncate text-sm font-medium text-gray-700" :class="!member.registered && 'italic text-gray-400'">
                                 {{ member.name }}
                             </span>

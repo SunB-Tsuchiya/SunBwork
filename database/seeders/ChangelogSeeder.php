@@ -1524,6 +1524,32 @@ HTML,
 </section>
 HTML,
         ],
+        [
+            'version'      => 'operator-calendar-enhance-1',
+            'title'        => 'オペレーターカレンダー：色担当一覧表示・メンバー追加の部署制限・並べ替え機能を追加',
+            'released_at'  => '2026-07-09',
+            'summary'      => 'オペレーターカレンダーのカレンダー上部に、製版伝票ボードと同じ「色○＋名前」の担当色一覧を表示するようにしました。また「＋メンバー」の追加候補を自分の部署のユーザーのみに限定し、部署内の並び順で表示するようにしました（SuperAdminは会社切替の状態に応じて絞り込みを調整します）。カレンダーのオペレーター行は上下ボタンで並べ替えでき、順序はデータベースに保存されます。',
+            'design_files' => [],
+            'claude_notes' => 'OperatorCalendar.vue: ツールバーの「色設定」トグルボタンを削除し、タイムライン直上に製版ボード Board.vue と同じ見た目（色丸＋苗字＋右下「担当色変更」リンク）のセクションを追加。苗字抽出は Board.vue の colorUserName() と同じ split(/[\s　]+/)[0] ロジックを colorUserFamilyName() として実装。' . "\n\n" . 'OperatorCalendarController.php: getCandidateUsers()（＋メンバー候補一覧）を自分の部署のユーザーのみ・User::ordered()（sort_order→name順）に限定。SuperAdmin は既存の ResolvesContextCompany トレイト（superadmin_context.company_id セッション）を使い、会社切替コンテキストが自社と一致する場合のみ自分の部署で絞り込み、他社選択中／会社未選択のグローバルモードでは部署では絞らず選択中の会社全体（またはグローバルなら無制限）を候補にする。絞り込みロジックは candidateScope() として共通化。' . "\n\n" . 'メンバー並べ替え: operator_calendar_members.sort_order（既存カラム、追加マイグレーション不要）を使用。PUT /operator-calendar/members/reorder（reorderMembers()）を新設し、「並べ替え」トグルON時に各メンバー行へ表示される▲▼ボタンでlocalMembers配列を入れ替え→即APIで永続化。' . "\n\n" . '実データ（company_id=2の情報出版/製版部署）で再現テストを実施: leader/adminユーザーでの部署絞り込みは正しく機能することをtinker経由の直接呼び出しで確認。ユーザー報告の「製版メンバーが見える」件は、修正前に開いていたブラウザタブがInertia SPAのため props 未更新のまま残っていたことが原因と判明（ページ再読み込みで解消）。' . "\n\n" . 'codexレビュー（--uncommitted）で1件（P2）検出し修正: getCandidateUsers() の部署・会社絞り込みは「＋メンバー」候補一覧のUI表示のみを制限しており、追加API storeMember() 自体には範囲チェックが無く、直接APIリクエストで範囲外（他部署・他社）のユーザーを追加できてしまう状態だった。candidateScope() を storeMember() 側でも呼び出し、対象ユーザーが会社・部署スコープ外の場合は403を返すよう修正。tinkerで範囲外ユーザー（403でブロック）・範囲内ユーザー（正常追加）の両方を実データで確認済み。',
+            'body'         => <<<'HTML'
+<section class="cl-feature">
+  <h3>追加した機能</h3>
+  <ul>
+    <li>カレンダー上部に、製版伝票ボードのカードと同じ「色○＋担当者名」の一覧を表示するようにした</li>
+    <li>一覧の右下の「担当色変更」リンクから、色ごとの担当者設定を開けるようにした（従来のツールバーのボタンは統合して削除）</li>
+    <li>「＋メンバー」の追加候補を自分の部署のユーザーのみに限定し、部署内の並び順で表示するようにした</li>
+    <li>「並べ替え」ボタンを追加。ONにするとオペレーター行に▲▼ボタンが表示され、クリックで表示順を入れ替えられる（並べ替えた順序は自動的に保存され、次回アクセス時も維持される）</li>
+  </ul>
+</section>
+
+<section class="cl-fix">
+  <h3>修正・改善内容</h3>
+  <ul>
+    <li>「＋メンバー」追加APIについても、候補一覧と同じ部署・会社の範囲チェックを行うようにし、一覧に出ない範囲外のユーザーを追加できないようにした</li>
+  </ul>
+</section>
+HTML,
+        ],
         ];
 
         foreach ($entries as $entry) {

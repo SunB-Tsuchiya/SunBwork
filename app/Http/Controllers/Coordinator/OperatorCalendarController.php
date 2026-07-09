@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Coordinator;
 
+use App\Http\Controllers\Concerns\ResolvesContextCompany;
 use App\Http\Controllers\Controller;
 use App\Models\OperatorCalendarColorAssignment;
 use App\Models\OperatorCalendarMember;
@@ -18,6 +19,8 @@ use Inertia\Response;
 
 class OperatorCalendarController extends Controller
 {
+    use ResolvesContextCompany;
+
     // ──────────────────────────────────────────────────────
     //  ページ表示
     // ──────────────────────────────────────────────────────
@@ -97,6 +100,16 @@ class OperatorCalendarController extends Controller
             'user_id' => ['required', 'exists:users,id'],
         ]);
 
+        // 候補一覧の絞り込みと同じスコープを検証する（直接APIを叩いての範囲外追加を防ぐ）
+        [$companyId, $departmentId] = $this->candidateScope();
+        $targetUser = User::findOrFail($data['user_id']);
+        if ($companyId && (int) $targetUser->company_id !== (int) $companyId) {
+            abort(403, '対象ユーザーは操作可能な範囲外です。');
+        }
+        if ($departmentId && (int) $targetUser->department_id !== (int) $departmentId) {
+            abort(403, '対象ユーザーは操作可能な範囲外です。');
+        }
+
         $maxOrder = OperatorCalendarMember::max('sort_order') ?? 0;
 
         $member = OperatorCalendarMember::firstOrCreate(
@@ -119,6 +132,23 @@ class OperatorCalendarController extends Controller
         OperatorCalendarMember::where('user_id', $user->id)->delete();
 
         return response()->json(['ok' => true, 'user_id' => $user->id, 'name' => $user->name]);
+    }
+
+    /** カレンダー行の並び順を保存する（ドラッグ／上下ボタンでの並べ替え確定時に呼ばれる） */
+    public function reorderMembers(Request $request): JsonResponse
+    {
+        $this->assertAccess();
+
+        $data = $request->validate([
+            'order'   => ['required', 'array'],
+            'order.*' => ['integer', 'exists:users,id'],
+        ]);
+
+        foreach ($data['order'] as $index => $userId) {
+            OperatorCalendarMember::where('user_id', $userId)->update(['sort_order' => $index + 1]);
+        }
+
+        return response()->json(['ok' => true]);
     }
 
     // ──────────────────────────────────────────────────────
@@ -408,12 +438,45 @@ class OperatorCalendarController extends Controller
             ->toArray();
     }
 
+    /**
+     * メンバー追加の対象範囲（会社ID・部署ID）を返す。候補一覧の絞り込みと、
+     * 追加API（storeMember）側の検証の両方でこのスコープを使う（片方だけだと直接APIで回避できてしまうため）。
+     * SuperAdmin は会社切替コンテキストに応じて絞り込む:
+     *   - 自社を選択中（または未切替でコンテキストが自社と一致） → 自分の部署のみ
+     *   - 他社を選択中／会社未選択のグローバルモード          → 部署では絞らず、選択中の会社全体（またはグローバルなら無制限）
+     *
+     * @return array{0: ?int, 1: ?int} [companyId, departmentId]（null は「絞り込みなし」を意味する）
+     */
+    private function candidateScope(): array
+    {
+        $user = Auth::user();
+
+        $companyId    = $user->isSuperAdmin() ? $this->contextCompanyId() : $user->company_id;
+        $departmentId = null;
+        if (! $user->isSuperAdmin()) {
+            $departmentId = $user->department_id;
+        } elseif ($companyId && (int) $companyId === (int) $user->company_id) {
+            $departmentId = $user->department_id;
+        }
+
+        return [$companyId, $departmentId];
+    }
+
+    /** 「＋メンバー」候補一覧: candidateScope() の範囲内のユーザーのみを sort_order 順で返す。 */
     private function getCandidateUsers(): array
     {
         $memberUserIds = OperatorCalendarMember::pluck('user_id');
+        [$companyId, $departmentId] = $this->candidateScope();
 
-        return User::whereNotIn('id', $memberUserIds)
-            ->ordered()
+        $query = User::whereNotIn('id', $memberUserIds);
+        if ($companyId) {
+            $query->where('company_id', $companyId);
+        }
+        if ($departmentId) {
+            $query->where('department_id', $departmentId);
+        }
+
+        return $query->ordered()
             ->get(['id', 'name'])
             ->toArray();
     }

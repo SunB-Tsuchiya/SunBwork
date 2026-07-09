@@ -948,6 +948,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
             Route::get('/all',  [App\Http\Controllers\Coordinator\OperatorCalendarController::class, 'all'])->name('all');
 
             Route::post('/members',          [App\Http\Controllers\Coordinator\OperatorCalendarController::class, 'storeMember'])->name('members.store');
+            Route::put('/members/reorder',   [App\Http\Controllers\Coordinator\OperatorCalendarController::class, 'reorderMembers'])->name('members.reorder');
             Route::delete('/members/{user}', [App\Http\Controllers\Coordinator\OperatorCalendarController::class, 'destroyMember'])->name('members.destroy');
 
             Route::post('/reservations', [App\Http\Controllers\Coordinator\OperatorCalendarController::class, 'store'])->name('reservations.store');
