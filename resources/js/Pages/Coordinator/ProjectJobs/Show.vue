@@ -896,6 +896,8 @@
                 class="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
                 placeholder="例: 工程管理"
                 @keydown.enter="onWorkflowNameEnter"
+                @compositionstart="workflowNameComposing = true"
+                @compositionend="workflowNameComposing = false"
             />
 
             <label class="mt-4 block text-sm font-medium text-gray-700">テンプレート（任意）</label>
@@ -1721,9 +1723,15 @@ const showCreateWorkflowModal = ref(false);
 const newWorkflowName = ref('');
 const newWorkflowTemplateId = ref(null);
 
+// IME変換中フラグ（event.isComposing 単体だとブラウザによって
+// 変換確定のEnterでも false になる既知の不具合があるため、
+// compositionstart/compositionend で自前管理して併用する）
+const workflowNameComposing = ref(false);
+
 function onWorkflowNameEnter(event) {
     // IME変換確定のEnterでは作成処理を発火させない
-    if (event.isComposing) {
+    // (event.keyCode === 229 は Safari 等で isComposing が false になる場合のフォールバック)
+    if (event.isComposing || event.keyCode === 229 || workflowNameComposing.value) {
         return;
     }
     createWorkflowSheet();
