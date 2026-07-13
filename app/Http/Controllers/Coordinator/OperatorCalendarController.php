@@ -242,6 +242,7 @@ class OperatorCalendarController extends Controller
         $notifications = OperatorReservationNotification::with([
                 'request.operatorUser:id,name',
                 'request.requestedByUser:id,name',
+                'request.conflictingReservation',
             ])
             ->where('user_id', Auth::id())
             ->unread()
@@ -263,6 +264,12 @@ class OperatorCalendarController extends Controller
                     'starts_at'         => $n->request->starts_at->toIso8601String(),
                     'ends_at'           => $n->request->ends_at->toIso8601String(),
                 ],
+                'conflicting_reservation' => $n->request->conflictingReservation ? [
+                    'id'        => $n->request->conflictingReservation->id,
+                    'job_name'  => $n->request->conflictingReservation->job_name,
+                    'starts_at' => $n->request->conflictingReservation->starts_at->toIso8601String(),
+                    'ends_at'   => $n->request->conflictingReservation->ends_at->toIso8601String(),
+                ] : null,
             ]);
 
         return response()->json(['notifications' => $notifications]);
@@ -325,8 +332,13 @@ class OperatorCalendarController extends Controller
         $this->assertAccess();
 
         $data = $request->validate([
-            'decision'         => ['required', 'in:approved,rejected'],
-            'response_message' => ['nullable', 'string', 'max:255'],
+            'decision'                          => ['required', 'in:approved,rejected'],
+            'response_message'                  => ['nullable', 'string', 'max:255'],
+            'new_starts_at'                     => ['nullable', 'date'],
+            'new_ends_at'                       => ['nullable', 'date', 'after:new_starts_at'],
+            'conflicting_segments'              => ['nullable', 'array', 'max:2'],
+            'conflicting_segments.*.starts_at'  => ['required_with:conflicting_segments', 'date'],
+            'conflicting_segments.*.ends_at'    => ['required_with:conflicting_segments', 'date', 'after:conflicting_segments.*.starts_at'],
         ]);
 
         if ($operatorReservationRequest->status !== 'pending') {
@@ -339,7 +351,11 @@ class OperatorCalendarController extends Controller
             if ($conflictingId) {
                 $conflicting = OperatorReservation::find($conflictingId);
                 if ($conflicting) {
-                    $this->splitReservationAroundRequest($conflicting, $operatorReservationRequest);
+                    if (isset($data['conflicting_segments'])) {
+                        $this->applyConflictingSegments($conflicting, $data['conflicting_segments']);
+                    } else {
+                        $this->splitReservationAroundRequest($conflicting, $operatorReservationRequest);
+                    }
                 }
 
                 // 同じ既存予約に対する他の保留中リクエストは自動的に却下する
@@ -369,8 +385,8 @@ class OperatorCalendarController extends Controller
                 'created_by_user_id'  => Auth::id(),
                 'job_name'            => $operatorReservationRequest->job_name,
                 'memo'                => $operatorReservationRequest->memo,
-                'starts_at'           => $operatorReservationRequest->starts_at,
-                'ends_at'             => $operatorReservationRequest->ends_at,
+                'starts_at'           => $data['new_starts_at'] ?? $operatorReservationRequest->starts_at,
+                'ends_at'             => $data['new_ends_at'] ?? $operatorReservationRequest->ends_at,
             ]);
         }
 
@@ -548,6 +564,27 @@ class OperatorCalendarController extends Controller
                 'memo'                => $conflicting->memo,
                 'starts_at'           => $reqEnd,
                 'ends_at'             => $conflicting->ends_at,
+            ]);
+        }
+
+        $conflicting->delete();
+    }
+
+    /**
+     * 承諾確認モーダルでコーディネーターが調整した内容で既存予約を作り直す。
+     * segments は「残す時間帯」の配列（0〜2件）。既存予約は一旦削除し、各区間を同じ内容（担当・案件名等）で再作成する。
+     */
+    private function applyConflictingSegments(OperatorReservation $conflicting, array $segments): void
+    {
+        foreach ($segments as $segment) {
+            OperatorReservation::create([
+                'operator_user_id'    => $conflicting->operator_user_id,
+                'reserved_by_user_id' => $conflicting->reserved_by_user_id,
+                'created_by_user_id'  => $conflicting->created_by_user_id,
+                'job_name'            => $conflicting->job_name,
+                'memo'                => $conflicting->memo,
+                'starts_at'           => $segment['starts_at'],
+                'ends_at'             => $segment['ends_at'],
             ]);
         }
 

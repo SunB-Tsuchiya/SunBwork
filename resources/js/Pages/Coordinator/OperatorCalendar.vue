@@ -654,11 +654,12 @@ function toggleNotifDropdown() {
     showNotifDropdown.value = !showNotifDropdown.value;
 }
 
-async function respondNotification(n, decision) {
+async function respondNotification(n, decision, extra = {}) {
     try {
         await apiPut(route('coordinator.operator_calendar.requests.respond', { operatorReservationRequest: n.request.id }), {
             decision,
             response_message: responseMessages.value[n.id]?.trim() || null,
+            ...extra,
         });
         delete responseMessages.value[n.id];
         notifications.value = notifications.value.filter(x => x.id !== n.id);
@@ -674,6 +675,113 @@ async function respondNotification(n, decision) {
         }
         alert('処理に失敗しました: ' + err.message);
     }
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  承認時のスケジュール調整モーダル（相手の新規予約／自分の既存予約の残す時間帯を編集してから承認する）
+// ─────────────────────────────────────────────────────────────────
+const showApproveModal = ref(false);
+const approveNotif     = ref(null);
+const approveDate      = ref('');
+const approveForm      = ref({
+    newStartHour: START_HOUR, newStartMinute: 0, newEndHour: START_HOUR, newEndMinute: 0,
+    beforeEnabled: false, beforeStartHour: START_HOUR, beforeStartMinute: 0, beforeEndHour: START_HOUR, beforeEndMinute: 0,
+    afterEnabled: false, afterStartHour: START_HOUR, afterStartMinute: 0, afterEndHour: START_HOUR, afterEndMinute: 0,
+});
+
+function isoToJstHM(iso) {
+    const [h, m] = new Date(iso)
+        .toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit', hour12: false })
+        .split(':')
+        .map(Number);
+    return { hour: h, minute: m };
+}
+
+function hourMinuteToIso(date, hour, minute) {
+    return `${date} ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`;
+}
+
+function hmToMinutes(hour, minute) {
+    return hour * 60 + minute;
+}
+
+function openApproveModal(n) {
+    approveNotif.value = n;
+    approveDate.value = notifGroupKey(n.request.starts_at);
+
+    const reqStart = isoToJstHM(n.request.starts_at);
+    const reqEnd   = isoToJstHM(n.request.ends_at);
+    approveForm.value.newStartHour   = reqStart.hour;
+    approveForm.value.newStartMinute = reqStart.minute;
+    approveForm.value.newEndHour     = reqEnd.hour;
+    approveForm.value.newEndMinute   = reqEnd.minute;
+
+    const conflict = n.conflicting_reservation;
+    if (conflict) {
+        const cStart = isoToJstHM(conflict.starts_at);
+        const cEnd   = isoToJstHM(conflict.ends_at);
+
+        // 前半（既存予約の開始 〜 リクエスト開始）：リクエストが既存予約の開始より後ろから始まる場合のみ残る
+        approveForm.value.beforeEnabled     = new Date(n.request.starts_at) > new Date(conflict.starts_at);
+        approveForm.value.beforeStartHour   = cStart.hour;
+        approveForm.value.beforeStartMinute = cStart.minute;
+        approveForm.value.beforeEndHour     = reqStart.hour;
+        approveForm.value.beforeEndMinute   = reqStart.minute;
+
+        // 後半（リクエスト終了 〜 既存予約の終了）：リクエストが既存予約の終了より前で終わる場合のみ残る
+        approveForm.value.afterEnabled     = new Date(n.request.ends_at) < new Date(conflict.ends_at);
+        approveForm.value.afterStartHour   = reqEnd.hour;
+        approveForm.value.afterStartMinute = reqEnd.minute;
+        approveForm.value.afterEndHour     = cEnd.hour;
+        approveForm.value.afterEndMinute   = cEnd.minute;
+    } else {
+        approveForm.value.beforeEnabled = false;
+        approveForm.value.afterEnabled  = false;
+    }
+
+    showApproveModal.value = true;
+}
+
+async function confirmApprove() {
+    const n = approveNotif.value;
+    if (!n) return;
+    const f = approveForm.value;
+
+    if (hmToMinutes(f.newEndHour, f.newEndMinute) <= hmToMinutes(f.newStartHour, f.newStartMinute)) {
+        alert('相手の予約時間: 終了は開始より後にしてください。');
+        return;
+    }
+    if (f.beforeEnabled && hmToMinutes(f.beforeEndHour, f.beforeEndMinute) <= hmToMinutes(f.beforeStartHour, f.beforeStartMinute)) {
+        alert('既存予約（前半）: 終了は開始より後にしてください。');
+        return;
+    }
+    if (f.afterEnabled && hmToMinutes(f.afterEndHour, f.afterEndMinute) <= hmToMinutes(f.afterStartHour, f.afterStartMinute)) {
+        alert('既存予約（後半）: 終了は開始より後にしてください。');
+        return;
+    }
+
+    const segments = [];
+    if (f.beforeEnabled) {
+        segments.push({
+            starts_at: hourMinuteToIso(approveDate.value, f.beforeStartHour, f.beforeStartMinute),
+            ends_at:   hourMinuteToIso(approveDate.value, f.beforeEndHour, f.beforeEndMinute),
+        });
+    }
+    if (f.afterEnabled) {
+        segments.push({
+            starts_at: hourMinuteToIso(approveDate.value, f.afterStartHour, f.afterStartMinute),
+            ends_at:   hourMinuteToIso(approveDate.value, f.afterEndHour, f.afterEndMinute),
+        });
+    }
+
+    await respondNotification(n, 'approved', {
+        new_starts_at:        hourMinuteToIso(approveDate.value, f.newStartHour, f.newStartMinute),
+        new_ends_at:          hourMinuteToIso(approveDate.value, f.newEndHour, f.newEndMinute),
+        conflicting_segments: segments,
+    });
+
+    showApproveModal.value = false;
+    approveNotif.value = null;
 }
 
 async function markNotificationRead(n) {
@@ -953,7 +1061,7 @@ onUnmounted(() => {
                                                 <input v-model="responseMessages[n.id]" type="text" placeholder="返信メッセージ（任意）例: 明日ならOK"
                                                        class="mt-1.5 w-full rounded border border-gray-300 px-2 py-1 text-xs focus:border-indigo-400 focus:outline-none" />
                                                 <div class="mt-1.5 flex gap-2">
-                                                    <button @click="respondNotification(n, 'approved')"
+                                                    <button @click="openApproveModal(n)"
                                                             class="rounded bg-green-600 px-2 py-1 text-white hover:bg-green-700">承諾</button>
                                                     <button @click="respondNotification(n, 'rejected')"
                                                             class="rounded bg-gray-500 px-2 py-1 text-white hover:bg-gray-600">拒否</button>
@@ -1305,6 +1413,94 @@ onUnmounted(() => {
                                 </button>
                             </template>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
+
+        <!-- ─── 承認時のスケジュール調整モーダル ─────────────────────── -->
+        <Teleport to="body">
+            <div v-if="showApproveModal && approveNotif" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+                 @click.self="showApproveModal = false">
+                <div class="relative w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
+                    <h3 class="mb-1 text-lg font-semibold text-gray-800">スケジュールを調整しますか？</h3>
+                    <p class="mb-4 text-xs text-gray-500">承認すると、以下の内容で予約が確定します。必要に応じて時間を調整してください。</p>
+
+                    <div class="mb-4 rounded border border-green-200 bg-green-50 p-3">
+                        <p class="mb-2 text-sm font-medium text-green-800">
+                            {{ approveNotif.request.requested_by_name }}さんの新規予約「{{ approveNotif.request.job_name }}」
+                        </p>
+                        <div class="flex flex-wrap items-center gap-2 text-sm">
+                            <span class="font-medium text-gray-500">開始</span>
+                            <select v-model.number="approveForm.newStartHour" class="w-16 rounded border border-gray-300 py-1.5 pl-2 pr-6 text-sm">
+                                <option v-for="h in hours" :key="h" :value="h">{{ h }}</option>
+                            </select>:
+                            <select v-model.number="approveForm.newStartMinute" class="w-16 rounded border border-gray-300 py-1.5 pl-2 pr-6 text-sm">
+                                <option v-for="m in MINUTE_OPTIONS" :key="m" :value="m">{{ String(m).padStart(2, '0') }}</option>
+                            </select>
+                            <span class="mx-1 text-gray-400">〜</span>
+                            <span class="font-medium text-gray-500">終了</span>
+                            <select v-model.number="approveForm.newEndHour" class="w-16 rounded border border-gray-300 py-1.5 pl-2 pr-6 text-sm">
+                                <option v-for="h in hours" :key="h" :value="h">{{ h }}</option>
+                            </select>:
+                            <select v-model.number="approveForm.newEndMinute" class="w-16 rounded border border-gray-300 py-1.5 pl-2 pr-6 text-sm">
+                                <option v-for="m in MINUTE_OPTIONS" :key="m" :value="m">{{ String(m).padStart(2, '0') }}</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div v-if="approveNotif.conflicting_reservation" class="mb-4 rounded border border-gray-200 bg-gray-50 p-3">
+                        <p class="mb-2 text-sm font-medium text-gray-700">
+                            あなたの既存予約「{{ approveNotif.conflicting_reservation.job_name }}」の調整
+                        </p>
+
+                        <div class="mb-2 flex items-center gap-2">
+                            <input type="checkbox" v-model="approveForm.beforeEnabled" id="approve-before-enabled" class="rounded border-gray-300" />
+                            <label for="approve-before-enabled" class="text-xs font-medium text-gray-500">前半を残す</label>
+                        </div>
+                        <div v-if="approveForm.beforeEnabled" class="mb-3 flex flex-wrap items-center gap-2 text-sm">
+                            <select v-model.number="approveForm.beforeStartHour" class="w-16 rounded border border-gray-300 py-1.5 pl-2 pr-6 text-sm">
+                                <option v-for="h in hours" :key="h" :value="h">{{ h }}</option>
+                            </select>:
+                            <select v-model.number="approveForm.beforeStartMinute" class="w-16 rounded border border-gray-300 py-1.5 pl-2 pr-6 text-sm">
+                                <option v-for="m in MINUTE_OPTIONS" :key="m" :value="m">{{ String(m).padStart(2, '0') }}</option>
+                            </select>
+                            <span class="mx-1 text-gray-400">〜</span>
+                            <select v-model.number="approveForm.beforeEndHour" class="w-16 rounded border border-gray-300 py-1.5 pl-2 pr-6 text-sm">
+                                <option v-for="h in hours" :key="h" :value="h">{{ h }}</option>
+                            </select>:
+                            <select v-model.number="approveForm.beforeEndMinute" class="w-16 rounded border border-gray-300 py-1.5 pl-2 pr-6 text-sm">
+                                <option v-for="m in MINUTE_OPTIONS" :key="m" :value="m">{{ String(m).padStart(2, '0') }}</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-2 flex items-center gap-2">
+                            <input type="checkbox" v-model="approveForm.afterEnabled" id="approve-after-enabled" class="rounded border-gray-300" />
+                            <label for="approve-after-enabled" class="text-xs font-medium text-gray-500">後半を残す</label>
+                        </div>
+                        <div v-if="approveForm.afterEnabled" class="flex flex-wrap items-center gap-2 text-sm">
+                            <select v-model.number="approveForm.afterStartHour" class="w-16 rounded border border-gray-300 py-1.5 pl-2 pr-6 text-sm">
+                                <option v-for="h in hours" :key="h" :value="h">{{ h }}</option>
+                            </select>:
+                            <select v-model.number="approveForm.afterStartMinute" class="w-16 rounded border border-gray-300 py-1.5 pl-2 pr-6 text-sm">
+                                <option v-for="m in MINUTE_OPTIONS" :key="m" :value="m">{{ String(m).padStart(2, '0') }}</option>
+                            </select>
+                            <span class="mx-1 text-gray-400">〜</span>
+                            <select v-model.number="approveForm.afterEndHour" class="w-16 rounded border border-gray-300 py-1.5 pl-2 pr-6 text-sm">
+                                <option v-for="h in hours" :key="h" :value="h">{{ h }}</option>
+                            </select>:
+                            <select v-model.number="approveForm.afterEndMinute" class="w-16 rounded border border-gray-300 py-1.5 pl-2 pr-6 text-sm">
+                                <option v-for="m in MINUTE_OPTIONS" :key="m" :value="m">{{ String(m).padStart(2, '0') }}</option>
+                            </select>
+                        </div>
+                        <p class="mt-2 text-xs text-gray-400">チェックを外した区間は削除されます（相手にその時間を譲る扱いになります）。</p>
+                    </div>
+
+                    <div class="flex justify-end gap-2">
+                        <button @click="showApproveModal = false"
+                                class="rounded border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">キャンセル</button>
+                        <button @click="confirmApprove"
+                                class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">この内容で承認する</button>
                     </div>
                 </div>
             </div>
