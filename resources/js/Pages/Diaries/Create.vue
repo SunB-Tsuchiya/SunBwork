@@ -450,6 +450,11 @@ const submitWithoutDiary = () => {
 };
 
 const submit = () => {
+    try {
+        if (editorInstance && editorInstance.root && editorInstance.root.innerHTML !== undefined) {
+            form.content = editorInstance.root.innerHTML;
+        }
+    } catch (e) {}
     const html = form.content?.trim() || '';
     if (html === '' || html === '<p><br></p>' || html === '<p></p>') {
         form.content = '';
@@ -481,21 +486,6 @@ const submit = () => {
         },
     });
 };
-
-function onInput(val) {
-    // valがInputEventの場合はval.target.innerHTMLなどで取得
-    if (typeof val === 'string') {
-        form.content = val;
-    } else if (val && val.target && val.target.innerHTML) {
-        form.content = val.target.innerHTML;
-    }
-}
-watch(
-    () => form.content,
-    (val) => {
-        content.value = val;
-    },
-);
 
 // ===== 過去データから流用 =====
 const showPastModal = ref(false);
@@ -643,9 +633,9 @@ function applyPastDiary(rec) {
                             <QuillEditor
                                 theme="snow"
                                 :toolbar="simpleToolbar"
+                                content-type="html"
                                 style="min-height: 220px; height: 220px; background: #fff"
-                                v-model="form.content"
-                                @input="onInput"
+                                v-model:content="form.content"
                                 @ready="handleEditorReady"
                             />
                             <div class="mt-1 text-xs text-gray-500">

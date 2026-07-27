@@ -653,8 +653,9 @@ const back = () => {
                     <QuillEditor
                         theme="snow"
                         :toolbar="simpleToolbar"
+                        content-type="html"
                         style="min-height: 180px; height: 180px; background: #fff"
-                        v-model="content"
+                        v-model:content="content"
                         @ready="handleEditorReady"
                     />
                 </div>
