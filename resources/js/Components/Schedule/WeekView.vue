@@ -18,7 +18,7 @@ const emit = defineEmits(['create', 'update', 'event-click', 'room-click']);
 
 // ── 定数 ──────────────────────────────────────────────────────
 const START_HOUR  = 7;
-const END_HOUR    = 22;
+const END_HOUR    = 24;
 const HOUR_H      = 64;
 const SNAP        = 15;
 const TOTAL_H     = (END_HOUR - START_HOUR) * HOUR_H;
