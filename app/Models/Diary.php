@@ -89,5 +89,30 @@ class Diary extends Model
             'user_name' => $userName,
             'comment' => mb_substr($comment, 0, 1000),
         ]);
+
+        $this->notifyCommentToOwner($userId, $userName, $comment);
+    }
+
+    /**
+     * 日報作成者へコメント通知（お知らせ）を送る。自分自身へのコメントは通知しない。
+     */
+    protected function notifyCommentToOwner(int $userId, string $userName, string $comment): void
+    {
+        if (intval($this->user_id) === intval($userId)) return;
+
+        $dateLabel = $this->date instanceof \Carbon\Carbon ? $this->date->format('Y-m-d') : (string) $this->date;
+
+        $announcement = Announcement::create([
+            'sender_id' => $userId,
+            'target_type' => 'individual',
+            'title' => '日報にコメントがあります',
+            'content' => "{$userName}さんが{$dateLabel}の日報にコメントしました。\n\n" . mb_substr($comment, 0, 1000),
+            'status' => 'sent',
+        ]);
+
+        AnnouncementRecipient::create([
+            'announcement_id' => $announcement->id,
+            'user_id' => $this->user_id,
+        ]);
     }
 }
