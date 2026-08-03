@@ -11,6 +11,31 @@ class ChangelogSeeder extends Seeder
     {
         $entries = [
             [
+                'version'      => 'diary-comment-notify-1',
+                'title'        => '日報：コメントが付いたら「お知らせ」で通知するように',
+                'released_at'  => '2026-08-04',
+                'summary'      => 'これまで日報にコメントが付いても、日報の作成者本人には何も通知されず、自分から日報を開いて確認するまで気づけませんでした。今回、管理者・リーダー・日報管理者が日報にコメントを書き込むと、コメントを書いた本人以外の日報作成者宛に「お知らせ」（/members/announcements）が自動送信されるようにしました。誰がいつどんなコメントを書いたかがお知らせ一覧・未読バッジに反映されます。',
+                'design_files' => [],
+                'claude_notes' => 'Diary::addComment() の末尾に notifyCommentToOwner() を追加し、DiaryComment 作成後にコメント投稿者(user_id)と日報作成者(diary->user_id)が異なる場合のみ Announcement(target_type=individual) + AnnouncementRecipient を作成する方式を採用。コメント投稿経路は app/Http/Controllers/Diaries/DiaryInteractionController::markRead() と app/Http/Controllers/DiaryManager/DiaryInteractionController::markRead() の2つが存在するが、いずれも Diary::addComment() を共通で呼んでいるためモデル側1箇所の実装で両経路をカバーできると判断した。既存の Announcement 機能（お知らせ一覧・未読バッジ・AnnouncementRecipient.read_at）をそのまま流用し、新規テーブル・マイグレーションは追加していない。お知らせ本文はプレーンテキスト表示（Show.vue が {{ }} でエスケープ表示）のため、日報詳細ページへのクリック可能なリンクは含めない方針をユーザーに確認済み（本文はコメント投稿者名・日報の日付・コメント本文のみ）。Vue/JS の変更は無いため npm run build は不要、さくらへは PHP ファイルのみ git pull で反映した。',
+                'body'         => <<<'HTML'
+<section class="cl-problem">
+  <h3>背景・問題</h3>
+  <ul>
+    <li>管理者・リーダーが日報にコメントを書いても、日報を書いた本人には通知が届かず、自分から日報を開いて確認するまで気づけなかった</li>
+  </ul>
+</section>
+
+<section class="cl-feature">
+  <h3>追加した機能</h3>
+  <ul>
+    <li>日報にコメントが付くと、日報の作成者宛に「お知らせ」（/members/announcements）が自動送信されるようにした</li>
+    <li>お知らせには、誰がいつどの日付の日報にどんなコメントを書いたかが表示される</li>
+    <li>既存のお知らせ未読バッジにもそのまま反映される</li>
+  </ul>
+</section>
+HTML,
+            ],
+            [
                 'version'      => 'prepress-stage-check-1',
                 'title'        => '製版伝票ボード：作業チェックを初校/再校/三校/下版の4工程に対応',
                 'released_at'  => '2026-07-06',
