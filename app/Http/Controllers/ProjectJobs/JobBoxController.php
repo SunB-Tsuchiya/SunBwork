@@ -1648,12 +1648,15 @@ class JobBoxController extends Controller
 
         DB::beginTransaction();
         try {
-            if ($data['event_id']) {
+            if (!empty($data['event_id'])) {
                 // Update existing event
                 $event = Event::find($data['event_id']);
                 if ($event) {
-                    $event->start = $start;
-                    $event->end   = $end;
+                    // events テーブルは proof ジョブ = UTC 保存 / 通常イベント = JST 保存の混在形式。
+                    // 保存形式を判定するため実際の紐づけ先 assignment をロードしてから変換する。
+                    $event->load('projectJobAssignment:id,job_type');
+                    $event->start = $this->toEventStorageString($event, $start);
+                    $event->end   = $this->toEventStorageString($event, $end);
                     if (Schema::hasColumn('events', 'date')) {
                         $event->date = $data['date'];
                     }
@@ -1665,48 +1668,22 @@ class JobBoxController extends Controller
                 $event->user_id     = $user->id;
                 $event->title       = $title;
                 $event->description = $description;
-                $event->start       = $start;
-                $event->end         = $end;
                 if (Schema::hasColumn('events', 'date')) {
                     $event->date = $data['date'];
                 }
                 if (Schema::hasColumn('events', 'project_job_assignment_id')) {
                     $event->project_job_assignment_id = $assignment->id;
                 }
+                // 未保存モデルでは判定用のリレーションを直接渡す（保存形式の判定に必要）
+                $event->setRelation('projectJobAssignment', $assignment);
+                $event->start = $this->toEventStorageString($event, $start);
+                $event->end   = $this->toEventStorageString($event, $end);
                 $event->save();
 
-                // ── 重複イベントの interruption_minutes 処理 ──────────────────
-                try {
-                    $evNewStart = \Carbon\Carbon::parse($start);
-                    $evNewEnd   = \Carbon\Carbon::parse($end);
-                    $newDurationMins = abs((int)$evNewEnd->diffInMinutes($evNewStart));
-
-                    $overlappingEvents = Event::where('user_id', $user->id)
-                        ->where('id', '!=', $event->id)
-                        ->where('starts_at', '<', $evNewEnd->toDateTimeString())
-                        ->where('ends_at', '>', $evNewStart->toDateTimeString())
-                        ->get();
-
-                    foreach ($overlappingEvents as $existingEv) {
-                        $evStart = \Carbon\Carbon::parse($existingEv->starts_at);
-                        $evEnd   = \Carbon\Carbon::parse($existingEv->ends_at);
-                        $existingDurationMins = abs((int)$evEnd->diffInMinutes($evStart));
-
-                        $overlapStart = $evNewStart->gt($evStart) ? $evNewStart : $evStart;
-                        $overlapEnd   = $evNewEnd->lt($evEnd)    ? $evNewEnd   : $evEnd;
-                        $overlapMins  = max(0, (int)$overlapStart->diffInMinutes($overlapEnd, false));
-
-                        if ($overlapMins <= 0) continue;
-
-                        if ($newDurationMins >= $existingDurationMins) {
-                            $event->increment('interruption_minutes', $overlapMins);
-                        } else {
-                            $existingEv->increment('interruption_minutes', $overlapMins);
-                        }
-                    }
-                } catch (\Throwable $__overlapE) {
-                    \Illuminate\Support\Facades\Log::warning('JobBoxController: failed to process event overlap', ['error' => $__overlapE->getMessage()]);
-                }
+                // ── 重複イベントの interruption_minutes 再計算 ──────────────────
+                // 独自実装は starts_at を全て JST として比較していたため proof ジョブ（UTC 保存）で
+                // 誤差が出ていた。UTC/JST 混在を正しく扱う共通トレイトに委譲する。
+                $this->recalcInterruptionMinutes($event);
                 // ──────────────────────────────────────────────────────────────
 
                 // Mark assignment as scheduled (セット: accepted=true, scheduled=true)
@@ -1717,7 +1694,8 @@ class JobBoxController extends Controller
                     $assignment->scheduled = true;
                 }
                 if (Schema::hasColumn('project_job_assignments', 'scheduled_at')) {
-                    $assignment->scheduled_at = $event->start;
+                    // $event->start は保存生値（proof なら UTC）を返すため、JST 文字列の $start を使う
+                    $assignment->scheduled_at = $start;
                 }
                 // Update status to scheduled if statuses table has a matching record
                 try {
@@ -1734,7 +1712,7 @@ class JobBoxController extends Controller
                         ->where(function ($q) {
                             $q->whereNull('scheduled')->orWhere('scheduled', false);
                         })
-                        ->update(['scheduled' => true, 'scheduled_at' => $event->start]);
+                        ->update(['scheduled' => true, 'scheduled_at' => $start]);
                 } catch (\Throwable $__e) {}
             }
 
