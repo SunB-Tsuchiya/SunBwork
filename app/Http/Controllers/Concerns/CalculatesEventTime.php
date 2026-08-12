@@ -9,12 +9,41 @@ use Carbon\Carbon;
  * 時間計算共通トレイト
  *
  * - resolveJstCarbon()              : proof/通常イベントのUTC/JST混在を正しく解決してJST Carbonを返す
+ * - rawToJstCarbon()                : 生の保存値（旧値など）を JST Carbon に変換する
+ * - eventStorageTimezone()          : そのイベントの保存タイムゾーンを返す
+ * - toEventStorageString()          : JST 日時をそのイベントの保存形式の文字列へ変換する（書き込み用）
  * - computeLunchMinutes()           : 昼休憩とイベントの重複分数を計算（Q-04）
  * - recalcInterruptionMinutes()     : interruption_minutes を再計算・保存（Q-01/Q-06）
  * - recalcSingleStoredInterruption(): 1件の interruption_minutes を再計算・保存
  */
 trait CalculatesEventTime
 {
+    /**
+     * イベントの保存タイムゾーンを返す。
+     * proof ジョブ（job_type='proof'）は UTC 保存、通常イベントは JST 保存。
+     *
+     * 前提: $event->projectJobAssignment リレーションがロード済みであること。
+     */
+    protected function eventStorageTimezone(Event $event): string
+    {
+        return ($event->projectJobAssignment?->job_type ?? null) === 'proof' ? 'UTC' : 'Asia/Tokyo';
+    }
+
+    /**
+     * JST の日時文字列（'Y-m-d H:i:s'）を、そのイベントの保存形式に合わせた文字列へ変換する。
+     *
+     * 読み出し側（resolveJstCarbon）が proof を UTC として解釈するため、
+     * 書き込み側でも同じ規則に従わないと保存のたびに 9 時間ずれる。
+     *
+     * 前提: $event->projectJobAssignment リレーションがロード済みであること。
+     */
+    protected function toEventStorageString(Event $event, string $jstDateTime): string
+    {
+        return Carbon::parse($jstDateTime, 'Asia/Tokyo')
+                     ->setTimezone($this->eventStorageTimezone($event))
+                     ->format('Y-m-d H:i:s');
+    }
+
     /**
      * イベントの starts_at / ends_at を JST Carbon として返す。
      * proof ジョブ（job_type='proof'）は UTC 保存、通常イベントは JST 保存のため
@@ -24,10 +53,18 @@ trait CalculatesEventTime
      */
     protected function resolveJstCarbon(Event $event, string $field): ?Carbon
     {
-        $raw = $event->getRawOriginal($field);
+        return $this->rawToJstCarbon($event, $event->getRawOriginal($field));
+    }
+
+    /**
+     * 生の保存値（更新前に退避した旧値など）を、そのイベントの保存形式に従って JST Carbon に変換する。
+     *
+     * 前提: $event->projectJobAssignment リレーションがロード済みであること。
+     */
+    protected function rawToJstCarbon(Event $event, ?string $raw): ?Carbon
+    {
         if (! $raw) return null;
-        $isProof = ($event->projectJobAssignment?->job_type ?? null) === 'proof';
-        return Carbon::createFromFormat('Y-m-d H:i:s', $raw, $isProof ? 'UTC' : 'Asia/Tokyo')
+        return Carbon::createFromFormat('Y-m-d H:i:s', $raw, $this->eventStorageTimezone($event))
                      ->setTimezone('Asia/Tokyo');
     }
 
@@ -132,8 +169,10 @@ trait CalculatesEventTime
 
             // ③ update 時: 旧時間帯で重複していたイベントも再計算（時間変更で重複解除された可能性）
             if ($oldStart && $oldEnd) {
-                $oldS = Carbon::parse($oldStart);
-                $oldE = Carbon::parse($oldEnd);
+                // 旧値も保存形式（proof=UTC / 通常=JST）に従って JST 化する
+                $oldS = $this->rawToJstCarbon($event, $oldStart);
+                $oldE = $this->rawToJstCarbon($event, $oldEnd);
+                if (!$oldS || !$oldE) return;
                 $oldWindowStart = $oldS->copy()->subDay()->toDateTimeString();
                 $oldWindowEnd   = $oldE->copy()->addDay()->toDateTimeString();
 

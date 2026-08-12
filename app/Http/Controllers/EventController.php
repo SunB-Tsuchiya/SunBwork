@@ -123,12 +123,39 @@ class EventController extends Controller
         $oldStart = $event->getRawOriginal('starts_at');
         $oldEnd   = $event->getRawOriginal('ends_at');
 
-        // setStart/EndAttribute が $start/$end の JST 文字列を attributes['starts_at'/'ends_at'] に
-        // そのまま格納する（EventController::store() と同じ方式）。
-        // UTC 変換を行うと events テーブル全体で格納方式が不整合になるため除去する。
-        $event->start = $start;
-        $event->end   = $end;
+        // setStart/EndAttribute が渡された文字列を attributes['starts_at'/'ends_at'] にそのまま格納する。
+        // events テーブルは proof ジョブ = UTC 保存 / 通常イベント = JST 保存の混在形式のため、
+        // 読み出し側（resolveJstCarbon）と同じ規則で保存形式に合わせてから書き込む。
+        $event->load('projectJobAssignment:id,job_type');
+        $event->start = $this->toEventStorageString($event, $start);
+        $event->end   = $this->toEventStorageString($event, $end);
         $event->save();
+
+        // 紐づく project_job_assignment の時間フィールドも同期
+        // （これを行わないと、カレンダーでドラッグ移動した後にジョブ修正ページを開いたとき
+        //   assignment 側の古い時刻が復元されてしまう。update() と同じ同期を行う）
+        if (Schema::hasColumn('events', 'project_job_assignment_id') && $event->project_job_assignment_id) {
+            try {
+                $assignment = \App\Models\ProjectJobAssignment::withoutGlobalScopes()->find($event->project_job_assignment_id);
+                if ($assignment) {
+                    $assignment->start_time = $validated['startHour'] . ':' . $validated['startMinute'];
+
+                    // 自己割当（マイジョブ）では desired_time が「作業終了時刻」として使われているため同期する。
+                    // Coordinator 割当では desired_time は「締め切り時刻」を意味するので変更しない。
+                    // desired_end_date（締め切り日）はどちらの場合もユーザーが設定した値なので変更しない。
+                    if ($assignment->sender_id !== null && (int) $assignment->sender_id === (int) $assignment->user_id) {
+                        $assignment->desired_time = $validated['endHour'] . ':' . $validated['endMinute'];
+                    }
+
+                    $assignment->save();
+                }
+            } catch (\Throwable $__e) {
+                Log::warning('EventController::update_from_calendar: failed to sync time to assignment', [
+                    'error'    => $__e->getMessage(),
+                    'event_id' => $event->id,
+                ]);
+            }
+        }
 
         // proof_schedule 自動連動
         $this->syncProofScheduleFromEvent($event);
@@ -458,8 +485,6 @@ class EventController extends Controller
         $event->event_item_type_id = $data['event_item_type_id'] ?? null;
         $event->title = $data['title'];
         $event->description = $data['description'];
-        $event->start = $data['start'];
-        $event->end = $data['end'];
         if (isset($data['date'])) {
             $event->date = $data['date'];
         }
@@ -471,6 +496,17 @@ class EventController extends Controller
         } catch (\Throwable $__e) {
             // ignore environment/schema checks
         }
+
+        // events テーブルは proof ジョブ = UTC 保存 / 通常イベント = JST 保存の混在形式のため、
+        // リンク先 assignment の job_type を見て保存形式に合わせてから書き込む
+        if ($event->project_job_assignment_id) {
+            $event->setRelation(
+                'projectJobAssignment',
+                \App\Models\ProjectJobAssignment::withoutGlobalScopes()->find($event->project_job_assignment_id)
+            );
+        }
+        $event->start = $this->toEventStorageString($event, $data['start']);
+        $event->end   = $this->toEventStorageString($event, $data['end']);
         $event->save();
 
         // own_interruption_minutes: 新しいイベント自体が「長い（差し込まれた）側」の場合に設定される重複時間
@@ -760,10 +796,12 @@ class EventController extends Controller
         $oldEnd   = $event->getRawOriginal('ends_at');
 
         // update_from_calendar() と同じ方式でモデル経由で保存
+        // （proof ジョブ = UTC 保存 / 通常イベント = JST 保存の混在形式に合わせる）
+        $event->load('projectJobAssignment:id,job_type');
         $event->title       = $data['title'];
         $event->description = $data['description'] ?? '';
-        $event->start       = $newStart;
-        $event->end         = $newEnd;
+        $event->start       = $this->toEventStorageString($event, $newStart);
+        $event->end         = $this->toEventStorageString($event, $newEnd);
         $event->save();
 
         // 紐づく project_job_assignment の時間フィールドも同期

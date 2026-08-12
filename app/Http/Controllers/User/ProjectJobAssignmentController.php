@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\CalculatesEventTime;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -16,6 +17,8 @@ use Illuminate\Support\Facades\Schema;
 
 class ProjectJobAssignmentController extends Controller
 {
+    use CalculatesEventTime;
+
     /**
      * Store a new assignment created by the authenticated user (no coordinator side-effects)
      */
@@ -467,76 +470,44 @@ class ProjectJobAssignmentController extends Controller
                     } catch (\Throwable $__pe) {
                     }
 
-                    if ($event) {
-                        $event->title = $by->title ?? $event->title;
-                        $event->description = implode("\n", $lines);
-                        if ($eventStart) {
-                            $event->start = $eventStart->toDateTimeString();
-                            if (Schema::hasColumn('events', 'starts_at')) $event->starts_at = $eventStart->toDateTimeString();
-                        }
-                        if ($eventEnd) {
-                            $event->end = $eventEnd->toDateTimeString();
-                            if (Schema::hasColumn('events', 'ends_at')) $event->ends_at = $eventEnd->toDateTimeString();
-                        }
-                        // 時間変更時は interruption_minutes をリセットしてから再計算
-                        if (($eventStart || $eventEnd) && Schema::hasColumn('events', 'interruption_minutes')) {
-                            $event->interruption_minutes = 0;
-                        }
-                        $event->save();
-                    } else {
+                    if (!$event) {
                         // create new event and link it to the by-myself assignment
                         $event = new Event();
                         $event->user_id = $user ? $user->id : null;
                         $event->title = $by->title ?? '割当予定';
-                        $event->description = implode("\n", $lines);
-                        if ($eventStart) {
-                            $event->start = $eventStart->toDateTimeString();
-                            if (Schema::hasColumn('events', 'starts_at')) $event->starts_at = $eventStart->toDateTimeString();
-                        }
-                        if ($eventEnd) {
-                            $event->end = $eventEnd->toDateTimeString();
-                            if (Schema::hasColumn('events', 'ends_at')) $event->ends_at = $eventEnd->toDateTimeString();
-                        }
                         if (Schema::hasColumn('events', 'project_job_assignment_id')) {
                             $event->project_job_assignment_id = $by->id;
                         }
-                        $event->save();
+                    } else {
+                        $event->title = $by->title ?? $event->title;
                     }
 
-                    // ── 重複イベントの interruption_minutes 処理 ──────────────────
-                    // 保存後、時間が重複する他のイベントとの差し引きを再計算する
-                    if ($event && $eventStart && $eventEnd) {
-                        try {
-                            $newDurationMins = abs((int)$eventEnd->diffInMinutes($eventStart));
+                    // events テーブルは proof ジョブ = UTC 保存 / 通常イベント = JST 保存の混在形式。
+                    // 保存形式を判定できるよう assignment をリレーションとしてセットしてから変換する。
+                    $event->setRelation('projectJobAssignment', $by);
 
-                            $overlappingEvents = Event::where('user_id', $event->user_id)
-                                ->where('id', '!=', $event->id)
-                                ->where('starts_at', '<', $eventEnd->toDateTimeString())
-                                ->where('ends_at', '>', $eventStart->toDateTimeString())
-                                ->get();
+                    $event->description = implode("\n", $lines);
+                    if ($eventStart) {
+                        $storedStart = $this->toEventStorageString($event, $eventStart->toDateTimeString());
+                        $event->start = $storedStart;
+                        if (Schema::hasColumn('events', 'starts_at')) $event->starts_at = $storedStart;
+                    }
+                    if ($eventEnd) {
+                        $storedEnd = $this->toEventStorageString($event, $eventEnd->toDateTimeString());
+                        $event->end = $storedEnd;
+                        if (Schema::hasColumn('events', 'ends_at')) $event->ends_at = $storedEnd;
+                    }
+                    // 時間変更時は interruption_minutes をリセットしてから再計算
+                    if (($eventStart || $eventEnd) && Schema::hasColumn('events', 'interruption_minutes')) {
+                        $event->interruption_minutes = 0;
+                    }
+                    $event->save();
 
-                            foreach ($overlappingEvents as $existingEv) {
-                                $evStart = \Carbon\Carbon::parse($existingEv->starts_at);
-                                $evEnd   = \Carbon\Carbon::parse($existingEv->ends_at);
-                                $existingDurationMins = abs((int)$evEnd->diffInMinutes($evStart));
-
-                                $overlapStart = $eventStart->gt($evStart) ? $eventStart : $evStart;
-                                $overlapEnd   = $eventEnd->lt($evEnd)    ? $eventEnd   : $evEnd;
-                                $overlapMins  = max(0, (int)$overlapStart->diffInMinutes($overlapEnd, false));
-
-                                if ($overlapMins <= 0) continue;
-
-                                if ($newDurationMins >= $existingDurationMins) {
-                                    // 新しいイベントの方が長い → 自分から差し引く
-                                    $event->increment('interruption_minutes', $overlapMins);
-                                } else {
-                                    // 既存イベントの方が長い → 既存から差し引く
-                                    $existingEv->increment('interruption_minutes', $overlapMins);
-                                }
-                            }
-                        } catch (\Throwable $__overlapE) {
-                            \Illuminate\Support\Facades\Log::warning('ProjectJobAssignmentController::update: failed to process event overlap', ['error' => $__overlapE->getMessage()]);
-                        }
+                    // ── 重複イベントの interruption_minutes 再計算 ──────────────────
+                    // 独自実装は starts_at を全て JST として比較していたため proof ジョブ（UTC 保存）で
+                    // 誤差が出ていた。UTC/JST 混在を正しく扱う共通トレイトに委譲する。
+                    if ($event && ($eventStart || $eventEnd)) {
+                        $this->recalcInterruptionMinutes($event);
                     }
                     // ──────────────────────────────────────────────────────────────
                 }
