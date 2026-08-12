@@ -11,6 +11,34 @@ class ChangelogSeeder extends Seeder
     {
         $entries = [
             [
+                'version'      => 'proof-event-timezone-fix-1',
+                'title'        => 'カレンダー：校正ジョブの時刻が9時間ずれる不具合と、修正ページに古い時刻が出る不具合を修正',
+                'released_at'  => '2026-08-13',
+                'summary'      => 'カレンダーでジョブの時間をドラッグで動かした後にジョブ修正ページを開くと、動かす前の古い時刻が表示される問題を修正しました。あわせて、校正（proof）ジョブの予定を保存するたびに時刻が9時間後ろにずれていく不具合も修正しています。校正ジョブの予定は保存の仕方が通常の予定と異なるにもかかわらず、カレンダーのドラッグ・予定編集・ジョブ修正ページのいずれから保存しても通常の予定と同じ形式で書き込まれていたため、開いて保存するたびに9時間ずつ進んでいました。すでにずれていた本番の予定7件についても正しい時刻に補正済みです。',
+                'design_files' => [],
+                'claude_notes' => 'events テーブルは job_type=proof の校正ジョブが UTC 保存、通常イベントが JST 保存という混在形式になっている。読み出し側（CalculatesEventTime::resolveJstCarbon / CalendarEventsController / ProofRequestController）はこの規則に従っていたが、書き込み側が常に JST 文字列を書いていたため、proof イベントは保存のたびに +9 時間ずれていた（開く→保存を繰り返すと9時間ずつ累積する）。' . "\n\n" . 'CalculatesEventTime トレイトに書き込み用の逆変換を追加: eventStorageTimezone()（保存TZ判定）/ toEventStorageString()（JST日時→保存形式の文字列）/ rawToJstCarbon()（生値→JST Carbon）。resolveJstCarbon() は rawToJstCarbon() へ委譲する形に整理し、recalcInterruptionMinutes() の旧時刻（$oldStart/$oldEnd）も Carbon::parse による JST 決め打ちからイベントの保存形式に従う解釈へ修正した。' . "\n\n" . '書き込み側は EventController の store() / update() / update_from_calendar() と User\\ProjectJobAssignmentController::update() の4経路すべてを toEventStorageString() 経由に変更。update_from_calendar() は Components/Calendar.vue のドラッグと ProofCoordinator/Assignments/Edit.vue の時刻保存も通る共通経路のため、これで校正コーディネーター画面のずれも解消する。User\\ProjectJobAssignmentController::update() にあった独自の重複時間計算（starts_at を全て JST として比較し increment で累積する方式）は proof で誤差が出るうえ再計算にならないため、共通トレイトの recalcInterruptionMinutes() に委譲した。' . "\n\n" . 'ジョブ修正ページに古い時刻が出る件は別原因。カレンダーのドラッグ（update_from_calendar）が events だけを更新し project_job_assignments を更新していなかったのに対し、修正ページ（AssignmentForm.vue の _isSelfEdit 分岐）は assignment.start_time / desired_time を event より優先して復元していたため。EventController::update() と同じ同期処理を update_from_calendar() にも追加した。ユーザーモードでは start_time=作業開始・desired_time=作業終了として使われている一方、Coordinator 割当では desired_time が締め切り時刻を意味するため、desired_time の同期は自己割当（sender_id = user_id）のときのみに限定し、desired_end_date（締め切り日）は変更しない。' . "\n\n" . '検証はローカルDBに proof イベントが0件だったため、トランザクション内で一時的に job_type=proof に変えて4経路すべてを往復させ、DB生値が UTC・画面表示が JST になること、再保存してもずれないこと、通常イベントの保存形式が変わらないことを確認してロールバックした。本番調査では job_type=proof のイベント11件のうち4件（ev=2802/2840/3073/3718）のずれを検出。判定は project_job_assignments.start_time / desired_time（以前から JST 同期されていた）との一致と、proof_schedules に残っていた作成時の正しい UTC 値（event_id=NULL のレコード id=20 が ev=3718 の元値 01:00〜01:30 を保持）との突合で行った。events 4件と proof_schedules 3件（id=5/8/21）を -9時間 補正し、補正後は全11件が業務時間内（JST 09:00〜17:42）に収まることを確認済み。ev=2840 のみ start_time が NULL で機械的に判定できなかったため、18時以降の校正作業は行わないというユーザーの業務判断で JST 09:00〜13:00 に確定した。なお proof_schedules が指すイベントのうち3件（ev=3059/3315/3811）は assignment が削除済みの孤立イベントで、job_type を引けず JST 解釈にフォールバックするが、生値が JST として自然なため補正対象外とした。PHP のみの変更のため npm run build は不要。',
+                'body'         => <<<'HTML'
+<section class="cl-problem">
+  <h3>背景・問題</h3>
+  <ul>
+    <li>カレンダー上でジョブの時間をドラッグで動かした後にジョブ修正ページを開くと、動かす前の古い時刻が表示されていた。そのまま保存すると、ドラッグした結果が消えて元の時刻に戻ってしまっていた</li>
+    <li>校正ジョブの予定は、カレンダーのドラッグ・予定の編集・ジョブ修正ページのいずれから保存しても、時刻が9時間後ろにずれていた。開いて保存し直すたびに9時間ずつ進んでいくため、17時の予定が翌日の午前2時になるといった状態になっていた</li>
+    <li>校正コーディネーターの割当編集画面で時刻を直す操作でも同じずれが発生していた</li>
+  </ul>
+</section>
+
+<section class="cl-fix">
+  <h3>修正・改善内容</h3>
+  <ul>
+    <li>カレンダーでジョブの時間を動かしたとき、ジョブ側の作業開始・終了時刻も一緒に更新されるようにした。これにより修正ページを開いても動かした後の時刻が正しく表示される</li>
+    <li>校正ジョブの予定について、保存時に正しい形式へ変換するようにし、保存のたびに9時間ずれる問題を解消した（カレンダーのドラッグ・予定の編集・新規作成・ジョブ修正ページ・校正コーディネーターの割当編集画面すべてが対象）</li>
+    <li>すでにずれていた既存の予定7件（予定4件・校正スケジュール3件）を正しい時刻に補正した</li>
+    <li>作業時間の重なりによる中断時間の計算も、校正ジョブの時刻を正しく解釈するようにした</li>
+  </ul>
+</section>
+HTML,
+            ],
+            [
                 'version'      => 'diary-comment-notify-1',
                 'title'        => '日報：コメントが付いたら「お知らせ」で通知するように',
                 'released_at'  => '2026-08-04',

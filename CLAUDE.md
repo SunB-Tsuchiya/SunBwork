@@ -285,6 +285,61 @@ $start = $this->resolveJstCarbon($event, 'starts_at'); // JST Carbon を返す
 
 ---
 
+### ④ events への **書き込み** も同じルールに従う ⚠️ 2026-08-13 追加
+
+**読み出しだけルールを守っても意味がない。** 実際に「読み出し側は proof を UTC として解釈するのに、書き込み側は常に JST を書いていた」ため、
+校正ジョブの予定が**保存のたびに 9 時間ずつ後ろにずれる**バグが発生した（本番データ 7 件を補正済み）。
+
+**ルール: `events.starts_at / ends_at` に書き込むときは `toEventStorageString()` を通す**
+
+```php
+// NG — proof イベントで 9 時間ずれる（保存のたびに累積する）
+$event->start = $date . ' ' . $hour . ':' . $minute . ':00';
+$event->starts_at = Carbon::parse($datePart . ' ' . $timePart);
+
+// OK
+$event->load('projectJobAssignment:id,job_type');   // 保存形式の判定に必要
+$event->start = $this->toEventStorageString($event, $jstDateTime);
+$event->end   = $this->toEventStorageString($event, $jstDateTime2);
+```
+
+| メソッド（CalculatesEventTime） | 用途 |
+|---|---|
+| `toEventStorageString($event, $jstDateTime)` | **JST 日時 → 保存形式の文字列**（書き込み時に必ず使う） |
+| `resolveJstCarbon($event, $field)` | 保存値 → JST Carbon（読み出し時） |
+| `rawToJstCarbon($event, $raw)` | 生値（退避した旧値など）→ JST Carbon |
+| `eventStorageTimezone($event)` | そのイベントの保存 TZ（proof=UTC / 通常=JST） |
+
+**新規作成時の注意:** `project_job_assignment_id` をセットしてから変換すること。順序を逆にすると job_type を判定できず JST 保存になる。
+未保存モデルでは `$event->setRelation('projectJobAssignment', $assignment)` でリレーションを渡す。
+
+**注意点:**
+- 判定材料は `$event->projectJobAssignment->job_type` のみ。**assignment が削除されると解釈が UTC→JST に切り替わる**（孤立イベントは JST 扱いになる）
+- 重複時間（`interruption_minutes`）の計算を自前で書かない。`recalcInterruptionMinutes($event, $oldStart, $oldEnd)` を使う
+  → 独自実装は `starts_at` を全て JST として比較しがちで、proof で誤差が出る
+- 対象経路（すべて対応済み）: `EventController::store / update / update_from_calendar`、`User\ProjectJobAssignmentController::update`
+  ※ `update_from_calendar` はカレンダーのドラッグ・`Components/Calendar.vue`・校正コーディネーターの割当編集画面が共有する経路
+
+---
+
+### ⑤ カレンダーのドラッグは events と assignment の両方を更新する
+
+`project_job_assignments` が正・`events` はそこから導出、という構造になっている（ジョブ修正ページは assignment 側の時刻を優先表示する）。
+そのため **events だけ更新すると、修正ページを開いたときに古い時刻が復元される。**
+
+| カラム | ユーザーモード（自己割当）での意味 | Coordinator 割当での意味 |
+|---|---|---|
+| `start_time` | 作業開始時刻 | 作業開始時刻 |
+| `desired_time` | **作業終了時刻** | **締め切り時刻**（触らないこと） |
+| `desired_end_date` | 締め切り日 | 締め切り日 |
+
+- `start_time` は割当種別を問わず同期してよい
+- `desired_time` の同期は**自己割当（`sender_id === user_id`）のときのみ**
+- `desired_end_date` はユーザーが設定した値なので、時刻変更では**変更しない**
+- `project_job_assignments` に `end_time` カラムは存在しない
+
+---
+
 ## データ設計 クイックリファレンス
 
 **`project_job_assignments`** が JobBox・MyJobBox 両方の唯一のテーブル:
