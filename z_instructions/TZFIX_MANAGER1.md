@@ -153,8 +153,38 @@
    `year_month . '-' . $dd` の文字列連結で生成されており、このモデルを経由していない。
    codex の「カレンダーで map のキーに使う」という指摘は**誤り**だった。
    モデル自体が死んでいる可能性があるため、削除可否は別途判断が必要
-2. **`ProjectScheduleComment` の `date` カラムが存在しない** — キャストが実体のないカラムを指している。
-   無害だが、削除するのが正しい
+2. **`ProjectScheduleComment` の `date` カラムが存在しない** → **調査の結果コメント機能自体が壊れており、別途修正した（下記）**
+
+#### 追加対応: 進行表スケジュールのコメント機能の復旧（同日）
+
+`date` キャストを削除しようとして実テーブルを確認したところ、**モデル・Controller がテーブルと全面的に食い違っていた**。
+
+```
+実テーブル : id, project_schedule_id, user_id, comment, created_at, updated_at, comment_date
+モデル     : fillable に body / metadata / date（いずれも存在しないカラム）
+Controller : body / date で create・save
+```
+
+**この機能は実装当初から一度も動いていなかった**（本番のレコード数 0 件）。検出したバグは 4 件:
+
+| # | 症状 | 原因 |
+|---|---|---|
+| 1 | 投稿すると 500 | `Unknown column 'body'`。存在しないカラムに INSERT していた |
+| 2 | 投稿後に 500 | 存在しないルート `coordinator.project_schedules.show` へリダイレクト（`show` は未定義） |
+| 3 | 更新・詳細表示が常に 403 | `ProjectScheduleCommentPolicy` が存在しないのに `authorize('update'/'view', $comment)` |
+| 4 | カレンダーが作成結果を描画できない | axios から呼ばれても redirect を返しており `resp.data.comment` が取れない |
+
+**対応方針**: Controller と Vue は一貫して `body` / `date` を使っているため、Vue は変更せず、
+`Event` モデルの `start ⇄ starts_at` と同じアクセサ／ミューテタ方式で
+`body ⇄ comment` / `date ⇄ comment_date` を吸収した（`$appends` で JSON にも body・date を出す）。
+
+- `ProjectScheduleComment`: fillable を実カラム + body/date に、`comment_date` を `'date:Y-m-d'` に、アクセサ／ミューテタと `$appends` を追加
+- `ProjectScheduleCommentsController`:
+  - `store` は `date` と `metadata.date` の両形式を受け付け、`wantsJson()` なら JSON、それ以外はリダイレクト
+  - リダイレクト先を実在する `coordinator.project_schedules.index` に変更
+  - `show` / `update` の認可を親スケジュールの `update` 権限に変更（`store` と同方式）
+- 検証（トランザクション内・ロールバック）: ①カレンダーからの作成（JSON） ②作成ページからの作成（302） ③更新 ④詳細表示 の**4経路すべて成功**
+- **Vue の変更は不要**（送信キー・表示キーが従来のまま通る）
 
 ---
 

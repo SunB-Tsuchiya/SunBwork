@@ -28,25 +28,37 @@ class ProjectScheduleCommentsController extends Controller
         $schedule = ProjectSchedule::findOrFail($project_schedule);
         $this->authorize('update', $schedule);
 
+        // 日付は Create.vue が 'date'、カレンダー側が 'metadata.date' で送ってくる
         $data = $request->validate([
-            'body' => ['required', 'string'],
-            'date' => ['nullable', 'date'],
+            'body'          => ['required', 'string'],
+            'date'          => ['nullable', 'date'],
+            'metadata.date' => ['nullable', 'date'],
         ]);
 
         $comment = ProjectScheduleComment::create([
             'project_schedule_id' => $schedule->id,
             'user_id' => Auth::id(),
             'body' => $data['body'],
-            'date' => $data['date'] ?? null,
+            'date' => $data['date'] ?? ($data['metadata']['date'] ?? null),
         ]);
 
-        return redirect()->route('coordinator.project_schedules.show', ['project_schedule' => $schedule->id]);
+        // カレンダーからは axios で呼ばれ、作成結果をその場で描画するため JSON を返す
+        if ($request->wantsJson()) {
+            return response()->json(['status' => 'ok', 'comment' => $comment]);
+        }
+
+        // 旧実装は存在しない coordinator.project_schedules.show へリダイレクトしており
+        // RouteNotFoundException になっていた（show ルートは定義されていない）
+        return redirect()->route('coordinator.project_schedules.index');
     }
 
     public function show($id)
     {
         $comment = ProjectScheduleComment::findOrFail($id);
-        $this->authorize('view', $comment);
+        // ProjectScheduleComment 用の Policy は存在しないため、store() と同じく
+        // 親スケジュールの権限で判定する（旧実装は常に 403 になっていた）
+        abort_if(! $comment->schedule, 404);
+        $this->authorize('update', $comment->schedule);
         return Inertia::render('Coordinator/ProjectSchedules/Comments/Show', [
             'comment' => $comment,
         ]);
@@ -55,16 +67,20 @@ class ProjectScheduleCommentsController extends Controller
     public function update(Request $request, $id)
     {
         $comment = ProjectScheduleComment::findOrFail($id);
-        $this->authorize('update', $comment);
+        // 同上（親スケジュールの権限で判定）
+        abort_if(! $comment->schedule, 404);
+        $this->authorize('update', $comment->schedule);
 
         $data = $request->validate([
-            'body' => ['required', 'string'],
+            'body'          => ['required', 'string'],
+            'date'          => ['nullable', 'date'],
             'metadata.date' => ['nullable', 'date'],
         ]);
 
         $comment->body = $data['body'];
-        if (isset($data['metadata']['date'])) {
-            $comment->date = $data['metadata']['date'];
+        $newDate = $data['date'] ?? ($data['metadata']['date'] ?? null);
+        if ($newDate !== null) {
+            $comment->date = $newDate;
         }
         $comment->save();
 
