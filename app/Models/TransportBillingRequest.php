@@ -16,8 +16,8 @@ class TransportBillingRequest extends Model
     ];
 
     protected $casts = [
-        'period_start' => 'date',
-        'period_end'   => 'date',
+        'period_start' => 'date:Y-m-d',
+        'period_end'   => 'date:Y-m-d',
         'total_amount' => 'integer',
     ];
 

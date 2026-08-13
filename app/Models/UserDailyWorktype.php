@@ -8,7 +8,7 @@ class UserDailyWorktype extends Model
 {
     protected $fillable = ['user_id', 'date', 'worktype_id'];
 
-    protected $casts = ['date' => 'date'];
+    protected $casts = ['date' => 'date:Y-m-d'];
 
     public function user()
     {

@@ -35,15 +35,15 @@
 
 | # | モデル | 状態 | 備考 |
 |---|---|---|---|
-| 2-1 | `ProjectJob`（`plate_submission_date` / `plate_down_date`） | 未着手 | Edit/Show 系の表示経路を要確認 |
-| 2-2 | `UserDailyWorktype`（`date`） | 未着手 | ⚠️ codex の指摘に疑義あり。利用実態を先に確認 |
-| 2-3 | `ProjectMemo`（`date`） | 未着手 | |
-| 2-4 | `Changelog`（`released_at`） | 未着手 | |
-| 2-5 | `ProgressCell` | 未着手 | 進行表。影響大 |
-| 2-6 | `WorkflowCell` | 未着手 | 管理シート |
-| 2-7 | `ProjectScheduleComment` | 未着手 | |
-| 2-8 | `DispatchProfile` | 未着手 | |
-| 2-9 | `TransportExpense` / `TransportExpenseItem` / `TransportBillingRequest` | 未着手 | 交通費・締め処理に注意 |
+| 2-1 | `ProjectJob`（`plate_submission_date` / `plate_down_date`） | ✅ 完了 | |
+| 2-2 | `UserDailyWorktype`（`date`） | ✅ 完了 | ⚠️ **テーブル `user_daily_worktypes` がローカル・本番とも存在しない**（下記） |
+| 2-3 | `ProjectMemo`（`date`） | ✅ 完了 | |
+| 2-4 | `Changelog`（`released_at`） | ✅ 完了 | 表示は `formatDate`（`new Date`）経由のため元から実害なし |
+| 2-5 | `ProgressCell`（`value_date` / `cell_deadline`） | ✅ 完了 | |
+| 2-6 | `WorkflowCell`（`work_date` / `value_date` / `cell_deadline`） | ✅ 完了 | |
+| 2-7 | `ProjectScheduleComment`（`date`） | ✅ 完了 | ⚠️ **`date` カラムが存在しない**（下記） |
+| 2-8 | `DispatchProfile`（`contract_start` / `contract_end`） | ✅ 完了 | |
+| 2-9 | `TransportExpense` / `TransportExpenseItem` / `TransportBillingRequest` | ✅ 完了 | **実害が確定していた箇所**（下記） |
 
 ### フェーズ3: Vue の日付生成
 
@@ -116,6 +116,45 @@
   | B) 通常 JST 10:00 | 含まれる / 返却値正 | 同左（変化なし） |
   | C) proof JST 10:00 | 含まれるが**返却値が -9h ずれ** | 返却値正 |
   | D) proof 8時シフト | — | 含まれる / 返却値正 |
+
+- 影響画面の特定: `pickerData` は `ProofTimelinePickerModal.vue`（割当時に時間帯を選ぶモーダル）から呼ばれる。
+  使用箇所は ProofCoordinator の Inbox/Assign・Assignments/Edit・ProgressSheets/Assign・WorkflowSheets/Assign の4画面。
+  モーダルに出る「校正者の既存予定の帯」が欠落していたため、夕方に予定がある校正者が空いて見え、
+  二重割当を招く状態だった。なお `/proof-coordinator/calendar` のページ本体（`index()`）は
+  `getMonthEvents()` / `getSchedulesForDate()` という別経路で、**フェーズ1 のスコープ外**（未点検）
+- **フェーズ1 デプロイ済み（コミット `bda2cecee`）。ユーザーによるブラウザ動作確認 OK**
+
+#### フェーズ2 実施（同日）— 完了
+
+- 対象 17 箇所（11 モデル）の `'date'` を `'date:Y-m-d'` に変更。migration を確認し、**全カラムが `date()` 型（時刻を持たない）** であることを確認済み
+- **本番データで実害を確定**（修正前の JSON はすべて前日 15:00 UTC）:
+
+  | モデル | カラム | DB | 修正前の JSON |
+  |---|---|---|---|
+  | ProjectJob | plate_down_date | 2026-05-29 | `2026-05-28T15:00:00.000000Z` |
+  | ProjectMemo | date | 2026-04-21 | `2026-04-20T15:00:00.000000Z` |
+  | ProgressCell | value_date | 2026-06-23 | `2026-06-22T15:00:00.000000Z` |
+  | TransportExpense | billing_date | 2026-06-17 | `2026-06-16T15:00:00.000000Z` |
+  | TransportExpenseItem | occurrence_date | 2026-06-16 | `2026-06-15T15:00:00.000000Z` |
+  | TransportBillingRequest | period_start | 2026-06-10 | `2026-06-09T15:00:00.000000Z` |
+  | DispatchProfile | contract_start | 2018-08-22 | `2018-08-21T15:00:00.000000Z` |
+
+- **画面に出ていた実害**: `SuperAdmin/Billing/Transport/Index.vue` が `billing_date` / `occurrence_date` を
+  `String(...).slice(0, 10)` で切っており、**1 日前の日付が表示され、かつ `occurrence_date` は明細のソートキー**にも
+  使われていた（96 / 100 / 131-132 行）
+- **実害がなかった箇所**: `Changelog.released_at` は Vue 側が `formatDate()`＝`new Date()` 経由のため、
+  UTC ISO でも JST 解釈で正しい日付になっていた。修正後も表示は変わらない
+- 検証: `Changelog.released_at` の JSON が `2026-05-31T15:00:00.000000Z` → `2026-06-01`（DB 値と一致）になることを確認
+
+##### ⚠️ フェーズ2 で判明した別件（キャストとは無関係・未対応）
+
+1. **`UserDailyWorktype` は使われていない可能性が高い** — テーブル `user_daily_worktypes` が
+   **ローカル・本番とも存在しない**。カレンダーの週間日程設定は `UserMonthlySchedule` から
+   `year_month . '-' . $dd` の文字列連結で生成されており、このモデルを経由していない。
+   codex の「カレンダーで map のキーに使う」という指摘は**誤り**だった。
+   モデル自体が死んでいる可能性があるため、削除可否は別途判断が必要
+2. **`ProjectScheduleComment` の `date` カラムが存在しない** — キャストが実体のないカラムを指している。
+   無害だが、削除するのが正しい
 
 ---
 

@@ -20,7 +20,7 @@ class Changelog extends Model
     ];
 
     protected $casts = [
-        'released_at' => 'date',
+        'released_at' => 'date:Y-m-d',
         'design_files' => 'array',
     ];
 }

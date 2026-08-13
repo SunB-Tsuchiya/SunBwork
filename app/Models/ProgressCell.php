@@ -25,9 +25,9 @@ class ProgressCell extends Model
     ];
 
     protected $casts = [
-        'value_date'   => 'date',
+        'value_date'   => 'date:Y-m-d',
         'value_bool'   => 'boolean',
-        'cell_deadline' => 'date',
+        'cell_deadline' => 'date:Y-m-d',
         'completed_at'  => 'datetime',
     ];
 

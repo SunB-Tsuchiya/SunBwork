@@ -21,7 +21,7 @@ class TransportExpenseItem extends Model
     ];
 
     protected $casts = [
-        'occurrence_date' => 'date',
+        'occurrence_date' => 'date:Y-m-d',
         'amount' => 'integer',
         'sort_order' => 'integer',
     ];

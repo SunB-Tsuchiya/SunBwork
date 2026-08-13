@@ -11,7 +11,7 @@ class ProjectScheduleComment extends Model
 
     protected $fillable = ['project_schedule_id', 'user_id', 'body', 'metadata', 'date'];
 
-    protected $casts = ['metadata' => 'array', 'date' => 'date'];
+    protected $casts = ['metadata' => 'array', 'date' => 'date:Y-m-d'];
 
     public function schedule()
     {

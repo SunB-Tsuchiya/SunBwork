@@ -29,10 +29,10 @@ class WorkflowCell extends Model
 
     protected $casts = [
         'completed_at'  => 'datetime',
-        'work_date'     => 'date',
-        'value_date'    => 'date',
+        'work_date'     => 'date:Y-m-d',
+        'value_date'    => 'date:Y-m-d',
         'value_bool'    => 'boolean',
-        'cell_deadline' => 'date',
+        'cell_deadline' => 'date:Y-m-d',
     ];
 
     public function row()

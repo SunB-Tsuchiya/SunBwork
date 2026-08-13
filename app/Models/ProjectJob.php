@@ -36,8 +36,8 @@ class ProjectJob extends Model
         'schedule' => 'array',
         'completed' => 'boolean',
         'page_count' => 'integer',
-        'plate_submission_date' => 'date',
-        'plate_down_date' => 'date',
+        'plate_submission_date' => 'date:Y-m-d',
+        'plate_down_date' => 'date:Y-m-d',
     ];
 
     public function getImageUrlAttribute(): ?string

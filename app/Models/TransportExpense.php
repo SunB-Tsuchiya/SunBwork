@@ -20,7 +20,7 @@ class TransportExpense extends Model
     ];
 
     protected $casts = [
-        'billing_date' => 'date',
+        'billing_date' => 'date:Y-m-d',
         'total_amount' => 'integer',
         'department_code' => 'integer',
     ];
