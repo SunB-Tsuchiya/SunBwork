@@ -19,6 +19,8 @@ use App\Models\Department;
 class DashboardController extends Controller
 {
     use \App\Http\Controllers\Concerns\ResolvesContextCompany;
+    use \App\Http\Controllers\Concerns\CalculatesEventTime;
+
     public function index(Request $request)
     {
         // Eager load related models so Vue pages can safely access them without extra queries
@@ -106,17 +108,29 @@ class DashboardController extends Controller
 
             $eventQuery = Event::where('user_id', $user->id);
             $select = ['id', 'title'];
+            // events は proof ジョブ = UTC 保存 / 通常イベント = JST 保存の混在形式のため、
+            // DB 側では ±9時間のバッファで広めに取得し、取得後に JST 変換して再フィルタする。
+            $bufferFrom = $event_from->copy()->subHours(9);
+            $bufferTo   = $event_to->copy()->addHours(9);
             if (Schema::hasColumn('events', 'starts_at')) {
-                $eventQuery->whereBetween('starts_at', [$event_from, $event_to]);
+                $eventQuery->whereBetween('starts_at', [$bufferFrom, $bufferTo]);
                 $select[] = 'starts_at';
             } elseif (Schema::hasColumn('events', 'start')) {
-                $eventQuery->whereBetween('start', [$event_from, $event_to]);
+                $eventQuery->whereBetween('start', [$bufferFrom, $bufferTo]);
                 $select[] = 'start';
             }
             foreach (['ends_at', 'end', 'body', 'description', 'project_job_assignment_id'] as $col) {
                 if (Schema::hasColumn('events', $col)) $select[] = $col;
             }
-            $rawEvents = $eventQuery->get($select);
+            // resolveJstCarbon() の判定に job_type が必要
+            $rawEvents = $eventQuery->with('projectJobAssignment:id,job_type')->get($select);
+
+            // JST 変換後に正確な期間で再フィルタ（バッファ分を落とす）
+            $rawEvents = $rawEvents->filter(function ($e) use ($event_from, $event_to) {
+                $jstStart = $this->resolveJstCarbon($e, 'starts_at');
+                if (! $jstStart) return true; // 時刻不明のものは従来どおり残す
+                return $jstStart->gte($event_from) && $jstStart->lte($event_to);
+            })->values();
 
             // CalendarController と同じ色判定ロジック: is_self_assigned / has_progress_cell を付与
             $assignmentIds = $rawEvents->pluck('project_job_assignment_id')->filter()->unique()->values()->all();

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\ProofCoordinator;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\CalculatesEventTime;
 use App\Models\Event;
 use App\Models\ProjectJobAssignment;
 use App\Models\ProofRequest;
@@ -18,6 +19,8 @@ use Inertia\Response;
 
 class CalendarController extends Controller
 {
+    use CalculatesEventTime;
+
     // ──────────────────────────────────────────────────────
     //  ページ表示
     // ──────────────────────────────────────────────────────
@@ -85,16 +88,31 @@ class CalendarController extends Controller
 
         // 通常イベント（コンテキスト表示用 — 色のみ、タイトルなし）
         $memberIds = array_column($members, 'id');
-        $dayStart  = Carbon::parse($date . ' 00:00:00', 'Asia/Tokyo')->utc();
-        $dayEnd    = Carbon::parse($date . ' 23:59:59', 'Asia/Tokyo')->utc();
+
+        // 日境界は JST で持つ。events は proof ジョブ = UTC 保存 / 通常イベント = JST 保存の
+        // 混在形式のため、DB 側の比較だけでは絞り切れない（UTC 境界で比較すると
+        // 通常イベントの JST 15:00 以降が当日から漏れる）。
+        // ±9時間のバッファで広めに取得し、JST 変換後にその日と重なるかで判定する。
+        $dayStartJst = Carbon::parse($date . ' 00:00:00', 'Asia/Tokyo');
+        $dayEndJst   = Carbon::parse($date . ' 23:59:59', 'Asia/Tokyo');
+        $bufferStart = $dayStartJst->copy()->subHours(9)->toDateTimeString();
+        $bufferEnd   = $dayEndJst->copy()->addHours(9)->toDateTimeString();
 
         $eventModels = Event::whereIn('user_id', $memberIds)
-            ->where(function ($q) use ($dayStart, $dayEnd) {
-                $q->whereBetween('starts_at', [$dayStart, $dayEnd])
-                  ->orWhereBetween('ends_at',   [$dayStart, $dayEnd])
-                  ->orWhere(fn ($q2) => $q2->where('starts_at', '<=', $dayStart)->where('ends_at', '>=', $dayEnd));
+            ->where(function ($q) use ($bufferStart, $bufferEnd) {
+                $q->whereBetween('starts_at', [$bufferStart, $bufferEnd])
+                  ->orWhereBetween('ends_at',   [$bufferStart, $bufferEnd])
+                  ->orWhere(fn ($q2) => $q2->where('starts_at', '<=', $bufferStart)->where('ends_at', '>=', $bufferEnd));
             })
-            ->get();
+            ->with('projectJobAssignment:id,job_type')
+            ->get()
+            ->filter(function ($e) use ($dayStartJst, $dayEndJst) {
+                $jstStart = $this->resolveJstCarbon($e, 'starts_at');
+                $jstEnd   = $this->resolveJstCarbon($e, 'ends_at');
+                if (! $jstStart || ! $jstEnd) return false;
+                return $jstStart->lte($dayEndJst) && $jstEnd->gte($dayStartJst);
+            })
+            ->values();
 
         // pja ID を一括取得してN+1回避
         $pjaIds = $eventModels->pluck('project_job_assignment_id')->filter()->unique()->values()->all();
@@ -126,13 +144,17 @@ class CalendarController extends Controller
                 $color = '#059669'; // Coordinator割当（グリーン）
             }
 
+            // events は proof=UTC / 通常=JST の混在保存。datetime キャストは常に JST として
+            // 解釈するため、proof を素の ->utc() に通すと二重に 9 時間ずれる。
+            // resolveJstCarbon() で正しい JST を得てから UTC ISO に変換する。
+            $jstStart = $this->resolveJstCarbon($e, 'starts_at');
+            $jstEnd   = $this->resolveJstCarbon($e, 'ends_at');
+
             return [
                 'id'        => $e->id,
                 'user_id'   => $e->user_id,
-                // events.starts_at は JST 文字列格納（EventController::store() の方式）。
-                // datetime キャスト(Asia/Tokyo)が JST と正しく解釈するため ->utc() で真の UTC を得る。
-                'starts_at' => $e->starts_at ? $e->starts_at->utc()->toIso8601String() : null,
-                'ends_at'   => $e->ends_at   ? $e->ends_at->utc()->toIso8601String()   : null,
+                'starts_at' => $jstStart ? $jstStart->copy()->utc()->toIso8601String() : null,
+                'ends_at'   => $jstEnd   ? $jstEnd->copy()->utc()->toIso8601String()   : null,
                 'color'     => $color,
             ];
         })->all();

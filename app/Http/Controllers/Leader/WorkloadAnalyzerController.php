@@ -250,8 +250,10 @@ class WorkloadAnalyzerController extends Controller
             // --- compute event points for this user ---
             $eventTotalPoints = 0.0;
             try {
+                // events は proof ジョブ = UTC 保存 / 通常イベント = JST 保存の混在形式のため、
+                // DB 側では ±9時間のバッファで広めに取得し、JST 変換後に期間判定する
                 $evItems = \App\Models\Event::where('user_id', $userId)
-                    ->whereBetween('starts_at', [$start, $end])
+                    ->whereBetween('starts_at', [$start->copy()->subHours(9), $end->copy()->addHours(9)])
                     ->with('projectJobAssignment:id,job_type')
                     ->get();
                 $evCoeffMap = EventItemType::pluck('coefficient', 'id')->toArray();
@@ -261,6 +263,8 @@ class WorkloadAnalyzerController extends Controller
                     try {
                         $evStart = $this->resolveJstCarbon($ev, 'starts_at');
                         $evEnd   = $this->resolveJstCarbon($ev, 'ends_at');
+                        // バッファで広く取った分を JST 基準で除外する
+                        if ($evStart && ($evStart->lt($start) || $evStart->gt($end))) continue;
                         if ($evStart && $evEnd) {
                             $totalMins = abs($evStart->diffInMinutes($evEnd));
                             // 中断時間を差し引く（stored interruption_minutes）
@@ -1092,8 +1096,9 @@ class WorkloadAnalyzerController extends Controller
         // --- event_item_types aggregation: sum hours per event_item_type_id ---
         $eventTypeSums = []; // event_item_type_id => 実際の作業時間 (hours)
         try {
+            // events は proof=UTC / 通常=JST の混在形式のため、±9時間で広く取得して JST 変換後に期間判定する
             $evItems = \App\Models\Event::where('user_id', $userId)
-                ->whereBetween('starts_at', [$start, $end])
+                ->whereBetween('starts_at', [$start->copy()->subHours(9), $end->copy()->addHours(9)])
                 ->with('projectJobAssignment:id,job_type')
                 ->get();
             $showEvBreakDateCache = []; // YYYY-MM-DD => ['start','end']|null
@@ -1102,6 +1107,8 @@ class WorkloadAnalyzerController extends Controller
                 try {
                     $evStart = $this->resolveJstCarbon($ev, 'starts_at');
                     $evEnd   = $this->resolveJstCarbon($ev, 'ends_at');
+                    // バッファで広く取った分を JST 基準で除外する
+                    if ($evStart && ($evStart->lt($start) || $evStart->gt($end))) continue;
                     if ($evStart && $evEnd) {
                         $totalMins = abs($evStart->diffInMinutes($evEnd));
                         // 中断時間を差し引く（stored interruption_minutes）
@@ -1497,11 +1504,14 @@ class WorkloadAnalyzerController extends Controller
             } catch (\Throwable $e) {}
             try {
                 $evCoeffMap = EventItemType::pluck('coefficient', 'id')->toArray();
-                $evItems = \App\Models\Event::where('user_id', $uid)->whereBetween('starts_at', [$start, $end])->with('projectJobAssignment:id,job_type')->get();
+                // events は proof=UTC / 通常=JST の混在形式のため、±9時間で広く取得して JST 変換後に期間判定する
+                $evItems = \App\Models\Event::where('user_id', $uid)->whereBetween('starts_at', [$start->copy()->subHours(9), $end->copy()->addHours(9)])->with('projectJobAssignment:id,job_type')->get();
                 foreach ($evItems as $ev) {
                     $evStart = $this->resolveJstCarbon($ev, 'starts_at');
                     $evEnd   = $this->resolveJstCarbon($ev, 'ends_at');
                     if (!$evStart || !$evEnd) continue;
+                    // バッファで広く取った分を JST 基準で除外する
+                    if ($evStart->lt($start) || $evStart->gt($end)) continue;
                     $hours = abs($evStart->diffInMinutes($evEnd) / 60.0);
                     if ($hours <= 0) continue;
                     $coeff = ($ev->event_item_type_id && isset($evCoeffMap[$ev->event_item_type_id])) ? (float)$evCoeffMap[$ev->event_item_type_id] : 1.0;

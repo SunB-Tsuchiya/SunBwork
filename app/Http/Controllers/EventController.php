@@ -217,14 +217,28 @@ class EventController extends Controller
             }
 
             if (isset($localStartStr) && isset($localEndStr)) {
+                // events は proof ジョブ = UTC 保存 / 通常イベント = JST 保存の混在形式のため、
+                // DB 側の文字列比較だけでは正確に絞れない（proof が隣接日に紛れる／落ちる）。
+                // ±9時間のバッファで広めに取得し、取得後に JST 変換して再フィルタする。
+                $bufferStartStr = $startOfDay->copy()->subHours(9)->toDateTimeString();
+                $bufferEndStr   = $endOfDay->copy()->addHours(9)->toDateTimeString();
                 if (Schema::hasColumn('events', 'starts_at')) {
-                    $query->whereBetween('starts_at', [$localStartStr, $localEndStr]);
+                    $query->whereBetween('starts_at', [$bufferStartStr, $bufferEndStr]);
                 } else {
-                    $query->whereBetween('start', [$localStartStr, $localEndStr]);
+                    $query->whereBetween('start', [$bufferStartStr, $bufferEndStr]);
                 }
             }
         }
         $events = $query->with('projectJobAssignment:id,job_type')->get();
+
+        // JST 変換後に正確な日付範囲で再フィルタ（バッファ分を落とす）
+        if ($date && isset($startOfDay) && isset($endOfDay)) {
+            $events = $events->filter(function ($e) use ($startOfDay, $endOfDay) {
+                $jstStart = $this->resolveJstCarbon($e, 'starts_at');
+                if (! $jstStart) return true; // 時刻不明のものは従来どおり残す
+                return $jstStart->gte($startOfDay) && $jstStart->lte($endOfDay);
+            })->values();
+        }
 
         // For JSON clients (axios in the diary interactions view) enrich events
         // with the same job/progress/self-assigned metadata and color mapping
