@@ -217,10 +217,10 @@ const hasGroupedDiaries = computed(() => groupedByDepartment.value.some((group) 
 
                             <button
                                 v-if="props.date"
-                                @click.prevent="() => Inertia.post(route(markReadAllRoute()), { date: props.date })"
+                                @click.prevent="() => Inertia.post(route(markReadAllRoute()), { date: props.date, department: group.department })"
                                 class="ml-2 inline-flex items-center rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700"
                             >
-                                全部既読にする
+                                この部署を全部既読にする
                             </button>
                         </h3>
                     </div>

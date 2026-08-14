@@ -584,13 +584,29 @@ class DiaryInteractionController extends Controller
         $userIds = $this->buildPermittedUserIds($currentUser);
         if (empty($userIds)) return redirect()->back()->with('error', '権限がありません');
 
-        $diaries = Diary::whereIn('user_id', $userIds)->where('date', $date)->get();
+        $diaries = Diary::with('user.department')
+            ->whereIn('user_id', $userIds)
+            ->where('date', $date)
+            ->get();
+
+        // 部署別表示から実行された場合は、その部署の日報だけを既読にする
+        $department = $request->input('department');
+        if ($department !== null && $department !== '') {
+            $diaries = $diaries->filter(function ($d) use ($department) {
+                $name = $d->user && $d->user->department ? $d->user->department->name : '未所属';
+
+                return $name === $department;
+            });
+        }
+
         foreach ($diaries as $d) {
             if (!$d->hasBeenReadBy($currentUser->id)) {
                 $d->addReadBy($currentUser->id);
             }
         }
 
-        return redirect()->back()->with('success', '日付の全ての日報を既読にしました');
+        return redirect()->back()->with('success', ($department !== null && $department !== '')
+            ? $department . 'の日報を既読にしました'
+            : '日付の全ての日報を既読にしました');
     }
 }
