@@ -166,7 +166,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     Route::put('/user/settings',      [App\Http\Controllers\User\UserSettingController::class, 'update'])->name('user.settings.update');
 
     // 日ごと勤務形態設定
-    Route::post('/user/daily-worktypes', [App\Http\Controllers\User\UserDailyWorktypeController::class, 'store'])->name('user.daily_worktypes.store');
+    // 週間日程設定（日別の勤務形態）。実データは user_monthly_schedules に月次 JSON で保存する
+    Route::post('/user/daily-worktypes', [App\Http\Controllers\User\UserWorktypeScheduleController::class, 'store'])->name('user.daily_worktypes.store');
 
     // 日ごと休憩設定
     Route::post('/user/daily-breaks', [App\Http\Controllers\User\UserDailyBreakController::class, 'store'])->name('user.daily_breaks.store');

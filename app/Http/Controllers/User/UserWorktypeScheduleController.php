@@ -7,7 +7,21 @@ use App\Models\UserMonthlySchedule;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
-class UserDailyWorktypeController extends Controller
+/**
+ * カレンダーの「週間日程設定」（日別の勤務形態）を保存するコントローラー。
+ *
+ * 実データは `user_monthly_schedules`（1ユーザー×1ヶ月＝1行、schedule は
+ * {"01": worktype_id, "15": worktype_id, ...} の JSON）に保存する。
+ *
+ * 旧実装は日別1行の `user_daily_worktypes` テーブルと `UserDailyWorktype` モデルを
+ * 使っていたが、行数削減のため 2026-03-28 の migration
+ * `replace_daily_worktypes_with_monthly_schedules` で月次 JSON 方式へ移行し、
+ * テーブルとモデルは削除済み。
+ *
+ * ルート名（`user.daily_worktypes.store`）と URL（`/user/daily-worktypes`）は
+ * 「日別の勤務形態を保存する」という機能を表す名前として維持している。
+ */
+class UserWorktypeScheduleController extends Controller
 {
     /**
      * 週間日程を保存（月次 JSON に upsert）
