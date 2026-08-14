@@ -366,45 +366,15 @@
             </DialogModal>
         </div>
 
-        <!-- 案件名重複チェック警告モーダル -->
-        <DialogModal :show="showDuplicateModal" @close="closeDuplicateModal">
-            <template #title>
-                <span class="flex items-center gap-2 text-yellow-700">
-                    <svg class="h-5 w-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                    </svg>
-                    類似案件が見つかりました
-                </span>
-            </template>
-            <template #content>
-                <div class="space-y-3">
-                    <p class="text-sm text-gray-700">同一クライアントに似た名前の案件がすでに登録されています。</p>
-                    <ul class="divide-y divide-yellow-100 rounded border border-yellow-200 bg-yellow-50">
-                        <li v-for="job in duplicateJobs" :key="job.id" class="flex items-center justify-between px-3 py-2 text-sm">
-                            <span class="font-medium text-gray-800">{{ job.title }}</span>
-                            <span class="ml-3 whitespace-nowrap text-xs text-gray-500">{{ job.created_at }}</span>
-                        </li>
-                    </ul>
-                    <p class="text-sm text-gray-600">タイトルを変えるか、そのまま登録するか選択してください。</p>
-                </div>
-            </template>
-            <template #footer>
-                <div class="flex w-full justify-between">
-                    <button
-                        class="rounded bg-gray-200 px-4 py-2 text-sm text-gray-700 hover:bg-gray-300"
-                        @click="closeDuplicateModal"
-                    >
-                        閉じる（タイトルを変更する）
-                    </button>
-                    <button
-                        class="rounded bg-orange-500 px-4 py-2 text-sm text-white hover:bg-orange-600"
-                        @click="forceSubmit"
-                    >
-                        それでも登録する
-                    </button>
-                </div>
-            </template>
-        </DialogModal>
+        <!-- 重複確認モーダル（受注番号・案件名） -->
+        <DuplicateJobModal
+            :show="showDuplicateModal"
+            :jobcode="form.jobcode"
+            :jobcode-duplicates="jobcodeDuplicates"
+            :title-duplicates="titleDuplicates"
+            @close="closeDuplicateModal"
+            @confirm="forceSubmit"
+        />
 
         <!-- チームメンバー選択モーダル -->
         <DialogModal :show="showMemberModal" @close="closeMemberModal">
@@ -564,7 +534,9 @@
 
 <script setup>
 import DialogModal from '@/Components/DialogModal.vue';
+import DuplicateJobModal from '@/Components/DuplicateJobModal.vue';
 import OcrModal from '@/Components/Prepress/OcrModal.vue';
+import { useJobDuplicateCheck } from '@/Composables/useJobDuplicateCheck';
 import DateInput from '@/Components/Prepress/DateInput.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, useForm, usePage } from '@inertiajs/vue3';
@@ -598,6 +570,8 @@ const form = useForm({
     team_members: [],
     image: null,
     tmp_ocr_image_path: '',
+    // 確認モーダルで「別作業として登録する」を選んだときのみ true にする
+    allow_duplicate_jobcode: false,
 });
 
 // ── 伝票画像 ────────────────────────────────────────────────────────────────
@@ -1038,14 +1012,9 @@ const errorLabels = {
     detail: '詳細',
 };
 
-// ===== 案件名重複チェック =====
-const showDuplicateModal = ref(false);
-const duplicateJobs = ref([]);
-const isCheckingDuplicate = ref(false);
-
-function closeDuplicateModal() {
-    showDuplicateModal.value = false;
-}
+// ===== 重複チェック（受注番号・案件名） =====
+const { showDuplicateModal, titleDuplicates, jobcodeDuplicates, checkDuplicates, closeDuplicateModal } =
+    useJobDuplicateCheck();
 
 // ===== リーダー・サブリーダー自動追加機能 =====
 // チームメンバーに自動追加するヘルパー関数
@@ -1252,37 +1221,13 @@ async function submit() {
         return;
     }
 
-    // クライアントと案件タイトルが揃っている場合のみ重複チェック
-    if (form.client_id && form.title) {
-        isCheckingDuplicate.value = true;
-        try {
-            const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
-            const res = await fetch(route('coordinator.project_jobs.check_duplicate'), {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Accept: 'application/json',
-                    'X-CSRF-TOKEN': csrf,
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-                credentials: 'same-origin',
-                body: JSON.stringify({ title: form.title, client_id: form.client_id }),
-            });
-            if (res.ok) {
-                const data = await res.json();
-                if (data.duplicates && data.duplicates.length > 0) {
-                    duplicateJobs.value = data.duplicates;
-                    showDuplicateModal.value = true;
-                    isCheckingDuplicate.value = false;
-                    return; // ユーザーの選択待ち
-                }
-            }
-        } catch {
-            // チェック失敗時はそのまま保存続行
-        } finally {
-            isCheckingDuplicate.value = false;
-        }
-    }
+    // 受注番号 / 品名の重複を確認。重複があればモーダルを開いてユーザーの選択を待つ
+    const hasDuplicates = await checkDuplicates({
+        jobcode: form.jobcode,
+        title: form.title,
+        clientId: form.client_id,
+    });
+    if (hasDuplicates) return;
 
     doSubmit();
 }
@@ -1311,6 +1256,8 @@ function doSubmit() {
 }
 
 function forceSubmit() {
+    // 受注番号の重複をユーザーが承認したのでサーバー側のブロックを解除して送信する
+    form.allow_duplicate_jobcode = true;
     closeDuplicateModal();
     doSubmit();
 }

@@ -474,9 +474,13 @@ class ProjectJobController extends Controller
                 'tmp_ocr_image_path'     => ['nullable', 'string', 'max:500'],
             ]);
 
-            if (!empty($data['jobcode'])) {
+            // 受注番号の重複は禁止ではなく警告。フロントの確認モーダルで承認された場合のみ通す
+            // （同じ受注番号で組版・可変・発送など別作業を登録する運用があるため）
+            if (!empty($data['jobcode']) && !$request->boolean('allow_duplicate_jobcode')) {
                 if (ProjectJob::where('jobcode', $data['jobcode'])->exists()) {
-                    return back()->withErrors(['jobcode' => 'この受注番号はすでに登録されています。'])->withInput();
+                    return back()->withErrors([
+                        'jobcode' => 'この受注番号はすでに登録されています。同じ受注番号で別作業を登録する場合は、確認画面で「別作業として登録する」を選んでください。',
+                    ])->withInput();
                 }
             }
 
@@ -499,10 +503,7 @@ class ProjectJobController extends Controller
                 $data['original_filename'] = basename($tmpOcrPath);
             }
 
-            $actor = $request->user();
-            $data['company_id'] = $actor->isSuperAdmin()
-                ? ((int) (session('superadmin_context.company_id') ?? $actor->company_id ?? 0) ?: null)
-                : ($actor->company_id ?? null);
+            $data['company_id'] = $this->resolveActorCompanyId($request->user());
 
             $job = ProjectJob::create($data);
 
@@ -1266,9 +1267,12 @@ class ProjectJobController extends Controller
                 'sub_coordinator_ids.*' => 'exists:users,id',
             ]);
 
-            if (!empty($data['jobcode'])) {
+            // store と同様、確認モーダルで承認された場合は重複を許可する
+            if (!empty($data['jobcode']) && !$request->boolean('allow_duplicate_jobcode')) {
                 if (ProjectJob::where('jobcode', $data['jobcode'])->where('id', '!=', $projectJob->id)->exists()) {
-                    return back()->withErrors(['jobcode' => 'この受注番号はすでに登録されています。'])->withInput();
+                    return back()->withErrors([
+                        'jobcode' => 'この受注番号はすでに登録されています。同じ受注番号で別作業にする場合は、確認画面で「別作業として登録する」を選んでください。',
+                    ])->withInput();
                 }
             }
 
@@ -1494,37 +1498,116 @@ class ProjectJobController extends Controller
     }
 
     /**
-     * 案件名の重複チェック（登録前のフロント呼び出し用 JSON エンドポイント）
-     * 同一クライアントで類似タイトルが存在する場合に返す（警告のみ、保存は任意）
+     * 案件登録前の重複チェック（フロント呼び出し用 JSON エンドポイント）
+     * - 品名   : 同一クライアント内で類似タイトルの案件を返す
+     * - 受注番号: 会社をまたいで完全一致する案件を返す
+     *
+     * どちらも警告のみで、ユーザーが確認すればそのまま登録できる。
+     * 受注番号を会社で絞らないのは、グループ会社（印刷 → 組版 → 印刷）で
+     * 同じ伝票番号を共有して扱う運用があるため。
      */
     public function checkDuplicate(\Illuminate\Http\Request $request)
     {
         $request->validate([
-            'title'      => 'required|string|max:255',
-            'client_id'  => 'required|integer|exists:clients,id',
+            'title'      => 'nullable|string|max:255',
+            'jobcode'    => 'nullable|string|max:255',
+            'client_id'  => 'nullable|integer|exists:clients,id',
             'exclude_id' => 'nullable|integer',
         ]);
 
-        $inputNormalized = $this->normalizeTitle($request->title);
-        $clientId        = (int) $request->client_id;
+        $excludeId = $request->filled('exclude_id') ? (int) $request->exclude_id : null;
+
+        return response()->json([
+            'duplicates'         => $this->findTitleDuplicates(
+                $request->input('title'),
+                $request->filled('client_id') ? (int) $request->input('client_id') : null,
+                $excludeId
+            ),
+            'jobcode_duplicates' => $this->findJobcodeDuplicates(
+                $request->input('jobcode'),
+                $excludeId,
+                $this->resolveActorCompanyId($request->user())
+            ),
+        ]);
+    }
+
+    /**
+     * 同一クライアント内で類似タイトルの案件を返す。
+     */
+    private function findTitleDuplicates(?string $title, ?int $clientId, ?int $excludeId): array
+    {
+        if (!$title || !$clientId) {
+            return [];
+        }
+
+        $inputNormalized = $this->normalizeTitle($title);
 
         $query = ProjectJob::where('client_id', $clientId)
             ->select('id', 'title', 'created_at');
 
-        if ($request->filled('exclude_id')) {
-            $query->where('id', '!=', (int) $request->exclude_id);
+        if ($excludeId) {
+            $query->where('id', '!=', $excludeId);
         }
 
-        $duplicates = $query->get()
+        return $query->get()
             ->filter(fn($j) => $this->normalizeTitle($j->title) === $inputNormalized)
             ->map(fn($j) => [
                 'id'         => $j->id,
                 'title'      => $j->title,
                 'created_at' => $j->created_at?->format('Y年n月'),
             ])
-            ->values();
+            ->values()
+            ->all();
+    }
 
-        return response()->json(['duplicates' => $duplicates]);
+    /**
+     * 受注番号が完全一致する案件を会社横断で返す。
+     * 自社か他社（グループ会社）かをフロントで出し分けられるよう same_company を付ける。
+     */
+    private function findJobcodeDuplicates(?string $jobcode, ?int $excludeId, ?int $actorCompanyId): array
+    {
+        $jobcode = $jobcode !== null ? trim($jobcode) : '';
+        if ($jobcode === '') {
+            return [];
+        }
+
+        $query = ProjectJob::where('jobcode', $jobcode)
+            ->with(['company:id,name', 'user:id,name', 'client:id,name'])
+            ->select('id', 'jobcode', 'title', 'company_id', 'user_id', 'client_id', 'created_at')
+            ->orderByDesc('id')
+            ->limit(20);
+
+        if ($excludeId) {
+            $query->where('id', '!=', $excludeId);
+        }
+
+        return $query->get()
+            ->map(fn($j) => [
+                'id'           => $j->id,
+                'jobcode'      => $j->jobcode,
+                'title'        => $j->title,
+                'client_name'  => $j->client?->name,
+                'company_name' => $j->company?->name,
+                'leader_name'  => $j->user?->name,
+                'same_company' => $actorCompanyId !== null && (int) $j->company_id === $actorCompanyId,
+                'created_at'   => $j->created_at?->format('Y年n月'),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * 操作者が属する会社 ID を返す（SuperAdmin はコンテキスト切替中の会社を優先）。
+     */
+    private function resolveActorCompanyId(?\App\Models\User $actor): ?int
+    {
+        if (!$actor) {
+            return null;
+        }
+
+        return $actor->isSuperAdmin()
+            ? ((int) (session('superadmin_context.company_id') ?? $actor->company_id ?? 0) ?: null)
+            : ($actor->company_id ?? null);
     }
 
     /**

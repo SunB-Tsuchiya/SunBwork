@@ -284,11 +284,24 @@
         @apply="onOcrApply"
         @close="showOcrModal = false"
     />
+
+    <!-- 重複確認モーダル（受注番号・案件名） -->
+    <DuplicateJobModal
+        :show="showDuplicateModal"
+        :jobcode="form.jobcode"
+        :jobcode-duplicates="jobcodeDuplicates"
+        :title-duplicates="titleDuplicates"
+        confirm-label="このまま保存する"
+        @close="closeDuplicateModal"
+        @confirm="forceSubmit"
+    />
 </template>
 
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
+import DuplicateJobModal from '@/Components/DuplicateJobModal.vue';
 import OcrModal from '@/Components/Prepress/OcrModal.vue';
+import { useJobDuplicateCheck } from '@/Composables/useJobDuplicateCheck';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import axios from 'axios';
 import { computed, ref, watch } from 'vue';
@@ -659,14 +672,40 @@ const form = useForm({
               : '',
     teammember: decodedTeammember || null,
     schedule: decodedSchedule || null,
+    // 確認モーダルで「別作業として登録する」を選んだときのみ true にする
+    allow_duplicate_jobcode: false,
 });
+
+// ===== 重複チェック（受注番号・案件名） =====
+const { showDuplicateModal, titleDuplicates, jobcodeDuplicates, checkDuplicates, closeDuplicateModal } =
+    useJobDuplicateCheck();
 // リーダーとして選択中のユーザーを除いたサブCo候補
 const subCandidates = computed(() =>
     props.coordinatorCandidates.filter((c) => c.id !== form.user_id),
 );
 
-function submit() {
+async function submit() {
+    // 受注番号 / 品名の重複を確認。重複があればモーダルを開いてユーザーの選択を待つ
+    const hasDuplicates = await checkDuplicates({
+        jobcode: form.jobcode,
+        title: form.title,
+        clientId: form.client_id,
+        excludeId: props.job.id,
+    });
+    if (hasDuplicates) return;
+
+    doSubmit();
+}
+
+function doSubmit() {
     form.put(route('coordinator.project_jobs.update', { projectJob: props.job.id }));
+}
+
+function forceSubmit() {
+    // 受注番号の重複をユーザーが承認したのでサーバー側のブロックを解除して送信する
+    form.allow_duplicate_jobcode = true;
+    closeDuplicateModal();
+    doSubmit();
 }
 
 const uncompleting = ref(false);
