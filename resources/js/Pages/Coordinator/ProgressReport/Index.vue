@@ -167,8 +167,8 @@ function openSheet(cell) {
     router.visit(route('coordinator.progress_sheets.show', { sheet: cell.sheet_id }));
 }
 
-const today = new Date().toISOString().slice(0, 10);
-const in3days = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
+const today = new Date().toLocaleDateString('sv-SE');
+const in3days = new Date(Date.now() + 3 * 86400000).toLocaleDateString('sv-SE');
 
 function rowClass(cell) {
     if (cell.completed_at) return 'bg-green-50';

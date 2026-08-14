@@ -18,7 +18,7 @@ const props = defineProps({
 
 // ─── 入力フォーム ───────────────────────────────────────────
 const today = new Date();
-const billingDate    = ref(today.toISOString().slice(0, 10));
+const billingDate    = ref(today.toLocaleDateString('sv-SE'));
 const departmentCode = ref(0);
 const billingYear    = computed(() => new Date(billingDate.value).getFullYear());
 
@@ -85,7 +85,7 @@ function submit() {
 
 function resetForm() {
     editingExpenseId.value = null;
-    billingDate.value      = today.toISOString().slice(0, 10);
+    billingDate.value      = today.toLocaleDateString('sv-SE');
     departmentCode.value   = 0;
     rows.value             = [newRow(0)];
     errors.value           = {};

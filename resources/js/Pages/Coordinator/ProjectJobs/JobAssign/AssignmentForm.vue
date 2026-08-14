@@ -1145,7 +1145,7 @@ function normalizeAssignment(a) {
             difficulty: a.difficulty || resolveDifficultySlug(a.difficulty_id),
             difficulty_id: a.difficulty_id != null ? Number(a.difficulty_id) : resolveDifficultyId(a.difficulty),
             desired_start_date: a.desired_start_date || a.desired_date || '',
-            desired_end_date: a.desired_end_date || new Date().toISOString().split('T')[0],
+            desired_end_date: a.desired_end_date || new Date().toLocaleDateString('sv-SE'),
             desired_time_hour: a.desired_time ? a.desired_time.split(':')[0] || '17' : a.desired_time_hour || '17',
             desired_time_min: a.desired_time ? a.desired_time.split(':')[1] || '30' : a.desired_time_min || '30',
             estimated_hours: a.estimated_hours !== undefined && a.estimated_hours !== null ? a.estimated_hours : '',
@@ -1196,7 +1196,7 @@ function normalizeAssignment(a) {
             difficulty: a.difficulty || resolveDifficultySlug(a.difficulty_id),
             difficulty_id: a.difficulty_id != null ? Number(a.difficulty_id) : resolveDifficultyId(a.difficulty),
             desired_start_date: a.desired_start_date || a.desired_date || '',
-            desired_end_date: a.desired_end_date || new Date().toISOString().split('T')[0],
+            desired_end_date: a.desired_end_date || new Date().toLocaleDateString('sv-SE'),
             desired_time_hour: a.desired_time ? a.desired_time.split(':')[0] || '17' : a.desired_time_hour || '17',
             desired_time_min: a.desired_time ? a.desired_time.split(':')[1] || '30' : a.desired_time_min || '30',
             start_time_hour: a.start_time
@@ -1355,7 +1355,7 @@ if (props.mode === 'coordinator') {
             }
         }
         if (a.desired_start_date === undefined) a.desired_start_date = a.desired_start_date || '';
-        if (a.desired_end_date === undefined) a.desired_end_date = a.desired_end_date || new Date().toISOString().split('T')[0];
+        if (a.desired_end_date === undefined) a.desired_end_date = a.desired_end_date || new Date().toLocaleDateString('sv-SE');
         if (a.desired_time_hour === undefined) a.desired_time_hour = a.desired_time_hour || '17';
         if (a.desired_time_min === undefined) a.desired_time_min = a.desired_time_min || '30';
         if (a.start_time_hour === undefined) a.start_time_hour = a.start_time_hour || a.desired_time_hour || '17';
@@ -1587,7 +1587,7 @@ function onSelected(payload) {
             title_suffix: payload.size_id ? `サイズ: ${payload.size_id}` : '',
             detail: '',
             difficulty: 'normal',
-            desired_date: new Date().toISOString().split('T')[0],
+            desired_date: new Date().toLocaleDateString('sv-SE'),
             desired_time_hour: '17',
             desired_time_min: '30',
             estimated_hours: '',
@@ -2053,7 +2053,7 @@ function addBlock() {
         title_suffix: '',
         detail: '',
         difficulty: 'normal',
-        desired_date: new Date().toISOString().split('T')[0],
+        desired_date: new Date().toLocaleDateString('sv-SE'),
         desired_time_hour: '17',
         desired_time_min: '30',
         estimated_hours: '',
@@ -2083,7 +2083,7 @@ function removeBlock(i) {
 
 function todayDateStr() {
     const d = new Date();
-    return d.toISOString().split('T')[0];
+    return d.toLocaleDateString('sv-SE');
 }
 
 function minEndDate(idx) {

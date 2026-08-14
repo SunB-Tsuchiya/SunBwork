@@ -49,9 +49,42 @@
 
 | # | 対象 | 状態 | 備考 |
 |---|---|---|---|
-| 3-A | 「今日」生成 6 箇所 | 未着手 | `toLocaleDateString('sv-SE')` へ |
-| 3-B | 既存 Date からの日付化 5 箇所 | 未着手 | **用途を確認**。UTC 基準が正しい箇所は変更しない |
-| 3-V | `npm run build` | 未着手 | |
+| 3-A | 「今日」生成 | ✅ 完了 | codex 指摘 6 箇所 → **実際は全体で 30 箇所以上** |
+| 3-B | 既存 Date からの日付化 | ✅ 完了 | 用途を確認し、UTC 一貫で正しい 4 箇所は**意図的に変更せず** |
+| 3-V | `npm run build` | ✅ 完了 | さくら用（`/members`）でビルドし、埋め込みを検証 |
+
+**codex が挙げたのは 11 箇所だったが、実際には同種の誤用が計 47 箇所あった**（修正 43 / 意図的に据え置き 4）。
+
+##### 修正した主なもの
+
+| 箇所 | 症状 |
+|---|---|
+| `Proof/Calendar.vue` 前日/翌日ボタン | `'T00:00:00'` でローカル解釈した Date を `toISOString()` していたため、**常に 1 日余分にずれる** |
+| `CalendarAll.vue` 月初/月末 | `new Date(y, m, 1).toISOString()` は JST 月初が UTC で**前月末日**になる |
+| `Calendar.vue` eventResize / eventDrop | `date` が UTC・`startHour` がローカルという不整合で、**日付だけ 1 日ずれて保存**される |
+| `JobBox/Schedule.vue` / `TeamRoom/Minutes/Create.vue` / `Transport/Index.vue` | 保存値の初期日付が JST 早朝に前日になる |
+| `AssignmentForm.vue` | 指摘は 1 箇所だったが同ファイル内 **6 箇所すべて**（`todayDateStr()` 含む） |
+| `JobBox/Show.vue` | 指摘は 1 箇所だったが **4 箇所**（`scheduled_at` の変換含む） |
+
+##### 意図的に変更しなかった箇所（UTC 一貫で正しく動作）
+
+`Calendar.vue:1255` / `Calendar.vue:1314` / `CalendarAll.vue:36` / `AssignedProjectCalendar.vue:321`
+— いずれも allDay の ±1 日計算。入力が `YYYY-MM-DD`（日付のみ）で UTC 解釈 → ローカル基準で ±1 → UTC 出力と一貫しており、変換すると逆に壊れる。
+
+##### 変更してはいけないパターンも確認
+
+`new Date(\`${date}T${h}:${m}:00+09:00\`).toISOString()` は **JST を明示して UTC タイムスタンプを作る正しい用法**（`ProofRequestModal` 等 5 箇所）。日付切り出しではないため対象外とした。
+
+##### 本番データへの影響調査（稼働中のため実施）
+
+保存値に影響する箇所について本番を調査し、**既存データにずれの痕跡がないことを確認**:
+
+| テーブル | 総数 | 0〜8時台に作成されたレコード | 判定 |
+|---|---|---|---|
+| `team_meeting_minutes`（`held_at`） | 17 | **0 件** | ずれなし |
+| `transport_expenses`（`billing_date`） | 1 | **0 件**（`billing_date` = 作成日で一致） | ずれなし |
+
+ずれるのは JST 00:00〜08:59 に操作した場合のみで、該当する操作実績がなかった。**データ補正は不要**。
 
 ### フェーズ4: 再発防止・ドキュメント
 

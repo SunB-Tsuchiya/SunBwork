@@ -81,7 +81,8 @@ const SNAP        = 15;   // 分スナップ
 // ─────────────────────────────────────────────────────────────────
 //  State
 // ─────────────────────────────────────────────────────────────────
-const currentDate    = ref(props.date || new Date().toISOString().slice(0, 10));
+// toISOString() は UTC を返すため JST 00:00〜08:59 に前日になる。ローカル日付を使う
+const currentDate    = ref(props.date || new Date().toLocaleDateString('sv-SE'));
 const localSchedules = ref(props.schedules.map(s => ({ ...s })));
 const unassigned     = ref(props.unassigned.map(u => ({ ...u })));
 const hideScheduled  = ref(false);

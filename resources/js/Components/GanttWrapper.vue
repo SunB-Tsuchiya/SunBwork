@@ -64,10 +64,11 @@ function applyContainerHeight(height) {
 
 function fmtDate(v) {
     if (!v) return null;
-    if (v instanceof Date) return v.toISOString().slice(0, 10);
+    // toISOString() は UTC を返すため、時刻付きの値を渡すと日付が前日にずれる。ローカル日付を使う
+    if (v instanceof Date) return v.toLocaleDateString('sv-SE');
     try {
         const d = new Date(v);
-        if (!isNaN(d)) return d.toISOString().slice(0, 10);
+        if (!isNaN(d)) return d.toLocaleDateString('sv-SE');
     } catch (e) {}
     return String(v).split('T')[0];
 }
@@ -79,8 +80,8 @@ onMounted(async () => {
         (arr || []).map((t) => ({
             id: String(t.id),
             name: t.name || 'untitled',
-            start: fmtDate(t.start) || new Date().toISOString().slice(0, 10),
-            end: fmtDate(t.end) || new Date().toISOString().slice(0, 10),
+            start: fmtDate(t.start) || new Date().toLocaleDateString('sv-SE'),
+            end: fmtDate(t.end) || new Date().toLocaleDateString('sv-SE'),
             progress: Number(t.progress ?? 0),
         }));
 
@@ -534,8 +535,8 @@ watch(
                 (arr || []).map((t) => ({
                     id: String(t.id),
                     name: t.name || 'untitled',
-                    start: fmtDate(t.start) || new Date().toISOString().slice(0, 10),
-                    end: fmtDate(t.end) || new Date().toISOString().slice(0, 10),
+                    start: fmtDate(t.start) || new Date().toLocaleDateString('sv-SE'),
+                    end: fmtDate(t.end) || new Date().toLocaleDateString('sv-SE'),
                     progress: Number(t.progress ?? 0),
                 }));
 

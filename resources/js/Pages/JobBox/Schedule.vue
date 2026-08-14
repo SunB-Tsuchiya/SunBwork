@@ -167,7 +167,7 @@ function parseDesiredTime(t) {
 }
 const desiredTime = parseDesiredTime(props.assignment.desired_time);
 
-const defaultDate = existingDate || props.assignment.desired_end_date || new Date().toISOString().slice(0, 10);
+const defaultDate = existingDate || props.assignment.desired_end_date || new Date().toLocaleDateString('sv-SE');
 const defaultStartH = existingStart?.hour ?? desiredTime?.hour ?? 9;
 const defaultStartM = existingStart?.minute ?? desiredTime?.minute ?? 0;
 const defaultEndH = existingEnd?.hour ?? Math.min(defaultStartH + 1, 23);

@@ -120,8 +120,8 @@ const filteredEvents = computed(() =>
 
 // Track current view range for legend filtering
 const now = new Date();
-const viewStart = ref(new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]);
-const viewEnd   = ref(new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]);
+const viewStart = ref(new Date(now.getFullYear(), now.getMonth(), 1).toLocaleDateString('sv-SE'));
+const viewEnd   = ref(new Date(now.getFullYear(), now.getMonth() + 1, 0).toLocaleDateString('sv-SE'));
 
 function onDatesSet(info) {
     viewStart.value = info.startStr.split('T')[0];
@@ -162,7 +162,7 @@ function scrollToCurrentWeek() {
     if (!wrapper) return;
 
     // Find today's cell by data-date attribute
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = new Date().toLocaleDateString('sv-SE');
     const todayEl  = wrapper.querySelector(`[data-date="${todayStr}"]`);
     if (!todayEl) return;
 

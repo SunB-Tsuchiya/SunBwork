@@ -413,23 +413,24 @@ const myJobBoxHref = computed(() => {
 const editDate = computed(() => {
     if (Array.isArray(events.value) && events.value.length > 0) {
         const ev = events.value[0];
+        // toISOString() は UTC を返すため JST 00:00〜08:59 の予定で前日になる。ローカル日付を使う
         if (ev.date) return ev.date;
-        if (ev.start) return new Date(ev.start).toISOString().slice(0, 10);
-        if (ev.starts_at) return new Date(ev.starts_at).toISOString().slice(0, 10);
+        if (ev.start) return new Date(ev.start).toLocaleDateString('sv-SE');
+        if (ev.starts_at) return new Date(ev.starts_at).toLocaleDateString('sv-SE');
     }
     if (assignment && assignment.scheduled_at) {
-        return new Date(assignment.scheduled_at).toISOString().slice(0, 10);
+        return new Date(assignment.scheduled_at).toLocaleDateString('sv-SE');
     }
     if (assignment && assignment.date) {
         return assignment.date;
     }
-    return new Date().toISOString().slice(0, 10);
+    return new Date().toLocaleDateString('sv-SE');
 });
 
 // 「今日の予定をセット」→ events.create_job with today's date and assignment prefill
 const scheduleHref = computed(() => {
     if (!assignment?.id) return '#';
-    const today = new Date().toISOString().slice(0, 10);
+    const today = new Date().toLocaleDateString('sv-SE');
     const base = safeRoute('events.create_job', {}, '/events/create-job');
     return base + '?job=' + encodeURIComponent(assignment.id) + '&date=' + encodeURIComponent(today);
 });
@@ -559,7 +560,7 @@ const formattedEvents = computed(() => {
         const rawEnd = e.end ?? e.ends_at ?? null;
         const start = rawStart ? new Date(rawStart) : null;
         const end = rawEnd ? new Date(rawEnd) : null;
-        const dateStr = e.date || (start ? start.toISOString().slice(0, 10) : '');
+        const dateStr = e.date || (start ? start.toLocaleDateString('sv-SE') : '');
         const startTime = start ? start.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : '';
         const endTime = end ? end.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : '';
         const minutes = start && end ? Math.max(0, Math.round((end - start) / 60000)) : 0;

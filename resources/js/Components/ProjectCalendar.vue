@@ -1454,7 +1454,7 @@ function openScheduleShowModal(event) {
                     try {
                         if (typeof d === 'string') return d.split('T')[0];
                         const dt = new Date(d);
-                        return dt.toISOString().split('T')[0];
+                        return dt.toLocaleDateString('sv-SE');
                     } catch (e) {
                         return String(d);
                     }

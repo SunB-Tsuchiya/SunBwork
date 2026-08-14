@@ -60,7 +60,7 @@ const calendarOptions = {
 
 function openCreateModal(dateStr = '') {
     editingEvent.value = null;
-    const today = dateStr || new Date().toISOString().slice(0, 10);
+    const today = dateStr || new Date().toLocaleDateString('sv-SE');
     form.value = {
         title:       '',
         description: '',

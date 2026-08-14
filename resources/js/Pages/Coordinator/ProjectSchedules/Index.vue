@@ -41,8 +41,8 @@ function addSample() {
     tasks.push({
         id: `sample-${Date.now()}`,
         name: 'Sample Task',
-        start: new Date().toISOString().slice(0, 10),
-        end: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString().slice(0, 10),
+        start: new Date().toLocaleDateString('sv-SE'),
+        end: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toLocaleDateString('sv-SE'),
         progress: 20,
     });
 }

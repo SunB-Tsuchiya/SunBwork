@@ -23,7 +23,8 @@ const SNAP       = 15;
 // ─────────────────────────────────────────────────────────────────
 //  State
 // ─────────────────────────────────────────────────────────────────
-const currentDate   = ref(new Date().toISOString().slice(0, 10));
+// toISOString() は UTC を返すため JST 00:00〜08:59 に前日になる。ローカル日付を使う
+const currentDate   = ref(new Date().toLocaleDateString('sv-SE'));
 const members       = ref([]);
 const schedules     = ref([]);
 const contextEvents = ref([]);
@@ -64,7 +65,7 @@ watch(() => props.show, (val) => {
             const sorted = [...editableSlots.value.map(s => s.date)].sort();
             currentDate.value = sorted[0];
         } else {
-            currentDate.value = new Date().toISOString().slice(0, 10);
+            currentDate.value = new Date().toLocaleDateString('sv-SE');
         }
 
         loadData();

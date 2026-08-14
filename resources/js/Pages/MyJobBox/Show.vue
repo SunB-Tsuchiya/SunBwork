@@ -449,7 +449,7 @@ const formattedEvents = computed(() => {
         const rawEnd = e.end ?? e.ends_at ?? null;
         const start = rawStart ? new Date(rawStart) : null;
         const end = rawEnd ? new Date(rawEnd) : null;
-        const dateStr = e.date || (start ? start.toISOString().slice(0, 10) : '');
+        const dateStr = e.date || (start ? start.toLocaleDateString('sv-SE') : '');
         const startTime = start ? start.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : '';
         const endTime = end ? end.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : '';
         const minutes = start && end ? Math.max(0, Math.round((end - start) / 60000)) : 0;
@@ -502,7 +502,7 @@ function eventsForPja(pjaId) {
             const rawEnd = e.end ?? e.ends_at ?? null;
             const start = rawStart ? new Date(rawStart) : null;
             const end = rawEnd ? new Date(rawEnd) : null;
-            const dateStr = e.date || (start ? start.toISOString().slice(0, 10) : '');
+            const dateStr = e.date || (start ? start.toLocaleDateString('sv-SE') : '');
             const startTime = start ? start.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : '';
             const endTime = end ? end.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : '';
             const minutes = start && end ? Math.max(0, Math.round((end - start) / 60000)) : 0;

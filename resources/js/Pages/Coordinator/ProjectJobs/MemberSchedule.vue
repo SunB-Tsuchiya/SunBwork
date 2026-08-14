@@ -29,7 +29,8 @@ const HEADER_H    = 36;   // px（時刻ヘッダーの高さ）
 // ─────────────────────────────────────────────────────────
 //  State
 // ─────────────────────────────────────────────────────────
-const currentDate  = ref(props.date || new Date().toISOString().slice(0, 10));
+// toISOString() は UTC を返すため JST 00:00〜08:59 に前日になる。ローカル日付を使う
+const currentDate  = ref(props.date || new Date().toLocaleDateString('sv-SE'));
 const localEvents  = ref(props.events.map(e => ({ ...e })));
 
 const timelineAreaRef = ref(null);

@@ -285,7 +285,7 @@ const form = ref({
     estimated_hours:    '',
 })
 
-const today = new Date().toISOString().split('T')[0]
+const today = new Date().toLocaleDateString('sv-SE')
 const hours = Array.from({ length: 17 }, (_, i) => String(6 + i).padStart(2, '0'))
 const mins  = ['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55']
 const estimatedOptions = Array.from({ length: 32 }, (_, i) => Number(((i + 1) * 0.25).toFixed(2)))

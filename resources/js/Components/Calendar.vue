@@ -1264,7 +1264,9 @@ const calendarOptions = computed(() => ({
         } else {
             const startDateObj = new Date(newStart);
             const endDateObj = new Date(newEnd);
-            const date = startDateObj.toISOString().slice(0, 10);
+            // 時刻は getHours() でローカル(JST)を取っているため、日付も必ずローカルで揃える。
+            // toISOString() だと JST 00:00〜08:59 で日付だけ前日になり、時刻と食い違う
+            const date = startDateObj.toLocaleDateString('sv-SE');
             const startHour = String(startDateObj.getHours()).padStart(2, '0');
             const startMinute = String(startDateObj.getMinutes()).padStart(2, '0');
             const endHour = String(endDateObj.getHours()).padStart(2, '0');
@@ -1320,7 +1322,7 @@ const calendarOptions = computed(() => ({
         } else {
             const startDateObj = new Date(newStart);
             const endDateObj = newEnd ? new Date(newEnd) : null;
-            const date = startDateObj.toISOString().slice(0, 10);
+            const date = startDateObj.toLocaleDateString('sv-SE');
             const startHour = String(startDateObj.getHours()).padStart(2, '0');
             const startMinute = String(startDateObj.getMinutes()).padStart(2, '0');
             const endHour = endDateObj ? String(endDateObj.getHours()).padStart(2, '0') : undefined;

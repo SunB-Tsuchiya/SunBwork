@@ -63,7 +63,8 @@ const TOTAL_MINS = (END_HOUR - START_HOUR) * 60;
 const ROW_H      = 64;
 const HEADER_H   = 40;
 
-const currentDate    = ref(props.currentDate || new Date().toISOString().slice(0, 10));
+// toISOString() は UTC を返すため JST 00:00〜08:59 に前日になる。ローカル日付を使う
+const currentDate    = ref(props.currentDate || new Date().toLocaleDateString('sv-SE'));
 const localSchedules = ref(props.dailySchedules.map(s => ({ ...s })));
 
 const timelineAreaRef = ref(null);
@@ -160,13 +161,13 @@ async function changeDate(newDate) {
 function prevDay() {
     const d = new Date(currentDate.value + 'T00:00:00');
     d.setDate(d.getDate() - 1);
-    changeDate(d.toISOString().slice(0, 10));
+    changeDate(d.toLocaleDateString('sv-SE'));
 }
 
 function nextDay() {
     const d = new Date(currentDate.value + 'T00:00:00');
     d.setDate(d.getDate() + 1);
-    changeDate(d.toISOString().slice(0, 10));
+    changeDate(d.toLocaleDateString('sv-SE'));
 }
 
 // ResizeObserver

@@ -12,7 +12,7 @@ const props = defineProps({
     members: { type: Array, default: () => [] },
 });
 
-const today = new Date().toISOString().slice(0, 10);
+const today = new Date().toLocaleDateString('sv-SE');
 
 const form = useForm({
     title:        '',
