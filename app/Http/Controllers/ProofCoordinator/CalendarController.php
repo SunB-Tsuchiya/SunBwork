@@ -280,9 +280,16 @@ class CalendarController extends Controller
 
     private function getSchedulesForDate(string $date): array
     {
-        // JSTの日付の範囲をUTCに変換
+        // ProofSchedule は UTC 保存なので、JST の日付範囲を UTC に変換して比較する
         $dayStart = Carbon::parse($date . ' 00:00:00', 'Asia/Tokyo')->utc();
         $dayEnd   = Carbon::parse($date . ' 23:59:59', 'Asia/Tokyo')->utc();
+
+        // events は proof=UTC / 通常=JST の混在保存のため、UTC 境界では正しく絞れない。
+        // JST の日境界と ±9 時間のバッファを別途用意する（後段のイベント取得で使用）
+        $dayStartJst = Carbon::parse($date . ' 00:00:00', 'Asia/Tokyo');
+        $dayEndJst   = Carbon::parse($date . ' 23:59:59', 'Asia/Tokyo');
+        $bufferStart = $dayStartJst->copy()->subHours(9)->toDateTimeString();
+        $bufferEnd   = $dayEndJst->copy()->addHours(9)->toDateTimeString();
 
         // ① ProofSchedule（手動登録）
         $manual = ProofSchedule::with(['proofRequest.projectJob', 'user'])
@@ -331,24 +338,36 @@ class CalendarController extends Controller
             if (! $selfJob) continue;
 
             // 該当日のイベントを取得
+            // events は proof=UTC / 通常=JST の混在保存で DB 側では絞り切れないため、
+            // ±9 時間のバッファで広く取得し、JST 変換後にその日と重なるかで判定する
             $events = Event::where('project_job_assignment_id', $selfJob->id)
-                ->where(function ($q) use ($dayStart, $dayEnd) {
-                    $q->whereBetween('starts_at', [$dayStart, $dayEnd])
-                      ->orWhereBetween('ends_at', [$dayStart, $dayEnd]);
+                ->where(function ($q) use ($bufferStart, $bufferEnd) {
+                    $q->whereBetween('starts_at', [$bufferStart, $bufferEnd])
+                      ->orWhereBetween('ends_at', [$bufferStart, $bufferEnd]);
                 })
+                ->with('projectJobAssignment:id,job_type')
                 ->orderBy('starts_at')
-                ->get();
+                ->get()
+                ->filter(function ($e) use ($dayStartJst, $dayEndJst) {
+                    $jstStart = $this->resolveJstCarbon($e, 'starts_at');
+                    $jstEnd   = $this->resolveJstCarbon($e, 'ends_at');
+                    if (! $jstStart || ! $jstEnd) return false;
+                    return $jstStart->lte($dayEndJst) && $jstEnd->gte($dayStartJst);
+                });
 
             foreach ($events as $ev) {
-                // events.starts_at は TIMESTAMP カラムで EventController::store() が JST を
-                // UTC として格納するため、datetime キャスト（Asia/Tokyo 解釈）経由で正しい
-                // UTC に変換する。getRawOriginal + toUtcIso では 9 時間ずれが生じる。
+                // pja101 には job_type=proof（UTC 保存）と NULL（JST 保存）が混在する。
+                // datetime キャストは常に JST として解釈するため、素の ->utc() では
+                // proof 側が二重変換で 9 時間ずれる。resolveJstCarbon() を通してから UTC 化する。
+                $jstStart = $this->resolveJstCarbon($ev, 'starts_at');
+                $jstEnd   = $this->resolveJstCarbon($ev, 'ends_at');
+
                 $fromEvents[] = [
                     'id'               => 'ev_' . $ev->id,
                     'proof_request_id' => $pr->id,
                     'user_id'          => $selfJob->user_id,
-                    'starts_at'        => $ev->starts_at ? $ev->starts_at->utc()->toIso8601String() : null,
-                    'ends_at'          => $ev->ends_at   ? $ev->ends_at->utc()->toIso8601String()   : null,
+                    'starts_at'        => $jstStart ? $jstStart->copy()->utc()->toIso8601String() : null,
+                    'ends_at'          => $jstEnd   ? $jstEnd->copy()->utc()->toIso8601String()   : null,
                     'title'            => $pr->title,
                     'job_title'        => $pr->projectJob?->title ?? null,
                     'status'           => $pr->status,

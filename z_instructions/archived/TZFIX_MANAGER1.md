@@ -111,8 +111,27 @@
 **本番データ補正**: フェーズ1〜3 の調査範囲では、先行対応（`proof-event-timezone-fix-1`）で
 補正した events 4 件 / proof_schedules 3 件以外に**ずれた実データは存在しなかった**。
 
-**残課題（本 PLAN のスコープ外・未対応）**
-- `/proof-coordinator/calendar` のページ本体（`index()` の `getMonthEvents()` / `getSchedulesForDate()`）は未点検
+**追加点検: `/proof-coordinator/calendar` のページ本体（2026-08-13・完了）**
+
+フェーズ4 完了後にユーザー依頼で点検。`getSchedulesForDate()` に **`pickerData` と同じ 2 件のバグ**を確認し修正した。
+
+- `getMonthEvents()` — `proof_requests.deadline` / `proof_reservations` を UTC 前提で正しく扱っており**問題なし**
+- `getSchedulesForDate()` — ProofSchedule 部分（UTC 保存）は正しいが、**pja101 経由の events 取得**に 2 件のバグ:
+  1. UTC 化した日境界で `events.starts_at` を比較 → **JST 15:00 以降が当日から漏れる**
+  2. 返却値の `$ev->starts_at->utc()` が datetime キャスト（JST 解釈）を経る → **proof で 9 時間ずれる**
+
+重要な前提として、**pja101 には `job_type='proof'`（UTC 保存）と `NULL`（JST 保存）が混在**している
+（本番実データで確認）。そのため片方だけの対応では不十分で、両方を `resolveJstCarbon()` 経由に統一した。
+
+検証（トランザクション内・ロールバック、3 ケース）:
+
+| ケース | 修正前 | 修正後 |
+|---|---|---|
+| proof / 生値 01:15（JST 10:15） | `2026-04-23T16:15:00Z`（**9時間ずれ**） | `2026-04-24T01:15:00Z` ✅ |
+| NULL / 生値 13:30（JST 13:30） | `2026-04-24T04:30:00Z` ✅ | 同左（変化なし） |
+| NULL / 生値 16:00（JST 16:00） | **取得できず（漏れ）** | `2026-04-24T07:00:00Z` ✅ |
+
+**残課題（未対応）**
 - `UserDailyWorktypeController` / ルート `user.daily_worktypes.store` は名称が実態（`UserMonthlySchedule`）と
   食い違ったまま。動作に影響はないため改名は見送り
 
