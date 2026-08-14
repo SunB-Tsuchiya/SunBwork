@@ -13,6 +13,7 @@ use Inertia\Inertia;
 class ProjectJobController extends Controller
 {
     use ResolvesContextCompany;
+    use \App\Http\Controllers\Concerns\CalculatesEventTime;
 
     /**
      * 部署に関係する案件をすべて表示（読み取り専用）
@@ -163,8 +164,11 @@ class ProjectJobController extends Controller
 
             if (\Illuminate\Support\Facades\Schema::hasColumn('events', 'project_job_assignment_id')) {
                 foreach ($assignments as $a) {
+                    // events は proof=UTC / 通常=JST の混在保存のため job_type をロードして
+                    // resolveJstCarbon() で解決する（Coordinator\ProjectJobController と同方式）
                     $events = \App\Models\Event::where('project_job_assignment_id', $a->id)
                         ->orderBy('starts_at')
+                        ->with('projectJobAssignment:id,job_type')
                         ->get();
 
                     foreach ($events as $ev) {
@@ -172,12 +176,10 @@ class ProjectJobController extends Controller
                         $userAssignmentCode = $userAssignmentId ? ($assignmentCodeMap[$userAssignmentId] ?? null) : null;
                         $userAssignmentName = $userAssignmentId ? ($assignmentNameMap[$userAssignmentId] ?? null) : null;
 
-                        $eventDate = null;
-                        try {
-                            if ($ev->starts_at) {
-                                $eventDate = \Illuminate\Support\Carbon::parse($ev->starts_at)->toDateString();
-                            }
-                        } catch (\Throwable $_) {}
+                        // Carbon::parse($ev->starts_at) は proof（UTC 保存）で 9 時間ずれる
+                        $jstStart = $this->resolveJstCarbon($ev, 'starts_at');
+                        $jstEnd   = $this->resolveJstCarbon($ev, 'ends_at');
+                        $eventDate = $jstStart?->toDateString();
 
                         $assignmentEvents[] = [
                             'assignment_id'   => $a->id,
@@ -191,8 +193,8 @@ class ProjectJobController extends Controller
                             'stage_sort'      => $a->stage?->sort_order ?? 99,
                             'status_name'     => $a->statusModel?->name ?? null,
                             'date'            => $eventDate,
-                            'start'           => $ev->start ?? $ev->starts_at ?? null,
-                            'end'             => $ev->end ?? $ev->ends_at ?? null,
+                            'start'           => $jstStart?->toIso8601String(),
+                            'end'             => $jstEnd?->toIso8601String(),
                         ];
                     }
                 }

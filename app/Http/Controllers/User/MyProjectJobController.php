@@ -14,6 +14,8 @@ use Illuminate\Support\Facades\Log;
 
 class MyProjectJobController extends Controller
 {
+    use \App\Http\Controllers\Concerns\CalculatesEventTime;
+
     public function index(Request $request)
     {
         $user = $request->user();
@@ -590,10 +592,15 @@ class MyProjectJobController extends Controller
             foreach ($assignments as $a) {
                 // only attempt to fetch events if the events table has the linking column
                 if (\Illuminate\Support\Facades\Schema::hasColumn('events', 'project_job_assignment_id')) {
+                    // events は proof=UTC / 通常=JST の混在保存のため job_type をロードして
+                    // resolveJstCarbon() で解決する（Coordinator\ProjectJobController と同方式）
                     $events = \App\Models\Event::where('project_job_assignment_id', $a->id)
                         ->orderBy('starts_at')
+                        ->with('projectJobAssignment:id,job_type')
                         ->get();
                     foreach ($events as $ev) {
+                        $jstStart = $this->resolveJstCarbon($ev, 'starts_at');
+                        $jstEnd   = $this->resolveJstCarbon($ev, 'ends_at');
                         // prefer the user's assignment name (from assignments table) when available
                         $userAssignmentName = null;
                         try {
@@ -614,8 +621,8 @@ class MyProjectJobController extends Controller
                             'assignment_name' => $userAssignmentName ?? $a->title ?? null,
                             'status_name' => $a->statusModel?->name ?? null,
                             // Event model exposes start/end accessors which return ISO strings
-                            'start' => $ev->start ?? $ev->starts_at ?? null,
-                            'end' => $ev->end ?? $ev->ends_at ?? null,
+                            'start' => $jstStart?->toIso8601String(),
+                            'end' => $jstEnd?->toIso8601String(),
                         ];
                     }
                 }
@@ -678,8 +685,15 @@ class MyProjectJobController extends Controller
 
             foreach ($assignments as $a) {
                 if (\Illuminate\Support\Facades\Schema::hasColumn('events', 'project_job_assignment_id')) {
-                    $events = \App\Models\Event::where('project_job_assignment_id', $a->id)->orderBy('starts_at')->get();
+                    // events は proof=UTC / 通常=JST の混在保存のため job_type をロードして
+                    // resolveJstCarbon() で解決する（Coordinator\ProjectJobController と同方式）
+                    $events = \App\Models\Event::where('project_job_assignment_id', $a->id)
+                        ->orderBy('starts_at')
+                        ->with('projectJobAssignment:id,job_type')
+                        ->get();
                     foreach ($events as $ev) {
+                        $jstStart = $this->resolveJstCarbon($ev, 'starts_at');
+                        $jstEnd   = $this->resolveJstCarbon($ev, 'ends_at');
                         $userAssignmentName = null;
                         try {
                             $userAssignmentId = $a->user?->assignment_id ?? null;
@@ -699,8 +713,8 @@ class MyProjectJobController extends Controller
                             'stage_id' => $a->stage_id ?? null,
                             'stage_name' => $a->stage?->name ?? null,
                             'status_name' => $a->statusModel?->name ?? null,
-                            'start' => $ev->start ?? $ev->starts_at ?? null,
-                            'end' => $ev->end ?? $ev->ends_at ?? null,
+                            'start' => $jstStart?->toIso8601String(),
+                            'end' => $jstEnd?->toIso8601String(),
                         ];
                     }
                 }

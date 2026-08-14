@@ -9,6 +9,8 @@ use Illuminate\Console\Command;
 
 class SendScheduleNotifications extends Command
 {
+    use \App\Http\Controllers\Concerns\CalculatesEventTime;
+
     protected $signature   = 'schedule:send-notifications {--date= : 対象日付(YYYY-MM-DD)。省略時は今日}';
     protected $description = '当日の予定を朝まとめ通知として schedule_notifications に登録する';
 
@@ -21,12 +23,22 @@ class SendScheduleNotifications extends Command
         $this->info("対象日: {$targetDate->toDateString()}");
 
         // 当日に starts_at が含まれるイベントをすべて取得
+        // events は proof=UTC / 通常=JST の混在保存のため DB 側では絞り切れない
+        //（JST 09:00 より前に始まる校正予定が前日扱いで漏れる）。
+        // ±9時間のバッファで広く取得し、JST 変換後に当日分だけへ絞る。
+        $dayStart = $targetDate->copy()->startOfDay();
+        $dayEnd   = $targetDate->copy()->endOfDay();
+
         $events = Event::whereBetween('starts_at', [
-                $targetDate->copy()->startOfDay(),
-                $targetDate->copy()->endOfDay(),
+                $dayStart->copy()->subHours(9),
+                $dayEnd->copy()->addHours(9),
             ])
-            ->with(['attendees:id,event_id,user_id'])
-            ->get(['id', 'user_id']);
+            ->with(['attendees:id,event_id,user_id', 'projectJobAssignment:id,job_type'])
+            ->get(['id', 'user_id', 'starts_at', 'project_job_assignment_id'])
+            ->filter(function ($e) use ($dayStart, $dayEnd) {
+                $jstStart = $this->resolveJstCarbon($e, 'starts_at');
+                return $jstStart && $jstStart->gte($dayStart) && $jstStart->lte($dayEnd);
+            });
 
         $count = 0;
 
