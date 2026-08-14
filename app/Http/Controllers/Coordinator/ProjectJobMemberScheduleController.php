@@ -14,6 +14,8 @@ use Inertia\Response;
 
 class ProjectJobMemberScheduleController extends Controller
 {
+    use \App\Http\Controllers\Concerns\CalculatesEventTime;
+
     // ──────────────────────────────────────────────────────
     //  ページ表示
     // ──────────────────────────────────────────────────────
@@ -117,14 +119,31 @@ class ProjectJobMemberScheduleController extends Controller
 
         // 該当日のEventsを取得（event_item_type が付いた「会議/外出等の絶対に作業できない予定」のみ。
         // マイジョブ等の project_job_assignment 由来イベントは event_item_type_id を持たないため除外される）
+        // events は proof=UTC / 通常=JST の混在保存。従来は event_item_type_id が付く
+        // イベントに proof が含まれないことを前提に JST 境界で直接比較していたが、
+        // その前提が崩れると当日判定を誤るため、±9時間のバッファで取得して
+        // JST 変換後にその日と重なるかで判定する。
+        $dayStartJst = Carbon::parse($dayStart, 'Asia/Tokyo');
+        $dayEndJst   = Carbon::parse($dayEnd, 'Asia/Tokyo');
+        $bufferStart = $dayStartJst->copy()->subHours(9)->toDateTimeString();
+        $bufferEnd   = $dayEndJst->copy()->addHours(9)->toDateTimeString();
+
         $eventModels = Event::whereIn('user_id', $memberIds)
             ->whereNotNull('event_item_type_id')
-            ->where(function ($q) use ($dayStart, $dayEnd) {
-                $q->whereBetween('starts_at', [$dayStart, $dayEnd])
-                  ->orWhereBetween('ends_at', [$dayStart, $dayEnd])
-                  ->orWhere(fn ($q2) => $q2->where('starts_at', '<=', $dayStart)->where('ends_at', '>=', $dayEnd));
+            ->where(function ($q) use ($bufferStart, $bufferEnd) {
+                $q->whereBetween('starts_at', [$bufferStart, $bufferEnd])
+                  ->orWhereBetween('ends_at', [$bufferStart, $bufferEnd])
+                  ->orWhere(fn ($q2) => $q2->where('starts_at', '<=', $bufferStart)->where('ends_at', '>=', $bufferEnd));
             })
-            ->get();
+            ->with('projectJobAssignment:id,job_type')
+            ->get()
+            ->filter(function ($e) use ($dayStartJst, $dayEndJst) {
+                $jstStart = $this->resolveJstCarbon($e, 'starts_at');
+                $jstEnd   = $this->resolveJstCarbon($e, 'ends_at');
+                if (! $jstStart || ! $jstEnd) return false;
+                return $jstStart->lte($dayEndJst) && $jstEnd->gte($dayStartJst);
+            })
+            ->values();
 
         // 全pja IDを一括取得（N+1回避）
         $allPjaIds = $eventModels->pluck('project_job_assignment_id')->filter()->unique()->values()->all();
@@ -174,8 +193,10 @@ class ProjectJobMemberScheduleController extends Controller
             $item = [
                 'id'        => $e->id,
                 'user_id'   => $e->user_id,
-                'starts_at' => $this->toUtcIso($e->getRawOriginal('starts_at')),
-                'ends_at'   => $this->toUtcIso($e->getRawOriginal('ends_at')),
+                // 生値を JST 固定で解釈すると proof（UTC 保存）で 9 時間ずれるため
+                // resolveJstCarbon() で保存形式に応じて解決する
+                'starts_at' => $this->resolveJstCarbon($e, 'starts_at')?->toIso8601String(),
+                'ends_at'   => $this->resolveJstCarbon($e, 'ends_at')?->toIso8601String(),
                 'color'     => $color,
                 'related'   => $isRelated,
             ];
@@ -191,15 +212,4 @@ class ProjectJobMemberScheduleController extends Controller
         })->values()->all();
     }
 
-    private function toUtcIso(?string $raw): ?string
-    {
-        if (! $raw) {
-            return null;
-        }
-        try {
-            return Carbon::parse($raw, 'Asia/Tokyo')->toIso8601String();
-        } catch (\Throwable) {
-            return $raw;
-        }
-    }
 }

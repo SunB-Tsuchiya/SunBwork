@@ -20,6 +20,7 @@ use Inertia\Inertia;
 class UserPresenceController extends Controller
 {
     use \App\Http\Controllers\Concerns\ResolvesContextCompany;
+    use \App\Http\Controllers\Concerns\CalculatesEventTime;
     /**
      * モバイル向けステータス更新ページ（Inertia）
      */
@@ -182,16 +183,25 @@ class UserPresenceController extends Controller
     private function syncCalendarStatus(User $user): void
     {
         try {
-            // 非proofイベントはJST文字列保存のためJSTで比較
-            $nowJST = Carbon::now('Asia/Tokyo')->format('Y-m-d H:i:s');
+            // events は proof=UTC / 通常=JST の混在保存。従来は event_item_type_id が付く
+            // イベント（会議・外出等）に proof が含まれないことを前提に JST 直接比較していたが、
+            // その前提が崩れると誤判定するため、時刻の解決自体を resolveJstCarbon() に委ねる。
+            // DB では ±9時間のバッファで絞り、現在時刻との判定は JST 変換後に行う。
+            $nowJST = Carbon::now('Asia/Tokyo');
 
             $event = Event::where('user_id', $user->id)
                 ->whereNotNull('event_item_type_id')
-                ->where('starts_at', '<=', $nowJST)
-                ->where('ends_at', '>=', $nowJST)
-                ->with('eventItemType')
-                ->latest('starts_at')
-                ->first();
+                ->where('starts_at', '<=', $nowJST->copy()->addHours(9)->format('Y-m-d H:i:s'))
+                ->where('ends_at', '>=', $nowJST->copy()->subHours(9)->format('Y-m-d H:i:s'))
+                ->with(['eventItemType', 'projectJobAssignment:id,job_type'])
+                ->orderByDesc('starts_at')
+                ->get()
+                ->first(function ($e) use ($nowJST) {
+                    $jstStart = $this->resolveJstCarbon($e, 'starts_at');
+                    $jstEnd   = $this->resolveJstCarbon($e, 'ends_at');
+                    return $jstStart && $jstEnd
+                        && $jstStart->lte($nowJST) && $jstEnd->gte($nowJST);
+                });
 
             $presence = UserPresenceStatus::where('user_id', $user->id)->first();
 
