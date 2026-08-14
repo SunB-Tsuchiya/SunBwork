@@ -1,5 +1,5 @@
 # カレンダー・JobBox・イベント（統合）
-最終更新: 2026-05-23
+最終更新: 2026-08-13
 
 ---
 
@@ -28,6 +28,32 @@ $start = $this->resolveJstCarbon($event, 'starts_at');
 - メソッド: `resolveJstCarbon($event, 'starts_at')` — JST の Carbon を返す
 - メソッド: `computeLunchMinutes($start, $end, $userId, $cache)` — 昼休憩分計算（UserMonthlyBreak → UserSetting → デフォルト 12:00–13:00 優先順）
 - 使い方: コントローラで `use CalculatesEventTime;` を宣言し、`projectJobAssignment:id,job_type` を eager load してから呼ぶ
+
+### 書き込み・期間フィルタ・Vue の日付（2026-08-13 追加）
+
+読み出しだけルールを守っても意味がない。**書き込み側・期間フィルタ側も同じ規則に従うこと。**
+
+| 場面 | 使うもの |
+|---|---|
+| **書き込み**（JST 日時 → 保存値） | `toEventStorageString($event, $jstDateTime)` |
+| 読み出し（保存値 → JST） | `resolveJstCarbon($event, $field)` |
+| 生値（退避した旧値など）→ JST | `rawToJstCarbon($event, $raw)` |
+| 保存 TZ の判定 | `eventStorageTimezone($event)` |
+| 重複時間の再計算 | `recalcInterruptionMinutes($event, $oldStart, $oldEnd)` |
+
+- **書き込み**: `$event->start = $date.' '.$h.':'.$m` のような直接代入は proof で 9 時間ずれ、保存のたびに累積する。
+  新規作成時は `project_job_assignment_id` をセットしてから変換すること（未保存モデルは `setRelation()` で渡す）
+- **期間フィルタ**: DB の文字列比較だけで絞らない。**±9 時間のバッファで取得 → `resolveJstCarbon()` で JST 判定**。
+  日境界は JST のまま持つこと（UTC 化して比較すると通常イベントの JST 15:00 以降が当日から消える）。
+  模範実装は `CalendarEventsController::range()`
+- **カレンダーのドラッグ**: `events` だけ更新するとジョブ修正ページで古い時刻が復元される。
+  `project_job_assignments.start_time`（開始）も同期する。`desired_time`（＝自己割当では作業終了時刻、
+  Coordinator 割当では締め切り時刻）の同期は**自己割当のときのみ**
+- **Vue の日付**: 「今日」や日付移動は `toLocaleDateString('sv-SE')` を使う。
+  ただし allDay の ±1 日計算（日付のみ入力で UTC 一貫）と、`+09:00` を明示した `toISOString()` は**正しいので変更しない**。
+  一括置換は禁止、1 箇所ずつ用途を確認すること
+
+詳細と NG/OK 例は `CLAUDE.md`「UTC / JST 混在ルール ④〜⑦」を参照。
 
 ---
 

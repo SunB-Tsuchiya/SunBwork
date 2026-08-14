@@ -340,6 +340,58 @@ $event->end   = $this->toEventStorageString($event, $jstDateTime2);
 
 ---
 
+### ⑥ events の **期間フィルタ**を DB の比較だけで書かない ⚠️ 2026-08-13 追加
+
+proof=UTC / 通常=JST が混在しているため、**DB 側の文字列比較では正確に絞れない。**
+`whereBetween('starts_at', [$start, $end])` だけで済ませると、**JST 09:00 より前に始まる校正予定が
+カレンダーに出ない・工数集計から漏れる**（8 時シフト勤務者で実際に発生する）。
+
+**ルール: ±9 時間のバッファで広く取得し、PHP 側で `resolveJstCarbon()` に通してから期間判定する**
+
+```php
+// NG — proof が隣接日に紛れる／落ちる
+$events = Event::whereBetween('starts_at', [$start, $end])->get();
+
+// OK
+$events = Event::whereBetween('starts_at', [
+        $start->copy()->subHours(9), $end->copy()->addHours(9),
+    ])
+    ->with('projectJobAssignment:id,job_type')   // 判定に必須（N+1 回避）
+    ->get()
+    ->filter(function ($e) use ($start, $end) {
+        $jst = $this->resolveJstCarbon($e, 'starts_at');
+        return $jst && $jst->gte($start) && $jst->lte($end);
+    });
+```
+
+**模範実装:** `CalendarEventsController::range()`
+
+**対応済み（すべてこの方式に統一）:** `EventController::index` / `DashboardController` /
+`Leader\WorkloadAnalyzerController`（3 箇所）/ `ProofCoordinator\CalendarController::pickerData`
+
+**注意:** 日境界は **JST のまま持つこと**。`Carbon::parse($date, 'Asia/Tokyo')->utc()` して
+`starts_at` と比較すると、**JST 保存の通常イベントが 9 時間ずれて 15:00 以降が当日から消える**
+（`ProofCoordinator\CalendarController` で実際に発生していた）。
+
+---
+
+### ⑦ Vue の日付生成は `toLocaleDateString('sv-SE')` を使う ⚠️ 2026-08-13 追加
+
+②の詳細。`toISOString()` は UTC を返すため、**JST 00:00〜08:59 の間だけ日付が前日になる。**
+
+| ケース | 判定 |
+|---|---|
+| `new Date().toISOString().slice(0,10)`（今日） | **NG** → `new Date().toLocaleDateString('sv-SE')` |
+| `new Date(y, m, 1).toISOString()`（月初・月末） | **NG** — JST 月初が UTC で前月末日になる |
+| `new Date(str + 'T00:00:00')` を `toISOString()`（日付移動） | **NG** — ローカル解釈した値を UTC 化すると常に 1 日ずれる |
+| `dateObj.toISOString()` と `dateObj.getHours()` の併用 | **NG** — 日付が UTC・時刻がローカルで食い違う |
+| allDay の ±1 日計算（`new Date('YYYY-MM-DD')` → `setDate(±1)` → `toISOString()`） | **OK・変更しない** — 日付のみ入力で UTC 一貫。直すと逆に壊れる |
+| ``new Date(`${date}T${h}:${m}:00+09:00`).toISOString()`` | **OK** — JST を明示して UTC タイムスタンプを作る正しい用法 |
+
+**一括置換は禁止。** 上記のとおり「正しい `toISOString()`」が混在するため、必ず 1 箇所ずつ用途を確認すること。
+
+---
+
 ## データ設計 クイックリファレンス
 
 **`project_job_assignments`** が JobBox・MyJobBox 両方の唯一のテーブル:

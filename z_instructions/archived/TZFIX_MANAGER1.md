@@ -90,10 +90,31 @@
 
 | # | 作業 | 状態 |
 |---|---|---|
-| 4-1 | `CLAUDE.md` に範囲フィルタのルールを追記 | 未着手 |
-| 4-2 | `CONSOLIDATED_05_calendar_and_jobbox.md` 更新 | 未着手 |
-| 4-3 | `ChangelogSeeder` 追記 + 本番 seed | 未着手 |
-| 4-4 | PLAN / MANAGER / PROMPT を `archived/` へ移動 | 未着手 |
+| 4-1 | `CLAUDE.md` に範囲フィルタのルールを追記 | ✅ 完了（⑥期間フィルタ / ⑦Vue の日付生成 を追加） |
+| 4-2 | `CONSOLIDATED_05_calendar_and_jobbox.md` 更新 | ✅ 完了（書き込み・期間フィルタ・Vue の日付を追記、最終更新日を更新） |
+| 4-3 | `ChangelogSeeder` 追記 + 本番 seed | ✅ 完了（`tzfix-1`） |
+| 4-4 | PLAN / MANAGER / PROMPT を `archived/` へ移動 | ✅ 完了 |
+
+---
+
+## 完了サマリー（2026-08-13）
+
+全 4 フェーズ完了。デプロイ・本番反映済み。
+
+| フェーズ | 内容 | 結果 |
+|---|---|---|
+| 1 | events の期間フィルタ 4 箇所 | 8時シフトの表示・集計漏れを解消。`ProofCoordinator/CalendarController` で**別の重大バグ 2 件**も発見・修正 |
+| 2 | date キャスト 11 モデル 17 箇所 | 本番で全カラムが DB 値と一致することを確認。派生で**コメント機能の完全復旧**（4 バグ） |
+| 3 | Vue の日付生成 | 指摘 11 箇所に対し**実際は 47 箇所**。43 修正 / 4 据え置き |
+| 4 | ドキュメント・Changelog | `CLAUDE.md` ⑥⑦、`CONSOLIDATED_05`、`tzfix-1` |
+
+**本番データ補正**: フェーズ1〜3 の調査範囲では、先行対応（`proof-event-timezone-fix-1`）で
+補正した events 4 件 / proof_schedules 3 件以外に**ずれた実データは存在しなかった**。
+
+**残課題（本 PLAN のスコープ外・未対応）**
+- `/proof-coordinator/calendar` のページ本体（`index()` の `getMonthEvents()` / `getSchedulesForDate()`）は未点検
+- `UserDailyWorktypeController` / ルート `user.daily_worktypes.store` は名称が実態（`UserMonthlySchedule`）と
+  食い違ったまま。動作に影響はないため改名は見送り
 
 ---
 
