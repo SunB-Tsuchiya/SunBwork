@@ -423,11 +423,7 @@ const submit = () => {
                     showToast('更新しました', 'success', 1500);
                 } catch (e) {}
                 setTimeout(() => {
-                    try {
-                        router.get(route('calendar.index'));
-                    } catch (e) {
-                        router.get(route('events.index'));
-                    }
+                    router.get(route('diaries.index'));
                 }, 300);
             })
             .catch((err) => {
@@ -468,11 +464,7 @@ const submit = () => {
                     showToast('更新しました', 'success', 1500);
                 } catch (e) {}
                 setTimeout(() => {
-                    try {
-                        router.get(route('calendar.index'));
-                    } catch (e) {
-                        router.get(route('events.index'));
-                    }
+                    router.get(route('diaries.index'));
                 }, 300);
             },
             onError: (errors) => {

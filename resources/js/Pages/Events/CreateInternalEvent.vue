@@ -27,22 +27,14 @@ const showMeetingSelect = computed(() => selectedType.value?.slug === 'conferenc
 const selectedMeetingId = ref(props.selectedMeetingId ?? null);
 const titleManuallyEdited = ref(false);
 
-/** 今日以降の次の曜日の日付を返す（毎週・隔週用） */
-function calcNextDate(dayOfWeek, startHour, startMinute) {
-    const now   = new Date();
+/** 今日以降の次の曜日の日付を返す（毎週・隔週用）。当日が対象曜日なら時刻を問わず当日を返す */
+function calcNextDate(dayOfWeek) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayDow = today.getDay();
     let diff = dayOfWeek - todayDow;
 
-    if (diff === 0) {
-        // 当日が会議曜日と一致する場合：会議開始時刻がまだ未来なら当日、過ぎていたら来週
-        const meetingStart = new Date(today);
-        meetingStart.setHours(parseInt(startHour, 10), parseInt(startMinute, 10), 0, 0);
-        if (now >= meetingStart) diff = 7;
-    } else if (diff < 0) {
-        diff += 7;
-    }
+    if (diff < 0) diff += 7;
 
     const next = new Date(today.getTime() + diff * 24 * 60 * 60 * 1000);
     const yyyy = next.getFullYear();
@@ -53,10 +45,9 @@ function calcNextDate(dayOfWeek, startHour, startMinute) {
 
 /**
  * 毎月の第 weekOfMonth 週の dayOfWeek 曜日で、今日以降の直近日付を返す。
- * 当日が対象日かつ会議開始時刻が未来なら当日を返す。
+ * 当日が対象日なら時刻を問わず当日を返す。
  */
-function calcNextMonthlyDate(dayOfWeek, weekOfMonth, startHour, startMinute) {
-    const now   = new Date();
+function calcNextMonthlyDate(dayOfWeek, weekOfMonth) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     for (let offset = 0; offset <= 24; offset++) {
@@ -67,40 +58,23 @@ function calcNextMonthlyDate(dayOfWeek, weekOfMonth, startHour, startMinute) {
         const candidate = new Date(firstOfMonth.getFullYear(), firstOfMonth.getMonth(), 1 + diff + (weekOfMonth - 1) * 7);
         // 月をまたいでしまう場合はスキップ
         if (candidate.getMonth() !== firstOfMonth.getMonth()) continue;
-        if (candidate > today) {
-            // 今日より先の日付は無条件採用
+        if (candidate >= today) {
             const yyyy = candidate.getFullYear();
             const mm   = String(candidate.getMonth() + 1).padStart(2, '0');
             const dd   = String(candidate.getDate()).padStart(2, '0');
             return `${yyyy}-${mm}-${dd}`;
-        } else if (candidate.getTime() === today.getTime()) {
-            // 当日が対象日の場合：会議開始時刻が未来なら当日を採用
-            const meetingStart = new Date(today);
-            meetingStart.setHours(parseInt(startHour, 10), parseInt(startMinute, 10), 0, 0);
-            if (now < meetingStart) {
-                const yyyy = candidate.getFullYear();
-                const mm   = String(candidate.getMonth() + 1).padStart(2, '0');
-                const dd   = String(candidate.getDate()).padStart(2, '0');
-                return `${yyyy}-${mm}-${dd}`;
-            }
         }
     }
     return '';
 }
 
-function calcNextCustomDate(customDates, startHour, startMinute) {
+function calcNextCustomDate(customDates) {
     if (!Array.isArray(customDates) || customDates.length === 0) return '';
     const sorted = [...customDates].sort((a, b) => a.localeCompare(b));
     const today = new Date().toLocaleDateString('sv-SE');
-    const now = new Date();
 
     for (const dateValue of sorted) {
-        if (dateValue > today) return dateValue;
-        if (dateValue === today) {
-            const meetingStart = new Date();
-            meetingStart.setHours(parseInt(startHour, 10), parseInt(startMinute, 10), 0, 0);
-            if (now < meetingStart) return dateValue;
-        }
+        if (dateValue >= today) return dateValue;
     }
 
     return sorted[0] ?? '';
@@ -120,11 +94,11 @@ watch(selectedMeetingId, (id) => {
     form.endHour      = String(meeting.end_time).split(':')[0].padStart(2, '0');
     form.endMinute    = String(meeting.end_time).split(':')[1].padStart(2, '0');
     if (meeting.recurrence === 'custom_dates') {
-        form.date = calcNextCustomDate(meeting.custom_dates, form.startHour, form.startMinute);
+        form.date = calcNextCustomDate(meeting.custom_dates);
     } else if (meeting.recurrence === 'monthly' && meeting.week_of_month) {
-        form.date = calcNextMonthlyDate(meeting.day_of_week, meeting.week_of_month, form.startHour, form.startMinute);
+        form.date = calcNextMonthlyDate(meeting.day_of_week, meeting.week_of_month);
     } else {
-        form.date = calcNextDate(meeting.day_of_week, form.startHour, form.startMinute);
+        form.date = calcNextDate(meeting.day_of_week);
     }
 });
 

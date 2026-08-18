@@ -187,21 +187,17 @@ function toDateParts(d) {
 }
 
 // ── 次回開催日計算（CreateInternalEvent.vue から移植） ─────────
-function calcNextDate(dayOfWeek, sh, sm) {
-    const now   = new Date();
+// 当日が対象日なら時刻を問わず当日を返す
+function calcNextDate(dayOfWeek) {
     const today = new Date(); today.setHours(0,0,0,0);
     const todayDow = today.getDay();
     let diff = dayOfWeek - todayDow;
-    if (diff === 0) {
-        const ms = new Date(today); ms.setHours(parseInt(sh), parseInt(sm), 0, 0);
-        if (now >= ms) diff = 7;
-    } else if (diff < 0) diff += 7;
+    if (diff < 0) diff += 7;
     const next = new Date(today.getTime() + diff * 86400000);
     return `${next.getFullYear()}-${pad(next.getMonth()+1)}-${pad(next.getDate())}`;
 }
 
-function calcNextMonthlyDate(dayOfWeek, weekOfMonth, sh, sm) {
-    const now   = new Date();
+function calcNextMonthlyDate(dayOfWeek, weekOfMonth) {
     const today = new Date(); today.setHours(0,0,0,0);
     for (let offset = 0; offset <= 24; offset++) {
         const first = new Date(today.getFullYear(), today.getMonth() + offset, 1);
@@ -209,29 +205,20 @@ function calcNextMonthlyDate(dayOfWeek, weekOfMonth, sh, sm) {
         if (diff < 0) diff += 7;
         const candidate = new Date(first.getFullYear(), first.getMonth(), 1 + diff + (weekOfMonth - 1) * 7);
         if (candidate.getMonth() !== first.getMonth()) continue;
-        if (candidate > today) {
+        if (candidate >= today) {
             return `${candidate.getFullYear()}-${pad(candidate.getMonth()+1)}-${pad(candidate.getDate())}`;
-        } else if (candidate.getTime() === today.getTime()) {
-            const ms = new Date(today); ms.setHours(parseInt(sh), parseInt(sm), 0, 0);
-            if (now < ms) return `${candidate.getFullYear()}-${pad(candidate.getMonth()+1)}-${pad(candidate.getDate())}`;
         }
     }
     return '';
 }
 
-function calcNextCustomDate(customDates, sh, sm) {
+function calcNextCustomDate(customDates) {
     if (!Array.isArray(customDates) || customDates.length === 0) return '';
     const sorted = [...customDates].sort((a, b) => a.localeCompare(b));
     const today = new Date().toLocaleDateString('sv-SE');
-    const now = new Date();
 
     for (const dateValue of sorted) {
-        if (dateValue > today) return dateValue;
-        if (dateValue === today) {
-            const ms = new Date();
-            ms.setHours(parseInt(sh, 10), parseInt(sm, 10), 0, 0);
-            if (now < ms) return dateValue;
-        }
+        if (dateValue >= today) return dateValue;
     }
 
     return sorted[0] ?? '';
@@ -321,11 +308,11 @@ watch(selectedMeetingId, (id) => {
     form.value.endTime   = `${eh}:${em}`;
 
     if (meeting.recurrence === 'custom_dates') {
-        form.value.date = calcNextCustomDate(meeting.custom_dates, sh, sm);
+        form.value.date = calcNextCustomDate(meeting.custom_dates);
     } else if (meeting.recurrence === 'monthly' && meeting.week_of_month) {
-        form.value.date = calcNextMonthlyDate(meeting.day_of_week, meeting.week_of_month, sh, sm);
+        form.value.date = calcNextMonthlyDate(meeting.day_of_week, meeting.week_of_month);
     } else {
-        form.value.date = calcNextDate(meeting.day_of_week, sh, sm);
+        form.value.date = calcNextDate(meeting.day_of_week);
     }
 
     // 新規作成時のみ参加者を自動入力

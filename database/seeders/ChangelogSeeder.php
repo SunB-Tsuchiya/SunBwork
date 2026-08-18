@@ -11,6 +11,56 @@ class ChangelogSeeder extends Seeder
     {
         $entries = [
             [
+                'version'      => 'meeting-date-autofill-1',
+                'title'        => '会議予定の登録：当日の会議を選ぶと時刻超過で翌週になっていた自動日付入力を修正',
+                'released_at'  => '2026-08-19',
+                'summary'      => 'リーダーが登録した定例会議（毎週・毎月第N週・個別日付指定）を予定登録画面で選択すると、日付欄に開催日が自動入力されます。これまでは、選んだ日が今日で、かつ開催時刻をすでに過ぎている場合、自動的に来週（来月）の日付が入っていました。日報や実施記録をあとから入力する際、毎回日付を今日に直す手間が発生していたため、当日が対象日であれば時刻に関わらず当日の日付が入るようにしました。対象日が今週（今月）まだ来ていない場合や、すでに終わっている場合の動きは今までどおりです。',
+                'design_files' => [],
+                'claude_notes' => 'CreateInternalEvent.vue（予定新規登録画面）と Components/Schedule/EventModal.vue（スケジュールのモーダル）に、calcNextDate / calcNextMonthlyDate / calcNextCustomDate という全く同じロジックの複製が存在していた。いずれも「当日が対象日と一致していても、会議開始時刻(start_time)を過ぎていれば diff=7（来週）に繰り上げる」という時刻比較を持っており、これが本件の原因。' . "\n\n" . 'ユーザーからは当初「来週を指すのを当日以降に変えられるか」という要望だったが、挙げられた具体例（水曜が対象の会議を木曜に選ぶと「最新の水曜」＝過去日を指してほしい）は文字どおりには「次回」ではなく「直近（当日を含む過去方向）」への仕様転換だったため、AskUserQuestion で意図を確認。「事前に来週の会議を予定したいケースに影響するが良いか」を聞いたところ、「当日は時刻を問わず当日、それ以外（今週まだ来ていない／すでに終わっている）は今まで通り来週」という、時刻判定の削除のみに着地した。月次・個別日付指定への適用要否も別途確認し、両方に同じ修正を適用している。' . "\n\n" . '実装は3関数とも「当日一致時のみ meetingStart と now を比較して diff=7 にする」ブロックを削除しただけ。calcNextMonthlyDate は candidate > today と candidate.getTime() === today.getTime() の分岐を candidate >= today に統合、calcNextCustomDate も dateValue > today / === today の分岐を dateValue >= today に統合した。start_time/end_time を渡していた引数（sh, sm や startHour, startMinute）は日付計算では不要になったため関数シグネチャから削除したが、呼び出し元で startTime/endTime のフォーム値を設定する処理自体は変更していない。',
+                'body'         => <<<'HTML'
+<section class="cl-problem">
+  <h3>背景・問題</h3>
+  <ul>
+    <li>予定登録画面や会議登録モーダルで定例会議を選ぶと、日付欄に開催日が自動入力される</li>
+    <li>選んだ会議が「今日開催」でも、開催時刻をすでに過ぎていると自動的に来週（毎月の会議なら来月）の日付が入ってしまい、日報や実施記録をあとから登録する際に毎回日付を今日へ直す手間が発生していた</li>
+  </ul>
+</section>
+
+<section class="cl-fix">
+  <h3>修正・改善内容</h3>
+  <ul>
+    <li>選んだ会議の対象日が「今日」の場合、開催時刻を過ぎていても時刻に関わらず今日の日付が自動入力されるようにした</li>
+    <li>毎週・毎月第N週・個別日付指定のいずれの会議でも同様に修正した</li>
+    <li>対象日が今週（今月）まだ来ていない場合や、すでに終わっている場合の自動入力（来週・来月の日付が入る）は今までどおり</li>
+  </ul>
+</section>
+HTML,
+            ],
+            [
+                'version'      => 'diary-edit-redirect-1',
+                'title'        => '日報：編集して保存すると毎回カレンダー画面に戻ってしまう不具合を修正',
+                'released_at'  => '2026-08-19',
+                'summary'      => '日報を新規作成したあとに内容を修正して保存すると、日報一覧ではなくカレンダー画面に戻ってしまい、続けて編集する場合も毎回カレンダーを経由する必要がありました。新規作成時と同じく、編集を保存したあとは日報一覧に戻るようにしました。',
+                'design_files' => [],
+                'claude_notes' => 'サーバー側（DiaryController::update）は元から redirect()->route(\'diaries.index\') を返しており問題なし。原因は Pages/Diaries/Edit.vue の submit() 側で、更新成功時（添付ファイルありの axios post 成功時、添付ファイルなしの Inertia form.put の onSuccess 時の両方）に router.get(route(\'calendar.index\')) を明示的に呼び出しており、サーバーのリダイレクト先を上書きしていたこと。新規作成側の Create.vue の submit() にはこの上書きが無く、サーバーのリダイレクトにそのまま従うため一覧に戻っていた（挙動差の原因）。' . "\n\n" . '2箇所とも router.get(route(\'calendar.index\'))（失敗時フォールバックの route(\'events.index\') 込み）を router.get(route(\'diaries.index\')) に置き換え、不要になった try/catch フォールバックも削除した。',
+                'body'         => <<<'HTML'
+<section class="cl-problem">
+  <h3>背景・問題</h3>
+  <ul>
+    <li>日報を新規保存したあと、内容を修正して保存すると、日報一覧ではなくカレンダー画面に戻ってしまっていた</li>
+    <li>その状態から再度編集して保存しても、毎回カレンダー画面に戻るため、続けて修正するのが面倒だった</li>
+  </ul>
+</section>
+
+<section class="cl-fix">
+  <h3>修正・改善内容</h3>
+  <ul>
+    <li>日報の編集を保存したあとは、新規作成時と同じく日報一覧に戻るようにした</li>
+  </ul>
+</section>
+HTML,
+            ],
+            [
                 'version'      => 'jobcode-duplicate-allow-1',
                 'title'        => '案件登録：同じ受注番号でも別作業として登録できるようにした',
                 'released_at'  => '2026-08-14',
