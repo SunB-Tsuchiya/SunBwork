@@ -825,7 +825,7 @@ class MyProjectJobController extends Controller
             $now = Carbon::now();
             if ($range === 'yesterday') {
                 $from = $now->copy()->subDay()->startOfDay();
-                $to   = $now->copy()->subDay()->endOfDay();
+                $to   = $now->copy()->endOfDay();
             } elseif ($range === '7days') {
                 $from = $now->copy()->subDays(7)->startOfDay();
                 $to   = $now->copy()->endOfDay();
