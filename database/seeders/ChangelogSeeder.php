@@ -11,6 +11,86 @@ class ChangelogSeeder extends Seeder
     {
         $entries = [
             [
+                'version'      => 'clerk-calendar-3',
+                'title'        => 'Clerkカレンダー：SuperAdminで会社が未選択のとき色設定・予定が読み込めない不具合を修正',
+                'released_at'  => '2026-08-20',
+                'summary'      => 'SuperAdminアカウントで会社コンテキストを切り替えずにClerkカレンダーを開くと、色設定パネルが空のまま表示され、予定も裏側で読み込みに失敗する不具合を修正しました。以後はコンテキスト未選択時、SuperAdmin自身が所属する会社のデータとして表示されます。',
+                'design_files' => [],
+                'claude_notes' => 'clerk-calendar-2 リリース直後にユーザーから「色設定パネルに何も表示されない」との報告。ログ調査の結果、ClerkCalendarColorController::companyId() が SuperAdmin かつ session(\'superadmin_context.company_id\') 未設定（会社切替UIで一度も会社を選んでいない）の場合に null を返し、戻り値型 int の宣言に違反してTypeErrorになっていた。フロント側（ClerkCalendarColorPanel.vue の fetchColors）のcatchが空実装で握りつぶしていたため、画面には何のエラーも出ず「パネルが開くだけで中身が空」に見えていた。' . "\n\n" . '同一パターンの companyId() を ClerkEventController・ClerkWeekPostController にも実装済みだったため、同じ条件（SuperAdminがコンテキスト未選択）ではカレンダーの予定一覧・週の掲示板も同様に裏側で失敗していたことが判明（画面は「予定0件」に見えるだけで気づきにくい状態だった）。' . "\n\n" . '調査の過程で、このアプリには同じ問題（SuperAdminのコンテキスト解決）を汎用的に扱う app/Http/Controllers/Concerns/ResolvesContextCompany.php というTraitが既に存在し、多数のコントローラー（Admin/DepartmentController、WorkloadSettingController等）で `contextCompanyId() ?? $user->company_id` という「未選択ならSuperAdmin自身の会社にフォールバックする」パターンで使われていることが分かった。Clerk\\AnnouncementControllerだけは意図的に「未選択ならグローバルモード（空表示）」という別パターンを採っていたため、実装時にそちらを参考にしてしまい、null安全性を見落としていた。' . "\n\n" . '対応は3コントローラーの private companyId(): int を `return $this->contextCompanyId() ?? Auth::user()->company_id;` に統一し、Trait を use するだけ。DBスキーマ・フロントの変更は無し。tinker でSuperAdminアカウントとして3つのcontroller（Event/WeekPost/CalendarColor）のindex()を直接呼び出し、正常応答することを確認済み。',
+                'body'         => <<<'HTML'
+<section class="cl-problem">
+  <h3>背景・問題</h3>
+  <ul>
+    <li>SuperAdminアカウントで会社コンテキストを一度も選択していない状態でClerkカレンダーを開くと、色設定パネルが常に空で表示されていた</li>
+    <li>同じ条件で、予定の一覧・週の掲示板も裏側で読み込みに失敗しており、実際は0件ではないのに「予定なし」に見えてしまっていた</li>
+  </ul>
+</section>
+
+<section class="cl-fix">
+  <h3>修正・改善内容</h3>
+  <ul>
+    <li>SuperAdminが会社コンテキストを選択していない場合、SuperAdmin自身が所属する会社のデータとして表示するようにした</li>
+    <li>色設定・予定一覧・週の掲示板の3箇所すべてに同じ修正を適用</li>
+  </ul>
+</section>
+HTML,
+            ],
+            [
+                'version'      => 'clerk-calendar-2',
+                'title'        => 'Clerkカレンダーに予定の色分け・完了機能を追加',
+                'released_at'  => '2026-08-20',
+                'summary'      => 'Clerkカレンダーの予定に色を付けられるようにしました。色は製版ボード（Prepress）の担当色選択と同じ11色パレットで、各色には会社ごとに自由記入でラベル（6文字程度）を設定できます。設定は「色設定」ボタン（CSV取込ボタンから離して右側に配置）から行い、予定の作成・編集画面では丸いスウォッチとラベルから色を選べます。また、予定を「完了」にできるようになりました。完了にした予定は、色はそのままで薄く表示され、タイトルに取り消し線が入るため、色分けを保ったまま完了状態がひと目でわかります。',
+                'design_files' => [],
+                'claude_notes' => 'Phase1（clerk-calendar-1）の続き。ユーザーからスクリーンショット付きで「prepress/boardのカード担当色選択と同じ10色（実際は11色、後から追加されたcyanを含む）で色分けしたい、ただし担当者選択ではなく自由記入」「完了機能が欲しい、グレーアウトかその色のまま薄くなるなど」という要望を受けた。' . "\n\n" . '参考実装は Prepress/Board.vue の CARD_COLORS（indigo/blue/cyan/teal/green/yellow/orange/red/pink/purple/gray）とドラッグ並び替え可能な担当色変更パネル。ただし prepress/operator の色設定テーブル（PrepressColorAssignment / OperatorCalendarColorAssignment）は user_id を持つ全社共通の1セットなのに対し、Clerk は「自由記入ラベル」かつ「会社ごとに別々」という要件だったため、そのまま使い回さずに company_id + color_key のユニーク制約を持つ新テーブル clerk_calendar_colors を切った。会社は後から増えるため、マイグレーション時にレコードをseedする方式（prepress/operatorの方式）は使えず、ClerkCalendarColorController::index() で未作成のcolor_keyをfirstOrCreateで都度補完する方式にした。' . "\n\n" . 'FullCalendarはイベントの背景色をタイトルの通りTailwindクラスではなくinline styleで塗る実装だったため（eventDidMountでstyle.backgroundColorを直接設定）、11色それぞれのhexコードを持つ CLERK_EVENT_COLORS マップを新設（resources/js/Components/Clerk/clerkEventColors.js）。Tailwindのデフォルトパレットの400番台（teal/greenのみ500番台、Board.vueのCARD_COLORSに合わせた）を使用し、yellowだけ文字色を濃色にして視認性を確保した。' . "\n\n" . '完了表示は「グレーアウト」ではなく「その色のまま薄くする」を採用（ユーザーが挙げた2案のうち）。理由は、グレーアウトすると何色に分類されていた予定か分からなくなり、色分けの意味が失われるため。カレンダー・週間プランナー・スケジュール一覧パネルの3箇所すべてで opacity を下げてタイトルに取り消し線を入れる形で統一した。完了の切り替えは編集モーダルの「完了にする」ボタンからのみで、一覧からのワンクリック切替や完了予定のフィルタ非表示は今回のスコープ外とした。',
+                'body'         => <<<'HTML'
+<section class="cl-problem">
+  <h3>背景・問題</h3>
+  <ul>
+    <li>Clerkカレンダーの予定を種類ごとに色分けして識別したいという要望があった</li>
+    <li>予定が完了したかどうかを、色分けを保ったまま一覧・カレンダー上で見分けたいという要望があった</li>
+  </ul>
+</section>
+
+<section class="cl-fix">
+  <h3>修正・改善内容</h3>
+  <ul>
+    <li>予定の作成・編集時に11色から色を選べるようにした（製版ボードの担当色選択と同じパレット）</li>
+    <li>各色には会社ごとに自由記入でラベル（6文字程度）を設定できる。設定はボタンバー右側の「色設定」ボタンから</li>
+    <li>色はカレンダー・週間プランナー・スケジュール一覧パネルすべてに反映される</li>
+    <li>予定を「完了」にできるようになった。完了した予定は色を保ったまま薄く表示され、タイトルに取り消し線が入る</li>
+  </ul>
+</section>
+HTML,
+            ],
+            [
+                'version'      => 'clerk-calendar-1',
+                'title'        => 'Clerk（クラーク）にカレンダー機能を追加',
+                'released_at'  => '2026-08-20',
+                'summary'      => 'Clerk のタブメニューに「カレンダー」を新設しました。チームルームのスケジュール機能（月カレンダー・週間プランナー・週の掲示板・CSV入出力）と同じ内容を移設したもので、同じ会社の Clerk / Admin / SuperAdmin / 部署リーダーで1つのカレンダーを共有します。Clerk は2〜3名で予定を共同管理したいとのことだったため、予定の作成者に関わらず、カレンダーにアクセスできる人であれば誰でも予定を編集・削除できます。',
+                'design_files' => [],
+                'claude_notes' => 'ユーザー要望は「team-rooms/{id}?tab=schedule のスケジュール機能一式を Clerk のタブに移設し、まずは移設からスタートしてあとで調整する」というもの。移設元は TeamRoom/Show.vue の schedule タブ（TeamScheduleCalendar.vue が本体、内部で TeamWeekPlanner.vue を切替表示）と TeamEventController / TeamWeekPostController、team_events / team_week_posts テーブル。' . "\n\n" . '最初の設計判断点は「Clerk にはチームが無いので、移設先のデータをどう区切るか」で、AskUserQuestion で確認したところ「会社単位で共有」を選択。company_id で clerk_events / clerk_week_posts の新規テーブルを切り、company_id の解決は同じ Clerk 配下の AnnouncementController が使っているパターン（isSuperAdmin なら session(\'superadmin_context.company_id\')、それ以外は $user->company_id）をそのまま踏襲した。アクセス制御も新規ミドルウェアを作らず、既存の ClerkMiddleware（clerk / admin / superadmin / 部署リーダーを許可）にそのまま乗せている。' . "\n\n" . '2点目の判断は編集権限。TeamEventController は「作成者本人 or SuperAdmin のみ編集可」だったが、ユーザーから「Clerk は2〜3人なので全員が編集できるようにしてほしい」と指摘があり、ClerkEventController / ClerkWeekPostController では所有者チェック（user_id !== Auth::id() の abort(403)）を意図的に外し、company_id が一致してミドルウェアを通過していれば誰でも編集・削除できる仕様にした。' . "\n\n" . 'フロント側は TeamScheduleCalendar.vue / TeamWeekPlanner.vue をほぼそのまま Components/Clerk/ClerkScheduleCalendar.vue / ClerkWeekPlanner.vue としてコピーし、teamId prop と route の team パラメータを除去して route 名を clerk.calendar.* に差し替えただけ（月カレンダー⇄週間プランナー切替、ホバーポップアップ、ドラッグ&ドロップ、スケジュール一覧パネルの編集モード、CSV入出力、週の掲示板の返信スレッドは全て同じ挙動）。ClerkNavigationTabs.vue にタブを追加する形で導線を作った（AppLayout 側の getTopTabActive() が route 名に "calendar" を含むかで判定する既存ロジックにそのまま乗るため、AppLayout 自体の変更は不要だった）。' . "\n\n" . '今回のスコープ外として、Clerk ダッシュボードとの統合や不要機能の取捨選択は次フェーズで別途相談する前提。UTC/JST 周りは移設元同様、all_day 予定は日付文字列のみを扱っており events テーブルの proof/UTC 問題とは無関係なため変更していない。',
+                'body'         => <<<'HTML'
+<section class="cl-problem">
+  <h3>背景・問題</h3>
+  <ul>
+    <li>Clerk（2〜3名）が予定を共有・共同管理する手段が無かった</li>
+    <li>チームルームのスケジュール機能（月カレンダー・週間プランナー・週の掲示板・CSV入出力）と同等の機能が求められていた</li>
+  </ul>
+</section>
+
+<section class="cl-fix">
+  <h3>修正・改善内容</h3>
+  <ul>
+    <li>Clerk のタブメニューに「カレンダー」を新設</li>
+    <li>月カレンダー表示・週間プランナー（週別の予定一覧＋週の掲示板）を切り替えて利用可能</li>
+    <li>予定のCSV出力・CSV取込に対応</li>
+    <li>同じ会社の Clerk / Admin / SuperAdmin / 部署リーダーで1つのカレンダーを共有</li>
+    <li>予定の作成者に関わらず、カレンダーにアクセスできる人なら誰でも編集・削除可能</li>
+  </ul>
+</section>
+HTML,
+            ],
+            [
                 'version'      => 'meeting-date-autofill-1',
                 'title'        => '会議予定の登録：当日の会議を選ぶと時刻超過で翌週になっていた自動日付入力を修正',
                 'released_at'  => '2026-08-19',

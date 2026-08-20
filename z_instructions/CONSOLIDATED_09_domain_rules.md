@@ -26,6 +26,42 @@ CLAUDE.md から移した詳細ルール。機能追加・修正時に必ず参�
 - `AdminUserController` バリデーション: `in:admin,leader,coordinator,clerk,user`
 - `UserTable.vue` / `Admin/Users/Index.vue` の `getAssignmentText()` / `getAssignmentBadgeClass()` 両方に定義が必要
 
+**Clerk カレンダー（2026-08-20 追加）:**
+- Clerk のタブメニュー「カレンダー」（route: `clerk.calendar`）。TeamRoom のスケジュール機能（`TeamScheduleCalendar.vue` /
+  `TeamWeekPlanner.vue`）を移設したもの。
+- Clerk にはチームの概念が無いため、`team_id` ではなく **`company_id` でデータをスコープ**する
+  （新テーブル `clerk_events` / `clerk_week_posts`、モデル `ClerkEvent` / `ClerkWeekPost`）。
+- アクセス制御は既存の `clerk` ミドルウェア（`ClerkMiddleware`）をそのまま使用。許可ロール（clerk / admin /
+  superadmin / 部署リーダー）が、そのままカレンダーを共有するメンバーの範囲になる。
+- 会社IDの解決は `Clerk\AnnouncementController` と同じパターン:
+  `$user->isSuperAdmin() ? session('superadmin_context.company_id') : $user->company_id`
+- **予定の編集・削除に所有者チェックは無い。** TeamEvent（team_events）は「作成者本人 or SuperAdmin のみ編集可」
+  だが、Clerk は少人数（2〜3名）で予定を共同管理する運用のため、`ClerkEventController` /
+  `ClerkWeekPostController` では意図的に所有者チェックを外している（company_id が一致してミドルウェアを
+  通過していれば誰でも編集・削除できる）。他ロールへの機能展開時にこの権限モデルをそのまま流用しないこと。
+- コントローラ: `app/Http/Controllers/Clerk/ClerkCalendarController.php`（画面表示）/
+  `ClerkEventController.php`（予定CRUD・CSV入出力・完了トグル）/ `ClerkWeekPostController.php`（週の掲示板）/
+  `ClerkCalendarColorController.php`（色設定）
+- フロント: `Pages/Clerk/Calendar/Index.vue` / `Components/Clerk/ClerkScheduleCalendar.vue` /
+  `Components/Clerk/ClerkWeekPlanner.vue` / `Components/Clerk/ClerkCalendarColorPanel.vue`
+
+**Clerk カレンダーの色分け・完了機能（2026-08-20 追加）:**
+- 予定に `color_key`（`clerk_events.color_key`）を設定できる。パレットは `Prepress/Board.vue` の
+  `CARD_COLORS` と同じ11色（indigo/blue/cyan/teal/green/yellow/orange/red/pink/purple/gray）。
+  フロントの定義は `resources/js/Components/Clerk/clerkEventColors.js`（`CLERK_EVENT_COLORS`）。
+- 各色のラベルは **会社ごとに自由記入**（`clerk_calendar_colors` テーブル、`company_id` + `color_key` で
+  ユニーク）。Prepress/Operator の色設定（`PrepressColorAssignment` / `OperatorCalendarColorAssignment`）は
+  `user_id` を選ぶ全社共通1セットだが、Clerk はそれと違い自由記入・会社ごとに独立している点に注意。
+  会社は後から増えるため、マイグレーションでの一括seedはできない。
+  **`ClerkCalendarColorController::index()` が未作成の color_key を `firstOrCreate` で都度補完**してから返す
+  （初回アクセス時に11行が自動生成される）。
+- FullCalendar はイベント背景色を Tailwind クラスではなく inline style で塗る実装のため、`CLERK_EVENT_COLORS`
+  は hex 値を持つ（Tailwind の 400番台、teal/green のみ 500番台で Board.vue と統一）。
+- 完了は `clerk_events.completed_at`（真偽値カラムではなく日時）で管理。トグルは
+  `PATCH clerk.calendar.events.complete`。**完了表示は「グレーアウト」ではなく「その色のまま opacity を
+  下げてタイトルに取り消し線」**（色分けの意味を保つため意図的にグレーアウトを避けている）。
+  カレンダー・週間プランナー・スケジュール一覧パネルの3箇所で統一。
+
 **Admin 権限フラグ（`admin_permissions`）:** `company_management` / `user_management` / `team_management` / `diary_management` / `client_management` / `workload_analysis` / `worktype_setting` / `work_record_management`
 
 **Leader 権限フラグ（`leader_permissions`）:** `client_management` / `diary_management` / `workload_analysis` / `workload_setting` / `work_record_management` / `dispatch_management` / `project_job_overview`

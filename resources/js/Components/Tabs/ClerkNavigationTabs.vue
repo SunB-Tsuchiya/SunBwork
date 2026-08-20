@@ -24,6 +24,7 @@ function tryRoute(name) {
 const tabs = computed(() => [
     { key: 'dashboard', href: tryRoute('clerk.dashboard'), label: 'ダッシュボード' },
     { key: 'announcements', href: tryRoute('clerk.announcements.index'), label: 'お知らせ通知' },
+    { key: 'calendar', href: tryRoute('clerk.calendar'), label: 'カレンダー' },
     { key: 'diaries', href: tryRoute('diary_manager.diaryinteractions.index'), label: '日報管理', condition: isDiaryManager.value },
 ].filter(t => t.condition !== false && t.href));
 
@@ -58,6 +59,9 @@ function onMobileSelect(e) {
             </Link>
             <Link :href="route('clerk.announcements.index')" :class="tab('announcements')">
                 お知らせ通知
+            </Link>
+            <Link :href="route('clerk.calendar')" :class="tab('calendar')">
+                カレンダー
             </Link>
             <Link
                 v-if="isDiaryManager"

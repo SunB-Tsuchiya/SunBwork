@@ -688,6 +688,22 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::put('announcements/{announcement}', [App\Http\Controllers\Clerk\AnnouncementController::class, 'update'])->name('announcements.update');
         Route::delete('announcements/{announcement}', [App\Http\Controllers\Clerk\AnnouncementController::class, 'destroy'])->name('announcements.destroy');
         Route::post('announcements/{announcement}/send', [App\Http\Controllers\Clerk\AnnouncementController::class, 'send'])->name('announcements.send');
+
+        // カレンダー（会社単位で共有）
+        Route::get('calendar', [App\Http\Controllers\Clerk\ClerkCalendarController::class, 'index'])->name('calendar');
+        Route::get('calendar/events', [App\Http\Controllers\Clerk\ClerkEventController::class, 'index'])->name('calendar.events.index');
+        Route::post('calendar/events', [App\Http\Controllers\Clerk\ClerkEventController::class, 'store'])->name('calendar.events.store');
+        Route::get('calendar/events/csv-export', [App\Http\Controllers\Clerk\ClerkEventController::class, 'csvExport'])->name('calendar.events.csv_export');
+        Route::post('calendar/events/csv-import', [App\Http\Controllers\Clerk\ClerkEventController::class, 'csvImport'])->name('calendar.events.csv_import');
+        Route::put('calendar/events/{event}', [App\Http\Controllers\Clerk\ClerkEventController::class, 'update'])->name('calendar.events.update');
+        Route::delete('calendar/events/{event}', [App\Http\Controllers\Clerk\ClerkEventController::class, 'destroy'])->name('calendar.events.destroy');
+        Route::get('calendar/week-posts', [App\Http\Controllers\Clerk\ClerkWeekPostController::class, 'index'])->name('calendar.week_posts.index');
+        Route::post('calendar/week-posts', [App\Http\Controllers\Clerk\ClerkWeekPostController::class, 'store'])->name('calendar.week_posts.store');
+        Route::delete('calendar/week-posts/{post}', [App\Http\Controllers\Clerk\ClerkWeekPostController::class, 'destroy'])->name('calendar.week_posts.destroy');
+        Route::patch('calendar/events/{event}/complete', [App\Http\Controllers\Clerk\ClerkEventController::class, 'complete'])->name('calendar.events.complete');
+        Route::get('calendar/colors', [App\Http\Controllers\Clerk\ClerkCalendarColorController::class, 'index'])->name('calendar.colors.index');
+        Route::patch('calendar/colors/{colorKey}', [App\Http\Controllers\Clerk\ClerkCalendarColorController::class, 'update'])->name('calendar.colors.update');
+        Route::post('calendar/colors/reorder', [App\Http\Controllers\Clerk\ClerkCalendarColorController::class, 'reorder'])->name('calendar.colors.reorder');
     });
 
 // お知らせ受信（全認証ユーザー）
