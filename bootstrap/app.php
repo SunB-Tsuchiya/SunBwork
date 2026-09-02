@@ -50,6 +50,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'representative'        => \App\Http\Middleware\EnsureIsRepresentative::class,
             'representative_leader' => \App\Http\Middleware\EnsureIsRepresentativeLeader::class,
             'company_type'   => \App\Http\Middleware\CheckCompanyType::class,
+            'sales_analysis' => \App\Http\Middleware\EnsureSalesAnalysisAccess::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

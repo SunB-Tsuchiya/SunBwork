@@ -290,6 +290,14 @@ class User extends Authenticatable
     }
 
     /**
+     * 売上分析機能の個人別利用許可
+     */
+    public function salesAnalysisPermission()
+    {
+        return $this->hasOne(\App\Models\SalesAnalysisPermission::class);
+    }
+
+    /**
      * Leader 権限設定
      */
     public function leaderPermission()

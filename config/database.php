@@ -52,6 +52,26 @@ return [
             ]) : [],
         ],
 
+        // 売上分析機能専用の接続。本番sales DBへのアクセスは専用DBユーザーで最小権限運用する。
+        'sales' => [
+            'driver' => env('SALES_DB_CONNECTION', 'mysql'),
+            'host' => env('SALES_DB_HOST', '127.0.0.1'),
+            'port' => env('SALES_DB_PORT', '3306'),
+            'database' => env('SALES_DB_DATABASE', ''),
+            'username' => env('SALES_DB_USERNAME', ''),
+            'password' => env('SALES_DB_PASSWORD', ''),
+            'unix_socket' => env('SALES_DB_SOCKET', ''),
+            'charset' => env('DB_CHARSET', 'utf8mb4'),
+            'collation' => env('DB_COLLATION', 'utf8mb4_unicode_ci'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => true,
+            'engine' => null,
+            'options' => extension_loaded('pdo_mysql') ? array_filter([
+                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+            ]) : [],
+        ],
+
         'mariadb' => [
             'driver' => 'mariadb',
             'url' => env('DB_URL'),

@@ -160,6 +160,23 @@ class HandleInertiaRequests extends Middleware
 
                     return false;
                 })(),
+                // 売上分析機能へのアクセス権（SuperAdmin常時可、Admin/Clerkは個人許可がある場合のみ）
+                'canAccessSalesAnalysis' => (function () use ($request) {
+                    $user = $request->user();
+                    if (! $user) {
+                        return false;
+                    }
+                    if ($user->isSuperAdmin()) {
+                        return true;
+                    }
+                    if ($user->isAdmin() || $user->isClerk()) {
+                        return \App\Models\SalesAnalysisPermission::where('user_id', $user->id)
+                            ->where('enabled', true)
+                            ->exists();
+                    }
+
+                    return false;
+                })(),
                 // 校正チームメンバーフラグ
                 'isProofMember' => $request->user()
                     ? ProofTeamMember::where('user_id', $request->user()->id)->exists()

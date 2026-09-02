@@ -305,6 +305,18 @@ fclose($handle);
 @unlink($tmpPath);
 ```
 
+## Sales Data Confidentiality
+
+- Production sales data uses the dedicated `sales` database connection.
+- Never inspect production sales records through SSH, SQL, Artisan Tinker,
+  database clients, dumps, logs, or ad-hoc scripts.
+- Do not copy production sales data into the local environment.
+- Use only synthetic fixtures and `z_instructions/sanbrain_meisai_sample.xlsx`
+  for development and review.
+- Schema/migration inspection is allowed from repository files. Do not query
+  production schema if doing so risks returning record data.
+- Never print sales DB credentials or backup contents.
+
 ## Large Work Protocol
 
 For large new features or repairs involving multiple phases or roughly five or more changed files, create these files under `z_instructions/` before implementation and ask for user confirmation:

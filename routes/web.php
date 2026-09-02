@@ -521,6 +521,10 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('admin-permissions/{adminuser}/edit', [App\Http\Controllers\SuperAdmin\AdminPermissionController::class, 'edit'])->name('admin_permissions.edit');
         Route::put('admin-permissions/{adminuser}', [App\Http\Controllers\SuperAdmin\AdminPermissionController::class, 'update'])->name('admin_permissions.update');
 
+        // 売上分析 利用許可設定（SuperAdmin限定。対象はAdmin/Clerkのみ）
+        Route::get('sales-analysis-permissions', [App\Http\Controllers\SuperAdmin\SalesAnalysisPermissionController::class, 'index'])->name('sales_analysis_permissions.index');
+        Route::put('sales-analysis-permissions/{user}', [App\Http\Controllers\SuperAdmin\SalesAnalysisPermissionController::class, 'update'])->name('sales_analysis_permissions.update');
+
         // 会社管理
         Route::resource('companies', App\Http\Controllers\SuperAdmin\CompanyController::class);
         Route::post('companies/reorder', [App\Http\Controllers\SuperAdmin\CompanyController::class, 'reorder'])->name('superadmin.companies.reorder');
@@ -704,6 +708,16 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('calendar/colors', [App\Http\Controllers\Clerk\ClerkCalendarColorController::class, 'index'])->name('calendar.colors.index');
         Route::patch('calendar/colors/{colorKey}', [App\Http\Controllers\Clerk\ClerkCalendarColorController::class, 'update'])->name('calendar.colors.update');
         Route::post('calendar/colors/reorder', [App\Http\Controllers\Clerk\ClerkCalendarColorController::class, 'reorder'])->name('calendar.colors.reorder');
+    });
+
+// 売上分析（SuperAdmin + 個人許可済みAdmin/Clerkのみ。Leader/Coordinator/Userは常に拒否）
+Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'sales_analysis'])
+    ->prefix('sales-analysis')
+    ->name('sales_analysis.')
+    ->group(function () {
+        Route::get('/', [App\Http\Controllers\SalesAnalysis\DashboardController::class, 'index'])->name('dashboard');
+        Route::get('import', [App\Http\Controllers\SalesAnalysis\ImportController::class, 'create'])->name('import.create');
+        Route::post('import/preview', [App\Http\Controllers\SalesAnalysis\ImportController::class, 'preview'])->name('import.preview');
     });
 
 // お知らせ受信（全認証ユーザー）
