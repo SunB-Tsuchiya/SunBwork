@@ -11,6 +11,7 @@ Dockerfile.amd64
 /public/storage
 /storage/*.key
 /storage/pail
+/storage/app/backups
 /vendor
 .env
 .env.backup
