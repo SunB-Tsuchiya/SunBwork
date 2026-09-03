@@ -1,10 +1,13 @@
 <script setup>
 import { computed } from 'vue';
-import { Link, router } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 
 const props = defineProps({
     active: { type: String, default: '' },
 });
+
+const page = usePage();
+const canAccessSalesAnalysis = computed(() => page.props.auth?.canAccessSalesAnalysis ?? false);
 
 // SuperAdmin カラー: yellow
 const tab = (key) => [
@@ -42,6 +45,18 @@ const tabs = computed(() => [
     { key: 'users', href: tryRoute('superadmin.adminusers.index'), label: 'Adminユーザー管理' },
     { key: 'admin_permissions', href: tryRoute('superadmin.admin_permissions.index'), label: 'Admin権限管理' },
     { key: 'position_titles', href: tryRoute('superadmin.position_titles.index'), label: '役職称号管理' },
+    {
+        key: 'sales_analysis',
+        href: tryRoute('superadmin.sales_analysis.dashboard'),
+        label: '売上分析',
+        condition: canAccessSalesAnalysis.value && typeof route === 'function' && route().has('superadmin.sales_analysis.dashboard'),
+    },
+    {
+        key: 'sales_analysis_permissions',
+        href: tryRoute('superadmin.sales_analysis_permissions.index'),
+        label: '売上分析 利用許可設定',
+        condition: typeof route === 'function' && route().has('superadmin.sales_analysis_permissions.index'),
+    },
     {
         key: 'ai',
         href: tryRoute('superadmin.ai.index'),
@@ -159,6 +174,20 @@ function onMobileSelect(e) {
                 :class="tab('position_titles')"
             >
                 役職称号管理
+            </Link>
+            <Link
+                v-if="canAccessSalesAnalysis && typeof route === 'function' && route().has('superadmin.sales_analysis.dashboard')"
+                :href="route('superadmin.sales_analysis.dashboard')"
+                :class="tab('sales_analysis')"
+            >
+                売上分析
+            </Link>
+            <Link
+                v-if="typeof route === 'function' && route().has('superadmin.sales_analysis_permissions.index')"
+                :href="route('superadmin.sales_analysis_permissions.index')"
+                :class="tab('sales_analysis_permissions')"
+            >
+                売上分析 利用許可設定
             </Link>
             <Link
                 v-if="typeof route === 'function' && route().has('superadmin.ai.index')"

@@ -8,6 +8,38 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\URL;
 use Carbon\Carbon;
 
+// 売上分析ルート（SuperAdmin/Admin/Clerkの各グループ内でロール別prefixとして複製登録する）
+// currentRouteContext（AppLayout.vue）がルート名プレフィックスでロールタブを判定するため、
+// 単一の共有ルート名空間にはせず、ロールごとに同名ルートをprefix複製する既存パターンに合わせる。
+$registerSalesAnalysisRoutes = function () {
+    Route::middleware('sales_analysis')->prefix('sales-analysis')->name('sales_analysis.')->group(function () {
+        // ホーム画面（2026-09-03 Codexレビュー2回目により、旧DashboardController相当を「データ登録状況」へ差し替え）
+        Route::get('/', [App\Http\Controllers\SalesAnalysis\RegistrationStatusController::class, 'index'])->name('dashboard');
+        Route::get('api/registration-status', [App\Http\Controllers\SalesAnalysis\RegistrationStatusController::class, 'data'])->name('api.registration_status');
+        Route::get('api/registration-status/files', [App\Http\Controllers\SalesAnalysis\RegistrationStatusController::class, 'files'])->name('api.registration_status.files');
+
+        // 月次分析（旧DashboardController。ホームの座を譲り、部署・年月を選ぶ単月分析画面として存続。
+        // 2026-09-03 実態が単月分析であるため、改名前の年次分析ルートから monthly_analysis へ改名）
+        Route::get('monthly', [App\Http\Controllers\SalesAnalysis\MonthlyAnalysisController::class, 'index'])->name('monthly_analysis');
+        Route::get('api/summary', [App\Http\Controllers\SalesAnalysis\MonthlyAnalysisController::class, 'summary'])->name('api.summary');
+        Route::get('api/trend', [App\Http\Controllers\SalesAnalysis\MonthlyAnalysisController::class, 'trend'])->name('api.trend');
+        Route::get('api/clients', [App\Http\Controllers\SalesAnalysis\MonthlyAnalysisController::class, 'clients'])->name('api.clients');
+        Route::get('api/categories', [App\Http\Controllers\SalesAnalysis\MonthlyAnalysisController::class, 'categories'])->name('api.categories');
+        Route::get('api/items', [App\Http\Controllers\SalesAnalysis\MonthlyAnalysisController::class, 'items'])->name('api.items');
+        Route::get('api/products', [App\Http\Controllers\SalesAnalysis\MonthlyAnalysisController::class, 'products'])->name('api.products');
+
+        // 年次分析（新規。2026-09-03 Codexレビュー2回目 6C節）
+        Route::get('annual', [App\Http\Controllers\SalesAnalysis\AnnualAnalysisController::class, 'index'])->name('annual_analysis');
+        Route::get('api/annual-summary', [App\Http\Controllers\SalesAnalysis\AnnualAnalysisController::class, 'summary'])->name('api.annual_summary');
+        Route::get('api/annual-products', [App\Http\Controllers\SalesAnalysis\AnnualAnalysisController::class, 'products'])->name('api.annual_products');
+
+        Route::get('import', [App\Http\Controllers\SalesAnalysis\ImportController::class, 'create'])->name('import.create');
+        Route::post('import/preview', [App\Http\Controllers\SalesAnalysis\ImportController::class, 'preview'])->name('import.preview');
+        Route::post('import/store', [App\Http\Controllers\SalesAnalysis\ImportController::class, 'store'])->name('import.store');
+        Route::get('import-history', [App\Http\Controllers\SalesAnalysis\ImportHistoryController::class, 'index'])->name('import_history.index');
+    });
+};
+
 // デバッグ用ルート
 require __DIR__ . '/debug.php';
 // チャット用ルート
@@ -336,7 +368,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'admin'])
     ->prefix('admin')
     ->name('admin.')
-    ->group(function () {
+    ->group(function () use ($registerSalesAnalysisRoutes) {
         // Ziggy用: 明示的にadmin.dashboardルートを追加
         Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
 
@@ -460,6 +492,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
                 'destroy' => 'diary_teams.destroy',
             ])
             ->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
+
+        $registerSalesAnalysisRoutes();
     });
 
 
@@ -482,7 +516,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'superadmin'])
     ->prefix('superadmin')
     ->name('superadmin.')
-    ->group(function () {
+    ->group(function () use ($registerSalesAnalysisRoutes) {
         // Ziggy用: 明示的にsuperadmin.dashboardルートを追加
         Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
 
@@ -566,6 +600,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         // SuperAdmin: スクリプト管理
         Route::get('scripts', [App\Http\Controllers\SuperAdmin\ScriptManagementController::class, 'index'])->name('scripts.index');
         Route::post('scripts/assign', [App\Http\Controllers\SuperAdmin\ScriptManagementController::class, 'assign'])->name('scripts.assign');
+
+        $registerSalesAnalysisRoutes();
     });
 
 
@@ -680,7 +716,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'clerk'])
     ->prefix('clerk')
     ->name('clerk.')
-    ->group(function () {
+    ->group(function () use ($registerSalesAnalysisRoutes) {
         Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
 
         // お知らせ管理（送信側）
@@ -708,16 +744,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::get('calendar/colors', [App\Http\Controllers\Clerk\ClerkCalendarColorController::class, 'index'])->name('calendar.colors.index');
         Route::patch('calendar/colors/{colorKey}', [App\Http\Controllers\Clerk\ClerkCalendarColorController::class, 'update'])->name('calendar.colors.update');
         Route::post('calendar/colors/reorder', [App\Http\Controllers\Clerk\ClerkCalendarColorController::class, 'reorder'])->name('calendar.colors.reorder');
-    });
 
-// 売上分析（SuperAdmin + 個人許可済みAdmin/Clerkのみ。Leader/Coordinator/Userは常に拒否）
-Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified', 'sales_analysis'])
-    ->prefix('sales-analysis')
-    ->name('sales_analysis.')
-    ->group(function () {
-        Route::get('/', [App\Http\Controllers\SalesAnalysis\DashboardController::class, 'index'])->name('dashboard');
-        Route::get('import', [App\Http\Controllers\SalesAnalysis\ImportController::class, 'create'])->name('import.create');
-        Route::post('import/preview', [App\Http\Controllers\SalesAnalysis\ImportController::class, 'preview'])->name('import.preview');
+        $registerSalesAnalysisRoutes();
     });
 
 // お知らせ受信（全認証ユーザー）

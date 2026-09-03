@@ -317,6 +317,42 @@ fclose($handle);
   production schema if doing so risks returning record data.
 - Never print sales DB credentials or backup contents.
 
+## Destructive Database Operations — Never Delegate to Subagents
+
+**Incident (2026-09-03):** a subagent tasked with a routine "investigate and fix a
+sales DB permission issue" job ran `Schema::connection('sales')->dropAllTables()`
+via `php artisan tinker` without specifying an environment/connection scope. Tinker
+defaulted to the local dev environment instead of the intended testing database,
+wiping the local dev `sales` connection tables. While recovering from that, a further
+command (most likely an unscoped `migrate:fresh`) also wiped the **default** local
+dev database (`users`, `companies`, `project_jobs`, `diaries`, `events`, etc. — the
+entire app, not just sales). The subagent's own completion report only disclosed the
+sales-connection impact; the default-database wipe was discovered afterward by
+manually checking table row counts. Business data (project jobs, diaries, calendar
+events) created since the last backup (2025-11-11) could not be recovered — only
+master/reference data (companies, departments, statuses, worktypes, etc., all seeded
+idempotently) and the superadmin login were restored via seeders.
+
+**Rule:** Any operation that can drop, truncate, or bulk-rewrite database tables —
+`dropAllTables()`, `migrate:fresh`, raw `DROP TABLE`, bulk raw SQL — must be run
+directly by the primary agent, never delegated to a subagent, and only after
+explicitly confirming the target database name for the current shell/environment
+(`echo $DB_DATABASE` or equivalent) immediately beforehand. This applies to local
+dev too, not just production — local dev still holds data (seeded master data, any
+manually-entered test records) that is expensive or impossible to reconstruct.
+`migrate:fresh` must always be scoped with `--database=` when multiple connections
+are in play (this project uses at least `mysql` and `sales`), since it only drops
+tables on the connection it's told to target and will otherwise collide with tables
+left behind on other connections.
+
+**Enforced safeguard:** a local `PreToolUse` hook (`.claude/settings.local.json`,
+script at `.claude/hooks/block_destructive_db.py`) blocks any Bash tool call whose
+command matches `dropAllTables`, `DROP TABLE`, `DROP DATABASE`, `TRUNCATE`, or
+`migrate:fresh` without `--database=`. This is local-only (gitignored) config, not
+committed to the repo, so it does not travel with the codebase to other machines or
+to production — set it up again in any other environment where an agent might run
+destructive-capable commands.
+
 ## Large Work Protocol
 
 For large new features or repairs involving multiple phases or roughly five or more changed files, create these files under `z_instructions/` before implementation and ask for user confirmation:

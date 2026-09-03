@@ -8,6 +8,7 @@ const props = defineProps({
 
 const page = usePage();
 const isDiaryManager = computed(() => page.props.auth?.isDiaryManager ?? false);
+const canAccessSalesAnalysis = computed(() => page.props.auth?.canAccessSalesAnalysis ?? false);
 
 // Clerk カラー: purple
 const tab = (key) => [
@@ -26,6 +27,12 @@ const tabs = computed(() => [
     { key: 'announcements', href: tryRoute('clerk.announcements.index'), label: 'お知らせ通知' },
     { key: 'calendar', href: tryRoute('clerk.calendar'), label: 'カレンダー' },
     { key: 'diaries', href: tryRoute('diary_manager.diaryinteractions.index'), label: '日報管理', condition: isDiaryManager.value },
+    {
+        key: 'sales_analysis',
+        href: tryRoute('clerk.sales_analysis.dashboard'),
+        label: '売上分析',
+        condition: canAccessSalesAnalysis.value && typeof route === 'function' && route().has('clerk.sales_analysis.dashboard'),
+    },
 ].filter(t => t.condition !== false && t.href));
 
 function onMobileSelect(e) {
@@ -69,6 +76,13 @@ function onMobileSelect(e) {
                 :class="tab('diaries')"
             >
                 日報管理
+            </Link>
+            <Link
+                v-if="canAccessSalesAnalysis && typeof route === 'function' && route().has('clerk.sales_analysis.dashboard')"
+                :href="route('clerk.sales_analysis.dashboard')"
+                :class="tab('sales_analysis')"
+            >
+                売上分析
             </Link>
         </nav>
     </div>

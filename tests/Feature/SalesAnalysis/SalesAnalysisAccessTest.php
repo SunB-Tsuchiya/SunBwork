@@ -17,7 +17,7 @@ class SalesAnalysisAccessTest extends TestCase
         $superadmin = User::factory()->create(['user_role' => 'superadmin']);
 
         $this->actingAs($superadmin)
-            ->get(route('sales_analysis.dashboard'))
+            ->get(route('superadmin.sales_analysis.dashboard'))
             ->assertOk();
     }
 
@@ -26,7 +26,7 @@ class SalesAnalysisAccessTest extends TestCase
         $admin = User::factory()->create(['user_role' => 'admin']);
 
         $this->actingAs($admin)
-            ->get(route('sales_analysis.dashboard'))
+            ->get(route('admin.sales_analysis.dashboard'))
             ->assertForbidden();
     }
 
@@ -36,7 +36,7 @@ class SalesAnalysisAccessTest extends TestCase
         SalesAnalysisPermission::create(['user_id' => $admin->id, 'enabled' => true]);
 
         $this->actingAs($admin)
-            ->get(route('sales_analysis.dashboard'))
+            ->get(route('admin.sales_analysis.dashboard'))
             ->assertOk();
     }
 
@@ -46,7 +46,7 @@ class SalesAnalysisAccessTest extends TestCase
         SalesAnalysisPermission::create(['user_id' => $admin->id, 'enabled' => false]);
 
         $this->actingAs($admin)
-            ->get(route('sales_analysis.dashboard'))
+            ->get(route('admin.sales_analysis.dashboard'))
             ->assertForbidden();
     }
 
@@ -56,7 +56,7 @@ class SalesAnalysisAccessTest extends TestCase
         SalesAnalysisPermission::create(['user_id' => $clerk->id, 'enabled' => true]);
 
         $this->actingAs($clerk)
-            ->get(route('sales_analysis.dashboard'))
+            ->get(route('clerk.sales_analysis.dashboard'))
             ->assertOk();
     }
 
@@ -65,7 +65,7 @@ class SalesAnalysisAccessTest extends TestCase
         $clerk = User::factory()->create(['user_role' => 'clerk']);
 
         $this->actingAs($clerk)
-            ->get(route('sales_analysis.dashboard'))
+            ->get(route('clerk.sales_analysis.dashboard'))
             ->assertForbidden();
     }
 
@@ -76,7 +76,11 @@ class SalesAnalysisAccessTest extends TestCase
         SalesAnalysisPermission::create(['user_id' => $leader->id, 'enabled' => true]);
 
         $this->actingAs($leader)
-            ->get(route('sales_analysis.dashboard'))
+            ->get(route('superadmin.sales_analysis.dashboard'))
+            ->assertForbidden();
+        // 部署LeaderはClerkルートを通過できるが、sales_analysisミドルウェアでは拒否されることも確認する
+        $this->actingAs($leader)
+            ->get(route('clerk.sales_analysis.dashboard'))
             ->assertForbidden();
     }
 
@@ -85,7 +89,7 @@ class SalesAnalysisAccessTest extends TestCase
         $coordinator = User::factory()->create(['user_role' => 'coordinator']);
 
         $this->actingAs($coordinator)
-            ->get(route('sales_analysis.dashboard'))
+            ->get(route('superadmin.sales_analysis.dashboard'))
             ->assertForbidden();
     }
 
@@ -94,13 +98,13 @@ class SalesAnalysisAccessTest extends TestCase
         $user = User::factory()->create(['user_role' => 'user']);
 
         $this->actingAs($user)
-            ->get(route('sales_analysis.dashboard'))
+            ->get(route('superadmin.sales_analysis.dashboard'))
             ->assertForbidden();
     }
 
     public function test_guest_is_redirected_to_login()
     {
-        $this->get(route('sales_analysis.dashboard'))
+        $this->get(route('superadmin.sales_analysis.dashboard'))
             ->assertRedirect(route('login'));
     }
 
@@ -148,7 +152,7 @@ class SalesAnalysisAccessTest extends TestCase
         ]);
 
         $this->actingAs($admin)
-            ->get(route('sales_analysis.dashboard'))
+            ->get(route('admin.sales_analysis.dashboard'))
             ->assertOk();
     }
 

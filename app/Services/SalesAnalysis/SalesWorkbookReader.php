@@ -114,7 +114,8 @@ class SalesWorkbookReader
         return [
             'year' => (int) $m[1],
             'month' => isset($m[2]) && $m[2] !== '' ? (int) $m[2] : null,
-            'department_label' => trim($m[3]),
+            // 半角カナ（例: "ｵﾝﾃﾞﾏﾝﾄﾞ"）で記載されるファイルがあるため、比較前に全角へ正規化する
+            'department_label' => mb_convert_kana(trim($m[3]), 'KV'),
         ];
     }
 
@@ -244,7 +245,16 @@ class SalesWorkbookReader
         $text = mb_convert_kana(trim((string) $value), 'n');
 
         if (preg_match('/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/', $text, $m)) {
-            return sprintf('%04d-%02d-%02d', (int) $m[1], (int) $m[2], (int) $m[3]);
+            $year = (int) $m[1];
+            $month = (int) $m[2];
+            $day = (int) $m[3];
+
+            // 実在しない日付（例: 2026/02/31）は拒否する（Codexレビュー6.2 Medium-2）
+            if (! checkdate($month, $day, $year)) {
+                return null;
+            }
+
+            return sprintf('%04d-%02d-%02d', $year, $month, $day);
         }
 
         return null;

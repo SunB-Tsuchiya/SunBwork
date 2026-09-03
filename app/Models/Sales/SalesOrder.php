@@ -17,6 +17,7 @@ class SalesOrder extends Model
         'sales_year',
         'sales_month',
         'order_amount',
+        'unallocated_amount',
     ];
 
     // JST/UTC混在バグを避けるため date-only カラムは date:Y-m-d を使う（AGENTS.md参照）
@@ -25,6 +26,8 @@ class SalesOrder extends Model
         'sales_year' => 'integer',
         'sales_month' => 'integer',
         'order_amount' => 'decimal:2',
+        // M列合計とN列受注金額の差額（隠さず保持・提示する。Codexレビュー6.2 Medium-1）
+        'unallocated_amount' => 'decimal:2',
     ];
 
     public function salesImport()

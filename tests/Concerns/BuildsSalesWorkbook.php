@@ -78,4 +78,10 @@ trait BuildsSalesWorkbook
             $departmentLabel
         );
     }
+
+    /** 範囲指定（半期等）ファイルの実仕様: タイトルには開始月のみが記載される（月次と同一形式） */
+    private function rangeTitle(string $departmentLabel, int $year, int $startMonth): string
+    {
+        return $this->monthlyTitle($departmentLabel, $year, $startMonth);
+    }
 }

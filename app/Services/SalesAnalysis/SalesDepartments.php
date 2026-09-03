@@ -3,9 +3,8 @@
 namespace App\Services\SalesAnalysis;
 
 /**
- * 売上分析の対象部署定義。将来「制作」「オンデマンド」を追加する際は
- * LABELS に追記するだけでよいが、ENABLED_KEYS に加えるまでは
- * UI・取込のどちらからも選択・取込できないようにする。
+ * 売上分析の対象部署定義。企画・制作・オンデマンドの3部署すべてを
+ * 初期版から選択・取込可能にする（2026-09-03変更、旧: 企画のみ）。
  */
 class SalesDepartments
 {
@@ -15,8 +14,8 @@ class SalesDepartments
         'ondemand' => 'オンデマンド',
     ];
 
-    /** 初期実装で選択・取込を許可する部署キー */
-    public const ENABLED_KEYS = ['planning'];
+    /** 選択・取込を許可する部署キー */
+    public const ENABLED_KEYS = ['planning', 'production', 'ondemand'];
 
     public static function keyFromLabel(string $label): ?string
     {

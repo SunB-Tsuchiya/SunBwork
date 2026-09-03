@@ -56,6 +56,13 @@ useToasts();
 const user = page.props.user;
 const authUser = page.props.auth && page.props.auth.user ? page.props.auth.user : page.props.user;
 const canAccessSalesAnalysis = computed(() => page.props.auth?.canAccessSalesAnalysis ?? false);
+// 売上分析ルートは superadmin/admin/clerk の各ロールグループ内に複製登録されている
+const salesAnalysisRouteName = computed(() => {
+    const role = page.props.auth?.user?.user_role;
+    if (role === 'admin') return 'admin.sales_analysis.dashboard';
+    if (role === 'clerk') return 'clerk.sales_analysis.dashboard';
+    return 'superadmin.sales_analysis.dashboard';
+});
 const canShowPrepressNav = computed(() => {
     if (authUser?.isSuperAdmin) return true;
 
@@ -482,7 +489,7 @@ function navigateToRole(role) {
 
                             <!-- 売上分析 -->
                             <div v-if="canAccessSalesAnalysis" class="group relative">
-                                <Link :href="route('sales_analysis.dashboard')" class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700">
+                                <Link :href="route(salesAnalysisRouteName)" class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.5l3.75-3.75L11 14l6-6m0 0h-4.5M17 8v4.5M4.5 19.5h15A1.5 1.5 0 0021 18V6a1.5 1.5 0 00-1.5-1.5h-15A1.5 1.5 0 003 6v12a1.5 1.5 0 001.5 1.5z" />
                                     </svg>
@@ -830,7 +837,7 @@ function navigateToRole(role) {
                             <ResponsiveNavLink :href="route('guide.index')" :active="route().current('guide.index')"> 使い方ガイド </ResponsiveNavLink>
                             <ResponsiveNavLink :href="route('changelogs.index')" :active="route().current('changelogs.index')"> 更新ログ </ResponsiveNavLink>
                             <ResponsiveNavLink v-if="canAccessScripts" :href="route('scripts.index')" :active="route().current('scripts.*')"> スクリプトツール </ResponsiveNavLink>
-                            <ResponsiveNavLink v-if="canAccessSalesAnalysis" :href="route('sales_analysis.dashboard')" :active="route().current('sales_analysis.*')"> 売上分析 </ResponsiveNavLink>
+                            <ResponsiveNavLink v-if="canAccessSalesAnalysis" :href="route(salesAnalysisRouteName)" :active="route().current('*.sales_analysis.*')"> 売上分析 </ResponsiveNavLink>
 
                             <div class="border-t border-gray-200 my-1" />
 

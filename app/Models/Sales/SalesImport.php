@@ -13,6 +13,7 @@ class SalesImport extends Model
         'source_type',
         'source_year',
         'source_month',
+        'source_month_end',
         'version',
         'original_filename',
         'file_sha256',
@@ -28,6 +29,7 @@ class SalesImport extends Model
     protected $casts = [
         'source_year' => 'integer',
         'source_month' => 'integer',
+        'source_month_end' => 'integer',
         'version' => 'integer',
         'imported_at' => 'datetime',
         'order_count' => 'integer',
