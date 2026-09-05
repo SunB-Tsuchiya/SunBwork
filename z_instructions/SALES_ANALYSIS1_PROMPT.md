@@ -1,174 +1,134 @@
-# SALES_ANALYSIS1_PROMPT.md — Claude Code 実装・Codexレビュー用プロンプト
+# SALES_ANALYSIS1_PROMPT.md — 引継ぎ・新セッション再開用プロンプト
 
-## 1. 使い方
+最終更新: 2026-09-04
 
-この文書には、Claude Codeへ渡す実装プロンプトと、実装完了後にCodexへ渡すレビュープロンプトを収録する。
+## 1. これは何か
 
-- Claude Codeには「2. Claude Code用」を渡す。
-- Claude Codeが全フェーズを一度に進めず、`SALES_ANALYSIS_MANAGER1.md`を更新しながら段階実装する。
-- 実装後、Codexには「3. Codex用」を渡す。
-- 本番売上DBのレコードは、どちらのAIにも閲覧させない。
+売上分析機能（企画・制作・オンデマンド3部署のExcel取込・分析）の開発状況の引継ぎ文書。
+新しいセッションでこの機能の続きに着手するときは、まずこのファイルを読み、次に
+「4. 必読ファイル」を読んでから作業を始める。
 
----
+設計の正本は`SALES_ANALYSIS_PLAN1.md`、進捗・判断ログの正本は`SALES_ANALYSIS_MANAGER1.md`。
+このファイルはそれらの要約＋再開用の入口でしかない。**詳細な理由や判断根拠はMANAGER1.mdの
+判断ログ・作業ログを見ること（このファイルには要約以上のことは書かない）。**
 
-## 2. Claude Code用プロンプト
+## 2. 現在の状態（ざっくり）
 
-以下をそのままClaude Codeへ渡してください。
+- Phase 0〜8: **完了**（DB分離、権限、Excel取込・検証、集計、データ登録状況、年次分析、
+  同月比較、左右比較、得意先統合（設定画面＋得意先分析画面）、Excel出力（年次分析画面のみ））
+- Phase 9（バックアップ）: **保留**。ユーザーが売上分析機能をSunBWork本体に残すか、
+  別のLaravelアプリへ切り出すか検討中のため、さくらへのSSH調査を含め着手していない
+  （詳細は「5. 特に重要な保留事項」参照）
+- Phase 10（総合検証・文書・リリース準備）: 未着手。10-1〜10-4（テスト総まとめ・build・
+  通常機能回帰・セキュリティチェックリスト）は本体に残すか切り出すかに関わらず着手可能
+- **Codexレビューは3回実施済み**（1回目: Excel検証設計、2回目: 実機検証まとめ＋新画面設計、
+  3回目: Phase 6C〜8実装＋実機バグ2件の設計妥当性確認）。**3回目レビューで大規模な追加改修案が
+  提示され、まだ未対応（次にやること参照）**
+- テスト: `tests/Feature/SalesAnalysis`+`tests/Unit/SalesAnalysis`配下203件・全成功
+  （実行は必ず`--user sail`で。3節参照）。プロジェクト全体317件成功
+- 実機での動作確認はユーザーが実施し、都度フィードバックを受けて修正するサイクルで進めてきた
 
-```text
-SunBWorkに売上分析機能を実装します。
+## 3. 作業を始める前に必ず守ること
 
-最初に必ず次のファイルを全文読んでください。
+- **`docker compose exec`は必ず`--user sail`を付ける。** 既定のroot実行だとstorage配下の
+  所有権事故や、複数DB接続を跨ぐ`migrate:fresh`等での事故を招く（2026-09-03に実際に発生）。
+  詳細はAGENTS.md「Destructive Database Operations」節。
+- 本番sales DBのレコードは、SSH・SQL・Tinker・DBクライアント・dump・ログいずれでも閲覧しない。
+  ローカル開発・テストは架空データのみ使用する。
+- **`php artisan tinker`で書き込み系操作（`updateOrCreate`等）を安易に実行しない。**
+  2026-09-04に、動作確認のため`tinker`で作成したダミーデータが、既存のローカル開発DB
+  （sunbwork_sales、ユーザーが実際に取込済みのデータ）のactive pointerを誤って上書きする
+  事故が発生した（即座に発見・復旧済み、本番には影響なし）。動作確認は`RefreshDatabase`が
+  効くPHPUnitテスト（`sunbwork_sales_testing`）内で行うか、既存データと衝突しない架空の
+  年月・部署を使うこと。
+- **破壊的DB操作（`dropAllTables`・`migrate:fresh`・`DROP TABLE`等）を含むBashコマンドは、
+  このリポジトリのローカルフック（`.claude/hooks/block_destructive_db.py`、
+  `.claude/settings.local.json`のPreToolUse）で機械的にブロックされる。** これはgit管理外の
+  ローカル専用設定なので、他のマシン・別プロジェクトには自動的に付いてこない。
+- 大きな設計変更や新画面着手前は、方針をユーザーに示して確認を取ってから実装する。
+  不明点は一度に一つだけ質問する（CLAUDE.md記載の最重要ルール）。
+- Vue/JS変更後は`npm run build`、`routes/web.php`変更後はZiggy再生成
+  （`php artisan ziggy:generate resources/js/ziggy.js`）を忘れない。
+- **axiosでbooleanをGETクエリへ渡すときは必ず`? 1 : 0`のように数値化すること。**
+  Laravelの`'boolean'`バリデーションルールは文字列`"true"`/`"false"`を受け付けず422になる
+  （2026-09-04に同月比較・左右比較で実際に発生。詳細はMANAGER1.md該当ログ、または
+  Claude Codeの永続メモリ`feedback_axios_boolean_query_params.md`）。
 
-- AGENTS.md
-- z_instructions/SALES_ANALYSIS_PLAN1.md
-- z_instructions/SALES_ANALYSIS_MANAGER1.md
-- z_instructions/SALES_ANALYSIS1_PROMPT.md
-- z_instructions/CONSOLIDATED_01_layout_and_ui.md
-- z_instructions/CONSOLIDATED_02_security_and_sessions.md
-- z_instructions/CONSOLIDATED_09_domain_rules.md
-- z_instructions/DEPLOY_SAKURA.md（本番作業をする段階だけ）
+## 4. 必読ファイル（着手前に全文）
 
-実装の正本はSALES_ANALYSIS_PLAN1.md、進捗の正本はSALES_ANALYSIS_MANAGER1.mdです。
+- `AGENTS.md`（機密規則・破壊的DB操作の禁止事項を含む）
+- `z_instructions/SALES_ANALYSIS_PLAN1.md`（設計正本。Phase 6B〜8詳細設計・ワイヤーフレーム・
+  JSON例あり）
+- `z_instructions/SALES_ANALYSIS_MANAGER1.md`（進捗・判断ログの正本。全経緯はここ）
+- **`z_instructions/SALES_ANALYSIS_REVIEW3.md`（★最新・最重要。3回目Codexレビューの全文。
+  11〜17章に指摘一覧・設計判断の妥当性確認・大規模UI/API改修案・実装依頼順が入っている）**
+- `z_instructions/SALES_ANALYSIS_REVIEW2.md`（2回目レビュー。9〜13章の新画面設計の経緯として参照可）
+- `z_instructions/CONSOLIDATED_01_layout_and_ui.md`（新規ページ作成前に必須）
+- 本番作業をする段階になったら`z_instructions/DEPLOY_SAKURA.md`（ただし5節の保留事項を先に確認）
 
-## 最重要の機密規則
+（`SALES_ANALYSIS_EXCEL_VALIDATION_REVIEW.md`は1回目レビューの記録。優先度は低い）
 
-- 本番売上データは専用のsales DB connectionへ分離します。
-- 本番sales DBのレコードをSSH、SQL、Tinker、DBクライアント、dump、ログ、臨時スクリプトで閲覧してはいけません。
-- 本番売上データをローカルへコピーしてはいけません。
-- 開発とテストには架空データだけを使用してください。`z_instructions/sanbrain_meisai_sample.xlsx`は、ユーザーが匿名化済みと確認した場合だけ値をfixtureへ利用できます。未確認なら構造確認だけに留め、名称・金額等を転載しないでください。
-- sales DB認証情報やbackup内容を出力・コミットしないでください。
-- AGENTS.mdへこの規則を追記してください。CLAUDE.mdは編集しないでください。
+## 5. 特に重要な保留事項
 
-## 機能要約
+### 5.1 アーキテクチャ未決定（U-4）
 
-- 既存Laravel 12 / Vue 3 / Inertia内へ実装
-- 通常DBとは別のsales DBへ売上明細・取込版・会社統合設定・監査を保存
-- 初期対象部署は「企画」のみ。将来「制作」「オンデマンド」を追加可能にする
-- xlsxは年次一括1シートと月次ファイルの両方に対応
-- 月次はExcelタイトル年月、年次はSB下版日から売上月を判定
-- 同一受注Noは複数明細。M列の明細金額合計とN列の受注金額合計を検証
-- 月間売上は受注金額の合計、税抜
-- 同月再取込は新版を自動採用し、旧版を履歴保持
-- 年次と月次が混在してもsales_active_monthsで月ごとの有効版を一意にする
-- 分析優先順: 前月、前年同月、5年推移、得意先、分類、項目、品名
-- 最新月初期表示、得意先上位10、会社統合は既定off
-- 得意先統合は候補を人が確定。自動統合は禁止
-- 初期版はAIなし
-- 画面フィルタを反映したxlsx出力
-- 元xlsxは非公開一時保存し、処理後削除
-- sales DB全体を取込後と日次に暗号化backup。日次30日、年末長期保持
+ユーザーは、売上分析機能をこのままSunBWork本体に残すか、別のLaravelアプリとして組み上げ直すかを
+まだ決めていない（2026-09-04申告）。現状は`sales`専用DB接続で通常DBとは分離済みだが、
+認証・ロール・`AppLayout`・ナビゲーション（`EnsureSalesAnalysisAccess`ミドルウェア、
+`ResolvesSalesAnalysisRoutePrefix`、SunBWorkのUser権限モデル）とは密結合している。
 
-## 権限
+**この判断が付くまで、さくら本番へのデプロイ・SSHでの本番調査には着手しないこと。**
+ローカルでのバックエンド改修（次節のREVIEW3対応等）は本体非依存なので継続してよい。
 
-- SuperAdminは常時利用可能で、Admin/Clerkの個人別利用許可を設定
-- 候補はAdminとClerkだけ。Leaderを含めない
-- 許可済みAdmin/Clerkは閲覧・取込・会社統合・出力の全機能を利用可
-- ナビ非表示だけでなく、全ルートを専用middlewareでサーバー側保護
+### 5.2 Excel出力の他画面拡張は保留
 
-## 作業方法
+同月比較・左右比較・得意先分析へのExcel出力拡張は、経理側の希望フォーマット（会社規定の
+書類形式等）をユーザーが確認してから対応する方針。現状は年次分析画面のみ対応。
 
-1. 最初にgit statusと関連実装を確認し、ユーザーや他エージェントの変更を保護してください。
-2. SALES_ANALYSIS_MANAGER1.mdの最初の未完了Phaseから始めてください。
-3. Phase開始時に対象タスクを🔄へ更新してください。
-4. 実装前に、そのPhaseの方針・対象ファイル・検証方法を短くユーザーへ説明してください。
-5. 未決事項や要件の曖昧さがあれば、一度に一つだけ質問してください。
-6. 各Phaseで自動testを追加し、完了時に実行結果をMANAGERへ記録してください。
-7. Phase完了後、タスクとPhaseを✅にし、作業ログと判断ログを更新してください。
-8. 大きな設計変更はPLANも同時更新し、理由を判断ログへ残してください。
-9. routes/web.php変更後はZiggyを再生成してください。
-10. Vue/JS変更後はAGENTS.mdとDEPLOY_SAKURA.mdのVITE_APP_BASE_PATH規則を守ってbuildしてください。
-11. 本番SSHコマンドは実行前に正確なコマンドを提示し、ユーザー確認を得てください。
-12. migrate/db:seedの本番ワンライナーには必ず--forceを付けてください。
+## 6. 次にやること（優先順）
 
-## 実装上の禁止事項
+**`SALES_ANALYSIS_REVIEW3.md`の17章「Claude Codeへの実装依頼順」に従うこと。** 以下は要約。
 
-- 本番sales DBを動作確認のために読むこと
-- 通常DBへ売上明細を保存すること
-- client_nameを推測だけで統合すること
-- AIに売上計算をさせること
-- 全明細をVueへ渡してブラウザ集計すること
-- created_at最大だけで最新版を決めること
-- URLのハードコード、api.phpへのSPA route追加
-- page側のmain/py-12/max-w-7xl重複、ToastUnified重複
-- 元xlsx、export、backupを公開領域へ恒久保存すること
-- 得意先名・品名・備考・金額明細・認証情報を通常ログへ出すこと
-- CLAUDE.mdを編集すること
+1. 11.2節のHigh 3件を修正し、16.1節の対応回帰テストを追加する
+   - 得意先詳細（`ClientAnalysisController::detail()`/`SalesQueryService::clientDetail()`）が
+     開始月・終了月を無視し年単位で集計してしまう問題
+   - 年次分析`annualSummary()`の`months_registered`が「最後に登録された月」であり、
+     欠落月があっても連続登録済みに見えてしまう問題
+   - 「全部署合計」で一部部署の月だけ未登録でも、完全登録に見えてしまう問題
+2. `SALES_ANALYSIS_PLAN1.md`と`SALES_ANALYSIS_MANAGER1.md`へ、REVIEW3の改修内容を
+   次Phaseとして追記し、実装範囲を確定する
+3. 月次・年次・同月比較・得意先分析のワイヤーフレームを文書化し、実装前にユーザー確認を取る
+   （細かな色・余白・部品形状はClaude Codeの裁量でよいとREVIEW3に明記あり）
+4. 共通期間ナビゲーター、Top10/20+全件詳細ドロワーの仕組みを先に作る（14章Priority A）
+5. 月次分析をPriority A完成見本として改修し、同じ共通部品・API形状を他画面へ展開する
+6. Priority B（14章）を追加。Priority Cは実機利用後に必要性を判断する
+7. 最大規模の合成データでAPI応答時間・ブラウザ描画・Excelメモリを確認する
+8. 売上分析テスト・プロジェクト全体テスト・`npm run build`を実行する
 
-## 現在の作業
+Medium 9件・Low 1件（REVIEW3 11.2節）、N列マイナス許容時の負数表示仕様（11.3節）、
+得意先統合候補の2区分化（11.4節、既存グループへの追加候補を出す）も、この改修の中で対応する。
 
-まずSALES_ANALYSIS_MANAGER1.mdのPhase 0を開始してください。
-Phase 0の未決事項は一問ずつユーザーへ確認し、確認なしに仮定して実装を進めないでください。最初にサンプルが匿名化済みか確認してください。
-```
+実装中に画面上の二者択一が必要になった場合のみ、ユーザーへ一度に一問ずつ確認すること
+（REVIEW3 17章に明記済みの指示）。
 
----
+## 7. 再開用の短縮プロンプト
 
-## 3. Codexレビュー用プロンプト
-
-Claude Codeの実装完了後、以下をCodexへ渡してください。
-
-```text
-Claude CodeがSunBWorkの売上分析機能を実装しました。コードレビューと検証をしてください。
-
-最初に必ず次を全文読んでください。
-
-- AGENTS.md
-- z_instructions/SALES_ANALYSIS_PLAN1.md
-- z_instructions/SALES_ANALYSIS_MANAGER1.md
-- z_instructions/SALES_ANALYSIS1_PROMPT.md
-- z_instructions/CONSOLIDATED_01_layout_and_ui.md
-- z_instructions/CONSOLIDATED_02_security_and_sessions.md
-- z_instructions/CONSOLIDATED_09_domain_rules.md
-
-## 絶対条件
-
-- 本番sales DBのレコードをSSH、SQL、Tinker、DBクライアント、dump、ログ、臨時スクリプトで閲覧しないでください。
-- 本番売上データをローカルへコピーしないでください。
-- sales DB認証情報やbackup内容を出力しないでください。
-- 検証はコード、migration、架空fixture、自動testで行ってください。sanbrain_meisai_sample.xlsxの値は、ユーザーが匿名化済みと確認した場合だけ利用してください。
-- レビュー依頼なので、最初はコードを変更せず、問題を重大度順に報告してください。ユーザーが修正も依頼した場合だけ修正してください。
-
-## レビュー観点
-
-1. SALES_ANALYSIS_PLAN1.mdとの仕様一致
-2. 通常DBとsales DBの接続分離
-3. sales Model/migration/queryが必ずsales connectionを使うこと
-4. 権限がサーバー側middleware/policyで強制され、Leader等が直URLで入れないこと
-5. SuperAdmin許可設定の候補がAdmin/Clerkだけであること
-6. xlsxの構造、部署、年月、必須値、負数、日付、M/N金額整合性検証
-7. 年次一括と月次ファイルの混在
-8. sales_active_monthsによる月別最新版とatomicな切替
-9. 再取込失敗時に旧版が維持されること
-10. 月間売上、前月、前年同月、年度累計、5年推移のSQL正確性
-11. 未取込月と0円を混同しないこと、0分母処理
-12. 得意先統合が既定offで、人が確定したグループだけ合算すること
-13. 品名を含むフィルタとxlsx出力の一致
-14. formula injection、zip/xlsx、temporary file、ログ、exportのセキュリティ
-15. 元xlsxが処理後に削除されること
-16. backupの暗号化、秘密値非露出、30日prune、年末保持、架空DB復元test
-17. AppLayout、Ziggy、route()、/members、responsive規則
-18. N+1、全明細のブラウザ送信、index不足等の性能問題
-19. testsが重要な失敗系・権限・transactionをカバーしていること
-20. ChangelogSeeder、CONSOLIDATED文書、MANAGERが実装と一致すること
-
-## 出力形式
-
-- 最初に重大度順の指摘を、ファイルと行番号付きで示してください。
-- 各指摘に、影響、再現条件、修正方針を簡潔に書いてください。
-- 次に未確認事項・テスト不足を示してください。
-- 最後に、実行したtest/buildと結果を示してください。
-- 問題がなければ「重大な問題は見つからなかった」と明記し、残存リスクを示してください。
-- SALES_ANALYSIS_MANAGER1.mdのReview R1欄へ結果を反映してください。ただしコード修正はユーザーの依頼があるまで行わないでください。
-```
-
----
-
-## 4. 再開用短縮プロンプト
-
-途中でClaude Codeのセッションを再開する場合:
+新しいセッションでそのまま貼り付けて使える形。
 
 ```text
-売上分析機能の実装を再開してください。
-AGENTS.md、SALES_ANALYSIS_PLAN1.md、SALES_ANALYSIS_MANAGER1.md、SALES_ANALYSIS1_PROMPT.mdを全文読み、MANAGERで🔄または最初の⬜タスクから続けてください。
-本番sales DBのレコードは絶対に閲覧せず、架空データだけで検証してください。不明点は一度に一つだけ質問してください。
+売上分析機能の続きに着手します。
+まず z_instructions/SALES_ANALYSIS1_PROMPT.md を全文読み、そこに書かれた必読ファイル
+（AGENTS.md、SALES_ANALYSIS_PLAN1.md、SALES_ANALYSIS_MANAGER1.md、
+SALES_ANALYSIS_REVIEW3.md、CONSOLIDATED_01_layout_and_ui.md）を読んでから、
+SALES_ANALYSIS_REVIEW3.md 17章「Claude Codeへの実装依頼順」の1番目
+（High 3件の修正・回帰テスト追加）から着手してください。
+
+着手前に、SALES_ANALYSIS_PLAN1.md / SALES_ANALYSIS_MANAGER1.md へ本改修を次Phaseとして
+追記し、ワイヤーフレームをユーザーへ提示して確認を取ってからコードに着手すること。
+不明点は一度に一つだけ質問してください。
+
+さくら本番へのデプロイ・SSHでの本番調査は、ユーザーがアーキテクチャ（SunBWork本体に残すか
+別Laravelアプリへ切り出すか）を決めるまで行わないこと（1PROMPT.md 5.1節参照）。
+本番sales DBのレコードは閲覧しない。docker compose execは必ず--user sailを付けること。
+tinkerでの書き込み系動作確認は既存データと衝突しない範囲でのみ行うこと。
 ```

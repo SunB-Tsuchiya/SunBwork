@@ -200,6 +200,53 @@ class SalesMonthlyAnalysisIndexTest extends TestCase
         );
     }
 
+    /**
+     * 実機フィードバック対応（2026-09-04）: 期間ナビゲーターで未登録月へ移動しURLを
+     * リロードすると、以前は「その年月」に登録が無いだけで空のインポート案内画面へ
+     * 戻ってしまっていた。部署に何か1件でも登録済みなら通常のインターフェースを表示する。
+     */
+    public function test_monthly_analysis_shows_interface_for_unregistered_month_in_query_params()
+    {
+        $superadmin = User::factory()->create(['user_role' => 'superadmin']);
+
+        $import = SalesImport::create([
+            'department_key' => 'planning',
+            'source_type' => 'monthly',
+            'source_year' => 2026,
+            'source_month' => 9,
+            'version' => 1,
+            'original_filename' => 'seed.xlsx',
+            'file_sha256' => hash('sha256', 'monthly-unregistered-reload-test'),
+            'status' => 'completed',
+            'imported_by' => $superadmin->id,
+            'imported_at' => now(),
+            'order_count' => 0,
+            'detail_count' => 0,
+            'total_amount' => 0,
+        ]);
+        SalesActiveMonth::create([
+            'department_key' => 'planning',
+            'sales_year' => 2026,
+            'sales_month' => 9,
+            'sales_import_id' => $import->id,
+            'activated_by' => $superadmin->id,
+            'activated_at' => now(),
+        ]);
+
+        // 9月は登録済みだが、URLは未登録の1月を指している状態を再現する
+        $response = $this->actingAs($superadmin)->get(route('superadmin.sales_analysis.monthly_analysis', [
+            'department_key' => 'planning', 'year' => 2026, 'month' => 1,
+        ]));
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('SalesAnalysis/MonthlyAnalysis', false)
+            ->where('hasAnyData', true)
+            ->where('initialYear', 2026)
+            ->where('initialMonth', 1)
+        );
+    }
+
     public function test_monthly_analysis_requires_sales_analysis_access()
     {
         $leader = User::factory()->create(['user_role' => 'leader']);

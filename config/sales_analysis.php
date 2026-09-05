@@ -14,5 +14,16 @@ return [
     | root所有のディレクトリが作られ、実サーバー（sailユーザー）が書き込めなく
     | なる事故が起きたため（2026-09-03実機検証で発覚）。
     */
-    'import_preview_cache_store' => env('SALES_ANALYSIS_PREVIEW_CACHE_STORE', 'file'),
+    'import_preview_cache_store' => env('SALES_ANALYSIS_PREVIEW_CACHE_STORE', 'sales_preview'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | プレビューキャッシュの保持期限（分）
+    |--------------------------------------------------------------------------
+    | ImportController::PREVIEW_TTL_MINUTESと同じ値を指定する。
+    | sales:prune-preview-cacheコマンドは、この分数より古いファイルを期限切れとみなして削除する
+    | （2026-09-04追加。Codexレビュー2回目 8.1 Medium-3対応: ファイルキャッシュの期限切れ残留・
+    | ディスク使用量の監視）。
+    */
+    'preview_cache_ttl_minutes' => 30,
 ];

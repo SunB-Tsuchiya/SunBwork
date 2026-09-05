@@ -23,6 +23,8 @@ $registerSalesAnalysisRoutes = function () {
         Route::get('monthly', [App\Http\Controllers\SalesAnalysis\MonthlyAnalysisController::class, 'index'])->name('monthly_analysis');
         Route::get('api/summary', [App\Http\Controllers\SalesAnalysis\MonthlyAnalysisController::class, 'summary'])->name('api.summary');
         Route::get('api/trend', [App\Http\Controllers\SalesAnalysis\MonthlyAnalysisController::class, 'trend'])->name('api.trend');
+        Route::get('api/same-month-history', [App\Http\Controllers\SalesAnalysis\MonthlyAnalysisController::class, 'sameMonthHistory'])->name('api.same_month_history');
+        Route::get('api/latest-period', [App\Http\Controllers\SalesAnalysis\MonthlyAnalysisController::class, 'latestPeriod'])->name('api.latest_period');
         Route::get('api/clients', [App\Http\Controllers\SalesAnalysis\MonthlyAnalysisController::class, 'clients'])->name('api.clients');
         Route::get('api/categories', [App\Http\Controllers\SalesAnalysis\MonthlyAnalysisController::class, 'categories'])->name('api.categories');
         Route::get('api/items', [App\Http\Controllers\SalesAnalysis\MonthlyAnalysisController::class, 'items'])->name('api.items');
@@ -32,6 +34,48 @@ $registerSalesAnalysisRoutes = function () {
         Route::get('annual', [App\Http\Controllers\SalesAnalysis\AnnualAnalysisController::class, 'index'])->name('annual_analysis');
         Route::get('api/annual-summary', [App\Http\Controllers\SalesAnalysis\AnnualAnalysisController::class, 'summary'])->name('api.annual_summary');
         Route::get('api/annual-products', [App\Http\Controllers\SalesAnalysis\AnnualAnalysisController::class, 'products'])->name('api.annual_products');
+        Route::get('api/annual-latest-period', [App\Http\Controllers\SalesAnalysis\AnnualAnalysisController::class, 'latestPeriod'])->name('api.annual_latest_period');
+        Route::get('api/annual-clients', [App\Http\Controllers\SalesAnalysis\AnnualAnalysisController::class, 'clients'])->name('api.annual_clients');
+        Route::get('api/annual-categories', [App\Http\Controllers\SalesAnalysis\AnnualAnalysisController::class, 'categories'])->name('api.annual_categories');
+        Route::get('api/annual-items', [App\Http\Controllers\SalesAnalysis\AnnualAnalysisController::class, 'items'])->name('api.annual_items');
+        Route::get('api/annual-multi-year-trend', [App\Http\Controllers\SalesAnalysis\AnnualAnalysisController::class, 'multiYearTrend'])->name('api.annual_multi_year_trend');
+        Route::get('annual/export', [App\Http\Controllers\SalesAnalysis\AnnualAnalysisController::class, 'export'])->name('annual_analysis.export');
+
+        // 期別分析（新規。4月始まり〜翌3月終わりの会計年度専用画面。実機フィードバック対応、2026-09-04）
+        Route::get('fiscal-year', [App\Http\Controllers\SalesAnalysis\FiscalYearAnalysisController::class, 'index'])->name('fiscal_year_analysis');
+        Route::get('api/fiscal-year-summary', [App\Http\Controllers\SalesAnalysis\FiscalYearAnalysisController::class, 'summary'])->name('api.fiscal_year_summary');
+        Route::get('api/fiscal-year-products', [App\Http\Controllers\SalesAnalysis\FiscalYearAnalysisController::class, 'products'])->name('api.fiscal_year_products');
+        Route::get('api/fiscal-year-latest-period', [App\Http\Controllers\SalesAnalysis\FiscalYearAnalysisController::class, 'latestPeriod'])->name('api.fiscal_year_latest_period');
+        Route::get('api/fiscal-year-clients', [App\Http\Controllers\SalesAnalysis\FiscalYearAnalysisController::class, 'clients'])->name('api.fiscal_year_clients');
+        Route::get('api/fiscal-year-categories', [App\Http\Controllers\SalesAnalysis\FiscalYearAnalysisController::class, 'categories'])->name('api.fiscal_year_categories');
+        Route::get('api/fiscal-year-items', [App\Http\Controllers\SalesAnalysis\FiscalYearAnalysisController::class, 'items'])->name('api.fiscal_year_items');
+        Route::get('api/fiscal-year-multi-year-trend', [App\Http\Controllers\SalesAnalysis\FiscalYearAnalysisController::class, 'multiYearTrend'])->name('api.fiscal_year_multi_year_trend');
+        Route::get('fiscal-year/export', [App\Http\Controllers\SalesAnalysis\FiscalYearAnalysisController::class, 'export'])->name('fiscal_year_analysis.export');
+
+        // 同月比較（新規。2026-09-04 Codexレビュー2回目 10.4節・PLAN1.md「6D. 同月比較 詳細設計」）
+        Route::get('same-month-comparison', [App\Http\Controllers\SalesAnalysis\SameMonthComparisonController::class, 'index'])->name('same_month_comparison');
+        Route::get('api/same-month-comparison', [App\Http\Controllers\SalesAnalysis\SameMonthComparisonController::class, 'summary'])->name('api.same_month_comparison');
+        Route::get('api/same-month-comparison-latest-period', [App\Http\Controllers\SalesAnalysis\SameMonthComparisonController::class, 'latestPeriod'])->name('api.same_month_comparison.latest_period');
+
+        // 左右比較（新規。2026-09-04 Codexレビュー2回目 10.5節・PLAN1.md「6E. 左右比較 詳細設計」）
+        Route::get('side-by-side-comparison', [App\Http\Controllers\SalesAnalysis\SideBySideComparisonController::class, 'index'])->name('side_by_side_comparison');
+        Route::get('api/side-by-side-comparison', [App\Http\Controllers\SalesAnalysis\SideBySideComparisonController::class, 'summary'])->name('api.side_by_side_comparison');
+
+        // 得意先統合設定（新規。Phase 7。2026-09-04 PLAN1.md「Phase 7-0 詳細設計」）
+        Route::get('client-groups', [App\Http\Controllers\SalesAnalysis\ClientGroupController::class, 'index'])->name('client_groups.index');
+        Route::get('api/client-groups', [App\Http\Controllers\SalesAnalysis\ClientGroupController::class, 'data'])->name('api.client_groups');
+        Route::post('api/client-groups', [App\Http\Controllers\SalesAnalysis\ClientGroupController::class, 'store'])->name('api.client_groups.store');
+        Route::patch('api/client-groups/{group}', [App\Http\Controllers\SalesAnalysis\ClientGroupController::class, 'update'])->name('api.client_groups.update');
+        Route::delete('api/client-groups/{group}', [App\Http\Controllers\SalesAnalysis\ClientGroupController::class, 'destroy'])->name('api.client_groups.destroy');
+        Route::post('api/client-groups/{group}/members', [App\Http\Controllers\SalesAnalysis\ClientGroupController::class, 'addMember'])->name('api.client_groups.members.store');
+        Route::delete('api/client-groups/{group}/members/{member}', [App\Http\Controllers\SalesAnalysis\ClientGroupController::class, 'removeMember'])->name('api.client_groups.members.destroy');
+        Route::post('api/client-groups/preview', [App\Http\Controllers\SalesAnalysis\ClientGroupController::class, 'preview'])->name('api.client_groups.preview');
+
+        // 得意先分析（新規。Phase 7と接続。2026-09-04 PLAN1.md「Phase 7-0 詳細設計」）
+        Route::get('client-analysis', [App\Http\Controllers\SalesAnalysis\ClientAnalysisController::class, 'index'])->name('client_analysis');
+        Route::get('api/client-analysis/ranking', [App\Http\Controllers\SalesAnalysis\ClientAnalysisController::class, 'ranking'])->name('api.client_analysis.ranking');
+        Route::get('api/client-analysis/ranking-panel', [App\Http\Controllers\SalesAnalysis\ClientAnalysisController::class, 'rankingPanel'])->name('api.client_analysis.ranking_panel');
+        Route::get('api/client-analysis/detail', [App\Http\Controllers\SalesAnalysis\ClientAnalysisController::class, 'detail'])->name('api.client_analysis.detail');
 
         Route::get('import', [App\Http\Controllers\SalesAnalysis\ImportController::class, 'create'])->name('import.create');
         Route::post('import/preview', [App\Http\Controllers\SalesAnalysis\ImportController::class, 'preview'])->name('import.preview');

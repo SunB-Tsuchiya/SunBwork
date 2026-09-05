@@ -52,7 +52,7 @@ SunBWork 内に、印刷帳票ソフトから出力した Excel を取り込み�
 | K | 台数 | quantity | 0以上の数値。**空欄可（警告付きNULL保存）** |
 | L | 単価 | unit_price | 税抜、0以上。**空欄可（警告付きNULL保存）** |
 | M | 金額 | line_amount | 明細金額、税抜、0以上。**空欄可（警告付きNULL保存）** |
-| N | 受注金額 | order_amount_component | 同一受注の途中行は0またはNULL、まとまりの最後（1行だけ）に合計が入る。**受注単位で必須**（同一受注内に正値が1つも無い、または最後の行以外にある場合はブロッキングエラー） |
+| N | 受注金額 | order_amount_component | 同一受注の途中行は0またはNULL、まとまりの最後（1行だけ）に合計が入る（正・負いずれも可、2026-09-04変更）。**受注単位で必須**（同一受注内に0以外の値が1つも無い、または最後の行以外にある場合はブロッキングエラー） |
 | O | SB下版日 | plate_date | `YYYY/MM/DD`、月またぎなし。実在日であることを検証（例: 2/31は拒否）。**必須（欠損・解析不能はブロッキングエラー）** |
 
 **空欄を許容する列（B, C, E, F, I, J, K, L, M）は行を除外せず、NULLのまま保存し警告として提示する。数値の空欄を0へ勝手に変換して保存しない（NULLと0は意味が異なる）。**
@@ -63,11 +63,11 @@ SunBWork 内に、印刷帳票ソフトから出力した Excel を取り込み�
 
 - 月間売上は、受注ごとの `受注金額`（N列由来）の合計。
 - 同一受注Noには複数明細があり得る。
-- 同一受注内では途中行の受注金額は0またはNULL、最後の行に受注全体の金額（正値）が入る。**0より大きいN列は原則その受注内で1行だけ、かつ受注グループの最後の行であることを検証する**（複数行にある・最後の行でない・正値が1つも無い、はいずれもブロッキングエラー）。
-- DB上の受注金額 `order_amount` は、上記規則で確定した「最後の行の正値」を採用する（単純な N 列合計ではない）。
+- 同一受注内では途中行の受注金額は0またはNULL、最後の行に受注全体の金額が入る。**0以外の値（正または負）を持つN列は原則その受注内で1行だけ、かつ受注グループの最後の行であることを検証する**（複数行にある・最後の行でない・0以外の値が1つも無い、はいずれもブロッキングエラー）。
+- DB上の受注金額 `order_amount` は、上記規則で確定した「最後の行の0以外の値」を採用する（単純な N 列合計ではない）。
 - 同一受注Noの M 列合計と N 列受注金額が不一致でも、**N列を正式な売上として採用し、警告付きで取込を許可する**（ブロッキングエラーにしない）。差額は「未配賦額」（受注金額合計 − 明細内訳合計）としてプレビュー・ダッシュボード・Excel出力で常に確認できるようにし、隠さない。
 - 売上金額は税抜。
-- 値引き・返品・取消によるマイナス受注金額はない。
+- 2026-09-04変更（ユーザー確認）: 事故・刷り直し等により受注全体の合計（N列最終行）が正当にマイナスになるケースがあるため、**受注金額（N列）のマイナスは許容する**（従来「マイナス受注金額はない」としていたが撤回）。損益を正しく把握するため、登録されているデータはできる限り除外せず取り込む方針とする。途中行（最後の行以外）に0以外の値がある、または0以外の値を持つ行が複数ある場合は引き続きブロッキングエラー（構造規則違反）。
 - 途中経過ファイルでも、掲載済み受注は受注金額まで確定している。
 - 受注Noは全期間で一意で、月またぎしない。
 - 一部の行・受注だけを黙ってスキップする部分取込は行わない。行レベルで確定不可能な重大エラー（受注No・SB下版日の欠損、N列規則違反等）が1件でもあれば、ファイル全体を確定不可にする。
@@ -395,9 +395,10 @@ SALES_DB_PASSWORD=
 - 数値セルのカンマ、文字列数値、全角数字を安全に正規化
 - 日付はExcelシリアル値と`YYYY/MM/DD`文字列の両方に対応し、JSTの日付として`Y-m-d`へ変換。`checkdate()`等で実在日を検証する
 - `toISOString()`等のUTC変換を使わない
-- 2026-09-03変更（実機検証・ユーザー確認）: 金額（M列）・単価は「事故損金」等の値引き・調整行で正当に負数になり得るため負数チェックの対象外とする。色数・台数・受注金額（N列）は引き続き負数を拒否する。
+- 2026-09-03変更（実機検証・ユーザー確認）: 金額（M列）・単価は「事故損金」等の値引き・調整行で正当に負数になり得るため負数チェックの対象外とする。色数・台数は引き続き負数を拒否する。
+- 2026-09-04変更（ユーザー確認）: 受注金額（N列）も、事故・刷り直し等で受注全体の合計が正当にマイナスになり得るため負数チェックの対象外とする（従来の「N列は負数拒否」から変更）。損益を正しく把握するため、登録データはできる限り除外せず取り込む方針
 - 同一受注Noで得意先名、品名、下版日が矛盾する場合は確定前エラー
-- N列（受注金額）規則: 同一受注No内で0より大きい値を持つ行が「ちょうど1行」かつ「その受注グループの最後の行」であることを検証する。正値が0件・複数件・最後の行以外にある場合はblocking error。
+- N列（受注金額）規則: 同一受注No内で0以外の値（正または負）を持つ行が「ちょうど1行」かつ「その受注グループの最後の行」であることを検証する。0以外の値が0件・複数件・最後の行以外にある場合はblocking error。エラーメッセージには空欄行数・0円行数・正負の内訳等の詳細を含め、原因（空欄による孤立データか、位置違反か等）を判別できるようにする（2026-09-04ユーザー要望）
 - 同一受注NoのM列合計とN列受注金額が不一致でも、N列を正式な売上として採用し、warningとして取込を許可する（差額は「未配賦額」として保持し、プレビュー・集計・Excel出力で提示する）
 - 月次ファイルでは全行の下版年月がフォーム入力年月と一致すること。範囲指定ファイルでは全行の下版年がフォーム入力年と一致し、下版月が指定範囲内であること
 - 年次ファイルでは下版年が対象年と一致すること
@@ -935,6 +936,232 @@ Codexレビュー2回目12章の指示により、実装前にワイヤーフレ
 3. `needs_review`（複数取込あり）バッジ: **セルに小さなバッジを出すだけの情報表示に留める**。
    重大ではないため年度行を警告色にはしない
 
+#### 6D-0. 同月比較 ルーティング方針
+
+年次分析（`AnnualAnalysisController`）と同じ構造（index=Inertiaページ、api系=JSON）を踏襲する。
+月次分析（`MonthlyAnalysisController`、単月KPI）と名称が紛らわしいため、コントローラ名・画面名を
+明確に区別する。
+
+| ルート名 | URL | 画面 | 実装 |
+|---|---|---|---|
+| `sales_analysis.same_month_comparison` | `/sales-analysis/same-month-comparison` | 同月比較（新規） | `SameMonthComparisonController`（新規）+ `SameMonthComparison.vue`（新規） |
+| `sales_analysis.api.same_month_comparison` | `/sales-analysis/api/same-month-comparison` | データ取得API | 同上 |
+
+- ロール別prefix複製は既存の`$registerSalesAnalysisRoutes`クロージャに追加するだけで対応可能（新規の仕組みは不要）
+- `SalesQueryService`に`sameMonthComparison(string $departmentKey, int $month, array $years, bool $consolidateClients = false): array`を新設し、
+  `activeOrdersQuery(array $departmentKeys)`・`resolveDepartmentKeys()`・`clientDisplayNameResolver()`・
+  `needs_review`/`has_issue`判定ロジックを`annualSummary()`と共通利用する（判定ロジックの重複実装を避ける）
+- ナビゲーション: データ登録状況・年次分析と同じ`#tabs`（SuperAdmin/Admin/ClerkNavigationTabs.vue）へ「同月比較」タブを追加
+
+#### 6D-1. 同月比較 ワイヤーフレーム
+
+```
+部署: [企画 ▾]（全部署合計を含む4択）  対象月: [9月 ▾]  年数: [直近5年 ●] [直近10年 ○]  得意先統合: [OFF ●] [ON ○]
+
+年     状態        売上           前年差         増減率     受注件数   1案件平均
+──────────────────────────────────────────────────────────────
+2022   登録済み    ¥1,350,000     ─             ─          38件       ¥35,526
+2023   登録済み    ¥1,400,000     +¥50,000      +3.7%      40件       ¥35,000
+2024   未登録      ─              ─             ─          ─          ─
+2025   登録済み    ¥1,550,000     ─（前年未登録）─          44件       ¥35,227
+2026   登録済み🔺  ¥1,600,000⚠   +¥50,000      +3.2%      45件       ¥35,555
+
+[グラフ: 年別売上の棒グラフ（登録年のみ、未登録年は棒を表示せず「未登録」ラベル）]
+
+得意先別 年次推移（上位15社＋その他）              新規得意先（前年同月になく今年ある）
+┌────────────────────────────┐         ┌──────────────────┐
+│      2022    2023   2024  2025   2026 │         │D社  ¥80,000        │
+│A社  30万   32万    ─    34万   36万  │         └──────────────────┘
+│B社  ...                                │
+│その他 21万                             │         離脱得意先（前年同月にあり今年ない）
+└────────────────────────────┘         ┌──────────────────┐
+                                          │E社  前年¥60,000     │
+増加額上位                                └──────────────────┘
+┌──────────────────┐
+│A社 +¥20,000 (+5.9%)│    減少額上位
+└──────────────────┘    ┌──────────────────┐
+                          │C社 -¥15,000 (-8.0%)│
+                          └──────────────────┘
+
+分類別・項目別 増減（基準年＝直近登録年に対し、1年前・3年前・5年前と比較。年次マトリクスは作らない）
+┌─分類別─────────────────────────────────────────────┐
+│組版  今年¥700,000 | 1年前¥650,000 +7.7% | 3年前¥600,000 +16.7% | 5年前 データなし │
+└─────────────────────────────────────────────────────┘
+┌─項目別─────────────────────────────────────────────┐
+│新規  今年¥500,000 | 1年前¥480,000 +4.2% | 3年前¥420,000 +19.0% | 5年前¥400,000 +25.0%│
+└─────────────────────────────────────────────────────┘
+```
+
+凡例: 🔺=`needs_review`（複数取込あり）、⚠=`has_issue`（未配賦額あり）— 年次分析と表現を統一する。
+「─（前年未登録）」は比較対象年が未登録のため増減率を`null`（比較データなし）として扱うことを示す。
+
+#### 6D-2. 同月比較 JSON例
+
+`GET /sales-analysis/api/same-month-comparison?department_key=planning&month=9&years=5&consolidate_clients=false`
+
+```json
+{
+  "department_key": "planning",
+  "month": 9,
+  "years_requested": 5,
+  "years": [2022, 2023, 2024, 2025, 2026],
+  "consolidate_clients": false,
+  "yearly": [
+    { "year": 2022, "state": "has_sales", "amount": 1350000.0, "order_count": 38, "avg_order_amount": 35526.0, "prior_year_diff": null, "prior_year_rate": null, "needs_review": false, "has_issue": false },
+    { "year": 2023, "state": "has_sales", "amount": 1400000.0, "order_count": 40, "avg_order_amount": 35000.0, "prior_year_diff": 50000.0, "prior_year_rate": 3.7, "needs_review": false, "has_issue": false },
+    { "year": 2024, "state": "no_data", "amount": null, "order_count": null, "avg_order_amount": null, "prior_year_diff": null, "prior_year_rate": null, "needs_review": false, "has_issue": false },
+    { "year": 2025, "state": "has_sales", "amount": 1550000.0, "order_count": 44, "avg_order_amount": 35227.0, "prior_year_diff": null, "prior_year_rate": null, "needs_review": false, "has_issue": false },
+    { "year": 2026, "state": "has_sales", "amount": 1600000.0, "order_count": 45, "avg_order_amount": 35555.0, "prior_year_diff": 50000.0, "prior_year_rate": 3.2, "needs_review": true, "has_issue": true, "issue_amount": -3500.0 }
+  ],
+  "client_matrix": {
+    "years": [2022, 2023, 2024, 2025, 2026],
+    "clients": [
+      { "client_name": "A社", "amounts": { "2022": 300000.0, "2023": 320000.0, "2024": null, "2025": 340000.0, "2026": 360000.0 }, "latest_amount": 360000.0, "prior_year_amount": 340000.0, "diff": 20000.0, "rate": 5.9 }
+    ],
+    "others_amount": 210000.0
+  },
+  "new_clients": [
+    { "client_name": "D社", "amount": 80000.0 }
+  ],
+  "departed_clients": [
+    { "client_name": "E社", "prior_year_amount": 60000.0 }
+  ],
+  "top_increase": [
+    { "client_name": "A社", "diff": 20000.0, "rate": 5.9, "current_amount": 360000.0, "prior_year_amount": 340000.0 }
+  ],
+  "top_decrease": [
+    { "client_name": "C社", "diff": -15000.0, "rate": -8.0, "current_amount": 172500.0, "prior_year_amount": 187500.0 }
+  ],
+  "category_item_comparison": {
+    "reference_year": 2026,
+    "compare_offsets": [1, 3, 5],
+    "categories": [
+      {
+        "label": "組版",
+        "amount": 700000.0,
+        "comparisons": [
+          { "years_ago": 1, "compare_year": 2025, "amount": 650000.0, "diff": 50000.0, "rate": 7.7 },
+          { "years_ago": 3, "compare_year": 2023, "amount": 600000.0, "diff": 100000.0, "rate": 16.7 },
+          { "years_ago": 5, "compare_year": 2021, "amount": null, "diff": null, "rate": null }
+        ]
+      }
+    ],
+    "items": [
+      {
+        "label": "新規",
+        "amount": 500000.0,
+        "comparisons": [
+          { "years_ago": 1, "compare_year": 2025, "amount": 480000.0, "diff": 20000.0, "rate": 4.2 },
+          { "years_ago": 3, "compare_year": 2023, "amount": 420000.0, "diff": 80000.0, "rate": 19.0 },
+          { "years_ago": 5, "compare_year": 2021, "amount": 400000.0, "diff": 100000.0, "rate": 25.0 }
+        ]
+      }
+    ]
+  }
+}
+```
+
+- `years`は「登録済みの最新年」を終点に`years_requested`（5または10）年分を機械的に生成する。未登録年も`no_data`として配列に含め、登録状況画面と同じ「0円と未登録を混同しない」原則を維持する
+- `client_matrix`・`new_clients`・`departed_clients`・`top_increase`・`top_decrease`はいずれも**得意先軸**の複数年比較。`new_clients`/`departed_clients`/`top_increase`/`top_decrease`は「`years`配列内の最新2年（直近の登録済み年とその前年）」のみを比較対象とする（3年以上のペアワイズ比較は行わない）
+- `category_item_comparison`は年次マトリクスにせず、**基準年（`years`配列内の最新登録年）に対し1年前・3年前・5年前の3点だけ**を比較する（ユーザー確認: 「去年だけよかった時などあるので、できれば1・3・5年比較があるとよい」）。該当年が未登録の場合は`amount`/`diff`/`rate`を`null`にし、0円と誤表示しない
+- `consolidate_clients=true`のとき、`client_matrix`/`new_clients`/`departed_clients`/`top_increase`/`top_decrease`はすべて`sales_client_group_members`の統合後名称で再集計する（年次分析の`clientRanking(consolidate: true)`と同じ`clientDisplayNameResolver()`を使う）
+- `department_key='all'`のとき、`yearly`の金額・件数は3部署の単純合算、`client_matrix`等の得意先軸は得意先名で部署横断合算する（年次分析の「全部署合計」ルールと同一）
+
+#### 6E-0. 左右比較 ルーティング方針
+
+年次分析・同月比較と同じ構造（index=Inertiaページ、api系=JSON）を踏襲する。
+
+| ルート名 | URL | 画面 | 実装 |
+|---|---|---|---|
+| `sales_analysis.side_by_side_comparison` | `/sales-analysis/side-by-side-comparison` | 左右比較（新規） | `SideBySideComparisonController`（新規）+ `SideBySideComparison.vue`（新規） |
+| `sales_analysis.api.side_by_side_comparison` | `/sales-analysis/api/side-by-side-comparison` | データ取得API | 同上 |
+
+- `SalesQueryService`に`sideBySideComparison(string $departmentKey, array $periodA, array $periodB, bool $consolidateClients = false): array`を新設する。
+  `$periodA`/`$periodB`は`['type' => 'year', 'year' => int]`または`['type' => 'month', 'year' => int, 'month' => int]`の形。
+- 「同月前年」は独立APIモードにせず、**月対月モードの入力補助（UI側で対象月・年を選ぶとA=年-1・B=年を自動セットするショートカット）**として実装する（API・Serviceは月対月と共通）
+- 得意先/分類/項目の内訳取得は既存の`periodOrdersGroupedByClient()`/`periodDetailBreakdown()`（`department_keys, year, startMonth, endMonth`形式）をそのまま再利用する。year型は`startMonth=1, endMonth=そのperiodの登録済み最終月`、month型は`startMonth=endMonth=対象月`として渡す
+- 得意先の新規判定・分類/項目の内訳集計など、既存メソッドをそのまま両側（A・B）に対して呼び出し、結果をラベルで突き合わせる
+
+#### 6E-1. 左右比較 ワイヤーフレーム
+
+```
+部署: [企画 ▾]（全部署合計含む）        得意先統合: [OFF ●] [ON ○]
+
+比較モード: [年対年 ●] [月対月 ○]
+年対年:   A [2024年 ▾]   対   B [2025年 ▾]
+月対月:   A [2025年 ▾][8月 ▾]   対   B [2025年 ▾][9月 ▾]   [同月前年にする]←Bと同じ月・前年をAへ自動セット
+
+┌─A: 2024年────────────┐  ┌─B: 2025年────────────┐  ┌─差額(B−A)────────┐
+│ ¥11,800,000  12/12ヶ月 │  │ ¥12,800,000  12/12ヶ月 │  │ +¥1,000,000  +8.5% │
+│ 340件 / 平均¥34,705    │  │ 356件 / 平均¥35,955    │  │ 受注 +16件          │
+└─────────────────────────┘  └─────────────────────────┘  └──────────────────────┘
+※registered_month_countが両側で異なる場合（例: 進行中の年を選んだ場合）は画面上に
+  「Aは12/12ヶ月、Bは8/12ヶ月分の合計です」と明記し、揃えずにそのまま両側の実績を出す
+
+得意先別（上位15社＋その他、Bの金額降順）
+得意先    Aの金額       Bの金額       差額          増減率
+A社      ¥2,100,000    ¥2,300,000    +¥200,000     +9.5%
+D社      ¥0            ¥80,000       +¥80,000      新規（前期実績なし）
+E社      ¥60,000       ¥0            -¥60,000      消滅（今期実績なし）
+
+分類別                              項目別
+┌──────────────────────┐  ┌──────────────────────┐
+│組版  A¥5,000,000 B¥5,200,000 +4.0%│  │新規  A¥3,800,000 B¥4,000,000 +5.3%│
+└──────────────────────┘  └──────────────────────┘
+```
+
+凡例: 片方にしか実績が無い行も0円のまま残す（除外しない）。
+
+#### 6E-2. 左右比較 JSON例
+
+`GET /sales-analysis/api/side-by-side-comparison?department_key=planning&period_a[type]=year&period_a[year]=2024&period_b[type]=year&period_b[year]=2025&consolidate_clients=false`
+
+```json
+{
+  "department_key": "planning",
+  "consolidate_clients": false,
+  "period_a": {
+    "type": "year", "year": 2024, "month": null, "label": "2024年",
+    "amount": 11800000.0, "order_count": 340, "avg_order_amount": 34705.0,
+    "registered_month_count": 12, "total_month_count": 12,
+    "unallocated_amount": -1200.0, "needs_review": false, "has_issue": true
+  },
+  "period_b": {
+    "type": "year", "year": 2025, "month": null, "label": "2025年",
+    "amount": 12800000.0, "order_count": 356, "avg_order_amount": 35955.0,
+    "registered_month_count": 12, "total_month_count": 12,
+    "unallocated_amount": -3500.0, "needs_review": true, "has_issue": true
+  },
+  "diff": {
+    "amount": 1000000.0, "rate": 8.5,
+    "order_count": 16, "avg_order_amount": 1250.0
+  },
+  "clients": {
+    "rows": [
+      { "client_name": "A社", "amount_a": 2100000.0, "amount_b": 2300000.0, "diff": 200000.0, "rate": 9.5 },
+      { "client_name": "D社", "amount_a": 0.0, "amount_b": 80000.0, "diff": 80000.0, "rate": null },
+      { "client_name": "E社", "amount_a": 60000.0, "amount_b": 0.0, "diff": -60000.0, "rate": -100.0 }
+    ],
+    "others_amount_a": 210000.0,
+    "others_amount_b": 230000.0,
+    "all_count": 42
+  },
+  "categories": [
+    { "label": "組版", "amount_a": 5000000.0, "amount_b": 5200000.0, "diff": 200000.0, "rate": 4.0 }
+  ],
+  "items": [
+    { "label": "新規", "amount_a": 3800000.0, "amount_b": 4000000.0, "diff": 200000.0, "rate": 5.3 }
+  ]
+}
+```
+
+- `period_a`/`period_b`は`type='year'`のとき`month`が`null`、`type='month'`のとき`year`+`month`両方を持つ。**その期間が一件も登録されていない場合は`amount`等をすべて`null`にする**（0円と誤表示しない。`registered_month_count`は0になる）
+- `type='year'`の`amount`は「その年のうち登録済みの月だけ」を合算する（年次分析と同様、未登録月は無視して合算し0埋めしない）。**AとBの登録済み月数を揃える処理はしない**（例: 進行中の年とすでに12ヶ月確定した年を比較すると、双方とも「実際に登録されている実績の合計」がそのまま出る）。`registered_month_count`/`total_month_count`を両側に必ず表示し、比較対象期間の長さが異なる場合はユーザー自身が画面表示で判断する
+- `diff.rate`は`period_a.amount`が0または未登録の場合`null`（比較データなし）。`clients.rows`内の`rate`も同様に、`amount_a=0`の行（新規得意先相当）は`null`、`amount_b=0`の行（前期のみ実績、今期消滅）は`-100.0`になる
+- `clients.rows`は`amount_b`降順で上位15件のみを返し、残りは`others_amount_a`/`others_amount_b`（それぞれの合計）にまとめる。`categories`/`items`は既存の`categoryBreakdown`/`itemBreakdown`と同様に件数を絞らない
+- `consolidate_clients=true`のとき`clients`は`clientDisplayNameResolver()`による統合後名称で集計する
+- `department_key='all'`のとき、`period_a`/`period_b`の金額・件数は3部署の単純合算、`clients`は得意先名で部署横断合算する（既存の「全部署合計」ルールと同一）
+
 ---
 
 ### Phase 7: 得意先統合
@@ -943,6 +1170,177 @@ Codexレビュー2回目12章の指示により、実装前にワイヤーフレ
 - 手動グループCRUD
 - 統合プレビュー
 - 自動統合をしないことのtest
+
+#### 7-0. 詳細設計（2026-09-04作成、実装前レビュー用）
+
+Codexレビュー2回目11章の実装順（Phase7=得意先統合ON/OFFと統合管理、10.1節の「得意先分析」画面と接続）に
+従い、次の2画面を同時に実装する。
+
+| 画面 | ルート名 | 内容 |
+|---|---|---|
+| 得意先統合設定 | `sales_analysis.client_groups.index` | 原名称一覧・正規化候補・グループCRUD・統合プレビュー（SuperAdmin/許可Admin/Clerk共通、既存権限のまま） |
+| 得意先分析 | `sales_analysis.client_analysis` | 得意先ランキング（統合反映）→個別得意先を選ぶと年別推移・受注一覧を表示 |
+
+##### 7-1. 正規化アルゴリズム（`ClientNameNormalizer`、候補提示のみ・自動確定しない）
+
+決定的な変換のみ行う。法人格表記（株式会社/(株)等）や括弧内の文言は**除去しない**
+（PLAN 2.7「括弧内の区分が違う名称を勝手に統合しない」を候補生成の段階から守るため）。
+
+1. 前後の空白をtrim
+2. `mb_convert_kana($name, 'KVa')` — 半角カナ→全角（濁点結合込み）、全角英数字→半角
+   （`SalesWorkbookReader::parseTitle()`の部署ラベル正規化と同じ関数・同じ考え方を踏襲）
+3. 全角スペース・半角スペースをすべて除去（社名表記のスペース有無ゆれを吸収）
+4. 全角括弧`（）`を半角`()`へ統一（中身の文言は変更しない）
+5. 英数字部分のみ大文字へ統一（`mb_strtoupper`、日本語部分は影響なし）
+
+この結果を`normalized_name`として保存する。**normalized_nameが一致する複数の原名称」を
+「候補」として提示するだけで、確定はユーザーの手動操作のみ**（グループ作成・メンバー追加）。
+
+##### 7-2. 得意先統合設定 ワイヤーフレーム
+
+```
+[企画] [制作] [オンデマンド] [全部署]  ← 部署タブ（候補生成は全部署の受注から原名称を集める。
+                                          タブは「その部署で使われている名称に絞り込む」表示フィルタ）
+
+■ 正規化候補（同じ正規化結果を持つが未統合の名称グループ）
+┌────────────────────────────────────────────┐
+│ 候補1: 「株式会社サンプル」/「株式会社ｻﾝﾌﾟﾙ」/「株式会社 サンプル」        │
+│        [グループを作成して統合]                                        │
+│ 候補2: 「A商事(東京)」/「A商事（東京）」                                │
+│        [グループを作成して統合]                                        │
+└────────────────────────────────────────────┘
+※候補が無い場合は「候補はありません」
+
+■ 既存グループ
+┌────────────────────────────────────────────┐
+│ 株式会社NON（3名称統合）              [編集] [削除]                    │
+│   └ 株式会社NON（2） / 株式会社NON（3） / NON商事                      │
+└────────────────────────────────────────────┘
+
+■ 原名称一覧（検索可、未所属のみ表示 切替可）
+得意先名           所属          直近取引額     件数    操作
+サンブラザ工業      未所属        ¥120,000       3件     [グループに追加]
+株式会社NON（2）    株式会社NON   ¥80,000        2件     [グループから外す]
+
+[新規グループを作成]（原名称一覧からチェックした複数名称→グループ名入力→作成）
+
+■ 統合プレビュー（グループ作成・メンバー変更を保存する前に表示）
+「株式会社NON」へ統合すると:
+  2026年 のグループ合計: ¥3,500,000 → 統合前は3名称に分散
+  影響する部署: 企画、制作
+  [保存する] [キャンセル]
+```
+
+##### 7-3. 得意先統合設定 JSON例
+
+`GET /sales-analysis/api/client-groups`
+
+```json
+{
+  "candidates": [
+    {
+      "normalized_name": "カブシキガイシャサンプル",
+      "client_names": ["株式会社サンプル", "株式会社ｻﾝﾌﾟﾙ", "株式会社 サンプル"]
+    }
+  ],
+  "groups": [
+    {
+      "id": 3,
+      "name": "株式会社NON",
+      "members": [
+        { "client_name": "株式会社NON（2）", "normalized_name": "カブシキガイシャNON2" },
+        { "client_name": "株式会社NON（3）", "normalized_name": "カブシキガイシャNON3" }
+      ]
+    }
+  ],
+  "unassigned_clients": [
+    { "client_name": "サンブラザ工業", "order_count": 3, "latest_amount": 120000.0, "latest_order_date": "2026-08-20" }
+  ]
+}
+```
+
+- `unassigned_clients`は`sales_orders.client_name`（`sales_active_months`経由の有効データのみ）から
+  distinctで抽出し、`sales_client_group_members`に無い名称だけを返す
+- `POST /sales-analysis/api/client-groups`（グループ作成: `name`, `client_names[]`）
+- `PATCH /sales-analysis/api/client-groups/{group}`（グループ名変更）
+- `DELETE /sales-analysis/api/client-groups/{group}`（グループ削除。メンバーもcascade削除）
+- `POST /sales-analysis/api/client-groups/{group}/members`（メンバー追加: `client_name`。既に他グループ
+  所属なら422、`sales_client_group_members.client_name`のUNIQUE制約が最終防御）
+- `DELETE /sales-analysis/api/client-groups/{group}/members/{member}`（メンバー除外）
+- `POST /sales-analysis/api/client-groups/preview`（保存前プレビュー: `client_names[]`を受け取り、
+  それらを1グループとして統合した場合の直近年合計・影響部署をJSONで返す。DBへは書き込まない）
+
+##### 7-4. 得意先分析 ワイヤーフレーム
+
+期間・期間内の得意先ランキングをまず見せ、そこから個別得意先を選ぶと推移画面に切り替わる
+2段階構成（同月比較・左右比較が「期間を選んで得意先内訳を見る」なのに対し、この画面は
+「得意先を選んでその推移を見る」という逆方向のため、新規実装する意味がある）。
+
+```
+部署: [全部署合計 ▾]   期間: [2022年1月 ▾] 〜 [2026年8月 ▾]   得意先統合: [ON ●]   [得意先名で検索_____]
+
+■ 得意先ランキング（期間内合計・降順）
+順位  得意先          期間内合計        構成比    受注件数
+1位   A社            ¥12,300,000      18.2%     142件      [推移を見る]
+2位   株式会社NON     ¥8,100,000       12.0%     98件       [推移を見る]
+...
+
+──「推移を見る」を押すと下に表示──
+
+■ A社 の年別推移（2022〜2026年、統合ON時は統合後の全名称合算）
+[棒グラフ: 年別売上]
+年     売上           前年差       増減率     受注件数
+2022  ¥2,100,000     ─            ─          28件
+...
+
+■ A社 の受注一覧（期間内、新しい順）
+年月       受注No      品名        分類      金額
+2026-08   J-12345     名刺セットA  組版      ¥35,000
+```
+
+##### 7-5. 得意先分析 JSON例
+
+`GET /sales-analysis/api/client-analysis/ranking?department_key=all&start_year=2022&start_month=1&end_year=2026&end_month=8&consolidate_clients=true&keyword=`
+
+```json
+{
+  "total_amount": 67500000.0,
+  "ranking": [
+    { "client_name": "A社", "amount": 12300000.0, "share_pct": 18.2, "order_count": 142 },
+    { "client_name": "株式会社NON", "amount": 8100000.0, "share_pct": 12.0, "order_count": 98 }
+  ]
+}
+```
+
+`GET /sales-analysis/api/client-analysis/detail?department_key=all&client_name=A社&start_year=2022&end_year=2026&consolidate_clients=true`
+
+```json
+{
+  "client_name": "A社",
+  "yearly": [
+    { "year": 2022, "amount": 2100000.0, "prior_year_diff": null, "prior_year_rate": null, "order_count": 28 },
+    { "year": 2023, "amount": 2300000.0, "prior_year_diff": 200000.0, "prior_year_rate": 9.5, "order_count": 30 }
+  ],
+  "orders": [
+    { "sales_year": 2026, "sales_month": 8, "order_number": "J-12345", "product_name": "名刺セットA", "category": "組版", "order_amount": 35000.0 }
+  ]
+}
+```
+
+- `ranking`は指定期間（年月〜年月、複数年またぎ可）の`activeOrdersQuery`集計。既存の
+  `periodOrdersGroupedByClient`/`clientDisplayNameResolver`をそのまま複数年へ拡張して再利用する
+  （年をまたぐ場合は年ごとにループしてマージする）
+- `detail`の`yearly`は指定した得意先（統合ON時はグループ名、OFF時は原名）に一致する受注だけを
+  年別に集計。`orders`は明細ではなく受注一覧を新しい順で返す（上限200件、既存の`searchByProductNameForYear`
+  と同様の安全なLIKE/絞り込みパターンを踏襲）
+- 新規/離脱の集計はこの画面では実装しない（同月比較・左右比較で既に提供済みのため重複させない）
+
+##### 7-6. 確認事項（実装前にユーザー確認予定）
+
+1. 得意先統合設定画面へのアクセス権限は既存の売上分析権限（SuperAdmin常時・許可Admin/Clerk）と同一でよいか
+2. 得意先分析のランキング初期期間は「登録済み全期間」でよいか、それとも直近1年等に絞るか
+
+---
 
 ### Phase 8: Excel出力
 
@@ -969,6 +1367,252 @@ Codexレビュー2回目12章の指示により、実装前にワイヤーフレ
 - Sakura migration/config/cache/build手順作成
 - 本番SSH前に正確なコマンドをユーザーへ提示し、確認を得る
 - 完了後にPLAN/MANAGER/PROMPTを`z_instructions/archived/`へ移動
+
+### Phase 11: REVIEW3対応 — High優先度3件（可視化改修着手前の土台修正）
+
+3回目Codexレビュー（`SALES_ANALYSIS_REVIEW3.md` 11.2節）で指摘されたHigh 3件を、14章以降の
+大規模UI改修（共通期間ナビゲーター等）に着手する前に先行修正する。
+
+**11-1. 得意先詳細の期間絞り込み**
+- `ClientAnalysisController::detail()`に`start_month`/`end_month`を追加（`ranking()`と同じ形）。
+- `SalesQueryService::clientDetail()`は、開始年は開始月〜12月・終了年は1月〜終了月・中間年は
+  通期という`clientRankingForPeriod()`と同じ月境界ロジックで年別`yearly[]`を集計する。
+- `yearIsRegistered`判定も年全体ではなく、その年の対象月範囲内に`SalesActiveMonth`があるかで
+  判定する。
+- 受注一覧（最大200件）も`(sales_year*100+sales_month)`の範囲で絞り込む（年だけでなく
+  月境界も超えない）。
+- フロント`ClientAnalysis.vue`は既存の`startMonth`/`endMonth`のrefをdetail取得のparamsへ
+  追加するのみ（新規UI要素は無し）。
+
+**11-2. 年次分析の登録月数・欠落月の可視化**
+- `annualSummary()`のレスポンスに`registered_months`（登録済み月の配列）・`missing_months`
+  （1〜最終登録月の間で欠落している月の配列）を追加する。
+- `months_registered`は「登録月数（件数）」の意味に変更する。既存の「最終登録月」の役割は
+  新フィールド`last_registered_month`が引き継ぐ。
+- `SalesExportService::buildOrdersSheet()`の呼び出し引数を`last_registered_month`に
+  差し替える（意味変更に追従。動作は変えない）。
+- **確定方針（ユーザー確認済み・2026-09-04）**: 欠落月があっても期間合計
+  （`kpi.period_amount`等）にはその月までの実データをそのまま含め、比較不可にはしない。
+  UIは`missing_months`が空でない場合に警告バッジを表示する（比較数値は隠さない）。
+
+**11-3. 「全部署合計」の部署別登録状況（coverage）**
+- `monthlyFiguresForYear()`が返す月ごとのデータに`registered_departments`（配列）・
+  `expected_departments`（配列）を追加する。`department_key='all'`以外（単一部署選択時）は
+  常に完全登録として扱う。
+- `annualSummary()`の`monthly[]`各要素に`coverage: { registered_departments,
+  expected_departments, is_complete }`を追加する。
+- **確定方針**: coverageが不完全（`is_complete=false`）でも金額はそのまま合算して表示し、
+  UIに「一部登録」バッジを出す（11-2と同じ方針で統一）。
+- 影響範囲は`annualSummary()`のみ（`RegistrationStatusController`は単一部署固定のため
+  対象外と確認済み）。
+
+**回帰テスト（REVIEW3 16.1節対応、追加）**
+- 得意先詳細: 開始月・終了月の範囲外データが混入しない（境界年の一部月のみ）。
+- 年次: 欠落月がある年で`registered_months`/`missing_months`が正しく返り、
+  `months_registered`が件数と一致する。
+- 年次: 全部署合計で1部署だけ未登録の月が`coverage.is_complete=false`になる。
+
+### Phase 12: 可視化改修 Priority A（月次分析を完成見本として改修）
+
+REVIEW3 12〜15章の大規模UI/API改修案のうち、17章の実装依頼順3〜5番目
+（ワイヤーフレーム→共通部品→月次分析を完成見本として改修）に対応する。
+年次・同月比較・得意先分析・左右比較への横展開は別ステップで行う（17章6番目）。
+
+**共通部品（新規、`resources/js/`配下）**
+- `Composables/useSalesChart.js` — `yen()`/`pct()`/`pctClass()`/金額tickフォーマッタ等の共通フォーマッタ
+- `Components/SalesAnalysis/PeriodNavigator.vue` — 部署・会社統合・年月のv-model、前後月移動
+  （12月→翌年1月等の境界越え込み）、「最新登録月」ボタン、未登録月の案内＋前後の登録済み月への
+  リンク（`period_status`を利用）
+- `Components/SalesAnalysis/RankingPanel.vue` — 得意先/分類/項目で共用するTop10/20切替＋
+  「全件を見る」ドロワー（検索300msデバウンス・並べ替え・サーバー側ページング）。
+  `fetchPage(params)`関数をpropで受け取るだけの疎結合設計で、他画面への展開時もAPIラッパー関数を
+  差し替えるだけで再利用できる
+
+**月次分析画面の構成変更（13.2節準拠、D/Eの重複は統合して解消）**
+- A. KPI帯: 当月売上（sparkline付き）／前月比／前年同月比／**同月3年平均との差**（新規）／年度累計
+- B. 月の推移グラフ: 従来の「5年通し1本線」を廃止し、**直近13ヶ月＋3ヶ月移動平均**に変更
+- C. 同月の複数年比較（新規）: 選択月だけを直近5年の棒グラフ＋3年平均の参照線で表示
+- D. 得意先比較: `RankingPanel`＋横棒グラフ。「当月／前月増減／前年同月増減」の3モード切替
+  （発散棒グラフ相当、`diff`/`rate`で表現）。行クリックで得意先分析画面へ遷移
+- E. 内訳（分類/項目のみ、得意先はDで扱うためタブから除外）: タブ切替＋`RankingPanel`
+- 品名検索・受注明細は「詳細を調べる」の折りたたみへ移動（既存機能を維持）
+- B/Cのグラフクリックで表示月・年を直接切り替えられる（ページ遷移なしのドリルダウン）
+
+**バックエンド変更（`SalesQueryService`/`MonthlyAnalysisController`）**
+- `monthlyTrend()`を`monthSeries()`private helperへ共通化し、`recentMonthlyTrend()`
+  （直近Nヶ月＋`moving_avg_3m`）を追加。既存`monthlyTrend()`の動作・シグネチャは変更なし
+- `sameMonthAcrossYears()`（選択月×直近N年、未登録年はnull）を追加
+- `nearestRegisteredMonths()`（`summary()`の`period_status`として返す）・
+  `latestRegisteredMonth()`（`api/latest-period`）を追加
+- `monthlyClientPanel()`／`monthlyBreakdownPanel()`＋共通`paginateRankingRows()`を追加し、
+  `clients()`/`categories()`/`items()`アクションの応答形状を`{rows,total_count,total_amount,page,limit}`
+  へ統一（旧`{ranking,all_count}`/`{breakdown}`形状から変更。呼び出し元は月次分析のみのため影響なし）
+- `trend`エンドポイントのクエリパラメータを`years`→`months`（既定13）に変更（破壊的変更、
+  月次分析以外に呼び出し元が無いことを確認済み）
+- 新規ルート: `api/same-month-history`・`api/latest-period`
+
+**得意先分析への深いリンクは未実装（既知の制限）**: Dセクションの得意先クリックは
+現状`client_analysis`ページへ遷移するのみで、クリックした得意先を自動選択する機能は
+`ClientAnalysisController`側の対応が必要なため、得意先分析画面への展開ステップ（17章6番目）で
+合わせて実装する。
+
+### Phase 13: 可視化改修 Priority A 横展開（年次分析）
+
+REVIEW3 17章6番目の1画面目。共通部品（PeriodNavigator/RankingPanel）を年次分析へ展開する。
+月次分析と異なり、月次特有の指標（3ヶ月移動平均・sparkline・同月複数年比較）は14章の
+Priority分類では月次専用のPriority A項目であり、年次分析では該当しないため移植しない
+（14章の分類に厳密に従うスコープ判断。詳細はMANAGER1.md判断ログ参照）。
+
+**PeriodNavigator拡張**
+- `granularity`prop（`'month'`|`'year'`）を追加。`'year'`では月選択・境界越え処理を省略し、
+  「← 前年 / 選択年 / 翌年 → / 最新年」のみになる（13.1節の年次向け仕様）
+- `allowAllDepartments`propを追加。年次分析は`department_key='all'`（全部署合計）に対応するため
+
+**バックエンド追加**
+- `latestRegisteredYear(departmentKey)`（'all'対応）→ `api/annual-latest-period`
+- `annualClientPanel()`/`annualBreakdownPanel()`（`monthlyClientPanel()`/`monthlyBreakdownPanel()`と
+  同じTop10/20+全件詳細ドロワー契約）→ `api/annual-clients`/`api/annual-categories`/`api/annual-items`。
+  得意先パネルはモード切替を持たず、常に前年同期間との差額（`diff`/`rate`）を返す
+  （14章Priority A「得意先別の増減寄与」に対応。年次は"前年"以外の比較対象が無いため）
+- 既存`periodClientRanking()`/`periodDetailBreakdown()`（`annualSummary()`が使う10件限定版）は
+  変更せず、別メソッドとして`lastRegisteredMonthForYear()`ヘルパー経由で追加
+
+**画面変更（AnnualAnalysis.vue）**
+- 部署/年/得意先統合の独自フィルタUIをPeriodNavigator（`granularity="year"`,
+  `allow-all-departments`）へ置換。URLクエリ同期を追加
+- 月別数値表をグラフ直下で初期折りたたみに変更（「数値表を開く」、13.3節準拠）
+- 得意先別/分類別/項目別の静的Top10表をRankingPanelへ置換（分類/項目はタブ化）
+- 月別推移グラフの月クリックで月次分析画面へ遷移するdrill-downを追加
+
+回帰テスト7件追加（controller層3件・service層2件、既存annualSummary系は変更なし）。
+
+### Phase 14: 可視化改修 Priority A 横展開（同月比較）
+
+REVIEW3 17章6番目の2画面目。同月比較は「年」を持たず1〜12月だけを巡回する画面のため、
+PeriodNavigatorに`granularity='month-cyclic'`（年表示なし、12⇄1月の巡回時に年を変更しない）を
+追加して対応した。
+
+**スコープ判断（Phase 13と同じ基準）**: 得意先マトリクス（年×得意先）・新規/離脱リスト・
+分類/項目の1・3・5年前比較は、RankingPanelが前提とする単純な`{label,amount}`ランキング形状とは
+異なる多次元データ構造であり、14章のPriority A「Top10/20＋その他＋詳細」を機械的に適用すると
+データモデルごとの作り直しが必要になる。これは13.4節が示す将来のタブ/カード化（Priority B/C寄り）に
+近いため、今回はPeriodNavigator（Priority A「期間ナビゲーターと条件引継ぎ」）の展開のみに留め、
+既存の得意先マトリクス等はそのまま維持した。
+
+**バックエンド追加**
+- `latestRegisteredMonthNumber(departmentKey)`（'all'対応、年を返さず月だけを返す）→
+  `api/same-month-comparison-latest-period`
+
+**画面変更（SameMonthComparison.vue）**
+- 部署/対象月/得意先統合の独自フィルタUIをPeriodNavigator（`granularity="month-cyclic"`,
+  `allow-all-departments`）へ置換。年数（5/10年）トグルは別ブロックとして維持。URLクエリ同期を追加
+
+回帰テスト2件追加。
+
+---
+
+### Phase 15: 可視化改修 Priority A 横展開（得意先分析）＋深いリンク解消
+
+REVIEW3 17章6番目の3画面目。月次/年次分析のDセクション（得意先クリック）から得意先分析画面への
+深いリンク（クリックした得意先を自動選択、Phase 12で未実装として先送りしていた分）もここで解消する。
+
+**スコープ判断（Phase 13/14と同じ基準）**: 13.5節が示す「月別売上折れ線を主表示にする」「表示期間
+プリセット（直近12ヶ月/3年/5年/全期間）」「前年同月・3ヶ月移動平均・同月3年平均の比較線」は
+14章のPriority分類に無く、月次分析専用の指標（3ヶ月移動平均・同月3年平均）を年次単位の推移に
+転用するには集計方式の再設計が要る。今回は既存の「年別推移（棒グラフ）」はそのまま維持し、
+14章Priority A「Top10/20＋その他＋詳細」（得意先ランキング）と「期間ナビゲーターと条件引継ぎ」
+（深いリンク）のみを対象とした。受注一覧（最大200件）も同じ理由でRankingPanel化せず現状維持。
+
+**バックエンド追加**
+- `ClientAnalysisController::index()`にクエリパラメータ`department_key`/`client_name`を追加。
+  有効な部署キーであれば`initialDepartmentKey`、`client_name`があれば`initialClientName`として
+  Inertia propsへ渡す（値が無ければ従来どおり`department_key='all'`・選択なし）
+- `SalesQueryService::clientAnalysisPanel()`（既存`clientRankingForPeriod()`の集計ロジックを
+  `mergeClientAggregatesForRange()`ヘルパーへ共通化した上で新設）→ `api/client-analysis/ranking-panel`。
+  既存`clientRankingForPeriod()`/`ranking()`エンドポイントの出力形状・挙動は変更していない
+  （既存テストとの互換性を維持するため、置き換えではなく追加とした）
+
+**画面変更（ClientAnalysis.vue）**
+- 得意先ランキングの静的テーブルをRankingPanelへ置換（ページ内単独のキーワード入力欄は
+  RankingPanelの全件詳細ドロワー内検索に統合したため削除）
+- `initialDepartmentKey`/`initialClientName` propsを受け取り、`initialClientName`があれば
+  マウント時に自動で該当得意先の推移を表示する
+- `MonthlyAnalysis.vue`/`AnnualAnalysis.vue`の得意先クリック（Dセクション/得意先別RankingPanel）が
+  `department_key`・`client_name`をクエリ引き継ぎで渡すように変更（Phase 12/13で先送りしていた分）
+
+回帰テスト5件追加（controller層3件・service層1件、既存`clientRankingForPeriod()`系は変更なし）。
+
+---
+
+### Phase 16: 左右比較の横展開検討（対象外と判断）
+
+REVIEW3 17章6番目の最終画面。検討の結果、左右比較へは共通部品を展開しない方針とした。
+
+**理由**
+- PeriodNavigator/RankingPanelはいずれも「単一の期間・単一の金額列」を前提に設計している。
+  左右比較はA/B**2つの独立した期間**（年 or 年月、それぞれ別々に選択）を同時に扱う画面であり、
+  月次/年次/同月比較（単一期間）とは構造が異なるため、PeriodNavigatorをそのまま適用できない
+- 得意先・分類・項目の比較表は`amount_a`/`amount_b`の**2列を並べて見せる**ことが画面の目的であり、
+  RankingPanelの「1金額列＋差額/増減率」という行形状に押し込めると片方の金額列が失われる
+  （13.6節が示す「横棒の比較チャートでAとBを同じ行で並べる」は、RankingPanelの再利用ではなく
+  新規のデュアル期間・デュアル金額専用コンポーネントが必要になり、Priority B/C相当の再設計）
+- 得意先比較は既にTop N＋「その他」集計（`others_amount_a`/`others_amount_b`）を備えており、
+  14章Priority A「Top10/20＋その他＋詳細」の趣旨は既存実装でも一定満たしている
+
+結論として`SideBySideComparisonController`/`SideBySideComparison.vue`には変更を加えていない。
+デュアル期間ナビゲーター・デュアル金額RankingPanelが必要になった場合は、Priority B着手時
+（17章7番目）に新規コンポーネントとして設計する。
+
+これでREVIEW3 17章6番目（年次・同月比較・得意先分析・左右比較への横展開）が完了した。
+
+---
+
+### Phase 17: 期別分析（4月〜翌3月の会計年度）を新規画面として独立
+
+実機フィードバック対応（2026-09-04）。月次分析の「年度累計」KPIカードに設けていた
+暦年/年度(4月)のトグル、および後にナビゲーションタブへ移設したスイッチについて、
+ユーザーから「年と期の分類、意味がないので削除（見えなくするのでもよい）」との指摘を受けた。
+対応として、スイッチ自体は撤去し、代わりに会計年度（4月始まり）専用の分析画面
+「期別分析」を、既存の「年次分析」とフル機能で対応する形（ユーザー選択）で新設した。
+
+**設計方針**
+- 「年次分析」（暦年）とは意図的に完全に別のコントローラー・サービスメソッド群として実装し、
+  既存の暦年ロジック（`annualSummary()`系）には一切手を入れない（低リスク・DRYよりも
+  独立した安全性を優先。年またぎ集計という別種の複雑さを持つため）
+- 期（fiscal_year=F）はF年4月〜F+1年3月。月配列は`fiscal_month`（1=4月〜12=翌3月）で
+  管理し、各要素に実際の`calendar_year`/`calendar_month`を持たせる
+- 得意先・分類・項目の年またぎ集計は、既存の`mergeClientAggregatesForRange()`（得意先分析用に
+  Phase 15で新設済み）をそのまま再利用し、分類/項目向けに新規`mergeDetailBreakdownForRange()`を
+  追加した
+
+**バックエンド追加（`SalesQueryService`）**
+- `fiscalYearSummary()`（annualSummary()の期別版。registered_months/missing_months/
+  coverage等の仕組みはPhase11と同じ設計を踏襲）
+- `fiscalYearClientPanel()`/`fiscalYearBreakdownPanel()`（Top10/20+全件詳細ドロワー、
+  annualClientPanel()/annualBreakdownPanel()と同じ契約）
+- `multiYearFiscalMonthlySeries()`（月別売上グラフの複数期重ね表示、2/3/5期切替）
+- `latestRegisteredFiscalYear()`（期間ナビゲーターの「最新期」ボタン用。3月は前年度、
+  4月は当年度として扱う）
+- `searchByProductNameForFiscalYear()`/`fiscalYearOrders()`（品名検索・Excel該当明細用）
+- 新規`FiscalYearAnalysisController`（`AnnualAnalysisController`と対応する構成。
+  index/summary/latestPeriod/clients/categories/items/multiYearTrend/products/export）
+- `SalesExportService::fiscalYearAnalysisWorkbook()`（Excel出力。概要・月別推移・該当明細は
+  期別専用メソッドを新設、得意先別/分類別/項目別は`annualAnalysisWorkbook()`と同じ
+  `buildClientSheet()`/`buildBreakdownSheet()`を共用）
+
+**画面（新規`FiscalYearAnalysis.vue`）**
+- `AnnualAnalysis.vue`と同じ構成（KPI帯・複数期重ね折れ線・得意先別/分類/項目パネル・
+  品名検索・Excel出力）。月配列は4月始まりの`monthLabels`を使う
+- `PeriodNavigator.vue`に`yearLabel`propを追加（既定`'年'`、期別分析では`'年度'`を指定。
+  前後移動ボタンも「前{{yearLabel}}」等に汎用化）
+- ナビゲーションタブに「期別分析」を追加
+
+**削除**
+- `SalesAnalysisNavigationTabs.vue`の暦年/年度スイッチ、`useFiscalMode.js`composableを撤去
+- `MonthlyAnalysis.vue`の「年度累計」カードは暦年（1〜12月）固定の「年間累計」に簡素化
+  （期別の数値は期別分析画面で見る設計に統一）
+
+回帰テスト14件追加（controller層10件・service層4件）。
 
 ---
 

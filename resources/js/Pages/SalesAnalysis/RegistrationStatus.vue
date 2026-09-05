@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link } from '@inertiajs/vue3';
 import axios from 'axios';
+import SalesAnalysisNavigationTabs from '@/Components/SalesAnalysis/SalesAnalysisNavigationTabs.vue';
 
 const props = defineProps({
     routePrefix: { type: String, required: true },
@@ -105,13 +106,10 @@ onMounted(fetchStatus);
 <template>
     <AppLayout title="データ登録状況">
         <template #header>
-            <div class="flex items-center justify-between">
-                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">売上分析 - データ登録状況</h2>
-                <div class="flex gap-3">
-                    <Link :href="route(rn('import.create'))" class="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-bold text-white hover:bg-indigo-700">Excel取込</Link>
-                    <Link :href="route(rn('import_history.index'))" class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-bold text-gray-700 hover:bg-gray-50">取込履歴</Link>
-                </div>
-            </div>
+            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">売上分析 - データ登録状況</h2>
+        </template>
+        <template #tabs>
+            <SalesAnalysisNavigationTabs :route-prefix="routePrefix" active="dashboard" />
         </template>
 
         <div class="space-y-4">

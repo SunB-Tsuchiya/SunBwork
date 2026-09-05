@@ -13,9 +13,14 @@ use App\Services\SalesAnalysis\Exceptions\SalesWorkbookException;
  * 2026-09-03 Codexレビュー（SALES_ANALYSIS_EXCEL_VALIDATION_REVIEW.md 6章）により、
  * 実帳票の欠損・記載ゆれを前提に error/warning を分離する設計へ変更した。
  * - blocking error: 受注No・SB下版日の欠損/解析不能、実在しない日付、
- *   同一受注内の得意先名/品名/下版日の矛盾、N列（受注金額）規則違反、負数（金額・単価を除く）。
+ *   同一受注内の得意先名/品名/下版日の矛盾、N列（受注金額）規則違反、負数（金額・単価・受注金額を除く）。
  * - warning（行は除外せず、対象列はNULL保存のまま取込を継続する）: 得意先名・品名の空欄、
  *   色数・台数の空欄、金額・単価の空欄/負数（事故損金等）、M/N不一致（未配賦額として提示）。
+ *
+ * 2026-09-04変更（ユーザー確認）: N列（受注金額）はこれまで「正の値のみ」を許容していたが、
+ * 事故・刷り直し等で受注全体の合計が正当にマイナスになるケースがあり、これを理由に受注を
+ * 丸ごと除外すべきではないため「0以外の値（正または負）」を許容するよう緩和した。
+ * 途中行が0/NULLで最後の1行だけが0以外という構造の要件（規則違反はblocking error）は維持する。
  * - 項目・判型・分類の空欄は警告も出さない（デジタル案件では恒常的に空欄になるため）。
  *
  * 2026-09-03 実機検証（ユーザー報告）により、blocking errorを「受注単位で個別除外可能」
@@ -279,10 +284,6 @@ class SalesImportValidator
             }
         }
 
-        if ($row['order_amount_component'] !== null && $row['order_amount_component'] < 0) {
-            $errors[] = '受注金額が負数です。';
-        }
-
         if ($row['plate_date'] === null) {
             $errors[] = 'SB下版日が日付として読み取れません（実在しない日付の可能性があります）。';
 
@@ -336,23 +337,36 @@ class SalesImportValidator
             }
         }
 
-        // N列（受注金額）規則: 正の値を持つ行は、同一受注内でちょうど1行、かつ最後の行であること
-        $positiveRowIndexes = [];
+        // N列（受注金額）規則: 0以外の値（正または負）を持つ行は、同一受注内でちょうど1行、かつ最後の行であること。
+        // 2026-09-04変更（ユーザー確認: 事故・刷り直し等で受注全体がマイナスになることもあり得るため、
+        // 「正の値」限定をやめ「0以外の値」に緩和した。マイナスを理由に受注を丸ごと除外しない）。
+        $nonZeroRowIndexes = [];
         $nullCount = 0;
+        $zeroCount = 0;
         foreach ($rows as $i => $row) {
-            if ($row['order_amount_component'] === null) {
+            $v = $row['order_amount_component'];
+            if ($v === null) {
                 $nullCount++;
-            } elseif ($row['order_amount_component'] > 0) {
-                $positiveRowIndexes[] = $i;
+            } elseif ($v == 0.0) {
+                $zeroCount++;
+            } else {
+                $nonZeroRowIndexes[] = $i;
             }
         }
 
-        if (count($positiveRowIndexes) === 0) {
-            $errors[] = "受注No {$orderNumber}: 受注金額（N列）に正の値がありません。";
-        } elseif (count($positiveRowIndexes) > 1) {
-            $errors[] = "受注No {$orderNumber}: 受注金額（N列）に正の値が複数行あります。";
-        } elseif (end($positiveRowIndexes) !== array_key_last($rows)) {
-            $errors[] = "受注No {$orderNumber}: 受注金額（N列）の正の値が最後の行にありません。";
+        if (count($nonZeroRowIndexes) === 0) {
+            // 2026-09-04変更: 原因（空欄・0円・行数）を明示し、「孤立データ（関連行が無い空欄行）」なのか
+            // それ以外なのかをユーザーが判別できるようにする（ユーザー報告により詳細化）
+            $totalRows = count($rows);
+            $errors[] = "受注No {$orderNumber}: 受注金額（N列）に0以外の値（正または負）がありません（全{$totalRows}行中、空欄{$nullCount}行・0円{$zeroCount}行）。";
+        } elseif (count($nonZeroRowIndexes) > 1) {
+            $posCount = count(array_filter($nonZeroRowIndexes, fn ($i) => $rows[$i]['order_amount_component'] > 0));
+            $negCount = count($nonZeroRowIndexes) - $posCount;
+            $errors[] = "受注No {$orderNumber}: 受注金額（N列）に0以外の値を持つ行が複数（{$posCount}行 正の値・{$negCount}行 負の値）あります。";
+        } elseif (end($nonZeroRowIndexes) !== array_key_last($rows)) {
+            $value = $rows[end($nonZeroRowIndexes)]['order_amount_component'];
+            $sign = $value < 0 ? '負' : '正';
+            $errors[] = "受注No {$orderNumber}: 受注金額（N列）の{$sign}の値（" . number_format($value) . '）が最後の行にありません。';
         }
 
         if (! empty($errors)) {
@@ -365,7 +379,7 @@ class SalesImportValidator
 
         $orderAmount = (float) $rows[array_key_last($rows)]['order_amount_component'];
 
-        // 未配賦額 = 受注金額（N列、正） − 明細内訳合計（M列。NULLは0として合算）
+        // 未配賦額 = 受注金額（N列。正または負） − 明細内訳合計（M列。NULLは0として合算）
         $lineAmountSum = array_sum(array_map(fn ($r) => $r['line_amount'] ?? 0.0, $rows));
         $unallocatedAmount = $orderAmount - $lineAmountSum;
 

@@ -21,3 +21,6 @@ Schedule::command('schedule:send-notifications')->dailyAt('08:00');
 
 // 本番DBバックアップ: 月・水・金 23:00（mon/wed/friの3世代ローテーションで上書き）
 Schedule::command('backup:database')->cron('0 23 * * 1,3,5')->timezone('Asia/Tokyo');
+
+// 売上分析Excel取込のプレビューキャッシュ（期限切れファイル）を毎時削除・容量をログ記録
+Schedule::command('sales:prune-preview-cache')->hourly();

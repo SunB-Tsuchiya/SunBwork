@@ -122,15 +122,18 @@ class SalesImportValidatorTest extends TestCase
         }
     }
 
-    public function test_negative_amount_is_rejected()
+    public function test_negative_amount_single_row_order_is_now_allowed()
     {
+        // 2026-09-04変更: 以前は受注金額（N列）の負数を一律拒否していたが、事故・刷り直し等で
+        // 受注全体がマイナスになるケースを許容する方針に変更した（単価・金額は2026-09-03から許容済み）
         $rows = [$this->row('2000003', 'A社', '商品A', -1000, -1000, '2026/09/05')];
         $path = $this->makeSalesWorkbook($this->monthlyTitle('企画', 2026, 9), $rows);
 
         try {
             $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9);
 
-            $this->assertFalse($result['valid']);
+            $this->assertTrue($result['valid'], implode(' / ', $result['errors']) . implode(' / ', $this->flattenInvalidOrderErrors($result)));
+            $this->assertSame(-1000.0, $result['orders'][0]['order_amount']);
         } finally {
             @unlink($path);
         }
@@ -319,7 +322,7 @@ class SalesImportValidatorTest extends TestCase
         }
     }
 
-    public function test_no_positive_order_amount_component_is_rejected()
+    public function test_zero_order_amount_component_is_rejected_with_detailed_counts()
     {
         $rows = [
             $this->row('8000003', 'A社', '商品A', 1000, 0, '2026/09/05'),
@@ -330,13 +333,34 @@ class SalesImportValidatorTest extends TestCase
             $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9);
 
             $this->assertFalse($result['valid']);
-            $this->assertNotEmpty(array_filter($this->flattenInvalidOrderErrors($result), fn ($e) => str_contains($e, '正の値がありません')));
+            $errors = $this->flattenInvalidOrderErrors($result);
+            // 2026-09-04変更: 「正の値がありません」ではなく空欄/0円の内訳が分かるメッセージにする
+            $this->assertNotEmpty(array_filter($errors, fn ($e) => str_contains($e, '0以外の値（正または負）がありません') && str_contains($e, '0円1行')));
         } finally {
             @unlink($path);
         }
     }
 
-    public function test_multiple_positive_order_amount_components_is_rejected()
+    public function test_null_order_amount_component_shows_blank_count_in_error()
+    {
+        // ユーザー報告（受注No 4304133相当）: N列が空欄（NULL）で関連行も無い孤立データのケース。
+        // 「正の値がありません」だけでは空欄なのか0円なのか区別できなかったため詳細化した
+        $row = $this->row('4304133', 'A社', '商品A', 1000, 0, '2026/09/05');
+        $row['order_amount_component'] = null;
+        $path = $this->makeSalesWorkbook($this->monthlyTitle('企画', 2026, 9), [$row]);
+
+        try {
+            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9);
+
+            $this->assertFalse($result['valid']);
+            $errors = $this->flattenInvalidOrderErrors($result);
+            $this->assertNotEmpty(array_filter($errors, fn ($e) => str_contains($e, '空欄1行') && str_contains($e, '4304133')));
+        } finally {
+            @unlink($path);
+        }
+    }
+
+    public function test_multiple_nonzero_order_amount_components_is_rejected()
     {
         $rows = [
             $this->row('8000004', 'A社', '商品A', 1000, 1000, '2026/09/05'),
@@ -348,7 +372,46 @@ class SalesImportValidatorTest extends TestCase
             $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9);
 
             $this->assertFalse($result['valid']);
-            $this->assertNotEmpty(array_filter($this->flattenInvalidOrderErrors($result), fn ($e) => str_contains($e, '正の値が複数行')));
+            $this->assertNotEmpty(array_filter($this->flattenInvalidOrderErrors($result), fn ($e) => str_contains($e, '0以外の値を持つ行が複数')));
+        } finally {
+            @unlink($path);
+        }
+    }
+
+    public function test_negative_order_amount_in_last_row_is_now_allowed()
+    {
+        // 2026-09-04変更（ユーザー確認）: 事故・刷り直し等で受注全体の合計がマイナスになるケースを許容する
+        $rows = [
+            $this->row('8000020', 'A社', '商品A', 1000, 0, '2026/09/05'),
+            $this->row('8000020', 'A社', '商品A', -1500, -500, '2026/09/05'),
+        ];
+        $path = $this->makeSalesWorkbook($this->monthlyTitle('企画', 2026, 9), $rows);
+
+        try {
+            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9);
+
+            $this->assertTrue($result['valid'], implode(' / ', $result['errors']) . implode(' / ', $this->flattenInvalidOrderErrors($result)));
+            $order = $result['orders'][0];
+            $this->assertSame(-500.0, $order['order_amount']);
+        } finally {
+            @unlink($path);
+        }
+    }
+
+    public function test_negative_order_amount_not_in_last_row_is_still_rejected()
+    {
+        $rows = [
+            $this->row('8000021', 'A社', '商品A', -500, -500, '2026/09/05'),
+            $this->row('8000021', 'A社', '商品A', 500, 0, '2026/09/05'),
+        ];
+        $path = $this->makeSalesWorkbook($this->monthlyTitle('企画', 2026, 9), $rows);
+
+        try {
+            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9);
+
+            $this->assertFalse($result['valid']);
+            $errors = $this->flattenInvalidOrderErrors($result);
+            $this->assertNotEmpty(array_filter($errors, fn ($e) => str_contains($e, '負の値') && str_contains($e, '最後の行にありません')));
         } finally {
             @unlink($path);
         }

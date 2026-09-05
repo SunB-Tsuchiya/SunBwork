@@ -49,10 +49,11 @@ class MonthlyAnalysisController extends Controller
             $year = (int) $year;
             $month = (int) $month;
 
-            $hasAnyData = SalesActiveMonth::where('department_key', $departmentKey)
-                ->where('sales_year', $year)
-                ->where('sales_month', $month)
-                ->exists();
+            // 深いリンク・期間ナビゲーターでの移動先・URLクエリでのリロードいずれでも、
+            // 選択中の年月自体に登録が無いだけで空表示に落とさない（未登録月はPeriodNavigatorの
+            // 案内で扱う）。判定は「この部署に何か1件でも登録済みか」に留める
+            // （実機フィードバック対応: 未登録月のURLでリロードすると空表示に戻ってしまう問題、2026-09-04）
+            $hasAnyData = SalesActiveMonth::where('department_key', $departmentKey)->exists();
 
             return Inertia::render('SalesAnalysis/MonthlyAnalysis', [
                 'routePrefix' => $this->salesAnalysisRoutePrefix(),
@@ -62,6 +63,7 @@ class MonthlyAnalysisController extends Controller
                 'initialYear' => $year,
                 'initialMonth' => $month,
                 'hasAnyData' => $hasAnyData,
+                'initialLatestPeriod' => $this->queryService->latestRegisteredMonth($departmentKey),
             ]);
         }
 
@@ -88,6 +90,7 @@ class MonthlyAnalysisController extends Controller
             'initialYear' => $latest->sales_year ?? (int) now()->format('Y'),
             'initialMonth' => $latest->sales_month ?? (int) now()->format('n'),
             'hasAnyData' => $latest !== null,
+            'initialLatestPeriod' => $latest ? ['year' => (int) $latest->sales_year, 'month' => (int) $latest->sales_month] : null,
         ]);
     }
 
@@ -96,6 +99,7 @@ class MonthlyAnalysisController extends Controller
         $data = $this->validatePeriod($request);
 
         return response()->json([
+            'period_status' => $this->queryService->nearestRegisteredMonths($data['department_key'], $data['year'], $data['month']),
             'monthly' => $this->queryService->monthlyComparison($data['department_key'], $data['year'], $data['month']),
             'fiscal_calendar' => $this->queryService->fiscalYearToDate(
                 $data['department_key'],
@@ -112,51 +116,108 @@ class MonthlyAnalysisController extends Controller
         ]);
     }
 
+    /** 「月の推移グラフ」用。選択月までの直近$monthsヶ月（既定13）＋3ヶ月移動平均（Phase 12） */
     public function trend(Request $request)
     {
         $data = $this->validatePeriod($request);
-        $years = (int) $request->validate(['years' => 'nullable|integer|min:1|max:20'])['years'] ?? 5;
+        $months = (int) ($request->validate(['months' => 'nullable|integer|min:3|max:36'])['months'] ?? 13);
 
         return response()->json([
-            'trend' => $this->queryService->monthlyTrend($data['department_key'], $data['year'], $data['month'], $years),
+            'trend' => $this->queryService->recentMonthlyTrend($data['department_key'], $data['year'], $data['month'], $months),
         ]);
     }
 
+    /** 「同月の複数年比較」用。選択月だけを直近$years年分（既定5）（Phase 12） */
+    public function sameMonthHistory(Request $request)
+    {
+        $data = $this->validatePeriod($request);
+        $years = (int) ($request->validate(['years' => 'nullable|integer|min:2|max:20'])['years'] ?? 5);
+
+        return response()->json([
+            'history' => $this->queryService->sameMonthAcrossYears($data['department_key'], $data['month'], $data['year'], $years),
+        ]);
+    }
+
+    /** 期間ナビゲーターの「最新登録月」ボタン用（部署切替後の再取得もこのAPIを使う。Phase 12） */
+    public function latestPeriod(Request $request)
+    {
+        $data = $request->validate([
+            'department_key' => ['required', 'string', Rule::in(SalesDepartments::ENABLED_KEYS)],
+        ]);
+
+        return response()->json([
+            'latest' => $this->queryService->latestRegisteredMonth($data['department_key']),
+        ]);
+    }
+
+    private function validatePanelOptions(Request $request): array
+    {
+        return $request->validate([
+            'keyword' => 'nullable|string|max:255',
+            'sort' => ['nullable', 'string', Rule::in(['amount', 'diff', 'rate', 'label'])],
+            'direction' => ['nullable', 'string', Rule::in(['asc', 'desc'])],
+            'limit' => 'nullable|integer|min:1|max:200',
+            'page' => 'nullable|integer|min:1|max:1000',
+        ]);
+    }
+
+    /** 得意先比較パネル（Top10/20＋全件詳細ドロワー共用、当月/前月増減/前年同月増減の3モード。Phase 12） */
     public function clients(Request $request)
     {
         $data = $this->validatePeriod($request);
-        $options = $request->validate([
-            'consolidate' => 'nullable|boolean',
-            'limit' => 'nullable|integer|min:1|max:1000',
-        ]);
+        $panel = $this->validatePanelOptions($request);
+        $mode = $request->validate(['mode' => ['nullable', 'string', Rule::in(['current', 'vs_previous', 'vs_previous_year'])]])['mode'] ?? 'current';
 
-        return response()->json(
-            $this->queryService->clientRanking(
-                $data['department_key'],
-                $data['year'],
-                $data['month'],
-                (bool) ($options['consolidate'] ?? false),
-                array_key_exists('limit', $options) ? $options['limit'] : 10
-            )
-        );
+        return response()->json($this->queryService->monthlyClientPanel(
+            $data['department_key'],
+            $data['year'],
+            $data['month'],
+            $mode,
+            (bool) $request->boolean('consolidate'),
+            $panel['keyword'] ?? null,
+            $panel['sort'] ?? 'amount',
+            $panel['direction'] ?? 'desc',
+            $panel['limit'] ?? 10,
+            $panel['page'] ?? 1
+        ));
     }
 
+    /** 分類内訳パネル（Top10/20＋全件詳細ドロワー共用。Phase 12） */
     public function categories(Request $request)
     {
         $data = $this->validatePeriod($request);
+        $panel = $this->validatePanelOptions($request);
 
-        return response()->json(
-            $this->queryService->categoryBreakdown($data['department_key'], $data['year'], $data['month'])
-        );
+        return response()->json($this->queryService->monthlyBreakdownPanel(
+            $data['department_key'],
+            $data['year'],
+            $data['month'],
+            'category',
+            $panel['keyword'] ?? null,
+            $panel['sort'] ?? 'amount',
+            $panel['direction'] ?? 'desc',
+            $panel['limit'] ?? 10,
+            $panel['page'] ?? 1
+        ));
     }
 
+    /** 項目内訳パネル（Top10/20＋全件詳細ドロワー共用。Phase 12） */
     public function items(Request $request)
     {
         $data = $this->validatePeriod($request);
+        $panel = $this->validatePanelOptions($request);
 
-        return response()->json(
-            $this->queryService->itemBreakdown($data['department_key'], $data['year'], $data['month'])
-        );
+        return response()->json($this->queryService->monthlyBreakdownPanel(
+            $data['department_key'],
+            $data['year'],
+            $data['month'],
+            'item_name',
+            $panel['keyword'] ?? null,
+            $panel['sort'] ?? 'amount',
+            $panel['direction'] ?? 'desc',
+            $panel['limit'] ?? 10,
+            $panel['page'] ?? 1
+        ));
     }
 
     public function products(Request $request)

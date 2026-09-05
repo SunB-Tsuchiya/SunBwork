@@ -52,6 +52,15 @@ return [
             'lock_path' => storage_path('framework/cache/data'),
         ],
 
+        // 売上分析のExcel取込プレビュー専用キャッシュ（2026-09-04追加）。
+        // 独立ディレクトリにすることで、期限切れファイルの一括削除（sales:prune-preview-cache）を
+        // 他のキャッシュ用途に影響させず安全に行える。
+        'sales_preview' => [
+            'driver' => 'file',
+            'path' => storage_path('framework/cache/sales-preview'),
+            'lock_path' => storage_path('framework/cache/sales-preview'),
+        ],
+
         'memcached' => [
             'driver' => 'memcached',
             'persistent_id' => env('MEMCACHED_PERSISTENT_ID'),

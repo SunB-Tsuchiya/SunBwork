@@ -1,6 +1,7 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link } from '@inertiajs/vue3';
+import SalesAnalysisNavigationTabs from '@/Components/SalesAnalysis/SalesAnalysisNavigationTabs.vue';
 
 const props = defineProps({
     routePrefix: { type: String, required: true },
@@ -31,6 +32,9 @@ const statusLabels = {
                 >← ダッシュボードに戻る</Link>
                 <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">売上取込履歴</h2>
             </div>
+        </template>
+        <template #tabs>
+            <SalesAnalysisNavigationTabs :route-prefix="routePrefix" active="import_history" />
         </template>
 
         <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
