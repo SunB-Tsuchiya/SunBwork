@@ -62,6 +62,23 @@ class SalesAnnualAnalysisTest extends TestCase
         );
     }
 
+    public function test_index_reports_route_prefix_matching_actual_url_not_user_role()
+    {
+        $superadmin = User::factory()->create(['user_role' => 'superadmin']);
+
+        $adminResponse = $this->actingAs($superadmin)->get(route('admin.sales_analysis.annual_analysis'));
+        $adminResponse->assertOk();
+        $adminResponse->assertInertia(fn (Assert $page) => $page->where('routePrefix', 'admin'));
+
+        $clerkResponse = $this->actingAs($superadmin)->get(route('clerk.sales_analysis.annual_analysis'));
+        $clerkResponse->assertOk();
+        $clerkResponse->assertInertia(fn (Assert $page) => $page->where('routePrefix', 'clerk'));
+
+        $superadminResponse = $this->actingAs($superadmin)->get(route('superadmin.sales_analysis.annual_analysis'));
+        $superadminResponse->assertOk();
+        $superadminResponse->assertInertia(fn (Assert $page) => $page->where('routePrefix', 'superadmin'));
+    }
+
     public function test_index_uses_query_params_for_deep_link_from_registration_status()
     {
         $superadmin = User::factory()->create(['user_role' => 'superadmin']);
