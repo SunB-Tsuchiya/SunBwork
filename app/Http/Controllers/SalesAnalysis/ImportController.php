@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\SalesAnalysis;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\SalesAnalysis\Concerns\ResolvesSalesAnalysisCompany;
 use App\Http\Controllers\SalesAnalysis\Concerns\ResolvesSalesAnalysisRoutePrefix;
 use App\Http\Requests\SalesAnalysis\UploadSalesWorkbookRequest;
 use App\Models\Sales\SalesImport;
@@ -19,7 +20,7 @@ use Inertia\Inertia;
 
 class ImportController extends Controller
 {
-    use ResolvesSalesAnalysisRoutePrefix;
+    use ResolvesSalesAnalysisRoutePrefix, ResolvesSalesAnalysisCompany;
 
     private const PREVIEW_TTL_MINUTES = 30;
 
@@ -31,15 +32,20 @@ class ImportController extends Controller
 
     public function create()
     {
+        $companyId = $this->salesAnalysisCompanyId();
+
         return Inertia::render('SalesAnalysis/Import', [
             'routePrefix' => $this->salesAnalysisRoutePrefix(),
-            'departmentLabels' => SalesDepartments::LABELS,
-            'enabledDepartmentKeys' => SalesDepartments::ENABLED_KEYS,
+            'hasCompanySelected' => $companyId !== null,
+            'departmentLabels' => $companyId !== null ? SalesDepartments::labelsFor($companyId) : [],
+            'enabledDepartmentKeys' => $companyId !== null ? SalesDepartments::enabledKeysFor($companyId) : [],
         ]);
     }
 
     public function preview(UploadSalesWorkbookRequest $request)
     {
+        $companyId = $this->requireSalesAnalysisCompanyId();
+
         $data = $request->validated();
         $file = $request->file('file');
 
@@ -57,10 +63,11 @@ class ImportController extends Controller
                 (int) $data['source_year'],
                 isset($data['source_month']) ? (int) $data['source_month'] : null,
                 isset($data['source_month_end']) ? (int) $data['source_month_end'] : null,
+                $companyId,
                 $data['excluded_order_numbers'] ?? []
             );
 
-            if (SalesImport::where('file_sha256', $fileHash)->exists()) {
+            if (SalesImport::where('company_id', $companyId)->where('file_sha256', $fileHash)->exists()) {
                 $result['warnings'][] = '同一内容のファイルが既に取り込まれています（二重取込の可能性があります）。';
             }
 
@@ -69,9 +76,11 @@ class ImportController extends Controller
             // 確定時に検証者と確定者が一致することを照合するため保持する
             // （Codexレビュー2回目 High-2対応: 他ユーザーのプレビュートークンを確定できてしまう問題）
             $result['previewed_by'] = Auth::id();
+            // 確定時にどの会社として保存するかを固定する（会社別データ分離、2026-09-05）
+            $result['company_id'] = $companyId;
 
             $diff = $result['valid']
-                ? $this->importService->calculateDiff($result['orders'], $data['department_key'])
+                ? $this->importService->calculateDiff($result['orders'], $data['department_key'], $companyId)
                 : [];
 
             $token = null;
@@ -106,12 +115,14 @@ class ImportController extends Controller
 
     public function store(Request $request)
     {
+        $companyId = $this->requireSalesAnalysisCompanyId();
+
         $data = $request->validate([
             'preview_token' => 'required|string',
         ]);
 
         try {
-            $import = $this->importService->confirm($data['preview_token'], Auth::id());
+            $import = $this->importService->confirm($data['preview_token'], Auth::id(), $companyId);
         } catch (SalesImportConfirmException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }

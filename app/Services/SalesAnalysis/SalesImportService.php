@@ -49,7 +49,7 @@ class SalesImportService
     /**
      * @throws SalesImportConfirmException
      */
-    public function confirm(string $previewToken, int $userId): SalesImport
+    public function confirm(string $previewToken, int $userId, int $companyId): SalesImport
     {
         // 同一トークンでの同時・連続確定を防ぐ排他ロック（Codexレビュー2回目 High-2対応）。
         // Cache::get()→forget()の間に競合すると二重登録され得るため、確定処理全体をロックで囲む。
@@ -60,14 +60,14 @@ class SalesImportService
         }
 
         try {
-            return $this->confirmLocked($previewToken, $userId);
+            return $this->confirmLocked($previewToken, $userId, $companyId);
         } finally {
             $lock->release();
         }
     }
 
     /** @throws SalesImportConfirmException */
-    private function confirmLocked(string $previewToken, int $userId): SalesImport
+    private function confirmLocked(string $previewToken, int $userId, int $companyId): SalesImport
     {
         $cacheKey = $this->previewCacheKey($previewToken);
         $encrypted = $this->previewCacheStore()->get($cacheKey);
@@ -88,12 +88,19 @@ class SalesImportService
             throw new SalesImportConfirmException('このプレビューは別のユーザーが検証したものです。再度ご自身で検証してください。');
         }
 
-        if (SalesImport::where('file_sha256', $result['file_sha256'])->exists()) {
+        // プレビュー時点の会社と確定時点の会社が一致することを確認する（会社別データ分離、2026-09-05）。
+        // SuperAdminがプレビュー後に画面右上の会社切替を操作してから確定した場合など、
+        // 意図と異なる会社にデータが保存されるのを防ぐ。
+        if (($result['company_id'] ?? null) !== $companyId) {
+            throw new SalesImportConfirmException('プレビュー時点と会社が異なります。再度ご自身で検証してください。');
+        }
+
+        if (SalesImport::where('company_id', $companyId)->where('file_sha256', $result['file_sha256'])->exists()) {
             throw new SalesImportConfirmException('同一内容のファイルが既に取り込まれています。');
         }
 
         try {
-            $import = $this->persistImport($result, $userId);
+            $import = $this->persistImport($result, $userId, $companyId);
         } catch (QueryException $e) {
             // 異なるプレビュートークン（同一ファイルを2回アップロード等）が競合した場合の最終防御。
             // 排他ロックはトークン単位のため、この経路はDB側のunique制約でのみ検知できる
@@ -126,13 +133,14 @@ class SalesImportService
 
     private function isDuplicateFileHashViolation(QueryException $e): bool
     {
-        return $e->getCode() === '23000' && str_contains($e->getMessage(), 'sales_imports_file_sha256_unique');
+        return $e->getCode() === '23000' && str_contains($e->getMessage(), 'sales_imports_company_file_sha256_unique');
     }
 
-    private function persistImport(array $result, int $userId): SalesImport
+    private function persistImport(array $result, int $userId, int $companyId): SalesImport
     {
-        return DB::connection('sales')->transaction(function () use ($result, $userId) {
+        return DB::connection('sales')->transaction(function () use ($result, $userId, $companyId) {
             $version = $this->nextVersion(
+                $companyId,
                 $result['department_key'],
                 $result['source_year'],
                 $result['source_month'],
@@ -140,6 +148,7 @@ class SalesImportService
             );
 
             $import = SalesImport::create([
+                'company_id' => $companyId,
                 'department_key' => $result['department_key'],
                 'source_type' => $result['source_type'],
                 'source_year' => $result['source_year'],
@@ -198,6 +207,7 @@ class SalesImportService
             foreach ($this->targetMonths($result['source_type'], $result['source_year'], $result['source_month'], $result['source_month_end'] ?? null) as $month) {
                 SalesActiveMonth::updateOrCreate(
                     [
+                        'company_id' => $companyId,
                         'department_key' => $result['department_key'],
                         'sales_year' => $month['year'],
                         'sales_month' => $month['month'],
@@ -217,9 +227,10 @@ class SalesImportService
     /**
      * 同一部署・対象期間（rangeは開始月〜終了月の組み合わせ）内で次に採番すべき版番号を返す。
      */
-    private function nextVersion(string $departmentKey, int $sourceYear, ?int $sourceMonth, ?int $sourceMonthEnd = null): int
+    private function nextVersion(int $companyId, string $departmentKey, int $sourceYear, ?int $sourceMonth, ?int $sourceMonthEnd = null): int
     {
-        $query = SalesImport::where('department_key', $departmentKey)
+        $query = SalesImport::where('company_id', $companyId)
+            ->where('department_key', $departmentKey)
             ->where('source_year', $sourceYear);
 
         $sourceMonth === null ? $query->whereNull('source_month') : $query->where('source_month', $sourceMonth);
@@ -270,12 +281,13 @@ class SalesImportService
      * @param  array<int, array>  $orders
      * @return array<int, array>
      */
-    public function calculateDiff(array $orders, string $departmentKey): array
+    public function calculateDiff(array $orders, string $departmentKey, int $companyId): array
     {
         $diffs = [];
 
         foreach ($this->affectedMonths($orders) as $month) {
-            $active = SalesActiveMonth::where('department_key', $departmentKey)
+            $active = SalesActiveMonth::where('company_id', $companyId)
+                ->where('department_key', $departmentKey)
                 ->where('sales_year', $month['year'])
                 ->where('sales_month', $month['month'])
                 ->with('salesImport')

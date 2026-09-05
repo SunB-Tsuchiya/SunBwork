@@ -23,8 +23,46 @@ class SalesQueryService
 
     public const FISCAL_MODE_APRIL = 'fiscal_april';
 
+    /** 会社別データ分離（2026-09-05）。呼び出し側は必ず先に`forCompany()`で設定してから使う */
+    private ?int $companyId = null;
+
     public function __construct(private SalesImportService $importService)
     {
+    }
+
+    /**
+     * このインスタンスが以降扱う会社を設定する（Controller側で`ResolvesSalesAnalysisCompany`から
+     * 解決した会社IDを渡す）。fluentで返すので`$this->queryService->forCompany($id)->xxx()`と書ける。
+     * 41個ある各集計メソッドの引数を全て変更する代わりに、インスタンス状態として持たせることで
+     * 変更範囲をこの起点2メソッドに閉じ込めている（PHP-FPMは1リクエスト1プロセスのため、
+     * リクエストをまたいだ状態漏洩は起きない）。
+     */
+    public function forCompany(int $companyId): self
+    {
+        $this->companyId = $companyId;
+
+        return $this;
+    }
+
+    private function requireCompanyId(): int
+    {
+        if ($this->companyId === null) {
+            throw new \LogicException('SalesQueryService: forCompany()が呼ばれる前にクエリメソッドが実行されました。');
+        }
+
+        return $this->companyId;
+    }
+
+    /** company_idスコープ済みのSalesActiveMonthクエリ起点 */
+    private function scopedActiveMonths(): Builder
+    {
+        return SalesActiveMonth::where('company_id', $this->requireCompanyId());
+    }
+
+    /** company_idスコープ済みのSalesImportクエリ起点 */
+    private function scopedImports(): Builder
+    {
+        return SalesImport::where('company_id', $this->requireCompanyId());
     }
 
     /**
@@ -34,11 +72,14 @@ class SalesQueryService
      */
     private function activeOrdersQuery(string|array $departmentKey): Builder
     {
+        $companyId = $this->requireCompanyId();
+
         return SalesOrder::query()
-            ->join('sales_active_months', function ($join) use ($departmentKey) {
+            ->join('sales_active_months', function ($join) use ($departmentKey, $companyId) {
                 $join->on('sales_orders.sales_import_id', '=', 'sales_active_months.sales_import_id')
                     ->on('sales_orders.sales_year', '=', 'sales_active_months.sales_year')
-                    ->on('sales_orders.sales_month', '=', 'sales_active_months.sales_month');
+                    ->on('sales_orders.sales_month', '=', 'sales_active_months.sales_month')
+                    ->where('sales_active_months.company_id', $companyId);
 
                 is_array($departmentKey)
                     ? $join->whereIn('sales_active_months.department_key', $departmentKey)
@@ -48,7 +89,7 @@ class SalesQueryService
 
     public function hasActiveMonth(string $departmentKey, int $year, int $month): bool
     {
-        return SalesActiveMonth::where('department_key', $departmentKey)
+        return $this->scopedActiveMonths()->where('department_key', $departmentKey)
             ->where('sales_year', $year)
             ->where('sales_month', $month)
             ->exists();
@@ -234,7 +275,7 @@ class SalesQueryService
     /** 期間ナビゲーターの「最新登録月」ボタン用。指定部署の最新登録年月を返す（無ければnull） */
     public function latestRegisteredMonth(string $departmentKey): ?array
     {
-        $row = SalesActiveMonth::where('department_key', $departmentKey)
+        $row = $this->scopedActiveMonths()->where('department_key', $departmentKey)
             ->orderByDesc('sales_year')
             ->orderByDesc('sales_month')
             ->first();
@@ -249,7 +290,7 @@ class SalesQueryService
     public function latestRegisteredMonthNumber(string $departmentKey): ?int
     {
         $departmentKeys = $this->resolveDepartmentKeys($departmentKey);
-        $row = SalesActiveMonth::whereIn('department_key', $departmentKeys)
+        $row = $this->scopedActiveMonths()->whereIn('department_key', $departmentKeys)
             ->orderByDesc('sales_year')
             ->orderByDesc('sales_month')
             ->first();
@@ -261,13 +302,13 @@ class SalesQueryService
     {
         $target = $year * 100 + $month;
 
-        $before = SalesActiveMonth::where('department_key', $departmentKey)
+        $before = $this->scopedActiveMonths()->where('department_key', $departmentKey)
             ->selectRaw('sales_year, sales_month')
             ->whereRaw('(sales_year * 100 + sales_month) < ?', [$target])
             ->orderByRaw('(sales_year * 100 + sales_month) DESC')
             ->first();
 
-        $after = SalesActiveMonth::where('department_key', $departmentKey)
+        $after = $this->scopedActiveMonths()->where('department_key', $departmentKey)
             ->selectRaw('sales_year, sales_month')
             ->whereRaw('(sales_year * 100 + sales_month) > ?', [$target])
             ->orderByRaw('(sales_year * 100 + sales_month) ASC')
@@ -285,7 +326,7 @@ class SalesQueryService
     {
         [$startYear, $startMonth] = $this->shiftMonth($endYear, $endMonth, -($count - 1));
 
-        $activeMonthKeys = SalesActiveMonth::where('department_key', $departmentKey)
+        $activeMonthKeys = $this->scopedActiveMonths()->where('department_key', $departmentKey)
             ->get(['sales_year', 'sales_month'])
             ->map(fn ($m) => "{$m->sales_year}-{$m->sales_month}")
             ->flip();
@@ -371,7 +412,8 @@ class SalesQueryService
 
     private function clientDisplayNameResolver(): Closure
     {
-        $map = SalesClientGroupMember::with('group')
+        $map = SalesClientGroupMember::where('company_id', $this->requireCompanyId())
+            ->with('group')
             ->get()
             ->filter(fn ($m) => $m->group)
             ->mapWithKeys(fn ($m) => [$m->client_name => $m->group->name]);
@@ -582,7 +624,7 @@ class SalesQueryService
      */
     public function registrationStatusByDepartment(string $departmentKey): array
     {
-        $activeMonths = SalesActiveMonth::where('department_key', $departmentKey)->get();
+        $activeMonths = $this->scopedActiveMonths()->where('department_key', $departmentKey)->get();
 
         if ($activeMonths->isEmpty()) {
             return [];
@@ -693,7 +735,7 @@ class SalesQueryService
      */
     public function registrationStatusFiles(string $departmentKey, int $year): array
     {
-        $imports = SalesImport::where('department_key', $departmentKey)
+        $imports = $this->scopedImports()->where('department_key', $departmentKey)
             ->where('source_year', $year)
             ->orderByDesc('imported_at')
             ->get();
@@ -702,7 +744,7 @@ class SalesQueryService
             return [];
         }
 
-        $activeCounts = SalesActiveMonth::where('department_key', $departmentKey)
+        $activeCounts = $this->scopedActiveMonths()->where('department_key', $departmentKey)
             ->whereIn('sales_import_id', $imports->pluck('id'))
             ->selectRaw('sales_import_id, COUNT(*) as active_count')
             ->groupBy('sales_import_id')
@@ -887,7 +929,7 @@ class SalesQueryService
     public function latestRegisteredYear(string $departmentKey): ?int
     {
         $departmentKeys = $this->resolveDepartmentKeys($departmentKey);
-        $row = SalesActiveMonth::whereIn('department_key', $departmentKeys)->orderByDesc('sales_year')->first();
+        $row = $this->scopedActiveMonths()->whereIn('department_key', $departmentKeys)->orderByDesc('sales_year')->first();
 
         return $row ? (int) $row->sales_year : null;
     }
@@ -1078,7 +1120,7 @@ class SalesQueryService
     public function latestRegisteredFiscalYear(string $departmentKey): ?int
     {
         $departmentKeys = $this->resolveDepartmentKeys($departmentKey);
-        $row = SalesActiveMonth::whereIn('department_key', $departmentKeys)
+        $row = $this->scopedActiveMonths()->whereIn('department_key', $departmentKeys)
             ->orderByDesc('sales_year')
             ->orderByDesc('sales_month')
             ->first();
@@ -1394,7 +1436,7 @@ class SalesQueryService
     /** @return array<int, string> 'all'は企画・制作・オンデマンドの3部署に展開する */
     private function resolveDepartmentKeys(string $departmentKey): array
     {
-        return $departmentKey === 'all' ? SalesDepartments::ENABLED_KEYS : [$departmentKey];
+        return $departmentKey === 'all' ? SalesDepartments::enabledKeysFor($this->requireCompanyId()) : [$departmentKey];
     }
 
     /**
@@ -1412,7 +1454,7 @@ class SalesQueryService
     {
         $result = array_fill(1, 12, null);
 
-        $activeMonths = SalesActiveMonth::whereIn('department_key', $departmentKeys)
+        $activeMonths = $this->scopedActiveMonths()->whereIn('department_key', $departmentKeys)
             ->where('sales_year', $year)
             ->get();
 
@@ -1665,7 +1707,7 @@ class SalesQueryService
      */
     private function rangeFigures(array $departmentKeys, int $year, int $startMonth, int $endMonth): ?array
     {
-        $activeRows = SalesActiveMonth::whereIn('department_key', $departmentKeys)
+        $activeRows = $this->scopedActiveMonths()->whereIn('department_key', $departmentKeys)
             ->where('sales_year', $year)
             ->whereBetween('sales_month', [$startMonth, $endMonth])
             ->get();
@@ -1839,7 +1881,7 @@ class SalesQueryService
         $compareBreakdowns = [];
         foreach ($offsets as $offset) {
             $compareYear = $referenceYear - $offset;
-            $registered = SalesActiveMonth::whereIn('department_key', $departmentKeys)
+            $registered = $this->scopedActiveMonths()->whereIn('department_key', $departmentKeys)
                 ->where('sales_year', $compareYear)
                 ->where('sales_month', $month)
                 ->exists();
@@ -1958,7 +2000,7 @@ class SalesQueryService
             $label = "{$year}年{$month}月";
         } else {
             $month = null;
-            $registeredMonths = SalesActiveMonth::whereIn('department_key', $departmentKeys)
+            $registeredMonths = $this->scopedActiveMonths()->whereIn('department_key', $departmentKeys)
                 ->where('sales_year', $year)
                 ->pluck('sales_month')
                 ->unique();
@@ -2145,7 +2187,7 @@ class SalesQueryService
             $companyAmount = null;
 
             if ($rangeEnd >= $rangeStart) {
-                $yearIsRegistered = SalesActiveMonth::whereIn('department_key', $departmentKeys)
+                $yearIsRegistered = $this->scopedActiveMonths()->whereIn('department_key', $departmentKeys)
                     ->where('sales_year', $year)
                     ->whereBetween('sales_month', [$rangeStart, $rangeEnd])
                     ->exists();
@@ -2333,7 +2375,7 @@ class SalesQueryService
             $companyAmount = null;
 
             if ($rangeEnd >= $rangeStart) {
-                $yearIsRegistered = SalesActiveMonth::whereIn('department_key', $departmentKeys)
+                $yearIsRegistered = $this->scopedActiveMonths()->whereIn('department_key', $departmentKeys)
                     ->where('sales_year', $year)
                     ->whereBetween('sales_month', [$rangeStart, $rangeEnd])
                     ->exists();
@@ -2434,7 +2476,7 @@ class SalesQueryService
         }
 
         $priorYear = $latestYear - 1;
-        $hasComparisonPair = SalesActiveMonth::whereIn('department_key', $departmentKeys)->where('sales_year', $priorYear)->exists();
+        $hasComparisonPair = $this->scopedActiveMonths()->whereIn('department_key', $departmentKeys)->where('sales_year', $priorYear)->exists();
 
         // 年度表記だけが違う同一商品（教材・テキスト等）を「新規/取扱終了」と誤検知しないよう、
         // 年度を除去した名称をキーに集計し直す（原名のランキング・個別推移には影響させない）
@@ -2529,7 +2571,7 @@ class SalesQueryService
     /** 統合後表示名から、その統合グループに属する原名称の一覧を返す。グループが無ければ原名そのものを1件返す */
     private function rawNamesForDisplayName(string $displayName): array
     {
-        $group = SalesClientGroup::where('name', $displayName)->with('members')->first();
+        $group = SalesClientGroup::where('company_id', $this->requireCompanyId())->where('name', $displayName)->with('members')->first();
 
         return $group ? $group->members->pluck('client_name')->all() : [$displayName];
     }

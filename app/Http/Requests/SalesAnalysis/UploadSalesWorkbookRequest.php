@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\SalesAnalysis;
 
+use App\Http\Controllers\SalesAnalysis\Concerns\ResolvesSalesAnalysisCompany;
 use App\Http\Requests\SalesAnalysis\Concerns\ValidatesXlsxFile;
 use App\Services\SalesAnalysis\SalesDepartments;
 use Illuminate\Foundation\Http\FormRequest;
@@ -10,7 +11,7 @@ use Illuminate\Validation\Validator;
 
 class UploadSalesWorkbookRequest extends FormRequest
 {
-    use ValidatesXlsxFile;
+    use ValidatesXlsxFile, ResolvesSalesAnalysisCompany;
 
     public function authorize(): bool
     {
@@ -22,7 +23,7 @@ class UploadSalesWorkbookRequest extends FormRequest
     {
         return [
             'file' => $this->xlsxFileRules(),
-            'department_key' => ['required', 'string', Rule::in(SalesDepartments::ENABLED_KEYS)],
+            'department_key' => ['required', 'string', Rule::in(SalesDepartments::enabledKeysFor($this->requireSalesAnalysisCompanyId()))],
             'source_type' => ['required', 'string', 'in:annual,monthly,range'],
             'source_year' => ['required', 'integer', 'min:2000', 'max:2100'],
             // monthly: 対象月。range: 開始月

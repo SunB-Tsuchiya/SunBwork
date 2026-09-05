@@ -46,6 +46,7 @@ class SalesDatabaseIsolationTest extends TestCase
     public function test_sales_model_writes_only_to_sales_connection()
     {
         $import = SalesImport::create([
+            'company_id' => $this->salesTestCompanyId(),
             'department_key' => 'planning',
             'source_type' => 'monthly',
             'source_year' => 2026,

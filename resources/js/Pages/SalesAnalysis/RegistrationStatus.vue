@@ -9,6 +9,7 @@ const props = defineProps({
     routePrefix: { type: String, required: true },
     departmentLabels: { type: Object, default: () => ({}) },
     enabledDepartmentKeys: { type: Array, default: () => [] },
+    hasCompanySelected: { type: Boolean, default: true },
 });
 
 // 売上分析ルートは superadmin/admin/clerk の各ロールグループ内に複製登録されている
@@ -29,6 +30,8 @@ const monthLabels = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '1
 const hasAnyDataAcrossAllDepartments = computed(() => years.value.length > 0);
 
 const fetchStatus = async () => {
+    if (!props.hasCompanySelected) return;
+
     loading.value = true;
     errorMessage.value = '';
     expandedYears.value = new Set();
@@ -129,6 +132,10 @@ onMounted(fetchStatus);
 
             <p v-if="errorMessage" class="rounded bg-red-50 p-3 text-sm text-red-700">{{ errorMessage }}</p>
             <p v-if="loading" class="text-sm text-gray-500">読み込み中...</p>
+
+            <div v-else-if="!hasCompanySelected" class="rounded bg-white p-6 shadow">
+                <p class="text-sm text-gray-500">会社が選択されていません。画面右上の会社切替から対象の会社を選択してください。</p>
+            </div>
 
             <div v-else-if="!hasAnyDataAcrossAllDepartments" class="rounded bg-white p-6 shadow">
                 <p class="text-sm text-gray-500">

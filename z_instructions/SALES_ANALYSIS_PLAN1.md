@@ -1664,6 +1664,81 @@ REVIEW3 17章6番目の最終画面。検討の結果、左右比較へは共通
 
 ---
 
+### Phase 19: 会社別データ分離（サンエー印刷追加対応）
+
+ユーザーからの要望（2026-09-05）:「この分析データを会社ごとに分けたい。今登録しているデータは
+すべてサン・ブレーンで、サン・ブレーン所属の人が見られる。super adminはすべてみられる。さくらは
+サンエー印刷も追加になるが、サンエー印刷所属の人が経理のデータを入れた場合はサンエー印刷の
+データが見られるようにしたい」。既存の他機能（案件・クライアント等）が使っている
+`session('superadmin_context.company_id') ?? $user->company_id`パターンを売上分析にも適用した。
+
+**設計方針**
+- SuperAdminは画面右上の既存「会社切替」で選んだ会社のデータを表示。**未選択（グローバル）時は
+  「会社を選んでください」という案内を表示**し、全社合算はしない（部署区分自体が会社ごとに
+  異なるため合算に意味がない）
+- Admin/Clerkは常に自分の所属会社（`$user->company_id`）のデータのみ（切替不可）
+- 部署区分（`SalesDepartments`）はサン・ブレーン専用のハードコード（企画/制作/オンデマンド）
+  だったため、新規テーブル`sales_department_definitions`（company_id, key, label, sort_order）へ
+  切り出した。サン・ブレーンは既存3区分、サンエー印刷は`general`（全社）の1区分のみ
+  （ユーザー確認済み: 「今は会社全体の単一区分でよい」）。投入は`SalesDepartmentDefinitionSeeder`
+- `sales_analysis_permissions`（個人単位の利用許可）はcompany_id列を追加せず現状維持。
+  会社の絞り込みはクエリ側でのみ行う設計とした
+
+**DBスキーマ変更（すべて`sales`接続、クロスDBのためFK無し）**
+- `sales_imports`/`sales_active_months`に`company_id`列を追加。`sales_active_months`の一意制約は
+  `[company_id, department_key, sales_year, sales_month]`へ変更
+- `sales_imports.file_sha256`の一意制約を`[company_id, file_sha256]`の複合一意へ変更
+  （別会社が偶然バイト単位で同一ファイルを取り込んでも誤って弾かれないように）
+- `sales_client_groups`/`sales_client_group_members`に`company_id`列を追加。
+  `sales_client_group_members.client_name`の一意制約を`[company_id, client_name]`へ変更
+  （別会社に同名クライアントがいると壊れるため）
+- 新規`sales_department_definitions`テーブル
+- 既存データの後方補完migrationで、既存の全行を`code='SUNBRAIN'`の会社IDへ設定
+
+**バックエンド設計**
+- `SalesQueryService`は41個ある集計メソッドの引数を全て変更する代わりに、
+  `forCompany(int $companyId): self`という状態保持型の起点メソッドを追加（fluent、
+  PHP-FPMは1リクエスト1プロセスのためリクエストをまたいだ状態漏洩は起きない）。
+  `activeOrdersQuery()`・`scopedActiveMonths()`・`scopedImports()`・`resolveDepartmentKeys()`等の
+  内部ヘルパーだけが`$this->companyId`を参照するよう変更し、41個の公開メソッドのシグネチャは
+  一切変更していない。`SalesExportService`/`ClientGroupService`も同じ設計
+- 新規trait`ResolvesSalesAnalysisCompany`（`salesAnalysisCompanyId()`: nullable、
+  `requireSalesAnalysisCompanyId()`: API/JSON用、null時422で止める）
+- `SalesImportService::confirm()`/`calculateDiff()`、`SalesImportValidator::validate()`は
+  `$companyId`を明示的な引数として受け取る設計（インポート確定はセッション状態に依存させず、
+  プレビュー時点の会社とconfirm時点の会社が一致することをアプリ層でも二重チェックする
+  ——SuperAdminがプレビュー後に会社切替を操作してから確定した場合の取り違えを防ぐ）
+- `SalesDepartments`は静的定数からDB参照（`labelsFor()`/`enabledKeysFor()`/`labelForKey()`/
+  `isEnabledFor()`、いずれも`$companyId`必須）へ全面書き換え。呼び出し元10コントローラー・
+  3サービス・1 FormRequestを全て会社ID対応に修正
+- `ClientGroupController`のルートモデルバインディング（`SalesClientGroup $group`等）に
+  `authorizeGroupCompany()`を追加し、IDを推測した他社データの操作を防止
+
+**フロントエンド**
+- 全11ページ（データ登録状況・月次/年次/期別分析・同月/左右比較・得意先/商品分析・
+  Excel取込・取込履歴・得意先統合設定）に`hasCompanySelected`propを追加し、
+  未選択時は「会社が選択されていません。画面右上の会社切替から対象の会社を選択してください。」
+  という案内を表示（自動fetchするページは`hasCompanySelected`がfalseなら要求を出さないよう
+  ガードし、422を予防）
+
+**テスト**
+- 既存の売上分析テスト（20ファイル）は`Tests\Concerns\RefreshesSalesDatabase`の`setUp()`で
+  テスト用会社を1つ自動作成し、SuperAdminアクターへ`session(['superadmin_context'=>['company_id'=>...]])`
+  を自動設定するよう変更（各テストファイルを個別に書き換える手間を無くした）。
+  既存の3部署（企画/制作/オンデマンド）の`sales_department_definitions`もsetUp()で自動投入
+- `seedMonth()`等のヘルパー・`SalesImport::create()`/`SalesActiveMonth::updateOrCreate()`/
+  `SalesClientGroup::create()`等の直接呼び出し全箇所に`company_id`を追加
+- 売上分析テスト全275件成功（既存271件+新規4件の離脱得意先/符号フィルタ回帰テストを含む）
+
+**未対応（本番デプロイ時に別途必要）**
+- 本番の`sales_department_definitions`にサンエー印刷分の投入
+  （`php artisan db:seed --class=SalesDepartmentDefinitionSeeder --force`）
+- 本番のサンエー印刷Admin/Clerkユーザーが正しい`company_id`（3）を持っているかの確認
+- 本番の`SalesAnalysisPermission`はサンエー印刷のユーザーにも別途付与が必要
+  （既存の許可設定画面から。サン・ブレーンとサンエー印刷で共有されない前提）
+
+---
+
 ## 11. テスト受入基準
 
 ### 権限

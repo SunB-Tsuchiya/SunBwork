@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\SalesAnalysis;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\SalesAnalysis\Concerns\ResolvesSalesAnalysisCompany;
 use App\Http\Controllers\SalesAnalysis\Concerns\ResolvesSalesAnalysisRoutePrefix;
 use App\Models\Sales\SalesActiveMonth;
 use App\Services\SalesAnalysis\SalesDepartments;
@@ -22,7 +23,7 @@ use Inertia\Inertia;
  */
 class MonthlyAnalysisController extends Controller
 {
-    use ResolvesSalesAnalysisRoutePrefix;
+    use ResolvesSalesAnalysisRoutePrefix, ResolvesSalesAnalysisCompany;
 
     public function __construct(private SalesQueryService $queryService)
     {
@@ -30,6 +31,24 @@ class MonthlyAnalysisController extends Controller
 
     public function index(Request $request)
     {
+        $companyId = $this->salesAnalysisCompanyId();
+
+        if ($companyId === null) {
+            return Inertia::render('SalesAnalysis/MonthlyAnalysis', [
+                'routePrefix' => $this->salesAnalysisRoutePrefix(),
+                'hasCompanySelected' => false,
+                'departmentLabels' => [],
+                'enabledDepartmentKeys' => [],
+                'initialDepartmentKey' => null,
+                'initialYear' => (int) now()->format('Y'),
+                'initialMonth' => (int) now()->format('n'),
+                'hasAnyData' => false,
+                'initialLatestPeriod' => null,
+            ]);
+        }
+
+        $enabledKeys = SalesDepartments::enabledKeysFor($companyId);
+
         // 部署・年・月がクエリストリングで指定されていれば、それを初期表示に使う
         // （データ登録状況画面などからの深いリンク用。2026-09-03追加）。
         $departmentKey = $request->query('department_key');
@@ -37,7 +56,7 @@ class MonthlyAnalysisController extends Controller
         $month = $request->query('month');
 
         $hasValidQueryParams = is_string($departmentKey)
-            && SalesDepartments::isEnabled($departmentKey)
+            && SalesDepartments::isEnabledFor($companyId, $departmentKey)
             && is_numeric($year)
             && is_numeric($month)
             && (int) $year >= 2000
@@ -53,17 +72,18 @@ class MonthlyAnalysisController extends Controller
             // 選択中の年月自体に登録が無いだけで空表示に落とさない（未登録月はPeriodNavigatorの
             // 案内で扱う）。判定は「この部署に何か1件でも登録済みか」に留める
             // （実機フィードバック対応: 未登録月のURLでリロードすると空表示に戻ってしまう問題、2026-09-04）
-            $hasAnyData = SalesActiveMonth::where('department_key', $departmentKey)->exists();
+            $hasAnyData = SalesActiveMonth::where('company_id', $companyId)->where('department_key', $departmentKey)->exists();
 
             return Inertia::render('SalesAnalysis/MonthlyAnalysis', [
                 'routePrefix' => $this->salesAnalysisRoutePrefix(),
-                'departmentLabels' => SalesDepartments::LABELS,
-                'enabledDepartmentKeys' => SalesDepartments::ENABLED_KEYS,
+                'hasCompanySelected' => true,
+                'departmentLabels' => SalesDepartments::labelsFor($companyId),
+                'enabledDepartmentKeys' => $enabledKeys,
                 'initialDepartmentKey' => $departmentKey,
                 'initialYear' => $year,
                 'initialMonth' => $month,
                 'hasAnyData' => $hasAnyData,
-                'initialLatestPeriod' => $this->queryService->latestRegisteredMonth($departmentKey),
+                'initialLatestPeriod' => $this->queryService->forCompany($companyId)->latestRegisteredMonth($departmentKey),
             ]);
         }
 
@@ -74,18 +94,20 @@ class MonthlyAnalysisController extends Controller
         // 追加登録した直後に古い2020年が「最新」として開いてしまうため、
         // sales_year/sales_month（対象期間そのもの）を優先する
         // （Codexレビュー2回目 8.1 Medium-1対応）。
-        $latest = SalesActiveMonth::whereIn('department_key', SalesDepartments::ENABLED_KEYS)
+        $latest = SalesActiveMonth::where('company_id', $companyId)
+            ->whereIn('department_key', $enabledKeys)
             ->orderByDesc('sales_year')
             ->orderByDesc('sales_month')
             ->orderByDesc('activated_at')
             ->first();
 
-        $departmentKey = $latest->department_key ?? SalesDepartments::ENABLED_KEYS[0];
+        $departmentKey = $latest->department_key ?? ($enabledKeys[0] ?? null);
 
         return Inertia::render('SalesAnalysis/MonthlyAnalysis', [
             'routePrefix' => $this->salesAnalysisRoutePrefix(),
-            'departmentLabels' => SalesDepartments::LABELS,
-            'enabledDepartmentKeys' => SalesDepartments::ENABLED_KEYS,
+            'hasCompanySelected' => true,
+            'departmentLabels' => SalesDepartments::labelsFor($companyId),
+            'enabledDepartmentKeys' => $enabledKeys,
             'initialDepartmentKey' => $departmentKey,
             'initialYear' => $latest->sales_year ?? (int) now()->format('Y'),
             'initialMonth' => $latest->sales_month ?? (int) now()->format('n'),
@@ -141,12 +163,14 @@ class MonthlyAnalysisController extends Controller
     /** 期間ナビゲーターの「最新登録月」ボタン用（部署切替後の再取得もこのAPIを使う。Phase 12） */
     public function latestPeriod(Request $request)
     {
+        $companyId = $this->requireSalesAnalysisCompanyId();
+
         $data = $request->validate([
-            'department_key' => ['required', 'string', Rule::in(SalesDepartments::ENABLED_KEYS)],
+            'department_key' => ['required', 'string', Rule::in(SalesDepartments::enabledKeysFor($companyId))],
         ]);
 
         return response()->json([
-            'latest' => $this->queryService->latestRegisteredMonth($data['department_key']),
+            'latest' => $this->queryService->forCompany($companyId)->latestRegisteredMonth($data['department_key']),
         ]);
     }
 
@@ -230,12 +254,23 @@ class MonthlyAnalysisController extends Controller
         ]);
     }
 
+    /**
+     * 期間パラメータのバリデーションと同時に会社IDを解決し、以降のqueryService呼び出しに
+     * `forCompany()`を適用しておく（各アクションが個別にforCompany()を呼ばずに済むようにする）。
+     */
     private function validatePeriod(Request $request): array
     {
-        return $request->validate([
-            'department_key' => ['required', 'string', Rule::in(SalesDepartments::ENABLED_KEYS)],
+        $companyId = $this->requireSalesAnalysisCompanyId();
+        $this->queryService->forCompany($companyId);
+
+        $data = $request->validate([
+            'department_key' => ['required', 'string', Rule::in(SalesDepartments::enabledKeysFor($companyId))],
             'year' => ['required', 'integer', 'min:2000', 'max:2100'],
             'month' => ['required', 'integer', 'min:1', 'max:12'],
         ]);
+
+        $data['company_id'] = $companyId;
+
+        return $data;
     }
 }

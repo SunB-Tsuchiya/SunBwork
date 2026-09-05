@@ -278,6 +278,23 @@
 | 18-5 | 回帰テスト追加・全体テスト・build | ✅ | 売上分析262件成功（新規15件）、npm run build成功 |
 | 18-6 | 新規/取扱終了商品の年度表記誤検知を修正（ProductNameNormalizer） | ✅ | 実例「2027年度用〜」対「2026年度用〜」を同一商品として扱うよう修正。範囲は新規/取扱終了パネルのみとユーザーに確認済み。売上分析271件成功（新規9件） |
 
+### Phase 19: 会社別データ分離（サンエー印刷追加対応）
+
+| ID | タスク | 状態 | 証跡・メモ |
+|---|---|---|---|
+| 19-1 | DBマイグレーション6本（company_id追加・一意制約変更・sales_department_definitions新設・後方補完） | ✅ | 全てsales接続、クロスDBのためFK無し。MySQL識別子64文字制限に一度ひっかかり修正（sales_active_months） |
+| 19-2 | SalesQueryService/SalesExportService/ClientGroupServiceにforCompany()追加 | ✅ | 41メソッドのシグネチャ変更を避け、インスタンス状態として会社IDを保持する設計 |
+| 19-3 | SalesDepartmentsをDB参照に全面書き換え、10コントローラー・3サービス・1 FormRequestを対応 | ✅ | labelsFor()/enabledKeysFor()/labelForKey()/isEnabledFor()、全てcompanyId必須 |
+| 19-4 | SalesImportService/SalesImportValidatorにcompanyId引数を追加、confirm時の会社不一致チェック追加 | ✅ | プレビュー時点と確定時点の会社一致を二重チェック（SuperAdminの会社切替タイミングずれ対策） |
+| 19-5 | ClientGroupControllerのルートモデルバインディングに会社所属チェック追加 | ✅ | IDを推測した他社データ操作を防止（authorizeGroupCompany()） |
+| 19-6 | 既存テスト20ファイルの修正（RefreshesSalesDatabaseにテスト会社自動作成・セッション自動設定） | ✅ | 各テストファイル個別修正を回避。売上分析275件成功 |
+| 19-7 | フロントエンド11ページにhasCompanySelected対応 | ✅ | 未選択時「会社を選択してください」案内、自動fetchページは422を予防するガード追加。npm run build成功 |
+
+**本番デプロイ時の未対応事項（別途実施が必要）:**
+- 本番`sales_department_definitions`にサンエー印刷分を投入（`SalesDepartmentDefinitionSeeder`）
+- 本番サンエー印刷Admin/Clerkの`company_id`確認
+- サンエー印刷ユーザーへの`SalesAnalysisPermission`個別付与
+
 ### Review R1: Codex
 
 | ID | レビュー観点 | 状態 | 指摘 |

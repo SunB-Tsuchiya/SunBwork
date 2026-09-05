@@ -26,6 +26,7 @@ class SalesExportServiceTest extends TestCase
         self::$importSeq++;
 
         $import = SalesImport::create([
+            'company_id' => $this->salesTestCompanyId(),
             'department_key' => $dept,
             'source_type' => 'monthly',
             'source_year' => $year,
@@ -71,14 +72,14 @@ class SalesExportServiceTest extends TestCase
         }
 
         SalesActiveMonth::updateOrCreate(
-            ['department_key' => $dept, 'sales_year' => $year, 'sales_month' => $month],
+            ['company_id' => $this->salesTestCompanyId(), 'department_key' => $dept, 'sales_year' => $year, 'sales_month' => $month],
             ['sales_import_id' => $import->id, 'activated_by' => 1, 'activated_at' => now()]
         );
     }
 
     private function service(): SalesExportService
     {
-        return new SalesExportService(new SalesQueryService(new SalesImportService()));
+        return (new SalesExportService(new SalesQueryService(new SalesImportService())))->forCompany($this->salesTestCompanyId());
     }
 
     public function test_workbook_has_all_required_sheets()
@@ -154,9 +155,9 @@ class SalesExportServiceTest extends TestCase
 
     public function test_client_sheet_consolidates_clients_when_flag_true()
     {
-        $group = SalesClientGroup::create(['name' => '株式会社NON', 'created_by' => 1, 'updated_by' => 1]);
-        SalesClientGroupMember::create(['sales_client_group_id' => $group->id, 'client_name' => '株式会社NON（2）', 'normalized_name' => 'x']);
-        SalesClientGroupMember::create(['sales_client_group_id' => $group->id, 'client_name' => '株式会社NON（3）', 'normalized_name' => 'y']);
+        $group = SalesClientGroup::create(['company_id' => $this->salesTestCompanyId(), 'name' => '株式会社NON', 'created_by' => 1, 'updated_by' => 1]);
+        SalesClientGroupMember::create(['sales_client_group_id' => $group->id, 'company_id' => $this->salesTestCompanyId(), 'client_name' => '株式会社NON（2）', 'normalized_name' => 'x']);
+        SalesClientGroupMember::create(['sales_client_group_id' => $group->id, 'company_id' => $this->salesTestCompanyId(), 'client_name' => '株式会社NON（3）', 'normalized_name' => 'y']);
 
         $this->seedMonth('planning', 2026, 2, [
             ['order_number' => 'EX-8', 'client_name' => '株式会社NON（2）', 'amount' => 1000],

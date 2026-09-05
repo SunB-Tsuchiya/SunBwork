@@ -9,6 +9,7 @@ const props = defineProps({
     routePrefix: { type: String, required: true },
     departmentLabels: { type: Object, default: () => ({}) },
     enabledDepartmentKeys: { type: Array, default: () => [] },
+    hasCompanySelected: { type: Boolean, default: true },
 });
 
 // 売上分析ルートは superadmin/admin/clerk の各ロールグループ内に複製登録されている
@@ -199,7 +200,11 @@ const confirmImport = async () => {
             <SalesAnalysisNavigationTabs :route-prefix="routePrefix" active="import" />
         </template>
 
-        <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
+        <div v-if="!hasCompanySelected" class="rounded bg-white p-6 shadow">
+            <p class="text-sm text-gray-500">会社が選択されていません。画面右上の会社切替から対象の会社を選択してください。</p>
+        </div>
+
+        <div v-else class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <div class="mb-8">
                 <h3 class="mb-3 text-sm font-semibold text-gray-900">ファイル名の例</h3>
                 <div class="rounded-lg bg-gray-50 p-4 text-sm text-gray-700">

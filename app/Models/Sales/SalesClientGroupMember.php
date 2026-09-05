@@ -10,6 +10,7 @@ class SalesClientGroupMember extends Model
 
     protected $fillable = [
         'sales_client_group_id',
+        'company_id',
         'client_name',
         'normalized_name',
     ];

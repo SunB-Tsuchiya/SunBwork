@@ -9,6 +9,7 @@ class SalesImport extends Model
     protected $connection = 'sales';
 
     protected $fillable = [
+        'company_id',
         'department_key',
         'source_type',
         'source_year',

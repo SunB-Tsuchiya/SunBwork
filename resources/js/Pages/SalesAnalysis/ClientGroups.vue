@@ -8,6 +8,7 @@ import SalesAnalysisNavigationTabs from '@/Components/SalesAnalysis/SalesAnalysi
 const props = defineProps({
     routePrefix: { type: String, required: true },
     departmentLabels: { type: Object, default: () => ({}) },
+    hasCompanySelected: { type: Boolean, default: true },
 });
 
 // 売上分析ルートは superadmin/admin/clerk の各ロールグループ内に複製登録されている
@@ -34,6 +35,8 @@ const editingGroupName = ref('');
 const yen = (v) => (v === null || v === undefined ? '—' : `¥${Number(v).toLocaleString()}`);
 
 const fetchData = async () => {
+    if (!props.hasCompanySelected) return;
+
     loading.value = true;
     errorMessage.value = '';
     try {
@@ -180,7 +183,11 @@ onMounted(fetchData);
             <SalesAnalysisNavigationTabs :route-prefix="routePrefix" active="client_groups" />
         </template>
 
-        <div class="space-y-6">
+        <div v-if="!hasCompanySelected" class="rounded bg-white p-6 shadow">
+            <p class="text-sm text-gray-500">会社が選択されていません。画面右上の会社切替から対象の会社を選択してください。</p>
+        </div>
+
+        <div v-else class="space-y-6">
             <p v-if="errorMessage" class="rounded bg-red-50 p-3 text-sm text-red-700">{{ errorMessage }}</p>
             <p v-if="statusMessage" class="rounded bg-green-50 p-3 text-sm text-green-700">{{ statusMessage }}</p>
             <p v-if="loading" class="text-sm text-gray-500">読み込み中...</p>

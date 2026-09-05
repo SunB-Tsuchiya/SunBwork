@@ -22,6 +22,7 @@ class SalesDashboardIndexTest extends TestCase
     private function seedMonth(string $dept, int $year, int $month, float $amount, int $userId): SalesImport
     {
         $import = SalesImport::create([
+            'company_id' => $this->salesTestCompanyId(),
             'department_key' => $dept,
             'source_type' => 'monthly',
             'source_year' => $year,
@@ -53,7 +54,7 @@ class SalesDashboardIndexTest extends TestCase
         // updateOrCreate: 同一部署・年月への再取込（SalesImportService::confirm()と同じ挙動）を
         // シミュレートできるようにする。create()だとユニーク制約違反で2回目が失敗する
         SalesActiveMonth::updateOrCreate(
-            ['department_key' => $dept, 'sales_year' => $year, 'sales_month' => $month],
+            ['company_id' => $this->salesTestCompanyId(), 'department_key' => $dept, 'sales_year' => $year, 'sales_month' => $month],
             ['sales_import_id' => $import->id, 'activated_by' => $userId, 'activated_at' => now()]
         );
 
@@ -166,6 +167,7 @@ class SalesDashboardIndexTest extends TestCase
         $superadmin = User::factory()->create(['user_role' => 'superadmin']);
 
         $import = SalesImport::create([
+            'company_id' => $this->salesTestCompanyId(),
             'department_key' => 'planning',
             'source_type' => 'monthly',
             'source_year' => 2025,
@@ -192,7 +194,7 @@ class SalesDashboardIndexTest extends TestCase
             'unallocated_amount' => -500, // 明細合計と受注金額の差額
         ]);
         SalesActiveMonth::updateOrCreate(
-            ['department_key' => 'planning', 'sales_year' => 2025, 'sales_month' => 7],
+            ['company_id' => $this->salesTestCompanyId(), 'department_key' => 'planning', 'sales_year' => 2025, 'sales_month' => 7],
             ['sales_import_id' => $import->id, 'activated_by' => $superadmin->id, 'activated_at' => now()]
         );
 

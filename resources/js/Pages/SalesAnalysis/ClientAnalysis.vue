@@ -18,6 +18,7 @@ const props = defineProps({
     initialEndYear: { type: Number, required: true },
     initialEndMonth: { type: Number, required: true },
     hasAnyData: { type: Boolean, default: false },
+    hasCompanySelected: { type: Boolean, default: true },
 });
 
 // 売上分析ルートは superadmin/admin/clerk の各ロールグループ内に複製登録されている
@@ -200,10 +201,15 @@ onMounted(() => {
         </template>
 
         <div v-if="!hasAnyData" class="rounded bg-white p-6 shadow">
-            <p class="text-sm text-gray-500">まだ取込データがありません。まずはExcelを取り込んでください。</p>
-            <Link :href="route(rn('import.create'))" class="mt-4 inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">
-                Excel取込へ
-            </Link>
+            <template v-if="!hasCompanySelected">
+                <p class="text-sm text-gray-500">会社が選択されていません。画面右上の会社切替から対象の会社を選択してください。</p>
+            </template>
+            <template v-else>
+                <p class="text-sm text-gray-500">まだ取込データがありません。まずはExcelを取り込んでください。</p>
+                <Link :href="route(rn('import.create'))" class="mt-4 inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">
+                    Excel取込へ
+                </Link>
+            </template>
         </div>
 
         <div v-else class="space-y-6">

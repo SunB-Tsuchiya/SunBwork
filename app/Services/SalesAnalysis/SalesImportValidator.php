@@ -71,7 +71,8 @@ class SalesImportValidator
         string $sourceType,
         int $sourceYear,
         ?int $sourceMonth,
-        ?int $sourceMonthEnd = null,
+        ?int $sourceMonthEnd,
+        int $companyId,
         array $excludedOrderNumbers = []
     ): array {
         $fileErrors = [];
@@ -87,7 +88,7 @@ class SalesImportValidator
             $fileErrors[] = "見出し不一致: {$mismatch['column']}列 期待値「{$mismatch['expected']}」実際「{$mismatch['actual']}」";
         }
 
-        $fileErrors = array_merge($fileErrors, $this->validateDepartment($workbook, $departmentKey));
+        $fileErrors = array_merge($fileErrors, $this->validateDepartment($workbook, $departmentKey, $companyId));
 
         if (! empty($fileErrors)) {
             return $this->invalidResult($fileErrors);
@@ -122,7 +123,7 @@ class SalesImportValidator
 
         // 他月との重複も受注単位のエラーとして扱う（該当受注のみ除外可能にする）
         if (empty($fileErrors)) {
-            $duplicateErrorsByOrderNumber = $this->checkCrossMonthDuplicates($orders, $departmentKey);
+            $duplicateErrorsByOrderNumber = $this->checkCrossMonthDuplicates($orders, $departmentKey, $companyId);
 
             if (! empty($duplicateErrorsByOrderNumber)) {
                 $orders = array_values(array_filter($orders, function ($order) use ($duplicateErrorsByOrderNumber, &$invalidOrders) {
@@ -201,17 +202,17 @@ class SalesImportValidator
         ];
     }
 
-    private function validateDepartment(array $workbook, string $departmentKey): array
+    private function validateDepartment(array $workbook, string $departmentKey, int $companyId): array
     {
         $errors = [];
 
-        if (! SalesDepartments::isEnabled($departmentKey)) {
-            $errors[] = '現在取込可能な部署は企画・制作・オンデマンドのみです。';
+        if (! SalesDepartments::isEnabledFor($companyId, $departmentKey)) {
+            $errors[] = '現在取込可能な部署は' . implode('・', SalesDepartments::labelsFor($companyId)) . 'のみです。';
 
             return $errors;
         }
 
-        $expectedLabel = SalesDepartments::labelFromKey($departmentKey);
+        $expectedLabel = SalesDepartments::labelForKey($companyId, $departmentKey);
 
         if ($workbook['department_label'] !== null && $workbook['department_label'] !== $expectedLabel) {
             $errors[] = "対象部署が一致しません（ファイル記載: {$workbook['department_label']} / 選択: {$expectedLabel}）。";
@@ -409,14 +410,15 @@ class SalesImportValidator
      *
      * @return array<string, string> 受注No => エラーメッセージ
      */
-    private function checkCrossMonthDuplicates(array $orders, string $departmentKey): array
+    private function checkCrossMonthDuplicates(array $orders, string $departmentKey, int $companyId): array
     {
         $orderNumbers = array_unique(array_column($orders, 'order_number'));
         if (empty($orderNumbers)) {
             return [];
         }
 
-        $activeImportIds = SalesActiveMonth::where('department_key', $departmentKey)
+        $activeImportIds = SalesActiveMonth::where('company_id', $companyId)
+            ->where('department_key', $departmentKey)
             ->pluck('sales_import_id');
 
         if ($activeImportIds->isEmpty()) {

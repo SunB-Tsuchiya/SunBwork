@@ -8,6 +8,7 @@ const props = defineProps({
     imports: { type: Array, default: () => [] },
     currentPage: { type: Number, default: 1 },
     lastPage: { type: Number, default: 1 },
+    hasCompanySelected: { type: Boolean, default: true },
 });
 
 // 売上分析ルートは superadmin/admin/clerk の各ロールグループ内に複製登録されている
@@ -38,7 +39,11 @@ const statusLabels = {
         </template>
 
         <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
-            <div v-if="imports.length === 0" class="py-8 text-center text-gray-500">
+            <div v-if="!hasCompanySelected" class="py-8 text-center text-gray-500">
+                会社が選択されていません。画面右上の会社切替から対象の会社を選択してください。
+            </div>
+
+            <div v-else-if="imports.length === 0" class="py-8 text-center text-gray-500">
                 取込履歴がありません。
             </div>
 

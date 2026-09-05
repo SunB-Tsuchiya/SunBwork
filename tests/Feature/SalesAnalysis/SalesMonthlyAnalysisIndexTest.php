@@ -31,6 +31,7 @@ class SalesMonthlyAnalysisIndexTest extends TestCase
         $superadmin = User::factory()->create(['user_role' => 'superadmin']);
 
         $import = SalesImport::create([
+            'company_id' => $this->salesTestCompanyId(),
             'department_key' => 'planning',
             'source_type' => 'monthly',
             'source_year' => 2026,
@@ -46,6 +47,7 @@ class SalesMonthlyAnalysisIndexTest extends TestCase
             'total_amount' => 0,
         ]);
         SalesActiveMonth::create([
+            'company_id' => $this->salesTestCompanyId(),
             'department_key' => 'planning',
             'sales_year' => 2026,
             'sales_month' => 7,
@@ -56,6 +58,7 @@ class SalesMonthlyAnalysisIndexTest extends TestCase
 
         // より新しい月（9月）も取り込み、最新月として初期表示されることを確認
         $newerImport = SalesImport::create([
+            'company_id' => $this->salesTestCompanyId(),
             'department_key' => 'planning',
             'source_type' => 'monthly',
             'source_year' => 2026,
@@ -71,6 +74,7 @@ class SalesMonthlyAnalysisIndexTest extends TestCase
             'total_amount' => 0,
         ]);
         SalesActiveMonth::create([
+            'company_id' => $this->salesTestCompanyId(),
             'department_key' => 'planning',
             'sales_year' => 2026,
             'sales_month' => 9,
@@ -97,6 +101,7 @@ class SalesMonthlyAnalysisIndexTest extends TestCase
         $superadmin = User::factory()->create(['user_role' => 'superadmin']);
 
         $import = SalesImport::create([
+            'company_id' => $this->salesTestCompanyId(),
             'department_key' => 'ondemand',
             'source_type' => 'monthly',
             'source_year' => 2026,
@@ -112,6 +117,7 @@ class SalesMonthlyAnalysisIndexTest extends TestCase
             'total_amount' => 0,
         ]);
         SalesActiveMonth::create([
+            'company_id' => $this->salesTestCompanyId(),
             'department_key' => 'ondemand',
             'sales_year' => 2026,
             'sales_month' => 8,
@@ -141,6 +147,7 @@ class SalesMonthlyAnalysisIndexTest extends TestCase
         $superadmin = User::factory()->create(['user_role' => 'superadmin']);
 
         $recentPeriodImport = SalesImport::create([
+            'company_id' => $this->salesTestCompanyId(),
             'department_key' => 'planning',
             'source_type' => 'monthly',
             'source_year' => 2026,
@@ -156,6 +163,7 @@ class SalesMonthlyAnalysisIndexTest extends TestCase
             'total_amount' => 0,
         ]);
         SalesActiveMonth::create([
+            'company_id' => $this->salesTestCompanyId(),
             'department_key' => 'planning',
             'sales_year' => 2026,
             'sales_month' => 9,
@@ -166,6 +174,7 @@ class SalesMonthlyAnalysisIndexTest extends TestCase
 
         // その後（=activated_atはこちらの方が新しい）、古い期間（2020年1月）を追加登録する
         $olderPeriodImport = SalesImport::create([
+            'company_id' => $this->salesTestCompanyId(),
             'department_key' => 'planning',
             'source_type' => 'monthly',
             'source_year' => 2020,
@@ -181,6 +190,7 @@ class SalesMonthlyAnalysisIndexTest extends TestCase
             'total_amount' => 0,
         ]);
         SalesActiveMonth::create([
+            'company_id' => $this->salesTestCompanyId(),
             'department_key' => 'planning',
             'sales_year' => 2020,
             'sales_month' => 1,
@@ -210,6 +220,7 @@ class SalesMonthlyAnalysisIndexTest extends TestCase
         $superadmin = User::factory()->create(['user_role' => 'superadmin']);
 
         $import = SalesImport::create([
+            'company_id' => $this->salesTestCompanyId(),
             'department_key' => 'planning',
             'source_type' => 'monthly',
             'source_year' => 2026,
@@ -225,6 +236,7 @@ class SalesMonthlyAnalysisIndexTest extends TestCase
             'total_amount' => 0,
         ]);
         SalesActiveMonth::create([
+            'company_id' => $this->salesTestCompanyId(),
             'department_key' => 'planning',
             'sales_year' => 2026,
             'sales_month' => 9,

@@ -26,6 +26,7 @@ class SalesClientGroupHttpTest extends TestCase
     private function seedMonthOrders(string $dept, int $year, int $month, array $clients): void
     {
         $import = SalesImport::create([
+            'company_id' => $this->salesTestCompanyId(),
             'department_key' => $dept,
             'source_type' => 'monthly',
             'source_year' => $year,
@@ -55,7 +56,7 @@ class SalesClientGroupHttpTest extends TestCase
         }
 
         SalesActiveMonth::updateOrCreate(
-            ['department_key' => $dept, 'sales_year' => $year, 'sales_month' => $month],
+            ['company_id' => $this->salesTestCompanyId(), 'department_key' => $dept, 'sales_year' => $year, 'sales_month' => $month],
             ['sales_import_id' => $import->id, 'activated_by' => 1, 'activated_at' => now()]
         );
     }
@@ -118,8 +119,8 @@ class SalesClientGroupHttpTest extends TestCase
     public function test_store_rejects_when_client_already_belongs_to_another_group()
     {
         $superadmin = User::factory()->create(['user_role' => 'superadmin']);
-        $group = SalesClientGroup::create(['name' => '既存グループ', 'created_by' => 1, 'updated_by' => 1]);
-        SalesClientGroupMember::create(['sales_client_group_id' => $group->id, 'client_name' => 'B社', 'normalized_name' => 'B社']);
+        $group = SalesClientGroup::create(['company_id' => $this->salesTestCompanyId(), 'name' => '既存グループ', 'created_by' => 1, 'updated_by' => 1]);
+        SalesClientGroupMember::create(['sales_client_group_id' => $group->id, 'company_id' => $this->salesTestCompanyId(), 'client_name' => 'B社', 'normalized_name' => 'B社']);
 
         $response = $this->actingAs($superadmin)->postJson(route('superadmin.sales_analysis.api.client_groups.store'), [
             'name' => '新グループ',
@@ -132,7 +133,7 @@ class SalesClientGroupHttpTest extends TestCase
     public function test_update_renames_group()
     {
         $superadmin = User::factory()->create(['user_role' => 'superadmin']);
-        $group = SalesClientGroup::create(['name' => '旧名称', 'created_by' => 1, 'updated_by' => 1]);
+        $group = SalesClientGroup::create(['company_id' => $this->salesTestCompanyId(), 'name' => '旧名称', 'created_by' => 1, 'updated_by' => 1]);
 
         $this->actingAs($superadmin)
             ->patchJson(route('superadmin.sales_analysis.api.client_groups.update', ['group' => $group->id]), ['name' => '新名称'])
@@ -144,8 +145,8 @@ class SalesClientGroupHttpTest extends TestCase
     public function test_destroy_deletes_group_and_cascades_members()
     {
         $superadmin = User::factory()->create(['user_role' => 'superadmin']);
-        $group = SalesClientGroup::create(['name' => '削除対象', 'created_by' => 1, 'updated_by' => 1]);
-        $member = SalesClientGroupMember::create(['sales_client_group_id' => $group->id, 'client_name' => 'C社', 'normalized_name' => 'C社']);
+        $group = SalesClientGroup::create(['company_id' => $this->salesTestCompanyId(), 'name' => '削除対象', 'created_by' => 1, 'updated_by' => 1]);
+        $member = SalesClientGroupMember::create(['sales_client_group_id' => $group->id, 'company_id' => $this->salesTestCompanyId(), 'client_name' => 'C社', 'normalized_name' => 'C社']);
 
         $this->actingAs($superadmin)
             ->deleteJson(route('superadmin.sales_analysis.api.client_groups.destroy', ['group' => $group->id]))
@@ -158,9 +159,9 @@ class SalesClientGroupHttpTest extends TestCase
     public function test_add_member_rejects_client_already_in_another_group()
     {
         $superadmin = User::factory()->create(['user_role' => 'superadmin']);
-        $groupA = SalesClientGroup::create(['name' => 'グループA', 'created_by' => 1, 'updated_by' => 1]);
-        $groupB = SalesClientGroup::create(['name' => 'グループB', 'created_by' => 1, 'updated_by' => 1]);
-        SalesClientGroupMember::create(['sales_client_group_id' => $groupA->id, 'client_name' => 'D社', 'normalized_name' => 'D社']);
+        $groupA = SalesClientGroup::create(['company_id' => $this->salesTestCompanyId(), 'name' => 'グループA', 'created_by' => 1, 'updated_by' => 1]);
+        $groupB = SalesClientGroup::create(['company_id' => $this->salesTestCompanyId(), 'name' => 'グループB', 'created_by' => 1, 'updated_by' => 1]);
+        SalesClientGroupMember::create(['sales_client_group_id' => $groupA->id, 'company_id' => $this->salesTestCompanyId(), 'client_name' => 'D社', 'normalized_name' => 'D社']);
 
         $this->actingAs($superadmin)
             ->postJson(route('superadmin.sales_analysis.api.client_groups.members.store', ['group' => $groupB->id]), ['client_name' => 'D社'])
@@ -170,9 +171,9 @@ class SalesClientGroupHttpTest extends TestCase
     public function test_remove_member_returns_404_when_member_does_not_belong_to_group()
     {
         $superadmin = User::factory()->create(['user_role' => 'superadmin']);
-        $groupA = SalesClientGroup::create(['name' => 'グループA', 'created_by' => 1, 'updated_by' => 1]);
-        $groupB = SalesClientGroup::create(['name' => 'グループB', 'created_by' => 1, 'updated_by' => 1]);
-        $member = SalesClientGroupMember::create(['sales_client_group_id' => $groupA->id, 'client_name' => 'E社', 'normalized_name' => 'E社']);
+        $groupA = SalesClientGroup::create(['company_id' => $this->salesTestCompanyId(), 'name' => 'グループA', 'created_by' => 1, 'updated_by' => 1]);
+        $groupB = SalesClientGroup::create(['company_id' => $this->salesTestCompanyId(), 'name' => 'グループB', 'created_by' => 1, 'updated_by' => 1]);
+        $member = SalesClientGroupMember::create(['sales_client_group_id' => $groupA->id, 'company_id' => $this->salesTestCompanyId(), 'client_name' => 'E社', 'normalized_name' => 'E社']);
 
         $this->actingAs($superadmin)
             ->deleteJson(route('superadmin.sales_analysis.api.client_groups.members.destroy', ['group' => $groupB->id, 'member' => $member->id]))

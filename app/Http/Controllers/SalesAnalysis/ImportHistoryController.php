@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\SalesAnalysis;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\SalesAnalysis\Concerns\ResolvesSalesAnalysisCompany;
 use App\Http\Controllers\SalesAnalysis\Concerns\ResolvesSalesAnalysisRoutePrefix;
 use App\Models\Sales\SalesActiveMonth;
 use App\Models\Sales\SalesImport;
@@ -13,7 +14,7 @@ use Inertia\Inertia;
 
 class ImportHistoryController extends Controller
 {
-    use ResolvesSalesAnalysisRoutePrefix;
+    use ResolvesSalesAnalysisRoutePrefix, ResolvesSalesAnalysisCompany;
 
     public function __construct(private SalesImportService $importService)
     {
@@ -21,7 +22,19 @@ class ImportHistoryController extends Controller
 
     public function index()
     {
-        $imports = SalesImport::orderByDesc('imported_at')->paginate(20);
+        $companyId = $this->salesAnalysisCompanyId();
+
+        if ($companyId === null) {
+            return Inertia::render('SalesAnalysis/ImportHistory', [
+                'routePrefix' => $this->salesAnalysisRoutePrefix(),
+                'hasCompanySelected' => false,
+                'imports' => [],
+                'currentPage' => 1,
+                'lastPage' => 1,
+            ]);
+        }
+
+        $imports = SalesImport::where('company_id', $companyId)->orderByDesc('imported_at')->paginate(20);
 
         $userNames = User::whereIn('id', $imports->pluck('imported_by')->unique())
             ->pluck('name', 'id');
@@ -34,7 +47,7 @@ class ImportHistoryController extends Controller
             ->groupBy('sales_import_id')
             ->pluck('active_count', 'sales_import_id');
 
-        $items = $imports->getCollection()->map(function (SalesImport $import) use ($userNames, $activeCounts) {
+        $items = $imports->getCollection()->map(function (SalesImport $import) use ($userNames, $activeCounts, $companyId) {
             $totalMonthCount = $this->importService->targetMonths(
                 $import->source_type,
                 $import->source_year,
@@ -45,7 +58,7 @@ class ImportHistoryController extends Controller
 
             return [
                 'id' => $import->id,
-                'department_label' => SalesDepartments::labelFromKey($import->department_key),
+                'department_label' => SalesDepartments::labelForKey($companyId, $import->department_key),
                 'source_type' => $import->source_type,
                 'source_year' => $import->source_year,
                 'source_month' => $import->source_month,
@@ -66,6 +79,7 @@ class ImportHistoryController extends Controller
 
         return Inertia::render('SalesAnalysis/ImportHistory', [
             'routePrefix' => $this->salesAnalysisRoutePrefix(),
+            'hasCompanySelected' => true,
             'imports' => $items,
             'currentPage' => $imports->currentPage(),
             'lastPage' => $imports->lastPage(),

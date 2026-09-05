@@ -9,6 +9,7 @@ class SalesActiveMonth extends Model
     protected $connection = 'sales';
 
     protected $fillable = [
+        'company_id',
         'department_key',
         'sales_year',
         'sales_month',

@@ -17,6 +17,7 @@ class SalesSameMonthComparisonTest extends TestCase
     private function seedMonth(string $dept, int $year, int $month, float $amount): void
     {
         $import = SalesImport::create([
+            'company_id' => $this->salesTestCompanyId(),
             'department_key' => $dept,
             'source_type' => 'monthly',
             'source_year' => $year,
@@ -44,7 +45,7 @@ class SalesSameMonthComparisonTest extends TestCase
         ]);
 
         SalesActiveMonth::updateOrCreate(
-            ['department_key' => $dept, 'sales_year' => $year, 'sales_month' => $month],
+            ['company_id' => $this->salesTestCompanyId(), 'department_key' => $dept, 'sales_year' => $year, 'sales_month' => $month],
             ['sales_import_id' => $import->id, 'activated_by' => 1, 'activated_at' => now()]
         );
     }

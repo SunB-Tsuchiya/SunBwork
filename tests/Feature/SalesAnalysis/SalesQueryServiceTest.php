@@ -28,6 +28,8 @@ class SalesQueryServiceTest extends TestCase
         self::$importSeq++;
 
         $import = SalesImport::create([
+            'company_id' => $this->salesTestCompanyId(),
+            'company_id' => $this->salesTestCompanyId(),
             'department_key' => $dept,
             'source_type' => 'monthly',
             'source_year' => $year,
@@ -75,7 +77,7 @@ class SalesQueryServiceTest extends TestCase
         // updateOrCreate: 同一部署・年月への再取込（needs_review検証など）で2回目のseedMonthが
         // ユニーク制約違反にならないようにする
         SalesActiveMonth::updateOrCreate(
-            ['department_key' => $dept, 'sales_year' => $year, 'sales_month' => $month],
+            ['company_id' => $this->salesTestCompanyId(), 'department_key' => $dept, 'sales_year' => $year, 'sales_month' => $month],
             ['sales_import_id' => $import->id, 'activated_by' => 1, 'activated_at' => now()]
         );
 
@@ -84,7 +86,7 @@ class SalesQueryServiceTest extends TestCase
 
     private function service(): SalesQueryService
     {
-        return new SalesQueryService(new SalesImportService());
+        return (new SalesQueryService(new SalesImportService()))->forCompany($this->salesTestCompanyId());
     }
 
     public function test_monthly_total_is_null_for_uningested_month()
@@ -231,9 +233,9 @@ class SalesQueryServiceTest extends TestCase
 
     public function test_client_ranking_with_consolidation_merges_grouped_clients()
     {
-        $group = SalesClientGroup::create(['name' => '株式会社NON', 'created_by' => 1, 'updated_by' => 1]);
-        SalesClientGroupMember::create(['sales_client_group_id' => $group->id, 'client_name' => '株式会社NON（2）', 'normalized_name' => 'non']);
-        SalesClientGroupMember::create(['sales_client_group_id' => $group->id, 'client_name' => '株式会社NON（3）', 'normalized_name' => 'non']);
+        $group = SalesClientGroup::create(['company_id' => $this->salesTestCompanyId(), 'name' => '株式会社NON', 'created_by' => 1, 'updated_by' => 1]);
+        SalesClientGroupMember::create(['sales_client_group_id' => $group->id, 'company_id' => $this->salesTestCompanyId(), 'client_name' => '株式会社NON（2）', 'normalized_name' => 'non']);
+        SalesClientGroupMember::create(['sales_client_group_id' => $group->id, 'company_id' => $this->salesTestCompanyId(), 'client_name' => '株式会社NON（3）', 'normalized_name' => 'non']);
 
         $this->seedMonth('planning', 2026, 9, [
             ['order_number' => 'G1', 'client_name' => '株式会社NON（2）', 'amount' => 1000],
@@ -319,6 +321,7 @@ class SalesQueryServiceTest extends TestCase
 
         // 再取込で新版に切り替え（旧版データは残るがactiveではなくなる）
         $newImport = SalesImport::create([
+            'company_id' => $this->salesTestCompanyId(),
             'department_key' => 'planning',
             'source_type' => 'monthly',
             'source_year' => 2026,
@@ -463,9 +466,9 @@ class SalesQueryServiceTest extends TestCase
 
     public function test_annual_summary_consolidates_top_clients_when_flag_true()
     {
-        $group = SalesClientGroup::create(['name' => '株式会社NON', 'created_by' => 1, 'updated_by' => 1]);
-        SalesClientGroupMember::create(['sales_client_group_id' => $group->id, 'client_name' => '株式会社NON（2）', 'normalized_name' => 'x']);
-        SalesClientGroupMember::create(['sales_client_group_id' => $group->id, 'client_name' => '株式会社NON（3）', 'normalized_name' => 'y']);
+        $group = SalesClientGroup::create(['company_id' => $this->salesTestCompanyId(), 'name' => '株式会社NON', 'created_by' => 1, 'updated_by' => 1]);
+        SalesClientGroupMember::create(['sales_client_group_id' => $group->id, 'company_id' => $this->salesTestCompanyId(), 'client_name' => '株式会社NON（2）', 'normalized_name' => 'x']);
+        SalesClientGroupMember::create(['sales_client_group_id' => $group->id, 'company_id' => $this->salesTestCompanyId(), 'client_name' => '株式会社NON（3）', 'normalized_name' => 'y']);
 
         $this->seedMonth('planning', 2025, 4, [
             ['order_number' => 'AS-1', 'client_name' => '株式会社NON（2）', 'amount' => 1000],
@@ -916,9 +919,9 @@ class SalesQueryServiceTest extends TestCase
 
     public function test_side_by_side_comparison_consolidates_clients_when_flag_true()
     {
-        $group = SalesClientGroup::create(['name' => '株式会社NON', 'created_by' => 1, 'updated_by' => 1]);
-        SalesClientGroupMember::create(['sales_client_group_id' => $group->id, 'client_name' => '株式会社NON（2）', 'normalized_name' => 'non']);
-        SalesClientGroupMember::create(['sales_client_group_id' => $group->id, 'client_name' => '株式会社NON（3）', 'normalized_name' => 'non']);
+        $group = SalesClientGroup::create(['company_id' => $this->salesTestCompanyId(), 'name' => '株式会社NON', 'created_by' => 1, 'updated_by' => 1]);
+        SalesClientGroupMember::create(['sales_client_group_id' => $group->id, 'company_id' => $this->salesTestCompanyId(), 'client_name' => '株式会社NON（2）', 'normalized_name' => 'non']);
+        SalesClientGroupMember::create(['sales_client_group_id' => $group->id, 'company_id' => $this->salesTestCompanyId(), 'client_name' => '株式会社NON（3）', 'normalized_name' => 'non']);
 
         $this->seedMonth('planning', 2025, 6, [['order_number' => 'SBS-G1', 'client_name' => '株式会社NON（2）', 'amount' => 1000]]);
         $this->seedMonth('planning', 2026, 6, [['order_number' => 'SBS-G2', 'client_name' => '株式会社NON（3）', 'amount' => 1500]]);

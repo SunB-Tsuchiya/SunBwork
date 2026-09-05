@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\SalesAnalysis;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\SalesAnalysis\Concerns\ResolvesSalesAnalysisCompany;
 use App\Http\Controllers\SalesAnalysis\Concerns\ResolvesSalesAnalysisRoutePrefix;
 use App\Models\Sales\SalesActiveMonth;
 use App\Models\Sales\SalesAuditLog;
@@ -22,7 +23,7 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
  */
 class AnnualAnalysisController extends Controller
 {
-    use ResolvesSalesAnalysisRoutePrefix;
+    use ResolvesSalesAnalysisRoutePrefix, ResolvesSalesAnalysisCompany;
 
     public function __construct(private SalesQueryService $queryService, private SalesExportService $exportService)
     {
@@ -30,23 +31,41 @@ class AnnualAnalysisController extends Controller
 
     public function index(Request $request)
     {
+        $companyId = $this->salesAnalysisCompanyId();
+
+        if ($companyId === null) {
+            return Inertia::render('SalesAnalysis/AnnualAnalysis', [
+                'routePrefix' => $this->salesAnalysisRoutePrefix(),
+                'hasCompanySelected' => false,
+                'departmentLabels' => [],
+                'enabledDepartmentKeys' => [],
+                'initialDepartmentKey' => null,
+                'initialYear' => (int) now()->format('Y'),
+                'hasAnyData' => false,
+            ]);
+        }
+
+        $this->queryService->forCompany($companyId);
+        $enabledKeys = SalesDepartments::enabledKeysFor($companyId);
+
         // データ登録状況画面からの深いリンク（部署・年指定）を優先する
         $departmentKey = $request->query('department_key');
         $year = $request->query('year');
 
         $hasValidQueryParams = is_string($departmentKey)
-            && $this->isValidDepartmentKey($departmentKey)
+            && $this->isValidDepartmentKey($companyId, $departmentKey)
             && is_numeric($year)
             && (int) $year >= 2000
             && (int) $year <= 2100;
 
         if (! $hasValidQueryParams) {
-            $latest = SalesActiveMonth::whereIn('department_key', SalesDepartments::ENABLED_KEYS)
+            $latest = SalesActiveMonth::where('company_id', $companyId)
+                ->whereIn('department_key', $enabledKeys)
                 ->orderByDesc('sales_year')
                 ->orderByDesc('activated_at')
                 ->first();
 
-            $departmentKey = $latest->department_key ?? SalesDepartments::ENABLED_KEYS[0];
+            $departmentKey = $latest->department_key ?? ($enabledKeys[0] ?? null);
             $year = $latest->sales_year ?? (int) now()->format('Y');
         }
 
@@ -55,13 +74,14 @@ class AnnualAnalysisController extends Controller
         // 選択中の年自体に登録が無いだけで空表示に落とさない（未登録年はPeriodNavigator/
         // 欠落月バナーの案内で扱う）。判定は部署に何か1件でも登録済みかに留める
         // （実機フィードバック対応: 未登録年のURLでリロードすると空表示に戻ってしまう問題、2026-09-04）
-        $departmentKeysForQuery = $departmentKey === 'all' ? SalesDepartments::ENABLED_KEYS : [$departmentKey];
-        $hasAnyData = SalesActiveMonth::whereIn('department_key', $departmentKeysForQuery)->exists();
+        $departmentKeysForQuery = $departmentKey === 'all' ? $enabledKeys : [$departmentKey];
+        $hasAnyData = SalesActiveMonth::where('company_id', $companyId)->whereIn('department_key', $departmentKeysForQuery)->exists();
 
         return Inertia::render('SalesAnalysis/AnnualAnalysis', [
             'routePrefix' => $this->salesAnalysisRoutePrefix(),
-            'departmentLabels' => SalesDepartments::LABELS,
-            'enabledDepartmentKeys' => SalesDepartments::ENABLED_KEYS,
+            'hasCompanySelected' => true,
+            'departmentLabels' => SalesDepartments::labelsFor($companyId),
+            'enabledDepartmentKeys' => $enabledKeys,
             'initialDepartmentKey' => $departmentKey,
             'initialYear' => $year,
             'hasAnyData' => $hasAnyData,
@@ -70,8 +90,7 @@ class AnnualAnalysisController extends Controller
 
     public function summary(Request $request)
     {
-        $data = $request->validate([
-            'department_key' => ['required', 'string', Rule::in([...SalesDepartments::ENABLED_KEYS, 'all'])],
+        $data = $this->validateDepartmentAndRules($request, [
             'year' => ['required', 'integer', 'min:2000', 'max:2100'],
             'consolidate_clients' => ['nullable', 'boolean'],
         ]);
@@ -88,9 +107,7 @@ class AnnualAnalysisController extends Controller
     /** 期間ナビゲーターの「最新年」ボタン用（Phase 13） */
     public function latestPeriod(Request $request)
     {
-        $data = $request->validate([
-            'department_key' => ['required', 'string', Rule::in([...SalesDepartments::ENABLED_KEYS, 'all'])],
-        ]);
+        $data = $this->validateDepartmentAndRules($request);
 
         return response()->json([
             'latest' => ($year = $this->queryService->latestRegisteredYear($data['department_key'])) !== null ? ['year' => $year] : null,
@@ -111,8 +128,7 @@ class AnnualAnalysisController extends Controller
     /** 得意先比較パネル（Top10/20＋全件詳細ドロワー共用、前年同期間との差額込み。Phase 13） */
     public function clients(Request $request)
     {
-        $data = $request->validate([
-            'department_key' => ['required', 'string', Rule::in([...SalesDepartments::ENABLED_KEYS, 'all'])],
+        $data = $this->validateDepartmentAndRules($request, [
             'year' => ['required', 'integer', 'min:2000', 'max:2100'],
         ]);
         $panel = $this->validatePanelOptions($request);
@@ -132,8 +148,7 @@ class AnnualAnalysisController extends Controller
     /** 分類内訳パネル（Phase 13） */
     public function categories(Request $request)
     {
-        $data = $request->validate([
-            'department_key' => ['required', 'string', Rule::in([...SalesDepartments::ENABLED_KEYS, 'all'])],
+        $data = $this->validateDepartmentAndRules($request, [
             'year' => ['required', 'integer', 'min:2000', 'max:2100'],
         ]);
         $panel = $this->validatePanelOptions($request);
@@ -153,8 +168,7 @@ class AnnualAnalysisController extends Controller
     /** 項目内訳パネル（Phase 13） */
     public function items(Request $request)
     {
-        $data = $request->validate([
-            'department_key' => ['required', 'string', Rule::in([...SalesDepartments::ENABLED_KEYS, 'all'])],
+        $data = $this->validateDepartmentAndRules($request, [
             'year' => ['required', 'integer', 'min:2000', 'max:2100'],
         ]);
         $panel = $this->validatePanelOptions($request);
@@ -174,8 +188,7 @@ class AnnualAnalysisController extends Controller
     /** 「月別売上」グラフの複数年重ね表示用（2/3/5年切替、実機フィードバック対応、2026-09-04） */
     public function multiYearTrend(Request $request)
     {
-        $data = $request->validate([
-            'department_key' => ['required', 'string', Rule::in([...SalesDepartments::ENABLED_KEYS, 'all'])],
+        $data = $this->validateDepartmentAndRules($request, [
             'year' => ['required', 'integer', 'min:2000', 'max:2100'],
             'years' => ['nullable', 'integer', Rule::in([2, 3, 5])],
         ]);
@@ -187,8 +200,7 @@ class AnnualAnalysisController extends Controller
 
     public function products(Request $request)
     {
-        $data = $request->validate([
-            'department_key' => ['required', 'string', Rule::in([...SalesDepartments::ENABLED_KEYS, 'all'])],
+        $data = $this->validateDepartmentAndRules($request, [
             'year' => ['required', 'integer', 'min:2000', 'max:2100'],
             'keyword' => ['required', 'string', 'min:1', 'max:255'],
         ]);
@@ -200,18 +212,18 @@ class AnnualAnalysisController extends Controller
 
     public function export(Request $request)
     {
-        $data = $request->validate([
-            'department_key' => ['required', 'string', Rule::in([...SalesDepartments::ENABLED_KEYS, 'all'])],
+        $data = $this->validateDepartmentAndRules($request, [
             'year' => ['required', 'integer', 'min:2000', 'max:2100'],
             'consolidate_clients' => ['nullable', 'boolean'],
         ]);
 
+        $companyId = $data['company_id'];
         $departmentKey = $data['department_key'];
         $year = (int) $data['year'];
         $consolidateClients = (bool) ($data['consolidate_clients'] ?? false);
 
-        $spreadsheet = $this->exportService->annualAnalysisWorkbook($departmentKey, $year, $consolidateClients);
-        $departmentLabel = $departmentKey === 'all' ? '全部署合計' : (SalesDepartments::labelFromKey($departmentKey) ?? $departmentKey);
+        $spreadsheet = $this->exportService->forCompany($companyId)->annualAnalysisWorkbook($departmentKey, $year, $consolidateClients);
+        $departmentLabel = $departmentKey === 'all' ? '全部署合計' : (SalesDepartments::labelForKey($companyId, $departmentKey) ?? $departmentKey);
         $filename = "年次分析_{$departmentLabel}_{$year}年.xlsx";
 
         $writer = new Xlsx($spreadsheet);
@@ -232,8 +244,26 @@ class AnnualAnalysisController extends Controller
         ]);
     }
 
-    private function isValidDepartmentKey(string $key): bool
+    private function isValidDepartmentKey(int $companyId, string $key): bool
     {
-        return $key === 'all' || SalesDepartments::isEnabled($key);
+        return $key === 'all' || SalesDepartments::isEnabledFor($companyId, $key);
+    }
+
+    /**
+     * 会社IDを解決してqueryServiceに適用したうえで、department_key（+all）と追加ルールを
+     * まとめてバリデートする（各アクションの重複コードを1箇所に集約）。
+     */
+    private function validateDepartmentAndRules(Request $request, array $extraRules = []): array
+    {
+        $companyId = $this->requireSalesAnalysisCompanyId();
+        $this->queryService->forCompany($companyId);
+
+        $data = $request->validate(array_merge([
+            'department_key' => ['required', 'string', Rule::in([...SalesDepartments::enabledKeysFor($companyId), 'all'])],
+        ], $extraRules));
+
+        $data['company_id'] = $companyId;
+
+        return $data;
     }
 }

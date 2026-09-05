@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\SalesAnalysis;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\SalesAnalysis\Concerns\ResolvesSalesAnalysisCompany;
 use App\Http\Controllers\SalesAnalysis\Concerns\ResolvesSalesAnalysisRoutePrefix;
 use App\Models\Sales\SalesActiveMonth;
 use App\Services\SalesAnalysis\SalesDepartments;
@@ -18,7 +19,7 @@ use Inertia\Inertia;
  */
 class ProductAnalysisController extends Controller
 {
-    use ResolvesSalesAnalysisRoutePrefix;
+    use ResolvesSalesAnalysisRoutePrefix, ResolvesSalesAnalysisCompany;
 
     public function __construct(private SalesQueryService $queryService)
     {
@@ -26,7 +27,26 @@ class ProductAnalysisController extends Controller
 
     public function index(Request $request)
     {
-        $bounds = SalesActiveMonth::whereIn('department_key', SalesDepartments::ENABLED_KEYS)
+        $companyId = $this->salesAnalysisCompanyId();
+
+        if ($companyId === null) {
+            return Inertia::render('SalesAnalysis/ProductAnalysis', [
+                'routePrefix' => $this->salesAnalysisRoutePrefix(),
+                'hasCompanySelected' => false,
+                'departmentLabels' => [],
+                'enabledDepartmentKeys' => [],
+                'initialDepartmentKey' => 'all',
+                'initialProductName' => null,
+                'initialStartYear' => (int) now()->format('Y'),
+                'initialStartMonth' => (int) now()->format('n'),
+                'initialEndYear' => (int) now()->format('Y'),
+                'initialEndMonth' => (int) now()->format('n'),
+                'hasAnyData' => false,
+            ]);
+        }
+
+        $bounds = SalesActiveMonth::where('company_id', $companyId)
+            ->whereIn('department_key', SalesDepartments::enabledKeysFor($companyId))
             ->selectRaw('MIN(sales_year * 100 + sales_month) as min_ym, MAX(sales_year * 100 + sales_month) as max_ym')
             ->first();
 
@@ -35,14 +55,15 @@ class ProductAnalysisController extends Controller
         $nowMonth = (int) now()->format('n');
 
         $departmentKey = $request->query('department_key');
-        $initialDepartmentKey = is_string($departmentKey) && SalesDepartments::isEnabled($departmentKey) ? $departmentKey : 'all';
+        $initialDepartmentKey = is_string($departmentKey) && SalesDepartments::isEnabledFor($companyId, $departmentKey) ? $departmentKey : 'all';
         $productName = $request->query('product_name');
         $initialProductName = is_string($productName) && $productName !== '' ? $productName : null;
 
         return Inertia::render('SalesAnalysis/ProductAnalysis', [
             'routePrefix' => $this->salesAnalysisRoutePrefix(),
-            'departmentLabels' => SalesDepartments::LABELS,
-            'enabledDepartmentKeys' => SalesDepartments::ENABLED_KEYS,
+            'hasCompanySelected' => true,
+            'departmentLabels' => SalesDepartments::labelsFor($companyId),
+            'enabledDepartmentKeys' => SalesDepartments::enabledKeysFor($companyId),
             'initialDepartmentKey' => $initialDepartmentKey,
             'initialProductName' => $initialProductName,
             'initialStartYear' => $hasAnyData ? intdiv((int) $bounds->min_ym, 100) : $nowYear,
@@ -56,8 +77,11 @@ class ProductAnalysisController extends Controller
     /** 商品ランキングのTop10/20＋全件詳細ドロワー用 */
     public function rankingPanel(Request $request)
     {
+        $companyId = $this->requireSalesAnalysisCompanyId();
+        $this->queryService->forCompany($companyId);
+
         $data = $request->validate([
-            'department_key' => ['required', 'string', Rule::in([...SalesDepartments::ENABLED_KEYS, 'all'])],
+            'department_key' => ['required', 'string', Rule::in([...SalesDepartments::enabledKeysFor($companyId), 'all'])],
             'start_year' => ['required', 'integer', 'min:2000', 'max:2100'],
             'start_month' => ['required', 'integer', 'min:1', 'max:12'],
             'end_year' => ['required', 'integer', 'min:2000', 'max:2100'],
@@ -85,8 +109,11 @@ class ProductAnalysisController extends Controller
 
     public function detail(Request $request)
     {
+        $companyId = $this->requireSalesAnalysisCompanyId();
+        $this->queryService->forCompany($companyId);
+
         $data = $request->validate([
-            'department_key' => ['required', 'string', Rule::in([...SalesDepartments::ENABLED_KEYS, 'all'])],
+            'department_key' => ['required', 'string', Rule::in([...SalesDepartments::enabledKeysFor($companyId), 'all'])],
             'product_name' => ['required', 'string', 'max:255'],
             'start_year' => ['required', 'integer', 'min:2000', 'max:2100'],
             'start_month' => ['required', 'integer', 'min:1', 'max:12'],
@@ -107,8 +134,11 @@ class ProductAnalysisController extends Controller
     /** 「新規/取扱終了商品」パネル用。常に直近登録年対前年で固定比較する */
     public function yearOverYear(Request $request)
     {
+        $companyId = $this->requireSalesAnalysisCompanyId();
+        $this->queryService->forCompany($companyId);
+
         $data = $request->validate([
-            'department_key' => ['required', 'string', Rule::in([...SalesDepartments::ENABLED_KEYS, 'all'])],
+            'department_key' => ['required', 'string', Rule::in([...SalesDepartments::enabledKeysFor($companyId), 'all'])],
         ]);
 
         return response()->json($this->queryService->productYearOverYearComparison($data['department_key']));

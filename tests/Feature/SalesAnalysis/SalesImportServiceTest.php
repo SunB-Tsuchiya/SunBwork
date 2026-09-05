@@ -36,6 +36,7 @@ class SalesImportServiceTest extends TestCase
     private function seedPreviewCache(array $validationResult, int $previewedBy): string
     {
         $validationResult['previewed_by'] = $previewedBy;
+        $validationResult['company_id'] = $this->salesTestCompanyId();
 
         $token = (string) Str::uuid();
         $this->service()->previewCacheStore()->put(
@@ -52,7 +53,7 @@ class SalesImportServiceTest extends TestCase
         $path = $this->makeSalesWorkbook($title, $rows);
 
         try {
-            $result = $this->validator()->validate($path, $departmentKey, $sourceType, $year, $month, $monthEnd);
+            $result = $this->validator()->validate($path, $departmentKey, $sourceType, $year, $month, $monthEnd, $this->salesTestCompanyId());
             $result['file_sha256'] = hash('sha256', Str::random(32) . microtime());
             $result['original_filename'] = 'test.xlsx';
 
@@ -89,7 +90,7 @@ class SalesImportServiceTest extends TestCase
 
         $token = $this->seedPreviewCache($result, $user->id);
 
-        $import = $this->service()->confirm($token, $user->id);
+        $import = $this->service()->confirm($token, $user->id, $this->salesTestCompanyId());
 
         $this->assertSame(1, $import->version);
         $this->assertSame('completed', $import->status);
@@ -114,11 +115,11 @@ class SalesImportServiceTest extends TestCase
 
         $firstRows = [$this->row('7100001', 'A社', '商品A', 1000, 1000, '2026/10/05')];
         $firstResult = $this->validateWorkbook($firstRows, $this->monthlyTitle('企画', 2026, 10), 'planning', 'monthly', 2026, 10);
-        $firstImport = $this->service()->confirm($this->seedPreviewCache($firstResult, $user->id), $user->id);
+        $firstImport = $this->service()->confirm($this->seedPreviewCache($firstResult, $user->id), $user->id, $this->salesTestCompanyId());
 
         $secondRows = [$this->row('7100002', 'A社', '商品B', 2000, 2000, '2026/10/06')];
         $secondResult = $this->validateWorkbook($secondRows, $this->monthlyTitle('企画', 2026, 10), 'planning', 'monthly', 2026, 10);
-        $secondImport = $this->service()->confirm($this->seedPreviewCache($secondResult, $user->id), $user->id);
+        $secondImport = $this->service()->confirm($this->seedPreviewCache($secondResult, $user->id), $user->id, $this->salesTestCompanyId());
 
         $this->assertSame(2, $secondImport->version);
 
@@ -141,7 +142,7 @@ class SalesImportServiceTest extends TestCase
         $result = $this->validateWorkbook($rows, $this->annualTitle('企画', 2026), 'planning', 'annual', 2026, null);
         $this->assertTrue($result['valid'], implode(' / ', $result['errors']));
 
-        $import = $this->service()->confirm($this->seedPreviewCache($result, $user->id), $user->id);
+        $import = $this->service()->confirm($this->seedPreviewCache($result, $user->id), $user->id, $this->salesTestCompanyId());
 
         $this->assertNotNull(SalesActiveMonth::where('department_key', 'planning')->where('sales_year', 2026)->where('sales_month', 2)->first());
         $this->assertNotNull(SalesActiveMonth::where('department_key', 'planning')->where('sales_year', 2026)->where('sales_month', 11)->first());
@@ -163,7 +164,7 @@ class SalesImportServiceTest extends TestCase
         $result = $this->validateWorkbook($rows, $this->rangeTitle('企画', 2026, 1), 'planning', 'range', 2026, 1, 6);
         $this->assertTrue($result['valid'], implode(' / ', $result['errors']));
 
-        $import = $this->service()->confirm($this->seedPreviewCache($result, $user->id), $user->id);
+        $import = $this->service()->confirm($this->seedPreviewCache($result, $user->id), $user->id, $this->salesTestCompanyId());
 
         $this->assertSame(1, $import->source_month);
         $this->assertSame(6, $import->source_month_end);
@@ -183,7 +184,7 @@ class SalesImportServiceTest extends TestCase
         $fixedHash = hash('sha256', 'fixed-content-for-dup-test');
         $result['file_sha256'] = $fixedHash;
 
-        $this->service()->confirm($this->seedPreviewCache($result, $user->id), $user->id);
+        $this->service()->confirm($this->seedPreviewCache($result, $user->id), $user->id, $this->salesTestCompanyId());
 
         // 同じハッシュを持つ別のプレビューを確定しようとする
         $rows2 = [$this->row('7300002', 'B社', '商品B', 2000, 2000, '2026/09/06')];
@@ -191,7 +192,7 @@ class SalesImportServiceTest extends TestCase
         $result2['file_sha256'] = $fixedHash;
 
         $this->expectException(SalesImportConfirmException::class);
-        $this->service()->confirm($this->seedPreviewCache($result2, $user->id), $user->id);
+        $this->service()->confirm($this->seedPreviewCache($result2, $user->id), $user->id, $this->salesTestCompanyId());
     }
 
     public function test_confirm_fails_for_expired_or_unknown_token()
@@ -199,7 +200,7 @@ class SalesImportServiceTest extends TestCase
         $user = User::factory()->create(['user_role' => 'superadmin']);
 
         $this->expectException(SalesImportConfirmException::class);
-        $this->service()->confirm((string) Str::uuid(), $user->id);
+        $this->service()->confirm((string) Str::uuid(), $user->id, $this->salesTestCompanyId());
     }
 
     public function test_failed_confirm_does_not_switch_active_pointer()
@@ -209,11 +210,11 @@ class SalesImportServiceTest extends TestCase
         // 事前に有効な版を作っておく
         $firstRows = [$this->row('7400001', 'A社', '商品A', 1000, 1000, '2026/12/05')];
         $firstResult = $this->validateWorkbook($firstRows, $this->monthlyTitle('企画', 2026, 12), 'planning', 'monthly', 2026, 12);
-        $firstImport = $this->service()->confirm($this->seedPreviewCache($firstResult, $user->id), $user->id);
+        $firstImport = $this->service()->confirm($this->seedPreviewCache($firstResult, $user->id), $user->id, $this->salesTestCompanyId());
 
         // 期限切れ・不正tokenでのconfirmはactive pointerに影響しないことを確認
         try {
-            $this->service()->confirm((string) Str::uuid(), $user->id);
+            $this->service()->confirm((string) Str::uuid(), $user->id, $this->salesTestCompanyId());
         } catch (SalesImportConfirmException $e) {
             // 期待どおりの例外
         }
@@ -229,7 +230,7 @@ class SalesImportServiceTest extends TestCase
         // 1回目: 6月にデータあり
         $firstRows = [$this->row('7600001', 'A社', '商品A', 1000, 1000, '2026/06/10')];
         $firstResult = $this->validateWorkbook($firstRows, $this->annualTitle('企画', 2026), 'planning', 'annual', 2026, null);
-        $firstImport = $this->service()->confirm($this->seedPreviewCache($firstResult, $user->id), $user->id);
+        $firstImport = $this->service()->confirm($this->seedPreviewCache($firstResult, $user->id), $user->id, $this->salesTestCompanyId());
 
         $activeBefore = SalesActiveMonth::where('department_key', 'planning')->where('sales_year', 2026)->where('sales_month', 6)->first();
         $this->assertSame($firstImport->id, $activeBefore->sales_import_id);
@@ -237,7 +238,7 @@ class SalesImportServiceTest extends TestCase
         // 2回目（修正版）: 6月のデータが無くなった
         $secondRows = [$this->row('7600002', 'B社', '商品B', 2000, 2000, '2026/03/10')];
         $secondResult = $this->validateWorkbook($secondRows, $this->annualTitle('企画', 2026), 'planning', 'annual', 2026, null);
-        $secondImport = $this->service()->confirm($this->seedPreviewCache($secondResult, $user->id), $user->id);
+        $secondImport = $this->service()->confirm($this->seedPreviewCache($secondResult, $user->id), $user->id, $this->salesTestCompanyId());
 
         // 6月は新データが0件でも、取込指定範囲（年次=1〜12月）全体としてactive pointerが
         // 新しい版に切り替わる（旧版が残留してはいけない。Codexレビュー6.2 High-4）。
@@ -264,7 +265,7 @@ class SalesImportServiceTest extends TestCase
         $result = $this->validateWorkbook([$row], $this->monthlyTitle('企画', 2026, 9), 'planning', 'monthly', 2026, 9);
         $this->assertTrue($result['valid'], implode(' / ', $result['errors']));
 
-        $import = $this->service()->confirm($this->seedPreviewCache($result, $user->id), $user->id);
+        $import = $this->service()->confirm($this->seedPreviewCache($result, $user->id), $user->id, $this->salesTestCompanyId());
 
         $this->assertDatabaseHas('sales_orders', [
             'sales_import_id' => $import->id,
@@ -286,7 +287,7 @@ class SalesImportServiceTest extends TestCase
         // 検証を実行したユーザー（previewer）と異なるユーザー（confirmer）が確定しようとする
         // （Codexレビュー2回目 High-2対応: 他ユーザーのプレビュートークンを確定できてしまう問題）
         $this->expectException(SalesImportConfirmException::class);
-        $this->service()->confirm($token, $confirmer->id);
+        $this->service()->confirm($token, $confirmer->id, $this->salesTestCompanyId());
     }
 
     public function test_confirm_succeeds_when_same_user_previews_and_confirms()
@@ -297,7 +298,7 @@ class SalesImportServiceTest extends TestCase
         $result = $this->validateWorkbook($rows, $this->monthlyTitle('企画', 2026, 9), 'planning', 'monthly', 2026, 9);
         $token = $this->seedPreviewCache($result, $user->id);
 
-        $import = $this->service()->confirm($token, $user->id);
+        $import = $this->service()->confirm($token, $user->id, $this->salesTestCompanyId());
 
         $this->assertSame('completed', $import->status);
     }
@@ -310,12 +311,12 @@ class SalesImportServiceTest extends TestCase
         $result = $this->validateWorkbook($rows, $this->monthlyTitle('企画', 2026, 9), 'planning', 'monthly', 2026, 9);
         $token = $this->seedPreviewCache($result, $user->id);
 
-        $this->service()->confirm($token, $user->id);
+        $this->service()->confirm($token, $user->id, $this->salesTestCompanyId());
 
         // 同じトークンを続けて確定しようとしても、既にキャッシュが消費されているため二重登録されない
         // （Codexレビュー2回目 High-2/8.3対応）
         $this->expectException(SalesImportConfirmException::class);
-        $this->service()->confirm($token, $user->id);
+        $this->service()->confirm($token, $user->id, $this->salesTestCompanyId());
     }
 
     private function row(string $orderNumber, string $client, string $product, float $lineAmount, float $orderAmount, string $plateDate): array

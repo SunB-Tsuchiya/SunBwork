@@ -17,6 +17,7 @@ class SalesDashboardApiTest extends TestCase
     private function seedOneOrder(int $year, int $month): void
     {
         $import = SalesImport::create([
+            'company_id' => $this->salesTestCompanyId(),
             'department_key' => 'planning',
             'source_type' => 'monthly',
             'source_year' => $year,
@@ -42,6 +43,7 @@ class SalesDashboardApiTest extends TestCase
             'order_amount' => 1000,
         ]);
         SalesActiveMonth::create([
+            'company_id' => $this->salesTestCompanyId(),
             'department_key' => 'planning',
             'sales_year' => $year,
             'sales_month' => $month,

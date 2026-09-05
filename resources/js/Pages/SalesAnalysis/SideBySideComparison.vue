@@ -9,6 +9,7 @@ const props = defineProps({
     routePrefix: { type: String, required: true },
     departmentLabels: { type: Object, default: () => ({}) },
     enabledDepartmentKeys: { type: Array, default: () => [] },
+    hasCompanySelected: { type: Boolean, default: true },
 });
 
 // 売上分析ルートは superadmin/admin/clerk の各ロールグループ内に複製登録されている
@@ -46,6 +47,8 @@ const useSameMonthLastYear = () => {
 };
 
 const fetchSummary = async () => {
+    if (!props.hasCompanySelected) return;
+
     loading.value = true;
     errorMessage.value = '';
 
@@ -104,7 +107,11 @@ fetchSummary();
             <SalesAnalysisNavigationTabs :route-prefix="routePrefix" active="side_by_side" />
         </template>
 
-        <div class="space-y-6">
+        <div v-if="!hasCompanySelected" class="rounded bg-white p-6 shadow">
+            <p class="text-sm text-gray-500">会社が選択されていません。画面右上の会社切替から対象の会社を選択してください。</p>
+        </div>
+
+        <div v-else class="space-y-6">
             <!-- フィルタ -->
             <div class="rounded bg-white p-4 shadow">
                 <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">

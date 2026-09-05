@@ -40,7 +40,7 @@ class SalesImportValidatorTest extends TestCase
     {
         $path = base_path('tests/Fixtures/SalesAnalysis/sanbrain_meisai_sample.xlsx');
 
-        $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 8);
+        $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 8, null, $this->salesTestCompanyId());
 
         $this->assertFalse($result['valid']);
         $this->assertNotEmpty(array_filter(
@@ -60,7 +60,7 @@ class SalesImportValidatorTest extends TestCase
         $path = $this->makeSalesWorkbook($this->monthlyTitle('企画', 2026, 9), $rows);
 
         try {
-            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9);
+            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9, null, $this->salesTestCompanyId());
 
             $this->assertTrue($result['valid'], implode(' / ', $result['errors']));
             $this->assertSame(2, $result['summary']['order_count']);
@@ -82,7 +82,7 @@ class SalesImportValidatorTest extends TestCase
         $path = $this->makeSalesWorkbook($this->monthlyTitle('ｵﾝﾃﾞﾏﾝﾄﾞ', 2026, 9), $rows);
 
         try {
-            $result = $this->validator()->validate($path, 'ondemand', 'monthly', 2026, 9);
+            $result = $this->validator()->validate($path, 'ondemand', 'monthly', 2026, 9, null, $this->salesTestCompanyId());
 
             $this->assertTrue($result['valid'], implode(' / ', $result['errors']));
         } finally {
@@ -97,7 +97,7 @@ class SalesImportValidatorTest extends TestCase
         $path = $this->makeSalesWorkbook($this->monthlyTitle('制作', 2026, 9), $rows);
 
         try {
-            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9);
+            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9, null, $this->salesTestCompanyId());
 
             $this->assertFalse($result['valid']);
         } finally {
@@ -114,7 +114,7 @@ class SalesImportValidatorTest extends TestCase
             // 行のSB下版日は9月だが、フォーム指定は10月 → 行データとの不一致でエラー。
             // タイトル行の年月は出力側の設定で常に開始月固定のため検証には使わない
             // （半期でも年次でも常に「1月」等と表示され得るため）。
-            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 10);
+            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 10, null, $this->salesTestCompanyId());
 
             $this->assertFalse($result['valid']);
         } finally {
@@ -130,7 +130,7 @@ class SalesImportValidatorTest extends TestCase
         $path = $this->makeSalesWorkbook($this->monthlyTitle('企画', 2026, 9), $rows);
 
         try {
-            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9);
+            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9, null, $this->salesTestCompanyId());
 
             $this->assertTrue($result['valid'], implode(' / ', $result['errors']) . implode(' / ', $this->flattenInvalidOrderErrors($result)));
             $this->assertSame(-1000.0, $result['orders'][0]['order_amount']);
@@ -148,7 +148,7 @@ class SalesImportValidatorTest extends TestCase
         $path = $this->makeSalesWorkbook($this->annualTitle('企画', 2026), $rows);
 
         try {
-            $result = $this->validator()->validate($path, 'planning', 'annual', 2026, null);
+            $result = $this->validator()->validate($path, 'planning', 'annual', 2026, null, null, $this->salesTestCompanyId());
 
             $this->assertTrue($result['valid'], implode(' / ', $result['errors']));
             $order1 = collect($result['orders'])->firstWhere('order_number', '3000001');
@@ -170,7 +170,7 @@ class SalesImportValidatorTest extends TestCase
         $path = $this->makeSalesWorkbook($this->rangeTitle('企画', 2026, 1), $rows);
 
         try {
-            $result = $this->validator()->validate($path, 'planning', 'range', 2026, 1, 6);
+            $result = $this->validator()->validate($path, 'planning', 'range', 2026, 1, 6, $this->salesTestCompanyId());
 
             $this->assertTrue($result['valid'], implode(' / ', $result['errors']));
             $order1 = collect($result['orders'])->firstWhere('order_number', '6000001');
@@ -190,7 +190,7 @@ class SalesImportValidatorTest extends TestCase
         $path = $this->makeSalesWorkbook($this->rangeTitle('企画', 2026, 1), $rows);
 
         try {
-            $result = $this->validator()->validate($path, 'planning', 'range', 2026, 1, 6);
+            $result = $this->validator()->validate($path, 'planning', 'range', 2026, 1, 6, $this->salesTestCompanyId());
 
             $this->assertFalse($result['valid']);
         } finally {
@@ -207,7 +207,7 @@ class SalesImportValidatorTest extends TestCase
         $path = $this->makeSalesWorkbook($this->rangeTitle('企画', 2026, 2), $rows);
 
         try {
-            $result = $this->validator()->validate($path, 'planning', 'range', 2026, 3, 6);
+            $result = $this->validator()->validate($path, 'planning', 'range', 2026, 3, 6, $this->salesTestCompanyId());
 
             $this->assertTrue($result['valid'], implode(' / ', $result['errors']));
         } finally {
@@ -218,6 +218,7 @@ class SalesImportValidatorTest extends TestCase
     public function test_order_number_already_active_in_another_month_is_rejected()
     {
         $import = SalesImport::create([
+            'company_id' => $this->salesTestCompanyId(),
             'department_key' => 'planning',
             'source_type' => 'monthly',
             'source_year' => 2026,
@@ -243,6 +244,7 @@ class SalesImportValidatorTest extends TestCase
             'order_amount' => 1000,
         ]);
         SalesActiveMonth::create([
+            'company_id' => $this->salesTestCompanyId(),
             'department_key' => 'planning',
             'sales_year' => 2026,
             'sales_month' => 8,
@@ -256,7 +258,7 @@ class SalesImportValidatorTest extends TestCase
         $path = $this->makeSalesWorkbook($this->monthlyTitle('企画', 2026, 9), $rows);
 
         try {
-            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9);
+            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9, null, $this->salesTestCompanyId());
 
             $this->assertFalse($result['valid']);
             $this->assertNotEmpty(array_filter(
@@ -284,7 +286,7 @@ class SalesImportValidatorTest extends TestCase
         $path = $this->makeSalesWorkbook($this->monthlyTitle('企画', 2026, 9), [$row]);
 
         try {
-            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9);
+            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9, null, $this->salesTestCompanyId());
 
             $this->assertTrue($result['valid'], implode(' / ', $result['errors']));
             $this->assertSame(1, $result['summary']['order_count']);
@@ -311,7 +313,7 @@ class SalesImportValidatorTest extends TestCase
         $path = $this->makeSalesWorkbook($this->monthlyTitle('企画', 2026, 9), $rows);
 
         try {
-            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9);
+            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9, null, $this->salesTestCompanyId());
 
             $this->assertTrue($result['valid'], implode(' / ', $result['errors']));
             $order = $result['orders'][0];
@@ -330,7 +332,7 @@ class SalesImportValidatorTest extends TestCase
         $path = $this->makeSalesWorkbook($this->monthlyTitle('企画', 2026, 9), $rows);
 
         try {
-            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9);
+            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9, null, $this->salesTestCompanyId());
 
             $this->assertFalse($result['valid']);
             $errors = $this->flattenInvalidOrderErrors($result);
@@ -350,7 +352,7 @@ class SalesImportValidatorTest extends TestCase
         $path = $this->makeSalesWorkbook($this->monthlyTitle('企画', 2026, 9), [$row]);
 
         try {
-            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9);
+            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9, null, $this->salesTestCompanyId());
 
             $this->assertFalse($result['valid']);
             $errors = $this->flattenInvalidOrderErrors($result);
@@ -369,7 +371,7 @@ class SalesImportValidatorTest extends TestCase
         $path = $this->makeSalesWorkbook($this->monthlyTitle('企画', 2026, 9), $rows);
 
         try {
-            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9);
+            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9, null, $this->salesTestCompanyId());
 
             $this->assertFalse($result['valid']);
             $this->assertNotEmpty(array_filter($this->flattenInvalidOrderErrors($result), fn ($e) => str_contains($e, '0以外の値を持つ行が複数')));
@@ -388,7 +390,7 @@ class SalesImportValidatorTest extends TestCase
         $path = $this->makeSalesWorkbook($this->monthlyTitle('企画', 2026, 9), $rows);
 
         try {
-            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9);
+            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9, null, $this->salesTestCompanyId());
 
             $this->assertTrue($result['valid'], implode(' / ', $result['errors']) . implode(' / ', $this->flattenInvalidOrderErrors($result)));
             $order = $result['orders'][0];
@@ -407,7 +409,7 @@ class SalesImportValidatorTest extends TestCase
         $path = $this->makeSalesWorkbook($this->monthlyTitle('企画', 2026, 9), $rows);
 
         try {
-            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9);
+            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9, null, $this->salesTestCompanyId());
 
             $this->assertFalse($result['valid']);
             $errors = $this->flattenInvalidOrderErrors($result);
@@ -426,7 +428,7 @@ class SalesImportValidatorTest extends TestCase
         $path = $this->makeSalesWorkbook($this->monthlyTitle('企画', 2026, 9), $rows);
 
         try {
-            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9);
+            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9, null, $this->salesTestCompanyId());
 
             $this->assertFalse($result['valid']);
             $this->assertNotEmpty(array_filter($this->flattenInvalidOrderErrors($result), fn ($e) => str_contains($e, '最後の行にありません')));
@@ -444,7 +446,7 @@ class SalesImportValidatorTest extends TestCase
         $path = $this->makeSalesWorkbook($this->monthlyTitle('企画', 2026, 9), $rows);
 
         try {
-            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9);
+            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9, null, $this->salesTestCompanyId());
 
             $this->assertTrue($result['valid'], implode(' / ', $result['errors']));
             $order = $result['orders'][0];
@@ -464,7 +466,7 @@ class SalesImportValidatorTest extends TestCase
         $path = $this->makeSalesWorkbook($this->monthlyTitle('企画', 2026, 9), [$row]);
 
         try {
-            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9);
+            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9, null, $this->salesTestCompanyId());
 
             $this->assertTrue($result['valid'], implode(' / ', $result['errors']) . implode(' / ', $this->flattenInvalidOrderErrors($result)));
             $order = $result['orders'][0];
@@ -482,7 +484,7 @@ class SalesImportValidatorTest extends TestCase
         $path = $this->makeSalesWorkbook($this->monthlyTitle('企画', 2026, 9), [$row]);
 
         try {
-            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9);
+            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9, null, $this->salesTestCompanyId());
 
             $this->assertFalse($result['valid']);
             $this->assertNotEmpty(array_filter($this->flattenInvalidOrderErrors($result), fn ($e) => str_contains($e, '台数が負数')));
@@ -500,12 +502,12 @@ class SalesImportValidatorTest extends TestCase
         $path = $this->makeSalesWorkbook($this->monthlyTitle('企画', 2026, 9), $rows);
 
         try {
-            $first = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9);
+            $first = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9, null, $this->salesTestCompanyId());
             $this->assertFalse($first['valid']);
             $this->assertCount(1, $first['invalid_orders']);
             $this->assertSame('8000013', $first['invalid_orders'][0]['order_number']);
 
-            $second = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9, null, ['8000013']);
+            $second = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9, null, $this->salesTestCompanyId(), ['8000013']);
             $this->assertTrue($second['valid'], implode(' / ', $this->flattenInvalidOrderErrors($second)));
             $this->assertCount(1, $second['orders']);
             $this->assertSame('8000012', $second['orders'][0]['order_number']);
@@ -524,7 +526,7 @@ class SalesImportValidatorTest extends TestCase
         $path = $this->makeSalesWorkbook($this->monthlyTitle('企画', 2026, 9), $rows);
 
         try {
-            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9, null, ['8000015']);
+            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9, null, $this->salesTestCompanyId(), ['8000015']);
 
             $this->assertFalse($result['valid']);
             $this->assertEmpty($result['excluded_orders']);
@@ -541,7 +543,7 @@ class SalesImportValidatorTest extends TestCase
 
         try {
             // ファイルに存在しない受注No（誤入力・別ファイルの番号混入等）を除外指定した場合も拒否する
-            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9, null, ['9999999']);
+            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9, null, $this->salesTestCompanyId(), ['9999999']);
 
             $this->assertFalse($result['valid']);
             $this->assertEmpty($result['excluded_orders']);
@@ -554,6 +556,7 @@ class SalesImportValidatorTest extends TestCase
     public function test_excluding_cross_month_duplicate_order_is_allowed()
     {
         $import = SalesImport::create([
+            'company_id' => $this->salesTestCompanyId(),
             'department_key' => 'planning',
             'source_type' => 'monthly',
             'source_year' => 2026,
@@ -579,6 +582,7 @@ class SalesImportValidatorTest extends TestCase
             'order_amount' => 1000,
         ]);
         SalesActiveMonth::create([
+            'company_id' => $this->salesTestCompanyId(),
             'department_key' => 'planning',
             'sales_year' => 2026,
             'sales_month' => 8,
@@ -596,7 +600,7 @@ class SalesImportValidatorTest extends TestCase
 
         try {
             // 他月重複エラーの受注も、通常のinvalid_orders同様に除外対象として認められる
-            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9, null, ['8000017']);
+            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9, null, $this->salesTestCompanyId(), ['8000017']);
 
             $this->assertTrue($result['valid'], implode(' / ', $this->flattenInvalidOrderErrors($result)));
             $this->assertSame(['8000017'], $result['excluded_orders']);
@@ -614,7 +618,7 @@ class SalesImportValidatorTest extends TestCase
         $path = $this->makeSalesWorkbook($this->monthlyTitle('企画', 2026, 9), [$row]);
 
         try {
-            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9, null, ['8000014']);
+            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 9, null, $this->salesTestCompanyId(), ['8000014']);
 
             $this->assertFalse($result['valid']);
             $this->assertNotEmpty(array_filter($result['errors'], fn ($e) => str_contains($e, '受注No')));
@@ -630,7 +634,7 @@ class SalesImportValidatorTest extends TestCase
         $path = $this->makeSalesWorkbook($this->monthlyTitle('企画', 2026, 2), $rows);
 
         try {
-            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 2);
+            $result = $this->validator()->validate($path, 'planning', 'monthly', 2026, 2, null, $this->salesTestCompanyId());
 
             $this->assertFalse($result['valid']);
             $this->assertNotEmpty(array_filter($this->flattenInvalidOrderErrors($result), fn ($e) => str_contains($e, 'SB下版日')));

@@ -18,8 +18,28 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
  */
 class SalesExportService
 {
+    private ?int $companyId = null;
+
     public function __construct(private SalesQueryService $queryService)
     {
+    }
+
+    /** 会社別データ分離（2026-09-05）。呼び出し側は先に必ずこれを呼ぶ（SalesQueryServiceと同じ設計） */
+    public function forCompany(int $companyId): self
+    {
+        $this->companyId = $companyId;
+        $this->queryService->forCompany($companyId);
+
+        return $this;
+    }
+
+    private function requireCompanyId(): int
+    {
+        if ($this->companyId === null) {
+            throw new \LogicException('SalesExportService: forCompany()が呼ばれる前にworkbookメソッドが実行されました。');
+        }
+
+        return $this->companyId;
     }
 
     public function annualAnalysisWorkbook(string $departmentKey, int $year, bool $consolidateClients): Spreadsheet
@@ -27,7 +47,7 @@ class SalesExportService
         $summary = $this->queryService->annualSummary($departmentKey, $year, $consolidateClients);
         $departmentLabel = $departmentKey === 'all'
             ? '全部署合計'
-            : (SalesDepartments::labelFromKey($departmentKey) ?? $departmentKey);
+            : (SalesDepartments::labelForKey($this->requireCompanyId(), $departmentKey) ?? $departmentKey);
 
         $spreadsheet = new Spreadsheet();
         $spreadsheet->removeSheetByIndex(0);
@@ -54,7 +74,7 @@ class SalesExportService
         $summary = $this->queryService->fiscalYearSummary($departmentKey, $fiscalYear, $consolidateClients);
         $departmentLabel = $departmentKey === 'all'
             ? '全部署合計'
-            : (SalesDepartments::labelFromKey($departmentKey) ?? $departmentKey);
+            : (SalesDepartments::labelForKey($this->requireCompanyId(), $departmentKey) ?? $departmentKey);
 
         $spreadsheet = new Spreadsheet();
         $spreadsheet->removeSheetByIndex(0);
