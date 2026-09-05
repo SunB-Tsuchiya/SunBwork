@@ -267,6 +267,17 @@
 | 17-4 | ナビゲーションタブに「期別分析」追加、暦年/年度スイッチ撤去 | ✅ | `useFiscalMode.js`composable削除。MonthlyAnalysis.vueの「年度累計」カードは「年間累計」（暦年固定）に簡素化 |
 | 17-5 | 回帰テスト追加・全体テスト・build | ✅ | プロジェクト全体361件成功、npm run build成功 |
 
+### Phase 18: 商品分析画面を新規追加（新規/取扱終了商品パネル含む）
+
+| ID | タスク | 状態 | 証跡・メモ |
+|---|---|---|---|
+| 18-1 | バックエンド（product*系メソッド・ProductAnalysisController） | ✅ | clientAnalysisPanel()等と対称構造、consolidate系引数は無し |
+| 18-2 | productYearOverYearComparison()（新規/取扱終了商品・増減額上位） | ✅ | 直近登録年対前年で固定。前年未登録時はhas_comparison_pair=falseで空リスト |
+| 18-3 | 新規ProductAnalysis.vue | ✅ | ClientAnalysis.vueと同一構成＋購入得意先ミニランキング追加 |
+| 18-4 | ナビゲーションタブに「商品分析」追加、ルート登録、Ziggy再生成 | ✅ | 得意先分析の直後に配置 |
+| 18-5 | 回帰テスト追加・全体テスト・build | ✅ | 売上分析262件成功（新規15件）、npm run build成功 |
+| 18-6 | 新規/取扱終了商品の年度表記誤検知を修正（ProductNameNormalizer） | ✅ | 実例「2027年度用〜」対「2026年度用〜」を同一商品として扱うよう修正。範囲は新規/取扱終了パネルのみとユーザーに確認済み。売上分析271件成功（新規9件） |
+
 ### Review R1: Codex
 
 | ID | レビュー観点 | 状態 | 指摘 |
@@ -482,6 +493,9 @@
 | 2026-09-04 | ユーザー報告: ランキングの得意先クリックでスクロールが上に移動しない。前回実装した`detailSectionRef.value?.scrollIntoView(...)`（要素refへのnextTick後呼び出し）は、DOM構造やVueのタイミングに依存する分バグの余地があった。原因の切り分けを待たず、より頑健な実装（`window.scrollTo({top:0, behavior:'smooth'})`をshowDetail()の先頭で即座に呼ぶ、要素ref不要）へ置き換えた。npm run build成功（バックエンド変更なし） |
 | 2026-09-04 | ユーザーからの複数の指示に対応。**①アーキテクチャ決定**: 「売上分析機能はSunBWork本体に残す」と確定（U-4解決）。ただし「さくらへのデプロイはまだ待って」と同時に明示指示があったため、Phase 9（バックアップ・さくらデプロイ・本番SSH調査）は別途デプロイ指示が出るまで保留を継続。永続メモリ`project_sales_analysis_architecture_decision.md`を更新。**②役割別タブの復元**: 「全社共通タブ（SuperAdmin等）も売上分析画面に残す」との指示を受け、`SalesAnalysisNavigationTabs.vue`がroutePrefixから役割を判定し、SuperAdmin/Admin/ClerkNavigationTabsを`active="sales_analysis"`で自前描画するよう変更（AppLayout.vue自体は変更せず、`#tabs`スロット上書きによる副作用をこのコンポーネント内で解消）。**③年度累計の集計区分を全画面共通のスイッチへ**: 新規`useFiscalMode.js`（モジュールスコープの単一ref+localStorage永続化）を作成し、`SalesAnalysisNavigationTabs.vue`のタブ行右端（「取込履歴」の右）に暦年/年度(4月)スイッチを追加。`MonthlyAnalysis.vue`はページ内トグルを廃止しこの共有状態を参照するのみに変更。**④品名検索の配置変更**: 「下に置かず、部署などの白い枠に検索ボタンを作り押したら検索窓が出るように」との指示を受け、`PeriodNavigator.vue`に`#extra`スロットを追加（同じ白い枠内に画面固有の追加操作を置けるようにする汎用的な拡張ポイント）。`MonthlyAnalysis.vue`/`AnnualAnalysis.vue`双方で、ページ下部にあった品名検索セクション（Monthlyは「詳細を調べる」折りたたみ、Annualは常時表示）を廃止し、期間ナビゲーターの「🔍品名検索」ボタン→直下に開閉パネル、という形に統一。バックエンド変更なし。npm run build成功、SalesAnalysis配下233件成功 |
 | 2026-09-04 | ユーザー指摘: 「年と期の分類、意味がないので削除（見えなくするのでもよい）、年次分析と期別分析を作ってください。期別は4月から3月で」。前回追加した暦年/年度スイッチ（`useFiscalMode.js`）を全面的に撤去し、代わりに会計年度（4月始まり）専用の新規画面「期別分析」を新設した（機能範囲はユーザーに一問確認し「年次分析とフル機能で対応」を選択）。PLAN1.md「Phase 17」に詳細設計を記録済み。要点: `SalesQueryService`に`fiscalYear*`系メソッド一式（既存の暦年ロジックには一切手を入れず完全新規、年またぎ集計は得意先分析Phase15で作った`mergeClientAggregatesForRange()`を再利用し分類/項目向けに`mergeDetailBreakdownForRange()`を新設）、新規`FiscalYearAnalysisController`（`AnnualAnalysisController`と対応する9アクション）、新規`FiscalYearAnalysis.vue`（月配列は4月始まり、`PeriodNavigator`に追加した`yearLabel`propで「年度」表示）、`SalesExportService::fiscalYearAnalysisWorkbook()`。ナビゲーションタブに「期別分析」を追加しスイッチは削除、`useFiscalMode.js`は削除。`MonthlyAnalysis.vue`の「年度累計」カードは期別の概念を持たせず「年間累計（1〜12月、暦年固定）」に簡素化。回帰テスト14件追加（controller層10件・service層4件）。プロジェクト全体361件成功、npm run build成功、Ziggy再生成・route/config/cacheクリア実施 |
+| 2026-09-05 | さくら本番へPhase11〜17一式をデプロイ（`SALES_DB_*`用に新規DB`silverlamb759_sales`をユーザーが作成、migrate --force、DEPLOY_SAKURA.mdの6ステップでビルド・push・pull）。あわせてローカルの実データ（imports28/active_months240/orders38191/order_details159789/audit_logs30）をmysqldumpで本番へ移行、件数完全一致を確認。デプロイ後、SuperAdminがadmin/clerk向け売上分析URLを開くと常にsuperadminタブが表示される不具合が発覚し修正（`ResolvesSalesAnalysisRoutePrefix`が実際のユーザーロールではなく現在のルート名からprefixを判定するよう変更）。ヘッダーの重複「売上分析」アイコンも削除。回帰テスト1件追加、さくら本番へ再デプロイ済み |
+| 2026-09-05 | ユーザーからの追加要望「分析画面で今実装しているもののほかにあると便利なもの」に対し、得意先分析と対称な「商品分析」を提案・合意。さらに事務・経理からの要望「前年比較で大きく差があったときに何がなくなったのか、追加になったのかを調べたい」を受け、新規`ProductAnalysisController`/`ProductAnalysis.vue`を追加。PLAN1.md「Phase 18」に詳細設計を記録済み。要点: `productRankingForPeriod()`/`productAnalysisPanel()`/`productDetail()`は`clientAnalysisPanel()`等と対称構造（consolidate系引数は無し）、`productDetail()`には得意先分析には無い「購入している得意先ランキング」を追加、`productYearOverYearComparison()`は常に「直近登録年対前年」で固定比較し新規/取扱終了商品・増減額上位を返す（前年未登録時はhas_comparison_pair=falseで空リスト）。ナビゲーションタブに「商品分析」を追加。回帰テスト15件追加（service層6件・controller層9件）。売上分析262件成功、npm run build成功、Ziggy再生成実施 |
+| 2026-09-05 | ユーザー指示によりCodexへ売上分析機能を全体的にレビューさせた（`codex exec review --base 02e302fc9`、Phase1〜18の基盤導入前コミットとの差分、112ファイル・約20,600行）。指摘3件: **[P1]** 商品分析コントローラー・ページが未コミット（`ProductAnalysisController.php`等が未追跡=git管理外だったため、レビューの差分に含まれずroutes/web.phpだけが参照する形になり「実装が無い」と誤検知された。実ファイルは存在。次回レビュー前は`git add`で追跡させることをメモ）。**[P2・実バグ]** `annualClientPanel()`/`fiscalYearClientPanel()`が`$current`のキーだけを回していたため、前年（前期）のみに存在し今年（今期）は受注が無い＝離脱した得意先が一覧・diffパネルから丸ごと消えていた。前年/前期のキーも合流させ、離脱得意先を`amount=0, diff=マイナス`で含めるよう修正。**[P2・実バグ]** 同月比較`buildSameMonthClientComparison()`の増加額上位/減少額上位が符号で絞り込んでおらず、対象が全員減少（または全員増加）の期間では反対符号の行が混ざって見出しと矛盾していた。同じ設計だった自前の`productYearOverYearComparison()`（Phase18で新規実装）にも同種のバグがあったため、両方とも`diff>0`/`diff<0`でフィルタするよう修正。回帰テスト4件追加。売上分析275件成功、PHPのみの変更のためbuild不要 |
 
 ## 7. ブロッカー・未決事項
 
@@ -490,7 +504,7 @@
 | U-1 | 暗号化backupの外部保存先 | 未決 | Phase 9直前に一問確認 |
 | U-2 | xlsx最大容量とupload上限 | 解決 | 中規模(年2,000〜1万行)と確認。暫定10MB上限を採用 |
 | U-3 | 年末backup保持年数 | 未決 | backup実装前に一問確認 |
-| U-4 | 売上分析機能をSunBWorkに残すか、別Laravelアプリへ切り出すか | **解決（2026-09-04）** | ユーザー確定: **SunBWork本体に残す**（切り出さない）。ただし同時に「さくらへのデプロイはまだ待って」と明示指示があったため、Phase 9（バックアップ・さくらデプロイ・本番SSH調査）は別途デプロイ指示が出るまで引き続き保留 |
+| U-4 | 売上分析機能をSunBWorkに残すか、別Laravelアプリへ切り出すか | **解決（2026-09-04）** | ユーザー確定: **SunBWork本体に残す**（切り出さない）。2026-09-05にさくら本番へデプロイ・実データ移行済み（U-1「暗号化backupの外部保存先」とは別件、本番運用開始） |
 
 ## 8. 完了条件
 

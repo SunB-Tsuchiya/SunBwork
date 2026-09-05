@@ -575,6 +575,20 @@ class SalesQueryServiceTest extends TestCase
         $this->assertSame(300.0, $b['diff']); // 前期は0円扱い（新規）
     }
 
+    /** Codexレビュー指摘の回帰テスト（2026-09-05）: annualClientPanel()と同種の離脱得意先消失バグ */
+    public function test_fiscal_year_client_panel_includes_clients_that_departed_since_prior_fiscal_year()
+    {
+        $this->seedMonth('planning', 2024, 4, [['order_number' => 'FYCD-24', 'client_name' => 'C社', 'amount' => 500]]);
+        $this->seedMonth('planning', 2025, 4, [['order_number' => 'FYCD-25', 'client_name' => 'A社', 'amount' => 1000]]);
+
+        $panel = $this->service()->fiscalYearClientPanel('planning', 2025, false, null, 'amount', 'desc', 10, 1);
+
+        $c = collect($panel['rows'])->firstWhere('label', 'C社');
+        $this->assertNotNull($c, 'C社（離脱得意先）が一覧から消えている');
+        $this->assertSame(0.0, $c['amount']);
+        $this->assertSame(-500.0, $c['diff']);
+    }
+
     public function test_latest_registered_fiscal_year_resolves_month_before_and_after_april()
     {
         $this->seedMonth('planning', 2025, 3, [['order_number' => 'LFY-1', 'client_name' => 'A社', 'amount' => 100]]);
@@ -615,6 +629,23 @@ class SalesQueryServiceTest extends TestCase
         $b = collect($panel['rows'])->firstWhere('label', 'B社');
         $this->assertSame(200.0, $a['diff']); // 1200 - 1000
         $this->assertSame(300.0, $b['diff']); // 前年同期間は0円扱い（新規）
+    }
+
+    /**
+     * Codexレビュー指摘の回帰テスト（2026-09-05）: 前年のみに存在し今年は受注が無い（＝離脱した）
+     * 得意先が、$currentのキーだけを回していたために一覧から丸ごと消えていた。
+     */
+    public function test_annual_client_panel_includes_clients_that_departed_since_prior_year()
+    {
+        $this->seedMonth('planning', 2025, 1, [['order_number' => 'ACD-25', 'client_name' => 'C社', 'amount' => 500]]);
+        $this->seedMonth('planning', 2026, 1, [['order_number' => 'ACD-26', 'client_name' => 'A社', 'amount' => 1000]]);
+
+        $panel = $this->service()->annualClientPanel('planning', 2026, false, null, 'amount', 'desc', 10, 1);
+
+        $c = collect($panel['rows'])->firstWhere('label', 'C社');
+        $this->assertNotNull($c, 'C社（離脱得意先）が一覧から消えている');
+        $this->assertSame(0.0, $c['amount']);
+        $this->assertSame(-500.0, $c['diff']);
     }
 
     /** 実機フィードバック対応（2026-09-04）: 年次分析「月別売上」の3年/5年重ね表示 */
@@ -739,6 +770,29 @@ class SalesQueryServiceTest extends TestCase
         $this->assertSame('C社', $summary['top_increase'][0]['client_name']);
         $this->assertSame('B社', $summary['top_decrease'][0]['client_name']);
         $this->assertSame(-500.0, $summary['top_decrease'][0]['diff']);
+    }
+
+    /**
+     * Codexレビュー指摘の回帰テスト（2026-09-05）: 符号で絞り込んでいなかったため、
+     * 対象が全員減少している期間でも「増加額上位」にマイナスのdiffが混ざって表示されていた。
+     */
+    public function test_same_month_comparison_top_increase_excludes_negative_diff_rows_when_all_decreased()
+    {
+        $currentYear = (int) now()->format('Y');
+
+        $this->seedMonth('planning', $currentYear - 1, 2, [
+            ['order_number' => 'SGN-A-PY', 'client_name' => 'A社', 'amount' => 1000],
+            ['order_number' => 'SGN-B-PY', 'client_name' => 'B社', 'amount' => 800],
+        ]);
+        $this->seedMonth('planning', $currentYear, 2, [
+            ['order_number' => 'SGN-A-CY', 'client_name' => 'A社', 'amount' => 600], // -400
+            ['order_number' => 'SGN-B-CY', 'client_name' => 'B社', 'amount' => 500], // -300
+        ]);
+
+        $summary = $this->service()->sameMonthComparison('planning', 2, 5, false);
+
+        $this->assertSame([], $summary['top_increase']);
+        $this->assertCount(2, $summary['top_decrease']);
     }
 
     public function test_same_month_comparison_category_offset_comparison_handles_missing_years()
@@ -880,5 +934,152 @@ class SalesQueryServiceTest extends TestCase
         $this->assertCount(1, $rows);
         $this->assertSame(1000.0, $rows['株式会社NON']['amount_a']);
         $this->assertSame(1500.0, $rows['株式会社NON']['amount_b']);
+    }
+
+    public function test_product_ranking_for_period_sums_across_range_and_computes_share()
+    {
+        $this->seedMonth('planning', 2026, 1, [
+            ['order_number' => 'PR-1', 'client_name' => 'A社', 'product_name' => '名刺', 'amount' => 600],
+            ['order_number' => 'PR-2', 'client_name' => 'B社', 'product_name' => '封筒', 'amount' => 400],
+        ]);
+        $this->seedMonth('planning', 2026, 2, [
+            ['order_number' => 'PR-3', 'client_name' => 'A社', 'product_name' => '名刺', 'amount' => 400],
+        ]);
+
+        $result = $this->service()->productRankingForPeriod('planning', 2026, 1, 2026, 2, null);
+
+        $ranking = collect($result['ranking'])->keyBy('product_name');
+        $this->assertSame(1000.0, $ranking['名刺']['amount']);
+        $this->assertSame(400.0, $ranking['封筒']['amount']);
+        $this->assertSame(71.4, $ranking['名刺']['share_pct']);
+    }
+
+    public function test_product_analysis_panel_returns_paginated_rows_like_client_panel()
+    {
+        $this->seedMonth('planning', 2026, 3, [
+            ['order_number' => 'PP-1', 'client_name' => 'A社', 'product_name' => '名刺', 'amount' => 1000],
+            ['order_number' => 'PP-2', 'client_name' => 'B社', 'product_name' => '封筒', 'amount' => 500],
+        ]);
+
+        $result = $this->service()->productAnalysisPanel('planning', 2026, 3, 2026, 3, null, 'amount', 'desc', 10, 1);
+
+        $this->assertSame(1500.0, $result['total_amount']);
+        $this->assertSame('名刺', $result['rows'][0]['label']);
+        $this->assertSame(1000.0, $result['rows'][0]['amount']);
+    }
+
+    public function test_product_detail_returns_yearly_trend_orders_and_client_ranking()
+    {
+        $this->seedMonth('planning', 2025, 6, [
+            ['order_number' => 'PD-1', 'client_name' => 'A社', 'product_name' => '名刺', 'amount' => 500],
+        ]);
+        $this->seedMonth('planning', 2026, 6, [
+            ['order_number' => 'PD-2', 'client_name' => 'A社', 'product_name' => '名刺', 'amount' => 800],
+            ['order_number' => 'PD-3', 'client_name' => 'B社', 'product_name' => '名刺', 'amount' => 200],
+        ]);
+
+        $result = $this->service()->productDetail('planning', '名刺', 2025, 6, 2026, 6);
+
+        $yearly = collect($result['yearly'])->keyBy('year');
+        $this->assertSame(500.0, $yearly[2025]['amount']);
+        $this->assertSame(1000.0, $yearly[2026]['amount']);
+        $this->assertSame(500.0, $yearly[2026]['prior_year_diff']);
+        $this->assertCount(3, $result['orders']);
+
+        // client_ranking は開始〜終了の全期間合計（A社は2025年500+2026年800=1300）
+        $clientRanking = collect($result['client_ranking'])->keyBy('client_name');
+        $this->assertSame(1300.0, $clientRanking['A社']['amount']);
+        $this->assertSame(200.0, $clientRanking['B社']['amount']);
+    }
+
+    public function test_product_year_over_year_comparison_flags_new_and_discontinued_products()
+    {
+        $this->seedMonth('planning', 2025, 1, [
+            ['order_number' => 'YOY-1', 'client_name' => 'A社', 'product_name' => '封筒', 'amount' => 300],
+            ['order_number' => 'YOY-2', 'client_name' => 'A社', 'product_name' => '名刺', 'amount' => 1000],
+        ]);
+        $this->seedMonth('planning', 2026, 1, [
+            ['order_number' => 'YOY-3', 'client_name' => 'A社', 'product_name' => '名刺', 'amount' => 200],
+            ['order_number' => 'YOY-4', 'client_name' => 'A社', 'product_name' => 'チラシ', 'amount' => 900],
+        ]);
+
+        $result = $this->service()->productYearOverYearComparison('planning');
+
+        $this->assertTrue($result['has_comparison_pair']);
+        $this->assertSame(2026, $result['latest_year']);
+        $this->assertSame(2025, $result['prior_year']);
+
+        $newProducts = collect($result['new_products'])->keyBy('product_name');
+        $this->assertArrayHasKey('チラシ', $newProducts->all());
+        $this->assertSame(900.0, $newProducts['チラシ']['amount']);
+
+        $discontinued = collect($result['discontinued_products'])->keyBy('product_name');
+        $this->assertArrayHasKey('封筒', $discontinued->all());
+        $this->assertSame(300.0, $discontinued['封筒']['prior_year_amount']);
+
+        $decrease = collect($result['top_decrease'])->keyBy('product_name');
+        $this->assertSame(-800.0, $decrease['名刺']['diff']);
+    }
+
+    /**
+     * 実機フィードバック回帰テスト（2026-09-05）: 教材・テキスト等は年度だけ変えて毎年作られるため、
+     * 年度表記のみが違う商品名（例:「2027年度用中学入試問題集組版代」対「2026年度用中学入試問題集組版代」）を
+     * 新規/取扱終了として誤検知してはならない。
+     */
+    public function test_product_year_over_year_comparison_treats_year_variant_names_as_same_product()
+    {
+        $this->seedMonth('planning', 2025, 4, [
+            ['order_number' => 'YOY-N1', 'client_name' => 'A社', 'product_name' => '2025年度用中学入試問題集組版代 銀本α版通常校データ', 'amount' => 1000],
+        ]);
+        $this->seedMonth('planning', 2026, 4, [
+            ['order_number' => 'YOY-N2', 'client_name' => 'A社', 'product_name' => '2026年度用中学入試問題集組版代 銀本α版通常校データ', 'amount' => 1200],
+        ]);
+
+        $result = $this->service()->productYearOverYearComparison('planning');
+
+        $newNames = collect($result['new_products'])->pluck('product_name')->all();
+        $discontinuedNames = collect($result['discontinued_products'])->pluck('product_name')->all();
+        $this->assertSame([], $newNames);
+        $this->assertSame([], $discontinuedNames);
+
+        // 増加額上位には、今年の名称（年度除去前の原名）で1200-1000=200円の増加として現れる
+        $increase = collect($result['top_increase'])->first(fn ($r) => str_contains($r['product_name'], '中学入試問題集組版代'));
+        $this->assertNotNull($increase);
+        $this->assertSame('2026年度用中学入試問題集組版代 銀本α版通常校データ', $increase['product_name']);
+        $this->assertSame(200.0, $increase['diff']);
+    }
+
+    /**
+     * Codexレビュー指摘の回帰テスト（2026-09-05）: 同月比較と同種のバグ。全商品が減少している年でも
+     * 「増加額上位」にマイナスのdiffが混ざって表示されないことを確認する。
+     */
+    public function test_product_year_over_year_comparison_top_increase_excludes_negative_diff_rows_when_all_decreased()
+    {
+        $this->seedMonth('planning', 2025, 1, [
+            ['order_number' => 'PYOY-1', 'client_name' => 'A社', 'product_name' => '名刺', 'amount' => 1000],
+            ['order_number' => 'PYOY-2', 'client_name' => 'A社', 'product_name' => '封筒', 'amount' => 800],
+        ]);
+        $this->seedMonth('planning', 2026, 1, [
+            ['order_number' => 'PYOY-3', 'client_name' => 'A社', 'product_name' => '名刺', 'amount' => 600], // -400
+            ['order_number' => 'PYOY-4', 'client_name' => 'A社', 'product_name' => '封筒', 'amount' => 500], // -300
+        ]);
+
+        $result = $this->service()->productYearOverYearComparison('planning');
+
+        $this->assertSame([], $result['top_increase']);
+        $this->assertCount(2, $result['top_decrease']);
+    }
+
+    public function test_product_year_over_year_comparison_has_no_pair_when_prior_year_unregistered()
+    {
+        $this->seedMonth('planning', 2026, 1, [
+            ['order_number' => 'YOY-5', 'client_name' => 'A社', 'product_name' => '名刺', 'amount' => 500],
+        ]);
+
+        $result = $this->service()->productYearOverYearComparison('planning');
+
+        $this->assertFalse($result['has_comparison_pair']);
+        $this->assertSame([], $result['new_products']);
+        $this->assertSame([], $result['discontinued_products']);
     }
 }

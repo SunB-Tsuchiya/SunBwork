@@ -40,6 +40,7 @@ const tabs = [
     { key: 'same_month', route: 'same_month_comparison', label: '同月比較' },
     { key: 'side_by_side', route: 'side_by_side_comparison', label: '左右比較' },
     { key: 'client_analysis', route: 'client_analysis', label: '得意先分析' },
+    { key: 'product_analysis', route: 'product_analysis', label: '商品分析' },
     { key: 'client_groups', route: 'client_groups.index', label: '得意先統合設定' },
     { key: 'import', route: 'import.create', label: 'Excel取込' },
     { key: 'import_history', route: 'import_history.index', label: '取込履歴' },

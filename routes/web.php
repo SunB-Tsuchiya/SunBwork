@@ -77,6 +77,11 @@ $registerSalesAnalysisRoutes = function () {
         Route::get('api/client-analysis/ranking-panel', [App\Http\Controllers\SalesAnalysis\ClientAnalysisController::class, 'rankingPanel'])->name('api.client_analysis.ranking_panel');
         Route::get('api/client-analysis/detail', [App\Http\Controllers\SalesAnalysis\ClientAnalysisController::class, 'detail'])->name('api.client_analysis.detail');
 
+        Route::get('product-analysis', [App\Http\Controllers\SalesAnalysis\ProductAnalysisController::class, 'index'])->name('product_analysis');
+        Route::get('api/product-analysis/ranking-panel', [App\Http\Controllers\SalesAnalysis\ProductAnalysisController::class, 'rankingPanel'])->name('api.product_analysis.ranking_panel');
+        Route::get('api/product-analysis/detail', [App\Http\Controllers\SalesAnalysis\ProductAnalysisController::class, 'detail'])->name('api.product_analysis.detail');
+        Route::get('api/product-analysis/year-over-year', [App\Http\Controllers\SalesAnalysis\ProductAnalysisController::class, 'yearOverYear'])->name('api.product_analysis.year_over_year');
+
         Route::get('import', [App\Http\Controllers\SalesAnalysis\ImportController::class, 'create'])->name('import.create');
         Route::post('import/preview', [App\Http\Controllers\SalesAnalysis\ImportController::class, 'preview'])->name('import.preview');
         Route::post('import/store', [App\Http\Controllers\SalesAnalysis\ImportController::class, 'store'])->name('import.store');

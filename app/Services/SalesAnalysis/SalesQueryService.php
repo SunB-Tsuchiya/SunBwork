@@ -1108,12 +1108,16 @@ class SalesQueryService
         $current = $this->mergeClientAggregatesForRange($departmentKeys, $startY, $startM, $endY, $endM, $consolidate);
         $prior = $this->mergeClientAggregatesForRange($departmentKeys, $priorStartY, $priorStartM, $priorEndY, $priorEndM, $consolidate);
 
-        $rows = collect($current)
-            ->map(function ($data, $name) use ($prior) {
-                $priorAmount = $prior[$name]['amount'] ?? 0.0;
-                $diff = $data['amount'] - $priorAmount;
+        // 前期のみに存在した得意先（今期は0円＝離脱）も一覧に含める（annualClientPanel()と同じ修正）
+        $allNames = collect(array_keys($current))->merge(array_keys($prior))->unique()->values();
 
-                return ['label' => $name, 'amount' => $data['amount'], 'diff' => $diff, 'rate' => $priorAmount > 0 ? round($diff / $priorAmount * 100, 1) : null];
+        $rows = $allNames
+            ->map(function ($name) use ($current, $prior) {
+                $amount = $current[$name]['amount'] ?? 0.0;
+                $priorAmount = $prior[$name]['amount'] ?? 0.0;
+                $diff = $amount - $priorAmount;
+
+                return ['label' => $name, 'amount' => $amount, 'diff' => $diff, 'rate' => $priorAmount > 0 ? round($diff / $priorAmount * 100, 1) : null];
             })
             ->values()
             ->all();
@@ -1330,14 +1334,19 @@ class SalesQueryService
         $current = $this->periodOrdersGroupedByClient($departmentKeys, $year, 1, $lastMonth, $consolidate);
         $prior = $this->periodOrdersGroupedByClient($departmentKeys, $year - 1, 1, $lastMonth, $consolidate);
 
-        $rows = collect($current)
-            ->map(function ($data, $name) use ($prior) {
+        // 前年のみに存在した得意先（今年は0円＝離脱）もdiffの最重要な負の寄与として一覧に含める
+        // （$currentのキーだけを回すと丸ごと消えていた、Codexレビュー指摘・2026-09-05）
+        $allNames = collect(array_keys($current))->merge(array_keys($prior))->unique()->values();
+
+        $rows = $allNames
+            ->map(function ($name) use ($current, $prior) {
+                $amount = $current[$name]['amount'] ?? 0.0;
                 $priorAmount = $prior[$name]['amount'] ?? 0.0;
-                $diff = $data['amount'] - $priorAmount;
+                $diff = $amount - $priorAmount;
 
                 return [
                     'label' => $name,
-                    'amount' => $data['amount'],
+                    'amount' => $amount,
                     'diff' => $diff,
                     'rate' => $priorAmount > 0 ? round($diff / $priorAmount * 100, 1) : null,
                 ];
@@ -1780,9 +1789,11 @@ class SalesQueryService
                 ->values()->all()
             : [];
 
+        // 増加/減少それぞれ符号でも絞り込む（絞り込まないと、全員減少の期間で「増加額上位」に
+        // マイナスの行が混ざる等、見出しと符号が矛盾していた。Codexレビュー指摘・2026-09-05）
         $comparable = $matrixRows->filter(fn ($r) => $r['diff'] !== null);
 
-        $topIncrease = $comparable->sortByDesc('diff')->take(10)
+        $topIncrease = $comparable->filter(fn ($r) => $r['diff'] > 0)->sortByDesc('diff')->take(10)
             ->map(fn ($r) => [
                 'client_name' => $r['client_name'],
                 'diff' => $r['diff'],
@@ -1791,7 +1802,7 @@ class SalesQueryService
                 'prior_year_amount' => $r['prior_year_amount'],
             ])->values()->all();
 
-        $topDecrease = $comparable->sortBy('diff')->take(10)
+        $topDecrease = $comparable->filter(fn ($r) => $r['diff'] < 0)->sortBy('diff')->take(10)
             ->map(fn ($r) => [
                 'client_name' => $r['client_name'],
                 'diff' => $r['diff'],
@@ -2196,6 +2207,323 @@ class SalesQueryService
             'yearly' => $yearly,
             'orders' => $orders,
         ];
+    }
+
+    // ==================================================================
+    // 商品分析（品名軸でのランキング・推移・前年比較）
+    // 得意先分析と対称構造だが、商品には「得意先統合」に相当する名寄せ概念が無いため
+    // consolidateClients引数は持たない（2026-09-05 事務・経理からの要望対応）。
+    // ==================================================================
+
+    public function productRankingForPeriod(string $departmentKey, int $startYear, int $startMonth, int $endYear, int $endMonth, ?string $keyword = null): array
+    {
+        $departmentKeys = $this->resolveDepartmentKeys($departmentKey);
+        $merged = $this->mergeProductAggregatesForRange($departmentKeys, $startYear, $startMonth, $endYear, $endMonth);
+        $total = array_sum(array_column($merged, 'amount'));
+
+        if ($keyword !== null && $keyword !== '') {
+            $merged = array_filter($merged, fn ($name) => mb_stripos($name, $keyword) !== false, ARRAY_FILTER_USE_KEY);
+        }
+
+        $ranking = collect($merged)
+            ->map(fn ($data, $name) => [
+                'product_name' => $name,
+                'amount' => $data['amount'],
+                'share_pct' => $total > 0 ? round($data['amount'] / $total * 100, 1) : null,
+                'order_count' => $data['order_count'],
+            ])
+            ->sortByDesc('amount')
+            ->values();
+
+        return [
+            'total_amount' => $total,
+            'ranking' => $ranking->all(),
+        ];
+    }
+
+    /**
+     * 商品分析画面用。`clientAnalysisPanel()`と同じTop10/20＋全件詳細ドロワー契約
+     * （{rows,total_count,total_amount,page,limit}）で返す。
+     */
+    public function productAnalysisPanel(string $departmentKey, int $startYear, int $startMonth, int $endYear, int $endMonth, ?string $keyword, string $sort, string $direction, int $limit, int $page): array
+    {
+        $departmentKeys = $this->resolveDepartmentKeys($departmentKey);
+        $merged = $this->mergeProductAggregatesForRange($departmentKeys, $startYear, $startMonth, $endYear, $endMonth);
+        $total = array_sum(array_column($merged, 'amount'));
+
+        $rows = collect($merged)
+            ->map(fn ($data, $name) => ['label' => $name, 'amount' => $data['amount'], 'diff' => null, 'rate' => null])
+            ->values()
+            ->all();
+
+        return $this->paginateRankingRows($rows, $keyword, $sort, $direction, $limit, $page, $total);
+    }
+
+    /**
+     * @param  array<int, string>  $departmentKeys
+     * @return array<string, array{amount: float, order_count: int}>
+     */
+    private function mergeProductAggregatesForRange(array $departmentKeys, int $startYear, int $startMonth, int $endYear, int $endMonth): array
+    {
+        $merged = [];
+
+        for ($year = $startYear; $year <= $endYear; $year++) {
+            $rangeStart = $year === $startYear ? $startMonth : 1;
+            $rangeEnd = $year === $endYear ? $endMonth : 12;
+
+            if ($rangeEnd < $rangeStart) {
+                continue;
+            }
+
+            foreach ($this->rangeProductAggregates($departmentKeys, $year, $rangeStart, $rangeEnd) as $name => $data) {
+                $merged[$name] ??= ['amount' => 0.0, 'order_count' => 0];
+                $merged[$name]['amount'] += $data['amount'];
+                $merged[$name]['order_count'] += $data['order_count'];
+            }
+        }
+
+        return $merged;
+    }
+
+    /**
+     * 指定部署群・年内の月範囲の商品（品名）別 金額合計・受注件数。
+     *
+     * @param  array<int, string>  $departmentKeys
+     * @return array<string, array{amount: float, order_count: int}>
+     */
+    private function rangeProductAggregates(array $departmentKeys, int $year, int $startMonth, int $endMonth): array
+    {
+        if ($endMonth < $startMonth) {
+            return [];
+        }
+
+        return $this->activeOrdersQuery($departmentKeys)
+            ->where('sales_orders.sales_year', $year)
+            ->whereBetween('sales_orders.sales_month', [$startMonth, $endMonth])
+            ->get(['product_name', 'order_amount'])
+            ->groupBy(fn ($o) => $o->product_name === null || $o->product_name === '' ? '（品名未設定）' : $o->product_name)
+            ->map(fn ($group) => ['amount' => (float) $group->sum('order_amount'), 'order_count' => $group->count()])
+            ->all();
+    }
+
+    /**
+     * 商品分析画面用。1商品を選んだときの年別推移・受注一覧・購入得意先ランキング。
+     * 得意先分析のclientDetail()と対称構造。加えて「この商品を購入している得意先」上位10件を返す
+     * （商品分析ならではの視点、2026-09-05）。
+     */
+    public function productDetail(string $departmentKey, string $productName, int $startYear, int $startMonth, int $endYear, int $endMonth): array
+    {
+        $departmentKeys = $this->resolveDepartmentKeys($departmentKey);
+
+        $matchProduct = function (Builder $query) use ($productName) {
+            return $productName === '（品名未設定）'
+                ? $query->where(fn ($q) => $q->whereNull('sales_orders.product_name')->orWhere('sales_orders.product_name', ''))
+                : $query->where('sales_orders.product_name', $productName);
+        };
+
+        $yearly = [];
+        $priorAmount = null;
+
+        for ($year = $startYear; $year <= $endYear; $year++) {
+            $rangeStart = $year === $startYear ? $startMonth : 1;
+            $rangeEnd = $year === $endYear ? $endMonth : 12;
+
+            $amount = null;
+            $orderCount = null;
+            $companyAmount = null;
+
+            if ($rangeEnd >= $rangeStart) {
+                $yearIsRegistered = SalesActiveMonth::whereIn('department_key', $departmentKeys)
+                    ->where('sales_year', $year)
+                    ->whereBetween('sales_month', [$rangeStart, $rangeEnd])
+                    ->exists();
+
+                if ($yearIsRegistered) {
+                    $row = $matchProduct(
+                        $this->activeOrdersQuery($departmentKeys)
+                            ->where('sales_orders.sales_year', $year)
+                            ->whereBetween('sales_orders.sales_month', [$rangeStart, $rangeEnd])
+                    )->selectRaw('COUNT(*) as order_count, COALESCE(SUM(order_amount), 0) as total_amount')->first();
+
+                    $amount = (float) $row->total_amount;
+                    $orderCount = (int) $row->order_count;
+                    $companyAmount = $this->rangeFigures($departmentKeys, $year, $rangeStart, $rangeEnd)['amount'] ?? 0.0;
+                }
+            }
+
+            $diff = ($amount !== null && $priorAmount !== null) ? $amount - $priorAmount : null;
+            $rate = ($diff !== null && $priorAmount > 0) ? round($diff / $priorAmount * 100, 1) : null;
+
+            $yearly[] = [
+                'year' => $year,
+                'amount' => $amount,
+                'order_count' => $orderCount,
+                'prior_year_diff' => $diff,
+                'prior_year_rate' => $rate,
+                'company_amount' => $companyAmount,
+                'share_pct' => ($amount !== null && $companyAmount !== null && $companyAmount > 0) ? round($amount / $companyAmount * 100, 1) : null,
+            ];
+
+            $priorAmount = $amount;
+        }
+
+        $startYm = $startYear * 100 + $startMonth;
+        $endYm = $endYear * 100 + $endMonth;
+
+        $ordersQuery = $matchProduct($this->activeOrdersQuery($departmentKeys))
+            ->whereRaw('(sales_orders.sales_year * 100 + sales_orders.sales_month) BETWEEN ? AND ?', [$startYm, $endYm]);
+
+        $orders = $ordersQuery
+            ->orderByDesc('sales_orders.sales_year')
+            ->orderByDesc('sales_orders.sales_month')
+            ->orderByDesc('sales_orders.plate_date')
+            ->limit(200)
+            ->get(['order_number', 'client_name', 'order_amount', 'plate_date', 'sales_orders.sales_year as sales_year', 'sales_orders.sales_month as sales_month'])
+            ->map(fn ($o) => [
+                'sales_year' => $o->sales_year,
+                'sales_month' => $o->sales_month,
+                'order_number' => $o->order_number,
+                'client_name' => $o->client_name,
+                'order_amount' => (float) $o->order_amount,
+                'plate_date' => $o->plate_date?->format('Y-m-d'),
+            ])
+            ->all();
+
+        // この商品を購入している得意先ランキング（期間内合計、上位10件、商品分析ならではの追加視点）
+        $clientRanking = $matchProduct($this->activeOrdersQuery($departmentKeys))
+            ->whereRaw('(sales_orders.sales_year * 100 + sales_orders.sales_month) BETWEEN ? AND ?', [$startYm, $endYm])
+            ->get(['client_name', 'order_amount'])
+            ->groupBy(fn ($o) => $o->client_name === null ? '（得意先未設定）' : $o->client_name)
+            ->map(fn ($group) => (float) $group->sum('order_amount'))
+            ->sortDesc()
+            ->take(10)
+            ->map(fn ($amount, $name) => ['client_name' => $name, 'amount' => $amount])
+            ->values()
+            ->all();
+
+        return [
+            'product_name' => $productName,
+            'yearly' => $yearly,
+            'orders' => $orders,
+            'client_ranking' => $clientRanking,
+        ];
+    }
+
+    /**
+     * 商品分析画面の「新規/取扱終了商品」パネル。常に「直近登録年 対 前年」で固定比較する
+     * （2026-09-05、事務・経理からの要望：前年比で大きく変わった商品を調べたい。ランキングの
+     * 自由な期間指定とは独立させ、既存の同月比較の新規/離脱ロジックと同じ考え方を年間集計に適用）。
+     * 前年が未登録（開業初年度等）の場合はhas_comparison_pair=falseとし、0円との差分をあたかも
+     * 「新規」であるかのように誤表示しない。
+     */
+    public function productYearOverYearComparison(string $departmentKey): array
+    {
+        $departmentKeys = $this->resolveDepartmentKeys($departmentKey);
+        $latestYear = $this->latestRegisteredYear($departmentKey);
+
+        if ($latestYear === null) {
+            return [
+                'latest_year' => null,
+                'prior_year' => null,
+                'has_comparison_pair' => false,
+                'new_products' => [],
+                'discontinued_products' => [],
+                'top_increase' => [],
+                'top_decrease' => [],
+            ];
+        }
+
+        $priorYear = $latestYear - 1;
+        $hasComparisonPair = SalesActiveMonth::whereIn('department_key', $departmentKeys)->where('sales_year', $priorYear)->exists();
+
+        // 年度表記だけが違う同一商品（教材・テキスト等）を「新規/取扱終了」と誤検知しないよう、
+        // 年度を除去した名称をキーに集計し直す（原名のランキング・個別推移には影響させない）
+        $latestProducts = $this->groupByNormalizedProductName($this->rangeProductAggregates($departmentKeys, $latestYear, 1, 12));
+        $priorProducts = $hasComparisonPair
+            ? $this->groupByNormalizedProductName($this->rangeProductAggregates($departmentKeys, $priorYear, 1, 12))
+            : [];
+
+        $allKeys = collect(array_keys($latestProducts))->merge(array_keys($priorProducts))->unique()->values();
+
+        $rows = $allKeys->map(function ($key) use ($latestProducts, $priorProducts) {
+            $latest = $latestProducts[$key] ?? null;
+            $prior = $priorProducts[$key] ?? null;
+            $latestAmount = $latest['amount'] ?? 0.0;
+            $priorAmount = $prior['amount'] ?? 0.0;
+            $diff = $latestAmount - $priorAmount;
+            $rate = $priorAmount > 0 ? round($diff / $priorAmount * 100, 1) : null;
+
+            return [
+                // 表示名は「今年の名称」を優先し、今年に存在しない（取扱終了）場合は前年の名称を使う
+                'product_name' => $latest['display_name'] ?? $prior['display_name'],
+                'current_amount' => $latestAmount,
+                'prior_year_amount' => $priorAmount,
+                'diff' => $diff,
+                'rate' => $rate,
+            ];
+        });
+
+        $newProducts = $hasComparisonPair
+            ? $rows->filter(fn ($r) => $r['current_amount'] > 0 && $r['prior_year_amount'] == 0.0)
+                ->sortByDesc('current_amount')
+                ->take(10)
+                ->map(fn ($r) => ['product_name' => $r['product_name'], 'amount' => $r['current_amount']])
+                ->values()->all()
+            : [];
+
+        $discontinuedProducts = $hasComparisonPair
+            ? $rows->filter(fn ($r) => $r['current_amount'] == 0.0 && $r['prior_year_amount'] > 0)
+                ->sortByDesc('prior_year_amount')
+                ->take(10)
+                ->map(fn ($r) => ['product_name' => $r['product_name'], 'prior_year_amount' => $r['prior_year_amount']])
+                ->values()->all()
+            : [];
+
+        // 符号でも絞り込む（同月比較の同種バグ・Codexレビュー指摘と同じ修正、2026-09-05）
+        $comparable = $hasComparisonPair ? $rows : collect();
+
+        $topIncrease = $comparable->filter(fn ($r) => $r['diff'] > 0)->sortByDesc('diff')->take(10)->values()->all();
+        $topDecrease = $comparable->filter(fn ($r) => $r['diff'] < 0)->sortBy('diff')->take(10)->values()->all();
+
+        return [
+            'latest_year' => $latestYear,
+            'prior_year' => $priorYear,
+            'has_comparison_pair' => $hasComparisonPair,
+            'new_products' => $newProducts,
+            'discontinued_products' => $discontinuedProducts,
+            'top_increase' => $topIncrease,
+            'top_decrease' => $topDecrease,
+        ];
+    }
+
+    /**
+     * `productYearOverYearComparison()`専用。原名ごとの集計を`ProductNameNormalizer`で
+     * 年度除去した名称をキーに集計し直す。同じキーに複数の原名が集まった場合、代表表示名には
+     * その中で最も金額の大きい原名を採用する。
+     *
+     * @param  array<string, array{amount: float, order_count: int}>  $rawAggregates
+     * @return array<string, array{amount: float, display_name: string}>
+     */
+    private function groupByNormalizedProductName(array $rawAggregates): array
+    {
+        $grouped = [];
+
+        foreach ($rawAggregates as $name => $data) {
+            $key = ProductNameNormalizer::normalize($name);
+            if ($key === '') {
+                $key = $name; // 全部が年度表記だった場合のフォールバック（原名のまま）
+            }
+
+            $grouped[$key] ??= ['amount' => 0.0, 'display_name' => $name, 'display_amount' => 0.0];
+            $grouped[$key]['amount'] += $data['amount'];
+
+            if ($data['amount'] > $grouped[$key]['display_amount']) {
+                $grouped[$key]['display_name'] = $name;
+                $grouped[$key]['display_amount'] = $data['amount'];
+            }
+        }
+
+        return array_map(fn ($g) => ['amount' => $g['amount'], 'display_name' => $g['display_name']], $grouped);
     }
 
     /** 統合後表示名から、その統合グループに属する原名称の一覧を返す。グループが無ければ原名そのものを1件返す */

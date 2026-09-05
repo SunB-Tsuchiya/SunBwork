@@ -1616,6 +1616,54 @@ REVIEW3 17章6番目の最終画面。検討の結果、左右比較へは共通
 
 ---
 
+### Phase 18: 商品分析画面を新規追加（新規/取扱終了商品パネル含む）
+
+ユーザーからの要望（2026-09-05）: 「分析画面で今実装しているもののほかにあると便利なもの」を
+問われ、得意先分析と対称な「商品分析」が無いことを提案し合意。さらに事務・経理からの要望として
+「前年比較で大きく差があったときに何がなくなったのか、追加になったのかを調べたい」を受け、
+新規/取扱終了商品の可視化も同時に実装した。
+
+**設計方針**
+- `ClientAnalysisController`/`clientAnalysisPanel()`/`clientDetail()`と対称構造で実装。
+  商品には「得意先統合」に相当する名寄せ概念が無いため consolidate 系引数は持たない
+- 「新規/取扱終了商品」パネルは、ランキングの自由な期間指定とは独立させ、常に
+  「直近登録年 対 前年」で固定比較する（ユーザー確認済み。同月比較の
+  `buildSameMonthClientComparison()`と同じ考え方を年間集計に適用）
+- 前年が未登録（開業初年度等）の場合は`has_comparison_pair=false`を返し、0円との差分を
+  あたかも「新規」であるかのように誤表示しない
+
+**バックエンド追加（`SalesQueryService`）**
+- `productRankingForPeriod()`/`productAnalysisPanel()`（Top10/20+全件詳細ドロワー、
+  `clientRankingForPeriod()`/`clientAnalysisPanel()`と同じ契約）
+- `mergeProductAggregatesForRange()`/`rangeProductAggregates()`（品名別集計、
+  `mergeClientAggregatesForRange()`/`rangeClientAggregates()`の商品版）
+- `productDetail()`（年別推移・受注一覧に加え、得意先分析には無い「この商品を購入している
+  得意先ランキング」上位10件を追加。商品分析ならではの視点）
+- `productYearOverYearComparison()`（新規/取扱終了商品Top10、増加額/減少額上位Top10）
+- 新規`ProductAnalysisController`（index/rankingPanel/detail/yearOverYear）
+
+**画面（新規`ProductAnalysis.vue`）**
+- `ClientAnalysis.vue`と同じ構成（部署選択・自由期間・RankingPanel・推移グラフ・受注一覧）
+- 先頭に「新規/取扱終了商品」パネルを常設（ランキング期間指定とは独立、直近登録年対前年で固定）
+- 個別商品の推移表示に「購入している得意先」ミニランキングを追加
+- ナビゲーションタブに「商品分析」を追加（得意先分析の直後）
+
+回帰テスト15件追加（service層6件・controller層9件）。Excel出力は対象外
+（得意先分析と同様、初期スコープでは持たない）。
+
+**追記（2026-09-05）: 新規/取扱終了商品の年度誤検知を修正**
+
+実機フィードバックで、「2027年度用中学入試問題集組版代」対「2026年度用中学入試問題集組版代」の
+ような、年度表記だけが違う同一商品（教材・テキスト類は年度だけ変えて毎年作られる）が
+新規/取扱終了として誤表示される問題が判明。新規`ProductNameNormalizer`
+（2000〜2040年の4桁数値＋「年度用/年度/年」接尾辞のみを除去、学年表記「3.4.5.6年」等の
+1桁数値は対象外）を追加し、`productYearOverYearComparison()`内でのみ年度除去後の名称を
+比較キーとして使う（新規`groupByNormalizedProductName()`。同一キーに複数原名が集まった場合は
+金額最大の原名を代表表示名とする）。**ランキング・個別商品推移は原名のまま**（対象は
+新規/取扱終了パネルのみ、ユーザーに範囲を確認済み）。回帰テスト9件追加（unit 8件・service 1件）。
+
+---
+
 ## 11. テスト受入基準
 
 ### 権限
