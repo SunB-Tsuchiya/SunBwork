@@ -3,7 +3,7 @@
 ## 1. 運用ルール
 
 - 設計の正本は`z_instructions/SALES_ANALYSIS_PLAN1.md`。
-- 再開プロンプトは`z_instructions/SALES_ANALYSIS1_PROMPT.md`。
+- 再開プロンプトは`z_instructions/SALES_ANALYSIS3_PROMPT.md`（Phase 20設計時点の最新版）。
 - 実装担当: Claude Code。
 - 実装後レビュー担当: Codex。
 - 本番売上DBのレコードをSSH、SQL、Tinker、dump、ログ、臨時スクリプトで閲覧しない。
@@ -295,6 +295,27 @@
 - 本番サンエー印刷Admin/Clerkの`company_id`確認
 - サンエー印刷ユーザーへの`SalesAnalysisPermission`個別付与
 
+### Phase 20: サン・ブレーン受注経路分離（設計確定・実装待ち）
+
+| ID | タスク | 状態 | 証跡・メモ |
+|---|---|---|---|
+| 20-1 | migration（sales_imports/sales_active_monthsへorder_channel追加・後方補完・active unique変更） | ⬜ | 既存はstandard。downでデータを自動削除しない |
+| 20-2 | SalesOrderChannelsとサーバー側ファイル名厳格解析 | ⬜ | SUNBRAIN限定。`_独自.xlsx`完全一致のみdirect |
+| 20-3 | preview/confirm/版管理/diff/監査ログの経路対応 | ⬜ | プレビューキャッシュへ経路を固定 |
+| 20-4 | 他月重複検証の経路スコープ対応 | ⬜ | 経路間の同一受注Noは許可、経路内は従来どおり |
+| 20-5 | SalesQueryService共通active queryと全集計の経路内訳対応 | ⬜ | `forCompany()`必須を維持、all/standard/direct |
+| 20-6 | 登録状況・取込履歴の両経路表示 | ⬜ | 両方あり=complete、片方のみ=partial |
+| 20-7 | 月次・年次・期別・同月・左右比較UI | ⬜ | 統一色、積み上げ、KPI、URLフィルタ |
+| 20-8 | 得意先・商品・分類・項目・検索UI | ⬜ | 同名得意先は合算し内訳表示 |
+| 20-9 | 年次・期別Excel出力の内訳対応 | ⬜ | 既存2出力だけを対象にする |
+| 20-10 | 架空fixtureによるmigration/import/query/controller/export回帰テスト | ⬜ | 本番レコードを見ない |
+| 20-11 | SalesAnalysis全テスト・全体テスト・npm build | ⬜ | dockerは必ず`--user sail` |
+| 20-12 | ChangelogSeeder・関連CONSOLIDATED文書・3PROMPT更新 | ⬜ | 実装完了後に実施 |
+| 20-13 | Codexレビュー | ⬜ | Claude実装完了後、ユーザーから依頼を受けて実施 |
+
+**Phase 20着手条件:** 本設計をユーザーがClaude Codeへ渡し、実装開始を指示すること。
+**本番デプロイ:** Phase 20の実装・レビューとは別。ユーザーの明示指示なしにSSH・本番migrationを行わない。
+
 ### Review R1: Codex
 
 | ID | レビュー観点 | 状態 | 指摘 |
@@ -328,6 +349,10 @@
 | 2026-09-02 | 初期版はAIなし。後からLocal LLMを補助用途だけに追加 |
 | 2026-09-02 | Excel出力は画面フィルタを反映 |
 | 2026-09-02 | 元xlsxは取込後削除、経理保管を原本とする |
+| 2026-09-06 | Phase 20を設計。サン・ブレーン内の受注経路を`order_channel=standard/direct`で分離する。既存データはstandard、`_独自.xlsx`完全一致のみdirect、1ファイル1経路、3部署共通。会社分離や既存`source_type`とは別軸とする |
+| 2026-09-06 | 同一受注Noはstandard/direct間で重複を許可するが、同一経路内の他月重複検証は維持。再取込・版管理・active pointerも経路別に独立させる |
+| 2026-09-06 | サン・ブレーンの月別登録完了はstandard/directの両方がそろうこと。片方だけはpartialであり0円扱いしない。0円専用ファイルの新仕様は実例発生時に再設計する |
+| 2026-09-06 | 分析の初期表示は両経路合計。各画面・既存年次/期別Excelにstandard/direct内訳と独自比率を追加。同名得意先は合算して内訳を示す。サンエー印刷会社側は今回変更しない |
 | 2026-09-02 | 売上DBを通常DBから分離。本番データをAIが照会しない運用規則で保護 |
 | 2026-09-02 | ローカルは架空データのみ |
 | 2026-09-02 | DB全体を取込後+日次backup、日次30日、年末長期保持 |
