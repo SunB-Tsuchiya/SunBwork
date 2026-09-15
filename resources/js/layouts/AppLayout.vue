@@ -210,6 +210,7 @@ const getTopTabActive = () => {
         if (r.includes('project_jobs')) return 'project_jobs';
         if (r.includes('diaryinteractions') || r.includes('diaries')) return 'diaries';
         if (r.includes('ai')) return 'ai';
+        if (r.includes('reminders')) return 'reminders';
         if (r.includes('calendar')) return 'calendar';
         if (r.startsWith('team-rooms')) return 'team_rooms';
         if (r.includes('myjobbox') || r === 'dashboard') return 'myjob';

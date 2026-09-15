@@ -14,7 +14,7 @@ class AnnouncementController extends Controller
         $userId = $request->user()->id;
 
         $items = AnnouncementRecipient::where('user_id', $userId)
-            ->whereHas('announcement', fn ($q) => $q->where('status', 'sent'))
+            ->forSentAnnouncements()
             ->with('announcement.sender')
             ->orderByDesc('created_at')
             ->get()
@@ -45,6 +45,7 @@ class AnnouncementController extends Controller
     {
         $recipient = AnnouncementRecipient::where('id', $id)
             ->where('user_id', $request->user()->id)
+            ->forSentAnnouncements()
             ->with(['announcement.sender', 'announcement.attachments'])
             ->firstOrFail();
 

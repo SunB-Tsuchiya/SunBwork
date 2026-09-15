@@ -33,7 +33,10 @@ class AnnouncementController extends Controller
             ? session('superadmin_context.company_id')
             : $user->company_id;
 
-        $base = Announcement::whereHas('sender', fn($q) => $q->where('company_id', $companyId));
+        // SuperAdmin operates in the selected company's Clerk context while their
+        // user account belongs to the SUPERADMIN company. Include announcements
+        // authored by the current user so their saved drafts remain accessible.
+        $base = Announcement::managedInCompanyContext($companyId, $user->id);
 
         $map = fn ($a) => [
             'id'               => $a->id,
@@ -391,6 +394,10 @@ class AnnouncementController extends Controller
             : $user->company_id;
 
         abort_if(!$companyId, 403);
+
+        if ($announcement->sender_id === $user->id) {
+            return;
+        }
 
         $announcement->loadMissing('sender');
         abort_if($announcement->sender?->company_id !== $companyId, 403);

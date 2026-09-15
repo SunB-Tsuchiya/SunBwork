@@ -9,6 +9,8 @@ const props = defineProps({
     currentPage: { type: Number, default: 1 },
     lastPage: { type: Number, default: 1 },
     hasCompanySelected: { type: Boolean, default: true },
+    // サン・ブレーンだけがサンエー印刷経由/独自受注の経路区別を持つ（Phase20）
+    supportsOrderChannels: { type: Boolean, default: false },
 });
 
 // 売上分析ルートは superadmin/admin/clerk の各ロールグループ内に複製登録されている
@@ -52,6 +54,7 @@ const statusLabels = {
                     <thead class="bg-gray-50">
                         <tr>
                             <th class="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">部署</th>
+                            <th v-if="supportsOrderChannels" class="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">受注経路</th>
                             <th class="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">対象期間</th>
                             <th class="px-3 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">版</th>
                             <th class="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">ファイル名</th>
@@ -66,6 +69,12 @@ const statusLabels = {
                     <tbody class="divide-y divide-gray-200 bg-white">
                         <tr v-for="item in imports" :key="item.id" class="hover:bg-gray-50">
                             <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-700">{{ item.department_label }}</td>
+                            <td v-if="supportsOrderChannels" class="whitespace-nowrap px-3 py-3 text-sm">
+                                <span
+                                    class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold"
+                                    :class="item.order_channel === 'direct' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'"
+                                >{{ item.order_channel_label }}</span>
+                            </td>
                             <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-700">{{ sourcePeriod(item) }}</td>
                             <td class="whitespace-nowrap px-3 py-3 text-center text-sm">
                                 <span

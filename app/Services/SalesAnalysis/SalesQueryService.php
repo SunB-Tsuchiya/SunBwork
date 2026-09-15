@@ -105,11 +105,17 @@ class SalesQueryService
         $row = $this->activeOrdersQuery($departmentKey)
             ->where('sales_orders.sales_year', $year)
             ->where('sales_orders.sales_month', $month)
-            ->selectRaw('COUNT(*) as order_count, COALESCE(SUM(order_amount), 0) as total_amount, COALESCE(SUM(unallocated_amount), 0) as total_unallocated_amount')
+            ->selectRaw('COUNT(*) as order_count, COALESCE(SUM(order_amount), 0) as total_amount, COALESCE(SUM(unallocated_amount), 0) as total_unallocated_amount, ' . $this->channelCaseSql('order_amount'))
             ->first();
 
         $orderCount = (int) $row->order_count;
         $totalAmount = (float) $row->total_amount;
+        $directAmount = (float) $row->direct_amount;
+
+        $activeRows = $this->scopedActiveMonths()->where('department_key', $departmentKey)
+            ->where('sales_year', $year)
+            ->where('sales_month', $month)
+            ->get();
 
         return [
             'year' => $year,
@@ -119,6 +125,11 @@ class SalesQueryService
             // M列合計とN列受注金額の差額（隠さず提示する。Codexレビュー6.2 Medium-1）
             'total_unallocated_amount' => (float) $row->total_unallocated_amount,
             'average_amount' => $orderCount > 0 ? round($totalAmount / $orderCount, 2) : 0.0,
+            // Phase20: サン・ブレーンの受注経路内訳（他社はstandard_amount=total_amount・direct_amount=0）
+            'standard_amount' => (float) $row->standard_amount,
+            'direct_amount' => $directAmount,
+            'direct_share' => $this->directShare($totalAmount, $directAmount),
+            'registration' => $this->registrationState($activeRows),
         ];
     }
 
@@ -194,12 +205,18 @@ class SalesQueryService
         $row = $this->activeOrdersQuery($departmentKey)
             ->where($this->periodFromCondition($startYear, $startMonth))
             ->where($this->periodToCondition($endYear, $endMonth))
-            ->selectRaw('COUNT(*) as order_count, COALESCE(SUM(order_amount), 0) as total_amount')
+            ->selectRaw('COUNT(*) as order_count, COALESCE(SUM(order_amount), 0) as total_amount, ' . $this->channelCaseSql('order_amount'))
             ->first();
+
+        $totalAmount = (float) $row->total_amount;
+        $directAmount = (float) $row->direct_amount;
 
         return [
             'order_count' => (int) $row->order_count,
-            'total_amount' => (float) $row->total_amount,
+            'total_amount' => $totalAmount,
+            'standard_amount' => (float) $row->standard_amount,
+            'direct_amount' => $directAmount,
+            'direct_share' => $this->directShare($totalAmount, $directAmount),
         ];
     }
 
@@ -262,6 +279,10 @@ class SalesQueryService
                 'year' => $year,
                 'amount' => $figures['amount'] ?? null,
                 'order_count' => $figures['order_count'] ?? null,
+                'standard_amount' => $figures['standard_amount'] ?? null,
+                'direct_amount' => $figures['direct_amount'] ?? null,
+                'direct_share' => $figures['direct_share'] ?? null,
+                'registration' => $hasData ? $figures['registration'] : 'no_data',
             ];
         }
 
@@ -326,15 +347,14 @@ class SalesQueryService
     {
         [$startYear, $startMonth] = $this->shiftMonth($endYear, $endMonth, -($count - 1));
 
-        $activeMonthKeys = $this->scopedActiveMonths()->where('department_key', $departmentKey)
-            ->get(['sales_year', 'sales_month'])
-            ->map(fn ($m) => "{$m->sales_year}-{$m->sales_month}")
-            ->flip();
+        $activeMonthRowsByKey = $this->scopedActiveMonths()->where('department_key', $departmentKey)
+            ->get(['sales_year', 'sales_month', 'order_channel'])
+            ->groupBy(fn ($m) => "{$m->sales_year}-{$m->sales_month}");
 
         $rows = $this->activeOrdersQuery($departmentKey)
             ->where($this->periodFromCondition($startYear, $startMonth))
             ->where($this->periodToCondition($endYear, $endMonth))
-            ->selectRaw('sales_orders.sales_year as y, sales_orders.sales_month as m, COUNT(*) as order_count, COALESCE(SUM(order_amount), 0) as total_amount')
+            ->selectRaw('sales_orders.sales_year as y, sales_orders.sales_month as m, COUNT(*) as order_count, COALESCE(SUM(order_amount), 0) as total_amount, ' . $this->channelCaseSql('order_amount'))
             ->groupBy('sales_orders.sales_year', 'sales_orders.sales_month')
             ->get()
             ->keyBy(fn ($r) => "{$r->y}-{$r->m}");
@@ -343,14 +363,21 @@ class SalesQueryService
         $cursor = [$startYear, $startMonth];
         for ($i = 0; $i < $count; $i++) {
             $key = "{$cursor[0]}-{$cursor[1]}";
-            $isActive = $activeMonthKeys->has($key);
+            $activeRowsForMonth = $activeMonthRowsByKey->get($key, collect());
+            $isActive = $activeRowsForMonth->isNotEmpty();
             $row = $rows->get($key);
+            $totalAmount = $isActive ? (float) ($row->total_amount ?? 0) : null;
+            $directAmount = $isActive ? (float) ($row->direct_amount ?? 0) : null;
 
             $months[] = [
                 'year' => $cursor[0],
                 'month' => $cursor[1],
-                'total_amount' => $isActive ? (float) ($row->total_amount ?? 0) : null,
+                'total_amount' => $totalAmount,
                 'order_count' => $isActive ? (int) ($row->order_count ?? 0) : null,
+                'standard_amount' => $isActive ? (float) ($row->standard_amount ?? 0) : null,
+                'direct_amount' => $directAmount,
+                'direct_share' => $isActive ? $this->directShare($totalAmount, $directAmount) : null,
+                'registration' => $this->registrationState($activeRowsForMonth),
             ];
 
             $cursor = $this->shiftMonth($cursor[0], $cursor[1], 1);
@@ -382,29 +409,43 @@ class SalesQueryService
         $orders = $this->activeOrdersQuery($departmentKey)
             ->where('sales_orders.sales_year', $year)
             ->where('sales_orders.sales_month', $month)
-            ->get(['client_name', 'order_amount']);
+            ->get(['client_name', 'order_amount', 'sales_active_months.order_channel as order_channel']);
 
         $resolveName = $consolidate ? $this->clientDisplayNameResolver() : fn ($name) => $name;
         $total = (float) $orders->sum('order_amount');
+        $channelTotals = $this->channelAmounts($orders);
 
         // 得意先名が空欄（NULL）の受注は「（得意先未設定）」としてまとめる（Codexレビュー6.2 High-2）
         $ranking = $orders->groupBy(fn ($o) => $o->client_name === null ? '（得意先未設定）' : $resolveName($o->client_name))
             ->map(function ($group, $name) use ($total) {
                 $amount = (float) $group->sum('order_amount');
+                $groupChannels = $this->channelAmounts($group);
 
                 return [
                     'name' => $name,
                     'amount' => $amount,
                     'share' => $total > 0 ? round($amount / $total * 100, 1) : null,
                     'order_count' => $group->count(),
+                    'standard_amount' => $groupChannels['standard_amount'],
+                    'direct_amount' => $groupChannels['direct_amount'],
+                    'direct_share' => $this->directShare($amount, $groupChannels['direct_amount']),
                 ];
             })
             ->sortByDesc('amount')
             ->values();
 
+        $activeRows = $this->scopedActiveMonths()->where('department_key', $departmentKey)
+            ->where('sales_year', $year)
+            ->where('sales_month', $month)
+            ->get();
+
         return [
             'has_data' => true,
             'total_amount' => $total,
+            'standard_amount' => $channelTotals['standard_amount'],
+            'direct_amount' => $channelTotals['direct_amount'],
+            'direct_share' => $this->directShare($total, $channelTotals['direct_amount']),
+            'registration' => $this->registrationState($activeRows),
             'ranking' => ($limit ? $ranking->take($limit) : $ranking)->all(),
             'all_count' => $ranking->count(),
         ];
@@ -439,14 +480,9 @@ class SalesQueryService
             return ['has_data' => false, 'total_amount' => 0.0, 'breakdown' => []];
         }
 
-        $orderIds = $this->activeOrdersQuery($departmentKey)
-            ->where('sales_orders.sales_year', $year)
-            ->where('sales_orders.sales_month', $month)
-            ->pluck('sales_orders.id');
-
-        $rows = SalesOrderDetail::whereIn('sales_order_id', $orderIds)
-            ->selectRaw("{$column} as label, COALESCE(SUM(line_amount), 0) as amount, COUNT(*) as detail_count")
-            ->groupBy($column)
+        $rows = $this->detailBreakdownQuery([$departmentKey], $year, $month, $month)
+            ->selectRaw("sales_order_details.{$column} as label, COALESCE(SUM(sales_order_details.line_amount), 0) as amount, COUNT(*) as detail_count, " . $this->channelCaseSql('sales_order_details.line_amount'))
+            ->groupBy("sales_order_details.{$column}")
             ->get();
 
         $total = (float) $rows->sum('amount');
@@ -458,6 +494,9 @@ class SalesQueryService
             'amount' => (float) $r->amount,
             'share' => $total > 0 ? round($r->amount / $total * 100, 1) : null,
             'detail_count' => $r->detail_count,
+            'standard_amount' => (float) $r->standard_amount,
+            'direct_amount' => (float) $r->direct_amount,
+            'direct_share' => $this->directShare((float) $r->amount, (float) $r->direct_amount),
         ])->sortByDesc('amount')->values();
 
         return ['has_data' => true, 'total_amount' => $total, 'breakdown' => $breakdown->all()];
@@ -484,7 +523,14 @@ class SalesQueryService
 
         if ($mode === 'current') {
             $rows = collect($current)
-                ->map(fn ($amount, $name) => ['label' => $name, 'amount' => $amount, 'diff' => null, 'rate' => null])
+                ->map(fn ($data, $name) => [
+                    'label' => $name,
+                    'amount' => $data['amount'],
+                    'diff' => null,
+                    'rate' => null,
+                    'standard_amount' => $data['standard_amount'],
+                    'direct_amount' => $data['direct_amount'],
+                ])
                 ->values()
                 ->all();
         } else {
@@ -494,11 +540,18 @@ class SalesQueryService
             $other = $this->monthOrdersGroupedByClient($deptKeys, $otherYear, $otherMonth, $consolidate);
 
             $rows = collect($this->combineSideBySideRows($other, $current))
-                ->map(fn ($r) => ['label' => $r['label'], 'amount' => $r['amount_b'], 'diff' => $r['diff'], 'rate' => $r['rate']])
+                ->map(fn ($r) => [
+                    'label' => $r['label'],
+                    'amount' => $r['amount_b'],
+                    'diff' => $r['diff'],
+                    'rate' => $r['rate'],
+                    'standard_amount' => $r['standard_amount_b'] ?? null,
+                    'direct_amount' => $r['direct_amount_b'] ?? null,
+                ])
                 ->all();
         }
 
-        return $this->paginateRankingRows($rows, $keyword, $sort, $direction, $limit, $page, array_sum($current));
+        return $this->paginateRankingRows($rows, $keyword, $sort, $direction, $limit, $page, array_sum(array_column($current, 'amount')));
     }
 
     /**
@@ -511,34 +564,39 @@ class SalesQueryService
         $map = $this->detailBreakdownMap($departmentKey, $year, $month, $column);
 
         $rows = collect($map)
-            ->map(fn ($amount, $label) => ['label' => $label, 'amount' => $amount, 'diff' => null, 'rate' => null])
+            ->map(fn ($data, $label) => [
+                'label' => $label,
+                'amount' => $data['amount'],
+                'diff' => null,
+                'rate' => null,
+                'standard_amount' => $data['standard_amount'],
+                'direct_amount' => $data['direct_amount'],
+            ])
             ->values()
             ->all();
 
-        return $this->paginateRankingRows($rows, $keyword, $sort, $direction, $limit, $page, array_sum($map));
+        return $this->paginateRankingRows($rows, $keyword, $sort, $direction, $limit, $page, array_sum(array_column($map, 'amount')));
     }
 
-    /** @return array<string, float> ラベル（未設定は「（分類未設定）」等）=>金額合計 */
+    /** @return array<string, array{amount: float, standard_amount: float, direct_amount: float}> ラベル（未設定は「（分類未設定）」等）=>内訳 */
     private function detailBreakdownMap(string $departmentKey, int $year, int $month, string $column): array
     {
         if (! $this->hasActiveMonth($departmentKey, $year, $month)) {
             return [];
         }
 
-        $orderIds = $this->activeOrdersQuery($departmentKey)
-            ->where('sales_orders.sales_year', $year)
-            ->where('sales_orders.sales_month', $month)
-            ->pluck('sales_orders.id');
-
         $unsetLabel = $this->unsetLabelFor($column);
 
-        return SalesOrderDetail::whereIn('sales_order_id', $orderIds)
-            ->selectRaw("{$column} as label, COALESCE(SUM(line_amount), 0) as amount")
-            ->groupBy($column)
+        return $this->detailBreakdownQuery([$departmentKey], $year, $month, $month)
+            ->selectRaw("sales_order_details.{$column} as label, COALESCE(SUM(sales_order_details.line_amount), 0) as amount, " . $this->channelCaseSql('sales_order_details.line_amount'))
+            ->groupBy("sales_order_details.{$column}")
             ->get()
             ->reduce(function (array $carry, $r) use ($unsetLabel) {
                 $label = $r->label ?? $unsetLabel;
-                $carry[$label] = ($carry[$label] ?? 0.0) + (float) $r->amount;
+                $carry[$label] ??= ['amount' => 0.0, 'standard_amount' => 0.0, 'direct_amount' => 0.0];
+                $carry[$label]['amount'] += (float) $r->amount;
+                $carry[$label]['standard_amount'] += (float) $r->standard_amount;
+                $carry[$label]['direct_amount'] += (float) $r->direct_amount;
 
                 return $carry;
             }, []);
@@ -563,13 +621,23 @@ class SalesQueryService
         $offset = max($page - 1, 0) * $limit;
 
         $pageRows = $sorted->slice($offset, $limit)
-            ->map(fn ($r) => [
-                'label' => $r['label'],
-                'amount' => $r['amount'],
-                'diff' => $r['diff'],
-                'rate' => $r['rate'],
-                'share_pct' => $totalAmountForShare > 0 ? round($r['amount'] / $totalAmountForShare * 100, 1) : null,
-            ])
+            ->map(function ($r) use ($totalAmountForShare) {
+                // Phase20: 呼び出し側がstandard_amount/direct_amountを付与している行だけ経路内訳を返す
+                // （未対応の行はnullのまま。他社・未対応画面でも安全に混在させられる）
+                $standardAmount = $r['standard_amount'] ?? null;
+                $directAmount = $r['direct_amount'] ?? null;
+
+                return [
+                    'label' => $r['label'],
+                    'amount' => $r['amount'],
+                    'diff' => $r['diff'],
+                    'rate' => $r['rate'],
+                    'share_pct' => $totalAmountForShare > 0 ? round($r['amount'] / $totalAmountForShare * 100, 1) : null,
+                    'standard_amount' => $standardAmount,
+                    'direct_amount' => $directAmount,
+                    'direct_share' => ($standardAmount !== null && $directAmount !== null) ? $this->directShare($r['amount'], $directAmount) : null,
+                ];
+            })
             ->values()
             ->all();
 
@@ -630,6 +698,7 @@ class SalesQueryService
             return [];
         }
 
+        $supportsChannels = SalesOrderChannels::supportsChannelsFor($this->requireCompanyId());
         $importIds = $activeMonths->pluck('sales_import_id')->unique();
 
         // 月別の受注合計・件数・未配賦額をまとめて取得する（年度×部署のループ内でN+1にしない）
@@ -639,14 +708,15 @@ class SalesQueryService
             ->get()
             ->keyBy(fn ($r) => "{$r->sales_import_id}-{$r->sales_year}-{$r->sales_month}");
 
-        $activeByYearMonth = $activeMonths->keyBy(fn ($m) => "{$m->sales_year}-{$m->sales_month}");
+        // Phase20: 経路（standard/direct）ごとに別々のactive行を持てるため、月あたり最大2件になる
+        $activeByYearMonth = $activeMonths->groupBy(fn ($m) => "{$m->sales_year}-{$m->sales_month}");
 
         $currentYear = (int) now()->format('Y');
         $currentMonth = (int) now()->format('n');
 
         $years = $activeMonths->pluck('sales_year')->unique()->sortDesc()->values();
 
-        return $years->map(function ($year) use ($activeByYearMonth, $orderTotals, $activeMonths, $currentYear, $currentMonth) {
+        return $years->map(function ($year) use ($activeByYearMonth, $orderTotals, $activeMonths, $currentYear, $currentMonth, $supportsChannels) {
             $isCurrentYear = $year === $currentYear;
             $dueMonthCount = $isCurrentYear ? min($currentMonth, 12) : ($year > $currentYear ? 0 : 12);
 
@@ -655,13 +725,14 @@ class SalesQueryService
             $totalOrderCount = 0;
             $hasAnyIssue = false;
             $hasAnyNeedsReview = false;
+            $hasAnyPartial = false;
 
             $months = [];
             for ($month = 1; $month <= 12; $month++) {
-                $activeRow = $activeByYearMonth->get("{$year}-{$month}");
+                $activeRows = $activeByYearMonth->get("{$year}-{$month}", collect());
                 $isFuture = $year > $currentYear || ($isCurrentYear && $month > $currentMonth);
 
-                if (! $activeRow) {
+                if ($activeRows->isEmpty()) {
                     $months[] = [
                         'month' => $month,
                         'state' => $isFuture ? 'future' : 'no_data',
@@ -669,21 +740,47 @@ class SalesQueryService
                         'order_count' => null,
                         'needs_review' => false,
                         'has_issue' => false,
+                        'standard_amount' => null,
+                        'direct_amount' => null,
+                        'direct_share' => null,
+                        'registration' => $isFuture ? 'future' : 'no_data',
                     ];
 
                     continue;
                 }
 
-                $totals = $orderTotals->get("{$activeRow->sales_import_id}-{$year}-{$month}");
-                $amount = $totals ? (float) $totals->total_amount : 0.0;
-                $orderCount = $totals ? (int) $totals->order_count : 0;
-                $unallocated = $totals ? (float) $totals->total_unallocated_amount : 0.0;
+                $amount = 0.0;
+                $orderCount = 0;
+                $unallocated = 0.0;
+                $needsReview = false;
+                $standardAmount = 0.0;
+                $directAmount = 0.0;
 
-                // created_at と updated_at が異なる＝この月のactive pointerが再取込で切り替わったことがある
-                // （新規カラムを追加せず既存タイムスタンプだけで「複数回取込あり」を判定できる）
-                $needsReview = $activeRow->created_at && $activeRow->updated_at
-                    && ! $activeRow->created_at->equalTo($activeRow->updated_at);
+                foreach ($activeRows as $activeRow) {
+                    $totals = $orderTotals->get("{$activeRow->sales_import_id}-{$year}-{$month}");
+                    $rowAmount = $totals ? (float) $totals->total_amount : 0.0;
+                    $amount += $rowAmount;
+                    $orderCount += $totals ? (int) $totals->order_count : 0;
+                    $unallocated += $totals ? (float) $totals->total_unallocated_amount : 0.0;
+
+                    // created_at と updated_at が異なる＝この月のactive pointerが再取込で切り替わったことがある
+                    // （新規カラムを追加せず既存タイムスタンプだけで「複数回取込あり」を判定できる）
+                    if ($activeRow->created_at && $activeRow->updated_at && ! $activeRow->created_at->equalTo($activeRow->updated_at)) {
+                        $needsReview = true;
+                    }
+
+                    if ($activeRow->order_channel === SalesOrderChannels::DIRECT) {
+                        $directAmount += $rowAmount;
+                    } else {
+                        $standardAmount += $rowAmount;
+                    }
+                }
+
                 $hasIssue = abs($unallocated) > 0.01;
+                $registration = $this->registrationState($activeRows);
+                if ($registration === 'partial') {
+                    $hasAnyPartial = true;
+                }
 
                 $months[] = [
                     'month' => $month,
@@ -693,6 +790,10 @@ class SalesQueryService
                     'needs_review' => $needsReview,
                     'has_issue' => $hasIssue,
                     'issue_amount' => $hasIssue ? $unallocated : null,
+                    'standard_amount' => $supportsChannels ? $standardAmount : null,
+                    'direct_amount' => $supportsChannels ? $directAmount : null,
+                    'direct_share' => $supportsChannels ? $this->directShare($amount, $directAmount) : null,
+                    'registration' => $registration,
                 ];
 
                 $registeredMonthCount++;
@@ -721,6 +822,8 @@ class SalesQueryService
                 ] : null,
                 'has_any_issue' => $hasAnyIssue,
                 'has_any_needs_review' => $hasAnyNeedsReview,
+                'has_any_partial' => $hasAnyPartial,
+                'supports_order_channels' => $supportsChannels,
                 'months' => $months,
             ];
         })->all();
@@ -765,6 +868,8 @@ class SalesQueryService
                 'sales_import_id' => $import->id,
                 'original_filename' => $import->original_filename,
                 'source_type' => $import->source_type,
+                'order_channel' => $import->order_channel,
+                'order_channel_label' => SalesOrderChannels::label($import->order_channel),
                 'period_label' => $this->periodLabel($import),
                 'version' => $import->version,
                 'active_month_count' => $activeMonthCount,
@@ -826,12 +931,16 @@ class SalesQueryService
         $orderCount = 0;
         $priorOrderCount = 0;
         $unallocatedAmount = 0.0;
+        $periodStandardAmount = 0.0;
+        $periodDirectAmount = 0.0;
 
         for ($m = 1; $m <= $lastRegisteredMonth; $m++) {
             if ($monthlyCurrent[$m]) {
                 $periodAmount += $monthlyCurrent[$m]['amount'];
                 $orderCount += $monthlyCurrent[$m]['order_count'];
                 $unallocatedAmount += $monthlyCurrent[$m]['unallocated_amount'];
+                $periodStandardAmount += $monthlyCurrent[$m]['standard_amount'];
+                $periodDirectAmount += $monthlyCurrent[$m]['direct_amount'];
             }
             if ($monthlyPrior[$m]) {
                 $priorPeriodAmount += $monthlyPrior[$m]['amount'];
@@ -869,6 +978,10 @@ class SalesQueryService
                 'needs_review' => $cur['needs_review'] ?? false,
                 'has_issue' => $cur['has_issue'] ?? false,
                 'coverage' => $cur['coverage'] ?? null,
+                'standard_amount' => $cur['standard_amount'] ?? null,
+                'direct_amount' => $cur['direct_amount'] ?? null,
+                'direct_share' => $cur['direct_share'] ?? null,
+                'registration' => $cur['registration'] ?? ($isFuture ? 'future' : 'no_data'),
             ];
         }
 
@@ -883,6 +996,7 @@ class SalesQueryService
             'comparison_year' => $year - 1,
             'comparison_mode' => $comparisonMode,
             'comparison_month_range' => $comparisonRange,
+            'supports_order_channels' => SalesOrderChannels::supportsChannelsFor($this->requireCompanyId()),
             'kpi' => [
                 'period_amount' => $periodAmount,
                 'prior_period_amount' => $priorPeriodAmount,
@@ -893,6 +1007,9 @@ class SalesQueryService
                 'avg_order_amount' => $orderCount > 0 ? round($periodAmount / $orderCount, 2) : 0.0,
                 'unallocated_amount' => $unallocatedAmount,
                 'full_prior_year_amount' => $fullPriorYearAmount,
+                'standard_amount' => $periodStandardAmount,
+                'direct_amount' => $periodDirectAmount,
+                'direct_share' => $this->directShare($periodAmount, $periodDirectAmount),
             ],
             'monthly' => $monthly,
             'consolidate_clients' => $consolidateClients,
@@ -976,12 +1093,16 @@ class SalesQueryService
         $orderCount = 0;
         $priorOrderCount = 0;
         $unallocatedAmount = 0.0;
+        $periodStandardAmount = 0.0;
+        $periodDirectAmount = 0.0;
 
         for ($i = 0; $i < $lastRegisteredMonth; $i++) {
             if ($monthlyCurrent[$i]) {
                 $periodAmount += $monthlyCurrent[$i]['amount'];
                 $orderCount += $monthlyCurrent[$i]['order_count'];
                 $unallocatedAmount += $monthlyCurrent[$i]['unallocated_amount'];
+                $periodStandardAmount += $monthlyCurrent[$i]['standard_amount'];
+                $periodDirectAmount += $monthlyCurrent[$i]['direct_amount'];
             }
             if ($monthlyPrior[$i]) {
                 $priorPeriodAmount += $monthlyPrior[$i]['amount'];
@@ -1019,6 +1140,10 @@ class SalesQueryService
                 'needs_review' => $cur['needs_review'] ?? false,
                 'has_issue' => $cur['has_issue'] ?? false,
                 'coverage' => $cur['coverage'] ?? null,
+                'standard_amount' => $cur['standard_amount'] ?? null,
+                'direct_amount' => $cur['direct_amount'] ?? null,
+                'direct_share' => $cur['direct_share'] ?? null,
+                'registration' => $cur['registration'] ?? ($isFuture ? 'future' : 'no_data'),
             ];
         }
 
@@ -1038,6 +1163,7 @@ class SalesQueryService
             'comparison_month_range' => $comparisonRange,
             'period_start' => ['year' => $startCalYear, 'month' => $startCalMonth],
             'period_end' => ['year' => $endCalYear, 'month' => $endCalMonth],
+            'supports_order_channels' => SalesOrderChannels::supportsChannelsFor($this->requireCompanyId()),
             'kpi' => [
                 'period_amount' => $periodAmount,
                 'prior_period_amount' => $priorPeriodAmount,
@@ -1048,6 +1174,9 @@ class SalesQueryService
                 'avg_order_amount' => $orderCount > 0 ? round($periodAmount / $orderCount, 2) : 0.0,
                 'unallocated_amount' => $unallocatedAmount,
                 'full_prior_year_amount' => $fullPriorYearAmount,
+                'standard_amount' => $periodStandardAmount,
+                'direct_amount' => $periodDirectAmount,
+                'direct_share' => $this->directShare($periodAmount, $periodDirectAmount),
             ],
             'monthly' => $monthly,
             'consolidate_clients' => $consolidateClients,
@@ -1103,7 +1232,7 @@ class SalesQueryService
             ->orderBy('sales_orders.sales_year')
             ->orderBy('sales_orders.sales_month')
             ->orderBy('sales_orders.order_number')
-            ->get(['sales_orders.sales_year as sales_year', 'sales_orders.sales_month as sales_month', 'order_number', 'client_name', 'product_name', 'order_amount', 'plate_date'])
+            ->get(['sales_orders.sales_year as sales_year', 'sales_orders.sales_month as sales_month', 'order_number', 'client_name', 'product_name', 'order_amount', 'plate_date', 'sales_active_months.order_channel as order_channel'])
             ->map(fn ($o) => [
                 'sales_year' => $o->sales_year,
                 'sales_month' => $o->sales_month,
@@ -1112,6 +1241,8 @@ class SalesQueryService
                 'product_name' => $o->product_name,
                 'order_amount' => (float) $o->order_amount,
                 'plate_date' => $o->plate_date?->format('Y-m-d'),
+                'order_channel' => $o->order_channel,
+                'order_channel_label' => SalesOrderChannels::label($o->order_channel),
             ])
             ->all();
     }
@@ -1159,7 +1290,14 @@ class SalesQueryService
                 $priorAmount = $prior[$name]['amount'] ?? 0.0;
                 $diff = $amount - $priorAmount;
 
-                return ['label' => $name, 'amount' => $amount, 'diff' => $diff, 'rate' => $priorAmount > 0 ? round($diff / $priorAmount * 100, 1) : null];
+                return [
+                    'label' => $name,
+                    'amount' => $amount,
+                    'diff' => $diff,
+                    'rate' => $priorAmount > 0 ? round($diff / $priorAmount * 100, 1) : null,
+                    'standard_amount' => $current[$name]['standard_amount'] ?? 0.0,
+                    'direct_amount' => $current[$name]['direct_amount'] ?? 0.0,
+                ];
             })
             ->values()
             ->all();
@@ -1182,9 +1320,16 @@ class SalesQueryService
         $column = $dimension === 'category' ? 'category' : 'item_name';
         $merged = $this->mergeDetailBreakdownForRange($departmentKeys, $startY, $startM, $endY, $endM, $column);
 
-        $rows = collect($merged)->map(fn ($amount, $label) => ['label' => $label, 'amount' => $amount, 'diff' => null, 'rate' => null])->values()->all();
+        $rows = collect($merged)->map(fn ($data, $label) => [
+            'label' => $label,
+            'amount' => $data['amount'],
+            'diff' => null,
+            'rate' => null,
+            'standard_amount' => $data['standard_amount'],
+            'direct_amount' => $data['direct_amount'],
+        ])->values()->all();
 
-        return $this->paginateRankingRows($rows, $keyword, $sort, $direction, $limit, $page, array_sum($merged));
+        return $this->paginateRankingRows($rows, $keyword, $sort, $direction, $limit, $page, array_sum(array_column($merged, 'amount')));
     }
 
     /** 期別分析「月別売上」の複数期重ね表示用（$endFiscalYearを終点に$years期分） */
@@ -1279,6 +1424,9 @@ class SalesQueryService
                     'prior_year_amount' => $priorAmount,
                     'diff' => $diff,
                     'rate' => $priorAmount > 0 ? round($diff / $priorAmount * 100, 1) : null,
+                    'standard_amount' => $data['standard_amount'],
+                    'direct_amount' => $data['direct_amount'],
+                    'direct_share' => $this->directShare($data['amount'], $data['direct_amount']),
                 ];
             })
             ->sortByDesc('amount')
@@ -1298,10 +1446,17 @@ class SalesQueryService
         [$endY, $endM] = $this->fiscalMonthToCalendar($fiscalYear, $lastRegisteredMonth);
 
         $merged = $this->mergeDetailBreakdownForRange($departmentKeys, $startY, $startM, $endY, $endM, $column);
-        $total = array_sum($merged);
+        $total = array_sum(array_column($merged, 'amount'));
 
         return collect($merged)
-            ->map(fn ($amount, $label) => ['label' => $label, 'amount' => $amount, 'share' => $total > 0 ? round($amount / $total * 100, 1) : null])
+            ->map(fn ($data, $label) => [
+                'label' => $label,
+                'amount' => $data['amount'],
+                'share' => $total > 0 ? round($data['amount'] / $total * 100, 1) : null,
+                'standard_amount' => $data['standard_amount'],
+                'direct_amount' => $data['direct_amount'],
+                'direct_share' => $this->directShare($data['amount'], $data['direct_amount']),
+            ])
             ->sortByDesc('amount')
             ->take(10)
             ->values()
@@ -1326,7 +1481,10 @@ class SalesQueryService
             }
 
             foreach ($this->periodDetailBreakdown($departmentKeys, $year, $rangeStart, $rangeEnd, $column) as $row) {
-                $merged[$row['label']] = ($merged[$row['label']] ?? 0.0) + $row['amount'];
+                $merged[$row['label']] ??= ['amount' => 0.0, 'standard_amount' => 0.0, 'direct_amount' => 0.0];
+                $merged[$row['label']]['amount'] += $row['amount'];
+                $merged[$row['label']]['standard_amount'] += $row['standard_amount'];
+                $merged[$row['label']]['direct_amount'] += $row['direct_amount'];
             }
         }
 
@@ -1391,6 +1549,8 @@ class SalesQueryService
                     'amount' => $amount,
                     'diff' => $diff,
                     'rate' => $priorAmount > 0 ? round($diff / $priorAmount * 100, 1) : null,
+                    'standard_amount' => $current[$name]['standard_amount'] ?? 0.0,
+                    'direct_amount' => $current[$name]['direct_amount'] ?? 0.0,
                 ];
             })
             ->values()
@@ -1413,7 +1573,14 @@ class SalesQueryService
         $breakdown = $this->periodDetailBreakdown($departmentKeys, $year, 1, $lastMonth, $column);
 
         $rows = collect($breakdown)
-            ->map(fn ($r) => ['label' => $r['label'], 'amount' => $r['amount'], 'diff' => null, 'rate' => null])
+            ->map(fn ($r) => [
+                'label' => $r['label'],
+                'amount' => $r['amount'],
+                'diff' => null,
+                'rate' => null,
+                'standard_amount' => $r['standard_amount'],
+                'direct_amount' => $r['direct_amount'],
+            ])
             ->all();
 
         return $this->paginateRankingRows($rows, $keyword, $sort, $direction, $limit, $page, array_sum(array_column($breakdown, 'amount')));
@@ -1437,6 +1604,107 @@ class SalesQueryService
     private function resolveDepartmentKeys(string $departmentKey): array
     {
         return $departmentKey === 'all' ? SalesDepartments::enabledKeysFor($this->requireCompanyId()) : [$departmentKey];
+    }
+
+    // ==================================================================
+    // Phase 20: サン・ブレーンの受注経路（サンエー印刷経由/独自受注）共通ヘルパー
+    // ==================================================================
+
+    /**
+     * $rows（`order_channel`列を含むEloquentコレクション）から経路別合計を計算する。
+     * 経路概念を持たない会社（サンエー印刷等）はorder_channelが常にstandardのため、
+     * standard_amount=amount・direct_amount=0になる（既存挙動と完全互換）。
+     */
+    private function channelAmounts($rows, string $amountColumn = 'order_amount'): array
+    {
+        return [
+            'standard_amount' => (float) $rows->where('order_channel', SalesOrderChannels::STANDARD)->sum($amountColumn),
+            'direct_amount' => (float) $rows->where('order_channel', SalesOrderChannels::DIRECT)->sum($amountColumn),
+        ];
+    }
+
+    /**
+     * 独自受注比率。合計が0以下、または調整によりマイナスを含み構成比として誤解を招く場合はnullを返す
+     * （PLAN Phase20 20.6。画面は`—`として表示する）。
+     */
+    private function directShare(float $amount, float $directAmount): ?float
+    {
+        if ($amount <= 0) {
+            return null;
+        }
+
+        return round($directAmount / $amount * 100, 1);
+    }
+
+    /**
+     * 部署・年月単位の登録状態。$activeMonthRowsはその年月に紐づく`sales_active_months`行
+     * （0〜2件、経路ごとに最大1件）。経路概念を持たない会社は常にstandardのみを持つため
+     * 「1件でもあればcomplete」、サン・ブレーンは両経路がそろって初めてcomplete、
+     * 片方だけならpartialになる（PLAN Phase20 20.7）。
+     */
+    private function registrationState($activeMonthRows): string
+    {
+        if ($activeMonthRows->isEmpty()) {
+            return 'no_data';
+        }
+
+        $channels = $activeMonthRows->pluck('order_channel')->unique();
+
+        if ($channels->count() >= 2) {
+            return 'complete';
+        }
+
+        return SalesOrderChannels::supportsChannelsFor($this->requireCompanyId()) ? 'partial' : 'complete';
+    }
+
+    /**
+     * `registrationState()`の「複数部署・複数月」版。$rowsに複数部署・複数月の行が混在する場合
+     * （'all'部署指定や複数月レンジの集計）、単純にまとめて渡すと「どこかの部署・月がstandard、
+     * 別のどこかがdirectを持っていればcomplete」という誤判定になる（Codexレビュー指摘、2026-09-07）。
+     * 部署×年月のセルごとに経路完全性を判定し、1セルでもpartialなら全体をpartialとする。
+     * まだ登録が無い部署・月（行が無いセル）は判定対象に含めない
+     * （部署の未登録自体は既存の`coverage.is_complete`側で別途警告する）。
+     */
+    private function registrationStateAcrossCells($rows): string
+    {
+        if ($rows->isEmpty()) {
+            return 'no_data';
+        }
+
+        $states = $rows->groupBy(fn ($r) => "{$r->department_key}-{$r->sales_year}-{$r->sales_month}")
+            ->map(fn ($cellRows) => $this->registrationState($cellRows));
+
+        return $states->contains('partial') ? 'partial' : 'complete';
+    }
+
+    /**
+     * 明細（sales_order_details）を経路情報付きで集計するための共通クエリ起点。
+     * `activeOrdersQuery()`と同じ有効版スコープをsales_orders経由でsales_order_detailsへ及ぼす。
+     */
+    private function detailBreakdownQuery(array $departmentKeys, int $year, int $startMonth, int $endMonth): Builder
+    {
+        $companyId = $this->requireCompanyId();
+
+        return SalesOrderDetail::query()
+            ->join('sales_orders', 'sales_orders.id', '=', 'sales_order_details.sales_order_id')
+            ->join('sales_active_months', function ($join) use ($departmentKeys, $companyId) {
+                $join->on('sales_orders.sales_import_id', '=', 'sales_active_months.sales_import_id')
+                    ->on('sales_orders.sales_year', '=', 'sales_active_months.sales_year')
+                    ->on('sales_orders.sales_month', '=', 'sales_active_months.sales_month')
+                    ->where('sales_active_months.company_id', $companyId)
+                    ->whereIn('sales_active_months.department_key', $departmentKeys);
+            })
+            ->where('sales_orders.sales_year', $year)
+            ->whereBetween('sales_orders.sales_month', [$startMonth, $endMonth]);
+    }
+
+    /** 経路別内訳SQL断片（selectRawへ埋め込む）。standard/directはSalesOrderChannelsの固定値のため安全 */
+    private function channelCaseSql(string $amountColumn): string
+    {
+        return "
+            COALESCE(SUM(CASE WHEN sales_active_months.order_channel = 'standard' THEN {$amountColumn} ELSE 0 END), 0) as standard_amount,
+            COALESCE(SUM(CASE WHEN sales_active_months.order_channel = 'direct' THEN {$amountColumn} ELSE 0 END), 0) as direct_amount
+        ";
     }
 
     /**
@@ -1477,6 +1745,8 @@ class SalesQueryService
             $unallocated = 0.0;
             $needsReview = false;
             $registeredDepartments = [];
+            $standardAmount = 0.0;
+            $directAmount = 0.0;
 
             foreach ($rowsForMonth as $row) {
                 $totals = $orderTotals->get("{$row->sales_import_id}-{$month}");
@@ -1484,6 +1754,12 @@ class SalesQueryService
                     $amount += (float) $totals->total_amount;
                     $orderCount += (int) $totals->order_count;
                     $unallocated += (float) $totals->total_unallocated_amount;
+                    // Phase20: この active_months 行の経路（standard/direct）へ加算する
+                    if ($row->order_channel === SalesOrderChannels::DIRECT) {
+                        $directAmount += (float) $totals->total_amount;
+                    } else {
+                        $standardAmount += (float) $totals->total_amount;
+                    }
                 }
                 if ($row->created_at && $row->updated_at && ! $row->created_at->equalTo($row->updated_at)) {
                     $needsReview = true;
@@ -1504,6 +1780,10 @@ class SalesQueryService
                     'expected_departments' => $departmentKeys,
                     'is_complete' => count($registeredDepartments) === count($departmentKeys),
                 ],
+                'standard_amount' => $standardAmount,
+                'direct_amount' => $directAmount,
+                'direct_share' => $this->directShare($amount, $directAmount),
+                'registration' => $this->registrationStateAcrossCells($rowsForMonth),
             ];
         }
 
@@ -1529,6 +1809,7 @@ class SalesQueryService
             ->map(function ($row, $name) use ($prior, $total) {
                 $priorAmount = $prior[$name]['amount'] ?? 0.0;
                 $diff = $row['amount'] - $priorAmount;
+                $directAmount = $row['direct_amount'] ?? 0.0;
 
                 return [
                     'client_name' => $name,
@@ -1537,6 +1818,9 @@ class SalesQueryService
                     'prior_year_amount' => $priorAmount,
                     'diff' => $diff,
                     'rate' => $priorAmount > 0 ? round($diff / $priorAmount * 100, 1) : null,
+                    'standard_amount' => $row['standard_amount'] ?? 0.0,
+                    'direct_amount' => $directAmount,
+                    'direct_share' => $this->directShare($row['amount'], $directAmount),
                 ];
             })
             ->sortByDesc('amount')
@@ -1561,9 +1845,13 @@ class SalesQueryService
         return $this->activeOrdersQuery($departmentKeys)
             ->where('sales_orders.sales_year', $year)
             ->whereBetween('sales_orders.sales_month', [$startMonth, $endMonth])
-            ->get(['client_name', 'order_amount'])
+            ->get(['client_name', 'order_amount', 'sales_active_months.order_channel as order_channel'])
             ->groupBy(fn ($o) => $o->client_name === null ? '（得意先未設定）' : $resolveName($o->client_name))
-            ->map(fn ($group) => ['amount' => (float) $group->sum('order_amount')])
+            ->map(function ($group) {
+                $channels = $this->channelAmounts($group);
+
+                return ['amount' => (float) $group->sum('order_amount'), 'standard_amount' => $channels['standard_amount'], 'direct_amount' => $channels['direct_amount']];
+            })
             ->all();
     }
 
@@ -1576,19 +1864,14 @@ class SalesQueryService
             return [];
         }
 
-        $orderIds = $this->activeOrdersQuery($departmentKeys)
-            ->where('sales_orders.sales_year', $year)
-            ->whereBetween('sales_orders.sales_month', [$startMonth, $endMonth])
-            ->pluck('sales_orders.id');
+        $rows = $this->detailBreakdownQuery($departmentKeys, $year, $startMonth, $endMonth)
+            ->selectRaw("sales_order_details.{$column} as label, COALESCE(SUM(sales_order_details.line_amount), 0) as amount, COUNT(*) as detail_count, " . $this->channelCaseSql('sales_order_details.line_amount'))
+            ->groupBy("sales_order_details.{$column}")
+            ->get();
 
-        if ($orderIds->isEmpty()) {
+        if ($rows->isEmpty()) {
             return [];
         }
-
-        $rows = SalesOrderDetail::whereIn('sales_order_id', $orderIds)
-            ->selectRaw("{$column} as label, COALESCE(SUM(line_amount), 0) as amount, COUNT(*) as detail_count")
-            ->groupBy($column)
-            ->get();
 
         $total = (float) $rows->sum('amount');
         $unsetLabel = $this->unsetLabelFor($column);
@@ -1598,6 +1881,9 @@ class SalesQueryService
             'amount' => (float) $r->amount,
             'share' => $total > 0 ? round($r->amount / $total * 100, 1) : null,
             'detail_count' => $r->detail_count,
+            'standard_amount' => (float) $r->standard_amount,
+            'direct_amount' => (float) $r->direct_amount,
+            'direct_share' => $this->directShare((float) $r->amount, (float) $r->direct_amount),
         ])->sortByDesc('amount')->values()->all();
     }
 
@@ -1653,6 +1939,10 @@ class SalesQueryService
                 'needs_review' => $cur['needs_review'] ?? false,
                 'has_issue' => $cur['has_issue'] ?? false,
                 'issue_amount' => ($cur !== null && $cur['has_issue']) ? $cur['unallocated_amount'] : null,
+                'standard_amount' => $cur['standard_amount'] ?? null,
+                'direct_amount' => $cur['direct_amount'] ?? null,
+                'direct_share' => $cur['direct_share'] ?? null,
+                'registration' => $cur['registration'] ?? 'no_data',
             ];
         }, $years);
 
@@ -1669,6 +1959,7 @@ class SalesQueryService
             'years_requested' => $yearsRequested,
             'years' => $years,
             'consolidate_clients' => $consolidateClients,
+            'supports_order_channels' => SalesOrderChannels::supportsChannelsFor($this->requireCompanyId()),
             'yearly' => $yearly,
             'client_matrix' => $clientComparison['client_matrix'],
             'new_clients' => $clientComparison['new_clients'],
@@ -1719,27 +2010,33 @@ class SalesQueryService
         $row = $this->activeOrdersQuery($departmentKeys)
             ->where('sales_orders.sales_year', $year)
             ->whereBetween('sales_orders.sales_month', [$startMonth, $endMonth])
-            ->selectRaw('COUNT(*) as order_count, COALESCE(SUM(order_amount), 0) as total_amount, COALESCE(SUM(unallocated_amount), 0) as total_unallocated_amount')
+            ->selectRaw('COUNT(*) as order_count, COALESCE(SUM(order_amount), 0) as total_amount, COALESCE(SUM(unallocated_amount), 0) as total_unallocated_amount, ' . $this->channelCaseSql('order_amount'))
             ->first();
 
         $unallocated = (float) $row->total_unallocated_amount;
+        $totalAmount = (float) $row->total_amount;
+        $directAmount = (float) $row->direct_amount;
 
         return [
-            'amount' => (float) $row->total_amount,
+            'amount' => $totalAmount,
             'order_count' => (int) $row->order_count,
             'unallocated_amount' => $unallocated,
             'needs_review' => $activeRows->contains(
                 fn ($m) => $m->created_at && $m->updated_at && ! $m->created_at->equalTo($m->updated_at)
             ),
             'has_issue' => abs($unallocated) > 0.01,
+            'standard_amount' => (float) $row->standard_amount,
+            'direct_amount' => $directAmount,
+            'direct_share' => $this->directShare($totalAmount, $directAmount),
+            'registration' => $this->registrationStateAcrossCells($activeRows),
         ];
     }
 
     /**
-     * 指定部署群・単一年月の得意先別金額合計。$consolidateがtrueなら会社統合後の名称で集計する。
+     * 指定部署群・単一年月の得意先別金額合計・経路内訳。$consolidateがtrueなら会社統合後の名称で集計する。
      *
      * @param  array<int, string>  $departmentKeys
-     * @return array<string, float> 得意先名（未設定は「（得意先未設定）」）=>金額合計
+     * @return array<string, array{amount: float, standard_amount: float, direct_amount: float}> 得意先名（未設定は「（得意先未設定）」）=>内訳
      */
     private function monthOrdersGroupedByClient(array $departmentKeys, int $year, int $month, bool $consolidate): array
     {
@@ -1747,11 +2044,11 @@ class SalesQueryService
     }
 
     /**
-     * 指定部署群・年内の月範囲（$startMonth〜$endMonth）の得意先別金額合計。
+     * 指定部署群・年内の月範囲（$startMonth〜$endMonth）の得意先別金額合計・経路内訳。
      * $consolidateがtrueなら会社統合後の名称で集計する（同月比較・左右比較で共用）。
      *
      * @param  array<int, string>  $departmentKeys
-     * @return array<string, float> 得意先名（未設定は「（得意先未設定）」）=>金額合計
+     * @return array<string, array{amount: float, standard_amount: float, direct_amount: float}> 得意先名（未設定は「（得意先未設定）」）=>内訳
      */
     private function rangeOrdersGroupedByClient(array $departmentKeys, int $year, int $startMonth, int $endMonth, bool $consolidate): array
     {
@@ -1764,9 +2061,14 @@ class SalesQueryService
         return $this->activeOrdersQuery($departmentKeys)
             ->where('sales_orders.sales_year', $year)
             ->whereBetween('sales_orders.sales_month', [$startMonth, $endMonth])
-            ->get(['client_name', 'order_amount'])
+            ->get(['client_name', 'order_amount', 'sales_active_months.order_channel as order_channel'])
             ->groupBy(fn ($o) => $o->client_name === null ? '（得意先未設定）' : $resolveName($o->client_name))
-            ->map(fn ($group) => (float) $group->sum('order_amount'))
+            ->map(function ($group) {
+                $amount = (float) $group->sum('order_amount');
+                $channels = $this->channelAmounts($group);
+
+                return ['amount' => $amount, 'standard_amount' => $channels['standard_amount'], 'direct_amount' => $channels['direct_amount']];
+            })
             ->all();
     }
 
@@ -1788,17 +2090,23 @@ class SalesQueryService
             ->unique()
             ->values();
 
-        $matrixRows = $allClientNames->map(function ($name) use ($years, $clientsByYear, $figuresByYear, $latestRegisteredYear, $priorYear) {
+        // $clientsByYear[$y][$name]は`array{amount,standard_amount,direct_amount}`
+        $amountOf = fn ($clientsForYear, $name) => (float) ($clientsForYear[$name]['amount'] ?? 0.0);
+
+        $matrixRows = $allClientNames->map(function ($name) use ($years, $clientsByYear, $figuresByYear, $latestRegisteredYear, $priorYear, $amountOf) {
             $amounts = [];
             foreach ($years as $y) {
                 // その年自体が未登録（no_data/future）ならnull、登録済みだが当該得意先の受注が無ければ0円
-                $amounts[(string) $y] = $figuresByYear[$y] === null ? null : ($clientsByYear[$y][$name] ?? 0.0);
+                $amounts[(string) $y] = $figuresByYear[$y] === null ? null : $amountOf($clientsByYear[$y], $name);
             }
 
-            $latestAmount = $latestRegisteredYear !== null ? ($clientsByYear[$latestRegisteredYear][$name] ?? 0.0) : null;
-            $priorAmount = $priorYear !== null ? ($clientsByYear[$priorYear][$name] ?? 0.0) : null;
+            $latestAmount = $latestRegisteredYear !== null ? $amountOf($clientsByYear[$latestRegisteredYear], $name) : null;
+            $priorAmount = $priorYear !== null ? $amountOf($clientsByYear[$priorYear], $name) : null;
             $diff = ($latestAmount !== null && $priorAmount !== null) ? $latestAmount - $priorAmount : null;
             $rate = ($diff !== null && $priorAmount > 0) ? round($diff / $priorAmount * 100, 1) : null;
+
+            $latestStandard = $latestRegisteredYear !== null ? (float) ($clientsByYear[$latestRegisteredYear][$name]['standard_amount'] ?? 0.0) : null;
+            $latestDirect = $latestRegisteredYear !== null ? (float) ($clientsByYear[$latestRegisteredYear][$name]['direct_amount'] ?? 0.0) : null;
 
             return [
                 'client_name' => $name,
@@ -1807,6 +2115,9 @@ class SalesQueryService
                 'prior_year_amount' => $priorAmount,
                 'diff' => $diff,
                 'rate' => $rate,
+                'standard_amount' => $latestStandard,
+                'direct_amount' => $latestDirect,
+                'direct_share' => ($latestAmount !== null && $latestDirect !== null) ? $this->directShare($latestAmount, $latestDirect) : null,
             ];
         })->sortByDesc(fn ($r) => $r['latest_amount'] ?? -INF)->values();
 
@@ -1910,6 +2221,9 @@ class SalesQueryService
             return [
                 'label' => $label,
                 'amount' => $row['amount'],
+                'standard_amount' => $row['standard_amount'],
+                'direct_amount' => $row['direct_amount'],
+                'direct_share' => $this->directShare($row['amount'], $row['direct_amount']),
                 'comparisons' => $comparisons,
             ];
         })->sortByDesc('amount')->values()->all();
@@ -1949,15 +2263,18 @@ class SalesQueryService
         $othersA = collect($clientRows)->slice(15)->sum('amount_a');
         $othersB = collect($clientRows)->slice(15)->sum('amount_b');
 
-        $categoriesA = $a['range'] !== null ? collect($this->periodDetailBreakdown($departmentKeys, $a['figures']['year'], $a['range'][0], $a['range'][1], 'category'))->pluck('amount', 'label')->all() : [];
-        $categoriesB = $b['range'] !== null ? collect($this->periodDetailBreakdown($departmentKeys, $b['figures']['year'], $b['range'][0], $b['range'][1], 'category'))->pluck('amount', 'label')->all() : [];
+        // keyBy('label')で行全体（standard_amount/direct_amount込み）を保持する
+        // （combineSideBySideRows()は配列値なら経路内訳も一緒に突き合わせる）
+        $categoriesA = $a['range'] !== null ? collect($this->periodDetailBreakdown($departmentKeys, $a['figures']['year'], $a['range'][0], $a['range'][1], 'category'))->keyBy('label')->all() : [];
+        $categoriesB = $b['range'] !== null ? collect($this->periodDetailBreakdown($departmentKeys, $b['figures']['year'], $b['range'][0], $b['range'][1], 'category'))->keyBy('label')->all() : [];
 
-        $itemsA = $a['range'] !== null ? collect($this->periodDetailBreakdown($departmentKeys, $a['figures']['year'], $a['range'][0], $a['range'][1], 'item_name'))->pluck('amount', 'label')->all() : [];
-        $itemsB = $b['range'] !== null ? collect($this->periodDetailBreakdown($departmentKeys, $b['figures']['year'], $b['range'][0], $b['range'][1], 'item_name'))->pluck('amount', 'label')->all() : [];
+        $itemsA = $a['range'] !== null ? collect($this->periodDetailBreakdown($departmentKeys, $a['figures']['year'], $a['range'][0], $a['range'][1], 'item_name'))->keyBy('label')->all() : [];
+        $itemsB = $b['range'] !== null ? collect($this->periodDetailBreakdown($departmentKeys, $b['figures']['year'], $b['range'][0], $b['range'][1], 'item_name'))->keyBy('label')->all() : [];
 
         return [
             'department_key' => $departmentKey,
             'consolidate_clients' => $consolidateClients,
+            'supports_order_channels' => SalesOrderChannels::supportsChannelsFor($this->requireCompanyId()),
             'period_a' => $a['figures'],
             'period_b' => $b['figures'],
             'diff' => [
@@ -1965,6 +2282,12 @@ class SalesQueryService
                 'rate' => $diffRate,
                 'order_count' => ($orderCountA !== null && $orderCountB !== null) ? $orderCountB - $orderCountA : null,
                 'avg_order_amount' => ($avgA !== null && $avgB !== null) ? round($avgB - $avgA, 2) : null,
+                'standard_amount' => ($a['figures']['standard_amount'] !== null && $b['figures']['standard_amount'] !== null)
+                    ? $b['figures']['standard_amount'] - $a['figures']['standard_amount'] : null,
+                'direct_amount' => ($a['figures']['direct_amount'] !== null && $b['figures']['direct_amount'] !== null)
+                    ? $b['figures']['direct_amount'] - $a['figures']['direct_amount'] : null,
+                'direct_share' => ($a['figures']['direct_share'] !== null && $b['figures']['direct_share'] !== null)
+                    ? round($b['figures']['direct_share'] - $a['figures']['direct_share'], 1) : null,
             ],
             'clients' => [
                 'rows' => $topClientRows->values()->all(),
@@ -2034,6 +2357,10 @@ class SalesQueryService
                 'unallocated_amount' => $figures['unallocated_amount'] ?? null,
                 'needs_review' => $figures['needs_review'] ?? false,
                 'has_issue' => $figures['has_issue'] ?? false,
+                'standard_amount' => $figures['standard_amount'] ?? null,
+                'direct_amount' => $figures['direct_amount'] ?? null,
+                'direct_share' => $figures['direct_share'] ?? null,
+                'registration' => $figures['registration'] ?? 'no_data',
             ],
             'range' => $range,
         ];
@@ -2046,22 +2373,38 @@ class SalesQueryService
      * @param  array<string, float>  $mapA
      * @param  array<string, float>  $mapB
      */
+    /**
+     * $mapA/$mapBは`label(または得意先名)=>金額(float)`、または`label=>array{amount,...}`
+     * （経路内訳付き）のどちらの形も受け付ける。後者の場合はstandard_amount_a/b・
+     * direct_amount_a/bも突き合わせて返す（Phase20）。
+     */
     private function combineSideBySideRows(array $mapA, array $mapB): array
     {
         $names = collect(array_keys($mapA))->merge(array_keys($mapB))->unique()->values();
 
         return $names->map(function ($name) use ($mapA, $mapB) {
-            $amountA = (float) ($mapA[$name] ?? 0.0);
-            $amountB = (float) ($mapB[$name] ?? 0.0);
+            $entryA = $mapA[$name] ?? null;
+            $entryB = $mapB[$name] ?? null;
+            $amountA = (float) (is_array($entryA) ? $entryA['amount'] : ($entryA ?? 0.0));
+            $amountB = (float) (is_array($entryB) ? $entryB['amount'] : ($entryB ?? 0.0));
             $diff = $amountB - $amountA;
 
-            return [
+            $row = [
                 'label' => $name,
                 'amount_a' => $amountA,
                 'amount_b' => $amountB,
                 'diff' => $diff,
                 'rate' => $amountA > 0 ? round($diff / $amountA * 100, 1) : null,
             ];
+
+            if (is_array($entryA) || is_array($entryB)) {
+                $row['standard_amount_a'] = (float) ($entryA['standard_amount'] ?? 0.0);
+                $row['direct_amount_a'] = (float) ($entryA['direct_amount'] ?? 0.0);
+                $row['standard_amount_b'] = (float) ($entryB['standard_amount'] ?? 0.0);
+                $row['direct_amount_b'] = (float) ($entryB['direct_amount'] ?? 0.0);
+            }
+
+            return $row;
         })->sortByDesc('amount_b')->values()->all();
     }
 
@@ -2086,6 +2429,9 @@ class SalesQueryService
                 'amount' => $data['amount'],
                 'share_pct' => $total > 0 ? round($data['amount'] / $total * 100, 1) : null,
                 'order_count' => $data['order_count'],
+                'standard_amount' => $data['standard_amount'],
+                'direct_amount' => $data['direct_amount'],
+                'direct_share' => $this->directShare($data['amount'], $data['direct_amount']),
             ])
             ->sortByDesc('amount')
             ->values();
@@ -2108,7 +2454,14 @@ class SalesQueryService
         $total = array_sum(array_column($merged, 'amount'));
 
         $rows = collect($merged)
-            ->map(fn ($data, $name) => ['label' => $name, 'amount' => $data['amount'], 'diff' => null, 'rate' => null])
+            ->map(fn ($data, $name) => [
+                'label' => $name,
+                'amount' => $data['amount'],
+                'diff' => null,
+                'rate' => null,
+                'standard_amount' => $data['standard_amount'],
+                'direct_amount' => $data['direct_amount'],
+            ])
             ->values()
             ->all();
 
@@ -2132,9 +2485,11 @@ class SalesQueryService
             }
 
             foreach ($this->rangeClientAggregates($departmentKeys, $year, $rangeStart, $rangeEnd, $consolidate) as $name => $data) {
-                $merged[$name] ??= ['amount' => 0.0, 'order_count' => 0];
+                $merged[$name] ??= ['amount' => 0.0, 'order_count' => 0, 'standard_amount' => 0.0, 'direct_amount' => 0.0];
                 $merged[$name]['amount'] += $data['amount'];
                 $merged[$name]['order_count'] += $data['order_count'];
+                $merged[$name]['standard_amount'] += $data['standard_amount'];
+                $merged[$name]['direct_amount'] += $data['direct_amount'];
             }
         }
 
@@ -2159,9 +2514,18 @@ class SalesQueryService
         return $this->activeOrdersQuery($departmentKeys)
             ->where('sales_orders.sales_year', $year)
             ->whereBetween('sales_orders.sales_month', [$startMonth, $endMonth])
-            ->get(['client_name', 'order_amount'])
+            ->get(['client_name', 'order_amount', 'sales_active_months.order_channel as order_channel'])
             ->groupBy(fn ($o) => $o->client_name === null ? '（得意先未設定）' : $resolveName($o->client_name))
-            ->map(fn ($group) => ['amount' => (float) $group->sum('order_amount'), 'order_count' => $group->count()])
+            ->map(function ($group) {
+                $channels = $this->channelAmounts($group);
+
+                return [
+                    'amount' => (float) $group->sum('order_amount'),
+                    'order_count' => $group->count(),
+                    'standard_amount' => $channels['standard_amount'],
+                    'direct_amount' => $channels['direct_amount'],
+                ];
+            })
             ->all();
     }
 
@@ -2185,6 +2549,8 @@ class SalesQueryService
             $amount = null;
             $orderCount = null;
             $companyAmount = null;
+            $standardAmount = null;
+            $directAmount = null;
 
             if ($rangeEnd >= $rangeStart) {
                 $yearIsRegistered = $this->scopedActiveMonths()->whereIn('department_key', $departmentKeys)
@@ -2197,11 +2563,13 @@ class SalesQueryService
                         ->where('sales_orders.sales_year', $year)
                         ->whereBetween('sales_orders.sales_month', [$rangeStart, $rangeEnd])
                         ->whereIn('sales_orders.client_name', $rawNames)
-                        ->selectRaw('COUNT(*) as order_count, COALESCE(SUM(order_amount), 0) as total_amount')
+                        ->selectRaw('COUNT(*) as order_count, COALESCE(SUM(order_amount), 0) as total_amount, ' . $this->channelCaseSql('order_amount'))
                         ->first();
 
                     $amount = (float) $row->total_amount;
                     $orderCount = (int) $row->order_count;
+                    $standardAmount = (float) $row->standard_amount;
+                    $directAmount = (float) $row->direct_amount;
                     $companyAmount = $this->rangeFigures($departmentKeys, $year, $rangeStart, $rangeEnd)['amount'] ?? 0.0;
                 }
             }
@@ -2218,6 +2586,9 @@ class SalesQueryService
                 // 得意先分析画面のグラフ用（全体に対する割合表示、2026-09-04実機フィードバック対応）
                 'company_amount' => $companyAmount,
                 'share_pct' => ($amount !== null && $companyAmount !== null && $companyAmount > 0) ? round($amount / $companyAmount * 100, 1) : null,
+                'standard_amount' => $standardAmount,
+                'direct_amount' => $directAmount,
+                'direct_share' => ($amount !== null && $directAmount !== null) ? $this->directShare($amount, $directAmount) : null,
             ];
 
             $priorAmount = $amount;
@@ -2273,6 +2644,9 @@ class SalesQueryService
                 'amount' => $data['amount'],
                 'share_pct' => $total > 0 ? round($data['amount'] / $total * 100, 1) : null,
                 'order_count' => $data['order_count'],
+                'standard_amount' => $data['standard_amount'],
+                'direct_amount' => $data['direct_amount'],
+                'direct_share' => $this->directShare($data['amount'], $data['direct_amount']),
             ])
             ->sortByDesc('amount')
             ->values();
@@ -2294,7 +2668,14 @@ class SalesQueryService
         $total = array_sum(array_column($merged, 'amount'));
 
         $rows = collect($merged)
-            ->map(fn ($data, $name) => ['label' => $name, 'amount' => $data['amount'], 'diff' => null, 'rate' => null])
+            ->map(fn ($data, $name) => [
+                'label' => $name,
+                'amount' => $data['amount'],
+                'diff' => null,
+                'rate' => null,
+                'standard_amount' => $data['standard_amount'],
+                'direct_amount' => $data['direct_amount'],
+            ])
             ->values()
             ->all();
 
@@ -2318,9 +2699,11 @@ class SalesQueryService
             }
 
             foreach ($this->rangeProductAggregates($departmentKeys, $year, $rangeStart, $rangeEnd) as $name => $data) {
-                $merged[$name] ??= ['amount' => 0.0, 'order_count' => 0];
+                $merged[$name] ??= ['amount' => 0.0, 'order_count' => 0, 'standard_amount' => 0.0, 'direct_amount' => 0.0];
                 $merged[$name]['amount'] += $data['amount'];
                 $merged[$name]['order_count'] += $data['order_count'];
+                $merged[$name]['standard_amount'] += $data['standard_amount'];
+                $merged[$name]['direct_amount'] += $data['direct_amount'];
             }
         }
 
@@ -2342,9 +2725,18 @@ class SalesQueryService
         return $this->activeOrdersQuery($departmentKeys)
             ->where('sales_orders.sales_year', $year)
             ->whereBetween('sales_orders.sales_month', [$startMonth, $endMonth])
-            ->get(['product_name', 'order_amount'])
+            ->get(['product_name', 'order_amount', 'sales_active_months.order_channel as order_channel'])
             ->groupBy(fn ($o) => $o->product_name === null || $o->product_name === '' ? '（品名未設定）' : $o->product_name)
-            ->map(fn ($group) => ['amount' => (float) $group->sum('order_amount'), 'order_count' => $group->count()])
+            ->map(function ($group) {
+                $channels = $this->channelAmounts($group);
+
+                return [
+                    'amount' => (float) $group->sum('order_amount'),
+                    'order_count' => $group->count(),
+                    'standard_amount' => $channels['standard_amount'],
+                    'direct_amount' => $channels['direct_amount'],
+                ];
+            })
             ->all();
     }
 
@@ -2373,6 +2765,8 @@ class SalesQueryService
             $amount = null;
             $orderCount = null;
             $companyAmount = null;
+            $standardAmount = null;
+            $directAmount = null;
 
             if ($rangeEnd >= $rangeStart) {
                 $yearIsRegistered = $this->scopedActiveMonths()->whereIn('department_key', $departmentKeys)
@@ -2385,10 +2779,12 @@ class SalesQueryService
                         $this->activeOrdersQuery($departmentKeys)
                             ->where('sales_orders.sales_year', $year)
                             ->whereBetween('sales_orders.sales_month', [$rangeStart, $rangeEnd])
-                    )->selectRaw('COUNT(*) as order_count, COALESCE(SUM(order_amount), 0) as total_amount')->first();
+                    )->selectRaw('COUNT(*) as order_count, COALESCE(SUM(order_amount), 0) as total_amount, ' . $this->channelCaseSql('order_amount'))->first();
 
                     $amount = (float) $row->total_amount;
                     $orderCount = (int) $row->order_count;
+                    $standardAmount = (float) $row->standard_amount;
+                    $directAmount = (float) $row->direct_amount;
                     $companyAmount = $this->rangeFigures($departmentKeys, $year, $rangeStart, $rangeEnd)['amount'] ?? 0.0;
                 }
             }
@@ -2404,6 +2800,9 @@ class SalesQueryService
                 'prior_year_rate' => $rate,
                 'company_amount' => $companyAmount,
                 'share_pct' => ($amount !== null && $companyAmount !== null && $companyAmount > 0) ? round($amount / $companyAmount * 100, 1) : null,
+                'standard_amount' => $standardAmount,
+                'direct_amount' => $directAmount,
+                'direct_share' => ($amount !== null && $directAmount !== null) ? $this->directShare($amount, $directAmount) : null,
             ];
 
             $priorAmount = $amount;
@@ -2434,12 +2833,21 @@ class SalesQueryService
         // この商品を購入している得意先ランキング（期間内合計、上位10件、商品分析ならではの追加視点）
         $clientRanking = $matchProduct($this->activeOrdersQuery($departmentKeys))
             ->whereRaw('(sales_orders.sales_year * 100 + sales_orders.sales_month) BETWEEN ? AND ?', [$startYm, $endYm])
-            ->get(['client_name', 'order_amount'])
+            ->get(['client_name', 'order_amount', 'sales_active_months.order_channel as order_channel'])
             ->groupBy(fn ($o) => $o->client_name === null ? '（得意先未設定）' : $o->client_name)
-            ->map(fn ($group) => (float) $group->sum('order_amount'))
-            ->sortDesc()
+            ->map(function ($group) {
+                $channels = $this->channelAmounts($group);
+
+                return ['amount' => (float) $group->sum('order_amount'), 'standard_amount' => $channels['standard_amount'], 'direct_amount' => $channels['direct_amount']];
+            })
+            ->sortByDesc('amount')
             ->take(10)
-            ->map(fn ($amount, $name) => ['client_name' => $name, 'amount' => $amount])
+            ->map(fn ($data, $name) => [
+                'client_name' => $name,
+                'amount' => $data['amount'],
+                'standard_amount' => $data['standard_amount'],
+                'direct_amount' => $data['direct_amount'],
+            ])
             ->values()
             ->all();
 
@@ -2593,7 +3001,7 @@ class SalesQueryService
             ->whereBetween('sales_orders.sales_month', [$startMonth, $endMonth])
             ->orderBy('sales_orders.sales_month')
             ->orderBy('sales_orders.order_number')
-            ->get(['sales_orders.sales_month as sales_month', 'order_number', 'client_name', 'product_name', 'order_amount', 'plate_date'])
+            ->get(['sales_orders.sales_month as sales_month', 'order_number', 'client_name', 'product_name', 'order_amount', 'plate_date', 'sales_active_months.order_channel as order_channel'])
             ->map(fn ($o) => [
                 'sales_month' => $o->sales_month,
                 'order_number' => $o->order_number,
@@ -2601,6 +3009,8 @@ class SalesQueryService
                 'product_name' => $o->product_name,
                 'order_amount' => (float) $o->order_amount,
                 'plate_date' => $o->plate_date?->format('Y-m-d'),
+                'order_channel' => $o->order_channel,
+                'order_channel_label' => SalesOrderChannels::label($o->order_channel),
             ])
             ->all();
     }

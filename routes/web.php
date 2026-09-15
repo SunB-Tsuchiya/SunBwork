@@ -780,6 +780,27 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
 
         // カレンダー（会社単位で共有）
         Route::get('calendar', [App\Http\Controllers\Clerk\ClerkCalendarController::class, 'index'])->name('calendar');
+        Route::get('reminders', [App\Http\Controllers\Clerk\ClerkCalendarReminderController::class, 'index'])->name('reminders.index');
+        Route::get('reminders/create', [App\Http\Controllers\Clerk\ClerkCalendarReminderController::class, 'create'])->name('reminders.create');
+        Route::post('reminders', [App\Http\Controllers\Clerk\ClerkCalendarReminderController::class, 'store'])->name('reminders.store');
+        Route::get('reminders/{reminder}/edit', [App\Http\Controllers\Clerk\ClerkCalendarReminderController::class, 'edit'])->name('reminders.edit');
+        Route::put('reminders/{reminder}', [App\Http\Controllers\Clerk\ClerkCalendarReminderController::class, 'update'])->name('reminders.update');
+        Route::patch('reminders/{reminder}/active', [App\Http\Controllers\Clerk\ClerkCalendarReminderController::class, 'toggle'])->name('reminders.toggle');
+        Route::delete('reminders/{reminder}', [App\Http\Controllers\Clerk\ClerkCalendarReminderController::class, 'destroy'])->name('reminders.destroy');
+        Route::get('calendar/settings/schedule-rules', [App\Http\Controllers\Clerk\ClerkScheduleRuleController::class, 'index'])->name('calendar.schedule_rules.index');
+        Route::get('calendar/settings/schedule-rules/create', [App\Http\Controllers\Clerk\ClerkScheduleRuleController::class, 'create'])->name('calendar.schedule_rules.create');
+        Route::post('calendar/settings/schedule-rules/preview', [App\Http\Controllers\Clerk\ClerkScheduleRuleController::class, 'preview'])->name('calendar.schedule_rules.preview');
+        Route::post('calendar/settings/schedule-rules', [App\Http\Controllers\Clerk\ClerkScheduleRuleController::class, 'store'])->name('calendar.schedule_rules.store');
+        Route::get('calendar/settings/schedule-rules/{scheduleRule}/edit', [App\Http\Controllers\Clerk\ClerkScheduleRuleController::class, 'edit'])->name('calendar.schedule_rules.edit');
+        Route::put('calendar/settings/schedule-rules/{scheduleRule}', [App\Http\Controllers\Clerk\ClerkScheduleRuleController::class, 'update'])->name('calendar.schedule_rules.update');
+        Route::patch('calendar/settings/schedule-rules/{scheduleRule}/active', [App\Http\Controllers\Clerk\ClerkScheduleRuleController::class, 'toggle'])->name('calendar.schedule_rules.toggle');
+        Route::delete('calendar/settings/schedule-rules/{scheduleRule}', [App\Http\Controllers\Clerk\ClerkScheduleRuleController::class, 'destroy'])->name('calendar.schedule_rules.destroy');
+        Route::get('calendar/settings', [App\Http\Controllers\Clerk\ClerkCalendarHolidayController::class, 'settings'])->name('calendar.settings');
+        Route::get('calendar/settings/holidays', [App\Http\Controllers\Clerk\ClerkCalendarHolidayController::class, 'index'])->name('calendar.holidays.index');
+        Route::post('calendar/settings/holidays', [App\Http\Controllers\Clerk\ClerkCalendarHolidayController::class, 'store'])->name('calendar.holidays.store');
+        Route::put('calendar/settings/holidays/{holiday}', [App\Http\Controllers\Clerk\ClerkCalendarHolidayController::class, 'update'])->name('calendar.holidays.update');
+        Route::delete('calendar/settings/holidays/{holiday}', [App\Http\Controllers\Clerk\ClerkCalendarHolidayController::class, 'destroy'])->name('calendar.holidays.destroy');
+        Route::get('calendar/holidays', [App\Http\Controllers\Clerk\ClerkCalendarHolidayController::class, 'data'])->name('calendar.holidays.data');
         Route::get('calendar/events', [App\Http\Controllers\Clerk\ClerkEventController::class, 'index'])->name('calendar.events.index');
         Route::post('calendar/events', [App\Http\Controllers\Clerk\ClerkEventController::class, 'store'])->name('calendar.events.store');
         Route::get('calendar/events/csv-export', [App\Http\Controllers\Clerk\ClerkEventController::class, 'csvExport'])->name('calendar.events.csv_export');

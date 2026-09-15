@@ -190,3 +190,45 @@ watch(() => form.date, (newDate) => {
 ## ルーティング
 
 SPA ルートは必ず `routes/web.php` に置く（`routes/api.php` は StartSession が通らず SPA 認証が失敗する）。
+
+
+## Clerkの連続カレンダー・祝日設定（2026-09-15）
+
+- 対象は`clerk.calendar`。日曜〜土曜の7列で年間＋前後5週を連続表示する。FullCalendar基本dayGridのカスタム`visibleRange`を使い、`duration`は指定しない。
+- FullCalendar内部の日付スクロール領域を5週分の実測高に合わせる。曜日見出し固定、年月選択で月の1日を含む日曜の週へ移動。初期値はJSTの現在年月。
+- 土曜は青、日曜と登録祝日は赤。土曜祝日は赤優先。今日の枠は休日背景と共存。祝日名を日付セル内に表示する。
+- `clerkCalendarDates.js`は日付キーの演算をUTCで一貫処理し、JSTの今日のみ明示的にAsia/Tokyoから得る。既存予定の保存形式・終日endの排他変換は変更しない。
+- 別タブの週間プランナーはISO週のまま。`clerk_week_posts`のyear/weekを変更しない。
+- 「カレンダー設定」→「祝日設定」で年別に追加・修正・削除。会社ごとの共有設定。将来の締め日設定はこのメニューに追加できるが未実装。
+- `clerk_calendar_holidays`: company_id/date/name、会社＋日付を一意制約。dateは`date:Y-m-d`キャスト。
+- `clerk_calendar_years`: company_id/year/initialized_at、会社＋年を一意制約。初回参照時のみ初期データ投入、トランザクションと行ロックで制御。全件削除しても初期化済みマーカーを残す。
+- 初期データは`resources/data/clerk_holidays.json`（内閣府、2026-09-15確認、2026/2027年）。2026/9/22と振替休日を含む。他の年は空の一覧から手動追加。既に初期化した年へJSON更新を自動で上書きしない。
+- 翌年の運用: 設定画面の年を選び、内閣府で確定日を確認して登録する。春分・秋分を推測しない。変更は会社のカレンダーへ反映される。共通useJapaneseHolidaysは別機能のため変更なし。
+- 権限は既存Clerkミドルウェアと同一。SuperAdminは会社コンテキスト優先、未選択時は所属会社。別会社の祝日IDは404。
+- 必要なmigration: `2026_09_15_100000_create_clerk_calendar_holidays_tables.php`。本番配備時にも適用が必要。
+- テスト: `node --test tests/js/clerkCalendarDates.test.mjs`、`docker compose exec laravel php vendor/bin/phpunit tests/Unit/ClerkCalendarHolidayTest.php`。PHPテストは専用インメモリSQLiteを使用し、Tests\TestCaseとRefreshDatabaseを使用しない。
+- 予定APIは選択年の年間ストリップ範囲（前年側35日、翌年側35日を含む）だけを返す。年変更時に再取得し、範囲をまたぐ予定は開始・終了の重なりで含める。CSV出力は全期間のまま。検索には`clerk_events(company_id, starts_at)`の複合インデックスを使う。
+
+## Clerk予定の複製・予定日設定（2026-09-15）
+
+- 予定詳細の「複製」はタイトル・内容・色・終日属性・期間を新規フォームへコピーする。開始日変更時は期間日数を保って終了日も移動する。元の完了状態と予定日設定の紐づけはコピーしない。
+- カレンダー設定の「予定日設定」で、`monthly_day`（毎月1〜31日）、`month_end`、`monthly_weekday`（第1〜5または最終＋曜日）、`custom_dates`を会社単位で登録する。
+- 第N曜日はその月のN回目。存在しない31日・第5曜日は生成しない。月末は実際の末日。休日による前後営業日への移動は行わない。
+- 定義は`clerk_schedule_rules`、各生成回は`clerk_schedule_occurrences`。`rule_id + nominal_date`を一意にして、画面表示と日次処理が並行しても二重登録しない。
+- 予定は通常の`clerk_events`として作成するため、連続カレンダー・週間プランナー・一覧・CSVへ表示される。
+- 自動予定を個別更新・ドラッグ・完了すると生成回を`customized`、個別削除すると`cancelled`にする。ルール変更や再生成で戻さない。
+- ルール変更・停止・削除は、今日以降の未完了・`generated`の予定だけに反映。過去、完了済み、個別変更済みは保持する。条件から外れた自動予定は`retired`とし、停止解除や再設定で必要なら将来分だけ再生成する。
+- 保存時に今後18か月を生成。カレンダー表示年の読込時はその年の前後余白も補充する。`clerk:generate-schedules`をAsia/Tokyoの毎日0:15、`withoutOverlapping`で実行する。
+- 作成者ユーザーが削除された場合はルール・生成履歴・そのユーザーのClerk予定をDBのcascadeで整理する。ルールの通常削除はSoftDeletesを使い、残した過去予定の由来を保持する。
+- 必須migration: `2026_09_15_110000_create_clerk_schedule_rules_tables.php`と`2026_09_15_110001_update_clerk_schedule_rule_creator_delete.php`。
+- 自動テストは専用インメモリSQLiteを使う`ClerkScheduleGeneratorTest`と、複製・日付の`tests/js/clerkCalendarDates.test.mjs`。
+
+## Clerkカレンダー・リマインダー（2026-09-15）
+
+- `clerk_calendar_reminders`へ会社単位で内容、表示開始日、表示終了日、有効状態を保存する。日付キャストは`date:Y-m-d`。
+- 表示条件は有効かつ`starts_on <= JSTの今日 <= ends_on`。開始日・終了日の両端を含み、サーバーの`Asia/Tokyo`で判定する。
+- 一般ユーザーの`/calendar`で、ログインユーザーの所属会社に一致するリマインダーだけを表示する。SuperAdminがUser画面を確認する場合は、選択中の会社コンテキストを優先する。Clerk会社共有カレンダーには表示しない。
+- `color_key`はClerk予定と同じ11色。選択色の濃い枠線と薄い背景を持つ一段の帯として表示する。期間外・停止中・削除済みは表示しない。
+- 通知受信、`events`、`clerk_events`へレコードを作らないため、通知ランプ、既読状態、個人予定、会社予定の件数に影響しない。
+- Clerk管理ルートは`clerk.reminders.*`。別会社のレコードを編集・停止・削除しようとした場合は404。
+- 必須migrationは`2026_09_15_120000_create_clerk_calendar_reminders_table.php`と`2026_09_15_120001_add_color_key_to_clerk_calendar_reminders_table.php`。テストは専用インメモリSQLiteの`ClerkCalendarReminderTest`を使う。

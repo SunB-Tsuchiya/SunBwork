@@ -1,5 +1,6 @@
 <script setup>
 import UserCalendar from '@/Components/Calendar/UserCalendar.vue';
+import CalendarReminderBanner from '@/Components/Calendar/CalendarReminderBanner.vue';
 import AppLayout    from '@/layouts/AppLayout.vue';
 
 defineProps({
@@ -14,6 +15,7 @@ defineProps({
     dailyBreaks:        { type: Array,  default: () => [] },
     defaultBreak:       { type: Object, default: () => ({ start: '12:00', end: '13:00' }) },
     defaultWorktype:    { type: Object, default: null },
+    calendarReminders:  { type: Array,  default: () => [] },
 });
 </script>
 
@@ -22,6 +24,8 @@ defineProps({
         <template #header>
             <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">カレンダー</h2>
         </template>
+
+        <CalendarReminderBanner :reminders="calendarReminders" />
 
         <!-- 会議室予約テスト中バナー（rooms が存在するときのみ表示） -->
         <div v-if="rooms.length"

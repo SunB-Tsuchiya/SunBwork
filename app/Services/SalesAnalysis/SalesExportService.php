@@ -48,16 +48,17 @@ class SalesExportService
         $departmentLabel = $departmentKey === 'all'
             ? '全部署合計'
             : (SalesDepartments::labelForKey($this->requireCompanyId(), $departmentKey) ?? $departmentKey);
+        $supportsChannels = (bool) ($summary['supports_order_channels'] ?? false);
 
         $spreadsheet = new Spreadsheet();
         $spreadsheet->removeSheetByIndex(0);
 
-        $this->buildSummarySheet($spreadsheet, $summary, $departmentLabel, $consolidateClients);
-        $this->buildMonthlySheet($spreadsheet, $summary);
-        $this->buildClientSheet($spreadsheet, $summary);
-        $this->buildBreakdownSheet($spreadsheet, '分類別', $summary['categories']);
-        $this->buildBreakdownSheet($spreadsheet, '項目別', $summary['items']);
-        $this->buildOrdersSheet($spreadsheet, $departmentKey, $year, max((int) $summary['last_registered_month'], 0));
+        $this->buildSummarySheet($spreadsheet, $summary, $departmentLabel, $consolidateClients, $supportsChannels);
+        $this->buildMonthlySheet($spreadsheet, $summary, $supportsChannels);
+        $this->buildClientSheet($spreadsheet, $summary, $supportsChannels);
+        $this->buildBreakdownSheet($spreadsheet, '分類別', $summary['categories'], $supportsChannels);
+        $this->buildBreakdownSheet($spreadsheet, '項目別', $summary['items'], $supportsChannels);
+        $this->buildOrdersSheet($spreadsheet, $departmentKey, $year, max((int) $summary['last_registered_month'], 0), $supportsChannels);
 
         $spreadsheet->setActiveSheetIndex(0);
 
@@ -75,23 +76,24 @@ class SalesExportService
         $departmentLabel = $departmentKey === 'all'
             ? '全部署合計'
             : (SalesDepartments::labelForKey($this->requireCompanyId(), $departmentKey) ?? $departmentKey);
+        $supportsChannels = (bool) ($summary['supports_order_channels'] ?? false);
 
         $spreadsheet = new Spreadsheet();
         $spreadsheet->removeSheetByIndex(0);
 
-        $this->buildFiscalSummarySheet($spreadsheet, $summary, $departmentLabel, $consolidateClients);
-        $this->buildFiscalMonthlySheet($spreadsheet, $summary);
-        $this->buildClientSheet($spreadsheet, $summary);
-        $this->buildBreakdownSheet($spreadsheet, '分類別', $summary['categories']);
-        $this->buildBreakdownSheet($spreadsheet, '項目別', $summary['items']);
-        $this->buildFiscalOrdersSheet($spreadsheet, $departmentKey, $fiscalYear, max((int) $summary['last_registered_month'], 0));
+        $this->buildFiscalSummarySheet($spreadsheet, $summary, $departmentLabel, $consolidateClients, $supportsChannels);
+        $this->buildFiscalMonthlySheet($spreadsheet, $summary, $supportsChannels);
+        $this->buildClientSheet($spreadsheet, $summary, $supportsChannels);
+        $this->buildBreakdownSheet($spreadsheet, '分類別', $summary['categories'], $supportsChannels);
+        $this->buildBreakdownSheet($spreadsheet, '項目別', $summary['items'], $supportsChannels);
+        $this->buildFiscalOrdersSheet($spreadsheet, $departmentKey, $fiscalYear, max((int) $summary['last_registered_month'], 0), $supportsChannels);
 
         $spreadsheet->setActiveSheetIndex(0);
 
         return $spreadsheet;
     }
 
-    private function buildFiscalSummarySheet(Spreadsheet $spreadsheet, array $summary, string $departmentLabel, bool $consolidateClients): void
+    private function buildFiscalSummarySheet(Spreadsheet $spreadsheet, array $summary, string $departmentLabel, bool $consolidateClients, bool $supportsChannels): void
     {
         $sheet = $spreadsheet->createSheet();
         $sheet->setTitle('概要');
@@ -114,6 +116,7 @@ class SalesExportService
             ['1案件平均', $summary['kpi']['avg_order_amount']],
             ['未配賦額', $summary['kpi']['unallocated_amount']],
             ['参考: 前期通期実績', $summary['kpi']['full_prior_year_amount']],
+            ...$this->channelSummaryRows($summary['kpi'], $supportsChannels),
             ['得意先統合', $consolidateClients ? 'ON' : 'OFF'],
             ['出力日時', now()->format('Y-m-d H:i')],
         ];
@@ -133,12 +136,15 @@ class SalesExportService
         $sheet->getStyle('A1:A' . count($rows))->getFont()->setBold(true);
     }
 
-    private function buildFiscalMonthlySheet(Spreadsheet $spreadsheet, array $summary): void
+    private function buildFiscalMonthlySheet(Spreadsheet $spreadsheet, array $summary, bool $supportsChannels): void
     {
         $sheet = $spreadsheet->createSheet();
         $sheet->setTitle('月別推移');
 
         $headers = ['年月', '売上', '前期同月', '差額', '増減率(%)', '受注件数', '1案件平均', '状態'];
+        if ($supportsChannels) {
+            $headers = [...$headers, 'サンエー印刷経由', '独自受注', '独自比率(%)'];
+        }
         $this->writeHeaderRow($sheet, $headers);
 
         $row = 2;
@@ -151,18 +157,27 @@ class SalesExportService
             $sheet->setCellValue("F{$row}", $m['order_count']);
             $this->setAmount($sheet, "G{$row}", $m['avg_order_amount']);
             $this->setUserString($sheet, "H{$row}", $this->monthStateLabel($m));
+            if ($supportsChannels) {
+                $this->setAmount($sheet, "I{$row}", $m['standard_amount'] ?? null);
+                $this->setAmount($sheet, "J{$row}", $m['direct_amount'] ?? null);
+                $this->setAmount($sheet, "K{$row}", $m['direct_share'] ?? null);
+            }
             $row++;
         }
 
-        $this->autoSizeColumns($sheet, 'A', 'H');
+        $this->autoSizeColumns($sheet, 'A', $supportsChannels ? 'K' : 'H');
     }
 
-    private function buildFiscalOrdersSheet(Spreadsheet $spreadsheet, string $departmentKey, int $fiscalYear, int $lastRegisteredMonth): void
+    private function buildFiscalOrdersSheet(Spreadsheet $spreadsheet, string $departmentKey, int $fiscalYear, int $lastRegisteredMonth, bool $supportsChannels): void
     {
         $sheet = $spreadsheet->createSheet();
         $sheet->setTitle('該当明細');
 
-        $this->writeHeaderRow($sheet, ['年月', '受注No', '得意先', '品名', '金額', 'SB下版日']);
+        $headers = ['年月', '受注No', '得意先', '品名', '金額', 'SB下版日'];
+        if ($supportsChannels) {
+            $headers[] = '受注経路';
+        }
+        $this->writeHeaderRow($sheet, $headers);
 
         $orders = $lastRegisteredMonth > 0
             ? $this->queryService->fiscalYearOrders($departmentKey, $fiscalYear, $lastRegisteredMonth)
@@ -176,13 +191,16 @@ class SalesExportService
             $this->setUserString($sheet, "D{$row}", $o['product_name']);
             $this->setAmount($sheet, "E{$row}", $o['order_amount']);
             $this->setUserString($sheet, "F{$row}", $o['plate_date']);
+            if ($supportsChannels) {
+                $this->setUserString($sheet, "G{$row}", $o['order_channel_label'] ?? '');
+            }
             $row++;
         }
 
-        $this->autoSizeColumns($sheet, 'A', 'F');
+        $this->autoSizeColumns($sheet, 'A', $supportsChannels ? 'G' : 'F');
     }
 
-    private function buildSummarySheet(Spreadsheet $spreadsheet, array $summary, string $departmentLabel, bool $consolidateClients): void
+    private function buildSummarySheet(Spreadsheet $spreadsheet, array $summary, string $departmentLabel, bool $consolidateClients, bool $supportsChannels): void
     {
         $sheet = $spreadsheet->createSheet();
         $sheet->setTitle('概要');
@@ -205,6 +223,7 @@ class SalesExportService
             ['1案件平均', $summary['kpi']['avg_order_amount']],
             ['未配賦額', $summary['kpi']['unallocated_amount']],
             ['参考: 前年通期実績', $summary['kpi']['full_prior_year_amount']],
+            ...$this->channelSummaryRows($summary['kpi'], $supportsChannels),
             ['得意先統合', $consolidateClients ? 'ON' : 'OFF'],
             ['出力日時', now()->format('Y-m-d H:i')],
         ];
@@ -224,12 +243,15 @@ class SalesExportService
         $sheet->getStyle('A1:A' . count($rows))->getFont()->setBold(true);
     }
 
-    private function buildMonthlySheet(Spreadsheet $spreadsheet, array $summary): void
+    private function buildMonthlySheet(Spreadsheet $spreadsheet, array $summary, bool $supportsChannels): void
     {
         $sheet = $spreadsheet->createSheet();
         $sheet->setTitle('月別推移');
 
         $headers = ['月', '売上', '前年同月', '差額', '増減率(%)', '受注件数', '1案件平均', '状態'];
+        if ($supportsChannels) {
+            $headers = [...$headers, 'サンエー印刷経由', '独自受注', '独自比率(%)'];
+        }
         $this->writeHeaderRow($sheet, $headers);
 
         $row = 2;
@@ -242,10 +264,15 @@ class SalesExportService
             $sheet->setCellValue("F{$row}", $m['order_count']);
             $this->setAmount($sheet, "G{$row}", $m['avg_order_amount']);
             $this->setUserString($sheet, "H{$row}", $this->monthStateLabel($m));
+            if ($supportsChannels) {
+                $this->setAmount($sheet, "I{$row}", $m['standard_amount'] ?? null);
+                $this->setAmount($sheet, "J{$row}", $m['direct_amount'] ?? null);
+                $this->setAmount($sheet, "K{$row}", $m['direct_share'] ?? null);
+            }
             $row++;
         }
 
-        $this->autoSizeColumns($sheet, 'A', 'H');
+        $this->autoSizeColumns($sheet, 'A', $supportsChannels ? 'K' : 'H');
     }
 
     private function monthStateLabel(array $m): string
@@ -253,18 +280,37 @@ class SalesExportService
         return match (true) {
             $m['state'] === 'future' => '未到来',
             $m['state'] === 'no_data' => '未登録',
+            ($m['registration'] ?? null) === 'partial' => '一部未登録（片方の経路のみ）',
             $m['has_issue'] => '登録済み（未配賦額あり）',
             $m['needs_review'] => '登録済み（複数回取込あり）',
             default => '登録済み',
         };
     }
 
-    private function buildClientSheet(Spreadsheet $spreadsheet, array $summary): void
+    /** サン・ブレーンだけに追加する概要シートの経路内訳行 */
+    private function channelSummaryRows(array $kpi, bool $supportsChannels): array
+    {
+        if (! $supportsChannels) {
+            return [];
+        }
+
+        return [
+            ['サンエー印刷経由', $kpi['standard_amount']],
+            ['独自受注', $kpi['direct_amount']],
+            ['独自受注比率(%)', $kpi['direct_share']],
+        ];
+    }
+
+    private function buildClientSheet(Spreadsheet $spreadsheet, array $summary, bool $supportsChannels): void
     {
         $sheet = $spreadsheet->createSheet();
         $sheet->setTitle('得意先別');
 
-        $this->writeHeaderRow($sheet, ['順位', '得意先', '金額', '構成比(%)', '前年同期金額', '差額', '増減率(%)']);
+        $headers = ['順位', '得意先', '金額', '構成比(%)', '前年同期金額', '差額', '増減率(%)'];
+        if ($supportsChannels) {
+            $headers = [...$headers, 'サンエー印刷経由', '独自受注', '独自比率(%)'];
+        }
+        $this->writeHeaderRow($sheet, $headers);
 
         $row = 2;
         foreach ($summary['top_clients'] as $i => $c) {
@@ -275,36 +321,54 @@ class SalesExportService
             $this->setAmount($sheet, "E{$row}", $c['prior_year_amount']);
             $this->setAmount($sheet, "F{$row}", $c['diff']);
             $this->setAmount($sheet, "G{$row}", $c['rate']);
+            if ($supportsChannels) {
+                $this->setAmount($sheet, "H{$row}", $c['standard_amount'] ?? null);
+                $this->setAmount($sheet, "I{$row}", $c['direct_amount'] ?? null);
+                $this->setAmount($sheet, "J{$row}", $c['direct_share'] ?? null);
+            }
             $row++;
         }
 
-        $this->autoSizeColumns($sheet, 'A', 'G');
+        $this->autoSizeColumns($sheet, 'A', $supportsChannels ? 'J' : 'G');
     }
 
-    private function buildBreakdownSheet(Spreadsheet $spreadsheet, string $title, array $rows): void
+    private function buildBreakdownSheet(Spreadsheet $spreadsheet, string $title, array $rows, bool $supportsChannels): void
     {
         $sheet = $spreadsheet->createSheet();
         $sheet->setTitle($title);
 
-        $this->writeHeaderRow($sheet, [$title === '分類別' ? '分類' : '項目', '金額', '構成比(%)']);
+        $headers = [$title === '分類別' ? '分類' : '項目', '金額', '構成比(%)'];
+        if ($supportsChannels) {
+            $headers = [...$headers, 'サンエー印刷経由', '独自受注', '独自比率(%)'];
+        }
+        $this->writeHeaderRow($sheet, $headers);
 
         $row = 2;
         foreach ($rows as $r) {
             $this->setUserString($sheet, "A{$row}", $r['label']);
             $this->setAmount($sheet, "B{$row}", $r['amount']);
             $this->setAmount($sheet, "C{$row}", $r['share']);
+            if ($supportsChannels) {
+                $this->setAmount($sheet, "D{$row}", $r['standard_amount'] ?? null);
+                $this->setAmount($sheet, "E{$row}", $r['direct_amount'] ?? null);
+                $this->setAmount($sheet, "F{$row}", $r['direct_share'] ?? null);
+            }
             $row++;
         }
 
-        $this->autoSizeColumns($sheet, 'A', 'C');
+        $this->autoSizeColumns($sheet, 'A', $supportsChannels ? 'F' : 'C');
     }
 
-    private function buildOrdersSheet(Spreadsheet $spreadsheet, string $departmentKey, int $year, int $monthsRegistered): void
+    private function buildOrdersSheet(Spreadsheet $spreadsheet, string $departmentKey, int $year, int $monthsRegistered, bool $supportsChannels): void
     {
         $sheet = $spreadsheet->createSheet();
         $sheet->setTitle('該当明細');
 
-        $this->writeHeaderRow($sheet, ['月', '受注No', '得意先', '品名', '金額', 'SB下版日']);
+        $headers = ['月', '受注No', '得意先', '品名', '金額', 'SB下版日'];
+        if ($supportsChannels) {
+            $headers[] = '受注経路';
+        }
+        $this->writeHeaderRow($sheet, $headers);
 
         $orders = $monthsRegistered > 0
             ? $this->queryService->periodOrders($departmentKey, $year, 1, $monthsRegistered)
@@ -318,10 +382,13 @@ class SalesExportService
             $this->setUserString($sheet, "D{$row}", $o['product_name']);
             $this->setAmount($sheet, "E{$row}", $o['order_amount']);
             $this->setUserString($sheet, "F{$row}", $o['plate_date']);
+            if ($supportsChannels) {
+                $this->setUserString($sheet, "G{$row}", $o['order_channel_label'] ?? '');
+            }
             $row++;
         }
 
-        $this->autoSizeColumns($sheet, 'A', 'F');
+        $this->autoSizeColumns($sheet, 'A', $supportsChannels ? 'G' : 'F');
     }
 
     private function writeHeaderRow(Worksheet $sheet, array $headers): void

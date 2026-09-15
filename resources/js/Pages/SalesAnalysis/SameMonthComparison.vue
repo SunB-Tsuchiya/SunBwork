@@ -6,6 +6,7 @@ import axios from 'axios';
 import Chart from 'chart.js/auto';
 import PeriodNavigator from '@/Components/SalesAnalysis/PeriodNavigator.vue';
 import SalesAnalysisNavigationTabs from '@/Components/SalesAnalysis/SalesAnalysisNavigationTabs.vue';
+import { channelColors } from '@/Composables/useSalesChart';
 
 const props = defineProps({
     routePrefix: { type: String, required: true },
@@ -15,6 +16,8 @@ const props = defineProps({
     initialMonth: { type: Number, required: true },
     hasAnyData: { type: Boolean, default: false },
     hasCompanySelected: { type: Boolean, default: true },
+    // サン・ブレーンだけがサンエー印刷経由/独自受注の経路区別を持つ（Phase20）
+    supportsOrderChannels: { type: Boolean, default: false },
 });
 
 // 売上分析ルートは superadmin/admin/clerk の各ロールグループ内に複製登録されている
@@ -49,18 +52,27 @@ const renderYearlyChart = () => {
         type: 'bar',
         data: {
             labels: summary.value.yearly.map((y) => `${y.year}年`),
-            datasets: [
-                {
-                    label: `${monthLabels[summary.value.month - 1]}の売上`,
-                    data: summary.value.yearly.map((y) => y.amount),
-                    backgroundColor: summary.value.yearly.map((y) => (y.has_issue ? 'rgba(217,119,6,0.6)' : 'rgba(79,70,229,0.6)')),
-                },
-            ],
+            datasets: props.supportsOrderChannels
+                ? [
+                    { label: 'サンエー印刷経由', data: summary.value.yearly.map((y) => y.standard_amount), backgroundColor: channelColors.standard, stack: 'amount' },
+                    { label: '独自受注', data: summary.value.yearly.map((y) => y.direct_amount), backgroundColor: channelColors.direct, stack: 'amount' },
+                ]
+                : [
+                    {
+                        label: `${monthLabels[summary.value.month - 1]}の売上`,
+                        data: summary.value.yearly.map((y) => y.amount),
+                        backgroundColor: summary.value.yearly.map((y) => (y.has_issue ? 'rgba(217,119,6,0.6)' : 'rgba(79,70,229,0.6)')),
+                        stack: 'amount',
+                    },
+                ],
         },
         options: {
             responsive: true,
-            plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true, ticks: { callback: (v) => `¥${Number(v).toLocaleString()}` } } },
+            plugins: { legend: { display: props.supportsOrderChannels, position: 'bottom' } },
+            scales: {
+                x: { stacked: props.supportsOrderChannels },
+                y: { stacked: props.supportsOrderChannels, beginAtZero: true, ticks: { callback: (v) => `¥${Number(v).toLocaleString()}` } },
+            },
         },
     });
 };
@@ -197,6 +209,10 @@ onMounted(() => {
                                     <th class="py-1 text-right">増減率</th>
                                     <th class="py-1 text-right">受注件数</th>
                                     <th class="py-1 text-right">1案件平均</th>
+                                    <template v-if="supportsOrderChannels">
+                                        <th class="py-1 text-right text-blue-700">サンエー印刷経由</th>
+                                        <th class="py-1 text-right text-orange-700">独自受注</th>
+                                    </template>
                                 </tr>
                             </thead>
                             <tbody>
@@ -205,6 +221,11 @@ onMounted(() => {
                                         {{ y.year }}年
                                         <span v-if="y.needs_review" title="複数回取込あり">⚠</span>
                                         <span v-if="y.has_issue" title="未配賦額あり">🔺</span>
+                                        <span
+                                            v-if="supportsOrderChannels && y.registration === 'partial'"
+                                            class="rounded bg-purple-100 px-1 text-[10px] font-semibold text-purple-700"
+                                            title="サンエー印刷経由/独自受注の片方のみ登録済み"
+                                        >一部未登録</span>
                                     </td>
                                     <td class="py-1">{{ yearStateLabel(y) }}</td>
                                     <td class="py-1 text-right">{{ yen(y.amount) }}</td>
@@ -212,6 +233,10 @@ onMounted(() => {
                                     <td class="py-1 text-right" :class="pctClass(y.prior_year_rate)">{{ y.prior_year_rate !== null ? pct(y.prior_year_rate) : '—' }}</td>
                                     <td class="py-1 text-right">{{ y.order_count ?? '—' }}</td>
                                     <td class="py-1 text-right">{{ yen(y.avg_order_amount) }}</td>
+                                    <template v-if="supportsOrderChannels">
+                                        <td class="py-1 text-right text-blue-700">{{ y.standard_amount !== null ? yen(y.standard_amount) : '—' }}</td>
+                                        <td class="py-1 text-right text-orange-700">{{ y.direct_amount !== null ? yen(y.direct_amount) : '—' }}</td>
+                                    </template>
                                 </tr>
                             </tbody>
                         </table>

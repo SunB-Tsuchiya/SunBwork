@@ -7,6 +7,7 @@ use App\Http\Controllers\SalesAnalysis\Concerns\ResolvesSalesAnalysisCompany;
 use App\Http\Controllers\SalesAnalysis\Concerns\ResolvesSalesAnalysisRoutePrefix;
 use App\Models\Sales\SalesActiveMonth;
 use App\Services\SalesAnalysis\SalesDepartments;
+use App\Services\SalesAnalysis\SalesOrderChannels;
 use App\Services\SalesAnalysis\SalesQueryService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -44,6 +45,7 @@ class MonthlyAnalysisController extends Controller
                 'initialMonth' => (int) now()->format('n'),
                 'hasAnyData' => false,
                 'initialLatestPeriod' => null,
+                'supportsOrderChannels' => false,
             ]);
         }
 
@@ -84,6 +86,7 @@ class MonthlyAnalysisController extends Controller
                 'initialMonth' => $month,
                 'hasAnyData' => $hasAnyData,
                 'initialLatestPeriod' => $this->queryService->forCompany($companyId)->latestRegisteredMonth($departmentKey),
+                'supportsOrderChannels' => SalesOrderChannels::supportsChannelsFor($companyId),
             ]);
         }
 
@@ -113,6 +116,7 @@ class MonthlyAnalysisController extends Controller
             'initialMonth' => $latest->sales_month ?? (int) now()->format('n'),
             'hasAnyData' => $latest !== null,
             'initialLatestPeriod' => $latest ? ['year' => (int) $latest->sales_year, 'month' => (int) $latest->sales_month] : null,
+            'supportsOrderChannels' => SalesOrderChannels::supportsChannelsFor($companyId),
         ]);
     }
 

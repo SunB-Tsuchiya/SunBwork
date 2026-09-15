@@ -11,6 +11,7 @@ class SalesActiveMonth extends Model
     protected $fillable = [
         'company_id',
         'department_key',
+        'order_channel',
         'sales_year',
         'sales_month',
         'sales_import_id',

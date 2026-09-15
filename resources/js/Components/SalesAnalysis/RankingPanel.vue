@@ -125,6 +125,13 @@ watch(() => props.refreshKey, () => {
 const drawerMaxPage = () => Math.max(1, Math.ceil(drawerTotalCount.value / drawerLimit.value));
 
 const showDiff = computed(() => props.diffColumns || (props.modes.length > 0 && mode.value !== 'current'));
+
+// Phase20: サン・ブレーンの行だけstandard_amount/direct_amountが付与されるため、
+// 行データの有無から自動判定する（親コンポーネント側で明示的なフラグ管理を不要にする）
+const hasChannelBreakdown = (rows) => rows.some((r) => r.standard_amount !== null && r.standard_amount !== undefined);
+const showChannelTop = computed(() => hasChannelBreakdown(topRows.value));
+const showChannelDrawer = computed(() => hasChannelBreakdown(drawerRows.value));
+const directShareLabel = (row) => (row.direct_share === null || row.direct_share === undefined ? '—' : `${row.direct_share}%`);
 </script>
 
 <template>
@@ -164,6 +171,11 @@ const showDiff = computed(() => props.diffColumns || (props.modes.length > 0 && 
                         <th v-if="showDiff" class="py-1 text-right">{{ diffLabel }}</th>
                         <th v-if="showDiff" class="py-1 text-right">{{ rateLabel }}</th>
                         <th v-else class="py-1 text-right">構成比</th>
+                        <template v-if="showChannelTop">
+                            <th class="py-1 text-right text-blue-700">サンエー印刷経由</th>
+                            <th class="py-1 text-right text-orange-700">独自受注</th>
+                            <th class="py-1 text-right">独自比率</th>
+                        </template>
                     </tr>
                 </thead>
                 <tbody>
@@ -181,6 +193,11 @@ const showDiff = computed(() => props.diffColumns || (props.modes.length > 0 && 
                             <td class="py-1 text-right" :class="pctClass(row.rate)">{{ row.rate !== null ? pct(row.rate) : '—' }}</td>
                         </template>
                         <td v-else class="py-1 text-right">{{ row.share_pct !== null ? `${row.share_pct}%` : '—' }}</td>
+                        <template v-if="showChannelTop">
+                            <td class="py-1 text-right text-blue-700">{{ row.standard_amount !== null && row.standard_amount !== undefined ? yen(row.standard_amount) : '—' }}</td>
+                            <td class="py-1 text-right text-orange-700">{{ row.direct_amount !== null && row.direct_amount !== undefined ? yen(row.direct_amount) : '—' }}</td>
+                            <td class="py-1 text-right">{{ directShareLabel(row) }}</td>
+                        </template>
                     </tr>
                 </tbody>
             </table>
@@ -212,6 +229,10 @@ const showDiff = computed(() => props.diffColumns || (props.modes.length > 0 && 
                             <th class="py-1">{{ title }}</th>
                             <th class="py-1 text-right">金額</th>
                             <th v-if="showDiff" class="py-1 text-right">{{ diffLabel }}</th>
+                            <template v-if="showChannelDrawer">
+                                <th class="py-1 text-right text-blue-700">サンエー印刷経由</th>
+                                <th class="py-1 text-right text-orange-700">独自受注</th>
+                            </template>
                         </tr>
                     </thead>
                     <tbody>
@@ -225,6 +246,10 @@ const showDiff = computed(() => props.diffColumns || (props.modes.length > 0 && 
                             <td class="py-1">{{ row.label }}</td>
                             <td class="py-1 text-right">{{ yen(row.amount) }}</td>
                             <td v-if="showDiff" class="py-1 text-right" :class="pctClass(row.rate)">{{ row.diff !== null ? yen(row.diff) : '—' }}</td>
+                            <template v-if="showChannelDrawer">
+                                <td class="py-1 text-right text-blue-700">{{ row.standard_amount !== null && row.standard_amount !== undefined ? yen(row.standard_amount) : '—' }}</td>
+                                <td class="py-1 text-right text-orange-700">{{ row.direct_amount !== null && row.direct_amount !== undefined ? yen(row.direct_amount) : '—' }}</td>
+                            </template>
                         </tr>
                     </tbody>
                 </table>

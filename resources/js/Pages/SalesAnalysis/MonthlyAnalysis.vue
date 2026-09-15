@@ -4,7 +4,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router } from '@inertiajs/vue3';
 import axios from 'axios';
 import Chart from 'chart.js/auto';
-import { useSalesChart } from '@/Composables/useSalesChart';
+import { channelColors, useSalesChart } from '@/Composables/useSalesChart';
 import PeriodNavigator from '@/Components/SalesAnalysis/PeriodNavigator.vue';
 import RankingPanel from '@/Components/SalesAnalysis/RankingPanel.vue';
 import SalesAnalysisNavigationTabs from '@/Components/SalesAnalysis/SalesAnalysisNavigationTabs.vue';
@@ -23,6 +23,8 @@ const props = defineProps({
     initialLatestPeriod: { type: Object, default: null },
     hasAnyData: { type: Boolean, default: false },
     hasCompanySelected: { type: Boolean, default: true },
+    // サン・ブレーンだけがサンエー印刷経由/独自受注の経路区別を持つ（Phase20）
+    supportsOrderChannels: { type: Boolean, default: false },
 });
 
 // 売上分析ルートは superadmin/admin/clerk の各ロールグループ内に複製登録されている
@@ -174,16 +176,18 @@ const renderSameMonthChart = () => {
 
     const avg = same3yrAvg.value?.average ?? null;
 
+    const barDatasets = props.supportsOrderChannels
+        ? [
+            { type: 'bar', label: 'サンエー印刷経由', data: sameMonthHistory.value.map((r) => r.standard_amount), backgroundColor: channelColors.standard, stack: 'amount' },
+            { type: 'bar', label: '独自受注', data: sameMonthHistory.value.map((r) => r.direct_amount), backgroundColor: channelColors.direct, stack: 'amount' },
+        ]
+        : [{ type: 'bar', label: `${month.value}月の売上`, data: sameMonthHistory.value.map((r) => r.amount), backgroundColor: '#16A34A', stack: 'amount' }];
+
     sameMonthChartInstance = new Chart(sameMonthChartRef.value.getContext('2d'), {
         data: {
             labels: sameMonthHistory.value.map((r) => `${r.year}年`),
             datasets: [
-                {
-                    type: 'bar',
-                    label: `${month.value}月の売上`,
-                    data: sameMonthHistory.value.map((r) => r.amount),
-                    backgroundColor: '#16A34A',
-                },
+                ...barDatasets,
                 ...(avg !== null
                     ? [{
                         type: 'line',
@@ -199,7 +203,10 @@ const renderSameMonthChart = () => {
         options: {
             responsive: true,
             plugins: { legend: { display: true, position: 'bottom' } },
-            scales: { y: { beginAtZero: true, ticks: { callback: (v) => `¥${Number(v).toLocaleString()}` } } },
+            scales: {
+                x: { stacked: props.supportsOrderChannels },
+                y: { stacked: props.supportsOrderChannels, beginAtZero: true, ticks: { callback: (v) => `¥${Number(v).toLocaleString()}` } },
+            },
             onClick: (evt, elements) => {
                 if (!elements.length) return;
                 const row = sameMonthHistory.value[elements[0].index];
@@ -213,17 +220,27 @@ const renderClientChart = (rows) => {
     if (!clientChartRef.value) return;
     if (clientChartInstance) clientChartInstance.destroy();
 
+    const hasChannelData = props.supportsOrderChannels && rows.some((r) => r.standard_amount !== null && r.standard_amount !== undefined);
+
     clientChartInstance = new Chart(clientChartRef.value.getContext('2d'), {
         type: 'bar',
         data: {
             labels: rows.map((r) => r.label),
-            datasets: [{ label: '金額', data: rows.map((r) => r.amount), backgroundColor: '#4F46E5' }],
+            datasets: hasChannelData
+                ? [
+                    { label: 'サンエー印刷経由', data: rows.map((r) => r.standard_amount), backgroundColor: channelColors.standard, stack: 'amount' },
+                    { label: '独自受注', data: rows.map((r) => r.direct_amount), backgroundColor: channelColors.direct, stack: 'amount' },
+                ]
+                : [{ label: '金額', data: rows.map((r) => r.amount), backgroundColor: '#4F46E5', stack: 'amount' }],
         },
         options: {
             indexAxis: 'y',
             responsive: true,
-            plugins: { legend: { display: false } },
-            scales: { x: { beginAtZero: true, ticks: { callback: (v) => `¥${Number(v).toLocaleString()}` } } },
+            plugins: { legend: { display: hasChannelData, position: 'bottom' } },
+            scales: {
+                x: { stacked: hasChannelData, beginAtZero: true, ticks: { callback: (v) => `¥${Number(v).toLocaleString()}` } },
+                y: { stacked: hasChannelData },
+            },
         },
     });
 };
@@ -413,6 +430,14 @@ onMounted(() => {
                             title="受注金額（N列）と明細金額合計（M列）の差額。取込元Excelの内訳が受注金額と一致していません"
                         >
                             未配賦額: {{ yen(summary.monthly.current.total_unallocated_amount) }}
+                        </p>
+                        <p v-if="supportsOrderChannels && summary.monthly.current" class="mt-1 text-xs">
+                            <span class="text-blue-700">サンエー印刷経由 {{ yen(summary.monthly.current.standard_amount) }}</span>
+                            ／
+                            <span class="text-orange-700">独自受注 {{ yen(summary.monthly.current.direct_amount) }}</span>
+                        </p>
+                        <p v-if="supportsOrderChannels && summary.monthly.current?.registration === 'partial'" class="mt-1 text-xs font-semibold text-purple-600">
+                            ⚠ 一部未登録（片方の経路のみ登録済み）
                         </p>
                     </div>
                     <div class="rounded bg-white p-4 shadow">

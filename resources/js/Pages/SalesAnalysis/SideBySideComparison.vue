@@ -10,6 +10,8 @@ const props = defineProps({
     departmentLabels: { type: Object, default: () => ({}) },
     enabledDepartmentKeys: { type: Array, default: () => [] },
     hasCompanySelected: { type: Boolean, default: true },
+    // サン・ブレーンだけがサンエー印刷経由/独自受注の経路区別を持つ（Phase20）
+    supportsOrderChannels: { type: Boolean, default: false },
 });
 
 // 売上分析ルートは superadmin/admin/clerk の各ロールグループ内に複製登録されている
@@ -198,6 +200,12 @@ fetchSummary();
                             {{ summary.period_a.order_count ?? '—' }}件 / 平均{{ yen(summary.period_a.avg_order_amount) }}
                             <span v-if="summary.period_a.type === 'year'">（{{ summary.period_a.registered_month_count }}/{{ summary.period_a.total_month_count }}ヶ月）</span>
                         </p>
+                        <p v-if="supportsOrderChannels" class="mt-1 text-xs">
+                            <span class="text-blue-700">経由 {{ yen(summary.period_a.standard_amount) }}</span>
+                            ／
+                            <span class="text-orange-700">独自 {{ yen(summary.period_a.direct_amount) }}</span>
+                            <span v-if="summary.period_a.registration === 'partial'" class="ml-1 font-semibold text-purple-600">一部未登録</span>
+                        </p>
                     </div>
                     <div class="rounded bg-white p-4 shadow">
                         <p class="text-xs text-gray-500">B: {{ summary.period_b.label }}</p>
@@ -205,6 +213,12 @@ fetchSummary();
                         <p class="text-xs text-gray-400">
                             {{ summary.period_b.order_count ?? '—' }}件 / 平均{{ yen(summary.period_b.avg_order_amount) }}
                             <span v-if="summary.period_b.type === 'year'">（{{ summary.period_b.registered_month_count }}/{{ summary.period_b.total_month_count }}ヶ月）</span>
+                        </p>
+                        <p v-if="supportsOrderChannels" class="mt-1 text-xs">
+                            <span class="text-blue-700">経由 {{ yen(summary.period_b.standard_amount) }}</span>
+                            ／
+                            <span class="text-orange-700">独自 {{ yen(summary.period_b.direct_amount) }}</span>
+                            <span v-if="summary.period_b.registration === 'partial'" class="ml-1 font-semibold text-purple-600">一部未登録</span>
                         </p>
                     </div>
                     <div class="rounded bg-white p-4 shadow">
@@ -214,6 +228,11 @@ fetchSummary();
                             <span class="text-sm">{{ summary.diff.rate !== null ? `(${pct(summary.diff.rate)})` : '' }}</span>
                         </p>
                         <p class="text-xs text-gray-400">受注 {{ summary.diff.order_count !== null ? (summary.diff.order_count > 0 ? '+' : '') + summary.diff.order_count : '—' }}件</p>
+                        <p v-if="supportsOrderChannels" class="mt-1 text-xs">
+                            <span class="text-blue-700">経由差 {{ summary.diff.standard_amount !== null ? yen(summary.diff.standard_amount) : '—' }}</span>
+                            ／
+                            <span class="text-orange-700">独自差 {{ summary.diff.direct_amount !== null ? yen(summary.diff.direct_amount) : '—' }}</span>
+                        </p>
                     </div>
                 </div>
 
@@ -235,6 +254,10 @@ fetchSummary();
                                     <th class="py-1 text-right">Bの金額</th>
                                     <th class="py-1 text-right">差額</th>
                                     <th class="py-1 text-right">増減率</th>
+                                    <template v-if="supportsOrderChannels">
+                                        <th class="py-1 text-right text-blue-700">A経由/独自</th>
+                                        <th class="py-1 text-right text-orange-700">B経由/独自</th>
+                                    </template>
                                 </tr>
                             </thead>
                             <tbody>
@@ -244,6 +267,14 @@ fetchSummary();
                                     <td class="py-1 text-right">{{ yen(c.amount_b) }}</td>
                                     <td class="py-1 text-right" :class="pctClass(c.rate)">{{ yen(c.diff) }}</td>
                                     <td class="py-1 text-right" :class="pctClass(c.rate)">{{ c.rate !== null ? pct(c.rate) : (c.amount_a === 0 ? '新規' : '—') }}</td>
+                                    <template v-if="supportsOrderChannels">
+                                        <td class="py-1 text-right text-[11px]">
+                                            <span class="text-blue-700">{{ yen(c.standard_amount_a) }}</span>/<span class="text-orange-700">{{ yen(c.direct_amount_a) }}</span>
+                                        </td>
+                                        <td class="py-1 text-right text-[11px]">
+                                            <span class="text-blue-700">{{ yen(c.standard_amount_b) }}</span>/<span class="text-orange-700">{{ yen(c.direct_amount_b) }}</span>
+                                        </td>
+                                    </template>
                                 </tr>
                                 <tr v-if="summary.clients.others_amount_a > 0 || summary.clients.others_amount_b > 0" class="border-t text-gray-400">
                                     <td class="py-1">その他（{{ summary.clients.all_count - summary.clients.rows.length }}社）</td>
@@ -267,6 +298,10 @@ fetchSummary();
                                     <th class="py-1 text-right">A</th>
                                     <th class="py-1 text-right">B</th>
                                     <th class="py-1 text-right">増減率</th>
+                                    <template v-if="supportsOrderChannels">
+                                        <th class="py-1 text-right text-[11px]">A経由/独自</th>
+                                        <th class="py-1 text-right text-[11px]">B経由/独自</th>
+                                    </template>
                                 </tr>
                             </thead>
                             <tbody>
@@ -275,6 +310,10 @@ fetchSummary();
                                     <td class="py-1 text-right">{{ yen(row.amount_a) }}</td>
                                     <td class="py-1 text-right">{{ yen(row.amount_b) }}</td>
                                     <td class="py-1 text-right" :class="pctClass(row.rate)">{{ row.rate !== null ? pct(row.rate) : '—' }}</td>
+                                    <template v-if="supportsOrderChannels">
+                                        <td class="py-1 text-right text-[11px]"><span class="text-blue-700">{{ yen(row.standard_amount_a) }}</span>/<span class="text-orange-700">{{ yen(row.direct_amount_a) }}</span></td>
+                                        <td class="py-1 text-right text-[11px]"><span class="text-blue-700">{{ yen(row.standard_amount_b) }}</span>/<span class="text-orange-700">{{ yen(row.direct_amount_b) }}</span></td>
+                                    </template>
                                 </tr>
                             </tbody>
                         </table>
@@ -288,6 +327,10 @@ fetchSummary();
                                     <th class="py-1 text-right">A</th>
                                     <th class="py-1 text-right">B</th>
                                     <th class="py-1 text-right">増減率</th>
+                                    <template v-if="supportsOrderChannels">
+                                        <th class="py-1 text-right text-[11px]">A経由/独自</th>
+                                        <th class="py-1 text-right text-[11px]">B経由/独自</th>
+                                    </template>
                                 </tr>
                             </thead>
                             <tbody>
@@ -296,6 +339,10 @@ fetchSummary();
                                     <td class="py-1 text-right">{{ yen(row.amount_a) }}</td>
                                     <td class="py-1 text-right">{{ yen(row.amount_b) }}</td>
                                     <td class="py-1 text-right" :class="pctClass(row.rate)">{{ row.rate !== null ? pct(row.rate) : '—' }}</td>
+                                    <template v-if="supportsOrderChannels">
+                                        <td class="py-1 text-right text-[11px]"><span class="text-blue-700">{{ yen(row.standard_amount_a) }}</span>/<span class="text-orange-700">{{ yen(row.direct_amount_a) }}</span></td>
+                                        <td class="py-1 text-right text-[11px]"><span class="text-blue-700">{{ yen(row.standard_amount_b) }}</span>/<span class="text-orange-700">{{ yen(row.direct_amount_b) }}</span></td>
+                                    </template>
                                 </tr>
                             </tbody>
                         </table>

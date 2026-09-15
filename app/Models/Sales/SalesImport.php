@@ -11,6 +11,7 @@ class SalesImport extends Model
     protected $fillable = [
         'company_id',
         'department_key',
+        'order_channel',
         'source_type',
         'source_year',
         'source_month',

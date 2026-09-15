@@ -20,6 +20,8 @@ const props = defineProps({
     initialEndMonth: { type: Number, required: true },
     hasAnyData: { type: Boolean, default: false },
     hasCompanySelected: { type: Boolean, default: true },
+    // サン・ブレーンだけがサンエー印刷経由/独自受注の経路区別を持つ（Phase20）
+    supportsOrderChannels: { type: Boolean, default: false },
 });
 
 // 売上分析ルートは superadmin/admin/clerk の各ロールグループ内に複製登録されている
@@ -328,6 +330,10 @@ onMounted(() => {
                                     <th class="py-1 text-right">前年差</th>
                                     <th class="py-1 text-right">増減率</th>
                                     <th class="py-1 text-right">受注件数</th>
+                                    <template v-if="supportsOrderChannels">
+                                        <th class="py-1 text-right text-blue-700">サンエー印刷経由</th>
+                                        <th class="py-1 text-right text-orange-700">独自受注</th>
+                                    </template>
                                 </tr>
                             </thead>
                             <tbody>
@@ -338,6 +344,10 @@ onMounted(() => {
                                     <td class="py-1 text-right" :class="pctClass(y.prior_year_rate)">{{ y.prior_year_diff !== null ? yen(y.prior_year_diff) : '—' }}</td>
                                     <td class="py-1 text-right" :class="pctClass(y.prior_year_rate)">{{ y.prior_year_rate !== null ? pct(y.prior_year_rate) : '—' }}</td>
                                     <td class="py-1 text-right">{{ y.order_count ?? '—' }}</td>
+                                    <template v-if="supportsOrderChannels">
+                                        <td class="py-1 text-right text-blue-700">{{ y.standard_amount !== null ? yen(y.standard_amount) : '—' }}</td>
+                                        <td class="py-1 text-right text-orange-700">{{ y.direct_amount !== null ? yen(y.direct_amount) : '—' }}</td>
+                                    </template>
                                 </tr>
                             </tbody>
                         </table>

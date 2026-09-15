@@ -21,6 +21,8 @@ const props = defineProps({
     initialFiscalYear: { type: Number, required: true },
     hasAnyData: { type: Boolean, default: false },
     hasCompanySelected: { type: Boolean, default: true },
+    // サン・ブレーンだけがサンエー印刷経由/独自受注の経路区別を持つ（Phase20）
+    supportsOrderChannels: { type: Boolean, default: false },
 });
 
 // 売上分析ルートは superadmin/admin/clerk の各ロールグループ内に複製登録されている
@@ -353,6 +355,11 @@ onMounted(() => {
                         >
                             未配賦額: {{ yen(summary.kpi.unallocated_amount) }}
                         </p>
+                        <p v-if="supportsOrderChannels" class="mt-1 text-xs">
+                            <span class="text-blue-700">サンエー印刷経由 {{ yen(summary.kpi.standard_amount) }}</span>
+                            ／
+                            <span class="text-orange-700">独自受注 {{ yen(summary.kpi.direct_amount) }}</span>
+                        </p>
                     </div>
                     <div class="rounded bg-white p-4 shadow">
                         <p class="text-xs text-gray-500">前期同期比（{{ comparisonRangeLabel }}）</p>
@@ -401,6 +408,10 @@ onMounted(() => {
                                     <th class="py-1 text-right">差額</th>
                                     <th class="py-1 text-right">増減率</th>
                                     <th class="py-1 text-right">受注件数</th>
+                                    <template v-if="supportsOrderChannels">
+                                        <th class="py-1 text-right text-blue-700">サンエー印刷経由</th>
+                                        <th class="py-1 text-right text-orange-700">独自受注</th>
+                                    </template>
                                 </tr>
                             </thead>
                             <tbody>
@@ -414,12 +425,21 @@ onMounted(() => {
                                             class="rounded bg-amber-100 px-1 text-[10px] font-semibold text-amber-700"
                                             :title="`登録済み部署: ${m.coverage.registered_departments.map((k) => departmentLabels[k] ?? k).join('・')}`"
                                         >一部登録</span>
+                                        <span
+                                            v-if="supportsOrderChannels && m.registration === 'partial'"
+                                            class="rounded bg-purple-100 px-1 text-[10px] font-semibold text-purple-700"
+                                            title="サンエー印刷経由/独自受注の片方のみ登録済み"
+                                        >一部未登録</span>
                                     </td>
                                     <td class="py-1 text-right">{{ m.state === 'future' ? '—' : yen(m.amount) }}</td>
                                     <td class="py-1 text-right">{{ yen(m.prior_year_amount) }}</td>
                                     <td class="py-1 text-right" :class="pctClass(m.rate)">{{ m.diff !== null ? yen(m.diff) : '—' }}</td>
                                     <td class="py-1 text-right" :class="pctClass(m.rate)">{{ m.rate !== null ? pct(m.rate) : '—' }}</td>
                                     <td class="py-1 text-right">{{ m.order_count ?? '—' }}</td>
+                                    <template v-if="supportsOrderChannels">
+                                        <td class="py-1 text-right text-blue-700">{{ m.standard_amount !== null ? yen(m.standard_amount) : '—' }}</td>
+                                        <td class="py-1 text-right text-orange-700">{{ m.direct_amount !== null ? yen(m.direct_amount) : '—' }}</td>
+                                    </template>
                                 </tr>
                             </tbody>
                         </table>

@@ -10,6 +10,8 @@ const props = defineProps({
     departmentLabels: { type: Object, default: () => ({}) },
     enabledDepartmentKeys: { type: Array, default: () => [] },
     hasCompanySelected: { type: Boolean, default: true },
+    // サン・ブレーンだけがサンエー印刷経由/独自受注の経路区別を持つ（Phase20）
+    supportsOrderChannels: { type: Boolean, default: false },
 });
 
 // 売上分析ルートは superadmin/admin/clerk の各ロールグループ内に複製登録されている
@@ -83,10 +85,21 @@ const cellClass = (m) => {
     return 'bg-green-100 text-green-800'; // has_sales
 };
 
+// Phase20: サン・ブレーンで片方の経路しか登録されていない月には紫のリングを重ねて強調する
+// （0円/未登録との混同を避け、独自受注ファイル取込待ちであることを一目で分かるようにする）
+const isPartial = (m) => props.supportsOrderChannels && m.registration === 'partial';
+
 const cellTitle = (m) => {
     if (m.state === 'future') return 'まだ来ていない月';
     if (m.state === 'no_data') return '未登録';
-    const parts = [`売上: ${yen(m.amount)}`, `受注件数: ${m.order_count ?? 0}件`];
+    const parts = [`合計: ${yen(m.amount)}`, `受注件数: ${m.order_count ?? 0}件`];
+    if (props.supportsOrderChannels) {
+        parts.push(`サンエー印刷経由: ${yen(m.standard_amount)}`, `独自受注: ${yen(m.direct_amount)}`);
+        if (m.registration === 'partial') {
+            const missing = (m.standard_amount ?? 0) > 0 && (m.direct_amount ?? 0) === 0 ? '独自受注' : 'サンエー印刷経由';
+            parts.push(`一部未登録（${missing}のファイル取込待ち）`);
+        }
+    }
     if (m.needs_review) parts.push('この月は複数回取込まれています（現在の有効版を確認してください）');
     if (m.has_issue) parts.push(`明細合計と受注金額に差額があります（未配賦額 ${yen(m.issue_amount)}）`);
     return parts.join(' / ');
@@ -155,6 +168,9 @@ onMounted(fetchStatus);
                     <span class="flex items-center gap-1"><span class="h-3 w-3 rounded bg-gray-50"></span>まだ来ていない月</span>
                     <span class="flex items-center gap-1">⚠<span>複数回取込あり</span></span>
                     <span class="flex items-center gap-1">🔺<span>明細と受注金額に差額あり</span></span>
+                    <span v-if="supportsOrderChannels" class="flex items-center gap-1">
+                        <span class="h-3 w-3 rounded ring-2 ring-purple-400"></span>一部未登録（サンエー印刷経由/独自受注の片方のみ）
+                    </span>
                 </div>
 
                 <div class="divide-y divide-gray-100">
@@ -164,6 +180,7 @@ onMounted(fetchStatus);
                                 <button type="button" class="w-40 shrink-0 text-left" @click="toggleYear(year.year)">
                                     <span class="text-sm font-bold text-gray-900">{{ expandedYears.has(year.year) ? '▼' : '▶' }} {{ year.year }}年</span>
                                     <span class="ml-2 text-xs text-gray-500">{{ registrationLabel(year) }}</span>
+                                    <span v-if="supportsOrderChannels && year.has_any_partial" class="ml-1 text-xs text-purple-600">一部未登録あり</span>
                                 </button>
 
                                 <div class="grid grid-cols-12 gap-1">
@@ -173,7 +190,7 @@ onMounted(fetchStatus);
                                         :key="m.month"
                                         :href="m.state === 'future' ? undefined : route(rn('monthly_analysis')) + `?department_key=${departmentKey}&year=${year.year}&month=${m.month}`"
                                         class="relative flex h-8 w-8 items-center justify-center rounded text-[10px] font-semibold"
-                                        :class="[cellClass(m), m.state !== 'future' ? 'cursor-pointer hover:ring-2 hover:ring-indigo-400' : '']"
+                                        :class="[cellClass(m), m.state !== 'future' ? 'cursor-pointer hover:ring-2 hover:ring-indigo-400' : '', isPartial(m) ? 'ring-2 ring-purple-400' : '']"
                                         :title="cellTitle(m)"
                                     >
                                         {{ monthLabels[m.month - 1] }}
@@ -205,6 +222,7 @@ onMounted(fetchStatus);
                                 <thead>
                                     <tr class="text-left text-gray-500">
                                         <th class="py-1">ファイル名</th>
+                                        <th v-if="supportsOrderChannels" class="py-1">受注経路</th>
                                         <th class="py-1">対象期間</th>
                                         <th class="py-1">版</th>
                                         <th class="py-1">現在有効</th>
@@ -215,6 +233,12 @@ onMounted(fetchStatus);
                                 <tbody>
                                     <tr v-for="file in filesByYear[year.year]" :key="file.sales_import_id" class="border-t border-gray-200">
                                         <td class="py-1">{{ file.original_filename }}</td>
+                                        <td v-if="supportsOrderChannels" class="py-1">
+                                            <span
+                                                class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                                                :class="file.order_channel === 'direct' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'"
+                                            >{{ file.order_channel_label }}</span>
+                                        </td>
                                         <td class="py-1">{{ periodLabelForFile(file) }}</td>
                                         <td class="py-1">v{{ file.version }}</td>
                                         <td class="py-1">

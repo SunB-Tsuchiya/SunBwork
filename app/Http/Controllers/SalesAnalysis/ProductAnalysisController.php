@@ -7,6 +7,7 @@ use App\Http\Controllers\SalesAnalysis\Concerns\ResolvesSalesAnalysisCompany;
 use App\Http\Controllers\SalesAnalysis\Concerns\ResolvesSalesAnalysisRoutePrefix;
 use App\Models\Sales\SalesActiveMonth;
 use App\Services\SalesAnalysis\SalesDepartments;
+use App\Services\SalesAnalysis\SalesOrderChannels;
 use App\Services\SalesAnalysis\SalesQueryService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -42,6 +43,7 @@ class ProductAnalysisController extends Controller
                 'initialEndYear' => (int) now()->format('Y'),
                 'initialEndMonth' => (int) now()->format('n'),
                 'hasAnyData' => false,
+                'supportsOrderChannels' => false,
             ]);
         }
 
@@ -71,6 +73,7 @@ class ProductAnalysisController extends Controller
             'initialEndYear' => $hasAnyData ? intdiv((int) $bounds->max_ym, 100) : $nowYear,
             'initialEndMonth' => $hasAnyData ? (int) $bounds->max_ym % 100 : $nowMonth,
             'hasAnyData' => $hasAnyData,
+            'supportsOrderChannels' => SalesOrderChannels::supportsChannelsFor($companyId),
         ]);
     }
 

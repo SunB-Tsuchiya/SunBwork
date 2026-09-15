@@ -9,6 +9,7 @@ use App\Models\Sales\SalesActiveMonth;
 use App\Models\Sales\SalesAuditLog;
 use App\Services\SalesAnalysis\SalesDepartments;
 use App\Services\SalesAnalysis\SalesExportService;
+use App\Services\SalesAnalysis\SalesOrderChannels;
 use App\Services\SalesAnalysis\SalesQueryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -44,6 +45,7 @@ class FiscalYearAnalysisController extends Controller
                 'initialDepartmentKey' => null,
                 'initialFiscalYear' => (int) (now()->month >= 4 ? now()->format('Y') : now()->format('Y') - 1),
                 'hasAnyData' => false,
+                'supportsOrderChannels' => false,
             ]);
         }
 
@@ -88,6 +90,7 @@ class FiscalYearAnalysisController extends Controller
             'initialDepartmentKey' => $departmentKey,
             'initialFiscalYear' => $fiscalYear,
             'hasAnyData' => $hasAnyData,
+            'supportsOrderChannels' => SalesOrderChannels::supportsChannelsFor($companyId),
         ]);
     }
 

@@ -10,6 +10,8 @@ const props = defineProps({
     departmentLabels: { type: Object, default: () => ({}) },
     enabledDepartmentKeys: { type: Array, default: () => [] },
     hasCompanySelected: { type: Boolean, default: true },
+    // サン・ブレーンだけがサンエー印刷経由/独自受注の経路区別を持つ（Phase20）
+    supportsOrderChannels: { type: Boolean, default: false },
 });
 
 // 売上分析ルートは superadmin/admin/clerk の各ロールグループ内に複製登録されている
@@ -27,6 +29,10 @@ const selectedFile = ref(null);
 const fileName = ref('');
 const inspectedDepartmentLabel = ref('');
 const inspectError = ref('');
+// サン・ブレーンの受注経路（standard=サンエー印刷経由 / direct=独自受注）。ファイル名末尾の
+// 「_独自」だけで判定する。サーバー側でも同じ規則で再判定するため、手入力での修正はできない
+const orderChannel = ref('standard');
+const orderChannelLabel = computed(() => (orderChannel.value === 'direct' ? '独自受注' : 'サンエー印刷経由'));
 
 const submitting = ref(false);
 const confirming = ref(false);
@@ -57,18 +63,20 @@ const parseFileName = (name) => {
     if (labels.length === 0) return null;
 
     const labelPattern = [...labels].sort((a, b) => b.length - a.length).map(escapeRegExp).join('|');
-    const re = new RegExp(`^(${labelPattern})_(\\d{4})年(?:(\\d{1,2})-(\\d{1,2})月|(\\d{1,2})月)?$`);
+    // 末尾の「_独自」はサン・ブレーンの独自受注ファイルの目印（Phase20）。他社では常に付かない
+    const re = new RegExp(`^(${labelPattern})_(\\d{4})年(?:(\\d{1,2})-(\\d{1,2})月|(\\d{1,2})月)?(_独自)?$`);
     const m = base.match(re);
     if (!m) return null;
 
-    const [, label, year, rangeStart, rangeEnd, singleMonth] = m;
+    const [, label, year, rangeStart, rangeEnd, singleMonth, directSuffix] = m;
+    const orderChannel = directSuffix ? 'direct' : 'standard';
     if (rangeStart && rangeEnd) {
-        return { label, year: Number(year), sourceType: 'range', month: Number(rangeStart), monthEnd: Number(rangeEnd) };
+        return { label, year: Number(year), sourceType: 'range', month: Number(rangeStart), monthEnd: Number(rangeEnd), orderChannel };
     }
     if (singleMonth) {
-        return { label, year: Number(year), sourceType: 'monthly', month: Number(singleMonth), monthEnd: null };
+        return { label, year: Number(year), sourceType: 'monthly', month: Number(singleMonth), monthEnd: null, orderChannel };
     }
-    return { label, year: Number(year), sourceType: 'annual', month: null, monthEnd: null };
+    return { label, year: Number(year), sourceType: 'annual', month: null, monthEnd: null, orderChannel };
 };
 
 // ファイル選択直後にファイル名を解析し、対象部署・種別・年月フォームへ自動反映する。
@@ -86,6 +94,7 @@ const onFileChange = (e) => {
     sourceYear.value = null;
     sourceMonth.value = null;
     sourceMonthEnd.value = null;
+    orderChannel.value = 'standard';
     excludedOrderNumbers.value = [];
     checkedInvalidOrders.value = [];
 
@@ -95,12 +104,16 @@ const onFileChange = (e) => {
         sourceYear.value = parsed.year;
         sourceMonth.value = parsed.month;
         sourceMonthEnd.value = parsed.monthEnd ?? parsed.month;
+        orderChannel.value = parsed.orderChannel;
         inspectedDepartmentLabel.value = parsed.label;
 
         const key = resolveDepartmentKey(parsed.label);
         if (key && props.enabledDepartmentKeys.includes(key)) {
             departmentKey.value = key;
         }
+    } else if (props.supportsOrderChannels) {
+        // サン・ブレーンはファイル名がサーバー側でも唯一の正本になるため、手入力による救済を行わない
+        inspectError.value = 'ファイル名が命名規則と一致しません（例: 企画_2026年08月.xlsx / 企画_2026年08月_独自.xlsx）。ファイル名を規則どおりに修正してから選び直してください。';
     } else {
         inspectError.value = 'ファイル名から対象部署・年月を自動読取できませんでした。命名規則に沿ったファイル名に変更するか、下記の項目を入力してください。';
     }
@@ -108,6 +121,8 @@ const onFileChange = (e) => {
 
 const canSubmit = computed(() => {
     if (!selectedFile.value) return false;
+    // サン・ブレーンはファイル名解析に成功していることが必須（手入力での救済はしない）
+    if (props.supportsOrderChannels) return !!inspectedDepartmentLabel.value;
     if (!sourceYear.value) return false;
     if ((sourceType.value === 'monthly' || sourceType.value === 'range') && !sourceMonth.value) return false;
     if (sourceType.value === 'range' && (!sourceMonthEnd.value || sourceMonthEnd.value < sourceMonth.value)) return false;
@@ -215,6 +230,11 @@ const confirmImport = async () => {
                         対象部署・対象年月は、<strong>このファイル名から自動入力</strong>されます。上記の命名規則に沿ったファイル名にしてください
                         （Excel内部のタイトル行は部署・担当者により記載が不統一なため、自動入力には使用しません。取込時の内容整合性チェックには引き続き使用します）。
                     </p>
+                    <p v-if="supportsOrderChannels" class="mt-2 text-xs text-gray-500">
+                        <strong>独自受注</strong>の場合はファイル名の末尾に「<span class="font-mono">_独自</span>」を付けてください
+                        （例: <span class="font-mono">企画_2026年08月_独自.xlsx</span>）。受注経路はファイル名だけで判定し、
+                        サーバー側でも同じ規則で必ず再確認するため、手入力による修正はできません。
+                    </p>
                 </div>
             </div>
 
@@ -239,8 +259,33 @@ const confirmImport = async () => {
                 <p v-else-if="inspectError" class="mt-2 text-xs text-amber-700">{{ inspectError }}</p>
             </div>
 
-            <!-- ファイル選択後に自動入力された内容を表示・確認 -->
-            <div v-if="selectedFile" class="mb-6">
+            <!-- サン・ブレーン: ファイル名解析結果を読み取り専用で表示（サーバー側もファイル名だけを正本とするため） -->
+            <div v-if="selectedFile && supportsOrderChannels && inspectedDepartmentLabel" class="mb-6">
+                <label class="block text-sm font-medium text-gray-700">② ファイル名からの読取結果（この内容で取込まれます）</label>
+                <div class="mt-2 grid grid-cols-2 gap-3 rounded-md border border-gray-200 bg-gray-50 p-4 text-sm sm:grid-cols-4">
+                    <div><span class="block text-xs text-gray-500">対象部署</span>{{ inspectedDepartmentLabel }}</div>
+                    <div>
+                        <span class="block text-xs text-gray-500">種別</span>
+                        {{ sourceType === 'annual' ? '年次' : sourceType === 'range' ? '範囲指定' : '月次' }}
+                    </div>
+                    <div>
+                        <span class="block text-xs text-gray-500">対象期間</span>
+                        {{ sourceYear }}年{{ sourceMonth ? `${sourceMonth}月` : '' }}{{ sourceType === 'range' ? `〜${sourceMonthEnd}月` : '' }}
+                    </div>
+                    <div>
+                        <span class="block text-xs text-gray-500">受注経路</span>
+                        <span
+                            class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold"
+                            :class="orderChannel === 'direct' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'"
+                        >
+                            {{ orderChannelLabel }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ファイル選択後に自動入力された内容を表示・確認（サン・ブレーン以外） -->
+            <div v-if="selectedFile && !supportsOrderChannels" class="mb-6">
                 <label class="block text-sm font-medium text-gray-700">② 内容の確認（自動入力されています。必要であれば修正してください）</label>
                 <div class="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <div>
@@ -319,7 +364,11 @@ const confirmImport = async () => {
             <p v-if="submitError" class="mb-6 rounded bg-red-50 p-3 text-sm text-red-700">{{ submitError }}</p>
 
             <div v-if="confirmedImport" class="mb-6 rounded-lg border border-green-300 bg-green-50 p-4">
-                <p class="text-sm font-semibold text-green-800">取込を確定しました（{{ departmentLabels[confirmedImport.department_key] }} 版 v{{ confirmedImport.version }}）</p>
+                <p class="text-sm font-semibold text-green-800">
+                    取込を確定しました（{{ departmentLabels[confirmedImport.department_key] }}
+                    <span v-if="confirmedImport.order_channel_label">・{{ confirmedImport.order_channel_label }}</span>
+                    版 v{{ confirmedImport.version }}）
+                </p>
                 <Link :href="route(rn('dashboard'))" class="mt-3 inline-flex items-center rounded-md bg-green-600 px-4 py-2 text-sm font-bold text-white hover:bg-green-700">
                     売上分析ダッシュボードで確認する
                 </Link>
@@ -327,9 +376,18 @@ const confirmImport = async () => {
             <p v-if="confirmError" class="mb-6 rounded bg-red-50 p-3 text-sm text-red-700">{{ confirmError }}</p>
 
             <div v-if="result" class="rounded-lg border p-4" :class="result.valid ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'">
-                <p class="text-sm font-semibold" :class="result.valid ? 'text-green-800' : 'text-red-800'">
-                    {{ result.valid ? '検証に成功しました' : '検証エラーがあります（確定できません）' }}
-                </p>
+                <div class="flex flex-wrap items-center gap-2">
+                    <p class="text-sm font-semibold" :class="result.valid ? 'text-green-800' : 'text-red-800'">
+                        {{ result.valid ? '検証に成功しました' : '検証エラーがあります（確定できません）' }}
+                    </p>
+                    <span
+                        v-if="result.order_channel_label"
+                        class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold"
+                        :class="result.order_channel === 'direct' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'"
+                    >
+                        受注経路: {{ result.order_channel_label }}
+                    </span>
+                </div>
 
                 <div v-if="result.summary" class="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
                     <div><span class="text-gray-500">受注件数:</span> {{ result.summary.order_count }}</div>

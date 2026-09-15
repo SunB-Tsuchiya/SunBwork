@@ -7,8 +7,60 @@ use Illuminate\Database\Seeder;
 
 class ChangelogSeeder extends Seeder
 {
+    public function seedClerkCalendarPerformance(): void
+    {
+        Changelog::updateOrCreate(['version' => 'clerk-calendar-7'], [
+            'title' => 'Clerkカレンダーの予定読込を軽量化',
+            'released_at' => '2026-09-15',
+            'summary' => '年間連続表示と5週分の表示枠を維持したまま、予定の読込対象を選択年と前後の表示余白に限定しました。予定が年々増えても、過去から将来までの全件を毎回読み込まないようになります。',
+            'design_files' => ['z_instructions/archived/CLERK_CALENDAR_PLAN1.md'],
+            'claude_notes' => 'Codex実装。フロントは既存の年切替再取得を利用し、ClerkEventControllerのindexを年間stripRangeと同じ期間へ制限。starts_atが範囲より前でもends_atが範囲内以降なら含める。company_id+starts_at複合インデックスを追加。CSV出力は全期間を維持。',
+            'body' => '<section class="cl-fix"><h3>変更内容</h3><ul><li>カレンダー予定APIを選択年と前後5週の範囲に限定</li><li>年をまたぐ長期予定も表示範囲と重なる場合は取得</li><li>会社・開始日による検索用インデックスを追加</li><li>CSV出力は従来どおり全期間を対象</li></ul></section>',
+        ]);
+    }
+
+    public function seedClerkCalendarReminders(): void
+    {
+        Changelog::updateOrCreate(['version' => 'clerk-calendar-6'], [
+            'title' => 'カレンダーにClerkからのリマインダーを追加',
+            'released_at' => '2026-09-15',
+            'summary' => '交通費精算などの案内を、指定した期間中、一般ユーザーのカレンダー上部へ帯状に表示できるようにしました。Clerkのリマインダー設定から内容・表示期間・色を会社単位で管理できます。',
+            'design_files' => ['z_instructions/archived/CLERK_REMINDER_PLAN1.md'],
+            'claude_notes' => 'Codex実装。clerk_calendar_remindersを会社単位で保存し、サーバーのAsia/Tokyo日付で開始日・終了日を含む表示判定を行う。表示先は一般ユーザーの/calendarのみ。SuperAdminがUser画面を開く場合は選択中の会社コンテキストを使う。color_keyで濃い枠線と薄い背景を選択し、一段の中央太字帯に「事務からのお知らせ：」を付ける。通知やevents/clerk_eventsには書き込まない。',
+            'body' => '<section class="cl-fix"><h3>変更内容</h3><ul><li>表示期間中、一般ユーザーのカレンダー上部へ「事務からのお知らせ：」の帯を表示</li><li>Clerkメニューにリマインダー設定を追加し、内容・開始日・終了日・色・有効状態を管理可能</li><li>選択色の濃い枠線と薄い背景、中央太字の省スペース表示</li><li>会社ごとに分離し、通知ランプやカレンダー予定数には影響しない方式で実装</li></ul></section>',
+        ]);
+    }
+
+    public function seedClerkScheduleRules(): void
+    {
+        Changelog::updateOrCreate(['version' => 'clerk-calendar-5'], [
+            'title' => 'Clerkカレンダーに予定の複製と予定日設定を追加',
+            'released_at' => '2026-09-15',
+            'summary' => '登録済み予定の内容・色・期間を引き継いで日付をずらして複製できるようにしました。カレンダー設定では、毎月の日付、月末、第何曜日・最終曜日、個別指定日から会社共通の予定を自動登録できます。',
+            'design_files' => ['z_instructions/archived/CLERK_SCHEDULE_PLAN1.md'],
+            'claude_notes' => 'Codex実装。clerk_schedule_rulesとclerk_schedule_occurrencesで定義と生成回を分離。rule_id+nominal_dateの一意制約で表示時・日次コマンドの重複を防止。自動予定を個別に編集・完了・削除した回はcustomized/cancelledとして保護し、ルール変更・停止・再開で上書きまたは復活させない。',
+            'body' => '<section class="cl-fix"><h3>変更内容</h3><ul><li>予定詳細から同じタイトル・内容・色・期間の予定を複製し、日付を変更して保存できるようにした</li><li>毎月の日付、月末、第N・最終曜日、複数の指定日から予定を自動登録する「予定日設定」を追加</li><li>ルール変更・停止・削除は、今後の未完了かつ個別変更していない予定だけに反映</li><li>画面表示時と毎日0:15の日次処理で今後の予定を補充し、同じ回の二重登録を防止</li></ul></section>',
+        ]);
+    }
+
+    public function seedClerkCalendarStrip(): void
+    {
+        Changelog::updateOrCreate(['version' => 'clerk-calendar-4'], [
+            'title' => 'Clerkカレンダーを日曜始まりの連続表示に変更し、祝日設定を追加',
+            'released_at' => '2026-09-15',
+            'summary' => '月をまたいで週が続くカレンダーを5週分の枠で表示し、年月選択とスクロールで移動できるようにしました。土曜は青、日曜・祝日は赤で表示します。カレンダー設定から会社共通の祝日を年別に追加・修正・削除できます。',
+            'design_files' => ['z_instructions/archived/CLERK_CALENDAR_PLAN1.md'],
+            'claude_notes' => 'Codex実装。基本dayGridのvisibleRangeを年間＋前後余白に設定し、FullCalendarの内部スクロールを使用。週間プランナーのISO週と掲示板は維持。clerk_calendar_yearsの初期化済み状態により削除した初期祝日を再登録しない。2026/2027年の内閣府公表値を同梱。設定APIはClerkミドルウェアと会社スコープを継承。',
+            'body' => '<section class="cl-fix"><h3>変更内容</h3><ul><li>日曜始まりの年間連続カレンダーと5週表示、年月選択・前後週移動を追加</li><li>土曜を青、日曜・祝日を赤、日付セルを薄い背景色で表示</li><li>カレンダー設定に祝日設定を追加。2026・2027年の公表済み祝日を初期登録し、年ごとに追加・修正・削除が可能</li></ul></section>',
+        ]);
+    }
+
     public function run(): void
     {
+        $this->seedClerkCalendarPerformance();
+        $this->seedClerkCalendarReminders();
+        $this->seedClerkScheduleRules();
+        $this->seedClerkCalendarStrip();
         $entries = [
             [
                 'version'      => 'clerk-calendar-3',
@@ -1821,6 +1873,34 @@ HTML,
   <h3>修正・改善内容</h3>
   <ul>
     <li>「＋メンバー」追加APIについても、候補一覧と同じ部署・会社の範囲チェックを行うようにし、一覧に出ない範囲外のユーザーを追加できないようにした</li>
+  </ul>
+</section>
+HTML,
+        ],
+        [
+            'version'      => 'sales-analysis-order-channel-1',
+            'title'        => '売上分析：サン・ブレーンの受注経路（サンエー印刷経由／独自受注）を分離表示',
+            'released_at'  => '2026-09-06',
+            'summary'      => 'サン・ブレーンの売上分析に「サンエー印刷経由」「独自受注」の区別を追加しました。Excel取込時はファイル名（末尾が「_独自」かどうか）だけで自動判定され、既存の取込データはすべて「サンエー印刷経由」として扱われます。データ登録状況・月次/年次/期別分析・同月比較・左右比較・得意先/商品分析・Excel出力の各画面で、合計に加えて両経路の内訳・独自受注比率を確認できます。サンエー印刷側の画面・運用は変更ありません。',
+            'design_files' => [],
+            'claude_notes' => '対象は会社コードSUNBRAINのみ（SalesOrderChannels::supportsChannelsFor()で判定）。DB: sales_imports/sales_active_monthsへorder_channel(varchar16, default standard)を追加、sales_active_monthsのunique制約を[company_id,department_key,order_channel,sales_year,sales_month]へ拡張し、standard/directを同時にactiveにできるようにした（migration 2026_09_06_100001/100002、down()はdirect行が残っている場合に例外で停止しデータを消さない）。ファイル名解析: SalesOrderChannels::parseFilename()が正規表現で部署ラベル・年・月・終了月・_独自サフィックスを厳格判定。サン・ブレーンではImportController::preview()がこの解析結果を正として採用し、フォーム送信値は無視する（手入力による救済なし）。SalesImportValidator/SalesImportServiceのnextVersion・active pointer切替・他月重複検証を経路単位にスコープし、経路間の同一受注Noは許可・経路内の重複検出は維持。SalesQueryServiceは新設のregistrationState()（no_data/partial/complete判定）・channelAmounts()（CASE WHEN集計）・detailBreakdownQuery()（明細への経路JOIN）を軸に、monthlyTotal/annualSummary/fiscalYearSummary/sameMonthComparison/sideBySideComparison/clientRanking/得意先・商品ランキング・分類/項目内訳など主要な集計へstandard_amount/direct_amount/direct_share/registrationを伝播。RankingPanel.vueは行データにstandard_amountがあれば自動的に内訳列を表示するため、月次/年次/期別/得意先/商品の各ランキングパネルに横展開済み。SalesExportServiceで年次・期別Excel出力（概要・月別推移・得意先別・分類別・項目別・該当明細シート）にも同じ内訳列を追加。得意先ランキング・商品の新規/取扱終了パネル等の一部の副次的な内訳表示は今回のスコープ外（合計値は正しく伝播済み）。テスト: SalesOrderChannelsTest（Unit）・SalesOrderChannelImportTest・SalesQueryServiceChannelTest・SalesExportServiceChannelTest（Feature）を新設し、既存275件と合わせてSalesAnalysis配下301件・プロジェクト全体415件（27件skipは既存の無関係な設定ルート未登録によるもの）が成功。npm run build成功。本番デプロイ・Codexレビューは別途実施予定。',
+            'body'         => <<<'HTML'
+<section class="cl-feature">
+  <h3>追加した機能（サン・ブレーンのみ対象）</h3>
+  <ul>
+    <li>Excel取込時、ファイル名の末尾が「_独自」なら「独自受注」、それ以外は「サンエー印刷経由」として自動的に区別して取り込むようにした（例: 企画_2026年08月_独自.xlsx）</li>
+    <li>データ登録状況画面で、月ごとに両経路の登録状況（登録完了・一部未登録・未登録）を確認できるようにした</li>
+    <li>月次・年次・期別分析、同月比較、左右比較、得意先分析、商品分析の各画面のKPI・ランキング・明細で、合計に加えてサンエー印刷経由/独自受注の内訳と独自受注比率を表示するようにした</li>
+    <li>年次・期別分析のExcel出力にも、同じ内訳列を追加した</li>
+    <li>取込履歴・データ登録状況のファイル一覧に「受注経路」を表示するようにした</li>
+  </ul>
+</section>
+
+<section class="cl-fix">
+  <h3>その他</h3>
+  <ul>
+    <li>既存の取込データはすべて「サンエー印刷経由」として扱われ、これまでの集計結果・画面表示は変わらない</li>
+    <li>サンエー印刷側の画面・取込運用は変更していない</li>
   </ul>
 </section>
 HTML,

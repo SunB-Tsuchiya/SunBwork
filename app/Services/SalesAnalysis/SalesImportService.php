@@ -121,6 +121,7 @@ class SalesImportService
             'target_id' => $import->id,
             'context' => [
                 'department_key' => $import->department_key,
+                'order_channel' => $import->order_channel,
                 'source_type' => $import->source_type,
                 'source_year' => $import->source_year,
                 'source_month' => $import->source_month,
@@ -139,9 +140,12 @@ class SalesImportService
     private function persistImport(array $result, int $userId, int $companyId): SalesImport
     {
         return DB::connection('sales')->transaction(function () use ($result, $userId, $companyId) {
+            $orderChannel = $result['order_channel'] ?? SalesOrderChannels::STANDARD;
+
             $version = $this->nextVersion(
                 $companyId,
                 $result['department_key'],
+                $orderChannel,
                 $result['source_year'],
                 $result['source_month'],
                 $result['source_month_end'] ?? null
@@ -150,6 +154,7 @@ class SalesImportService
             $import = SalesImport::create([
                 'company_id' => $companyId,
                 'department_key' => $result['department_key'],
+                'order_channel' => $orderChannel,
                 'source_type' => $result['source_type'],
                 'source_year' => $result['source_year'],
                 'source_month' => $result['source_month'],
@@ -209,6 +214,7 @@ class SalesImportService
                     [
                         'company_id' => $companyId,
                         'department_key' => $result['department_key'],
+                        'order_channel' => $orderChannel,
                         'sales_year' => $month['year'],
                         'sales_month' => $month['month'],
                     ],
@@ -227,10 +233,11 @@ class SalesImportService
     /**
      * 同一部署・対象期間（rangeは開始月〜終了月の組み合わせ）内で次に採番すべき版番号を返す。
      */
-    private function nextVersion(int $companyId, string $departmentKey, int $sourceYear, ?int $sourceMonth, ?int $sourceMonthEnd = null): int
+    private function nextVersion(int $companyId, string $departmentKey, string $orderChannel, int $sourceYear, ?int $sourceMonth, ?int $sourceMonthEnd = null): int
     {
         $query = SalesImport::where('company_id', $companyId)
             ->where('department_key', $departmentKey)
+            ->where('order_channel', $orderChannel)
             ->where('source_year', $sourceYear);
 
         $sourceMonth === null ? $query->whereNull('source_month') : $query->where('source_month', $sourceMonth);
@@ -281,13 +288,14 @@ class SalesImportService
      * @param  array<int, array>  $orders
      * @return array<int, array>
      */
-    public function calculateDiff(array $orders, string $departmentKey, int $companyId): array
+    public function calculateDiff(array $orders, string $departmentKey, int $companyId, string $orderChannel = SalesOrderChannels::STANDARD): array
     {
         $diffs = [];
 
         foreach ($this->affectedMonths($orders) as $month) {
             $active = SalesActiveMonth::where('company_id', $companyId)
                 ->where('department_key', $departmentKey)
+                ->where('order_channel', $orderChannel)
                 ->where('sales_year', $month['year'])
                 ->where('sales_month', $month['month'])
                 ->with('salesImport')

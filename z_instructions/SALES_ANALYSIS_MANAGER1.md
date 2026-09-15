@@ -49,6 +49,9 @@
 | 15 | 可視化改修 Priority A 横展開（得意先分析）＋深いリンク解消 | ✅ | Claude Code | 2026-09-04 |
 | 16 | 左右比較の横展開検討 | ✅（対象外判断） | Claude Code | 2026-09-04 |
 | 17 | 期別分析（4月〜翌3月）を新規画面として独立 | ✅ | Claude Code | 2026-09-04 |
+| 18 | 商品分析画面の新規追加 | ✅ | Claude Code | 2026-09-04 |
+| 19 | 会社別データ分離（サンエー印刷追加対応） | ✅ | Claude Code | 2026-09-05 |
+| 20 | サン・ブレーン受注経路分離（サンエー印刷経由/独自受注） | ✅（Codexレビュー対応済み。一部スコープ縮小、詳細は本Phase節・作業ログ参照） | Claude Code | 2026-09-06（Codexレビュー対応: 2026-09-07） |
 
 ## 4. タスク詳細
 
@@ -295,26 +298,32 @@
 - 本番サンエー印刷Admin/Clerkの`company_id`確認
 - サンエー印刷ユーザーへの`SalesAnalysisPermission`個別付与
 
-### Phase 20: サン・ブレーン受注経路分離（設計確定・実装待ち）
+### Phase 20: サン・ブレーン受注経路分離（実装・Codexレビュー対応完了、本番デプロイ待ち）
 
 | ID | タスク | 状態 | 証跡・メモ |
 |---|---|---|---|
-| 20-1 | migration（sales_imports/sales_active_monthsへorder_channel追加・後方補完・active unique変更） | ⬜ | 既存はstandard。downでデータを自動削除しない |
-| 20-2 | SalesOrderChannelsとサーバー側ファイル名厳格解析 | ⬜ | SUNBRAIN限定。`_独自.xlsx`完全一致のみdirect |
-| 20-3 | preview/confirm/版管理/diff/監査ログの経路対応 | ⬜ | プレビューキャッシュへ経路を固定 |
-| 20-4 | 他月重複検証の経路スコープ対応 | ⬜ | 経路間の同一受注Noは許可、経路内は従来どおり |
-| 20-5 | SalesQueryService共通active queryと全集計の経路内訳対応 | ⬜ | `forCompany()`必須を維持、all/standard/direct |
-| 20-6 | 登録状況・取込履歴の両経路表示 | ⬜ | 両方あり=complete、片方のみ=partial |
-| 20-7 | 月次・年次・期別・同月・左右比較UI | ⬜ | 統一色、積み上げ、KPI、URLフィルタ |
-| 20-8 | 得意先・商品・分類・項目・検索UI | ⬜ | 同名得意先は合算し内訳表示 |
-| 20-9 | 年次・期別Excel出力の内訳対応 | ⬜ | 既存2出力だけを対象にする |
-| 20-10 | 架空fixtureによるmigration/import/query/controller/export回帰テスト | ⬜ | 本番レコードを見ない |
-| 20-11 | SalesAnalysis全テスト・全体テスト・npm build | ⬜ | dockerは必ず`--user sail` |
-| 20-12 | ChangelogSeeder・関連CONSOLIDATED文書・3PROMPT更新 | ⬜ | 実装完了後に実施 |
-| 20-13 | Codexレビュー | ⬜ | Claude実装完了後、ユーザーから依頼を受けて実施 |
+| 20-1 | migration（sales_imports/sales_active_monthsへorder_channel追加・後方補完・active unique変更） | ✅ | `2026_09_06_100001`/`100002`。`default('standard')`指定で列追加と同時に既存行を後方補完。`sales_active_months`のuniqueを`[company_id,department_key,order_channel,sales_year,sales_month]`へ拡張。down()はdirect行が残っていれば例外で停止しデータを消さない |
+| 20-2 | SalesOrderChannelsとサーバー側ファイル名厳格解析 | ✅ | `SalesOrderChannels::parseFilename()`。`supportsChannelsFor()`は`Company.code==='SUNBRAIN'`判定（Phase19のcode基準パターンを踏襲）。`ImportController::preview()`でSUNBRAINのみ解析結果をフォーム値より優先（手入力救済なし） |
+| 20-3 | preview/confirm/版管理/diff/監査ログの経路対応 | ✅ | `SalesImportValidator::validate()`/`SalesImportService::nextVersion()`/`persistImport()`/`calculateDiff()`に`order_channel`引数追加。監査ログcontextにも追加 |
+| 20-4 | 他月重複検証の経路スコープ対応 | ✅ | `checkCrossMonthDuplicates()`へ`order_channel`条件追加。経路間は許可・経路内他月重複は従来どおり検出 |
+| 20-5 | SalesQueryService共通active queryと全集計の経路内訳対応 | ✅ | 新設`channelAmounts()`/`directShare()`/`registrationState()`/`detailBreakdownQuery()`を軸に、monthlyTotal/cumulativeTotal/monthSeries/rangeFigures/clientRanking/detailBreakdown系/得意先・商品ランキング系/annualSummary/fiscalYearSummary/sameMonthComparison/sideBySideComparisonへ`standard_amount`/`direct_amount`/`direct_share`/`registration`を伝播。得意先/商品の「新規/取扱終了」パネルと`productYearOverYearComparison`は対象外（スコープ縮小、下記参照） |
+| 20-6 | 登録状況・取込履歴の両経路表示 | ✅ | `registrationStatusByDepartment()`が月ごとに`registration`(no_data/partial/complete/future)と`standard_amount`/`direct_amount`を返す。`RegistrationStatus.vue`に紫リング+バッジ、`ImportHistory.vue`/`registrationStatusFiles()`に経路バッジ列を追加 |
+| 20-7 | 月次・年次・期別・同月・左右比較UI | ✅ | KPIカードに経由/独自内訳、月次/同月比較はChart.js積み上げ棒（`channelColors`共通定数）、年次/期別/同月は月別テーブルへ内訳列＋一部未登録バッジ、左右比較はA/B・差額カードと得意先/分類/項目テーブルへ内訳列 |
+| 20-8 | 得意先・商品・分類・項目・検索UI | ✅ | `RankingPanel.vue`が行データの`standard_amount`有無を見て自動的に内訳列を表示する設計にしたため、月次/年次/期別/得意先分析/商品分析のランキングパネルすべてに一括反映。得意先/商品詳細（推移テーブル）にも内訳列を追加 |
+| 20-9 | 年次・期別Excel出力の内訳対応 | ✅ | `SalesExportService`の概要・月別推移・得意先別・分類別・項目別・該当明細の全シートへ経路列を追加（`supportsOrderChannels`がfalseの会社は従来どおり列を追加しない） |
+| 20-10 | 架空fixtureによるmigration/import/query/controller/export回帰テスト | ✅ | `SalesOrderChannelsTest`(Unit)・`SalesOrderChannelImportTest`・`SalesQueryServiceChannelTest`・`SalesExportServiceChannelTest`(Feature)を新設（計26件）。非SUNBRAIN会社での既存挙動維持も明示的に回帰確認 |
+| 20-11 | SalesAnalysis全テスト・全体テスト・npm build | ✅ | SalesAnalysis配下301件成功（既存275件+新規26件）、プロジェクト全体415件成功・27件skip（既存の無関係な設定ルート未登録によるもの）、npm run build成功 |
+| 20-12 | ChangelogSeeder・関連CONSOLIDATED文書・3PROMPT更新 | ✅ | ChangelogSeederへ`sales-analysis-order-channel-1`追加・ローカルDBへseed反映済み。CONSOLIDATED_09には売上分析機能自体がPhase19まで一度も追記されていない前例があり、本Phaseも同じ前例に倣いPLAN1.md/MANAGER1.mdのみ更新（3PROMPT.mdは次回セッション用に本ファイルの完了状況を参照する運用のため内容変更なし） |
+| 20-13 | Codexレビュー | ✅ | 2026-09-07実施。`z_instructions/SALES_ANALYSIS_PHASE20_REVIEW.md`をレビュー文書として作成し`codex exec review`で実施。指摘2件（[P2]ファイル名解析の月バリデーション欠如、[P2]全部署合計時のregistration誤判定）はいずれも実バグと判断し修正・回帰テスト8件追加、SalesAnalysis配下309件成功 |
 
-**Phase 20着手条件:** 本設計をユーザーがClaude Codeへ渡し、実装開始を指示すること。
-**本番デプロイ:** Phase 20の実装・レビューとは別。ユーザーの明示指示なしにSSH・本番migrationを行わない。
+**Phase 20着手条件:** 本設計をユーザーがClaude Codeへ渡し、実装開始を指示すること。→ 2026-09-06にユーザー指示を受け着手・完了。
+**本番デプロイ:** Phase 20の実装・レビューとは別。ユーザーの明示指示なしにSSH・本番migrationを行わない。→ 今回は実施していない（ローカル実装・テストのみ）。
+
+**今回スコープを縮小した項目（PLAN20設計に対する差分、次回以降の課題）:**
+- APIレベルの`order_channel=all|standard|direct`フィルタ（20.6設計）は未実装。現状は常に両経路合算＋内訳表示のみで、UI側で「独自受注だけに絞る」操作はできない。
+- 得意先/商品の「新規/取扱終了商品」パネル（`productYearOverYearComparison`）と`buildSameMonthClientComparison`の新規/離脱リストには経路内訳を追加していない（合計値は正しい）。
+- 得意先分析・商品分析のランキング部分はRankingPanel.vueの自動検出で内訳表示されるが、同月比較の「得意先別年次推移」テーブル（マトリクス表）には内訳列を追加していない。
+- 「合計/サンエー印刷経由/独自受注」を明示的に切り替えるUIトグル（20.8設計の2番目）は実装していない（常時合算＋内訳同時表示のみ）。
 
 ### Review R1: Codex
 
@@ -396,6 +405,8 @@
 | 2026-09-04 | 回帰テスト更新: 既存の`test_negative_amount_is_rejected`（2026-09-03のM列許容より前の名残テスト）を新仕様（受注全体マイナスを許容）に合わせて`test_negative_amount_single_row_order_is_now_allowed`へ書き換え。既存2件（正の値0件・複数件）を新メッセージに合わせて更新・改名。新規5件追加（0円/空欄の詳細メッセージ・複数0以外値・受注No付きの空欄検証・負数が最後の行なら許可・負数が最後の行でなければ引き続き拒否）。SalesAnalysis配下テスト計197件・プロジェクト全体311件成功（回帰なし）。Vue側の変更は無し（エラーメッセージ文字列に依存した表示分岐が無いことを確認済み）のためnpm run buildは不要 |
 | 2026-09-04 | REVIEW3.md 11.2節のHigh 3件（得意先詳細が期間を無視／年次の`months_registered`が登録月数ではなく最終登録月／「全部署合計」で一部部署未登録の月が完全登録に見える）の対応方針について、欠落月・部分登録月がある場合の年間合計の扱いを一問確認。ユーザー回答:「含めて警告表示（推奨）」で確定。欠落・部分登録があっても期間合計（period_amount等）にはそのまま実データを含め、比較不可にはしない。UIには`missing_months`/`coverage.is_complete`に基づく警告バッジを表示する方針とした（比較数値は隠さない） |
 | 2026-09-04 | 年次分析への展開スコープを、REVIEW3 13.3節の全ワイヤーフレーム（3/5年切替の複数年重ね線・12ヶ月移動合計・Pareto構成比等）ではなく、14章のPriority A分類（同月3年平均差・3ヶ月移動平均は月次専用、Top10/20+詳細・得意先別増減寄与・期間ナビゲーターは全画面共通）に厳密に従う方針とした。理由: 14章が「まずPriority Aを完成させる」と明示しており、13章の画面別ワイヤーフレームは各Priorityの実現イメージであって全項目が横展開対象ではないため。12ヶ月移動合計・Pareto構成比はPriority B（14章）に分類されており、17章7番目で扱う。ユーザーへの確認は行っていない（Claude裁量の範囲と判断。REVIEW3 12.1「名称や最終デザインは任せる」の趣旨に従う） |
+| 2026-09-06 | Phase 20実装着手前の事前調査で、PLAN20.3「サーバー側でファイル名を必須検証する」という設計と、既存実装（department_key/source_type/year/month等はユーザーがフォームで明示選択した値を正とし、Excelタイトル行との照合のみを行う設計）との間にギャップがあることを発見。PLAN20.3は「より安全で単純なら、サーバー解析値だけを正としてフォーム値を上書きしてよい」と実装裁量を認めていたため、サン・ブレーン（会社コードSUNBRAIN）に限りこのシンプルな方式（ファイル名解析値を正としフォーム値を上書き、規則外ファイル名は手入力救済せず拒否）を採用する方針とし、影響範囲・ファイル一覧をユーザーへ提示のうえ承認を得て実装した。他社は経路の概念自体を持たないため既存のフォーム値ベースの挙動を維持する |
+| 2026-09-06 | Phase 20実装の過程で、`SalesQueryService::activeOrdersQuery()`の設計（`sales_orders`と`sales_active_months`を`sales_import_id`で結合し、`department_key`のみでフィルタし`order_channel`では絞らない）により、standard/directの合計金額（`amount`）は**スキーマ変更だけで既存コードを一切変更せずに自動的に正しくなる**ことを確認した（standard/direct各1件ずつのactive_month行が同一部署・年月に存在しても、各`sales_order`は自分の`sales_import_id`が指す片方の行としか結合しないため、両経路のorderが自然に合算される）。これによりPhase 20の実装コストは「合計値を正しくする」ではなく「合計に加えて経路別内訳（standard_amount/direct_amount/direct_share/registration）を追加する」ことに絞られると判断し、`channelAmounts()`/`registrationState()`/`detailBreakdownQuery()`という3つの共通ヘルパーを軸に主要な集計メソッドへ機械的に伝播させる設計とした |
 
 ## 6. 作業ログ
 
@@ -538,6 +549,9 @@
 | 2026-09-05 | さくら本番へPhase11〜17一式をデプロイ（`SALES_DB_*`用に新規DB`silverlamb759_sales`をユーザーが作成、migrate --force、DEPLOY_SAKURA.mdの6ステップでビルド・push・pull）。あわせてローカルの実データ（imports28/active_months240/orders38191/order_details159789/audit_logs30）をmysqldumpで本番へ移行、件数完全一致を確認。デプロイ後、SuperAdminがadmin/clerk向け売上分析URLを開くと常にsuperadminタブが表示される不具合が発覚し修正（`ResolvesSalesAnalysisRoutePrefix`が実際のユーザーロールではなく現在のルート名からprefixを判定するよう変更）。ヘッダーの重複「売上分析」アイコンも削除。回帰テスト1件追加、さくら本番へ再デプロイ済み |
 | 2026-09-05 | ユーザーからの追加要望「分析画面で今実装しているもののほかにあると便利なもの」に対し、得意先分析と対称な「商品分析」を提案・合意。さらに事務・経理からの要望「前年比較で大きく差があったときに何がなくなったのか、追加になったのかを調べたい」を受け、新規`ProductAnalysisController`/`ProductAnalysis.vue`を追加。PLAN1.md「Phase 18」に詳細設計を記録済み。要点: `productRankingForPeriod()`/`productAnalysisPanel()`/`productDetail()`は`clientAnalysisPanel()`等と対称構造（consolidate系引数は無し）、`productDetail()`には得意先分析には無い「購入している得意先ランキング」を追加、`productYearOverYearComparison()`は常に「直近登録年対前年」で固定比較し新規/取扱終了商品・増減額上位を返す（前年未登録時はhas_comparison_pair=falseで空リスト）。ナビゲーションタブに「商品分析」を追加。回帰テスト15件追加（service層6件・controller層9件）。売上分析262件成功、npm run build成功、Ziggy再生成実施 |
 | 2026-09-05 | ユーザー指示によりCodexへ売上分析機能を全体的にレビューさせた（`codex exec review --base 02e302fc9`、Phase1〜18の基盤導入前コミットとの差分、112ファイル・約20,600行）。指摘3件: **[P1]** 商品分析コントローラー・ページが未コミット（`ProductAnalysisController.php`等が未追跡=git管理外だったため、レビューの差分に含まれずroutes/web.phpだけが参照する形になり「実装が無い」と誤検知された。実ファイルは存在。次回レビュー前は`git add`で追跡させることをメモ）。**[P2・実バグ]** `annualClientPanel()`/`fiscalYearClientPanel()`が`$current`のキーだけを回していたため、前年（前期）のみに存在し今年（今期）は受注が無い＝離脱した得意先が一覧・diffパネルから丸ごと消えていた。前年/前期のキーも合流させ、離脱得意先を`amount=0, diff=マイナス`で含めるよう修正。**[P2・実バグ]** 同月比較`buildSameMonthClientComparison()`の増加額上位/減少額上位が符号で絞り込んでおらず、対象が全員減少（または全員増加）の期間では反対符号の行が混ざって見出しと矛盾していた。同じ設計だった自前の`productYearOverYearComparison()`（Phase18で新規実装）にも同種のバグがあったため、両方とも`diff>0`/`diff<0`でフィルタするよう修正。回帰テスト4件追加。売上分析275件成功、PHPのみの変更のためbuild不要 |
+| 2026-09-06 | ユーザー指示「Phase 20（サン・ブレーンの独自受注対応）を実装してください」を受け着手。事前調査でPLAN20.3「サーバー側でファイル名を必須検証」という設計と、既存実装（department_key等はフォーム送信値を正としタイトル行との照合のみ）との間にギャップがあることを発見。PLAN20.3が「より安全で単純なら、サーバー解析値だけを正としてフォーム値を上書きしてよい」と裁量を認めていたため、この方式（サン・ブレーンはファイル名を唯一の正本としフォーム値を無視、他社は現状維持）を採用する旨を影響範囲・ファイル一覧とともにユーザーへ提示し、承認を得て実装した。**DB**: `2026_09_06_100001`/`100002`でsales_imports/sales_active_monthsへ`order_channel`追加（`default('standard')`で列追加と同時に後方補完、追加の後方補完migration不要）。sales_active_monthsのunique制約を`[company_id,department_key,order_channel,sales_year,sales_month]`へ拡張。down()はdirect行が残っていれば例外で停止。**バックエンド**: 新設`SalesOrderChannels`（`supportsChannelsFor()`はPhase19が確立した`Company.code==='SUNBRAIN'`判定を踏襲、`parseFilename()`が部署ラベル・年・月・終了月・`_独自`サフィックスを正規表現で厳格判定）。`ImportController::preview()`はSUNBRAINの場合ファイル名解析結果を正として採用しフォーム値を上書き、規則外ファイル名はプレビュー前に422で拒否（手入力救済なし）。`SalesImportValidator`/`SalesImportService`のnextVersion・active pointer切替・calculateDiff・他月重複検証をすべて`order_channel`でスコープ（経路間の同一受注Noは許可、経路内の他月重複は従来どおり検出）。`SalesQueryService`は新設の`channelAmounts()`（CASE WHEN集計ヘルパー）・`directShare()`・`registrationState()`（no_data/partial/complete判定、経路概念を持たない会社は自動的に「1件でもあればcomplete」という既存挙動と互換）・`detailBreakdownQuery()`（sales_order_detailsへの経路JOIN共通クエリ）を軸に、monthlyTotal/cumulativeTotal/monthSeries/rangeFigures/clientRanking/detailBreakdown系/得意先・商品ランキング系（rangeClientAggregates/rangeProductAggregates/periodOrdersGroupedByClient等）/annualSummary/fiscalYearSummary/sameMonthComparison/sideBySideComparison/registrationStatusByDepartment/periodOrders/fiscalYearOrdersへ`standard_amount`/`direct_amount`/`direct_share`/`registration`を伝播。`paginateRankingRows()`・`combineSideBySideRows()`は入力行にこれらのキーがあれば自動的に出力へ含める設計にし、既存の呼び出し元コードへの影響を最小化した。**フロントエンド**: `RankingPanel.vue`（月次/年次/期別/得意先/商品の全ランキングパネルが共用する部品）が行データの`standard_amount`有無を自動検出して内訳列を表示する設計にしたため、1箇所の変更で5画面のランキング表示に一括反映。`useSalesChart.js`に`channelColors`（standard=青/direct=橙の固定配色）を追加。`Import.vue`（ファイル名解析にorder_channel/バッジ追加、SUNBRAINは読み取り専用サマリー表示に変更）、`RegistrationStatus.vue`（月セルへの紫リング+一部未登録バッジ、ファイル一覧への経路列）、`ImportHistory.vue`、`MonthlyAnalysis.vue`（KPIカード内訳＋同月比較・得意先チャートを積み上げ棒に変更）、`AnnualAnalysis.vue`/`FiscalYearAnalysis.vue`（KPIカード内訳＋月別テーブル内訳列・一部未登録バッジ）、`SameMonthComparison.vue`（積み上げ棒＋年別テーブル内訳列）、`SideBySideComparison.vue`（A/B・差額カード内訳＋得意先/分類/項目テーブル内訳列）、`ClientAnalysis.vue`/`ProductAnalysis.vue`（推移テーブル内訳列）を個別に修正。**Excel出力**: `SalesExportService`の概要・月別推移・得意先別・分類別・項目別・該当明細の全シートへ、`supportsOrderChannels`がtrueの会社のみ経路列を追加（列位置は固定、非対象会社は従来どおり）。**テスト**: 新規`SalesOrderChannelsTest`(Unit 12件)・`SalesOrderChannelImportTest`(Feature 6件、SUNBRAIN化した既存テスト会社で標準/独自の同時取込・再取込非干渉・経路間重複許可・不正ファイル名拒否・非対象会社での無視を確認)・`SalesQueryServiceChannelTest`(Feature 5件)・`SalesExportServiceChannelTest`(Feature 3件)を追加。SalesAnalysis配下テスト計301件（既存275件+新規26件）・プロジェクト全体415件成功・27件skip（既存の無関係な設定ルート未登録によるもの、Phase20と無関係）、`npm run build`成功。ChangelogSeederへ`sales-analysis-order-channel-1`を追加しローカルDBへseed反映済み。**スコープ縮小（次回以降の課題としてPhase20節に明記）**: APIレベルの`order_channel=all|standard|direct`絞り込みフィルタ、得意先/商品の新規/取扱終了パネルへの内訳追加、同月比較の得意先年次推移マトリクスへの内訳列、合計/経由/独自を切り替える明示的UIトグルの4点は未実装（常時合算＋内訳表示のみ）。本番デプロイ・Codexレビューはユーザーの別途指示待ち、今回は一切実施していない |
+| 2026-09-07 | ユーザー実機報告「localhostで500エラーになり分析ができない。独自受注が未登録だからか」を受け調査。原因は独自受注の未登録ではなく、**ローカル開発DBの`sales`接続にPhase20の2migrationが未適用**だったこと（`Unknown column 'sales_active_months.order_channel'`）。テスト用DBはRefreshDatabaseで自動適用されるため見落としていた。`php artisan migrate --force`で解消、既存240件のactive_monthsが正しく`standard`へ後方補完されていることを確認（`Company::where('code','SUNBRAIN')`のid=2がローカルの実会社）。あわせて「独自受注を一度も取り込んでいない過去の全期間に一律で『一部未登録』バッジが出る」というPLAN通りの仕様についてユーザーへ一問確認し、「現状のまま（PLAN通り）でよい」と回答を得て変更なしとした |
+| 2026-09-07 | ユーザー指示「codexにレビューさせますので、レビュー用の文書を作ってください」を受け、`z_instructions/SALES_ANALYSIS_PHASE20_REVIEW.md`（設計意図・変更ファイル一覧・意図的なスコープ外事項・レビュー重点観点をまとめた文書）を新規作成。`codex exec review`は`--uncommitted`とカスタムPROMPT引数を併用できない仕様と判明したため（`error: the argument '--uncommitted' cannot be used with '[PROMPT]'`）、PROMPT引数のみでレビュー文書を読ませたうえで現在の非コミット差分をレビューさせる方式に切り替えて実施。指摘2件（いずれも[P2]）: **①** `SalesOrderChannels::parseFilename()`の正規表現が`\d{1,2}`で1〜99を受理し月の実在性を検証していないため、`企画_2026年01-99月.xlsx`のような不正なファイル名がフォーム送信値を上書きして`targetMonths()`に渡ると13〜99月分のactive pointerが作られ得る。**②** `department_key='all'`（全部署合計）のとき、`SalesQueryService::monthlyFiguresForYear()`が複数部署のactive行をまとめて`registrationState()`に渡していたため、「どこかの部署がstandard・別のどこかの部署がdirectを持っていればcomplete」と誤判定していた（例: 企画は両経路そろっているが制作はstandardのみでも全体がcomplete表示になる）。両方とも実バグと判断し修正: ①`parseFilename()`に月の範囲チェック（1〜12かつ開始≦終了、外れる場合はnullを返し規則外ファイル名として拒否）を追加。②新設`registrationStateAcrossCells()`（部署×年月のセルごとに`registrationState()`を判定し、1セルでもpartialなら全体をpartialとする）を`monthlyFiguresForYear()`に適用。さらに、Codexが直接指摘したのは`monthlyFiguresForYear()`だけだったが、同じ集計パターン（'all'部署・複数月レンジで`registrationState()`にまとめて渡す）を持つ`rangeFigures()`（同月比較・左右比較のyear型期間で使用）にも同種の不具合があることを自ら発見し、`registrationStateAcrossCells()`を同様に適用（Codex指摘の横展開）。回帰テスト8件追加（Unit 5件: 月0/13、範囲外終了月、範囲外開始月、開始>終了の各パターン拒否／Feature 3件: 全部署合計でのpartial判定・complete判定・sameMonthComparisonでの回帰）。SalesAnalysis配下テスト計309件成功、PHPのみの変更のためnpm run build不要 |
 
 ## 7. ブロッカー・未決事項
 

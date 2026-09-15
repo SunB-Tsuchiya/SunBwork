@@ -73,7 +73,8 @@ class SalesImportValidator
         ?int $sourceMonth,
         ?int $sourceMonthEnd,
         int $companyId,
-        array $excludedOrderNumbers = []
+        array $excludedOrderNumbers = [],
+        string $orderChannel = SalesOrderChannels::STANDARD
     ): array {
         $fileErrors = [];
         $warnings = [];
@@ -123,7 +124,7 @@ class SalesImportValidator
 
         // 他月との重複も受注単位のエラーとして扱う（該当受注のみ除外可能にする）
         if (empty($fileErrors)) {
-            $duplicateErrorsByOrderNumber = $this->checkCrossMonthDuplicates($orders, $departmentKey, $companyId);
+            $duplicateErrorsByOrderNumber = $this->checkCrossMonthDuplicates($orders, $departmentKey, $companyId, $orderChannel);
 
             if (! empty($duplicateErrorsByOrderNumber)) {
                 $orders = array_values(array_filter($orders, function ($order) use ($duplicateErrorsByOrderNumber, &$invalidOrders) {
@@ -181,6 +182,7 @@ class SalesImportValidator
             'source_year' => $sourceYear,
             'source_month' => $sourceMonth,
             'source_month_end' => $sourceMonthEnd,
+            'order_channel' => $orderChannel,
         ];
     }
 
@@ -199,6 +201,7 @@ class SalesImportValidator
             'source_year' => null,
             'source_month' => null,
             'source_month_end' => null,
+            'order_channel' => null,
         ];
     }
 
@@ -410,15 +413,17 @@ class SalesImportValidator
      *
      * @return array<string, string> 受注No => エラーメッセージ
      */
-    private function checkCrossMonthDuplicates(array $orders, string $departmentKey, int $companyId): array
+    private function checkCrossMonthDuplicates(array $orders, string $departmentKey, int $companyId, string $orderChannel): array
     {
         $orderNumbers = array_unique(array_column($orders, 'order_number'));
         if (empty($orderNumbers)) {
             return [];
         }
 
+        // 経路間の同一受注Noは許可する（PLAN Phase20 20.5）。同一経路内の他月重複だけを検知する。
         $activeImportIds = SalesActiveMonth::where('company_id', $companyId)
             ->where('department_key', $departmentKey)
+            ->where('order_channel', $orderChannel)
             ->pluck('sales_import_id');
 
         if ($activeImportIds->isEmpty()) {

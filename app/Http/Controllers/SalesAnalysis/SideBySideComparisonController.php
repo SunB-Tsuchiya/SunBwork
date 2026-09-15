@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\SalesAnalysis\Concerns\ResolvesSalesAnalysisCompany;
 use App\Http\Controllers\SalesAnalysis\Concerns\ResolvesSalesAnalysisRoutePrefix;
 use App\Services\SalesAnalysis\SalesDepartments;
+use App\Services\SalesAnalysis\SalesOrderChannels;
 use App\Services\SalesAnalysis\SalesQueryService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -34,6 +35,7 @@ class SideBySideComparisonController extends Controller
             'hasCompanySelected' => $companyId !== null,
             'departmentLabels' => $companyId !== null ? SalesDepartments::labelsFor($companyId) : [],
             'enabledDepartmentKeys' => $companyId !== null ? SalesDepartments::enabledKeysFor($companyId) : [],
+            'supportsOrderChannels' => $companyId !== null && SalesOrderChannels::supportsChannelsFor($companyId),
         ]);
     }
 

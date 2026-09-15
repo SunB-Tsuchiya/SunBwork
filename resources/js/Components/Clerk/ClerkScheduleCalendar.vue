@@ -4,6 +4,9 @@ import FullCalendar from '@fullcalendar/vue3';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import axios from 'axios';
+import { Link } from '@inertiajs/vue3';
+import { useClerkCalendarStrip } from './useClerkCalendarStrip';
+import { duplicateEventForm, shiftedDuplicateEnd } from './clerkEventDuplicate';
 import { route } from 'ziggy-js';
 import ClerkWeekPlanner from '@/Components/Clerk/ClerkWeekPlanner.vue';
 import ClerkCalendarColorPanel from '@/Components/Clerk/ClerkCalendarColorPanel.vue';
@@ -12,12 +15,19 @@ import { CLERK_EVENT_COLORS, CLERK_EVENT_COLOR_KEYS, CLERK_DEFAULT_COLOR_KEY } f
 // ────────────────── データ ──────────────────
 // API から取得したイベント (FullCalendar 形式)
 const events = ref([]);
+const eventError = ref('');
+let eventRequest = 0;
 
 async function fetchEvents() {
+    const request = ++eventRequest;
     try {
-        const res = await axios.get(route('clerk.calendar.events.index'));
+        const res = await axios.get(route('clerk.calendar.events.index'), { params: { year: selectedYear.value } });
+        if (request !== eventRequest) return;
         events.value = res.data;
-    } catch { /* ignore */ }
+        eventError.value = '';
+    } catch {
+        if (request === eventRequest) eventError.value = '予定を読み込めませんでした。もう一度お試しください。';
+    }
 }
 
 onMounted(fetchEvents);
@@ -42,15 +52,18 @@ function colorLabel(colorKey) {
 // ────────────────── ビュー切り替え ──────────────────
 const currentView = ref('calendar'); // 'calendar' | 'week-planner'
 const calendarRef = ref(null);
+const { selectedYear, selectedMonth, years, rangeLabel, holidays, holidayError, selectMonth, thisMonth, moveWeek, refreshSize, fetchHolidays, localKey, options: stripOptions } = useClerkCalendarStrip(calendarRef);
+watch(selectedYear, fetchEvents);
 
 function switchView(v) {
     currentView.value = v;
     if (v === 'calendar') {
-        nextTick(() => calendarRef.value?.getApi?.()?.changeView('dayGridMonth'));
+        refreshSize();
+        fetchHolidays();
     }
 }
 
-const updateCalendarSize = () => nextTick(() => calendarRef.value?.getApi?.()?.updateSize?.());
+const updateCalendarSize = refreshSize;
 defineExpose({ updateCalendarSize, refreshCalendar: updateCalendarSize });
 
 // ────────────────── FullCalendar イベント連携 ──────────────────
@@ -72,6 +85,7 @@ watch(events, (evs) => {
                     teamEventId:  e.id,
                     colorKey:     e.color_key || CLERK_DEFAULT_COLOR_KEY,
                     completed:    !!e.completed,
+                    scheduleRuleId: e.schedule_rule_id,
                 },
             })));
         }
@@ -113,11 +127,13 @@ const panelEditMode = ref(false);
 const panelEditRows = ref([]);
 const panelSaving   = ref(false);
 let   _keySeq       = 0;
+let panelOriginalIds = new Set();
 
 function togglePanelEditMode() {
     if (panelEditMode.value) {
         cancelPanelEditMode();
     } else {
+        panelOriginalIds = new Set(events.value.map(e => e.id));
         panelEditRows.value = events.value.map(e => ({
             _key:        e.id,
             id:          e.id,
@@ -153,7 +169,7 @@ function removePanelEditRow(idx) {
 async function savePanelEdits() {
     if (panelSaving.value) return;
     panelSaving.value = true;
-    const originalIds = new Set(events.value.map(e => e.id));
+    const originalIds = panelOriginalIds;
     const editIds     = new Set(panelEditRows.value.filter(r => r.id).map(r => r.id));
     const deletedIds  = [...originalIds].filter(id => !editIds.has(id));
     try {
@@ -188,6 +204,7 @@ async function savePanelEdits() {
 // ────────────────── 予定モーダル ──────────────────
 const showEventModal   = ref(false);
 const eventModalIsEdit = ref(false);
+const eventModalIsDuplicate = ref(false);
 const eventForm        = ref({ id: null, title: '', description: '', start_date: '', end_date: '', all_day: true, color_key: CLERK_DEFAULT_COLOR_KEY, completed: false });
 const eventFormSaving  = ref(false);
 
@@ -197,6 +214,7 @@ const getTodayString = () => {
 };
 
 function openCreateModal(startDate = null, endDate = null) {
+    eventModalIsDuplicate.value = false;
     const today = getTodayString();
     eventForm.value = {
         id:          null,
@@ -213,6 +231,7 @@ function openCreateModal(startDate = null, endDate = null) {
 }
 
 function openEditModal(fcEvent) {
+    eventModalIsDuplicate.value = false;
     const startStr = fcEvent.startStr ? fcEvent.startStr.split('T')[0] : '';
     let endStr = '';
     if (fcEvent.end) {
@@ -230,12 +249,25 @@ function openEditModal(fcEvent) {
         all_day:     fcEvent.allDay ?? true,
         color_key:   fcEvent.extendedProps?.colorKey || CLERK_DEFAULT_COLOR_KEY,
         completed:   !!fcEvent.extendedProps?.completed,
+        start_time:  fcEvent.startStr?.split('T')[1]?.slice(0, 8) || '00:00:00',
+        end_time:    fcEvent.endStr?.split('T')[1]?.slice(0, 8) || '00:00:00',
+        schedule_rule_id: fcEvent.extendedProps?.scheduleRuleId || null,
     };
     eventModalIsEdit.value = true;
     showEventModal.value   = true;
 }
 
+function duplicateEvent() {
+    eventForm.value = duplicateEventForm(eventForm.value);
+    eventModalIsEdit.value = false;
+    eventModalIsDuplicate.value = true;
+}
+watch(() => eventForm.value.start_date, (date, oldDate) => {
+    if (eventModalIsDuplicate.value) eventForm.value.end_date = shiftedDuplicateEnd(oldDate, date, eventForm.value.end_date);
+});
+
 async function saveEvent() {
+    if (eventFormSaving.value) return;
     if (!eventForm.value.title.trim()) { alert('タイトルを入力してください'); return; }
     if (!eventForm.value.start_date)   { alert('開始日を指定してください');    return; }
     eventFormSaving.value = true;
@@ -243,8 +275,8 @@ async function saveEvent() {
         const payload = {
             title:       eventForm.value.title,
             description: eventForm.value.description || null,
-            starts_at:   eventForm.value.start_date,
-            ends_at:     eventForm.value.end_date || eventForm.value.start_date,
+            starts_at:   eventForm.value.all_day ? eventForm.value.start_date : `${eventForm.value.start_date}T${eventForm.value.start_time || '00:00:00'}`,
+            ends_at:     eventForm.value.all_day ? (eventForm.value.end_date || eventForm.value.start_date) : `${eventForm.value.end_date || eventForm.value.start_date}T${eventForm.value.end_time || '00:00:00'}`,
             all_day:     eventForm.value.all_day,
             color_key:   eventForm.value.color_key || null,
         };
@@ -412,14 +444,11 @@ async function submitCsvImport() {
 // ────────────────── FullCalendar オプション ──────────────────
 const calendarOptions = {
     plugins: [dayGridPlugin, interactionPlugin],
-    initialView: 'dayGridMonth',
+    ...stripOptions,
     locale: 'ja',
-    headerToolbar: { left: 'prev,next today', center: 'title', right: '' },
     selectable: true,
-    firstDay: 1,
     weekText: '週',
     dayHeaderFormat: { weekday: 'short' },
-    height: 'auto',
     editable: true,
     eventDurationEditable: true,
     eventResizableFromStart: true,
@@ -484,12 +513,13 @@ const calendarOptions = {
                 @click="switchView('calendar')"
                 :class="currentView === 'calendar' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
                 class="rounded px-3 py-1.5 text-sm font-medium"
-            >月カレンダー</button>
+            >連続カレンダー</button>
             <button
                 @click="switchView('week-planner')"
                 :class="currentView === 'week-planner' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
                 class="rounded px-3 py-1.5 text-sm font-medium"
             >週間プランナー</button>
+            <Link :href="route('clerk.calendar.settings')" class="rounded border border-purple-300 px-3 py-1.5 text-sm font-medium text-purple-700 hover:bg-purple-50">カレンダー設定</Link>
             <span class="mx-1 text-gray-300">|</span>
             <button
                 @click="openCreateModal()"
@@ -636,8 +666,31 @@ const calendarOptions = {
             </template>
         </div>
 
-        <!-- FullCalendar（月カレンダー） -->
-        <FullCalendar v-show="currentView === 'calendar'" ref="calendarRef" :options="calendarOptions" />
+        <div v-show="currentView === 'calendar'" class="clerk-year-strip">
+            <div class="mb-3 flex flex-wrap items-center gap-2">
+                <label for="clerk-calendar-year" class="sr-only">年</label>
+                <select id="clerk-calendar-year" v-model.number="selectedYear" class="rounded border-gray-300 text-sm" @change="selectMonth">
+                    <option v-for="year in years" :key="year" :value="year">{{ year }}年</option>
+                </select>
+                <label for="clerk-calendar-month" class="sr-only">月</label>
+                <select id="clerk-calendar-month" v-model.number="selectedMonth" class="rounded border-gray-300 text-sm" @change="selectMonth">
+                    <option v-for="month in 12" :key="month" :value="month">{{ month }}月</option>
+                </select>
+                <button type="button" class="rounded bg-gray-100 px-3 py-2 text-sm hover:bg-gray-200" @click="thisMonth">今月</button>
+                <button type="button" class="rounded bg-gray-100 px-3 py-2 text-sm hover:bg-gray-200" @click="moveWeek(-7)">前の週</button>
+                <button type="button" class="rounded bg-gray-100 px-3 py-2 text-sm hover:bg-gray-200" @click="moveWeek(7)">次の週</button>
+                <span class="text-xs text-gray-500">{{ rangeLabel }}</span>
+            </div>
+            <p class="mb-2 text-xs text-gray-500">上下にスクロールして続きの週を表示できます。</p>
+            <p v-if="eventError" role="alert" class="mb-2 text-sm text-red-600">{{ eventError }} <button class="underline" @click="fetchEvents">再読み込み</button></p>
+            <p v-if="holidayError" role="alert" class="mb-2 text-sm text-red-600">{{ holidayError }} <button class="underline" @click="fetchHolidays">再読み込み</button></p>
+            <FullCalendar ref="calendarRef" :options="calendarOptions">
+                <template #dayCellContent="{ date }">
+                    <span class="clerk-date-number">{{ date.getMonth() + 1 }}/{{ date.getDate() }}</span>
+                    <span class="clerk-holiday-name" :title="holidays[localKey(date)] || ''">{{ holidays[localKey(date)] || '\u00a0' }}</span>
+                </template>
+            </FullCalendar>
+        </div>
 
         <!-- 週間プランナー -->
         <ClerkWeekPlanner
@@ -664,7 +717,9 @@ const calendarOptions = {
         <!-- 予定モーダル（作成・編集） -->
         <div v-if="showEventModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
             <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
-                <h2 class="mb-4 text-lg font-bold">{{ eventModalIsEdit ? '予定詳細' : '予定作成' }}</h2>
+                <h2 class="mb-4 text-lg font-bold">{{ eventModalIsDuplicate ? '予定を複製' : eventModalIsEdit ? '予定詳細' : '予定作成' }}</h2>
+                <p v-if="eventModalIsDuplicate" class="mb-3 text-sm text-purple-700">日付を変更して保存すると、新しい予定を作成します。</p>
+                <p v-if="eventForm.schedule_rule_id" class="mb-3 text-xs text-gray-500">予定日設定から自動登録された予定です。この画面の変更・削除はこの回だけに適用します。</p>
                 <div class="mb-2">
                     <label class="block text-sm font-medium">タイトル</label>
                     <input type="text" v-model="eventForm.title" class="w-full rounded border p-2 focus:border-indigo-400 focus:outline-none" />
@@ -680,6 +735,10 @@ const calendarOptions = {
                             <input type="date" v-model="eventForm.end_date" :min="eventForm.start_date" class="w-full rounded border p-2" />
                         </div>
                     </div>
+                </div>
+                <div v-if="!eventForm.all_day" class="mb-2 grid grid-cols-2 gap-2">
+                    <label class="text-sm">開始時刻<input v-model="eventForm.start_time" type="time" step="1" class="w-full rounded border p-2" /></label>
+                    <label class="text-sm">終了時刻<input v-model="eventForm.end_time" type="time" step="1" class="w-full rounded border p-2" /></label>
                 </div>
                 <div class="mb-2">
                     <label class="block text-sm font-medium">内容</label>
@@ -715,8 +774,9 @@ const calendarOptions = {
                     <span class="font-medium">状態:</span>
                     <span :class="eventForm.completed ? 'text-gray-400' : 'text-indigo-600 font-semibold'">{{ eventForm.completed ? '完了' : '未完了' }}</span>
                 </div>
-                <div class="mt-4 flex justify-between">
-                    <div class="flex gap-2">
+                <div class="mt-4 flex flex-wrap justify-between gap-3">
+                    <div class="flex flex-wrap gap-2">
+                        <button v-if="eventModalIsEdit" type="button" :disabled="eventFormSaving" class="rounded border border-purple-400 px-3 py-2 text-sm font-medium text-purple-700 hover:bg-purple-50 disabled:opacity-50" @click="duplicateEvent">複製</button>
                         <button v-if="eventModalIsEdit" type="button" @click="deleteEvent"
                             :disabled="eventFormSaving"
                             class="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">削除</button>
@@ -765,3 +825,26 @@ const calendarOptions = {
         </div>
     </div>
 </template>
+
+<style scoped>
+.clerk-year-strip :deep(.fc-scrollgrid-sync-table) { height: auto !important; }
+.clerk-year-strip :deep(.fc-daygrid-day-frame) { height: 118px; min-height: 118px !important; }
+.clerk-year-strip :deep(.fc-daygrid-day-top) { height: 38px; overflow: hidden; }
+.clerk-year-strip :deep(.fc-daygrid-day-number) { display: block; width: 100%; min-width: 0; padding: 2px 4px; }
+.clerk-date-number { display: block; text-align: right; font-size: 12px; line-height: 16px; }
+.clerk-holiday-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; line-height: 16px; text-align: right; }
+.clerk-year-strip :deep(.fc-day-other .fc-daygrid-day-top) { opacity: 1; }
+.clerk-year-strip :deep(.clerk-saturday) { background-color: #eff6ff; }
+.clerk-year-strip :deep(.clerk-saturday .fc-daygrid-day-number),
+.clerk-year-strip :deep(.clerk-saturday .fc-col-header-cell-cushion) { color: #2563eb; }
+.clerk-year-strip :deep(.clerk-holiday) { background-color: #fef2f2; }
+.clerk-year-strip :deep(.clerk-holiday .fc-daygrid-day-number),
+.clerk-year-strip :deep(.clerk-holiday .fc-col-header-cell-cushion) { color: #dc2626; }
+.clerk-year-strip :deep(.fc-day-today) { background-color: inherit; }
+.clerk-year-strip :deep(.fc-day-today.clerk-holiday) { background-color: #fef2f2; }
+.clerk-year-strip :deep(.fc-day-today.clerk-saturday) { background-color: #eff6ff; }
+.clerk-year-strip :deep(.fc-day-today .fc-daygrid-day-frame) { box-shadow: inset 0 0 0 2px #9333ea; }
+.clerk-year-strip :deep(.fc-daygrid-event) { font-size: 11px; line-height: 16px; }
+.clerk-year-strip :deep(.fc-daygrid-event .fc-event-title) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.clerk-year-strip :deep(.fc-scroller) { overscroll-behavior-y: contain; }
+</style>

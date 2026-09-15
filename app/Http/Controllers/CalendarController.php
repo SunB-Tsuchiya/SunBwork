@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ResolvesContextCompany;
 use App\Models\Company;
+use App\Models\ClerkCalendarReminder;
 use App\Models\Department;
 use App\Models\EventItemType;
 use App\Models\MeetingDefinition;
@@ -17,6 +19,8 @@ use Inertia\Inertia;
 
 class CalendarController extends Controller
 {
+    use ResolvesContextCompany;
+
     public function index()
     {
         $user = Auth::user();
@@ -31,8 +35,14 @@ class CalendarController extends Controller
         $rooms           = [];
         $companies       = [];
         $departments     = [];
+        $calendarReminders = [];
 
         if ($user) {
+            // SuperAdminがUser画面を確認するときも、Clerkで登録した会社コンテキストを使う。
+            $reminderCompanyId = $this->contextCompanyId() ?? $user->company_id;
+            if ($reminderCompanyId) {
+                $calendarReminders = ClerkCalendarReminder::visibleForCompany((int) $reminderCompanyId);
+            }
             // 勤務形態一覧
             try {
                 $wq = Worktype::orderBy('sort_order');
@@ -150,6 +160,7 @@ class CalendarController extends Controller
             'dailyBreaks'        => $dailyBreaks,
             'defaultBreak'       => $defaultBreak,
             'defaultWorktype'    => $defaultWorktype,
+            'calendarReminders'  => $calendarReminders,
         ]);
     }
 }

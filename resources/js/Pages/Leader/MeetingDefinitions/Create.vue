@@ -167,6 +167,7 @@ function getAssignmentBadgeClass(name) {
 const errorMessage = ref('');
 
 function submit() {
+    errorMessage.value = '';
     syncTimes();
     if (form.recurrence === 'custom_dates') {
         if (form.custom_dates.length > 0) {
@@ -175,11 +176,11 @@ function submit() {
     }
     if (isEdit.value) {
         form.put(route('leader.meeting_definitions.update', { meeting_definition: props.meetingDefinition.id }), {
-            onError: () => { errorMessage.value = '保存に失敗しました。'; },
+            onError: (errors) => { errorMessage.value = Object.values(errors)[0] ?? '保存に失敗しました。'; },
         });
     } else {
         form.post(route('leader.meeting_definitions.store'), {
-            onError: () => { errorMessage.value = '保存に失敗しました。'; },
+            onError: (errors) => { errorMessage.value = Object.values(errors)[0] ?? '保存に失敗しました。'; },
         });
     }
 }

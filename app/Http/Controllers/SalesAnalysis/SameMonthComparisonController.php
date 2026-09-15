@@ -7,6 +7,7 @@ use App\Http\Controllers\SalesAnalysis\Concerns\ResolvesSalesAnalysisCompany;
 use App\Http\Controllers\SalesAnalysis\Concerns\ResolvesSalesAnalysisRoutePrefix;
 use App\Models\Sales\SalesActiveMonth;
 use App\Services\SalesAnalysis\SalesDepartments;
+use App\Services\SalesAnalysis\SalesOrderChannels;
 use App\Services\SalesAnalysis\SalesQueryService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -39,6 +40,7 @@ class SameMonthComparisonController extends Controller
                 'initialDepartmentKey' => null,
                 'initialMonth' => (int) now()->format('n'),
                 'hasAnyData' => false,
+                'supportsOrderChannels' => false,
             ]);
         }
 
@@ -81,6 +83,7 @@ class SameMonthComparisonController extends Controller
             'initialDepartmentKey' => $departmentKey,
             'initialMonth' => $month,
             'hasAnyData' => $hasAnyData,
+            'supportsOrderChannels' => SalesOrderChannels::supportsChannelsFor($companyId),
         ]);
     }
 

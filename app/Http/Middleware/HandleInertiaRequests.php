@@ -63,6 +63,7 @@ class HandleInertiaRequests extends Middleware
         $unreadAnnouncements = 0;
         if ($request->user()) {
             $unreadAnnouncements = AnnouncementRecipient::where('user_id', $request->user()->id)
+                ->forSentAnnouncements()
                 ->whereNull('read_at')
                 ->count();
         }

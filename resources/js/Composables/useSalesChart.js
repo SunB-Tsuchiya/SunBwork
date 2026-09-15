@@ -24,5 +24,8 @@ export function useSalesChart() {
         ...extra,
     });
 
-    return { yen, pct, pctClass, yenTicks, divergingScale };
+    return { yen, pct, pctClass, yenTicks, divergingScale, channelColors };
 }
+
+// Phase20: サンエー印刷経由/独自受注の固定配色（全画面で統一。青=standard、橙=direct）
+export const channelColors = { standard: '#2563eb', direct: '#f97316' };

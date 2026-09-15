@@ -26,6 +26,7 @@ const tabs = computed(() => [
     { key: 'dashboard', href: tryRoute('clerk.dashboard'), label: 'ダッシュボード' },
     { key: 'announcements', href: tryRoute('clerk.announcements.index'), label: 'お知らせ通知' },
     { key: 'calendar', href: tryRoute('clerk.calendar'), label: 'カレンダー' },
+    { key: 'reminders', href: tryRoute('clerk.reminders.index'), label: 'リマインダー設定' },
     { key: 'diaries', href: tryRoute('diary_manager.diaryinteractions.index'), label: '日報管理', condition: isDiaryManager.value },
     {
         key: 'sales_analysis',
@@ -69,6 +70,9 @@ function onMobileSelect(e) {
             </Link>
             <Link :href="route('clerk.calendar')" :class="tab('calendar')">
                 カレンダー
+            </Link>
+            <Link :href="route('clerk.reminders.index')" :class="tab('reminders')">
+                リマインダー設定
             </Link>
             <Link
                 v-if="isDiaryManager"

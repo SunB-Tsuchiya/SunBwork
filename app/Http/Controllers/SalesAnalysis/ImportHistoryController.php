@@ -10,6 +10,7 @@ use App\Models\Sales\SalesImport;
 use App\Models\User;
 use App\Services\SalesAnalysis\SalesDepartments;
 use App\Services\SalesAnalysis\SalesImportService;
+use App\Services\SalesAnalysis\SalesOrderChannels;
 use Inertia\Inertia;
 
 class ImportHistoryController extends Controller
@@ -59,6 +60,8 @@ class ImportHistoryController extends Controller
             return [
                 'id' => $import->id,
                 'department_label' => SalesDepartments::labelForKey($companyId, $import->department_key),
+                'order_channel' => $import->order_channel,
+                'order_channel_label' => SalesOrderChannels::label($import->order_channel),
                 'source_type' => $import->source_type,
                 'source_year' => $import->source_year,
                 'source_month' => $import->source_month,
@@ -80,6 +83,7 @@ class ImportHistoryController extends Controller
         return Inertia::render('SalesAnalysis/ImportHistory', [
             'routePrefix' => $this->salesAnalysisRoutePrefix(),
             'hasCompanySelected' => true,
+            'supportsOrderChannels' => SalesOrderChannels::supportsChannelsFor($companyId),
             'imports' => $items,
             'currentPage' => $imports->currentPage(),
             'lastPage' => $imports->lastPage(),

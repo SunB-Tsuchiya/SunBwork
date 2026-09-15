@@ -4,10 +4,10 @@ namespace App\Http\Controllers\Leader;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\ResolvesContextCompany;
+use App\Http\Requests\MeetingDefinitionRequest;
 use App\Models\MeetingDefinition;
 use App\Models\User;
 use Carbon\Carbon;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 
@@ -21,9 +21,16 @@ class MeetingDefinitionController extends Controller
         $user = Auth::user();
         if ($user->isSuperAdmin()) {
             $companyId = $this->contextCompanyId();
-            return User::when($companyId, fn ($q) => $q->where('company_id', $companyId))
+            $members = User::when($companyId, fn ($q) => $q->where('company_id', $companyId))
                 ->ordered()
                 ->get(['id', 'name', 'department_id', 'assignment_id']);
+
+            // SuperAdmin自身は専用会社所属でも、選択中の会社の会議へ参加できる。
+            if (! $members->contains('id', $user->id)) {
+                $members->push($user->only(['id', 'name', 'department_id', 'assignment_id']));
+            }
+
+            return $members;
         }
         if ($user->isAdmin() || $user->isDepartmentLeader()) {
             return User::where('company_id', $user->company_id)
@@ -83,21 +90,9 @@ class MeetingDefinitionController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(MeetingDefinitionRequest $request)
     {
-        $validated = $request->validate([
-            'title'         => 'required|string|max:255',
-            'description'   => 'nullable|string',
-            'recurrence'    => 'required|in:weekly,biweekly,monthly,custom_dates',
-            'day_of_week'   => 'required_unless:recurrence,custom_dates|integer|min:0|max:6',
-            'week_of_month' => 'nullable|integer|min:1|max:5|required_if:recurrence,monthly',
-            'custom_dates'  => 'nullable|array|min:1|required_if:recurrence,custom_dates',
-            'custom_dates.*'=> 'date_format:Y-m-d|distinct',
-            'start_time'    => 'required|date_format:H:i',
-            'end_time'      => 'required|date_format:H:i|after:start_time',
-            'members'       => 'required|array|min:1',
-            'members.*'     => 'exists:users,id',
-        ]);
+        $validated = $request->validated();
 
         $customDates = collect($validated['custom_dates'] ?? [])
             ->filter()
@@ -143,23 +138,11 @@ class MeetingDefinitionController extends Controller
         ]);
     }
 
-    public function update(Request $request, MeetingDefinition $meetingDefinition)
+    public function update(MeetingDefinitionRequest $request, MeetingDefinition $meetingDefinition)
     {
         $this->authorizeDefinition($meetingDefinition);
 
-        $validated = $request->validate([
-            'title'         => 'required|string|max:255',
-            'description'   => 'nullable|string',
-            'recurrence'    => 'required|in:weekly,biweekly,monthly,custom_dates',
-            'day_of_week'   => 'required_unless:recurrence,custom_dates|integer|min:0|max:6',
-            'week_of_month' => 'nullable|integer|min:1|max:5|required_if:recurrence,monthly',
-            'custom_dates'  => 'nullable|array|min:1|required_if:recurrence,custom_dates',
-            'custom_dates.*'=> 'date_format:Y-m-d|distinct',
-            'start_time'    => 'required|date_format:H:i',
-            'end_time'      => 'required|date_format:H:i|after:start_time',
-            'members'       => 'required|array|min:1',
-            'members.*'     => 'exists:users,id',
-        ]);
+        $validated = $request->validated();
 
         $customDates = collect($validated['custom_dates'] ?? [])
             ->filter()
