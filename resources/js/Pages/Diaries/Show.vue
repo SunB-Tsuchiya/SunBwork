@@ -25,6 +25,7 @@ function isoDateOnly(dateStr) {
     }
 }
 import TimelineDiary from '@/Components/TimelineDiary.vue';
+import { useDiaryAttachments } from '@/Composables/useDiaryAttachments';
 import { ensureAttachmentUrl, ensureThumbUrl } from '@/Helpers/attachment';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router } from '@inertiajs/vue3';
@@ -604,45 +605,12 @@ function sanitize(html) {
 
 const sanitizedContent = computed(() => sanitize(localDiary.value?.content || ''));
 
-// Preview modal state and helpers
-const previewModal = ref({ open: false, url: null, mime: null, filename: null, isBlob: false });
-let currentObjectUrl = null;
-function revokeCurrentObjectUrl() {
-    try {
-        if (currentObjectUrl) {
-            URL.revokeObjectURL(currentObjectUrl);
-            currentObjectUrl = null;
-        }
-    } catch (e) {}
-}
-async function fetchBlobAndShow(url, filename) {
-    try {
-        const res = await axios.get(url, { responseType: 'blob', withCredentials: true });
-        const blob = res.data;
-        const mime = blob.type || res.headers['content-type'] || 'application/octet-stream';
-        revokeCurrentObjectUrl();
-        currentObjectUrl = URL.createObjectURL(blob);
-        previewModal.value = { open: true, url: currentObjectUrl, mime, filename: filename || url.split('/').pop() || 'file', isBlob: true };
-    } catch (e) {
-        try {
-            window.open(url, '_blank', 'noopener');
-        } catch (e2) {}
-    }
-}
+// Preview modal state and helpers（Create/Edit と共通のコンポーザブルを利用）
+const { previewModal, openPreview, closePreview } = useDiaryAttachments();
 
 function openAttachmentInModal(file) {
     if (!file || !file.url) return;
-    if (file.url.startsWith('blob:') || file.url.startsWith('data:')) {
-        previewModal.value = {
-            open: true,
-            url: file.url,
-            mime: file.mime_type || '',
-            filename: file.original_name || '',
-            isBlob: file.url.startsWith('blob:'),
-        };
-        return;
-    }
-    fetchBlobAndShow(file.url, file.original_name || 'file');
+    openPreview({ url: file.url, mime: file.mime_type || file.mime || '', original_name: file.original_name || 'file' });
 }
 
 function onBodyClick(e) {
@@ -652,14 +620,9 @@ function onBodyClick(e) {
             e.preventDefault();
             const url = a.href;
             const filename = (a.textContent && a.textContent.trim()) || url.split('/').pop();
-            fetchBlobAndShow(url, filename);
+            openPreview({ url, original_name: filename });
         }
     } catch (e) {}
-}
-
-function closePreviewModal() {
-    previewModal.value.open = false;
-    revokeCurrentObjectUrl();
 }
 
 onMounted(async () => {
@@ -1381,7 +1344,7 @@ onUnmounted(() => {
                     <div class="max-h-[90vh] w-full max-w-4xl overflow-auto rounded bg-white p-4">
                         <div class="mb-2 flex items-center justify-between">
                             <div class="text-sm font-medium">プレビュー: {{ previewModal.filename }}</div>
-                            <button type="button" @click="closePreviewModal" class="text-gray-600">閉じる</button>
+                            <button type="button" @click="closePreview" class="text-gray-600">閉じる</button>
                         </div>
                         <div class="border p-2">
                             <template v-if="previewModal.mime && previewModal.mime.startsWith('image/')">

@@ -87,6 +87,15 @@
 
 - ファイルアップロード → `AttachmentService::storeUploadedFile()` 実行 → DB に `Attachment` レコードが作られる → 日報表示側で `URL::temporarySignedRoute('attachments.signed', now()->addMinutes(15), ['path' => $path])` を生成 → エンドユーザーは署名 URL 経由で `GET /attachments/signed` にアクセス → `AttachmentController::stream` が `URL::hasValidSignature` を確認して配信。
 
+## 日報（Diary）での利用方法（2026-09-18 改修）
+
+日報の添付ファイルは、本文（Quillエディタ）に埋め込まず、`attachmentables` ピボット経由で明示的に紐付ける方式に統一した。
+
+- フロントエンド: `resources/js/Composables/useDiaryAttachments.js` が `POST /api/uploads` でのアップロード・ステージング（保存前の一時表示）・ステータスポーリング・プレビューモーダル・`DELETE /api/attachments/:id` での削除をまとめて提供する。`Diaries/Create.vue` / `Edit.vue` / `Show.vue` はこれを共有する。
+- 保存時、ステージング中の添付ID一覧（`attachment_ids`）をフォームと一緒に送信する。`/api/uploads` の時点ではピボットは作成しない（アップロードしただけでは日報に紐付かない）。
+- バックエンド: `DiaryController::attachUploadedAttachments()` が `attachment_ids` を検証（アップロード者本人・`status='ready'` のみ）した上で `AttachmentService::attachPivot()` を呼ぶ。`formatDiaryAttachments()` が一覧表示用の整形（署名付きURL・サムネイル）を担当し、`show()`/`edit()` の両方で共用する。
+- **注意:** 過去に保存された日報の本文には、旧方式（同期処理時に `<img>` を直接埋め込む／非同期フォールバック時に `[[attachment:id:filename]]` プレースホルダを挿入する）の名残がそのまま残っている。データ移行は行っていないため、`Diaries/Show.vue` には後方互換のための本文抽出・プレースホルダポーリング処理が引き続き存在する。新規保存分ではこれらのコードパスは使われない。
+
 ## 将来の改善案
 
 - 全ストリーミングを ID ベースに移行してパスエンコーディングの問題を根絶する。

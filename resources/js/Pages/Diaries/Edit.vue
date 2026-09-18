@@ -1,12 +1,13 @@
 <script setup>
 import useToasts from '@/Composables/useToasts';
+import { useDiaryAttachments } from '@/Composables/useDiaryAttachments';
 import TimelineDiary from '@/Components/TimelineDiary.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { router, useForm, usePage } from '@inertiajs/vue3';
 import { QuillEditor } from '@vueup/vue-quill';
 import '@vueup/vue-quill/dist/vue-quill.snow.css';
 import axios from 'axios';
-import { onMounted, ref, watch } from 'vue';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
 // original toolbar configuration (kept for later use):
 // import { defaultToolbar } from '@/config/quillToolbar';
@@ -28,6 +29,9 @@ const props = defineProps({
 });
 const content = ref('');
 let editorInstance = null;
+
+const { attachments, previewModal, openPreview, closePreview, uploadAndStage, removeAttachment, attachmentIds } =
+    useDiaryAttachments(props.diary.attachments || []);
 
 const hours   = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
 const minutes = ['00', '15', '30', '45'];
@@ -182,7 +186,7 @@ function handleEditorReady(editor) {
                 e.stopPropagation();
                 for (const f of files) {
                     try {
-                        await processAndInsertFile(f);
+                        await uploadAndStage(f);
                     } catch (err) {
                         console.error('paste file upload', err);
                     }
@@ -196,6 +200,8 @@ function handleEditorReady(editor) {
     } catch (err) {
         console.error('attach drop/paste handlers failed', err);
     }
+
+    restoreDraftIfAny();
 }
 
 const { showToast } = useToasts();
@@ -212,7 +218,7 @@ const form = useForm({
     start_time:   `${st.hour}:${st.minute}`,
     end_time:     `${et.hour}:${et.minute}`,
     content:      content.value,
-    files:        [],
+    attachment_ids: [],
 });
 
 function onWorktypeChange() {
@@ -226,150 +232,84 @@ function onWorktypeChange() {
     form.end_minute   = e.minute;
 }
 
-// Upload config and helpers (copied/adapted from Create.vue)
-const MAX_UPLOAD_SIZE = 5 * 1024 * 1024; // 5MB
-const ALLOWED_EXT = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'docx', 'xlsx', 'txt'];
-const MAX_IMAGE_WIDTH = 600; // px
+// ── 下書き自動保存 ──────────────────────────────────────────────
+// セッション切れ等で強制リロード（bootstrap.js の reloadForStaleSession）が
+// 発生しても編集中の内容を失わないよう、localStorage に定期的に退避する。
+const draftKey = () => `sb_diary_draft:edit:${props.diary.id}`;
 
-function isAllowed(file) {
-    const name = (file.name || '').toLowerCase();
-    const ext = name.split('.').pop();
-    if (!ext) return false;
-    if (!ALLOWED_EXT.includes(ext)) return false;
-    if (file.type && (file.type.includes('application/x-msdownload') || file.type.includes('application/x-sh'))) return false;
-    return true;
-}
-
-function fileTooLarge(size) {
-    return size > MAX_UPLOAD_SIZE;
-}
-
-async function resizeImageFile(file) {
-    if (!file.type.startsWith('image/')) return file;
-    const img = await new Promise((res, rej) => {
-        const url = URL.createObjectURL(file);
-        const i = new Image();
-        i.onload = () => {
-            URL.revokeObjectURL(url);
-            res(i);
-        };
-        i.onerror = rej;
-        i.src = url;
-    });
-    const canvas = document.createElement('canvas');
-    const ratio = Math.min(1, MAX_IMAGE_WIDTH / img.width);
-    canvas.width = Math.round(img.width * ratio);
-    canvas.height = Math.round(img.height * ratio);
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    const mime = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
-    const blob = await new Promise((resolve) => canvas.toBlob(resolve, mime, 0.8));
-    const newFile = new File([blob], file.name, { type: blob.type });
-    return newFile;
-}
-
-async function processAndInsertFile(file) {
-    if (!isAllowed(file)) {
-        alert(`許可されていないファイル形式です: ${file.name}`);
-        return;
-    }
-    let working = file;
-    if (file.type.startsWith('image/')) {
-        working = await resizeImageFile(file);
-    }
-    if (fileTooLarge(working.size)) {
-        alert(`ファイルが大きすぎます (最大 ${(MAX_UPLOAD_SIZE / 1024 / 1024).toFixed(1)}MB): ${file.name}`);
-        return;
-    }
-
-    const fd = new FormData();
-    fd.append('file', working);
+function saveDraft() {
     try {
-        const res = await axios.post('/api/uploads', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
-        const attach = res.data;
-        const idx =
-            (editorInstance && editorInstance.getSelection && editorInstance.getSelection()?.index) ||
-            (editorInstance && editorInstance.getLength && editorInstance.getLength()) ||
-            0;
-        if (attach.status === 'ready' && attach.url) {
-            // サーバー側で同期処理済み: プレースホルダー不要でそのまま挿入
-            const url = attach.url;
-            if (editorInstance && editorInstance.insertText) {
-                if (attach.mime && attach.mime.startsWith('image/')) {
-                    editorInstance.insertEmbed(idx, 'image', url);
-                    editorInstance.setSelection(idx + 1);
-                } else {
-                    editorInstance.insertText(idx, attach.original_name, { link: url });
-                    editorInstance.setSelection(idx + attach.original_name.length);
-                }
-            }
-            form.files = [...(form.files || []), { id: attach.id, name: attach.original_name, status: 'ready', url }];
-        } else {
-            // 非同期処理中: プレースホルダーを挿入してポーリングで置換
-            const placeholder = `[[attachment:${attach.id}:${attach.original_name}]]`;
-            if (editorInstance && editorInstance.insertText) {
-                editorInstance.insertText(idx, placeholder);
-                editorInstance.setSelection(idx + placeholder.length);
-            }
-            form.files = [...(form.files || []), { id: attach.id, name: attach.original_name, status: attach.status }];
-            pollAttachmentAndReplace(attach.id, placeholder);
-        }
-    } catch (e) {
-        console.error('upload error', e);
-        alert('ファイルのアップロードに失敗しました');
+        const html = editorInstance?.root?.innerHTML ?? content.value;
+        localStorage.setItem(draftKey(), JSON.stringify({
+            content: html,
+            work_style: form.work_style,
+            start_hour: form.start_hour,
+            start_minute: form.start_minute,
+            end_hour: form.end_hour,
+            end_minute: form.end_minute,
+            savedAt: Date.now(),
+        }));
+    } catch (e) { /* localStorage 利用不可時は無視 */ }
+}
+
+function clearDraft() {
+    try { localStorage.removeItem(draftKey()); } catch (e) {}
+}
+
+function loadDraft() {
+    try {
+        const raw = localStorage.getItem(draftKey());
+        return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+}
+
+let draftSaveTimer = null;
+function scheduleDraftSave() {
+    clearTimeout(draftSaveTimer);
+    draftSaveTimer = setTimeout(saveDraft, 800);
+}
+
+function restoreDraftIfAny() {
+    const draft = loadDraft();
+    if (!draft || !draft.content) return;
+    if (draft.content === (props.diary.content || '')) {
+        clearDraft();
+        return;
     }
-}
-
-async function pollAttachmentAndReplace(id, placeholder) {
-    const maxAttempts = 30;
-    let attempt = 0;
-    const interval = 2000;
-    const timer = setInterval(async () => {
-        attempt++;
+    if (!confirm('前回保存されなかった下書きが見つかりました。復元しますか？')) {
+        clearDraft();
+        return;
+    }
+    content.value = draft.content;
+    form.content = draft.content;
+    if (editorInstance) {
         try {
-            const r = await axios.get(`/api/uploads/status/${id}`);
-            if (r.data && r.data.status === 'ready') {
-                const url = r.data.url;
-                const plain = editorInstance.getText();
-                const idx = plain.indexOf(placeholder);
-                if (idx >= 0) {
-                    editorInstance.deleteText(idx, placeholder.length);
-                    if (r.data.mime && r.data.mime.startsWith('image/')) {
-                        editorInstance.insertEmbed(idx, 'image', url);
-                        editorInstance.setSelection(idx + 1);
-                    } else {
-                        editorInstance.insertText(idx, r.data.original_name, { link: url });
-                        editorInstance.setSelection(idx + r.data.original_name.length);
-                    }
-                }
-                form.files = (form.files || []).map((f) => (f.id === id ? { ...f, status: 'ready', url } : f));
-                clearInterval(timer);
-            } else if (r.data && (r.data.status === 'failed' || r.data.status === 'rejected')) {
-                alert(`アップロード処理に失敗しました: ${r.data.status}`);
-                form.files = (form.files || []).filter((f) => f.id !== id);
-                const plain = editorInstance.getText();
-                const pos = plain.indexOf(placeholder);
-                if (pos >= 0) editorInstance.deleteText(pos, placeholder.length);
-                clearInterval(timer);
-            }
-        } catch (err) {
-            // ignore and retry
+            const delta = editorInstance.clipboard.convert(draft.content);
+            editorInstance.setContents(delta);
+        } catch (e) {
+            editorInstance.root.innerHTML = draft.content;
         }
-        if (attempt >= maxAttempts) {
-            clearInterval(timer);
-            alert('アップロード処理がタイムアウトしました');
-        }
-    }, interval);
+    }
+    if (draft.work_style)   form.work_style   = draft.work_style;
+    if (draft.start_hour)   form.start_hour   = draft.start_hour;
+    if (draft.start_minute) form.start_minute = draft.start_minute;
+    if (draft.end_hour)     form.end_hour     = draft.end_hour;
+    if (draft.end_minute)   form.end_minute   = draft.end_minute;
 }
 
-// handle dropped files
+watch(content, scheduleDraftSave);
+watch(() => [form.work_style, form.start_hour, form.start_minute, form.end_hour, form.end_minute], saveDraft);
+
+window.addEventListener('beforeunload', saveDraft);
+onUnmounted(() => window.removeEventListener('beforeunload', saveDraft));
+
+// ドロップ／貼り付けされたファイルは本文には埋め込まず、添付ファイル欄にステージングする
 async function handleDrop(e) {
     const items = e.dataTransfer?.files || [];
     if (!items.length) return;
     for (let i = 0; i < items.length; i++) {
-        const f = items[i];
         try {
-            await processAndInsertFile(f);
+            await uploadAndStage(items[i]);
         } catch (err) {
             console.error('drop process error', err);
         }
@@ -377,7 +317,6 @@ async function handleDrop(e) {
 }
 
 const submit = () => {
-    console.debug('Diary Edit: submit called');
     try {
         if (editorInstance && editorInstance.root && editorInstance.root.innerHTML !== undefined) {
             form.content = editorInstance.root.innerHTML;
@@ -387,101 +326,39 @@ const submit = () => {
     } catch (e) {
         form.content = content.value;
     }
-    // If there are files, Inertia will send multipart/form-data.
-    // Only force FormData when files exist to avoid surprising server parsing.
-    const hasFiles = form.files && Array.isArray(form.files) && form.files.length > 0;
-    console.debug('Diary Edit: submitting', { date: props.diary.date, contentLength: (form.content || '').length, hasFiles });
-    // When sending files with a PUT/PATCH verb, PHP may not parse multipart PUT bodies.
-    // Workaround: if there are files, send as POST with _method=PUT and forceFormData=true.
-    if (hasFiles) {
-        // Build FormData and POST with method override to avoid multipart PUT parsing issues
-        const url = route('diaries.update', props.diary.id);
-        const fd = new FormData();
-        fd.append('_method', 'PUT');
-        fd.append('content', form.content || '');
-        if (form.date) fd.append('date', form.date);
-        fd.append('work_style', form.work_style || '');
-        fd.append('start_time', `${form.start_hour}:${form.start_minute}`);
-        fd.append('end_time',   `${form.end_hour}:${form.end_minute}`);
-        // If there are actual File objects to send (unlikely here because files are uploaded immediately), append them
-        try {
-            // if form.rawFiles exists (not used by default), append
-            if (form.rawFiles && Array.isArray(form.rawFiles)) {
-                form.rawFiles.forEach((f, i) => fd.append('files[' + i + ']', f));
-            }
-        } catch (e) {}
-
-        // set submitting state and send via axios
-        isSubmitting.value = true;
-        try {
-            showToast('送信中...', 'info', 1000);
-        } catch (e) {}
-        axios
-            .post(url, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
-            .then((_res) => {
+    form.start_time = `${form.start_hour}:${form.start_minute}`;
+    form.end_time   = `${form.end_hour}:${form.end_minute}`;
+    form.attachment_ids = attachmentIds();
+    form.put(route('diaries.update', props.diary.id), {
+        onStart: () => {
+            isSubmitting.value = true;
+            try {
+                showToast('送信中...', 'info', 1000);
+            } catch (e) {}
+        },
+        onFinish: () => {
+            isSubmitting.value = false;
+        },
+        onSuccess: () => {
+            clearDraft();
+            try {
+                showToast('更新しました', 'success', 1500);
+            } catch (e) {}
+            setTimeout(() => {
+                router.get(route('diaries.index'));
+            }, 300);
+        },
+        onError: (errors) => {
+            try {
+                const { showValidationErrors } = useToasts();
+                showValidationErrors(errors, 6000);
+            } catch (e) {
                 try {
-                    showToast('更新しました', 'success', 1500);
-                } catch (e) {}
-                setTimeout(() => {
-                    router.get(route('diaries.index'));
-                }, 300);
-            })
-            .catch((err) => {
-                if (err.response && err.response.status === 422 && err.response.data && err.response.data.errors) {
-                    try {
-                        const { showValidationErrors } = useToasts();
-                        showValidationErrors(err.response.data.errors, 6000);
-                    } catch (e) {
-                        showToast('更新に失敗しました', 'error', 4000);
-                    }
-                } else {
                     showToast('更新に失敗しました', 'error', 4000);
-                }
-            })
-            .finally(() => {
-                isSubmitting.value = false;
-            });
-    } else {
-        // no files: use normal Inertia form.put to preserve Inertia behaviour
-        form.start_time = `${form.start_hour}:${form.start_minute}`;
-        form.end_time   = `${form.end_hour}:${form.end_minute}`;
-        form.put(route('diaries.update', props.diary.id), {
-            forceFormData: false,
-            onStart: () => {
-                console.debug('Diary Edit: onStart');
-                isSubmitting.value = true;
-                try {
-                    showToast('送信中...', 'info', 1000);
-                } catch (e) {}
-            },
-            onFinish: () => {
-                console.debug('Diary Edit: onFinish');
-                isSubmitting.value = false;
-            },
-            onSuccess: () => {
-                console.debug('Diary Edit: onSuccess');
-                try {
-                    showToast('更新しました', 'success', 1500);
-                } catch (e) {}
-                setTimeout(() => {
-                    router.get(route('diaries.index'));
-                }, 300);
-            },
-            onError: (errors) => {
-                console.debug('Diary Edit: onError', errors);
-                try {
-                    const { showValidationErrors } = useToasts();
-                    showValidationErrors(errors, 6000);
-                } catch (e) {
-                    try {
-                        showToast('更新に失敗しました', 'error', 4000);
-                    } catch (ee) {}
-                } finally {
-                    isSubmitting.value = false;
-                }
-            },
-        });
-    }
+                } catch (ee) {}
+            }
+        },
+    });
 };
 
 // ===== 過去データから流用 =====
@@ -656,12 +533,33 @@ const back = () => {
                     <input
                         type="file"
                         multiple
-                        @change="(e) => Array.from(e.target.files).forEach((f) => processAndInsertFile(f))"
+                        @change="(e) => { Array.from(e.target.files).forEach((f) => uploadAndStage(f)); e.target.value = ''; }"
                         class="w-full rounded border p-2"
                     />
-                    <div class="mt-2 text-sm text-gray-600">
-                        添付済み: <span v-if="form.files && form.files.length">{{ form.files.length }} 個</span><span v-else>0 個</span>
-                    </div>
+                    <ul v-if="attachments.length" class="mt-2 space-y-2">
+                        <li
+                            v-for="file in attachments"
+                            :key="file.id"
+                            class="flex items-center justify-between rounded bg-gray-50 p-2"
+                        >
+                            <div class="flex items-center gap-3">
+                                <div v-if="file.url && (file.mime || '').startsWith('image/')" class="h-12 w-16 flex-shrink-0">
+                                    <img :src="file.url" class="h-12 w-16 rounded object-cover" alt="thumbnail" />
+                                </div>
+                                <div>
+                                    <div class="text-sm font-medium text-gray-900">{{ file.original_name }}</div>
+                                    <div class="text-xs text-gray-500">
+                                        {{ file.status === 'ready' ? (file.size ? (file.size / 1024).toFixed(1) + ' KB' : '') : '処理中...' }}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <button v-if="file.url" type="button" @click.prevent="openPreview(file)" class="text-sm text-blue-600 underline">開く</button>
+                                <button type="button" @click.prevent="removeAttachment(file)" class="text-sm text-red-600">削除</button>
+                            </div>
+                        </li>
+                    </ul>
+                    <div v-else class="mt-2 text-sm text-gray-500">添付ファイルなし</div>
                 </div>
                 <div class="mt-4 flex justify-end gap-3">
                     <button :disabled="isSubmitting" type="submit" class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60">
@@ -738,6 +636,29 @@ const back = () => {
             </div>
             <div class="border-t px-6 py-3 text-right">
                 <button @click="closePastModal" class="rounded bg-gray-200 px-4 py-2 text-sm text-gray-700 whitespace-nowrap hover:bg-gray-300">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添付ファイル プレビューモーダル -->
+    <div v-if="previewModal.open" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div class="max-h-[90vh] w-full max-w-4xl overflow-auto rounded bg-white p-4">
+            <div class="mb-2 flex items-center justify-between">
+                <div class="text-sm font-medium">プレビュー: {{ previewModal.filename }}</div>
+                <button type="button" @click="closePreview" class="text-gray-600">閉じる</button>
+            </div>
+            <div class="border p-2">
+                <template v-if="previewModal.mime && previewModal.mime.startsWith('image/')">
+                    <img :src="previewModal.url" alt="preview" class="h-auto max-w-full" />
+                </template>
+                <template v-else-if="previewModal.mime === 'application/pdf'">
+                    <iframe :src="previewModal.url" class="w-full" style="height: 70vh" frameborder="0"></iframe>
+                </template>
+                <template v-else>
+                    <div class="text-sm">
+                        プレビューできません。<a :href="previewModal.url" target="_blank" rel="noopener" class="text-blue-600 underline">新しいタブで開く</a>
+                    </div>
+                </template>
             </div>
         </div>
     </div>

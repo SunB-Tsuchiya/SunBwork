@@ -256,6 +256,13 @@ if (Schema::hasTable('n_publication_entry_exams') && DB::getDriverName() !== 'sq
 - `ResizeObserver` でラッパー幅をリアクティブ取得。`minWidth` をピクセルで強制しない（水平スクロールが発生する）
 - 夜勤モード: `defaultWorktype.start_time >= 16:00` の場合 `slotMaxTime: '30:00:00'`（翌6時）
 
+**日報の添付ファイル（2026-09-18 改修）:**
+- 画像・ファイルは本文（Quillエディタ）に埋め込まない。`resources/js/Composables/useDiaryAttachments.js` でアップロード（`/api/uploads`）→ステージング→保存時に `attachment_ids`（配列）をフォームと一緒に送信する方式に統一。
+- サーバー側は `DiaryController::attachUploadedAttachments()` が `attachment_ids` を検証（`user_id === Auth::id()` かつ `status === 'ready'` のみ許可）した上で `AttachmentService::attachPivot()` により `attachmentables` ピボットへ紐付ける。`store()`/`update()` の両方で共通利用。
+- 添付ファイル一覧の取得・整形（署名付きURL・サムネイルURL付与）は `DiaryController::formatDiaryAttachments()` に集約。`show()` と `edit()` の両方で使う。
+- **旧方式（`[[attachment:id:filename]]` プレースホルダを本文からスキャンして紐付ける処理）は廃止済み。** 過去に保存された日報の本文には、旧方式（同期アップロード時に直接 `<img>` を埋め込んだもの、または非同期フォールバック時のプレースホルダ）がそのまま残っており、データ移行は行っていない。`Diaries/Show.vue` は互換性のため、本文からの抽出・プレースホルダのポーリング置換ロジックをそのまま残してある（新規保存分では使われない）。
+- `Create.vue` / `Edit.vue` / `Show.vue` はいずれも `useDiaryAttachments()` を使い、アップロード・削除・プレビューモーダルの実装を共通化している。
+
 ---
 
 ## ユーザー設定・カレンダー勤務日程ルール

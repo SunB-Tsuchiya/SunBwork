@@ -13,6 +13,9 @@ function reloadForStaleSession() {
     if (window.__sbwStaleSessionReloading) return;
 
     window.__sbwStaleSessionReloading = true;
+    // 日報など下書き自動保存に対応した画面では、リロード前に保存の猶予を与える。
+    // window.alert はブロッキングのため、ユーザーが状況を把握してから再読み込みできる。
+    window.alert('セッションの有効期限が切れたため、ページを再読み込みします。\n入力中の内容は自動保存されている場合、再度開いたときに復元できます。');
     window.location.reload();
 }
 

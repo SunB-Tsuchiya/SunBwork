@@ -55,12 +55,25 @@ class ChangelogSeeder extends Seeder
         ]);
     }
 
+    public function seedDiaryAttachments(): void
+    {
+        Changelog::updateOrCreate(['version' => 'diary-attachments-1'], [
+            'title' => '日報の画像添付で入力内容が消える不具合を修正し、添付ファイルを本文から独立させました',
+            'released_at' => '2026-09-18',
+            'summary' => '日報作成中にセッションが切れると、画像添付をきっかけに入力内容が保存されずログイン画面に戻ってしまう不具合を修正しました。あわせて、添付ファイルは本文に埋め込まず、一覧からプレビュー・ダウンロードできる独立した添付欄に変更しました。',
+            'design_files' => ['z_instructions/archived/DIARYATT_PLAN1.md'],
+            'claude_notes' => 'ユーザー報告（画像添付時にログイン画面へ戻り入力内容が消失）の原因調査で、bootstrap.jsが401/419受信時に即座にwindow.location.reload()する挙動が主因と判明（さくら本番ログでは419は発生していないことを確認、401はLaravel標準でログに残らないため状況証拠での判断）。対応としてCreate.vue/Edit.vueにlocalStorage下書き自動保存を追加。' . "\n\n" . '調査の過程で別の設計上の欠陥も発見: /api/uploadsで画像を同期アップロードした場合（通常はこちらが常に成功する）、Attachmentレコードは作られるがattachmentablesピボットが作成されず、日報の添付ファイル一覧に反映されない「孤児化」状態だった（紐付けが発生するのは本文中の[[attachment:id:filename]]プレースホルダをスキャンする非同期フォールバック時のみで、フロント側はこの経路をほぼ使っていなかった）。これを機に、画像を本文（Quillエディタ）に直接insertEmbedする方式を廃止し、アップロード完了後は独立した添付欄にステージングし、保存時にattachment_idsを送信してサーバー側で明示的にピボット紐付けする方式に変更。アップロード・プレビューモーダル・削除処理はuseDiaryAttachments.jsコンポーザブルに共通化し、Create/Edit/Show 3画面で利用。過去に保存済みの日報（本文に直接埋め込み済みのもの）はデータ移行せず、Show.vue側の後方互換表示ロジックをそのまま残している。',
+            'body' => '<section class="cl-fix"><h3>修正内容</h3><ul><li>日報作成・編集中にセッションが切れても、入力内容をlocalStorageに自動保存し、再度開いたときに復元できるようにした</li><li>セッション切れによる自動リロード前に、理由を知らせるメッセージを表示するようにした</li></ul></section><section class="cl-fix"><h3>変更内容</h3><ul><li>添付ファイル（画像・PDF等）を本文に埋め込まず、独立した「添付ファイル」欄で管理するように変更</li><li>添付ファイルはサムネイル一覧から「開く」でモーダルプレビュー、ダウンロードが可能</li><li>過去に保存済みの日報（本文埋め込み方式）はそのまま従来通り表示される</li></ul></section>',
+        ]);
+    }
+
     public function run(): void
     {
         $this->seedClerkCalendarPerformance();
         $this->seedClerkCalendarReminders();
         $this->seedClerkScheduleRules();
         $this->seedClerkCalendarStrip();
+        $this->seedDiaryAttachments();
         $entries = [
             [
                 'version'      => 'clerk-calendar-3',

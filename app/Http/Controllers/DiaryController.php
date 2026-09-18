@@ -231,11 +231,13 @@ class DiaryController extends Controller
               ];
 
         $data = $request->validate([
-            'date'       => 'required|date',
-            'work_style' => 'nullable|string|max:50',
-            'start_time' => 'nullable|date_format:H:i',
-            'end_time'   => 'nullable|date_format:H:i',
-            'content'    => $contentRules,
+            'date'              => 'required|date',
+            'work_style'        => 'nullable|string|max:50',
+            'start_time'        => 'nullable|date_format:H:i',
+            'end_time'          => 'nullable|date_format:H:i',
+            'content'           => $contentRules,
+            'attachment_ids'    => 'nullable|array',
+            'attachment_ids.*'  => 'integer|exists:attachments,id',
         ]);
 
         // no_diary フラグが立っている場合、または本文が空の場合は空文字で保存
@@ -256,31 +258,8 @@ class DiaryController extends Controller
             Log::warning('DiaryController: upsertWorkRecord failed (store): ' . $e->getMessage());
         }
 
-        // 本文内の [[attachment:{id}:filename]] プレースホルダを検出し、該当する attachments レコードを日報に紐付ける
-        $contentForScan = $data['content'] ?? $request->input('content', '');
-        if ($contentForScan) {
-            preg_match_all('/\[\[attachment:(\d+):[^\]]+\]\]/', $contentForScan, $matches);
-            if (!empty($matches[1])) {
-                $ids = array_map('intval', $matches[1]);
-                $attachments = Attachment::whereIn('id', $ids)->get();
-                $now = now();
-                $toInsert = [];
-                foreach ($attachments as $a) {
-                    $toInsert[] = [
-                        'attachment_id' => $a->id,
-                        'attachable_type' => \App\Models\Diary::class,
-                        'attachable_id' => $diary->id,
-                        'created_at' => $now,
-                        'updated_at' => $now,
-                    ];
-                }
-                if (!empty($toInsert)) {
-                    foreach (array_chunk($toInsert, 200) as $chunk) {
-                        DB::table('attachmentables')->insertOrIgnore($chunk);
-                    }
-                }
-            }
-        }
+        // アップロード済み（ステージング中）の添付ファイルを日報に紐付ける
+        $this->attachUploadedAttachments($data['attachment_ids'] ?? [], $diary);
 
         // 添付ファイル保存: AttachmentService に処理を委譲してサムネイル生成/DB登録/ピボットを集中管理
         if ($request->hasFile('files')) {
@@ -336,50 +315,7 @@ class DiaryController extends Controller
         }, $diaryArray['comments'] ?? []);
 
         // Map attachments to expose signed/stream urls and thumbnail urls using AttachmentService
-        $svc = new AttachmentService();
-        $diaryArray['attachments'] = $diary->attachments->map(function ($att) use ($svc) {
-            $meta = [
-                'original_name' => $att->original_name,
-                'mime' => $att->mime_type ?? null,
-                'size' => $att->size ?? null,
-                'path' => $att->path,
-                'attachment_id' => $att->id,
-            ];
-            $formatted = $svc->formatResponseMeta($meta);
-            // try to provide a signed stream URL for app-internal use when possible
-            try {
-                if (!empty($formatted['path'])) {
-                    $formatted['url'] = URL::temporarySignedRoute('attachments.signed', now()->addMinutes(15), ['path' => $formatted['path']]);
-                }
-            } catch (\Throwable $_e) {
-                try {
-                    if (!empty($formatted['path'])) $formatted['url'] = route('attachments.stream', ['path' => $formatted['path']]);
-                } catch (\Throwable $__e) {
-                    // leave formatted['url'] as-is
-                }
-            }
-            // attempt to populate thumb_url if thumb_path exists or common thumb location exists
-            if (empty($formatted['thumb_url']) && !empty($formatted['path'])) {
-                $candidate = dirname($formatted['path']) . '/thumbs/' . basename($formatted['path']);
-                if (Storage::disk('public')->exists($candidate)) {
-                    try {
-                        $formatted['thumb_url'] = URL::temporarySignedRoute('attachments.signed', now()->addMinutes(15), ['path' => $candidate]);
-                    } catch (\Throwable $_te) {
-                        $formatted['thumb_url'] = asset('storage/' . ltrim($candidate, '/'));
-                    }
-                } else {
-                    $alt = 'attachments/thumbs/' . basename($formatted['path']);
-                    if (Storage::disk('public')->exists($alt)) {
-                        try {
-                            $formatted['thumb_url'] = URL::temporarySignedRoute('attachments.signed', now()->addMinutes(15), ['path' => $alt]);
-                        } catch (\Throwable $_te) {
-                            $formatted['thumb_url'] = asset('storage/' . ltrim($alt, '/'));
-                        }
-                    }
-                }
-            }
-            return $formatted + ['id' => $att->id, 'status' => $att->status];
-        })->values();
+        $diaryArray['attachments'] = $this->formatDiaryAttachments($diary);
 
         // 勤務記録を取得
         $diaryDate = $diary->date instanceof \Carbon\Carbon
@@ -427,6 +363,7 @@ class DiaryController extends Controller
         // date を純粋な Y-m-d 文字列に変換して渡す（Carbon→ISO変換でタイムゾーンずれを防ぐ）
         $diaryArr = $diary->toArray();
         $diaryArr['date'] = $dateStr;
+        $diaryArr['attachments'] = $this->formatDiaryAttachments($diary);
 
         return Inertia::render('Diaries/Edit', [
             'diary'       => $diaryArr,
@@ -450,10 +387,10 @@ class DiaryController extends Controller
                 : date('Y-m-d', strtotime((string) $diary->date));
             $request->merge(['date' => $request->input('date', $existingDate)]);
             $data = $request->validate([
-                'date'       => 'required|date',
-                'work_style' => 'nullable|string|max:50',
-                'start_time' => 'nullable|date_format:H:i',
-                'end_time'   => 'nullable|date_format:H:i',
+                'date'              => 'required|date',
+                'work_style'        => 'nullable|string|max:50',
+                'start_time'        => 'nullable|date_format:H:i',
+                'end_time'          => 'nullable|date_format:H:i',
                 'content' => [
                     'required',
                     function ($attribute, $value, $fail) {
@@ -462,6 +399,8 @@ class DiaryController extends Controller
                         }
                     }
                 ],
+                'attachment_ids'    => 'nullable|array',
+                'attachment_ids.*'  => 'integer|exists:attachments,id',
             ]);
             $data['user_id'] = Auth::id();
             $data['date']    = \Carbon\Carbon::parse($data['date'])->toDateString();
@@ -474,31 +413,8 @@ class DiaryController extends Controller
                 Log::warning('DiaryController: upsertWorkRecord failed (update): ' . $e->getMessage());
             }
 
-            // 本文内の [[attachment:{id}:filename]] プレースホルダを検出し、該当する attachments レコードを日報に紐付ける
-            $contentForScan = $data['content'] ?? $request->input('content', '');
-            if ($contentForScan) {
-                preg_match_all('/\[\[attachment:(\d+):[^\]]+\]\]/', $contentForScan, $matches);
-                if (!empty($matches[1])) {
-                    $ids = array_map('intval', $matches[1]);
-                    $attachments = Attachment::whereIn('id', $ids)->get();
-                    $now = now();
-                    $toInsert = [];
-                    foreach ($attachments as $a) {
-                        $toInsert[] = [
-                            'attachment_id' => $a->id,
-                            'attachable_type' => \App\Models\Diary::class,
-                            'attachable_id' => $diary->id,
-                            'created_at' => $now,
-                            'updated_at' => $now,
-                        ];
-                    }
-                    if (!empty($toInsert)) {
-                        foreach (array_chunk($toInsert, 200) as $chunk) {
-                            DB::table('attachmentables')->insertOrIgnore($chunk);
-                        }
-                    }
-                }
-            }
+            // アップロード済み（ステージング中）の添付ファイルを日報に紐付ける
+            $this->attachUploadedAttachments($data['attachment_ids'] ?? [], $diary);
 
             // 添付ファイル保存（追加分のみ）: AttachmentService に委譲 (画像処理・サムネイル・DB登録・ピボットを統一)
             if ($request->hasFile('files')) {
@@ -565,6 +481,78 @@ class DiaryController extends Controller
         }
         $diary->delete();
         return redirect()->route('dashboard');
+    }
+
+    /**
+     * アップロード済み（ステージング中）の添付ファイルを日報にピボット紐付けする。
+     * 他人がアップロードしたファイルや未完了（status !== 'ready'）のファイルは無視する。
+     */
+    private function attachUploadedAttachments(array $attachmentIds, Diary $diary): void
+    {
+        if (empty($attachmentIds)) {
+            return;
+        }
+        $svc = new AttachmentService();
+        $attachments = Attachment::whereIn('id', $attachmentIds)
+            ->where('user_id', Auth::id())
+            ->where('status', 'ready')
+            ->get();
+        foreach ($attachments as $a) {
+            $svc->attachPivot($a->id, \App\Models\Diary::class, $diary->id);
+        }
+    }
+
+    /**
+     * 日報に紐付く添付ファイルを、署名付きURL・サムネイルURLを含む形式に整形する。
+     * show() / edit() の両方から利用する。
+     */
+    private function formatDiaryAttachments(Diary $diary): array
+    {
+        $diary->loadMissing('attachments');
+        $svc = new AttachmentService();
+        return $diary->attachments->map(function ($att) use ($svc) {
+            $meta = [
+                'original_name' => $att->original_name,
+                'mime' => $att->mime_type ?? null,
+                'size' => $att->size ?? null,
+                'path' => $att->path,
+                'attachment_id' => $att->id,
+            ];
+            $formatted = $svc->formatResponseMeta($meta);
+            // try to provide a signed stream URL for app-internal use when possible
+            try {
+                if (!empty($formatted['path'])) {
+                    $formatted['url'] = URL::temporarySignedRoute('attachments.signed', now()->addMinutes(15), ['path' => $formatted['path']]);
+                }
+            } catch (\Throwable $_e) {
+                try {
+                    if (!empty($formatted['path'])) $formatted['url'] = route('attachments.stream', ['path' => $formatted['path']]);
+                } catch (\Throwable $__e) {
+                    // leave formatted['url'] as-is
+                }
+            }
+            // attempt to populate thumb_url if thumb_path exists or common thumb location exists
+            if (empty($formatted['thumb_url']) && !empty($formatted['path'])) {
+                $candidate = dirname($formatted['path']) . '/thumbs/' . basename($formatted['path']);
+                if (Storage::disk('public')->exists($candidate)) {
+                    try {
+                        $formatted['thumb_url'] = URL::temporarySignedRoute('attachments.signed', now()->addMinutes(15), ['path' => $candidate]);
+                    } catch (\Throwable $_te) {
+                        $formatted['thumb_url'] = asset('storage/' . ltrim($candidate, '/'));
+                    }
+                } else {
+                    $alt = 'attachments/thumbs/' . basename($formatted['path']);
+                    if (Storage::disk('public')->exists($alt)) {
+                        try {
+                            $formatted['thumb_url'] = URL::temporarySignedRoute('attachments.signed', now()->addMinutes(15), ['path' => $alt]);
+                        } catch (\Throwable $_te) {
+                            $formatted['thumb_url'] = asset('storage/' . ltrim($alt, '/'));
+                        }
+                    }
+                }
+            }
+            return $formatted + ['id' => $att->id, 'status' => $att->status];
+        })->values()->toArray();
     }
 
     /**
