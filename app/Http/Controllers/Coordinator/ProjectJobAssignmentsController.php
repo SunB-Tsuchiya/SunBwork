@@ -1170,6 +1170,8 @@ class ProjectJobAssignmentsController extends Controller
         }
 
         DB::transaction(function () use ($assignment) {
+            app(\App\Services\MGinbon\MGinbonAssignmentSyncService::class)
+                ->release($assignment->id, request()->user()?->id, 'coordinator_assignment_deleted');
             // simply delete the assignment. any historical WorkItem rows were dropped by migration.
             $assignment->delete();
         });

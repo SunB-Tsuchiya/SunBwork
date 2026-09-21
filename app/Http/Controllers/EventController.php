@@ -614,6 +614,11 @@ class EventController extends Controller
                         $assignment->save();
                     });
 
+                    $mginbonStartedOn = $this->resolveJstCarbon($event, 'starts_at')?->toDateString()
+                        ?? now()->toDateString();
+                    app(\App\Services\MGinbon\MGinbonAssignmentSyncService::class)
+                        ->start($assignment, $mginbonStartedOn, Auth::id());
+
                     // Update any related JobAssignmentMessage rows so JobBox entries
                     // reflect that a schedule was set for this assignment.
                     try {
@@ -1003,6 +1008,8 @@ class EventController extends Controller
 
                     // PJA-B（マイジョブ）を削除 → マイジョブ一覧から消え、依頼されたジョブに戻る
                     if ($myJobAssignment) {
+                        app(\App\Services\MGinbon\MGinbonAssignmentSyncService::class)
+                            ->release($myJobAssignment->id, auth()->id(), 'calendar_event_deleted');
                         $myJobAssignment->delete();
                         Log::info('EventController::destroy: my-job assignment deleted', [
                             'assignment_id' => $assignmentIdToCheck,
@@ -1528,6 +1535,12 @@ class EventController extends Controller
             }
             $assignment->save();
 
+            // カレンダー完了を銀本専用進行表へ反映する。
+            $mginbonCompletedOn = $this->resolveJstCarbon($event, 'starts_at')?->toDateString()
+                ?? now()->toDateString();
+            app(\App\Services\MGinbon\MGinbonAssignmentSyncService::class)
+                ->complete($assignment, $request->user()?->id, $mginbonCompletedOn);
+
             // ジョブ通知（進行管理表リンクあり → リーダーへ / なし → Coordinator依頼分のみ）
             try {
                 $user = $request->user();
@@ -2000,9 +2013,16 @@ class EventController extends Controller
                 $jobData = $assignment->toEventPrefill();
                 // Build assignments prefill with IDs for dropdowns, amounts intentionally null
                 $jobAssignments = [[
-                    'id' => null,
-                    'coordinator_assignment_id' => $assignment->id,
+                    // MyJob詳細の「予定をセット」は既存の自己割当を更新する。
+                    // null にすると同内容の割当が複製され、カレンダー完了と
+                    // 元MyJob（および銀本進行）が別IDを参照してしまう。
+                    'id' => $sourceJobAssignmentId ? null : $assignment->id,
+                    'coordinator_assignment_id' => $sourceJobAssignmentId
+                        ? $assignment->id
+                        : $assignment->coordinator_assignment_id,
                     'project_job_id' => $assignment->project_job_id,
+                    'user_id' => $assignment->user_id,
+                    'sender_id' => $assignment->sender_id,
                     '_client_id' => $assignment->projectJob?->client?->id ?? '',
                     'title_suffix' => $assignment->title ?? '',
                     'detail' => $assignment->detail ?? '',

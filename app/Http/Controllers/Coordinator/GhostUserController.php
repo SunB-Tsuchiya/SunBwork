@@ -62,6 +62,10 @@ class GhostUserController extends Controller
             ->firstOrFail();
 
         DB::transaction(function () use ($ghost) {
+            DB::table('project_job_assignments')->where('user_id', $ghost->id)
+                ->pluck('id')
+                ->each(fn ($assignmentId) => app(\App\Services\MGinbon\MGinbonAssignmentSyncService::class)
+                    ->release((int) $assignmentId, Auth::id(), 'test_user_deleted'));
             DB::table('project_job_assignments')->where('user_id', $ghost->id)->delete();
             DB::table('events')->where('user_id', $ghost->id)->delete();
             $ghost->delete();

@@ -56,6 +56,14 @@ function getProgressReportLink() {
     }
 }
 
+function getMGinbonLink() {
+    try {
+        return route('coordinator.mginbon.index');
+    } catch (e) {
+        return '/coordinator/mginbon';
+    }
+}
+
 function getSettingsLink() {
     try {
         return route('coordinator.settings.index');
@@ -86,6 +94,7 @@ const tabs = computed(() => [
     { key: 'operator_calendar', href: tryRoute('coordinator.operator_calendar.index'), label: 'オペレーターカレンダー' },
     { key: 'progress_sheet_list', href: getProgressSheetListLink(), label: '進行表一覧' },
     { key: 'workflow_sheet_list', href: getWorkflowSheetListLink(), label: '管理シート一覧' },
+    { key: 'mginbon', href: getMGinbonLink(), label: '銀本進行', newTab: true },
     { key: 'progress_report', href: getProgressReportLink(), label: '進行レポート' },
     { key: 'settings', href: getSettingsLink(), label: '設定' },
     { key: 'ghost_users', href: getGhostUsersLink(), label: 'テストユーザー' },
@@ -95,7 +104,16 @@ const tabs = computed(() => [
 
 function onMobileSelect(e) {
     const href = e.target.value;
-    if (href) router.get(href);
+    if (!href) return;
+
+    const selectedTab = tabs.value.find((item) => item.href === href);
+    if (selectedTab?.newTab) {
+        window.open(href, '_blank', 'noopener');
+        e.target.value = '';
+        return;
+    }
+
+    router.get(href);
 }
 </script>
 
@@ -132,6 +150,7 @@ function onMobileSelect(e) {
             > オペレーターカレンダー </Link>
             <Link :href="getProgressSheetListLink()" :class="tab('progress_sheet_list')"> 進行表一覧 </Link>
             <Link :href="getWorkflowSheetListLink()" :class="tab('workflow_sheet_list')"> 管理シート一覧 </Link>
+            <a :href="getMGinbonLink()" target="_blank" rel="noopener" :class="tab('mginbon')"> 銀本進行 </a>
             <Link :href="getProgressReportLink()" :class="tab('progress_report')"> 進行レポート </Link>
             <Link :href="getSettingsLink()" :class="tab('settings')"> 設定 </Link>
             <Link :href="getGhostUsersLink()" :class="tab('ghost_users')"> テストユーザー </Link>

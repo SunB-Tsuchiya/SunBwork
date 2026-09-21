@@ -741,6 +741,25 @@ class ProjectJobController extends Controller
                 'created_at' => $s->created_at?->format('Y-m-d'),
             ]);
 
+        // MGinbonで紐づけた案件にだけ、専用の銀本進行表を表示する。
+        $mginbonProgress = null;
+        try {
+            $mginbonProject = \App\Models\MGinbon\MGinbonProject::query()
+                ->where('project_job_id', $projectJob->id)
+                ->first(['id', 'year', 'name']);
+            if ($mginbonProject) {
+                $mginbonProgress = [
+                    'id' => $mginbonProject->id,
+                    'name' => $mginbonProject->year.'年 銀本進行',
+                    'year' => $mginbonProject->year,
+                ];
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Failed to load MGinbon progress link for coordinator project', [
+                'error' => $e->getMessage(), 'project_job_id' => $projectJob->id,
+            ]);
+        }
+
         // 管理シート一覧
         $workflowSheets = $projectJob->workflowSheets()
             ->select(['id', 'name', 'sort_order', 'created_at'])
@@ -1039,6 +1058,7 @@ class ProjectJobController extends Controller
             'schedules' => $schedules,
             'jobHistory' => $jobHistory,
             'progressSheets'  => $progressSheets,
+            'mginbonProgress' => $mginbonProgress,
             'sheetTemplates'  => $sheetTemplates,
             'managementTemplates' => $managementTemplates,
             'workflowSheets'  => $workflowSheets,

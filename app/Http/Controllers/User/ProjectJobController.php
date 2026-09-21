@@ -432,6 +432,23 @@ class ProjectJobController extends Controller
             ->get(['id', 'name', 'sort_order'])
             ->map(fn ($s) => ['id' => $s->id, 'name' => $s->name, 'sort_order' => $s->sort_order]);
 
+        $mginbonProgress = null;
+        try {
+            $mginbonProject = \App\Models\MGinbon\MGinbonProject::query()
+                ->where('project_job_id', $projectJob->id)->first(['id', 'year', 'name']);
+            if ($mginbonProject) {
+                $mginbonProgress = [
+                    'id' => $mginbonProject->id,
+                    'name' => $mginbonProject->year.'年 銀本進行',
+                    'year' => $mginbonProject->year,
+                ];
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Failed to load MGinbon progress link', [
+                'error' => $e->getMessage(), 'project_job_id' => $projectJob->id,
+            ]);
+        }
+
         // 管理シート（名前一覧のみ）
         $workflowSheets = \App\Models\WorkflowSheet::where('project_job_id', $projectJob->id)
             ->orderBy('sort_order')
@@ -458,6 +475,7 @@ class ProjectJobController extends Controller
             'schedules'                => $schedules,
             'jobHistory'               => $jobHistory,
             'progressSheets'           => $progressSheets,
+            'mginbonProgress'          => $mginbonProgress,
             'workflowSheets'           => $workflowSheets,
             'requestedAssignmentIds'   => $requestedAssignmentIds,
             'sheetLinkedAssignmentIds' => $sheetLinkedAssignmentIds,

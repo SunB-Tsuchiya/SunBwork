@@ -288,7 +288,7 @@
                         </Link>
                     </div>
 
-                    <div v-if="progressSheets.length > 0" class="overflow-x-auto">
+                    <div v-if="progressSheets.length > 0 || mginbonProgress" class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-gray-200">
                             <thead class="bg-gray-50">
                                 <tr>
@@ -298,6 +298,18 @@
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-200 bg-white">
+                                <tr v-if="mginbonProgress"
+                                    class="cursor-pointer bg-cyan-50/60 hover:bg-cyan-100"
+                                    @click="openMGinbonProgress">
+                                    <td class="px-4 py-2 text-sm font-semibold text-cyan-950">
+                                        {{ mginbonProgress.name }}
+                                        <span class="ml-2 rounded bg-cyan-100 px-2 py-0.5 text-xs font-medium text-cyan-800">銀本専用表</span>
+                                    </td>
+                                    <td class="px-4 py-2 text-sm text-gray-500">自動表示</td>
+                                    <td class="px-4 py-2">
+                                        <button type="button" class="rounded bg-cyan-700 px-3 py-1 text-xs font-medium text-white hover:bg-cyan-800" @click.stop="openMGinbonProgress">開く</button>
+                                    </td>
+                                </tr>
                                 <tr v-for="ps in progressSheets" :key="ps.id"
                                     class="cursor-pointer hover:bg-indigo-50"
                                     @click="router.get(route('coordinator.progress_sheets.show', { sheet: ps.id }) + '?back_tab=progress')">
@@ -1583,6 +1595,7 @@ function truncate(text, len) {
 // ── 進行管理表 ───────────────────────────────────────────────────────────
 
 const progressSheets  = computed(() => Array.isArray(page.props.progressSheets)  ? page.props.progressSheets  : []);
+const mginbonProgress = computed(() => page.props.mginbonProgress || null);
 const workflowSheets  = computed(() => Array.isArray(page.props.workflowSheets)   ? page.props.workflowSheets  : []);
 const sheetTemplates = computed(() => Array.isArray(page.props.sheetTemplates) ? page.props.sheetTemplates : []);
 const managementTemplates = computed(() => Array.isArray(page.props.managementTemplates) ? page.props.managementTemplates : []);
@@ -1591,6 +1604,11 @@ const newSheetName = ref('');
 const newSheetTemplateId = ref(null);
 const newSheetMode = ref('v2'); // 'v2' | 'template' | 'calendar'
 const calendarSheetRows = ref([]);
+
+function openMGinbonProgress() {
+    if (!mginbonProgress.value) return;
+    router.visit(route('coordinator.mginbon.index', { year: mginbonProgress.value.year }));
+}
 
 // stages（進行表セット方式モーダル用）
 const availableStages = computed(() => {

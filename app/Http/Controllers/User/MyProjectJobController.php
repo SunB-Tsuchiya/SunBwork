@@ -224,6 +224,10 @@ class MyProjectJobController extends Controller
             }
             $assignment->save();
 
+            // 銀本専用進行表にも完了状態を反映する。
+            app(\App\Services\MGinbon\MGinbonAssignmentSyncService::class)
+                ->complete($assignment, $user->id);
+
             // ジョブ通知（進行管理表リンクあり → リーダーへ / なし → Coordinator依頼分のみ依頼主＋リーダーへ）
             try {
                 $projectJob = $assignment->projectJob
@@ -406,6 +410,21 @@ class MyProjectJobController extends Controller
         // eager load relations used by the frontend
         $assignment->load(['projectJob.client', 'user', 'sender', 'size', 'stage', 'workItemType', 'statusModel', 'difficultyModel']);
 
+        // 銀本から登録したMyJobは、共通マスタの種別・ステージを使わないため、
+        // 専用DBから工程・媒体・教科を補って共通詳細カードへ渡す。
+        try {
+            $assignment->setAttribute(
+                'mginbon_context',
+                app(\App\Services\MGinbon\MGinbonAssignmentSyncService::class)->detailContext($assignment)
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Failed to load MGinbon assignment detail context', [
+                'assignment_id' => $assignment->id,
+                'error' => $e->getMessage(),
+            ]);
+            $assignment->setAttribute('mginbon_context', null);
+        }
+
         $projectJob = $assignment->projectJob ?? null;
 
         // 本人または Admin 以上が削除可能
@@ -482,6 +501,10 @@ class MyProjectJobController extends Controller
         if (! $user || ($assignment->user_id !== $user->id && ! $user->isSuperAdmin() && ! $user->isAdmin())) {
             abort(403, '削除する権限がありません。');
         }
+
+        // 銀本専用進行表を先に未登録へ戻す（別DBなので明示的な同期が必要）。
+        app(\App\Services\MGinbon\MGinbonAssignmentSyncService::class)
+            ->release($assignment->id, $user->id);
 
         // ProgressCell の assignment_id と completed_at をクリア
         try {

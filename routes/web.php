@@ -282,6 +282,10 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     // 進行管理表（User 閲覧・担当者登録）
     Route::get('/user/progress-sheets/{sheet}', [\App\Http\Controllers\User\ProgressSheetController::class, 'show'])->name('user.progress_sheets.show');
     Route::get('/user/progress-sheets/{sheet}/print', [\App\Http\Controllers\User\ProgressSheetController::class, 'printView'])->name('user.progress_sheets.print');
+    Route::get('/user/project-jobs/{projectJob}/mginbon-progress', [\App\Http\Controllers\User\MGinbonProgressController::class, 'show'])
+        ->name('user.project_jobs.mginbon_progress.show');
+    Route::post('/user/project-jobs/{projectJob}/mginbon-progress/register', [\App\Http\Controllers\User\MGinbonProgressController::class, 'register'])
+        ->name('user.project_jobs.mginbon_progress.register');
     Route::post('/user/progress-sheets/{sheet}/cells/{cell}/assign', [\App\Http\Controllers\User\ProgressSheetController::class, 'assign'])->name('progress_sheets.cells.assign');
     Route::delete('/user/progress-sheets/{sheet}/cells/{cell}/assign', [\App\Http\Controllers\User\ProgressSheetController::class, 'unassign'])->name('progress_sheets.cells.unassign');
     Route::get('/user/progress-cells/my-assignments', [\App\Http\Controllers\User\ProgressCellController::class, 'myAssignments'])->name('user.progress_cells.my_assignments');
@@ -842,6 +846,28 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
     ->name('coordinator.')
     ->group(function () {
         Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
+
+        // MGinbon（銀本制作進行管理）
+        Route::get('/mginbon', [App\Http\Controllers\Coordinator\MGinbonLedgerController::class, 'index'])
+            ->name('mginbon.index');
+        Route::put('/mginbon/projects/{project}/project-link', [App\Http\Controllers\Coordinator\MGinbonProjectLinkController::class, 'update'])
+            ->name('mginbon.projects.project_link');
+        Route::post('/mginbon/projects/{project}/project-link/create', [App\Http\Controllers\Coordinator\MGinbonProjectLinkController::class, 'create'])
+            ->name('mginbon.projects.project_link.create');
+        Route::get('/mginbon/items/{item}', [App\Http\Controllers\Coordinator\MGinbonItemController::class, 'show'])
+            ->name('mginbon.items.show');
+        Route::put('/mginbon/items/{item}', [App\Http\Controllers\Coordinator\MGinbonItemController::class, 'update'])
+            ->name('mginbon.items.update');
+        Route::patch('/mginbon/items/{item}/intake-check', [App\Http\Controllers\Coordinator\MGinbonItemController::class, 'updateIntakeCheck'])
+            ->name('mginbon.items.intake_check.update');
+        Route::post('/mginbon/items/{item}/assign-stage', [App\Http\Controllers\Coordinator\MGinbonWorkPackageController::class, 'store'])
+            ->name('mginbon.items.assign_stage');
+        Route::get('/mginbon/actor-mappings', [App\Http\Controllers\Coordinator\MGinbonActorMappingController::class, 'index'])
+            ->name('mginbon.actor_mappings.index');
+        Route::put('/mginbon/actor-mappings', [App\Http\Controllers\Coordinator\MGinbonActorMappingController::class, 'update'])
+            ->name('mginbon.actor_mappings.update');
+        Route::get('/mginbon/import-preview', [App\Http\Controllers\Coordinator\MGinbonImportPreviewController::class, 'index'])
+            ->name('mginbon.import_preview');
 
         // 外注先管理
         Route::post('subcontractors/check-duplicate', [App\Http\Controllers\Coordinator\SubcontractorController::class, 'checkDuplicate'])->name('subcontractors.check_duplicate');

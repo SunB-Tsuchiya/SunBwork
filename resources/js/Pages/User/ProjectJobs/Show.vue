@@ -139,7 +139,7 @@
                 <!-- ── 進行管理表セクション ──────────────────── -->
                 <section v-show="activeTab === 'progress'" class="py-5">
                     <h3 class="mb-3 font-semibold text-gray-800">進行管理表</h3>
-                    <div v-if="progressSheets.length > 0" class="overflow-x-auto">
+                    <div v-if="progressSheets.length > 0 || mginbonProgress" class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-gray-200">
                             <thead class="bg-gray-50">
                                 <tr>
@@ -148,6 +148,17 @@
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-200 bg-white">
+                                <tr v-if="mginbonProgress"
+                                    class="cursor-pointer bg-cyan-50/50 hover:bg-cyan-100"
+                                    @click="openMGinbonProgress">
+                                    <td class="px-4 py-2 text-sm font-semibold text-cyan-950">
+                                        {{ mginbonProgress.name }}
+                                        <span class="ml-2 rounded bg-cyan-100 px-2 py-0.5 text-xs font-medium text-cyan-800">銀本専用表</span>
+                                    </td>
+                                    <td class="px-4 py-2">
+                                        <button type="button" class="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700" @click.stop="openMGinbonProgress">開く</button>
+                                    </td>
+                                </tr>
                                 <tr v-for="sheet in progressSheets" :key="sheet.id"
                                     class="cursor-pointer hover:bg-blue-50"
                                     @click="openSheet(sheet)">
@@ -468,6 +479,7 @@ const schedules     = computed(() => Array.isArray(page.props.schedules) ? page.
 const members       = page.props.members || [];
 const subCoordinators = computed(() => page.props.subCoordinators || []);
 const progressSheets  = computed(() => page.props.progressSheets || []);
+const mginbonProgress = computed(() => page.props.mginbonProgress || null);
 const workflowSheets  = computed(() => page.props.workflowSheets  || []);
 
 const jobImageUrl         = ref(job.image_url ?? null);
@@ -508,6 +520,10 @@ const activeTab = ref(new URLSearchParams(window.location.search).get('tab') || 
 // ── 進行管理表を開く ──────────────────────────────────────────────────────
 function openSheet(sheet) {
     router.visit(route('user.progress_sheets.show', { sheet: sheet.id }) + '?back_tab=progress');
+}
+
+function openMGinbonProgress() {
+    router.visit(route('user.project_jobs.mginbon_progress.show', { projectJob: job.id }));
 }
 
 function openWorkflowSheet(ws) {

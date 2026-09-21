@@ -292,6 +292,11 @@ class ProjectJobAssignmentController extends Controller
 
                         $event->save();
 
+                        if ($eventStart) {
+                            app(\App\Services\MGinbon\MGinbonAssignmentSyncService::class)
+                                ->start($assignment, $eventStart->toDateString(), $user?->id);
+                        }
+
                         // ── 重複イベントの interruption_minutes 処理 ──────────────────
                         // 作成したイベントと時間が重複する既存イベントを探し、
                         // 長い方のイベントから重複分を差し引く（interruption_minutes に加算）
@@ -502,6 +507,11 @@ class ProjectJobAssignmentController extends Controller
                         $event->interruption_minutes = 0;
                     }
                     $event->save();
+
+                    if ($eventStart) {
+                        app(\App\Services\MGinbon\MGinbonAssignmentSyncService::class)
+                            ->start($by, $eventStart->toDateString(), $user?->id);
+                    }
 
                     // ── 重複イベントの interruption_minutes 再計算 ──────────────────
                     // 独自実装は starts_at を全て JST として比較していたため proof ジョブ（UTC 保存）で

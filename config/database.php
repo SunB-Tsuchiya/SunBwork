@@ -72,6 +72,26 @@ return [
             ]) : [],
         ],
 
+        // 銀本制作進行管理専用。SBWork本体DBとは物理的に分離する。
+        'mginbon' => [
+            'driver' => env('MGINBON_DB_CONNECTION', 'mysql'),
+            'host' => env('MGINBON_DB_HOST', env('DB_HOST', '127.0.0.1')),
+            'port' => env('MGINBON_DB_PORT', env('DB_PORT', '3306')),
+            'database' => env('MGINBON_DB_DATABASE', ''),
+            'username' => env('MGINBON_DB_USERNAME', env('DB_USERNAME', 'root')),
+            'password' => env('MGINBON_DB_PASSWORD', env('DB_PASSWORD', '')),
+            'unix_socket' => env('MGINBON_DB_SOCKET', env('DB_SOCKET', '')),
+            'charset' => env('DB_CHARSET', 'utf8mb4'),
+            'collation' => env('DB_COLLATION', 'utf8mb4_unicode_ci'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => true,
+            'engine' => null,
+            'options' => extension_loaded('pdo_mysql') ? array_filter([
+                PDO::MYSQL_ATTR_SSL_CA => env('MGINBON_MYSQL_ATTR_SSL_CA'),
+            ]) : [],
+        ],
+
         'mariadb' => [
             'driver' => 'mariadb',
             'url' => env('DB_URL'),

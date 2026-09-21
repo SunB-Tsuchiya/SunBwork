@@ -37,5 +37,5 @@ yarn-error.log
 /public/n_images/
 /public/n_sample.css
 
-# N_DBSystem ローカル参照用Excel（元データはGit管理しない）
-/z_NDBSystem/*.xlsx*
+# N_DBSystem / FileMaker受領資料（元データはGit管理しない）
+/z_NDBSystem/

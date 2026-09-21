@@ -277,6 +277,7 @@ const computeCoordinatorActive = () => {
         // explicit project_jobs routes (index/show/create/edit) → projects tab
         if (r.match(/^coordinator\.project_jobs\.(index|show|create|edit|store|update|destroy|complete)$/)) return 'projects';
         if (r.startsWith('coordinator.progress_sheet_list')) return 'progress_sheet_list';
+        if (r.startsWith('coordinator.mginbon')) return 'mginbon';
         if (r.startsWith('coordinator.progress_report')) return 'progress_report';
         if (r.startsWith('coordinator.settings')) return 'settings';
         if (r.startsWith('coordinator.ghost_users')) return 'ghost_users';
@@ -334,12 +335,18 @@ function pathnameOf(url) {
     try { return new URL(url, window.location.origin).pathname; } catch { return url; }
 }
 
+// 銀本進行は共通ナビゲーションを持たない独立画面。
+// ロールの復帰先に保存すると通常画面へ戻れなくなるため除外する。
+function isStandaloneMGinbonUrl(url) {
+    return /\/coordinator\/mginbon(?:\/|$)/.test(pathnameOf(url));
+}
+
 // ページ遷移時に現ロールの最終URLをlocalStorageに保存
 watch(
     () => page.url,
     (url) => {
         const role = currentRouteContext.value;
-        if (role && url && pathnameOf(url) !== '/dashboard') {
+        if (role && url && pathnameOf(url) !== '/dashboard' && !isStandaloneMGinbonUrl(url)) {
             try { localStorage.setItem(`lastTab_${role}`, url); } catch {}
         }
     },
@@ -358,9 +365,12 @@ function navigateToRole(role) {
         }
         const saved = localStorage.getItem(`lastTab_${role}`);
         // 過去に汚染されて保存された /dashboard は使わず、自己修復する
-        if (saved && pathnameOf(saved) !== '/dashboard') {
+        if (saved && pathnameOf(saved) !== '/dashboard' && !isStandaloneMGinbonUrl(saved)) {
             router.get(saved);
         } else {
+            if (saved && isStandaloneMGinbonUrl(saved)) {
+                localStorage.removeItem(`lastTab_${role}`);
+            }
             router.get(route(ROLE_DASHBOARD_ROUTE[role]));
         }
     } catch {

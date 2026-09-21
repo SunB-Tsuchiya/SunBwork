@@ -105,6 +105,12 @@ const amounts = computed(() => {
 });
 
 const completedBadge = computed(() => props.assignment.completed);
+const mginbonContext = computed(() => props.assignment.mginbon_context ?? null);
+const hasStandardWorkDetails = computed(() => workItemTypeName.value !== '—'
+    || sizeName.value !== '—'
+    || stageName.value !== '—'
+    || difficultyName.value !== '—'
+    || !!amounts.value);
 </script>
 
 <template>
@@ -154,6 +160,25 @@ const completedBadge = computed(() => props.assignment.completed);
             <div class="px-5 py-4">
                 <h4 class="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">作業詳細</h4>
                 <div class="flex flex-wrap gap-2">
+                    <!-- 銀本専用ジョブ -->
+                    <template v-if="mginbonContext">
+                        <div class="flex items-center gap-1.5 rounded-md bg-cyan-50 px-3 py-1.5">
+                            <span class="text-xs text-cyan-600">対象</span>
+                            <span class="text-sm font-semibold text-cyan-900">{{ mginbonContext.production_unit_name }}</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 rounded-md bg-green-50 px-3 py-1.5">
+                            <span class="text-xs text-green-600">媒体</span>
+                            <span class="text-sm font-semibold text-green-900">{{ mginbonContext.media_name }}</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 rounded-md bg-indigo-50 px-3 py-1.5">
+                            <span class="text-xs text-indigo-500">工程</span>
+                            <span class="text-sm font-semibold text-indigo-800">{{ mginbonContext.stage_name }}</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 rounded-md bg-amber-50 px-3 py-1.5">
+                            <span class="text-xs text-amber-600">教科</span>
+                            <span class="text-sm font-semibold text-amber-900">{{ mginbonContext.subject_names?.join('・') || '共通' }}</span>
+                        </div>
+                    </template>
                     <!-- 種別 -->
                     <div v-if="workItemTypeName !== '—'" class="flex items-center gap-1.5 rounded-md bg-blue-50 px-3 py-1.5">
                         <span class="text-xs text-blue-500">種別</span>
@@ -181,7 +206,7 @@ const completedBadge = computed(() => props.assignment.completed);
                     </div>
                 </div>
                 <!-- 何も情報がない場合 -->
-                <p v-if="workItemTypeName === '—' && sizeName === '—' && stageName === '—' && difficultyName === '—' && !amounts"
+                <p v-if="!mginbonContext && !hasStandardWorkDetails"
                    class="text-sm text-gray-400">作業詳細情報なし</p>
             </div>
 

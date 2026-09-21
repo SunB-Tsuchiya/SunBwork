@@ -1436,6 +1436,9 @@ class JobBoxController extends Controller
 
         $assignment->save();
 
+        app(\App\Services\MGinbon\MGinbonAssignmentSyncService::class)
+            ->complete($assignment, $user?->id);
+
         // workerセルの completed_at を記録
         try {
             \App\Models\ProgressCell::where('assignment_id', $assignment->id)
@@ -1717,6 +1720,11 @@ class JobBoxController extends Controller
             }
 
             DB::commit();
+
+            if (isset($event) && $event) {
+                app(\App\Services\MGinbon\MGinbonAssignmentSyncService::class)
+                    ->start($assignment, $data['date'], $user?->id);
+            }
         } catch (\Throwable $e) {
             DB::rollBack();
             report($e);

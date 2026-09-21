@@ -537,6 +537,8 @@ class ProgressSheetController extends Controller
             }
 
             if (!$hasEvents) {
+                app(\App\Services\MGinbon\MGinbonAssignmentSyncService::class)
+                    ->release($assignment->id, request()->user()?->id, 'progress_cell_unlinked');
                 $assignment->delete();
             }
         });
@@ -602,6 +604,9 @@ class ProgressSheetController extends Controller
         $this->setCompletedStatus($assignment);
         $assignment->save();
 
+        app(\App\Services\MGinbon\MGinbonAssignmentSyncService::class)
+            ->complete($assignment, $user->id);
+
         // workerセルの completed_at を記録
         try {
             \App\Models\ProgressCell::where('assignment_id', $assignment->id)
@@ -665,6 +670,9 @@ class ProgressSheetController extends Controller
         $assignment->completed = false;
         $assignment->status_id = null;
         $assignment->save();
+
+        app(\App\Services\MGinbon\MGinbonAssignmentSyncService::class)
+            ->reopen($assignment, $user->id);
 
         // 進行表セルの completed_at もクリア
         try {
