@@ -7,6 +7,7 @@ use App\Models\MGinbon\MGinbonProject;
 use App\Models\ProjectJob;
 use App\Models\ProjectJobAssignment;
 use App\Models\ProjectTeamMember;
+use App\Services\MGinbon\MGinbonPlannedActorPolicy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -103,11 +104,24 @@ class MGinbonProgressController extends Controller
             ->get(['id', 'user_id'])->keyBy('id');
         $userNames = \App\Models\User::query()->whereIn('id', $assignments->pluck('user_id')->filter()->unique())
             ->pluck('name', 'id');
+        $plannedPackages = $db->table('mginbon_work_package_tasks as links')
+            ->join('mginbon_work_packages as packages', 'packages.id', '=', 'links.mginbon_work_package_id')
+            ->whereIn('links.mginbon_stage_task_id', $tasks->pluck('id'))
+            ->where('packages.status', 'planned')
+            ->orderByDesc('packages.id')
+            ->get(['links.mginbon_stage_task_id', 'packages.user_id', 'packages.subcontractor_id'])
+            ->groupBy('mginbon_stage_task_id')->map->first();
+        $plannedUserNames = \App\Models\User::withGhosts()
+            ->whereIn('id', $plannedPackages->pluck('user_id')->filter()->unique())->pluck('name', 'id');
+        $plannedSubcontractorNames = \App\Models\Subcontractor::query()
+            ->whereIn('id', $plannedPackages->pluck('subcontractor_id')->filter()->unique())->pluck('name', 'id');
         $tasksBySubject = $tasks->groupBy('mginbon_item_subject_id');
         $subjectsByItem = $subjectRows->groupBy('mginbon_item_id');
-        $itemRows = $itemRows->map(function ($item) use ($subjectsByItem, $tasksBySubject, $assignments, $userNames, $request) {
-            $item->subjects = $subjectsByItem->get($item->id, collect())->map(function ($subject) use ($tasksBySubject, $assignments, $userNames, $request) {
-                $subject->tasks = $tasksBySubject->get($subject->id, collect())->map(fn ($task) => [
+        $itemRows = $itemRows->map(function ($item) use ($subjectsByItem, $tasksBySubject, $assignments, $userNames, $plannedPackages, $plannedUserNames, $plannedSubcontractorNames, $request) {
+            $item->subjects = $subjectsByItem->get($item->id, collect())->map(function ($subject) use ($tasksBySubject, $assignments, $userNames, $plannedPackages, $plannedUserNames, $plannedSubcontractorNames, $request) {
+                $subject->tasks = $tasksBySubject->get($subject->id, collect())->map(function ($task) use ($assignments, $userNames, $plannedPackages, $plannedUserNames, $plannedSubcontractorNames, $request) {
+                    $planned = $plannedPackages->get($task->id);
+                    return [
                     'id' => $task->id,
                     'stage_id' => $task->stage_id,
                     'code' => $task->code,
@@ -118,7 +132,13 @@ class MGinbonProgressController extends Controller
                     'is_mine' => $assignments->get($task->project_job_assignment_id)?->user_id === $request->user()->id,
                     'user_name' => ($userId = $assignments->get($task->project_job_assignment_id)?->user_id)
                         ? ($userNames[$userId] ?? '担当者') : null,
-                ])->values();
+                    'planned_user_id' => $planned?->user_id,
+                    'planned_subcontractor_id' => $planned?->subcontractor_id,
+                    'planned_actor_name' => $planned?->user_id
+                        ? ($plannedUserNames[$planned->user_id] ?? '仮担当者')
+                        : ($planned?->subcontractor_id ? ($plannedSubcontractorNames[$planned->subcontractor_id] ?? '仮外注先') : null),
+                    ];
+                })->values();
                 return $subject;
             })->values();
             return $item;
@@ -138,7 +158,7 @@ class MGinbonProgressController extends Controller
         ]);
     }
 
-    public function register(Request $request, ProjectJob $projectJob): JsonResponse
+    public function register(Request $request, ProjectJob $projectJob, MGinbonPlannedActorPolicy $plannedActorPolicy): JsonResponse
     {
         $this->authorizeProject($request, $projectJob);
         $project = MGinbonProject::query()->where('project_job_id', $projectJob->id)->firstOrFail();
@@ -147,12 +167,13 @@ class MGinbonProgressController extends Controller
             'stage_id' => ['required', 'integer'],
             'subject_ids' => ['required', 'array', 'min:1', 'max:4'],
             'subject_ids.*' => ['required', 'integer'],
+            'replace_planned' => ['sometimes', 'boolean'],
         ]);
 
         $db = DB::connection('mginbon');
         $assignment = null;
         try {
-            $result = $db->transaction(function () use ($request, $projectJob, $project, $validated, $db, &$assignment) {
+            $result = $db->transaction(function () use ($request, $projectJob, $project, $validated, $db, $plannedActorPolicy, &$assignment) {
                 $item = $db->table('mginbon_items as items')
                     ->join('mginbon_production_units as units', 'units.id', '=', 'items.mginbon_production_unit_id')
                     ->join('mginbon_media_types as media', 'media.id', '=', 'items.mginbon_media_type_id')
@@ -179,10 +200,21 @@ class MGinbonProgressController extends Controller
                 abort_if($tasks->contains(fn ($task) => $task->project_job_assignment_id || $task->status !== 'not_started'),
                     422, '選択した作業のいずれかはすでに登録済みです。');
 
+                $plannedPackages = $db->table('mginbon_work_package_tasks as links')
+                    ->join('mginbon_work_packages as packages', 'packages.id', '=', 'links.mginbon_work_package_id')
+                    ->whereIn('links.mginbon_stage_task_id', $tasks->pluck('id'))
+                    ->where('packages.status', 'planned')
+                    ->get(['packages.id', 'packages.user_id', 'packages.subcontractor_id'])->unique('id');
+                $user = $request->user();
+                $hasDifferentPlannedActor = $plannedActorPolicy
+                    ->requiresReplacementConfirmation($plannedPackages, (int) $user->id);
+                if ($hasDifferentPlannedActor && ! ($validated['replace_planned'] ?? false)) {
+                    abort(409, '別の仮担当者が設定されています。あなたを正式担当者として登録しますか？');
+                }
+
                 $stageName = $this->userStageName($stage->code, $stage->name);
                 $title = "銀本 {$item->display_name} {$item->media_name}（{$stageName}）";
                 $detail = '対象教科: '.$subjects->pluck('name')->implode('・');
-                $user = $request->user();
                 $assignment = ProjectJobAssignment::create([
                     'project_job_id' => $projectJob->id,
                     'user_id' => $user->id,
@@ -205,18 +237,33 @@ class MGinbonProgressController extends Controller
                     'created_by' => $user->id,
                     'created_at' => now(), 'updated_at' => now(),
                 ]);
+                $plannedPackageIds = $plannedPackages->pluck('id');
+                $db->table('mginbon_work_package_tasks')->whereIn('mginbon_stage_task_id', $tasks->pluck('id'))
+                    ->whereIn('mginbon_work_package_id', $plannedPackageIds)->delete();
+                foreach ($plannedPackageIds as $plannedPackageId) {
+                    if (! $db->table('mginbon_work_package_tasks')->where('mginbon_work_package_id', $plannedPackageId)->exists()) {
+                        $db->table('mginbon_work_packages')->where('id', $plannedPackageId)
+                            ->update(['status' => 'cancelled', 'cancelled_at' => now(), 'updated_at' => now()]);
+                    }
+                }
                 foreach ($tasks as $task) {
                     $db->table('mginbon_work_package_tasks')->insert([
                         'mginbon_work_package_id' => $packageId,
                         'mginbon_stage_task_id' => $task->id,
                         'created_at' => now(), 'updated_at' => now(),
                     ]);
-                    $db->table('mginbon_stage_task_participants')->insert([
+                    $participant = $db->table('mginbon_stage_task_participants')
+                        ->where('mginbon_stage_task_id', $task->id)->where('role_type', $stage->activity_type)->first();
+                    $participantValues = [
+                        'execution_type' => 'internal', 'user_id' => $user->id, 'subcontractor_id' => null,
+                        'resolution_status' => 'resolved', 'updated_at' => now(),
+                    ];
+                    $participant
+                        ? $db->table('mginbon_stage_task_participants')->where('id', $participant->id)->update($participantValues)
+                        : $db->table('mginbon_stage_task_participants')->insert([
                         'mginbon_stage_task_id' => $task->id,
                         'role_type' => $stage->activity_type,
-                        'execution_type' => 'internal',
-                        'user_id' => $user->id,
-                        'resolution_status' => 'resolved',
+                        ...$participantValues,
                         'created_at' => now(), 'updated_at' => now(),
                     ]);
                 }
@@ -224,6 +271,17 @@ class MGinbonProgressController extends Controller
                     'status' => 'assigned',
                     'project_job_assignment_id' => $assignment->id,
                     'updated_at' => now(),
+                ]);
+                $db->table('mginbon_items')->where('id', $item->id)->update(['updated_at' => now()]);
+                $db->table('mginbon_change_logs')->insert([
+                    'mginbon_project_id' => $project->id, 'mginbon_item_id' => $item->id,
+                    'changed_by' => $user->id, 'field_path' => 'work_package.registered_actor',
+                    'old_value' => json_encode($plannedPackages->map(fn ($package) => [
+                        'user_id' => $package->user_id, 'subcontractor_id' => $package->subcontractor_id,
+                    ])->values()->all(), JSON_UNESCAPED_UNICODE),
+                    'new_value' => json_encode(['user_id' => $user->id, 'assignment_id' => $assignment->id,
+                        'stage' => $stage->code, 'subject_ids' => $subjects->pluck('id')->all()], JSON_UNESCAPED_UNICODE),
+                    'source' => 'user_registration', 'created_at' => now(), 'updated_at' => now(),
                 ]);
 
                 return ['assignment_id' => $assignment->id, 'title' => $title];

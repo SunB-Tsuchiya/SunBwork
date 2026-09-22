@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Coordinator;
 use App\Http\Controllers\Controller;
 use App\Models\MGinbon\MGinbonProject;
 use App\Models\ProjectJob;
+use App\Services\ProjectJobAssigneeOptions;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -17,7 +18,7 @@ class MGinbonLedgerController extends Controller
 {
     private const SUBJECT_ORDER = ['japanese', 'math', 'social', 'science'];
 
-    public function index(Request $request): Response
+    public function index(Request $request, ProjectJobAssigneeOptions $assigneeOptions): Response
     {
         $validated = $request->validate([
             'year' => ['nullable', 'integer', 'between:2000,2100'],
@@ -75,6 +76,11 @@ class MGinbonLedgerController extends Controller
                 ->where('mginbon_project_id', $project->id)->count(),
         ];
 
+        $actorOptions = ['users' => collect(), 'subcontractors' => collect()];
+        if ($project->project_job_id && ($projectJob = ProjectJob::find($project->project_job_id))) {
+            $actorOptions = $assigneeOptions->for($projectJob, $request->user());
+        }
+
         return Inertia::render('Coordinator/MGinbon/LedgerIndex', [
             'project' => $project,
             'projects' => $projects,
@@ -89,6 +95,7 @@ class MGinbonLedgerController extends Controller
                 ['code' => 'science', 'name' => '理科'],
             ],
             'filters' => $filters,
+            'actorOptions' => $actorOptions,
         ]);
     }
 
@@ -197,7 +204,7 @@ class MGinbonLedgerController extends Controller
             ->orderBy('stages.sort_order')
             ->get([
                 'tasks.id', 'tasks.mginbon_item_id', 'tasks.mginbon_item_subject_id', 'tasks.status',
-                'tasks.project_job_assignment_id', 'stages.code', 'stages.name',
+                'tasks.project_job_assignment_id', 'stages.id as stage_id', 'stages.code', 'stages.name',
             ]);
         $taskIds = $tasks->pluck('id');
         $participants = DB::connection('mginbon')->table('mginbon_stage_task_participants')
@@ -206,7 +213,7 @@ class MGinbonLedgerController extends Controller
         $packages = DB::connection('mginbon')->table('mginbon_work_package_tasks as package_tasks')
             ->join('mginbon_work_packages as packages', 'packages.id', '=', 'package_tasks.mginbon_work_package_id')
             ->whereIn('package_tasks.mginbon_stage_task_id', $taskIds)
-            ->whereIn('packages.status', ['assigned', 'in_progress', 'completed'])
+            ->whereIn('packages.status', ['planned', 'assigned', 'in_progress', 'completed'])
             ->orderByDesc('packages.id')
             ->get([
                 'package_tasks.mginbon_stage_task_id', 'packages.id', 'packages.user_id',
@@ -245,18 +252,20 @@ class MGinbonLedgerController extends Controller
                                 : $participant?->legacy_value);
 
                         return [
+                            'stage_id' => $task->stage_id,
                             'code' => $task->code,
                             'name' => $task->name,
                             'status' => $task->status,
                             'actor' => $actor,
+                            'target' => $package?->user_id ? 'user:'.$package->user_id
+                                : ($package?->subcontractor_id ? 'subcontractor:'.$package->subcontractor_id : null),
                             'assignment_id' => $package?->project_job_assignment_id,
                             'assigned_at' => $package?->assigned_at,
                             'completed_at' => $package?->completed_at,
+                            'planned' => $package?->status === 'planned',
                             'resolution_status' => $participant?->resolution_status,
                         ];
-                    })
-                    ->filter(fn ($task) => $task['actor'] || $task['status'] !== 'not_started')
-                    ->values();
+                    })->values();
 
                 return $subject;
             })->values();

@@ -147,7 +147,7 @@ class ProgressSheetController extends Controller
     /**
      * シート詳細（進行管理表）
      */
-    public function show(Request $request, ProgressSheet $sheet)
+    public function show(Request $request, ProgressSheet $sheet, \App\Services\ProjectJobAssigneeOptions $assigneeOptions)
     {
         $sheet->load(['projectJob.client', 'projectJob.size', 'projectJob.user', 'projectJob.coordinators']);
         $projectJob = $sheet->projectJob;
@@ -301,28 +301,10 @@ class ProgressSheetController extends Controller
             return $c;
         });
 
-        // 担当者選択用ユーザー一覧（案件メンバー + Coordinator + ゴーストユーザー）
-        $memberIds = $projectJob->teamMembers()->pluck('user_id')->toArray();
-        $coIds = $projectJob->coordinators->pluck('id')->toArray();
-        $ownerId = $projectJob->user_id;
-        $userIds = array_unique(array_merge($memberIds, $coIds, [$ownerId]));
-        $regularUsers = User::whereIn('id', $userIds)->ordered()->get(['id', 'name'])
-            ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'is_ghost' => false]);
-        $ghostUsers = \App\Models\User::withGhosts()
-            ->where('ghost_owner_id', $request->user()->id)
-            ->ordered()->get(['id', 'name'])
-            ->map(fn ($g) => ['id' => $g->id, 'name' => $g->name, 'is_ghost' => true]);
-        $users = $regularUsers->concat($ghostUsers)->values();
-
-        // ログインCoordinatorが管理する外注先
-        $authUser = $request->user();
-        $subcontractors = \App\Models\Subcontractor::managedBy($authUser->id)
-            ->get(['id', 'name'])
-            ->map(fn($s) => [
-                'id'               => $s->id,
-                'name'             => $s->name,
-                'is_subcontractor' => true,
-            ]);
+        // 担当候補は銀本進行と共通化し、案件メンバー／管理外注先の範囲を揃える。
+        $actorOptions = $assigneeOptions->for($projectJob, $request->user());
+        $users = $actorOptions['users'];
+        $subcontractors = $actorOptions['subcontractors'];
 
         // 列タイプ用マスターデータ
         $stages = \App\Models\Stage::orderBy('id')->get(['id', 'name']);

@@ -70,6 +70,7 @@ function assignStage() {
     stage_definition_id: assignment.stage_definition_id,
     subject_ids: assignment.subject_ids,
     target: assignment.target,
+    updated_at: props.item.updated_at,
   }, {
     preserveScroll: true,
     onError: (errors) => { assignment.error = Object.values(errors)[0] ?? '担当登録に失敗しました。'; },
@@ -128,14 +129,14 @@ function lifecycleDate(value) {
 
       <section class="rounded border border-green-200 bg-white p-4 shadow">
         <div class="flex flex-wrap items-center justify-between gap-2">
-          <div><h3 class="font-semibold text-gray-800">工程担当を登録</h3><p class="mt-1 text-xs text-gray-500">複数教科を選んでも、1つの作業パッケージとして登録します。</p></div>
+          <div><h3 class="font-semibold text-gray-800">工程の仮担当を設定</h3><p class="mt-1 text-xs text-gray-500">依頼ジョブは送信しません。ユーザーがMyJobへ登録した時点で正式担当になります。</p></div>
           <button type="button" class="rounded border border-green-300 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-800 hover:bg-green-100" @click="selectAllSubjects">4教科に反映</button>
         </div>
         <div class="mt-4 grid gap-4 lg:grid-cols-[15rem_1fr_18rem_auto] lg:items-end">
           <label class="text-xs text-gray-600">工程<select v-model="assignment.stage_definition_id" class="mt-1 w-full rounded border-gray-300 text-sm"><option value="">選択してください</option><option v-for="stage in stageDefinitions" :key="stage.id" :value="stage.id">{{ stage.name }}</option></select></label>
           <fieldset><legend class="mb-1 text-xs text-gray-600">対象教科</legend><div class="flex flex-wrap gap-2"><label v-for="subject in item.subjects" :key="subject.id" class="flex items-center gap-1 rounded border bg-gray-50 px-3 py-2 text-sm"><input v-model="assignment.subject_ids" type="checkbox" :value="subject.id" />{{ subject.name }}</label></div></fieldset>
           <label class="text-xs text-gray-600">担当先<select v-model="assignment.target" class="mt-1 w-full rounded border-gray-300 text-sm"><option value="">選択してください</option><optgroup label="社員"><option v-for="user in users" :key="`u${user.id}`" :value="`user:${user.id}`">{{ user.name }}</option></optgroup><optgroup label="外注先"><option v-for="vendor in subcontractors" :key="`s${vendor.id}`" :value="`subcontractor:${vendor.id}`">{{ vendor.name }}</option></optgroup></select></label>
-          <button type="button" :disabled="assignment.processing" class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50" @click="assignStage">{{ assignment.processing ? '登録中…' : '担当を反映' }}</button>
+          <button type="button" :disabled="assignment.processing" class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50" @click="assignStage">{{ assignment.processing ? '設定中…' : '仮担当を反映' }}</button>
         </div>
         <p v-if="assignment.error" class="mt-2 text-sm text-red-600">{{ assignment.error }}</p>
       </section>
@@ -151,7 +152,7 @@ function lifecycleDate(value) {
               <div v-for="stage in subject.stages" :key="stage.code" class="border-b py-1">
                 <div class="flex items-center justify-between gap-3">
                   <span class="text-gray-500">{{ stage.name }}</span>
-                  <span class="text-right font-medium">{{ stage.actor || '—' }}</span>
+                  <span class="text-right font-medium" :class="stage.planned ? 'border-b border-dashed border-amber-700 text-amber-900' : ''">{{ stage.actor || '—' }}<small v-if="stage.planned" class="ml-1">仮</small></span>
                 </div>
                 <div v-if="stage.status !== 'not_started'" class="mt-1 flex items-center justify-end gap-2">
                   <span class="rounded px-1.5 py-0.5 text-[10px]" :class="stageStatusClass(stage.status)">{{ stageStatusLabel(stage.status) }}</span>

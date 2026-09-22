@@ -97,9 +97,14 @@ async function register(item, stage) {
   }
   processing[k] = true;
   try {
-    const response = await axios.post(route('user.project_jobs.mginbon_progress.register', { projectJob: props.projectJob.id }), {
-      item_id: item.id, stage_id: stage.id, subject_ids: subjectIds,
-    });
+    const url = route('user.project_jobs.mginbon_progress.register', { projectJob: props.projectJob.id });
+    let response;
+    try {
+      response = await axios.post(url, { item_id: item.id, stage_id: stage.id, subject_ids: subjectIds });
+    } catch (error) {
+      if (error?.response?.status !== 409 || !window.confirm(error.response.data?.message ?? '仮担当者を上書きして登録しますか？')) throw error;
+      response = await axios.post(url, { item_id: item.id, stage_id: stage.id, subject_ids: subjectIds, replace_planned: true });
+    }
     for (const subject of item.subjects ?? []) {
       if (!subjectIds.includes(subject.id)) continue;
       const task = taskFor(subject, stage.id);
@@ -107,6 +112,7 @@ async function register(item, stage) {
         task.status = 'assigned';
         task.assignment_id = response.data.assignment_id;
         task.user_name = '自分';
+        task.planned_actor_name = null;
       }
     }
     selections[k] = [];
@@ -166,6 +172,7 @@ function paginationLabel(label) {
                   @click="toggleSubject(item, stage, subject.id)">
                   <span class="font-medium">{{ subject.name }}</span>
                   <span v-if="taskFor(subject, stage.id)?.assignment_id" class="ml-1 text-xs">{{ taskFor(subject, stage.id)?.user_name || '登録済' }}</span>
+                  <span v-else-if="taskFor(subject, stage.id)?.planned_actor_name" class="ml-1 text-xs text-amber-700">仮: {{ taskFor(subject, stage.id)?.planned_actor_name }}</span>
                 </button>
               </div>
               <div class="flex flex-wrap items-center justify-end gap-2">

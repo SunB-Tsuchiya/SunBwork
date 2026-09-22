@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\MGinbon\MGinbonItem;
 use App\Models\Subcontractor;
 use App\Models\User;
+use App\Models\ProjectJob;
+use App\Services\ProjectJobAssigneeOptions;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,14 +19,15 @@ use Inertia\Response;
 
 class MGinbonItemController extends Controller
 {
-    public function show(Request $request, MGinbonItem $item): Response
+    public function show(Request $request, MGinbonItem $item, ProjectJobAssigneeOptions $assigneeOptions): Response
     {
         $data = $this->itemData($item->id);
         abort_unless($data, 404);
 
-        $companyId = $request->user()?->user_role === 'superadmin'
-            ? session('superadmin_context.company_id') : $request->user()?->company_id;
-        $globalSuperAdmin = $request->user()?->user_role === 'superadmin' && $companyId === null;
+        $actorOptions = ['users' => collect(), 'subcontractors' => collect()];
+        if ($data['project_job_id'] && ($projectJob = ProjectJob::find($data['project_job_id']))) {
+            $actorOptions = $assigneeOptions->for($projectJob, $request->user());
+        }
 
         return Inertia::render('Coordinator/MGinbon/ItemShow', [
             'item' => $data,
@@ -33,10 +36,8 @@ class MGinbonItemController extends Controller
                 ->join('mginbon_items as items', 'items.mginbon_production_unit_id', '=', 'units.id')
                 ->where('items.id', $item->id)->where('stages.is_active', true)
                 ->orderBy('stages.sort_order')->get(['stages.id', 'stages.code', 'stages.name', 'stages.activity_type']),
-            'users' => User::query()->when($globalSuperAdmin, fn ($q) => $q->whereRaw('1 = 0'))
-                ->when($companyId, fn ($q) => $q->where('company_id', $companyId))->ordered()->get(['id', 'name']),
-            'subcontractors' => Subcontractor::query()->when($globalSuperAdmin, fn ($q) => $q->whereRaw('1 = 0'))
-                ->when($companyId, fn ($q) => $q->where('company_id', $companyId))->orderBy('name')->get(['id', 'name']),
+            'users' => $actorOptions['users'],
+            'subcontractors' => $actorOptions['subcontractors'],
             'history' => DB::connection('mginbon')->table('mginbon_change_logs')
                 ->where('mginbon_item_id', $item->id)->latest()->limit(30)->get()
                 ->map(fn ($row) => [
@@ -178,7 +179,7 @@ class MGinbonItemController extends Controller
             ->join('mginbon_projects as projects', 'projects.id', '=', 'units.mginbon_project_id')
             ->where('items.id', $itemId)->first([
                 'items.*', 'units.mikuni_code', 'units.n_code', 'units.display_name', 'units.school_category',
-                'units.n_category', 'media.name as media_name', 'projects.year',
+                'units.n_category', 'media.name as media_name', 'projects.year', 'projects.project_job_id',
             ]);
         if (! $row) return null;
 
@@ -202,7 +203,7 @@ class MGinbonItemController extends Controller
         $packages = DB::connection('mginbon')->table('mginbon_work_package_tasks as package_tasks')
             ->join('mginbon_work_packages as packages', 'packages.id', '=', 'package_tasks.mginbon_work_package_id')
             ->whereIn('package_tasks.mginbon_stage_task_id', $taskIds)
-            ->whereIn('packages.status', ['assigned', 'in_progress', 'completed'])
+            ->whereIn('packages.status', ['planned', 'assigned', 'in_progress', 'completed'])
             ->orderByDesc('packages.id')
             ->get([
                 'package_tasks.mginbon_stage_task_id', 'packages.user_id', 'packages.subcontractor_id',
@@ -240,6 +241,7 @@ class MGinbonItemController extends Controller
                             'assignment_id' => $package?->project_job_assignment_id,
                             'assigned_at' => $package?->assigned_at,
                             'completed_at' => $package?->completed_at,
+                            'planned' => $package?->status === 'planned',
                         ];
                     })
                     ->filter(fn ($task) => $task['actor'] || $task['status'] !== 'not_started')

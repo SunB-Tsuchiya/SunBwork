@@ -3,12 +3,14 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import SchoolHeader from '@/Components/MGinbon/SchoolHeader.vue';
 import IntakeCheckBlock from '@/Components/MGinbon/IntakeCheckBlock.vue';
+import LedgerCellEditor from '@/Components/MGinbon/LedgerCellEditor.vue';
 import ToastUnified from '@/Components/ToastUnified.vue';
 
 const props = defineProps({
   project: { type: Object, required: true }, projects: { type: Array, default: () => [] }, projectJobs: { type: Array, default: () => [] },
   units: { type: Object, required: true }, summary: { type: Object, required: true }, mediaOptions: { type: Array, default: () => [] },
   subjects: { type: Array, default: () => [] }, filters: { type: Object, required: true },
+  actorOptions: { type: Object, default: () => ({ users: [], subcontractors: [] }) },
 });
 const form = reactive({ ...props.filters });
 const projectLinkForm = useForm({ project_job_id: props.project.project_job_id ?? '' });
@@ -57,11 +59,18 @@ function resetFilters() { Object.assign(form, { search: '', media: '', subject: 
 function saveProjectLink() { projectLinkForm.put(route('coordinator.mginbon.projects.project_link', { project: props.project.id }), { preserveScroll: true }); }
 function createProjectLink() { if (window.confirm(`${props.project.year}年の銀本専用案件を新規作成して接続しますか？`)) router.post(route('coordinator.mginbon.projects.project_link.create', { project: props.project.id }), {}, { preserveScroll: true }); }
 const task = (subject, code) => subject.stages?.find((row) => row.code === code);
-const actor = (subject, code) => task(subject, code)?.actor || '';
-const qty = (subject, type, execution) => subject.measurements?.find((row) => row.work_type === type && row.execution_type === execution)?.quantity ?? 0;
-const shortDate = (value) => value ? value.slice(5).replace('-', '/') : '';
 const columnClass = (tone) => ({ intake: 'bg-[#ffccff]', prepress: 'bg-[#fff0cb]', scan: 'bg-[#dadada]', operation: 'bg-[#66ffcc]', output: 'bg-[#fffb83]', proof: 'bg-white', complete: 'bg-[#ccffcc]' })[tone] ?? 'bg-white';
 const paginationLabel = (label) => label.replace('&laquo; Previous', '前へ').replace('Next &raquo;', '次へ');
+function cellSaved(item, subject, payload) {
+  item.updated_at = payload.updated_at;
+  if (payload.kind === 'date') {
+    if (payload.subjectId === null) item.shared_dates[payload.code] = payload.date;
+    else subject.dates[payload.code] = payload.date;
+    return;
+  }
+  const row = task(subject, payload.code);
+  if (row) Object.assign(row, { actor: payload.actor, target: payload.target, assignment_id: payload.assignment_id, status: payload.status, planned: payload.planned });
+}
 </script>
 
 <template>
@@ -145,7 +154,9 @@ const paginationLabel = (label) => label.replace('&laquo; Previous', '前へ').r
                   </tr></thead>
                   <tbody><tr v-for="subject in item.subjects" :key="subject.id" class="border-b border-white text-center last:border-b-0">
                     <th class="h-6 w-11 bg-white px-1 py-1 text-right text-xs font-semibold">{{ subject.name }}</th>
-                    <td v-for="column in band.columns" :key="column.code" class="h-6 border-r border-white px-1 py-1 font-medium" :class="columnClass(column.tone)">{{ column.type === 'stage' ? actor(subject, column.code) : shortDate(column.type === 'shared' ? item.shared_dates[column.code] : subject.dates[column.code]) }}</td>
+                    <td v-for="column in band.columns" :key="column.code" class="h-6 border-r border-white p-0 font-medium" :class="columnClass(column.tone)">
+                      <LedgerCellEditor :item="item" :subject="subject" :column="column" :task="task(subject, column.code)" :actor-options="actorOptions" :project-linked="Boolean(project.project_job_id)" @saved="cellSaved(item, subject, $event)" />
+                    </td>
                   </tr></tbody>
                 </table>
               </div>

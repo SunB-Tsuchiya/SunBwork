@@ -860,6 +860,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
             ->name('mginbon.items.update');
         Route::patch('/mginbon/items/{item}/intake-check', [App\Http\Controllers\Coordinator\MGinbonItemController::class, 'updateIntakeCheck'])
             ->name('mginbon.items.intake_check.update');
+        Route::patch('/mginbon/items/{item}/date-cell', [App\Http\Controllers\Coordinator\MGinbonCellController::class, 'updateDate'])
+            ->name('mginbon.items.date_cell.update');
         Route::post('/mginbon/items/{item}/assign-stage', [App\Http\Controllers\Coordinator\MGinbonWorkPackageController::class, 'store'])
             ->name('mginbon.items.assign_stage');
         Route::get('/mginbon/actor-mappings', [App\Http\Controllers\Coordinator\MGinbonActorMappingController::class, 'index'])
