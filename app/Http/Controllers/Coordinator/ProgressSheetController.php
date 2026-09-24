@@ -544,6 +544,9 @@ class ProgressSheetController extends Controller
             'completed'          => true,
         ]);
 
+        app(\App\Services\MGinbon\MGinbonAssignmentSyncService::class)
+            ->complete($assignment, $user->id);
+
         return response()->json(['success' => true]);
     }
 

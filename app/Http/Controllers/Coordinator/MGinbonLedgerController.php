@@ -26,7 +26,7 @@ class MGinbonLedgerController extends Controller
             'media' => ['nullable', 'string', 'max:100'],
             'subject' => ['nullable', Rule::in(['', ...self::SUBJECT_ORDER])],
             'status' => ['nullable', Rule::in(['all', 'draft', 'review_required'])],
-            'view' => ['nullable', Rule::in(['list', 'intake'])],
+            'view' => ['nullable', Rule::in(['list', 'intake', 'order_form', 'text_order', 'drawing_order'])],
             'per_page' => ['nullable', Rule::in([10, 25, 50])],
         ]);
 
@@ -47,7 +47,13 @@ class MGinbonLedgerController extends Controller
             'per_page' => (int) ($validated['per_page'] ?? 10),
         ];
 
-        $mediaOptions = $this->itemsQuery($project->id)->distinct()->orderBy('media_name')->pluck('media_name')->values();
+        $mediaOptions = $this->itemsQuery($project->id)
+            ->reorder()
+            ->select('media.name as media_name')
+            ->distinct()
+            ->orderBy('media.name')
+            ->pluck('media_name')
+            ->values();
         $query = $this->applyUnitFilters($this->unitsQuery($project->id), $filters);
 
         /** @var LengthAwarePaginator $units */
@@ -69,11 +75,27 @@ class MGinbonLedgerController extends Controller
         }));
 
         $summaryQuery = $this->itemsQuery($project->id);
+        $filteredItemIds = $this->applyItemFilters($this->itemsQuery($project->id), $filters)
+            ->reorder()->pluck('items.id');
+        $intakeTotals = DB::connection('mginbon')->table('mginbon_work_measurements as measurements')
+            ->join('mginbon_item_subjects as item_subjects', 'item_subjects.id', '=', 'measurements.mginbon_item_subject_id')
+            ->join('mginbon_subjects as subjects', 'subjects.id', '=', 'item_subjects.mginbon_subject_id')
+            ->whereIn('item_subjects.mginbon_item_id', $filteredItemIds)
+            ->when($filters['subject'] !== '', fn (Builder $query) => $query->where('subjects.code', $filters['subject']))
+            ->groupBy('measurements.work_type', 'measurements.execution_type')
+            ->get(['measurements.work_type', 'measurements.execution_type', DB::raw('SUM(measurements.quantity) as total')])
+            ->mapWithKeys(fn ($row) => [$row->work_type.':'.$row->execution_type => (int) $row->total]);
         $summary = [
             'total' => (clone $summaryQuery)->count(),
             'review_required' => (clone $summaryQuery)->where('items.review_status', 'review_required')->count(),
             'units' => DB::connection('mginbon')->table('mginbon_production_units')
                 ->where('mginbon_project_id', $project->id)->count(),
+            'intake_totals' => [
+                'scan:subcontracted' => $intakeTotals->get('scan:subcontracted', 0),
+                'drawing:subcontracted' => $intakeTotals->get('drawing:subcontracted', 0),
+                'scan:internal' => $intakeTotals->get('scan:internal', 0),
+                'drawing:internal' => $intakeTotals->get('drawing:internal', 0),
+            ],
         ];
 
         $actorOptions = ['users' => collect(), 'subcontractors' => collect()];
@@ -159,6 +181,14 @@ class MGinbonLedgerController extends Controller
     /** @param array<string, mixed> $filters */
     private function applyItemFilters(Builder $query, array $filters): Builder
     {
+        if ($filters['search'] !== '') {
+            $search = addcslashes($filters['search'], '\\%_');
+            $query->where(function (Builder $inner) use ($search) {
+                $inner->where('units.display_name', 'like', "%{$search}%")
+                    ->orWhere('units.mikuni_code', 'like', "%{$search}%")
+                    ->orWhere('units.n_code', 'like', "%{$search}%");
+            });
+        }
         $this->applyNestedItemFilters($query, $filters, 'items', 'media');
         return $query;
     }

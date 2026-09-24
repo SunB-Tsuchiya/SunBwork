@@ -117,6 +117,7 @@ class MGinbonItemController extends Controller
     {
         $validated = $request->validate([
             'updated_at' => ['required', 'string'],
+            'note' => ['nullable', 'string', 'max:5000'],
             'subjects' => ['required', 'array', 'min:1', 'max:4'],
             'subjects.*.id' => ['required', 'integer'],
             'subjects.*.measurements' => ['required', 'array'],
@@ -137,6 +138,9 @@ class MGinbonItemController extends Controller
             $unit = $connection->table('mginbon_production_units')->where('id', $lockedItem->mginbon_production_unit_id)->first();
             $validSubjectIds = $connection->table('mginbon_item_subjects')
                 ->where('mginbon_item_id', $item->id)->pluck('id')->all();
+
+            $this->updateWithLogs($connection, $unit->mginbon_project_id, $item->id, null,
+                'mginbon_items', $item->id, ['note' => $validated['note'] ?? null], 'item', $request->user()?->id);
 
             foreach ($validated['subjects'] as $subject) {
                 abort_unless(in_array($subject['id'], $validSubjectIds, true), 422);

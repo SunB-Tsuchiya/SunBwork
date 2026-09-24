@@ -1,9 +1,9 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import SchoolHeader from '@/Components/MGinbon/SchoolHeader.vue';
 import IntakeCheckBlock from '@/Components/MGinbon/IntakeCheckBlock.vue';
 import LedgerCellEditor from '@/Components/MGinbon/LedgerCellEditor.vue';
+import OrderReportLayout from '@/Components/MGinbon/OrderReportLayout.vue';
 import ToastUnified from '@/Components/ToastUnified.vue';
 
 const props = defineProps({
@@ -12,6 +12,9 @@ const props = defineProps({
   subjects: { type: Array, default: () => [] }, filters: { type: Object, required: true },
   actorOptions: { type: Object, default: () => ({ users: [], subcontractors: [] }) },
 });
+const uniqueMediaOptions = computed(() => [...new Set(props.mediaOptions.filter(Boolean))]);
+const reportViews = ['order_form', 'text_order', 'drawing_order'];
+const pageTitle = computed(() => ({ list: '銀本進行', intake: '入稿チェック', order_form: '作図＆文字発注フォーム', text_order: 'C&C文字発注', drawing_order: '大連若葉作図発注書' })[form.view] || '銀本進行');
 const form = reactive({ ...props.filters });
 const projectLinkForm = useForm({ project_job_id: props.project.project_job_id ?? '' });
 const toolbarVisible = ref(true);
@@ -64,21 +67,24 @@ const paginationLabel = (label) => label.replace('&laquo; Previous', '前へ').r
 function cellSaved(item, subject, payload) {
   item.updated_at = payload.updated_at;
   if (payload.kind === 'date') {
-    if (payload.subjectId === null) item.shared_dates[payload.code] = payload.date;
-    else subject.dates[payload.code] = payload.date;
+    if (payload.subjectIds === null) item.shared_dates[payload.code] = payload.date;
+    else item.subjects.filter((row) => payload.subjectIds.includes(row.id)).forEach((row) => { row.dates[payload.code] = payload.date; });
     return;
   }
-  const row = task(subject, payload.code);
-  if (row) Object.assign(row, { actor: payload.actor, target: payload.target, assignment_id: payload.assignment_id, status: payload.status, planned: payload.planned });
+  const subjectIds = payload.subjectIds ?? [subject.id];
+  item.subjects.filter((row) => subjectIds.includes(row.id)).forEach((targetSubject) => {
+    const row = task(targetSubject, payload.code);
+    if (row) Object.assign(row, { actor: payload.actor, target: payload.target, assignment_id: payload.assignment_id, status: payload.status, planned: payload.planned });
+  });
 }
 </script>
 
 <template>
-  <Head title="銀本進行" />
-  <div class="min-h-screen w-full bg-gray-100 p-2 sm:p-3">
+  <Head :title="pageTitle" />
+  <div class="min-h-screen w-full bg-gray-100 mginbon-ledger-root p-2 print:bg-white print:p-0 sm:p-3">
     <ToastUnified />
     <div class="space-y-3">
-      <section class="sticky top-0 z-50 -mx-2 -mt-2 border-b border-gray-500 bg-white shadow-sm transition-transform duration-200 sm:-mx-3 sm:-mt-3" :class="toolbarVisible ? 'translate-y-0' : '-translate-y-full'">
+      <section class="no-print sticky top-0 z-50 -mx-2 -mt-2 border-b border-gray-500 bg-white shadow-sm transition-transform duration-200 sm:-mx-3 sm:-mt-3" :class="toolbarVisible ? 'translate-y-0' : '-translate-y-full'">
         <div class="overflow-x-auto">
           <div class="min-w-[72rem] text-xs text-gray-800">
             <div class="flex h-12 items-stretch border-b border-gray-300">
@@ -97,17 +103,17 @@ function cellSaved(item, subject, payload) {
               <form class="ml-auto flex items-center gap-1 px-2" @submit.prevent="search"><span class="text-lg">⌕</span><input v-model="form.search" type="search" placeholder="学校名・コードを検索" class="h-7 w-60 border-gray-400 px-2 py-1 text-xs" /><button class="h-7 border border-gray-400 bg-white px-3 hover:bg-gray-100">検索</button></form>
             </div>
             <div class="flex h-8 items-center gap-3 border-b border-gray-400 bg-gray-50 px-1">
-              <label class="flex items-center gap-1">レイアウト:<select v-model="form.view" class="h-6 w-44 border-gray-400 py-0 pl-2 pr-7 text-xs" @change="search"><option value="list">LIST</option><option value="intake">入稿チェック</option></select></label>
+              <label class="flex items-center gap-1">レイアウト:<select v-model="form.view" class="h-6 w-44 border-gray-400 py-0 pl-2 pr-7 text-xs" @change="search"><option value="list">LIST</option><option value="intake">入稿チェック</option><option value="order_form">作図＆文字発注フォーム</option><option value="text_order">C&amp;C文字発注</option><option value="drawing_order">大連若葉作図発注書</option></select></label>
               <span class="flex items-center gap-1">表示方法の切り替え:<button type="button" class="border border-gray-400 bg-gray-600 px-2 py-0.5 text-white">▤</button><button type="button" class="border border-gray-400 bg-white px-2 py-0.5">▦</button><button type="button" class="border border-gray-400 bg-white px-2 py-0.5">▦</button></span>
               <span class="border border-gray-400 bg-white px-3 py-0.5">プレビュー</span>
               <span class="ml-auto font-semibold">{{ displayedRange }}（全{{ summary.total }}媒体）</span>
             </div>
             <form class="flex h-8 items-center gap-2 bg-[#aeb2b5] px-1" @submit.prevent="search">
-              <select v-model.number="form.year" class="h-6 w-28 border-gray-400 py-0 pl-2 pr-7 text-xs"><option v-for="p in projects" :key="p.id" :value="p.year">{{ p.year }}年</option></select>
-              <select v-model="form.media" class="h-6 w-36 border-gray-400 py-0 pl-2 pr-7 text-xs"><option value="">媒体: すべて</option><option v-for="m in mediaOptions" :key="m">{{ m }}</option></select>
-              <select v-model="form.subject" class="h-6 w-32 border-gray-400 py-0 pl-2 pr-7 text-xs"><option value="">教科: すべて</option><option v-for="s in subjects" :key="s.code" :value="s.code">{{ s.name }}</option></select>
-              <select v-model="form.status" class="h-6 w-32 border-gray-400 py-0 pl-2 pr-7 text-xs"><option value="all">状態: すべて</option><option value="draft">下書き</option><option value="review_required">要確認</option></select>
-              <select v-model.number="form.per_page" class="h-6 w-28 border-gray-400 py-0 pl-2 pr-7 text-xs"><option :value="10">10校／頁</option><option :value="25">25校／頁</option><option :value="50">50校／頁</option></select>
+              <select v-model.number="form.year" class="h-6 w-28 border-gray-400 py-0 pl-2 pr-7 text-xs" @change="search"><option v-for="p in projects" :key="p.id" :value="p.year">{{ p.year }}年</option></select>
+              <select v-model="form.media" class="h-6 w-36 border-gray-400 py-0 pl-2 pr-7 text-xs" @change="search"><option value="">媒体: すべて</option><option v-for="m in uniqueMediaOptions" :key="m" :value="m">{{ m }}</option></select>
+              <select v-model="form.subject" class="h-6 w-32 border-gray-400 py-0 pl-2 pr-7 text-xs" @change="search"><option value="">教科: すべて</option><option v-for="s in subjects" :key="s.code" :value="s.code">{{ s.name }}</option></select>
+              <select v-model="form.status" class="h-6 w-32 border-gray-400 py-0 pl-2 pr-7 text-xs" @change="search"><option value="all">状態: すべて</option><option value="draft">下書き</option><option value="review_required">要確認</option></select>
+              <select v-model.number="form.per_page" class="h-6 w-28 border-gray-400 py-0 pl-2 pr-7 text-xs" @change="search"><option :value="10">10校／頁</option><option :value="25">25校／頁</option><option :value="50">50校／頁</option></select>
               <button class="h-6 border border-gray-500 bg-white px-4 hover:bg-gray-100">絞り込む</button>
               <label class="ml-auto flex items-center gap-1 text-white">連携案件:<select v-model="projectLinkForm.project_job_id" class="h-6 w-72 border-gray-400 py-0 pl-2 pr-7 text-xs text-gray-800"><option value="">未接続</option><option v-for="job in projectJobs" :key="job.id" :value="job.id">{{ job.jobcode ? `${job.jobcode} / ` : '' }}{{ job.title }}</option></select></label>
               <button type="button" class="h-6 border border-gray-600 bg-gray-700 px-3 text-white" @click="saveProjectLink">保存</button>
@@ -115,11 +121,15 @@ function cellSaved(item, subject, payload) {
           </div>
         </div>
       </section>
-      <section v-if="units.data.length" class="border-t border-gray-700 bg-white">
+      <section v-if="form.view === 'intake'" class="grid min-w-[72rem] grid-cols-[17rem_1fr_17rem] items-center border-b border-[#54aaa8] bg-[#fbffd7] px-2 py-1">
+        <h1 class="text-center text-lg font-semibold">{{ project.year }}年　中学入試問題集</h1>
+        <div class="flex items-center justify-center gap-2"><span class="inline-block rounded-md border-2 border-green-600 bg-[#ccffcc] px-7 py-1 text-base font-bold">入稿チェック</span></div>
+        <div class="text-right text-[11px] leading-tight text-gray-700"><div>{{ displayedRange }}（全{{ summary.total }}媒体）</div><div class="mt-0.5 font-semibold text-blue-800">検索対象合計　社外 scan {{ summary.intake_totals?.['scan:subcontracted'] ?? 0 }}・作図 {{ summary.intake_totals?.['drawing:subcontracted'] ?? 0 }}</div><div class="font-semibold text-blue-800">社内 scan {{ summary.intake_totals?.['scan:internal'] ?? 0 }}・作図 {{ summary.intake_totals?.['drawing:internal'] ?? 0 }}</div></div>
+      </section>
+      <section v-if="units.data.length && !reportViews.includes(form.view)" class="border-t border-gray-700 bg-white">
         <article v-for="unit in units.data" :key="unit.id" class="border-b border-gray-700">
           <template v-if="form.view === 'intake'">
-            <SchoolHeader :unit="unit"><span v-if="unit.review_status === 'review_required'" class="bg-orange-100 px-2 py-1 text-xs text-orange-800">要確認</span></SchoolHeader>
-            <IntakeCheckBlock v-for="item in unit.items" :key="item.id" :item="item" />
+            <IntakeCheckBlock v-for="item in unit.items" :key="item.id" :item="item" :unit="unit" :actor-options="actorOptions" :project-linked="Boolean(project.project_job_id)" />
           </template>
           <template v-else>
             <section v-for="item in unit.items" :key="item.id" class="grid border-b-2 border-gray-700 last:border-b-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
@@ -164,8 +174,9 @@ function cellSaved(item, subject, payload) {
           </template>
         </article>
       </section>
+      <OrderReportLayout v-else-if="units.data.length && reportViews.includes(form.view)" :type="form.view" :project="project" :units="units.data" />
       <div v-else class="rounded bg-white p-8 text-center text-sm text-gray-500 shadow">条件に一致する学校はありません。</div>
-      <nav v-if="units.links.length > 3" class="flex flex-wrap justify-center gap-1"><template v-for="link in units.links" :key="`${link.label}-${link.url}`"><Link v-if="link.url" :href="link.url" preserve-scroll class="rounded border px-3 py-1.5 text-sm" :class="link.active ? 'border-green-600 bg-green-600 text-white' : 'bg-white'">{{ paginationLabel(link.label) }}</Link><span v-else class="rounded border bg-gray-50 px-3 py-1.5 text-sm text-gray-400">{{ paginationLabel(link.label) }}</span></template></nav>
+      <nav v-if="units.links.length > 3" class="no-print flex flex-wrap justify-center gap-1"><template v-for="link in units.links" :key="`${link.label}-${link.url}`"><Link v-if="link.url" :href="link.url" preserve-scroll class="rounded border px-3 py-1.5 text-sm" :class="link.active ? 'border-green-600 bg-green-600 text-white' : 'bg-white'">{{ paginationLabel(link.label) }}</Link><span v-else class="rounded border bg-gray-50 px-3 py-1.5 text-sm text-gray-400">{{ paginationLabel(link.label) }}</span></template></nav>
     </div>
   </div>
 </template>

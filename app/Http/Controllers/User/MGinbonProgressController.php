@@ -153,7 +153,7 @@ class MGinbonProgressController extends Controller
             'projectJob' => ['id' => $projectJob->id, 'title' => $projectJob->title],
             'units' => $units,
             'mediaOptions' => $db->table('mginbon_media_types')->where('is_active', true)
-                ->orderBy('sort_order')->pluck('name'),
+                ->select('name')->distinct()->orderBy('name')->pluck('name'),
             'filters' => $filters,
         ]);
     }

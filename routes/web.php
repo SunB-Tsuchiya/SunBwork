@@ -850,6 +850,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         // MGinbon（銀本制作進行管理）
         Route::get('/mginbon', [App\Http\Controllers\Coordinator\MGinbonLedgerController::class, 'index'])
             ->name('mginbon.index');
+        Route::get('/mginbon/reports/text-input', [App\Http\Controllers\Coordinator\MGinbonReportController::class, 'textInput'])
+            ->name('mginbon.reports.text_input');
         Route::put('/mginbon/projects/{project}/project-link', [App\Http\Controllers\Coordinator\MGinbonProjectLinkController::class, 'update'])
             ->name('mginbon.projects.project_link');
         Route::post('/mginbon/projects/{project}/project-link/create', [App\Http\Controllers\Coordinator\MGinbonProjectLinkController::class, 'create'])

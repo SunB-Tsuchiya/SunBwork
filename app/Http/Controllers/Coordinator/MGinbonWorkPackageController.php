@@ -25,22 +25,29 @@ class MGinbonWorkPackageController extends Controller
             'target' => ['required', 'string', 'max:100'],
             'updated_at' => ['required', 'string'],
         ]);
-        [$targetType, $targetId] = array_pad(explode(':', $validated['target'], 2), 2, null);
-        abort_unless(in_array($targetType, ['user', 'subcontractor'], true) && ctype_digit((string) $targetId), 422);
+        $clearing = $validated['target'] === 'clear';
+        [$targetType, $targetId] = $clearing
+            ? [null, null]
+            : array_pad(explode(':', $validated['target'], 2), 2, null);
+        abort_unless($clearing || (in_array($targetType, ['user', 'subcontractor'], true)
+            && ctype_digit((string) $targetId)), 422);
 
         $db = DB::connection('mginbon');
         $unit = $db->table('mginbon_production_units')->where('id', $item->mginbon_production_unit_id)->first();
         $project = $unit ? $db->table('mginbon_projects')->where('id', $unit->mginbon_project_id)->first() : null;
         abort_unless($project?->project_job_id, 422, '先に銀本年度をSBWork案件へ接続してください。');
         $projectJob = ProjectJob::findOrFail($project->project_job_id);
-        $options = $assigneeOptions->for($projectJob, $request->user());
-        $allowedIds = $targetType === 'user' ? $options['users']->pluck('id') : $options['subcontractors']->pluck('id');
-        abort_unless($allowedIds->contains((int) $targetId), 422, 'この案件へ設定できない担当者です。');
-        $target = $targetType === 'user'
-            ? User::withGhosts()->findOrFail((int) $targetId)
-            : Subcontractor::findOrFail((int) $targetId);
+        $target = null;
+        if (! $clearing) {
+            $options = $assigneeOptions->for($projectJob, $request->user());
+            $allowedIds = $targetType === 'user' ? $options['users']->pluck('id') : $options['subcontractors']->pluck('id');
+            abort_unless($allowedIds->contains((int) $targetId), 422, 'この案件へ設定できない担当者です。');
+            $target = $targetType === 'user'
+                ? User::withGhosts()->findOrFail((int) $targetId)
+                : Subcontractor::findOrFail((int) $targetId);
+        }
 
-        $result = $db->transaction(function () use ($request, $item, $project, $validated, $targetType, $target, $db) {
+        $result = $db->transaction(function () use ($request, $item, $project, $validated, $clearing, $targetType, $target, $db) {
             $lockedItem = $db->table('mginbon_items')->where('id', $item->id)->lockForUpdate()->first();
             if (! $lockedItem || (string) $lockedItem->updated_at !== $validated['updated_at']) {
                 throw ValidationException::withMessages(['updated_at' => 'ほかの利用者が更新しました。画面を再読み込みしてください。']);
@@ -68,10 +75,43 @@ class MGinbonWorkPackageController extends Controller
                 ? 'user:'.$package->user_id : ($package->subcontractor_id ? 'subcontractor:'.$package->subcontractor_id : null))
                 ->filter()->values()->all();
             $oldPackageIds = $oldPackages->pluck('id');
-            $db->table('mginbon_work_package_tasks')->whereIn('mginbon_stage_task_id', $tasks->pluck('id'))->delete();
             if ($oldPackageIds->isNotEmpty()) {
+                $db->table('mginbon_work_package_tasks')
+                    ->whereIn('mginbon_stage_task_id', $tasks->pluck('id'))
+                    ->whereIn('mginbon_work_package_id', $oldPackageIds)
+                    ->delete();
                 $db->table('mginbon_work_packages')->whereIn('id', $oldPackageIds)
                     ->update(['status' => 'cancelled', 'cancelled_at' => now(), 'updated_at' => now()]);
+            }
+
+            if ($clearing) {
+                foreach ($tasks as $task) {
+                    $participants = $db->table('mginbon_stage_task_participants')
+                        ->where('mginbon_stage_task_id', $task->id)
+                        ->where('role_type', $stage->activity_type)
+                        ->where('resolution_status', 'planned')->get();
+                    foreach ($participants as $participant) {
+                        if ($participant->legacy_value !== null && $participant->legacy_value !== '') {
+                            $db->table('mginbon_stage_task_participants')->where('id', $participant->id)->update([
+                                'user_id' => null, 'subcontractor_id' => null, 'execution_type' => null,
+                                'resolution_status' => 'unresolved', 'updated_at' => now(),
+                            ]);
+                        } else {
+                            $db->table('mginbon_stage_task_participants')->where('id', $participant->id)->delete();
+                        }
+                    }
+                }
+                $now = now();
+                $db->table('mginbon_items')->where('id', $item->id)->update(['updated_at' => $now]);
+                $db->table('mginbon_change_logs')->insert([
+                    'mginbon_project_id' => $project->id, 'mginbon_item_id' => $item->id,
+                    'changed_by' => $request->user()->id, 'field_path' => 'work_package.planned_actor',
+                    'old_value' => json_encode($oldTargets, JSON_UNESCAPED_UNICODE), 'new_value' => json_encode(null),
+                    'source' => 'manual', 'created_at' => now(), 'updated_at' => now(),
+                ]);
+
+                return ['actor' => '', 'target' => null, 'assignment_id' => null,
+                    'status' => 'not_started', 'planned' => false, 'updated_at' => $now->format('Y-m-d H:i:s')];
             }
 
             $packageId = $db->table('mginbon_work_packages')->insertGetId([
@@ -118,7 +158,9 @@ class MGinbonWorkPackageController extends Controller
         });
 
         return $request->header('X-Inertia')
-            ? back()->with('success', '仮担当者を設定しました。依頼ジョブは送信していません。')
+            ? back()->with('success', $clearing
+                ? '仮担当者を解除しました。'
+                : '仮担当者を設定しました。依頼ジョブは送信していません。')
             : response()->json($result);
     }
 }
