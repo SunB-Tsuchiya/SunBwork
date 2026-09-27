@@ -1,0 +1,6 @@
+# SunBWork project-local Codex permissions.
+# Keep file writes inside the workspace while automatically reviewing
+# approval requests that would otherwise interrupt routine development.
+approval_policy = "on-request"
+approvals_reviewer = "auto_review"
+sandbox_mode = "workspace-write"

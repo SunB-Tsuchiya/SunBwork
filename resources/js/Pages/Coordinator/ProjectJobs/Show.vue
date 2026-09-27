@@ -200,6 +200,7 @@
                             class="rounded border border-green-300 px-3 py-1 text-xs font-medium text-green-600 hover:bg-green-50"
                             @click="hasMembers ? editMembers() : goProjectTeammember()"
                         >{{ hasMembers ? '編集' : '登録' }}</button>
+                        <button type="button" class="rounded border border-purple-300 px-3 py-1 text-xs font-medium text-purple-700 hover:bg-purple-50" @click="manageSubcontractors">外注先管理</button>
                     </div>
 
                     <div class="space-y-2">
@@ -258,6 +259,12 @@
                         </div>
 
                         <p v-if="!job.user && !subCoordinators.length && !coordinatorMembers.length && !userMembers.length" class="text-sm text-gray-400">メンバー未登録</p>
+
+                        <div v-if="job.subcontractors?.length" class="flex items-start gap-2 text-sm">
+                            <span class="w-24 shrink-0 text-xs font-semibold text-purple-700">外注先</span>
+                            <div class="flex flex-wrap gap-2"><span v-for="vendor in job.subcontractors" :key="vendor.id" class="rounded-full border border-purple-200 bg-purple-50 px-3 py-1 text-sm font-medium text-purple-800">{{ vendor.name }}</span></div>
+                        </div>
+                        <p v-else class="text-xs text-gray-400">案件外注先は未登録です。</p>
                     </div>
                 </section>
 
@@ -1396,6 +1403,10 @@ function goScheduleCalendar() {
     const id = job.id;
     if (!id) return;
     router.visit(route('coordinator.project_schedules.calendar') + '?project_job_id=' + encodeURIComponent(id));
+}
+
+function manageSubcontractors() {
+    if (job.id) router.visit(route('coordinator.project_jobs.subcontractors.edit', { projectJob: job.id }));
 }
 
 function goProjectTeammember() {

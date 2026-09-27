@@ -86,6 +86,11 @@ class ProjectJob extends Model
         return $this->hasMany(ProjectTeamMember::class, 'project_job_id');
     }
 
+    public function subcontractors()
+    {
+        return $this->belongsToMany(Subcontractor::class, 'project_job_subcontractors')->withPivot('created_by')->withTimestamps();
+    }
+
     // Schedules for this project job
     public function schedules()
     {

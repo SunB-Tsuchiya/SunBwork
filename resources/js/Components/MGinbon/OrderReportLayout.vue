@@ -6,12 +6,13 @@ const props = defineProps({
   type: { type: String, required: true },
   project: { type: Object, required: true },
   units: { type: Array, default: () => [] },
+  summaryTotals: { type: Object, default: () => ({}) },
 });
 const records = computed(() => props.units.flatMap((unit) => unit.items.map((item) => ({ unit, item }))));
 const selected = ref([]);
 watch(records, (rows) => { selected.value = rows.map(({ item }) => item.id); }, { immediate: true });
 const selectedRecords = computed(() => records.value.filter(({ item }) => selected.value.includes(item.id)));
-const pageSize = computed(() => props.type === 'text_order' ? 8 : (props.type === 'drawing_order' ? 6 : 4));
+const pageSize = computed(() => props.type === 'text_order' ? 8 : (['drawing_order', 'scan_order'].includes(props.type) ? 6 : 4));
 const printPages = computed(() => {
   const pages = [];
   for (let i = 0; i < selectedRecords.value.length; i += pageSize.value) pages.push(selectedRecords.value.slice(i, i + pageSize.value));
@@ -19,7 +20,8 @@ const printPages = computed(() => {
 });
 const qty = (item, kind) => item.subjects?.reduce((sum, subject) => sum + Number(subject.measurements?.find((row) => row.work_type === kind && row.execution_type === 'subcontracted')?.quantity || 0), 0) || 0;
 const grandTotal = (kind) => selectedRecords.value.reduce((sum, { item }) => sum + qty(item, kind), 0);
-const title = computed(() => ({ order_form: '作図＆文字発注フォーム', text_order: 'C&C 文字入力発注書', drawing_order: '大連若葉 作図発注書' })[props.type]);
+const title = computed(() => ({ order_form: '作図＆文字発注フォーム', text_order: 'C&C 文字入力発注書', drawing_order: '大連若葉 作図発注書', scan_order: '原本スキャン発注書' })[props.type]);
+const displayedScanTotal = computed(() => Number(props.summaryTotals?.['scan:subcontracted'] || 0));
 function toggle(id, checked) { selected.value = checked ? [...new Set([...selected.value, id])] : selected.value.filter((value) => value !== id); }
 function clearPrintMode() { document.body.classList.remove('mginbon-report-printing'); }
 function printSelected() {
@@ -33,16 +35,20 @@ onBeforeUnmount(clearPrintMode);
 
 <template>
   <section class="order-layout bg-white">
-    <div class="no-print sticky top-[5.5rem] z-30 flex items-center gap-2 border border-gray-400 bg-gray-100 px-3 py-2 text-xs shadow">
+    <Teleport defer to="#mginbon-report-controls">
+    <div class="flex w-full items-center gap-2 px-3 py-1.5 text-xs">
       <b>{{ title }}</b><span>選択 {{ selected.length }} / {{ records.length }}媒体</span>
+      <span v-if="type === 'scan_order'" class="font-semibold text-blue-800">表示対象 scan {{ displayedScanTotal }}点 / 印刷選択 {{ grandTotal('scan') }}点</span>
       <button type="button" class="border border-gray-500 bg-white px-3 py-1" @click="selected = records.map(({ item }) => item.id)">すべて選択</button>
       <button type="button" class="border border-gray-500 bg-white px-3 py-1" @click="selected = []">解除</button>
       <button type="button" :disabled="!selected.length" class="ml-auto bg-gray-800 px-4 py-1.5 font-semibold text-white disabled:opacity-40" @click="printSelected">選択したレコードを印刷・PDF</button>
     </div>
+    </Teleport>
 
     <div class="screen-report">
-      <header class="report-header" :class="type === 'drawing_order' ? 'bg-[#ccffff]' : (type === 'order_form' ? 'bg-[#ffffd7]' : 'bg-[#f2f2f2]')">
-        <div v-if="type === 'drawing_order'" class="flex items-center gap-3 whitespace-nowrap text-[12px]"><b>大連若葉御中</b><b>{{ project.year }}年</b><b>中学入試問題集</b><b>発注書</b><b class="bg-blue-800 px-2 text-white">作図</b><span class="ml-auto text-xs">作図/合計 <b>{{ grandTotal('drawing') }}</b>　スキャン/合計 <b>{{ grandTotal('scan') }}</b>　□ 未請求でお願いします。</span></div>
+      <header class="report-header" :class="['drawing_order', 'scan_order'].includes(type) ? 'bg-[#ccffff]' : (type === 'order_form' ? 'bg-[#ffffd7]' : 'bg-[#f2f2f2]')">
+        <div v-if="type === 'drawing_order'" class="flex items-center gap-3 whitespace-nowrap text-[16px]"><b>大連若葉御中</b><b>{{ project.year }}年</b><b>中学入試問題集</b><b>発注書</b><b class="bg-blue-800 px-2 text-white">作図</b><span class="ml-auto text-[11px]">作図/合計 <b>{{ grandTotal('drawing') }}</b>　スキャン/合計 <b>{{ grandTotal('scan') }}</b>　□ 未請求でお願いします。</span></div>
+        <div v-else-if="type === 'scan_order'" class="flex items-center gap-5"><b>{{ project.year }}年</b><b>中学入試問題集</b><b>本画像スキャン　発注書</b><span class="ml-auto text-xs">合計　<b>{{ displayedScanTotal.toLocaleString() }}</b></span></div>
         <div v-else-if="type === 'text_order'" class="flex items-center gap-7"><b>シーアンドシー御中</b><b>{{ project.year }}年</b><b>中学入試問題集</b><b>発注書</b></div>
         <div v-else class="flex items-center gap-5"><b>{{ project.year }}年</b><b>中学入試問題集</b><b>文字＆作図</b><b>外注</b></div>
       </header>
@@ -51,8 +57,9 @@ onBeforeUnmount(clearPrintMode);
 
     <div class="print-report">
       <section v-for="(page, pageIndex) in printPages" :key="pageIndex" class="print-sheet">
-        <header class="report-header" :class="type === 'drawing_order' ? 'bg-[#ccffff]' : (type === 'order_form' ? 'bg-[#ffffd7]' : 'bg-[#f2f2f2]')">
-          <div v-if="type === 'drawing_order'" class="flex items-center gap-3 whitespace-nowrap text-[12px]"><b>大連若葉御中</b><b>{{ project.year }}年</b><b>中学入試問題集</b><b>発注書</b><b class="bg-blue-800 px-2 text-white">作図</b><span class="ml-auto text-[9px]">作図/合計 <b>{{ grandTotal('drawing') }}</b>　スキャン/合計 <b>{{ grandTotal('scan') }}</b>　□ 未請求でお願いします。</span></div>
+        <header class="report-header" :class="['drawing_order', 'scan_order'].includes(type) ? 'bg-[#ccffff]' : (type === 'order_form' ? 'bg-[#ffffd7]' : 'bg-[#f2f2f2]')">
+          <div v-if="type === 'drawing_order'" class="flex items-center gap-3 whitespace-nowrap text-[16px]"><b>大連若葉御中</b><b>{{ project.year }}年</b><b>中学入試問題集</b><b>発注書</b><b class="bg-blue-800 px-2 text-white">作図</b><span class="ml-auto text-[10px]">作図/合計 <b>{{ grandTotal('drawing') }}</b>　スキャン/合計 <b>{{ grandTotal('scan') }}</b>　□ 未請求でお願いします。</span></div>
+          <div v-else-if="type === 'scan_order'" class="flex items-center gap-5"><b>{{ project.year }}年</b><b>中学入試問題集</b><b>本画像スキャン　発注書</b><span class="ml-auto text-[11px]">合計　<b>{{ displayedScanTotal.toLocaleString() }}</b></span></div>
           <div v-else-if="type === 'text_order'" class="flex items-center gap-7"><b>シーアンドシー御中</b><b>{{ project.year }}年</b><b>中学入試問題集</b><b>発注書</b></div>
           <div v-else class="flex items-center gap-5"><b>{{ project.year }}年</b><b>中学入試問題集</b><b>文字＆作図</b><b>外注</b></div>
         </header>
@@ -64,7 +71,7 @@ onBeforeUnmount(clearPrintMode);
 </template>
 
 <style scoped>
-.report-header { border-bottom: 2px solid #087a78; padding: .55rem 1rem; font-size: 17px; }
+.report-header { border-bottom: 2px solid #087a78; padding: .8rem 1rem; font-size: 20px; }
 .screen-report { width: 56rem; }
 .print-report { display: none; }
 .report-footer { display: flex; align-items: center; gap: .75rem; border-top: 1px solid #999; padding-top: 2mm; font-size: 9px; }
@@ -73,11 +80,11 @@ onBeforeUnmount(clearPrintMode);
   .screen-report { display: none !important; }
   .print-report { display: block !important; }
   .admin-only { display: none !important; }
-  .print-sheet { box-sizing: border-box; display: flex; width: 210mm; height: 297mm; flex-direction: column; overflow: hidden; padding: 8mm 10mm 7mm; break-after: page; background: white; }
+  .print-sheet { position: relative; box-sizing: border-box; display: flex; width: 210mm; height: 296mm; flex-direction: column; overflow: hidden; padding: 6mm 10mm 16mm; break-after: page; page-break-after: always; background: white; }
   .print-sheet:last-child { break-after: auto; }
-  .print-sheet .report-header { flex: none; }
+  .print-sheet .report-header { flex: none; padding: 3mm 4mm; font-size: 20px; }
   .record-column { flex: none; }
-  .report-footer { margin-top: auto; flex: none; }
+  .report-footer { position: absolute; right: 10mm; bottom: 5mm; left: 10mm; min-height: 9mm; margin: 0; background: white; }
   @page { size: A4 portrait; margin: 0; }
 }
 </style>
@@ -88,7 +95,7 @@ onBeforeUnmount(clearPrintMode);
   body.mginbon-report-printing .no-print { display: none !important; }
   body.mginbon-report-printing .mginbon-ledger-root { min-height: 0 !important; padding: 0 !important; background: white !important; }
   body.mginbon-report-printing .mginbon-ledger-root > :not(.space-y-3) { display: none !important; }
-  body.mginbon-report-printing .mginbon-ledger-root .space-y-3 > :not(.order-layout) { display: none !important; }
+  body.mginbon-report-printing .mginbon-ledger-root > .space-y-3 > :not(.order-layout) { display: none !important; }
   body.mginbon-report-printing .mginbon-ledger-root .order-layout { margin: 0 !important; }
 }
 </style>

@@ -84,7 +84,11 @@ async function saveDate(event) {
   try {
     const subjectIds = props.column.type === 'shared'
       ? null
-      : (dateScope.value === 'all' ? props.item.subjects.map((subject) => subject.id) : [props.subject.id]);
+      : (dateScope.value === 'all'
+        ? props.item.subjects
+          .filter((subject) => subject.id === props.subject.id || !subject.dates?.[props.column.code])
+          .map((subject) => subject.id)
+        : [props.subject.id]);
     const response = await axios.patch(route('coordinator.mginbon.items.date_cell.update', { item: props.item.id }), {
       updated_at: props.item.updated_at,
       subject_id: props.column.type === 'shared' ? null : undefined,
@@ -145,7 +149,7 @@ async function saveActor(event) {
     <span v-else-if="editing && column.type === 'date'" class="absolute left-0 top-0 z-40 block w-56 border border-gray-500 bg-white p-1 text-left shadow-lg">
       <span v-if="item.subjects.length > 1" class="mb-1 grid grid-cols-2 gap-1 text-[10px]">
         <label class="flex items-center gap-1 bg-gray-100 px-1 py-0.5"><input v-model="dateScope" type="radio" value="one" class="h-3 w-3" />この教科</label>
-        <label class="flex items-center gap-1 bg-gray-100 px-1 py-0.5"><input v-model="dateScope" type="radio" value="all" class="h-3 w-3" />全教科</label>
+        <label class="flex items-center gap-1 bg-gray-100 px-1 py-0.5"><input v-model="dateScope" type="radio" value="all" class="h-3 w-3" />未登録の全教科</label>
       </span>
       <input ref="editor" type="date" :value="dateValue()" class="h-7 w-full border border-green-700 bg-white px-1 py-0 text-[11px] focus:ring-1 focus:ring-green-600" :disabled="saving" @change="saveDate" @keydown.esc="editing = false" />
       <button type="button" class="mt-1 w-full border border-gray-300 bg-gray-50 py-0.5 text-center text-[10px] hover:bg-gray-100" @click="editing = false">閉じる</button>

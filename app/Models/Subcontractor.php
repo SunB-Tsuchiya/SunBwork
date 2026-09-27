@@ -26,6 +26,11 @@ class Subcontractor extends Model
         return $this->hasMany(ProjectJobAssignment::class);
     }
 
+    public function projectJobs(): BelongsToMany
+    {
+        return $this->belongsToMany(ProjectJob::class, 'project_job_subcontractors')->withPivot('created_by')->withTimestamps();
+    }
+
     /** 同会社内でのスコープ */
     public function scopeForCompany($query, int $companyId)
     {

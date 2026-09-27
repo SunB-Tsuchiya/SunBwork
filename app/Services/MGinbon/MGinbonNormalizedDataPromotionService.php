@@ -22,18 +22,20 @@ class MGinbonNormalizedDataPromotionService
         'science' => ['name' => '理科', 'sort_order' => 40],
     ];
 
+    private const MEDIA_ORDER = ['問題', '解答のみ', '解説解答', '解答用紙', '傾向と対策', '解答'];
+
     private const STAGES = [
         'text_input' => ['文字入力', 'operation', 10],
         'drawing' => ['作図・スキャン', 'operation', 20],
         'initial_operation' => ['初校組版', 'operation', 30],
         'initial_check' => ['初校出稿前チェック', 'proof', 40],
         'initial_text_proof' => ['初校文字校正', 'proof', 50],
-        'reproof_operation' => ['再校修正', 'operation', 60],
-        'reproof_scan_check' => ['再校スキャン図校正', 'proof', 70],
-        'reproof_text_proof' => ['再校文字校正', 'proof', 80],
-        'third_operation' => ['三校修正', 'operation', 90],
+        'reproof_scan_check' => ['再校スキャン図校正', 'proof', 60],
+        'reproof_text_proof' => ['再校文字校正', 'proof', 70],
+        'reproof_operation' => ['再校修正', 'operation', 80],
+        'client_return_operation' => ['みくに戻り対応', 'operation', 90],
         'third_proof' => ['三校赤字照合', 'proof', 100],
-        'client_return_operation' => ['みくに戻り対応', 'operation', 110],
+        'third_operation' => ['三校修正', 'operation', 110],
         'fourth_operation' => ['四校修正', 'operation', 120],
         'fourth_proof' => ['四校赤字照合', 'proof', 130],
         'fifth_operation' => ['五校修正', 'operation', 140],
@@ -149,13 +151,23 @@ class MGinbonNormalizedDataPromotionService
     private function seedMediaTypes(iterable $rows): array
     {
         $names = collect($rows)->map(fn ($row) => trim((string) ($row->normalized_json['media_type'] ?? '')) ?: '未分類')
-            ->unique()->values();
+            ->unique()
+            ->sortBy(function (string $name) {
+                $position = array_search($name, self::MEDIA_ORDER, true);
+
+                return sprintf('%03d:%s', $position === false ? 999 : $position, $name);
+            })
+            ->values();
         $ids = [];
         foreach ($names as $index => $name) {
             $code = 'legacy_'.substr(hash('sha256', $name), 0, 16);
+            $position = array_search($name, self::MEDIA_ORDER, true);
+            $sortOrder = $position === false
+                ? (count(self::MEDIA_ORDER) + $index + 1) * 10
+                : ($position + 1) * 10;
             $ids[$name] = MGinbonMediaType::updateOrCreate(
                 ['code' => $code],
-                ['name' => $name, 'sort_order' => ($index + 1) * 10, 'is_active' => true]
+                ['name' => $name, 'sort_order' => $sortOrder, 'is_active' => true]
             )->id;
         }
 

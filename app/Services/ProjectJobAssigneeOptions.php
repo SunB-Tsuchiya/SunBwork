@@ -16,28 +16,24 @@ class ProjectJobAssigneeOptions
      */
     public function for(ProjectJob $projectJob, User $actor): array
     {
-        $projectJob->loadMissing('coordinators:id');
+        $projectJob->loadMissing(['coordinators:id', 'subcontractors:id,name']);
 
         $userIds = $projectJob->teamMembers()->pluck('user_id')
             ->merge($projectJob->coordinators->pluck('id'))
             ->when($projectJob->user_id, fn (Collection $ids) => $ids->push($projectJob->user_id))
             ->filter()->unique()->values();
 
-        $users = User::query()->whereIn('id', $userIds)->ordered()->get(['id', 'name'])
-            ->map(fn (User $user) => ['id' => $user->id, 'name' => $user->name, 'is_ghost' => false]);
-        $ghostUsers = User::withGhosts()->where('ghost_owner_id', $actor->id)->ordered()->get(['id', 'name'])
-            ->map(fn (User $user) => ['id' => $user->id, 'name' => $user->name, 'is_ghost' => true]);
-
-        $subcontractors = Subcontractor::query()->managedBy($actor->id)->orderBy('name')->get(['id', 'name'])
-            ->map(fn (Subcontractor $subcontractor) => [
-                'id' => $subcontractor->id,
-                'name' => $subcontractor->name,
-                'is_subcontractor' => true,
+        $users = User::withGhosts()->whereIn('id', $userIds)->ordered()->get(['id', 'name', 'is_ghost'])
+            ->map(fn (User $user) => [
+                'id' => $user->id, 'name' => $user->name, 'is_ghost' => (bool) $user->is_ghost,
             ]);
+        $subcontractors = $projectJob->subcontractors->map(fn (Subcontractor $subcontractor) => [
+            'id' => $subcontractor->id, 'name' => $subcontractor->name, 'is_subcontractor' => true,
+        ]);
 
         return [
-            'users' => $users->concat($ghostUsers)->unique('id')->values(),
-            'subcontractors' => $subcontractors->values(),
+            'users' => $users->unique('id')->values(),
+            'subcontractors' => $subcontractors->unique('id')->values(),
         ];
     }
 }

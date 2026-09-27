@@ -12,6 +12,8 @@ use Illuminate\Validation\ValidationException;
 class MGinbonCellController extends Controller
 {
     private const SUBJECT_DATE_CODES = [
+        'text_input_ordered_on', 'drawing_ordered_on',
+        'original_scan_ordered_on', 'original_scan_delivered_on',
         'manuscript_received_on', 'manuscript_due_on', 'text_input_completed_on', 'drawing_completed_on',
         'initial_shared_on', 'initial_text_proof_started_on', 'initial_text_proof_completed_on',
         'initial_returned_on', 'reproof_scan_check_started_on', 'reproof_scan_check_completed_on',

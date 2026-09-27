@@ -67,8 +67,21 @@ class ChangelogSeeder extends Seeder
         ]);
     }
 
+    public function seedMGinbonValueMasters(): void
+    {
+        Changelog::updateOrCreate(['version' => 'mginbon-value-master-1'], [
+            'title' => '銀本に年度別の値一覧マスターを追加',
+            'released_at' => '2026-09-26',
+            'summary' => 'FileMakerで管理していた13種類の値一覧をWeb化し、年度ごとに値の追加・修正・有効無効・表示順を管理できるようにしました。 コピー元年度を選んで新年度へ引き継ぐこともできます。',
+            'design_files' => ['z_instructions/MGINBON_VALUE_MASTER_PLAN1.md'],
+            'claude_notes' => 'Codex実装。mginbon_value_lists / mginbon_value_list_itemsを銀本専用DBへ追加。既存年度は初回表示時、新年度は年度取込時に初期生成し、生成後は利用者が修正した値を初期値で復元しない。担当者リンク列は後続の工程区分マスター接続用に予約。Sakura未デプロイ。',
+            'body' => '<section class="cl-feature"><h3>追加した機能</h3><ul><li>銀本ツールバーに「値一覧」を追加</li><li>13種類の値一覧を年度別に管理</li><li>値の新規追加・名称編集・有効無効・上下並べ替えに対応</li><li>任意の年度をコピー元に選び、対象年度へ値一覧を引き継げる</li></ul></section>',
+        ]);
+    }
+
     public function run(): void
     {
+        $this->seedMGinbonValueMasters();
         $this->seedClerkCalendarPerformance();
         $this->seedClerkCalendarReminders();
         $this->seedClerkScheduleRules();

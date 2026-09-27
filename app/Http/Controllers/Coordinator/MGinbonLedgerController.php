@@ -26,8 +26,8 @@ class MGinbonLedgerController extends Controller
             'media' => ['nullable', 'string', 'max:100'],
             'subject' => ['nullable', Rule::in(['', ...self::SUBJECT_ORDER])],
             'status' => ['nullable', Rule::in(['all', 'draft', 'review_required'])],
-            'view' => ['nullable', Rule::in(['list', 'intake', 'order_form', 'text_order', 'drawing_order'])],
-            'per_page' => ['nullable', Rule::in([10, 25, 50])],
+            'view' => ['nullable', Rule::in(['list', 'intake', 'school_outing_problem', 'order_form', 'text_order', 'drawing_order', 'scan_order'])],
+            'per_page' => ['nullable', Rule::in([10, 25, 50, 75, 100])],
         ]);
 
         $projects = MGinbonProject::query()->orderByDesc('year')->get(['id', 'project_job_id', 'year', 'name', 'status']);
@@ -44,9 +44,8 @@ class MGinbonLedgerController extends Controller
             'subject' => (string) ($validated['subject'] ?? ''),
             'status' => (string) ($validated['status'] ?? 'all'),
             'view' => (string) ($validated['view'] ?? 'list'),
-            'per_page' => (int) ($validated['per_page'] ?? 10),
+            'per_page' => max(25, (int) ($validated['per_page'] ?? 25)),
         ];
-
         $mediaOptions = $this->itemsQuery($project->id)
             ->reorder()
             ->select('media.name as media_name')
@@ -131,7 +130,7 @@ class MGinbonLedgerController extends Controller
             ->orderByDesc('id')->get(['id', 'jobcode', 'title']);
     }
 
-    private function itemsQuery(int $projectId): Builder
+    protected function itemsQuery(int $projectId): Builder
     {
         return DB::connection('mginbon')->table('mginbon_items as items')
             ->join('mginbon_production_units as units', 'units.id', '=', 'items.mginbon_production_unit_id')
@@ -151,7 +150,8 @@ class MGinbonLedgerController extends Controller
             ->where('units.mginbon_project_id', $projectId)
             ->select([
                 'units.id', 'units.unit_type', 'units.mikuni_code', 'units.n_code',
-                'units.display_name', 'units.school_category', 'units.n_category', 'units.review_status',
+                'units.display_name', 'units.school_category', 'units.n_category', 'units.alpha_group',
+                'units.exam_session', 'units.source_row_number', 'units.review_status',
             ]);
     }
 
@@ -179,7 +179,7 @@ class MGinbonLedgerController extends Controller
     }
 
     /** @param array<string, mixed> $filters */
-    private function applyItemFilters(Builder $query, array $filters): Builder
+    protected function applyItemFilters(Builder $query, array $filters): Builder
     {
         if ($filters['search'] !== '') {
             $search = addcslashes($filters['search'], '\\%_');
@@ -208,7 +208,7 @@ class MGinbonLedgerController extends Controller
         }
     }
 
-    private function hydrateItems($items)
+    protected function hydrateItems($items)
     {
         $itemIds = $items->pluck('id');
         if ($itemIds->isEmpty()) {

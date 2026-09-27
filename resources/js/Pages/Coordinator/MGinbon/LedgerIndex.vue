@@ -4,6 +4,7 @@ import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import IntakeCheckBlock from '@/Components/MGinbon/IntakeCheckBlock.vue';
 import LedgerCellEditor from '@/Components/MGinbon/LedgerCellEditor.vue';
 import OrderReportLayout from '@/Components/MGinbon/OrderReportLayout.vue';
+import SchoolOutingReportLayout from '@/Components/MGinbon/SchoolOutingReportLayout.vue';
 import ToastUnified from '@/Components/ToastUnified.vue';
 
 const props = defineProps({
@@ -13,8 +14,8 @@ const props = defineProps({
   actorOptions: { type: Object, default: () => ({ users: [], subcontractors: [] }) },
 });
 const uniqueMediaOptions = computed(() => [...new Set(props.mediaOptions.filter(Boolean))]);
-const reportViews = ['order_form', 'text_order', 'drawing_order'];
-const pageTitle = computed(() => ({ list: '銀本進行', intake: '入稿チェック', order_form: '作図＆文字発注フォーム', text_order: 'C&C文字発注', drawing_order: '大連若葉作図発注書' })[form.view] || '銀本進行');
+const reportViews = ['order_form', 'text_order', 'drawing_order', 'scan_order', 'school_outing_problem'];
+const pageTitle = computed(() => ({ list: '銀本進行', intake: '入稿チェック', order_form: '作図＆文字発注フォーム', text_order: 'C&C文字発注', drawing_order: '大連若葉作図発注書', scan_order: '原本スキャン発注書', school_outing_problem: '出校表' })[form.view] || '銀本進行');
 const form = reactive({ ...props.filters });
 const projectLinkForm = useForm({ project_job_id: props.project.project_job_id ?? '' });
 const toolbarVisible = ref(true);
@@ -58,7 +59,7 @@ const ledgerBands = [
 const displayedRange = computed(() => props.units.total ? `${props.units.from}～${props.units.to}校 / ${props.units.total}校` : '0校');
 const search = () => router.get(route('coordinator.mginbon.index'), { ...form }, { preserveState: true, preserveScroll: true, replace: true });
 function setView(view) { form.view = view; search(); }
-function resetFilters() { Object.assign(form, { search: '', media: '', subject: '', status: 'all', per_page: 10 }); search(); }
+function resetFilters() { Object.assign(form, { search: '', media: '', subject: '', status: 'all', per_page: 25 }); search(); }
 function saveProjectLink() { projectLinkForm.put(route('coordinator.mginbon.projects.project_link', { project: props.project.id }), { preserveScroll: true }); }
 function createProjectLink() { if (window.confirm(`${props.project.year}年の銀本専用案件を新規作成して接続しますか？`)) router.post(route('coordinator.mginbon.projects.project_link.create', { project: props.project.id }), {}, { preserveScroll: true }); }
 const task = (subject, code) => subject.stages?.find((row) => row.code === code);
@@ -98,12 +99,16 @@ function cellSaved(item, subject, payload) {
               </div>
               <button type="button" class="min-w-24 border-r border-gray-300 px-3 hover:bg-gray-100" @click="resetFilters"><span class="block text-lg">▣</span>すべてを表示</button>
               <Link :href="route('coordinator.mginbon.import_preview')" class="min-w-20 border-r border-gray-300 px-3 py-1 text-center hover:bg-gray-100"><span class="block text-lg">＋</span>取込確認</Link>
+              <Link :href="route('coordinator.mginbon.aggregations.index', { year: project.year })" class="min-w-20 border-r border-gray-300 px-3 py-1 text-center hover:bg-gray-100"><span class="block text-lg">Σ</span>集計</Link>
+              <Link :href="route('coordinator.mginbon.annual_import.create')" class="min-w-20 border-r border-gray-300 px-3 py-1 text-center hover:bg-gray-100"><span class="block text-lg">⇧</span>年度取込</Link>
+              <Link :href="route('coordinator.mginbon.value_masters.index', { year: project.year })" class="min-w-20 border-r border-gray-300 px-3 py-1 text-center hover:bg-gray-100"><span class="block text-lg">≡</span>値一覧</Link>
+              <a v-if="form.view === 'list'" :href="route('coordinator.mginbon.export.csv', { year: form.year, search: form.search, media: form.media, subject: form.subject, status: form.status })" class="min-w-20 border-r border-gray-300 px-3 py-1 text-center hover:bg-gray-100"><span class="block text-lg">⇩</span>LIST CSV</a>
               <button v-if="!project.project_job_id" type="button" class="min-w-20 border-r border-gray-300 px-3 hover:bg-gray-100" @click="createProjectLink"><span class="block text-lg">■</span>案件作成</button>
               <Link :href="route('coordinator.dashboard')" class="min-w-24 border-r border-gray-300 px-3 py-1 text-center hover:bg-gray-100"><span class="block text-lg">↗</span>通常サイト</Link>
               <form class="ml-auto flex items-center gap-1 px-2" @submit.prevent="search"><span class="text-lg">⌕</span><input v-model="form.search" type="search" placeholder="学校名・コードを検索" class="h-7 w-60 border-gray-400 px-2 py-1 text-xs" /><button class="h-7 border border-gray-400 bg-white px-3 hover:bg-gray-100">検索</button></form>
             </div>
             <div class="flex h-8 items-center gap-3 border-b border-gray-400 bg-gray-50 px-1">
-              <label class="flex items-center gap-1">レイアウト:<select v-model="form.view" class="h-6 w-44 border-gray-400 py-0 pl-2 pr-7 text-xs" @change="search"><option value="list">LIST</option><option value="intake">入稿チェック</option><option value="order_form">作図＆文字発注フォーム</option><option value="text_order">C&amp;C文字発注</option><option value="drawing_order">大連若葉作図発注書</option></select></label>
+              <label class="flex items-center gap-1">レイアウト:<select v-model="form.view" class="h-6 w-52 border-gray-400 py-0 pl-2 pr-7 text-xs" @change="search"><option value="list">LIST</option><option value="intake">入稿チェック</option><option value="school_outing_problem">出稿表</option><option value="order_form">作図＆文字発注フォーム</option><option value="text_order">C&amp;C文字発注</option><option value="drawing_order">大連若葉作図発注書</option><option value="scan_order">原本スキャン発注書</option></select></label>
               <span class="flex items-center gap-1">表示方法の切り替え:<button type="button" class="border border-gray-400 bg-gray-600 px-2 py-0.5 text-white">▤</button><button type="button" class="border border-gray-400 bg-white px-2 py-0.5">▦</button><button type="button" class="border border-gray-400 bg-white px-2 py-0.5">▦</button></span>
               <span class="border border-gray-400 bg-white px-3 py-0.5">プレビュー</span>
               <span class="ml-auto font-semibold">{{ displayedRange }}（全{{ summary.total }}媒体）</span>
@@ -113,11 +118,12 @@ function cellSaved(item, subject, payload) {
               <select v-model="form.media" class="h-6 w-36 border-gray-400 py-0 pl-2 pr-7 text-xs" @change="search"><option value="">媒体: すべて</option><option v-for="m in uniqueMediaOptions" :key="m" :value="m">{{ m }}</option></select>
               <select v-model="form.subject" class="h-6 w-32 border-gray-400 py-0 pl-2 pr-7 text-xs" @change="search"><option value="">教科: すべて</option><option v-for="s in subjects" :key="s.code" :value="s.code">{{ s.name }}</option></select>
               <select v-model="form.status" class="h-6 w-32 border-gray-400 py-0 pl-2 pr-7 text-xs" @change="search"><option value="all">状態: すべて</option><option value="draft">下書き</option><option value="review_required">要確認</option></select>
-              <select v-model.number="form.per_page" class="h-6 w-28 border-gray-400 py-0 pl-2 pr-7 text-xs" @change="search"><option :value="10">10校／頁</option><option :value="25">25校／頁</option><option :value="50">50校／頁</option></select>
+              <select v-model.number="form.per_page" class="h-6 w-28 border-gray-400 py-0 pl-2 pr-7 text-xs" @change="search"><option :value="25">25校／頁</option><option :value="50">50校／頁</option><option :value="75">75校／頁</option><option :value="100">100校／頁</option></select>
               <button class="h-6 border border-gray-500 bg-white px-4 hover:bg-gray-100">絞り込む</button>
               <label class="ml-auto flex items-center gap-1 text-white">連携案件:<select v-model="projectLinkForm.project_job_id" class="h-6 w-72 border-gray-400 py-0 pl-2 pr-7 text-xs text-gray-800"><option value="">未接続</option><option v-for="job in projectJobs" :key="job.id" :value="job.id">{{ job.jobcode ? `${job.jobcode} / ` : '' }}{{ job.title }}</option></select></label>
               <button type="button" class="h-6 border border-gray-600 bg-gray-700 px-3 text-white" @click="saveProjectLink">保存</button>
             </form>
+            <div v-if="reportViews.includes(form.view)" id="mginbon-report-controls" class="flex min-h-10 items-center border-t border-gray-400 bg-gray-100"></div>
           </div>
         </div>
       </section>
@@ -126,11 +132,19 @@ function cellSaved(item, subject, payload) {
         <div class="flex items-center justify-center gap-2"><span class="inline-block rounded-md border-2 border-green-600 bg-[#ccffcc] px-7 py-1 text-base font-bold">入稿チェック</span></div>
         <div class="text-right text-[11px] leading-tight text-gray-700"><div>{{ displayedRange }}（全{{ summary.total }}媒体）</div><div class="mt-0.5 font-semibold text-blue-800">検索対象合計　社外 scan {{ summary.intake_totals?.['scan:subcontracted'] ?? 0 }}・作図 {{ summary.intake_totals?.['drawing:subcontracted'] ?? 0 }}</div><div class="font-semibold text-blue-800">社内 scan {{ summary.intake_totals?.['scan:internal'] ?? 0 }}・作図 {{ summary.intake_totals?.['drawing:internal'] ?? 0 }}</div></div>
       </section>
-      <section v-if="units.data.length && !reportViews.includes(form.view)" class="border-t border-gray-700 bg-white">
-        <article v-for="unit in units.data" :key="unit.id" class="border-b border-gray-700">
+      <section v-if="units.data.length && !reportViews.includes(form.view)" class="bg-white">
+        <article v-for="unit in units.data" :key="unit.id" class="border-b border-gray-700 first:border-t" :class="unit.items.length === 0 && form.view === 'list' ? 'mx-auto w-[54rem] max-w-full' : ''">
           <template v-if="form.view === 'intake'">
             <IntakeCheckBlock v-for="item in unit.items" :key="item.id" :item="item" :unit="unit" :actor-options="actorOptions" :project-linked="Boolean(project.project_job_id)" />
           </template>
+          <section v-else-if="unit.items.length === 0" class="mx-auto grid min-h-8 w-[54rem] max-w-full grid-cols-[5.5rem_6.5rem_6rem_18rem_10rem_8rem] items-stretch text-xs">
+            <div class="flex items-center justify-center border-r border-gray-300 bg-gray-500 text-white">{{ unit.mikuni_code }}</div>
+            <div class="flex items-center justify-center border-r border-gray-300">{{ unit.n_code }}</div>
+            <div class="flex items-center justify-center border-r border-gray-300 bg-[#ccffff]">{{ unit.alpha_group ? unit.alpha_group : "通常校" }}</div>
+            <div class="flex items-center border-r border-gray-300 bg-[#f6fad3] px-3 text-sm font-semibold">{{ unit.display_name }}</div>
+            <div class="flex items-center justify-center border-r border-gray-300">{{ unit.exam_session }}</div>
+            <div class="flex items-center justify-center bg-amber-50 font-semibold text-amber-800">媒体未取込</div>
+          </section>
           <template v-else>
             <section v-for="item in unit.items" :key="item.id" class="grid border-b-2 border-gray-700 last:border-b-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
               <div class="bg-white p-1 text-xs leading-snug">
@@ -143,7 +157,7 @@ function cellSaved(item, subject, payload) {
                   <span class="border border-gray-400 bg-white py-1">{{ unit.n_category || unit.school_category || '' }}</span>
                   <span class="border border-gray-400 bg-white py-1">{{ item.media_name }}</span>
                 </div>
-                <div class="bg-[#f6fad3] px-1 py-1.5 text-sm font-semibold">{{ unit.display_name }}</div>
+                <div class="flex items-center gap-2 bg-[#f6fad3] px-1 py-1.5 text-sm font-semibold"><span>{{ unit.display_name }}</span><span v-if="unit.exam_session" class="ml-auto text-[10px] font-normal">{{ unit.exam_session }}</span><span v-if="unit.alpha_group" class="rounded bg-cyan-100 px-1 text-[10px]">α {{ unit.alpha_group }}</span></div>
                 <div class="grid h-7 grid-cols-[1fr_4.25rem_2.75rem] items-center gap-0.5">
                   <span class="bg-[#ccffcc] px-1 py-1">{{ item.subjects.map((subject) => subject.name).join('・') }}</span>
                   <span class="bg-[#ccffcc] px-1 py-1 text-center">{{ item.publication_status || '○' }}</span>
@@ -174,7 +188,8 @@ function cellSaved(item, subject, payload) {
           </template>
         </article>
       </section>
-      <OrderReportLayout v-else-if="units.data.length && reportViews.includes(form.view)" :type="form.view" :project="project" :units="units.data" />
+      <SchoolOutingReportLayout v-else-if="units.data.length && form.view === 'school_outing_problem'" :project="project" :units="units.data" :actor-options="actorOptions" :project-linked="Boolean(project.project_job_id)" />
+      <OrderReportLayout v-else-if="units.data.length && reportViews.includes(form.view)" :type="form.view" :project="project" :units="units.data" :summary-totals="summary.intake_totals" />
       <div v-else class="rounded bg-white p-8 text-center text-sm text-gray-500 shadow">条件に一致する学校はありません。</div>
       <nav v-if="units.links.length > 3" class="no-print flex flex-wrap justify-center gap-1"><template v-for="link in units.links" :key="`${link.label}-${link.url}`"><Link v-if="link.url" :href="link.url" preserve-scroll class="rounded border px-3 py-1.5 text-sm" :class="link.active ? 'border-green-600 bg-green-600 text-white' : 'bg-white'">{{ paginationLabel(link.label) }}</Link><span v-else class="rounded border bg-gray-50 px-3 py-1.5 text-sm text-gray-400">{{ paginationLabel(link.label) }}</span></template></nav>
     </div>

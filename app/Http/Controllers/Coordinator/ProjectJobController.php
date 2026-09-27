@@ -153,7 +153,7 @@ class ProjectJobController extends Controller
         }
 
         $newJob = null;
-        DB::transaction(function () use ($projectJob, &$newJob) {
+        DB::transaction(function () use ($projectJob, $user, &$newJob) {
             $data = $projectJob->only([
                 'user_id', 'client_id', 'company_id', 'size_id', 'page_count', 'detail',
             ]);
@@ -176,6 +176,15 @@ class ProjectJobController extends Controller
                     'project_job_id' => $newJob->id,
                     'user_id'        => $member->user_id,
                 ]);
+            }
+
+            // 案件で使用する外注先も複製（年度マスターや既存割当には影響させない）
+            $subcontractorIds = $projectJob->subcontractors()->pluck('subcontractors.id')->all();
+            if (!empty($subcontractorIds)) {
+                $newJob->subcontractors()->syncWithPivotValues(
+                    $subcontractorIds,
+                    ['created_by' => $user->id]
+                );
             }
 
             // スケジュール複製（日付は空にする）
@@ -603,7 +612,7 @@ class ProjectJobController extends Controller
         $jobid = session('jobid');
         $registerFlags = session('register_flags', []);
         // reload projectJob with team members and their user relation, and also ensure user and client relations are loaded
-        $projectJob->load(['teamMembers.user', 'user', 'client', 'coordinators', 'size']);
+        $projectJob->load(['teamMembers.user', 'user', 'client', 'coordinators', 'size', 'subcontractors:id,name']);
         $members = $projectJob->teamMembers->map(function ($m) {
             return [
                 'id' => $m->id,

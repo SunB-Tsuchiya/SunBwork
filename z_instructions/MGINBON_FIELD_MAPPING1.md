@@ -134,6 +134,13 @@
 DDRには科目別の原本scan日付もあり、`原本スキャン発注書`で使用される。LISTの代表日付とは
 役割を分け、初期のLIST再現では代表のスキャンUP日を使用する。発注書対応時に科目別明細を扱う。
 
+帳票の科目別日付は、LISTの既存節目と混同せず次のコードで保持する。
+
+- 文字入力: `text_input_ordered_on` / `text_input_completed_on`
+- 作図: `drawing_ordered_on` / `drawing_completed_on`
+- 原本スキャン: `original_scan_ordered_on` / `original_scan_delivered_on`
+
+
 原本スキャンの実施先:
 
 - 社内: 製版部門。個人担当者までは管理しない。

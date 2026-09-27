@@ -1,4 +1,6 @@
 <script setup>
+import LedgerCellEditor from '@/Components/MGinbon/LedgerCellEditor.vue';
+
 const props = defineProps({
   type: { type: String, required: true },
   unit: { type: Object, required: true },
@@ -14,6 +16,24 @@ const date = (code, key) => subject(code)?.dates?.[key]?.slice(5).replace('-', '
 const stage = (code, key) => subject(code)?.stages?.find((row) => row.code === key)?.actor || '';
 const qty = (code, kind, execution) => subject(code)?.measurements?.find((row) => row.work_type === kind && row.execution_type === execution)?.quantity ?? '';
 const total = (kind, execution) => subjectOrder.reduce((sum, code) => sum + (Number(qty(code, kind, execution)) || 0), 0);
+const sharedDate = (key) => props.item.shared_dates?.[key]?.slice(5).replace('-', '/') || '';
+const stageActors = (key) => [...new Set(subjectOrder.map((code) => stage(code, key)).filter(Boolean))].join('・');
+const reportDateCodes = {
+  text_order: { ordered: 'text_input_ordered_on', delivered: 'text_input_completed_on' },
+  drawing_order: { ordered: 'drawing_ordered_on', delivered: 'drawing_completed_on' },
+  scan_order: { ordered: 'original_scan_ordered_on', delivered: 'original_scan_delivered_on' },
+  order_form: { ordered: 'drawing_ordered_on', delivered: 'drawing_completed_on' },
+};
+const dateColumn = (kind) => ({ type: 'date', code: reportDateCodes[props.type]?.[kind] });
+function dateSaved(payload) {
+  props.item.updated_at = payload.updated_at;
+  (payload.subjectIds || []).forEach((subjectId) => {
+    const row = props.item.subjects.find((subject) => subject.id === subjectId);
+    if (!row) return;
+    row.dates ||= {};
+    row.dates[payload.code] = payload.date;
+  });
+}
 </script>
 
 <template>
@@ -29,19 +49,35 @@ const total = (kind, execution) => subjectOrder.reduce((sum, code) => sum + (Num
 
     <div v-if="type === 'text_order'" class="text-order-grid grid grid-cols-[2.8rem_repeat(4,1fr)_1rem_repeat(4,3.8rem)] text-[10px] leading-[1.15]">
       <span></span><b v-for="code in subjectOrder" :key="'h'+code" class="text-center">{{ names[code] }}</b><span class="admin-only"></span><b v-for="code in subjectOrder" :key="'r'+code" class="admin-only text-center">{{ names[code] }}</b>
-      <span class="text-right">発注日</span><span v-for="code in subjectOrder" :key="'o'+code" class="border border-gray-300 text-center">{{ date(code, 'manuscript_received_on') }}</span><span class="admin-only"></span><span v-for="code in subjectOrder" :key="'i'+code" class="admin-only border border-red-200 bg-[#ffcccc] text-center">{{ date(code, 'manuscript_received_on') }}</span>
-      <span class="text-right">納品日</span><span v-for="code in subjectOrder" :key="'d'+code" class="border border-gray-300 bg-[#dddddd] text-center">{{ date(code, 'text_input_completed_on') }}</span><span class="admin-only"></span><span v-for="code in subjectOrder" :key="'a'+code" class="admin-only border border-yellow-200 bg-[#ffffcc] text-center">{{ stage(code, 'text_input') }}</span>
+      <span class="text-right">発注日</span><span v-for="code in subjectOrder" :key="'o'+code" class="border border-gray-300 text-center"><LedgerCellEditor v-if="subject(code)" :item="item" :subject="subject(code)" :column="dateColumn('ordered')" @saved="dateSaved" /></span><span class="admin-only"></span><span v-for="code in subjectOrder" :key="'i'+code" class="admin-only border border-red-200 bg-[#ffcccc] text-center">{{ date(code, 'manuscript_received_on') }}</span>
+      <span class="text-right">納品日</span><span v-for="code in subjectOrder" :key="'d'+code" class="border border-gray-300 bg-[#dddddd] text-center"><LedgerCellEditor v-if="subject(code)" :item="item" :subject="subject(code)" :column="dateColumn('delivered')" @saved="dateSaved" /></span><span class="admin-only"></span><span v-for="code in subjectOrder" :key="'a'+code" class="admin-only border border-yellow-200 bg-[#ffffcc] text-center">{{ stage(code, 'text_input') }}</span>
     </div>
 
-    <div v-else class="drawing-order-grid grid grid-cols-[4.8rem_repeat(4,1fr)_2.6rem_1rem_repeat(4,3.8rem)] text-[10px] leading-[1.15]">
+    <div v-else-if="type === 'scan_order'" class="scan-order-shell text-[10px] leading-[1.15]">
+      <div class="scan-order-grid grid grid-cols-[4.8rem_repeat(5,minmax(0,1fr))]">
+        <span></span><b v-for="code in subjectOrder" :key="'h'+code" class="text-center">{{ names[code] }}</b><b class="text-center">合計</b>
+        <span class="text-right">スキャン点数</span><span v-for="code in subjectOrder" :key="'s'+code" class="border border-gray-300 bg-[#ffffcc] text-center">{{ qty(code, 'scan', 'subcontracted') }}</span><b class="border border-gray-300 bg-[#ffffcc] text-center">{{ total('scan', 'subcontracted') || '' }}</b>
+        <span class="text-right">発注日</span><span v-for="code in subjectOrder" :key="'a'+code" class="border border-gray-300 text-center"><LedgerCellEditor v-if="subject(code)" :item="item" :subject="subject(code)" :column="dateColumn('ordered')" @saved="dateSaved" /></span><span></span>
+        <span class="text-right">納品日</span><span v-for="code in subjectOrder" :key="'d'+code" class="border border-gray-300 bg-[#dddddd] text-center"><LedgerCellEditor v-if="subject(code)" :item="item" :subject="subject(code)" :column="dateColumn('delivered')" @saved="dateSaved" /></span><span></span>
+      </div>
+      <div class="admin-only scan-admin-grid grid grid-cols-[6.2rem_minmax(0,1fr)] gap-x-2 gap-y-1">
+        <b class="col-span-2 whitespace-nowrap bg-gray-600 px-1 text-center text-white">国語・算数・社会・理科</b>
+        <span class="text-right">問題初校組担当</span><b class="bg-gray-200 px-2 text-center">{{ stageActors('initial_operation') }}</b>
+        <span class="text-right">原本入稿</span><span class="bg-gray-200 px-2 text-center">{{ sharedDate('original_received_on') }}</span>
+        <span class="text-right">原本scan担当</span><span class="bg-gray-200 px-2 text-center">{{ stageActors('drawing') }}</span>
+        <span class="text-right">銀本掲載</span><span class="bg-[#ccffcc] px-2 text-center">{{ item.publication_status || '' }}</span>
+      </div>
+    </div>
+
+    <div v-else class="drawing-order-grid grid grid-cols-[4.8rem_repeat(5,minmax(0,1fr))_1rem_repeat(4,3.8rem)] text-[10px] leading-[1.15]">
       <span></span><b v-for="code in subjectOrder" :key="'h'+code" class="text-center">{{ names[code] }}</b><span></span><span class="admin-only"></span><b v-for="code in subjectOrder" :key="'r'+code" class="admin-only text-center">{{ names[code] }}</b>
       <span class="text-right">スキャン点数</span><span v-for="code in subjectOrder" :key="'s'+code" class="border border-gray-300 bg-[#ffffcc] text-center">{{ qty(code, 'scan', type === 'drawing_order' ? 'subcontracted' : 'internal') }}</span><b class="border-b border-gray-400 text-center">{{ total('scan', type === 'drawing_order' ? 'subcontracted' : 'internal') || '' }}</b><span class="admin-only"></span><span v-for="code in subjectOrder" :key="'i'+code" class="admin-only border border-red-200 bg-[#ffcccc] text-center">{{ date(code, 'manuscript_received_on') }}</span>
       <span class="text-right">作図点数</span><span v-for="code in subjectOrder" :key="'g'+code" class="border border-gray-300 bg-[#ccffff] text-center">{{ qty(code, 'drawing', type === 'drawing_order' ? 'subcontracted' : 'internal') }}</span><b class="border-b border-gray-400 text-center">{{ total('drawing', type === 'drawing_order' ? 'subcontracted' : 'internal') || '' }}</b><span class="admin-only"></span><span v-for="code in subjectOrder" :key="'w'+code" class="admin-only border border-yellow-200 bg-[#ffffcc] text-center">{{ stage(code, 'drawing') }}</span>
-      <span class="text-right">発注日</span><span v-for="code in subjectOrder" :key="'o'+code" class="border border-gray-300 text-center">{{ date(code, 'manuscript_received_on') }}</span><span></span><span class="admin-only"></span><span v-for="code in subjectOrder" :key="'x'+code" class="admin-only"></span>
-      <span class="text-right">納品日</span><span v-for="code in subjectOrder" :key="'d'+code" class="border border-gray-300 bg-[#dddddd] text-center">{{ date(code, 'drawing_completed_on') }}</span><span></span><span class="admin-only"></span><span v-for="code in subjectOrder" :key="'y'+code" class="admin-only"></span>
+      <span class="text-right">発注日</span><span v-for="code in subjectOrder" :key="'o'+code" class="border border-gray-300 text-center"><LedgerCellEditor v-if="subject(code)" :item="item" :subject="subject(code)" :column="dateColumn('ordered')" @saved="dateSaved" /></span><span></span><span class="admin-only"></span><span v-for="code in subjectOrder" :key="'x'+code" class="admin-only"></span>
+      <span class="text-right">納品日</span><span v-for="code in subjectOrder" :key="'d'+code" class="border border-gray-300 bg-[#dddddd] text-center"><LedgerCellEditor v-if="subject(code)" :item="item" :subject="subject(code)" :column="dateColumn('delivered')" @saved="dateSaved" /></span><span></span><span class="admin-only"></span><span v-for="code in subjectOrder" :key="'y'+code" class="admin-only"></span>
     </div>
 
-    <div v-if="type === 'order_form'" class="grid grid-cols-[4.8rem_repeat(4,1fr)_2.6rem] text-[10px] leading-[1.15]">
+    <div v-if="type === 'order_form'" class="grid grid-cols-[4.8rem_repeat(5,minmax(0,1fr))] text-[10px] leading-[1.15]">
       <span class="text-right">文字入力</span><span v-for="code in subjectOrder" :key="'t'+code" class="border border-gray-300 bg-[#ffffcc] text-center">{{ stage(code, 'text_input') }}</span><span></span>
       <span class="text-right">社外/scan数</span><span v-for="code in subjectOrder" :key="'es'+code" class="border border-gray-300 bg-[#99ffcc] text-center">{{ qty(code, 'scan', 'subcontracted') }}</span><b class="text-center text-blue-700">{{ total('scan', 'subcontracted') }}</b>
       <span class="text-right">社外/作図数</span><span v-for="code in subjectOrder" :key="'eg'+code" class="border border-gray-300 bg-[#99ffcc] text-center">{{ qty(code, 'drawing', 'subcontracted') }}</span><b class="text-center text-blue-700">{{ total('drawing', 'subcontracted') }}</b>
@@ -56,9 +92,17 @@ const total = (kind, execution) => subjectOrder.reduce((sum, code) => sum + (Num
 .text_order-record .record-head, .drawing_order-record .record-head { font-size: 13px; line-height: 28px; }
 .text_order-record .text-order-grid { font-size: 13px; line-height: 27px; }
 .drawing_order-record .drawing-order-grid { font-size: 12px; line-height: 23px; }
+.scan_order-record .record-head { width: 66.6667%; font-size: 13px; line-height: 28px; }
+.scan_order-record .scan-order-shell { display: grid; grid-template-columns: minmax(0, 2fr) minmax(15rem, 1fr); gap: .75rem; }
+.scan_order-record .scan-order-grid { font-size: 12px; line-height: 25px; }
+.scan_order-record .scan-admin-grid { align-content: start; font-size: 12px; line-height: 23px; }
 @media print {
   .admin-only { display: none !important; }
   .text-order-grid { grid-template-columns: 2.8rem repeat(4, 1fr) !important; }
-  .drawing-order-grid { grid-template-columns: 4.8rem repeat(4, 1fr) 2.6rem !important; }
+  .drawing-order-grid { grid-template-columns: 4.8rem repeat(5, minmax(0, 1fr)) !important; }
+  .scan_order-record .record-head { width: 100%; }
+  .scan_order-record .scan-order-shell { display: block; }
+  .scan-order-grid { grid-template-columns: 4.8rem repeat(5, minmax(0, 1fr)) !important; }
+  .order-record { padding: .5mm 0; }
 }
 </style>

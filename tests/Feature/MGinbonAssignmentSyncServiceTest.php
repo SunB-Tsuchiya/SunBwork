@@ -153,7 +153,7 @@ class MGinbonAssignmentSyncServiceTest extends TestCase
         $request = Request::create('/mginbon/date-cell', 'PATCH', [
             'updated_at' => $updatedAt,
             'subject_ids' => [$ids['item_subject'], $secondItemSubject],
-            'code' => 'manuscript_received_on',
+            'code' => 'original_scan_ordered_on',
             'date' => '2026-05-08',
         ]);
         $user = new User();
@@ -167,7 +167,7 @@ class MGinbonAssignmentSyncServiceTest extends TestCase
 
         $this->assertSame([$ids['item_subject'], $secondItemSubject], $response->getData(true)['subjectIds']);
         $this->assertSame(2, $db->table('mginbon_milestones')
-            ->where('code', 'manuscript_received_on')->where('occurred_on', '2026-05-08')->count());
+            ->where('code', 'original_scan_ordered_on')->where('occurred_on', '2026-05-08')->count());
     }
 
     private function fixture(string $stageCode): array

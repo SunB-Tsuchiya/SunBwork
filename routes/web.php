@@ -850,6 +850,28 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         // MGinbon（銀本制作進行管理）
         Route::get('/mginbon', [App\Http\Controllers\Coordinator\MGinbonLedgerController::class, 'index'])
             ->name('mginbon.index');
+        Route::get('/mginbon/aggregations', [App\Http\Controllers\Coordinator\MGinbonAggregationController::class, 'index'])
+            ->name('mginbon.aggregations.index');
+        Route::get('/mginbon/export.csv', App\Http\Controllers\Coordinator\MGinbonCsvExportController::class)
+            ->name('mginbon.export.csv');
+        Route::get('/mginbon/annual-import', [App\Http\Controllers\Coordinator\MGinbonAnnualImportController::class, 'create'])
+            ->name('mginbon.annual_import.create');
+        Route::post('/mginbon/annual-import/preview', [App\Http\Controllers\Coordinator\MGinbonAnnualImportController::class, 'preview'])
+            ->name('mginbon.annual_import.preview');
+        Route::post('/mginbon/annual-import', [App\Http\Controllers\Coordinator\MGinbonAnnualImportController::class, 'store'])
+            ->name('mginbon.annual_import.store');
+        Route::get('/mginbon/value-masters', [App\Http\Controllers\Coordinator\MGinbonValueMasterController::class, 'index'])
+            ->name('mginbon.value_masters.index');
+        Route::post('/mginbon/value-masters/items', [App\Http\Controllers\Coordinator\MGinbonValueMasterController::class, 'store'])
+            ->name('mginbon.value_masters.items.store');
+        Route::patch('/mginbon/value-masters/items/{item}', [App\Http\Controllers\Coordinator\MGinbonValueMasterController::class, 'update'])
+            ->name('mginbon.value_masters.items.update');
+        Route::delete('/mginbon/value-masters/items/{item}', [App\Http\Controllers\Coordinator\MGinbonValueMasterController::class, 'destroy'])
+            ->name('mginbon.value_masters.items.destroy');
+        Route::post('/mginbon/value-masters/{valueList}/reorder', [App\Http\Controllers\Coordinator\MGinbonValueMasterController::class, 'reorder'])
+            ->name('mginbon.value_masters.reorder');
+        Route::post('/mginbon/value-masters/copy', [App\Http\Controllers\Coordinator\MGinbonValueMasterController::class, 'copy'])
+            ->name('mginbon.value_masters.copy');
         Route::get('/mginbon/reports/text-input', [App\Http\Controllers\Coordinator\MGinbonReportController::class, 'textInput'])
             ->name('mginbon.reports.text_input');
         Route::put('/mginbon/projects/{project}/project-link', [App\Http\Controllers\Coordinator\MGinbonProjectLinkController::class, 'update'])
@@ -936,6 +958,8 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         // メンバー予定表（静的サブパスなので {projectJob} の前に定義）
         Route::get('project_jobs/{projectJob}/member-schedule', [App\Http\Controllers\Coordinator\ProjectJobMemberScheduleController::class, 'index'])->name('project_jobs.member_schedule');
         Route::get('project_jobs/{projectJob}/member-schedule/data', [App\Http\Controllers\Coordinator\ProjectJobMemberScheduleController::class, 'data'])->name('project_jobs.member_schedule.data');
+        Route::get('project_jobs/{projectJob}/subcontractors', [App\Http\Controllers\Coordinator\ProjectJobSubcontractorController::class, 'edit'])->name('project_jobs.subcontractors.edit');
+        Route::put('project_jobs/{projectJob}/subcontractors', [App\Http\Controllers\Coordinator\ProjectJobSubcontractorController::class, 'update'])->name('project_jobs.subcontractors.update');
         Route::get('project_jobs/{projectJob}', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'show'])->name('project_jobs.show');
         Route::get('project_jobs/{projectJob}/edit', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'edit'])->name('project_jobs.edit');
         Route::put('project_jobs/{projectJob}', [App\Http\Controllers\Coordinator\ProjectJobController::class, 'update'])->name('project_jobs.update');

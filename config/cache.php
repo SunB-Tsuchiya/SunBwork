@@ -61,6 +61,13 @@ return [
             'lock_path' => storage_path('framework/cache/sales-preview'),
         ],
 
+        // 銀本年度取込は177行分の原文・警告を保持するため、DB cacheのTEXT上限を避ける。
+        'mginbon_preview' => [
+            'driver' => 'file',
+            'path' => storage_path('framework/cache/mginbon-preview'),
+            'lock_path' => storage_path('framework/cache/mginbon-preview'),
+        ],
+
         'memcached' => [
             'driver' => 'memcached',
             'persistent_id' => env('MEMCACHED_PERSISTENT_ID'),
