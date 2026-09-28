@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Coordinator;
 use App\Http\Controllers\Controller;
 use App\Models\MGinbon\MGinbonProject;
 use App\Models\ProjectJob;
+use App\Services\MGinbon\MGinbonProjectAccess;
 use App\Services\ProjectJobAssigneeOptions;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
@@ -18,7 +19,7 @@ class MGinbonLedgerController extends Controller
 {
     private const SUBJECT_ORDER = ['japanese', 'math', 'social', 'science'];
 
-    public function index(Request $request, ProjectJobAssigneeOptions $assigneeOptions): Response
+    public function index(Request $request, ProjectJobAssigneeOptions $assigneeOptions, MGinbonProjectAccess $access): Response
     {
         $validated = $request->validate([
             'year' => ['nullable', 'integer', 'between:2000,2100'],
@@ -46,6 +47,7 @@ class MGinbonLedgerController extends Controller
             'view' => (string) ($validated['view'] ?? 'list'),
             'per_page' => max(25, (int) ($validated['per_page'] ?? 25)),
         ];
+        if (! $project->project_job_id) $filters['view'] = 'list';
         $mediaOptions = $this->itemsQuery($project->id)
             ->reorder()
             ->select('media.name as media_name')
@@ -117,6 +119,7 @@ class MGinbonLedgerController extends Controller
             ],
             'filters' => $filters,
             'actorOptions' => $actorOptions,
+            'projectLinkLocked' => $access->isInUse($project),
         ]);
     }
 

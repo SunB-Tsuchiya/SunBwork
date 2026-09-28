@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Coordinator;
 
 use App\Http\Controllers\Controller;
+use App\Services\MGinbon\MGinbonProjectAccess;
 use App\Models\MGinbon\MGinbonProject;
 use App\Models\Subcontractor;
 use App\Models\User;
@@ -66,13 +67,14 @@ class MGinbonActorMappingController extends Controller
         ]);
     }
 
-    public function update(Request $request): RedirectResponse
+    public function update(Request $request, MGinbonProjectAccess $access): RedirectResponse
     {
         $validated = $request->validate([
             'project_id' => ['required', 'integer'], 'legacy_value' => ['required', 'string', 'max:255'],
             'target' => ['required', 'string', 'max:100'],
         ]);
         $project = MGinbonProject::findOrFail($validated['project_id']);
+        $access->requireLinked($project);
         [$targetType, $targetId] = array_pad(explode(':', $validated['target'], 2), 2, null);
         abort_unless(in_array($targetType, ['user', 'subcontractor', 'ignore'], true), 422);
 

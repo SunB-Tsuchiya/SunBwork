@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Coordinator;
 
 use App\Http\Controllers\Controller;
+use App\Services\MGinbon\MGinbonProjectAccess;
 use App\Models\MGinbon\MGinbonItem;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -24,8 +25,9 @@ class MGinbonCellController extends Controller
 
     private const SHARED_DATE_CODES = ['original_received_on', 'original_scan_completed_on'];
 
-    public function updateDate(Request $request, MGinbonItem $item): JsonResponse
+    public function updateDate(Request $request, MGinbonItem $item, MGinbonProjectAccess $access): JsonResponse
     {
+        $access->requireLinked($access->projectForItem($item->id));
         $validated = $request->validate([
             'updated_at' => ['required', 'string'],
             'subject_id' => ['nullable', 'integer'],

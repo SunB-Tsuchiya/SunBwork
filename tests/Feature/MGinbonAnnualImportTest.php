@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Http\Controllers\Coordinator\MGinbonAnnualImportController;
 use App\Models\User;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
@@ -13,6 +14,7 @@ use Tests\TestCase;
 
 class MGinbonAnnualImportTest extends TestCase
 {
+    use DatabaseTransactions;
     private string $databasePath;
 
     protected function setUp(): void
@@ -49,12 +51,16 @@ class MGinbonAnnualImportTest extends TestCase
     public function test_confirmed_preview_creates_project_units_and_ordered_stages(): void
     {
         $token = (string) Str::uuid();
+        $companyId = DB::table('companies')->insertGetId(['name' => 'MGinbon Test', 'code' => 'mginbon-test-'.Str::uuid(), 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $user = User::factory()->create(['company_id' => $companyId, 'user_role' => 'coordinator']);
         $rows = [
             $this->row(2, '101', '1721', '①', '青山学院中等部', '第1回'),
             $this->row(3, '102', '3331', '', '青山学院横浜英和中学校', 'A', ['注記を確認']),
         ];
-        Cache::store('mginbon_preview')->put('mginbon:annual-import:99:'.$token, [
+        Cache::store('mginbon_preview')->put('mginbon:annual-import:'.$user->id.':'.$token, [
             'year' => 2098,
+            'project_link_mode' => 'create',
+            'project_job_id' => null,
             'filename' => '2098年度対象校.xlsx',
             'rows' => $rows,
         ], now()->addMinutes(30));
@@ -62,15 +68,15 @@ class MGinbonAnnualImportTest extends TestCase
         $request = Request::create('/coordinator/mginbon/annual-import', 'POST', [
             'token' => $token,
             'year' => 2098,
+            'project_link_mode' => 'create',
+            'project_job_id' => null,
             'rows' => [
                 [...$rows[0], 'confirmed' => false],
                 [...$rows[1], 'school_name' => '青山学院横浜英和中学校（確認済）', 'confirmed' => true],
             ],
         ]);
-        $user = new User;
-        $user->id = 99;
-        $request->setUserResolver(fn () => $user);
 
+        $request->setUserResolver(fn () => $user);
         $response = app(MGinbonAnnualImportController::class)->store($request);
 
         $this->assertTrue($response->isRedirect(route('coordinator.mginbon.index', ['year' => 2098])));
@@ -90,7 +96,7 @@ class MGinbonAnnualImportTest extends TestCase
         $this->assertSame('青山学院横浜英和中学校（確認済）', $unit->display_name);
         $this->assertSame(['注記を確認'], json_decode($unit->import_warnings, true));
         $this->assertSame('青山学院横浜英和中学校', json_decode($unit->source_data, true)['school_name']);
-        $this->assertFalse(Cache::store('mginbon_preview')->has('mginbon:annual-import:99:'.$token));
+        $this->assertFalse(Cache::store('mginbon_preview')->has('mginbon:annual-import:'.$user->id.':'.$token));
     }
 
     public function test_default_values_are_not_restored_after_an_item_is_renamed(): void
@@ -113,8 +119,8 @@ class MGinbonAnnualImportTest extends TestCase
     public function test_value_lists_can_be_copied_between_years(): void
     {
         $db = DB::connection('mginbon');
-        $sourceId = $db->table('mginbon_projects')->insertGetId(['year' => 2095, 'name' => '2095年', 'status' => 'draft', 'created_at' => now(), 'updated_at' => now()]);
-        $targetId = $db->table('mginbon_projects')->insertGetId(['year' => 2096, 'name' => '2096年', 'status' => 'draft', 'created_at' => now(), 'updated_at' => now()]);
+        $sourceId = $db->table('mginbon_projects')->insertGetId(['project_job_id' => 1, 'year' => 2095, 'name' => '2095年', 'status' => 'draft', 'created_at' => now(), 'updated_at' => now()]);
+        $targetId = $db->table('mginbon_projects')->insertGetId(['project_job_id' => 1, 'year' => 2096, 'name' => '2096年', 'status' => 'draft', 'created_at' => now(), 'updated_at' => now()]);
         $service = app(\App\Services\MGinbon\MGinbonValueListDefaults::class);
         $service->ensureForProject(\App\Models\MGinbon\MGinbonProject::findOrFail($sourceId), 99);
         $service->ensureForProject(\App\Models\MGinbon\MGinbonProject::findOrFail($targetId), 99);
@@ -122,9 +128,7 @@ class MGinbonAnnualImportTest extends TestCase
         $db->table('mginbon_value_list_items')->where('mginbon_value_list_id', $sourceListId)->where('value', '鈴木')->update(['value' => '派遣A', 'is_active' => false]);
 
         $request = Request::create('/coordinator/mginbon/value-masters/copy', 'POST', ['source_project_id' => $sourceId, 'target_project_id' => $targetId]);
-        $user = new User; $user->id = 99; $request->setUserResolver(fn () => $user);
-        app(\App\Http\Controllers\Coordinator\MGinbonValueMasterController::class)->copy($request);
-
+        app(\App\Http\Controllers\Coordinator\MGinbonValueMasterController::class)->copy($request, app(\App\Services\MGinbon\MGinbonProjectAccess::class));
         $targetListId = $db->table('mginbon_value_lists')->where('mginbon_project_id', $targetId)->where('code', 'checker')->value('id');
         $copied = $db->table('mginbon_value_list_items')->where('mginbon_value_list_id', $targetListId)->orderBy('sort_order')->get(['value', 'is_active']);
         $this->assertSame(['派遣A', '横田', '土屋'], $copied->pluck('value')->all());

@@ -4,12 +4,16 @@ namespace App\Http\Controllers\Coordinator;
 
 use App\Http\Controllers\Controller;
 use App\Models\MGinbon\MGinbonProject;
+use App\Models\ProjectJob;
+use App\Models\ProjectTeamMember;
 use App\Services\MGinbon\MGinbonAnnualSchoolListReader;
 use App\Services\MGinbon\MGinbonValueListDefaults;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -28,17 +32,20 @@ class MGinbonAnnualImportController extends Controller
         ['fourth_proof', '四校赤字照合', 'proof', 130], ['fifth_operation', '五校修正', 'operation', 140],
     ];
 
-    public function create(): Response
+    public function create(Request $request): Response
     {
-        return Inertia::render('Coordinator/MGinbon/AnnualImport', ['preview' => null]);
+        $token = $request->query('preview_token');
+        $cached = is_string($token) && Str::isUuid($token)
+            ? Cache::store('mginbon_preview')->get($this->cacheKey($request, $token))
+            : null;
+        $preview = $cached ? [...$cached['result'], 'year' => $cached['year'], 'filename' => $cached['filename'], 'token' => $token] : null;
+
+        return Inertia::render('Coordinator/MGinbon/AnnualImport', ['preview' => $preview, 'projectJobs' => $this->projectJobOptions($request)]);
     }
 
-    public function preview(Request $request, MGinbonAnnualSchoolListReader $reader): Response
+    public function preview(Request $request, MGinbonAnnualSchoolListReader $reader): RedirectResponse
     {
-        $data = $request->validate([
-            'year' => ['required', 'integer', 'between:2000,2100'],
-            'file' => ['required', 'file', 'mimes:xlsx', 'max:5120'],
-        ]);
+        $data = $request->validate(['year' => ['required', 'integer', 'between:2000,2100'], 'file' => ['required', 'file', 'mimes:xlsx', 'max:5120']]);
         try {
             $result = $reader->read($request->file('file')->getRealPath());
         } catch (RuntimeException $exception) {
@@ -50,32 +57,26 @@ class MGinbonAnnualImportController extends Controller
         $token = (string) Str::uuid();
         try {
             Cache::store('mginbon_preview')->put($this->cacheKey($request, $token), [
-                'year' => (int) $data['year'], 'filename' => $request->file('file')->getClientOriginalName(),
-                'rows' => $result['rows'],
+                'year' => (int) $data['year'], 'filename' => $request->file('file')->getClientOriginalName(), 'rows' => $result['rows'], 'result' => $result,
             ], now()->addMinutes(30));
         } catch (Throwable $exception) {
             report($exception);
             throw ValidationException::withMessages(['file' => 'プレビューを一時保存できませんでした。管理者へ連絡してください。']);
         }
 
-        return Inertia::render('Coordinator/MGinbon/AnnualImport', [
-            'preview' => [...$result, 'year' => (int) $data['year'], 'filename' => $request->file('file')->getClientOriginalName(), 'token' => $token],
-        ]);
+        return redirect()->route('coordinator.mginbon.annual_import.create', ['preview_token' => $token]);
     }
-
     public function store(Request $request, ?MGinbonValueListDefaults $valueListDefaults = null)
     {
         $valueListDefaults ??= app(MGinbonValueListDefaults::class);
         $data = $request->validate([
             'token' => ['required', 'uuid'], 'year' => ['required', 'integer', 'between:2000,2100'],
-            'rows' => ['required', 'array', 'min:1'],
-            'rows.*.source_row_number' => ['required', 'integer'],
-            'rows.*.mikuni_code' => ['required', 'string', 'max:50'],
-            'rows.*.n_code' => ['required', 'string', 'max:100'],
-            'rows.*.alpha_group' => ['nullable', 'string', 'max:20'],
-            'rows.*.school_name' => ['required', 'string', 'max:300'],
-            'rows.*.exam_session' => ['nullable', 'string', 'max:255'],
-            'rows.*.confirmed' => ['required', 'boolean'],
+            'project_link_mode' => ['required', Rule::in(['existing', 'create'])],
+            'project_job_id' => ['nullable', 'integer', 'required_if:project_link_mode,existing', 'exists:project_jobs,id'],
+            'rows' => ['required', 'array', 'min:1'], 'rows.*.source_row_number' => ['required', 'integer'],
+            'rows.*.mikuni_code' => ['required', 'string', 'max:50'], 'rows.*.n_code' => ['required', 'string', 'max:100'],
+            'rows.*.alpha_group' => ['nullable', 'string', 'max:20'], 'rows.*.school_name' => ['required', 'string', 'max:300'],
+            'rows.*.exam_session' => ['nullable', 'string', 'max:255'], 'rows.*.confirmed' => ['required', 'boolean'],
         ]);
         try {
             $cached = Cache::store('mginbon_preview')->get($this->cacheKey($request, $data['token']));
@@ -83,69 +84,83 @@ class MGinbonAnnualImportController extends Controller
             report($exception);
             throw ValidationException::withMessages(['token' => 'プレビューを読み込めませんでした。Excelを再度アップロードしてください。']);
         }
-        if (! $cached || $cached['year'] !== (int) $data['year']) {
-            throw ValidationException::withMessages(['token' => 'プレビューの有効期限が切れました。Excelを再度アップロードしてください。']);
-        }
-        if (MGinbonProject::query()->where('year', $data['year'])->exists()) {
-            return back()->withErrors(['year' => '同年度は既に登録されています。']);
-        }
+        if (! $cached || $cached['year'] !== (int) $data['year']) throw ValidationException::withMessages(['token' => 'プレビューの有効期限が切れました。Excelを再度アップロードしてください。']);
+        if (MGinbonProject::query()->where('year', $data['year'])->exists()) return back()->withErrors(['year' => '同年度は既に登録されています。']);
         foreach (['mikuni_code' => 'Mコード', 'n_code' => 'Nコード'] as $key => $label) {
             $duplicates = collect($data['rows'])->pluck($key)->filter()->duplicates();
-            if ($duplicates->isNotEmpty()) {
-                return back()->withErrors(['rows' => $label.'が重複しています: '.$duplicates->unique()->implode(', ')]);
-            }
+            if ($duplicates->isNotEmpty()) return back()->withErrors(['rows' => $label.'が重複しています: '.$duplicates->unique()->implode(', ')]);
         }
         $rawByRow = collect($cached['rows'])->keyBy('source_row_number');
         foreach ($data['rows'] as $row) {
             $source = $rawByRow->get($row['source_row_number']);
-            if (! $source) {
-                return back()->withErrors(['rows' => $row['source_row_number'].'行目は元ファイルに存在しません。']);
-            }
-            if (! empty($source['warnings']) && ! $row['confirmed']) {
-                return back()->withErrors(['rows' => $row['source_row_number'].'行目の要確認項目を確認してください。']);
-            }
+            if (! $source) return back()->withErrors(['rows' => $row['source_row_number'].'行目は元ファイルに存在しません。']);
+            if (! empty($source['warnings']) && ! $row['confirmed']) return back()->withErrors(['rows' => $row['source_row_number'].'行目の要確認項目を確認してください。']);
         }
+
+        [$projectJob, $createdProjectJob] = $this->resolveProjectJob($request, $data);
         try {
-            DB::connection('mginbon')->transaction(function () use ($data, $rawByRow, $request, $valueListDefaults) {
+            DB::connection('mginbon')->transaction(function () use ($data, $rawByRow, $request, $valueListDefaults, $projectJob) {
                 $project = MGinbonProject::create([
-                    'year' => $data['year'], 'name' => $data['year'].'年 中学入試問題集',
+                    'project_job_id' => $projectJob->id, 'year' => $data['year'], 'name' => $data['year'].'年 中学入試問題集',
                     'status' => 'draft', 'created_by' => $request->user()?->id,
                 ]);
                 $now = now();
                 foreach ($data['rows'] as $row) {
                     $source = $rawByRow->get($row['source_row_number']);
                     DB::connection('mginbon')->table('mginbon_production_units')->insert([
-                        'mginbon_project_id' => $project->id, 'unit_type' => 'exam',
-                        'mikuni_code' => trim($row['mikuni_code']), 'n_code' => trim($row['n_code']),
-                        'display_name' => trim($row['school_name']), 'alpha_group' => trim((string) ($row['alpha_group'] ?? '')) ?: null,
+                        'mginbon_project_id' => $project->id, 'unit_type' => 'exam', 'mikuni_code' => trim($row['mikuni_code']),
+                        'n_code' => trim($row['n_code']), 'display_name' => trim($row['school_name']),
+                        'alpha_group' => trim((string) ($row['alpha_group'] ?? '')) ?: null,
                         'exam_session' => trim((string) ($row['exam_session'] ?? '')) ?: null,
                         'source_row_number' => $row['source_row_number'], 'source_data' => json_encode($source['raw'] ?? [], JSON_UNESCAPED_UNICODE),
-                        'import_warnings' => json_encode($source['warnings'] ?? [], JSON_UNESCAPED_UNICODE),
-                        'review_status' => 'draft',
+                        'import_warnings' => json_encode($source['warnings'] ?? [], JSON_UNESCAPED_UNICODE), 'review_status' => 'draft',
                         'created_at' => $now, 'updated_at' => $now,
                     ]);
                 }
                 foreach (self::STAGES as [$code, $name, $type, $order]) {
                     DB::connection('mginbon')->table('mginbon_stage_definitions')->insert([
-                        'mginbon_project_id' => $project->id, 'code' => $code, 'name' => $name,
-                        'activity_type' => $type, 'sort_order' => $order, 'is_active' => true,
-                        'created_at' => $now, 'updated_at' => $now,
+                        'mginbon_project_id' => $project->id, 'code' => $code, 'name' => $name, 'activity_type' => $type,
+                        'sort_order' => $order, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now,
                     ]);
                 }
                 $valueListDefaults->ensureForProject($project, $request->user()?->id);
             });
         } catch (Throwable $exception) {
             report($exception);
-
+            if ($createdProjectJob) DB::transaction(fn () => $createdProjectJob->delete());
             return back()->withErrors(['rows' => '年度データを登録できませんでした。入力内容を確認し、解決しない場合は管理者へ連絡してください。']);
         }
-        try {
-            Cache::store('mginbon_preview')->forget($this->cacheKey($request, $data['token']));
-        } catch (Throwable $exception) {
-            report($exception);
-        }
+        try { Cache::store('mginbon_preview')->forget($this->cacheKey($request, $data['token'])); } catch (Throwable $exception) { report($exception); }
 
         return redirect()->route('coordinator.mginbon.index', ['year' => $data['year']])->with('success', '年度対象校リストを登録しました。');
+    }
+
+    private function resolveProjectJob(Request $request, array $data): array
+    {
+        $companyId = $this->companyId($request);
+        abort_unless($companyId, 422, '会社を選択してください。');
+        if ($data['project_link_mode'] === 'existing') {
+            return [ProjectJob::query()->where('company_id', $companyId)->where('completed', false)->findOrFail($data['project_job_id']), null];
+        }
+        $job = DB::transaction(function () use ($request, $data, $companyId) {
+            $job = ProjectJob::create(['title' => $data['year'].'年 銀本制作', 'detail' => 'MGinbon（中学入試問題集）専用のJobBox・カレンダー連携案件', 'user_id' => $request->user()?->id, 'company_id' => $companyId, 'completed' => false]);
+            ProjectTeamMember::firstOrCreate(['project_job_id' => $job->id, 'user_id' => $request->user()?->id]);
+            return $job;
+        });
+        return [$job, $job];
+    }
+
+    private function projectJobOptions(Request $request)
+    {
+        $companyId = $this->companyId($request);
+        if (! $companyId) return collect();
+        return ProjectJob::query()->where('company_id', $companyId)->where('completed', false)->orderByDesc('id')->get(['id', 'jobcode', 'title']);
+    }
+
+    private function companyId(Request $request): ?int
+    {
+        $companyId = $request->user()?->user_role === 'superadmin' ? session('superadmin_context.company_id') : $request->user()?->company_id;
+        return $companyId ? (int) $companyId : null;
     }
 
     private function cacheKey(Request $request, string $token): string

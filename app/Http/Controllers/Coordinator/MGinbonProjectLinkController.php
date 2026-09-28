@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Coordinator;
 use App\Http\Controllers\Controller;
 use App\Models\MGinbon\MGinbonProject;
 use App\Models\ProjectJob;
+use App\Models\ProjectTeamMember;
+use App\Services\MGinbon\MGinbonProjectAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -26,6 +28,10 @@ class MGinbonProjectLinkController extends Controller
                 'company_id' => $companyId,
                 'completed' => false,
             ]);
+            ProjectTeamMember::firstOrCreate([
+                'project_job_id' => $job->id,
+                'user_id' => $request->user()?->id,
+            ]);
             DB::connection('mginbon')->transaction(function () use ($request, $project, $job) {
                 $project->update(['project_job_id' => $job->id]);
                 DB::connection('mginbon')->table('mginbon_change_logs')->insert([
@@ -41,7 +47,7 @@ class MGinbonProjectLinkController extends Controller
         return back()->with('success', "{$projectJob->title}を作成して接続しました。");
     }
 
-    public function update(Request $request, MGinbonProject $project): RedirectResponse
+    public function update(Request $request, MGinbonProject $project, MGinbonProjectAccess $access): RedirectResponse
     {
         $validated = $request->validate(['project_job_id' => ['nullable', 'integer', 'exists:project_jobs,id']]);
         $companyId = $request->user()?->user_role === 'superadmin'
@@ -52,6 +58,7 @@ class MGinbonProjectLinkController extends Controller
             ? ProjectJob::query()->where('company_id', $companyId)->findOrFail($validated['project_job_id'])
             : null;
         $old = $project->project_job_id;
+        $access->requireLinkChangeAllowed($project, $projectJob?->id);
 
         DB::connection('mginbon')->transaction(function () use ($request, $project, $projectJob, $old) {
             $project->update(['project_job_id' => $projectJob?->id]);

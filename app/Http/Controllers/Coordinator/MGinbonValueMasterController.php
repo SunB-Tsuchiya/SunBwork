@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Coordinator;
 
 use App\Http\Controllers\Controller;
+use App\Services\MGinbon\MGinbonProjectAccess;
 use App\Models\MGinbon\MGinbonProject;
 use App\Models\MGinbon\MGinbonValueList;
 use App\Models\MGinbon\MGinbonValueListItem;
@@ -16,12 +17,13 @@ use Inertia\Response;
 
 class MGinbonValueMasterController extends Controller
 {
-    public function index(Request $request, MGinbonValueListDefaults $defaults): Response
+    public function index(Request $request, MGinbonValueListDefaults $defaults, MGinbonProjectAccess $access): Response
     {
         $validated = $request->validate(['year' => ['nullable', 'integer', 'between:2000,2100']]);
         $projects = MGinbonProject::query()->orderByDesc('year')->get(['id', 'year', 'name']);
         $project = isset($validated['year']) ? $projects->firstWhere('year', (int) $validated['year']) : $projects->first();
         abort_unless($project, 404);
+        $access->requireLinked($project);
 
         $defaults->ensureForProject($project, $request->user()?->id);
         $lists = MGinbonValueList::query()->with('items')->where('mginbon_project_id', $project->id)
@@ -32,10 +34,11 @@ class MGinbonValueMasterController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, MGinbonProjectAccess $access): RedirectResponse
     {
         $data = $request->validate(['value_list_id' => ['required', 'integer'], 'value' => ['required', 'string', 'max:255']]);
         $list = MGinbonValueList::findOrFail($data['value_list_id']);
+        $access->requireLinked(MGinbonProject::findOrFail($list->mginbon_project_id));
         $value = trim($data['value']);
         $duplicate = $list->items()->where('value', $value)->exists();
         if ($duplicate) return back()->withErrors(['value' => '同じ値が既に登録されています。']);
@@ -48,8 +51,9 @@ class MGinbonValueMasterController extends Controller
         return back()->with('success', '値を追加しました。');
     }
 
-    public function update(Request $request, MGinbonValueListItem $item): RedirectResponse
+    public function update(Request $request, MGinbonValueListItem $item, MGinbonProjectAccess $access): RedirectResponse
     {
+        $access->requireLinked(MGinbonProject::findOrFail($item->valueList->mginbon_project_id));
         $data = $request->validate([
             'value' => ['required', 'string', 'max:255', Rule::unique('mginbon.mginbon_value_list_items', 'value')->where('mginbon_value_list_id', $item->mginbon_value_list_id)->ignore($item->id)],
             'is_active' => ['required', 'boolean'],
@@ -59,15 +63,17 @@ class MGinbonValueMasterController extends Controller
         return back()->with('success', '値を更新しました。');
     }
 
-    public function destroy(Request $request, MGinbonValueListItem $item): RedirectResponse
+    public function destroy(Request $request, MGinbonValueListItem $item, MGinbonProjectAccess $access): RedirectResponse
     {
+        $access->requireLinked(MGinbonProject::findOrFail($item->valueList->mginbon_project_id));
         $item->update(['is_active' => false, 'updated_by' => $request->user()?->id]);
 
         return back()->with('success', '値を削除しました。');
     }
 
-    public function reorder(Request $request, MGinbonValueList $valueList): RedirectResponse
+    public function reorder(Request $request, MGinbonValueList $valueList, MGinbonProjectAccess $access): RedirectResponse
     {
+        $access->requireLinked(MGinbonProject::findOrFail($valueList->mginbon_project_id));
         $data = $request->validate(['item_ids' => ['required', 'array'], 'item_ids.*' => ['integer']]);
         $actual = $valueList->items()->pluck('id')->sort()->values()->all();
         $submitted = collect($data['item_ids'])->map(fn ($id) => (int) $id)->unique()->sort()->values()->all();
@@ -81,7 +87,7 @@ class MGinbonValueMasterController extends Controller
 
         return back()->with('success', '表示順を変更しました。');
     }
-    public function copy(Request $request): RedirectResponse
+    public function copy(Request $request, MGinbonProjectAccess $access): RedirectResponse
     {
         $data = $request->validate([
             'source_project_id' => ['required', 'integer', 'different:target_project_id'],
@@ -89,6 +95,7 @@ class MGinbonValueMasterController extends Controller
         ]);
         $source = MGinbonProject::findOrFail($data['source_project_id']);
         $target = MGinbonProject::findOrFail($data['target_project_id']);
+        $access->requireLinked($target);
         $sourceLists = MGinbonValueList::query()->with('items')->where('mginbon_project_id', $source->id)->orderBy('sort_order')->get();
         if ($sourceLists->isEmpty()) return back()->withErrors(['source_project_id' => 'コピー元年度に値一覧がありません。']);
 

@@ -12,6 +12,7 @@ const props = defineProps({
   units: { type: Object, required: true }, summary: { type: Object, required: true }, mediaOptions: { type: Array, default: () => [] },
   subjects: { type: Array, default: () => [] }, filters: { type: Object, required: true },
   actorOptions: { type: Object, default: () => ({ users: [], subcontractors: [] }) },
+  projectLinkLocked: { type: Boolean, default: false },
 });
 const uniqueMediaOptions = computed(() => [...new Set(props.mediaOptions.filter(Boolean))]);
 const reportViews = ['order_form', 'text_order', 'drawing_order', 'scan_order', 'school_outing_problem'];
@@ -108,7 +109,7 @@ function cellSaved(item, subject, payload) {
               <form class="ml-auto flex items-center gap-1 px-2" @submit.prevent="search"><span class="text-lg">⌕</span><input v-model="form.search" type="search" placeholder="学校名・コードを検索" class="h-7 w-60 border-gray-400 px-2 py-1 text-xs" /><button class="h-7 border border-gray-400 bg-white px-3 hover:bg-gray-100">検索</button></form>
             </div>
             <div class="flex h-8 items-center gap-3 border-b border-gray-400 bg-gray-50 px-1">
-              <label class="flex items-center gap-1">レイアウト:<select v-model="form.view" class="h-6 w-52 border-gray-400 py-0 pl-2 pr-7 text-xs" @change="search"><option value="list">LIST</option><option value="intake">入稿チェック</option><option value="school_outing_problem">出稿表</option><option value="order_form">作図＆文字発注フォーム</option><option value="text_order">C&amp;C文字発注</option><option value="drawing_order">大連若葉作図発注書</option><option value="scan_order">原本スキャン発注書</option></select></label>
+              <label class="flex items-center gap-1">レイアウト:<select v-model="form.view" :disabled="!project.project_job_id" class="h-6 w-52 border-gray-400 py-0 pl-2 pr-7 text-xs" @change="search"><option value="list">LIST</option><option value="intake">入稿チェック</option><option value="school_outing_problem">出稿表</option><option value="order_form">作図＆文字発注フォーム</option><option value="text_order">C&amp;C文字発注</option><option value="drawing_order">大連若葉作図発注書</option><option value="scan_order">原本スキャン発注書</option></select></label>
               <span class="flex items-center gap-1">表示方法の切り替え:<button type="button" class="border border-gray-400 bg-gray-600 px-2 py-0.5 text-white">▤</button><button type="button" class="border border-gray-400 bg-white px-2 py-0.5">▦</button><button type="button" class="border border-gray-400 bg-white px-2 py-0.5">▦</button></span>
               <span class="border border-gray-400 bg-white px-3 py-0.5">プレビュー</span>
               <span class="ml-auto font-semibold">{{ displayedRange }}（全{{ summary.total }}媒体）</span>
@@ -120,13 +121,15 @@ function cellSaved(item, subject, payload) {
               <select v-model="form.status" class="h-6 w-32 border-gray-400 py-0 pl-2 pr-7 text-xs" @change="search"><option value="all">状態: すべて</option><option value="draft">下書き</option><option value="review_required">要確認</option></select>
               <select v-model.number="form.per_page" class="h-6 w-28 border-gray-400 py-0 pl-2 pr-7 text-xs" @change="search"><option :value="25">25校／頁</option><option :value="50">50校／頁</option><option :value="75">75校／頁</option><option :value="100">100校／頁</option></select>
               <button class="h-6 border border-gray-500 bg-white px-4 hover:bg-gray-100">絞り込む</button>
-              <label class="ml-auto flex items-center gap-1 text-white">連携案件:<select v-model="projectLinkForm.project_job_id" class="h-6 w-72 border-gray-400 py-0 pl-2 pr-7 text-xs text-gray-800"><option value="">未接続</option><option v-for="job in projectJobs" :key="job.id" :value="job.id">{{ job.jobcode ? `${job.jobcode} / ` : '' }}{{ job.title }}</option></select></label>
-              <button type="button" class="h-6 border border-gray-600 bg-gray-700 px-3 text-white" @click="saveProjectLink">保存</button>
+              <label class="ml-auto flex items-center gap-1 text-white">連携案件:<select v-model="projectLinkForm.project_job_id" :disabled="projectLinkLocked" class="h-6 w-72 border-gray-400 py-0 pl-2 pr-7 text-xs text-gray-800"><option v-if="!project.project_job_id" value="">未接続</option><option v-for="job in projectJobs" :key="job.id" :value="job.id">{{ job.jobcode ? `${job.jobcode} / ` : '' }}{{ job.title }}</option></select></label>
+              <button type="button" :disabled="projectLinkLocked" class="h-6 border border-gray-600 bg-gray-700 px-3 text-white disabled:opacity-40" @click="saveProjectLink">保存</button>
             </form>
             <div v-if="reportViews.includes(form.view)" id="mginbon-report-controls" class="flex min-h-10 items-center border-t border-gray-400 bg-gray-100"></div>
           </div>
         </div>
       </section>
+      <div v-if="!project.project_job_id" class="rounded border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">この年度はSBWork案件へ未接続です。LISTの閲覧のみ可能です。上部から既存案件へ接続するか、銀本専用案件を作成してください。</div>
+      <div v-else-if="projectLinkLocked" class="rounded border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900">工程データを利用済みのため、連携案件は変更・解除できません。</div>
       <section v-if="form.view === 'intake'" class="grid min-w-[72rem] grid-cols-[17rem_1fr_17rem] items-center border-b border-[#54aaa8] bg-[#fbffd7] px-2 py-1">
         <h1 class="text-center text-lg font-semibold">{{ project.year }}年　中学入試問題集</h1>
         <div class="flex items-center justify-center gap-2"><span class="inline-block rounded-md border-2 border-green-600 bg-[#ccffcc] px-7 py-1 text-base font-bold">入稿チェック</span></div>

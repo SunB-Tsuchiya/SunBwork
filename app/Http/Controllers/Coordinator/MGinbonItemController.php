@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Coordinator;
 
 use App\Http\Controllers\Controller;
+use App\Services\MGinbon\MGinbonProjectAccess;
 use App\Models\MGinbon\MGinbonItem;
 use App\Models\Subcontractor;
 use App\Models\User;
@@ -49,8 +50,9 @@ class MGinbonItemController extends Controller
         ]);
     }
 
-    public function update(Request $request, MGinbonItem $item): RedirectResponse
+    public function update(Request $request, MGinbonItem $item, MGinbonProjectAccess $access): RedirectResponse
     {
+        $access->requireLinked($access->projectForItem($item->id));
         $validated = $request->validate([
             'updated_at' => ['required', 'string'],
             'display_name' => ['required', 'string', 'max:300'],
@@ -113,8 +115,9 @@ class MGinbonItemController extends Controller
         return back()->with('success', '銀本進行データを更新しました。');
     }
 
-    public function updateIntakeCheck(Request $request, MGinbonItem $item): JsonResponse
+    public function updateIntakeCheck(Request $request, MGinbonItem $item, MGinbonProjectAccess $access): JsonResponse
     {
+        $access->requireLinked($access->projectForItem($item->id));
         $validated = $request->validate([
             'updated_at' => ['required', 'string'],
             'note' => ['nullable', 'string', 'max:5000'],

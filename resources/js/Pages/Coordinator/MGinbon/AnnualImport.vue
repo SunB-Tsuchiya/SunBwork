@@ -3,10 +3,10 @@ import { computed, watch } from 'vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 
-const props = defineProps({ preview: { type: Object, default: null } });
+const props = defineProps({ preview: { type: Object, default: null }, projectJobs: { type: Array, default: () => [] } });
 const upload = useForm({ year: new Date().getFullYear() + 1, file: null });
 const confirm = useForm({
-  token: props.preview?.token || '', year: props.preview?.year || '',
+  token: props.preview?.token || '', year: props.preview?.year || '', project_link_mode: 'create', project_job_id: '',
   rows: props.preview?.rows?.map(({ source_row_number, mikuni_code, n_code, alpha_group, school_name, exam_session }) =>
     ({ source_row_number, mikuni_code, n_code, alpha_group, school_name, exam_session, confirmed: false })) || [],
 });
@@ -15,6 +15,7 @@ watch(() => props.preview, (preview) => {
 
   confirm.token = preview.token;
   confirm.year = preview.year;
+  confirm.project_link_mode = confirm.project_link_mode || 'create';
   confirm.rows = preview.rows.map(({ source_row_number, mikuni_code, n_code, alpha_group, school_name, exam_session }) => ({
     source_row_number, mikuni_code, n_code, alpha_group, school_name, exam_session, confirmed: false,
   }));
@@ -39,7 +40,19 @@ const store = () => confirm.post(route('coordinator.mginbon.annual_import.store'
         <div v-if="upload.errors.file || upload.errors.year" class="mt-3 text-sm text-red-600">{{ upload.errors.file || upload.errors.year }}</div>
       </section>
       <section v-if="preview" class="rounded bg-white p-4 shadow">
-        <div class="mb-2 flex flex-wrap items-center gap-4 text-sm"><b>{{ preview.year }}年度 / {{ preview.filename }}</b><span>登録対象 {{ preview.total }}行</span><span>α版 {{ preview.alpha_total }}行</span><span :class="unresolved ? 'text-red-700' : 'text-green-700'">修正確認が必要 {{ unresolved }}行</span><button :disabled="confirm.processing || confirm.rows.length === 0" class="ml-auto rounded bg-green-700 px-5 py-2 font-semibold text-white disabled:opacity-40" @click="store">この内容で年度を作成</button></div>
+        <div class="mb-4 rounded border border-green-200 bg-green-50 p-4 text-sm">
+          <p class="mb-2 font-semibold text-green-900">SBWork案件への接続（必須）</p>
+          <div class="flex flex-wrap items-center gap-4">
+            <label><input v-model="confirm.project_link_mode" type="radio" value="create" class="mr-1" />銀本専用案件を作成</label>
+            <label><input v-model="confirm.project_link_mode" type="radio" value="existing" class="mr-1" />既存案件へ接続</label>
+            <select v-if="confirm.project_link_mode === 'existing'" v-model="confirm.project_job_id" class="min-w-80 rounded border-gray-300">
+              <option value="">案件を選択してください</option>
+              <option v-for="job in projectJobs" :key="job.id" :value="job.id">{{ job.jobcode ? job.jobcode + ' / ' + job.title : job.title }}</option>
+            </select>
+          </div>
+          <p v-if="confirm.errors.project_job_id || confirm.errors.project_link_mode" class="mt-2 text-red-700">{{ confirm.errors.project_job_id || confirm.errors.project_link_mode }}</p>
+        </div>
+        <div class="mb-2 flex flex-wrap items-center gap-4 text-sm"><b>{{ preview.year }}年度 / {{ preview.filename }}</b><span>登録対象 {{ preview.total }}行</span><span>α版 {{ preview.alpha_total }}行</span><span :class="unresolved ? 'text-red-700' : 'text-green-700'">修正確認が必要 {{ unresolved }}行</span><button :disabled="confirm.processing || confirm.rows.length === 0 || (confirm.project_link_mode === 'existing' && !confirm.project_job_id)" class="ml-auto rounded bg-green-700 px-5 py-2 font-semibold text-white disabled:opacity-40" @click="store">この内容で年度を作成</button></div>
         <p v-if="unresolved === 0" class="mb-3 text-sm text-green-700">全{{ preview.total }}行を登録できます。修正確認が必要な行はありません。</p>
         <p v-else class="mb-3 text-sm text-red-700">確認内容のある行を修正し、「確認済」にチェックしてから年度を作成してください。</p>
         <div v-if="confirm.errors.rows || confirm.errors.year || confirm.errors.token" class="mb-3 rounded bg-red-50 p-3 text-sm text-red-700">{{ confirm.errors.rows || confirm.errors.year || confirm.errors.token }}</div>

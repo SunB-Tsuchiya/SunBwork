@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Coordinator;
 
 use App\Http\Controllers\Controller;
+use App\Services\MGinbon\MGinbonProjectAccess;
 use App\Models\MGinbon\MGinbonItem;
 use App\Models\ProjectJob;
 use App\Models\Subcontractor;
