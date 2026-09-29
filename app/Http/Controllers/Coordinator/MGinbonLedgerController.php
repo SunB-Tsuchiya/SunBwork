@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\MGinbon\MGinbonProject;
 use App\Models\ProjectJob;
 use App\Services\MGinbon\MGinbonProjectAccess;
+use App\Services\MGinbon\MGinbonStageActorOptions;
 use App\Services\ProjectJobAssigneeOptions;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
@@ -19,7 +20,7 @@ class MGinbonLedgerController extends Controller
 {
     private const SUBJECT_ORDER = ['japanese', 'math', 'social', 'science'];
 
-    public function index(Request $request, ProjectJobAssigneeOptions $assigneeOptions, MGinbonProjectAccess $access): Response
+    public function index(Request $request, ProjectJobAssigneeOptions $assigneeOptions, MGinbonProjectAccess $access, MGinbonStageActorOptions $stageActorOptions): Response
     {
         $validated = $request->validate([
             'year' => ['nullable', 'integer', 'between:2000,2100'],
@@ -27,7 +28,7 @@ class MGinbonLedgerController extends Controller
             'media' => ['nullable', 'string', 'max:100'],
             'subject' => ['nullable', Rule::in(['', ...self::SUBJECT_ORDER])],
             'status' => ['nullable', Rule::in(['all', 'draft', 'review_required'])],
-            'view' => ['nullable', Rule::in(['list', 'intake', 'school_outing_problem', 'order_form', 'text_order', 'drawing_order', 'scan_order'])],
+            'view' => ['nullable', Rule::in(['preparation', 'list', 'intake', 'text_proof', 'school_outing_problem', 'order_form', 'text_order', 'drawing_order', 'scan_order'])],
             'per_page' => ['nullable', Rule::in([10, 25, 50, 75, 100])],
         ]);
 
@@ -38,16 +39,20 @@ class MGinbonLedgerController extends Controller
 
         abort_unless($project, 404, 'MGinbon年度プロジェクトがありません。');
 
+        $mediaCount = $this->itemsQuery($project->id)->count();
+        $hasMedia = $mediaCount > 0;
+        $requestedView = (string) ($validated['view'] ?? '');
         $filters = [
             'year' => $project->year,
             'search' => trim((string) ($validated['search'] ?? '')),
             'media' => (string) ($validated['media'] ?? ''),
             'subject' => (string) ($validated['subject'] ?? ''),
             'status' => (string) ($validated['status'] ?? 'all'),
-            'view' => (string) ($validated['view'] ?? 'list'),
+            'view' => $requestedView !== '' ? $requestedView : ($hasMedia ? 'list' : 'preparation'),
             'per_page' => max(25, (int) ($validated['per_page'] ?? 25)),
         ];
-        if (! $project->project_job_id) $filters['view'] = 'list';
+        if (! $hasMedia) $filters['view'] = 'preparation';
+        elseif (! $project->project_job_id && $filters['view'] !== 'preparation') $filters['view'] = 'list';
         $mediaOptions = $this->itemsQuery($project->id)
             ->reorder()
             ->select('media.name as media_name')
@@ -70,8 +75,15 @@ class MGinbonLedgerController extends Controller
             ->whereIn('units.id', $unitIds)
             ->orderBy('media.sort_order')->orderBy('items.id')->get();
         $hydratedItems = $this->hydrateItems($pageItems)->groupBy('unit_id');
-        $units->setCollection($units->getCollection()->map(function ($unit) use ($hydratedItems) {
+        $pageCounts = DB::connection('mginbon')->table('mginbon_page_counts as page_counts')
+            ->join('mginbon_subjects as subjects', 'subjects.id', '=', 'page_counts.mginbon_subject_id')
+            ->whereIn('page_counts.mginbon_production_unit_id', $unitIds)
+            ->get(['page_counts.mginbon_production_unit_id', 'page_counts.page_type', 'page_counts.page_count', 'subjects.code as subject_code'])
+            ->groupBy('mginbon_production_unit_id');
+        $units->setCollection($units->getCollection()->map(function ($unit) use ($hydratedItems, $pageCounts) {
             $unit->items = $hydratedItems->get($unit->id, collect())->values();
+            $unit->page_counts = $pageCounts->get($unit->id, collect())
+                ->mapWithKeys(fn ($row) => [$row->page_type.':'.$row->subject_code => (int) $row->page_count]);
             return $unit;
         }));
 
@@ -87,7 +99,7 @@ class MGinbonLedgerController extends Controller
             ->get(['measurements.work_type', 'measurements.execution_type', DB::raw('SUM(measurements.quantity) as total')])
             ->mapWithKeys(fn ($row) => [$row->work_type.':'.$row->execution_type => (int) $row->total]);
         $summary = [
-            'total' => (clone $summaryQuery)->count(),
+            'total' => $mediaCount,
             'review_required' => (clone $summaryQuery)->where('items.review_status', 'review_required')->count(),
             'units' => DB::connection('mginbon')->table('mginbon_production_units')
                 ->where('mginbon_project_id', $project->id)->count(),
@@ -100,8 +112,11 @@ class MGinbonLedgerController extends Controller
         ];
 
         $actorOptions = ['users' => collect(), 'subcontractors' => collect()];
+        $actorOptionsByStage = [];
         if ($project->project_job_id && ($projectJob = ProjectJob::find($project->project_job_id))) {
             $actorOptions = $assigneeOptions->for($projectJob, $request->user());
+            $actorOptionsByStage = $stageActorOptions->forProject($project, $projectJob, $request->user());
+            $actorOptions['by_stage'] = $actorOptionsByStage;
         }
 
         return Inertia::render('Coordinator/MGinbon/LedgerIndex', [
@@ -119,7 +134,17 @@ class MGinbonLedgerController extends Controller
             ],
             'filters' => $filters,
             'actorOptions' => $actorOptions,
+            'actorOptionsByStage' => $actorOptionsByStage,
             'projectLinkLocked' => $access->isInUse($project),
+            'preparation' => [
+                'school_imported' => $units->total() > 0,
+                'school_count' => $units->total(),
+                'project_linked' => (bool) $project->project_job_id,
+                'media_imported' => $hasMedia,
+                'media_count' => $mediaCount,
+                'import_batch_id' => DB::connection('mginbon')->table('mginbon_import_batches')
+                    ->where('mginbon_project_id', $project->id)->latest('id')->value('id'),
+            ],
         ]);
     }
 
@@ -222,7 +247,7 @@ class MGinbonLedgerController extends Controller
             ->join('mginbon_subjects as subjects', 'subjects.id', '=', 'item_subjects.mginbon_subject_id')
             ->whereIn('item_subjects.mginbon_item_id', $itemIds)
             ->orderBy('subjects.sort_order')
-            ->get(['item_subjects.id', 'item_subjects.mginbon_item_id', 'subjects.code', 'subjects.name']);
+            ->get(['item_subjects.id', 'item_subjects.mginbon_item_id', 'item_subjects.page_count', 'subjects.code', 'subjects.name']);
         $subjectIds = $subjectRows->pluck('id');
 
         $measurements = DB::connection('mginbon')->table('mginbon_work_measurements')
@@ -267,6 +292,7 @@ class MGinbonLedgerController extends Controller
             $item->shared_dates = $itemMilestones->whereNull('mginbon_item_subject_id')
                 ->mapWithKeys(fn ($date) => [$date->code => $date->occurred_on]);
             $item->subjects = $subjectsByItem->get($item->id, collect())->map(function ($subject) use ($measurements, $itemMilestones, $tasks, $participants, $packages, $userNames, $subcontractorNames) {
+                $subject->page_count = $subject->page_count === null ? null : (int) $subject->page_count;
                 $subject->measurements = $measurements->get($subject->id, collect())->map(fn ($measurement) => [
                     'work_type' => $measurement->work_type,
                     'execution_type' => $measurement->execution_type,

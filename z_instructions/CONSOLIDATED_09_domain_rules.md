@@ -765,3 +765,30 @@ class MyNSystemTest extends TestCase
 | `tests/Feature/NSystem/NQuestionSearchTest.php` | 全文検索 API・デモ画面の動作確認 |
 | `tests/Feature/NSystem/NPublicationCatalogImportTest.php` | 目録 CSV インポートサービスのロジック検証 |
 | `tests/Unit/NSystem/NQuestionSearchServiceTest.php` | 検索サービスの単体テスト |
+---
+
+## 銀本進行：ProjectJob・担当者連携（2026-09-29）
+
+- 銀本年度は制作進行を始める前にSBWorkのProjectJobへ接続する。年度取込では既存案件の選択または銀本専用案件の作成が必須。
+- 担当候補の正本はProjectJobのリーダー・副リーダー・`project_team_members`・`project_job_subcontractors`。案件未所属のユーザー、ghost、外注先を正式担当にしない。
+- 担当者系5値一覧は年度別の工程区分として使用し、`linked_user_id` または `linked_subcontractor_id` で案件所属者へリンクする。表示値は実ユーザー名と異なってよい。
+- 工程別候補は `MGinbonStageActorOptions` で一元判定する。区分リンクが0件なら案件所属者全員へフォールバックし、1件以上ならリンク済みかつ案件所属中の候補だけを返す。
+- LIST、入稿チェック、媒体詳細、出稿表、Coordinatorの仮担当保存、UserのMyJob自己登録は同じ工程別候補判定を使用する。
+- 仮担当は依頼ジョブを作らない。対象ユーザーが銀本専用進行表からMyJobへ登録した時点で `project_job_assignments` と正式な作業パッケージを作成する。
+- MyJobの開始・完了は銀本工程へ同期し、工程に対応する日付を自動更新する。手入力済みの日付を上書きせず、再開時は自動入力した日付だけを戻す。
+- `assigned`、`in_progress`、`completed`、`legacy_completed` の工程は仮担当を変更できない。
+- 年度コピーでは、コピー先ProjectJobにも所属する担当リンクだけを維持する。所属外リンクは表示文字列を残して解除し、コピーによって案件所属を増やさない。
+- 工程参加者、作業パッケージ、JobBox割当、手入力日付がある年度は、接続案件の変更・解除を禁止する。
+- 完了した設計・検証記録は `z_instructions/archived/MGINBON_PROJECT_ACTOR_PLAN1.md` と `z_instructions/archived/MGINBON_PROJECT_ACTOR_MANAGER1.md` を参照。
+
+## 銀本進行：文字校正・ページ数（2026-09-29）
+
+- `text_proof` は新しい工程ではなく、既存の校正工程・milestoneを校正用に再構成する専用ビュー。
+- 校正担当・発注日・納品日はLISTと同じ `mginbon_stage_tasks`、`mginbon_stage_task_participants`、`mginbon_work_packages`、`mginbon_milestones` を正本とする。文字校正とLISTの編集結果は相互に反映される。
+- 三校・四校の校正発注日・納品日は実運用で使用しないため追加しない。
+- ページ数は `mginbon_page_counts` に学校・試験回（production unit）×教科×区分で保存する。区分は `problem`、`answer`、`trend`、`explanation`。
+- ページ数入力は媒体レコードの有無から自動判定しない。4区分×4教科の16セルを常に表示し、入力先は利用者が判断する。
+- ページ数変更は `mginbon_change_logs` に記録し、保存結果を共通トーストで通知する。
+- MyJobの `project_job_assignments.amounts` は1ジョブ1値であり、複数教科へ安全に逆配分できないためページ数とは連動しない。
+- 現行FileMaker取込にはページ数が含まれないため、初期実装はLaravel画面からの手入力を正本とする。
+- 完了した設計・検証記録は `z_instructions/archived/MGINBON_TEXT_PROOF_PLAN1.md` と `z_instructions/archived/MGINBON_TEXT_PROOF_MANAGER1.md` を参照。

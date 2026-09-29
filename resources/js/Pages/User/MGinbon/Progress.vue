@@ -111,6 +111,7 @@ async function register(item, stage) {
       if (task) {
         task.status = 'assigned';
         task.assignment_id = response.data.assignment_id;
+        task.is_mine = true;
         task.user_name = '自分';
         task.planned_actor_name = null;
       }
@@ -172,6 +173,7 @@ function paginationLabel(label) {
                   @click="toggleSubject(item, stage, subject.id)">
                   <span class="font-medium">{{ subject.name }}</span>
                   <span v-if="taskFor(subject, stage.id)?.assignment_id" class="ml-1 text-xs">{{ taskFor(subject, stage.id)?.user_name || '登録済' }}</span>
+                  <span v-else-if="['completed', 'legacy_completed'].includes(taskFor(subject, stage.id)?.status)" class="ml-1 text-xs text-green-700">完了済</span>
                   <span v-else-if="taskFor(subject, stage.id)?.planned_actor_name" class="ml-1 text-xs text-amber-700">仮: {{ taskFor(subject, stage.id)?.planned_actor_name }}</span>
                 </button>
               </div>
@@ -182,7 +184,7 @@ function paginationLabel(label) {
                   登録内容を確認（{{ assignment.subjects.join('・') }}）
                 </Link>
                 <button v-if="selectableSubjects(item, stage).length > 1" type="button" class="rounded border border-blue-300 px-2 py-1.5 text-xs text-blue-700 hover:bg-blue-50" @click="selectAll(item, stage)">4教科を選択</button>
-                <button type="button" :disabled="processing[key(item, stage)] || !selectableSubjects(item, stage).length" class="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-gray-300" @click="register(item, stage)">{{ processing[key(item, stage)] ? '登録中…' : 'MyJobに登録' }}</button>
+                <button type="button" :disabled="processing[key(item, stage)] || !selected(item, stage).length" class="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-gray-300" @click="register(item, stage)">{{ processing[key(item, stage)] ? '登録中…' : 'MyJobに登録' }}</button>
               </div>
               <p v-if="errors[key(item, stage)]" class="text-sm text-red-600 lg:col-start-2 lg:col-span-2">{{ errors[key(item, stage)] }}</p>
             </div>

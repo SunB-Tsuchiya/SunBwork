@@ -9,6 +9,7 @@ use App\Models\Subcontractor;
 use App\Models\User;
 use App\Models\ProjectJob;
 use App\Services\ProjectJobAssigneeOptions;
+use App\Services\MGinbon\MGinbonStageActorOptions;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,14 +21,16 @@ use Inertia\Response;
 
 class MGinbonItemController extends Controller
 {
-    public function show(Request $request, MGinbonItem $item, ProjectJobAssigneeOptions $assigneeOptions): Response
+    public function show(Request $request, MGinbonItem $item, ProjectJobAssigneeOptions $assigneeOptions, MGinbonStageActorOptions $stageActorOptions): Response
     {
         $data = $this->itemData($item->id);
         abort_unless($data, 404);
 
         $actorOptions = ['users' => collect(), 'subcontractors' => collect()];
+        $actorOptionsByStage = [];
         if ($data['project_job_id'] && ($projectJob = ProjectJob::find($data['project_job_id']))) {
             $actorOptions = $assigneeOptions->for($projectJob, $request->user());
+            $actorOptionsByStage = $stageActorOptions->forProject(\App\Models\MGinbon\MGinbonProject::findOrFail($data['project_id']), $projectJob, $request->user());
         }
 
         return Inertia::render('Coordinator/MGinbon/ItemShow', [
@@ -39,6 +42,7 @@ class MGinbonItemController extends Controller
                 ->orderBy('stages.sort_order')->get(['stages.id', 'stages.code', 'stages.name', 'stages.activity_type']),
             'users' => $actorOptions['users'],
             'subcontractors' => $actorOptions['subcontractors'],
+            'actorOptionsByStage' => $actorOptionsByStage,
             'history' => DB::connection('mginbon')->table('mginbon_change_logs')
                 ->where('mginbon_item_id', $item->id)->latest()->limit(30)->get()
                 ->map(fn ($row) => [
@@ -186,7 +190,8 @@ class MGinbonItemController extends Controller
             ->join('mginbon_projects as projects', 'projects.id', '=', 'units.mginbon_project_id')
             ->where('items.id', $itemId)->first([
                 'items.*', 'units.mikuni_code', 'units.n_code', 'units.display_name', 'units.school_category',
-                'units.n_category', 'media.name as media_name', 'projects.year', 'projects.project_job_id',
+                'units.n_category', 'media.name as media_name', 'projects.id as project_id',
+                'projects.year', 'projects.project_job_id',
             ]);
         if (! $row) return null;
 
@@ -244,6 +249,9 @@ class MGinbonItemController extends Controller
                             'name' => $task->name,
                             'status' => $task->status,
                             'actor' => $actor,
+                            'target' => $package?->user_id
+                                ? 'user:'.$package->user_id
+                                : ($package?->subcontractor_id ? 'subcontractor:'.$package->subcontractor_id : null),
                             'legacy_value' => $participant?->legacy_value,
                             'assignment_id' => $package?->project_job_assignment_id,
                             'assigned_at' => $package?->assigned_at,
@@ -251,7 +259,6 @@ class MGinbonItemController extends Controller
                             'planned' => $package?->status === 'planned',
                         ];
                     })
-                    ->filter(fn ($task) => $task['actor'] || $task['status'] !== 'not_started')
                     ->values(),
             ])->values(),
         ];

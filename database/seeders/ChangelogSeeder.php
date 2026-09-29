@@ -79,8 +79,34 @@ class ChangelogSeeder extends Seeder
         ]);
     }
 
+    public function seedMGinbonProjectActors(): void
+    {
+        Changelog::updateOrCreate(['version' => 'mginbon-project-actors-1'], [
+            'title' => '銀本進行の担当者を案件メンバー・MyJobと連携',
+            'released_at' => '2026-09-29',
+            'summary' => '銀本年度をSBWork案件へ接続し、年度別の担当区分から工程ごとの担当候補を管理できるようにしました。仮担当はMyJobへの正式登録、進行中、完了まで連動し、完了日は銀本の詳細編集にも自動反映されます。',
+            'design_files' => ['z_instructions/archived/MGINBON_PROJECT_ACTOR_PLAN1.md'],
+            'claude_notes' => 'Codex実装。ProjectJobを担当者・外注先の正本とし、project_job_subcontractorsとProjectJobAssigneeOptionsで案件所属候補を統一。銀本年度は年度取込時に既存案件接続または専用案件作成を必須化し、利用開始後の接続変更を保護。担当者系5値一覧は案件所属ユーザー／外注先へリンクし、MGinbonStageActorOptionsが工程コード別の候補を一元判定する。LIST・入稿チェック・媒体詳細・出稿表・仮担当保存・User自己登録で同じ候補制約を使用。値一覧の表示値と実ユーザー名を分離し、例として表示値「土屋」から実ユーザー「Super Admin」へ安全に連携可能。年度準備画面、銀本専用ヘッダー、保存トースト、詳細画面3列レイアウトも追加。legacy_completedは変更不可。MyJob登録直後は再読込なしで登録内容確認を表示。銀本関連25 tests / 87 assertions、Vite build、利用者による仮担当→MyJob登録→進行中→完了→日付反映を確認。Sakura未デプロイ。',
+            'body' => '<section class="cl-feature"><h3>追加・改善した機能</h3><ul><li>銀本年度をSBWork案件へ接続し、案件メンバーと案件外注先だけを正式担当候補として利用</li><li>担当者系の値一覧を実ユーザー・外注先へリンクし、工程別に候補を絞り込み</li><li>銀本で設定した仮担当を、ユーザー自身がMyJobへ正式登録可能</li><li>MyJobの進行中・完了を銀本進行へ反映し、対応する工程日付も自動入力</li><li>年度準備画面、銀本専用ヘッダー、保存結果のトースト、見やすい媒体詳細編集を追加</li><li>完了済み工程や案件範囲外の担当者を変更・登録できないよう保護</li></ul></section>',
+        ]);
+    }
+
+    public function seedMGinbonTextProof(): void
+    {
+        Changelog::updateOrCreate(['version' => 'mginbon-text-proof-1'], [
+            'title' => '銀本進行に文字校正一覧とページ数入力を追加',
+            'released_at' => '2026-09-29',
+            'summary' => 'FileMakerの文字校正画面を銀本進行へ追加しました。学校・試験回ごとに校正担当者と発注・納品日をまとめて確認・編集でき、問題・解答・傾向と対策・解説のページ数を4教科別に入力できます。',
+            'design_files' => ['z_instructions/archived/MGINBON_TEXT_PROOF_PLAN1.md'],
+            'claude_notes' => 'Codex実装。LedgerIndexにtext_proofビューとTextProofLayoutを追加。担当者・日付はLedgerCellEditorを再利用してLISTと同じstage task / milestoneを更新するため、両画面へ同じ値が反映される。ページ数は媒体の存在から自動判定せず、mginbon_page_countsへproduction unit×subject×page_type(problem/answer/trend/explanation)で保存し、16セルを常時入力可能とした。MyJobのamountsは1ジョブ1値で複数教科へ逆配分できないため連動対象外。保存履歴はmginbon_change_logsへ記録し、ToastUnifiedの共通イベントで保存結果を通知。利用者が表示、16セル入力、担当・日付編集、LIST反映、トーストを確認。MGinbon 26 tests / 91 assertions、Vite build、git diff --check成功。Sakura未デプロイ。',
+            'body' => '<section class="cl-feature"><h3>追加した機能</h3><ul><li>銀本進行のレイアウト選択に「文字校正」を追加</li><li>初校・再校・三校・四校の校正担当と、校正発注日・納品日を教科別に一覧表示</li><li>文字校正画面から担当者と日付を編集し、制作進行LISTにも同じ内容を反映</li><li>問題・解答・傾向と対策・解説のページ数を国語・算数・社会・理科別に入力</li><li>ページ数の保存時に結果をトーストで通知</li></ul></section>',
+        ]);
+    }
+
     public function run(): void
     {
+        $this->seedMGinbonTextProof();
+        $this->seedMGinbonProjectActors();
         $this->seedMGinbonValueMasters();
         $this->seedClerkCalendarPerformance();
         $this->seedClerkCalendarReminders();

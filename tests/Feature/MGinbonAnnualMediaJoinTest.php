@@ -119,4 +119,5 @@ class MGinbonAnnualMediaJoinTest extends TestCase
             $db->table('mginbon_stage_definitions')->where('mginbon_project_id', $projectId)->orderBy('sort_order')->pluck('code')->all()
         );
     }
+
 }

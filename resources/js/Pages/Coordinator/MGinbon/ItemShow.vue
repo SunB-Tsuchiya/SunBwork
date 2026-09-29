@@ -1,12 +1,13 @@
 <script setup>
-import { reactive } from 'vue';
-import { useForm, Link, router } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
+import { computed, reactive, watch } from 'vue';
+import { Head, useForm, Link, router } from '@inertiajs/vue3';
+import ToastUnified from '@/Components/ToastUnified.vue';
 
 const props = defineProps({
   item: { type: Object, required: true }, history: { type: Array, default: () => [] },
   stageDefinitions: { type: Array, default: () => [] }, users: { type: Array, default: () => [] },
   subcontractors: { type: Array, default: () => [] },
+  actorOptionsByStage: { type: Object, default: () => ({}) },
 });
 
 const dateFields = [
@@ -50,13 +51,30 @@ const assignment = reactive({
   subject_ids: defaultAllSubjects ? props.item.subjects.map((subject) => subject.id) : (props.item.subjects[0] ? [props.item.subjects[0].id] : []),
   target: '', processing: false, error: '',
 });
+const selectedStage = computed(() => props.stageDefinitions.find((stage) => stage.id === Number(assignment.stage_definition_id)));
+const selectedActorOptions = computed(() => props.actorOptionsByStage[selectedStage.value?.code] ?? { users: props.users, subcontractors: props.subcontractors });
+const selectableSubjectIds = computed(() => props.item.subjects
+  .filter((subject) => {
+    const stage = subject.stages?.find((row) => row.code === selectedStage.value?.code);
+    return stage && !stage.assignment_id && stage.status === 'not_started';
+  })
+  .map((subject) => subject.id));
+watch(() => assignment.stage_definition_id, () => {
+  assignment.subject_ids = defaultAllSubjects
+    ? [...selectableSubjectIds.value]
+    : selectableSubjectIds.value.slice(0, 1);
+}, { immediate: true });
+
+function subjectIsSelectable(subjectId) {
+  return selectableSubjectIds.value.includes(subjectId);
+}
 
 function submit() {
   form.put(route('coordinator.mginbon.items.update', { item: props.item.id }), { preserveScroll: true });
 }
 
 function selectAllSubjects() {
-  assignment.subject_ids = props.item.subjects.map((subject) => subject.id);
+  assignment.subject_ids = [...selectableSubjectIds.value];
 }
 
 function assignStage() {
@@ -95,19 +113,38 @@ function stageStatusClass(status) {
   }[status] ?? 'bg-gray-100 text-gray-600';
 }
 
+function stageActor(stage) { const [type, id] = String(stage.target || '').split(':'); const options = props.actorOptionsByStage[stage.code] ?? { users: props.users, subcontractors: props.subcontractors }; const rows = type === 'user' ? options.users : options.subcontractors; return rows?.find((actor) => actor.id === Number(id))?.name ?? stage.actor ?? '—'; }
+
 function lifecycleDate(value) {
   return value ? String(value).slice(0, 10) : '';
 }
 </script>
 
 <template>
-  <AppLayout :title="`${item.display_name}・${item.media_name}`">
-    <template #header>
-      <div class="flex flex-wrap items-center gap-3">
-        <Link :href="route('coordinator.mginbon.index', { year: item.year })" class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300">← 銀本進行へ戻る</Link>
-        <h2 class="text-base font-semibold text-gray-800 sm:text-xl">銀本進行・詳細編集</h2>
+  <Head :title="`${item.display_name}・${item.media_name}`" />
+  <div class="min-h-screen w-full bg-gray-100 p-2 sm:p-3">
+    <ToastUnified />
+    <section class="sticky top-0 z-40 -mx-2 -mt-2 mb-3 border-b border-gray-500 bg-white shadow-sm sm:-mx-3 sm:-mt-3">
+      <div class="overflow-x-auto">
+        <div class="min-w-[72rem] text-xs text-gray-800">
+          <div class="flex h-12 items-stretch border-b border-gray-300">
+            <div class="flex items-center border-r border-gray-300 px-1"><button type="button" class="h-8 w-8 border border-gray-300 bg-white text-2xl leading-none hover:bg-gray-100" @click="window.history.back()">‹</button><button type="button" class="ml-1 h-8 w-8 border border-gray-500 bg-white text-2xl leading-none hover:bg-gray-100" @click="window.history.forward()">›</button></div>
+            <div class="flex min-w-56 items-center gap-2 border-r border-gray-300 px-3"><span class="flex h-7 w-7 items-center justify-center rounded-full border-4 border-gray-300 bg-white"></span><div><div class="font-bold">媒体詳細編集</div><div class="max-w-48 truncate text-[10px]">{{ item.year }}年 {{ item.display_name }}・{{ item.media_name }}</div></div></div>
+            <Link :href="route('coordinator.mginbon.import_preview')" class="min-w-20 border-r border-gray-300 px-3 py-1 text-center hover:bg-gray-100"><span class="block text-lg">＋</span>取込確認</Link>
+            <Link :href="route('coordinator.mginbon.aggregations.index', { year: item.year })" class="min-w-20 border-r border-gray-300 px-3 py-1 text-center hover:bg-gray-100"><span class="block text-lg">Σ</span>集計</Link>
+            <Link :href="route('coordinator.mginbon.annual_import.create')" class="min-w-20 border-r border-gray-300 px-3 py-1 text-center hover:bg-gray-100"><span class="block text-lg">⇧</span>年度取込</Link>
+            <Link :href="route('coordinator.mginbon.value_masters.index', { year: item.year })" class="min-w-20 border-r border-gray-300 px-3 py-1 text-center hover:bg-gray-100"><span class="block text-lg">≡</span>値一覧</Link>
+            <span class="min-w-20 border-r border-gray-400 bg-gray-700 px-3 py-1 text-center text-white"><span class="block text-lg">✎</span>詳細編集</span>
+            <Link :href="route('coordinator.dashboard')" class="min-w-24 border-r border-gray-300 px-3 py-1 text-center hover:bg-gray-100"><span class="block text-lg">↗</span>通常サイト</Link>
+          </div>
+          <div class="flex h-8 items-center border-b border-gray-400 bg-gray-50 px-1">
+            <Link :href="route('coordinator.mginbon.index', { year: item.year, view: 'preparation' })" class="h-full border-x border-gray-300 bg-white px-4 py-2 font-semibold hover:bg-gray-100">年度準備</Link>
+            <Link :href="route('coordinator.mginbon.index', { year: item.year, view: 'list' })" class="h-full border-r border-gray-300 bg-white px-4 py-2 font-semibold hover:bg-gray-100">制作進行</Link>
+            <span class="h-full border-r border-green-700 bg-green-700 px-4 py-2 font-semibold text-white">媒体詳細編集</span>
+          </div>
+        </div>
       </div>
-    </template>
+    </section>
 
     <form class="space-y-4" @submit.prevent="submit">
       <section class="overflow-hidden rounded border border-cyan-200 bg-white shadow">
@@ -134,8 +171,8 @@ function lifecycleDate(value) {
         </div>
         <div class="mt-4 grid gap-4 lg:grid-cols-[15rem_1fr_18rem_auto] lg:items-end">
           <label class="text-xs text-gray-600">工程<select v-model="assignment.stage_definition_id" class="mt-1 w-full rounded border-gray-300 text-sm"><option value="">選択してください</option><option v-for="stage in stageDefinitions" :key="stage.id" :value="stage.id">{{ stage.name }}</option></select></label>
-          <fieldset><legend class="mb-1 text-xs text-gray-600">対象教科</legend><div class="flex flex-wrap gap-2"><label v-for="subject in item.subjects" :key="subject.id" class="flex items-center gap-1 rounded border bg-gray-50 px-3 py-2 text-sm"><input v-model="assignment.subject_ids" type="checkbox" :value="subject.id" />{{ subject.name }}</label></div></fieldset>
-          <label class="text-xs text-gray-600">担当先<select v-model="assignment.target" class="mt-1 w-full rounded border-gray-300 text-sm"><option value="">選択してください</option><option value="clear">選択教科の仮担当を解除</option><optgroup label="社員"><option v-for="user in users" :key="`u${user.id}`" :value="`user:${user.id}`">{{ user.name }}</option></optgroup><optgroup label="外注先"><option v-for="vendor in subcontractors" :key="`s${vendor.id}`" :value="`subcontractor:${vendor.id}`">{{ vendor.name }}</option></optgroup></select></label>
+          <fieldset><legend class="mb-1 text-xs text-gray-600">対象教科</legend><div class="flex flex-wrap gap-2"><label v-for="subject in item.subjects" :key="subject.id" class="flex items-center gap-1 rounded border bg-gray-50 px-3 py-2 text-sm"><input v-model="assignment.subject_ids" type="checkbox" :value="subject.id" :disabled="!subjectIsSelectable(subject.id)" />{{ subject.name }}<small v-if="!subjectIsSelectable(subject.id)" class="text-gray-400">変更不可</small></label></div></fieldset>
+          <label class="text-xs text-gray-600">担当先<select v-model="assignment.target" class="mt-1 w-full rounded border-gray-300 text-sm"><option value="">選択してください</option><option value="clear">選択教科の仮担当を解除</option><optgroup label="社員"><option v-for="user in selectedActorOptions.users" :key="`u${user.id}`" :value="`user:${user.id}`">{{ user.name }}</option></optgroup><optgroup label="外注先"><option v-for="vendor in selectedActorOptions.subcontractors" :key="`s${vendor.id}`" :value="`subcontractor:${vendor.id}`">{{ vendor.name }}</option></optgroup></select></label>
           <button type="button" :disabled="assignment.processing" class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50" @click="assignStage">{{ assignment.processing ? '設定中…' : '仮担当を反映' }}</button>
         </div>
         <p v-if="assignment.error" class="mt-2 text-sm text-red-600">{{ assignment.error }}</p>
@@ -143,16 +180,18 @@ function lifecycleDate(value) {
 
       <section v-for="(subject, index) in item.subjects" :key="subject.id" class="rounded border bg-white shadow">
         <div class="flex items-center justify-between rounded-t bg-cyan-50 px-4 py-2"><h3 class="font-semibold text-cyan-950">{{ subject.name }}</h3><span class="text-xs text-gray-500">科目ID {{ subject.id }}</span></div>
-        <div class="grid gap-4 p-4 xl:grid-cols-[18rem_1fr]">
-          <div>
+        <div class="grid gap-4 p-4 xl:grid-cols-[16rem_22rem_minmax(0,1fr)]">
+          <div class="rounded border border-gray-200 bg-gray-50 p-3">
             <h4 class="mb-2 text-xs font-semibold text-gray-600">作業点数</h4>
             <div class="grid grid-cols-2 gap-2"><label v-for="[code, label] in measurementFields" :key="code" class="text-xs text-gray-600">{{ label }}<input v-model.number="form.subjects[index].measurements[code]" type="number" min="0" class="mt-1 w-full rounded border-gray-300 text-sm" /></label></div>
-            <h4 class="mb-2 mt-4 text-xs font-semibold text-gray-600">工程担当</h4>
+          </div>
+          <div class="rounded border border-gray-200 bg-gray-50 p-3">
+            <h4 class="mb-2 text-xs font-semibold text-gray-600">工程担当</h4>
             <div v-if="subject.stages.length" class="space-y-1 text-xs">
               <div v-for="stage in subject.stages" :key="stage.code" class="border-b py-1">
                 <div class="flex items-center justify-between gap-3">
                   <span class="text-gray-500">{{ stage.name }}</span>
-                  <span class="text-right font-medium" :class="stage.planned ? 'border-b border-dashed border-amber-700 text-amber-900' : ''">{{ stage.actor || '—' }}<small v-if="stage.planned" class="ml-1">仮</small></span>
+                  <span class="text-right font-medium" :class="stage.planned ? 'border-b border-dashed border-amber-700 text-amber-900' : ''">{{ stageActor(stage) }}<small v-if="stage.planned" class="ml-1">仮</small></span>
                 </div>
                 <div v-if="stage.status !== 'not_started'" class="mt-1 flex items-center justify-end gap-2">
                   <span class="rounded px-1.5 py-0.5 text-[10px]" :class="stageStatusClass(stage.status)">{{ stageStatusLabel(stage.status) }}</span>
@@ -163,9 +202,9 @@ function lifecycleDate(value) {
             </div>
             <p v-else class="text-xs text-gray-400">担当候補なし</p>
           </div>
-          <div>
+          <div class="rounded border border-gray-200 bg-gray-50 p-3">
             <h4 class="mb-2 text-xs font-semibold text-gray-600">工程日付</h4>
-            <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"><label v-for="[code, label] in dateFields" :key="code" class="text-xs text-gray-600">{{ label }}<input v-model="form.subjects[index].dates[code]" type="date" class="mt-1 w-full rounded border-gray-300 text-xs" /></label></div>
+            <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 2xl:grid-cols-4"><label v-for="[code, label] in dateFields" :key="code" class="text-xs text-gray-600">{{ label }}<input v-model="form.subjects[index].dates[code]" type="date" class="mt-1 w-full rounded border-gray-300 text-xs" /></label></div>
           </div>
         </div>
       </section>
@@ -179,5 +218,5 @@ function lifecycleDate(value) {
       <div v-if="history.length" class="mt-3 divide-y text-xs"><div v-for="entry in history" :key="entry.id" class="grid gap-1 py-2 sm:grid-cols-[10rem_1fr]"><span class="text-gray-500">{{ entry.created_at }}</span><span><b>{{ entry.field_path }}</b>：{{ historyValue(entry.old_value) }} → {{ historyValue(entry.new_value) }}</span></div></div>
       <p v-else class="mt-2 text-sm text-gray-500">手動変更はまだありません。</p>
     </section>
-  </AppLayout>
+  </div>
 </template>

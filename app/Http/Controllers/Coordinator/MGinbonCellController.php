@@ -12,6 +12,10 @@ use Illuminate\Validation\ValidationException;
 
 class MGinbonCellController extends Controller
 {
+    private const PAGE_TYPES = ['problem', 'answer', 'trend', 'explanation'];
+
+    private const SUBJECT_CODES = ['japanese', 'math', 'social', 'science'];
+
     private const SUBJECT_DATE_CODES = [
         'text_input_ordered_on', 'drawing_ordered_on',
         'original_scan_ordered_on', 'original_scan_delivered_on',
@@ -91,5 +95,60 @@ class MGinbonCellController extends Controller
             'subjectIds' => $isShared ? null : array_values(array_unique(array_map('intval', $validated['subject_ids'] ?? [$validated['subject_id']]))),
             'updated_at' => $updatedAt,
         ]);
+    }
+
+    public function updatePageCount(Request $request, MGinbonItem $item, MGinbonProjectAccess $access): JsonResponse
+    {
+        $project = $access->projectForItem($item->id);
+        $access->requireLinked($project);
+        $validated = $request->validate([
+            'subject_code' => ['required', 'string', 'in:'.implode(',', self::SUBJECT_CODES)],
+            'page_type' => ['required', 'string', 'in:'.implode(',', self::PAGE_TYPES)],
+            'page_count' => ['nullable', 'integer', 'min:1', 'max:999'],
+        ]);
+
+        $db = DB::connection('mginbon');
+        $result = $db->transaction(function () use ($request, $item, $project, $validated, $db) {
+            $lockedItem = $db->table('mginbon_items')->where('id', $item->id)->lockForUpdate()->first();
+            abort_unless($lockedItem, 404);
+            $subjectId = $db->table('mginbon_subjects')->where('code', $validated['subject_code'])->value('id');
+            abort_unless($subjectId, 422, '教科が見つかりません。');
+
+            $pageCount = $validated['page_count'] ?? null;
+            $query = $db->table('mginbon_page_counts')
+                ->where('mginbon_production_unit_id', $lockedItem->mginbon_production_unit_id)
+                ->where('mginbon_subject_id', $subjectId)
+                ->where('page_type', $validated['page_type']);
+            $current = $query->first();
+            $old = $current ? (int) $current->page_count : null;
+            if ($old !== $pageCount) {
+                if ($pageCount === null) $query->delete();
+                elseif ($current) $query->update(['page_count' => $pageCount, 'updated_at' => now()]);
+                else $db->table('mginbon_page_counts')->insert([
+                    'mginbon_production_unit_id' => $lockedItem->mginbon_production_unit_id,
+                    'mginbon_subject_id' => $subjectId,
+                    'page_type' => $validated['page_type'],
+                    'page_count' => $pageCount,
+                    'created_at' => now(), 'updated_at' => now(),
+                ]);
+                $db->table('mginbon_change_logs')->insert([
+                    'mginbon_project_id' => $project->id,
+                    'mginbon_item_id' => $item->id,
+                    'mginbon_item_subject_id' => null,
+                    'changed_by' => $request->user()->id,
+                    'field_path' => "page_counts.{$validated['page_type']}.{$validated['subject_code']}",
+                    'old_value' => json_encode($old),
+                    'new_value' => json_encode($pageCount),
+                    'source' => 'manual',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+                $db->table('mginbon_items')->where('id', $item->id)->update(['updated_at' => now()]);
+            }
+
+            return ['page_count' => $pageCount, 'page_type' => $validated['page_type'], 'subject_code' => $validated['subject_code']];
+        });
+
+        return response()->json($result);
     }
 }

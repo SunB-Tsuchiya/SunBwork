@@ -1,6 +1,11 @@
 # MGinbon ProjectJob連動 引継ぎ2
 
-更新日: 2026-09-28
+更新日: 2026-09-29
+
+> 完了: Phase A〜Dの実装、回帰テスト、利用者確認まで完了。詳細記録は
+> `z_instructions/archived/MGINBON_PROJECT_ACTOR_MANAGER1.md` を参照。
+>
+> 後続作業は `z_instructions/MGINBON_HANDOFF3.md` へ引き継いだ。
 
 ## 現在地
 
@@ -9,12 +14,12 @@ ProjectJobを正本とする担当者連動のPhase Bを実装し、年度取込
 ## 最初に読むファイル
 
 1. `AGENTS.md`
-2. `z_instructions/MGINBON_PROJECT_ACTOR_PLAN1.md`
-3. `z_instructions/MGINBON_PROJECT_ACTOR_MANAGER1.md`
+2. `z_instructions/archived/MGINBON_PROJECT_ACTOR_PLAN1.md`
+3. `z_instructions/archived/MGINBON_PROJECT_ACTOR_MANAGER1.md`
 4. `z_instructions/MGINBON_PROJECT_ACTOR_HANDOFF2.md`
 5. `z_instructions/MGINBON_VALUE_LINK_PLAN1.md`
 6. `z_instructions/MGINBON_MANAGER1.md`
-7. `z_instructions/MGINBON_PROJECT_ACTOR_NEXT_PROMPT.md`
+7. `z_instructions/archived/MGINBON_PROJECT_ACTOR_NEXT_PROMPT.md`
 
 ## Phase Bで実装したこと
 

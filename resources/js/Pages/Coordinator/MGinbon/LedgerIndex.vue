@@ -5,6 +5,7 @@ import IntakeCheckBlock from '@/Components/MGinbon/IntakeCheckBlock.vue';
 import LedgerCellEditor from '@/Components/MGinbon/LedgerCellEditor.vue';
 import OrderReportLayout from '@/Components/MGinbon/OrderReportLayout.vue';
 import SchoolOutingReportLayout from '@/Components/MGinbon/SchoolOutingReportLayout.vue';
+import TextProofLayout from '@/Components/MGinbon/TextProofLayout.vue';
 import ToastUnified from '@/Components/ToastUnified.vue';
 
 const props = defineProps({
@@ -13,10 +14,11 @@ const props = defineProps({
   subjects: { type: Array, default: () => [] }, filters: { type: Object, required: true },
   actorOptions: { type: Object, default: () => ({ users: [], subcontractors: [] }) },
   projectLinkLocked: { type: Boolean, default: false },
+  preparation: { type: Object, required: true },
 });
 const uniqueMediaOptions = computed(() => [...new Set(props.mediaOptions.filter(Boolean))]);
 const reportViews = ['order_form', 'text_order', 'drawing_order', 'scan_order', 'school_outing_problem'];
-const pageTitle = computed(() => ({ list: '銀本進行', intake: '入稿チェック', order_form: '作図＆文字発注フォーム', text_order: 'C&C文字発注', drawing_order: '大連若葉作図発注書', scan_order: '原本スキャン発注書', school_outing_problem: '出校表' })[form.view] || '銀本進行');
+const pageTitle = computed(() => ({ preparation: '銀本 年度準備', list: '銀本進行', intake: '入稿チェック', text_proof: '文字校正', order_form: '作図＆文字発注フォーム', text_order: 'C&C文字発注', drawing_order: '大連若葉作図発注書', scan_order: '原本スキャン発注書', school_outing_problem: '出稿表' })[form.view] || '銀本進行');
 const form = reactive({ ...props.filters });
 const projectLinkForm = useForm({ project_job_id: props.project.project_job_id ?? '' });
 const toolbarVisible = ref(true);
@@ -109,7 +111,9 @@ function cellSaved(item, subject, payload) {
               <form class="ml-auto flex items-center gap-1 px-2" @submit.prevent="search"><span class="text-lg">⌕</span><input v-model="form.search" type="search" placeholder="学校名・コードを検索" class="h-7 w-60 border-gray-400 px-2 py-1 text-xs" /><button class="h-7 border border-gray-400 bg-white px-3 hover:bg-gray-100">検索</button></form>
             </div>
             <div class="flex h-8 items-center gap-3 border-b border-gray-400 bg-gray-50 px-1">
-              <label class="flex items-center gap-1">レイアウト:<select v-model="form.view" :disabled="!project.project_job_id" class="h-6 w-52 border-gray-400 py-0 pl-2 pr-7 text-xs" @change="search"><option value="list">LIST</option><option value="intake">入稿チェック</option><option value="school_outing_problem">出稿表</option><option value="order_form">作図＆文字発注フォーム</option><option value="text_order">C&amp;C文字発注</option><option value="drawing_order">大連若葉作図発注書</option><option value="scan_order">原本スキャン発注書</option></select></label>
+              <button type="button" class="h-full border-x px-4 font-semibold" :class="form.view === 'preparation' ? 'border-green-700 bg-green-700 text-white' : 'border-gray-300 bg-white hover:bg-gray-100'" @click="setView('preparation')">年度準備</button>
+              <button type="button" :disabled="!preparation.media_imported" class="h-full border-r px-4 font-semibold disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400" :class="form.view !== 'preparation' ? 'border-green-700 bg-green-700 text-white' : 'border-gray-300 bg-white hover:bg-gray-100'" @click="setView('list')">制作進行</button>
+              <label v-if="form.view !== 'preparation'" class="flex items-center gap-1">レイアウト:<select v-model="form.view" :disabled="!project.project_job_id || !preparation.media_imported" class="h-6 w-52 border-gray-400 py-0 pl-2 pr-7 text-xs" @change="search"><option value="list">LIST</option><option value="intake">入稿チェック</option><option value="text_proof">文字校正</option><option value="school_outing_problem">出稿表</option><option value="order_form">作図＆文字発注フォーム</option><option value="text_order">C&amp;C文字発注</option><option value="drawing_order">大連若葉作図発注書</option><option value="scan_order">原本スキャン発注書</option></select></label>
               <span class="flex items-center gap-1">表示方法の切り替え:<button type="button" class="border border-gray-400 bg-gray-600 px-2 py-0.5 text-white">▤</button><button type="button" class="border border-gray-400 bg-white px-2 py-0.5">▦</button><button type="button" class="border border-gray-400 bg-white px-2 py-0.5">▦</button></span>
               <span class="border border-gray-400 bg-white px-3 py-0.5">プレビュー</span>
               <span class="ml-auto font-semibold">{{ displayedRange }}（全{{ summary.total }}媒体）</span>
@@ -128,14 +132,31 @@ function cellSaved(item, subject, payload) {
           </div>
         </div>
       </section>
-      <div v-if="!project.project_job_id" class="rounded border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">この年度はSBWork案件へ未接続です。LISTの閲覧のみ可能です。上部から既存案件へ接続するか、銀本専用案件を作成してください。</div>
+      <section v-if="form.view === 'preparation'" class="mx-auto w-full max-w-5xl rounded bg-white p-5 shadow sm:p-8">
+        <div class="flex flex-col gap-3 border-b border-gray-200 pb-5 sm:flex-row sm:items-center sm:justify-between">
+          <div><p class="text-sm font-medium text-green-700">{{ project.year }}年 中学入試問題集</p><h1 class="mt-1 text-2xl font-bold text-gray-900">年度準備</h1><p class="mt-2 text-sm text-gray-600">制作進行を開始する前に、対象校・連携案件・媒体データを確認します。</p></div>
+          <span class="self-start rounded-full px-3 py-1 text-sm font-semibold" :class="preparation.media_imported ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'">{{ preparation.media_imported ? '制作進行を開始できます' : '媒体データの取込待ち' }}</span>
+        </div>
+        <ol class="mt-6 grid gap-4 md:grid-cols-3">
+          <li class="rounded border p-4" :class="preparation.school_imported ? 'border-green-300 bg-green-50' : 'border-amber-300 bg-amber-50'"><div class="flex items-center justify-between"><span class="font-semibold">1. 対象校リスト</span><span class="rounded px-2 py-0.5 text-xs font-semibold" :class="preparation.school_imported ? 'bg-green-200 text-green-900' : 'bg-amber-200 text-amber-900'">{{ preparation.school_imported ? '取込済み' : '未取込' }}</span></div><p class="mt-3 text-sm text-gray-700">{{ preparation.school_count }}校を登録済み</p></li>
+          <li class="rounded border p-4" :class="preparation.project_linked ? 'border-green-300 bg-green-50' : 'border-amber-300 bg-amber-50'"><div class="flex items-center justify-between"><span class="font-semibold">2. ProjectJob接続</span><span class="rounded px-2 py-0.5 text-xs font-semibold" :class="preparation.project_linked ? 'bg-green-200 text-green-900' : 'bg-amber-200 text-amber-900'">{{ preparation.project_linked ? '接続済み' : '未接続' }}</span></div><p class="mt-3 text-sm text-gray-700">{{ preparation.project_linked ? '担当・JobBox連動の準備ができています。' : '上部の連携案件を選び、保存してください。' }}</p></li>
+          <li class="rounded border p-4" :class="preparation.media_imported ? 'border-green-300 bg-green-50' : 'border-amber-300 bg-amber-50'"><div class="flex items-center justify-between"><span class="font-semibold">3. 媒体データ</span><span class="rounded px-2 py-0.5 text-xs font-semibold" :class="preparation.media_imported ? 'bg-green-200 text-green-900' : 'bg-amber-200 text-amber-900'">{{ preparation.media_imported ? '取込済み' : '未取込' }}</span></div><p class="mt-3 text-sm text-gray-700">{{ preparation.media_count }}媒体を登録済み</p></li>
+        </ol>
+        <div class="mt-6 flex flex-wrap items-center gap-3 rounded border border-blue-200 bg-blue-50 p-4">
+          <div class="min-w-0 flex-1"><p class="font-semibold text-blue-950">{{ preparation.media_imported ? '媒体データを確認する' : '次に媒体データを取り込みます' }}</p><p class="mt-1 text-sm text-blue-800">既存の取込確認画面で、原文と正規化候補を確認してください。</p></div>
+          <Link v-if="preparation.import_batch_id" :href="route('coordinator.mginbon.import_preview', { batch: preparation.import_batch_id })" class="rounded bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700">取込確認へ進む</Link>
+          <span v-else class="rounded bg-gray-200 px-4 py-2 text-sm font-semibold text-gray-500">取込バッチ作成待ち</span>
+          <button v-if="preparation.media_imported" type="button" class="rounded border border-green-700 bg-white px-4 py-2 text-sm font-semibold text-green-800 hover:bg-green-50" @click="setView('list')">制作進行LISTを開く</button>
+        </div>
+      </section>
+      <div v-if="!project.project_job_id" class="rounded border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">この年度はSBWork案件へ未接続です。年度準備のみ可能です。上部から既存案件へ接続するか、銀本専用案件を作成してください。</div>
       <div v-else-if="projectLinkLocked" class="rounded border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900">工程データを利用済みのため、連携案件は変更・解除できません。</div>
       <section v-if="form.view === 'intake'" class="grid min-w-[72rem] grid-cols-[17rem_1fr_17rem] items-center border-b border-[#54aaa8] bg-[#fbffd7] px-2 py-1">
         <h1 class="text-center text-lg font-semibold">{{ project.year }}年　中学入試問題集</h1>
         <div class="flex items-center justify-center gap-2"><span class="inline-block rounded-md border-2 border-green-600 bg-[#ccffcc] px-7 py-1 text-base font-bold">入稿チェック</span></div>
         <div class="text-right text-[11px] leading-tight text-gray-700"><div>{{ displayedRange }}（全{{ summary.total }}媒体）</div><div class="mt-0.5 font-semibold text-blue-800">検索対象合計　社外 scan {{ summary.intake_totals?.['scan:subcontracted'] ?? 0 }}・作図 {{ summary.intake_totals?.['drawing:subcontracted'] ?? 0 }}</div><div class="font-semibold text-blue-800">社内 scan {{ summary.intake_totals?.['scan:internal'] ?? 0 }}・作図 {{ summary.intake_totals?.['drawing:internal'] ?? 0 }}</div></div>
       </section>
-      <section v-if="units.data.length && !reportViews.includes(form.view)" class="bg-white">
+      <section v-if="form.view !== 'preparation' && form.view !== 'text_proof' && units.data.length && !reportViews.includes(form.view)" class="bg-white">
         <article v-for="unit in units.data" :key="unit.id" class="border-b border-gray-700 first:border-t" :class="unit.items.length === 0 && form.view === 'list' ? 'mx-auto w-[54rem] max-w-full' : ''">
           <template v-if="form.view === 'intake'">
             <IntakeCheckBlock v-for="item in unit.items" :key="item.id" :item="item" :unit="unit" :actor-options="actorOptions" :project-linked="Boolean(project.project_job_id)" />
@@ -191,10 +212,11 @@ function cellSaved(item, subject, payload) {
           </template>
         </article>
       </section>
+      <TextProofLayout v-else-if="units.data.length && form.view === 'text_proof'" :project="project" :units="units.data" :actor-options="actorOptions" :project-linked="Boolean(project.project_job_id)" />
       <SchoolOutingReportLayout v-else-if="units.data.length && form.view === 'school_outing_problem'" :project="project" :units="units.data" :actor-options="actorOptions" :project-linked="Boolean(project.project_job_id)" />
       <OrderReportLayout v-else-if="units.data.length && reportViews.includes(form.view)" :type="form.view" :project="project" :units="units.data" :summary-totals="summary.intake_totals" />
-      <div v-else class="rounded bg-white p-8 text-center text-sm text-gray-500 shadow">条件に一致する学校はありません。</div>
-      <nav v-if="units.links.length > 3" class="no-print flex flex-wrap justify-center gap-1"><template v-for="link in units.links" :key="`${link.label}-${link.url}`"><Link v-if="link.url" :href="link.url" preserve-scroll class="rounded border px-3 py-1.5 text-sm" :class="link.active ? 'border-green-600 bg-green-600 text-white' : 'bg-white'">{{ paginationLabel(link.label) }}</Link><span v-else class="rounded border bg-gray-50 px-3 py-1.5 text-sm text-gray-400">{{ paginationLabel(link.label) }}</span></template></nav>
+      <div v-else-if="form.view !== 'preparation'" class="rounded bg-white p-8 text-center text-sm text-gray-500 shadow">条件に一致する学校はありません。</div>
+      <nav v-if="form.view !== 'preparation' && units.links.length > 3" class="no-print flex flex-wrap justify-center gap-1"><template v-for="link in units.links" :key="`${link.label}-${link.url}`"><Link v-if="link.url" :href="link.url" preserve-scroll class="rounded border px-3 py-1.5 text-sm" :class="link.active ? 'border-green-600 bg-green-600 text-white' : 'bg-white'">{{ paginationLabel(link.label) }}</Link><span v-else class="rounded border bg-gray-50 px-3 py-1.5 text-sm text-gray-400">{{ paginationLabel(link.label) }}</span></template></nav>
     </div>
   </div>
 </template>

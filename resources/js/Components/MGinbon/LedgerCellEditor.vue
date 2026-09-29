@@ -11,6 +11,7 @@ const props = defineProps({
   projectLinked: { type: Boolean, default: false },
 });
 const emit = defineEmits(['saved']);
+const scopedActorOptions = computed(() => props.actorOptions.by_stage?.[props.column.code] ?? props.actorOptions);
 const editing = ref(false);
 const saving = ref(false);
 const editor = ref(null);
@@ -37,7 +38,8 @@ const shortDate = (value) => value ? value.slice(5).replace('-', '/') : '';
 const dateValue = () => props.column.type === 'shared'
   ? (props.item.shared_dates?.[props.column.code] || '')
   : (props.subject.dates?.[props.column.code] || '');
-const display = () => props.column.type === 'stage' ? (props.task?.actor || '') : shortDate(dateValue());
+const actorDisplay = () => { const [type, id] = String(props.task?.target || '').split(':'); const rows = type === 'user' ? scopedActorOptions.value.users : scopedActorOptions.value.subcontractors; return rows?.find((actor) => actor.id === Number(id))?.name ?? props.task?.actor ?? ''; };
+const display = () => props.column.type === 'stage' ? actorDisplay() : shortDate(dateValue());
 const eligibleSubjects = computed(() => props.item.subjects.filter((subject) => {
   const row = subject.stages?.find((stage) => stage.code === props.column.code);
   return row?.stage_id === props.task?.stage_id && !row?.assignment_id && row?.status === 'not_started';
@@ -137,11 +139,11 @@ async function saveActor(event) {
       <select ref="editor" :value="task?.target || ''" class="h-7 w-full border border-green-700 bg-white px-1 py-0 text-[11px] focus:ring-1 focus:ring-green-600" :disabled="saving" @change="saveActor" @keydown.esc="editing = false">
         <option value="">担当者を選択</option>
         <option v-if="task?.planned" value="clear">仮担当を解除</option>
-        <optgroup v-if="actorOptions.users?.length" label="メンバー">
-          <option v-for="user in actorOptions.users" :key="`u-${user.id}`" :value="`user:${user.id}`">{{ user.name }}{{ user.is_ghost ? '（テスト）' : '' }}</option>
+        <optgroup v-if="scopedActorOptions.users?.length" label="メンバー">
+          <option v-for="user in scopedActorOptions.users" :key="`u-${user.id}`" :value="`user:${user.id}`">{{ user.name }}{{ user.is_ghost ? '（テスト）' : '' }}</option>
         </optgroup>
-        <optgroup v-if="actorOptions.subcontractors?.length" label="外注先">
-          <option v-for="vendor in actorOptions.subcontractors" :key="`s-${vendor.id}`" :value="`subcontractor:${vendor.id}`">{{ vendor.name }}</option>
+        <optgroup v-if="scopedActorOptions.subcontractors?.length" label="外注先">
+          <option v-for="vendor in scopedActorOptions.subcontractors" :key="`s-${vendor.id}`" :value="`subcontractor:${vendor.id}`">{{ vendor.name }}</option>
         </optgroup>
       </select>
       <button type="button" class="mt-1 w-full border border-gray-300 bg-gray-50 py-0.5 text-center text-[10px] hover:bg-gray-100" @click="editing = false">閉じる</button>

@@ -13,12 +13,14 @@ const props = defineProps({
 });
 const emit = defineEmits(['saved']);
 const saving = ref(false);
+const scopedActorOptions = computed(() => props.actorOptions.by_stage?.[props.stageCode] ?? props.actorOptions);
 
 const rows = computed(() => props.subjects.map((subject) => ({
   subject,
   task: subject.stages?.find((stage) => stage.code === props.stageCode),
 })).filter(({ task }) => task));
-const actors = computed(() => [...new Set(rows.value.map(({ task }) => task.actor).filter(Boolean))]);
+const actorName = (task) => { const [type, id] = String(task.target || '').split(':'); const options = props.actorOptions.by_stage?.[props.stageCode] ?? props.actorOptions; const candidates = type === 'user' ? options.users : options.subcontractors; return candidates?.find((actor) => actor.id === Number(id))?.name ?? task.actor; };
+const actors = computed(() => [...new Set(rows.value.map(({ task }) => actorName(task)).filter(Boolean))]);
 const display = computed(() => props.includeProgress ? actors.value.join('／') : '');
 const editableRows = computed(() => rows.value.filter(({ task }) => !task.assignment_id && task.status === 'not_started'));
 const stageId = computed(() => editableRows.value[0]?.task.stage_id ?? null);
@@ -73,11 +75,11 @@ async function save(event) {
   >
     <option value="" disabled>{{ display || '担当者を選択' }}</option>
     <option v-if="hasPlanned" value="clear">仮担当を解除</option>
-    <optgroup v-if="actorOptions.users?.length" label="チームメンバー">
-      <option v-for="user in actorOptions.users" :key="`u-${user.id}`" :value="`user:${user.id}`">{{ user.name }}{{ user.is_ghost ? '（テスト）' : '' }}</option>
+    <optgroup v-if="scopedActorOptions.users?.length" label="チームメンバー">
+      <option v-for="user in scopedActorOptions.users" :key="`u-${user.id}`" :value="`user:${user.id}`">{{ user.name }}{{ user.is_ghost ? '（テスト）' : '' }}</option>
     </optgroup>
-    <optgroup v-if="actorOptions.subcontractors?.length" label="外注先">
-      <option v-for="vendor in actorOptions.subcontractors" :key="`s-${vendor.id}`" :value="`subcontractor:${vendor.id}`">{{ vendor.name }}</option>
+    <optgroup v-if="scopedActorOptions.subcontractors?.length" label="外注先">
+      <option v-for="vendor in scopedActorOptions.subcontractors" :key="`s-${vendor.id}`" :value="`subcontractor:${vendor.id}`">{{ vendor.name }}</option>
     </optgroup>
   </select>
   <button v-else-if="editable" type="button" class="h-full min-h-8 w-full truncate px-2 text-left text-base font-normal hover:outline hover:outline-1 hover:outline-green-700" @click="explainUnavailable">{{ display }}</button>

@@ -48,7 +48,7 @@
 <script setup>
 import useToasts from '@/Composables/useToasts';
 import { router, usePage } from '@inertiajs/vue3';
-import { onMounted, onUnmounted, reactive } from 'vue';
+import { onMounted, onUnmounted, reactive, watch } from 'vue';
 
 const { toasts: composableToasts, dismissToast, toastClass } = useToasts();
 
@@ -117,6 +117,9 @@ function checkFlashAndErrors() {
     }
 }
 
+watch(() => page.props.flash, checkFlashAndErrors, { deep: true });
+watch(() => page.props.errors, checkFlashAndErrors, { deep: true });
+
 let removeNavigateListener = null;
 
 onMounted(() => {
@@ -142,6 +145,7 @@ onMounted(() => {
         if (nid) seenNotificationIds.add(String(nid));
         pushLocal({ id: nid, type: 'success', message });
     });
+    window.addEventListener('toast:show', onToastShow);
 
     // Also subscribe to server-side lightweight toast broadcasts on the 'toasts' channel.
     try {
@@ -174,7 +178,16 @@ onMounted(() => {
 
 onUnmounted(() => {
     if (removeNavigateListener) removeNavigateListener();
+    window.removeEventListener('toast:show', onToastShow);
 });
+
+function onToastShow(ev) {
+    pushLocal({
+        id: ev?.detail?.id || `custom-${Date.now()}`,
+        type: ev?.detail?.type || 'success',
+        message: ev?.detail?.message || '保存しました。',
+    });
+}
 </script>
 
 <style scoped>

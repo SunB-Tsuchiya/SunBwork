@@ -162,7 +162,8 @@ class MGinbonAssignmentSyncServiceTest extends TestCase
 
         $response = app(MGinbonCellController::class)->updateDate(
             $request,
-            MGinbonItem::query()->findOrFail($ids['item'])
+            MGinbonItem::query()->findOrFail($ids['item']),
+            app(\App\Services\MGinbon\MGinbonProjectAccess::class)
         );
 
         $this->assertSame([$ids['item_subject'], $secondItemSubject], $response->getData(true)['subjectIds']);
@@ -170,12 +171,57 @@ class MGinbonAssignmentSyncServiceTest extends TestCase
             ->where('code', 'original_scan_ordered_on')->where('occurred_on', '2026-05-08')->count());
     }
 
+    public function test_page_count_can_be_updated_and_cleared_for_an_item_subject(): void
+    {
+        [, $ids] = $this->fixture('initial_text_proof');
+        $request = Request::create('/mginbon/page-count', 'PATCH', [
+            'subject_code' => 'japanese',
+            'page_type' => 'problem',
+            'page_count' => 17,
+        ]);
+        $user = new User();
+        $user->id = 99;
+        $request->setUserResolver(fn () => $user);
+        $controller = app(MGinbonCellController::class);
+        $item = MGinbonItem::query()->findOrFail($ids['item']);
+
+        $response = $controller->updatePageCount(
+            $request,
+            $item,
+            app(\App\Services\MGinbon\MGinbonProjectAccess::class)
+        );
+
+        $this->assertSame(17, $response->getData(true)['page_count']);
+        $this->assertSame(17, (int) DB::connection('mginbon')->table('mginbon_page_counts')
+            ->where('page_type', 'problem')->value('page_count'));
+        $this->assertDatabaseHas('mginbon_change_logs', [
+            'mginbon_item_id' => $ids['item'],
+            'field_path' => 'page_counts.problem.japanese',
+            'source' => 'manual',
+        ], 'mginbon');
+
+        $clearRequest = Request::create('/mginbon/page-count', 'PATCH', [
+            'subject_code' => 'japanese',
+            'page_type' => 'problem',
+            'page_count' => null,
+        ]);
+        $clearRequest->setUserResolver(fn () => $user);
+        $controller->updatePageCount(
+            $clearRequest,
+            $item,
+            app(\App\Services\MGinbon\MGinbonProjectAccess::class)
+        );
+
+        $this->assertFalse(DB::connection('mginbon')->table('mginbon_page_counts')
+            ->where('page_type', 'problem')->exists());
+    }
+
     private function fixture(string $stageCode): array
     {
         $db = DB::connection('mginbon');
         $now = now();
         $project = $db->table('mginbon_projects')->insertGetId([
-            'year' => 2099, 'name' => 'テスト銀本', 'status' => 'active',
+            'project_job_id' => 1, 'year' => 2099, 'name' => 'テスト銀本', 'status' => 'active',
             'created_at' => $now, 'updated_at' => $now,
         ]);
         $media = $db->table('mginbon_media_types')->insertGetId([

@@ -8,6 +8,7 @@ use App\Models\ProjectJob;
 use App\Models\ProjectJobAssignment;
 use App\Models\ProjectTeamMember;
 use App\Services\MGinbon\MGinbonPlannedActorPolicy;
+use App\Services\MGinbon\MGinbonStageActorOptions;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -35,10 +36,11 @@ class MGinbonProgressController extends Controller
         'fifth_operation',
     ];
 
-    public function show(Request $request, ProjectJob $projectJob): Response
+    public function show(Request $request, ProjectJob $projectJob, MGinbonStageActorOptions $stageActorOptions): Response
     {
         $this->authorizeProject($request, $projectJob);
         $project = MGinbonProject::query()->where('project_job_id', $projectJob->id)->firstOrFail();
+        $actorOptionsByStage = $stageActorOptions->forProject($project, $projectJob, $request->user());
         $validated = $request->validate([
             'search' => ['nullable', 'string', 'max:100'],
             'media' => ['nullable', 'string', 'max:100'],
@@ -117,10 +119,16 @@ class MGinbonProgressController extends Controller
             ->whereIn('id', $plannedPackages->pluck('subcontractor_id')->filter()->unique())->pluck('name', 'id');
         $tasksBySubject = $tasks->groupBy('mginbon_item_subject_id');
         $subjectsByItem = $subjectRows->groupBy('mginbon_item_id');
-        $itemRows = $itemRows->map(function ($item) use ($subjectsByItem, $tasksBySubject, $assignments, $userNames, $plannedPackages, $plannedUserNames, $plannedSubcontractorNames, $request) {
-            $item->subjects = $subjectsByItem->get($item->id, collect())->map(function ($subject) use ($tasksBySubject, $assignments, $userNames, $plannedPackages, $plannedUserNames, $plannedSubcontractorNames, $request) {
-                $subject->tasks = $tasksBySubject->get($subject->id, collect())->map(function ($task) use ($assignments, $userNames, $plannedPackages, $plannedUserNames, $plannedSubcontractorNames, $request) {
+        $itemRows = $itemRows->map(function ($item) use ($subjectsByItem, $tasksBySubject, $assignments, $userNames, $plannedPackages, $plannedUserNames, $plannedSubcontractorNames, $actorOptionsByStage, $request) {
+            $item->subjects = $subjectsByItem->get($item->id, collect())->map(function ($subject) use ($tasksBySubject, $assignments, $userNames, $plannedPackages, $plannedUserNames, $plannedSubcontractorNames, $actorOptionsByStage, $request) {
+                $subject->tasks = $tasksBySubject->get($subject->id, collect())->map(function ($task) use ($assignments, $userNames, $plannedPackages, $plannedUserNames, $plannedSubcontractorNames, $actorOptionsByStage, $request) {
                     $planned = $plannedPackages->get($task->id);
+                    $stageOptions = $actorOptionsByStage[$task->code] ?? ['users' => collect(), 'subcontractors' => collect()];
+                    $plannedLabel = $planned?->user_id
+                        ? collect($stageOptions['users'])->firstWhere('id', (int) $planned->user_id)['name'] ?? null
+                        : ($planned?->subcontractor_id
+                            ? collect($stageOptions['subcontractors'])->firstWhere('id', (int) $planned->subcontractor_id)['name'] ?? null
+                            : null);
                     return [
                     'id' => $task->id,
                     'stage_id' => $task->stage_id,
@@ -134,9 +142,9 @@ class MGinbonProgressController extends Controller
                         ? ($userNames[$userId] ?? '担当者') : null,
                     'planned_user_id' => $planned?->user_id,
                     'planned_subcontractor_id' => $planned?->subcontractor_id,
-                    'planned_actor_name' => $planned?->user_id
+                    'planned_actor_name' => $plannedLabel ?? ($planned?->user_id
                         ? ($plannedUserNames[$planned->user_id] ?? '仮担当者')
-                        : ($planned?->subcontractor_id ? ($plannedSubcontractorNames[$planned->subcontractor_id] ?? '仮外注先') : null),
+                        : ($planned?->subcontractor_id ? ($plannedSubcontractorNames[$planned->subcontractor_id] ?? '仮外注先') : null)),
                     ];
                 })->values();
                 return $subject;
@@ -158,7 +166,7 @@ class MGinbonProgressController extends Controller
         ]);
     }
 
-    public function register(Request $request, ProjectJob $projectJob, MGinbonPlannedActorPolicy $plannedActorPolicy): JsonResponse
+    public function register(Request $request, ProjectJob $projectJob, MGinbonPlannedActorPolicy $plannedActorPolicy, MGinbonStageActorOptions $stageActorOptions): JsonResponse
     {
         $this->authorizeProject($request, $projectJob);
         $project = MGinbonProject::query()->where('project_job_id', $projectJob->id)->firstOrFail();
@@ -173,7 +181,7 @@ class MGinbonProgressController extends Controller
         $db = DB::connection('mginbon');
         $assignment = null;
         try {
-            $result = $db->transaction(function () use ($request, $projectJob, $project, $validated, $db, $plannedActorPolicy, &$assignment) {
+            $result = $db->transaction(function () use ($request, $projectJob, $project, $validated, $db, $plannedActorPolicy, $stageActorOptions, &$assignment) {
                 $item = $db->table('mginbon_items as items')
                     ->join('mginbon_production_units as units', 'units.id', '=', 'items.mginbon_production_unit_id')
                     ->join('mginbon_media_types as media', 'media.id', '=', 'items.mginbon_media_type_id')
@@ -184,6 +192,8 @@ class MGinbonProgressController extends Controller
                     ->where('mginbon_project_id', $project->id)->where('is_active', true)
                     ->whereIn('code', self::USER_SELECTABLE_STAGE_CODES)->first();
                 abort_unless($item && $stage, 422, '対象の銀本作業が見つかりません。');
+                abort_unless($stageActorOptions->allows($project, $projectJob, $request->user(), $stage->code, 'user', (int) $request->user()->id),
+                    422, 'この工程の担当区分に登録されていません。値一覧を確認してください。');
 
                 $subjects = $db->table('mginbon_item_subjects as item_subjects')
                     ->join('mginbon_subjects as subjects', 'subjects.id', '=', 'item_subjects.mginbon_subject_id')

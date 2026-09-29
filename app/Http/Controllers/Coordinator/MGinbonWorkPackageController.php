@@ -4,11 +4,12 @@ namespace App\Http\Controllers\Coordinator;
 
 use App\Http\Controllers\Controller;
 use App\Services\MGinbon\MGinbonProjectAccess;
+use App\Services\MGinbon\MGinbonStageActorOptions;
+use App\Models\MGinbon\MGinbonProject;
 use App\Models\MGinbon\MGinbonItem;
 use App\Models\ProjectJob;
 use App\Models\Subcontractor;
 use App\Models\User;
-use App\Services\ProjectJobAssigneeOptions;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,7 +18,7 @@ use Illuminate\Validation\ValidationException;
 
 class MGinbonWorkPackageController extends Controller
 {
-    public function store(Request $request, MGinbonItem $item, ProjectJobAssigneeOptions $assigneeOptions): JsonResponse|RedirectResponse
+    public function store(Request $request, MGinbonItem $item, MGinbonStageActorOptions $stageActorOptions): JsonResponse|RedirectResponse
     {
         $validated = $request->validate([
             'stage_definition_id' => ['required', 'integer'],
@@ -38,11 +39,14 @@ class MGinbonWorkPackageController extends Controller
         $project = $unit ? $db->table('mginbon_projects')->where('id', $unit->mginbon_project_id)->first() : null;
         abort_unless($project?->project_job_id, 422, '先に銀本年度をSBWork案件へ接続してください。');
         $projectJob = ProjectJob::findOrFail($project->project_job_id);
+        $projectModel = MGinbonProject::findOrFail($project->id);
+        $stageForOptions = $db->table('mginbon_stage_definitions')->where('id', $validated['stage_definition_id'])
+            ->where('mginbon_project_id', $project->id)->where('is_active', true)->first();
+        abort_unless($stageForOptions, 422, '対象工程が見つかりません。');
         $target = null;
         if (! $clearing) {
-            $options = $assigneeOptions->for($projectJob, $request->user());
-            $allowedIds = $targetType === 'user' ? $options['users']->pluck('id') : $options['subcontractors']->pluck('id');
-            abort_unless($allowedIds->contains((int) $targetId), 422, 'この案件へ設定できない担当者です。');
+            abort_unless($stageActorOptions->allows($projectModel, $projectJob, $request->user(), $stageForOptions->code, $targetType, (int) $targetId),
+                422, 'この工程へ設定できない担当者です。値一覧の担当区分を確認してください。');
             $target = $targetType === 'user'
                 ? User::withGhosts()->findOrFail((int) $targetId)
                 : Subcontractor::findOrFail((int) $targetId);
@@ -63,9 +67,12 @@ class MGinbonWorkPackageController extends Controller
                 ->where('mginbon_stage_definition_id', $stage->id)
                 ->whereIn('mginbon_item_subject_id', $subjectIds)->lockForUpdate()->get();
             abort_unless($tasks->count() === $subjectIds->count(), 422, '工程データが不足しています。');
-            abort_if($tasks->contains(fn ($task) => $task->project_job_assignment_id
-                || in_array($task->status, ['assigned', 'in_progress', 'completed'], true)),
-                422, '正式登録済み、開始済み、または完了済みの担当者は変更できません。');
+            if ($tasks->contains(fn ($task) => $task->project_job_assignment_id
+                || in_array($task->status, ['assigned', 'in_progress', 'completed', 'legacy_completed'], true))) {
+                throw ValidationException::withMessages([
+                    'subject_ids' => '正式登録済み、開始済み、または完了済みの教科は変更できません。未着手の教科だけを選択してください。',
+                ]);
+            }
 
             $oldPackages = $db->table('mginbon_work_package_tasks as links')
                 ->join('mginbon_work_packages as packages', 'packages.id', '=', 'links.mginbon_work_package_id')
