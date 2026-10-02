@@ -10,6 +10,7 @@ use App\Services\MGinbon\MGinbonProjectAccess;
 use App\Services\MGinbon\MGinbonStageActorOptions;
 use App\Services\ProjectJobAssigneeOptions;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -22,7 +23,7 @@ class MGinbonLedgerController extends Controller
     private const SUBJECT_ORDER = ['japanese', 'math', 'social', 'science'];
     private const MEDIA_ORDER = ['問題', '解答のみ', '解説解答', '解答用紙', '傾向と対策', '解答'];
 
-    public function index(Request $request, ProjectJobAssigneeOptions $assigneeOptions, MGinbonProjectAccess $access, MGinbonStageActorOptions $stageActorOptions, MGinbonLedgerSearch $ledgerSearch): Response
+    public function index(Request $request, ProjectJobAssigneeOptions $assigneeOptions, MGinbonProjectAccess $access, MGinbonStageActorOptions $stageActorOptions, MGinbonLedgerSearch $ledgerSearch): Response|RedirectResponse
     {
         $validated = $request->validate([
             'year' => ['nullable', 'integer', 'between:2000,2100'],
@@ -40,7 +41,9 @@ class MGinbonLedgerController extends Controller
             ? $projects->firstWhere('year', (int) $validated['year'])
             : $projects->first();
 
-        abort_unless($project, 404, 'MGinbon年度プロジェクトがありません。');
+        if (! $project) {
+            return redirect()->route('coordinator.mginbon.annual_import.create');
+        }
 
         $mediaCount = $this->itemsQuery($project->id)->count();
         $hasMedia = $mediaCount > 0;

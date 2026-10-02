@@ -48,6 +48,15 @@ class MGinbonAnnualImportTest extends TestCase
         parent::tearDown();
     }
 
+    public function test_empty_ledger_redirects_to_annual_import(): void
+    {
+        $user = User::factory()->create(['user_role' => 'coordinator']);
+
+        $this->actingAs($user)
+            ->get(route('coordinator.mginbon.index'))
+            ->assertRedirect(route('coordinator.mginbon.annual_import.create'));
+    }
+
     public function test_confirmed_preview_creates_project_units_and_ordered_stages(): void
     {
         $token = (string) Str::uuid();
