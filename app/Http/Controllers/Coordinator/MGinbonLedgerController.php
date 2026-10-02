@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Coordinator;
 use App\Http\Controllers\Controller;
 use App\Models\MGinbon\MGinbonProject;
 use App\Models\ProjectJob;
+use App\Services\MGinbon\MGinbonLedgerSearch;
 use App\Services\MGinbon\MGinbonProjectAccess;
 use App\Services\MGinbon\MGinbonStageActorOptions;
 use App\Services\ProjectJobAssigneeOptions;
@@ -19,8 +20,9 @@ use Inertia\Response;
 class MGinbonLedgerController extends Controller
 {
     private const SUBJECT_ORDER = ['japanese', 'math', 'social', 'science'];
+    private const MEDIA_ORDER = ['問題', '解答のみ', '解説解答', '解答用紙', '傾向と対策', '解答'];
 
-    public function index(Request $request, ProjectJobAssigneeOptions $assigneeOptions, MGinbonProjectAccess $access, MGinbonStageActorOptions $stageActorOptions): Response
+    public function index(Request $request, ProjectJobAssigneeOptions $assigneeOptions, MGinbonProjectAccess $access, MGinbonStageActorOptions $stageActorOptions, MGinbonLedgerSearch $ledgerSearch): Response
     {
         $validated = $request->validate([
             'year' => ['nullable', 'integer', 'between:2000,2100'],
@@ -28,8 +30,9 @@ class MGinbonLedgerController extends Controller
             'media' => ['nullable', 'string', 'max:100'],
             'subject' => ['nullable', Rule::in(['', ...self::SUBJECT_ORDER])],
             'status' => ['nullable', Rule::in(['all', 'draft', 'review_required'])],
-            'view' => ['nullable', Rule::in(['preparation', 'list', 'intake', 'text_proof', 'school_outing_problem', 'order_form', 'text_order', 'drawing_order', 'scan_order'])],
+            'view' => ['nullable', Rule::in(['preparation', 'list', 'intake', 'text_proof', 'composition_outsource', 'composition_initial_order', 'school_outing_problem', 'order_form', 'text_order', 'drawing_order', 'scan_order'])],
             'per_page' => ['nullable', Rule::in([10, 25, 50, 75, 100])],
+            'find' => ['nullable', 'string', 'max:20000'],
         ]);
 
         $projects = MGinbonProject::query()->orderByDesc('year')->get(['id', 'project_job_id', 'year', 'name', 'status']);
@@ -50,6 +53,7 @@ class MGinbonLedgerController extends Controller
             'status' => (string) ($validated['status'] ?? 'all'),
             'view' => $requestedView !== '' ? $requestedView : ($hasMedia ? 'list' : 'preparation'),
             'per_page' => max(25, (int) ($validated['per_page'] ?? 25)),
+            'find' => (string) ($validated['find'] ?? ''),
         ];
         if (! $hasMedia) $filters['view'] = 'preparation';
         elseif (! $project->project_job_id && $filters['view'] !== 'preparation') $filters['view'] = 'list';
@@ -59,37 +63,71 @@ class MGinbonLedgerController extends Controller
             ->distinct()
             ->orderBy('media.name')
             ->pluck('media_name')
+            ->sortBy(function (string $mediaName): int {
+                $index = array_search($mediaName, self::MEDIA_ORDER, true);
+
+                return $index === false ? PHP_INT_MAX : $index;
+            })
             ->values();
-        $query = $this->applyUnitFilters($this->unitsQuery($project->id), $filters);
+        $findRequests = $ledgerSearch->decode($filters['find']);
+        $recordsQuery = $ledgerSearch->apply(
+            $this->applyItemFilters($this->itemsQuery($project->id), $filters),
+            $findRequests
+        );
 
         /** @var LengthAwarePaginator $units */
-        $units = $query
+        $units = $recordsQuery
+            ->orderByRaw("CASE media.name
+                WHEN '問題' THEN 10
+                WHEN '解答のみ' THEN 20
+                WHEN '解説解答' THEN 30
+                WHEN '解答用紙' THEN 40
+                WHEN '傾向と対策' THEN 50
+                WHEN '解答' THEN 60
+                ELSE 999
+            END")
             ->orderByRaw('CASE WHEN units.mikuni_code REGEXP "^[0-9]+$" THEN CAST(units.mikuni_code AS UNSIGNED) ELSE 999999 END')
             ->orderBy('units.mikuni_code')
             ->orderBy('units.display_name')
+            ->orderBy('items.id')
             ->paginate($filters['per_page'])
             ->withQueryString();
 
-        $unitIds = $units->getCollection()->pluck('id');
-        $pageItems = $this->applyItemFilters($this->itemsQuery($project->id), $filters)
-            ->whereIn('units.id', $unitIds)
-            ->orderBy('media.sort_order')->orderBy('items.id')->get();
-        $hydratedItems = $this->hydrateItems($pageItems)->groupBy('unit_id');
+        $pageItems = $this->hydrateItems($units->getCollection());
+        $matchDescriptors = $ledgerSearch->matchDescriptors($this->itemsQuery($project->id), $pageItems->pluck('id'), $findRequests);
+        $pageItems->each(function ($item) use ($matchDescriptors) {
+            $item->match_descriptors = $matchDescriptors[$item->id] ?? [];
+        });
+        $unitIds = $pageItems->pluck('unit_id')->unique()->values();
         $pageCounts = DB::connection('mginbon')->table('mginbon_page_counts as page_counts')
             ->join('mginbon_subjects as subjects', 'subjects.id', '=', 'page_counts.mginbon_subject_id')
             ->whereIn('page_counts.mginbon_production_unit_id', $unitIds)
             ->get(['page_counts.mginbon_production_unit_id', 'page_counts.page_type', 'page_counts.page_count', 'subjects.code as subject_code'])
             ->groupBy('mginbon_production_unit_id');
-        $units->setCollection($units->getCollection()->map(function ($unit) use ($hydratedItems, $pageCounts) {
-            $unit->items = $hydratedItems->get($unit->id, collect())->values();
+        $units->setCollection($pageItems->map(function ($item) use ($pageCounts) {
+            $unit = (object) [
+                'id' => $item->unit_id,
+                'unit_type' => $item->unit_type,
+                'mikuni_code' => $item->mikuni_code,
+                'n_code' => $item->n_code,
+                'display_name' => $item->display_name,
+                'school_category' => $item->school_category,
+                'n_category' => $this->compactCategoryLabel($item->n_category),
+                'alpha_group' => $item->alpha_group,
+                'exam_session' => $item->exam_session,
+                'items' => collect([$item]),
+            ];
             $unit->page_counts = $pageCounts->get($unit->id, collect())
                 ->mapWithKeys(fn ($row) => [$row->page_type.':'.$row->subject_code => (int) $row->page_count]);
+
             return $unit;
         }));
 
         $summaryQuery = $this->itemsQuery($project->id);
-        $filteredItemIds = $this->applyItemFilters($this->itemsQuery($project->id), $filters)
-            ->reorder()->pluck('items.id');
+        $filteredItemIds = $ledgerSearch->apply(
+            $this->applyItemFilters($this->itemsQuery($project->id), $filters),
+            $findRequests
+        )->reorder()->pluck('items.id');
         $intakeTotals = DB::connection('mginbon')->table('mginbon_work_measurements as measurements')
             ->join('mginbon_item_subjects as item_subjects', 'item_subjects.id', '=', 'measurements.mginbon_item_subject_id')
             ->join('mginbon_subjects as subjects', 'subjects.id', '=', 'item_subjects.mginbon_subject_id')
@@ -100,6 +138,7 @@ class MGinbonLedgerController extends Controller
             ->mapWithKeys(fn ($row) => [$row->work_type.':'.$row->execution_type => (int) $row->total]);
         $summary = [
             'total' => $mediaCount,
+            'filtered_total' => $units->total(),
             'review_required' => (clone $summaryQuery)->where('items.review_status', 'review_required')->count(),
             'units' => DB::connection('mginbon')->table('mginbon_production_units')
                 ->where('mginbon_project_id', $project->id)->count(),
@@ -137,8 +176,9 @@ class MGinbonLedgerController extends Controller
             'actorOptionsByStage' => $actorOptionsByStage,
             'projectLinkLocked' => $access->isInUse($project),
             'preparation' => [
-                'school_imported' => $units->total() > 0,
-                'school_count' => $units->total(),
+                'school_imported' => $hasMedia,
+                'school_count' => DB::connection('mginbon')->table('mginbon_production_units')
+                    ->where('mginbon_project_id', $project->id)->count(),
                 'project_linked' => (bool) $project->project_job_id,
                 'media_imported' => $hasMedia,
                 'media_count' => $mediaCount,
@@ -168,7 +208,7 @@ class MGinbonLedgerController extends Controller
                 'items.id', 'items.mginbon_import_row_id', 'items.publication_status', 'items.note', 'items.updated_at',
                 'items.review_status', 'units.id as unit_id', 'units.unit_type', 'units.mikuni_code',
                 'units.n_code', 'units.display_name', 'units.school_category', 'units.n_category',
-                'media.name as media_name',
+                'units.alpha_group', 'units.exam_session', 'media.name as media_name',
             ]);
     }
 
@@ -331,5 +371,12 @@ class MGinbonLedgerController extends Controller
 
             return $item;
         });
+    }
+
+    private function compactCategoryLabel(?string $category): ?string
+    {
+        if ($category === null) return null;
+
+        return preg_replace('/^α版[\s　-]*関西[４4四]校$/u', 'α版 関西', trim($category)) ?? $category;
     }
 }

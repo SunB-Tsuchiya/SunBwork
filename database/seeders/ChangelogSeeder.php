@@ -7,6 +7,30 @@ use Illuminate\Database\Seeder;
 
 class ChangelogSeeder extends Seeder
 {
+    public function seedMGinbonFilenameBulk(): void
+    {
+        Changelog::updateOrCreate(['version' => 'mginbon-filename-bulk-1'], [
+            'title' => '銀本進行にPDFファイル名からの一括工程登録を追加',
+            'released_at' => '2026-10-03',
+            'summary' => '決められた形式のPDFファイル名をまとめて読み取り、学校・媒体・教科を判定して、選択した工程日を確認後に一括登録できるようにしました。',
+            'design_files' => ['z_instructions/archived/MGINBON_FILENAME_BULK_PLAN1.md'],
+            'claude_notes' => 'Codex実装。MGinbonFilenameBulkServiceでNNNNYYYY__MEDIA_SUBJECT.pdfを解析し、Nコード・年度・媒体Q/A/AA/Y/T・教科Ko/Sa/Sh/Riを一意照合。previewとcommitで同じ判定を使い、既存値の保護、明示的な上書き、重複・対象なし・形式不正・年度相違を分類する。フォルダ選択、PDF複数選択、ドラッグ＆ドロップではブラウザー内でファイル名だけを抽出し、PDF本体は送信しない。登録時は再照合と行ロックを行い、milestoneと変更履歴をトランザクション更新。銀本関連47 tests / 200 assertions、Vite build、利用者画面確認成功。Sakura未デプロイ。',
+            'body' => '<section class="cl-feature"><h3>追加した機能</h3><ul><li>PDFファイル名からNコード・年度・媒体・教科を自動判定</li><li>フォルダ選択、PDF複数選択、ドラッグ＆ドロップ、テキスト貼り付けに対応</li><li>登録前に対象学校・工程・現在値・登録値とエラーを一覧で確認</li><li>既存日付は初期状態で保護し、指定した場合だけ上書き</li><li>初校出から校了までの主要12工程を一括登録</li></ul></section>',
+        ]);
+    }
+
+    public function seedMGinbonSmartSearch(): void
+    {
+        Changelog::updateOrCreate(['version' => 'mginbon-smart-search-1'], [
+            'title' => '銀本進行にFileMaker型の詳細検索を追加',
+            'released_at' => '2026-10-02',
+            'summary' => '検索条件の追加・除外・演算子をFileMakerに近い操作で使えるようにし、よく使う条件、異常チェック、お気に入り保存、履歴、件数プレビューを追加しました。',
+            'design_files' => ['z_instructions/archived/MGINBON_SMART_SEARCH_PLAN2.md'],
+            'claude_notes' => 'Codex実装。MGinbonLedgerSearchで箱内AND・箱間OR・除外・FileMaker演算子・相対日付を共通化。便利な検索は置換／OR追加／結果内AND、異常検索12種、件数preview、シミュレーション、個人／共有のお気に入り、履歴に対応。結果セルの一致強調と一致理由、同一条件のCSV出力・検索メタデータ付記を追加。MGinbon関連38 tests / 151 assertions、Vite build成功。Sakura未デプロイ。',
+            'body' => '<section class="cl-feature"><h3>追加・改善した機能</h3><ul><li>検索箱の追加、除外、FileMaker演算子、日付の直接入力に対応</li><li>よく使う検索、日付・未入力、異常チェック12種を追加</li><li>検索結果を確認してからお気に入り保存し、過去の検索履歴も再利用可能</li><li>一致セルと一致理由を表示</li><li>CSVに現在の検索条件と実行情報を引き継ぎ</li></ul></section>',
+        ]);
+    }
+
     public function seedClerkCalendarPerformance(): void
     {
         Changelog::updateOrCreate(['version' => 'clerk-calendar-7'], [
@@ -103,8 +127,23 @@ class ChangelogSeeder extends Seeder
         ]);
     }
 
+    public function seedMGinbonCompositionOutsource(): void
+    {
+        Changelog::updateOrCreate(['version' => 'mginbon-outsource-1'], [
+            'title' => '銀本進行に組版外注一覧と初校発注書を追加',
+            'released_at' => '2026-09-30',
+            'summary' => 'FileMakerの組版外注一覧と初校組発注書を、銀本進行の既存データから再構成しました。初校組から四校組までの担当・進行日を一覧でき、初校発注書は学校情報を含めて印刷・PDF保存できます。',
+            'design_files' => ['z_instructions/archived/MGINBON_COMPOSITION_OUTSOURCE_PLAN1.md'],
+            'claude_notes' => 'Codex実装。LedgerIndexへcomposition_outsource / composition_initial_orderを追加。新規DB列は作らず、担当は既存stage task、発注・納品相当日はwork packageのassigned_at / completed_at、入稿・文字・作図日は既存milestoneを利用。FileMaker型コンパクトレイアウト規則を統合仕様へ追加し、内容量に応じた固定幅で画面全幅へのストレッチを禁止。初校発注書は左側を主表とし、右側は入稿日・文字完了日を単一セル、作図だけ4教科表示。選択印刷とA4縦PDFに対応し、印刷時もコード・分類・学校名・媒体を保持。利用者が両画面とレイアウトを確認。MGinbon 26 tests / 91 assertions、Vite build、git diff --check成功。Sakura未デプロイ。',
+            'body' => '<section class="cl-feature"><h3>追加した機能</h3><ul><li>銀本進行のレイアウト選択に「組版外注」と「組版外注_初校 御中」を追加</li><li>初校組・再校組・三校組・四校組を4教科別に一覧表示</li><li>初校組発注書にコード・分類・学校名・媒体と4教科の担当・進行日を表示</li><li>入稿日・文字完了日・作図担当・作図納品日を既存データから再構成</li><li>選択した発注書をA4縦で印刷・PDF保存</li><li>FileMakerに合わせ、内容量に応じた読みやすい固定セル幅へ統一</li></ul></section>',
+        ]);
+    }
+
     public function run(): void
     {
+        $this->seedMGinbonFilenameBulk();
+        $this->seedMGinbonSmartSearch();
+        $this->seedMGinbonCompositionOutsource();
         $this->seedMGinbonTextProof();
         $this->seedMGinbonProjectActors();
         $this->seedMGinbonValueMasters();

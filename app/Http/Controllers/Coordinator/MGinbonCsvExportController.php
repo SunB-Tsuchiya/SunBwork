@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Coordinator;
 
 use App\Models\MGinbon\MGinbonProject;
+use App\Services\MGinbon\MGinbonLedgerSearch;
+use App\Services\MGinbon\MGinbonSearchCriteria;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class MGinbonCsvExportController extends MGinbonLedgerController
 {
-    public function __invoke(Request $request)
+    public function __invoke(Request $request, MGinbonLedgerSearch $ledgerSearch, MGinbonSearchCriteria $criteria)
     {
         $data = $request->validate([
             'year' => ['nullable', 'integer', 'between:2000,2100'],
@@ -16,6 +18,7 @@ class MGinbonCsvExportController extends MGinbonLedgerController
             'media' => ['nullable', 'string', 'max:100'],
             'subject' => ['nullable', Rule::in(['', 'japanese', 'math', 'social', 'science'])],
             'status' => ['nullable', Rule::in(['all', 'draft', 'review_required'])],
+            'find' => ['nullable', 'string', 'max:20000'],
         ]);
         $project = isset($data['year'])
             ? MGinbonProject::query()->where('year', (int) $data['year'])->first()
@@ -28,10 +31,24 @@ class MGinbonCsvExportController extends MGinbonLedgerController
             'subject' => (string) ($data['subject'] ?? ''),
             'status' => (string) ($data['status'] ?? 'all'),
         ];
-        $items = $this->applyItemFilters($this->itemsQuery($project->id), $filters)
-            ->orderByRaw('CASE WHEN units.mikuni_code REGEXP "^[0-9]+$" THEN CAST(units.mikuni_code AS UNSIGNED) ELSE 999999 END')
-            ->orderBy('units.mikuni_code')->orderBy('media.sort_order')->orderBy('items.id')->get();
+        $findRequests = $ledgerSearch->decode((string) ($data['find'] ?? ''));
+        $itemsQuery = $ledgerSearch->apply($this->applyItemFilters($this->itemsQuery($project->id), $filters), $findRequests)
+            ->orderByRaw("CASE media.name WHEN '問題' THEN 10 WHEN '解答のみ' THEN 20 WHEN '解説解答' THEN 30 WHEN '解答用紙' THEN 40 WHEN '傾向と対策' THEN 50 WHEN '解答' THEN 60 ELSE 999 END");
+
+        if ($itemsQuery->getConnection()->getDriverName() === 'sqlite') {
+            $itemsQuery->orderByRaw("CASE WHEN units.mikuni_code NOT GLOB '*[^0-9]*' AND units.mikuni_code <> '' THEN CAST(units.mikuni_code AS INTEGER) ELSE 999999 END");
+        } else {
+            $itemsQuery->orderByRaw('CASE WHEN units.mikuni_code REGEXP "^[0-9]+$" THEN CAST(units.mikuni_code AS UNSIGNED) ELSE 999999 END');
+        }
+
+        $items = $itemsQuery->orderBy('units.mikuni_code')->orderBy('units.display_name')->orderBy('items.id')->get();
         $items = $this->hydrateItems($items);
+        $criteriaSummary = $criteria->summary(['version' => 2, 'requests' => $findRequests]);
+        $normalFilters = array_filter(['キーワード' => $filters['search'], '媒体' => $filters['media'], '教科' => $filters['subject'], '状態' => $filters['status'] === 'all' ? '' : $filters['status']]);
+        if ($normalFilters) $criteriaSummary = implode('・', array_map(fn ($key, $value) => $key.':'.$value, array_keys($normalFilters), $normalFilters)).($findRequests ? ' / '.$criteriaSummary : '');
+        $criteriaSummary = mb_substr($criteriaSummary, 0, 500);
+        $executedAt = now()->format('Y-m-d H:i:s');
+        $executedBy = (string) ($request->user()?->name ?? '');
 
         $handle = fopen('php://temp', 'w+');
         fputcsv($handle, [
@@ -39,6 +56,7 @@ class MGinbonCsvExportController extends MGinbonLedgerController
             '社外scan点数', '社内scan点数', '社外作図点数', '社内作図点数',
             '原本入稿日', 'scan UP日', '文字発注日', '文字納品日',
             '作図発注日', '作図納品日', '原本scan発注日', '原本scan納品日',
+            '検索条件', '検索実行日時', '検索実行者',
         ], ',', '"', '\\');
 
         foreach ($items as $item) {
@@ -65,6 +83,7 @@ class MGinbonCsvExportController extends MGinbonLedgerController
                     $subject->dates->get('drawing_completed_on'),
                     $subject->dates->get('original_scan_ordered_on'),
                     $subject->dates->get('original_scan_delivered_on'),
+                    $criteriaSummary, $executedAt, $executedBy,
                 ], ',', '"', '\\');
             }
         }

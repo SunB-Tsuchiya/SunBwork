@@ -1,6 +1,6 @@
 # MGinbon 引継ぎ3
 
-更新日: 2026-09-29
+更新日: 2026-09-30
 
 ## 再開手順
 
@@ -12,10 +12,12 @@
    - `z_instructions/archived/MGINBON_PROJECT_ACTOR_MANAGER1.md`
    - `z_instructions/archived/MGINBON_TEXT_PROOF_PLAN1.md`
    - `z_instructions/archived/MGINBON_TEXT_PROOF_MANAGER1.md`
+   - `z_instructions/archived/MGINBON_COMPOSITION_OUTSOURCE_PLAN1.md`
+   - `z_instructions/archived/MGINBON_COMPOSITION_OUTSOURCE_MANAGER1.md`
 
 ## 現在地
 
-FileMakerの銀本タブメニューをLaravel側へ整理して移行中。ProjectJob・担当者・MyJob連動と、文字校正一覧まで実装・利用者確認済み。Sakura本番には未デプロイ。
+FileMakerの銀本タブメニューをLaravel側へ整理して移行中。ProjectJob・担当者・MyJob連動、文字校正、組版外注一覧、初校組発注書まで実装・利用者確認済み。Sakura本番には未デプロイ。
 
 ## 完了済み
 
@@ -43,6 +45,16 @@ FileMakerの銀本タブメニューをLaravel側へ整理して移行中。Proj
 - 保存結果は共通 `ToastUnified` の `toast:show` イベントで通知。
 - 利用者がレイアウト、ページ数保存・再読込、担当／日付編集、LIST反映、トーストを確認済み。
 
+### 組版外注・初校発注書
+
+- 制作進行のレイアウト選択に `組版外注` と `組版外注_初校 御中` を追加。
+- 組版外注は初校組・再校組・三校組・四校組の担当と、作業パッケージの登録・完了日を4教科で一覧表示。
+- 初校発注書はコード・分類・学校名・媒体と、4教科の初校組担当・登録日・完了日を主表として表示。
+- 右側補助表は入稿日・文字完了日を単一セル、作図担当・作図納品日だけを4教科表示。
+- 新規DB列は作らず、既存工程、作業パッケージ、milestoneを再構成。
+- FileMaker型コンパクトレイアウト規則を統合仕様へ追加し、固定セル幅で画面全幅へのストレッチを禁止。
+- 利用者が両画面とレイアウトを確認済み。
+
 ## FileMakerメニュー監査
 
 直接または既存別メニューで対応済み:
@@ -58,17 +70,12 @@ FileMakerの銀本タブメニューをLaravel側へ整理して移行中。Proj
 - 図版点数・集計
 - LISTコピー（CSV）
 - 文字校正
-
-未調査・未実装の専用画面候補:
-
 - 組版外注
 - 組版外注_初校 御中
 
 `～for mac` は専用画面を作らず、共通のWeb印刷・PDF保存で扱う方針。
 
 ## 次の作業
-
-利用者からFileMakerの「組版外注」または「組版外注_初校 御中」の画面・項目・運用説明を受け、既存データで再構成できるか調査する。大規模実装になる場合はAGENTS.mdのLarge Work Protocolに従う。
 
 文字校正ページ数のFileMaker取込は未対応。現行取込JSONにページ数フィールドがないため、現在はLaravel画面での手入力が正本。将来対応する場合は完全修飾フィールド名とエクスポート内容を確認する。
 

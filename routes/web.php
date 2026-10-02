@@ -852,6 +852,21 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
             ->name('mginbon.index');
         Route::get('/mginbon/aggregations', [App\Http\Controllers\Coordinator\MGinbonAggregationController::class, 'index'])
             ->name('mginbon.aggregations.index');
+        Route::post('/mginbon/search/preview-count', [App\Http\Controllers\Coordinator\MGinbonSearchController::class, 'previewCount'])
+            ->middleware('throttle:30,1')->name('mginbon.search.preview_count');
+        Route::get('/mginbon/filename-bulk/options', [App\Http\Controllers\Coordinator\MGinbonFilenameBulkController::class, 'options'])
+            ->name('mginbon.filename_bulk.options');
+        Route::post('/mginbon/filename-bulk/preview', [App\Http\Controllers\Coordinator\MGinbonFilenameBulkController::class, 'preview'])
+            ->middleware('throttle:30,1')->name('mginbon.filename_bulk.preview');
+        Route::post('/mginbon/filename-bulk', [App\Http\Controllers\Coordinator\MGinbonFilenameBulkController::class, 'store'])
+            ->middleware('throttle:10,1')->name('mginbon.filename_bulk.store');
+        Route::get('/mginbon/saved-searches', [App\Http\Controllers\Coordinator\MGinbonSavedSearchController::class, 'index'])->name('mginbon.saved_searches.index');
+        Route::post('/mginbon/saved-searches', [App\Http\Controllers\Coordinator\MGinbonSavedSearchController::class, 'store'])->name('mginbon.saved_searches.store');
+        Route::patch('/mginbon/saved-searches/{savedSearch}', [App\Http\Controllers\Coordinator\MGinbonSavedSearchController::class, 'update'])->name('mginbon.saved_searches.update');
+        Route::delete('/mginbon/saved-searches/{savedSearch}', [App\Http\Controllers\Coordinator\MGinbonSavedSearchController::class, 'destroy'])->name('mginbon.saved_searches.destroy');
+        Route::get('/mginbon/search-histories', [App\Http\Controllers\Coordinator\MGinbonSearchHistoryController::class, 'index'])->name('mginbon.search_histories.index');
+        Route::post('/mginbon/search-histories', [App\Http\Controllers\Coordinator\MGinbonSearchHistoryController::class, 'store'])->name('mginbon.search_histories.store');
+        Route::delete('/mginbon/search-histories', [App\Http\Controllers\Coordinator\MGinbonSearchHistoryController::class, 'clear'])->name('mginbon.search_histories.clear');
         Route::get('/mginbon/export.csv', App\Http\Controllers\Coordinator\MGinbonCsvExportController::class)
             ->name('mginbon.export.csv');
         Route::get('/mginbon/annual-import', [App\Http\Controllers\Coordinator\MGinbonAnnualImportController::class, 'create'])
