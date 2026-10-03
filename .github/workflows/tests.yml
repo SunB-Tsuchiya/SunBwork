@@ -64,6 +64,9 @@ jobs:
       - name: Build Assets
         run: npm run build
 
+      - name: Create Sales Test Database
+        run: mysql --protocol=tcp --host=127.0.0.1 --port=3306 --user=root --password=root --execute="CREATE DATABASE IF NOT EXISTS sunbwork_sales_testing CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+
       - name: Tests
         env:
           DB_CONNECTION: mysql
@@ -72,4 +75,10 @@ jobs:
           DB_DATABASE: sunbwork_testing
           DB_USERNAME: root
           DB_PASSWORD: root
+          SALES_DB_CONNECTION: mysql
+          SALES_DB_HOST: 127.0.0.1
+          SALES_DB_PORT: 3306
+          SALES_DB_DATABASE: sunbwork_sales_testing
+          SALES_DB_USERNAME: root
+          SALES_DB_PASSWORD: root
         run: ./vendor/bin/pest
