@@ -80,7 +80,7 @@ onBeforeUnmount(clearPrintMode);
 
     <div class="screen-outing space-y-4">
       <SchoolOutingReportSheet
-        v-for="({ unit, item, subjectCode }, index) in screenSheets"
+        v-for="{ unit, item, subjectCode } in screenSheets"
         :key="`${item.id}-${subjectCode || 'all'}`"
         :project="project"
         :unit="unit"
