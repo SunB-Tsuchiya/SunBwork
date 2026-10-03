@@ -95,6 +95,22 @@ class MGinbonAssignmentSyncServiceTest extends TestCase
         $this->assertSame('cancelled', $db->table('mginbon_work_packages')->where('id', $ids['package'])->value('status'));
     }
 
+    public function test_sync_operations_are_no_op_when_mginbon_database_is_not_configured(): void
+    {
+        $assignment = new ProjectJobAssignment();
+        $assignment->id = 123;
+        config()->set('database.connections.mginbon.database', '');
+        DB::purge('mginbon');
+
+        $service = app(MGinbonAssignmentSyncService::class);
+
+        $this->assertNull($service->detailContext($assignment));
+        $service->start($assignment, '2026-04-11', 99);
+        $service->complete($assignment, 99, '2026-04-12');
+        $service->reopen($assignment, 99);
+        $this->assertSame(0, $service->release($assignment->id, 99));
+    }
+
     #[DataProvider('completionMilestones')]
     public function test_each_completion_stage_records_its_milestone(string $stageCode, string $milestoneCode): void
     {

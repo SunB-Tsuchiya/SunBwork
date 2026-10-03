@@ -28,6 +28,10 @@ class MGinbonAssignmentSyncService
      */
     public function detailContext(ProjectJobAssignment $assignment): ?array
     {
+        if (! $this->isConfigured()) {
+            return null;
+        }
+
         $db = DB::connection('mginbon');
         $package = $db->table('mginbon_work_packages as packages')
             ->join('mginbon_items as items', 'items.id', '=', 'packages.mginbon_item_id')
@@ -84,6 +88,10 @@ class MGinbonAssignmentSyncService
      */
     public function start(ProjectJobAssignment $assignment, string $occurredOn, ?int $actorId = null): void
     {
+        if (! $this->isConfigured()) {
+            return;
+        }
+
         $assignmentIds = $this->lineageIds($assignment);
         $db = DB::connection('mginbon');
 
@@ -118,6 +126,10 @@ class MGinbonAssignmentSyncService
      */
     public function reopen(ProjectJobAssignment $assignment, ?int $actorId = null): void
     {
+        if (! $this->isConfigured()) {
+            return;
+        }
+
         $assignmentIds = $this->lineageIds($assignment);
         $db = DB::connection('mginbon');
 
@@ -157,6 +169,10 @@ class MGinbonAssignmentSyncService
      */
     public function complete(ProjectJobAssignment $assignment, ?int $actorId = null, ?string $occurredOn = null): void
     {
+        if (! $this->isConfigured()) {
+            return;
+        }
+
         $assignmentIds = $this->lineageIds($assignment);
         $db = DB::connection('mginbon');
         $occurredOn ??= now()->toDateString();
@@ -193,6 +209,10 @@ class MGinbonAssignmentSyncService
      */
     public function release(int $assignmentId, ?int $actorId = null, string $reason = 'myjob_deleted'): int
     {
+        if (! $this->isConfigured()) {
+            return 0;
+        }
+
         $db = DB::connection('mginbon');
 
         return $db->transaction(function () use ($db, $assignmentId, $actorId, $reason): int {
@@ -255,6 +275,11 @@ class MGinbonAssignmentSyncService
         }
 
         return $ids;
+    }
+
+    private function isConfigured(): bool
+    {
+        return trim((string) config('database.connections.mginbon.database')) !== '';
     }
 
     private function recordCompletionMilestones(
