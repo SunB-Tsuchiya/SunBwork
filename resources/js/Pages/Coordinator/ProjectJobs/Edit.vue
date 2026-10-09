@@ -19,6 +19,10 @@
                     <label class="mb-1 block font-semibold">案件タイトル</label>
                     <input v-model="form.title" type="text" class="w-full rounded border px-3 py-2" required />
                 </div>
+                <label class="mb-4 flex items-start gap-2 rounded border border-amber-200 bg-amber-50 p-3 text-sm">
+                    <input v-model="form.show_on_department_schedule" type="checkbox" class="mt-1 rounded" />
+                    <span><strong>部署の作業予定表に案件名を表示する</strong><br />極秘案件はチェックを外してください。既存の案件画面や日報の閲覧権限は変わりません。</span>
+                </label>
                 <div class="mb-4">
                     <label class="mb-1 block font-semibold">リーダー（代表Coordinator）</label>
                     <select v-model="form.user_id" class="w-full rounded border px-3 py-2" required>
@@ -657,6 +661,7 @@ const decodedSchedule = decodeField(props.job.schedule, null);
 const form = useForm({
     jobcode: props.job.jobcode || '',
     title: props.job.title || props.job.name || '',
+    show_on_department_schedule: props.job.show_on_department_schedule !== false,
     user_id: props.job.user_id || '',
     sub_coordinator_ids: props.job.sub_coordinator_ids || [],
     client_id: props.job.client_id || '',

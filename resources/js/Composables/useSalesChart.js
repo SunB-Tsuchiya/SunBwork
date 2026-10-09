@@ -24,8 +24,16 @@ export function useSalesChart() {
         ...extra,
     });
 
-    return { yen, pct, pctClass, yenTicks, divergingScale, channelColors };
+    return { yen, pct, pctClass, yenTicks, divergingScale, channelColors, fiscalPeriodNumber, fiscalPeriodLabel };
 }
+
+// 会計年度（4月始まり、開始暦年で表す）から「第◯期」を求める（2026-10-09追加）。
+// サン・ブレーンは2025年度=55期・2026年度=56期で、開始暦年との差が常に1970年で一定なため、
+// 会社情報等の追加データ無しにfiscal_yearから直接計算できる。
+const fiscalPeriodNumber = (fiscalYear) => fiscalYear - 1970;
+
+// 期別分析・経費関連画面で統一する表記（例: 2026年度 → 「56期（2026年度）」）
+const fiscalPeriodLabel = (fiscalYear) => `${fiscalPeriodNumber(fiscalYear)}期（${fiscalYear}年度）`;
 
 // Phase20: サンエー印刷経由/独自受注の固定配色（全画面で統一。青=standard、橙=direct）
 export const channelColors = { standard: '#2563eb', direct: '#f97316' };

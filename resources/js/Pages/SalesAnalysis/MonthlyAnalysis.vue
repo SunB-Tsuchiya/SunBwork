@@ -1,13 +1,13 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
-import AppLayout from '@/layouts/AppLayout.vue';
+import SalesAnalysisShell from '@/Components/SalesAnalysis/SalesAnalysisShell.vue';
 import { Link, router } from '@inertiajs/vue3';
 import axios from 'axios';
 import Chart from 'chart.js/auto';
 import { channelColors, useSalesChart } from '@/Composables/useSalesChart';
 import PeriodNavigator from '@/Components/SalesAnalysis/PeriodNavigator.vue';
 import RankingPanel from '@/Components/SalesAnalysis/RankingPanel.vue';
-import SalesAnalysisNavigationTabs from '@/Components/SalesAnalysis/SalesAnalysisNavigationTabs.vue';
+import ShareCompositionBar from '@/Components/SalesAnalysis/ShareCompositionBar.vue';
 
 // 月次分析（REVIEW3 13.2節、2026-09-04 Phase 12でPriority Aの完成見本として全面改修）。
 // 期間ナビゲーター・Top10/20+全件詳細ドロワーはresources/js/Components/SalesAnalysis/配下の
@@ -298,6 +298,13 @@ const breakdownSortOptions = [
     { sort: 'label', direction: 'asc', label: '名称順' },
 ];
 
+// 分類別/項目別タブの構成比（ShareCompositionBar）用。RankingPanelのrows-updatedから
+// 表示中のTop N行＋真の合計金額を受け取る（新規API呼び出しは発生させない）
+const categoryShareRows = ref([]);
+const categoryShareTotal = ref(null);
+const itemShareRows = ref([]);
+const itemShareTotal = ref(null);
+
 const goToClientAnalysis = (clientName) => {
     router.get(route(rn('client_analysis')), { department_key: departmentKey.value, client_name: clientName });
 };
@@ -315,20 +322,7 @@ onMounted(() => {
 </script>
 
 <template>
-    <AppLayout title="月次分析">
-        <template #header>
-            <div class="flex items-center gap-3">
-                <Link
-                    :href="route(rn('dashboard'))"
-                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300 whitespace-nowrap"
-                >← データ登録状況</Link>
-                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">月次分析</h2>
-            </div>
-        </template>
-        <template #tabs>
-            <SalesAnalysisNavigationTabs :route-prefix="routePrefix" active="monthly" />
-        </template>
-
+    <SalesAnalysisShell title="月次分析" :route-prefix="routePrefix" active="monthly">
         <div v-if="!hasAnyData" class="rounded bg-white p-6 shadow">
             <template v-if="!hasCompanySelected">
                 <p class="text-sm text-gray-500">会社が選択されていません。画面右上の会社切替から対象の会社を選択してください。</p>
@@ -465,51 +459,68 @@ onMounted(() => {
                     </div>
                 </div>
 
-                <!-- C. 同月の複数年比較 -->
-                <div class="rounded bg-white p-4 shadow">
-                    <h3 class="mb-1 text-sm font-semibold text-gray-900">{{ month }}月の複数年比較（直近5年）</h3>
-                    <p class="mb-3 text-xs text-gray-400">棒グラフをクリックすると、その年に移動します。破線は3年平均です。</p>
-                    <canvas ref="sameMonthChartRef" style="max-height: 260px"></canvas>
+                <!-- C/D. 同月の複数年比較・得意先比較（lg以上は横並びでコンパクトに） -->
+                <div class="grid gap-4 lg:grid-cols-2 lg:items-start">
+                    <div class="rounded bg-white p-4 shadow">
+                        <h3 class="mb-1 text-sm font-semibold text-gray-900">{{ month }}月の複数年比較（直近5年）</h3>
+                        <p class="mb-3 text-xs text-gray-400">棒グラフをクリックすると、その年に移動します。破線は3年平均です。</p>
+                        <canvas ref="sameMonthChartRef" style="max-height: 260px"></canvas>
+                    </div>
+
+                    <div class="rounded bg-white p-4 shadow">
+                        <canvas ref="clientChartRef" class="mb-4" style="max-height: 260px"></canvas>
+                        <RankingPanel
+                            title="得意先別"
+                            :fetch-page="fetchClientsPage"
+                            :modes="clientModes"
+                            :sort-options="clientSortOptions"
+                            :refresh-key="refreshKey"
+                            @rows-updated="(rows) => { renderClientChart(rows); }"
+                            @select-row="goToClientAnalysis"
+                        />
+                    </div>
                 </div>
 
-                <!-- D. 得意先比較 -->
-                <div class="rounded bg-white p-4 shadow">
-                    <canvas ref="clientChartRef" class="mb-4" style="max-height: 260px"></canvas>
-                    <RankingPanel
-                        title="得意先別"
-                        :fetch-page="fetchClientsPage"
-                        :modes="clientModes"
-                        :sort-options="clientSortOptions"
-                        :refresh-key="refreshKey"
-                        @rows-updated="(rows) => { renderClientChart(rows); }"
-                        @select-row="goToClientAnalysis"
-                    />
-                </div>
-
-                <!-- E. 内訳（分類/項目） -->
+                <!-- E. 内訳（分類/項目）。表の隣に構成比の積み上げ棒を並べる -->
                 <div class="rounded bg-white p-4 shadow">
                     <div class="mb-3 flex gap-2 border-b text-sm">
                         <button type="button" class="border-b-2 px-3 py-2" :class="detailTab === 'category' ? 'border-indigo-600 font-semibold text-indigo-700' : 'border-transparent text-gray-500'" @click="detailTab = 'category'">分類別</button>
                         <button type="button" class="border-b-2 px-3 py-2" :class="detailTab === 'item' ? 'border-indigo-600 font-semibold text-indigo-700' : 'border-transparent text-gray-500'" @click="detailTab = 'item'">項目別</button>
                     </div>
-                    <RankingPanel
-                        v-if="detailTab === 'category'"
-                        title="分類"
-                        :fetch-page="fetchCategoriesPage"
-                        :sort-options="breakdownSortOptions"
-                        :refresh-key="refreshKeyNoConsolidate"
-                        :clickable="false"
-                    />
-                    <RankingPanel
-                        v-else
-                        title="項目"
-                        :fetch-page="fetchItemsPage"
-                        :sort-options="breakdownSortOptions"
-                        :refresh-key="refreshKeyNoConsolidate"
-                        :clickable="false"
-                    />
+                    <div class="grid gap-4 lg:grid-cols-2 lg:items-start">
+                        <RankingPanel
+                            v-if="detailTab === 'category'"
+                            title="分類"
+                            :fetch-page="fetchCategoriesPage"
+                            :sort-options="breakdownSortOptions"
+                            :refresh-key="refreshKeyNoConsolidate"
+                            :clickable="false"
+                            @rows-updated="(rows, total) => { categoryShareRows = rows; categoryShareTotal = total; }"
+                        />
+                        <RankingPanel
+                            v-else
+                            title="項目"
+                            :fetch-page="fetchItemsPage"
+                            :sort-options="breakdownSortOptions"
+                            :refresh-key="refreshKeyNoConsolidate"
+                            :clickable="false"
+                            @rows-updated="(rows, total) => { itemShareRows = rows; itemShareTotal = total; }"
+                        />
+                        <ShareCompositionBar
+                            v-if="detailTab === 'category'"
+                            title="分類別構成比"
+                            :rows="categoryShareRows"
+                            :total="categoryShareTotal"
+                        />
+                        <ShareCompositionBar
+                            v-else
+                            title="項目別構成比"
+                            :rows="itemShareRows"
+                            :total="itemShareTotal"
+                        />
+                    </div>
                 </div>
             </template>
         </div>
-    </AppLayout>
+    </SalesAnalysisShell>
 </template>

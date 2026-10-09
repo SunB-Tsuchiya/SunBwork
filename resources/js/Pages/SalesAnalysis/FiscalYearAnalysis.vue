@@ -1,13 +1,13 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
-import AppLayout from '@/layouts/AppLayout.vue';
+import SalesAnalysisShell from '@/Components/SalesAnalysis/SalesAnalysisShell.vue';
 import { Link, router } from '@inertiajs/vue3';
 import axios from 'axios';
 import Chart from 'chart.js/auto';
 import { useSalesChart } from '@/Composables/useSalesChart';
 import PeriodNavigator from '@/Components/SalesAnalysis/PeriodNavigator.vue';
 import RankingPanel from '@/Components/SalesAnalysis/RankingPanel.vue';
-import SalesAnalysisNavigationTabs from '@/Components/SalesAnalysis/SalesAnalysisNavigationTabs.vue';
+import ShareCompositionBar from '@/Components/SalesAnalysis/ShareCompositionBar.vue';
 
 // 期別分析（4月始まり〜翌3月終わりの会計年度専用画面。実機フィードバック対応で年次分析から
 // 独立させた、2026-09-04）。構造は年次分析（AnnualAnalysis.vue）と対応しているが、
@@ -23,12 +23,14 @@ const props = defineProps({
     hasCompanySelected: { type: Boolean, default: true },
     // サン・ブレーンだけがサンエー印刷経由/独自受注の経路区別を持つ（Phase20）
     supportsOrderChannels: { type: Boolean, default: false },
+    // サン・ブレーンだけが部署別経費データ（外注加工費等）を参考情報として持つ（Phase21）
+    supportsExpenses: { type: Boolean, default: false },
 });
 
 // 売上分析ルートは superadmin/admin/clerk の各ロールグループ内に複製登録されている
 const rn = (name) => `${props.routePrefix}.sales_analysis.${name}`;
 
-const { yen, pct, pctClass } = useSalesChart();
+const { yen, pct, pctClass, fiscalPeriodLabel } = useSalesChart();
 
 const departmentKey = ref(props.initialDepartmentKey);
 const fiscalYear = ref(props.initialFiscalYear);
@@ -80,7 +82,7 @@ const renderTrendChart = () => {
         data: {
             labels: monthLabels,
             datasets: multiYearSeries.value.map((s, i) => ({
-                label: `${s.fiscal_year}年度`,
+                label: props.supportsExpenses ? fiscalPeriodLabel(s.fiscal_year) : `${s.fiscal_year}年度`,
                 data: s.months,
                 borderColor: seriesColor(i, total),
                 backgroundColor: 'transparent',
@@ -224,8 +226,79 @@ const breakdownSortOptions = [
     { sort: 'label', direction: 'asc', label: '名称順' },
 ];
 
+// 得意先別/分類別/項目別の構成比（ShareCompositionBar）用。RankingPanelのrows-updatedから
+// 表示中のTop N行＋真の合計金額を受け取る（新規API呼び出しは発生させない）
+const clientShareRows = ref([]);
+const clientShareTotal = ref(null);
+const categoryShareRows = ref([]);
+const categoryShareTotal = ref(null);
+const itemShareRows = ref([]);
+const itemShareTotal = ref(null);
+
 const detailTab = ref('category');
 const goToClientAnalysis = (clientName) => router.get(route(rn('client_analysis')), { department_key: departmentKey.value, client_name: clientName });
+
+// --- 経費セクション（Phase21。粗利計算はせず、参考情報として並べて表示するだけ） ---
+const expenseDepartmentTabs = computed(() => [
+    ...props.enabledDepartmentKeys.map((k) => ({ key: k, label: props.departmentLabels[k] ?? k })),
+    { key: 'shared', label: '共通費' },
+]);
+const expenseDepartmentKey = ref(props.enabledDepartmentKeys[0] ?? 'planning');
+const expenseLoading = ref(false);
+const expenseData = ref(null);
+const expenseError = ref('');
+
+// 科目別構成比（ShareCompositionBar）。経費テーブル自体は14列あり2カラム化すると窮屈になるため、
+// 表の上に横棒1本で構成比だけを別途見せる（新規API呼び出しは発生させない）
+const expenseShareRows = computed(() => (expenseData.value?.categories ?? []).map((c) => ({ label: c.category, amount: c.total_amount })));
+
+// アコーディオン: 開いている科目は1つだけ（同じ科目を再クリックすると閉じる）。
+// 取得済みの内訳はcacheに保持し、開閉を繰り返しても再取得しない
+const expandedCategory = ref(null);
+const expandedLoading = ref(false);
+const expenseDetailCache = ref({});
+
+const fetchExpenses = async () => {
+    if (!props.supportsExpenses) return;
+
+    expenseLoading.value = true;
+    expenseError.value = '';
+    expandedCategory.value = null;
+    expenseDetailCache.value = {};
+    try {
+        const response = await axios.get(route(rn('api.fiscal_year_expenses')), {
+            params: { department_key: expenseDepartmentKey.value, fiscal_year: fiscalYear.value },
+        });
+        expenseData.value = response.data;
+    } catch (e) {
+        expenseError.value = '経費データの取得に失敗しました。';
+        expenseData.value = null;
+    } finally {
+        expenseLoading.value = false;
+    }
+};
+
+const toggleCategory = async (category) => {
+    if (expandedCategory.value === category) {
+        expandedCategory.value = null;
+        return;
+    }
+
+    expandedCategory.value = category;
+    if (expenseDetailCache.value[category]) return;
+
+    expandedLoading.value = true;
+    try {
+        const response = await axios.get(route(rn('api.fiscal_year_expenses.vendors')), {
+            params: { department_key: expenseDepartmentKey.value, fiscal_year: fiscalYear.value, category },
+        });
+        expenseDetailCache.value = { ...expenseDetailCache.value, [category]: response.data };
+    } finally {
+        expandedLoading.value = false;
+    }
+};
+
+watch([expenseDepartmentKey, fiscalYear], fetchExpenses);
 
 watch([departmentKey, fiscalYear], () => {
     syncQueryString();
@@ -235,29 +308,18 @@ watch(consolidateClients, fetchSummary);
 watch(yearsToShow, fetchMultiYearSeries);
 onMounted(() => {
     if (props.hasAnyData) fetchSummary();
+    if (props.supportsExpenses) fetchExpenses();
 });
 </script>
 
 <template>
-    <AppLayout title="期別分析">
-        <template #header>
-            <div class="flex items-center gap-3">
-                <Link
-                    :href="route(rn('dashboard'))"
-                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300 whitespace-nowrap"
-                >← データ登録状況</Link>
-                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">期別分析<span class="ml-1 text-xs font-normal text-gray-400">（4月〜翌3月）</span></h2>
-            </div>
-        </template>
-        <template #headerExtras>
+    <SalesAnalysisShell title="期別分析（4月〜翌3月）" :route-prefix="routePrefix" active="fiscal_year">
+        <template #actions>
             <a
                 v-if="hasAnyData"
                 :href="route(rn('fiscal_year_analysis.export'), { department_key: departmentKey, fiscal_year: fiscalYear, consolidate_clients: consolidateClients ? 1 : 0 })"
                 class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-bold text-gray-700 hover:bg-gray-50"
             >Excel出力</a>
-        </template>
-        <template #tabs>
-            <SalesAnalysisNavigationTabs :route-prefix="routePrefix" active="fiscal_year" />
         </template>
 
         <div v-if="!hasAnyData" class="rounded bg-white p-6 shadow">
@@ -279,6 +341,7 @@ onMounted(() => {
                 v-model:consolidate-clients="consolidateClients"
                 granularity="year"
                 year-label="年度"
+                :show-fiscal-period="supportsExpenses"
                 allow-all-departments
                 :department-labels="departmentLabels"
                 :enabled-department-keys="enabledDepartmentKeys"
@@ -295,7 +358,7 @@ onMounted(() => {
             </PeriodNavigator>
 
             <div v-if="productSearchOpen" class="rounded bg-white p-4 shadow">
-                <h3 class="mb-3 text-sm font-semibold text-gray-900">品名検索（{{ fiscalYear }}年度・登録済み全月対象）</h3>
+                <h3 class="mb-3 text-sm font-semibold text-gray-900">品名検索（{{ supportsExpenses ? fiscalPeriodLabel(fiscalYear) : `${fiscalYear}年度` }}・登録済み全月対象）</h3>
                 <div class="flex gap-2">
                     <input
                         v-model="productKeyword"
@@ -338,7 +401,7 @@ onMounted(() => {
 
             <template v-if="summary">
                 <p v-if="missingMonthsLabel" class="rounded bg-amber-50 p-3 text-xs text-amber-700">
-                    ⚠ {{ summary.fiscal_year }}年度は{{ missingMonthsLabel }}のデータが未登録です（登録済み{{ summary.months_registered }}ヶ月）。期間合計には登録済みの月のみを含めています。
+                    ⚠ {{ supportsExpenses ? fiscalPeriodLabel(summary.fiscal_year) : `${summary.fiscal_year}年度` }}は{{ missingMonthsLabel }}のデータが未登録です（登録済み{{ summary.months_registered }}ヶ月）。期間合計には登録済みの月のみを含めています。
                 </p>
 
                 <!-- KPIカード -->
@@ -375,7 +438,7 @@ onMounted(() => {
                         <p class="text-xs text-gray-500">1案件平均</p>
                         <p class="mt-1 text-xl font-bold text-gray-900">{{ yen(summary.kpi.avg_order_amount) }}</p>
                         <p v-if="summary.comparison_mode === 'partial'" class="text-xs text-gray-400">
-                            参考: {{ summary.comparison_fiscal_year }}年度通期 {{ yen(summary.kpi.full_prior_year_amount) }}
+                            参考: {{ supportsExpenses ? fiscalPeriodLabel(summary.comparison_fiscal_year) : `${summary.comparison_fiscal_year}年度` }}通期 {{ yen(summary.kpi.full_prior_year_amount) }}
                         </p>
                     </div>
                 </div>
@@ -384,7 +447,7 @@ onMounted(() => {
                 <div class="rounded bg-white p-4 shadow">
                     <div class="mb-1 flex flex-wrap items-center justify-between gap-2">
                         <h3 class="text-sm font-semibold text-gray-900">
-                            月別売上（{{ yearsToShow === 2 ? `${summary.fiscal_year}年度 対 ${summary.comparison_fiscal_year}年度` : `直近${yearsToShow}期` }}）
+                            月別売上（{{ yearsToShow === 2 ? (supportsExpenses ? `${fiscalPeriodLabel(summary.fiscal_year)} 対 ${fiscalPeriodLabel(summary.comparison_fiscal_year)}` : `${summary.fiscal_year}年度 対 ${summary.comparison_fiscal_year}年度`) : `直近${yearsToShow}期` }}）
                         </h3>
                         <div class="flex rounded border text-xs">
                             <button type="button" class="px-2 py-1" :class="yearsToShow === 2 ? 'bg-indigo-600 text-white' : 'text-gray-600'" @click="yearsToShow = 2">対前期</button>
@@ -446,44 +509,163 @@ onMounted(() => {
                     </div>
                 </div>
 
-                <!-- 得意先別（前期同期間との増減寄与込み） -->
+                <!-- 得意先別（前期同期間との増減寄与込み）。表の隣に構成比の積み上げ棒を並べる -->
                 <div class="rounded bg-white p-4 shadow">
-                    <RankingPanel
-                        title="得意先別"
-                        :fetch-page="fetchClientsPage"
-                        :sort-options="clientSortOptions"
-                        diff-columns
-                        diff-label="前期差"
-                        rate-label="前期比"
-                        :refresh-key="refreshKey"
-                        @select-row="goToClientAnalysis"
-                    />
+                    <div class="grid gap-4 lg:grid-cols-2 lg:items-start">
+                        <RankingPanel
+                            title="得意先別"
+                            :fetch-page="fetchClientsPage"
+                            :sort-options="clientSortOptions"
+                            diff-columns
+                            diff-label="前期差"
+                            rate-label="前期比"
+                            :refresh-key="refreshKey"
+                            @select-row="goToClientAnalysis"
+                            @rows-updated="(rows, total) => { clientShareRows = rows; clientShareTotal = total; }"
+                        />
+                        <ShareCompositionBar title="得意先別構成比" :rows="clientShareRows" :total="clientShareTotal" />
+                    </div>
                 </div>
 
-                <!-- 内訳（分類/項目） -->
+                <!-- 内訳（分類/項目）。表の隣に構成比の積み上げ棒を並べる -->
                 <div class="rounded bg-white p-4 shadow">
                     <div class="mb-3 flex gap-2 border-b text-sm">
                         <button type="button" class="border-b-2 px-3 py-2" :class="detailTab === 'category' ? 'border-indigo-600 font-semibold text-indigo-700' : 'border-transparent text-gray-500'" @click="detailTab = 'category'">分類別</button>
                         <button type="button" class="border-b-2 px-3 py-2" :class="detailTab === 'item' ? 'border-indigo-600 font-semibold text-indigo-700' : 'border-transparent text-gray-500'" @click="detailTab = 'item'">項目別</button>
                     </div>
-                    <RankingPanel
-                        v-if="detailTab === 'category'"
-                        title="分類"
-                        :fetch-page="fetchCategoriesPage"
-                        :sort-options="breakdownSortOptions"
-                        :refresh-key="refreshKeyNoConsolidate"
-                        :clickable="false"
-                    />
-                    <RankingPanel
-                        v-else
-                        title="項目"
-                        :fetch-page="fetchItemsPage"
-                        :sort-options="breakdownSortOptions"
-                        :refresh-key="refreshKeyNoConsolidate"
-                        :clickable="false"
-                    />
+                    <div class="grid gap-4 lg:grid-cols-2 lg:items-start">
+                        <RankingPanel
+                            v-if="detailTab === 'category'"
+                            title="分類"
+                            :fetch-page="fetchCategoriesPage"
+                            :sort-options="breakdownSortOptions"
+                            :refresh-key="refreshKeyNoConsolidate"
+                            :clickable="false"
+                            @rows-updated="(rows, total) => { categoryShareRows = rows; categoryShareTotal = total; }"
+                        />
+                        <RankingPanel
+                            v-else
+                            title="項目"
+                            :fetch-page="fetchItemsPage"
+                            :sort-options="breakdownSortOptions"
+                            :refresh-key="refreshKeyNoConsolidate"
+                            :clickable="false"
+                            @rows-updated="(rows, total) => { itemShareRows = rows; itemShareTotal = total; }"
+                        />
+                        <ShareCompositionBar
+                            v-if="detailTab === 'category'"
+                            title="分類別構成比"
+                            :rows="categoryShareRows"
+                            :total="categoryShareTotal"
+                        />
+                        <ShareCompositionBar
+                            v-else
+                            title="項目別構成比"
+                            :rows="itemShareRows"
+                            :total="itemShareTotal"
+                        />
+                    </div>
                 </div>
             </template>
+
+            <!-- 経費（Phase21。売上とは別枠の参考情報。粗利計算は行わない） -->
+            <div v-if="supportsExpenses" class="rounded border-2 border-dashed border-gray-300 bg-gray-50 p-4">
+                <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <h3 class="text-sm font-semibold text-gray-900">経費（参考情報）</h3>
+                        <p class="text-xs text-gray-500">売上とは別集計の経費データです。粗利計算は行っていません。</p>
+                    </div>
+                    <div class="flex gap-1 rounded border bg-white p-1 text-xs">
+                        <button
+                            v-for="tab in expenseDepartmentTabs"
+                            :key="tab.key"
+                            type="button"
+                            class="rounded px-2 py-1"
+                            :class="expenseDepartmentKey === tab.key ? 'bg-gray-700 text-white' : 'text-gray-600 hover:bg-gray-100'"
+                            @click="expenseDepartmentKey = tab.key"
+                        >{{ tab.label }}</button>
+                    </div>
+                </div>
+
+                <p v-if="expenseLoading" class="text-xs text-gray-500">読み込み中...</p>
+                <p v-else-if="expenseError" class="rounded bg-red-50 p-2 text-xs text-red-700">{{ expenseError }}</p>
+                <p v-else-if="!expenseData?.has_data" class="text-xs text-gray-500">この年度・部署の経費データはまだ取り込まれていません。</p>
+                <template v-else>
+                    <div class="mb-4 max-w-md rounded bg-white p-3">
+                        <ShareCompositionBar title="科目別構成比" :rows="expenseShareRows" :total="expenseData.total_amount" />
+                    </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-xs">
+                        <thead>
+                            <tr class="text-left text-gray-500">
+                                <th class="py-1">科目</th>
+                                <th v-for="m in monthLabels" :key="m" class="py-1 text-right">{{ m }}</th>
+                                <th class="py-1 text-right">年間合計</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template v-for="row in expenseData.categories" :key="row.category">
+                                <tr class="border-t cursor-pointer hover:bg-gray-100" @click="toggleCategory(row.category)">
+                                    <td class="py-1">
+                                        <span class="mr-1 inline-block w-3 text-gray-400">{{ expandedCategory === row.category ? '▾' : '▸' }}</span>{{ row.category }}
+                                        <span v-if="row.is_shared_split" class="ml-1 rounded bg-purple-100 px-1 text-[10px] font-semibold text-purple-700">サンエー印刷と折半</span>
+                                    </td>
+                                    <td v-for="m in row.months" :key="`${m.calendar_year}-${m.calendar_month}`" class="py-1 text-right">
+                                        {{ m.amount > 0 ? yen(m.amount) : '—' }}
+                                    </td>
+                                    <td class="py-1 text-right font-semibold">{{ yen(row.total_amount) }}</td>
+                                </tr>
+                                <tr v-if="expandedCategory === row.category">
+                                    <td :colspan="14" class="bg-gray-50 p-3">
+                                        <p v-if="expandedLoading" class="text-xs text-gray-400">読み込み中...</p>
+                                        <template v-else-if="expenseDetailCache[row.category]">
+                                            <p class="mb-2 text-[11px] text-gray-500">{{ row.category }}（支払先別内訳。Excelの小計の区切りをそのまま再現しています）</p>
+                                            <p v-if="expenseDetailCache[row.category].is_shared_split" class="mb-2 rounded bg-purple-50 px-2 py-1 text-xs text-purple-700">
+                                                この科目はサンエー印刷と折半しています（金額はこのファイルの記載額そのままです）。
+                                            </p>
+                                            <table class="min-w-full max-w-lg text-xs">
+                                                <thead>
+                                                    <tr class="text-left text-gray-500">
+                                                        <th class="py-1">会社名（支払先）</th>
+                                                        <th class="py-1 text-right">金額</th>
+                                                        <th class="py-1 text-right">構成比</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <template v-for="(group, gi) in expenseDetailCache[row.category].groups" :key="gi">
+                                                        <tr v-for="v in group.vendors" :key="v.vendor_name" class="border-t bg-white">
+                                                            <td class="py-1">{{ v.vendor_name }}</td>
+                                                            <td class="py-1 text-right">{{ yen(v.amount) }}</td>
+                                                            <td class="py-1 text-right">{{ v.share_pct !== null ? `${v.share_pct}%` : '—' }}</td>
+                                                        </tr>
+                                                        <tr v-if="group.subtotal_label" class="border-t bg-gray-100 font-semibold">
+                                                            <td class="py-1">{{ group.subtotal_label }}</td>
+                                                            <td class="py-1 text-right">{{ yen(group.subtotal_amount) }}</td>
+                                                            <td class="py-1 text-right"></td>
+                                                        </tr>
+                                                    </template>
+                                                    <tr class="border-t-2 bg-white font-semibold">
+                                                        <td class="py-1">合計</td>
+                                                        <td class="py-1 text-right">{{ yen(expenseDetailCache[row.category].total_amount) }}</td>
+                                                        <td class="py-1 text-right"></td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </template>
+                                    </td>
+                                </tr>
+                            </template>
+                            <tr class="border-t-2 font-semibold">
+                                <td class="py-1">合計</td>
+                                <td v-for="i in 12" :key="i"></td>
+                                <td class="py-1 text-right">{{ yen(expenseData.total_amount) }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <p class="mt-2 text-[11px] text-gray-400">科目をクリックすると、下に会社名（支払先）別の内訳が開きます。</p>
+                </div>
+                </template>
+            </div>
         </div>
-    </AppLayout>
+    </SalesAnalysisShell>
 </template>

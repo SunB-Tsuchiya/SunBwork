@@ -1,6 +1,8 @@
 # レイアウトと UI（統合ドキュメント）
 最終更新: 2026-05-23
 
+`resources/js/app.js` は Vite の `vite:preloadError` を受け、ビルド更新後に古い画面が削除済みの分割 JavaScript を参照した場合、入力中の内容を失う可能性を案内して再読み込みを選べるようにする。古い JavaScript にはこの処理が含まれないため、初回はブラウザでページを再読み込みする。
+
 CLAUDE.md の UI/レイアウトセクションが最上位の権威。本ファイルはその詳細リファレンス。
 
 ---
@@ -24,6 +26,49 @@ CLAUDE.md の UI/レイアウトセクションが最上位の権威。本ファ
 ```
 
 **`py-12 > max-w-7xl mx-auto` は AppLayout の内部に実装済み。ページ側で重複させない。**
+
+### 全幅レイアウト（`:fluid="true"`）
+
+列数が多い表・グラフ中心の画面など、`max-w-7xl`（横幅制限）では窮屈になる場合は
+`AppLayout`に`:fluid="true"`を渡す。ヘッダー・ナビゲーションタブは通常どおり
+`max-w-7xl`内に収まったまま、**デフォルトスロット（本文）だけ**が画面幅いっぱいに広がる
+（`mt-2 px-3 sm:px-4`のみの余白）。独自レイアウトを書く必要はない。
+
+```vue
+<AppLayout title="ページタイトル" :fluid="true">
+  <template #header>...</template>
+  <div class="rounded bg-white p-6 shadow">...</div>
+</AppLayout>
+```
+
+採用例: `Schedule/Index.vue`（予定表）。
+
+社内ナビゲーション自体を完全に外したい特殊なケース（例: `Coordinator/MGinbon/LedgerIndex.vue`の
+密なスプレッドシート風画面）は`AppLayout`を使わない例外が存在するが、通常は`fluid`で十分であり、
+よほどの理由がない限り`AppLayout`を外さないこと（ヘッダー・役割別タブ・ToastUnified等を失う）。
+
+### AppLayoutを使わない独立レイアウトの例外: `SalesAnalysis`配下（2026-10-09）
+
+`SalesAnalysis/`配下の全画面は`fluid`でも視認範囲が狭いという実機フィードバックを経て、
+最終的に`AppLayout`自体を使わない専用の`SalesAnalysisShell.vue`
+（`resources/js/Components/SalesAnalysis/SalesAnalysisShell.vue`）へ移行した。
+
+```vue
+<SalesAnalysisShell title="ページタイトル" :route-prefix="routePrefix" active="タブキー">
+  <template #actions><!-- 任意。Excel出力ボタン等 --></template>
+  <div class="rounded bg-white p-6 shadow">...</div>
+</SalesAnalysisShell>
+```
+
+- `Head`・`ToastUnified`・最小限のバー（戻るリンク＋タイトル＋SuperAdminのみ会社切替
+  `SuperAdminContextSwitcher`）・グループ化したタブ（`SalesAnalysisNavigationTabs.vue`）を内包する。
+- 通知ベル・メール・カレンダー・ヘルプガイド・更新ログ・役割別タブ（SuperAdmin/Admin/Leader等）は
+  表示されない。戻るリンク（`{routePrefix}.dashboard`）で通常メニューに戻れば使える。
+- 会社切替（`SuperAdminContextSwitcher`）だけは、SuperAdminが分析対象会社を選ぶために機能上
+  必須のため、銀本進行のように完全には削らず専用バーへ残している。
+- 新規ページを`SalesAnalysis/`配下に追加する場合はこの`SalesAnalysisShell`を使うこと
+  （`AppLayout`は使わない）。他の機能ではこの例外を真似ず、通常どおり`AppLayout`（必要なら
+  `fluid`）を使うこと。
 
 ### NG パターン（やってはいけない）
 

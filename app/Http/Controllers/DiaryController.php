@@ -212,11 +212,15 @@ class DiaryController extends Controller
             'date'               => $date,
             'worktypes'          => $worktypes,
             'defaultWorktypeId'  => $defaultWorktypeId,
+            'workCandidates'     => app(\App\Services\DiaryWorkEntries::class)->candidates($user, $date),
+            'personalWorkEnabled' => app(\App\Services\PersonalWorkSchedule::class)->available($user),
         ]);
     }
 
     public function store(Request $request)
     {
+        $workService = app(\App\Services\DiaryWorkEntries::class);
+        $workEntries = $workService->validate($request);
         $noDiary = (bool) $request->input('no_diary', false);
 
         $contentRules = $noDiary
@@ -245,11 +249,15 @@ class DiaryController extends Controller
             $data['content'] = '';
         }
 
-        $diary = new Diary();
-        $diary->user_id = Auth::id();
-        $diary->date    = Carbon::parse($data['date'])->toDateString();
-        $diary->content = $data['content'];
-        $diary->save();
+        $diary = DB::transaction(function () use ($data, $workService, $workEntries) {
+            $diary = new Diary();
+            $diary->user_id = Auth::id();
+            $diary->date = Carbon::parse($data['date'])->toDateString();
+            $diary->content = $data['content'];
+            $diary->save();
+            $workService->sync($diary, Auth::user(), $workEntries);
+            return $diary;
+        });
 
         // work_records に勤務時間を upsert
         try {
@@ -282,7 +290,7 @@ class DiaryController extends Controller
     {
         $this->authorize('view', $diary);
         // Load relations and normalize read_by / comments to match interactions view
-        $diary->load('user', 'comments', 'attachments');
+        $diary->load('user', 'comments', 'attachments', 'personalWorkEntries.projectJob');
 
         $readBy = $diary->read_by ?? [];
         $readByNames = [];
@@ -302,6 +310,7 @@ class DiaryController extends Controller
         }
 
         $diaryArray = $diary->toArray();
+        if (! Auth::user()->isSuperAdmin()) unset($diaryArray['personal_work_entries']);
         $diaryArray['read_by_names'] = $readByNames;
         $diaryArray['read_by'] = $readByStructured;
         $diaryArray['comments'] = array_map(function ($c) {
@@ -364,6 +373,9 @@ class DiaryController extends Controller
         $diaryArr = $diary->toArray();
         $diaryArr['date'] = $dateStr;
         $diaryArr['attachments'] = $this->formatDiaryAttachments($diary);
+        $diaryArr['personal_work_entries'] = $user->isSuperAdmin()
+            ? $diary->personalWorkEntries()->with('projectJob')->get()
+            : [];
 
         return Inertia::render('Diaries/Edit', [
             'diary'       => $diaryArr,
@@ -373,6 +385,8 @@ class DiaryController extends Controller
                 'start_time'  => substr($workRecord->start_time ?? '', 0, 5),
                 'end_time'    => substr($workRecord->end_time   ?? '', 0, 5),
             ] : null,
+            'workCandidates' => app(\App\Services\DiaryWorkEntries::class)->candidates($user, $dateStr),
+            'personalWorkEnabled' => app(\App\Services\PersonalWorkSchedule::class)->available($user),
         ]);
     }
 
@@ -381,6 +395,8 @@ class DiaryController extends Controller
         $this->authorize('update', $diary);
         // Quick path: if the request contains `content`, treat this as the Quill-based edit
         if ($request->input('content') !== null) {
+            $workService = app(\App\Services\DiaryWorkEntries::class);
+            $workEntries = $workService->validate($request);
             // ensure date exists for validation: always use pure date string (Y-m-d)
             $existingDate = $diary->date instanceof \Carbon\Carbon
                 ? $diary->date->toDateString()
@@ -404,7 +420,13 @@ class DiaryController extends Controller
             ]);
             $data['user_id'] = Auth::id();
             $data['date']    = \Carbon\Carbon::parse($data['date'])->toDateString();
-            $diary->update(['date' => $data['date'], 'content' => $data['content'], 'user_id' => $data['user_id']]);
+            if ($data['date'] !== $existingDate && ($workEntries || $diary->personalWorkEntries()->exists())) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['date' => '作業結果がある日報の日付は変更できません。']);
+            }
+            DB::transaction(function () use ($diary, $data, $workService, $workEntries, $request) {
+                $diary->update(['date' => $data['date'], 'content' => $data['content'], 'user_id' => $data['user_id']]);
+                if ($request->exists('work_entries')) $workService->sync($diary, Auth::user(), $workEntries);
+            });
 
             // work_records を upsert
             try {

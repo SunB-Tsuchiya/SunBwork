@@ -16,6 +16,7 @@ defineProps({
     defaultBreak:       { type: Object, default: () => ({ start: '12:00', end: '13:00' }) },
     defaultWorktype:    { type: Object, default: null },
     calendarReminders:  { type: Array,  default: () => [] },
+    departmentWorkEnabled: { type: Boolean, default: false },
 });
 </script>
 
@@ -47,6 +48,7 @@ defineProps({
             :daily-breaks="dailyBreaks"
             :default-break="defaultBreak"
             :default-worktype="defaultWorktype"
+            :department-work-enabled="departmentWorkEnabled"
         />
     </AppLayout>
 </template>

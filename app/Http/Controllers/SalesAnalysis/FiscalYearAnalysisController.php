@@ -8,6 +8,8 @@ use App\Http\Controllers\SalesAnalysis\Concerns\ResolvesSalesAnalysisRoutePrefix
 use App\Models\Sales\SalesActiveMonth;
 use App\Models\Sales\SalesAuditLog;
 use App\Services\SalesAnalysis\SalesDepartments;
+use App\Services\SalesAnalysis\SalesExpenseQueryService;
+use App\Services\SalesAnalysis\SalesExpenses;
 use App\Services\SalesAnalysis\SalesExportService;
 use App\Services\SalesAnalysis\SalesOrderChannels;
 use App\Services\SalesAnalysis\SalesQueryService;
@@ -28,8 +30,11 @@ class FiscalYearAnalysisController extends Controller
 {
     use ResolvesSalesAnalysisRoutePrefix, ResolvesSalesAnalysisCompany;
 
-    public function __construct(private SalesQueryService $queryService, private SalesExportService $exportService)
-    {
+    public function __construct(
+        private SalesQueryService $queryService,
+        private SalesExportService $exportService,
+        private SalesExpenseQueryService $expenseQueryService
+    ) {
     }
 
     public function index(Request $request)
@@ -46,6 +51,7 @@ class FiscalYearAnalysisController extends Controller
                 'initialFiscalYear' => (int) (now()->month >= 4 ? now()->format('Y') : now()->format('Y') - 1),
                 'hasAnyData' => false,
                 'supportsOrderChannels' => false,
+                'supportsExpenses' => false,
             ]);
         }
 
@@ -91,6 +97,7 @@ class FiscalYearAnalysisController extends Controller
             'initialFiscalYear' => $fiscalYear,
             'hasAnyData' => $hasAnyData,
             'supportsOrderChannels' => SalesOrderChannels::supportsChannelsFor($companyId),
+            'supportsExpenses' => SalesExpenses::supportsExpensesFor($companyId),
         ]);
     }
 
@@ -250,6 +257,39 @@ class FiscalYearAnalysisController extends Controller
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'Content-Disposition' => 'attachment; filename="' . rawurlencode($filename) . '"',
         ]);
+    }
+
+    /** 経費セクション（Phase 21）の部署×科目×月の金額表。「共通費」(shared)も選べる */
+    public function expenses(Request $request)
+    {
+        $companyId = $this->requireSalesAnalysisCompanyId();
+        abort_unless(SalesExpenses::supportsExpensesFor($companyId), 403);
+
+        $data = $request->validate([
+            'department_key' => ['required', 'string', Rule::in([...SalesDepartments::enabledKeysFor($companyId), SalesExpenses::SHARED_DEPARTMENT_KEY])],
+            'fiscal_year' => ['required', 'integer', 'min:2000', 'max:2100'],
+        ]);
+
+        return response()->json(
+            $this->expenseQueryService->forCompany($companyId)->departmentMonthlyTotals((int) $data['fiscal_year'], $data['department_key'])
+        );
+    }
+
+    /** 経費セクションの科目クリック時：会社名（支払先）別内訳 */
+    public function expenseVendors(Request $request)
+    {
+        $companyId = $this->requireSalesAnalysisCompanyId();
+        abort_unless(SalesExpenses::supportsExpensesFor($companyId), 403);
+
+        $data = $request->validate([
+            'department_key' => ['required', 'string', Rule::in([...SalesDepartments::enabledKeysFor($companyId), SalesExpenses::SHARED_DEPARTMENT_KEY])],
+            'fiscal_year' => ['required', 'integer', 'min:2000', 'max:2100'],
+            'category' => ['required', 'string', 'max:100'],
+        ]);
+
+        return response()->json(
+            $this->expenseQueryService->forCompany($companyId)->vendorBreakdown((int) $data['fiscal_year'], $data['department_key'], $data['category'])
+        );
     }
 
     private function isValidDepartmentKey(int $companyId, string $key): bool

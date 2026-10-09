@@ -27,6 +27,11 @@ class Diary extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function personalWorkEntries()
+    {
+        return $this->hasMany(PersonalWorkEntry::class);
+    }
+
     /**
      * 添付ファイル
      */

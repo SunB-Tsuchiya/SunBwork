@@ -1,9 +1,11 @@
 <script setup>
 import AppLayout from '@/layouts/AppLayout.vue';
 import ScheduleCalendar from '@/Components/Schedule/ScheduleCalendar.vue';
+import DepartmentWorkBoard from '@/Components/Schedule/DepartmentWorkBoard.vue';
 import { Link } from '@inertiajs/vue3';
+import { ref } from 'vue';
 
-defineProps({
+const props = defineProps({
     initialDate:        { type: String, default: '' },
     overlays:           { type: Array,  default: () => [] },
     rooms:              { type: Array,  default: () => [] },
@@ -14,7 +16,11 @@ defineProps({
     worktypes:          { type: Array,  default: () => [] },
     dailyWorktypes:     { type: Array,  default: () => [] },
     defaultWorktype:    { type: Object, default: null },
+    departmentWorkEnabled: { type: Boolean, default: false },
 });
+
+const tab = ref(props.departmentWorkEnabled && new URLSearchParams(window.location.search).get('tab') !== 'calendar' ? 'work' : 'calendar');
+const workDate = ref(props.initialDate);
 </script>
 
 <template>
@@ -28,6 +34,15 @@ defineProps({
             </div>
         </template>
 
+        <div v-if="departmentWorkEnabled" class="mb-3 flex gap-2 border-b border-gray-200">
+            <button type="button" class="rounded-t px-4 py-2 text-sm font-semibold" :class="tab === 'work' ? 'border border-b-white bg-white text-blue-700' : 'text-gray-600 hover:bg-gray-100'" @click="tab = 'work'">部署の作業</button>
+            <Link :href="route('schedule.department_work.results', { date: workDate })" class="rounded-t px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100">作業実績の内訳</Link>
+            <button type="button" class="rounded-t px-4 py-2 text-sm font-semibold" :class="tab === 'calendar' ? 'border border-b-white bg-white text-blue-700' : 'text-gray-600 hover:bg-gray-100'" @click="tab = 'calendar'">共有予定</button>
+            <Link :href="route('calendar.index')" class="rounded-t px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100">カレンダー</Link>
+        </div>
+
+        <DepartmentWorkBoard v-if="departmentWorkEnabled && tab === 'work'" :initial-date="initialDate" @date-change="workDate = $event" />
+        <template v-else>
         <!-- 会議室予約テスト中バナー -->
         <div class="mb-2 flex items-center gap-2 rounded border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs text-amber-800">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-amber-500" viewBox="0 0 20 20" fill="currentColor">
@@ -49,5 +64,6 @@ defineProps({
                 :daily-worktypes="dailyWorktypes"
                 :default-worktype="defaultWorktype" />
         </div>
+        </template>
     </AppLayout>
 </template>

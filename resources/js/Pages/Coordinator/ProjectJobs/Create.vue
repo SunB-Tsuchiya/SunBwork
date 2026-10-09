@@ -106,6 +106,10 @@
                     <input v-model="form.title" type="text" class="w-full rounded border px-3 py-2" required />
                     <div v-if="form.errors.title" class="mt-1 text-sm text-red-600">{{ form.errors.title }}</div>
                 </div>
+                <label class="mb-4 flex items-start gap-2 rounded border border-amber-200 bg-amber-50 p-3 text-sm">
+                    <input v-model="form.show_on_department_schedule" type="checkbox" class="mt-1 rounded" />
+                    <span><strong>部署の作業予定表に案件名を表示する</strong><br />極秘案件はチェックを外してください。既存の案件画面や日報の閲覧権限は変わりません。</span>
+                </label>
 
                 <!-- 担当営業 -->
                 <div class="mb-4">
@@ -556,6 +560,7 @@ const page = usePage();
 const form = useForm({
     jobcode: '',
     title: '',
+    show_on_department_schedule: true,
     user_id: page.props.auth.user.id,
     sub_coordinator_ids: [],
     client_id: '',

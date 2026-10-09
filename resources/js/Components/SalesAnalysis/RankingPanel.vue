@@ -57,7 +57,9 @@ const loadTop = async () => {
         });
         topRows.value = result.rows;
         topTotalCount.value = result.total_count;
-        emit('rows-updated', result.rows);
+        // Phase22(UI再設計): 構成比の可視化（ShareCompositionBar）で「その他」バケットを
+        // 正しく計算するため、表示中のTop N行だけでなく真の合計金額も渡す
+        emit('rows-updated', result.rows, result.total_amount);
     } finally {
         loadingTop.value = false;
     }

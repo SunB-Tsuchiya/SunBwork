@@ -1,5 +1,8 @@
 <script setup>
 import { computed } from 'vue';
+import { useSalesChart } from '@/Composables/useSalesChart';
+
+const { fiscalPeriodLabel } = useSalesChart();
 
 // 売上分析・月次系画面の共通期間ナビゲーター（REVIEW3 13.1節、2026-09-04 Phase 12。
 // 2026-09-04 Phase 13でgranularity='year'（年次分析等）、
@@ -18,6 +21,9 @@ const props = defineProps({
     granularity: { type: String, default: 'month' }, // 'month' | 'year' | 'month-cyclic'
     // granularity='year'のときの「◯年」表示の接尾辞。期別分析では「年度」を指定する
     yearLabel: { type: String, default: '年' },
+    // 期別分析でサン・ブレーンのときだけ「56期（2026年度）」のように期数を併記する
+    // （期数の計算式は会社ごとの創業年に依存するため、創業年が既知のサン・ブレーンのみに限定する。2026-10-09）
+    showFiscalPeriod: { type: Boolean, default: false },
     // granularity='month'のときのみ使用: { has_data, nearest_before, nearest_after } | null
     periodStatus: { type: Object, default: null },
     loading: { type: Boolean, default: false },
@@ -99,7 +105,7 @@ const showUnregisteredNotice = computed(() => props.granularity === 'month' && p
                     class="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50"
                     @click="emit('update:year', year - 1)"
                 >← 前{{ yearLabel }}</button>
-                <span class="px-2 text-sm font-bold text-gray-900">{{ year }}{{ yearLabel }}</span>
+                <span class="px-2 text-sm font-bold text-gray-900">{{ showFiscalPeriod ? fiscalPeriodLabel(year) : `${year}${yearLabel}` }}</span>
                 <button
                     type="button"
                     :disabled="loading"

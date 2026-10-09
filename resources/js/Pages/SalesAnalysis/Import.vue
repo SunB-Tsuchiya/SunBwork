@@ -1,9 +1,8 @@
 <script setup>
 import { computed, ref } from 'vue';
-import AppLayout from '@/layouts/AppLayout.vue';
+import SalesAnalysisShell from '@/Components/SalesAnalysis/SalesAnalysisShell.vue';
 import { Link } from '@inertiajs/vue3';
 import axios from 'axios';
-import SalesAnalysisNavigationTabs from '@/Components/SalesAnalysis/SalesAnalysisNavigationTabs.vue';
 
 const props = defineProps({
     routePrefix: { type: String, required: true },
@@ -207,14 +206,7 @@ const confirmImport = async () => {
 </script>
 
 <template>
-    <AppLayout title="売上Excel取込">
-        <template #header>
-            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">売上Excel取込</h2>
-        </template>
-        <template #tabs>
-            <SalesAnalysisNavigationTabs :route-prefix="routePrefix" active="import" />
-        </template>
-
+    <SalesAnalysisShell title="売上Excel取込（年度別データ）" :route-prefix="routePrefix" active="import_hub">
         <div v-if="!hasCompanySelected" class="rounded bg-white p-6 shadow">
             <p class="text-sm text-gray-500">会社が選択されていません。画面右上の会社切替から対象の会社を選択してください。</p>
         </div>
@@ -474,5 +466,5 @@ const confirmImport = async () => {
                 </div>
             </div>
         </div>
-    </AppLayout>
+    </SalesAnalysisShell>
 </template>

@@ -1,11 +1,11 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
-import AppLayout from '@/layouts/AppLayout.vue';
+import SalesAnalysisShell from '@/Components/SalesAnalysis/SalesAnalysisShell.vue';
 import { Link } from '@inertiajs/vue3';
 import axios from 'axios';
 import Chart from 'chart.js/auto';
 import RankingPanel from '@/Components/SalesAnalysis/RankingPanel.vue';
-import SalesAnalysisNavigationTabs from '@/Components/SalesAnalysis/SalesAnalysisNavigationTabs.vue';
+import ShareCompositionBar from '@/Components/SalesAnalysis/ShareCompositionBar.vue';
 import { useSalesChart } from '@/Composables/useSalesChart';
 
 const props = defineProps({
@@ -124,6 +124,10 @@ const rankingSortOptions = [
     { sort: 'label', direction: 'asc', label: '品名順' },
 ];
 
+// 商品ランキングの構成比（ShareCompositionBar）用。新規API呼び出しは発生させない
+const rankingShareRows = ref([]);
+const rankingShareTotal = ref(null);
+
 const refreshKey = computed(() => `${departmentKey.value}-${startYear.value}-${startMonth.value}-${endYear.value}-${endMonth.value}`);
 
 const showDetail = async (productName) => {
@@ -189,20 +193,7 @@ onMounted(() => {
 </script>
 
 <template>
-    <AppLayout title="商品分析">
-        <template #header>
-            <div class="flex items-center gap-3">
-                <Link
-                    :href="route(rn('dashboard'))"
-                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300 whitespace-nowrap"
-                >← データ登録状況</Link>
-                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">商品分析</h2>
-            </div>
-        </template>
-        <template #tabs>
-            <SalesAnalysisNavigationTabs :route-prefix="routePrefix" active="product_analysis" />
-        </template>
-
+    <SalesAnalysisShell title="商品分析" :route-prefix="routePrefix" active="product_analysis">
         <div v-if="!hasAnyData" class="rounded bg-white p-6 shadow">
             <template v-if="!hasCompanySelected">
                 <p class="text-sm text-gray-500">会社が選択されていません。画面右上の会社切替から対象の会社を選択してください。</p>
@@ -419,16 +410,18 @@ onMounted(() => {
                     </h3>
                     <span class="text-xs text-indigo-600">{{ rankingCollapsed ? '▼ 表示する' : '▲ 閉じる' }}</span>
                 </button>
-                <div v-if="!rankingCollapsed" class="mt-3">
+                <div v-if="!rankingCollapsed" class="mt-3 grid gap-4 lg:grid-cols-2 lg:items-start">
                     <RankingPanel
                         title="商品"
                         :fetch-page="fetchRankingPage"
                         :sort-options="rankingSortOptions"
                         :refresh-key="refreshKey"
                         @select-row="showDetail"
+                        @rows-updated="(rows, total) => { rankingShareRows = rows; rankingShareTotal = total; }"
                     />
+                    <ShareCompositionBar title="商品別構成比" :rows="rankingShareRows" :total="rankingShareTotal" />
                 </div>
             </div>
         </div>
-    </AppLayout>
+    </SalesAnalysisShell>
 </template>

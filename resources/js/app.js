@@ -17,6 +17,17 @@ function reloadForStaleSession() {
     window.location.reload();
 }
 
+// ビルド更新前から開いていた画面は、削除済みの分割ファイルを参照することがある。
+// 入力途中の画面を勝手に破棄しないよう、利用者が選んだときだけ読み直す。
+window.addEventListener('vite:preloadError', (event) => {
+    event.preventDefault();
+    if (window.__sbwAssetReloadPromptOpen) return;
+    window.__sbwAssetReloadPromptOpen = true;
+    const reload = window.confirm('画面の一部を読み込めませんでした。ページを再読み込みしますか？\n入力中の内容は保存されない場合があります。');
+    window.__sbwAssetReloadPromptOpen = false;
+    if (reload) window.location.reload();
+});
+
 const ROLE_DASHBOARD_ROUTES = {
     superadmin:       'superadmin.dashboard',
     admin:            'admin.dashboard',

@@ -1972,6 +1972,209 @@ migrationの`down()`で両経路のactive行が同じ会社・部署・年月に
 
 ---
 
+### Phase 21: 部署別経費データ（外注加工費等）の取込と参考表示
+
+#### 21.1 背景と合意済み要件（2026-10-08確定）
+
+サン・ブレーンの部署別経費元帳（`情報出版`・`製版`・`オンデマンド`・`共有`の4シート、各シートに
+主材料費・外注加工費・消耗品費・修繕費・リース料・通信費等15〜20程度の科目、各科目に
+会社名（支払先）別の行＋月別金額＋累計、という構造）を取り込み、既存の売上分析画面（期別分析）
+に参考情報として並べて表示する。
+
+- **粗利計算は行わない**（売上－経費のような計算はしない。あくまで並べて見られるだけの参考情報。
+  ユーザー確認済み・2026-10-08）。
+- **取り込む費目は全科目**（外注加工費だけでなく、主材料費・消耗品費・修繕費・リース料・通信費等
+  すべて）。
+- **会社名（支払先）単位の内訳が必要**（「どこにどれだけ払っているか」を参照できること）。
+- 対象は**会社コード`SUNBRAIN`（サン・ブレーン）のみ**（Phase19/20と同じ前提）。
+- シート名は部署の旧呼称（`情報出版`・`製版`）を使用している。現行の部署定義
+  （`sales_department_definitions`）とは別名称のため、本機能専用の固定対応表で変換する:
+  `情報出版→planning（企画）`、`製版→production（制作）`、`オンデマンド→ondemand`。
+- `共有`シートは部署をまたぐ共通経費。企画・制作・オンデマンドのいずれにも配分せず、
+  **`shared`という独立した区分**として別枠表示する（配分比率を推測で作らない）。
+- `共有`シートの一部科目（例: 通信費）はサンエー印刷と50%ずつ分担（「折半」）している。
+  金額はExcel記載のまま取り込み、画面には「サンエー印刷と折半」等の注意書きバッジを表示する
+  （自動的に半分にする計算はしない）。
+- ファイルは会計年度単位（4月始まり〜翌3月終わり、既存の期別分析と同じ区分）。同じ年度の
+  ファイルが期中に何度も再アップロードされる想定（セルに「請求書未着(暫定)」の注記があり、
+  請求書が揃うごとに数値が更新される運用のため）。再取込は**会計年度単位でまるごと新しい版に
+  差し替える**（売上Excelのような月別の個別active pointerは不要。1ファイル＝1会計年度＝全社分）。
+  旧版は履歴として残す。
+
+#### 21.2 Excelフォーマットの構造
+
+4シート共通の構造（`z_instructions/★経費表_フォーマット.xlsx`参照）:
+
+- 1行目: タイトル（例: `55期(2025年4月～2026年3月）　情報出版部経費`）。年度の自動判定には
+  使わない（フォーム入力を正とする、Phase3の教訓を踏襲）。ソフトチェック（不一致は警告のみ）
+  には使う。
+- 2行目: ヘッダー行。A列=`科目`、B列=`会社名`、C〜N列=`4月`〜`3月`（会計年度順）、O列=`累計`。
+  ヘッダー行の位置は決め打ちせず、A列=`科目`・B列=`会社名`の行を探索する（シートごとに
+  微妙にずれている可能性があるため）。
+- 3行目以降: 科目ブロックの繰り返し。
+  - A列に科目名がある行がブロックの開始（科目名はセル内で改行されていることがある。
+    例: `業務\n委託料` → 空白・改行を除去して`業務委託料`に正規化する）。
+  - ブロック内の各行はB列=会社名（支払先）＋C〜N列の月別金額。
+  - B列に`小計`を含む行（`小計①`等）は中間小計のため無視する。
+  - B列に`合計`を含む行はブロックの終端マーカー。この行の文字列に`折半`が含まれていれば、
+    そのブロック（科目×部署）の全明細行へ`is_shared_split=true`を立てる。この行自体の金額は
+    取り込まない（計算式セルの評価を避ける。金額は明細行の合計から画面側で算出する）。
+  - 会社名が空欄でも金額があれば明細行として取り込む（`vendor_name=null`、「その他・内訳未記入」
+    として扱う）。
+  - 金額が空欄または0の月セルは明細行を作らない（0件と「未記入」を区別する必要が無いため）。
+
+#### 21.3 DB設計（sales接続、新規2テーブル）
+
+`sales_expense_imports`:
+
+| カラム | 型 | 内容 |
+|---|---|---|
+| id | bigint | PK |
+| company_id | unsignedBigInteger | 対象会社（現時点はSUNBRAINのみ） |
+| fiscal_year | smallint | 会計年度の開始暦年（例: 2025年4月〜2026年3月なら2025） |
+| version | unsignedInteger | 同一(company_id, fiscal_year)内の版番号 |
+| original_filename | varchar(255) | basenameのみ |
+| file_sha256 | char(64) | 二重取込検知（アプリ層の`SalesExpenseImportService::confirm()`が参照。`force`指定時はこのチェックをスキップできる。2026-10-09追加） |
+| status | varchar(20) | `completed`/`failed` |
+| imported_by | bigint unsigned | 通常DB user_id、FKなし |
+| imported_at | timestamp | 取込日時 |
+| category_count / line_item_count | unsigned int | 件数 |
+| total_amount | decimal(15,2) | 取込ファイル全体の金額合計（参考値） |
+| warnings | json nullable | 構造化警告（タイトル年度不一致等） |
+| created_at / updated_at | timestamps | |
+
+制約: unique `(company_id, fiscal_year, version)`。`(company_id, file_sha256)`は当初unique制約だったが、
+取込処理更新後に同一ファイルを再取込みしたいという要望（2026-10-09）を受けて通常indexへ変更した
+（`2026_10_09_100002_drop_file_hash_unique_from_sales_expense_imports_table`）。二重取込の誤操作防止は
+アプリ層の確認チェックボックス（既定オフ）で担保する。
+
+`sales_expense_line_items`:
+
+| カラム | 型 | 内容 |
+|---|---|---|
+| id | bigint | PK |
+| sales_expense_import_id | bigint | `sales_expense_imports.id`へのFK（同一sales接続内のためFK可、onDelete restrict） |
+| department_key | varchar(32) | `planning`/`production`/`ondemand`/`shared` |
+| category | varchar(100) | 科目（改行・空白除去済み） |
+| category_order | unsignedSmallInteger default 0 | 科目のExcel登場順（部署内で1始まり連番。表示並び順に使う。2026-10-09追加） |
+| vendor_name | varchar(255) nullable | 会社名（支払先）。空欄は`null` |
+| calendar_year / calendar_month | smallint / tinyint | 実際の暦年月（fiscal_yearと月から算出） |
+| amount | decimal(15,2) | 金額 |
+| is_shared_split | boolean default false | サンエー印刷との折半科目かどうか |
+| subtotal_group | unsignedSmallInteger default 1 | 科目内の小計グループ番号（Excelの小計①②…の区切りで1始まり連番。区切りが無い科目は常に1） |
+| subtotal_label | varchar(100) nullable | その小計グループを閉じたExcelの小計行の文言（例: 「小計①」）。合計行で閉じる最後のグループは常に`null`（Excelに無い小計を合成しない） |
+| created_at / updated_at | timestamps | |
+
+index: `(sales_expense_import_id, department_key, category)`、`(sales_expense_import_id, calendar_year, calendar_month)`。
+
+`category_order`/`subtotal_group`/`subtotal_label`は2026-10-09のユーザーフィードバック（並び順をExcelと同じに、内訳の小計も表示したい）を受けて追加した列（`2026_10_09_100001_add_order_and_subtotal_to_sales_expense_line_items_table.php`）。既存取込データはこれらの情報を持たないため、反映には経費表の再取込みが必要（旧版は履歴として残るため上書きではない）。
+
+「現在有効な版」は別テーブルを持たず、`(company_id, fiscal_year)`内の最大`version`を都度解決する
+（売上Excelと違い、月単位で個別に有効化/無効化する必要が無いため、active pointerテーブルは作らない）。
+
+#### 21.4 取込処理
+
+- 新規`SalesOrderChannels`と同様の設計思想で、新規`SalesExpenses`（会社コード`SUNBRAIN`判定、
+  `supportsExpensesFor(int $companyId): bool`）を用意する。既存の`SalesOrderChannels::supportsChannelsFor()`
+  とは別の機能ゲートとして独立させる（将来どちらかだけ他社へ展開する可能性があるため）。
+- 新規`SalesExpenseWorkbookReader`: 4シートを読み取り、科目ブロックを解析し、
+  `department_key`・`category`・`vendor_name`・月（1〜12）・金額・`is_shared_split`の配列を返す。
+  計算式は評価しない（既存`SalesWorkbookReader`と同じ方針）。
+- 新規`SalesExpenseImportService`: 会計年度・会社単位で次の版番号を採番し、
+  `sales_expense_imports`＋`sales_expense_line_items`をtransaction内で保存する。
+  月はReaderが返す1〜12の値と、アップロード画面で指定した`fiscal_year`から
+  `calendar_year`（4〜12月は`fiscal_year`、1〜3月は`fiscal_year+1`）を算出する。
+- アップロード画面（新規`ExpenseImportController`/`ExpenseImport.vue`）: `fiscal_year`を
+  フォームで明示入力させる（タイトル行からの自動判定はしない。Phase3の教訓を踏襲）。
+  タイトル行の年度とフォーム入力が不一致の場合は警告を出すが、取込は妨げない。
+  二重取込（同一`file_sha256`）はブロックする。
+
+#### 21.5 集計・表示
+
+- 新規`SalesExpenseQueryService`（または既存`SalesQueryService`への追加ではなく独立させる。
+  経費は売上と集計軸が異なるため、別サービスとして持つ）。
+  - `departmentMonthlyTotals(companyId, fiscalYear, departmentKey)`: 科目×月の金額表
+  - `vendorBreakdown(companyId, fiscalYear, departmentKey, category)`: 会社名別内訳
+  - `hasData(companyId, fiscalYear)`: その年度の経費取込が存在するか
+- 表示先は既存の**期別分析画面**（`FiscalYearAnalysis.vue`）に「経費」セクションを追加する。
+  新しい分析画面は作らない（会計年度の単位が一致するため最も自然）。
+  - 科目別の月次表（会計年度の4月〜翌3月）を部署タブ（企画/制作/オンデマンド/共通費）で切替表示
+  - 科目をクリックすると会社名（支払先）別の内訳をドロワー等で表示（既存`RankingPanel.vue`の
+    ドロワーUIパターンを参考にする。ただし経費は差額/増減率の概念を持たないため新規の
+    軽量テーブル表示でよい）
+  - `is_shared_split=true`の科目には「サンエー印刷と折半」バッジを表示する
+  - 売上のKPIとは明確に区別された見た目（例: 別カード・別背景色）にし、粗利等と誤解されない
+    ようにする
+
+#### 21.6 実装順序
+
+1. migration・Model・`SalesExpenses`機能ゲート
+2. `SalesExpenseWorkbookReader`（架空fixtureでの構造解析テスト）
+3. `SalesExpenseImportService`・`ExpenseImportController`・`ExpenseImport.vue`（取込画面）
+4. `SalesExpenseQueryService`
+5. `FiscalYearAnalysisController`への経費API追加・`FiscalYearAnalysis.vue`への経費セクション追加
+6. ナビゲーションタブへ「経費取込」を追加
+7. 架空fixtureによる回帰テスト・SalesAnalysis全テスト・npm build
+
+#### 21.7 Phase 21受入基準
+
+- 全科目（外注加工費だけでない）が取り込まれ、科目×会社名×月の内訳が保持される。
+- `情報出版`→企画、`製版`→制作、`オンデマンド`→オンデマンド、`共有`→`shared`に正しく変換される。
+- `共有`シートは3部署のいずれにも配分されず、独立した区分として表示される。
+- 「折半」注記のある科目は金額をそのまま取り込み、画面に注意書きが表示される。
+- 同一会計年度の再取込で新しい版に全体が差し替わり、旧版は履歴として残る。
+- 粗利・原価計算は一切行われない（売上と並べて表示するだけ）。
+- サンエー印刷側の既存画面・挙動は変わらない。
+- 本番sales DBを照会せず、架空fixtureだけで検証する。
+
+### Phase 22: 経費比較（科目の複数年推移・支払先依存度）
+
+**背景（2026-10-09ユーザー要望）**: Phase21で経費を期別分析に表示できるようになったが、
+「科目ごとに複数年の増減を見たい」「どの支払先にどれだけ依存しているか（外注先の依存度）を
+把握したい」という要望が追加で発生した。年次分析（暦年）への展開も検討したが、経費データの
+出どころ（Excel）自体が会計年度（4月〜翌3月）単位でしか作られておらず、サン・ブレーン自身も
+期（4月〜3月）で業務を見ているとの確認が取れたため、**経費比較は期別（会計年度）のみを対象とし、
+年次分析（暦年）への展開は行わない**ことで合意した（判断ログ参照）。
+
+**要件（ユーザー確認済み）**:
+- 「価格差」は単価ではなく金額（この外注先には1000万、この外注先には100万、という依存度がざっくり
+  わかる程度でよい）。数量データを持たないため単価比較はそもそも作れない。
+- 「会社ごとの比較」は支払先（外注先の会社名）ごとの比較。得意先や他社比較ではない。
+- 粗利計算はしない（Phase21の方針を継続）。
+
+**22.1 画面構成**: 新規`ExpenseComparison.vue`（ルート名`expense_comparison`）。
+部署タブ（企画/制作/オンデマンド/共通費）→科目セレクタ（経費が取り込まれている最新会計年度の
+科目一覧から選ぶ）の2段階で絞り込む。
+
+- **複数年推移**: 選んだ科目の金額を、実際に経費データが取り込まれている会計年度**すべて**で
+  棒グラフ表示する（固定のN年ではなく、取込実績がある年度分だけ自動的に表示する。インポートが
+  増えるごとにグラフも自然に伸びる）。あわせて「その部署の総経費に占める割合」を年度ごとに表示する。
+- **支払先比較**: 選んだ科目・会計年度の支払先ごとの金額を棒グラフ＋表で表示する（依存度の把握用）。
+  前年の同じ支払先の金額も並べ、増減額・増減率を表示する（新規に追加された支払先はpreviousがnull、
+  前年に存在したが今年消えた支払先は表示しない＝「ざっくり」の要件に合わせ複雑な新規/離脱判定は作らない）。
+- SUNBRAIN以外の会社では「利用できません」と表示する（`SalesExpenses::supportsExpensesFor()`で判定、
+  Phase21と同じゲート）。
+
+**22.2 バックエンド**: `SalesExpenseQueryService`に以下を追加（新規テーブル・migrationは不要、
+既存`sales_expense_line_items`/`sales_expense_imports`を集計するだけ）。
+- `availableFiscalYears(): array` — 対象会社で経費取込が存在する会計年度一覧（昇順）
+- `categoriesForDepartment(departmentKey): array` — 直近で取込実績がある会計年度の科目一覧
+  （`category_order`順、`departmentMonthlyTotals()`を再利用）
+- `categoryMultiYearTrend(departmentKey, category): array` — `availableFiscalYears()`の各年度で
+  `departmentMonthlyTotals()`を呼び、対象科目の金額と部署総額に対する割合を集計する
+- `vendorRanking(fiscalYear, departmentKey, category): array` — 支払先別の金額をExcelの小計区切りを
+  無視してフラットに集計・金額降順（`vendorBreakdown()`とは別メソッド。あちらはExcel構造の再現が
+  目的、こちらは依存度ランキングが目的で性質が異なるため分離した）
+- `vendorComparison(fiscalYear, departmentKey, category): array` — `vendorRanking()`を対象年度・前年度の
+  両方で呼び、支払先名をキーに前年金額・増減額・増減率をマージする
+
+新規`ExpenseComparisonController`（`index`/`meta`/`trend`/`vendors`の4アクション）。
+
+**22.3 実装順序**: ①QueryServiceへのメソッド追加＋Unitテスト → ②Controller＋Featureテスト →
+③Vue画面＋ナビゲーションタブ追加 → ④npm run build・SalesAnalysis全テスト。
+
+---
+
 ## 11. テスト受入基準
 
 ### 権限

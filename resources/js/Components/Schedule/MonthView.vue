@@ -48,7 +48,13 @@ function eventsOnDate(d) {
     return props.events.filter(e => {
         const s = new Date(e.starts_at).toLocaleDateString('sv-SE');
         return s === ds;
-    }).slice(0, 3);
+    }).sort((a, b) => Number(b._source === 'personal-work') - Number(a._source === 'personal-work')).slice(0, 3);
+}
+
+function remainingEventsOnDate(d) {
+    if (!d) return 0;
+    const ds = dateStr(d);
+    return Math.max(0, props.events.filter(e => new Date(e.starts_at).toLocaleDateString('sv-SE') === ds).length - 3);
 }
 
 function isToday(d) {
@@ -57,14 +63,18 @@ function isToday(d) {
 }
 
 function eventColor(e) {
-    if (e._custom_color) return 'text-white';  // 色はインラインスタイルで設定
+    if (e._custom_color) return e._custom_text_color ? '' : 'text-white';
     if (!e.is_own) return 'bg-gray-200 text-gray-600';
     const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500'];
     return colors[(e.id ?? 0) % colors.length] + ' text-white';
 }
 
 function eventStyle(e) {
-    const style = e._custom_color ? { backgroundColor: e._custom_color } : {};
+    const style = e._custom_color ? {
+        backgroundColor: e._custom_color,
+        ...(e._custom_text_color ? { color: e._custom_text_color } : {}),
+        ...(e._custom_border_color ? { borderColor: e._custom_border_color, borderWidth: '1px' } : {}),
+    } : {};
     if (e.completed) style.opacity = '0.45';
     return style;
 }
@@ -132,6 +142,7 @@ function fmtResTime(isoStr) {
                     @click.stop="$emit('event-click', ev)">
                     {{ ev.title }}
                 </div>
+                <div v-if="remainingEventsOnDate(day)" class="text-[10px] text-gray-500">ほか {{ remainingEventsOnDate(day) }} 件</div>
 
                 <!-- 会議室予約 -->
                 <div v-for="res in reservationsOnDate(day)" :key="'r' + res.id"

@@ -47,6 +47,11 @@ class Event extends Model
         'is_materialized_copy' => 'boolean',
     ];
 
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
     public function eventItemType()
     {
         return $this->belongsTo(EventItemType::class);

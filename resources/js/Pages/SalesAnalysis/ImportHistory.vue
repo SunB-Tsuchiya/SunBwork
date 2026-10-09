@@ -1,7 +1,6 @@
 <script setup>
-import AppLayout from '@/layouts/AppLayout.vue';
+import SalesAnalysisShell from '@/Components/SalesAnalysis/SalesAnalysisShell.vue';
 import { Link } from '@inertiajs/vue3';
-import SalesAnalysisNavigationTabs from '@/Components/SalesAnalysis/SalesAnalysisNavigationTabs.vue';
 
 const props = defineProps({
     routePrefix: { type: String, required: true },
@@ -26,20 +25,7 @@ const statusLabels = {
 </script>
 
 <template>
-    <AppLayout title="売上取込履歴">
-        <template #header>
-            <div class="flex items-center gap-3">
-                <Link
-                    :href="route(rn('dashboard'))"
-                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300 whitespace-nowrap"
-                >← ダッシュボードに戻る</Link>
-                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">売上取込履歴</h2>
-            </div>
-        </template>
-        <template #tabs>
-            <SalesAnalysisNavigationTabs :route-prefix="routePrefix" active="import_history" />
-        </template>
-
+    <SalesAnalysisShell title="売上取込履歴" :route-prefix="routePrefix" active="import_history">
         <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <div v-if="!hasCompanySelected" class="py-8 text-center text-gray-500">
                 会社が選択されていません。画面右上の会社切替から対象の会社を選択してください。
@@ -99,5 +85,5 @@ const statusLabels = {
 
             <p v-if="lastPage > 1" class="mt-4 text-center text-xs text-gray-500">{{ currentPage }} / {{ lastPage }} ページ</p>
         </div>
-    </AppLayout>
+    </SalesAnalysisShell>
 </template>

@@ -21,7 +21,11 @@ export const DEFAULT_OVERLAY_COLOR = { bg: '#e5e7eb', text: '#374151', border: '
  */
 export function evColor(ev) {
     // _custom_color: CalendarEventsController が計算したカスタム色（個人イベント用）
-    if (ev._custom_color) return { bg: ev._custom_color, text: '#fff', border: ev._custom_color };
+    if (ev._custom_color) return {
+        bg: ev._custom_color,
+        text: ev._custom_text_color ?? '#fff',
+        border: ev._custom_border_color ?? ev._custom_color,
+    };
     if (!ev.is_own) return DEFAULT_OVERLAY_COLOR;
     const slug = ev.event_item_type?.slug;
     return EVENT_TYPE_COLORS[slug] ?? DEFAULT_OWN_COLOR;

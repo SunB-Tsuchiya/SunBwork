@@ -28,6 +28,7 @@ class ProjectJob extends Model
         'sales_rep_id',
         'plate_submission_date',
         'plate_down_date',
+        'show_on_department_schedule',
     ];
 
     protected $appends = ['image_url'];
@@ -38,6 +39,7 @@ class ProjectJob extends Model
         'page_count' => 'integer',
         'plate_submission_date' => 'date:Y-m-d',
         'plate_down_date' => 'date:Y-m-d',
+        'show_on_department_schedule' => 'boolean',
     ];
 
     public function getImageUrlAttribute(): ?string

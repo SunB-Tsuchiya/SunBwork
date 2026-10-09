@@ -1,9 +1,8 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue';
-import AppLayout from '@/layouts/AppLayout.vue';
+import SalesAnalysisShell from '@/Components/SalesAnalysis/SalesAnalysisShell.vue';
 import { Link } from '@inertiajs/vue3';
 import axios from 'axios';
-import SalesAnalysisNavigationTabs from '@/Components/SalesAnalysis/SalesAnalysisNavigationTabs.vue';
 
 const props = defineProps({
     routePrefix: { type: String, required: true },
@@ -120,14 +119,7 @@ onMounted(fetchStatus);
 </script>
 
 <template>
-    <AppLayout title="データ登録状況">
-        <template #header>
-            <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">売上分析 - データ登録状況</h2>
-        </template>
-        <template #tabs>
-            <SalesAnalysisNavigationTabs :route-prefix="routePrefix" active="dashboard" />
-        </template>
-
+    <SalesAnalysisShell title="データ登録状況" :route-prefix="routePrefix" active="dashboard">
         <div class="space-y-4">
             <!-- 部署タブ -->
             <div class="flex gap-2 border-b border-gray-200">
@@ -257,5 +249,5 @@ onMounted(fetchStatus);
                 </div>
             </div>
         </div>
-    </AppLayout>
+    </SalesAnalysisShell>
 </template>

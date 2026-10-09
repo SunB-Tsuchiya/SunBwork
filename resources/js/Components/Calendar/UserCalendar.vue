@@ -8,6 +8,7 @@ import WeekView         from '@/Components/Schedule/WeekView.vue';
 import EventModal       from '@/Components/Schedule/EventModal.vue';
 import EventDetailModal from '@/Components/Schedule/EventDetailModal.vue';
 import ActionSheet      from '@/Components/Calendar/ActionSheet.vue';
+import QuickWorkEntryModal from '@/Components/Calendar/QuickWorkEntryModal.vue';
 import UserDayView      from '@/Components/Calendar/UserDayView.vue';
 import { useCalendarCore } from '@/Components/Schedule/useCalendarCore.js';
 
@@ -22,6 +23,7 @@ const props = defineProps({
     dailyBreaks:        { type: Array,  default: () => [] },
     defaultBreak:       { type: Object, default: () => ({ start: '12:00', end: '13:00' }) },
     defaultWorktype:    { type: Object, default: null },
+    departmentWorkEnabled: { type: Boolean, default: false },
 });
 
 const CSRF = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
@@ -33,8 +35,12 @@ const { viewMode, currentDate, weekStart, viewYear, viewMonth, viewLabel, naviga
 // ── イベントデータ ─────────────────────────────────────────────
 const companyEvents  = ref([]); // Schedule と共有（is_company_event=true）
 const personalEvents = ref([]); // 個人専用（ジョブ・旧カレンダーイベント）
+const quickWorkEvents = ref([]); // 簡易作業予定
 const diaryDates     = ref([]); // 日報マーカー [{ id, date: 'YYYY-MM-DD' }]
 const loading        = ref(false);
+const calendarError = ref('');
+const quickWorkColor = '#fbcfe8';
+let loadSequence = 0;
 
 // 日報マーカーをイベント形式に変換（MonthView 表示用）
 const diaryEvents = computed(() =>
@@ -64,6 +70,7 @@ const allEvents = computed(() => {
     return [
         ...dedupedCompanyEvents,
         ...personalEvents.value,
+        ...quickWorkEvents.value,
         ...diaryEvents.value,
     ];
 });
@@ -72,23 +79,36 @@ const allEvents = computed(() => {
 const timedEvents = computed(() => allEvents.value.filter(e => !e._is_diary));
 
 async function loadEvents() {
+    const sequence = ++loadSequence;
     loading.value = true;
+    calendarError.value = '';
     try {
-        const [companyRes, personalRes] = await Promise.all([
+        const [companyRes, personalRes, workRes] = await Promise.allSettled([
             axios.get(route('schedule.events.range'), {
                 params: { start: loadRange.value.start, end: loadRange.value.end },
             }),
             axios.get(route('calendar.events.range'), {
                 params: { start: loadRange.value.start, end: loadRange.value.end },
             }),
+            props.departmentWorkEnabled
+                ? axios.get(route('schedule.department_work.mine'), { params: { start: loadRange.value.start, end: loadRange.value.end } })
+                : Promise.resolve({ data: { events: [] } }),
         ]);
-        companyEvents.value  = companyRes.data.events       ?? companyRes.data;
-        personalEvents.value = personalRes.data.events      ?? [];
-        diaryDates.value     = personalRes.data.diaries     ?? [];
+        if (sequence !== loadSequence) return;
+        if (companyRes.status === 'fulfilled') companyEvents.value = companyRes.value.data.events ?? companyRes.value.data;
+        if (personalRes.status === 'fulfilled') {
+            personalEvents.value = personalRes.value.data.events ?? [];
+            diaryDates.value = personalRes.value.data.diaries ?? [];
+        }
+        if (workRes.status === 'fulfilled') quickWorkEvents.value = workRes.value.data.events ?? [];
+        else if (props.departmentWorkEnabled) calendarError.value = '簡易作業予定を読み込めませんでした。再読み込みしてください。';
+        for (const result of [companyRes, personalRes, workRes]) {
+            if (result.status === 'rejected') console.error('カレンダーイベント取得失敗', result.reason);
+        }
     } catch (e) {
         console.error('カレンダーイベント取得失敗', e);
     } finally {
-        loading.value = false;
+        if (sequence === loadSequence) loading.value = false;
     }
 }
 
@@ -140,6 +160,29 @@ function onActionDiary() {
     router.get(route('diaries.create', { date: actionSheetDef.value.date }));
 }
 
+function goToDepartmentWork(date = currentDate.value) {
+    showActionSheet.value = false;
+    router.get(route('schedule.index', { tab: 'work', date }));
+}
+
+const showQuickWork = ref(false);
+const quickWorkEntry = ref(null);
+const quickWorkDef = ref({ date: '', startMin: null, endMin: null });
+
+function onActionWork() {
+    quickWorkEntry.value = null;
+    quickWorkDef.value = { ...actionSheetDef.value };
+    showActionSheet.value = false;
+    showQuickWork.value = true;
+}
+
+function onQuickWorkSaved(savedDate) {
+    showQuickWork.value = false;
+    quickWorkEntry.value = null;
+    if (savedDate) currentDate.value = savedDate;
+    loadEvents();
+}
+
 // ── Schedule EventModal（案件打合せ・外出 / 社内予定） ─────────
 const showCreate   = ref(false);
 const editTarget   = ref(null);
@@ -162,6 +205,12 @@ function openEdit(ev) {
 function openDetail(ev) {
     if (ev._is_diary) {
         goToDiary(ev._diary_date);
+        return;
+    }
+    if (ev._source === 'personal-work') {
+        quickWorkEntry.value = ev._work_entry;
+        quickWorkDef.value = { date: ev._work_entry.work_date, startMin: null, endMin: null };
+        showQuickWork.value = true;
         return;
     }
     if (ev._source === 'personal') {
@@ -214,6 +263,23 @@ function onMonthDateClick(date) {
 
 // ── ドラッグ更新（会社イベント・個人イベント両対応） ──────────
 async function onUpdate({ id, starts_at, ends_at }) {
+    if (String(id).startsWith('personal-work-')) {
+        const existing = quickWorkEvents.value.find((event) => event.id === id);
+        if (!existing?._work_entry) return;
+        const [date, startTime] = starts_at.replace('T', ' ').split(' ');
+        const [endDate, endTime] = ends_at.replace('T', ' ').split(' ');
+        if (date !== endDate) { alert('作業予定は同じ日内で指定してください。'); loadEvents(); return; }
+        const entry = existing._work_entry;
+        try {
+            await axios.put(route('schedule.department_work.update', { entry: entry.id }), {
+                ...entry, work_date: date, plan_slot: 'hour',
+                planned_start_time: startTime.slice(0, 5), planned_end_time: endTime.slice(0, 5),
+                project_job_id: entry.project_job_id || null,
+            });
+        } catch { alert('作業予定の移動に失敗しました。'); }
+        loadEvents();
+        return;
+    }
     // 会社イベント（Schedule 系）
     const cIdx = companyEvents.value.findIndex(e => e.id === id);
     if (cIdx >= 0) {
@@ -539,6 +605,10 @@ async function saveWeekBreaks() {
 </script>
 
 <template>
+    <div v-if="departmentWorkEnabled" class="flex flex-wrap gap-x-3 gap-y-1 border-b bg-white px-3 py-1 text-xs text-gray-600">
+        <span class="inline-flex items-center gap-1 font-medium"><i class="h-2.5 w-2.5 rounded-full border border-pink-400" :style="{ backgroundColor: quickWorkColor }"></i>簡易作業予定</span>
+        <span v-if="calendarError" class="text-red-700" role="alert">{{ calendarError }}</span>
+    </div>
     <CalendarShell
         :current-date="currentDate"
         :view-mode="viewMode"
@@ -551,10 +621,13 @@ async function saveWeekBreaks() {
 
         <!-- ── ツールバー追加ボタン ──────────────────────────────── -->
         <template #toolbar-extra>
+            <button v-if="departmentWorkEnabled"
+                class="rounded border border-blue-500 bg-blue-50 px-3 py-1.5 text-sm font-semibold text-blue-700 hover:bg-blue-100"
+                @click="goToDepartmentWork(currentDate)">今日の作業・部署一覧</button>
             <!-- 予定を登録ボタン -->
             <button
                 class="rounded border border-emerald-500 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-100"
-                @click="openActionSheet({ date: new Date().toLocaleDateString('sv-SE') })">
+                @click="openActionSheet({ date: currentDate })">
                 ＋ 予定を登録
             </button>
 
@@ -645,6 +718,7 @@ async function saveWeekBreaks() {
 
     <ActionSheet
         :show="showActionSheet"
+        :show-work-action="departmentWorkEnabled"
         :date="actionSheetDef.date"
         :start-min="actionSheetDef.startMin"
         :end-min="actionSheetDef.endMin"
@@ -652,7 +726,17 @@ async function saveWeekBreaks() {
         @add-event="onActionAddEvent"
         @my-job="onActionMyJob"
         @sheet-job="onActionSheetJob"
-        @diary="onActionDiary" />
+        @diary="onActionDiary"
+        @work="onActionWork" />
+
+    <QuickWorkEntryModal
+        :show="showQuickWork"
+        :date="quickWorkDef.date"
+        :start-min="quickWorkDef.startMin"
+        :end-min="quickWorkDef.endMin"
+        :entry="quickWorkEntry"
+        @close="showQuickWork = false"
+        @saved="onQuickWorkSaved" />
 
     <!-- ── 進行表・管理シートモーダル ─────────────────────────── -->
     <div

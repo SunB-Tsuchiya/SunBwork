@@ -68,7 +68,8 @@ const filteredUsers = computed(() => {
 });
 
 // ソート状態
-const sortKey = ref('id');
+// The API already returns the saved user order; keep it when filtering the list.
+const sortKey = ref('');
 const sortDesc = ref(false);
 
 // フィルタ済みのユーザーをソートして返す

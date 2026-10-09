@@ -1,9 +1,8 @@
 <script setup>
 import { onMounted, ref } from 'vue';
-import AppLayout from '@/layouts/AppLayout.vue';
+import SalesAnalysisShell from '@/Components/SalesAnalysis/SalesAnalysisShell.vue';
 import { Link } from '@inertiajs/vue3';
 import axios from 'axios';
-import SalesAnalysisNavigationTabs from '@/Components/SalesAnalysis/SalesAnalysisNavigationTabs.vue';
 
 const props = defineProps({
     routePrefix: { type: String, required: true },
@@ -169,20 +168,7 @@ onMounted(fetchData);
 </script>
 
 <template>
-    <AppLayout title="得意先統合設定">
-        <template #header>
-            <div class="flex items-center gap-3">
-                <Link
-                    :href="route(rn('dashboard'))"
-                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300 whitespace-nowrap"
-                >← データ登録状況</Link>
-                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">得意先統合設定</h2>
-            </div>
-        </template>
-        <template #tabs>
-            <SalesAnalysisNavigationTabs :route-prefix="routePrefix" active="client_groups" />
-        </template>
-
+    <SalesAnalysisShell title="得意先統合設定" :route-prefix="routePrefix" active="client_groups">
         <div v-if="!hasCompanySelected" class="rounded bg-white p-6 shadow">
             <p class="text-sm text-gray-500">会社が選択されていません。画面右上の会社切替から対象の会社を選択してください。</p>
         </div>
@@ -300,5 +286,5 @@ onMounted(fetchData);
                 </div>
             </div>
         </div>
-    </AppLayout>
+    </SalesAnalysisShell>
 </template>

@@ -25,6 +25,7 @@ function isoDateOnly(dateStr) {
     }
 }
 import TimelineDiary from '@/Components/TimelineDiary.vue';
+import { workCategories, activityLabel } from '@/Constants/personalWorkActivities';
 import { useDiaryAttachments } from '@/Composables/useDiaryAttachments';
 import { ensureAttachmentUrl, ensureThumbUrl } from '@/Helpers/attachment';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -1210,6 +1211,19 @@ onUnmounted(() => {
                         <span v-if="!sanitizedContent || !sanitizedContent.trim()" class="text-gray-400 italic">日報はありません</span>
                         <div v-else v-html="sanitizedContent" @click="onBodyClick"></div>
                     </div>
+                    <section v-if="props.diary.personal_work_entries?.length" class="rounded border bg-blue-50 p-3">
+                        <h3 class="mb-2 text-sm font-semibold">今日の作業結果</h3>
+                        <ul class="space-y-2 text-sm">
+                            <li v-for="entry in props.diary.personal_work_entries" :key="entry.id" class="rounded bg-white p-2">
+                                <strong>{{ workCategories.find(([code]) => code === entry.work_category)?.[1] || 'その他' }}</strong>
+                                <span v-if="entry.activity_type" class="ml-2 text-blue-700">{{ activityLabel(entry.activity_type, entry.work_category) }}</span>
+                                <span class="ml-2">{{ entry.title || entry.project_job?.title || entry.project_name_text || '作業' }}</span>
+                                <p class="mt-1">{{ entry.result_note }}</p>
+                                <p v-if="entry.actual_quantity !== null" class="text-gray-600">{{ entry.actual_quantity }} {{ entry.actual_unit }}</p>
+                                <p v-if="entry.actual_minutes !== null" class="text-gray-600">実績 {{ Math.floor(entry.actual_minutes / 60) }}時間{{ entry.actual_minutes % 60 }}分</p>
+                            </li>
+                        </ul>
+                    </section>
 
                     <!-- 既読者表示 -->
                     <div v-if="readerNames.length" class="text-sm text-gray-600">

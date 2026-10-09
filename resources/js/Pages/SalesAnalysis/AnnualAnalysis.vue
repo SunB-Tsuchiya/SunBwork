@@ -1,13 +1,13 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
-import AppLayout from '@/layouts/AppLayout.vue';
+import SalesAnalysisShell from '@/Components/SalesAnalysis/SalesAnalysisShell.vue';
 import { Link, router } from '@inertiajs/vue3';
 import axios from 'axios';
 import Chart from 'chart.js/auto';
 import { useSalesChart } from '@/Composables/useSalesChart';
 import PeriodNavigator from '@/Components/SalesAnalysis/PeriodNavigator.vue';
 import RankingPanel from '@/Components/SalesAnalysis/RankingPanel.vue';
-import SalesAnalysisNavigationTabs from '@/Components/SalesAnalysis/SalesAnalysisNavigationTabs.vue';
+import ShareCompositionBar from '@/Components/SalesAnalysis/ShareCompositionBar.vue';
 
 // 年次分析（REVIEW3 13.3節、2026-09-04 Phase 13で月次分析と同じ共通部品へ展開）。
 
@@ -222,6 +222,15 @@ const breakdownSortOptions = [
     { sort: 'label', direction: 'asc', label: '名称順' },
 ];
 
+// 得意先別/分類別/項目別の構成比（ShareCompositionBar）用。RankingPanelのrows-updatedから
+// 表示中のTop N行＋真の合計金額を受け取る（新規API呼び出しは発生させない）
+const clientShareRows = ref([]);
+const clientShareTotal = ref(null);
+const categoryShareRows = ref([]);
+const categoryShareTotal = ref(null);
+const itemShareRows = ref([]);
+const itemShareTotal = ref(null);
+
 const detailTab = ref('category');
 const goToClientAnalysis = (clientName) => router.get(route(rn('client_analysis')), { department_key: departmentKey.value, client_name: clientName });
 
@@ -237,25 +246,13 @@ onMounted(() => {
 </script>
 
 <template>
-    <AppLayout title="年次分析">
-        <template #header>
-            <div class="flex items-center gap-3">
-                <Link
-                    :href="route(rn('dashboard'))"
-                    class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300 whitespace-nowrap"
-                >← データ登録状況</Link>
-                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">年次分析</h2>
-            </div>
-        </template>
-        <template #headerExtras>
+    <SalesAnalysisShell title="年次分析" :route-prefix="routePrefix" active="annual">
+        <template #actions>
             <a
                 v-if="hasAnyData"
                 :href="route(rn('annual_analysis.export'), { department_key: departmentKey, year: year, consolidate_clients: consolidateClients ? 1 : 0 })"
                 class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-bold text-gray-700 hover:bg-gray-50"
             >Excel出力</a>
-        </template>
-        <template #tabs>
-            <SalesAnalysisNavigationTabs :route-prefix="routePrefix" active="annual" />
         </template>
 
         <div v-if="!hasAnyData" class="rounded bg-white p-6 shadow">
@@ -444,44 +441,64 @@ onMounted(() => {
                     </div>
                 </div>
 
-                <!-- 得意先別（前年同期間との増減寄与込み） -->
+                <!-- 得意先別（前年同期間との増減寄与込み）。表の隣に構成比の積み上げ棒を並べる -->
                 <div class="rounded bg-white p-4 shadow">
-                    <RankingPanel
-                        title="得意先別"
-                        :fetch-page="fetchClientsPage"
-                        :sort-options="clientSortOptions"
-                        diff-columns
-                        diff-label="前年差"
-                        rate-label="前年比"
-                        :refresh-key="refreshKey"
-                        @select-row="goToClientAnalysis"
-                    />
+                    <div class="grid gap-4 lg:grid-cols-2 lg:items-start">
+                        <RankingPanel
+                            title="得意先別"
+                            :fetch-page="fetchClientsPage"
+                            :sort-options="clientSortOptions"
+                            diff-columns
+                            diff-label="前年差"
+                            rate-label="前年比"
+                            :refresh-key="refreshKey"
+                            @select-row="goToClientAnalysis"
+                            @rows-updated="(rows, total) => { clientShareRows = rows; clientShareTotal = total; }"
+                        />
+                        <ShareCompositionBar title="得意先別構成比" :rows="clientShareRows" :total="clientShareTotal" />
+                    </div>
                 </div>
 
-                <!-- 内訳（分類/項目） -->
+                <!-- 内訳（分類/項目）。表の隣に構成比の積み上げ棒を並べる -->
                 <div class="rounded bg-white p-4 shadow">
                     <div class="mb-3 flex gap-2 border-b text-sm">
                         <button type="button" class="border-b-2 px-3 py-2" :class="detailTab === 'category' ? 'border-indigo-600 font-semibold text-indigo-700' : 'border-transparent text-gray-500'" @click="detailTab = 'category'">分類別</button>
                         <button type="button" class="border-b-2 px-3 py-2" :class="detailTab === 'item' ? 'border-indigo-600 font-semibold text-indigo-700' : 'border-transparent text-gray-500'" @click="detailTab = 'item'">項目別</button>
                     </div>
-                    <RankingPanel
-                        v-if="detailTab === 'category'"
-                        title="分類"
-                        :fetch-page="fetchCategoriesPage"
-                        :sort-options="breakdownSortOptions"
-                        :refresh-key="refreshKeyNoConsolidate"
-                        :clickable="false"
-                    />
-                    <RankingPanel
-                        v-else
-                        title="項目"
-                        :fetch-page="fetchItemsPage"
-                        :sort-options="breakdownSortOptions"
-                        :refresh-key="refreshKeyNoConsolidate"
-                        :clickable="false"
-                    />
+                    <div class="grid gap-4 lg:grid-cols-2 lg:items-start">
+                        <RankingPanel
+                            v-if="detailTab === 'category'"
+                            title="分類"
+                            :fetch-page="fetchCategoriesPage"
+                            :sort-options="breakdownSortOptions"
+                            :refresh-key="refreshKeyNoConsolidate"
+                            :clickable="false"
+                            @rows-updated="(rows, total) => { categoryShareRows = rows; categoryShareTotal = total; }"
+                        />
+                        <RankingPanel
+                            v-else
+                            title="項目"
+                            :fetch-page="fetchItemsPage"
+                            :sort-options="breakdownSortOptions"
+                            :refresh-key="refreshKeyNoConsolidate"
+                            :clickable="false"
+                            @rows-updated="(rows, total) => { itemShareRows = rows; itemShareTotal = total; }"
+                        />
+                        <ShareCompositionBar
+                            v-if="detailTab === 'category'"
+                            title="分類別構成比"
+                            :rows="categoryShareRows"
+                            :total="categoryShareTotal"
+                        />
+                        <ShareCompositionBar
+                            v-else
+                            title="項目別構成比"
+                            :rows="itemShareRows"
+                            :total="itemShareTotal"
+                        />
+                    </div>
                 </div>
             </template>
         </div>
-    </AppLayout>
+    </SalesAnalysisShell>
 </template>

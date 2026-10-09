@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Models\UserMonthlyBreak;
 use App\Models\UserMonthlySchedule;
 use App\Models\Worktype;
+use App\Services\PersonalWorkSchedule;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -86,7 +87,7 @@ class ScheduleController extends Controller
         }
 
         return Inertia::render('Schedule/Index', [
-            'initialDate'        => now()->toDateString(),
+            'initialDate'        => $request->validate(['date' => ['nullable', 'date_format:Y-m-d']])['date'] ?? now()->toDateString(),
             'overlays'           => $overlays,
             'rooms'              => $rooms,
             'eventItemTypes'     => $eventItemTypes,
@@ -96,6 +97,7 @@ class ScheduleController extends Controller
             'worktypes'          => $worktypes,
             'dailyWorktypes'     => $dailyWorktypes,
             'defaultWorktype'    => $defaultWorktype,
+            'departmentWorkEnabled' => app(PersonalWorkSchedule::class)->available($user),
         ]);
     }
 

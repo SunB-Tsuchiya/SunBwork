@@ -16,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
+use App\Services\PersonalWorkSchedule;
 
 class CalendarController extends Controller
 {
@@ -161,6 +162,7 @@ class CalendarController extends Controller
             'defaultBreak'       => $defaultBreak,
             'defaultWorktype'    => $defaultWorktype,
             'calendarReminders'  => $calendarReminders,
+            'departmentWorkEnabled' => $user ? app(PersonalWorkSchedule::class)->available($user) : false,
         ]);
     }
 }

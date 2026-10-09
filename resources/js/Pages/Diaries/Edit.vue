@@ -2,6 +2,7 @@
 import useToasts from '@/Composables/useToasts';
 import { useDiaryAttachments } from '@/Composables/useDiaryAttachments';
 import TimelineDiary from '@/Components/TimelineDiary.vue';
+import DiaryWorkEntries from '@/Components/Diaries/DiaryWorkEntries.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { router, useForm, usePage } from '@inertiajs/vue3';
 import { QuillEditor } from '@vueup/vue-quill';
@@ -26,6 +27,8 @@ const props = defineProps({
     diary:      { type: Object, required: true },
     worktypes:  { type: Array,  default: () => [] },
     workRecord: { type: Object, default: null },
+    workCandidates: { type: Array, default: () => [] },
+    personalWorkEnabled: { type: Boolean, default: false },
 });
 const content = ref('');
 let editorInstance = null;
@@ -219,6 +222,7 @@ const form = useForm({
     end_time:     `${et.hour}:${et.minute}`,
     content:      content.value,
     attachment_ids: [],
+    work_entries: [],
 });
 
 function onWorktypeChange() {
@@ -528,6 +532,7 @@ const back = () => {
                         @ready="handleEditorReady"
                     />
                 </div>
+                <DiaryWorkEntries v-if="personalWorkEnabled" :candidates="workCandidates" v-model="form.work_entries" :errors="form.errors" />
                 <div class="mb-4">
                     <label class="mb-1 block text-sm font-medium text-gray-700">添付ファイル</label>
                     <input

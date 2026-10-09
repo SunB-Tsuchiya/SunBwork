@@ -2,6 +2,7 @@
 import useToasts from '@/Composables/useToasts';
 import { useDiaryAttachments } from '@/Composables/useDiaryAttachments';
 import TimelineDiary from '@/Components/TimelineDiary.vue';
+import DiaryWorkEntries from '@/Components/Diaries/DiaryWorkEntries.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { QuillEditor } from '@vueup/vue-quill';
@@ -27,6 +28,8 @@ const props = defineProps({
     date:              { type: String, default: '' },
     worktypes:         { type: Array,  default: () => [] },
     defaultWorktypeId: { type: Number, default: null },
+    workCandidates: { type: Array, default: () => [] },
+    personalWorkEnabled: { type: Boolean, default: false },
 });
 
 function parseTime(t) {
@@ -69,6 +72,7 @@ const form = useForm({
     content,
     attachment_ids: [],
     no_diary: false,
+    work_entries: [],
 });
 
 const { attachments, previewModal, openPreview, closePreview, uploadAndStage, removeAttachment, attachmentIds } = useDiaryAttachments();
@@ -347,6 +351,8 @@ function handleEditorReady(editor) {
 const { showToast, showValidationErrors } = useToasts();
 
 const submitWithoutDiary = () => {
+    const selectedWorkEntries = form.work_entries;
+    form.work_entries = [];
     form.start_time = `${form.start_hour}:${form.start_minute}`;
     form.end_time = `${form.end_hour}:${form.end_minute}`;
     form.no_diary = true;
@@ -355,7 +361,7 @@ const submitWithoutDiary = () => {
         onStart: () => {
             try { showToast('送信中...', 'info', 1000); } catch (e) {}
         },
-        onFinish: () => { form.no_diary = false; },
+        onFinish: () => { form.no_diary = false; form.work_entries = selectedWorkEntries; },
         onSuccess: () => {
             clearDraft();
             try { showToast('保存しました', 'success', 1500); } catch (e) {}
@@ -565,6 +571,7 @@ function applyPastDiary(rec) {
                             </div>
                         </div>
                     </div>
+                    <DiaryWorkEntries v-if="personalWorkEnabled" :candidates="workCandidates" v-model="form.work_entries" :errors="form.errors" />
                     <!-- <div class="mb-4">
           <label class="block text-sm font-medium text-gray-700 mb-1">入力内容がここに出ます（HTML）</label>
             <div class="p-2 bg-gray-100 border rounded min-h-[40px]">{{ stripHtml(form.content) }}</div>

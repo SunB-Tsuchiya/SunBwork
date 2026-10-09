@@ -481,6 +481,7 @@ class ProjectJobController extends Controller
                 'team_members.*.user_id' => 'required|integer|exists:users,id',
                 'image'                  => ['nullable', 'file', 'mimes:jpg,jpeg,png,gif,webp,heic,heif,pdf', 'max:20480'],
                 'tmp_ocr_image_path'     => ['nullable', 'string', 'max:500'],
+                'show_on_department_schedule' => 'boolean',
             ]);
 
             // 受注番号の重複は禁止ではなく警告。フロントの確認モーダルで承認された場合のみ通す
@@ -513,6 +514,7 @@ class ProjectJobController extends Controller
             }
 
             $data['company_id'] = $this->resolveActorCompanyId($request->user());
+            $data['show_on_department_schedule'] = $request->boolean('show_on_department_schedule', true);
 
             $job = ProjectJob::create($data);
 
@@ -1294,6 +1296,7 @@ class ProjectJobController extends Controller
                 'schedule'              => 'nullable|array',
                 'sub_coordinator_ids'   => 'nullable|array',
                 'sub_coordinator_ids.*' => 'exists:users,id',
+                'show_on_department_schedule' => 'boolean',
             ]);
 
             // store と同様、確認モーダルで承認された場合は重複を許可する
@@ -1307,6 +1310,9 @@ class ProjectJobController extends Controller
 
             $subIds = Arr::pull($data, 'sub_coordinator_ids', []);
             Arr::pull($data, 'schedule'); // project_jobs テーブルに schedule カラムなし
+            if ($request->exists('show_on_department_schedule')) {
+                $data['show_on_department_schedule'] = $request->boolean('show_on_department_schedule');
+            }
             $projectJob->update($data);
 
             // リーダー自身はピボットに入れない

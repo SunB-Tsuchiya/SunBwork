@@ -51,6 +51,18 @@ $registerSalesAnalysisRoutes = function () {
         Route::get('api/fiscal-year-items', [App\Http\Controllers\SalesAnalysis\FiscalYearAnalysisController::class, 'items'])->name('api.fiscal_year_items');
         Route::get('api/fiscal-year-multi-year-trend', [App\Http\Controllers\SalesAnalysis\FiscalYearAnalysisController::class, 'multiYearTrend'])->name('api.fiscal_year_multi_year_trend');
         Route::get('fiscal-year/export', [App\Http\Controllers\SalesAnalysis\FiscalYearAnalysisController::class, 'export'])->name('fiscal_year_analysis.export');
+        Route::get('api/fiscal-year-expenses', [App\Http\Controllers\SalesAnalysis\FiscalYearAnalysisController::class, 'expenses'])->name('api.fiscal_year_expenses');
+        Route::get('api/fiscal-year-expenses/vendors', [App\Http\Controllers\SalesAnalysis\FiscalYearAnalysisController::class, 'expenseVendors'])->name('api.fiscal_year_expenses.vendors');
+
+        // 部署別経費データ取込（新規。Phase 21）
+        Route::get('expense-import', [App\Http\Controllers\SalesAnalysis\ExpenseImportController::class, 'create'])->name('expense_import.create');
+        Route::post('expense-import/store', [App\Http\Controllers\SalesAnalysis\ExpenseImportController::class, 'store'])->name('expense_import.store');
+
+        // 経費比較（新規。Phase 22。部署×科目を選んで複数年推移・支払先の依存度を比較する）
+        Route::get('expense-comparison', [App\Http\Controllers\SalesAnalysis\ExpenseComparisonController::class, 'index'])->name('expense_comparison');
+        Route::get('api/expense-comparison/meta', [App\Http\Controllers\SalesAnalysis\ExpenseComparisonController::class, 'meta'])->name('api.expense_comparison.meta');
+        Route::get('api/expense-comparison/trend', [App\Http\Controllers\SalesAnalysis\ExpenseComparisonController::class, 'trend'])->name('api.expense_comparison.trend');
+        Route::get('api/expense-comparison/vendors', [App\Http\Controllers\SalesAnalysis\ExpenseComparisonController::class, 'vendors'])->name('api.expense_comparison.vendors');
 
         // 同月比較（新規。2026-09-04 Codexレビュー2回目 10.4節・PLAN1.md「6D. 同月比較 詳細設計」）
         Route::get('same-month-comparison', [App\Http\Controllers\SalesAnalysis\SameMonthComparisonController::class, 'index'])->name('same_month_comparison');
@@ -81,6 +93,10 @@ $registerSalesAnalysisRoutes = function () {
         Route::get('api/product-analysis/ranking-panel', [App\Http\Controllers\SalesAnalysis\ProductAnalysisController::class, 'rankingPanel'])->name('api.product_analysis.ranking_panel');
         Route::get('api/product-analysis/detail', [App\Http\Controllers\SalesAnalysis\ProductAnalysisController::class, 'detail'])->name('api.product_analysis.detail');
         Route::get('api/product-analysis/year-over-year', [App\Http\Controllers\SalesAnalysis\ProductAnalysisController::class, 'yearOverYear'])->name('api.product_analysis.year_over_year');
+
+        // 取込メニュー入口（新規。年度別データ取込・経費取込の2本のボタンがタブで分かれて
+        // 迷いやすいとの実機フィードバックを受け、1つの入口から選ぶ構成にした。2026-10-09）
+        Route::get('import-hub', [App\Http\Controllers\SalesAnalysis\ImportHubController::class, 'index'])->name('import_hub');
 
         Route::get('import', [App\Http\Controllers\SalesAnalysis\ImportController::class, 'create'])->name('import.create');
         Route::post('import/preview', [App\Http\Controllers\SalesAnalysis\ImportController::class, 'preview'])->name('import.preview');
@@ -1502,6 +1518,15 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
         // 予定表メインページ
         Route::get('/', [\App\Http\Controllers\Schedule\ScheduleController::class, 'index'])
             ->name('index');
+
+        Route::get('/department-work', [\App\Http\Controllers\Schedule\DepartmentWorkController::class, 'index'])->name('department_work.index');
+        Route::get('/department-work/options', [\App\Http\Controllers\Schedule\DepartmentWorkController::class, 'options'])->name('department_work.options');
+        Route::get('/department-work/mine', [\App\Http\Controllers\Schedule\DepartmentWorkController::class, 'mine'])->name('department_work.mine');
+        Route::get('/department-work/analysis', [\App\Http\Controllers\Schedule\DepartmentWorkController::class, 'analysis'])->name('department_work.analysis');
+        Route::get('/department-work/results', [\App\Http\Controllers\Schedule\DepartmentWorkController::class, 'analysisPage'])->name('department_work.results');
+        Route::post('/department-work', [\App\Http\Controllers\Schedule\DepartmentWorkController::class, 'store'])->name('department_work.store');
+        Route::put('/department-work/{entry}', [\App\Http\Controllers\Schedule\DepartmentWorkController::class, 'update'])->name('department_work.update');
+        Route::delete('/department-work/{entry}', [\App\Http\Controllers\Schedule\DepartmentWorkController::class, 'destroy'])->name('department_work.destroy');
 
         // 予定イベント CRUD
         Route::post('/events', [\App\Http\Controllers\Schedule\ScheduleEventController::class, 'store'])
