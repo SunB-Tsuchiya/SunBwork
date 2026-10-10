@@ -13,6 +13,8 @@ import UserDayView      from '@/Components/Calendar/UserDayView.vue';
 import { useCalendarCore } from '@/Components/Schedule/useCalendarCore.js';
 
 const props = defineProps({
+    initialDate:        { type: String, default: '' },
+    initialView:        { type: String, default: '' },
     eventItemTypes:     { type: Array,  default: () => [] },
     meetingDefinitions: { type: Array,  default: () => [] },
     rooms:              { type: Array,  default: () => [] },
@@ -30,7 +32,8 @@ const CSRF = () => document.querySelector('meta[name="csrf-token"]')?.getAttribu
 
 // ── ナビゲーション（共通コンポーザブル） ─────────────────────
 const { viewMode, currentDate, weekStart, viewYear, viewMonth, viewLabel, navigate, goToday, loadRange } =
-    useCalendarCore({ storageKey: 'user_calendar_view_mode' });
+    useCalendarCore({ storageKey: 'user_calendar_view_mode', initialDate: props.initialDate });
+if (props.initialView) viewMode.value = props.initialView;
 
 // ── イベントデータ ─────────────────────────────────────────────
 const companyEvents  = ref([]); // Schedule と共有（is_company_event=true）

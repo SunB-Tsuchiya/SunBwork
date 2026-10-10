@@ -22,9 +22,15 @@ class CalendarController extends Controller
 {
     use ResolvesContextCompany;
 
-    public function index()
+    public function index(Request $request)
     {
         $user = Auth::user();
+        $navigation = $request->validate([
+            'date' => ['nullable', 'date_format:Y-m-d'],
+            'view' => ['nullable', 'in:day,week,month'],
+        ]);
+        $initialDate = $navigation['date'] ?? '';
+        $initialView = $navigation['view'] ?? '';
 
         $worktypes       = [];
         $dailyWorktypes  = [];
@@ -151,6 +157,8 @@ class CalendarController extends Controller
 
         return Inertia::render('Calendar', [
             'user'               => $user,
+            'initialDate'        => $initialDate,
+            'initialView'        => $initialView,
             'eventItemTypes'     => $eventItemTypes,
             'meetingDefinitions' => $meetingDefinitions,
             'rooms'              => $rooms,

@@ -3,6 +3,7 @@ import useToasts from '@/Composables/useToasts';
 import { useDiaryAttachments } from '@/Composables/useDiaryAttachments';
 import TimelineDiary from '@/Components/TimelineDiary.vue';
 import DiaryWorkEntries from '@/Components/Diaries/DiaryWorkEntries.vue';
+import DiaryWorkReminder from '@/Components/Diaries/DiaryWorkReminder.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { QuillEditor } from '@vueup/vue-quill';
@@ -30,6 +31,7 @@ const props = defineProps({
     defaultWorktypeId: { type: Number, default: null },
     workCandidates: { type: Array, default: () => [] },
     personalWorkEnabled: { type: Boolean, default: false },
+    workReminder: { type: Object, default: null },
 });
 
 function parseTime(t) {
@@ -250,6 +252,12 @@ function onTimelineOpenCreate(payload) {
     } else {
         router.get(route('events.create', { date: form.date, return_to: returnTo }));
     }
+}
+
+function openWorkCalendar() {
+    if (!confirm('日報の未保存の入力内容は失われる場合があります。カレンダーへ移動しますか？')) return;
+    saveDraft();
+    router.get(route('calendar.index', { date: form.date, view: 'day' }));
 }
 
 function onTimelineOpenEdit(payload) {
@@ -555,6 +563,7 @@ function applyPastDiary(rec) {
                             </div>
                         </div>
                     </div>
+                    <DiaryWorkReminder v-if="personalWorkEnabled" :reminder="workReminder" @open-calendar="openWorkCalendar" />
                     <div class="mb-4">
                         <label class="mb-1 block text-sm font-medium text-gray-700">内容</label>
                         <div @drop.prevent="handleDrop" @dragover.prevent="handleDragOver" class="rounded border bg-white p-1">

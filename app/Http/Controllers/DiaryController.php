@@ -17,9 +17,48 @@ use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Log;
 use App\Services\AttachmentService;
+use App\Services\DiaryWorkEntries;
+use App\Services\PersonalWorkSchedule;
+use App\Services\WorkloadTrialAnalysis;
 
 class DiaryController extends Controller
 {
+    private function workReminder(User $user, string $date, array $candidates): ?array
+    {
+        $schedule = app(PersonalWorkSchedule::class);
+        if (! $schedule->available($user)) return null;
+
+        $unfinishedPlans = collect($candidates)
+            ->filter(fn ($row) => ! empty($row['entry_id']) && ! ($row['ready'] ?? false))
+            ->count();
+        $window = $schedule->workWindow($user, $date);
+        // 勤務形態が未設定の試用者は、A日程の7時間30分を目安として案内する。
+        $expectedMinutes = $window
+            ? max(0, $window['end'] - $window['start']
+                - max(0, min($window['end'], $window['break_end']) - max($window['start'], $window['break_start'])))
+            : 450;
+        $recordedMinutes = 0;
+        if ($expectedMinutes > 0 && $date <= now('Asia/Tokyo')->toDateString()) {
+            $day = Carbon::parse($date, 'Asia/Tokyo')->startOfDay();
+            $analysis = app(WorkloadTrialAnalysis::class)->analyze($user, collect([$user]), $day, $day);
+            $recordedMinutes = min($expectedMinutes, (int) ($window
+                ? ($analysis[0]['scheduled_covered_minutes'] ?? 0)
+                : ($analysis[0]['minutes'] ?? 0)));
+        }
+        $missingMinutes = $expectedMinutes > 0 && $date <= now('Asia/Tokyo')->toDateString()
+            ? $expectedMinutes - $recordedMinutes : 0;
+        if ($missingMinutes < 30 && $unfinishedPlans === 0) return null;
+
+        return [
+            'date' => $date,
+            'scheduled_minutes' => $expectedMinutes,
+            'recorded_minutes' => $recordedMinutes,
+            'missing_minutes' => $missingMinutes,
+            'unfinished_plans' => $unfinishedPlans,
+            'approximate' => $window === null,
+        ];
+    }
+
     public function index(Request $request)
     {
         $userId = Auth::id();
@@ -188,7 +227,7 @@ class DiaryController extends Controller
 
     public function create(Request $request)
     {
-        $date = $request->query('date', now()->toDateString());
+        $date = $request->validate(['date' => ['nullable', 'date_format:Y-m-d']])['date'] ?? now()->toDateString();
         $userId = Auth::id();
         $diary = Diary::where('user_id', $userId)->where('date', $date)->first();
         if ($diary) {
@@ -208,12 +247,15 @@ class DiaryController extends Controller
         $dailyWorktypeId   = \App\Models\UserMonthlySchedule::worktypeIdForDate($user->id, $date);
         $defaultWorktypeId = $dailyWorktypeId ?? $user->userSetting?->worktype_id;
 
+        $workCandidates = app(DiaryWorkEntries::class)->candidates($user, $date);
+
         return Inertia::render('Diaries/Create', [
             'date'               => $date,
             'worktypes'          => $worktypes,
             'defaultWorktypeId'  => $defaultWorktypeId,
-            'workCandidates'     => app(\App\Services\DiaryWorkEntries::class)->candidates($user, $date),
-            'personalWorkEnabled' => app(\App\Services\PersonalWorkSchedule::class)->available($user),
+            'workCandidates'     => $workCandidates,
+            'personalWorkEnabled' => app(PersonalWorkSchedule::class)->available($user),
+            'workReminder' => $this->workReminder($user, $date, $workCandidates),
         ]);
     }
 
@@ -377,6 +419,8 @@ class DiaryController extends Controller
             ? $diary->personalWorkEntries()->with('projectJob')->get()
             : [];
 
+        $workCandidates = app(DiaryWorkEntries::class)->candidates($user, $dateStr);
+
         return Inertia::render('Diaries/Edit', [
             'diary'       => $diaryArr,
             'worktypes'   => $worktypes,
@@ -385,8 +429,9 @@ class DiaryController extends Controller
                 'start_time'  => substr($workRecord->start_time ?? '', 0, 5),
                 'end_time'    => substr($workRecord->end_time   ?? '', 0, 5),
             ] : null,
-            'workCandidates' => app(\App\Services\DiaryWorkEntries::class)->candidates($user, $dateStr),
-            'personalWorkEnabled' => app(\App\Services\PersonalWorkSchedule::class)->available($user),
+            'workCandidates' => $workCandidates,
+            'personalWorkEnabled' => app(PersonalWorkSchedule::class)->available($user),
+            'workReminder' => $this->workReminder($user, $dateStr, $workCandidates),
         ]);
     }
 

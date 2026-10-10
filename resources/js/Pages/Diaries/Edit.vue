@@ -3,6 +3,7 @@ import useToasts from '@/Composables/useToasts';
 import { useDiaryAttachments } from '@/Composables/useDiaryAttachments';
 import TimelineDiary from '@/Components/TimelineDiary.vue';
 import DiaryWorkEntries from '@/Components/Diaries/DiaryWorkEntries.vue';
+import DiaryWorkReminder from '@/Components/Diaries/DiaryWorkReminder.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { router, useForm, usePage } from '@inertiajs/vue3';
 import { QuillEditor } from '@vueup/vue-quill';
@@ -29,6 +30,7 @@ const props = defineProps({
     workRecord: { type: Object, default: null },
     workCandidates: { type: Array, default: () => [] },
     personalWorkEnabled: { type: Boolean, default: false },
+    workReminder: { type: Object, default: null },
 });
 const content = ref('');
 let editorInstance = null;
@@ -121,6 +123,11 @@ function onTimelineOpenEdit(payload) {
     if (!payload || !payload.id) return;
     const returnTo = window.location.pathname + window.location.search;
     router.get(route('events.edit', { event: payload.id, return_to: returnTo }));
+}
+
+function openWorkCalendar() {
+    if (!confirm('日報の未保存の入力内容は失われる場合があります。カレンダーへ移動しますか？')) return;
+    router.get(route('calendar.index', { date: form.date, view: 'day' }));
 }
 
 function applyQuillJaTitles(editor) {
@@ -521,6 +528,7 @@ const back = () => {
                         </div>
                     </div>
                 </div>
+                <DiaryWorkReminder v-if="personalWorkEnabled" :reminder="workReminder" @open-calendar="openWorkCalendar" />
                 <div class="mb-4">
                     <label class="mb-1 block text-sm font-medium text-gray-700">内容</label>
                     <QuillEditor

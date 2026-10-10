@@ -213,6 +213,7 @@ class WorkloadTrialAnalysis
             $dayItems = $intervals[$id] ?? [];
             $totals = [];
             $minutes = 0;
+            $scheduledCoveredMinutes = 0;
             $basePoints = 0.0;
             $overtimePoints = 0.0;
             $unrecordedOvertime = 0;
@@ -222,6 +223,10 @@ class WorkloadTrialAnalysis
                 $ledger = $this->minuteLedger($items, $window);
                 if ($ledger['minutes'] > 0) $recordedDays++;
                 $minutes += $ledger['minutes'];
+                if ($window) {
+                    $scheduledCoveredMinutes += count(array_filter($ledger['covered'],
+                        fn ($minute) => $minute >= $window['start'] && $minute < $window['end']));
+                }
                 $basePoints += $ledger['points'];
                 foreach ($ledger['activities'] as $key => $activity) {
                     $totals[$key]['work_category'] = $activity['work_category'];
@@ -296,6 +301,7 @@ class WorkloadTrialAnalysis
             $people[] = [
                 'id' => $id, 'name' => $user->name, 'role' => PersonalWorkRole::forUser($user),
                 'minutes' => $minutes, 'base_points' => round($basePoints, 1),
+                'scheduled_covered_minutes' => $scheduledCoveredMinutes,
                 'overtime_points' => round($overtimePoints, 1),
                 'creation_points' => round($creationPoints, 1),
                 'management_points' => round($managementPoints, 1),

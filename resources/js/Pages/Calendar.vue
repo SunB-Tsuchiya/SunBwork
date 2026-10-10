@@ -5,6 +5,8 @@ import AppLayout    from '@/layouts/AppLayout.vue';
 
 defineProps({
     user:               { type: Object, default: null },
+    initialDate:        { type: String, default: '' },
+    initialView:        { type: String, default: '' },
     eventItemTypes:     { type: Array,  default: () => [] },
     meetingDefinitions: { type: Array,  default: () => [] },
     rooms:              { type: Array,  default: () => [] },
@@ -38,6 +40,8 @@ defineProps({
         </div>
 
         <UserCalendar
+            :initial-date="initialDate"
+            :initial-view="initialView"
             :event-item-types="eventItemTypes"
             :meeting-definitions="meetingDefinitions"
             :rooms="rooms"
