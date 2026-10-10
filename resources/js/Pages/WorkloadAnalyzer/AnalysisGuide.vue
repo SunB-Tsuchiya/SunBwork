@@ -3,6 +3,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
+const props = defineProps({ legacyArchive: { type: Boolean, default: false } });
 const page = usePage();
 const authUser = page?.props?.value?.auth?.user || page?.props?.value?.user || {};
 const userRole = authUser?.user_role || '';
@@ -20,7 +21,8 @@ const routeNamePrefix = (() => {
 })();
 
 const indexUrl    = computed(() => {
-    try { return route(`${routeNamePrefix}.workload_analyzer.index`); } catch (e) {}
+    try { return route(props.legacyArchive ? 'superadmin.workload_analyzer.archive'
+        : `${routeNamePrefix}.workload_analyzer.index`); } catch (e) {}
     return `${rolePrefix}/workload-analyzer`;
 });
 const settingsUrl = computed(() => {
@@ -39,6 +41,10 @@ const settingsUrl = computed(() => {
         </template>
 
         <Head title="作業量分析 — 分析ガイド" />
+
+        <div v-if="legacyArchive" class="mb-4 rounded border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+            このガイドは旧方式の説明です。旧方式は実態とのずれが確認され、現在の評価基準ではありません。
+        </div>
 
         <div class="space-y-6">
 
@@ -112,7 +118,7 @@ const settingsUrl = computed(() => {
                         </tbody>
                     </table>
                 </div>
-                <p class="mt-3 text-xs text-gray-500">
+                <p v-if="!legacyArchive" class="mt-3 text-xs text-gray-500">
                     ※ 各係数は「<Link :href="settingsUrl" class="text-blue-600 underline">作業量分析 設定</Link>」画面で調整可能です。
                 </p>
             </div>
@@ -341,7 +347,7 @@ const settingsUrl = computed(() => {
                             パーセンタイル変換後も同職種内では公平に評価されます。
                         </p>
                     </div>
-                    <div>
+                    <div v-if="!legacyArchive">
                         <p class="font-semibold text-gray-800">Q. 係数はどこで変更できる？</p>
                         <p class="mt-1 text-sm text-gray-600">
                             A.

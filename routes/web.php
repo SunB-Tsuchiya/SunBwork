@@ -648,6 +648,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified',
         Route::delete('/ai-presets/{ai_preset}', [\App\Http\Controllers\SuperAdmin\AiPresetsController::class, 'destroy'])->name('ai.presets.destroy');
         // SuperAdmin: Workload Analyzer (global)
         Route::get('workload-analyzer', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'index'])->name('workload_analyzer.index');
+        Route::get('workload-analyzer/archive', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'archive'])->name('workload_analyzer.archive');
         Route::get('workload-analyzer/category-rank', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'index'])->name('workload_analyzer.category_rank');
         Route::get('workload-analyzer/guide', [App\Http\Controllers\Leader\WorkloadAnalyzerController::class, 'guide'])->name('workload_analyzer.guide');
 
@@ -1524,6 +1525,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
         Route::get('/department-work/mine', [\App\Http\Controllers\Schedule\DepartmentWorkController::class, 'mine'])->name('department_work.mine');
         Route::get('/department-work/analysis', [\App\Http\Controllers\Schedule\DepartmentWorkController::class, 'analysis'])->name('department_work.analysis');
         Route::get('/department-work/results', [\App\Http\Controllers\Schedule\DepartmentWorkController::class, 'analysisPage'])->name('department_work.results');
+        Route::get('/department-work/details', [\App\Http\Controllers\Schedule\DepartmentWorkController::class, 'detailPage'])->name('department_work.details');
         Route::post('/department-work', [\App\Http\Controllers\Schedule\DepartmentWorkController::class, 'store'])->name('department_work.store');
         Route::put('/department-work/{entry}', [\App\Http\Controllers\Schedule\DepartmentWorkController::class, 'update'])->name('department_work.update');
         Route::delete('/department-work/{entry}', [\App\Http\Controllers\Schedule\DepartmentWorkController::class, 'destroy'])->name('department_work.destroy');

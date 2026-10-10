@@ -4,9 +4,10 @@ import { useUIState } from '@/Composables/useUIState';
 import { Inertia } from '@inertiajs/inertia';
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
-defineProps({
+const props = defineProps({
     // 期待する props: companies: [{ id, name, departments: [{ id, name, teams: [{ id, name, members: [{ id, name }] }] }] }]
     companies: { type: Array, default: () => [] },
+    legacyArchive: { type: Boolean, default: false },
 });
 // read selected_ym and auth user from server-provided props (defensive)
 const page = usePage();
@@ -228,6 +229,7 @@ function flattenDepartmentRows(dept) {
 }
 
 function onMemberRowClick(row) {
+    if (props.legacyArchive) return;
     const ym = selectedYm.value || currentMonth;
     const routeParams = { user: row.id, ym };
     // try named route via Ziggy; ensures the clicked month is preserved in the query string
@@ -324,10 +326,10 @@ function formatOvertimeMinutes(min) {
 </script>
 
 <template>
-    <AppLayout title="作業量分析">
+    <AppLayout :title="legacyArchive ? '旧方式アーカイブ' : '作業量分析'">
         <template #header>
             <div class="flex items-center gap-2.5">
-                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">作業量分析</h2>
+                <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">{{ legacyArchive ? '旧方式アーカイブ' : '作業量分析' }}</h2>
                 <span class="text-base text-gray-500">{{ selectedYmLabel }}</span>
             </div>
         </template>
@@ -370,7 +372,12 @@ function formatOvertimeMinutes(min) {
             </div>
         </template>
 
-        <Head title="作業量分析" />
+        <Head :title="legacyArchive ? '旧方式アーカイブ' : '作業量分析'" />
+
+        <div v-if="legacyArchive" class="mb-4 rounded border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+            <strong>旧方式の参照用画面です。</strong> ページ数を複数項目へ反映した旧算式で、現在のDBから再計算します。過去時点の固定記録ではありません。
+            <Link :href="route('schedule.department_work.details')" class="ml-2 font-semibold text-blue-700 underline">新しい作業量分析へ</Link>
+        </div>
 
         <div class="rounded bg-white px-4 py-6 sm:p-6 shadow">
             <h1 class="mb-4 text-xl font-semibold text-gray-800">総合ランキング</h1>
@@ -516,7 +523,7 @@ function formatOvertimeMinutes(min) {
                                             <!-- 総合モード -->
                                             <template v-if="viewMode === 'total'">
                                                 <template v-for="row in getDeptRows(dept)" :key="`m-${row.id}`">
-                                                    <tr class="cursor-pointer transition-colors hover:bg-green-50" @click="onMemberRowClick(row)">
+                                                    <tr :class="legacyArchive ? '' : 'cursor-pointer hover:bg-green-50'" class="transition-colors" @click="onMemberRowClick(row)">
                                                         <td style="width: 8%" class="px-6 py-4 text-sm font-medium text-gray-900">{{ row.rank }}</td>
                                                         <td
                                                             style="width: 14%"
@@ -580,7 +587,8 @@ function formatOvertimeMinutes(min) {
                                                     <tr
                                                         v-for="row in group.rows"
                                                         :key="`m-${row.id}`"
-                                                        class="cursor-pointer transition-colors hover:bg-green-50"
+                                                        :class="legacyArchive ? '' : 'cursor-pointer hover:bg-green-50'"
+                                                        class="transition-colors"
                                                         @click="onMemberRowClick(row)"
                                                     >
                                                         <td style="width: 8%" class="px-6 py-4 text-sm font-medium text-gray-900">{{ row.rank }}</td>

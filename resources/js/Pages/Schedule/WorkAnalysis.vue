@@ -154,6 +154,7 @@ onMounted(() => { load(); loadPlans(); });
             <span class="rounded-t border border-b-white bg-white px-4 py-2 text-sm font-semibold text-blue-700">作業実績の内訳</span>
             <Link :href="route('schedule.index', { date, tab: 'calendar' })" class="rounded-t px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100">共有予定</Link>
             <Link :href="route('calendar.index')" class="rounded-t px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100">カレンダー</Link>
+            <Link :href="route('schedule.department_work.details', { date })" class="rounded-t px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100">詳しい作業分析</Link>
         </div>
 
         <section class="rounded-lg bg-white p-4 shadow">

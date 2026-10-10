@@ -47,6 +47,7 @@ class WorkloadTrialAnalysis
                 'projectJob.coordinators:id',
                 'projectJob:id,title,company_id,user_id,show_on_department_schedule',
                 'sourceEvent.user:id,company_id',
+                'sourceEvent.projectJobAssignment:id,project_job_id,user_id,sender_id,job_type,stage_id,work_item_type_id',
                 'sourceEvent.projectJobAssignment.projectJob.coordinators:id',
                 'sourceEvent.projectJobAssignment.projectJob:id,title,company_id,user_id,show_on_department_schedule',
             ])->get()->filter(function (PersonalWorkEntry $entry) use ($viewer) {
@@ -73,7 +74,7 @@ class WorkloadTrialAnalysis
             })
             ->with([
                 'user:id,company_id', 'eventItemType:id,slug',
-                'projectJobAssignment:id,project_job_id,user_id,sender_id,job_type',
+                'projectJobAssignment:id,project_job_id,user_id,sender_id,job_type,stage_id,work_item_type_id',
                 'projectJobAssignment.projectJob.coordinators:id',
                 'projectJobAssignment.projectJob:id,title,company_id,user_id,show_on_department_schedule',
             ])->get();
@@ -85,6 +86,8 @@ class WorkloadTrialAnalysis
 
         $intervals = [];
         $recordKeys = [];
+        $sourceRecords = [];
+        $workUnits = [];
         $quickQuantities = [];
         foreach ($entries as $entry) {
             $user = $userById->get($entry->user_id);
@@ -101,6 +104,16 @@ class WorkloadTrialAnalysis
             if (! $range || $range[1] <= $range[0]) continue;
             $intervals[$entry->user_id][$date][] = $this->item($key, $range, $entry->work_category, $entry->activity_type);
             $recordKeys[$entry->user_id][$key] = true;
+            $assignment = $entry->sourceEvent?->projectJobAssignment;
+            $source = $assignment
+                ? ((int) $assignment->sender_id === (int) $entry->user_id ? 'my_job' : 'assigned_job')
+                : 'quick';
+            $sourceRecords[$entry->user_id][$source][$key] = true;
+            $reference = $assignment
+                ? $this->jobUnitReference($assignment)
+                : ($entry->project_job_id ? 'project-'.$entry->project_job_id
+                    : 'title-'.mb_strtolower(trim((string) ($entry->title ?: $entry->id))));
+            $workUnits[$entry->user_id][$date.'|'.$entry->work_category.'|'.$entry->activity_type.'|'.$reference] = true;
             if ($entry->actual_quantity !== null && filled($entry->actual_unit)) {
                 $group = $entry->work_category.'|'.$entry->activity_type;
                 $unit = trim($entry->actual_unit);
@@ -144,6 +157,12 @@ class WorkloadTrialAnalysis
                     $key = ($isJob ? 'job-' : 'meeting-').$event->id.'-'.$personId;
                     $intervals[$personId][$date][] = $this->item($key, $range, $category, $activity);
                     $recordKeys[$personId][$key] = true;
+                    $source = $isJob
+                        ? ((int) $assignment->sender_id === $personId ? 'my_job' : 'assigned_job')
+                        : 'meeting';
+                    $sourceRecords[$personId][$source][$key] = true;
+                    $reference = $isJob ? $this->jobUnitReference($assignment) : 'meeting-'.$event->id;
+                    $workUnits[$personId][$date.'|'.$category.'|'.$activity.'|'.$reference] = true;
                 }
             }
         }
@@ -313,6 +332,12 @@ class WorkloadTrialAnalysis
                 'legacy_created_projects' => $projects->where('creator_source', 'legacy_leader')->count(),
                 'records' => count($recordKeys[$id] ?? []),
                 'recorded_days' => $recordedDays,
+                'attendance_days' => $workRecords->get($id, collect())
+                    ->filter(fn ($row) => filled($row->start_time) && filled($row->end_time))
+                    ->unique(fn ($row) => $row->date->toDateString())->count(),
+                'source_counts' => collect($sourceRecords[$id] ?? [])
+                    ->map(fn ($records) => count($records))->all(),
+                'work_units' => count($workUnits[$id] ?? []),
                 'activities' => $activities,
             ];
         }
@@ -324,6 +349,13 @@ class WorkloadTrialAnalysis
         return ['key' => $key, 'from' => max(0, $range[0]), 'to' => min(1440, $range[1]),
             'work_category' => $category, 'activity_type' => $activity,
             'coefficient' => PersonalWorkPoints::coefficient($activity)];
+    }
+
+    private function jobUnitReference($assignment): string
+    {
+        return 'job-'.($assignment->project_job_id ?: 'assignment-'.$assignment->id)
+            .'-stage-'.($assignment->stage_id ?: 'none')
+            .'-type-'.($assignment->work_item_type_id ?: 'none');
     }
 
     private function minuteLedger(array $items, ?array $window): array

@@ -31,6 +31,25 @@ class WorkloadAnalyzerController extends Controller
 
     public function index(Request $request)
     {
+        if ($request->routeIs('superadmin.workload_analyzer.index')
+            && app(\App\Services\PersonalWorkSchedule::class)->available($request->user())) {
+            return redirect()->route('schedule.department_work.details');
+        }
+
+        return $this->legacyIndex($request,
+            $request->routeIs('superadmin.workload_analyzer.category_rank')
+                && app(\App\Services\PersonalWorkSchedule::class)->available($request->user()));
+    }
+
+    public function archive(Request $request)
+    {
+        abort_unless(app(\App\Services\PersonalWorkSchedule::class)->available($request->user()), 403);
+
+        return $this->legacyIndex($request, true);
+    }
+
+    private function legacyIndex(Request $request, bool $archive = false)
+    {
         $this->requireAdminPermission('workload_analysis');
         $this->requireLeaderPermission('workload_analysis');
         // month selection: expect query param 'ym' as YYYY-MM or use current month
@@ -682,6 +701,7 @@ class WorkloadAnalyzerController extends Controller
         return Inertia::render($component, [
             'companies' => $companiesArray ?? [],
             'selected_ym' => $ym,
+            'legacyArchive' => $archive,
         ]);
     }
 
@@ -1825,7 +1845,10 @@ class WorkloadAnalyzerController extends Controller
         $this->requireAdminPermission('workload_analysis');
         $this->requireLeaderPermission('workload_analysis');
 
-        return Inertia::render('WorkloadAnalyzer/AnalysisGuide');
+        return Inertia::render('WorkloadAnalyzer/AnalysisGuide', [
+            'legacyArchive' => $request->routeIs('superadmin.workload_analyzer.guide')
+                && app(\App\Services\PersonalWorkSchedule::class)->available($request->user()),
+        ]);
     }
 
     /**

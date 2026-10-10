@@ -31,6 +31,14 @@ class DepartmentWorkController extends Controller
         return Inertia::render('Schedule/WorkAnalysis', ['initialDate' => $date]);
     }
 
+    public function detailPage(Request $request)
+    {
+        abort_unless($this->schedule->available($request->user()), 403);
+        $date = $request->validate(['date' => ['nullable', 'date_format:Y-m-d']])['date'] ?? now()->toDateString();
+
+        return Inertia::render('Schedule/WorkDetailAnalysis', ['initialDate' => $date]);
+    }
+
     public function index(Request $request)
     {
         $viewer = $request->user();
@@ -247,27 +255,36 @@ class DepartmentWorkController extends Controller
         abort_unless($this->schedule->available($viewer), 403);
         $params = $request->validate([
             'date' => ['required', 'date_format:Y-m-d'],
-            'period' => ['required', Rule::in(['day', 'week', 'month'])],
+            'period' => ['required', Rule::in(['day', 'week', 'month', 'quarter'])],
         ]);
         $day = Carbon::createFromFormat('!Y-m-d', $params['date'], 'Asia/Tokyo');
         $start = match ($params['period']) {
             'week' => $day->copy()->startOfWeek(),
             'month' => $day->copy()->startOfMonth(),
+            'quarter' => $day->copy()->startOfMonth()->subMonths(2),
             default => $day->copy(),
         };
         $end = match ($params['period']) {
             'week' => $day->copy()->endOfWeek(),
             'month' => $day->copy()->endOfMonth(),
+            'quarter' => $day->copy()->endOfMonth(),
             default => $day->copy(),
         };
-        $users = User::where('company_id', $viewer->company_id)
+        $allUsers = User::where('company_id', $viewer->company_id)
             ->where('department_id', $viewer->department_id)
-            ->with(['assignment:id,code,name', 'userSetting'])->ordered()
-            ->get(['id', 'name', 'user_role', 'assignment_id', 'sort_order']);
+            ->with(['assignment:id,code,name', 'userSetting', 'employmentSetting'])->ordered()
+            ->get(['id', 'name', 'user_role', 'assignment_id', 'sort_order', 'employment_type']);
+        $users = $allUsers->filter(function (User $user) {
+            $default = in_array($user->employment_type ?? 'regular', ['regular', 'contract'], true);
+            return ($user->employmentSetting?->ranking_included ?? $default)
+                && ($user->employmentSetting?->workload_tracked ?? $default);
+        })->values();
 
         return response()->json([
             'period' => $params['period'],
             'start' => $start->toDateString(), 'end' => $end->toDateString(),
+            'excluded_count' => $allUsers->count() - $users->count(),
+            'score_version' => 'trial_time_v1',
             'point_rule' => [
                 'points_per_hour' => PersonalWorkPoints::POINTS_PER_HOUR,
                 'default_coefficient' => PersonalWorkPoints::DEFAULT_COEFFICIENT,

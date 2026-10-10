@@ -8,6 +8,7 @@ import { computed, ref } from 'vue';
 const props = defineProps({
     companies: { type: Array, default: () => [] },
     selected_ym: { type: String, default: '' },
+    legacyArchive: { type: Boolean, default: false },
 });
 
 const page = usePage();
@@ -54,7 +55,8 @@ function changeYm() {
 function goToOverallRank() {
     const ym = selectedYm.value || currentMonth;
     try {
-        Inertia.get(route(`${routeNamePrefix}.workload_analyzer.index`, { ym }));
+        Inertia.get(route(props.legacyArchive ? 'superadmin.workload_analyzer.archive'
+            : `${routeNamePrefix}.workload_analyzer.index`, { ym }));
         return;
     } catch (e) {}
     window.location.href = `${rolePrefix}/workload-analyzer?ym=${ym}`;
@@ -183,7 +185,7 @@ const rankBadgeClass = (rank) => {
         <template #header>
             <div class="flex items-center gap-3">
                 <Link
-                    :href="(() => { try { return route(`${routeNamePrefix}.workload_analyzer.index`); } catch(e) { return `${rolePrefix}/workload-analyzer`; } })()"
+                    :href="(() => { try { return route(props.legacyArchive ? 'superadmin.workload_analyzer.archive' : `${routeNamePrefix}.workload_analyzer.index`); } catch(e) { return `${rolePrefix}/workload-analyzer`; } })()"
                     class="rounded bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 whitespace-nowrap hover:bg-gray-300"
                 >← 作業量分析に戻る</Link>
                 <h2 class="text-base sm:text-xl font-semibold leading-tight text-gray-800">作業量分析 — カテゴリ別ランク</h2>

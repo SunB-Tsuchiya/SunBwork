@@ -206,6 +206,7 @@ const getTopTabActive = () => {
         if (r.includes('teams')) return 'teams';
         if (r.includes('clients')) return 'clients';
         if (r.includes('workload_setting')) return 'workload_setting';
+        if (r === 'schedule.department_work.details') return 'workload';
         if (r.includes('workload_analyzer')) return 'workload';
         if (r.includes('project_jobs')) return 'project_jobs';
         if (r.includes('diaryinteractions') || r.includes('diaries')) return 'diaries';
