@@ -14,6 +14,9 @@ class ProjectJob extends Model
         'jobcode',
         'title',
         'user_id',
+        'created_by_user_id',
+        'creator_source',
+        'creation_method',
         'client_id',
         'company_id',
         'detail',
@@ -63,6 +66,11 @@ class ProjectJob extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by_user_id');
     }
 
     // サブリーダー（リーダー以外の共同管理者）

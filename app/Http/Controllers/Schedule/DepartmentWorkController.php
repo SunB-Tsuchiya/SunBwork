@@ -9,6 +9,7 @@ use App\Models\ProjectJobAssignment;
 use App\Models\ProgressCell;
 use App\Models\User;
 use App\Services\PersonalWorkSchedule;
+use App\Services\WorkloadTrialAnalysis;
 use App\Support\PersonalWorkActivities;
 use App\Support\PersonalWorkPoints;
 use App\Support\PersonalWorkRole;
@@ -20,7 +21,7 @@ use Inertia\Inertia;
 
 class DepartmentWorkController extends Controller
 {
-    public function __construct(private PersonalWorkSchedule $schedule) {}
+    public function __construct(private PersonalWorkSchedule $schedule, private WorkloadTrialAnalysis $trial) {}
 
     public function analysisPage(Request $request)
     {
@@ -261,57 +262,9 @@ class DepartmentWorkController extends Controller
         };
         $users = User::where('company_id', $viewer->company_id)
             ->where('department_id', $viewer->department_id)
-            ->with('assignment:id,code,name')->ordered()->get(['id', 'name', 'user_role', 'assignment_id', 'sort_order']);
-        $entries = PersonalWorkEntry::where('company_id', $viewer->company_id)
-            ->where('department_id', $viewer->department_id)
-            ->whereIn('user_id', $users->pluck('id'))
-            ->whereBetween('work_date', [$start->toDateString(), $end->toDateString()])
-            ->where('actual_minutes', '>', 0)
-            ->whereNotNull('activity_type')->where('activity_type', '!=', '')
-            ->whereNotNull('result_note')->whereRaw('TRIM(result_note) <> ?', [''])
-            ->with([
-                'projectJob.coordinators:id', 'projectJob:id,title,company_id,user_id,show_on_department_schedule',
-                'sourceEvent.user:id,company_id',
-                'sourceEvent.projectJobAssignment.projectJob.coordinators:id',
-                'sourceEvent.projectJobAssignment.projectJob:id,title,company_id,user_id,show_on_department_schedule',
-            ])
-            ->get()->filter(function (PersonalWorkEntry $entry) use ($viewer) {
-                if ($entry->source_event_id) {
-                    if (! $entry->sourceEvent) return false;
-                    return ! $this->schedule->eventForViewer(
-                        $entry->sourceEvent, $viewer, $entry->work_date->toDateString(), (int) $entry->user_id, $entry
-                    )['private'];
-                }
-                return ! $this->schedule->entryForViewer($entry, $viewer)['private'];
-            })->filter(fn (PersonalWorkEntry $entry) => PersonalWorkPoints::points($entry) > 0);
+            ->with(['assignment:id,code,name', 'userSetting'])->ordered()
+            ->get(['id', 'name', 'user_role', 'assignment_id', 'sort_order']);
 
-        $people = $users->map(function (User $user) use ($entries) {
-            $own = $entries->where('user_id', $user->id);
-            $activities = $own->groupBy(fn ($entry) => $entry->work_category.'|'.($entry->activity_type ?: 'legacy'))
-                ->map(function ($group) {
-                    $first = $group->first();
-                    return [
-                        'work_category' => $first->work_category,
-                        'activity_type' => $first->activity_type,
-                        'minutes' => $group->sum('actual_minutes'),
-                        'points' => round($group->sum(fn ($entry) => PersonalWorkPoints::points($entry)), 1),
-                        'coefficient' => PersonalWorkPoints::coefficient($first->activity_type),
-                        'records' => $group->count(),
-                        'days' => $group->pluck('work_date')->map(fn ($date) => $date->toDateString())->unique()->count(),
-                        'quantities' => $group->filter(fn ($entry) => $entry->actual_quantity !== null && filled($entry->actual_unit))
-                            ->groupBy('actual_unit')->map(fn ($unitRows) => $unitRows->sum('actual_quantity')),
-                    ];
-                })->values();
-            return [
-                'id' => $user->id, 'name' => $user->name,
-                'role' => PersonalWorkRole::forUser($user),
-                'minutes' => $own->sum('actual_minutes'),
-                'points' => round($own->sum(fn ($entry) => PersonalWorkPoints::points($entry)), 1),
-                'records' => $own->count(),
-                'recorded_days' => $own->pluck('work_date')->map(fn ($date) => $date->toDateString())->unique()->count(),
-                'activities' => $activities,
-            ];
-        });
         return response()->json([
             'period' => $params['period'],
             'start' => $start->toDateString(), 'end' => $end->toDateString(),
@@ -319,8 +272,13 @@ class DepartmentWorkController extends Controller
                 'points_per_hour' => PersonalWorkPoints::POINTS_PER_HOUR,
                 'default_coefficient' => PersonalWorkPoints::DEFAULT_COEFFICIENT,
                 'coefficients' => PersonalWorkPoints::COEFFICIENTS,
+                'creation_points' => WorkloadTrialAnalysis::CREATION_POINTS,
+                'overtime_first_three_hours' => WorkloadTrialAnalysis::OVERTIME_BONUS_FIRST_THREE_HOURS,
+                'overtime_after_three_hours' => WorkloadTrialAnalysis::OVERTIME_BONUS_AFTER_THREE_HOURS,
+                'management_points_per_active_day' => WorkloadTrialAnalysis::MANAGEMENT_POINTS_PER_ACTIVE_DAY,
+                'deputy_factor' => WorkloadTrialAnalysis::DEPUTY_FACTOR,
             ],
-            'people' => $people,
+            'people' => $this->trial->analyze($viewer, $users, $start, $end),
         ]);
     }
 

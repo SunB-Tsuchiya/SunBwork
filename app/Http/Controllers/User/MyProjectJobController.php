@@ -556,6 +556,9 @@ class MyProjectJobController extends Controller
                 'detail' => 'nullable|string',
             ]);
             // detailはプレーンテキストで保存
+            $data['created_by_user_id'] = $request->user()->id;
+            $data['creator_source'] = 'recorded_actor';
+            $data['creation_method'] = 'manual';
             $job = ProjectJob::create($data);
             // 新規作成時はメンバー/スケジュール未設定のため案内を出す
             $registerFlags = ['teammember', 'schedule'];

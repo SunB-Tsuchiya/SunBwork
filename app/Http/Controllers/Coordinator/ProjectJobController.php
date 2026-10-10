@@ -159,6 +159,9 @@ class ProjectJobController extends Controller
             ]);
             $data['title']   = 'コピー - ' . $projectJob->title;
             $data['jobcode'] = null;
+            $data['created_by_user_id'] = $user->id;
+            $data['creator_source'] = 'recorded_actor';
+            $data['creation_method'] = 'clone';
             Arr::pull($data, 'schedule'); // さくら本番: project_jobs.schedule カラムなし
 
             $newJob = ProjectJob::create($data);
@@ -361,11 +364,14 @@ class ProjectJobController extends Controller
         }
 
         $newJob = null;
-        DB::transaction(function () use ($projectJob, $targetUser, &$newJob) {
+        DB::transaction(function () use ($projectJob, $targetUser, $user, &$newJob) {
             $newJob = ProjectJob::create([
                 'jobcode'           => $projectJob->jobcode,
                 'title'             => $projectJob->title,
                 'user_id'           => $targetUser->id,
+                'created_by_user_id' => $user->id,
+                'creator_source'     => 'recorded_actor',
+                'creation_method'    => 'share',
                 'client_id'         => $projectJob->client_id,
                 'company_id'        => $targetUser->company_id,
                 'size_id'           => $projectJob->size_id,
@@ -515,6 +521,9 @@ class ProjectJobController extends Controller
 
             $data['company_id'] = $this->resolveActorCompanyId($request->user());
             $data['show_on_department_schedule'] = $request->boolean('show_on_department_schedule', true);
+            $data['created_by_user_id'] = $request->user()->id;
+            $data['creator_source'] = 'recorded_actor';
+            $data['creation_method'] = 'manual';
 
             $job = ProjectJob::create($data);
 
@@ -573,6 +582,9 @@ class ProjectJobController extends Controller
             'title'      => $data['title'],
             'jobcode'    => $data['jobcode'] ?? null,
             'user_id'    => $fixed['user_id']    ?? $data['user_id']    ?? null,
+            'created_by_user_id' => $actor->id,
+            'creator_source' => 'recorded_actor',
+            'creation_method' => 'template',
             'client_id'  => $fixed['client_id']  ?? $data['client_id']  ?? null,
             'company_id' => $companyId,
             'size_id'    => $fixed['size_id']    ?? $data['size_id']    ?? null,

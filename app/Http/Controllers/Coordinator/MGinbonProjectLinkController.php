@@ -25,6 +25,9 @@ class MGinbonProjectLinkController extends Controller
                 'title' => "{$project->year}年 銀本制作",
                 'detail' => 'MGinbon（中学入試問題集）専用のJobBox・カレンダー連携案件',
                 'user_id' => $request->user()?->id,
+                'created_by_user_id' => $request->user()?->id,
+                'creator_source' => $request->user() ? 'recorded_actor' : null,
+                'creation_method' => 'ginbon',
                 'company_id' => $companyId,
                 'completed' => false,
             ]);

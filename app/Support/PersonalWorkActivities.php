@@ -8,6 +8,12 @@ class PersonalWorkActivities
     public const TEXT_COLOR = '#831843';
     public const BORDER_COLOR = '#f472b6';
 
+    public const COMMON = [
+        'intake_allocation' => '受付・差配',
+        'preparation_specs' => '準備・仕様整理',
+        'internal_improvement' => '社内改善・システム開発',
+    ];
+
     public const GROUPS = [
         'dtp' => [
             'new_creation' => '新規作成', 'revision' => '修正',
@@ -36,11 +42,16 @@ class PersonalWorkActivities
 
     public static function codes(): array
     {
-        return array_values(array_unique(array_merge(...array_values(array_map('array_keys', self::GROUPS)))));
+        return array_values(array_unique(array_merge(
+            array_keys(self::COMMON),
+            ...array_values(array_map('array_keys', self::GROUPS))
+        )));
     }
 
     public static function allows(string $category, ?string $type): bool
     {
-        return $type === null || $type === '' || array_key_exists($type, self::GROUPS[$category] ?? []);
+        return $type === null || $type === ''
+            || array_key_exists($type, self::COMMON)
+            || array_key_exists($type, self::GROUPS[$category] ?? []);
     }
 }

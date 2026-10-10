@@ -19,6 +19,7 @@
 - 作業種類は朝の簡易予定では任意、帰りに日報へ取り込む行では必須。`jimu`（事務）を大区分に加え、Clerk 権限者も兼務する組版・校正等へ区分を切り替えられる。事務は伝票チェック・書類作成・書類処理等、校正の修正は重・軽を選ぶ。簡易予定の作業時間はカレンダーの時間枠から計算し、既存ジョブ予定・予定外作業の実績時間は日報で入力する。作業実績の内訳は予定表の独立ページ `schedule.department_work.results` で日・月曜始まりの週・暦月を切り替える。日表示には結果未入力の予定を別欄で示し、実績合計へ加えない。分析 API は `schedule.department_work.analysis`、予定欄は部署限定の既存 API を使う。
 - 情報出版に所属する Clerk の専用カレンダーには、共通の個人カレンダー（簡易作業入力）と部署の作業・実績へのリンクを表示する。大区分の初期値は本人が最近使った種類を優先し、履歴がない Clerk は事務を初期値にする。権限・担当で選択肢を制限しない。
 - 関連実装: `app/Services/PersonalWorkSchedule.php`、`app/Services/DiaryWorkEntries.php`、`app/Support/PersonalWorkActivities.php`、`app/Http/Controllers/Schedule/DepartmentWorkController.php`、`app/Models/PersonalWorkEntry.php`、`resources/js/Components/Schedule/DepartmentWorkBoard.vue`。本番適用時は3件の migration を実行する。
+- 試験分析では `WorkloadTrialAnalysis` が過去のジョブ予定・仕事の会議と簡易結果を時間で統合し、重複と昼休憩を除く。登録者・作成方法の2件の migration も必要。試験点の算式は `CONSOLIDATED_07_workload_and_handover.md` を参照。
 
 ---
 

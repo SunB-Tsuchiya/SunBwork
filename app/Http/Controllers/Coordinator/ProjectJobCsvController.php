@@ -148,6 +148,9 @@ class ProjectJobCsvController extends Controller
 
             $inserts[] = [
                 'user_id'      => $userId,
+                'created_by_user_id' => $userId,
+                'creator_source' => 'recorded_actor',
+                'creation_method' => 'csv',
                 'jobcode'      => $jc,
                 'title'        => $row['title'],
                 'client_id'    => !empty($row['client_id'])    ? (int) $row['client_id']    : null,

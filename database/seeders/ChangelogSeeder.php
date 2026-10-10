@@ -7,6 +7,18 @@ use Illuminate\Database\Seeder;
 
 class ChangelogSeeder extends Seeder
 {
+    public function seedWorkloadTrialRebuild(): void
+    {
+        Changelog::updateOrCreate(['version' => 'workload-trial-rebuild-1'], [
+            'title' => '情報出版の作業実績分析に過去のジョブ・会議・案件負担を試験的に統合',
+            'released_at' => '2026-10-10',
+            'summary' => '作業実績の内訳で、簡易記録に加えて過去のジョブ予定、仕事の会議、記録のある残業、案件登録と管理負担を試験的に集計します。追加点は切り替えて順位を比較できます。',
+            'design_files' => ['z_instructions/WORKLOAD_REBUILD_PLAN1.md'],
+            'claude_notes' => 'Codex実装。project_jobsに登録者・補完元・作成方法を追加。過去案件の登録者は現リーダーで推定。作業時間は校正イベントのUTCをJSTへ解決し、昼休憩と予定重複を除いて集計。残業追加点は勤務記録と作業記録の重なる時間のみ、案件管理点は直近14日のチーム作業を条件とする。実データで係数を校正する試用段階で、SuperAdminかつINFO所属だけに表示。',
+            'body' => '<section class="cl-feature"><h3>試験分析</h3><ul><li>マイジョブ・依頼ジョブ・簡易作業・仕事の会議を同じ時間軸で集計</li><li>残業・案件登録・案件管理の点数を分けて表示し、順位への算入を切替可能</li><li>複製・一括取込で作った案件も通常作成と同じ登録点</li><li>ページ数・サイズ・難易度は総合点に使わない</li></ul></section>',
+        ]);
+    }
+
     public function seedMGinbonFilenameBulk(): void
     {
         Changelog::updateOrCreate(['version' => 'mginbon-filename-bulk-1'], [
@@ -141,6 +153,7 @@ class ChangelogSeeder extends Seeder
 
     public function run(): void
     {
+        $this->seedWorkloadTrialRebuild();
         $this->seedMGinbonFilenameBulk();
         $this->seedMGinbonSmartSearch();
         $this->seedMGinbonCompositionOutsource();

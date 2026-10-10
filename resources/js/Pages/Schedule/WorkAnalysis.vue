@@ -15,6 +15,9 @@ const range = ref('');
 const loading = ref(false);
 const error = ref('');
 const pointRule = ref({ points_per_hour: 10, default_coefficient: 1, coefficients: {} });
+const includeCreation = ref(true);
+const includeOvertime = ref(true);
+const includeManagement = ref(true);
 const plannedPeople = ref([]);
 const planLoading = ref(false);
 const planError = ref('');
@@ -49,17 +52,22 @@ const plannedChipStyle = (item) => chipStyle(item.private
 const duration = (minutes) => `${Math.floor(minutes / 60)}時間${minutes % 60 ? `${minutes % 60}分` : ''}`;
 const totalRecords = computed(() => people.value.reduce((sum, person) => sum + Number(person.records || 0), 0));
 const totalMinutes = computed(() => people.value.reduce((sum, person) => sum + Number(person.minutes || 0), 0));
-const totalPoints = computed(() => people.value.reduce((sum, person) => sum + Number(person.points || 0), 0));
+const visiblePoints = (person) => Number(person.base_points || 0)
+    + (includeOvertime.value ? Number(person.overtime_points || 0) : 0)
+    + (includeCreation.value ? Number(person.creation_points || 0) : 0)
+    + (includeManagement.value ? Number(person.management_points || 0) : 0);
+const totalPoints = computed(() => people.value.reduce((sum, person) => sum + visiblePoints(person), 0));
+const totalCreatedProjects = computed(() => people.value.reduce((sum, person) => sum + Number(person.created_projects || 0), 0));
+const totalUnrecordedOvertime = computed(() => people.value.reduce((sum, person) => sum + Number(person.unrecorded_overtime_minutes || 0), 0));
 const recordedPeople = computed(() => people.value.filter((person) => Number(person.records || 0) > 0).length);
 const maxPersonMinutes = computed(() => Math.max(1, ...people.value.map((person) => Number(person.minutes || 0))));
 const pointRows = computed(() => {
-    const rows = [...people.value].sort((a, b) => Number(b.points || 0) - Number(a.points || 0) || a.name.localeCompare(b.name, 'ja'));
-    const max = Math.max(1, ...rows.map((row) => Number(row.points || 0)));
-    return rows.map((row) => ({ ...row, width: `${(Number(row.points || 0) / max) * 100}%` }));
+    const rows = [...people.value].sort((a, b) => visiblePoints(b) - visiblePoints(a) || a.name.localeCompare(b.name, 'ja'));
+    const max = Math.max(1, ...rows.map((row) => visiblePoints(row)));
+    return rows.map((row) => ({ ...row, width: `${(visiblePoints(row) / max) * 100}%` }));
 });
 const pointLabel = (value) => Number(value || 0).toFixed(1);
 const selectedActivityKey = ref('');
-const rankingMetric = ref('minutes');
 const activityKey = (activity) => `${activity.work_category}|${activity.activity_type || 'legacy'}`;
 const activityOptions = computed(() => {
     const options = new Map();
@@ -75,20 +83,13 @@ const activityOptions = computed(() => {
     return [...options.values()];
 });
 const selectedActivity = computed(() => activityOptions.value.find((option) => option.key === selectedActivityKey.value) || activityOptions.value[0]);
-const quantityUnits = computed(() => [...new Set(people.value.flatMap((person) => {
-    const activity = (person.activities || []).find((row) => activityKey(row) === selectedActivity.value?.key);
-    return Object.keys(activity?.quantities || {});
-}))]);
-const selectedMetric = computed(() => rankingMetric.value.startsWith('unit:') && quantityUnits.value.includes(rankingMetric.value.slice(5))
-    ? rankingMetric.value : 'minutes');
 const rankingRows = computed(() => {
     if (!selectedActivity.value) return [];
     const rows = people.value.map((person) => {
         const activity = (person.activities || []).find((row) => activityKey(row) === selectedActivity.value.key);
-        const unit = selectedMetric.value.startsWith('unit:') ? selectedMetric.value.slice(5) : null;
         return { id: person.id, name: person.name, role: person.role, minutes: Number(activity?.minutes || 0),
             records: Number(activity?.records || 0), quantities: activity?.quantities || {},
-            value: unit ? Number(activity?.quantities?.[unit] || 0) : Number(activity?.minutes || 0) };
+            value: Number(activity?.minutes || 0) };
     }).sort((a, b) => b.value - a.value || a.name.localeCompare(b.name, 'ja'));
     const max = Math.max(1, ...rows.map((row) => row.value));
     return rows.map((row) => ({ ...row, width: `${(row.value / max) * 100}%` }));
@@ -100,7 +101,6 @@ const categorySegments = (person) => Object.entries((person.activities || []).re
 watch(activityOptions, (options) => {
     if (!options.some((option) => option.key === selectedActivityKey.value)) selectedActivityKey.value = options[0]?.key || '';
 });
-watch(selectedActivityKey, () => { rankingMetric.value = 'minutes'; });
 const rangeLabel = computed(() => range.value || date.value);
 const pendingPlans = (personId) => plannedPeople.value.find((person) => person.id === personId)?.items
     ?.filter((item) => !item.result_note) || [];
@@ -160,7 +160,7 @@ onMounted(() => { load(); loadPlans(); });
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h3 class="font-semibold">作業実績の内訳</h3>
-                    <p class="mt-1 text-xs text-gray-500">記録された結果を集計します。未記録は作業ゼロを意味しません。非公開の作業は本人以外の内訳に含めません。</p>
+                    <p class="mt-1 text-xs text-gray-500">結果を記録した簡易作業と、過去のジョブ・仕事の会議を集計します。未記録は作業ゼロを意味しません。非公開の作業は本人以外の内訳に含めません。</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2 text-sm">
                     <input v-model="date" type="date" aria-label="集計日" class="rounded border px-2 py-1" />
@@ -171,12 +171,14 @@ onMounted(() => { load(); loadPlans(); });
             </div>
             <p class="mt-2 text-xs text-gray-500">対象：{{ rangeLabel }} <span v-if="loading">読み込み中...</span></p>
             <p v-if="error" class="mt-2 text-sm text-red-700" role="alert">{{ error }}</p>
-            <div v-else class="mt-4 grid gap-3 sm:grid-cols-3">
+            <div v-else class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 <div class="rounded border bg-slate-50 p-3"><div class="text-xs text-gray-600">結果を記録した人</div><div class="text-xl font-semibold">{{ recordedPeople }} / {{ people.length }}人</div></div>
                 <div class="rounded border bg-slate-50 p-3"><div class="text-xs text-gray-600">認定実績</div><div class="text-xl font-semibold">{{ totalRecords }}件</div></div>
                 <div class="rounded border bg-slate-50 p-3"><div class="text-xs text-gray-600">記録された作業時間</div><div class="text-xl font-semibold">{{ duration(totalMinutes) }}</div></div>
+                <div class="rounded border bg-slate-50 p-3"><div class="text-xs text-gray-600">案件登録</div><div class="text-xl font-semibold">{{ totalCreatedProjects }}件</div></div>
+                <div class="rounded border bg-slate-50 p-3"><div class="text-xs text-gray-600">作業記録のない残業</div><div class="text-xl font-semibold">{{ duration(totalUnrecordedOvertime) }}</div></div>
             </div>
-            <p class="mt-2 text-xs text-gray-500">予定だけの登録は認定実績0件・暫定0点です。作業種類・結果文・時間が揃った記録だけを集計します。</p>
+            <p class="mt-2 text-xs text-gray-500">簡易予定は結果文と作業種類が揃った場合だけ認定します。過去のジョブ予定・仕事の会議も時間に含め、同じ時間帯の重複は分けて数えます。ページ数は点数や順位に使いません。</p>
             <div v-if="!error" class="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-600" aria-label="担当ごとのグラフ色">
                 <span v-for="role in visibleRoles" :key="role.code" class="inline-flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-sm" :style="{ backgroundColor: role.bar }"></span>{{ role.label }}</span>
             </div>
@@ -186,7 +188,8 @@ onMounted(() => { load(); loadPlans(); });
                     <h4 class="font-semibold">暫定ポイント順位 <span class="ml-1 text-xs font-normal text-amber-800">試用・係数は調整可能</span></h4>
                     <span class="text-sm text-gray-600">部署の記録合計 {{ pointLabel(totalPoints) }}点</span>
                 </div>
-                <p class="mt-1 text-xs text-gray-600">各記録の点数 ＝ 記録時間（時間）×10×作業種類の係数。数量や予定だけの時間は加えません。表示範囲内の記録で計算した参考順位です。</p>
+                <p class="mt-1 text-xs text-gray-600">記録時間×10点/時×種類係数に、記録と重なる残業の追加点、案件登録1件{{ pointRule.creation_points }}点、直近14日にチーム作業が動いた管理案件の暫定点を加えます。通常作成・複製・一括取込は同点。過去の登録者は移行時のリーダーから推定しています。</p>
+                <div class="mt-2 flex flex-wrap gap-3 text-xs"><label><input v-model="includeOvertime" type="checkbox" class="mr-1 rounded" />残業追加点</label><label><input v-model="includeCreation" type="checkbox" class="mr-1 rounded" />案件登録点</label><label><input v-model="includeManagement" type="checkbox" class="mr-1 rounded" />案件管理点</label></div>
                 <details class="mt-2 text-xs text-gray-600">
                     <summary class="cursor-pointer text-amber-900">仮係数を見る</summary>
                     <div class="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -201,7 +204,7 @@ onMounted(() => { load(); loadPlans(); });
                         <span class="text-right tabular-nums text-gray-500">{{ index + 1 }}</span>
                         <span class="truncate font-medium" :title="`${row.name}（${row.role?.label || 'その他'}）`"><span class="mr-1 inline-block h-2 w-2 rounded-sm" :style="{ backgroundColor: roleColor(row.role?.code).bar }"></span>{{ row.name }}</span>
                         <div class="h-5 overflow-hidden rounded bg-white"><div class="h-full rounded" :style="{ width: row.width, backgroundColor: roleColor(row.role?.code).bar }"></div></div>
-                        <span class="text-right font-semibold tabular-nums">{{ pointLabel(row.points) }}点</span>
+                        <span class="text-right font-semibold tabular-nums" :title="`作業 ${pointLabel(row.base_points)}／残業 ${pointLabel(row.overtime_points)}／登録 ${pointLabel(row.creation_points)}（${row.created_projects}件）／管理 ${pointLabel(row.management_points)}（${row.active_managed_projects}案件）`">{{ pointLabel(visiblePoints(row)) }}点</span>
                     </div>
                 </div>
             </div>
@@ -211,18 +214,14 @@ onMounted(() => { load(); loadPlans(); });
                     <select v-model="selectedActivityKey" aria-label="比較する作業種類" class="rounded border px-2 py-1 text-sm">
                         <option v-for="option in activityOptions" :key="option.key" :value="option.key">{{ option.label }}</option>
                     </select>
-                    <select v-model="rankingMetric" aria-label="比較する指標" class="rounded border px-2 py-1 text-sm">
-                        <option value="minutes">記録時間</option>
-                        <option v-for="unit in quantityUnits" :key="unit" :value="`unit:${unit}`">数量（{{ unit }}）</option>
-                    </select>
                 </div>
-                <p class="mt-1 text-xs text-gray-500">同じ作業種類・単位だけを比較します。未記録は0表示ですが、作業をしていないという意味ではありません。</p>
+                <p class="mt-1 text-xs text-gray-500">同じ作業種類の記録時間を比較します。未記録は0表示ですが、作業をしていないという意味ではありません。</p>
                 <div class="mt-3 space-y-2">
                     <div v-for="(row, index) in rankingRows" :key="row.id" class="grid grid-cols-[1.5rem_minmax(5rem,8rem)_minmax(2rem,1fr)_5.5rem] items-center gap-2 text-sm">
                         <span class="text-right tabular-nums text-gray-500">{{ index + 1 }}</span>
                         <span class="truncate font-medium" :title="`${row.name}（${row.role?.label || 'その他'}）`"><span class="mr-1 inline-block h-2 w-2 rounded-sm" :style="{ backgroundColor: roleColor(row.role?.code).bar }"></span>{{ row.name }}</span>
                         <div class="h-5 overflow-hidden rounded bg-gray-100"><div class="h-full rounded" :style="{ width: row.width, backgroundColor: roleColor(row.role?.code).bar }"></div></div>
-                        <span class="text-right tabular-nums">{{ selectedMetric === 'minutes' ? duration(row.value) : `${row.value}${selectedMetric.slice(5)}` }}<small class="ml-1 text-gray-500">{{ row.records }}件</small></span>
+                        <span class="text-right tabular-nums">{{ duration(row.value) }}<small class="ml-1 text-gray-500">{{ row.records }}件</small></span>
                     </div>
                 </div>
             </div>
@@ -234,7 +233,7 @@ onMounted(() => { load(); loadPlans(); });
                     <div>
                         <strong>{{ person.name }}</strong>
                         <span class="ml-2 rounded px-1.5 py-0.5 text-xs" :style="{ backgroundColor: roleColor(person.role?.code).chip, color: roleColor(person.role?.code).bar }">{{ person.role?.label || 'その他' }}</span>
-                        <p class="text-xs text-gray-500">{{ person.recorded_days ? `${person.recorded_days}日・${person.records || 0}件・${duration(person.minutes)}・${pointLabel(person.points)}点` : '公開範囲内の認定実績0件・暫定0点' }}</p>
+                        <p class="text-xs text-gray-500">{{ person.recorded_days ? `${person.recorded_days}日・${person.records || 0}件・${duration(person.minutes)}` : '公開範囲内の認定時間なし' }}／作業 {{ pointLabel(person.base_points) }}点・残業 {{ pointLabel(person.overtime_points) }}点・案件登録 {{ pointLabel(person.creation_points) }}点（{{ person.created_projects }}件<span v-if="person.legacy_created_projects">、うち推定{{ person.legacy_created_projects }}件</span>）・案件管理 {{ pointLabel(person.management_points) }}点（{{ person.active_managed_projects }}件）</p>
                     </div>
                     <div v-if="person.activities.length" class="space-y-2">
                         <div class="flex h-3 overflow-hidden rounded bg-gray-100" :aria-label="`${person.name}の作業種類別記録時間`">

@@ -143,7 +143,16 @@ class MGinbonAnnualImportController extends Controller
             return [ProjectJob::query()->where('company_id', $companyId)->where('completed', false)->findOrFail($data['project_job_id']), null];
         }
         $job = DB::transaction(function () use ($request, $data, $companyId) {
-            $job = ProjectJob::create(['title' => $data['year'].'年 銀本制作', 'detail' => 'MGinbon（中学入試問題集）専用のJobBox・カレンダー連携案件', 'user_id' => $request->user()?->id, 'company_id' => $companyId, 'completed' => false]);
+            $job = ProjectJob::create([
+                'title' => $data['year'].'年 銀本制作',
+                'detail' => 'MGinbon（中学入試問題集）専用のJobBox・カレンダー連携案件',
+                'user_id' => $request->user()?->id,
+                'created_by_user_id' => $request->user()?->id,
+                'creator_source' => $request->user() ? 'recorded_actor' : null,
+                'creation_method' => 'ginbon',
+                'company_id' => $companyId,
+                'completed' => false,
+            ]);
             ProjectTeamMember::firstOrCreate(['project_job_id' => $job->id, 'user_id' => $request->user()?->id]);
             return $job;
         });

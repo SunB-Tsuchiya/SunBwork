@@ -22,6 +22,7 @@ class PersonalWorkPoints
         'voucher_check' => 0.9,
         'customer_contact' => 0.8,
         'other' => 0.8,
+        'my_job' => 1.0,
     ];
 
     public static function coefficient(?string $activityType): float

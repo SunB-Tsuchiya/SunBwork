@@ -198,9 +198,10 @@ class BulkProjectJobController extends Controller
 
         $rows      = $request->input('rows');
         $companyId = $this->resolveCompanyId($request->user());
+        $creatorId = $request->user()->id;
         $created   = [];
 
-        DB::transaction(function () use ($rows, $fixed, $teamMembersFixed, $companyId, &$created) {
+        DB::transaction(function () use ($rows, $fixed, $teamMembersFixed, $companyId, $creatorId, &$created) {
             foreach ($rows as $row) {
                 if (!($row['valid'] ?? false)) {
                     continue;
@@ -213,6 +214,9 @@ class BulkProjectJobController extends Controller
                     'jobcode'    => $data['jobcode'] ?: null,
                     'client_id'  => (int) $data['client_id'],
                     'user_id'    => (int) ($data['user_id'] ?? $fixed['user_id'] ?? null),
+                    'created_by_user_id' => $creatorId,
+                    'creator_source' => 'recorded_actor',
+                    'creation_method' => 'bulk',
                     'company_id' => $companyId,
                     'size_id'    => $data['size_id'] ? (int) $data['size_id'] : null,
                     'page_count' => $data['page_count'] ? (int) $data['page_count'] : null,
