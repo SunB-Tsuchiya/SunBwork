@@ -8,6 +8,7 @@ use App\Models\JobNotification;
 use App\Models\LeaderPermission;
 use App\Models\ProofTeamMember;
 use App\Models\ScheduleNotification;
+use App\Services\PersonalWorkSchedule;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -178,6 +179,8 @@ class HandleInertiaRequests extends Middleware
 
                     return false;
                 })(),
+                'canAccessWorkRecordTrial' => $request->user()?->isSuperAdmin()
+                    && app(PersonalWorkSchedule::class)->available($request->user()),
                 // 校正チームメンバーフラグ
                 'isProofMember' => $request->user()
                     ? ProofTeamMember::where('user_id', $request->user()->id)->exists()

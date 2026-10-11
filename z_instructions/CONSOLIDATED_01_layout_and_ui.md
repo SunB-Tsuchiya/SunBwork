@@ -74,6 +74,8 @@ CLAUDE.md の UI/レイアウトセクションが最上位の権威。本ファ
 
 `Schedule/WorkAnalysis.vue` と `Schedule/WorkDetailAnalysis.vue` は、予定表や Super Admin の通常メニューから別タブで開く独立画面。両画面は `Components/Schedule/WorkloadAnalysisShell.vue` を使い、`AppLayout` の役割別ヘッダー・タブを表示しない。独立画面内では簡易順位と詳細分析を同じタブで切り替え、予定表へ戻れる。旧方式アーカイブは別タブで既存画面を参照する。集計 API と表示権限は従来どおり。
 
+作業記録の独立試用も同じシェルを使う。Super Admin メニューの「作業記録の試用」は情報出版の Super Admin にだけ表示し、別タブで開く。モバイルの選択メニューも同じ条件を使う。ページとAPIの権限は `PersonalWorkSchedule::available()` でサーバ側でも確認する。
+
 ### NG パターン（やってはいけない）
 
 ```vue

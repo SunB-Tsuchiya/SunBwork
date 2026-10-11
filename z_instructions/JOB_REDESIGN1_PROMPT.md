@@ -9,3 +9,5 @@
 評価順位のずれを直すレビュー機能はさらに後工程。利用者の構想は、専用ページを残し、約4人の順位入れ替えや異議コメントを集め、AIが追加調査して評価方法を修正するもの。修正案の表示と適用手順は後で設計する。今回の独立試用には含めない（`JOB_SYSTEM_RETHINK_NOTES1.md` の R21）。
 
 作業場所は `/tmp/sunbwork-job-redesign-20261012`。元の `/home/w229/SunBwork` は多数の未コミット変更がある。別 worktree `/tmp/sunbwork-work-record-trial-20261011` には停止した冗長な MyJob 試用の未コミット変更があり、取り込まない。Sakura SSHは毎回正確なコマンドを示して確認を得る。売上DBは調べない。通常のDB初期化テストは使わない。
+
+画面確認用の最新本番基点 worktree は `/tmp/sunbwork-job-redesign-review-20261012`。`3d49d6adb` をさくらへ反映し、試用用4 migration だけを実行済み。ユーザーは確認ステップ4-1「表示」を了承。次は4-2「1件入力」。Super Admin メニューへのリンク追加を依頼され、情報出版 Super Admin に限って表示する修正を準備中。

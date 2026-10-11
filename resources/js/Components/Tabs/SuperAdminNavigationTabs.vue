@@ -8,6 +8,7 @@ const props = defineProps({
 
 const page = usePage();
 const canAccessSalesAnalysis = computed(() => page.props.auth?.canAccessSalesAnalysis ?? false);
+const canAccessWorkRecordTrial = computed(() => page.props.auth?.canAccessWorkRecordTrial ?? false);
 
 // SuperAdmin カラー: yellow
 const tab = (key) => [
@@ -69,6 +70,13 @@ const tabs = computed(() => [
         label: '作業量分析',
         newTab: true,
         condition: typeof route === 'function' && route().has('superadmin.workload_analyzer.index'),
+    },
+    {
+        key: 'work_record_trial',
+        href: tryRoute('schedule.work_record_trial.page'),
+        label: '作業記録の試用',
+        newTab: true,
+        condition: canAccessWorkRecordTrial.value && typeof route === 'function' && route().has('schedule.work_record_trial.page'),
     },
     {
         key: 'billing_transport_input',
@@ -207,6 +215,15 @@ function onMobileSelect(e) {
                 :class="tab('workload')"
             >
                 作業量分析
+            </a>
+            <a
+                v-if="canAccessWorkRecordTrial && typeof route === 'function' && route().has('schedule.work_record_trial.page')"
+                :href="route('schedule.work_record_trial.page')"
+                target="_blank"
+                rel="noopener noreferrer"
+                :class="tab('work_record_trial')"
+            >
+                作業記録の試用
             </a>
             <Link
                 v-if="typeof route === 'function' && route().has('superadmin.billing.transport.index')"
