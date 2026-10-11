@@ -13,6 +13,7 @@ const props = defineProps({
 const scheduleHref = computed(() => route('schedule.index', { date: props.date, tab: 'work' }));
 const resultsHref = computed(() => route('schedule.department_work.results', { date: props.date }));
 const detailsHref = computed(() => route('schedule.department_work.details', { date: props.date }));
+const guideHref = computed(() => route('schedule.department_work.guide', { date: props.date }));
 const tabClass = (key) => [
     'rounded-t px-4 py-2 text-sm font-semibold',
     props.active === key
@@ -31,7 +32,10 @@ const tabClass = (key) => [
                     <a :href="scheduleHref" class="rounded bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-200">← 予定表へ</a>
                     <h1 class="text-lg font-semibold text-gray-800">{{ title }}</h1>
                 </div>
-                <span class="text-xs text-gray-500">情報出版・試用</span>
+                <div class="flex items-center gap-3">
+                    <Link :href="guideHref" class="rounded border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-800 hover:bg-blue-100" :aria-current="active === 'guide' ? 'page' : undefined">この分析のガイド</Link>
+                    <span class="text-xs text-gray-500">情報出版・試用</span>
+                </div>
             </div>
         </header>
         <nav class="flex flex-wrap gap-2 border-b border-gray-200 px-3 pt-3 sm:px-4" aria-label="作業分析の画面">

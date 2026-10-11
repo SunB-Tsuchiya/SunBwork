@@ -106,17 +106,18 @@ onMounted(load);
                         <option value="all">全担当</option>
                         <option v-for="[code, label] in roles" :key="code" :value="code">{{ label }}</option>
                     </select>
-                    <select v-model="category" aria-label="作業区分で絞る" class="rounded border px-2 py-1">
+                    <select v-model="category" aria-label="作業区分に該当する人を表示" class="rounded border px-2 py-1">
                         <option value="all">全作業区分</option>
                         <option v-for="[code, label] in workCategories" :key="code" :value="code">{{ label }}</option>
                     </select>
-                    <select v-model="source" aria-label="入力元で絞る" class="rounded border px-2 py-1">
+                    <select v-model="source" aria-label="入力元に該当する人を表示" class="rounded border px-2 py-1">
                         <option value="all">全入力元</option>
                         <option v-for="[code, label] in sourceLabels" :key="code" :value="code">{{ label }}</option>
                     </select>
                 </div>
             </div>
             <p class="mt-2 text-xs text-gray-500">対象：{{ range || `${month}-01` }} <span v-if="loading">読み込み中...</span></p>
+            <p class="mt-1 text-xs text-gray-600">作業区分・入力元は該当する人を表示する条件です。下の件数・時間・点数は、その人の全記録の集計です。</p>
             <p v-if="error" class="mt-3 text-sm text-red-700" role="alert">{{ error }}</p>
 
             <div v-if="!error" class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -129,12 +130,13 @@ onMounted(load);
 
             <div class="mt-5 rounded border border-amber-200 bg-amber-50/50 p-3 text-sm">
                 <div class="font-semibold">並び方と暫定点の比較</div>
-                <p class="mt-1 text-xs text-gray-700">工程候補数、入力件数、時間中心の暫定点を切り替えて比べます。いずれも仕事の能力や評価を確定する順位ではありません。</p>
+                <p class="mt-1 text-xs text-gray-700">工程候補は同じ案件・作業種類・日付などをまとめた参考数、入力件数は記録の数です。どちらも完了数ではありません。暫定点は主に記録時間で決まります。</p>
                 <div class="mt-2 flex flex-wrap gap-2 text-xs">
-                    <label v-for="[key, label] in [['units', '工程候補順'], ['records', '入力件数順'], ['points', '暫定点順']]" :key="key" class="rounded border px-2 py-1" :class="sortBy === key ? 'border-blue-500 bg-blue-50 text-blue-800' : 'bg-white'">
+                    <label v-for="[key, label] in [['units', '工程候補が多い順'], ['records', '入力件数が多い順'], ['points', '暫定点が高い順']]" :key="key" class="rounded border px-2 py-1" :class="sortBy === key ? 'border-blue-500 bg-blue-50 text-blue-800' : 'bg-white'">
                         <input v-model="sortBy" type="radio" name="work-detail-sort" :value="key" class="sr-only" />{{ label }}
                     </label>
                 </div>
+                <p class="mt-1 text-xs text-gray-600">表示順は記録を見るための並び替えで、能力や成果の順位ではありません。</p>
                 <div class="mt-2 flex flex-wrap gap-4 text-xs">
                     <label><input v-model="includeOvertime" type="checkbox" class="mr-1 rounded" />残業追加点</label>
                     <label><input v-model="includeCreation" type="checkbox" class="mr-1 rounded" />案件登録点</label>

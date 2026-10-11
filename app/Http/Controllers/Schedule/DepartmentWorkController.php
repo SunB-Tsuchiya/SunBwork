@@ -39,6 +39,14 @@ class DepartmentWorkController extends Controller
         return Inertia::render('Schedule/WorkDetailAnalysis', ['initialDate' => $date]);
     }
 
+    public function guidePage(Request $request)
+    {
+        abort_unless($this->schedule->available($request->user()), 403);
+        $date = $request->validate(['date' => ['nullable', 'date_format:Y-m-d']])['date'] ?? now()->toDateString();
+
+        return Inertia::render('Schedule/WorkloadGuide', ['initialDate' => $date]);
+    }
+
     public function index(Request $request)
     {
         $viewer = $request->user();

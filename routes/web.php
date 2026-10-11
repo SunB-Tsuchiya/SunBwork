@@ -1526,6 +1526,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
         Route::get('/department-work/analysis', [\App\Http\Controllers\Schedule\DepartmentWorkController::class, 'analysis'])->name('department_work.analysis');
         Route::get('/department-work/results', [\App\Http\Controllers\Schedule\DepartmentWorkController::class, 'analysisPage'])->name('department_work.results');
         Route::get('/department-work/details', [\App\Http\Controllers\Schedule\DepartmentWorkController::class, 'detailPage'])->name('department_work.details');
+        Route::get('/department-work/guide', [\App\Http\Controllers\Schedule\DepartmentWorkController::class, 'guidePage'])->name('department_work.guide');
         Route::post('/department-work', [\App\Http\Controllers\Schedule\DepartmentWorkController::class, 'store'])->name('department_work.store');
         Route::put('/department-work/{entry}', [\App\Http\Controllers\Schedule\DepartmentWorkController::class, 'update'])->name('department_work.update');
         Route::delete('/department-work/{entry}', [\App\Http\Controllers\Schedule\DepartmentWorkController::class, 'destroy'])->name('department_work.destroy');
