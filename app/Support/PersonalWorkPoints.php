@@ -17,6 +17,7 @@ class PersonalWorkPoints
         'proof_revision_light' => 0.9,
         'manuscript_check' => 1.1,
         'meeting' => 0.8,
+        'outing' => 0.8,
         'office_work' => 0.8,
         'document_processing' => 0.9,
         'voucher_check' => 0.9,

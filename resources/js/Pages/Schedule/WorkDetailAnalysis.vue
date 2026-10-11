@@ -33,7 +33,7 @@ const roleColors = {
 };
 const sourceLabels = [
     ['quick', '簡易実績'], ['my_job', 'マイジョブ'],
-    ['assigned_job', '依頼ジョブ'], ['meeting', '会議'],
+    ['assigned_job', '依頼ジョブ'], ['meeting', '会議・外出'],
 ];
 const categoryLabel = (code) => workCategories.find(([key]) => key === code)?.[1] || 'その他';
 const number = (value) => Number(value || 0).toLocaleString('ja-JP');

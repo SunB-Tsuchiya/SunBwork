@@ -47,6 +47,7 @@ class WorkloadTrialAnalysis
                 'projectJob.coordinators:id',
                 'projectJob:id,title,company_id,user_id,show_on_department_schedule',
                 'sourceEvent.user:id,company_id',
+                'sourceEvent.eventItemType:id,slug',
                 'sourceEvent.projectJobAssignment:id,project_job_id,user_id,sender_id,job_type,stage_id,work_item_type_id',
                 'sourceEvent.projectJobAssignment.projectJob.coordinators:id',
                 'sourceEvent.projectJobAssignment.projectJob:id,title,company_id,user_id,show_on_department_schedule',
@@ -102,7 +103,10 @@ class WorkloadTrialAnalysis
                 $range = $this->schedule->slotInterval($entry, $this->schedule->workWindow($user, $date));
             }
             if (! $range || $range[1] <= $range[0]) continue;
-            $intervals[$entry->user_id][$date][] = $this->item($key, $range, $entry->work_category, $entry->activity_type);
+            $intervals[$entry->user_id][$date][] = $this->item(
+                $key, $range, $entry->work_category, $entry->activity_type,
+                $entry->sourceEvent && $this->isFixedAppointment($entry->sourceEvent)
+            );
             $recordKeys[$entry->user_id][$key] = true;
             $assignment = $entry->sourceEvent?->projectJobAssignment;
             $source = $assignment
@@ -129,9 +133,7 @@ class WorkloadTrialAnalysis
             if (! $from || ! $to || $to->lte($from) || $to->gt($now)) continue;
             $assignment = $event->projectJobAssignment;
             $isJob = $assignment && $assignment->user_id;
-            $isMeeting = ! $isJob && ($event->is_company_event
-                || $event->meeting_definition_id
-                || in_array($event->eventItemType?->slug, ['meeting_internal', 'meeting_client', 'conference'], true));
+            $isMeeting = ! $isJob && $this->isFixedAppointment($event);
             if (! $isJob && ! $isMeeting) continue;
             $people = [(int) $event->user_id];
             if ($event->is_company_event && $isMeeting) {
@@ -149,13 +151,15 @@ class WorkloadTrialAnalysis
                 );
                 if ($detail['private']) continue;
                 $category = $isJob ? $this->jobCategory($user, $assignment->job_type) : $this->roleCategory($user);
-                $activity = $isJob ? 'my_job' : 'meeting';
+                $activity = $isJob ? 'my_job'
+                    : (in_array($event->eventItemType?->slug, ['customer_visit', 'client_visit', 'outing'], true)
+                        ? 'outing' : 'meeting');
                 for ($day = $start->copy()->startOfDay(); $day->lte($end); $day->addDay()) {
                     $date = $day->toDateString();
                     $range = $this->dateInterval($from, $to, $date);
                     if (! $range) continue;
                     $key = ($isJob ? 'job-' : 'meeting-').$event->id.'-'.$personId;
-                    $intervals[$personId][$date][] = $this->item($key, $range, $category, $activity);
+                    $intervals[$personId][$date][] = $this->item($key, $range, $category, $activity, $isMeeting);
                     $recordKeys[$personId][$key] = true;
                     $source = $isJob
                         ? ((int) $assignment->sender_id === $personId ? 'my_job' : 'assigned_job')
@@ -344,11 +348,22 @@ class WorkloadTrialAnalysis
         return $people;
     }
 
-    private function item(string $key, array $range, string $category, string $activity): array
+    private function item(string $key, array $range, string $category, string $activity, bool $fixedAppointment = false): array
     {
         return ['key' => $key, 'from' => max(0, $range[0]), 'to' => min(1440, $range[1]),
             'work_category' => $category, 'activity_type' => $activity,
-            'coefficient' => PersonalWorkPoints::coefficient($activity)];
+            'coefficient' => PersonalWorkPoints::coefficient($activity),
+            'priority' => $fixedAppointment || in_array($activity, ['meeting', 'sales_visit'], true) ? 1 : 0];
+    }
+
+    private function isFixedAppointment(Event $event): bool
+    {
+        return ! $event->project_job_assignment_id && ($event->is_company_event
+            || $event->meeting_definition_id
+            || in_array($event->eventItemType?->slug, [
+                'meeting_internal', 'meeting_client', 'conference',
+                'customer_visit', 'client_visit', 'outing',
+            ], true));
     }
 
     private function jobUnitReference($assignment): string
@@ -369,6 +384,8 @@ class WorkloadTrialAnalysis
             if ($minute >= $lunchFrom && $minute < $lunchTo) continue;
             $active = array_values(array_filter($items, fn ($item) => $item['from'] <= $minute && $item['to'] > $minute));
             if (! $active) continue;
+            $priority = max(array_column($active, 'priority'));
+            $active = array_values(array_filter($active, fn ($item) => $item['priority'] === $priority));
             $covered[] = $minute;
             $share = 1 / count($active);
             foreach ($active as $item) {
