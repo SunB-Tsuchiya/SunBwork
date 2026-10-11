@@ -181,6 +181,7 @@ onMounted(() => { load(); loadPlans(); });
                 </div>
                 <p class="mt-1 text-xs text-gray-600">記録時間×10点/時×種類係数に、記録と重なる残業の追加点、案件登録1件{{ pointRule.creation_points }}点、直近14日にチーム作業が動いた管理案件の暫定点を加えます。通常作成・複製・一括取込は同点。過去の登録者は移行時のリーダーから推定しています。</p>
                 <div class="mt-2 flex flex-wrap gap-3 text-xs"><label><input v-model="includeOvertime" type="checkbox" class="mr-1 rounded" />残業追加点</label><label><input v-model="includeCreation" type="checkbox" class="mr-1 rounded" />案件登録点</label><label><input v-model="includeManagement" type="checkbox" class="mr-1 rounded" />案件管理点</label></div>
+                <p class="mt-1 text-xs text-gray-600">チェックした点だけで合計と順位を再計算します。保存済みの記録は変わりません。</p>
                 <details class="mt-2 text-xs text-gray-600">
                     <summary class="cursor-pointer text-amber-900">仮係数を見る</summary>
                     <div class="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -195,7 +196,7 @@ onMounted(() => { load(); loadPlans(); });
                         <span class="text-right tabular-nums text-gray-500">{{ index + 1 }}</span>
                         <span class="truncate font-medium" :title="`${row.name}（${row.role?.label || 'その他'}）`"><span class="mr-1 inline-block h-2 w-2 rounded-sm" :style="{ backgroundColor: roleColor(row.role?.code).bar }"></span>{{ row.name }}</span>
                         <div class="h-5 overflow-hidden rounded bg-white"><div class="h-full rounded" :style="{ width: row.width, backgroundColor: roleColor(row.role?.code).bar }"></div></div>
-                        <span class="text-right font-semibold tabular-nums" :title="`作業 ${pointLabel(row.base_points)}／残業 ${pointLabel(row.overtime_points)}／登録 ${pointLabel(row.creation_points)}（${row.created_projects}件）／管理 ${pointLabel(row.management_points)}（${row.active_managed_projects}案件）`">{{ pointLabel(visiblePoints(row)) }}点</span>
+                        <span class="text-right font-semibold tabular-nums" :title="`適用中：作業 ${pointLabel(row.base_points)}／残業 ${pointLabel(includeOvertime ? row.overtime_points : 0)}／登録 ${pointLabel(includeCreation ? row.creation_points : 0)}／管理 ${pointLabel(includeManagement ? row.management_points : 0)}`">{{ pointLabel(visiblePoints(row)) }}点</span>
                     </div>
                 </div>
             </div>

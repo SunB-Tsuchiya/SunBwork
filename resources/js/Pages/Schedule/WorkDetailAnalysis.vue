@@ -42,6 +42,7 @@ const visiblePoints = (person) => Number(person.base_points || 0)
     + (includeOvertime.value ? Number(person.overtime_points || 0) : 0)
     + (includeCreation.value ? Number(person.creation_points || 0) : 0)
     + (includeManagement.value ? Number(person.management_points || 0) : 0);
+const appliedPoint = (person, key, enabled) => decimal(enabled ? person[key] : 0);
 const roles = computed(() => [...new Set(people.value.map((person) => person.role?.code || 'other'))]
     .map((code) => [code, roleLabels[code] || 'その他']));
 const filtered = computed(() => people.value.filter((person) =>
@@ -83,6 +84,7 @@ async function load() {
 }
 
 watch([month, period], load);
+watch([includeOvertime, includeCreation, includeManagement], () => { sortBy.value = 'points'; });
 onMounted(load);
 </script>
 
@@ -138,12 +140,13 @@ onMounted(load);
                     <label><input v-model="includeCreation" type="checkbox" class="mr-1 rounded" />案件登録点</label>
                     <label><input v-model="includeManagement" type="checkbox" class="mr-1 rounded" />案件管理点</label>
                 </div>
+                <p class="mt-1 text-xs text-gray-600">切り替えると「暫定点順」で再表示します。下の内訳と合計には、チェックした点だけを反映します。</p>
             </div>
 
             <div v-if="!error" class="mt-4 overflow-x-auto rounded border">
                 <table class="min-w-full divide-y divide-gray-200 text-sm">
                     <thead class="bg-gray-50 text-left text-xs text-gray-600">
-                        <tr><th class="px-3 py-2">表示順</th><th class="px-3 py-2">担当者</th><th class="px-3 py-2">担当</th><th class="px-3 py-2 text-right">工程候補／入力</th><th class="px-3 py-2 text-right">記録日／勤怠日（参考）</th><th class="px-3 py-2 text-right">記録時間</th><th class="px-3 py-2 text-right">作業点</th><th class="px-3 py-2 text-right">残業／登録／管理</th><th class="px-3 py-2 text-right">暫定合計</th></tr>
+                        <tr><th class="px-3 py-2">表示順</th><th class="px-3 py-2">担当者</th><th class="px-3 py-2">担当</th><th class="px-3 py-2 text-right">工程候補／入力</th><th class="px-3 py-2 text-right">記録日／勤怠日（参考）</th><th class="px-3 py-2 text-right">記録時間</th><th class="px-3 py-2 text-right">作業点</th><th class="px-3 py-2 text-right">適用中の残業／登録／管理</th><th class="px-3 py-2 text-right">暫定合計</th></tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
                         <tr v-for="(person, index) in ranked" :key="person.id" class="hover:bg-gray-50">
@@ -154,7 +157,7 @@ onMounted(load);
                             <td class="px-3 py-2 text-right tabular-nums">{{ number(person.recorded_days) }}／{{ person.attendance_days ? number(person.attendance_days) : '—' }}<span v-if="person.attendance_days" class="ml-1 text-xs text-gray-500">({{ Math.round(person.recorded_days / person.attendance_days * 100) }}%)</span></td>
                             <td class="px-3 py-2 text-right tabular-nums">{{ duration(person.minutes) }}</td>
                             <td class="px-3 py-2 text-right tabular-nums">{{ decimal(person.base_points) }}</td>
-                            <td class="px-3 py-2 text-right tabular-nums">{{ decimal(person.overtime_points) }}／{{ decimal(person.creation_points) }}／{{ decimal(person.management_points) }}</td>
+                            <td class="px-3 py-2 text-right tabular-nums" :title="`元の点数：残業 ${decimal(person.overtime_points)}／登録 ${decimal(person.creation_points)}／管理 ${decimal(person.management_points)}`">{{ appliedPoint(person, 'overtime_points', includeOvertime) }}／{{ appliedPoint(person, 'creation_points', includeCreation) }}／{{ appliedPoint(person, 'management_points', includeManagement) }}</td>
                             <td class="px-3 py-2 text-right font-semibold tabular-nums">{{ decimal(visiblePoints(person)) }}</td>
                         </tr>
                         <tr v-if="!ranked.length"><td colspan="9" class="px-3 py-6 text-center text-gray-500">対象の記録がありません。</td></tr>
