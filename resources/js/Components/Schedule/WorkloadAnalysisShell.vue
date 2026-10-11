@@ -14,6 +14,7 @@ const scheduleHref = computed(() => route('schedule.index', { date: props.date, 
 const resultsHref = computed(() => route('schedule.department_work.results', { date: props.date }));
 const detailsHref = computed(() => route('schedule.department_work.details', { date: props.date }));
 const guideHref = computed(() => route('schedule.department_work.guide', { date: props.date }));
+const recordTrialHref = computed(() => route('schedule.work_record_trial.page', { date: props.date }));
 const tabClass = (key) => [
     'rounded-t px-4 py-2 text-sm font-semibold',
     props.active === key
@@ -41,6 +42,7 @@ const tabClass = (key) => [
         <nav class="flex flex-wrap gap-2 border-b border-gray-200 px-3 pt-3 sm:px-4" aria-label="作業分析の画面">
             <Link :href="resultsHref" :class="tabClass('results')">作業実績の内訳・簡易順位</Link>
             <Link :href="detailsHref" :class="tabClass('details')">詳しい作業量分析</Link>
+            <Link :href="recordTrialHref" :class="tabClass('record')">作業記録の試用</Link>
             <a :href="route('superadmin.workload_analyzer.archive')" target="_blank" rel="noopener noreferrer" :class="tabClass('archive')">旧方式アーカイブ ↗</a>
         </nav>
         <div class="px-3 py-3 sm:px-4">

@@ -1526,6 +1526,14 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified']
         Route::get('/department-work/analysis', [\App\Http\Controllers\Schedule\DepartmentWorkController::class, 'analysis'])->name('department_work.analysis');
         Route::get('/department-work/results', [\App\Http\Controllers\Schedule\DepartmentWorkController::class, 'analysisPage'])->name('department_work.results');
         Route::get('/department-work/details', [\App\Http\Controllers\Schedule\DepartmentWorkController::class, 'detailPage'])->name('department_work.details');
+        // 作業記録の独立試用。Controller 側でも情報出版 Super Admin に限定する。
+        Route::get('/work-record-trial', [\App\Http\Controllers\Schedule\WorkRecordTrialController::class, 'page'])->name('work_record_trial.page');
+        Route::get('/work-record-trial/records', [\App\Http\Controllers\Schedule\WorkRecordTrialController::class, 'index'])->name('work_record_trial.index');
+        Route::get('/work-record-trial/my-jobs', [\App\Http\Controllers\Schedule\WorkRecordTrialController::class, 'myJobOptions'])->name('work_record_trial.my_jobs');
+        Route::post('/work-record-trial/review-day', [\App\Http\Controllers\Schedule\WorkRecordTrialController::class, 'reviewDay'])->name('work_record_trial.review_day');
+        Route::post('/work-record-trial/records', [\App\Http\Controllers\Schedule\WorkRecordTrialController::class, 'store'])->name('work_record_trial.store');
+        Route::put('/work-record-trial/records/{record}', [\App\Http\Controllers\Schedule\WorkRecordTrialController::class, 'update'])->name('work_record_trial.update');
+        Route::delete('/work-record-trial/records/{record}', [\App\Http\Controllers\Schedule\WorkRecordTrialController::class, 'destroy'])->name('work_record_trial.destroy');
         Route::get('/department-work/guide', [\App\Http\Controllers\Schedule\DepartmentWorkController::class, 'guidePage'])->name('department_work.guide');
         Route::post('/department-work', [\App\Http\Controllers\Schedule\DepartmentWorkController::class, 'store'])->name('department_work.store');
         Route::put('/department-work/{entry}', [\App\Http\Controllers\Schedule\DepartmentWorkController::class, 'update'])->name('department_work.update');
