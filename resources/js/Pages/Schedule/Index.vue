@@ -36,7 +36,7 @@ const workDate = ref(props.initialDate);
 
         <div v-if="departmentWorkEnabled" class="mb-3 flex gap-2 border-b border-gray-200">
             <button type="button" class="rounded-t px-4 py-2 text-sm font-semibold" :class="tab === 'work' ? 'border border-b-white bg-white text-blue-700' : 'text-gray-600 hover:bg-gray-100'" @click="tab = 'work'">部署の作業</button>
-            <Link :href="route('schedule.department_work.results', { date: workDate })" class="rounded-t px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100">作業実績の内訳</Link>
+            <a :href="route('schedule.department_work.results', { date: workDate })" target="_blank" rel="noopener noreferrer" class="rounded-t px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100">作業実績の内訳 ↗</a>
             <button type="button" class="rounded-t px-4 py-2 text-sm font-semibold" :class="tab === 'calendar' ? 'border border-b-white bg-white text-blue-700' : 'text-gray-600 hover:bg-gray-100'" @click="tab = 'calendar'">共有予定</button>
             <Link :href="route('calendar.index')" class="rounded-t px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100">カレンダー</Link>
         </div>

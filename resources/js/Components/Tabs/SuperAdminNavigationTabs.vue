@@ -67,6 +67,7 @@ const tabs = computed(() => [
         key: 'workload',
         href: tryRoute('superadmin.workload_analyzer.index'),
         label: '作業量分析',
+        newTab: true,
         condition: typeof route === 'function' && route().has('superadmin.workload_analyzer.index'),
     },
     {
@@ -98,7 +99,9 @@ const tabs = computed(() => [
 
 function onMobileSelect(e) {
     const href = e.target.value;
-    if (href) router.get(href);
+    const selectedTab = tabs.value.find((tab) => tab.href === href);
+    if (selectedTab?.newTab) window.open(href, '_blank', 'noopener,noreferrer');
+    else if (href) router.get(href);
 }
 </script>
 
@@ -196,13 +199,15 @@ function onMobileSelect(e) {
             >
                 AI設定
             </Link>
-            <Link
+            <a
                 v-if="typeof route === 'function' && route().has('superadmin.workload_analyzer.index')"
                 :href="route('superadmin.workload_analyzer.index')"
+                target="_blank"
+                rel="noopener noreferrer"
                 :class="tab('workload')"
             >
                 作業量分析
-            </Link>
+            </a>
             <Link
                 v-if="typeof route === 'function' && route().has('superadmin.billing.transport.index')"
                 :href="route('superadmin.billing.transport.index')"

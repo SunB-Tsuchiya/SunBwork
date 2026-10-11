@@ -1,9 +1,8 @@
 <script setup>
 import axios from 'axios';
-import { Link } from '@inertiajs/vue3';
 import { computed, onMounted, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
-import AppLayout from '@/layouts/AppLayout.vue';
+import WorkloadAnalysisShell from '@/Components/Schedule/WorkloadAnalysisShell.vue';
 import { workCategories, activityLabel } from '@/Constants/personalWorkActivities';
 
 const props = defineProps({ initialDate: { type: String, default: '' } });
@@ -88,14 +87,7 @@ onMounted(load);
 </script>
 
 <template>
-    <AppLayout title="作業量分析" :fluid="true">
-        <template #header><h2 class="text-xl font-semibold leading-tight text-gray-800">作業量分析</h2></template>
-
-        <div class="mb-3 flex flex-wrap gap-2 border-b border-gray-200 text-sm">
-            <Link :href="route('schedule.department_work.results', { date: `${month}-01` })" class="rounded-t px-4 py-2 text-gray-600 hover:bg-white">予定表の簡易順位</Link>
-            <span class="rounded-t border border-b-white bg-white px-4 py-2 font-semibold text-blue-700">詳しい作業分析</span>
-            <Link :href="route('superadmin.workload_analyzer.archive')" class="rounded-t px-4 py-2 text-gray-500 hover:bg-white">旧方式アーカイブ</Link>
-        </div>
+    <WorkloadAnalysisShell title="作業量分析" active="details" :date="`${month}-01`">
 
         <section class="rounded-lg bg-white p-4 shadow">
             <div class="flex flex-wrap items-start justify-between gap-3">
@@ -187,5 +179,5 @@ onMounted(load);
                 </article>
             </div>
         </section>
-    </AppLayout>
+    </WorkloadAnalysisShell>
 </template>

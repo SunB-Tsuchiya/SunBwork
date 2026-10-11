@@ -70,6 +70,10 @@ CLAUDE.md の UI/レイアウトセクションが最上位の権威。本ファ
   （`AppLayout`は使わない）。他の機能ではこの例外を真似ず、通常どおり`AppLayout`（必要なら
   `fluid`）を使うこと。
 
+### 情報出版の作業分析試用画面（2026-10-11）
+
+`Schedule/WorkAnalysis.vue` と `Schedule/WorkDetailAnalysis.vue` は、予定表や Super Admin の通常メニューから別タブで開く独立画面。両画面は `Components/Schedule/WorkloadAnalysisShell.vue` を使い、`AppLayout` の役割別ヘッダー・タブを表示しない。独立画面内では簡易順位と詳細分析を同じタブで切り替え、予定表へ戻れる。旧方式アーカイブは別タブで既存画面を参照する。集計 API と表示権限は従来どおり。
+
 ### NG パターン（やってはいけない）
 
 ```vue

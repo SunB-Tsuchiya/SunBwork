@@ -1,9 +1,8 @@
 <script setup>
 import axios from 'axios';
-import { Link } from '@inertiajs/vue3';
 import { computed, onMounted, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
-import AppLayout from '@/layouts/AppLayout.vue';
+import WorkloadAnalysisShell from '@/Components/Schedule/WorkloadAnalysisShell.vue';
 import { workCategories, workActivities, activityLabel } from '@/Constants/personalWorkActivities';
 import { evColor } from '@/Composables/useEventTypeColors';
 
@@ -146,16 +145,7 @@ onMounted(() => { load(); loadPlans(); });
 </script>
 
 <template>
-    <AppLayout title="作業実績の内訳" :fluid="true">
-        <template #header><h2 class="text-xl font-semibold leading-tight text-gray-800">予定表</h2></template>
-
-        <div class="mb-3 flex flex-wrap gap-2 border-b border-gray-200">
-            <Link :href="route('schedule.index', { date, tab: 'work' })" class="rounded-t px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100">部署の作業</Link>
-            <span class="rounded-t border border-b-white bg-white px-4 py-2 text-sm font-semibold text-blue-700">作業実績の内訳</span>
-            <Link :href="route('schedule.index', { date, tab: 'calendar' })" class="rounded-t px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100">共有予定</Link>
-            <Link :href="route('calendar.index')" class="rounded-t px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100">カレンダー</Link>
-            <Link :href="route('schedule.department_work.details', { date })" class="rounded-t px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100">詳しい作業分析</Link>
-        </div>
+    <WorkloadAnalysisShell title="作業実績の内訳" active="results" :date="date">
 
         <section class="rounded-lg bg-white p-4 shadow">
             <div class="flex flex-wrap items-center justify-between gap-3">
@@ -258,5 +248,5 @@ onMounted(() => { load(); loadPlans(); });
                 </div>
             </div>
         </section>
-    </AppLayout>
+    </WorkloadAnalysisShell>
 </template>
