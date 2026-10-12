@@ -2,14 +2,14 @@
 import useToasts from '@/Composables/useToasts';
 import { useDiaryAttachments } from '@/Composables/useDiaryAttachments';
 import TimelineDiary from '@/Components/TimelineDiary.vue';
-import DiaryWorkEntries from '@/Components/Diaries/DiaryWorkEntries.vue';
 import DiaryWorkReminder from '@/Components/Diaries/DiaryWorkReminder.vue';
+import { diaryTimelineHours, fetchDiaryTimelineEvents } from '@/Helpers/diaryTimelineEvents';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { router, useForm, usePage } from '@inertiajs/vue3';
 import { QuillEditor } from '@vueup/vue-quill';
 import '@vueup/vue-quill/dist/vue-quill.snow.css';
 import axios from 'axios';
-import { onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
 // original toolbar configuration (kept for later use):
 // import { defaultToolbar } from '@/config/quillToolbar';
@@ -28,7 +28,6 @@ const props = defineProps({
     diary:      { type: Object, required: true },
     worktypes:  { type: Array,  default: () => [] },
     workRecord: { type: Object, default: null },
-    workCandidates: { type: Array, default: () => [] },
     personalWorkEnabled: { type: Boolean, default: false },
     workReminder: { type: Object, default: null },
 });
@@ -60,22 +59,21 @@ const et = parseHourMinute(initEnd,   '17');
 // ── タイムライン ────────────────────────────────────────────────
 const pageProps = usePage().props;
 const timelineEvents = ref([]);
+const timelineHours = computed(() => diaryTimelineHours(timelineEvents.value, 7, 21));
+const timelineLoadFailed = ref(false);
+let timelineRequest = 0;
 
 async function fetchDayEvents(date) {
     if (!date) return;
+    const request = ++timelineRequest;
     try {
         const userId = pageProps.auth?.user?.id;
-        const resp = await axios.get(route('events.index'), { params: { date, user_id: userId } });
-        timelineEvents.value = (resp.data || []).map((e) => ({
-            id: e.id ?? e.event_id ?? null,
-            title: e.title || e.name || '(無題)',
-            start: e.start,
-            end: e.end || e.start,
-            allDay: !!e.allDay || !!e.all_day || false,
-            color: e.color || e.backgroundColor || '#2563eb',
-        }));
+        const result = await fetchDiaryTimelineEvents(date, userId, props.personalWorkEnabled);
+        if (request !== timelineRequest) return;
+        timelineEvents.value = result.events;
+        timelineLoadFailed.value = result.failed;
     } catch {
-        // サイレントに無視
+        if (request === timelineRequest) timelineLoadFailed.value = true;
     }
 }
 
@@ -229,7 +227,6 @@ const form = useForm({
     end_time:     `${et.hour}:${et.minute}`,
     content:      content.value,
     attachment_ids: [],
-    work_entries: [],
 });
 
 function onWorktypeChange() {
@@ -540,7 +537,6 @@ const back = () => {
                         @ready="handleEditorReady"
                     />
                 </div>
-                <DiaryWorkEntries v-if="personalWorkEnabled" :candidates="workCandidates" v-model="form.work_entries" :errors="form.errors" />
                 <div class="mb-4">
                     <label class="mb-1 block text-sm font-medium text-gray-700">添付ファイル</label>
                     <input
@@ -585,11 +581,12 @@ const back = () => {
             <!-- 当日タイムライン -->
             <div class="mt-6">
                 <label class="mb-2 block text-sm font-medium text-gray-700">当日の予定</label>
+                <p v-if="timelineLoadFailed" class="mb-2 text-sm text-red-700">一部の予定を読み込めませんでした。画面を再読み込みしてください。</p>
                 <TimelineDiary
                     :date="form.date"
                     :events="timelineEvents"
-                    :startHour="7"
-                    :endHour="21"
+                    :startHour="timelineHours.start"
+                    :endHour="timelineHours.end"
                     :editable="true"
                     @update:events="onTimelineUpdate"
                     @open-create="onTimelineOpenCreate"

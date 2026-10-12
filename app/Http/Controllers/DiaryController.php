@@ -17,7 +17,6 @@ use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Log;
 use App\Services\AttachmentService;
-use App\Services\DiaryWorkEntries;
 use App\Services\PersonalWorkSchedule;
 use App\Services\WorkloadTrialAnalysis;
 
@@ -243,13 +242,10 @@ class DiaryController extends Controller
         $dailyWorktypeId   = \App\Models\UserMonthlySchedule::worktypeIdForDate($user->id, $date);
         $defaultWorktypeId = $dailyWorktypeId ?? $user->userSetting?->worktype_id;
 
-        $workCandidates = app(DiaryWorkEntries::class)->candidates($user, $date);
-
         return Inertia::render('Diaries/Create', [
             'date'               => $date,
             'worktypes'          => $worktypes,
             'defaultWorktypeId'  => $defaultWorktypeId,
-            'workCandidates'     => $workCandidates,
             'personalWorkEnabled' => app(PersonalWorkSchedule::class)->available($user),
             'workReminder' => $this->workReminder($user, $date),
         ]);
@@ -385,6 +381,8 @@ class DiaryController extends Controller
         return Inertia::render('Diaries/Show', [
             'diary'      => $diaryArray,
             'workRecord' => $workRecordData,
+            'personalWorkEnabled' => (int) Auth::id() === (int) $diary->user_id
+                && app(PersonalWorkSchedule::class)->available(Auth::user()),
         ]);
     }
 
@@ -415,8 +413,6 @@ class DiaryController extends Controller
             ? $diary->personalWorkEntries()->with('projectJob')->get()
             : [];
 
-        $workCandidates = app(DiaryWorkEntries::class)->candidates($user, $dateStr);
-
         return Inertia::render('Diaries/Edit', [
             'diary'       => $diaryArr,
             'worktypes'   => $worktypes,
@@ -425,7 +421,6 @@ class DiaryController extends Controller
                 'start_time'  => substr($workRecord->start_time ?? '', 0, 5),
                 'end_time'    => substr($workRecord->end_time   ?? '', 0, 5),
             ] : null,
-            'workCandidates' => $workCandidates,
             'personalWorkEnabled' => app(PersonalWorkSchedule::class)->available($user),
             'workReminder' => $this->workReminder($user, $dateStr),
         ]);

@@ -2,14 +2,14 @@
 import useToasts from '@/Composables/useToasts';
 import { useDiaryAttachments } from '@/Composables/useDiaryAttachments';
 import TimelineDiary from '@/Components/TimelineDiary.vue';
-import DiaryWorkEntries from '@/Components/Diaries/DiaryWorkEntries.vue';
 import DiaryWorkReminder from '@/Components/Diaries/DiaryWorkReminder.vue';
+import { diaryTimelineHours, fetchDiaryTimelineEvents } from '@/Helpers/diaryTimelineEvents';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { QuillEditor } from '@vueup/vue-quill';
 import axios from 'axios';
 import '@vueup/vue-quill/dist/vue-quill.snow.css';
-import { onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { route } from 'ziggy-js';
 
 // original toolbar configuration (kept for later use):
@@ -29,7 +29,6 @@ const props = defineProps({
     date:              { type: String, default: '' },
     worktypes:         { type: Array,  default: () => [] },
     defaultWorktypeId: { type: Number, default: null },
-    workCandidates: { type: Array, default: () => [] },
     personalWorkEnabled: { type: Boolean, default: false },
     workReminder: { type: Object, default: null },
 });
@@ -74,7 +73,6 @@ const form = useForm({
     content,
     attachment_ids: [],
     no_diary: false,
-    work_entries: [],
 });
 
 const { attachments, previewModal, openPreview, closePreview, uploadAndStage, removeAttachment, attachmentIds } = useDiaryAttachments();
@@ -200,22 +198,21 @@ function handleDragOver(e) {
 // ── タイムライン ────────────────────────────────────────────────
 const pageProps = usePage().props;
 const timelineEvents = ref([]);
+const timelineHours = computed(() => diaryTimelineHours(timelineEvents.value, 7, 21));
+const timelineLoadFailed = ref(false);
+let timelineRequest = 0;
 
 async function fetchDayEvents(date) {
     if (!date) return;
+    const request = ++timelineRequest;
     try {
         const userId = pageProps.auth?.user?.id;
-        const resp = await axios.get(route('events.index'), { params: { date, user_id: userId } });
-        timelineEvents.value = (resp.data || []).map((e) => ({
-            id: e.id ?? e.event_id ?? null,
-            title: e.title || e.name || '(無題)',
-            start: e.start,
-            end: e.end || e.start,
-            allDay: !!e.allDay || !!e.all_day || false,
-            color: e.color || e.backgroundColor || '#2563eb',
-        }));
+        const result = await fetchDiaryTimelineEvents(date, userId, props.personalWorkEnabled);
+        if (request !== timelineRequest) return;
+        timelineEvents.value = result.events;
+        timelineLoadFailed.value = result.failed;
     } catch {
-        // サイレントに無視
+        if (request === timelineRequest) timelineLoadFailed.value = true;
     }
 }
 
@@ -359,8 +356,6 @@ function handleEditorReady(editor) {
 const { showToast, showValidationErrors } = useToasts();
 
 const submitWithoutDiary = () => {
-    const selectedWorkEntries = form.work_entries;
-    form.work_entries = [];
     form.start_time = `${form.start_hour}:${form.start_minute}`;
     form.end_time = `${form.end_hour}:${form.end_minute}`;
     form.no_diary = true;
@@ -369,7 +364,7 @@ const submitWithoutDiary = () => {
         onStart: () => {
             try { showToast('送信中...', 'info', 1000); } catch (e) {}
         },
-        onFinish: () => { form.no_diary = false; form.work_entries = selectedWorkEntries; },
+        onFinish: () => { form.no_diary = false; },
         onSuccess: () => {
             clearDraft();
             try { showToast('保存しました', 'success', 1500); } catch (e) {}
@@ -580,7 +575,6 @@ function applyPastDiary(rec) {
                             </div>
                         </div>
                     </div>
-                    <DiaryWorkEntries v-if="personalWorkEnabled" :candidates="workCandidates" v-model="form.work_entries" :errors="form.errors" />
                     <!-- <div class="mb-4">
           <label class="block text-sm font-medium text-gray-700 mb-1">入力内容がここに出ます（HTML）</label>
             <div class="p-2 bg-gray-100 border rounded min-h-[40px]">{{ stripHtml(form.content) }}</div>
@@ -629,11 +623,12 @@ function applyPastDiary(rec) {
             <!-- 当日タイムライン -->
             <div class="mt-6">
                 <label class="mb-2 block text-sm font-medium text-gray-700">当日の予定</label>
+                <p v-if="timelineLoadFailed" class="mb-2 text-sm text-red-700">一部の予定を読み込めませんでした。画面を再読み込みしてください。</p>
                 <TimelineDiary
                     :date="form.date"
                     :events="timelineEvents"
-                    :startHour="7"
-                    :endHour="21"
+                    :startHour="timelineHours.start"
+                    :endHour="timelineHours.end"
                     :editable="true"
                     @update:events="onTimelineUpdate"
                     @open-create="onTimelineOpenCreate"

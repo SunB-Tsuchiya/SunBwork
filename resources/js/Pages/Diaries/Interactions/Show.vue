@@ -1,7 +1,7 @@
 <script setup>
 import TimelineDiary from '@/Components/TimelineDiary.vue';
+import { diaryTimelineHours, fetchDiaryTimelineEvents } from '@/Helpers/diaryTimelineEvents';
 import AppLayout from '@/layouts/AppLayout.vue';
-import axios from 'axios';
 import { computed, onMounted, ref } from 'vue';
 import { route } from 'ziggy-js';
 
@@ -9,6 +9,7 @@ const props = defineProps({
     diary: Object,
     routePrefix: { type: String, default: 'diaries' },
     workRecord: { type: Object, default: null },
+    personalWorkEnabled: { type: Boolean, default: false },
 });
 
 // 残業を「○時間○分」形式に変換
@@ -26,15 +27,15 @@ const isExcessOvertime = computed(() => (props.workRecord?.overtime_minutes ?? 0
 // 勤務記録の開始・終了時刻からタイムライン範囲を決定
 const timelineStartHour = computed(() => {
     const t = props.workRecord?.start_time; // "HH:MM"
-    if (!t) return 8;
-    return Math.max(0, Math.floor(parseInt(t.split(':')[0], 10)) - 1);
+    const defaultStart = t ? Math.max(0, Math.floor(parseInt(t.split(':')[0], 10)) - 1) : 8;
+    return diaryTimelineHours(events.value, defaultStart, 20).start;
 });
 const timelineEndHour = computed(() => {
     const t = props.workRecord?.end_time; // "HH:MM"
-    if (!t) return 20;
-    const h = parseInt(t.split(':')[0], 10);
-    const m = parseInt(t.split(':')[1] ?? '0', 10);
-    return Math.min(24, h + (m > 0 ? 2 : 1)); // 終了時刻 + 余裕
+    const h = t ? parseInt(t.split(':')[0], 10) : 19;
+    const m = t ? parseInt(t.split(':')[1] ?? '0', 10) : 0;
+    const defaultEnd = t ? Math.min(24, h + (m > 0 ? 2 : 1)) : 20;
+    return diaryTimelineHours(events.value, 8, defaultEnd).end;
 });
 
 const comment = ref('');
@@ -166,6 +167,7 @@ function markRead() {
 
 // --- events timetable state for interactions show (read-only) ---
 const events = ref([]);
+const timelineLoadFailed = ref(false);
 
 // helper to format YYYY-MM-DD in app/JST timezone (keep consistent with Diaries/Show.vue)
 function formatJstDate(dateStr) {
@@ -185,20 +187,12 @@ function formatJstDate(dateStr) {
 onMounted(async () => {
     try {
         const date = formatJstDate(props.diary.date);
-        // include the diary owner's user_id so leaders/admins can fetch that user's events
-        const resp = await axios.get(route('events.index'), { params: { date, user_id: props.diary.user_id } });
-        events.value = (resp.data || []).map((e) => ({
-            id: e.id ?? e.event_id ?? e._id ?? null,
-            title: (e.title || e.name || '(無題)').replace(/^【完了】\s*/, ''),
-            start: e.start,
-            end: e.end || e.start,
-            allDay: !!e.allDay || !!e.all_day || false,
-            color: e.color || e.backgroundColor || '#2563eb',
-            description: e.description || e.extendedProps?.description || '',
-        }));
-    } catch (err) {
-        // ignore fetch errors for now
-        console.warn('Failed to load events for diary interaction show', err);
+        const result = await fetchDiaryTimelineEvents(date, props.diary.user_id, props.personalWorkEnabled);
+        events.value = result.events.map((event) => event.readOnly
+            ? event : { ...event, title: event.title.replace(/^【完了】\s*/, '') });
+        timelineLoadFailed.value = result.failed;
+    } catch {
+        timelineLoadFailed.value = true;
     }
 });
 
@@ -387,6 +381,7 @@ async function updateComment() {
                 <!-- 当日の予定（全幅） -->
                 <div>
                     <label class="mb-2 block text-sm font-medium text-gray-700">当日の予定</label>
+                    <p v-if="timelineLoadFailed" class="mb-2 text-sm text-red-700">一部の予定を読み込めませんでした。画面を再読み込みしてください。</p>
                     <TimelineDiary
                         :date="formatJstDate(props.diary.date)"
                         :events="events"

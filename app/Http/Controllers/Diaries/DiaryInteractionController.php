@@ -543,6 +543,8 @@ class DiaryInteractionController extends Controller
             'diary'       => $diaryArray,
             'routePrefix' => $routePrefix,
             'workRecord'  => $workRecordData,
+            'personalWorkEnabled' => (int) $currentUser->id === (int) $diary->user_id
+                && app(\App\Services\PersonalWorkSchedule::class)->available($currentUser),
         ]);
     }
 

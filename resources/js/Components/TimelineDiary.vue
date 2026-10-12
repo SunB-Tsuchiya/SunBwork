@@ -62,19 +62,20 @@
                     <template v-for="ev in localEvents" :key="ev.id">
                         <div
                             v-if="!ev.allDay && ev.start"
-                            class="absolute cursor-pointer overflow-hidden rounded px-2 py-1 text-xs text-white"
-                            :title="ev.title"
+                            class="absolute overflow-hidden rounded px-2 py-1 text-xs"
+                            :class="ev.readOnly ? 'cursor-default' : 'cursor-pointer'"
+                            :title="ev.tooltip || ev.title"
                             :style="{ ...getEventStyleWithOverrides(ev), top: getEventTop(ev) }"
-                            @mousedown.prevent="editable ? startDrag(ev, $event) : null"
+                            @mousedown.prevent="editable && !ev.readOnly ? startDrag(ev, $event) : null"
                             @click.stop.prevent="onEventClick(ev, $event)"
                         >
                             <span
                                 class="absolute left-0 top-0 h-full w-2 cursor-col-resize"
-                                @mousedown.stop.prevent="editable ? startResizeLeft(ev, $event) : null"
+                                @mousedown.stop.prevent="editable && !ev.readOnly ? startResizeLeft(ev, $event) : null"
                             ></span>
                             <span
                                 class="absolute right-0 top-0 h-full w-2 cursor-col-resize"
-                                @mousedown.stop.prevent="editable ? startResizeRight(ev, $event) : null"
+                                @mousedown.stop.prevent="editable && !ev.readOnly ? startResizeRight(ev, $event) : null"
                             ></span>
                             <span
                                 v-if="computeEventStyle(ev)['--clipped-left'] === '1'"
@@ -247,7 +248,8 @@ function computeEventStyle(ev) {
             left: `${leftPx}px`,
             width: `${widthPx}px`,
             background: ev.color || '#2563eb',
-            border: '2px solid rgba(255,255,255,0.7)',
+            color: ev.textColor || '#fff',
+            border: `2px solid ${ev.borderColor || 'rgba(255,255,255,0.7)'}`,
             boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
             position: 'absolute',
             height: '2.25rem',
@@ -295,6 +297,7 @@ function getEventStyleWithOverrides(ev) {
 function onEventClick(ev, mouseEvent) {
     try {
         if (!ev) return;
+        if (ev.readOnly) return;
         if (ev && ev.id && suppressClick.value[ev.id]) {
             delete suppressClick.value[ev.id];
             return;

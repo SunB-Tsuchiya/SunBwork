@@ -25,6 +25,7 @@ function isoDateOnly(dateStr) {
     }
 }
 import TimelineDiary from '@/Components/TimelineDiary.vue';
+import { diaryTimelineHours, fetchDiaryTimelineEvents } from '@/Helpers/diaryTimelineEvents';
 import { workCategories, activityLabel } from '@/Constants/personalWorkActivities';
 import { useDiaryAttachments } from '@/Composables/useDiaryAttachments';
 import { ensureAttachmentUrl, ensureThumbUrl } from '@/Helpers/attachment';
@@ -38,6 +39,7 @@ import { route } from 'ziggy-js';
 const props = defineProps({
     diary: Object,
     workRecord: { type: Object, default: null },
+    personalWorkEnabled: { type: Boolean, default: false },
 });
 
 // 残業を「○時間○分」形式に変換
@@ -52,15 +54,15 @@ const overtimeLabel = computed(() => {
 // タイムライン範囲を勤務記録から決定
 const timelineStartHour = computed(() => {
     const t = props.workRecord?.start_time;
-    if (!t) return 8;
-    return Math.max(0, Math.floor(parseInt(t.split(':')[0], 10)) - 1);
+    const defaultStart = t ? Math.max(0, Math.floor(parseInt(t.split(':')[0], 10)) - 1) : 8;
+    return diaryTimelineHours(events.value, defaultStart, 20).start;
 });
 const timelineEndHour = computed(() => {
     const t = props.workRecord?.end_time;
-    if (!t) return 20;
-    const h = parseInt(t.split(':')[0], 10);
-    const m = parseInt(t.split(':')[1] ?? '0', 10);
-    return Math.min(24, h + (m > 0 ? 2 : 1));
+    const h = t ? parseInt(t.split(':')[0], 10) : 19;
+    const m = t ? parseInt(t.split(':')[1] ?? '0', 10) : 0;
+    const defaultEnd = t ? Math.min(24, h + (m > 0 ? 2 : 1)) : 20;
+    return diaryTimelineHours(events.value, 8, defaultEnd).end;
 });
 
 const editHref = computed(() => {
@@ -111,17 +113,7 @@ async function onTimelineUpdate(payload) {
             endHour: payload.endHour,
             endMinute: payload.endMinute,
         });
-        // refresh events
-        const resp = await axios.get(route('events.index'), { params: { date: payload.date, user_id: props.diary.user_id } });
-        events.value = (resp.data || []).map((e) => ({
-            id: e.id ?? e.event_id ?? e._id ?? null,
-            title: e.title || e.name || '(無題)',
-            start: e.start,
-            end: e.end || e.start,
-            allDay: !!e.allDay || !!e.all_day || false,
-            color: e.color || e.backgroundColor || '#2563eb',
-            description: e.description || e.extendedProps?.description || '',
-        }));
+        await fetchDayEvents(payload.date);
     } catch (err) {
         alert('予定の更新に失敗しました');
     }
@@ -277,6 +269,16 @@ const back = () => {
 
 // --- events timetable state ---
 const events = ref([]);
+const timelineLoadFailed = ref(false);
+async function fetchDayEvents(date) {
+    try {
+        const result = await fetchDiaryTimelineEvents(date, props.diary.user_id, props.personalWorkEnabled);
+        events.value = result.events;
+        timelineLoadFailed.value = result.failed;
+    } catch {
+        timelineLoadFailed.value = true;
+    }
+}
 const showEventModal = ref(false);
 const selectedEvent = ref(null);
 const showSelectModal = ref(false);
@@ -627,25 +629,7 @@ function onBodyClick(e) {
 }
 
 onMounted(async () => {
-    try {
-        // pass only YYYY-MM-DD to backend using the app/JST-aware formatter so the diary's displayed date
-        // (which may differ from the raw ISO UTC date) is used for server queries.
-        const date = formatJstDate(props.diary.date);
-        const resp = await axios.get(route('events.index'), { params: { date, user_id: props.diary.user_id } });
-        // normalize: ensure start/end are present and color fallback
-        events.value = (resp.data || []).map((e) => ({
-            id: e.id ?? e.event_id ?? e._id ?? null,
-            title: e.title || e.name || '(無題)',
-            start: e.start,
-            end: e.end || e.start,
-            allDay: !!e.allDay || !!e.all_day || false,
-            color: e.color || e.backgroundColor || '#2563eb',
-            description: e.description || e.extendedProps?.description || '',
-        }));
-    } catch (err) {
-        // ignore fetch errors silently for now
-        console.warn('Failed to load events for diary show', err);
-    }
+    await fetchDayEvents(formatJstDate(props.diary.date));
     // start attachment polling for any in-progress uploads
     startAttachmentPolling();
 });
@@ -1138,17 +1122,7 @@ async function endDrag(e) {
                 } catch (e) {}
             }, 500);
         } catch (e) {}
-        // refresh events
-        const resp = await axios.get(route('events.index'), { params: { date, user_id: props.diary.user_id } });
-        events.value = (resp.data || []).map((e) => ({
-            id: e.id ?? e.event_id ?? e._id ?? null,
-            title: e.title || e.name || '(無題)',
-            start: e.start,
-            end: e.end || e.start,
-            allDay: !!e.allDay || !!e.all_day || false,
-            color: e.color || e.backgroundColor || '#2563eb',
-            description: e.description || e.extendedProps?.description || '',
-        }));
+        await fetchDayEvents(date);
     } catch (err) {
         alert('予定の更新に失敗しました');
     }
@@ -1236,6 +1210,7 @@ onUnmounted(() => {
                 <!-- タイムライン（内容の下に表示） -->
                 <div>
                     <label class="mb-2 block text-sm font-medium text-gray-700">当日の予定</label>
+                    <p v-if="timelineLoadFailed" class="mb-2 text-sm text-red-700">一部の予定を読み込めませんでした。画面を再読み込みしてください。</p>
                     <TimelineDiary
                         :date="formatJstDate(props.diary.date)"
                         :events="events"
